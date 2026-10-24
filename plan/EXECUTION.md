@@ -46,6 +46,10 @@ Inspect official exports first. Inventory format signatures, schema versions, fi
 
 Done: source/version matrix, field mapping, sample-independent synthetic fixtures, documented limits, and a route to preserve known fields. Do not claim cookie/password/session/extension-data transfer from the presence of URLs or extension IDs.
 
+### MA-003.a: inventory a supplied Markdown sample
+
+Observed one privately supplied export and created an [independent structural fixture](../tests/fixtures/arc-markdown/README.md). First-level Space labels, named second-level groups and ordered URL lists are present. Producer/version markers, Profile identities and tab titles are absent. The `Favorites` label does not establish ownership or distinguish favorite/pin types. Stop at observed structure and an invented counterpart; production parsing, nested-folder coverage and semantic mapping remain open. Confirm the producing action before claiming official-format compatibility.
+
 ## MA-004 — Implement the Rust workspace and commands
 
 Dependencies: agreed workspace behavior contract; MA-003 findings for supported Arc field mappings. MA-002 is required for native browser integration only. The standalone Rust model, commands and preservation path must not wait for a Chromium build or depend on browser/UI libraries.

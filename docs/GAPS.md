@@ -5,7 +5,7 @@ Updated: 2026-10-24. Browser release blockers remain open. Synthetic onboarding 
 | Rank | Gap | Why it leads | Completion evidence |
 | --- | --- | --- | --- |
 | 1 | Foundation acceptance and maintenance capacity unresolved | Build/native interoperation passed; extension lifecycle, runtime boundaries and ownership remain unverified | MA-002 extension/recovery evidence, complete notices and accepted upkeep/signing/budget plan |
-| 2 | Arc export schema and coverage unknown | Migration is urgent and cannot be specified from marketing alone | MA-003 sample inventory, version signatures, synthetic schema examples |
+| 2 | Arc export provenance and semantic coverage incomplete | One Markdown shape is inventoried; producer/version, Favorites scope and nested-folder behavior remain unverified | MA-003 confirmed export route, field mapping and expanded synthetic corpus |
 | 3 | Native animated onboarding remains unverified | First-run quality is an explicit product requirement; [web study](../design/onboarding/README.md) now runs with synthetic fixtures | Review study; integrate shared state and gather native motion, accessibility, performance and user-task evidence |
 | 4 | Workspace semantics and persistence unimplemented | Import, sidebar, onboarding and recovery share this contract | MA-004/005 model, commands, round trip and interruption checks |
 | 5 | No safe import transaction or preservation utility | Users need a usable escape hatch before the complete browser | MA-006 dry run, omissions report, rollback/source-integrity proof |
