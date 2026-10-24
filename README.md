@@ -2,7 +2,7 @@
   <img src="design/brand/assets/myarc-matte.png" alt="myArc logo" width="160">
 </p>
 
-<h1 align="center">myArc. Arc, forever yours.</h1>
+<h1 align="center">myArc, forever yours.</h1>
 
 A browser project for Arc's Spaces, pinned tabs and keyboard workflow, with local, exportable data and optional AI.
 
