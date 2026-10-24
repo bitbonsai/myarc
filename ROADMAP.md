@@ -1,6 +1,6 @@
 # Roadmap
 
-Updated: 2026-10-24. Stage: M0 feasibility. Synthetic onboarding study runs locally; unmodified Chromium build is being exercised. Browser implementation and foundation acceptance remain pending.
+Updated: 2026-10-24. Stage: M0 feasibility. Synthetic onboarding runs locally. Chromium builds and passes a Rust/native bridge experiment on two revisions. Extension lifecycle, export evidence and maintenance acceptance remain open; the complete browser is unimplemented.
 
 ## Delivery strategy
 

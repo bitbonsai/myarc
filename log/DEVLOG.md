@@ -2,6 +2,16 @@
 
 Keep significant outcomes, failures and next actions reproducible. Newest entry first. No private exports, page titles/URLs from real browsing, credentials or raw user transcripts.
 
+## 2026-10-24: Chromium build and bounded Rust/native proof
+
+- MA-002.a: unmodified Chromium `7ae71de816ba32868ff9f974c2716f04ebd9b860` built and launched. The successful resumed segment ran 06:40:26–09:03:03 UTC; full fresh-build time and peak memory/storage remain unmeasured. A synthetic local form and separate-user-data-dir localStorage smoke check passed. This establishes neither full Profile isolation nor private-mode safety.
+- MA-002.b: added a dependency-free transient Rust workspace with validated rename, Cxx/GN bridge and opt-in native Views control. Six core tests passed under Cargo and GN; seven bridge checks include 1,000 ownership cycles. Accessibility activation and focused Space key changed Everyday to Research and back. Keyboard access required `FocusBehavior::ALWAYS`. The complete workspace model and persistence remain unimplemented.
+- MA-002.c: packaged the source/toolbar patch and rebuilt it at the original pin and immediate child `8d208f20744ac6d4ce00cc3f9de6a14a9b8b926d`, without conflicts. Both runs executed six Rust tests and seven C++/Rust checks. The second sync/hooks passed. This PHP test-dependency roll gives limited update-porting evidence; UI rerun on the second rebuild remains pending. External checkout Git identity is separate from this repository's configuration; recorded commits verify both identities as `bitbonsai`.
+- Added pinned standalone Rust tooling, core/patch CI and a payload check. Local format, clippy, six unit tests and dependency guard passed; deliberately stale source was rejected by the payload check. Remote workflow execution remains unverified. Canonical source hashes and scope are in [foundation evidence](../browser/evidence/foundation.json).
+- Extension installation through Chrome Web Store was observed for uBlock Origin Lite `2026.1021.1354`. Discarded a driver reconnection that selected stock Chrome 151. A later disposable profile lacked extension files while native management reported ENABLED; its dashboard returned `net::ERR_FILE_NOT_FOUND`. Cause is unresolved. Function/restart/update/remove acceptance remains open pending a fresh native-launched profile.
+- Licensing/package findings: inventory contains 326 entries and eight unresolved metadata/license errors; generated development credits are a sample page. The ad-hoc component app fails strict bundle verification. Duplicate `ANGLESwapCGLLayer` warnings remain unexplained. No binary is ready for distribution. Owner, backup capacity and recurring budget remain unspecified.
+- Arc UI fixture preparation remains incomplete and produced no verified official export. Private media, browsing captures and local test profiles stay outside the repository. M0 remains open; no production browsing, migration, control-service or security gate was closed by these experiments.
+
 ## 2026-10-24: Self-contained landing page and GitHub Pages
 
 - Followed the requested `claude -p --model fable --effort high` design route. The trace identified `claude-fable-5-1` and invoked `/frontend-design`; the CLI timed out after writing the template and README. Retained its editorial layout, approved brand assets and truthful development-stage copy.

@@ -1,6 +1,6 @@
 # First implementation sequence
 
-Workstreams below remain open. MA-001.a has an executable synthetic motion study; MA-002.a is exercising a pinned upstream build. These slices do not complete native onboarding or foundation acceptance. Each task becomes reviewable changes with evidence. Dates and priorities are in [ROADMAP.md](../ROADMAP.md).
+Workstreams below remain open. MA-001.a has a synthetic motion study; MA-002.a–c establish an unmodified build, a native Rust command and two-revision build/bridge checks. These slices do not complete native onboarding or foundation acceptance. Each task becomes reviewable changes with evidence. Dates and priorities are in [ROADMAP.md](../ROADMAP.md).
 
 These IDs identify workstreams. Break the selected workstream into bounded slices (for example `MA-004.a`) with a concrete outcome, affected boundary and evidence. Follow [behavior contracts](BEHAVIOR-CONTRACTS.md) and [the adapted workflow](../docs/ARTCRAFT-WORKFLOW.md). Standalone core/preservation work does not require a successful Chromium build; browser integration does.
 
@@ -28,7 +28,15 @@ Done: reproducible instructions, machine/build costs and times, extension eviden
 
 ### MA-002.a: unmodified upstream build
 
-In progress. [Pin, commands and run record](../browser/README.md) live under `browser/`; large checkout/logs stay outside the repository. Boundary: unmodified complete Chromium at one exact revision. Acceptance: reproducible successful `chrome` build and launch with a fresh disposable profile. Stop with that evidence or an actionable failure record. Rust/native command, extension lifecycle, second-revision rebase and maintenance decision follow; none is implied by checkout or GN success.
+Verified at `7ae71de816ba32868ff9f974c2716f04ebd9b860`: complete unmodified `chrome` build and disposable-profile launch. [Pin, commands and evidence](../browser/README.md) live under `browser/`; the large checkout/logs remain external. Stop at that bounded result. It does not complete extension, security or maintenance acceptance.
+
+### MA-002.b: one Rust command in native UI
+
+Implemented a dependency-free transient workspace and validated rename command, shared between Cargo and GN. Cxx owns the boundary; a flag-gated Views control invokes it. Six core tests, seven C++/Rust checks and initial accessibility-click/keyboard activation passed. State resets with the toolbar; persistence and the complete MA-004 model are excluded. Stop at native interoperation proof, with broader thread/sanitizer coverage explicit.
+
+### MA-002.c: reproducible patch reapplication
+
+Packaged the owned sources and upstream integration in one patch. It applies without conflicts at the original pin and immediate child `8d208f20744ac6d4ce00cc3f9de6a14a9b8b926d`. Build plus core/bridge checks passed on both, with sync/hooks on the second. This PHP test-dependency roll does not establish representative security-update porting cost. Native UI rerun on the rebuilt second revision remains pending. Extension lifecycle and foundation acceptance stay open.
 
 ## MA-003 — Establish real export coverage
 

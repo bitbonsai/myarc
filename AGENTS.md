@@ -4,7 +4,7 @@
 
 Read [README.md](README.md), [ROADMAP.md](ROADMAP.md), [plan/STATUS.md](plan/STATUS.md), [docs/GAPS.md](docs/GAPS.md), and the task in [plan/EXECUTION.md](plan/EXECUTION.md). Read the relevant architecture and behavioral documents. Explicit user instructions control the current scope; these files do not authorize unrelated external actions.
 
-This repository contains plans and a synthetic web onboarding study. No myarc browser, importer or native onboarding exists. Keep prototype evidence separate from production behavior; see [the study](design/onboarding/README.md) and [foundation experiment](browser/README.md).
+This repository contains plans, a synthetic onboarding study and a small Rust/native Chromium experiment. A complete myarc browser, importer and native onboarding remain unimplemented. Keep prototype evidence separate from production behavior; see [the study](design/onboarding/README.md) and [foundation experiment](browser/README.md).
 
 Use [docs/ARTCRAFT-WORKFLOW.md](docs/ARTCRAFT-WORKFLOW.md) for the adapted working method, [plan/BEHAVIOR-CONTRACTS.md](plan/BEHAVIOR-CONTRACTS.md) for cross-system interactions, and relevant recent entries in [log/DEVLOG.md](log/DEVLOG.md) when resuming an investigation.
 
@@ -61,4 +61,6 @@ Commit publishable `plan/` tasks and decisions. Never commit real browser profil
 
 Run `python3 tools/check_docs.py` from the repository root for relative document links. Run `node --test design/onboarding/state.test.mjs` for storyboard state checks and `python3 tools/check_onboarding.py` for local prototype interactions, focus and recordings. The browser check needs agent-browser/Chrome and ffprobe; it closes agent-browser and Chrome for Testing helpers. Read [study instructions](design/onboarding/README.md) before running it.
 
-These checks do not validate native browsing, import, Rust integration or security. Read [docs/SCORECARD.md](docs/SCORECARD.md) for release evidence still required. The documentation workflow runs only the relative-link check in GitHub Actions; Rust/native/browser gates remain unimplemented.
+Rust checks: `cargo fmt --all -- --check`, `rustfmt --check --edition 2024 browser/foundation/bridge.rs`, `cargo clippy --workspace --all-targets --locked -- -D warnings`, and `cargo test --workspace --locked`. Run `python3 tools/check_foundation_patch.py` after changing the core or foundation sources; regenerate the packaged patch when they differ. The M0 core is dependency-free, enforced by the Rust workflow. That guard needs explicit review when introducing pure-core dependencies.
+
+Standalone and study checks do not validate production browsing, import or security. The external Chromium build and its GN/Cxx checks have a separate [run record](browser/README.md). GitHub workflows now declare document links and standalone Rust/patch checks; native/browser CI remains unavailable. Read [docs/SCORECARD.md](docs/SCORECARD.md) for release evidence still required.

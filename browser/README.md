@@ -1,10 +1,10 @@
 # M0 foundation experiment
 
-Status: investigation in progress. [upstream.json](upstream.json) pins a complete Chromium main-branch feasibility candidate and depot_tools. This is neither an accepted foundation nor a supported release baseline. No myarc browser binary or Rust/native bridge has been verified.
+Status: unmodified Chromium built and launched; a Rust-owned rename command works through a native toolbar test control. The integration builds and passes its core/bridge checks on two upstream revisions. Foundation acceptance remains open. [upstream.json](upstream.json) pins the feasibility candidate and patch; [evidence](evidence/foundation.json) records verified scope and outstanding checks. This development build is not a myarc release.
 
 ## Bounded outcomes
 
-MA-002.a first builds the unmodified `chrome` target at the pinned revision. Stop at a reproducible result or an actionable build blocker. Only after it runs, integrate one real Rust workspace command with a native UI trigger, then reapply that patch on another upstream revision. The full [MA-002 gate](../plan/EXECUTION.md) also needs extension lifecycle, isolation/recovery, licensing and maintenance evidence.
+MA-002.a completed the unmodified `chrome` build and disposable-profile launch. MA-002.b proves one transient Rust workspace command through Cxx and a native Views control. MA-002.c reapplies that patch and runs the integrated checks on a second revision. These bounded slices leave the full [MA-002 gate](../plan/EXECUTION.md) open for extension lifecycle, isolation/recovery, licensing and maintenance evidence.
 
 MA-001.a has an independent [onboarding motion study](../design/onboarding/README.md). It cannot substitute for native build evidence.
 
@@ -49,7 +49,7 @@ autoninja -C out/MyarcM0 -j 8 chrome > "$WORK/build.log" 2>&1
 
 Execute each stage only after the preceding command succeeds. The checked-in [args.gn](args.gn) requests an arm64 release component build without debug symbols or remote execution. It is a development configuration, not signing/update configuration.
 
-Monitor free disk during checkout, hooks and compilation. The first local attempt used a 40 GiB free-space stop reserve, checked every five seconds; this is a local safety policy, not an upstream capacity guarantee. Do not delete unrelated files or disable browser security to finish a build. Build time, peak storage and recurring runner cost remain unknown until measured.
+Monitor free disk during checkout, hooks and compilation. The first local attempt used a 40 GiB free-space stop reserve, checked every five seconds; this is a local safety policy, not an upstream capacity guarantee. Do not delete unrelated files or disable browser security to finish a build. The successful resumed baseline segment took 2h 22m 37s. A later snapshot measured 37.6 GiB for source plus build output and 0.7 GiB for depot_tools. Fresh-build total time, peak storage/RAM and recurring runner cost remain unmeasured.
 
 Once compilation succeeds, launch with a new disposable profile outside the repository:
 
@@ -60,6 +60,42 @@ out/MyarcM0/Chromium.app/Contents/MacOS/Chromium \
 
 Do not point the experiment at an existing Chrome, Arc or Helium profile. Installation of an existing browser is not evidence that this source build works.
 
+## Build the Rust/native experiment
+
+From this repository, standalone checks need no Chromium checkout:
+
+```sh
+cargo fmt --all -- --check
+rustfmt --check --edition 2024 browser/foundation/bridge.rs
+cargo clippy --workspace --all-targets --locked -- -D warnings
+cargo test --workspace --locked
+python3 tools/check_foundation_patch.py
+```
+
+Cargo uses pinned Rust 1.96.1. Chromium GN uses its fetched toolchain. The same dependency-free [core source](../crates/workspace/src/lib.rs) is packaged in the patch; the freshness check rejects drift between that payload and the canonical repository files. The GitHub workflow covers standalone checks, not the external Chromium build.
+
+After the unmodified build, use a clean external checkout at the pinned base. Preserve unrelated changes and existing branches. The patch includes the native integration, owned source files and MIT notice:
+
+```sh
+SRC="$WORK/chromium/src"
+git -C "$SRC" config --local user.name bitbonsai
+git -C "$SRC" config --local user.email 44185+bitbonsai@users.noreply.github.com
+git -C "$SRC" switch -c myarc/m0-foundation "$REV"
+git -C "$SRC" am "$REPO/browser/patches/0001-workspace-foundation.patch"
+cd "$SRC"
+gn gen out/MyarcM0
+autoninja -C out/MyarcM0 -j 8 chrome myarc:bridge_check myarc:workspace_unittests
+out/MyarcM0/bridge_check
+out/MyarcM0/workspace_unittests
+out/MyarcM0/Chromium.app/Contents/MacOS/Chromium \
+  --user-data-dir="$WORK/native-test-profile" \
+  --no-first-run --no-default-browser-check --myarc-foundation
+```
+
+The flag adds `Test Space: Everyday`. Activating it runs `rename_space` in Rust and changes the label to Research, then back on the next activation. Each toolbar owns one transient workspace; closing it discards that state. Browser Spaces, import and persistence remain unimplemented. The control is omitted without the flag.
+
+For reapplication, select a new branch at `8d208f20744ac6d4ce00cc3f9de6a14a9b8b926d`, apply the same patch, then run dependency sync/hooks, GN generation and the build/check commands again. Keep the root checkout unmanaged during sync, as in the generated `.gclient`, so sync preserves the applied patch. Verify the checked-out commit and identity before compiling. The recorded run reused the output directory; it was an incremental rebuild, not a second fresh-output timing measurement. This immediate-child revision rolls a PHP test dependency and is a weak measure of future browser/security-update porting cost.
+
 ## Run record, 2026-10-24
 
 - Host preflight: macOS 26.7, arm64, 48 GiB RAM, 15 logical CPUs, APFS, Xcode 27.0 (`27A266a`), macOS SDK 27.0. Initial available disk was approximately 220 GiB. Signing identities and credentials were not inspected.
@@ -68,12 +104,17 @@ Do not point the experiment at an existing Chrome, Arc or Helium profile. Instal
 - Installed Git LFS 3.8.1 and resumed the same pinned sync. Dependency sync and upstream hooks passed. First GN invocation failed because pinned depot_tools lacked bootstrapped Python (`python3_bin_reldir.txt not found`). Ran its supported `ensure_bootstrap` without updating the pin, then generation passed.
 - First build scheduled at 06:36:24 UTC and failed before compilation because LiteRT's earlier failed checkout had no valid HEAD and lacked `tflite/converter/schema/schema.fbs`. A direct repair then reached the mirror's LFS endpoint, which returned HTTP 405. Restored only this generated dependency at its pinned revision with process-scoped `GIT_LFS_SKIP_SMUDGE=1`; its Git tree is clean, required source exists, and generated Ninja files contain no references to its prebuilt-library paths. No global LFS configuration or upstream source was changed.
 - Second build completed 1,155 steps before ANGLE failed on missing Metal Toolchain. Apple's `xcodebuild -downloadComponent MetalToolchain` installed component `27A266a`; `xcrun --find metal` then succeeded. Incremental build resumed at 06:40 UTC with eight jobs.
-- Completion and peak storage remain unmeasured. Local stage logs remain outside the public tree. Follow the active stage before retrying; never start a second sync/build against this checkout.
-- No clean build result, extension install/use/restart/update/remove, native-message case, Rust bridge, rebase, profile/private-mode isolation, renderer recovery or signed update has passed yet. Maintenance owner, backup runner and ongoing budget remain unspecified. Foundation acceptance stays open.
+- The resumed unmodified build passed at 09:03:03 UTC after starting at 06:40:26 UTC. Launched the resulting Chrome 158 binary and exercised a synthetic local form. A saved localStorage value survived reload and was absent from a separate user-data directory. This is a narrow smoke check, not browser-Profile/private-mode isolation evidence.
+- Initial native integration passed six core tests under Cargo and GN, seven C++/Rust checks including 1,000 construction/rename/destruction cycles, and an accessibility click followed by focused Space-key activation of the toolbar control. Keyboard access needed explicit `FocusBehavior::ALWAYS`. No sanitizer or cross-thread violation test was run.
+- The packaged patch applied without conflicts at both pins. GN generation, `chrome`, six GN Rust tests and seven bridge checks passed on each. Dependency sync/hooks passed after the second application. The native UI sequence has not yet been repeated after that rebuild. Exact source commits, hashes and limits are in [the evidence record](evidence/foundation.json).
+- Chrome Web Store installation of uBlock Origin Lite `2026.1021.1354`, ID `ddkjiahejlhfcafbddmgiahcphecmpfh`, was observed. Functional/lifecycle acceptance remains unverified: driver reconnection first selected stock Chrome 151, invalidating those results; later the disposable profile lacked extension files while native management still reported ENABLED. Its dashboard returned `net::ERR_FILE_NOT_FOUND`. Cause is unresolved; retest with a fresh native-launched profile before concluding anything about compatibility.
+- Launch emits a duplicate `ANGLESwapCGLLayer` Objective-C class warning from two component libraries. No safety conclusion follows from successful launch. Private-mode/profile boundaries, renderer recovery, native messaging and signed updates remain untested. Maintenance owner, backup runner and budget remain unspecified.
 
 ## Rust and page-control findings
 
-The pinned [Rust guide](https://chromium.googlesource.com/chromium/src/+/7ae71de816ba32868ff9f974c2716f04ebd9b860/docs/rust/README.md) documents `rust_static_library` and Cxx; FFI guidance identifies Cxx as the standard bridge and describes current Crubit limitations. Select Cxx for the initial experiment, subject to actual GN/build proof. Keep the core source reusable under Cargo and GN, with FFI isolated and no unwinding across it. No bridge code is claimed here.
+The pinned [Rust guide](https://chromium.googlesource.com/chromium/src/+/7ae71de816ba32868ff9f974c2716f04ebd9b860/docs/rust/README.md) documents `rust_static_library` and Cxx. The experiment now uses that route with upstream Cxx 1.0.202. Safe core code forbids unsafe. Cxx-generated interoperation is isolated in the GN bridge target.
+
+C++ owns a `rust::Box` for the control's lifetime. Borrowed strings last only through the synchronous call; results own their strings. Names are limited to 128 UTF-8 bytes, with explicit validation errors and no mutation on rejection. Views callbacks stay on the UI sequence, with debug sequence assertions. There is no asynchronous work or cancellation queue in this bounded command. It has no explicit panic path; this is not a general thread-safety, sanitizer or durability proof.
 
 For MA-011, inspected these upstream interfaces at the same revision:
 
@@ -87,6 +128,10 @@ This is source-level investigation only. Agent-browser's CDP-based test driver v
 
 ## Export and maintenance blockers
 
-MA-003 has zero consented official export samples available to this task. No private profile was opened. Platform/version, official export route, file signature, schema version, field mapping and omissions remain unverified. The motion fixtures are invented workspace content, not Arc-format fixtures. Next step: obtain one user-selected export with explicit permission and version/route metadata, inspect locally, then create independent synthetic equivalents. Follow [migration boundaries](../docs/MIGRATION.md).
+MA-003 still has no verified official export. Consented local UI work in a user-created Arc test Profile created synthetic Spaces, but automation has not established a repeatable pin/export sequence. Screenshots and reference media remain private and outside the repository. File signature, schema version, field mapping and omissions remain unknown. The motion fixtures are invented workspace content, not Arc-format fixtures. Obtain an official export within the consented Profile scope, inspect it privately, then create independent synthetic counterparts. Follow [migration boundaries](../docs/MIGRATION.md).
 
-Before accepting the foundation, identify security triage and signing/update owners, primary/backup build capacity, storage/artifact costs and absence coverage. Do not infer funding or ownership from an available workstation. Inventory Chromium's `LICENSE` and applicable third-party notices after dependency sync; permissive licensing of this small repository does not license the whole browser. Helium, store access, native messaging, DRM and codecs remain unevaluated.
+The [dependency/license inventory](evidence/dependency-licenses.json) contains 326 metadata entries discovered for `//chrome:chrome`, including optional version/revision fields. It is incomplete: eight metadata/license errors cover Catapult, Crashpad's nested zlib, Perfetto proto directories, Rust/toolchain wrappers and SwiftShader dependencies. The discovered graph includes build tooling; exact shipped closure and obligations need review. Chromium's development credits are a sample page by default. Set `generate_about_credits=true` for real notices, inspect collector errors and verify completeness before packaging; successful generation alone can omit metadata failures.
+
+The current component app has an ad-hoc linker signature, no team identifier or sealed resources, and fails strict bundle verification with `code has no resources but signature indicates they must be present`. It is a local development build, unsuitable for distribution. Signing/notarization and authenticated update rehearsal remain open; signing identities were not inspected.
+
+Before accepting the foundation, identify security triage and signing/update owners, primary/backup build capacity, recurring costs and absence coverage. An available workstation establishes neither funding nor ownership. Upstream licenses remain separate from this repository's MIT license. Helium, native messaging, DRM and codecs remain unevaluated.

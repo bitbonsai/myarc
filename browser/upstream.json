@@ -6,5 +6,5 @@
   "depotToolsRepository": "https://chromium.googlesource.com/chromium/tools/depot_tools.git",
   "depotToolsRevision": "dbc99f8b5b88e43a2b907d8ddd93c269d24c287e",
   "target": "mac-arm64",
-  "patches": []
+  "patches": ["patches/0001-workspace-foundation.patch"]
 }

@@ -10,7 +10,7 @@ The goal is familiar everyday browsing, including the sidebar, Spaces, keyboard 
 
 AI is an optional layer, off by default. The plan supports models running on your machine, your own API keys (BYOK), or an optional paid hosted service. You choose what a provider can access. Pages won't be uploaded in the background, and hosted features won't be required for local browsing.
 
-**Foundation experiment in progress.** An original [onboarding motion study](design/onboarding/README.md) runs locally with synthetic data. The browser, importer and native onboarding remain unimplemented.
+**Foundation experiment in progress.** A compiled Chromium candidate runs a [Rust-backed native test control](browser/README.md), with build/bridge checks passing on two upstream revisions. An original [onboarding motion study](design/onboarding/README.md) runs with synthetic data. The complete browser, importer and native onboarding remain unimplemented.
 
 `myArc` is a working name. This project is independent of The Browser Company and Atlassian.
 
@@ -72,4 +72,6 @@ Continue the pinned [Chromium foundation experiment](browser/README.md) and revi
 
 Read [AGENTS.md](AGENTS.md) and [CONTRIBUTING.md](CONTRIBUTING.md). Current documents and original tooling are MIT licensed; future upstream code retains its own notices and license obligations. A chosen browser foundation must receive a separate license review before integration or distribution.
 
-Run `python3 tools/check_docs.py` for the same relative-link check used by the documentation CI. Run `node --test design/onboarding/state.test.mjs` for study state tests; [study instructions](design/onboarding/README.md) cover browser-driven checks and recordings. Native browser/Rust verification remains pending.
+Run `python3 tools/check_docs.py` for relative links. Standalone Rust checks are `cargo fmt --all -- --check`, `cargo clippy --workspace --all-targets --locked -- -D warnings` and `cargo test --workspace --locked`. Run `python3 tools/check_foundation_patch.py` to check the packaged source payload. The [foundation recipe](browser/README.md) covers GN/Cxx checks and their limits.
+
+Run `node --test design/onboarding/state.test.mjs` for study state tests; [study instructions](design/onboarding/README.md) cover browser-driven checks and recordings. These checks establish experimental behavior, not production-browser readiness.

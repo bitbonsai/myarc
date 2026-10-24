@@ -1,10 +1,10 @@
 # Ranked work and blockers
 
-Updated: 2026-10-24. Browser release blockers remain open. A synthetic onboarding study now supplies design evidence.
+Updated: 2026-10-24. Browser release blockers remain open. Synthetic onboarding and a two-revision Rust/native build experiment now supply bounded evidence.
 
 | Rank | Gap | Why it leads | Completion evidence |
 | --- | --- | --- | --- |
-| 1 | No proven browser foundation or maintenance capacity | A UI prototype cannot satisfy extension/security promises | MA-002 decision, build logs, extension run, rebase and cost record |
+| 1 | Foundation acceptance and maintenance capacity unresolved | Build/native interoperation passed; extension lifecycle, runtime boundaries and ownership remain unverified | MA-002 extension/recovery evidence, complete notices and accepted upkeep/signing/budget plan |
 | 2 | Arc export schema and coverage unknown | Migration is urgent and cannot be specified from marketing alone | MA-003 sample inventory, version signatures, synthetic schema examples |
 | 3 | Native animated onboarding remains unverified | First-run quality is an explicit product requirement; [web study](../design/onboarding/README.md) now runs with synthetic fixtures | Review study; integrate shared state and gather native motion, accessibility, performance and user-task evidence |
 | 4 | Workspace semantics and persistence unimplemented | Import, sidebar, onboarding and recovery share this contract | MA-004/005 model, commands, round trip and interruption checks |

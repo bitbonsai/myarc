@@ -1,0 +1,3947 @@
+{
+  "schemaVersion": 1,
+  "upstreamRevision": "8d208f20744ac6d4ce00cc3f9de6a14a9b8b926d",
+  "integrationRevision": "3e117efa80cec1c4e1e6fbfdf44edeb087a279a5",
+  "target": "//chrome:chrome",
+  "collector": "Chromium licenses._DiscoverMetadatas, shipped_only=True, optional Version/Revision fields enabled",
+  "complete": false,
+  "metadataErrors": [
+    "Error: missing third party metadata file or licenses.py SPECIAL_CASES entry in third_party/catapult",
+    "",
+    "Errors in third_party/crashpad/crashpad/third_party/zlib/README.crashpad:",
+    " License file not found for third_party/crashpad/crashpad/third_party/zlib/README.crashpad>>zlib. Either add a file named LICENSE, import upstream's COPYING if available, or add a 'License File:' line to README.chromium with the appropriate paths.",
+    "",
+    "Error: missing third party metadata file or licenses.py SPECIAL_CASES entry in third_party/perfetto/protos/third_party/android",
+    "",
+    "Error: missing third party metadata file or licenses.py SPECIAL_CASES entry in third_party/perfetto/protos/third_party/chromium",
+    "",
+    "Error: missing third party metadata file or licenses.py SPECIAL_CASES entry in third_party/rust",
+    "",
+    "Error: missing third party metadata file or licenses.py SPECIAL_CASES entry in third_party/rust-toolchain/lib/third_party/crubit",
+    "",
+    "Error: missing third party metadata file or licenses.py SPECIAL_CASES entry in third_party/swiftshader/third_party/llvm-10.0",
+    "",
+    "Error: missing third party metadata file or licenses.py SPECIAL_CASES entry in third_party/swiftshader/third_party/marl"
+  ],
+  "entries": [
+    {
+      "Name": "The Chromium Project",
+      "Version": null,
+      "Revision": null,
+      "URL": "https://www.chromium.org",
+      "License": "BSD-3-Clause",
+      "License File": [
+        "LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": ""
+    },
+    {
+      "Name": "2-dim General Purpose FFT (Fast Fourier/Cosine/Sine Transform) Package",
+      "Version": "2006/12/28",
+      "Revision": null,
+      "URL": "http://www.kurims.kyoto-u.ac.jp/~ooura/fft.html",
+      "License": "FFT2D",
+      "License File": [
+        "third_party/fft2d/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/fft2d"
+    },
+    {
+      "Name": "@bufbuild/protobuf",
+      "Version": "2.2.5",
+      "Revision": null,
+      "URL": "https://www.npmjs.com/package/@bufbuild/protobuf",
+      "License": "Apache-2.0",
+      "License File": [
+        "third_party/node/Apache-LICENSE-2.0.txt"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/node"
+    },
+    {
+      "Name": "@puppeteer/replay",
+      "Version": "4.0.2",
+      "Revision": "23ab6bc760bc6982d0dcbf3f832a2a7d54571f72",
+      "URL": "https://github.com/puppeteer/replay",
+      "License": "Apache-2.0",
+      "License File": [
+        "third_party/devtools-frontend/src/front_end/third_party/puppeteer-replay/package/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/devtools-frontend/src/front_end/third_party/puppeteer-replay"
+    },
+    {
+      "Name": "@vscode/web-custom-data",
+      "Version": "0.5.2",
+      "Revision": "79f0e53d9ade00eb00eda53016edb637a809ec1f",
+      "URL": "https://github.com/microsoft/vscode-custom-data",
+      "License": "MIT",
+      "License File": [
+        "third_party/devtools-frontend/src/front_end/third_party/vscode.web-custom-data/package/LICENSE.md"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/devtools-frontend/src/front_end/third_party/vscode.web-custom-data"
+    },
+    {
+      "Name": "Abseil",
+      "Version": "N/A",
+      "Revision": "f55358c60f517763307c09ae57c3eadb6d23985e",
+      "URL": "https://github.com/abseil/abseil-cpp",
+      "License": "Apache-2.0",
+      "License File": [
+        "third_party/abseil-cpp/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/abseil-cpp"
+    },
+    {
+      "Name": "Acorn, a tiny, fast JavaScript parser written in JavaScript.",
+      "Version": "8.10.0",
+      "Revision": "8da1fdd1918c9a9a5748501017262ce18bb2f2cc",
+      "URL": "https://github.com/acornjs/acorn",
+      "License": "MIT",
+      "License File": [
+        "third_party/devtools-frontend/src/front_end/third_party/acorn/package/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/devtools-frontend/src/front_end/third_party/acorn"
+    },
+    {
+      "Name": "adler2",
+      "Version": "2.0.1",
+      "Revision": "89a031a0f42eeff31c70dc598b398cbf31f1680f",
+      "URL": "https://crates.io/crates/adler2",
+      "License": "Apache-2.0",
+      "License File": [
+        "third_party/rust/chromium_crates_io/vendor/adler2-v2/LICENSE-APACHE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/rust/adler2/v2"
+    },
+    {
+      "Name": "Alliance for Open Media Video Codec",
+      "Version": "N/A",
+      "Revision": "8f126544519961bb3d5afe83455f4caf5d312d05",
+      "URL": "https://aomedia.googlesource.com/aom/",
+      "License": "Alliance-for-Open-Media-Patent, BSD-2-Clause",
+      "License File": [
+        "third_party/libaom/source/libaom/LICENSE",
+        "third_party/libaom/source/libaom/PATENTS"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/libaom"
+    },
+    {
+      "Name": "ANGLE",
+      "Version": "N/A",
+      "Revision": "DEPS",
+      "URL": "http://angleproject.org",
+      "License": "BSD-3-Clause",
+      "License File": [
+        "third_party/angle/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/angle"
+    },
+    {
+      "Name": "Anonymous Tokens",
+      "Version": "N/A",
+      "Revision": "1ae8df5e40bab28959cc182c2c0d88923059e278",
+      "URL": "https://github.com/google/anonymous-tokens",
+      "License": "Apache-2.0",
+      "License File": [
+        "third_party/anonymous_tokens/src/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/anonymous_tokens"
+    },
+    {
+      "Name": "anyhow",
+      "Version": "1.0.104",
+      "Revision": "1dbe1862aae650423e3361fbd20b7d17c5109cc3",
+      "URL": "https://crates.io/crates/anyhow",
+      "License": "Apache-2.0",
+      "License File": [
+        "third_party/rust/chromium_crates_io/vendor/anyhow-v1/LICENSE-APACHE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/rust/anyhow/v1"
+    },
+    {
+      "Name": "ARM_NEON_2_x86_SSE",
+      "Version": "N/A",
+      "Revision": "183fc88bcb90dbfaefba33a292eae8a5ce94bd67",
+      "URL": "https://github.com/intel/ARM_NEON_2_x86_SSE",
+      "License": "BSD-Source-Code",
+      "License File": [
+        "third_party/neon_2_sse/src/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/neon_2_sse"
+    },
+    {
+      "Name": "array-init",
+      "Version": "2.1.0",
+      "Revision": "60635047ab2800832319829840c68df03c39945b",
+      "URL": "https://crates.io/crates/array-init",
+      "License": "Apache-2.0",
+      "License File": [
+        "third_party/rust/chromium_crates_io/vendor/array-init-v2/LICENSE-APACHE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/rust/array_init/v2"
+    },
+    {
+      "Name": "base64",
+      "Version": "0.22.1",
+      "Revision": "e14400697453bcc85997119b874bc03d9601d0af",
+      "URL": "https://crates.io/crates/base64",
+      "License": "Apache-2.0",
+      "License File": [
+        "third_party/rust/chromium_crates_io/vendor/base64-v0_22/LICENSE-APACHE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/rust/base64/v0_22"
+    },
+    {
+      "Name": "bitflags",
+      "Version": "2.13.2",
+      "Revision": "80ce9b545acb0bd42150695fc351889cac1d8eb4",
+      "URL": "https://crates.io/crates/bitflags",
+      "License": "Apache-2.0",
+      "License File": [
+        "third_party/rust/chromium_crates_io/vendor/bitflags-v2/LICENSE-APACHE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/rust/bitflags/v2"
+    },
+    {
+      "Name": "Blackmagic DeckLink SDK - Mac",
+      "Version": "10.7.0",
+      "Revision": null,
+      "URL": "http://software.blackmagicdesign.com/DeckLink/v10.7/Blackmagic_DeckLink_SDK_10.7.zip",
+      "License": "BSL-1.0",
+      "License File": [
+        "third_party/decklink/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/decklink"
+    },
+    {
+      "Name": "BoringSSL",
+      "Version": "N/A",
+      "Revision": "8f77af2e983b73df4f018e2a141450d005f5587b",
+      "URL": "https://boringssl.googlesource.com/boringssl",
+      "License": "Apache-2.0, BSD-3-Clause",
+      "License File": [
+        "third_party/boringssl/src/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/boringssl"
+    },
+    {
+      "Name": "BoringSSL",
+      "Version": null,
+      "Revision": null,
+      "URL": "https://boringssl.googlesource.com/boringssl/",
+      "License": "Apache-2.0, BSD-3-Clause",
+      "License File": [
+        "third_party/boringssl/src/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/openscreen/src/third_party/boringssl"
+    },
+    {
+      "Name": "Brotli",
+      "Version": "cfa184a997ac19454d5a3ae97f6d600aac2445a6",
+      "Revision": "cfa184a997ac19454d5a3ae97f6d600aac2445a6",
+      "URL": "https://github.com/google/brotli",
+      "License": "MIT",
+      "License File": [
+        "third_party/brotli/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/brotli"
+    },
+    {
+      "Name": "bytemuck",
+      "Version": "1.25.2",
+      "Revision": "f363643e951a7ac9e4b9921de982f2b0918902e3",
+      "URL": "https://crates.io/crates/bytemuck",
+      "License": "Apache-2.0",
+      "License File": [
+        "third_party/rust/chromium_crates_io/vendor/bytemuck-v1/LICENSE-APACHE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/rust/bytemuck/v1"
+    },
+    {
+      "Name": "bytemuck_derive",
+      "Version": "1.12.1",
+      "Revision": "839ee557dd9b1ac5a0b0155cabba71f96b4ccd06",
+      "URL": "https://crates.io/crates/bytemuck_derive",
+      "License": "Apache-2.0",
+      "License File": [
+        "third_party/rust/chromium_crates_io/vendor/bytemuck_derive-v1/LICENSE-APACHE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/rust/bytemuck_derive/v1"
+    },
+    {
+      "Name": "byteorder",
+      "Version": "1.5.0",
+      "Revision": "ec068eefa042d494475db125c4b034bd8e9e34dd",
+      "URL": "https://crates.io/crates/byteorder",
+      "License": "MIT",
+      "License File": [
+        "third_party/rust/chromium_crates_io/vendor/byteorder-v1/LICENSE-MIT"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/rust/byteorder/v1"
+    },
+    {
+      "Name": "byteorder-lite",
+      "Version": "0.1.0",
+      "Revision": "7d44da06a48fe10d7e23efd9a932d18a7a2def63",
+      "URL": "https://crates.io/crates/byteorder-lite",
+      "License": "MIT",
+      "License File": [
+        "third_party/rust/chromium_crates_io/vendor/byteorder-lite-v0_1/LICENSE-MIT"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/rust/byteorder_lite/v0_1"
+    },
+    {
+      "Name": "C++ port of zxcvbn, an advanced password strength estimation library.",
+      "Version": "N/A",
+      "Revision": "6559806fc0c1671aa2d77dfc66e1d4784a57beaa",
+      "URL": "https://thelig.ht/code/zxcvbn-cpp",
+      "License": "MIT",
+      "License File": [
+        "third_party/zxcvbn-cpp/LICENSE.txt"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/zxcvbn-cpp"
+    },
+    {
+      "Name": "calendrical_calculations",
+      "Version": "0.2.4",
+      "Revision": "c9fac4e625ccb2c6a7aa35079fff9709db4385ac",
+      "URL": "https://crates.io/crates/calendrical_calculations",
+      "License": "Apache-2.0",
+      "License File": [
+        "third_party/rust/chromium_crates_io/vendor/calendrical_calculations-v0_2/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/rust/calendrical_calculations/v0_2"
+    },
+    {
+      "Name": "cfg-if",
+      "Version": "1.0.5",
+      "Revision": "8b0a2b0fc1fa3b3741b9e72895f390cf499fe36f",
+      "URL": "https://crates.io/crates/cfg-if",
+      "License": "Apache-2.0",
+      "License File": [
+        "third_party/rust/chromium_crates_io/vendor/cfg-if-v1/LICENSE-APACHE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/rust/cfg_if/v1"
+    },
+    {
+      "Name": "CityHash",
+      "Version": "1.1.1",
+      "Revision": "8af9b8c",
+      "URL": "https://github.com/google/cityhash",
+      "License": "MIT",
+      "License File": [
+        "base/third_party/cityhash/COPYING"
+      ],
+      "Shipped": "yes",
+      "dir": "base/third_party/cityhash"
+    },
+    {
+      "Name": "CityHash",
+      "Version": "1.0.3",
+      "Revision": "00b9287e8c1255b5922ef90e304d5287361b2c2a",
+      "URL": "https://github.com/google/cityhash",
+      "License": "MIT",
+      "License File": [
+        "base/third_party/cityhash_v103/COPYING"
+      ],
+      "Shipped": "yes",
+      "dir": "base/third_party/cityhash_v103"
+    },
+    {
+      "Name": "CodeMirror 5",
+      "Version": "5.61.0",
+      "Revision": "eac70bb1a31a08201e5705c788cd72e6283958f0",
+      "URL": "https://github.com/codemirror/CodeMirror/",
+      "License": "MIT",
+      "License File": [
+        "third_party/devtools-frontend/src/front_end/third_party/codemirror/package/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/devtools-frontend/src/front_end/third_party/codemirror"
+    },
+    {
+      "Name": "CodeMirror 6",
+      "Version": "0.19.0",
+      "Revision": null,
+      "URL": "https://github.com/codemirror/CodeMirror.next/",
+      "License": "MIT",
+      "License File": [
+        "third_party/devtools-frontend/src/front_end/third_party/codemirror.next/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/devtools-frontend/src/front_end/third_party/codemirror.next"
+    },
+    {
+      "Name": "codespan-reporting",
+      "Version": "0.13.1",
+      "Revision": "ef354877a16c83e678051830b260a8f9a53778bd",
+      "URL": "https://crates.io/crates/codespan-reporting",
+      "License": "Apache-2.0",
+      "License File": [
+        "third_party/rust/chromium_crates_io/vendor/codespan-reporting-v0_13/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/rust/codespan_reporting/v0_13"
+    },
+    {
+      "Name": "Compact Encoding Detection",
+      "Version": "2f40a850bcc5d6f7c1bfa02dbf42ad19d8220dc0",
+      "Revision": null,
+      "URL": "https://github.com/google/compact_enc_det",
+      "License": "Apache-2.0",
+      "License File": [
+        "third_party/ced/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/ced"
+    },
+    {
+      "Name": "Compact Language Detector v3",
+      "Version": "N/A",
+      "Revision": "b48dc46512566f5a2d41118c8c1116c4f96dc661",
+      "URL": "https://github.com/google/cld3",
+      "License": "Apache-2.0",
+      "License File": [
+        "third_party/cld_3/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/cld_3"
+    },
+    {
+      "Name": "Core ML Tools",
+      "Version": "9.0",
+      "Revision": "428d4b2658dfc44194f27f4f36870751be402ff7",
+      "URL": "https://github.com/apple/coremltools",
+      "License": "BSD-3-Clause",
+      "License File": [
+        "third_party/coremltools/mlmodel/format/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/coremltools"
+    },
+    {
+      "Name": "core_maths",
+      "Version": "0.1.1",
+      "Revision": "d8ea96acac3893ad9a7e16cd7526936fbfc51021",
+      "URL": "https://crates.io/crates/core_maths",
+      "License": "MIT",
+      "License File": [
+        "third_party/rust/chromium_crates_io/vendor/core_maths-v0_1/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/rust/core_maths/v0_1"
+    },
+    {
+      "Name": "cpuinfo",
+      "Version": "N/A",
+      "Revision": "66ee79c038d70dad9f08705b2c9b3e58f6d8f512",
+      "URL": "https://github.com/pytorch/cpuinfo",
+      "License": "BSD-2-Clause",
+      "License File": [
+        "third_party/cpuinfo/src/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/cpuinfo"
+    },
+    {
+      "Name": "CrabbyAvif - Library for decoding AVIF files.",
+      "Version": "N/A",
+      "Revision": "38a3ebe85acdf80ff208c177b7e54ef80b43f9e5",
+      "URL": "https://github.com/webmproject/CrabbyAvif",
+      "License": "Apache-2.0",
+      "License File": [
+        "third_party/crabbyavif/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/crabbyavif"
+    },
+    {
+      "Name": "Crashpad",
+      "Version": "N/A",
+      "Revision": "677b9e33a269d8ddcf6ad21344e43f6caec4786f",
+      "URL": "https://chromium.googlesource.com/crashpad/crashpad",
+      "License": "Apache-2.0",
+      "License File": [
+        "third_party/crashpad/crashpad/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/crashpad"
+    },
+    {
+      "Name": "CRC32C",
+      "Version": "1.0.7.git-5998f8451548244de8cde7fab387a550e7c4497d",
+      "Revision": "2bbb3be42e20a0e6c0f7b39dc07dc863d9ffbc07",
+      "URL": "https://github.com/google/crc32c",
+      "License": "BSD-3-Clause",
+      "License File": [
+        "third_party/crc32c/src/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/crc32c"
+    },
+    {
+      "Name": "crc32fast",
+      "Version": "1.5.2",
+      "Revision": "7eb0b8a2c9b246d27dc4cb5a53d3fc3b43a4bb83",
+      "URL": "https://crates.io/crates/crc32fast",
+      "License": "Apache-2.0",
+      "License File": [
+        "third_party/rust/chromium_crates_io/vendor/crc32fast-v1/LICENSE-APACHE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/rust/crc32fast/v1"
+    },
+    {
+      "Name": "CSP Evaluator Core Library, a tool that allows developers to check if a Content Security Policy (CSP) serves as mitigation against XSS attacks",
+      "Version": "1.1.1",
+      "Revision": null,
+      "URL": "https://www.npmjs.com/package/csp_evaluator",
+      "License": "Apache-2.0",
+      "License File": [
+        "third_party/devtools-frontend/src/front_end/third_party/csp_evaluator/package/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/devtools-frontend/src/front_end/third_party/csp_evaluator"
+    },
+    {
+      "Name": "cxx",
+      "Version": "1.0.202",
+      "Revision": "983982c5fd5584a5391ae46877e952118e431f73",
+      "URL": "https://crates.io/crates/cxx",
+      "License": "Apache-2.0",
+      "License File": [
+        "third_party/rust/chromium_crates_io/vendor/cxx-v1/LICENSE-APACHE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/rust/cxx/v1"
+    },
+    {
+      "Name": "cxxbridge-macro",
+      "Version": "1.0.202",
+      "Revision": "983982c5fd5584a5391ae46877e952118e431f73",
+      "URL": "https://crates.io/crates/cxxbridge-macro",
+      "License": "Apache-2.0",
+      "License File": [
+        "third_party/rust/chromium_crates_io/vendor/cxxbridge-macro-v1/LICENSE-APACHE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/rust/cxxbridge_macro/v1"
+    },
+    {
+      "Name": "d3",
+      "Version": "7.8.4",
+      "Revision": "37b1960e0af52d12bc7bbea2ed932ea954c36d14",
+      "URL": "https://github.com/d3/d3",
+      "License": "ISC",
+      "License File": [
+        "third_party/d3/src/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/d3"
+    },
+    {
+      "Name": "dav1d is an AV1 decoder :)",
+      "Version": "master",
+      "Revision": null,
+      "URL": "https://code.videolan.org/videolan/dav1d",
+      "License": "BSD-2-Clause",
+      "License File": [
+        "third_party/dav1d/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/dav1d"
+    },
+    {
+      "Name": "Dawn",
+      "Version": "N/A",
+      "Revision": "a117f96e09e88e76c0a9e3b553b7316cda50633d",
+      "URL": "https://dawn.googlesource.com/dawn",
+      "License": "BSD-3-Clause",
+      "License File": [
+        "third_party/dawn/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/dawn"
+    },
+    {
+      "Name": "Dependencies sourced from the upstream `chromium` repository",
+      "Version": "N/A",
+      "Revision": "4f991ca53d23a716fc5bb9f0b7626a258e4d7b40",
+      "URL": "Internal",
+      "License": "BSD-3-Clause",
+      "License File": [
+        "third_party/devtools-frontend/src/front_end/third_party/chromium/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/devtools-frontend/src/front_end/third_party/chromium"
+    },
+    {
+      "Name": "derivre",
+      "Version": "0.3.13",
+      "Revision": "26de10ba99226fae29ffdb266f35bb1e7571fcbe",
+      "URL": "https://crates.io/crates/derivre",
+      "License": "MIT",
+      "License File": [
+        "third_party/rust/chromium_crates_io/vendor/derivre-v0_3/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/rust/derivre/v0_3"
+    },
+    {
+      "Name": "Devtools-Frontend",
+      "Version": "N/A",
+      "Revision": "7be69dfa5dd9cdd753ef832a4cf55b8f253fb6aa",
+      "URL": "https://chromium.googlesource.com/devtools/devtools-frontend",
+      "License": "BSD-3-Clause",
+      "License File": [
+        "third_party/devtools-frontend/src/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/devtools-frontend"
+    },
+    {
+      "Name": "diplomat",
+      "Version": "0.16.1",
+      "Revision": "125df445fc304a116c17fd974712ca2410c8e580",
+      "URL": "https://crates.io/crates/diplomat",
+      "License": "Apache-2.0",
+      "License File": [
+        "third_party/rust/chromium_crates_io/vendor/diplomat-v0_16/LICENSE-APACHE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/rust/diplomat/v0_16"
+    },
+    {
+      "Name": "diplomat",
+      "Version": "0.17.0",
+      "Revision": "0cca8412630402302b4bd720842101b144a3e18d",
+      "URL": "https://crates.io/crates/diplomat",
+      "License": "Apache-2.0",
+      "License File": [
+        "third_party/rust/chromium_crates_io/vendor/diplomat-v0_17/LICENSE-APACHE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/rust/diplomat/v0_17"
+    },
+    {
+      "Name": "diplomat-runtime",
+      "Version": "0.16.1",
+      "Revision": "0cca8412630402302b4bd720842101b144a3e18d",
+      "URL": "https://crates.io/crates/diplomat-runtime",
+      "License": "Apache-2.0",
+      "License File": [
+        "third_party/rust/chromium_crates_io/vendor/diplomat-runtime-v0_16/LICENSE-APACHE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/rust/diplomat_runtime/v0_16"
+    },
+    {
+      "Name": "diplomat_core",
+      "Version": "0.16.1",
+      "Revision": "125df445fc304a116c17fd974712ca2410c8e580",
+      "URL": "https://crates.io/crates/diplomat_core",
+      "License": "Apache-2.0",
+      "License File": [
+        "third_party/rust/chromium_crates_io/vendor/diplomat_core-v0_16/LICENSE-APACHE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/rust/diplomat_core/v0_16"
+    },
+    {
+      "Name": "diplomat_core",
+      "Version": "0.17.0",
+      "Revision": "0cca8412630402302b4bd720842101b144a3e18d",
+      "URL": "https://crates.io/crates/diplomat_core",
+      "License": "Apache-2.0",
+      "License File": [
+        "third_party/rust/chromium_crates_io/vendor/diplomat_core-v0_17/LICENSE-APACHE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/rust/diplomat_core/v0_17"
+    },
+    {
+      "Name": "displaydoc",
+      "Version": "0.2.7",
+      "Revision": "20016487354a96b22a7b97974483ae4f51a1bddc",
+      "URL": "https://crates.io/crates/displaydoc",
+      "License": "Apache-2.0",
+      "License File": [
+        "third_party/rust/chromium_crates_io/vendor/displaydoc-v0_2/LICENSE-APACHE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/rust/displaydoc/v0_2"
+    },
+    {
+      "Name": "dragonbox",
+      "Version": "N/A",
+      "Revision": "beeeef91cf6fef89a4d4ba5e95d47ca64ccb3a44",
+      "URL": "https://github.com/jk-jeon/dragonbox",
+      "License": "Apache-with-LLVM-Exception, BSL-1.0",
+      "License File": [
+        "third_party/dragonbox/src/LICENSE-Apache2-LLVM",
+        "third_party/dragonbox/src/LICENSE-Boost"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/dragonbox"
+    },
+    {
+      "Name": "either",
+      "Version": "1.18.0",
+      "Revision": "ce6f07fc3d56d6a56ecfc32256d2c33bd0b4ad09",
+      "URL": "https://crates.io/crates/either",
+      "License": "Apache-2.0",
+      "License File": [
+        "third_party/rust/chromium_crates_io/vendor/either-v1/LICENSE-APACHE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/rust/either/v1"
+    },
+    {
+      "Name": "Emoji Segmenter",
+      "Version": "0.3.0",
+      "Revision": "955936be8b391e00835257059607d7c5b72ce744",
+      "URL": "https://github.com/googlei18n/emoji-segmenter",
+      "License": "Apache-2.0",
+      "License File": [
+        "third_party/emoji-segmenter/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/emoji-segmenter"
+    },
+    {
+      "Name": "equivalent",
+      "Version": "1.0.2",
+      "Revision": "44cdd44f8b8ebb5f9ae096c7550a5e74ffb7d6ae",
+      "URL": "https://crates.io/crates/equivalent",
+      "License": "Apache-2.0",
+      "License File": [
+        "third_party/rust/chromium_crates_io/vendor/equivalent-v1/LICENSE-APACHE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/rust/equivalent/v1"
+    },
+    {
+      "Name": "Expat XML Parser",
+      "Version": "R_2_8_1-189-ga851869e",
+      "Revision": "a851869e111c06fbcdc89edf639abf5fc2b6deba",
+      "URL": "https://github.com/libexpat/libexpat",
+      "License": "MIT",
+      "License File": [
+        "third_party/expat/src/expat/COPYING"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/expat"
+    },
+    {
+      "Name": "extended",
+      "Version": "0.1.0",
+      "Revision": "dc18803769dd6702c9cf91b033f91e200c98a684",
+      "URL": "https://crates.io/crates/extended",
+      "License": "MIT",
+      "License File": [
+        "third_party/rust/chromium_crates_io/vendor/extended-v0_1/LICENSE.txt"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/rust/extended/v0_1"
+    },
+    {
+      "Name": "FarmHash",
+      "Version": "N/A",
+      "Revision": "9d99331eb762e9ee22fd97d15a594525ad98310a",
+      "URL": "https://github.com/google/farmhash",
+      "License": "MIT",
+      "License File": [
+        "third_party/farmhash/src/COPYING"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/farmhash"
+    },
+    {
+      "Name": "fast_float",
+      "Version": "upstream/v8.3.2",
+      "Revision": "42f254836ee416ffcf2f4e6576260003ac33d48c",
+      "URL": "https://github.com/fastfloat/fast_float",
+      "License": "MIT",
+      "License File": [
+        "third_party/fast_float/src/LICENSE-MIT"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/fast_float"
+    },
+    {
+      "Name": "fdeflate",
+      "Version": "0.3.7",
+      "Revision": "c365c7e6ffa81feb2e1fb762eed7299f05c9b0ca",
+      "URL": "https://crates.io/crates/fdeflate",
+      "License": "Apache-2.0",
+      "License File": [
+        "third_party/rust/chromium_crates_io/vendor/fdeflate-v0_3/LICENSE-APACHE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/rust/fdeflate/v0_3"
+    },
+    {
+      "Name": "federated-compute",
+      "Version": "N/A",
+      "Revision": "a9d5262aa05a4b1ff3c23697d644023c5d913840",
+      "URL": "https://github.com/google-parfait/federated-compute/",
+      "License": "Apache-2.0",
+      "License File": [
+        "third_party/federated_compute/src/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/federated_compute"
+    },
+    {
+      "Name": "ffmpeg",
+      "Version": "N/A",
+      "Revision": "DEPS",
+      "URL": "https://git.ffmpeg.org/ffmpeg.git",
+      "License": "bsd-2-clause, bsd-3-clause, isc, lgpl-2.1, mit",
+      "License File": [
+        "third_party/ffmpeg/CREDITS.chromium"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/ffmpeg"
+    },
+    {
+      "Name": "fft",
+      "Version": "N/A",
+      "Revision": null,
+      "URL": "This is the canonical repository.",
+      "License": "dtoa",
+      "License File": [
+        "third_party/webrtc/modules/third_party/fft/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/webrtc/modules/third_party/fft"
+    },
+    {
+      "Name": "Fiat-Crypto: Synthesizing Correct-by-Construction Code for Cryptographic Primitives",
+      "Version": "git (see METADATA)",
+      "Revision": "6ccc6638716d4632304baf1adbb5c47c3a12ea6f",
+      "URL": "https://github.com/mit-plv/fiat-crypto",
+      "License": "Apache-2.0",
+      "License File": [
+        "third_party/boringssl/src/third_party/fiat/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/boringssl/src/third_party/fiat"
+    },
+    {
+      "Name": "fixed_decimal",
+      "Version": "0.7.3",
+      "Revision": "031d9e89f6a3fd26a14491e090729d46094328fd",
+      "URL": "https://crates.io/crates/fixed_decimal",
+      "License": "Unicode-3.0",
+      "License File": [
+        "third_party/rust/chromium_crates_io/vendor/fixed_decimal-v0_7/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/rust/fixed_decimal/v0_7"
+    },
+    {
+      "Name": "flac",
+      "Version": "1.4.2",
+      "Revision": "b32e5cbf9818ca23dd22aaa75522042c16ea7d17",
+      "URL": "https://github.com/xiph/flac.git",
+      "License": "BSD-3-Clause",
+      "License File": [
+        "third_party/flac/COPYING.Xiph"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/flac"
+    },
+    {
+      "Name": "FlatBuffers",
+      "Version": "N/A",
+      "Revision": "a86afae9399bbe631d1ea0783f8816e780e236cc",
+      "URL": "https://github.com/google/flatbuffers",
+      "License": "Apache-2.0",
+      "License File": [
+        "third_party/flatbuffers/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/flatbuffers"
+    },
+    {
+      "Name": "flate2",
+      "Version": "1.1.10",
+      "Revision": "ed93d4fc60eaf876c6aded741bf992d524551930",
+      "URL": "https://crates.io/crates/flate2",
+      "License": "Apache-2.0",
+      "License File": [
+        "third_party/rust/chromium_crates_io/vendor/flate2-v1/LICENSE-APACHE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/rust/flate2/v1"
+    },
+    {
+      "Name": "foldhash",
+      "Version": "0.2.0",
+      "Revision": "8f878c636fda9c9e93384824ea45e06d03f009f5",
+      "URL": "https://crates.io/crates/foldhash",
+      "License": "Zlib",
+      "License File": [
+        "third_party/rust/chromium_crates_io/vendor/foldhash-v0_2/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/rust/foldhash/v0_2"
+    },
+    {
+      "Name": "font-types",
+      "Version": "0.12.6",
+      "Revision": "0e939934004776b1982982428a7ce748e61b0310",
+      "URL": "https://crates.io/crates/font-types",
+      "License": "Apache-2.0",
+      "License File": [
+        "third_party/rust/chromium_crates_io/vendor/font-types-v0_12/LICENSE-APACHE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/rust/font_types/v0_12"
+    },
+    {
+      "Name": "FP16",
+      "Version": "N/A",
+      "Revision": "782eea126dc5c755827be751a099eb01826175cf",
+      "URL": "https://github.com/Maratyszcza/FP16",
+      "License": "MIT",
+      "License File": [
+        "third_party/fp16/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/fp16"
+    },
+    {
+      "Name": "FreeType",
+      "Version": "VER-2-15-0-7-ga5877f48f",
+      "Revision": "a5877f48fff8dd6cf8d53c505ce055499376aee2",
+      "URL": "http://www.freetype.org/",
+      "License": "FTL",
+      "License File": [
+        "third_party/freetype/src/docs/FTL.TXT"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/freetype"
+    },
+    {
+      "Name": "FXDiv",
+      "Version": "N/A",
+      "Revision": "63058eff77e11aa15bf531df5dd34395ec3017c8",
+      "URL": "https://github.com/Maratyszcza/FXdiv",
+      "License": "MIT",
+      "License File": [
+        "third_party/fxdiv/src/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/fxdiv"
+    },
+    {
+      "Name": "gemmlowp",
+      "Version": "N/A",
+      "Revision": "16e8662c34917be0065110bfcd9cc27d30f52fdf",
+      "URL": "https://github.com/google/gemmlowp",
+      "License": "Apache-2.0",
+      "License File": [
+        "third_party/gemmlowp/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/gemmlowp"
+    },
+    {
+      "Name": "General Purpose FFT (Fast Fourier/Cosine/Sine Transform) Package",
+      "Version": "N/A",
+      "Revision": null,
+      "URL": "http://www.kurims.kyoto-u.ac.jp/~ooura/fft.html",
+      "License": "LicenseRef-takuya-ooura",
+      "License File": [
+        "third_party/webrtc/common_audio/third_party/ooura/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/webrtc/common_audio/third_party/ooura"
+    },
+    {
+      "Name": "Google Chrome Content Analysis Connector Agent SDK",
+      "Version": "N/A",
+      "Revision": "0a0e7ea516249e786d5a8884552bbd6e163d89cb",
+      "URL": "https://github.com/chromium/content_analysis_sdk",
+      "License": "BSD-3-Clause",
+      "License File": [
+        "third_party/content_analysis_sdk/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/content_analysis_sdk"
+    },
+    {
+      "Name": "Google Double Conversion",
+      "Version": "v3.4.0",
+      "Revision": null,
+      "URL": "https://github.com/google/double-conversion",
+      "License": "BSD-3-Clause",
+      "License File": [
+        "base/third_party/double_conversion/src/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "base/third_party/double_conversion"
+    },
+    {
+      "Name": "googleapis",
+      "Version": "N/A",
+      "Revision": "f5cb7afc40b63d52f43bc306cb9b64a87b681aea",
+      "URL": "https://github.com/googleapis/googleapis",
+      "License": "Apache-2.0",
+      "License File": [
+        "third_party/federated_compute/third_party/googleapis/src/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/federated_compute/third_party/googleapis"
+    },
+    {
+      "Name": "harfbuzz",
+      "Version": "14.5.1-141",
+      "Revision": "12ee77ee00514c442bcd28f9aa9d56b708c37382",
+      "URL": "http://harfbuzz.org",
+      "License": "MIT-Modern-Variant",
+      "License File": [
+        "third_party/harfbuzz/src/COPYING"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/harfbuzz"
+    },
+    {
+      "Name": "harfrust",
+      "Version": "0.14.0",
+      "Revision": "3fbac46c3943bffb7519e38fa1eabe963a6579c7",
+      "URL": "https://crates.io/crates/harfrust",
+      "License": "MIT",
+      "License File": [
+        "third_party/rust/chromium_crates_io/vendor/harfrust-v0_14/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/rust/harfrust/v0_14"
+    },
+    {
+      "Name": "hashbrown",
+      "Version": "0.17.1",
+      "Revision": "c62a63a61b7caf2de8f9ecb7b06a66b0ab6bdf3d",
+      "URL": "https://crates.io/crates/hashbrown",
+      "License": "Apache-2.0",
+      "License File": [
+        "third_party/rust/chromium_crates_io/vendor/hashbrown-v0_17/LICENSE-APACHE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/rust/hashbrown/v0_17"
+    },
+    {
+      "Name": "heck",
+      "Version": "0.5.0",
+      "Revision": "070693322aee7c5c7fbee7c9964bf8d7d3a29c96",
+      "URL": "https://crates.io/crates/heck",
+      "License": "Apache-2.0",
+      "License File": [
+        "third_party/rust/chromium_crates_io/vendor/heck-v0_5/LICENSE-APACHE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/rust/heck/v0_5"
+    },
+    {
+      "Name": "Highway: C++ library for SIMD",
+      "Version": "1.4.0",
+      "Revision": "2607d3b5b0113992fe84d3848859eae13b3b52c1",
+      "URL": "https://github.com/google/highway",
+      "License": "Apache-2.0",
+      "License File": [
+        "third_party/highway/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/highway"
+    },
+    {
+      "Name": "hmac-sha256",
+      "Version": "1.1.15",
+      "Revision": "3f2ad8a97d4d0e46a6eaf7d3323f25aef6d095bd",
+      "URL": "https://crates.io/crates/hmac-sha256",
+      "License": "ISC",
+      "License File": [
+        "third_party/rust/chromium_crates_io/vendor/hmac-sha256-v1/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/rust/hmac_sha256/v1"
+    },
+    {
+      "Name": "hunspell",
+      "Version": "v1.7.3",
+      "Revision": null,
+      "URL": "http://hunspell.sourceforge.net/",
+      "License": "MPL-1.1",
+      "License File": [
+        "third_party/hunspell/src/COPYING.MPL"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/hunspell"
+    },
+    {
+      "Name": "iamf_tools",
+      "Version": "v3.0.0",
+      "Revision": null,
+      "URL": "https://github.com/AOMediaCodec/iamf-tools",
+      "License": "Apache-2.0, BSD-3-Clause, BSD-3-Clause-Clear-with-Alliance-for-Open-Media-Patent",
+      "License File": [
+        "third_party/iamf_tools/src/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/iamf_tools"
+    },
+    {
+      "Name": "icu",
+      "Version": "78-2",
+      "Revision": null,
+      "URL": "https://github.com/unicode-org/icu",
+      "License": "MIT, BSD-2-Clause, BSD-3-Clause, HPND-sell-variant, ICU, MIT-0, NAIST-2003, Unicode-3.0",
+      "License File": [
+        "third_party/icu/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/icu"
+    },
+    {
+      "Name": "icu_calendar",
+      "Version": "2.4.0",
+      "Revision": "031d9e89f6a3fd26a14491e090729d46094328fd",
+      "URL": "https://crates.io/crates/icu_calendar",
+      "License": "Unicode-3.0",
+      "License File": [
+        "third_party/rust/chromium_crates_io/vendor/icu_calendar-v2/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/rust/icu_calendar/v2"
+    },
+    {
+      "Name": "icu_calendar_data",
+      "Version": "2.4.0",
+      "Revision": "031d9e89f6a3fd26a14491e090729d46094328fd",
+      "URL": "https://crates.io/crates/icu_calendar_data",
+      "License": "Unicode-3.0",
+      "License File": [
+        "third_party/rust/chromium_crates_io/vendor/icu_calendar_data-v2/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/rust/icu_calendar_data/v2"
+    },
+    {
+      "Name": "icu_capi",
+      "Version": "2.4.0",
+      "Revision": "031d9e89f6a3fd26a14491e090729d46094328fd",
+      "URL": "https://crates.io/crates/icu_capi",
+      "License": "Unicode-3.0",
+      "License File": [
+        "third_party/rust/chromium_crates_io/vendor/icu_capi-v2/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/rust/icu_capi/v2"
+    },
+    {
+      "Name": "icu_collections",
+      "Version": "2.4.0",
+      "Revision": "031d9e89f6a3fd26a14491e090729d46094328fd",
+      "URL": "https://crates.io/crates/icu_collections",
+      "License": "Unicode-3.0",
+      "License File": [
+        "third_party/rust/chromium_crates_io/vendor/icu_collections-v2/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/rust/icu_collections/v2"
+    },
+    {
+      "Name": "icu_decimal",
+      "Version": "2.4.0",
+      "Revision": "031d9e89f6a3fd26a14491e090729d46094328fd",
+      "URL": "https://crates.io/crates/icu_decimal",
+      "License": "Unicode-3.0",
+      "License File": [
+        "third_party/rust/chromium_crates_io/vendor/icu_decimal-v2/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/rust/icu_decimal/v2"
+    },
+    {
+      "Name": "icu_decimal_data",
+      "Version": "2.4.0",
+      "Revision": "031d9e89f6a3fd26a14491e090729d46094328fd",
+      "URL": "https://crates.io/crates/icu_decimal_data",
+      "License": "Unicode-3.0",
+      "License File": [
+        "third_party/rust/chromium_crates_io/vendor/icu_decimal_data-v2/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/rust/icu_decimal_data/v2"
+    },
+    {
+      "Name": "icu_locale",
+      "Version": "2.4.0",
+      "Revision": "031d9e89f6a3fd26a14491e090729d46094328fd",
+      "URL": "https://crates.io/crates/icu_locale",
+      "License": "Unicode-3.0",
+      "License File": [
+        "third_party/rust/chromium_crates_io/vendor/icu_locale-v2/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/rust/icu_locale/v2"
+    },
+    {
+      "Name": "icu_locale_core",
+      "Version": "2.4.0",
+      "Revision": "031d9e89f6a3fd26a14491e090729d46094328fd",
+      "URL": "https://crates.io/crates/icu_locale_core",
+      "License": "Unicode-3.0",
+      "License File": [
+        "third_party/rust/chromium_crates_io/vendor/icu_locale_core-v2/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/rust/icu_locale_core/v2"
+    },
+    {
+      "Name": "icu_locale_data",
+      "Version": "2.4.0",
+      "Revision": "031d9e89f6a3fd26a14491e090729d46094328fd",
+      "URL": "https://crates.io/crates/icu_locale_data",
+      "License": "Unicode-3.0",
+      "License File": [
+        "third_party/rust/chromium_crates_io/vendor/icu_locale_data-v2/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/rust/icu_locale_data/v2"
+    },
+    {
+      "Name": "icu_locale_fallback",
+      "Version": "2.4.0",
+      "Revision": "031d9e89f6a3fd26a14491e090729d46094328fd",
+      "URL": "https://crates.io/crates/icu_locale_fallback",
+      "License": "Unicode-3.0",
+      "License File": [
+        "third_party/rust/chromium_crates_io/vendor/icu_locale_fallback-v2/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/rust/icu_locale_fallback/v2"
+    },
+    {
+      "Name": "icu_locale_fallback_data",
+      "Version": "2.4.0",
+      "Revision": "031d9e89f6a3fd26a14491e090729d46094328fd",
+      "URL": "https://crates.io/crates/icu_locale_fallback_data",
+      "License": "Unicode-3.0",
+      "License File": [
+        "third_party/rust/chromium_crates_io/vendor/icu_locale_fallback_data-v2/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/rust/icu_locale_fallback_data/v2"
+    },
+    {
+      "Name": "icu_normalizer",
+      "Version": "2.4.0",
+      "Revision": "031d9e89f6a3fd26a14491e090729d46094328fd",
+      "URL": "https://crates.io/crates/icu_normalizer",
+      "License": "Unicode-3.0",
+      "License File": [
+        "third_party/rust/chromium_crates_io/vendor/icu_normalizer-v2/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/rust/icu_normalizer/v2"
+    },
+    {
+      "Name": "icu_normalizer_data",
+      "Version": "2.4.0",
+      "Revision": "031d9e89f6a3fd26a14491e090729d46094328fd",
+      "URL": "https://crates.io/crates/icu_normalizer_data",
+      "License": "Unicode-3.0",
+      "License File": [
+        "third_party/rust/chromium_crates_io/vendor/icu_normalizer_data-v2/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/rust/icu_normalizer_data/v2"
+    },
+    {
+      "Name": "icu_pattern",
+      "Version": "0.5.1",
+      "Revision": "031d9e89f6a3fd26a14491e090729d46094328fd",
+      "URL": "https://crates.io/crates/icu_pattern",
+      "License": "Unicode-3.0",
+      "License File": [
+        "third_party/rust/chromium_crates_io/vendor/icu_pattern-v0_5/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/rust/icu_pattern/v0_5"
+    },
+    {
+      "Name": "icu_plurals",
+      "Version": "2.4.0",
+      "Revision": "031d9e89f6a3fd26a14491e090729d46094328fd",
+      "URL": "https://crates.io/crates/icu_plurals",
+      "License": "Unicode-3.0",
+      "License File": [
+        "third_party/rust/chromium_crates_io/vendor/icu_plurals-v2/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/rust/icu_plurals/v2"
+    },
+    {
+      "Name": "icu_plurals_data",
+      "Version": "2.4.0",
+      "Revision": "031d9e89f6a3fd26a14491e090729d46094328fd",
+      "URL": "https://crates.io/crates/icu_plurals_data",
+      "License": "Unicode-3.0",
+      "License File": [
+        "third_party/rust/chromium_crates_io/vendor/icu_plurals_data-v2/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/rust/icu_plurals_data/v2"
+    },
+    {
+      "Name": "icu_properties",
+      "Version": "2.4.0",
+      "Revision": "031d9e89f6a3fd26a14491e090729d46094328fd",
+      "URL": "https://crates.io/crates/icu_properties",
+      "License": "Unicode-3.0",
+      "License File": [
+        "third_party/rust/chromium_crates_io/vendor/icu_properties-v2/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/rust/icu_properties/v2"
+    },
+    {
+      "Name": "icu_properties_data",
+      "Version": "2.4.0",
+      "Revision": "031d9e89f6a3fd26a14491e090729d46094328fd",
+      "URL": "https://crates.io/crates/icu_properties_data",
+      "License": "Unicode-3.0",
+      "License File": [
+        "third_party/rust/chromium_crates_io/vendor/icu_properties_data-v2/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/rust/icu_properties_data/v2"
+    },
+    {
+      "Name": "icu_provider",
+      "Version": "2.4.0",
+      "Revision": "031d9e89f6a3fd26a14491e090729d46094328fd",
+      "URL": "https://crates.io/crates/icu_provider",
+      "License": "Unicode-3.0",
+      "License File": [
+        "third_party/rust/chromium_crates_io/vendor/icu_provider-v2/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/rust/icu_provider/v2"
+    },
+    {
+      "Name": "icu_provider_adapters",
+      "Version": "2.4.0",
+      "Revision": "031d9e89f6a3fd26a14491e090729d46094328fd",
+      "URL": "https://crates.io/crates/icu_provider_adapters",
+      "License": "Unicode-3.0",
+      "License File": [
+        "third_party/rust/chromium_crates_io/vendor/icu_provider_adapters-v2/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/rust/icu_provider_adapters/v2"
+    },
+    {
+      "Name": "image",
+      "Version": "0.25.10",
+      "Revision": "76e57184f22772dad1138e96954e57945406b15e",
+      "URL": "https://crates.io/crates/image",
+      "License": "Apache-2.0",
+      "License File": [
+        "third_party/rust/chromium_crates_io/vendor/image-v0_25/LICENSE-APACHE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/rust/image/v0_25"
+    },
+    {
+      "Name": "In line A-law and u-law conversion routines",
+      "Version": "N/A",
+      "Revision": null,
+      "URL": "https://www.soft-switch.org/downloads/spandsp/",
+      "License": "LicenseRef-Public-Domain-SpanDSP",
+      "License File": [
+        "third_party/webrtc/modules/third_party/g711/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/webrtc/modules/third_party/g711"
+    },
+    {
+      "Name": "incremental-font-transfer",
+      "Version": "0.9.0",
+      "Revision": "4f0e215ae30ee25052d08299332ed2959c70d70b",
+      "URL": "https://crates.io/crates/incremental-font-transfer",
+      "License": "Apache-2.0",
+      "License File": [
+        "third_party/rust/chromium_crates_io/vendor/incremental-font-transfer-v0_9/LICENSE-APACHE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/rust/incremental_font_transfer/v0_9"
+    },
+    {
+      "Name": "indexmap",
+      "Version": "2.14.2",
+      "Revision": "41a870887c4c77adf665886e63df08f406bfe37a",
+      "URL": "https://crates.io/crates/indexmap",
+      "License": "Apache-2.0",
+      "License File": [
+        "third_party/rust/chromium_crates_io/vendor/indexmap-v2/LICENSE-APACHE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/rust/indexmap/v2"
+    },
+    {
+      "Name": "Ink",
+      "Version": "N/A",
+      "Revision": "b6def591a73a6aa0ffce1e58dc69b39de31484ba",
+      "URL": "https://github.com/google/ink.git",
+      "License": "Apache-2.0",
+      "License File": [
+        "third_party/ink/src/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/ink"
+    },
+    {
+      "Name": "inspector protocol",
+      "Version": "N/A",
+      "Revision": "339e2b3abf429719b11c04143a9439ae7c1e33a1",
+      "URL": "https://chromium.googlesource.com/deps/inspector_protocol/",
+      "License": "BSD-3-Clause",
+      "License File": [
+        "third_party/inspector_protocol/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/inspector_protocol"
+    },
+    {
+      "Name": "inspector protocol",
+      "Version": "N/A",
+      "Revision": "c0045057ce801744c5e88596a2f1bab1802e39f0",
+      "URL": "https://chromium.googlesource.com/deps/inspector_protocol/",
+      "License": "BSD-3-Clause",
+      "License File": [
+        "v8/third_party/inspector_protocol/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "v8/third_party/inspector_protocol"
+    },
+    {
+      "Name": "International Phone Number Library",
+      "Version": "N/A",
+      "Revision": "6d349ac62b76a86eccba0ac1d2fc83ea2b00a841",
+      "URL": "https://github.com/googlei18n/libphonenumber/",
+      "License": "Apache-2.0",
+      "License File": [
+        "third_party/libphonenumber/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/libphonenumber"
+    },
+    {
+      "Name": "intl-messageformat",
+      "Version": "9.8.0",
+      "Revision": "51a665ca0a7c6129c0c93b6b7837603a8e31caa4",
+      "URL": "https://github.com/formatjs/formatjs",
+      "License": "BSD-3-Clause",
+      "License File": [
+        "third_party/devtools-frontend/src/front_end/third_party/intl-messageformat/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/devtools-frontend/src/front_end/third_party/intl-messageformat"
+    },
+    {
+      "Name": "ipcz",
+      "Version": null,
+      "Revision": null,
+      "URL": "https://chromium.googlesource.com/chromium/src/third_party/ipcz",
+      "License": "BSD-3-Clause",
+      "License File": [
+        "third_party/ipcz/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/ipcz"
+    },
+    {
+      "Name": "itoa",
+      "Version": "1.0.18",
+      "Revision": "af77385d0daf4d0e949e81f2588be2e44f69f086",
+      "URL": "https://crates.io/crates/itoa",
+      "License": "Apache-2.0",
+      "License File": [
+        "third_party/rust/chromium_crates_io/vendor/itoa-v1/LICENSE-APACHE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/rust/itoa/v1"
+    },
+    {
+      "Name": "ixdtf",
+      "Version": "0.6.7",
+      "Revision": "031d9e89f6a3fd26a14491e090729d46094328fd",
+      "URL": "https://crates.io/crates/ixdtf",
+      "License": "Unicode-3.0",
+      "License File": [
+        "third_party/rust/chromium_crates_io/vendor/ixdtf-v0_6/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/rust/ixdtf/v0_6"
+    },
+    {
+      "Name": "jpeg-encoder",
+      "Version": "0.7.1",
+      "Revision": "baf40191ae25a32e56a884fa6e001c4fe938d451",
+      "URL": "https://crates.io/crates/jpeg-encoder",
+      "License": "Apache-2.0, IJG",
+      "License File": [
+        "third_party/rust/chromium_crates_io/vendor/jpeg-encoder-v0_7/LICENSE-APACHE",
+        "third_party/rust/chromium_crates_io/vendor/jpeg-encoder-v0_7/LICENSE-IJG"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/rust/jpeg_encoder/v0_7"
+    },
+    {
+      "Name": "json5",
+      "Version": "2.2.3",
+      "Revision": "de344f0",
+      "URL": "https://github.com/json5/json5",
+      "License": "MIT",
+      "License File": [
+        "third_party/devtools-frontend/src/front_end/third_party/json5/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/devtools-frontend/src/front_end/third_party/json5"
+    },
+    {
+      "Name": "jsoncpp",
+      "Version": "N/A",
+      "Revision": "3347a4b86bb914cb565f0cbda19c06e109513300",
+      "URL": "https://github.com/open-source-parsers/jsoncpp",
+      "License": "JsonCPP",
+      "License File": [
+        "third_party/jsoncpp/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/jsoncpp"
+    },
+    {
+      "Name": "jsoncpp",
+      "Version": null,
+      "Revision": null,
+      "URL": "https://github.com/open-source-parsers/jsoncpp",
+      "License": "MIT",
+      "License File": [
+        "third_party/jsoncpp/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/openscreen/src/third_party/jsoncpp"
+    },
+    {
+      "Name": "jxl",
+      "Version": "0.8.0",
+      "Revision": "9a08ca643fd2d01f803dd0be6a5bebc9cc11e597",
+      "URL": "https://crates.io/crates/jxl",
+      "License": "BSD-3-Clause",
+      "License File": [
+        "third_party/rust/chromium_crates_io/vendor/jxl-v0_8/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/rust/jxl/v0_8"
+    },
+    {
+      "Name": "jxl_macros",
+      "Version": "0.8.0",
+      "Revision": "9a08ca643fd2d01f803dd0be6a5bebc9cc11e597",
+      "URL": "https://crates.io/crates/jxl_macros",
+      "License": "BSD-3-Clause",
+      "License File": [
+        "third_party/rust/chromium_crates_io/vendor/jxl_macros-v0_8/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/rust/jxl_macros/v0_8"
+    },
+    {
+      "Name": "jxl_simd",
+      "Version": "0.8.0",
+      "Revision": "9a08ca643fd2d01f803dd0be6a5bebc9cc11e597",
+      "URL": "https://crates.io/crates/jxl_simd",
+      "License": "BSD-3-Clause",
+      "License File": [
+        "third_party/rust/chromium_crates_io/vendor/jxl_simd-v0_8/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/rust/jxl_simd/v0_8"
+    },
+    {
+      "Name": "jxl_transforms",
+      "Version": "0.8.0",
+      "Revision": "9a08ca643fd2d01f803dd0be6a5bebc9cc11e597",
+      "URL": "https://crates.io/crates/jxl_transforms",
+      "License": "BSD-3-Clause",
+      "License File": [
+        "third_party/rust/chromium_crates_io/vendor/jxl_transforms-v0_8/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/rust/jxl_transforms/v0_8"
+    },
+    {
+      "Name": "lazy_static",
+      "Version": "1.5.1",
+      "Revision": "4c1b9a170c157d679592e2682b13cc780c1db814",
+      "URL": "https://crates.io/crates/lazy_static",
+      "License": "Apache-2.0",
+      "License File": [
+        "third_party/rust/chromium_crates_io/vendor/lazy_static-v1/LICENSE-APACHE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/rust/lazy_static/v1"
+    },
+    {
+      "Name": "legacy-javascript",
+      "Version": "0.0.3",
+      "Revision": "eb1e7c42c50347de25a6e92be7e29eb0ddf9f53e",
+      "URL": "https://github.com/GoogleChrome/lighthouse/tree/main/core/lib/legacy-javascript",
+      "License": "Apache-2.0",
+      "License File": [
+        "third_party/devtools-frontend/src/front_end/third_party/legacy-javascript/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/devtools-frontend/src/front_end/third_party/legacy-javascript"
+    },
+    {
+      "Name": "Lens Protos",
+      "Version": "992387292",
+      "Revision": null,
+      "URL": "This is the canonical public repository",
+      "License": "BSD-3-Clause",
+      "License File": [
+        "third_party/lens_server_proto/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/lens_server_proto"
+    },
+    {
+      "Name": "LevelDB: A Fast Persistent Key-Value Store",
+      "Version": "1.23",
+      "Revision": "bb74ef739973a70ca9f0d90788a1da89b788c0ad",
+      "URL": "https://github.com/google/leveldb.git",
+      "License": "BSD-3-Clause",
+      "License File": [
+        "third_party/leveldatabase/src/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/leveldatabase"
+    },
+    {
+      "Name": "libaddressinput",
+      "Version": "N/A",
+      "Revision": "81eb9628382b07d371d8ea0b11badf7de3857fd5",
+      "URL": "https://github.com/google/libaddressinput",
+      "License": "Apache-2.0",
+      "License File": [
+        "third_party/libaddressinput/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/libaddressinput"
+    },
+    {
+      "Name": "libc",
+      "Version": "0.2.190",
+      "Revision": "7b0ab5528dc7f361f3a0b4c06c2cad9971617f75",
+      "URL": "https://crates.io/crates/libc",
+      "License": "Apache-2.0",
+      "License File": [
+        "third_party/rust/chromium_crates_io/vendor/libc-v0_2/LICENSE-APACHE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/rust/libc/v0_2"
+    },
+    {
+      "Name": "libgav1",
+      "Version": "N/A",
+      "Revision": "c3c824dcc1b907eed484f88ca7af21c743d27494",
+      "URL": "https://chromium.googlesource.com/codecs/libgav1/",
+      "License": "Apache-2.0",
+      "License File": [
+        "third_party/libgav1/src/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/libgav1"
+    },
+    {
+      "Name": "libjpeg-turbo",
+      "Version": "3.1.0",
+      "Revision": "20ade4dea9589515a69793e447a6c6220b464535",
+      "URL": "https://github.com/libjpeg-turbo/libjpeg-turbo/",
+      "License": "IJG, BSD-3-Clause",
+      "License File": [
+        "third_party/libjpeg_turbo/LICENSE.md.chromium"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/libjpeg_turbo"
+    },
+    {
+      "Name": "libm",
+      "Version": "0.2.16",
+      "Revision": "dfd2203a4d6110820ad7bb65cafe1bf331a03a3d",
+      "URL": "https://crates.io/crates/libm",
+      "License": "MIT",
+      "License File": [
+        "third_party/rust/chromium_crates_io/vendor/libm-v0_2/LICENSE.txt"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/rust/libm/v0_2"
+    },
+    {
+      "Name": "libsrtp",
+      "Version": "24b3bf8f19b6f5ab4cd2bcceb4f4064efca (v\u2489.8.0)",
+      "Revision": null,
+      "URL": "https://github.com/cisco/libsrtp",
+      "License": "BSD-3-Clause",
+      "License File": [
+        "third_party/libsrtp/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/libsrtp"
+    },
+    {
+      "Name": "Libtess2",
+      "Version": "1.0.3",
+      "Revision": "8dbd6483e920311a58c9af10a10beb278efebc36",
+      "URL": "https://github.com/memononen/libtess2",
+      "License": "SGI-B-2.0",
+      "License File": [
+        "third_party/libtess2/src/LICENSE.txt"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/libtess2"
+    },
+    {
+      "Name": "libusbx",
+      "Version": "1.0.17",
+      "Revision": "0c3d17c9b1c96afe6889ae4595abb22072fc1c0d",
+      "URL": "https://github.com/libusb/libusb",
+      "License": "LGPL-2.1",
+      "License File": [
+        "third_party/libusb/src/COPYING"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/libusb"
+    },
+    {
+      "Name": "libutf",
+      "Version": "ee5074db68f498a5c802dc9f1645f396c219938a",
+      "Revision": "ee5074db68f498a5c802dc9f1645f396c219938a",
+      "URL": "https://github.com/cls/libutf",
+      "License": "Unicode-DFS-2015, MIT",
+      "License File": [
+        "third_party/utf/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/utf"
+    },
+    {
+      "Name": "libvpx",
+      "Version": "N/A",
+      "Revision": "fb1279dcc6db0cbfb0b6015d0ba7587759c5625a",
+      "URL": "https://chromium.googlesource.com/webm/libvpx",
+      "License": "BSD-3-Clause, WebM-Project-Patent",
+      "License File": [
+        "third_party/libvpx/source/libvpx/LICENSE",
+        "third_party/libvpx/source/libvpx/PATENTS"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/libvpx"
+    },
+    {
+      "Name": "libxml",
+      "Version": "81c05bafd4d7df6da91ccf8eab8f539cc78421d8",
+      "Revision": "81c05bafd4d7df6da91ccf8eab8f539cc78421d8",
+      "URL": "http://xmlsoft.org",
+      "License": "MIT",
+      "License File": [
+        "third_party/libxml/src/Copyright"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/libxml"
+    },
+    {
+      "Name": "libxslt",
+      "Version": "35323d6a15f6e63c9919ddbc0abe64c90a0dd88a",
+      "Revision": "35323d6a15f6e63c9919ddbc0abe64c90a0dd88a",
+      "URL": "http://xmlsoft.org/XSLT",
+      "License": "X11",
+      "License File": [
+        "third_party/libxslt/src/Copyright"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/libxslt"
+    },
+    {
+      "Name": "libyuv",
+      "Version": "1974",
+      "Revision": "DEPS",
+      "URL": "https://chromium.googlesource.com/libyuv/libyuv/",
+      "License": "BSD-3-Clause",
+      "License File": [
+        "third_party/libyuv/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/libyuv"
+    },
+    {
+      "Name": "libzip",
+      "Version": "N/A",
+      "Revision": "fdb951209129e98c72628d7ec85c87b4efc2de64",
+      "URL": "https://github.com/nih-at/libzip",
+      "License": "BSD-3-Clause",
+      "License File": [
+        "third_party/libzip/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/libzip"
+    },
+    {
+      "Name": "Lighthouse",
+      "Version": "13.5.0",
+      "Revision": "cb853a38a6410617518b363590c967b3fe211949",
+      "URL": "https://github.com/GoogleChrome/lighthouse",
+      "License": "Apache-2.0",
+      "License File": [
+        "third_party/devtools-frontend/src/front_end/third_party/lighthouse/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/devtools-frontend/src/front_end/third_party/lighthouse"
+    },
+    {
+      "Name": "Lighthouse i18n.js",
+      "Version": "15dad3944c2754a9e147fef9ef99934169e2ca08",
+      "Revision": "15dad3944c2754a9e147fef9ef99934169e2ca08",
+      "URL": "https://github.com/GoogleChrome/lighthouse",
+      "License": "Apache-2.0",
+      "License File": [
+        "third_party/devtools-frontend/src/front_end/third_party/i18n/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/devtools-frontend/src/front_end/third_party/i18n"
+    },
+    {
+      "Name": "Lit",
+      "Version": "2.4.1",
+      "Revision": "02c28397c612845ffab9e22af08eecc869f8ce47",
+      "URL": "https://github.com/lit/lit",
+      "License": "BSD-3-Clause",
+      "License File": [
+        "third_party/devtools-frontend/src/front_end/third_party/lit/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/devtools-frontend/src/front_end/third_party/lit"
+    },
+    {
+      "Name": "Lit",
+      "Version": "3.0.2",
+      "Revision": "02b8d62003a16075ce3873ac3e40db43c0254ecf",
+      "URL": "https://lit.dev",
+      "License": "BSD-3-Clause",
+      "License File": [
+        "third_party/lit/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/lit"
+    },
+    {
+      "Name": "Lit",
+      "Version": "3.2.1",
+      "Revision": null,
+      "URL": "https://lit.dev",
+      "License": "BSD-3-Clause",
+      "License File": [
+        "third_party/node/node_modules/lit/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/node"
+    },
+    {
+      "Name": "litemap",
+      "Version": "0.8.3",
+      "Revision": "a14f2dad852be26bad277ae704abf27a15cbfed1",
+      "URL": "https://crates.io/crates/litemap",
+      "License": "Unicode-3.0",
+      "License File": [
+        "third_party/rust/chromium_crates_io/vendor/litemap-v0_8/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/rust/litemap/v0_8"
+    },
+    {
+      "Name": "LiteRT",
+      "Version": "N/A",
+      "Revision": "86ae38de889076209e2eb71d9ac43f243226cb3a",
+      "URL": "https://github.com/google-ai-edge/LiteRT",
+      "License": "Apache-2.0",
+      "License File": [
+        "third_party/litert/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/litert"
+    },
+    {
+      "Name": "llguidance",
+      "Version": "1.9.1",
+      "Revision": "f0971424ec072d3e4d4196bcc7f31a2f60527df9",
+      "URL": "https://crates.io/crates/llguidance",
+      "License": "MIT",
+      "License File": [
+        "third_party/rust/chromium_crates_io/vendor/llguidance-v1/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/rust/llguidance/v1"
+    },
+    {
+      "Name": "llvm-libc",
+      "Version": "N/A",
+      "Revision": "465c923d26adc1017518ae372823ce45a528935b",
+      "URL": "https://libc.llvm.org/",
+      "License": "Apache-with-LLVM-Exception, NCSA",
+      "License File": [
+        "third_party/llvm-libc/src/LICENSE.TXT"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/llvm-libc"
+    },
+    {
+      "Name": "log",
+      "Version": "0.4.34",
+      "Revision": "8034743dd9d7f7583bd9a670271483d176130911",
+      "URL": "https://crates.io/crates/log",
+      "License": "Apache-2.0",
+      "License File": [
+        "third_party/rust/chromium_crates_io/vendor/log-v0_4/LICENSE-APACHE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/rust/log/v0_4"
+    },
+    {
+      "Name": "Lottie Web",
+      "Version": "v5.5.2",
+      "Revision": "f80e20477c2dc899e886e6c48c912ed8f15d8ffa",
+      "URL": "https://github.com/airbnb/lottie-web",
+      "License": "MIT",
+      "License File": [
+        "third_party/lottie/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/lottie"
+    },
+    {
+      "Name": "LZMA SDK",
+      "Version": "26.03",
+      "Revision": null,
+      "URL": "http://www.7-zip.org/sdk.html",
+      "License": "LZMA-SDK-9.22",
+      "License File": [
+        "third_party/lzma_sdk/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/lzma_sdk"
+    },
+    {
+      "Name": "Marked",
+      "Version": "18.0.4",
+      "Revision": "0a2cd54cbe91911890e4460ae4fd7b9966e05654",
+      "URL": "https://github.com/markedjs/marked",
+      "License": "BSD-3-Clause, MIT",
+      "License File": [
+        "third_party/devtools-frontend/src/front_end/third_party/marked/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/devtools-frontend/src/front_end/third_party/marked"
+    },
+    {
+      "Name": "Material color utilities",
+      "Version": "N/A",
+      "Revision": null,
+      "URL": "https://github.com/material-foundation/material-color-utilities",
+      "License": "Apache-2.0",
+      "License File": [
+        "third_party/material_color_utilities/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/material_color_utilities"
+    },
+    {
+      "Name": "Mediapipe Tasks Vision",
+      "Version": "0.10.9",
+      "Revision": null,
+      "URL": "https://www.npmjs.com/package/@mediapipe/tasks-vision",
+      "License": "Apache-2.0",
+      "License File": [
+        "third_party/node/Apache-LICENSE-2.0.txt"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/node"
+    },
+    {
+      "Name": "memchr",
+      "Version": "2.8.3",
+      "Revision": "5fdb40c054e1fff359a2f7bdf7f87a13b34b465d",
+      "URL": "https://crates.io/crates/memchr",
+      "License": "MIT",
+      "License File": [
+        "third_party/rust/chromium_crates_io/vendor/memchr-v2/LICENSE-MIT"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/rust/memchr/v2"
+    },
+    {
+      "Name": "messageformat",
+      "Version": "4.0.0-11",
+      "Revision": null,
+      "URL": "https://www.npmjs.com/package/messageformat",
+      "License": "Apache-2.0",
+      "License File": [
+        "third_party/node/Apache-LICENSE-2.0.txt"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/node"
+    },
+    {
+      "Name": "Metrics Protos",
+      "Version": "1000386406",
+      "Revision": null,
+      "URL": "This is the canonical public repository",
+      "License": "BSD-3-Clause",
+      "License File": [
+        "third_party/metrics_proto/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/metrics_proto"
+    },
+    {
+      "Name": "Microsoft Authentication Library for JavaScript (MSAL.js) for Browser-Based Single-Page Applications",
+      "Version": "4.2.1",
+      "Revision": null,
+      "URL": "https://www.npmjs.com/package/@azure/msal-browser",
+      "License": "MIT",
+      "License File": [
+        "third_party/node/node_modules/@azure/msal-browser/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/node"
+    },
+    {
+      "Name": "miniz_oxide",
+      "Version": "0.8.9",
+      "Revision": "44e43c7786e379b2b1a7fde4aa0e63be719e583d",
+      "URL": "https://crates.io/crates/miniz_oxide",
+      "License": "Apache-2.0",
+      "License File": [
+        "third_party/rust/chromium_crates_io/vendor/miniz_oxide-v0_8/LICENSE-APACHE.md"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/rust/miniz_oxide/v0_8"
+    },
+    {
+      "Name": "miniz_oxide",
+      "Version": "0.9.1",
+      "Revision": "4e582392df3a739d2b0dfd2c537dc33e8942be38",
+      "URL": "https://crates.io/crates/miniz_oxide",
+      "License": "Apache-2.0",
+      "License File": [
+        "third_party/rust/chromium_crates_io/vendor/miniz_oxide-v0_9/LICENSE-APACHE.md"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/rust/miniz_oxide/v0_9"
+    },
+    {
+      "Name": "modp base64 decoder",
+      "Version": "2.0.0",
+      "Revision": "26701a1c1fcb98ae43eefcaee23abc58459a6e59",
+      "URL": "https://github.com/client9/stringencoders",
+      "License": "BSD-3-Clause",
+      "License File": [
+        "third_party/modp_b64/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/modp_b64"
+    },
+    {
+      "Name": "moxcms",
+      "Version": "0.8.1",
+      "Revision": "c4affa196727d17f21a7f6f148a558867decb470",
+      "URL": "https://crates.io/crates/moxcms",
+      "License": "Apache-2.0",
+      "License File": [
+        "third_party/rust/chromium_crates_io/vendor/moxcms-v0_8/LICENSE-APACHE.md"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/rust/moxcms/v0_8"
+    },
+    {
+      "Name": "num-complex",
+      "Version": "0.4.6",
+      "Revision": "91fdc06356c0c868cb88b5a180859023c57e6e50",
+      "URL": "https://crates.io/crates/num-complex",
+      "License": "Apache-2.0",
+      "License File": [
+        "third_party/rust/chromium_crates_io/vendor/num-complex-v0_4/LICENSE-APACHE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/rust/num_complex/v0_4"
+    },
+    {
+      "Name": "num-derive",
+      "Version": "0.4.2",
+      "Revision": "7cc33515dd2ae0eb43c5795c50ce49c554e8ba02",
+      "URL": "https://crates.io/crates/num-derive",
+      "License": "Apache-2.0",
+      "License File": [
+        "third_party/rust/chromium_crates_io/vendor/num-derive-v0_4/LICENSE-APACHE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/rust/num_derive/v0_4"
+    },
+    {
+      "Name": "num-integer",
+      "Version": "0.1.47",
+      "Revision": "765fd9b3eb9397471d41b9f613e530f6d9d6383f",
+      "URL": "https://crates.io/crates/num-integer",
+      "License": "Apache-2.0",
+      "License File": [
+        "third_party/rust/chromium_crates_io/vendor/num-integer-v0_1/LICENSE-APACHE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/rust/num_integer/v0_1"
+    },
+    {
+      "Name": "num-traits",
+      "Version": "0.2.19",
+      "Revision": "7ec3d41d39b28190ec1d42db38021107b3951f3a",
+      "URL": "https://crates.io/crates/num-traits",
+      "License": "Apache-2.0",
+      "License File": [
+        "third_party/rust/chromium_crates_io/vendor/num-traits-v0_2/LICENSE-APACHE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/rust/num_traits/v0_2"
+    },
+    {
+      "Name": "oak",
+      "Version": "N/A",
+      "Revision": "8288b8006066499d95c370498da9bb04348914f3",
+      "URL": "https://github.com/project-oak/oak/",
+      "License": "Apache-2.0",
+      "License File": [
+        "third_party/oak/src/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/oak"
+    },
+    {
+      "Name": "Omnibox Protos",
+      "Version": "1000197265",
+      "Revision": null,
+      "URL": "This is the canonical public repository",
+      "License": "BSD-3-Clause",
+      "License File": [
+        "third_party/omnibox_proto/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/omnibox_proto"
+    },
+    {
+      "Name": "once_cell",
+      "Version": "1.21.4",
+      "Revision": "80fe900b21f6d76c1a2ed74d3343e8a3a88c46d0",
+      "URL": "https://crates.io/crates/once_cell",
+      "License": "Apache-2.0",
+      "License File": [
+        "third_party/rust/chromium_crates_io/vendor/once_cell-v1/LICENSE-APACHE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/rust/once_cell/v1"
+    },
+    {
+      "Name": "One Euro Filter",
+      "Version": "N/A",
+      "Revision": "d78925584245597f2aa9c4c01a802eb0f0b77fb9",
+      "URL": "https://github.com/casiez/OneEuroFilter",
+      "License": "BSD-3-Clause",
+      "License File": [
+        "third_party/one_euro_filter/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/one_euro_filter"
+    },
+    {
+      "Name": "Open Screen Protocol Library",
+      "Version": "N/A",
+      "Revision": "2a78d154c5786ef4dfdb04ad1ce720596f3cb47e",
+      "URL": "https://chromium.googlesource.com/openscreen",
+      "License": "BSD-3-Clause",
+      "License File": [
+        "third_party/openscreen/src/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/openscreen"
+    },
+    {
+      "Name": "opus",
+      "Version": "55513e81",
+      "Revision": "55513e81d8f606bd75d0ff773d2144e5f2a732f5",
+      "URL": "https://gitlab.xiph.org/xiph/opus",
+      "License": "Opus-Patent-BSD-3-Clause",
+      "License File": [
+        "third_party/opus/src/COPYING"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/opus"
+    },
+    {
+      "Name": "OTS (OpenType Sanitizer)",
+      "Version": "N/A",
+      "Revision": "46bea9879127d0ff1c6601b078e2ce98e83fcd33",
+      "URL": "https://github.com/khaledhosny/ots.git",
+      "License": "BSD-3-Clause",
+      "License File": [
+        "third_party/ots/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/ots"
+    },
+    {
+      "Name": "Paul Hsieh's SuperFastHash",
+      "Version": "N/A",
+      "Revision": null,
+      "URL": "http://www.azillionmonkeys.com/qed/hash.html",
+      "License": "BSD-3-Clause",
+      "License File": [
+        "base/third_party/superfasthash/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "base/third_party/superfasthash"
+    },
+    {
+      "Name": "PDFium",
+      "Version": null,
+      "Revision": null,
+      "URL": "https://pdfium.googlesource.com/pdfium/",
+      "License": "Apache-2.0, BSD-3-Clause",
+      "License File": [
+        "third_party/pdfium/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/pdfium"
+    },
+    {
+      "Name": "Perfetto",
+      "Version": "N/A",
+      "Revision": "DEPS",
+      "URL": "https://github.com/google/perfetto/",
+      "License": "blessing, BSD-3-Clause, Apache-2.0",
+      "License File": [
+        "third_party/perfetto/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/perfetto"
+    },
+    {
+      "Name": "PFFFT: a pretty fast FFT.",
+      "Version": "N/A",
+      "Revision": "483453d8f766",
+      "URL": "https://bitbucket.org/jpommier/pffft/",
+      "License": "pffft",
+      "License File": [
+        "third_party/pffft/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/pffft"
+    },
+    {
+      "Name": "png",
+      "Version": "0.18.1",
+      "Revision": "2a3f980245e3ae38b82ade96533e7b450e8477bb",
+      "URL": "https://crates.io/crates/png",
+      "License": "Apache-2.0",
+      "License File": [
+        "third_party/rust/chromium_crates_io/vendor/png-v0_18/LICENSE-APACHE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/rust/png/v0_18"
+    },
+    {
+      "Name": "Polymer",
+      "Version": "3.5.0",
+      "Revision": "78f75e3108f43744fc135e06c2e50ab0384c6f39",
+      "URL": "https://github.com/Polymer/polymer.git",
+      "License": "BSD-3-Clause",
+      "License File": [
+        "third_party/polymer/LICENSE.polymer"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/polymer"
+    },
+    {
+      "Name": "potential_utf",
+      "Version": "0.1.6",
+      "Revision": "a14f2dad852be26bad277ae704abf27a15cbfed1",
+      "URL": "https://crates.io/crates/potential_utf",
+      "License": "Unicode-3.0",
+      "License File": [
+        "third_party/rust/chromium_crates_io/vendor/potential_utf-v0_1/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/rust/potential_utf/v0_1"
+    },
+    {
+      "Name": "primal-check",
+      "Version": "0.3.4",
+      "Revision": "1a06fdf87b5aad2ec119dad631cd7985667b022d",
+      "URL": "https://crates.io/crates/primal-check",
+      "License": "Apache-2.0",
+      "License File": [
+        "third_party/rust/chromium_crates_io/vendor/primal-check-v0_3/LICENSE-APACHE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/rust/primal_check/v0_3"
+    },
+    {
+      "Name": "Private Join and Compute subset",
+      "Version": "N/A",
+      "Revision": "08df854f9fa14304fb4f19df48c7b6bc31f140d3",
+      "URL": "https://github.com/google/private-join-and-compute",
+      "License": "Apache-2.0",
+      "License File": [
+        "third_party/private-join-and-compute/src/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/private-join-and-compute"
+    },
+    {
+      "Name": "proc-macro2",
+      "Version": "1.0.107",
+      "Revision": "ed8a5497669cd63db33bf24646f261b012bbbc4a",
+      "URL": "https://crates.io/crates/proc-macro2",
+      "License": "Apache-2.0",
+      "License File": [
+        "third_party/rust/chromium_crates_io/vendor/proc-macro2-v1/LICENSE-APACHE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/rust/proc_macro2/v1"
+    },
+    {
+      "Name": "Protocol Buffers",
+      "Version": "36.0",
+      "Revision": "3f17acbf7ffbda81db8be17505554c726e558bb2",
+      "URL": "https://github.com/google/protobuf",
+      "License": "BSD-3-Clause",
+      "License File": [
+        "third_party/protobuf/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/protobuf"
+    },
+    {
+      "Name": "Protocol Buffers (javascript)",
+      "Version": "31.1",
+      "Revision": "e6d763860001ba1a76a63adcff5efb12b1c96024",
+      "URL": "https://github.com/protocolbuffers/protobuf-javascript",
+      "License": "BSD-3-Clause",
+      "License File": [
+        "third_party/protobuf-javascript/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/protobuf-javascript"
+    },
+    {
+      "Name": "protodatastore-cpp",
+      "Version": "N/A",
+      "Revision": "0cd8b124bc65bcac105bce4a706923218ae5d625",
+      "URL": "https://github.com/google/protodatastore-cpp",
+      "License": "Apache-2.0",
+      "License File": [
+        "third_party/federated_compute/third_party/protodatastore-cpp/src/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/federated_compute/third_party/protodatastore-cpp"
+    },
+    {
+      "Name": "PSM (Private Set Membership) client side",
+      "Version": "N/A",
+      "Revision": null,
+      "URL": "Google Internal",
+      "License": "Apache-2.0",
+      "License File": [
+        "third_party/private_membership/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/private_membership"
+    },
+    {
+      "Name": "pthreadpool",
+      "Version": "N/A",
+      "Revision": "15a6644ba1c45f1acc16ac1e883efc3e56c6bed2",
+      "URL": "https://github.com/google/pthreadpool",
+      "License": "BSD-2-Clause",
+      "License File": [
+        "third_party/pthreadpool/src/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/pthreadpool"
+    },
+    {
+      "Name": "Puffin deterministic deflate recompressor",
+      "Version": "1.0.0",
+      "Revision": "e0820dcfebfb4df925be2e37ad8f56c00dc624f5",
+      "URL": "https://android.googlesource.com/platform/external/puffin",
+      "License": "BSD-3-Clause",
+      "License File": [
+        "third_party/puffin/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/puffin"
+    },
+    {
+      "Name": "Puppeteer Core",
+      "Version": "25.16.0",
+      "Revision": "a207faf527ce4305b33a6c0f9706b090c21c115e",
+      "URL": "https://github.com/puppeteer/puppeteer/tree/main/packages/puppeteer-core",
+      "License": "Apache-2.0",
+      "License File": [
+        "third_party/devtools-frontend/src/front_end/third_party/puppeteer/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/devtools-frontend/src/front_end/third_party/puppeteer"
+    },
+    {
+      "Name": "pxfm",
+      "Version": "0.1.30",
+      "Revision": "acf7acd00cfc845307eda7b7b2de19e42303de82",
+      "URL": "https://crates.io/crates/pxfm",
+      "License": "Apache-2.0",
+      "License File": [
+        "third_party/rust/chromium_crates_io/vendor/pxfm-v0_1/LICENSE-APACHE.md"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/rust/pxfm/v0_1"
+    },
+    {
+      "Name": "qr_code",
+      "Version": "2.0.0",
+      "Revision": "341f62be3a91ecb05e6e0870e61f763308eaf2ff",
+      "URL": "https://crates.io/crates/qr_code",
+      "License": "Apache-2.0",
+      "License File": [
+        "third_party/rust/chromium_crates_io/vendor/qr_code-v2/LICENSE-APACHE.txt"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/rust/qr_code/v2"
+    },
+    {
+      "Name": "QUICHE",
+      "Version": "git",
+      "Revision": "132bfd90ea370faeacee616c70d10210bb12ba66",
+      "URL": "https://quiche.googlesource.com/quiche",
+      "License": "BSD-3-Clause",
+      "License File": [
+        "net/third_party/quiche/src/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "net/third_party/quiche"
+    },
+    {
+      "Name": "quote",
+      "Version": "1.0.47",
+      "Revision": "723dcb47d3f0ddc896e17287c8a8d3f2ea2317d5",
+      "URL": "https://crates.io/crates/quote",
+      "License": "Apache-2.0",
+      "License File": [
+        "third_party/rust/chromium_crates_io/vendor/quote-v1/LICENSE-APACHE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/rust/quote/v1"
+    },
+    {
+      "Name": "rapidhash",
+      "Version": "N/A",
+      "Revision": "588978411df8683777429f729be5213eb1bfd5f3",
+      "URL": "https://github.com/Nicoshev/rapidhash/blob/master/rapidhash.h",
+      "License": "BSD-2-Clause",
+      "License File": [
+        "third_party/rapidhash/LICENSE"
+      ],
+      "Shipped": "Yes",
+      "dir": "third_party/rapidhash"
+    },
+    {
+      "Name": "re2 - an efficient, principled regular expression library",
+      "Version": "N/A",
+      "Revision": "2da0056814cf180480a19f5cf811e7e1c054bf6d",
+      "URL": "https://github.com/google/re2",
+      "License": "BSD-3-Clause",
+      "License File": [
+        "third_party/re2/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/re2"
+    },
+    {
+      "Name": "read-fonts",
+      "Version": "0.45.0",
+      "Revision": "0e939934004776b1982982428a7ce748e61b0310",
+      "URL": "https://crates.io/crates/read-fonts",
+      "License": "Apache-2.0",
+      "License File": [
+        "third_party/rust/chromium_crates_io/vendor/read-fonts-v0_45/LICENSE-APACHE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/rust/read_fonts/v0_45"
+    },
+    {
+      "Name": "Recurrent neural network for audio noise reduction",
+      "Version": "N/A",
+      "Revision": "91ef401f4c3536c6de999ac609262691ec888c4c",
+      "URL": "https://github.com/xiph/rnnoise",
+      "License": "BSD-3-Clause",
+      "License File": [
+        "third_party/rnnoise/COPYING"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/rnnoise"
+    },
+    {
+      "Name": "ref-cast",
+      "Version": "1.0.27",
+      "Revision": "971b90557fc096216a52b2672a6ab5d39523162c",
+      "URL": "https://crates.io/crates/ref-cast",
+      "License": "Apache-2.0",
+      "License File": [
+        "third_party/rust/chromium_crates_io/vendor/ref-cast-v1/LICENSE-APACHE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/rust/ref_cast/v1"
+    },
+    {
+      "Name": "ref-cast-impl",
+      "Version": "1.0.27",
+      "Revision": "971b90557fc096216a52b2672a6ab5d39523162c",
+      "URL": "https://crates.io/crates/ref-cast-impl",
+      "License": "Apache-2.0",
+      "License File": [
+        "third_party/rust/chromium_crates_io/vendor/ref-cast-impl-v1/LICENSE-APACHE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/rust/ref_cast_impl/v1"
+    },
+    {
+      "Name": "regex-lite",
+      "Version": "0.1.9",
+      "Revision": "0c07fae444adf0802d84455e689f1143d2dd7790",
+      "URL": "https://crates.io/crates/regex-lite",
+      "License": "Apache-2.0",
+      "License File": [
+        "third_party/rust/chromium_crates_io/vendor/regex-lite-v0_1/LICENSE-APACHE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/rust/regex_lite/v0_1"
+    },
+    {
+      "Name": "regex-syntax",
+      "Version": "0.8.11",
+      "Revision": "140167995737fa11dfe11b8af8b9aa143b790b4e",
+      "URL": "https://crates.io/crates/regex-syntax",
+      "License": "Apache-2.0",
+      "License File": [
+        "third_party/rust/chromium_crates_io/vendor/regex-syntax-v0_8/LICENSE-APACHE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/rust/regex_syntax/v0_8"
+    },
+    {
+      "Name": "resb",
+      "Version": "0.1.2",
+      "Revision": "ed9cb2a8ac23f90c4042b369de43f1c998aa011c",
+      "URL": "https://crates.io/crates/resb",
+      "License": "Unicode-3.0",
+      "License File": [
+        "third_party/rust/chromium_crates_io/vendor/resb-v0_1/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/rust/resb/v0_1"
+    },
+    {
+      "Name": "rustfft",
+      "Version": "6.4.1",
+      "Revision": "4758ab0dd6f256c50ac8987c75c9cb96152dc2ca",
+      "URL": "https://crates.io/crates/rustfft",
+      "License": "Apache-2.0",
+      "License File": [
+        "third_party/rust/chromium_crates_io/vendor/rustfft-v6/LICENSE-APACHE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/rust/rustfft/v6"
+    },
+    {
+      "Name": "rustversion",
+      "Version": "1.0.23",
+      "Revision": "3a7c76605450b9a7299c6502a421909de9126a59",
+      "URL": "https://crates.io/crates/rustversion",
+      "License": "Apache-2.0",
+      "License File": [
+        "third_party/rust/chromium_crates_io/vendor/rustversion-v1/LICENSE-APACHE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/rust/rustversion/v1"
+    },
+    {
+      "Name": "ryu",
+      "Version": "1.0.23",
+      "Revision": "f0b52bb194befe6fd242154f2182fafd43a819b8",
+      "URL": "https://crates.io/crates/ryu",
+      "License": "Apache-2.0",
+      "License File": [
+        "third_party/rust/chromium_crates_io/vendor/ryu-v1/LICENSE-APACHE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/rust/ryu/v1"
+    },
+    {
+      "Name": "Search Engines resources",
+      "Version": "N/A",
+      "Revision": null,
+      "URL": "This is the canonical public repository",
+      "License": "BSD-3-Clause",
+      "License File": [
+        "LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/search_engines_data"
+    },
+    {
+      "Name": "Sentencepiece",
+      "Version": "b9e2e4f6ebc73900e061044b54f68a95090e23ff",
+      "Revision": "b9e2e4f6ebc73900e061044b54f68a95090e23ff",
+      "URL": "https://github.com/google/sentencepiece",
+      "License": "BSD-3-Clause, Apache-2.0, MIT",
+      "License File": [
+        "third_party/sentencepiece/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/sentencepiece"
+    },
+    {
+      "Name": "serde",
+      "Version": "1.0.229",
+      "Revision": "7fc3b4c30c94f73a96ebd1553f2b090d928fc3a8",
+      "URL": "https://crates.io/crates/serde",
+      "License": "Apache-2.0",
+      "License File": [
+        "third_party/rust/chromium_crates_io/vendor/serde-v1/LICENSE-APACHE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/rust/serde/v1"
+    },
+    {
+      "Name": "serde_core",
+      "Version": "1.0.229",
+      "Revision": "7fc3b4c30c94f73a96ebd1553f2b090d928fc3a8",
+      "URL": "https://crates.io/crates/serde_core",
+      "License": "Apache-2.0",
+      "License File": [
+        "third_party/rust/chromium_crates_io/vendor/serde_core-v1/LICENSE-APACHE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/rust/serde_core/v1"
+    },
+    {
+      "Name": "serde_derive",
+      "Version": "1.0.229",
+      "Revision": "7fc3b4c30c94f73a96ebd1553f2b090d928fc3a8",
+      "URL": "https://crates.io/crates/serde_derive",
+      "License": "Apache-2.0",
+      "License File": [
+        "third_party/rust/chromium_crates_io/vendor/serde_derive-v1/LICENSE-APACHE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/rust/serde_derive/v1"
+    },
+    {
+      "Name": "serde_json",
+      "Version": "1.0.151",
+      "Revision": "de8500740cdcabffb9734f503e4889def823cf10",
+      "URL": "https://crates.io/crates/serde_json",
+      "License": "Apache-2.0",
+      "License File": [
+        "third_party/rust/chromium_crates_io/vendor/serde_json-v1/LICENSE-APACHE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/rust/serde_json/v1"
+    },
+    {
+      "Name": "serde_json_lenient",
+      "Version": "0.2.4",
+      "Revision": "ec5b6e7782647f8e165e3d2e619dbe4541071cf7",
+      "URL": "https://crates.io/crates/serde_json_lenient",
+      "License": "Apache-2.0",
+      "License File": [
+        "third_party/rust/chromium_crates_io/vendor/serde_json_lenient-v0_2/LICENSE-APACHE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/rust/serde_json_lenient/v0_2"
+    },
+    {
+      "Name": "Sframe",
+      "Version": "N/A",
+      "Revision": "6a37f061f4eda0c6594c91ecf99b5ff498c8c124",
+      "URL": "https://github.com/cisco/sframe",
+      "License": "BSD-2-Clause, MIT",
+      "License File": [
+        "third_party/sframe/src/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/sframe"
+    },
+    {
+      "Name": "sfv",
+      "Version": "0.15.0",
+      "Revision": "8743dc2a6ea62fa12340a753fb068f0771ad97b3",
+      "URL": "https://crates.io/crates/sfv",
+      "License": "Apache-2.0",
+      "License File": [
+        "third_party/rust/chromium_crates_io/vendor/sfv-v0_15/LICENSE-APACHE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/rust/sfv/v0_15"
+    },
+    {
+      "Name": "shared-brotli-patch-decoder",
+      "Version": "0.1.6",
+      "Revision": "0e939934004776b1982982428a7ce748e61b0310",
+      "URL": "https://crates.io/crates/shared-brotli-patch-decoder",
+      "License": "Apache-2.0",
+      "License File": [
+        "third_party/rust/chromium_crates_io/vendor/shared-brotli-patch-decoder-v0_1/LICENSE-APACHE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/rust/shared_brotli_patch_decoder/v0_1"
+    },
+    {
+      "Name": "simd-adler32",
+      "Version": "0.3.10",
+      "Revision": "d93164f98d7fe2daf883f2e1bec82778dd26199a",
+      "URL": "https://crates.io/crates/simd-adler32",
+      "License": "MIT",
+      "License File": [
+        "third_party/rust/chromium_crates_io/vendor/simd-adler32-v0_3/LICENSE.md"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/rust/simd_adler32/v0_3"
+    },
+    {
+      "Name": "simdutf unicode transcoder",
+      "Version": "7.7.0",
+      "Revision": "da645ece",
+      "URL": "https://github.com/simdutf/simdutf",
+      "License": "MIT",
+      "License File": [
+        "third_party/simdutf/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/simdutf"
+    },
+    {
+      "Name": "Simple Homomorphic Encryption Library with Lattices",
+      "Version": "f94f58852e9b3edaf2766e348a69a70f596bb9dd",
+      "Revision": "f94f58852e9b3edaf2766e348a69a70f596bb9dd",
+      "URL": "https://github.com/google/shell-encryption",
+      "License": "Apache-2.0",
+      "License File": [
+        "third_party/shell-encryption/src/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/shell-encryption"
+    },
+    {
+      "Name": "simple-dns",
+      "Version": "0.12.0",
+      "Revision": "5c7ec98798d7c9f7d76df7aa3bbe754913ff5159",
+      "URL": "https://chromium.googlesource.com/external/github.com/balliegojr/simple-dns",
+      "License": "MIT",
+      "License File": [
+        "third_party/openscreen/src/third_party/simple_dns/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/openscreen/src/third_party/simple_dns"
+    },
+    {
+      "Name": "skera",
+      "Version": "0.8.0",
+      "Revision": "0e939934004776b1982982428a7ce748e61b0310",
+      "URL": "https://crates.io/crates/skera",
+      "License": "Apache-2.0",
+      "License File": [
+        "third_party/rust/chromium_crates_io/vendor/skera-v0_8/LICENSE-APACHE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/rust/skera/v0_8"
+    },
+    {
+      "Name": "skrifa",
+      "Version": "0.48.0",
+      "Revision": "0e939934004776b1982982428a7ce748e61b0310",
+      "URL": "https://crates.io/crates/skrifa",
+      "License": "Apache-2.0",
+      "License File": [
+        "third_party/rust/chromium_crates_io/vendor/skrifa-v0_48/LICENSE-APACHE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/rust/skrifa/v0_48"
+    },
+    {
+      "Name": "smallvec",
+      "Version": "1.16.2",
+      "Revision": "ccf5fc71044d491c46a3d79e7ed53948e6da1590",
+      "URL": "https://crates.io/crates/smallvec",
+      "License": "Apache-2.0",
+      "License File": [
+        "third_party/rust/chromium_crates_io/vendor/smallvec-v1/LICENSE-APACHE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/rust/smallvec/v1"
+    },
+    {
+      "Name": "SMHasher",
+      "Version": "N/A",
+      "Revision": "07bb4de10a63e8cc2e1724865454eba635742383",
+      "URL": "https://github.com/aappleby/smhasher",
+      "License": "MIT",
+      "License File": [
+        "third_party/smhasher/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/smhasher"
+    },
+    {
+      "Name": "Snappy: A fast compressor/decompressor",
+      "Version": "1.1.10.git.c9f9edf6d75bb065fa47468bf035e051a57bec7c",
+      "Revision": null,
+      "URL": "http://google.github.io/snappy/",
+      "License": "BSD-3-Clause",
+      "License File": [
+        "third_party/snappy/src/COPYING"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/snappy"
+    },
+    {
+      "Name": "source-map-scopes-codec",
+      "Version": "2.0.0",
+      "Revision": "62d8ae168730693c164850320f1364ba57af62be",
+      "URL": "https://github.com/ChromeDevTools/source-map-scopes-codec",
+      "License": "BSD-3-Clause",
+      "License File": [
+        "third_party/devtools-frontend/src/front_end/third_party/source-map-scopes-codec/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/devtools-frontend/src/front_end/third_party/source-map-scopes-codec"
+    },
+    {
+      "Name": "SPIR-V Headers",
+      "Version": "N/A",
+      "Revision": "fbf86836a9b1966586faf7be7bb8a6440e156d62",
+      "URL": "https://github.com/KhronosGroup/SPIRV-Headers.git",
+      "License": "Apache-2.0",
+      "License File": [
+        "third_party/spirv-headers/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/spirv-headers"
+    },
+    {
+      "Name": "SPIR-V Tools",
+      "Version": "N/A",
+      "Revision": "cb1df99aa1ca64845f156181bcd1d98730414f15",
+      "URL": "https://github.com/KhronosGroup/SPIRV-Tools.git",
+      "License": "Apache-2.0",
+      "License File": [
+        "third_party/spirv-tools/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/spirv-tools"
+    },
+    {
+      "Name": "SPIRV-Headers",
+      "Version": null,
+      "Revision": null,
+      "URL": "https://github.com/KhronosGroup/SPIRV-Headers",
+      "License": "Khronos, MIT, CC-BY-4.0",
+      "License File": [
+        "third_party/swiftshader/third_party/SPIRV-Headers/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/swiftshader/third_party/SPIRV-Headers"
+    },
+    {
+      "Name": "SPIRV-Tools",
+      "Version": null,
+      "Revision": null,
+      "URL": "https://github.com/KhronosGroup/SPIRV-Tools",
+      "License": "Apache-2.0",
+      "License File": [
+        "third_party/swiftshader/third_party/SPIRV-Tools/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/swiftshader/third_party/SPIRV-Tools"
+    },
+    {
+      "Name": "spl sqrt floor",
+      "Version": "N/A",
+      "Revision": null,
+      "URL": "http://www.pertinentdetail.org/sqrt",
+      "License": "SPL-SQRT-FLOOR",
+      "License File": [
+        "third_party/webrtc/common_audio/third_party/spl_sqrt_floor/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/webrtc/common_audio/third_party/spl_sqrt_floor"
+    },
+    {
+      "Name": "sqlite",
+      "Version": "3.54.1",
+      "Revision": "c1172ac3c91edb02a86ea9ce479ef5b5fe5c6f34",
+      "URL": "https://github.com/sqlite/sqlite",
+      "License": "blessing",
+      "License File": [
+        "third_party/sqlite/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/sqlite"
+    },
+    {
+      "Name": "stable_deref_trait",
+      "Version": "1.2.1",
+      "Revision": "30002b4228f7cdee309217b6bf6eee099dda0b00",
+      "URL": "https://crates.io/crates/stable_deref_trait",
+      "License": "Apache-2.0",
+      "License File": [
+        "third_party/rust/chromium_crates_io/vendor/stable_deref_trait-v1/LICENSE-APACHE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/rust/stable_deref_trait/v1"
+    },
+    {
+      "Name": "static_assertions",
+      "Version": "1.1.0",
+      "Revision": "18bc65a094d890fe1faa5d3ccb70f12b89eabf56",
+      "URL": "https://crates.io/crates/static_assertions",
+      "License": "Apache-2.0",
+      "License File": [
+        "third_party/rust/chromium_crates_io/vendor/static_assertions-v1/LICENSE-APACHE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/rust/static_assertions/v1"
+    },
+    {
+      "Name": "strck",
+      "Version": "1.0.0",
+      "Revision": "4c3add2f9964ce1c5720d7924dbf5291818fc37e",
+      "URL": "https://crates.io/crates/strck",
+      "License": "MIT",
+      "License File": [
+        "third_party/rust/chromium_crates_io/vendor/strck-v1/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/rust/strck/v1"
+    },
+    {
+      "Name": "strength_reduce",
+      "Version": "0.2.4",
+      "Revision": "5b0a43d9d672ee2ac4e471f201fb13417a0a0c71",
+      "URL": "https://crates.io/crates/strength_reduce",
+      "License": "Apache-2.0",
+      "License File": [
+        "third_party/rust/chromium_crates_io/vendor/strength_reduce-v0_2/LICENSE-APACHE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/rust/strength_reduce/v0_2"
+    },
+    {
+      "Name": "strum",
+      "Version": "0.28.0",
+      "Revision": "7376771128834d28bb9beba5c39846cba62e71ec",
+      "URL": "https://crates.io/crates/strum",
+      "License": "MIT",
+      "License File": [
+        "third_party/rust/chromium_crates_io/vendor/strum-v0_28/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/rust/strum/v0_28"
+    },
+    {
+      "Name": "strum_macros",
+      "Version": "0.28.0",
+      "Revision": "7376771128834d28bb9beba5c39846cba62e71ec",
+      "URL": "https://crates.io/crates/strum_macros",
+      "License": "MIT",
+      "License File": [
+        "third_party/rust/chromium_crates_io/vendor/strum_macros-v0_28/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/rust/strum_macros/v0_28"
+    },
+    {
+      "Name": "subtle",
+      "Version": "2.6.1",
+      "Revision": "5457b5448b021d1da101ababbb854e6657233943",
+      "URL": "https://crates.io/crates/subtle",
+      "License": "BSD-3-Clause",
+      "License File": [
+        "third_party/rust/chromium_crates_io/vendor/subtle-v2/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/rust/subtle/v2"
+    },
+    {
+      "Name": "SwiftShader",
+      "Version": null,
+      "Revision": null,
+      "URL": "https://swiftshader.googlesource.com/SwiftShader",
+      "License": "Apache-2.0",
+      "License File": [
+        "third_party/swiftshader/LICENSE.txt"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/swiftshader"
+    },
+    {
+      "Name": "symphonia",
+      "Version": "0.6.1",
+      "Revision": "ee35874b571a35a9a6e15d3bc9a3aaf8f11fbeee",
+      "URL": "https://crates.io/crates/symphonia",
+      "License": "MPL-2.0",
+      "License File": [
+        "third_party/rust/chromium_crates_io/vendor/symphonia-v0_6/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/rust/symphonia/v0_6"
+    },
+    {
+      "Name": "symphonia-bundle-flac",
+      "Version": "0.6.1",
+      "Revision": "ee35874b571a35a9a6e15d3bc9a3aaf8f11fbeee",
+      "URL": "https://crates.io/crates/symphonia-bundle-flac",
+      "License": "MPL-2.0",
+      "License File": [
+        "third_party/rust/chromium_crates_io/vendor/symphonia-bundle-flac-v0_6/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/rust/symphonia_bundle_flac/v0_6"
+    },
+    {
+      "Name": "symphonia-bundle-mp3",
+      "Version": "0.6.1",
+      "Revision": "ee35874b571a35a9a6e15d3bc9a3aaf8f11fbeee",
+      "URL": "https://crates.io/crates/symphonia-bundle-mp3",
+      "License": "MPL-2.0",
+      "License File": [
+        "third_party/rust/chromium_crates_io/vendor/symphonia-bundle-mp3-v0_6/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/rust/symphonia_bundle_mp3/v0_6"
+    },
+    {
+      "Name": "symphonia-codec-pcm",
+      "Version": "0.6.1",
+      "Revision": "ee35874b571a35a9a6e15d3bc9a3aaf8f11fbeee",
+      "URL": "https://crates.io/crates/symphonia-codec-pcm",
+      "License": "MPL-2.0",
+      "License File": [
+        "third_party/rust/chromium_crates_io/vendor/symphonia-codec-pcm-v0_6/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/rust/symphonia_codec_pcm/v0_6"
+    },
+    {
+      "Name": "symphonia-codec-vorbis",
+      "Version": "0.6.1",
+      "Revision": "ee35874b571a35a9a6e15d3bc9a3aaf8f11fbeee",
+      "URL": "https://crates.io/crates/symphonia-codec-vorbis",
+      "License": "MPL-2.0",
+      "License File": [
+        "third_party/rust/chromium_crates_io/vendor/symphonia-codec-vorbis-v0_6/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/rust/symphonia_codec_vorbis/v0_6"
+    },
+    {
+      "Name": "symphonia-common",
+      "Version": "0.6.1",
+      "Revision": "ee35874b571a35a9a6e15d3bc9a3aaf8f11fbeee",
+      "URL": "https://crates.io/crates/symphonia-common",
+      "License": "MPL-2.0",
+      "License File": [
+        "third_party/rust/chromium_crates_io/vendor/symphonia-common-v0_6/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/rust/symphonia_common/v0_6"
+    },
+    {
+      "Name": "symphonia-core",
+      "Version": "0.6.1",
+      "Revision": "ee35874b571a35a9a6e15d3bc9a3aaf8f11fbeee",
+      "URL": "https://crates.io/crates/symphonia-core",
+      "License": "MPL-2.0",
+      "License File": [
+        "third_party/rust/chromium_crates_io/vendor/symphonia-core-v0_6/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/rust/symphonia_core/v0_6"
+    },
+    {
+      "Name": "symphonia-format-isomp4",
+      "Version": "0.6.1",
+      "Revision": "ee35874b571a35a9a6e15d3bc9a3aaf8f11fbeee",
+      "URL": "https://crates.io/crates/symphonia-format-isomp4",
+      "License": "MPL-2.0",
+      "License File": [
+        "third_party/rust/chromium_crates_io/vendor/symphonia-format-isomp4-v0_6/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/rust/symphonia_format_isomp4/v0_6"
+    },
+    {
+      "Name": "symphonia-format-mkv",
+      "Version": "0.6.1",
+      "Revision": "ee35874b571a35a9a6e15d3bc9a3aaf8f11fbeee",
+      "URL": "https://crates.io/crates/symphonia-format-mkv",
+      "License": "MPL-2.0",
+      "License File": [
+        "third_party/rust/chromium_crates_io/vendor/symphonia-format-mkv-v0_6/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/rust/symphonia_format_mkv/v0_6"
+    },
+    {
+      "Name": "symphonia-format-ogg",
+      "Version": "0.6.1",
+      "Revision": "ee35874b571a35a9a6e15d3bc9a3aaf8f11fbeee",
+      "URL": "https://crates.io/crates/symphonia-format-ogg",
+      "License": "MPL-2.0",
+      "License File": [
+        "third_party/rust/chromium_crates_io/vendor/symphonia-format-ogg-v0_6/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/rust/symphonia_format_ogg/v0_6"
+    },
+    {
+      "Name": "symphonia-format-riff",
+      "Version": "0.6.1",
+      "Revision": "ee35874b571a35a9a6e15d3bc9a3aaf8f11fbeee",
+      "URL": "https://crates.io/crates/symphonia-format-riff",
+      "License": "MPL-2.0",
+      "License File": [
+        "third_party/rust/chromium_crates_io/vendor/symphonia-format-riff-v0_6/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/rust/symphonia_format_riff/v0_6"
+    },
+    {
+      "Name": "symphonia-metadata",
+      "Version": "0.6.1",
+      "Revision": "ee35874b571a35a9a6e15d3bc9a3aaf8f11fbeee",
+      "URL": "https://crates.io/crates/symphonia-metadata",
+      "License": "MPL-2.0",
+      "License File": [
+        "third_party/rust/chromium_crates_io/vendor/symphonia-metadata-v0_6/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/rust/symphonia_metadata/v0_6"
+    },
+    {
+      "Name": "syn",
+      "Version": "2.0.119",
+      "Revision": "3295f9e9841785ac88a5e558c884854d5fb7d67f",
+      "URL": "https://crates.io/crates/syn",
+      "License": "Apache-2.0",
+      "License File": [
+        "third_party/rust/chromium_crates_io/vendor/syn-v2/LICENSE-APACHE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/rust/syn/v2"
+    },
+    {
+      "Name": "syn",
+      "Version": "3.0.6",
+      "Revision": "559cab55ef0c644f77660840edc3620d0d99d3d7",
+      "URL": "https://crates.io/crates/syn",
+      "License": "Apache-2.0",
+      "License File": [
+        "third_party/rust/chromium_crates_io/vendor/syn-v3/LICENSE-APACHE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/rust/syn/v3"
+    },
+    {
+      "Name": "synstructure",
+      "Version": "0.14.0",
+      "Revision": "30cfafe36e42405e717a8e55da042a2835a698d7",
+      "URL": "https://crates.io/crates/synstructure",
+      "License": "MIT",
+      "License File": [
+        "third_party/rust/chromium_crates_io/vendor/synstructure-v0_14/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/rust/synstructure/v0_14"
+    },
+    {
+      "Name": "temporal_capi",
+      "Version": "0.2.6",
+      "Revision": "6a5d18375acd62ba778726df68cdc9dd3d09f285",
+      "URL": "https://crates.io/crates/temporal_capi",
+      "License": "Apache-2.0",
+      "License File": [
+        "third_party/rust/chromium_crates_io/vendor/temporal_capi-v0_2/LICENSE-Apache"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/rust/temporal_capi/v0_2"
+    },
+    {
+      "Name": "temporal_rs",
+      "Version": "0.2.6",
+      "Revision": "6a5d18375acd62ba778726df68cdc9dd3d09f285",
+      "URL": "https://crates.io/crates/temporal_rs",
+      "License": "Apache-2.0",
+      "License File": [
+        "third_party/rust/chromium_crates_io/vendor/temporal_rs-v0_2/LICENSE-Apache"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/rust/temporal_rs/v0_2"
+    },
+    {
+      "Name": "TensorFlow Lite",
+      "Version": "201e0b2f5e7469145e4c37efb7459eea0b7a79d5",
+      "Revision": "201e0b2f5e7469145e4c37efb7459eea0b7a79d5",
+      "URL": "https://github.com/tensorflow/tensorflow",
+      "License": "Apache-2.0",
+      "License File": [
+        "third_party/tflite/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/tflite"
+    },
+    {
+      "Name": "TensorFlow Lite Support",
+      "Version": "522a02b47444e6016d5a0d4d1388b522bc2529f2",
+      "Revision": "522a02b47444e6016d5a0d4d1388b522bc2529f2",
+      "URL": "https://github.com/tensorflow/tflite-support",
+      "License": "Apache-2.0",
+      "License File": [
+        "third_party/tflite_support/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/tflite_support"
+    },
+    {
+      "Name": "TensorFlow Models",
+      "Version": "5bad7493ed8a56ad67bbadad80194d7206efac86",
+      "Revision": "5bad7493ed8a56ad67bbadad80194d7206efac86",
+      "URL": "https://github.com/tensorflow/models",
+      "License": "Apache-2.0",
+      "License File": [
+        "third_party/tensorflow_models/src/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/tensorflow_models"
+    },
+    {
+      "Name": "TensorFlow Text",
+      "Version": "N/A",
+      "Revision": "17c38bf014810b80abbb7c13ff1c2ac3cd9f710f",
+      "URL": "https://github.com/tensorflow/text.git",
+      "License": "Apache-2.0",
+      "License File": [
+        "third_party/tensorflow-text/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/tensorflow-text"
+    },
+    {
+      "Name": "tensorflow-federated",
+      "Version": "N/A",
+      "Revision": "8f0a2d9fad426763e9df64b6d1bf845eaed3c9a8",
+      "URL": "https://github.com/google-parfait/tensorflow-federated",
+      "License": "Apache-2.0",
+      "License File": [
+        "third_party/federated_compute/third_party/tensorflow-federated/src/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/federated_compute/third_party/tensorflow-federated"
+    },
+    {
+      "Name": "termcolor",
+      "Version": "1.4.1",
+      "Revision": "71f0921f1eeceda85487098588a1602979d52493",
+      "URL": "https://crates.io/crates/termcolor",
+      "License": "MIT",
+      "License File": [
+        "third_party/rust/chromium_crates_io/vendor/termcolor-v1/LICENSE-MIT"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/rust/termcolor/v1"
+    },
+    {
+      "Name": "The Diff Match and Patch libraries offer robust algorithms to perform the operations required for synchronizing plain text.",
+      "Version": "5.60.0",
+      "Revision": "0ae308daa77aeddb089cd6b7b0a443fca026266e",
+      "URL": "https://github.com/google/diff-match-patch/tree/master/javascript",
+      "License": "Apache-2.0",
+      "License File": [
+        "third_party/devtools-frontend/src/front_end/third_party/diff/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/devtools-frontend/src/front_end/third_party/diff"
+    },
+    {
+      "Name": "The ITU G.722 codec, encode and decode part.",
+      "Version": "N/A",
+      "Revision": null,
+      "URL": "https://www.soft-switch.org/downloads/spandsp/",
+      "License": "LicenseRef-Public-Domain-SpanDSP",
+      "License File": [
+        "third_party/webrtc/modules/third_party/g722/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/webrtc/modules/third_party/g722"
+    },
+    {
+      "Name": "The ruy matrix multiplication library",
+      "Version": "N/A",
+      "Revision": "2264753777198e4393fb83c44c693462d57a2be1",
+      "URL": "https://github.com/google/ruy",
+      "License": "Apache-2.0",
+      "License File": [
+        "third_party/ruy/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/ruy"
+    },
+    {
+      "Name": "third-party-web",
+      "Version": "0.26.2",
+      "Revision": "d60863a2ea913ed26ae0446296a0cb1cc6c71291",
+      "URL": "https://github.com/patrickhulce/third-party-web",
+      "License": "MIT",
+      "License File": [
+        "third_party/devtools-frontend/src/front_end/third_party/third-party-web/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/devtools-frontend/src/front_end/third_party/third-party-web"
+    },
+    {
+      "Name": "thiserror",
+      "Version": "2.0.21",
+      "Revision": "b1827ee06f81a7d7f954e676771e19a97f9f8e3b",
+      "URL": "https://crates.io/crates/thiserror",
+      "License": "Apache-2.0",
+      "License File": [
+        "third_party/rust/chromium_crates_io/vendor/thiserror-v2/LICENSE-APACHE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/rust/thiserror/v2"
+    },
+    {
+      "Name": "thiserror-impl",
+      "Version": "2.0.21",
+      "Revision": "b1827ee06f81a7d7f954e676771e19a97f9f8e3b",
+      "URL": "https://crates.io/crates/thiserror-impl",
+      "License": "Apache-2.0",
+      "License File": [
+        "third_party/rust/chromium_crates_io/vendor/thiserror-impl-v2/LICENSE-APACHE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/rust/thiserror_impl/v2"
+    },
+    {
+      "Name": "timezone_provider",
+      "Version": "0.2.6",
+      "Revision": "6a5d18375acd62ba778726df68cdc9dd3d09f285",
+      "URL": "https://crates.io/crates/timezone_provider",
+      "License": "Apache-2.0",
+      "License File": [
+        "third_party/rust/chromium_crates_io/vendor/timezone_provider-v0_2/LICENSE-Apache"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/rust/timezone_provider/v0_2"
+    },
+    {
+      "Name": "tinystr",
+      "Version": "0.8.5",
+      "Revision": "031d9e89f6a3fd26a14491e090729d46094328fd",
+      "URL": "https://crates.io/crates/tinystr",
+      "License": "Unicode-3.0",
+      "License File": [
+        "third_party/rust/chromium_crates_io/vendor/tinystr-v0_8/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/rust/tinystr/v0_8"
+    },
+    {
+      "Name": "toktrie",
+      "Version": "1.9.1",
+      "Revision": "f0971424ec072d3e4d4196bcc7f31a2f60527df9",
+      "URL": "https://crates.io/crates/toktrie",
+      "License": "MIT",
+      "License File": [
+        "third_party/rust/chromium_crates_io/vendor/toktrie-v1/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/rust/toktrie/v1"
+    },
+    {
+      "Name": "transpose",
+      "Version": "0.2.3",
+      "Revision": "134293e7f7f8e13d342ae625e479e6097b5525db",
+      "URL": "https://crates.io/crates/transpose",
+      "License": "Apache-2.0",
+      "License File": [
+        "third_party/rust/chromium_crates_io/vendor/transpose-v0_2/LICENSE-APACHE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/rust/transpose/v0_2"
+    },
+    {
+      "Name": "typed-path",
+      "Version": "0.12.3",
+      "Revision": "ec65f79eb1f61b0e11e70859b041a0a304c3a9ff",
+      "URL": "https://crates.io/crates/typed-path",
+      "License": "Apache-2.0",
+      "License File": [
+        "third_party/rust/chromium_crates_io/vendor/typed-path-v0_12/LICENSE-APACHE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/rust/typed_path/v0_12"
+    },
+    {
+      "Name": "unicode-ident",
+      "Version": "1.0.26",
+      "Revision": "48771a67a73f7e14ce802aaeee16770ba661035b",
+      "URL": "https://crates.io/crates/unicode-ident",
+      "License": "Apache-2.0, Unicode-3.0",
+      "License File": [
+        "third_party/rust/chromium_crates_io/vendor/unicode-ident-v1/LICENSE-APACHE",
+        "third_party/rust/chromium_crates_io/vendor/unicode-ident-v1/LICENSE-UNICODE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/rust/unicode_ident/v1"
+    },
+    {
+      "Name": "unicode-width",
+      "Version": "0.2.2",
+      "Revision": "9d98411769fe13c7c18cab0b3fbbab29ba8350ea",
+      "URL": "https://crates.io/crates/unicode-width",
+      "License": "Apache-2.0",
+      "License File": [
+        "third_party/rust/chromium_crates_io/vendor/unicode-width-v0_2/LICENSE-APACHE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/rust/unicode_width/v0_2"
+    },
+    {
+      "Name": "UnRAR source for decompressing .RAR and other files.",
+      "Version": "7.21.1",
+      "Revision": null,
+      "URL": "https://www.rarlab.com/rar/unrarsrc-7.2.5.tar.gz",
+      "License": "UnRAR",
+      "License File": [
+        "third_party/unrar/src/license.txt"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/unrar"
+    },
+    {
+      "Name": "URI Template Parser",
+      "Version": "N/A",
+      "Revision": "d0bbe169d81a50936ec5fcea4e6dbcfb97303f13",
+      "URL": "https://github.com/google/google-api-cpp-client/",
+      "License": "Apache-2.0",
+      "License File": [
+        "net/third_party/uri_template/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "net/third_party/uri_template"
+    },
+    {
+      "Name": "URL Pattern Library",
+      "Version": "N/A",
+      "Revision": null,
+      "URL": "This is the canonical public repository",
+      "License": "MIT",
+      "License File": [
+        "third_party/liburlpattern/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/liburlpattern"
+    },
+    {
+      "Name": "utf16_iter",
+      "Version": "1.0.5",
+      "Revision": "4028560bea1185af2989a0c59d71284a763c52d5",
+      "URL": "https://crates.io/crates/utf16_iter",
+      "License": "Apache-2.0",
+      "License File": [
+        "third_party/rust/chromium_crates_io/vendor/utf16_iter-v1/LICENSE-APACHE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/rust/utf16_iter/v1"
+    },
+    {
+      "Name": "utf8_iter",
+      "Version": "1.0.4",
+      "Revision": "6b604ea2365bd535fb66eb4bfe92a9e00e333090",
+      "URL": "https://crates.io/crates/utf8_iter",
+      "License": "Apache-2.0",
+      "License File": [
+        "third_party/rust/chromium_crates_io/vendor/utf8_iter-v1/LICENSE-APACHE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/rust/utf8_iter/v1"
+    },
+    {
+      "Name": "V8 fork of fdlibm",
+      "Version": "N/A",
+      "Revision": "c512d6173f33c6b8301d3fba9384edc9fc1f9e45",
+      "URL": "https://source.chromium.org/chromium/chromium/src/+/master:v8/src/base/ieee754.cc",
+      "License": "SunPro",
+      "License File": [
+        "third_party/fdlibm/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/fdlibm"
+    },
+    {
+      "Name": "Volk Meta loader for Vulkan API",
+      "Version": "N/A",
+      "Revision": "9767549a8bba5454555764ee0f3319bc5d205da9",
+      "URL": "https://github.com/zeux/volk",
+      "License": "MIT",
+      "License File": [
+        "third_party/angle/src/third_party/volk/src/LICENSE.md"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/angle/src/third_party/volk"
+    },
+    {
+      "Name": "Vulkan API headers",
+      "Version": "N/A",
+      "Revision": "73814d006638aa00bd553215b054f0f02e457e22",
+      "URL": "https://github.com/KhronosGroup/Vulkan-Headers",
+      "License": "Apache-2.0",
+      "License File": [
+        "third_party/vulkan-headers/LICENSE.txt"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/vulkan-headers"
+    },
+    {
+      "Name": "Vulkan Loader Components",
+      "Version": "N/A",
+      "Revision": "3187e1e4d463ddf7f60f0bbaf26c7d7b7e40ca34",
+      "URL": "https://github.com/KhronosGroup/Vulkan-Loader",
+      "License": "Apache-2.0",
+      "License File": [
+        "third_party/vulkan-loader/src/LICENSE.txt"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/vulkan-loader"
+    },
+    {
+      "Name": "VulkanMemoryAllocator",
+      "Version": null,
+      "Revision": "309fa0e613c6db0231df03d0d7ac0c166dbee1d1",
+      "URL": "https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator",
+      "License": "MIT",
+      "License File": [
+        "third_party/vulkan_memory_allocator/LICENSE.txt"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/vulkan_memory_allocator"
+    },
+    {
+      "Name": "Wasmparser",
+      "Version": "5.4.0",
+      "Revision": "e0a3281fdd678e6e3d5624b6d939bdf7c3d215ad",
+      "URL": "https://github.com/wasdk/wasmparser",
+      "License": "Apache-2.0",
+      "License File": [
+        "third_party/devtools-frontend/src/front_end/third_party/wasmparser/package/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/devtools-frontend/src/front_end/third_party/wasmparser"
+    },
+    {
+      "Name": "Web Vitals",
+      "Version": "6.2.3",
+      "Revision": "400d01968abffcd91a6f0307c9aaac97c5f7a76a",
+      "URL": "https://github.com/GoogleChrome/web-vitals",
+      "License": "Apache-2.0",
+      "License File": [
+        "third_party/devtools-frontend/src/front_end/third_party/web-vitals/package/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/devtools-frontend/src/front_end/third_party/web-vitals"
+    },
+    {
+      "Name": "WebKit",
+      "Version": null,
+      "Revision": null,
+      "URL": "https://webkit.org/",
+      "License": "BSD-2-Clause, BSD-3-Clause, LGPL-2.0, LGPL-2.1",
+      "License File": [
+        "third_party/blink/LICENSE_FOR_ABOUT_CREDITS"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/blink"
+    },
+    {
+      "Name": "WebM container parser and writer.",
+      "Version": "N/A",
+      "Revision": "a7c6662c68a90af18dd53dbb1f4262a346e9a547",
+      "URL": "https://chromium.googlesource.com/webm/libwebm",
+      "License": "WebM-Project-Patent, BSD-3-Clause",
+      "License File": [
+        "third_party/libwebm/source/LICENSE.TXT",
+        "third_party/libwebm/source/PATENTS.TXT"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/libwebm"
+    },
+    {
+      "Name": "WebP image encoder/decoder",
+      "Version": "N/A",
+      "Revision": "68dd1c3040d500f56fe7ffb754b1813fb64b5887",
+      "URL": "https://chromium.googlesource.com/webm/libwebp",
+      "License": "BSD-3-Clause, WebM-Project-Patent",
+      "License File": [
+        "third_party/libwebp/src/COPYING",
+        "third_party/libwebp/src/PATENTS"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/libwebp"
+    },
+    {
+      "Name": "WebRTC",
+      "Version": "DEPS",
+      "Revision": null,
+      "URL": "This is the canonical repository",
+      "License": "BSD-3-Clause",
+      "License File": [
+        "third_party/webrtc/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/webrtc"
+    },
+    {
+      "Name": "woff2",
+      "Version": "1c69169e9e1811dccd6c54c532fedda300233968",
+      "Revision": "1c69169e9e1811dccd6c54c532fedda300233968",
+      "URL": "https://github.com/google/woff2",
+      "License": "MIT",
+      "License File": [
+        "third_party/woff2/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/woff2"
+    },
+    {
+      "Name": "write-fonts",
+      "Version": "0.54.0",
+      "Revision": "0e939934004776b1982982428a7ce748e61b0310",
+      "URL": "https://crates.io/crates/write-fonts",
+      "License": "Apache-2.0",
+      "License File": [
+        "third_party/rust/chromium_crates_io/vendor/write-fonts-v0_54/LICENSE-APACHE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/rust/write_fonts/v0_54"
+    },
+    {
+      "Name": "write16",
+      "Version": "1.0.0",
+      "Revision": "0fea9edd7f7aaafee59859ff91eb6560d861b6bc",
+      "URL": "https://crates.io/crates/write16",
+      "License": "Apache-2.0",
+      "License File": [
+        "third_party/rust/chromium_crates_io/vendor/write16-v1/LICENSE-APACHE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/rust/write16/v1"
+    },
+    {
+      "Name": "writeable",
+      "Version": "0.6.4",
+      "Revision": "a14f2dad852be26bad277ae704abf27a15cbfed1",
+      "URL": "https://crates.io/crates/writeable",
+      "License": "Unicode-3.0",
+      "License File": [
+        "third_party/rust/chromium_crates_io/vendor/writeable-v0_6/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/rust/writeable/v0_6"
+    },
+    {
+      "Name": "Wuffs (Wrangling Untrusted File Formats Safely)",
+      "Version": "v0.3.6",
+      "Revision": "3bbda65fd6e7266f6cd80bc48f0c7ebce4e8f24b",
+      "URL": "https://github.com/google/wuffs-mirror-release-c",
+      "License": "MIT, Apache-2.0",
+      "License File": [
+        "third_party/wuffs/src/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/wuffs"
+    },
+    {
+      "Name": "xml",
+      "Version": "1.4.0",
+      "Revision": "41949a759dada9493b29e0661b318f1960d1f849",
+      "URL": "https://crates.io/crates/xml",
+      "License": "MIT",
+      "License File": [
+        "third_party/rust/chromium_crates_io/vendor/xml-v1/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/rust/xml/v1"
+    },
+    {
+      "Name": "XNNPACK",
+      "Version": "N/A",
+      "Revision": "49ac6bffa2343b7917163d88e6aacedb7d56d088",
+      "URL": "https://github.com/google/xnnpack",
+      "License": "BSD-3-Clause",
+      "License File": [
+        "third_party/xnnpack/src/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/xnnpack"
+    },
+    {
+      "Name": "yoke",
+      "Version": "0.8.4",
+      "Revision": "031d9e89f6a3fd26a14491e090729d46094328fd",
+      "URL": "https://crates.io/crates/yoke",
+      "License": "Unicode-3.0",
+      "License File": [
+        "third_party/rust/chromium_crates_io/vendor/yoke-v0_8/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/rust/yoke/v0_8"
+    },
+    {
+      "Name": "yoke-derive",
+      "Version": "0.8.4",
+      "Revision": "a59ab860d4bda548e94dfbf992d87fe1f761bc55",
+      "URL": "https://crates.io/crates/yoke-derive",
+      "License": "Unicode-3.0",
+      "License File": [
+        "third_party/rust/chromium_crates_io/vendor/yoke-derive-v0_8/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/rust/yoke_derive/v0_8"
+    },
+    {
+      "Name": "zerofrom",
+      "Version": "0.1.8",
+      "Revision": "e9575f7e4b5aeddfeeb87ada5d3e715950e8233e",
+      "URL": "https://crates.io/crates/zerofrom",
+      "License": "Unicode-3.0",
+      "License File": [
+        "third_party/rust/chromium_crates_io/vendor/zerofrom-v0_1/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/rust/zerofrom/v0_1"
+    },
+    {
+      "Name": "zerofrom-derive",
+      "Version": "0.1.8",
+      "Revision": "ce235d80cf7cbd028e8bd59920420e1203b205b3",
+      "URL": "https://crates.io/crates/zerofrom-derive",
+      "License": "Unicode-3.0",
+      "License File": [
+        "third_party/rust/chromium_crates_io/vendor/zerofrom-derive-v0_1/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/rust/zerofrom_derive/v0_1"
+    },
+    {
+      "Name": "zeroize",
+      "Version": "1.9.0",
+      "Revision": "0b715735a660a8566ccd240bf42489fe2ed98efb",
+      "URL": "https://crates.io/crates/zeroize",
+      "License": "Apache-2.0",
+      "License File": [
+        "third_party/rust/chromium_crates_io/vendor/zeroize-v1/LICENSE-APACHE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/rust/zeroize/v1"
+    },
+    {
+      "Name": "zeroize_derive",
+      "Version": "1.5.0",
+      "Revision": "1ea42bb68f560a2909c856b20aa3c62901f6305c",
+      "URL": "https://crates.io/crates/zeroize_derive",
+      "License": "Apache-2.0",
+      "License File": [
+        "third_party/rust/chromium_crates_io/vendor/zeroize_derive-v1/LICENSE-APACHE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/rust/zeroize_derive/v1"
+    },
+    {
+      "Name": "zerotrie",
+      "Version": "0.2.5",
+      "Revision": "a14f2dad852be26bad277ae704abf27a15cbfed1",
+      "URL": "https://crates.io/crates/zerotrie",
+      "License": "Unicode-3.0",
+      "License File": [
+        "third_party/rust/chromium_crates_io/vendor/zerotrie-v0_2/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/rust/zerotrie/v0_2"
+    },
+    {
+      "Name": "zerovec",
+      "Version": "0.11.9",
+      "Revision": "031d9e89f6a3fd26a14491e090729d46094328fd",
+      "URL": "https://crates.io/crates/zerovec",
+      "License": "Unicode-3.0",
+      "License File": [
+        "third_party/rust/chromium_crates_io/vendor/zerovec-v0_11/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/rust/zerovec/v0_11"
+    },
+    {
+      "Name": "zerovec-derive",
+      "Version": "0.11.7",
+      "Revision": "031d9e89f6a3fd26a14491e090729d46094328fd",
+      "URL": "https://crates.io/crates/zerovec-derive",
+      "License": "Unicode-3.0",
+      "License File": [
+        "third_party/rust/chromium_crates_io/vendor/zerovec-derive-v0_11/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/rust/zerovec_derive/v0_11"
+    },
+    {
+      "Name": "zip",
+      "Version": "8.6.0",
+      "Revision": "771dfc534d2614158af5497ea3dff4d4208d7db1",
+      "URL": "https://crates.io/crates/zip",
+      "License": "MIT",
+      "License File": [
+        "third_party/rust/chromium_crates_io/vendor/zip-v8/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/rust/zip/v8"
+    },
+    {
+      "Name": "zlib",
+      "Version": "1.3.2",
+      "Revision": "09a1572aa624e5ddb6c075dc013880de70b1b9b9",
+      "URL": "https://github.com/madler/zlib",
+      "License": "Zlib",
+      "License File": [
+        "third_party/zlib/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/zlib"
+    },
+    {
+      "Name": "zmij",
+      "Version": "1.0.23",
+      "Revision": "7b7cc48b58028e8af7be87e94c0c1c8936f1a57c",
+      "URL": "https://crates.io/crates/zmij",
+      "License": "MIT",
+      "License File": [
+        "third_party/rust/chromium_crates_io/vendor/zmij-v1/LICENSE-MIT"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/rust/zmij/v1"
+    },
+    {
+      "Name": "zoneinfo64",
+      "Version": "0.3.0",
+      "Revision": "ed9cb2a8ac23f90c4042b369de43f1c998aa011c",
+      "URL": "https://crates.io/crates/zoneinfo64",
+      "License": "Unicode-3.0",
+      "License File": [
+        "third_party/rust/chromium_crates_io/vendor/zoneinfo64-v0_3/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/rust/zoneinfo64/v0_3"
+    },
+    {
+      "Name": "Zstandard",
+      "Version": "N/A",
+      "Revision": "10da6ba6de05e29169261fa4b68eb99239f770dd",
+      "URL": "https://github.com/facebook/zstd",
+      "License": "BSD-3-Clause",
+      "License File": [
+        "third_party/zstd/src/LICENSE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/zstd"
+    },
+    {
+      "Name": "zune-core",
+      "Version": "0.5.3",
+      "Revision": "de5dfc800cfa063116eb695edb6ccd01cb96ea7a",
+      "URL": "https://crates.io/crates/zune-core",
+      "License": "Apache-2.0",
+      "License File": [
+        "third_party/rust/chromium_crates_io/vendor/zune-core-v0_5/LICENSE-APACHE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/rust/zune_core/v0_5"
+    },
+    {
+      "Name": "zune-jpeg",
+      "Version": "0.5.16-rc2",
+      "Revision": "c93e77f5652f76fa77bf7a3823f360f65ceaab6f",
+      "URL": "https://crates.io/crates/zune-jpeg",
+      "License": "Apache-2.0",
+      "License File": [
+        "third_party/rust/chromium_crates_io/vendor/zune-jpeg-v0_5/LICENSE-APACHE"
+      ],
+      "Shipped": "yes",
+      "dir": "third_party/rust/zune_jpeg/v0_5"
+    }
+  ]
+}

@@ -1,0 +1,460 @@
+From ec343d84d3bdefc8b2fa84b699211379227a4e67 Mon Sep 17 00:00:00 2001
+From: bitbonsai <44185+bitbonsai@users.noreply.github.com>
+Date: Sat, 24 Oct 2026 12:27:47 +0200
+Subject: [PATCH] Prove Rust workspace command in native Chromium toolbar
+
+---
+ chrome/browser/ui/views/toolbar/BUILD.gn      |   1 +
+ .../browser/ui/views/toolbar/toolbar_view.cc  |   5 +
+ myarc/BUILD.gn                                |  34 +++++
+ myarc/LICENSE                                 |  21 +++
+ myarc/bridge.rs                               |  41 ++++++
+ myarc/bridge_check.cc                         |  43 ++++++
+ myarc/native_button.cc                        |  66 +++++++++
+ myarc/native_button.h                         |  14 ++
+ myarc/workspace/src/lib.rs                    | 137 ++++++++++++++++++
+ 9 files changed, 362 insertions(+)
+ create mode 100644 myarc/BUILD.gn
+ create mode 100644 myarc/LICENSE
+ create mode 100644 myarc/bridge.rs
+ create mode 100644 myarc/bridge_check.cc
+ create mode 100644 myarc/native_button.cc
+ create mode 100644 myarc/native_button.h
+ create mode 100644 myarc/workspace/src/lib.rs
+
+diff --git a/chrome/browser/ui/views/toolbar/BUILD.gn b/chrome/browser/ui/views/toolbar/BUILD.gn
+index a5019f2ad2..c5519acf5c 100644
+--- a/chrome/browser/ui/views/toolbar/BUILD.gn
++++ b/chrome/browser/ui/views/toolbar/BUILD.gn
+@@ -365,6 +365,7 @@ source_set("impl") {
+     "//media",
+     "//media/capture/mojom:video_capture",
+     "//media/capture/mojom:video_capture_buffer",
++    "//myarc:native_button",
+     "//skia",
+     "//third_party/abseil-cpp:absl",
+     "//ui/accessibility:ax_base",
+diff --git a/chrome/browser/ui/views/toolbar/toolbar_view.cc b/chrome/browser/ui/views/toolbar/toolbar_view.cc
+index 80b0e24263..3067ad4d19 100644
+--- a/chrome/browser/ui/views/toolbar/toolbar_view.cc
++++ b/chrome/browser/ui/views/toolbar/toolbar_view.cc
+@@ -140,6 +140,7 @@
+ #include "components/strings/grit/components_strings.h"
+ #include "content/public/browser/render_view_host.h"
+ #include "content/public/browser/web_contents.h"
++#include "myarc/native_button.h"
+ #include "third_party/skia/include/core/SkPath.h"
+ #include "third_party/skia/include/core/SkPathBuilder.h"
+ #include "ui/accessibility/ax_node_data.h"
+@@ -479,6 +480,10 @@ void ToolbarView::Init() {
+     location_bar_ = toolbar_webview_->GetLocationBar();
+   }
+ 
++  if (base::CommandLine::ForCurrentProcess()->HasSwitch("myarc-foundation")) {
++    AddChildView(myarc::CreateFoundationButton());
++  }
++
+   bool is_glic_left_of_profile =
+       features::kGlicToolbarButtonLocationParam.Get() ==
+           features::GlicToolbarButtonLocation::kLeftOfProfileChip ||
+diff --git a/myarc/BUILD.gn b/myarc/BUILD.gn
+new file mode 100644
+index 0000000000..e0434f10ae
+--- /dev/null
++++ b/myarc/BUILD.gn
+@@ -0,0 +1,34 @@
++import("//build/rust/rust_static_library.gni")
++
++rust_static_library("workspace") {
++  crate_root = "workspace/src/lib.rs"
++  sources = [ crate_root ]
++  build_native_rust_unit_tests = true
++}
++
++rust_static_library("bridge") {
++  crate_root = "bridge.rs"
++  sources = [ crate_root ]
++  cxx_bindings = [ crate_root ]
++  allow_unsafe = true  # Cxx-generated interoperation only; core forbids unsafe.
++  deps = [ ":workspace" ]
++}
++
++source_set("native_button") {
++  sources = [
++    "native_button.cc",
++    "native_button.h",
++  ]
++  deps = [
++    ":bridge",
++    "//base",
++    "//ui/base",
++    "//ui/views",
++  ]
++}
++
++executable("bridge_check") {
++  testonly = true
++  sources = [ "bridge_check.cc" ]
++  deps = [ ":bridge" ]
++}
+diff --git a/myarc/LICENSE b/myarc/LICENSE
+new file mode 100644
+index 0000000000..5677ab94cd
+--- /dev/null
++++ b/myarc/LICENSE
+@@ -0,0 +1,21 @@
++MIT License
++
++Copyright (c) 2026 myarc contributors
++
++Permission is hereby granted, free of charge, to any person obtaining a copy
++of this software and associated documentation files (the "Software"), to deal
++in the Software without restriction, including without limitation the rights
++to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
++copies of the Software, and to permit persons to whom the Software is
++furnished to do so, subject to the following conditions:
++
++The above copyright notice and this permission notice shall be included in all
++copies or substantial portions of the Software.
++
++THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
++IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
++FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
++AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
++LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
++OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
++SOFTWARE.
+diff --git a/myarc/bridge.rs b/myarc/bridge.rs
+new file mode 100644
+index 0000000000..1d1fb8d148
+--- /dev/null
++++ b/myarc/bridge.rs
+@@ -0,0 +1,41 @@
++chromium::import! {
++    "//myarc:workspace";
++}
++
++pub struct Workspace(workspace::Workspace);
++
++#[cxx::bridge(namespace = "myarc::foundation")]
++mod ffi {
++    struct RenameResult {
++        ok: bool,
++        name: String,
++        error: String,
++    }
++
++    extern "Rust" {
++        type Workspace;
++        fn new_workspace() -> Box<Workspace>;
++        fn current_name(workspace: &Workspace) -> String;
++        fn rename_space(workspace: &mut Workspace, id: u64, name: &str) -> RenameResult;
++    }
++}
++
++pub fn new_workspace() -> Box<Workspace> {
++    Box::new(Workspace(workspace::Workspace::default()))
++}
++
++pub fn current_name(workspace: &Workspace) -> String {
++    workspace.0.space_name().to_owned()
++}
++
++pub fn rename_space(workspace: &mut Workspace, id: u64, name: &str) -> ffi::RenameResult {
++    let result = workspace.0.rename_space(id, name);
++    ffi::RenameResult {
++        ok: result.is_ok(),
++        name: current_name(workspace),
++        error: result
++            .err()
++            .map(|error| error.to_string())
++            .unwrap_or_default(),
++    }
++}
+diff --git a/myarc/bridge_check.cc b/myarc/bridge_check.cc
+new file mode 100644
+index 0000000000..b0135ea30c
+--- /dev/null
++++ b/myarc/bridge_check.cc
+@@ -0,0 +1,43 @@
++#include <iostream>
++#include <string>
++
++#include "myarc/bridge.rs.h"
++
++int main() {
++  auto workspace = myarc::foundation::new_workspace();
++  auto second = myarc::foundation::new_workspace();
++  if (std::string(myarc::foundation::current_name(*workspace)) != "Everyday") {
++    return 1;
++  }
++  const auto renamed =
++      myarc::foundation::rename_space(*workspace, 1, "Research");
++  if (!renamed.ok || std::string(renamed.name) != "Research") {
++    return 2;
++  }
++  const auto invalid = myarc::foundation::rename_space(*workspace, 1, "");
++  if (invalid.ok || std::string(invalid.name) != "Research" ||
++      invalid.error.empty()) {
++    return 3;
++  }
++  const auto unknown = myarc::foundation::rename_space(*workspace, 2, "Other");
++  if (unknown.ok || std::string(unknown.name) != "Research") {
++    return 4;
++  }
++  const auto oversize =
++      myarc::foundation::rename_space(*workspace, 1, std::string(129, 'x'));
++  if (oversize.ok || std::string(oversize.name) != "Research") {
++    return 5;
++  }
++  if (std::string(myarc::foundation::current_name(*second)) != "Everyday") {
++    return 6;
++  }
++  for (int i = 0; i < 1000; ++i) {
++    auto temporary = myarc::foundation::new_workspace();
++    if (!myarc::foundation::rename_space(*temporary, 1, "Owned by Rust").ok) {
++      return 7;
++    }
++  }
++  std::cout << "7 C++/Rust bridge checks passed, including 1000 ownership "
++               "round trips\n";
++  return 0;
++}
+diff --git a/myarc/native_button.cc b/myarc/native_button.cc
+new file mode 100644
+index 0000000000..51745d788b
+--- /dev/null
++++ b/myarc/native_button.cc
+@@ -0,0 +1,66 @@
++#include "myarc/native_button.h"
++
++#include <string>
++
++#include "base/functional/bind.h"
++#include "base/sequence_checker.h"
++#include "base/strings/utf_string_conversions.h"
++#include "myarc/bridge.rs.h"
++#include "ui/base/metadata/metadata_header_macros.h"
++#include "ui/base/metadata/metadata_impl_macros.h"
++#include "ui/views/controls/button/md_text_button.h"
++
++namespace myarc {
++namespace {
++
++class FoundationButton : public views::MdTextButton {
++  METADATA_HEADER(FoundationButton, views::MdTextButton)
++
++ public:
++  FoundationButton()
++      : views::MdTextButton(base::BindRepeating(&FoundationButton::Rename,
++                                                base::Unretained(this))),
++        workspace_(foundation::new_workspace()) {
++    SetFocusBehavior(views::View::FocusBehavior::ALWAYS);
++    UpdateName(foundation::current_name(*workspace_));
++    SetTooltipText(
++        u"M0 test: rename transient Space through Rust. Resets on close.");
++  }
++
++  ~FoundationButton() override {
++    DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
++  }
++
++ private:
++  void UpdateName(const rust::String& name) {
++    SetText(base::UTF8ToUTF16("Test Space: " + std::string(name)));
++  }
++
++  void Rename() {
++    DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
++    const auto current = foundation::current_name(*workspace_);
++    const std::string next =
++        std::string(current) == "Everyday" ? "Research" : "Everyday";
++    auto result = foundation::rename_space(*workspace_, 1, next);
++    if (!result.ok) {
++      SetText(u"Test Space: rename failed");
++      SetTooltipText(base::UTF8ToUTF16(std::string(result.error)));
++      return;
++    }
++    UpdateName(result.name);
++  }
++
++  rust::Box<foundation::Workspace> workspace_;
++  SEQUENCE_CHECKER(sequence_checker_);
++};
++
++BEGIN_METADATA(FoundationButton)
++END_METADATA
++
++}  // namespace
++
++std::unique_ptr<views::View> CreateFoundationButton() {
++  return std::make_unique<FoundationButton>();
++}
++
++}  // namespace myarc
+diff --git a/myarc/native_button.h b/myarc/native_button.h
+new file mode 100644
+index 0000000000..82fdbf3bd5
+--- /dev/null
++++ b/myarc/native_button.h
+@@ -0,0 +1,14 @@
++#ifndef MYARC_NATIVE_BUTTON_H_
++#define MYARC_NATIVE_BUTTON_H_
++
++#include <memory>
++
++namespace views {
++class View;
++}
++
++namespace myarc {
++std::unique_ptr<views::View> CreateFoundationButton();
++}
++
++#endif  // MYARC_NATIVE_BUTTON_H_
+diff --git a/myarc/workspace/src/lib.rs b/myarc/workspace/src/lib.rs
+new file mode 100644
+index 0000000000..0cca70ba2d
+--- /dev/null
++++ b/myarc/workspace/src/lib.rs
+@@ -0,0 +1,137 @@
++#![forbid(unsafe_code)]
++
++use std::fmt;
++
++pub const MAX_SPACE_NAME_BYTES: usize = 128;
++pub const TEST_SPACE_ID: u64 = 1;
++
++#[derive(Debug, PartialEq, Eq)]
++pub enum RenameError {
++    UnknownSpace,
++    EmptyName,
++    NameTooLong,
++    ControlCharacter,
++}
++
++impl fmt::Display for RenameError {
++    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
++        formatter.write_str(match self {
++            Self::UnknownSpace => "Space does not exist",
++            Self::EmptyName => "Enter a Space name",
++            Self::NameTooLong => "Space name exceeds 128 UTF-8 bytes",
++            Self::ControlCharacter => "Space name cannot contain control characters",
++        })
++    }
++}
++
++impl std::error::Error for RenameError {}
++
++// shortcut: one transient Space for M0 bridge proof, replace with the validated MA-004 model.
++#[derive(Debug, PartialEq, Eq)]
++pub struct Workspace {
++    space_name: String,
++}
++
++impl Default for Workspace {
++    fn default() -> Self {
++        Self {
++            space_name: String::from("Everyday"),
++        }
++    }
++}
++
++impl Workspace {
++    pub fn space_name(&self) -> &str {
++        &self.space_name
++    }
++
++    pub fn rename_space(&mut self, id: u64, name: &str) -> Result<(), RenameError> {
++        if id != TEST_SPACE_ID {
++            return Err(RenameError::UnknownSpace);
++        }
++        if name.len() > MAX_SPACE_NAME_BYTES {
++            return Err(RenameError::NameTooLong);
++        }
++        if name.trim().is_empty() {
++            return Err(RenameError::EmptyName);
++        }
++        if name.chars().any(char::is_control) {
++            return Err(RenameError::ControlCharacter);
++        }
++        self.space_name = name.to_owned();
++        Ok(())
++    }
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++
++    #[test]
++    fn rename_updates_shared_state() {
++        let mut workspace = Workspace::default();
++        assert_eq!(workspace.rename_space(TEST_SPACE_ID, "Research"), Ok(()));
++        assert_eq!(workspace.space_name(), "Research");
++        assert_eq!(workspace.rename_space(TEST_SPACE_ID, "Everyday"), Ok(()));
++        assert_eq!(workspace.space_name(), "Everyday");
++    }
++
++    #[test]
++    fn rejects_unknown_space_without_mutation() {
++        let mut workspace = Workspace::default();
++        assert_eq!(
++            workspace.rename_space(2, "Research"),
++            Err(RenameError::UnknownSpace)
++        );
++        assert_eq!(workspace.space_name(), "Everyday");
++    }
++
++    #[test]
++    fn rejects_blank_names_without_mutation() {
++        let mut workspace = Workspace::default();
++        for name in ["", " ", "\u{2003}"] {
++            assert_eq!(
++                workspace.rename_space(TEST_SPACE_ID, name),
++                Err(RenameError::EmptyName)
++            );
++            assert_eq!(workspace.space_name(), "Everyday");
++        }
++    }
++
++    #[test]
++    fn rejects_control_characters_without_mutation() {
++        let mut workspace = Workspace::default();
++        for name in ["Work\nNotes", "Work\0Notes", "Work\u{0085}Notes"] {
++            assert_eq!(
++                workspace.rename_space(TEST_SPACE_ID, name),
++                Err(RenameError::ControlCharacter)
++            );
++            assert_eq!(workspace.space_name(), "Everyday");
++        }
++    }
++
++    #[test]
++    fn bounds_utf8_bytes_and_preserves_unicode() {
++        let mut workspace = Workspace::default();
++        let maximum = "é".repeat(MAX_SPACE_NAME_BYTES / 2);
++        assert_eq!(workspace.rename_space(TEST_SPACE_ID, &maximum), Ok(()));
++        assert_eq!(workspace.space_name(), maximum);
++        assert_eq!(
++            workspace.rename_space(TEST_SPACE_ID, &(maximum.clone() + "x")),
++            Err(RenameError::NameTooLong)
++        );
++        assert_eq!(workspace.space_name(), maximum);
++        assert_eq!(workspace.rename_space(TEST_SPACE_ID, "Café ☕"), Ok(()));
++        assert_eq!(workspace.space_name(), "Café ☕");
++    }
++
++    #[test]
++    fn repeat_is_idempotent_and_instances_are_independent() {
++        let mut first = Workspace::default();
++        let second = Workspace::default();
++        assert_eq!(first.rename_space(TEST_SPACE_ID, "Research"), Ok(()));
++        assert_eq!(first.rename_space(TEST_SPACE_ID, "Research"), Ok(()));
++        assert_eq!(first.space_name(), "Research");
++        assert_eq!(second.space_name(), "Everyday");
++    }
++}
+-- 
+2.56.0
+

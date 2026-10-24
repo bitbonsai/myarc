@@ -1,0 +1,113 @@
+{
+  "schemaVersion": 1,
+  "date": "2026-10-24",
+  "foundationAccepted": false,
+  "platform": {
+    "os": "macOS 26.7",
+    "architecture": "arm64",
+    "ramGiB": 48,
+    "logicalCpus": 15,
+    "filesystem": "APFS",
+    "xcode": "27.0 (27A266a)",
+    "sdk": "27.0"
+  },
+  "baseline": {
+    "upstream": "7ae71de816ba32868ff9f974c2716f04ebd9b860",
+    "version": "158.0.8122.0",
+    "result": "unmodified chrome build and disposable-profile launch passed",
+    "successfulResumedSegmentStarted": "2026-10-24T06:40:26.172726+00:00",
+    "successfulResumedSegmentFinished": "2026-10-24T09:03:03.164709+00:00",
+    "successfulResumedSegmentSeconds": 8556.992,
+    "fullFreshBuildWallTime": "unmeasured"
+  },
+  "integration": {
+    "firstUpstream": "7ae71de816ba32868ff9f974c2716f04ebd9b860",
+    "firstPatchedCommit": "ec343d84d3bdefc8b2fa84b699211379227a4e67",
+    "secondUpstream": "8d208f20744ac6d4ce00cc3f9de6a14a9b8b926d",
+    "secondPatchedCommit": "3e117efa80cec1c4e1e6fbfdf44edeb087a279a5",
+    "bothBuilds": "passed",
+    "rustTestsPerRevision": 6,
+    "cppRustChecksPerRevision": 7,
+    "ownershipCyclesPerRevision": 1000,
+    "conflicts": 0,
+    "started": "2026-10-24T10:29:10.523378+00:00",
+    "finished": "2026-10-24T10:31:55.835275+00:00",
+    "limitation": "Second upstream is the immediate child, a PHP test-dependency roll. This does not measure porting across a representative browser or security update."
+  },
+  "nativeUi": {
+    "status": "passed on initial integrated build",
+    "activation": "macOS accessibility click, then focused Space key",
+    "result": "Everyday to Research to Everyday through Rust",
+    "reapplicationUiRerun": "pending"
+  },
+  "standalone": {
+    "toolchain": "1.96.1",
+    "unitTests": 6,
+    "dependencies": 0,
+    "format": "passed",
+    "clippy": "passed",
+    "patchPayloadCheck": "passed for seven owned files; stale-source fault rejected",
+    "githubActions": "workflow added; remote execution not verified"
+  },
+  "upstreamToolchain": {
+    "rust": "rustc 1.101.0-nightly (4d020d894 2099-01-01) (8a9dd7abdf013ec10cfeaaa3685feba18ef1c90c-1-llvmorg-24-init-14453-ge063be79 chromium)",
+    "clang": "clang version 24.0.0git (https://chromium.googlesource.com/a/external/github.com/llvm/llvm-project e063be79adf127cce301fe5948273102a33012b6)",
+    "cxx": "1.0.202 (Apache-2.0)"
+  },
+  "observedStorage": {
+    "chromiumSourceAndOutputKiB": 39438840,
+    "depotToolsKiB": 731456,
+    "minimumSampledFreeBytesDuringReapplication": 172060090368,
+    "samplingSeconds": 5,
+    "peakStorageAndRam": "unmeasured",
+    "recurringRunnerCost": "unmeasured"
+  },
+  "extension": {
+    "id": "ddkjiahejlhfcafbddmgiahcphecmpfh",
+    "name": "uBlock Origin Lite",
+    "version": "2026.1021.1354",
+    "route": "Chrome Web Store",
+    "install": "observed",
+    "functionAndLifecycle": "unverified",
+    "failedAttempt": "A disposable profile lost extension files while management still reported ENABLED; extension dashboard returned net::ERR_FILE_NOT_FOUND. Cause unresolved. Retest from a fresh native-launched profile."
+  },
+  "runtime": {
+    "localFormAndLocalStorage": "passed on initial unmodified build",
+    "separateUserDataDirectoryLocalStorage": "passed narrow smoke check",
+    "sameBrowserProfileIsolation": "not run",
+    "privateMode": "not run",
+    "rendererCrashRecovery": "not run",
+    "nativeMessaging": "not run",
+    "signedUpdate": "not run"
+  },
+  "distribution": {
+    "configuration": "development component build, not a distributable package",
+    "signature": "ad hoc, no TeamIdentifier or sealed resources",
+    "strictVerification": "failed: code has no resources but signature indicates they must be present",
+    "credits": "generated development credits are a sample page; full notices not generated",
+    "licenseInventory": "326 discovered metadata entries, eight metadata/license errors, incomplete"
+  },
+  "unresolved": [
+    "extension lifecycle",
+    "runtime isolation and renderer recovery",
+    "distribution signing and authenticated updates",
+    "complete license review and notices",
+    "official Arc export inventory",
+    "named security/signing owner and backup builder",
+    "recurring maintenance budget"
+  ],
+  "sourceSha256": {
+    "Cargo.toml": "5e75647fada99c12699307696299b3659be215cce71eea0990f36452ec05f67a",
+    "Cargo.lock": "be4df2ad838e013961dadaf2e4f4f9808cc92018caccf3dc2a5336a9f222c1d1",
+    "rust-toolchain.toml": "d378cc6bc4c46cf85f3bc26a191bcb13a6f9efab78f758b39029555f88dc6e79",
+    "crates/workspace/Cargo.toml": "eb4e2cba8df3a5e112961c7c24a3d88b85603a25713142e4438bd8939a6fbbe5",
+    "crates/workspace/src/lib.rs": "c6ce878533e6a27cfdd771251d0a7c5d2e0bfbf56a2c6673dff4665d64fa580f",
+    "browser/args.gn": "5a1cc63fd5d5c75e956a8aec59b9ffb6ced025c69595dd47eda56dfb122d22e1",
+    "browser/foundation/BUILD.gn": "e32c03fc12b52c0f2174798866aac5f198d9d23a41aec14cc85eb37f598ebf93",
+    "browser/foundation/bridge.rs": "ac5df2b87daaae73bd77cbcaef4a10eeb14df4de7d897ae9a3662331ae8797e8",
+    "browser/foundation/native_button.cc": "d1412c80cc47d21615f4b66fe5d2f7bcdbef385faf28db50456953264560c3bf",
+    "browser/foundation/native_button.h": "0cff9bc6f9eeaa3c9b1cc83ca9ece1a61fb7779e1030633e91524aef277127b4",
+    "browser/foundation/bridge_check.cc": "501e1a61898e231ff81b4f9c4b4ba97989b7f994e050866aaa021091b09356b4",
+    "browser/patches/0001-workspace-foundation.patch": "237b46cab094db8d5b0ab928bbc039fdf9e3e14c725183d760fe45de2f3cc91c"
+  }
+}

@@ -1,0 +1,2 @@
+# Unified diff context markers and mail footers contain required trailing spaces.
+*.patch -whitespace
