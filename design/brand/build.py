@@ -31,26 +31,39 @@ baseline = pad + cap
 height = cap - font['hhea'].descent + 2 * pad
 cursor = pad
 paths = []
+reference_paths = []
 for char in 'myArc':
     name = cmap[ord(char)]
     advance = font['hmtx'][name][0]
+    pen = SVGPathPen(glyphs)
+    glyphs[name].draw(pen)
+    original = f'<path d="{pen.getCommands()}" transform="translate({cursor:g} {baseline}) scale(1 -1)"/>'
+    reference_paths.append(original)
     if char == 'A':
         scale = cap / 80
         left = cursor + (advance - cap) / 2
-        paths.append(f'<path d="M7 76 L37 8 Q40 2 43 8 L73 76" transform="translate({left:g} {pad}) scale({scale:g})" fill="none" stroke="currentColor" stroke-width="18" stroke-linejoin="round"/>')
+        # Flat outline feet share Outfit's baseline; stroked caps leave diagonal gaps.
+        paths.append(f'<path d="M0 80 L32 6 C35.46 -2 44.54 -2 48 6 L80 80 L60 80 L40 34 L20 80 Z" transform="translate({left:g} {pad}) scale({scale:g})"/>')
     else:
-        pen = SVGPathPen(glyphs)
-        glyphs[name].draw(pen)
-        paths.append(f'<path d="{pen.getCommands()}" transform="translate({cursor:g} {baseline}) scale(1 -1)"/>')
+        paths.append(original)
     cursor += advance - 35
 width = cursor + 35 + pad
+svg_document = lambda outlines, color, title: f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}" fill="{color}" color="{color}"><title>{title}</title>{"".join(outlines)}</svg>\n'
 wordmarks = {}
 for finish, color in (('ink', '#182432'), ('ivory', '#f5f2ec')):
-    svg = f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}" fill="{color}" color="{color}"><title>myArc, Outfit ExtraBold with custom A</title>{"".join(paths)}</svg>\n'
+    svg = svg_document(paths, color, 'myArc, Outfit ExtraBold with custom A')
     (ASSETS / f'wordmark-{finish}.svg').write_text(svg)
     rendered = subprocess.run(['rsvg-convert', '--height', '320'], input=svg.encode(), stdout=subprocess.PIPE, check=True)
     wordmarks[finish] = Image.open(io.BytesIO(rendered.stdout)).convert('RGBA')
     assert wordmarks[finish].width <= 1010, 'Wordmark exceeds lockup clear space'
+
+guides = f'<g fill="none" stroke-width="3"><path d="M0 {pad}H{width}" stroke="#87909a" stroke-dasharray="16 12"/><path d="M0 {baseline}H{width}" stroke="#d94848"/></g>'
+reference_svg = svg_document(reference_paths, '#182432', 'myArc, original Outfit A').replace('</svg>', guides + '</svg>')
+custom_svg = svg_document(paths, '#182432', 'myArc, custom A aligned to Outfit').replace('</svg>', guides + '</svg>')
+(ROOT / 'alignment.html').write_text(f'''<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>myArc / Wordmark alignment</title>
+<style>@font-face{{font-family:Outfit;src:url('assets/Outfit.ttf');font-weight:100 900}}*{{box-sizing:border-box}}html{{font-size:100%}}body{{margin:0;background:#f5f2ec;color:#182432;font-family:Outfit,sans-serif;font-size:1rem;line-height:1.5}}main{{max-width:60rem;margin:2rem auto;padding:0 1.25rem}}h1{{font-size:1.5rem;font-weight:600;margin:0}}p{{color:#54616d}}a{{color:rgb(3 75 244 / .9);text-underline-offset:.125rem;transition:color .2s ease-in-out,text-underline-offset .2s ease-in-out}}a:is(:hover,:focus-visible){{color:#034bf4;text-underline-offset:.3125rem}}@media(prefers-reduced-motion:reduce){{a{{transition:none}}}}a:focus-visible{{outline:.1875rem solid #034bf4;outline-offset:.25rem}}figure{{margin:1.5rem 0;padding:1rem;border:.0625rem solid #18243225;border-radius:1rem}}figcaption{{font-size:1rem;margin-bottom:1rem}}svg{{display:block;width:100%;height:auto}}</style></head>
+<body><main><h1>Wordmark alignment</h1><p>Same weight, advance widths and canvas. Gray: cap height. Red: baseline.</p><figure><figcaption>Outfit original A</figcaption>{reference_svg}</figure><figure><figcaption>Custom A</figcaption>{custom_svg}</figure><a href="index.html">Back to brand kit</a></main></body></html>''')
 
 CSS = '''
 @font-face{font-family:Outfit;src:url('../assets/Outfit.ttf');font-weight:100 900}
@@ -85,12 +98,12 @@ logo = lambda finish: f'<img class="mark" src="../assets/myarc-{finish}.png" alt
 wordmark = lambda finish: f'<div class="word"><img src="../assets/wordmark-{finish}.svg" alt="myArc"></div>'
 top = lambda finish: f'<div class="top">{wordmark(finish)}</div>'
 ART = {
-    'social-dark': (1200, 630, 'social dark', top('ivory') + '<div class="orbit"></div><div class="headline"><h1>Arc, forever<br>yours.</h1></div>' + logo('glass')),
-    'social-light': (1200, 630, 'social', top('ink') + '<div class="orbit"></div><div class="headline"><h1>Arc, forever<br>yours.</h1></div>' + logo('matte')),
-    'social-square': (1080, 1080, 'square', top('ink') + logo('glass') + '<h1>Arc, forever<br>yours.</h1>'),
-    'wallpaper-dark': (2560, 1600, 'desktop dark', '<div class="ring"></div>' + logo('glass') + wordmark('ivory') + '<div class="tagline">Arc, forever yours.</div>'),
-    'wallpaper-light': (2560, 1600, 'desktop light', '<div class="ring"></div>' + logo('matte') + wordmark('ink') + '<div class="tagline">Arc, forever yours.</div>'),
-    'wallpaper-phone': (1440, 2560, 'phone', '<div class="ring"></div>' + logo('glass') + wordmark('ivory') + '<p>Arc, forever yours.</p>'),
+    'social-dark': (1200, 630, 'social dark', top('ivory') + '<div class="orbit"></div><div class="headline"><h1>myArc,<br>forever yours.</h1></div>' + logo('glass')),
+    'social-light': (1200, 630, 'social', top('ink') + '<div class="orbit"></div><div class="headline"><h1>myArc,<br>forever yours.</h1></div>' + logo('matte')),
+    'social-square': (1080, 1080, 'square', top('ink') + logo('glass') + '<h1>myArc,<br>forever yours.</h1>'),
+    'wallpaper-dark': (2560, 1600, 'desktop dark', '<div class="ring"></div>' + logo('glass') + wordmark('ivory') + '<div class="tagline">myArc, forever yours.</div>'),
+    'wallpaper-light': (2560, 1600, 'desktop light', '<div class="ring"></div>' + logo('matte') + wordmark('ink') + '<div class="tagline">myArc, forever yours.</div>'),
+    'wallpaper-phone': (1440, 2560, 'phone', '<div class="ring"></div>' + logo('glass') + wordmark('ivory') + '<p>myArc, forever yours.</p>'),
 }
 
 manifest = []

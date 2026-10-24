@@ -2,6 +2,13 @@
 
 Keep significant outcomes, failures and next actions reproducible. Newest entry first. No private exports, page titles/URLs from real browsing, credentials or raw user transcripts.
 
+## 2026-10-24: Baseline comparison and live interaction polish
+
+- Reproduced the custom-A regression: stroked chevron feet ended diagonally above the baseline. Replaced the stroke with a closed outline, matching original Outfit A cap height and the m/r baseline. Added `design/brand/alignment.html` with original/custom wordmarks at identical scale, spacing and guides; curved c overshoot remains unchanged. New geometry checks failed on the old asset and passed after correction.
+- Standardized all social cards and wallpapers on `myArc, forever yours.` Shortened the lede to local workspace and optional AI. Replaced the footer status line with a GitHub-linked maker credit and an accessible Lucide outline heart; pinned ISC notice and source hash are retained.
+- Removed page divider rules and increased spacing. Primary buttons are blue. Text links are blue at 90% alpha, becoming opaque while their underline moves 2 to 5 pixels over 200 ms. The personal blog supplied observed motion behavior, not copied site code. Footer hover/focus runs a single pulse every 1.5 seconds, 40 BPM; reduced motion disables movement and transitions.
+- Fixed stale preview images with content-versioned URLs after rendering. Verified the actual internal browser's current DOM and hover state, in addition to the retained headless checks: 90% to opaque link color, 2-to-5-pixel underline, no layout shift and 1.5-second heartbeat. Static checks cover ten HTML pages, exact original-A alignment, icon path provenance and image revisions. Layout/type checks passed at 1440/728/390 widths; source hashes and document links passed. These remain branding checks, not native browser tests.
+
 ## 2026-10-24: Outfit, custom A and ivory grain
 
 - Selected Outfit for the main brand page, wordmarks and six artwork compositions. Added a short ethos and four design principles. These express product intent, not implemented browser capabilities.

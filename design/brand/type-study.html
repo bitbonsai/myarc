@@ -11,7 +11,9 @@
     * { box-sizing: border-box }
     html { font-size: 100% }
     body { margin: 0; background: #f5f2ec; background-image: url('assets/grain.png'); background-size: 16rem 16rem; color: #182432; font-family: Outfit, sans-serif; font-size: 1rem; line-height: 1.55 }
-    a { color: inherit; text-underline-offset: .25rem }
+    a { color: rgb(3 75 244 / .9); text-decoration-line: underline; text-underline-offset: .125rem; transition: color .2s ease-in-out, text-underline-offset .2s ease-in-out }
+    a:is(:hover, :focus-visible) { color: #034bf4; text-underline-offset: .3125rem }
+    @media (prefers-reduced-motion: reduce) { a { transition: none } }
     a:focus-visible, input:focus-visible { outline: .1875rem solid #034bf4; outline-offset: .25rem }
     img { display: block; max-width: 100%; height: auto }
     .trial { --trial: Outfit; max-width: 80rem; padding: 0 3rem; margin: auto; font-family: var(--trial), sans-serif }
@@ -53,7 +55,7 @@
 </head>
 <body>
   <main class="trial">
-    <header class="nav"><span class="brand"><img class="selected-mark" src="assets/wordmark-ink.svg" alt="myArc"></span><a href="index.html">Current brand kit ↗</a></header>
+    <header class="nav"><span class="brand"><img class="selected-mark" src="assets/wordmark-ink.svg?v=18b9e7ae3785" alt="myArc"></span><a href="index.html">Current brand kit ↗</a></header>
     <fieldset>
       <legend>Typeface</legend>
       <label><input id="outfit" name="typeface" type="radio" checked>Outfit <small>current</small></label>
@@ -61,14 +63,14 @@
       <label><input id="manrope" name="typeface" type="radio">Manrope <small>previous</small></label>
     </fieldset>
     <section class="hero">
-      <div><h1>myArc, forever yours.</h1><p class="lede">An open-source browser project bringing back Arc's browsing experience, with a local, exportable workspace and optional AI.</p></div>
-      <div class="art"><img src="assets/myarc-glass.png" alt="myArc glass logo"></div>
+      <div><h1>myArc, forever yours.</h1><p class="lede">An open-source browser project bringing back Arc's browsing experience, with a local workspace and optional AI.</p></div>
+      <div class="art"><img src="assets/myarc-glass.png?v=cb3b4f869a23" alt="myArc glass logo"></div>
     </section>
     <section class="wordmarks" aria-label="Wordmark comparison">
       <div><h2>ExtraBold 800</h2><p class="wordmark">myArc</p></div>
-      <div><h2>Selected custom wordmark</h2><p class="wordmark"><img class="selected-mark" src="assets/wordmark-ink.svg" alt="myArc with a custom barless A"></p></div>
+      <div><h2>Selected custom wordmark</h2><p class="wordmark"><img class="selected-mark" src="assets/wordmark-ink.svg?v=18b9e7ae3785" alt="myArc with a custom barless A"></p></div>
     </section>
-    <p class="note">Outfit with a custom A is selected. Other fonts remain for comparison.</p>
+    <p class="note">Outfit with a custom A is selected. Other fonts remain for comparison. <a href="alignment.html">Compare A alignment ↗</a></p>
   </main>
 </body>
 </html>

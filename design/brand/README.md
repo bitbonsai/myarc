@@ -16,7 +16,7 @@ Follow the repository README: **myArc, forever yours.** Outfit is the selected t
 
 ## Typeface trial
 
-Open [type-study.html](type-study.html) to compare selected Outfit against Sora and previous Manrope. Native radio controls switch the hero, body copy and wordmark samples without JavaScript. The selected wordmark uses an original barless A with outlined Outfit ExtraBold letters. Both finishes share generated geometry and need no installed font. Main page and exports use that custom wordmark; headings and body copy keep normal Outfit letters.
+Open [type-study.html](type-study.html) to compare selected Outfit against Sora and previous Manrope. Native radio controls switch the hero, body copy and wordmark samples without JavaScript. The selected wordmark uses an original barless A with outlined Outfit ExtraBold letters. Both finishes share generated geometry and need no installed font. Main page and exports use that custom wordmark; headings and body copy keep normal Outfit letters. [Alignment comparison](alignment.html) puts the original Outfit A and custom A on identical canvases with baseline and cap-height guides.
 
 ## Structure and regeneration
 
@@ -24,7 +24,11 @@ Open [type-study.html](type-study.html) to compare selected Outfit against Sora 
 
 From repository root, run `bash design/brand/export.sh` to regenerate sources and screenshots. Requires Python 3 with Pillow and fontTools, `rsvg-convert` from librsvg, and agent-browser with Chrome for Testing installed. Font and image decoding finish before capture. The script closes its session and terminates agent-browser/Chrome for Testing helpers on exit, including helpers from other agent-browser sessions. Run it when those sessions can be closed.
 
-Run `python3 design/brand/verify.py` for local links, rem font sizes, minimum type size, branding/copy consistency, image dimensions, transparency and nonempty-content checks. The export script also checks actual font sizes, image proportions and overflow at desktop/mobile widths. These are branding checks, not application tests. Recreate the ZIP after changes; the archive contains this directory except itself and Python caches.
+Run `python3 design/brand/verify.py` for local links, rem font sizes, minimum type size, branding/copy consistency, image dimensions, transparency and nonempty-content checks. The export script also checks actual font sizes, image proportions and overflow at desktop/mobile widths, text-link hover/fade without layout shift, 40 BPM footer heartbeat and reduced-motion behavior. It content-versions image URLs after rendering so previews cannot retain older wordmarks. These are branding checks, not application tests. Recreate the ZIP after changes; the archive contains this directory except itself and Python caches.
+
+## Interaction details
+
+Page sections use spacing instead of divider rules. Primary buttons use brand blue. Text links are brand blue at 90% alpha, becoming opaque on hover or focus. They use the moving-underline treatment observed on mauriciowolff.com/blog: a 2-to-5-pixel offset and text-color fade over 200 ms, expressed in rem for the page. The footer uses Lucide's outlined heart in dim red, pulsing at 40 BPM on hover or keyboard focus. Reduced motion disables the heartbeat and link transitions. The footer links to bitbonsai on GitHub; product stage remains documented in the repository README.
 
 ## Boundaries
 
