@@ -2,6 +2,20 @@
 
 Keep significant outcomes, failures and next actions reproducible. Newest entry first. No private exports, page titles/URLs from real browsing, credentials or raw user transcripts.
 
+## 2026-10-24: Outfit, custom A and ivory grain
+
+- Selected Outfit for the main brand page, wordmarks and six artwork compositions. Added a short ethos and four design principles. These express product intent, not implemented browser capabilities.
+- Promoted the original barless-A drawing into shared, font-independent vector wordmarks. Other letters outline Outfit ExtraBold 800. Dark/light SVGs, UI marks and raster lockups share the same generated geometry; normal copy retains Outfit's standard A. Supplied ribbon PNGs remain unchanged.
+- Inspected tiled noise treatment in archived home/developer pages, then generated a fresh seeded monochrome tile behind warm ivory. No archived texture or blue page background was introduced.
+- Verification: regenerated six compositions and two lockups; checked shared five-path SVG geometry, font independence, grain dimensions/alpha/variation, nine HTML pages, original asset hashes and document links. Actual Outfit loading, 16-pixel body, 14-pixel minimum, image proportions and overflow passed at 1440/728/390 widths. Fresh desktop/mobile screenshots were inspected; browser helpers were closed.
+- Tooling boundary: CairoSVG was installed but could not resolve its Cairo library. Reused installed fontTools and librsvg (`rsvg-convert`) for outlined wordmark generation/rasterization; no packages were installed. Native browser implementation and branding legal clearance remain outside this work.
+
+## 2026-10-24: Typeface trial
+
+- Added a separate `design/brand/type-study.html` with native radio controls for Outfit, Sora and current Manrope, plus an original SVG barless-A experiment. The supplied wordmark's exact typeface remains unidentified; Outfit ExtraBold is a visual candidate, not a verified match.
+- Added unchanged OFL font binaries with license notices, source links and SHA-256 hashes. Main brand page, generated artwork and ZIP were preserved pending selection.
+- Verification: all three fonts loaded and switched correctly at 1440/390 widths, with a 14-pixel minimum and no horizontal overflow. Native arrow-key selection passed; fresh desktop/mobile screenshots were inspected. Static branding checks cover nine HTML pages; document links and font hashes passed. No production browser behavior was tested.
+
 ## 2026-10-24: M0 motion study and pinned foundation build
 
 - Starting source content: archived-reference baseline `6de61de`; concurrent README/brand work and GitHub attribution corrections were preserved.

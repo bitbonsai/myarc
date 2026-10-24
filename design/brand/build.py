@@ -1,7 +1,13 @@
 """Generate editable artboards and transparent lockups. Requires Pillow for PNGs."""
 from pathlib import Path
+import io
 import json
-from PIL import Image, ImageDraw, ImageFont
+import random
+import subprocess
+from PIL import Image
+from fontTools.pens.svgPathPen import SVGPathPen
+from fontTools.ttLib import TTFont
+from fontTools.varLib.instancer import instantiateVariableFont
 
 ROOT = Path(__file__).resolve().parent
 ASSETS = ROOT / 'assets'
@@ -10,15 +16,52 @@ EXPORTS = ROOT / 'exports'
 for directory in (ARTWORK, EXPORTS):
     directory.mkdir(exist_ok=True)
 
+# Static original grain, drawn behind content rather than over text.
+rng = random.Random(17)
+grain = Image.new('LA', (256, 256))
+grain.putdata([(rng.randrange(256), 12) for _ in range(256 * 256)])
+grain.save(ASSETS / 'grain.png')
+
+font = instantiateVariableFont(TTFont(ASSETS / 'Outfit.ttf'), {'wght': 800})
+glyphs = font.getGlyphSet()
+cmap = font.getBestCmap()
+cap = font['OS/2'].sCapHeight
+pad = 40
+baseline = pad + cap
+height = cap - font['hhea'].descent + 2 * pad
+cursor = pad
+paths = []
+for char in 'myArc':
+    name = cmap[ord(char)]
+    advance = font['hmtx'][name][0]
+    if char == 'A':
+        scale = cap / 80
+        left = cursor + (advance - cap) / 2
+        paths.append(f'<path d="M7 76 L37 8 Q40 2 43 8 L73 76" transform="translate({left:g} {pad}) scale({scale:g})" fill="none" stroke="currentColor" stroke-width="18" stroke-linejoin="round"/>')
+    else:
+        pen = SVGPathPen(glyphs)
+        glyphs[name].draw(pen)
+        paths.append(f'<path d="{pen.getCommands()}" transform="translate({cursor:g} {baseline}) scale(1 -1)"/>')
+    cursor += advance - 35
+width = cursor + 35 + pad
+wordmarks = {}
+for finish, color in (('ink', '#182432'), ('ivory', '#f5f2ec')):
+    svg = f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}" fill="{color}" color="{color}"><title>myArc, Outfit ExtraBold with custom A</title>{"".join(paths)}</svg>\n'
+    (ASSETS / f'wordmark-{finish}.svg').write_text(svg)
+    rendered = subprocess.run(['rsvg-convert', '--height', '320'], input=svg.encode(), stdout=subprocess.PIPE, check=True)
+    wordmarks[finish] = Image.open(io.BytesIO(rendered.stdout)).convert('RGBA')
+    assert wordmarks[finish].width <= 1010, 'Wordmark exceeds lockup clear space'
+
 CSS = '''
-@font-face{font-family:Manrope;src:url('../assets/Manrope.ttf');font-weight:200 800}
-*{box-sizing:border-box}html{font-size:100%}html,body{margin:0}body{font-family:Manrope,sans-serif;font-size:1rem}
+@font-face{font-family:Outfit;src:url('../assets/Outfit.ttf');font-weight:100 900}
+*{box-sizing:border-box}html{font-size:100%}html,body{margin:0}body{font-family:Outfit,sans-serif;font-size:1rem}
 .art{position:relative;overflow:hidden;background:#f5f2ec;color:#182432}
-.word{font-weight:800;letter-spacing:-.055em;line-height:1}
+.word{font-weight:800;letter-spacing:-.035em;line-height:1}
+.word img{display:block;height:1em;width:auto}.desktop .word img,.phone .word img{margin:auto}
 .top{position:absolute;top:3.25rem;left:4rem;right:4rem}
 .top .word{font-size:2.25rem}
 .dark{background:#101c2b;color:#f5f2ec}
-h1{font-size:5.5rem;line-height:1.02;letter-spacing:-.055em;font-weight:600;margin:0}
+h1{font-size:5.5rem;line-height:1.02;letter-spacing:-.045em;font-weight:600;margin:0}
 .social .headline{position:absolute;top:14.0625rem;left:4rem;z-index:1}
 .social .mark{position:absolute;width:27.5rem;height:27.5rem;right:3.5rem;top:5.9375rem}
 .orbit{position:absolute;width:40rem;height:40rem;border:.0625rem solid #b8a8b130;border-radius:50%;right:-3.125rem;top:-.5625rem}
@@ -39,14 +82,15 @@ h1{font-size:5.5rem;line-height:1.02;letter-spacing:-.055em;font-weight:600;marg
 '''
 
 logo = lambda finish: f'<img class="mark" src="../assets/myarc-{finish}.png" alt="myArc {finish} logo">'
-top = '<div class="top"><span class="word">myArc</span></div>'
+wordmark = lambda finish: f'<div class="word"><img src="../assets/wordmark-{finish}.svg" alt="myArc"></div>'
+top = lambda finish: f'<div class="top">{wordmark(finish)}</div>'
 ART = {
-    'social-dark': (1200, 630, 'social dark', top + '<div class="orbit"></div><div class="headline"><h1>Arc, forever<br>yours.</h1></div>' + logo('glass')),
-    'social-light': (1200, 630, 'social', top + '<div class="orbit"></div><div class="headline"><h1>Arc, forever<br>yours.</h1></div>' + logo('matte')),
-    'social-square': (1080, 1080, 'square', top + logo('glass') + '<h1>Arc, forever<br>yours.</h1>'),
-    'wallpaper-dark': (2560, 1600, 'desktop dark', '<div class="ring"></div>' + logo('glass') + '<div class="word">myArc</div><div class="tagline">Arc, forever yours.</div>'),
-    'wallpaper-light': (2560, 1600, 'desktop light', '<div class="ring"></div>' + logo('matte') + '<div class="word">myArc</div><div class="tagline">Arc, forever yours.</div>'),
-    'wallpaper-phone': (1440, 2560, 'phone', '<div class="ring"></div>' + logo('glass') + '<div class="word">myArc</div><p>Arc, forever yours.</p>'),
+    'social-dark': (1200, 630, 'social dark', top('ivory') + '<div class="orbit"></div><div class="headline"><h1>Arc, forever<br>yours.</h1></div>' + logo('glass')),
+    'social-light': (1200, 630, 'social', top('ink') + '<div class="orbit"></div><div class="headline"><h1>Arc, forever<br>yours.</h1></div>' + logo('matte')),
+    'social-square': (1080, 1080, 'square', top('ink') + logo('glass') + '<h1>Arc, forever<br>yours.</h1>'),
+    'wallpaper-dark': (2560, 1600, 'desktop dark', '<div class="ring"></div>' + logo('glass') + wordmark('ivory') + '<div class="tagline">Arc, forever yours.</div>'),
+    'wallpaper-light': (2560, 1600, 'desktop light', '<div class="ring"></div>' + logo('matte') + wordmark('ink') + '<div class="tagline">Arc, forever yours.</div>'),
+    'wallpaper-phone': (1440, 2560, 'phone', '<div class="ring"></div>' + logo('glass') + wordmark('ivory') + '<p>Arc, forever yours.</p>'),
 }
 
 manifest = []
@@ -57,17 +101,12 @@ for name, (width, height, classes, content) in ART.items():
     (ARTWORK / f'{name}.html').write_text(html)
     manifest.append({'name': name, 'width': width, 'height': height})
 
-font = ImageFont.truetype(str(ASSETS / 'Manrope.ttf'), 320)
-font.set_variation_by_name('ExtraBold')
-for finish, color in (('matte', '#182432'), ('glass', '#f5f2ec')):
+for finish, wordmark_finish in (('matte', 'ink'), ('glass', 'ivory')):
     # Keep original logo proportions and full canvas, including transparent margin.
     mark = Image.open(ASSETS / f'myarc-{finish}.png').convert('RGBA')
     lockup = Image.new('RGBA', (1550, 480))
     lockup.alpha_composite(mark.resize((400, 400), Image.Resampling.LANCZOS), (40, 40))
-    draw = ImageDraw.Draw(lockup)
-    bounds = draw.textbbox((0, 0), 'myArc', font=font)
-    text_y = (480 - (bounds[3] - bounds[1])) / 2 - bounds[1]
-    draw.text((500, text_y), 'myArc', font=font, fill=color)
+    lockup.alpha_composite(wordmarks[wordmark_finish], (500, 80))
     lockup.save(EXPORTS / f'lockup-{finish}.png')
     for size in (128, 256, 512, 1024):
         mark.resize((size, size), Image.Resampling.LANCZOS).save(EXPORTS / f'mark-{finish}-{size}.png')

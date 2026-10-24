@@ -17,11 +17,13 @@ while read -r name width height; do
 done < <(python3 -c "import json; [print(a['name'], a['width'], a['height']) for a in json.load(open('artwork/manifest.json'))]")
 agent-browser --session myarc-brand open "file://$root/index.html"
 agent-browser --session myarc-brand eval "document.fonts.ready.then(() => Promise.all(Array.from(document.images).map(img => img.decode())))"
-for width in 1440 390; do
+for width in 1440 728 390; do
   agent-browser --session myarc-brand set viewport "$width" 1000
   agent-browser --session myarc-brand eval --stdin <<'JS'
 (() => {
   const rootSize = parseFloat(getComputedStyle(document.documentElement).fontSize)
+  const outfitLoaded = Array.from(document.fonts).some(font => font.family === 'Outfit' && font.status === 'loaded')
+  if (!outfitLoaded || !getComputedStyle(document.body).fontFamily.startsWith('Outfit')) throw new Error('Outfit must be loaded and active')
   if (parseFloat(getComputedStyle(document.body).fontSize) !== rootSize) throw new Error('Body must use 1rem')
   if (document.documentElement.scrollWidth > innerWidth) throw new Error('Horizontal overflow')
   const textElements = Array.from(document.querySelectorAll('body *')).filter(el =>

@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>myArc / Typeface trial</title>
+  <style>
+    @font-face { font-family: Outfit; src: url('assets/Outfit.ttf'); font-weight: 100 900 }
+    @font-face { font-family: Sora; src: url('assets/Sora.ttf'); font-weight: 100 800 }
+    @font-face { font-family: Manrope; src: url('assets/Manrope.ttf'); font-weight: 200 800 }
+    * { box-sizing: border-box }
+    html { font-size: 100% }
+    body { margin: 0; background: #f5f2ec; background-image: url('assets/grain.png'); background-size: 16rem 16rem; color: #182432; font-family: Outfit, sans-serif; font-size: 1rem; line-height: 1.55 }
+    a { color: inherit; text-underline-offset: .25rem }
+    a:focus-visible, input:focus-visible { outline: .1875rem solid #034bf4; outline-offset: .25rem }
+    img { display: block; max-width: 100%; height: auto }
+    .trial { --trial: Outfit; max-width: 80rem; padding: 0 3rem; margin: auto; font-family: var(--trial), sans-serif }
+    .trial:has(#sora:checked) { --trial: Sora }
+    .trial:has(#manrope:checked) { --trial: Manrope }
+    .nav { display: flex; align-items: center; justify-content: space-between; gap: 1.5rem; padding: 1.75rem 0; border-bottom: .0625rem solid #18243225 }
+    .brand { font-size: 2rem; font-weight: 800; letter-spacing: -.035em; line-height: 1 }
+    fieldset { display: flex; flex-wrap: wrap; gap: 1rem 2rem; padding: 1rem 0; margin: 1.25rem 0 0; border: 0 }
+    legend { padding: 0; font-size: .875rem; color: #54616d }
+    label { display: flex; gap: .625rem; align-items: center; cursor: pointer; min-height: 2.75rem }
+    input { width: 1.125rem; height: 1.125rem; margin: 0; accent-color: #034bf4 }
+    label small { font-size: .875rem; color: #54616d }
+    .hero { display: grid; grid-template-columns: 1fr 1fr; gap: 3rem; align-items: center; padding: 2rem 0 3rem }
+    h1 { margin: 0; font-size: 4.5rem; font-weight: 600; letter-spacing: -.045em; line-height: 1.08 }
+    .lede { max-width: 30rem; margin: 1.5rem 0 0; font-size: 1.125rem; line-height: 1.6; color: #54616d }
+    .art { display: grid; place-items: center; aspect-ratio: 1; background: #101c2b; border-radius: 1.125rem }
+    .art img { width: 76% }
+    .wordmarks { display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; padding: 2rem 0; border-top: .0625rem solid #18243225; border-bottom: .0625rem solid #18243225 }
+    h2 { font-size: 1rem; font-weight: 500; margin: 0 0 1.25rem; color: #54616d }
+    .wordmark { margin: 0; font-size: 6rem; font-weight: 800; letter-spacing: -.035em; line-height: 1.15; white-space: nowrap }
+    .selected-mark { height: 1em; width: auto }
+    .note { font-size: .875rem; color: #54616d; margin: 1.5rem 0 2rem }
+    @media (max-width: 70rem) { h1 { font-size: 3.5rem } .wordmark { font-size: 5rem } }
+    @media (max-width: 48rem) {
+      .trial { padding: 0 1.5rem }
+      .hero { grid-template-columns: 1fr; gap: 2rem }
+      h1 { font-size: 3rem; max-width: 12ch }
+      .art { max-width: 32rem; width: 100% }
+      .wordmark { font-size: 4rem }
+    }
+    @media (max-width: 30rem) {
+      .trial { padding: 0 1.25rem }
+      h1 { font-size: 2.5rem }
+      .wordmarks { grid-template-columns: 1fr; gap: 2rem }
+      fieldset { gap: .5rem 1.25rem }
+      .nav { flex-wrap: wrap }
+    }
+  </style>
+</head>
+<body>
+  <main class="trial">
+    <header class="nav"><span class="brand"><img class="selected-mark" src="assets/wordmark-ink.svg" alt="myArc"></span><a href="index.html">Current brand kit ↗</a></header>
+    <fieldset>
+      <legend>Typeface</legend>
+      <label><input id="outfit" name="typeface" type="radio" checked>Outfit <small>current</small></label>
+      <label><input id="sora" name="typeface" type="radio">Sora</label>
+      <label><input id="manrope" name="typeface" type="radio">Manrope <small>previous</small></label>
+    </fieldset>
+    <section class="hero">
+      <div><h1>myArc, forever yours.</h1><p class="lede">An open-source browser project bringing back Arc's browsing experience, with a local, exportable workspace and optional AI.</p></div>
+      <div class="art"><img src="assets/myarc-glass.png" alt="myArc glass logo"></div>
+    </section>
+    <section class="wordmarks" aria-label="Wordmark comparison">
+      <div><h2>ExtraBold 800</h2><p class="wordmark">myArc</p></div>
+      <div><h2>Selected custom wordmark</h2><p class="wordmark"><img class="selected-mark" src="assets/wordmark-ink.svg" alt="myArc with a custom barless A"></p></div>
+    </section>
+    <p class="note">Outfit with a custom A is selected. Other fonts remain for comparison.</p>
+  </main>
+</body>
+</html>
