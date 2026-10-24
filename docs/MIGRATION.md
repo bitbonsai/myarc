@@ -4,7 +4,7 @@
 
 Preserving workspace structure is the first engineering deliverable after feasibility. Existing users need a recoverable copy before losing access to Arc. Do not wait for a browser release to make export/conversion useful.
 
-Arc advertises exports and its own migration to Dia. This does **not** establish that a third-party export contains every field or that myarc can read it. Supported producer versions and complete coverage remain unverified. One consented Markdown sample now has a [structure inventory and independent fixture](../tests/fixtures/arc-markdown/README.md). It contains Space labels and grouped URL lists; its export action and `Favorites` scope still need confirmation. The file lacks Profile identities and tab titles, so neither can be restored from this sample alone. A production importer remains unimplemented.
+Arc advertises exports and its own migration to Dia. This does **not** establish that a third-party export contains every field or that myarc can read it. Supported producer versions and complete coverage remain unverified. One consented Markdown sample now has a [structure inventory and independent fixture](../tests/fixtures/arc-markdown/README.md). It contains Space labels and grouped URL lists from a user-confirmed built-in export action; `Favorites` scope still needs confirmation. The file lacks Profile identities and tab titles, so neither can be restored from this sample alone. A production importer remains unimplemented.
 
 ## Import order
 

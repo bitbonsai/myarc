@@ -1,6 +1,6 @@
 # Observed Markdown export shape
 
-MA-003.a, inspected 2026-10-24. One user-supplied Arc export is held privately outside this repository. Its producing menu/action and build remain unverified. Arc 1.170.0 was observed locally, but the attachment itself identifies neither producer nor schema version. This is format reconnaissance, not importer acceptance.
+MA-003.a, inspected 2026-10-24. One user-supplied Arc export is held privately outside this repository. The user confirmed the built-in route, `Arc > Settings > Advanced > Export Data`, with a settings screenshot. Arc 1.170.0 was observed locally; the exported file and screenshot carry no producer-build or schema version marker. This is format reconnaissance, not importer acceptance.
 
 [workspace.md](workspace.md) is an independently written counterpart. All labels and URLs are invented; hosts use reserved `.test` names. It preserves the observed layout and repetition without publishing personal browsing data. The source file and its fingerprint remain private. No URLs were opened during inspection.
 
@@ -25,4 +25,4 @@ Tab titles, stable item IDs, canonical-versus-current URL distinctions and expli
 
 The synthetic counterpart has four first-level headings, five second-level groups, 19 URL occurrences and ten distinct URLs. Its first `Favorites` group has one extra URL, preserving an ownership ambiguity worth testing. The other groups share three URL strings. This proves textual repetition, not actual Profile relationships.
 
-No production parser, conversion or round trip has been implemented or tested. The next evidence needed is the exact export action, a known top-level pin versus favorite case, and a nested-folder sample.
+No production parser, conversion or round trip has been implemented or tested. The next evidence needed is a known top-level pin versus favorite case and a nested-folder sample. Producing-build binding remains contextual rather than embedded in the file.

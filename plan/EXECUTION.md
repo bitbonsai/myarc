@@ -48,7 +48,7 @@ Done: source/version matrix, field mapping, sample-independent synthetic fixture
 
 ### MA-003.a: inventory a supplied Markdown sample
 
-Observed one privately supplied export and created an [independent structural fixture](../tests/fixtures/arc-markdown/README.md). First-level Space labels, named second-level groups and ordered URL lists are present. Producer/version markers, Profile identities and tab titles are absent. The `Favorites` label does not establish ownership or distinguish favorite/pin types. Stop at observed structure and an invented counterpart; production parsing, nested-folder coverage and semantic mapping remain open. Confirm the producing action before claiming official-format compatibility.
+Observed one privately supplied export and created an [independent structural fixture](../tests/fixtures/arc-markdown/README.md). First-level Space labels, named second-level groups and ordered URL lists are present. Producer/version markers, Profile identities and tab titles are absent. The `Favorites` label does not establish ownership or distinguish favorite/pin types. Stop at observed structure and an invented counterpart; production parsing, nested-folder coverage and semantic mapping remain open. The user confirmed the built-in export action with a settings screenshot. This establishes the route, while compatibility across builds and richer cases remains unverified.
 
 ## MA-004 — Implement the Rust workspace and commands
 

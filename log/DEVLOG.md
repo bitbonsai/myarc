@@ -6,7 +6,7 @@ Keep significant outcomes, failures and next actions reproducible. Newest entry 
 
 - MA-003.a: inspected a user-supplied Markdown sample read-only, with source fingerprint unchanged. Space headings, second-level named groups and ordered bare URLs are present. The file provides no producer/schema version, Profile IDs or tab titles. No URLs were opened.
 - Created [an independent shape fixture](../tests/fixtures/arc-markdown/README.md) using invented labels and reserved `.test` URLs. Repeated `Favorites` groups retain an ownership ambiguity; equal URLs cannot establish shared Profiles or justify global deduplication.
-- Verification covers relative links, fixture structure and separation from private source values. This is evidence preparation, with no production importer or semantic round trip claimed. Exact export action, favorite-versus-pin scope and nested-folder representation remain open. Personal source bytes and fingerprint stay outside the repository.
+- Verification covers relative links, fixture structure and separation from private source values. This is evidence preparation, with no production importer or semantic round trip claimed. Follow-up settings screenshot confirms the built-in export action; route is recorded in the fixture inventory. Producing-build binding, favorite-versus-pin scope and nested-folder representation remain open. Personal source bytes, fingerprint and screenshot stay outside the repository.
 
 ## 2026-10-24: Chromium build and bounded Rust/native proof
 
