@@ -2,6 +2,8 @@
 
 All tasks are **ready for specification or blocked by stated dependencies**, not implemented. Each task should become a small set of reviewable changes with evidence. Dates and priorities are in [ROADMAP.md](../ROADMAP.md).
 
+These IDs identify workstreams. Break the selected workstream into bounded slices (for example `MA-004.a`) with a concrete outcome, affected boundary and evidence. Follow [behavior contracts](BEHAVIOR-CONTRACTS.md) and [the adapted workflow](../docs/ARTCRAFT-WORKFLOW.md). Standalone core/preservation work does not require a successful Chromium build; browser integration does.
+
 ## MA-001 — Design the animated first minute
 
 Dependencies: product brief; final integration waits for MA-004/007. Begin immediately.
@@ -28,11 +30,11 @@ Done: source/version matrix, field mapping, sample-independent synthetic fixture
 
 ## MA-004 — Implement the Rust workspace and commands
 
-Dependencies: MA-002 integration boundary; MA-003 findings inform schema. Schema/specification can begin earlier.
+Dependencies: agreed workspace behavior contract; MA-003 findings for supported Arc field mappings. MA-002 is required for native browser integration only. The standalone Rust model, commands and preservation path must not wait for a Chromium build or depend on browser/UI libraries.
 
 Implement stable IDs, Profile references, Spaces, favorites, pins/folders, temporary tabs, archives and import receipts. Add validation and the initial command registry. Keep runtime browser IDs separate from persistent IDs. Share the exact same model between preservation CLI and browser integration.
 
-Done: meaningful semantic tests for many-Spaces-to-one-Profile, invalid ownership/cycles, move/reorder/rename, unsupported versions and round trips. The minimal command API is usable without a UI and matches [control contract](../docs/CONTROL-PROTOCOL.md).
+Done: meaningful semantic tests for many-Spaces-to-one-Profile, invalid ownership/cycles, move/reorder/rename, unsupported versions and round trips. The minimal command API is usable without a UI and matches [control contract](../docs/CONTROL-PROTOCOL.md). With the first real Rust code, add functioning formatting/lint, dependency-boundary and relevant command checks; validate nonzero test execution. Do not add empty crates or a harness that reports unimplemented checks as passing.
 
 ## MA-005 — Make workspace storage recoverable
 

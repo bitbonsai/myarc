@@ -17,4 +17,6 @@ Updated: 2026-10-24. No engineering blocker below has been cleared.
 
 Choose the highest-ranked task whose dependencies and resources are available. Keep MA-001 design progress moving while build/data investigations proceed; this is a sequencing instruction, not authorization to spawn autonomous agents or contact users.
 
+The standalone Rust model and preservation path may progress while the browser foundation is blocked; MA-004 no longer treats a completed Chromium build as a prerequisite. Use [behavior contracts](../plan/BEHAVIOR-CONTRACTS.md) to settle cross-system rules and retain useful failed-attempt context in [the development log](../log/DEVLOG.md).
+
 Security, data loss, cross-Profile leakage, an invalid updater, or import corruption outrank feature work. A blocked task produces a concrete blocker record, not pretend completion.

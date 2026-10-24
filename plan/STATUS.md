@@ -10,6 +10,8 @@ Updated: 2026-10-24.
 | Arc import | Coverage contract documented; real schema/version evidence still needed |
 | Browser foundation | Recommended approach documented; no local build or integration performed |
 | Agent workflow | Contributor instructions and task sequence prepared |
+| Artcraft workflow audit | Behavior contracts, bounded tasks, development log, evidence freshness and regression rules added; standalone core dependency corrected |
+| Executable check today | Relative document-link checker; GitHub Actions workflow added for that same check only |
 | Browser/importer/AI implementation | Not started |
 | Benchmarks/application tests | Not run; budgets are proposals |
 

@@ -20,12 +20,16 @@ Research date: 2026-10-24. These are primary sources and a limited public-docume
 | R12 | [DesignCraft AGENTS](https://github.com/storytold/designcraft/blob/main/AGENTS.md), [raw](https://raw.githubusercontent.com/storytold/designcraft/main/AGENTS.md) | Session orientation and recovery emphasis | Some referenced session plans are ignored/private rather than public templates |
 | R13 | [PhotoCraft roadmap](https://github.com/storytold/photocraft/blob/main/ROADMAP.md) | Separates breadth, practical readiness, estimates, and evidence | Its numbers are its own assessments, not verified proof of agent productivity or a browser schedule |
 | R14 | [Chromium Rust documentation](https://chromium.googlesource.com/chromium/src/+/HEAD/docs/rust/), [Rust FFI](https://chromium.googlesource.com/chromium/src.git/+/main/docs/rust/ffi.md), [API design](https://chromium.googlesource.com/chromium/src/+/main/docs/rust/api_design.md) | Official Rust integration and C++ interoperation guidance; support differs by tool/direction/platform | Select and pin supported integration at M0; myarc's bridge has not been implemented |
+| R15 | [PhotoCraft readiness assessment](https://github.com/storytold/photocraft/blob/main/docs/target-app-parity.md) | Revised estimates and separation of presence from practical replacement quality | Repository's self-assessment, not independently reproduced measurements |
+| R16 | [PhotoCraft development guide](https://github.com/storytold/photocraft/blob/main/docs/development.md), [scorecard](https://github.com/storytold/photocraft/blob/main/docs/scorecard.md) | Separate behavior/native checks, fresh artifacts and actual test selection; structured/generated progress and explicit measurement states | Read through public GitHub file access when raw retrieval failed; implementation remains theirs, not copied tooling |
 
 ## What to take from Artcraft
 
 Use documented session orientation, clear subsystem boundaries, a common command path, explicit failure handling, and proof attached to completion claims. Separate a feature's presence from its usefulness. Keep a ranked gap list and automate meaningful checks as actual code appears. These are methodological choices; repository popularity, commit counts, or screenshots do not establish dependable replacement quality.
 
 Adapt rather than transplant: a browser must preserve upstream security and extension infrastructure. Our Rust core therefore sits beside Chromium's existing platform. Our public `plan/` contains publishable tasks and decisions; private samples and machine/session data stay out of it. Shared rules stay inside this repository until multiple projects justify extraction. We do not reproduce a private `craftrules` repository or copy a sibling app's constraints blindly.
+
+The follow-up audit and concrete application decisions are in [ARTCRAFT-WORKFLOW.md](ARTCRAFT-WORKFLOW.md). It adds behavior-contract seeds, reproducible work records and a dependency correction; it does not claim that application checks exist before implementation.
 
 ## How much the help center can teach us
 

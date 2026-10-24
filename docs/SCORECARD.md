@@ -18,6 +18,7 @@ All results: **not measured**. Numbers below are proposed acceptance budgets to 
 | Accessibility | Core journeys work with keyboard, screen reader, zoom, OS contrast/reduced motion | Manual review plus appropriate automation; no broad compliance claim from a single scan |
 | Daily use | No unresolved P0 issue after a 14-day consenting cohort trial | Redacted issue log, task outcomes, known limitations |
 | AI off / provider failure | No inference/page upload when off; local/BYOK/hosted failure does not affect browsing | Request traces, denied network tests and secret/log review |
+| Visible controls | Zero unexplained no-op settings/actions in supported journeys | Command/control inventory with observed effect, enabled condition and semantic check; unsupported controls disabled/explained or omitted |
 
 ## Extension test categories
 
@@ -26,3 +27,7 @@ Cover at least: MV3 service worker lifecycle, password manager with permitted na
 ## Reporting
 
 Evidence lives with a dated build record and issue references. Unmeasured, unsupported, failed, and passed are distinct states. A gate may change only through a recorded decision explaining the user impact. Deadlines and attractive demos cannot waive security, privacy, migration integrity, or updater failures.
+
+Record actual executed test names/counts and use fresh output directories for recordings/snapshots. Zero selected tests and artifacts left by an earlier run do not count. When comparable measurements exist, retain passing behavior checks and record before/after results; do not silently lower a regression baseline. Keep aspirational budgets distinct from demonstrated floors.
+
+This scorecard is manually maintained today. With the first measurement harness, introduce structured evidence records containing scenario ID, build/revision, platform, workload/fixture, status, command, run time, measurement and artifact reference. Derive the report and verify freshness in CI. Do not scaffold a generator until it has real records to validate. The current documentation CI validates link paths only.

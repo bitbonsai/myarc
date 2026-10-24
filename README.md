@@ -31,6 +31,8 @@ An independent browser project for people who love Arc's workflow: a calm sideba
 | [Ranked gaps](docs/GAPS.md) | Work order and launch blockers |
 | [Scorecard](docs/SCORECARD.md) | Proposed budgets and evidence needed to ship |
 | [Agent workflow](AGENTS.md) | How to contribute without drifting from the product |
+| [Artcraft methods applied](docs/ARTCRAFT-WORKFLOW.md) | Practical lessons, current enforcement and implementation triggers |
+| [Behavior contracts](plan/BEHAVIOR-CONTRACTS.md) | Precise interactions and unresolved questions before coding |
 | [Execution plan](plan/EXECUTION.md) | First ten implementation tasks with definitions of done |
 | [Research](docs/RESEARCH.md) | Primary sources, limitations, and Artcraft lessons |
 
@@ -47,3 +49,5 @@ Follow [plan/EXECUTION.md](plan/EXECUTION.md), starting with task MA-001. Work t
 ## Contributing
 
 Read [AGENTS.md](AGENTS.md) and [CONTRIBUTING.md](CONTRIBUTING.md). Current documents and original tooling are MIT licensed; future upstream code retains its own notices and license obligations. A chosen browser foundation must receive a separate license review before integration or distribution.
+
+Run `python3 tools/check_docs.py` for the same relative-link check used by the documentation CI. Browser/Rust verification remains planned until implementation exists.

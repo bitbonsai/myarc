@@ -6,6 +6,8 @@ Read [README.md](README.md), [ROADMAP.md](ROADMAP.md), [plan/STATUS.md](plan/STA
 
 This is currently a planning repository. No browser or importer exists. Do not describe planned commands, crates, tests, animations, or integrations as implemented.
 
+Use [docs/ARTCRAFT-WORKFLOW.md](docs/ARTCRAFT-WORKFLOW.md) for the adapted working method, [plan/BEHAVIOR-CONTRACTS.md](plan/BEHAVIOR-CONTRACTS.md) for cross-system interactions, and relevant recent entries in [log/DEVLOG.md](log/DEVLOG.md) when resuming an investigation.
+
 ## Protect the product
 
 - No mandatory account, AI, subscription, or hosted service for local browsing, migration, recovery, and export.
@@ -38,6 +40,10 @@ Use upstream browser security/profile machinery; do not bypass sandboxing or dup
 5. For motion/interaction changes, inspect a running build, record the relevant sequence and verify reduced motion/focus. Use synthetic data for public artifacts.
 6. Update status, parity and blockers with evidence, then commit a coherent change. Record what remains unmeasured.
 
+Treat MA-001–MA-010 as workstreams. Select one bounded outcome and use a task suffix for implementation slices, with explicit acceptance evidence and a stopping condition. Record significant outcomes and failed attempts in the development log. Verify that filtered tests actually executed and that visual/output artifacts are fresh from the reported run. A zero-test exit or stale screenshot is not proof.
+
+Retain regression checks for established behaviors; change baselines only with an explained product/measurement decision. Once browser UI exists, audit visible settings and commands for an observable effect. Disable/explain or omit unsupported controls rather than presenting a working-looking no-op.
+
 Do not mark a task complete based on code volume, a screenshot, build success alone, or a simulated backend. Never invent productivity multipliers, implementation percentages, benchmark results, or successful test runs. Propose parallel ownership only when it would help; obey the session's rules about authorizing additional agents.
 
 ## Sources and public repository hygiene
@@ -49,3 +55,5 @@ Commit publishable `plan/` tasks and decisions. Never commit real browser profil
 ## Actual verification available now
 
 Run `python3 tools/check_docs.py` from the repository root for relative document links. It is a local documentation check, not a browser test or security scanner. Read [docs/SCORECARD.md](docs/SCORECARD.md) for the future release evidence.
+
+The documentation workflow runs this same narrow check in GitHub Actions. Adding CI does not enforce branch protection or implement Rust/application gates.
