@@ -32,6 +32,7 @@ These are design commitments, not claims that the planned features work today.
 - Keep workspace data local and exportable, with no required account or background uploads to AI services. Websites still use the network; ownership of the workspace is the promise.
 - Make CLI and MCP supported launch interfaces over the same commands as the UI, with scoped access and an obvious Stop control.
 - Keep AI optional: off by default, with local models, user API keys, and an optional paid hosted service. The browser must remain useful without that service.
+- Block ads and trackers by default, with clear per-site controls. Verify the blocking implementation against the selected Chromium version before release.
 - Support Chrome extensions through a proven browser implementation, with published compatibility results.
 - Include Boosts, beginning with appearance, CSS, and element hiding. No Easels.
 - Launch with an animated onboarding experience that teaches by doing.

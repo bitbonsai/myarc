@@ -8,7 +8,7 @@ Serve desktop Arc users who have invested in Spaces, folders, named pinned tabs,
 
 ## Requirements carried into this plan
 
-The project brief calls for account-free browsing, Chromium extension compatibility, Arc settings import, an onboarding experience with meaningful animation, Boosts, no Easels, entirely optional AI through local models/user keys/a paid hosted service, and browser control through CLI and MCP for AI agents. These are product constraints. The technical choices and dates below are proposals, not prior decisions.
+The project brief calls for account-free browsing, ad and tracker blocking enabled by default, Chromium extension compatibility, Arc settings import, an onboarding experience with meaningful animation, Boosts, no Easels, entirely optional AI through local models/user keys/a paid hosted service, and browser control through CLI and MCP for AI agents. These are product constraints. The technical choices and dates below are proposals, not prior decisions.
 
 ## Design commitments
 
@@ -18,6 +18,7 @@ These commitments guide product and design tradeoffs. They do not describe shipp
 - Native desktop browser. Build on Chromium's complete browser layer with a Rust-owned workspace core. Use Chromium WebUI where it fits; do not use Electron as the production shell or describe the full browser as pure Rust.
 - Familiar from day one. Preserve Arc's useful layouts, shortcuts, Spaces, and workspace habits. Use onboarding to explain differences rather than ask people to relearn browsing.
 - Your workspace, your machine. Keep workspace state local, exportable, and usable without an account. Do not upload pages or workspace data to AI services in the background. Normal website traffic still uses the network.
+- Default-on blocking. Block ads and trackers from the first page load, with Profile-scoped per-site exceptions and a clear way to restore protection. Verify engine/filter compatibility and update behavior on the selected Chromium version; the implementation is not chosen yet.
 - Agent-ready. Expose CLI and MCP as supported product interfaces over the same command path as the UI. Scope each grant and give the user a visible way to stop control.
 
 For the project site, use a restrained grid, clear typography, and small blue accents. The browser should keep that clarity while allowing warmer, more personal Spaces and motion.
@@ -44,6 +45,7 @@ Dia already advertises optional AI and Arc migration. Those are baseline competi
 | P0 | Command bar | Open URL/search, find existing tab, dispatch common actions, remain inside the active Profile |
 | P0 | Migration and export | Preview, selection, recoverable commit, truthful coverage report, portable workspace |
 | P0 | Browser essentials | Extensions, permissions, downloads, history, find, private browsing, context menus, DevTools, recovery, updates |
+| P0 | Default-on ad and tracker blocking | Fresh Profiles start protected; per-site exceptions remain Profile-scoped; engine/filter updates and site recovery are tested on the selected Chromium version |
 | P0 | CLI and MCP browser control | An approved agent can inspect and act on real pages, manage tabs/Spaces, capture screenshots and stop/release control through a shared interface; works independently of built-in AI |
 | P1, beta target | Peek and two-pane Split View | Correct focus, navigation, dismissal, persistence; no cross-Profile split |
 | P1, beta target | Boosts | Appearance controls, CSS, element hiding; inspectable and reversible |

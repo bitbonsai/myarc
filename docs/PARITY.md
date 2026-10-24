@@ -14,6 +14,7 @@ Legend: `DOC` = public documentation/index evidence; `BRIEF` = project requireme
 | CMD-01 | URL/search/tab/action command bar | P0 | BRIEF; details UNKNOWN | Keyboard navigation, input cases, active-Profile scoping |
 | IMP-01 | Arc export preview and transaction; re-import/rollback | P0 | BRIEF; format UNKNOWN | Versioned adapters, synthetic corpus, interruption evidence |
 | EXT-01 | Extension install/use/restart/update/remove | P0 | Chromium requirement; compatibility UNKNOWN | Supported platform matrix and real store route |
+| PRV-01 | Ad and tracker blocking enabled by default | P0 | BRIEF; R18 documents Arc bundling uBlock Origin, not current-build behavior | Fresh-Profile first-load blocking; synthetic blocked/allowed requests; per-site exceptions and restore; Profile isolation; engine/filter compatibility, update failures and site recovery; not implemented |
 | CORE-01 | Permissions, downloads, history, private browsing, DevTools | P0 | Inherit platform; integration UNKNOWN | Native integration smoke tests and private-data non-persistence |
 | REL-01 | Crash recovery, versioned export, secure updates | P0 | BRIEF; project release standard | Fault injection and signed-update rehearsal |
 | AUTO-01 | CLI and MCP for scoped tab/Space and real-page control | P0 | BRIEF; [control contract](CONTROL-PROTOCOL.md) | Both-interface journey and external client evidence; grants, stale references, cancellation, Stop control; not implemented |

@@ -2,6 +2,13 @@
 
 Keep significant outcomes, failures and next actions reproducible. Newest entry first. No private exports, page titles/URLs from real browsing, credentials or raw user transcripts.
 
+## 2026-10-24 — Default-on blocking requirement
+
+- Decision: ad and tracker blocking is P0 browser scope, enabled from the first page load in fresh Profiles, with Profile-scoped per-site exceptions and restore controls.
+- Outcome: updated README commitments, product scope and PRV-01 evidence requirements. Added R18 for the Arc security FAQ; its 2024 effective date does not prove current-build defaults.
+- Boundary: no blocking engine or extension selected or implemented. Require selected-Chromium compatibility, filter updates/failure handling and synthetic blocked/allowed/site-recovery evidence before release. CLI/MCP headed/headless support remains a proposal pending confirmation.
+- Verification: relative documentation links and whitespace checks only; no browser blocking tests exist yet.
+
 ## 2026-10-24 — myArc copy and readable type
 
 - Source: README branding, `myArc. Arc, forever yours.` Consulted `claude -p --model fable --effort medium`; the response identified `claude-fable-5-1`. Advice was read-only.
