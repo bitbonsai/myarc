@@ -4,11 +4,23 @@
 
 <h1 align="center">myArc, forever yours.</h1>
 
-A browser project for Arc's Spaces, pinned tabs and keyboard workflow, with local, exportable data and optional AI.
+Arc was an awesome browser. Now it's being [sunsetted](https://arc.net/). We're building myArc to bring back the browsing experience people loved, as an open-source browser that keeps your workspace local and works without an account.
+
+The goal is familiar everyday browsing, including the sidebar, Spaces, keyboard commands, Peek, Split View and Boosts. Your setup stays exportable, and browsing won't depend on a subscription.
+
+AI is an optional layer, off by default. The plan supports models running on your machine, your own API keys (BYOK), or an optional paid hosted service. You choose what a provider can access. Pages won't be uploaded in the background, and hosted features won't be required for local browsing.
 
 **Planning stage.** Browser, importer and animated onboarding are not implemented yet.
 
 `myArc` is a working name. This project is independent of The Browser Company and Atlassian.
+
+## How we're building it
+
+This is an independent reimplementation based on public documentation and permitted observations of Arc's behavior. We're writing myArc's own code, with Chromium providing the existing browser foundation. Our [development workflow](docs/ARTCRAFT-WORKFLOW.md) takes cues from Artcraft's public projects.
+
+The planned architecture uses Rust for workspace state, import, storage and commands. Chromium's browser engine and services remain C++, including its extension support. Foundation and compatibility still need proof.
+
+CLI and MCP browser control are launch requirements. With your permission, external tools and AI agents should be able to inspect real pages, interact with them and manage tabs through the same commands as the UI. Both interfaces will work with built-in AI turned off.
 
 ## Product commitments
 
