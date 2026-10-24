@@ -2,6 +2,16 @@
 
 Keep significant outcomes, failures and next actions reproducible. Newest entry first. No private exports, page titles/URLs from real browsing, credentials or raw user transcripts.
 
+## 2026-10-24: M0 motion study and pinned foundation build
+
+- Starting source content: archived-reference baseline `6de61de`; concurrent README/brand work and GitHub attribution corrections were preserved.
+- MA-001.a: implemented `design/onboarding/` as an original, dependency-free synthetic motion study. Six scenes include empty/error/1,000-pin and reduced-motion variants, local pin/Space/search practice, Back/Skip and replay. Study state is disposable, with no importer, persistent workspace or live page claimed.
+- Evidence: six semantic Node tests and 40 agent-browser checks passed. Fresh source/artifact hashes, normal/reduced recordings and desktop/mobile captures are retained under `design/onboarding/evidence/`. Decoded recordings were inspected. No page errors or lingering browser helpers remained. Native timing, VoiceOver and formative tasks were not measured.
+- Failed checks retained as lessons: agent-browser eval needs an async wrapper for awaited animation completion; reloading during capture produced a truncated video, so capture now replays in-place and checks duration/frame count; search input swallowed Escape, fixed with explicit dialog dismissal and focus restoration.
+- MA-002.a: pinned Chromium `7ae71de816ba32868ff9f974c2716f04ebd9b860` and depot_tools, fetched outside the repository, and exercised dependency sync, hooks and GN generation. Fixed missing Git LFS, explicit depot_tools Python bootstrap, and a partial LiteRT checkout left by the first sync failure. Mirror LFS returned HTTP 405; scoped skip-smudge restored the exact clean source tree, with no generated build references to unused LiteRT prebuilt libraries. Global Git LFS configuration stayed unchanged.
+- Build attempt two completed 1,155 steps before missing Metal Toolchain stopped ANGLE. Installed Apple's component `27A266a` and resumed incremental `chrome` build with eight jobs. Build/launch, extension lifecycle, Rust/native bridge, second-revision patch, isolation/recovery and signed distribution remain unverified. [Foundation recipe/run record](../browser/README.md) documents reproducible commands and boundaries.
+- MA-003: no consented official export was supplied or private profile accessed. Coverage remains unknown; study fixtures are not Arc-format evidence. M0 stays open pending build acceptance, export evidence and named maintenance capacity.
+
 ## 2026-10-24 — Default-on blocking requirement
 
 - Decision: ad and tracker blocking is P0 browser scope, enabled from the first page load in fresh Profiles, with Profile-scoped per-site exceptions and restore controls.

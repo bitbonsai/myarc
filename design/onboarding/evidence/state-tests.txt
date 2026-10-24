@@ -1,0 +1,14 @@
+✔ reveal requires explicit successful sample application (0.579167ms)
+✔ failed application returns to recoverable preview, with no reveal (0.145458ms)
+✔ back preserves sample choice; start fresh reaches empty reveal immediately (0.826375ms)
+✔ practice records actual local interactions; skipping does not mark success (1.457125ms)
+✔ synthetic samples have stable identities and shared Profile references (9.254875ms)
+✔ unknown inputs and out-of-order actions cannot bypass scene guards (0.272958ms)
+ℹ tests 6
+ℹ suites 0
+ℹ pass 6
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 136.491833

@@ -1,0 +1,110 @@
+{
+  "started": "20261024T064100275075Z",
+  "finished": "2026-10-24T06:41:33.595852+00:00",
+  "status": "passed",
+  "agentBrowser": "agent-browser 0.27.3",
+  "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.0.0 Safari/537.36",
+  "checks": [
+    "scene: welcome",
+    "scene: source",
+    "scene: preview",
+    "preview reports fixture counts",
+    "scene: reveal",
+    "scene change focuses heading",
+    "pin opens local sample content",
+    "pin action retains keyboard focus",
+    "two Spaces retain shared Profile label",
+    "Space switch changes visible workspace",
+    "Cmd+T opens focused command dialog",
+    "search result opens sample and restores focus",
+    "scene: complete",
+    "handoff preserves selected sample page",
+    "handoff offers useful workspace focus",
+    "validated multi-frame recording: normal.webm",
+    "OS reduced motion honored",
+    "scene: reveal",
+    "empty reveal has no spatial motion under OS preference",
+    "empty sample supports guidance without fake pins",
+    "scene: complete",
+    "validated multi-frame recording: reduced.webm",
+    "OS reduced motion honored on first frame after reload",
+    "scene: preview",
+    "failed sample never enters reveal",
+    "scene: reveal",
+    "retry clears error and applies sample",
+    "Back retains selected sample",
+    "large fixture bounds initial visible sample to 12 pins",
+    "large reveal bounds animated elements to eight pins plus artwork",
+    "motion preference can change during reveal",
+    "more pins reveals next bounded page",
+    "command search exposes empty result",
+    "Escape closes dialog and restores opener focus",
+    "mobile viewport has no horizontal overflow",
+    "scene: complete",
+    "study writes no browser storage",
+    "scene: welcome",
+    "reload resets study instead of repeating sample application",
+    "no browser page errors"
+  ],
+  "sources": {
+    "design/onboarding/state.mjs": "4140ec616cc10f17b0456b8795981a1c4b590b4b27ebd602ee162a11773ea9ed",
+    "design/onboarding/state.test.mjs": "26d7b1721b8f2253b223e3c8eebab0c800808cb7c5082ce8c537895fe4a14344",
+    "design/onboarding/study.mjs": "2a8d0c60175962de7fc6e16c74bee3d97133c72478c3625d4a1003edbf9171e9",
+    "design/onboarding/index.html": "b3e9be2be9fbfa64f77a14123338e5f7898bdf55facea6aa2f760407c4f99e0a",
+    "design/onboarding/study.css": "c6e247806bd3f750f1bf422d90edd4fa02de5ccdc6b8d14932d70ac372d66b2e",
+    "tools/check_onboarding.py": "ac1a79a375b6ba955b306b031a44a812d8f5301cf79eea808ad178ff9c9d6ffd"
+  },
+  "videos": {
+    "normal.webm": {
+      "programs": [],
+      "stream_groups": [],
+      "streams": [
+        {
+          "width": 1440,
+          "height": 1000,
+          "nb_read_frames": "134"
+        }
+      ],
+      "format": {
+        "duration": "13.400000"
+      }
+    },
+    "reduced.webm": {
+      "programs": [],
+      "stream_groups": [],
+      "streams": [
+        {
+          "width": 1440,
+          "height": 1000,
+          "nb_read_frames": "34"
+        }
+      ],
+      "format": {
+        "duration": "3.400000"
+      }
+    }
+  },
+  "kind": "Synthetic web study, not native browser acceptance",
+  "artifacts": {
+    "normal.webm": {
+      "bytes": 501093,
+      "sha256": "4664293e397a990a831d6c33d0d5673e17c627d96d8e105af0a1526f28b8d7d1"
+    },
+    "reduced.webm": {
+      "bytes": 189993,
+      "sha256": "c9da0386b7e97face8320979787d8466a053511bd952bd07d373566082446bad"
+    },
+    "welcome.png": {
+      "bytes": 121308,
+      "sha256": "48c77ad7b612a913ec4f749d691065ccbbbdb2f86a9c21f47a26591bb83f7443"
+    },
+    "handoff.png": {
+      "bytes": 114640,
+      "sha256": "7c325f3068df61d7e700579fded274e3ee7ffe307ab8ad0add03e0c3ccc0e56a"
+    },
+    "mobile.png": {
+      "bytes": 88349,
+      "sha256": "b4031868e4418eda8e5d25527a8029bdc882f2735369b11984ea7bbfa474336d"
+    }
+  }
+}

@@ -10,4 +10,6 @@ Public Artcraft repository conventions informed the development methodology. Pri
 
 `design/brand/assets/Manrope.ttf` is Manrope, authored by Mikhail Sharanda and contributors, sourced from [Google Fonts](https://github.com/google/fonts/tree/main/ofl/manrope). Its SIL Open Font License 1.1 notice is retained in `design/brand/assets/Manrope-OFL.txt`. The font file's SHA-256 is recorded in the kit's `assets/SHA256SUMS` alongside the original logo hashes.
 
+`design/onboarding/` contains original HTML/CSS choreography, invented sample content and locally recorded synthetic-study evidence. It loads no Arc or brand-kit artwork and distributes no font files. Browser checks use separately installed agent-browser and Chrome for Testing; those tools are not bundled. The Chromium feasibility checkout is also external; `browser/upstream.json` records its exact source/tooling revisions. Full upstream dependency/license inventory remains a foundation acceptance requirement.
+
 Future third-party additions must record path, title/component, author, source URL, exact revision/version, license, and retained notice location. Repository publication does not grant rights to unrelated product names or branding.

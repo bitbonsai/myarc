@@ -1,6 +1,6 @@
 # Roadmap
 
-Updated: 2026-10-24. Stage: planning. Browser implementation: not started.
+Updated: 2026-10-24. Stage: M0 feasibility. Synthetic onboarding study runs locally; unmodified Chromium build is being exercised. Browser implementation and foundation acceptance remain pending.
 
 ## Delivery strategy
 

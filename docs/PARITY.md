@@ -1,12 +1,12 @@
 # Behavioral parity register
 
-Updated: 2026-10-24. **Every implementation row is currently not started.** This is a scope/evidence register, not a claim of product completeness. Each future implementation needs commands, behavioral checks, and end-to-end evidence. Screenshots alone cannot prove behavior.
+Updated: 2026-10-24. **Production implementation remains unstarted.** UX-01 has a synthetic web study, separate from native acceptance. This is a scope/evidence register, not a claim of product completeness. Each implementation needs commands, behavioral checks, and end-to-end evidence. Screenshots alone cannot prove behavior.
 
 Legend: `DOC` = public documentation/index evidence; `BRIEF` = project requirement; `UNKNOWN` = needs source/sample/observation. Historical docs may be stale; see [research](RESEARCH.md).
 
 | ID | Behavior to specify | Priority | Reference basis | Evidence still needed |
 | --- | --- | --- | --- | --- |
-| UX-01 | Animated welcome, workspace reveal, guided practice, handoff | P0 | BRIEF; original [storyboard](ONBOARDING.md) | Native recordings, reduced motion, focus, frame traces, user tasks |
+| UX-01 | Animated welcome, workspace reveal, guided practice, handoff | P0 | BRIEF; original [storyboard](ONBOARDING.md); [web study](../design/onboarding/README.md) with state/focus checks and recordings | Native integration/recordings, screen-reader review, frame traces and user tasks |
 | WS-01 | Several Spaces can share a Profile; Profiles isolate data | P0 | DOC: Profiles | Shared/isolation browser tests and import mappings |
 | WS-02 | Switch, reorder, rename, remove and restore Spaces | P0 | DOC: Spaces index; details UNKNOWN | Commands, deletion safeguards, keyboard behavior |
 | TAB-01 | Profile favorites and Space pins/folders retain order/names | P0 | DOC: organization index; details UNKNOWN | Canonical pinned URL, reset, close, move, cross-Space behavior |

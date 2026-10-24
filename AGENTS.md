@@ -4,7 +4,7 @@
 
 Read [README.md](README.md), [ROADMAP.md](ROADMAP.md), [plan/STATUS.md](plan/STATUS.md), [docs/GAPS.md](docs/GAPS.md), and the task in [plan/EXECUTION.md](plan/EXECUTION.md). Read the relevant architecture and behavioral documents. Explicit user instructions control the current scope; these files do not authorize unrelated external actions.
 
-This is currently a planning repository. No browser or importer exists. Do not describe planned commands, crates, tests, animations, or integrations as implemented.
+This repository contains plans and a synthetic web onboarding study. No myarc browser, importer or native onboarding exists. Keep prototype evidence separate from production behavior; see [the study](design/onboarding/README.md) and [foundation experiment](browser/README.md).
 
 Use [docs/ARTCRAFT-WORKFLOW.md](docs/ARTCRAFT-WORKFLOW.md) for the adapted working method, [plan/BEHAVIOR-CONTRACTS.md](plan/BEHAVIOR-CONTRACTS.md) for cross-system interactions, and relevant recent entries in [log/DEVLOG.md](log/DEVLOG.md) when resuming an investigation.
 
@@ -17,6 +17,10 @@ Use [docs/ARTCRAFT-WORKFLOW.md](docs/ARTCRAFT-WORKFLOW.md) for the adapted worki
 - AI must support off/local/user-key/hosted choices, with off as the default. No silent cloud fallback or background page uploads.
 - CLI and MCP browser control are P0 product scope. Provide real page observation and interaction through shared, scoped commands; do not defer them behind built-in AI or treat them only as test tooling.
 - Preserve real Chrome extension/browser services. Do not replace the foundation with a generic webview just to simplify the UI.
+
+## Git identity
+
+All product commits must attribute to `bitbonsai`. Configure repository-local identity as `bitbonsai <44185+bitbonsai@users.noreply.github.com>` and verify author/committer before committing. Do not inherit the work-account identity from global Git configuration. Existing published attribution was corrected with explicit user permission; future history rewrites still require authorization.
 
 ## Architecture and style
 
@@ -55,6 +59,6 @@ Commit publishable `plan/` tasks and decisions. Never commit real browser profil
 
 ## Actual verification available now
 
-Run `python3 tools/check_docs.py` from the repository root for relative document links. It is a local documentation check, not a browser test or security scanner. Read [docs/SCORECARD.md](docs/SCORECARD.md) for the future release evidence.
+Run `python3 tools/check_docs.py` from the repository root for relative document links. Run `node --test design/onboarding/state.test.mjs` for storyboard state checks and `python3 tools/check_onboarding.py` for local prototype interactions, focus and recordings. The browser check needs agent-browser/Chrome and ffprobe; it closes agent-browser and Chrome for Testing helpers. Read [study instructions](design/onboarding/README.md) before running it.
 
-The documentation workflow runs this same narrow check in GitHub Actions. Adding CI does not enforce branch protection or implement Rust/application gates.
+These checks do not validate native browsing, import, Rust integration or security. Read [docs/SCORECARD.md](docs/SCORECARD.md) for release evidence still required. The documentation workflow runs only the relative-link check in GitHub Actions; Rust/native/browser gates remain unimplemented.

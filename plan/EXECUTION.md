@@ -1,6 +1,6 @@
 # First implementation sequence
 
-All tasks are **ready for specification or blocked by stated dependencies**, not implemented. Each task should become a small set of reviewable changes with evidence. Dates and priorities are in [ROADMAP.md](../ROADMAP.md).
+Workstreams below remain open. MA-001.a has an executable synthetic motion study; MA-002.a is exercising a pinned upstream build. These slices do not complete native onboarding or foundation acceptance. Each task becomes reviewable changes with evidence. Dates and priorities are in [ROADMAP.md](../ROADMAP.md).
 
 These IDs identify workstreams. Break the selected workstream into bounded slices (for example `MA-004.a`) with a concrete outcome, affected boundary and evidence. Follow [behavior contracts](BEHAVIOR-CONTRACTS.md) and [the adapted workflow](../docs/ARTCRAFT-WORKFLOW.md). Standalone core/preservation work does not require a successful Chromium build; browser integration does.
 
@@ -12,6 +12,10 @@ Deliver an original storyboard and motion study for welcome, source selection, i
 
 Done: reviewable recording/prototype, state transitions, motion tokens, accessibility/focus behavior, original-asset provenance, and identified integration points. Final acceptance still requires the actual browser build under MA-008.
 
+### MA-001.a: synthetic first-minute motion study
+
+Implemented in [design/onboarding](../design/onboarding/README.md). Boundary: disposable HTML/CSS/JS presentation and storyboard transitions, with wholly synthetic fixtures; production workspace/import rules remain Rust-owned. Evidence: six semantic state tests and browser-driven controls, reduced motion/focus, empty/failure/1,000-pin variants and recordings. Stop at reviewable local design evidence. Native integration, durable onboarding, VoiceOver, frame/latency budgets and formative tasks remain open.
+
 ## MA-002 — Prove Chromium + Rust foundation
 
 Dependencies: macOS build capacity, signing/update feasibility investigation, maintenance owner.
@@ -21,6 +25,10 @@ Build the unmodified complete Chromium candidate at an exact revision. Exercise 
 Include a narrow real-page control feasibility slice: identify how an authenticated adapter will inspect a page and perform an observable action without exposing an unrestricted debugging endpoint. Record this for MA-011; no paid AI service is needed to prove the control boundary.
 
 Done: reproducible instructions, machine/build costs and times, extension evidence, interop error/thread/ownership checks, isolation/recovery smoke checks, patch/rebase record, dependency/license inventory, and accepted foundation decision. Unknowns remain explicit. If no affordable maintenance route exists, pause browser release targets and continue preservation/design work.
+
+### MA-002.a: unmodified upstream build
+
+In progress. [Pin, commands and run record](../browser/README.md) live under `browser/`; large checkout/logs stay outside the repository. Boundary: unmodified complete Chromium at one exact revision. Acceptance: reproducible successful `chrome` build and launch with a fresh disposable profile. Stop with that evidence or an actionable failure record. Rust/native command, extension lifecycle, second-revision rebase and maintenance decision follow; none is implied by checkout or GN success.
 
 ## MA-003 — Establish real export coverage
 

@@ -10,7 +10,7 @@ The goal is familiar everyday browsing, including the sidebar, Spaces, keyboard 
 
 AI is an optional layer, off by default. The plan supports models running on your machine, your own API keys (BYOK), or an optional paid hosted service. You choose what a provider can access. Pages won't be uploaded in the background, and hosted features won't be required for local browsing.
 
-**Planning stage.** Browser, importer and animated onboarding are not implemented yet.
+**Foundation experiment in progress.** An original [onboarding motion study](design/onboarding/README.md) runs locally with synthetic data. The browser, importer and native onboarding remain unimplemented.
 
 `myArc` is a working name. This project is independent of The Browser Company and Atlassian.
 
@@ -66,10 +66,10 @@ The current recommendation is a **Rust core for myarc's workspace, importer, per
 
 ## Immediate next step
 
-Follow [plan/EXECUTION.md](plan/EXECUTION.md), starting with task MA-001. Work toward an Arc preservation tool and a safe desktop alpha before attempting full replacement. The December 2026 milestones are conditional targets, not release promises.
+Continue the pinned [Chromium foundation experiment](browser/README.md) and review the [clickable onboarding study](design/onboarding/README.md). Follow [plan/EXECUTION.md](plan/EXECUTION.md) toward an Arc preservation tool and a safe desktop alpha. The December 2026 milestones are conditional targets, not release promises.
 
 ## Contributing
 
 Read [AGENTS.md](AGENTS.md) and [CONTRIBUTING.md](CONTRIBUTING.md). Current documents and original tooling are MIT licensed; future upstream code retains its own notices and license obligations. A chosen browser foundation must receive a separate license review before integration or distribution.
 
-Run `python3 tools/check_docs.py` for the same relative-link check used by the documentation CI. Browser/Rust verification remains planned until implementation exists.
+Run `python3 tools/check_docs.py` for the same relative-link check used by the documentation CI. Run `node --test design/onboarding/state.test.mjs` for study state tests; [study instructions](design/onboarding/README.md) cover browser-driven checks and recordings. Native browser/Rust verification remains pending.

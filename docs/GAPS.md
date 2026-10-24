@@ -1,12 +1,12 @@
 # Ranked work and blockers
 
-Updated: 2026-10-24. No engineering blocker below has been cleared.
+Updated: 2026-10-24. Browser release blockers remain open. A synthetic onboarding study now supplies design evidence.
 
 | Rank | Gap | Why it leads | Completion evidence |
 | --- | --- | --- | --- |
 | 1 | No proven browser foundation or maintenance capacity | A UI prototype cannot satisfy extension/security promises | MA-002 decision, build logs, extension run, rebase and cost record |
 | 2 | Arc export schema and coverage unknown | Migration is urgent and cannot be specified from marketing alone | MA-003 sample inventory, version signatures, synthetic schema examples |
-| 3 | Animated onboarding not yet designed or prototyped | First-run quality is an explicit product requirement | MA-001 storyboard/motion study; later real-build quality evidence |
+| 3 | Native animated onboarding remains unverified | First-run quality is an explicit product requirement; [web study](../design/onboarding/README.md) now runs with synthetic fixtures | Review study; integrate shared state and gather native motion, accessibility, performance and user-task evidence |
 | 4 | Workspace semantics and persistence unimplemented | Import, sidebar, onboarding and recovery share this contract | MA-004/005 model, commands, round trip and interruption checks |
 | 5 | No safe import transaction or preservation utility | Users need a usable escape hatch before the complete browser | MA-006 dry run, omissions report, rollback/source-integrity proof |
 | 6 | No complete browsing slice | An attractive shell is insufficient | MA-007 integrated import → pin → Space → command → restart journey |

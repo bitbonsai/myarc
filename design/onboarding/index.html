@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>myarc • The first minute</title>
+  <link rel="stylesheet" href="study.css">
+  <script type="module" src="study.mjs"></script>
+</head>
+<body>
+  <a class="skip-link" href="#scene-title">Skip to current step</a>
+  <header class="masthead">
+    <a class="wordmark" href="./" aria-label="myarc onboarding study">myarc<span class="brand-dot" aria-hidden="true"></span></a>
+    <span class="study-label">Motion study 001 <span>/</span> synthetic data only</span>
+    <label class="motion-setting">Motion
+      <select id="motion"><option value="system">Follow system</option><option value="reduce">Reduced</option><option value="full">Full</option></select>
+    </label>
+  </header>
+  <main id="study" data-scene="welcome">
+    <section class="copy" aria-labelledby="scene-title"></section>
+    <section class="demonstration" aria-label="Interactive synthetic workspace">
+      <div class="orbit orbit-one" aria-hidden="true"></div>
+      <div class="orbit orbit-two" aria-hidden="true"></div>
+      <div class="shell">
+        <div class="window-bar"><span class="window-dots" aria-hidden="true"><i></i><i></i><i></i></span><span>YOUR NEXT CHAPTER</span><span class="local-badge">Local study</span></div>
+        <div class="workspace">
+          <aside class="sidebar" aria-label="Sample workspace sidebar"></aside>
+          <section class="page" aria-label="Local sample page"></section>
+        </div>
+      </div>
+      <p class="specimen-note">Original choreography. Sample content. Browser integration follows foundation proof.</p>
+    </section>
+  </main>
+  <footer>
+    <ol class="steps" aria-label="Onboarding progress"></ol>
+    <button class="text-button" id="restart">Replay study <span aria-hidden="true">↗</span></button>
+  </footer>
+  <p id="announcement" class="sr-only" role="status" aria-live="polite"></p>
+  <dialog id="command-dialog" aria-labelledby="command-title">
+    <div class="command-top"><h2 id="command-title">Find your place</h2><button class="text-button" id="close-command">Close <kbd>Esc</kbd></button></div>
+    <label for="command-query" class="sr-only">Search synthetic pins</label>
+    <input id="command-query" type="search" placeholder="Search your sample pins…" autocomplete="off" maxlength="120">
+    <div id="command-results"></div>
+    <p class="dialog-note">Study command bar. Results open local sample content.</p>
+  </dialog>
+</body>
+</html>

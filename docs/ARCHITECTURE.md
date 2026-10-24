@@ -74,4 +74,6 @@ Keep dormant tabs lazy; virtualize long sidebars; build command-bar indexes per 
 
 ## Repository topology
 
-Keep product docs, Rust core, and myarc patches in this small repository. Pin upstream revision, toolchain, license inventory, and patch order when selected; acquire the large upstream checkout outside it. Proposed implementation directories are `crates/`, `browser/`, `patches/`, `tools/`, `tests/fixtures/`, `xtask/`, and `design/`. They are intentionally not scaffolded until the decision makes them meaningful.
+Keep product docs, Rust core, and myarc patches in this small repository; acquire the large upstream checkout outside it. `browser/` now contains the feasibility candidate/tooling pin, GN arguments and [build/run record](../browser/README.md). `design/onboarding/` is a disposable synthetic HTML/CSS/JS study with storyboard state, not production workspace logic. Its browser harness lives in `tools/check_onboarding.py` and writes ignored local artifacts.
+
+`crates/`, `patches/`, `tests/fixtures/` and `xtask/` remain proposed until real implementation needs them. Foundation acceptance still requires license inventory, native Rust integration and a tested patch/rebase route. Keep browser services authoritative and replace study fixtures with shared Rust commands when native integration begins.

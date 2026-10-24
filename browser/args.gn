@@ -1,0 +1,6 @@
+# Local feasibility build, not distribution configuration.
+is_debug = false
+is_component_build = true
+symbol_level = 0
+target_cpu = "arm64"
+use_remoteexec = false

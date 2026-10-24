@@ -49,4 +49,6 @@ Build the early prototype with synthetic workspace data. Integrate with the real
 
 ## Required design deliverables
 
+MA-001.a now has a [clickable synthetic study](../design/onboarding/README.md), original CSS motion, state/focus checks and normal/reduced-motion recordings. It is disposable web design evidence. Native onboarding, durable import integration, screen-reader review, performance measurements and formative tasks remain open.
+
 M0: storyboard, motion tokens, source notes, and a reviewable motion study. M1: state machine and synthetic successful/empty/error/large-import variants. M2: native integration and real-build recordings. M3/M4: keyboard/screen-reader and reduced-motion evidence, frame traces, interruption tests, and a signed-off quality review. Do not declare this feature complete from screenshots alone.
