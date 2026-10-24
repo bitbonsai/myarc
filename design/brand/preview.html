@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>myArc / Brand material</title>
+  <style>
+    * { box-sizing: border-box }
+    html { font-size: 100% }
+    body { margin: 0; font-family: var(--font-sans, sans-serif); font-size: 1rem; line-height: 1.5; color: var(--foreground, #182432) }
+    img { display: block; max-width: 100%; height: auto }
+    .hero { border-radius: 1rem; overflow: hidden; background: #101c2b; padding: 1rem }
+    .hero img { width: 100%; border-radius: .5rem }
+    .pair { display: grid; grid-template-columns: 1fr 1fr; gap: .75rem; margin-top: .75rem }
+    .panel { border-radius: 1rem; padding: 1rem; background: #f5f2ec; color: #182432 }
+    .panel.dark { background: #101c2b; color: #f5f2ec }
+    .panel .mark { width: 68%; margin: .5rem auto 1rem }
+    .label { display: flex; justify-content: space-between; flex-wrap: wrap; gap: .5rem; font-size: 1rem }
+    .label b { font-weight: 600 }
+    .label span { font-size: .875rem }
+    .application { border-radius: 1rem; padding: 1rem; background: #f5f2ec; color: #182432 }
+    .application img { width: 100%; border-radius: .5rem }
+    .application .label { margin-top: .75rem }
+    .swatches { display: flex; height: 1.375rem; border-radius: .375rem; overflow: hidden; margin-top: .75rem }
+    .swatches span { flex: 1 }
+    .lockup { margin-top: 1.5rem }
+    @media (max-width: 30rem) { .pair { grid-template-columns: 1fr } .panel .mark { width: 64% } }
+  </style>
+</head>
+<body>
+  <div class="hero"><img src="exports/social-dark.png" alt="myArc. Arc, forever yours. Midnight social card."></div>
+  <div class="pair">
+    <section class="panel"><img class="mark" src="assets/myarc-matte.png" alt="myArc matte logo"><div class="label"><b>Matte</b></div></section>
+    <section class="panel dark"><img class="mark" src="assets/myarc-glass.png" alt="myArc glass logo"><div class="label"><b>Glass</b></div></section>
+  </div>
+  <div class="swatches" aria-label="Ribbon colors"><span style="background:#10aeff"></span><span style="background:#034bf4"></span><span style="background:#4627ee"></span><span style="background:#a553ec"></span><span style="background:#ff527e"></span><span style="background:#ffaf8e"></span></div>
+  <div class="pair">
+    <section class="application"><img src="exports/social-square.png" alt="myArc square social card"><div class="label"><b>Social</b><span>1080 × 1080</span></div></section>
+    <section class="application"><img src="exports/wallpaper-dark.png" alt="myArc midnight desktop wallpaper"><div class="label"><b>Wallpaper</b><span>2560 × 1600</span></div><img class="lockup" src="exports/lockup-matte.png" alt="myArc matte logo and wordmark"><div class="label"><b>Lockup</b><span>1550 × 480</span></div></section>
+  </div>
+</body>
+</html>

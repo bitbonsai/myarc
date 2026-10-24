@@ -13,6 +13,7 @@ Updated: 2026-10-24.
 | Artcraft workflow audit | Behavior contracts, bounded tasks, development log, evidence freshness and regression rules added; standalone core dependency corrected |
 | Executable check today | Relative document-link checker; GitHub Actions workflow added for that same check only |
 | Browser/importer/AI implementation | Not started |
+| Brand exploration | Standalone [brand kit](../design/brand/README.md) with supplied raster marks, social cards, wallpapers and lockups; naming/asset rights unverified |
 | CLI and MCP browser control | P0 launch requirement; tools, shared control service, scoped grants and MA-011 specified; no executable implementation yet |
 | Benchmarks/application tests | Not run; budgets are proposals |
 

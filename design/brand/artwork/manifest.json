@@ -1,0 +1,32 @@
+[
+  {
+    "name": "social-dark",
+    "width": 1200,
+    "height": 630
+  },
+  {
+    "name": "social-light",
+    "width": 1200,
+    "height": 630
+  },
+  {
+    "name": "social-square",
+    "width": 1080,
+    "height": 1080
+  },
+  {
+    "name": "wallpaper-dark",
+    "width": 2560,
+    "height": 1600
+  },
+  {
+    "name": "wallpaper-light",
+    "width": 2560,
+    "height": 1600
+  },
+  {
+    "name": "wallpaper-phone",
+    "width": 1440,
+    "height": 2560
+  }
+]

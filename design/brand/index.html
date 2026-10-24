@@ -1,0 +1,212 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>myArc / Brand kit</title>
+  <style>
+    @font-face {
+      font-family: Manrope;
+      src: url('assets/Manrope.ttf');
+      font-weight: 200 800;
+      font-display: swap;
+    }
+
+    :root {
+      --ivory: #f5f2ec;
+      --ink: #182432;
+      --quiet: #54616d;
+      --blue: #034bf4;
+      --line: #18243225;
+      --radius: 1.125rem;
+    }
+
+    * { box-sizing: border-box }
+    html { font-size: 100% }
+    body {
+      margin: 0;
+      background: var(--ivory);
+      color: var(--ink);
+      font-family: Manrope, 'Helvetica Neue', sans-serif;
+      font-size: 1rem;
+      line-height: 1.55;
+    }
+    a { color: inherit; text-underline-offset: .25rem }
+    a:focus-visible { outline: .1875rem solid var(--blue); outline-offset: .3125rem }
+    img { display: block; max-width: 100%; height: auto }
+    h1, h2, p { margin: 0 }
+    h1, h2 { font-weight: 500; letter-spacing: -.055em; line-height: 1.08 }
+    h1 { font-size: 5rem }
+    h2 { font-size: 2rem }
+    .wrap { max-width: 80rem; margin: auto; padding: 0 3rem }
+    .word { font-weight: 800; letter-spacing: -.055em; line-height: 1; font-size: 2rem }
+    .nav { display: flex; align-items: center; justify-content: space-between; gap: 1.5rem; padding: 1.75rem 0; border-bottom: .0625rem solid var(--line) }
+    .nav .word { text-decoration: none }
+    .button { display: inline-flex; align-items: center; gap: 1rem; padding: .75rem 1.125rem; border-radius: 6rem; background: var(--ink); color: var(--ivory); font-weight: 600; text-decoration: none }
+    .button:hover { background: var(--blue) }
+    .hero { display: grid; grid-template-columns: 1fr 1fr; gap: 3rem; align-items: center; padding: 4rem 0 }
+    .hero-copy p { max-width: 30rem; margin-top: 1.5rem; color: var(--quiet); font-size: 1.125rem; line-height: 1.6 }
+    .hero-art { aspect-ratio: 1; border-radius: var(--radius); background: #101c2b; display: grid; place-items: center }
+    .hero-art img { width: 76% }
+    .block { padding: 3rem 0; border-top: .0625rem solid var(--line) }
+    .block > h2 { margin-bottom: 1.5rem }
+    .two, .lockups { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem }
+    .card { border: .0625rem solid var(--line); border-radius: var(--radius); overflow: hidden }
+    .stage { background: #ebe7df; display: grid; place-items: center; aspect-ratio: 1.4 }
+    .stage img { width: 61% }
+    .dark { background: #101c2b; color: var(--ivory) }
+    .caption { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: .75rem; padding: 1rem 1.25rem }
+    .caption b { font-weight: 700 }
+    .caption p, .caption small { display: block; color: var(--quiet); font-size: .875rem }
+    .caption a { flex-shrink: 0 }
+    .lockups { margin-top: 1.25rem }
+    .lockup-stage { padding: 1rem; background: #ebe7df }
+    .lockup-stage.dark { background: #101c2b }
+    .lockup-stage img { width: 100% }
+    .sizes { display: flex; gap: .75rem; flex-wrap: wrap; margin-top: 1.5rem }
+    .usage { margin-top: 1rem; color: var(--quiet); font-size: .875rem }
+    .palette { display: grid; grid-template-columns: repeat(8, 1fr); gap: .5rem }
+    .swatch { display: flex; flex-direction: column; justify-content: space-between; gap: 2rem; padding: 1rem .75rem; border-radius: .75rem; border: .0625rem solid var(--line) }
+    .swatch b { font-size: 1rem; font-weight: 600 }
+    .swatch span { font-size: .875rem }
+    .type { display: grid; grid-template-columns: 1.4fr 1fr; gap: 2rem; align-items: center }
+    .type .word { font-size: 6rem }
+    .type p { margin-bottom: 1rem }
+    .artwork { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1.25rem; align-items: start }
+    .art-stage { display: grid; place-items: center; height: 15rem; padding: 1rem; background: #ebe7df }
+    .art-stage img { width: auto; height: auto; max-width: 100%; max-height: 13rem }
+    .end { display: flex; align-items: start; justify-content: space-between; gap: 2rem; padding: 2rem 0; border-top: .0625rem solid var(--line) }
+    .end p { max-width: 34rem; color: var(--quiet); font-size: .875rem }
+    .end a { display: inline-block; margin-top: .5rem }
+
+    @media (max-width: 70rem) {
+      h1 { font-size: 4rem }
+      .palette { grid-template-columns: repeat(4, 1fr) }
+      .artwork { grid-template-columns: repeat(2, minmax(0, 1fr)) }
+    }
+    @media (max-width: 48rem) {
+      .wrap { padding: 0 1.5rem }
+      .hero { gap: 1.5rem; padding: 3rem 0 }
+      h1 { font-size: 3rem }
+      .caption { padding: 1rem }
+      .type .word { font-size: 4rem }
+    }
+    @media (max-width: 40rem) {
+      .wrap { padding: 0 1.25rem }
+      h1 { font-size: 2.5rem }
+      .hero, .two, .lockups, .type, .artwork { grid-template-columns: 1fr }
+      .hero { gap: 2rem; padding: 2.5rem 0 }
+      .hero h1 { max-width: 9ch }
+      .block { padding: 2.5rem 0 }
+      .palette { grid-template-columns: repeat(2, minmax(0, 1fr)) }
+      .end { flex-direction: column; gap: 1.5rem }
+    }
+    @media print {
+      .wrap { padding: 0 1.25rem }
+      .button { display: none }
+      .card, .palette, .type { break-inside: avoid }
+      body { print-color-adjust: exact; -webkit-print-color-adjust: exact }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header class="nav">
+      <a class="word" href="#" aria-label="myArc brand kit home">myArc</a>
+      <a class="button" href="myarc-brand-kit.zip" download>Download kit <span aria-hidden="true">↓</span></a>
+    </header>
+    <main>
+      <section class="hero">
+        <div class="hero-copy">
+          <h1>myArc, forever yours.</h1>
+          <p>An open-source browser project bringing back Arc's browsing experience, with a local, exportable workspace and optional AI.</p>
+        </div>
+        <div class="hero-art"><img src="assets/myarc-glass.png" alt="myArc glass logo"></div>
+      </section>
+
+      <section class="block" aria-labelledby="logos">
+        <h2 id="logos">Logos</h2>
+        <div class="two">
+          <article class="card">
+            <div class="stage"><img src="assets/myarc-matte.png" alt="myArc matte logo"></div>
+            <div class="caption"><b>Matte</b><a href="assets/myarc-matte.png" download aria-label="Download matte logo PNG">PNG ↓</a></div>
+          </article>
+          <article class="card">
+            <div class="stage dark"><img src="assets/myarc-glass.png" alt="myArc glass logo"></div>
+            <div class="caption"><b>Glass</b><a href="assets/myarc-glass.png" download aria-label="Download glass logo PNG">PNG ↓</a></div>
+          </article>
+        </div>
+        <div class="lockups">
+          <article class="card">
+            <div class="lockup-stage"><img src="exports/lockup-matte.png" alt="myArc matte logo and wordmark"></div>
+            <div class="caption"><b>Matte lockup</b><a href="exports/lockup-matte.png" download aria-label="Download matte lockup PNG">PNG ↓</a></div>
+          </article>
+          <article class="card">
+            <div class="lockup-stage dark"><img src="exports/lockup-glass.png" alt="myArc glass logo and wordmark"></div>
+            <div class="caption"><b>Glass lockup</b><a href="exports/lockup-glass.png" download aria-label="Download glass lockup PNG">PNG ↓</a></div>
+          </article>
+        </div>
+        <p class="sizes"><span>Matte sizes</span><a href="exports/mark-matte-128.png" download>128</a><a href="exports/mark-matte-256.png" download>256</a><a href="exports/mark-matte-512.png" download>512</a><a href="exports/mark-matte-1024.png" download>1024 px</a></p>
+        <p class="usage">Keep 12% clear space around the logo. Preserve its proportions and colors.</p>
+      </section>
+
+      <section class="block" aria-labelledby="color">
+        <h2 id="color">Color</h2>
+        <div class="palette">
+          <div class="swatch" style="background:#f5f2ec;color:#182432"><b>Ivory</b><span>#F5F2EC</span></div>
+          <div class="swatch" style="background:#182432;color:#f5f2ec"><b>Midnight</b><span>#182432</span></div>
+          <div class="swatch" style="background:#10aeff;color:#102238"><b>Sky</b><span>#10AEFF</span></div>
+          <div class="swatch" style="background:#034bf4;color:#fff"><b>Blue</b><span>#034BF4</span></div>
+          <div class="swatch" style="background:#4627ee;color:#fff"><b>Violet</b><span>#4627EE</span></div>
+          <div class="swatch" style="background:#a553ec;color:#101015"><b>Orchid</b><span>#A553EC</span></div>
+          <div class="swatch" style="background:#ff527e;color:#14202d"><b>Pink</b><span>#FF527E</span></div>
+          <div class="swatch" style="background:#ffaf8e;color:#14202d"><b>Coral</b><span>#FFAF8E</span></div>
+        </div>
+      </section>
+
+      <section class="block" aria-labelledby="type">
+        <h2 id="type">Type</h2>
+        <div class="type">
+          <div class="word" aria-label="myArc wordmark specimen">myArc</div>
+          <div><p>Manrope. Wordmark in ExtraBold, written myArc.</p><a href="assets/Manrope.ttf" download>Download Manrope ↓</a></div>
+        </div>
+      </section>
+
+      <section class="block" aria-labelledby="artwork">
+        <h2 id="artwork">Artwork</h2>
+        <div class="artwork">
+          <article class="card">
+            <div class="art-stage"><img src="exports/social-dark.png" alt="myArc midnight social card" width="1200" height="630"></div>
+            <div class="caption"><div><b>Social, midnight</b><small>1200 × 630 px</small></div><a href="exports/social-dark.png" download aria-label="Download midnight social PNG">PNG ↓</a></div>
+          </article>
+          <article class="card">
+            <div class="art-stage"><img src="exports/social-light.png" alt="myArc ivory social card" width="1200" height="630"></div>
+            <div class="caption"><div><b>Social, ivory</b><small>1200 × 630 px</small></div><a href="exports/social-light.png" download aria-label="Download ivory social PNG">PNG ↓</a></div>
+          </article>
+          <article class="card">
+            <div class="art-stage"><img src="exports/social-square.png" alt="myArc square social card" width="1080" height="1080"></div>
+            <div class="caption"><div><b>Social, square</b><small>1080 × 1080 px</small></div><a href="exports/social-square.png" download aria-label="Download square social PNG">PNG ↓</a></div>
+          </article>
+          <article class="card">
+            <div class="art-stage"><img src="exports/wallpaper-dark.png" alt="myArc midnight desktop wallpaper" width="2560" height="1600"></div>
+            <div class="caption"><div><b>Wallpaper, midnight</b><small>2560 × 1600 px</small></div><a href="exports/wallpaper-dark.png" download aria-label="Download midnight wallpaper PNG">PNG ↓</a></div>
+          </article>
+          <article class="card">
+            <div class="art-stage"><img src="exports/wallpaper-light.png" alt="myArc ivory desktop wallpaper" width="2560" height="1600"></div>
+            <div class="caption"><div><b>Wallpaper, ivory</b><small>2560 × 1600 px</small></div><a href="exports/wallpaper-light.png" download aria-label="Download ivory wallpaper PNG">PNG ↓</a></div>
+          </article>
+          <article class="card">
+            <div class="art-stage"><img src="exports/wallpaper-phone.png" alt="myArc phone wallpaper" width="1440" height="2560"></div>
+            <div class="caption"><div><b>Wallpaper, phone</b><small>1440 × 2560 px</small></div><a href="exports/wallpaper-phone.png" download aria-label="Download phone wallpaper PNG">PNG ↓</a></div>
+          </article>
+        </div>
+      </section>
+    </main>
+    <footer class="end">
+      <span class="word">myArc</span>
+      <p>Project in planning. Independent of The Browser Company and Atlassian.<br><a href="README.md">Usage & credits</a></p>
+    </footer>
+  </div>
+</body>
+</html>

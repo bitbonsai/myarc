@@ -2,6 +2,10 @@
 private/
 local/
 exports/
+# Publish brand PNGs while keeping user exports ignored.
+!design/brand/exports/
+design/brand/exports/*
+!design/brand/exports/*.png
 profiles/
 research-private/
 .env
