@@ -1,0 +1,5 @@
+pages=8
+asset_references=304
+unique_assets=280
+downloaded=6
+failed=274
