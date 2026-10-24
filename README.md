@@ -8,14 +8,17 @@ An independent browser project for people who love Arc's workflow: a calm sideba
 
 ## Product commitments
 
-- Browse without an account. No service outage or subscription expiry may disable local browsing or access to local data.
-- Preserve the Arc workflow and make migration a first-class feature.
-- Launch with a beautifully animated onboarding experience that teaches by doing.
+These are design commitments, not claims that the planned features work today.
+
+- Develop in public with build instructions and clear license information. Keep myarc-owned code and documentation permissively licensed; upstream components retain their own licenses.
+- Build a native desktop browser on Chromium's complete browser layer, with a Rust-owned workspace core. Do not use Electron as the production shell or claim the whole browser is pure Rust.
+- Preserve Arc's useful layouts, shortcuts, Spaces, and workspace habits. Onboarding should teach the differences instead of forcing people to relearn browsing.
+- Keep workspace data local and exportable, with no required account or background uploads to AI services. Websites still use the network; ownership of the workspace is the promise.
+- Make CLI and MCP supported launch interfaces over the same commands as the UI, with scoped access and an obvious Stop control.
+- Keep AI optional: off by default, with local models, user API keys, and an optional paid hosted service. The browser must remain useful without that service.
 - Support Chrome extensions through a proven browser implementation, with published compatibility results.
-- Make AI optional: off by default, with local models, user API keys, and an optional paid hosted service.
-- Make browser control available through both CLI and MCP at launch, so users can connect their own AI agents independently of built-in AI.
 - Include Boosts, beginning with appearance, CSS, and element hiding. No Easels.
-- Keep workspace data local and exportable. Cloud services are optional conveniences.
+- Launch with an animated onboarding experience that teaches by doing.
 
 ## Start here
 

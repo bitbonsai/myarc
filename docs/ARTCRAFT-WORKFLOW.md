@@ -2,6 +2,12 @@
 
 Reviewed 2026-10-24. This is an original adaptation of public repository practices. It does not reproduce private `craftrules` standards or establish that their delivery speed transfers to a browser.
 
+## Scope of the adaptation
+
+Adopt the public engineering methods that fit myarc: clear orientation, bounded work, shared command paths, explicit failure handling, and evidence attached to completion claims. Do not infer or copy an Artcraft business strategy. The relationship between its open repositories, commercial AI services, and marketing is unverified.
+
+myarc may offer an optional paid AI service, but local browsing, migration, recovery, export, CLI, and MCP control must remain useful without it. Open development is a product and maintenance commitment, not a traffic tactic assumed from another project.
+
 ## What the public implementation teaches us
 
 | Practice and primary evidence | Application to myarc | Available now / implementation trigger |

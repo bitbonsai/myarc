@@ -10,6 +10,20 @@ Serve desktop Arc users who have invested in Spaces, folders, named pinned tabs,
 
 The project brief calls for account-free browsing, Chromium extension compatibility, Arc settings import, an onboarding experience with meaningful animation, Boosts, no Easels, entirely optional AI through local models/user keys/a paid hosted service, and browser control through CLI and MCP for AI agents. These are product constraints. The technical choices and dates below are proposals, not prior decisions.
 
+## Design commitments
+
+These commitments guide product and design tradeoffs. They do not describe shipped features.
+
+- Open source. Publish code, build instructions, and license information. Keep myarc-owned work permissively licensed without implying that Chromium or other upstream components use the same license.
+- Native desktop browser. Build on Chromium's complete browser layer with a Rust-owned workspace core. Use Chromium WebUI where it fits; do not use Electron as the production shell or describe the full browser as pure Rust.
+- Familiar from day one. Preserve Arc's useful layouts, shortcuts, Spaces, and workspace habits. Use onboarding to explain differences rather than ask people to relearn browsing.
+- Your workspace, your machine. Keep workspace state local, exportable, and usable without an account. Do not upload pages or workspace data to AI services in the background. Normal website traffic still uses the network.
+- Agent-ready. Expose CLI and MCP as supported product interfaces over the same command path as the UI. Scope each grant and give the user a visible way to stop control.
+
+For the project site, use a restrained grid, clear typography, and small blue accents. The browser should keep that clarity while allowing warmer, more personal Spaces and motion.
+
+Do not add an "also in your browser" version to the current scope. A local workspace or export viewer may be useful later, but it does not justify maintaining another platform now.
+
 ## Why someone switches
 
 1. Their spaces, hierarchy, and named tabs arrive in a recognizable workspace, with an honest report of anything missing.

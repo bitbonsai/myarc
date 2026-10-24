@@ -2,6 +2,13 @@
 
 Keep significant outcomes, failures and next actions reproducible. Newest entry first. No private exports, page titles/URLs from real browsing, credentials or raw user transcripts.
 
+## 2026-10-24 — Product principles and Artcraft boundary
+
+- Starting revision: `1ccb972`; no application implementation.
+- Outcome: recorded open development, native Chromium plus Rust ownership, Arc-familiar interaction, local workspace ownership, and agent-ready control as design commitments rather than shipped claims. Excluded a browser-inside-browser platform from current scope and added the project-site visual direction.
+- Artcraft boundary: retained useful public engineering methods without assuming its open-source work exists to drive traffic or that its repositories have a verified relationship to a commercial AI service. myarc remains useful without paid AI.
+- Verification scope: documentation consistency, relative links, and whitespace only. No browser, importer, project site, or AI service was implemented.
+
 ## 2026-10-24 — CLI and MCP become launch scope
 
 - Starting revision: `b799568`; no application implementation.

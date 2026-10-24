@@ -1,6 +1,6 @@
 # Research and provenance
 
-Research date: 2026-10-24. These are primary sources and a limited public-document review, not a completed Arc behavioral audit or an Artcraft success study. Live branches and help pages can change. Pin exact upstream commits during implementation. No proprietary source, product assets, private shared standards, or personal export files are copied into this repository.
+Research date: 2026-10-24. These are primary sources and a limited public-document review, not a completed Arc behavioral audit or an Artcraft success study. The review also does not establish how Artcraft's public repositories relate to any commercial AI service. Live branches and help pages can change. Pin exact upstream commits during implementation. No proprietary source, product assets, private shared standards, or personal export files are copied into this repository.
 
 ## Evidence ledger
 
@@ -23,6 +23,12 @@ Research date: 2026-10-24. These are primary sources and a limited public-docume
 | R15 | [PhotoCraft readiness assessment](https://github.com/storytold/photocraft/blob/main/docs/target-app-parity.md) | Revised estimates and separation of presence from practical replacement quality | Repository's self-assessment, not independently reproduced measurements |
 | R16 | [PhotoCraft development guide](https://github.com/storytold/photocraft/blob/main/docs/development.md), [scorecard](https://github.com/storytold/photocraft/blob/main/docs/scorecard.md) | Separate behavior/native checks, fresh artifacts and actual test selection; structured/generated progress and explicit measurement states | Read through public GitHub file access when raw retrieval failed; implementation remains theirs, not copied tooling |
 | R17 | [MCP transports](https://modelcontextprotocol.io/specification/2026-07-28/basic/transports), [MCP tools](https://modelcontextprotocol.io/specification/2026-07-28/server/tools) | Official transport/tool schemas, local stdio transport and user-visible control guidance | Pin actually supported SDK/protocol revisions and verify real clients during MA-011; a specification link is not implemented interoperability |
+
+## What not to infer from Artcraft
+
+An open-source project can coexist with a business that sells hosted AI or other convenience services. The sources reviewed here do not establish the ownership, code sharing, or commercial relationship between Artcraft's repositories and any image-generation service. They also do not show whether open-source releases are intended to generate traffic. Treat that as a hypothesis, not a product fact or a model for myarc.
+
+Repository visibility and marketing can attract attention without proving product quality, sustainability, or user benefit. myarc should adopt useful engineering practices on their evidence, while keeping the browser useful without a paid AI service.
 
 ## What to take from Artcraft
 
