@@ -1,10 +1,14 @@
-# myarc
+<p align="center">
+  <img src="design/brand/assets/myarc-matte.png" alt="myArc logo" width="160">
+</p>
 
-**Your browsing space, yours to keep.**
+<h1 align="center">myArc. Arc, forever yours.</h1>
 
-An independent browser project for people who love Arc's workflow: a calm sidebar, Spaces, persistent tabs, fast commands, thoughtful motion, and control over their own setup.
+A browser project for Arc's Spaces, pinned tabs and keyboard workflow, with local, exportable data and optional AI.
 
-**Status: planning repository. No browser, importer, or onboarding animation is implemented yet.** The first milestone proves the browser foundation and specifies the animated first-run experience. This repository does not contain Arc source code or assets and is not affiliated with The Browser Company or Atlassian. `myarc` is a working name; public product naming remains open.
+**Planning stage.** Browser, importer and animated onboarding are not implemented yet.
+
+`myArc` is a working name. This project is independent of The Browser Company and Atlassian.
 
 ## Product commitments
 

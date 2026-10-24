@@ -6,4 +6,6 @@ The planning documents and documentation-check script were created for myarc. Th
 
 Public Artcraft repository conventions informed the development methodology. Primary-source links and limits are recorded in [docs/RESEARCH.md](docs/RESEARCH.md). This is an independently written adaptation, not a copy of their instructions or a reproduction of private shared standards.
 
+`design/brand/assets/myarc-matte.png` and `myarc-glass.png` are user-supplied originals used unchanged in the requested identity draft. Their author, creation method and license were not supplied; redistribution and trademark clearance remain unverified. Generated raster variants and compositions inherit that limitation. No archived Arc artwork is used in the kit.
+
 Future third-party additions must record path, title/component, author, source URL, exact revision/version, license, and retained notice location. Repository publication does not grant rights to unrelated product names or branding.
