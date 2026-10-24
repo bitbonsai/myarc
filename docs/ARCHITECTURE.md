@@ -76,4 +76,6 @@ Keep dormant tabs lazy; virtualize long sidebars; build command-bar indexes per 
 
 Keep product docs, Rust core, and myarc patches in this small repository; acquire the large upstream checkout outside it. `browser/` now contains the feasibility candidate/tooling pin, GN arguments and [build/run record](../browser/README.md). `design/onboarding/` is a disposable synthetic HTML/CSS/JS study with storyboard state, not production workspace logic. Its browser harness lives in `tools/check_onboarding.py` and writes ignored local artifacts.
 
+The public [landing page](../site/README.md) is a separate static presentation boundary. `site/build.py` embeds approved brand images, variable Outfit and license notices into one HTML file; there is no executable JavaScript or runtime service dependency. GitHub Pages serves an artifact-only `gh-pages` branch. Hosting and DNS are independent of local browser operation and do not prove product implementation.
+
 `crates/`, `patches/`, `tests/fixtures/` and `xtask/` remain proposed until real implementation needs them. Foundation acceptance still requires license inventory, native Rust integration and a tested patch/rebase route. Keep browser services authoritative and replace study fixtures with shared Rust commands when native integration begins.

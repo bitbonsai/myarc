@@ -13,6 +13,7 @@ Updated: 2026-10-24.
 | Artcraft workflow audit | Behavior contracts, bounded tasks, development log, evidence freshness and regression rules added; standalone core dependency corrected |
 | Executable checks today | Relative document links; six storyboard state tests; prototype browser checks with recordings. CI runs document links only |
 | Browser/importer/AI implementation | Not started |
+| Public landing page | [Self-contained HTML](../site/README.md) deployed to GitHub Pages over HTTPS; offline/layout/motion checks passed. `myarc.dev` DNS and domain HTTPS pending Cloudflare access |
 | Brand exploration | Standalone [brand kit](../design/brand/README.md) with supplied raster marks, social cards, wallpapers and lockups; naming/asset rights unverified |
 | CLI and MCP browser control | P0 launch requirement; tools, shared control service, scoped grants and MA-011 specified; no executable implementation yet |
 | Benchmarks/native application tests | Not run; prototype interaction checks are separate; release budgets remain proposals |

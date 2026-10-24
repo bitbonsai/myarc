@@ -2,6 +2,14 @@
 
 Keep significant outcomes, failures and next actions reproducible. Newest entry first. No private exports, page titles/URLs from real browsing, credentials or raw user transcripts.
 
+## 2026-10-24: Self-contained landing page and GitHub Pages
+
+- Followed the requested `claude -p --model fable --effort high` design route. The trace identified `claude-fable-5-1` and invoked `/frontend-design`; the CLI timed out after writing the template and README. Retained its editorial layout, approved brand assets and truthful development-stage copy.
+- Added `site/build.py` to produce one 442,041-byte HTML file with embedded font/images and full OFL/ISC notices. No runtime dependencies, analytics or executable JavaScript. Intro movement is finite; footer hover/focus retains the 40-BPM heart.
+- Verification: static resource/link/rem guards and a deliberately invalid external-image self-check passed. Chromium rendered offline with no remote resource requests and decoded Outfit/images. Text clipping, 16/14-pixel body/minimum sizes passed at 320/390/768/1440; actual hover/keyboard focus and reduced motion passed. Inspected fresh desktop/mobile captures and a decoded 6.7-second motion/focus/reduced-motion recording; verified browser helper cleanup. Full-page stills taken during recording repeated viewport tiles, so they were rejected and recaptured outside recording. Native browsing remains outside this evidence.
+- Published only the artifact to `gh-pages` at `1f9f608cbdb97f16acf3f67604893a562a003304`; GitHub verified author and committer as `bitbonsai`. Pages source is branch root, HTTPS enforced. Creation returned a non-JSON transport error; read-back confirmed success, avoiding duplicate publication. Preserved source font timestamps after finding conversion made otherwise unchanged builds differ; two successive builds now match byte-for-byte. Public HTTP 200 HTML matched the final local file exactly.
+- Cloudflare access is blocked by an invalid stored credential and unauthenticated browser session. `myarc.dev` custom-domain binding, DNS writes and domain-certificate verification remain pending. Existing DNS and concurrent browser/reference work were preserved. Naming/asset rights, Safari/Firefox and screen readers remain unverified.
+
 ## 2026-10-24: Baseline comparison and live interaction polish
 
 - Reproduced the custom-A regression: stroked chevron feet ended diagonally above the baseline. Replaced the stroke with a closed outline, matching original Outfit A cap height and the m/r baseline. Added `design/brand/alignment.html` with original/custom wordmarks at identical scale, spacing and guides; curved c overshoot remains unchanged. New geometry checks failed on the old asset and passed after correction.

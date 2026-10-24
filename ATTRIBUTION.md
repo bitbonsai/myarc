@@ -18,4 +18,6 @@ Public Artcraft repository conventions informed the development methodology. Pri
 
 `design/onboarding/` contains original HTML/CSS choreography, invented sample content and locally recorded synthetic-study evidence. It loads no Arc or brand-kit artwork and distributes no font files. Browser checks use separately installed agent-browser and Chrome for Testing; those tools are not bundled. The Chromium feasibility checkout is also external; `browser/upstream.json` records its exact source/tooling revisions. Full upstream dependency/license inventory remains a foundation acceptance requirement.
 
+`site/index.html` embeds the approved kit assets as data URIs: Outfit repackaged as WOFF2, WebP derivatives of the supplied ribbon logos, outlined wordmarks and original grain. Full Outfit OFL and Lucide ISC notices are retained in its inert `asset-notices` JSON block. The supplied-logo rights and trademark limitations above still apply; publication is not legal clearance.
+
 Future third-party additions must record path, title/component, author, source URL, exact revision/version, license, and retained notice location. Repository publication does not grant rights to unrelated product names or branding.
