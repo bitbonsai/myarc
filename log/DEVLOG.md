@@ -2,6 +2,13 @@
 
 Keep significant outcomes, failures and next actions reproducible. Newest entry first. No private exports, page titles/URLs from real browsing, credentials or raw user transcripts.
 
+## 2026-10-24: Native MV3 and runtime smoke checks
+
+- MA-002.d: user installed uBlock Origin Lite `2026.1021.1354` in a newly marked native Chromium profile; native management reported FROM_STORE. Causal enabled/disabled/re-enabled checks and a normal process restart passed. Corrected a measurement mistake: uBlock redirects this XHR to a local noop resource, so a resolved fetch alone proves neither external network access nor blocking. Final response origin/path and a disabled control now determine the result.
+- Renderer crash/reload preserved an acknowledged localStorage value with browser PID unchanged. Off-the-record storage was absent initially, isolated from normal state and absent in a fresh private context after disposal. Native Rust control accessibility/Space-key activation also passed on the rebuilt second pin. These checks establish neither production workspace durability nor full cookie/history/private-data isolation.
+- Retained [the developer regression client and fixture](../tests/fixtures/browser/README.md), with version/PID/profile-marker preconditions and a changed-PID restart requirement. Positive scenarios ran against the compiled candidate; wrong PID, unmarked profile and unchanged-PID restart were rejected. Source fixture bytes served by the local server were checked against the repository.
+- New failure: default-context `Target.createTarget` aborted the browser on a blocking-disallowed assertion in `Profile::CreateProfile` on the UI thread. Its trigger and upstream-versus-patch origin remain unisolated. Existing-tab tests avoid that path while preserving the failed case; thread checks remain enabled. Extension update/removal, native messaging, duplicate ANGLE class warning and distribution/licensing/ownership gates remain open. [Structured runtime evidence](../browser/evidence/runtime.json) keeps private profiles, screenshots and raw logs outside the repository.
+
 ## 2026-10-24: First private Markdown export inventory
 
 - MA-003.a: inspected a user-supplied Markdown sample read-only, with source fingerprint unchanged. Space headings, second-level named groups and ordered bare URLs are present. The file provides no producer/schema version, Profile IDs or tab titles. No URLs were opened.

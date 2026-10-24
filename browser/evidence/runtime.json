@@ -1,0 +1,97 @@
+{
+  "schemaVersion": 1,
+  "recordedAt": "2026-10-24T18:56:13.174643+00:00",
+  "scope": "Development Chromium smoke checks; production release gates remain open",
+  "upstreamRevision": "8d208f20744ac6d4ce00cc3f9de6a14a9b8b926d",
+  "integrationRevision": "3e117efa80cec1c4e1e6fbfdf44edeb087a279a5",
+  "browserVersion": "158.0.8122.0",
+  "platform": "macOS arm64",
+  "extension": {
+    "name": "uBlock Origin Lite",
+    "id": "ddkjiahejlhfcafbddmgiahcphecmpfh",
+    "version": "2026.1021.1354",
+    "manifestVersion": 3,
+    "installRoute": "User installed through Chrome Web Store in a marked fresh test profile; native management reported FROM_STORE"
+  },
+  "cases": [
+    {
+      "id": "M0-EXT-01",
+      "status": "passed",
+      "operation": "enabled, disabled, re-enabled",
+      "observed": "Enabled fetch resolved to extension-local noop resource. Disabled fetch produced response from expected advertising origin/path. Re-enabled fetch returned local replacement again. Resource was fetched as data, without credentials or script execution."
+    },
+    {
+      "id": "M0-EXT-02",
+      "status": "passed",
+      "operation": "normal Browser.close and process restart",
+      "observed": "New browser PID; extension remained enabled at the same version and filtering still returned a local replacement."
+    },
+    {
+      "id": "M0-RT-01",
+      "status": "passed",
+      "operation": "Page.crash, Page.reload",
+      "observed": "Renderer crash event observed; browser PID unchanged; acknowledged localStorage value survived reload."
+    },
+    {
+      "id": "M0-PRV-01",
+      "status": "passed",
+      "operation": "explicit off-the-record context creation/disposal",
+      "observed": "Private context started without normal localStorage; private write did not change normal state; a new private context lacked the disposed context value."
+    },
+    {
+      "id": "M0-UI-02",
+      "status": "passed",
+      "operation": "native toolbar accessibility activation and focused Space key on rebuilt second revision",
+      "observed": "Rust state and label changed Everyday to Research to Everyday."
+    },
+    {
+      "id": "M0-GUARD-01",
+      "status": "passed",
+      "operation": "wrong browser PID",
+      "observed": "Rejected before page navigation."
+    },
+    {
+      "id": "M0-GUARD-02",
+      "status": "passed",
+      "operation": "restart scenario with unchanged PID",
+      "observed": "Rejected instead of claiming restart coverage."
+    },
+    {
+      "id": "M0-GUARD-03",
+      "status": "passed",
+      "operation": "unmarked profile directory",
+      "observed": "Rejected before browser connection."
+    }
+  ],
+  "measurementCorrection": "A successful fetch does not prove ad-server access: this extension redirects XHR to a local noop resource. Tests inspect final response origin/path and require the disabled network control; an earlier rejection-only assertion was invalid.",
+  "openFailures": [
+    {
+      "id": "M0-RT-02",
+      "status": "failed",
+      "operation": "default-context Target.createTarget",
+      "observed": "One request aborted the browser on a blocking-disallowed assertion in Profile::CreateProfile on the browser UI thread. Existing-tab testing avoids this path. Trigger conditions and upstream-versus-patch origin remain unisolated."
+    }
+  ],
+  "notVerified": [
+    "version-changing extension update",
+    "extension removal/reinstallation",
+    "native messaging",
+    "full persistent-Profile cookie/history/extension isolation",
+    "private-data disk forensics",
+    "production workspace durability and recovery",
+    "signed distribution and authenticated updates",
+    "resolution of duplicate ANGLESwapCGLLayer warning",
+    "complete license/notices review",
+    "product CLI/MCP authorization"
+  ],
+  "commands": [
+    "node tools/check_browser_foundation.mjs \"$PROFILE\" \"$BROWSER_PID\" extension",
+    "node tools/check_browser_foundation.mjs \"$PROFILE\" \"$BROWSER_PID\" runtime",
+    "node tools/check_browser_foundation.mjs \"$PROFILE\" \"$BROWSER_PID\" restart"
+  ],
+  "sourceSha256": {
+    "tools/check_browser_foundation.mjs": "6b1499c3dc85923e4d989cba3b19b8f22099586018cfeafbdfcb3102ffbff6fe",
+    "tests/fixtures/browser/index.html": "641fa96b7fdacf7135e81593f1f0c1736e6035f613b45b790c9c9b31496bd81e"
+  },
+  "rawArtifacts": "Private logs, browser profiles and captures retained outside repository; no cookies, headers or debugging endpoint identifiers published"
+}

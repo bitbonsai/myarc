@@ -1,6 +1,6 @@
 # M0 foundation experiment
 
-Status: unmodified Chromium built and launched; a Rust-owned rename command works through a native toolbar test control. The integration builds and passes its core/bridge checks on two upstream revisions. Foundation acceptance remains open. [upstream.json](upstream.json) pins the feasibility candidate and patch; [evidence](evidence/foundation.json) records verified scope and outstanding checks. This development build is not a myarc release.
+Status: unmodified Chromium built and launched; a Rust-owned rename command works through a native toolbar test control. The integration builds and passes its core/bridge checks on two upstream revisions. Foundation acceptance remains open. [upstream.json](upstream.json) pins the feasibility candidate and patch; [initial build evidence](evidence/foundation.json) and [later runtime evidence](evidence/runtime.json) record their separate scope and outstanding checks. This development build is not a myarc release.
 
 ## Bounded outcomes
 
@@ -96,6 +96,10 @@ The flag adds `Test Space: Everyday`. Activating it runs `rename_space` in Rust 
 
 For reapplication, select a new branch at `8d208f20744ac6d4ce00cc3f9de6a14a9b8b926d`, apply the same patch, then run dependency sync/hooks, GN generation and the build/check commands again. Keep the root checkout unmanaged during sync, as in the generated `.gclient`, so sync preserves the applied patch. Verify the checked-out commit and identity before compiling. The recorded run reused the output directory; it was an incremental rebuild, not a second fresh-output timing measurement. This immediate-child revision rolls a PHP test dependency and is a weak measure of future browser/security-update porting cost.
 
+## Runtime regression checks
+
+The [native fixture instructions](../tests/fixtures/browser/README.md) cover marked disposable profiles, expected-PID/version checks, causal extension on/off probes, process-restart verification and renderer/private-storage smoke checks. `tools/check_browser_foundation.mjs` is a privileged developer test client. It is separate from product CLI/MCP authorization and runs manually against the external browser build.
+
 ## Run record, 2026-10-24
 
 - Host preflight: macOS 26.7, arm64, 48 GiB RAM, 15 logical CPUs, APFS, Xcode 27.0 (`27A266a`), macOS SDK 27.0. Initial available disk was approximately 220 GiB. Signing identities and credentials were not inspected.
@@ -106,9 +110,10 @@ For reapplication, select a new branch at `8d208f20744ac6d4ce00cc3f9de6a14a9b8b9
 - Second build completed 1,155 steps before ANGLE failed on missing Metal Toolchain. Apple's `xcodebuild -downloadComponent MetalToolchain` installed component `27A266a`; `xcrun --find metal` then succeeded. Incremental build resumed at 06:40 UTC with eight jobs.
 - The resumed unmodified build passed at 09:03:03 UTC after starting at 06:40:26 UTC. Launched the resulting Chrome 158 binary and exercised a synthetic local form. A saved localStorage value survived reload and was absent from a separate user-data directory. This is a narrow smoke check, not browser-Profile/private-mode isolation evidence.
 - Initial native integration passed six core tests under Cargo and GN, seven C++/Rust checks including 1,000 construction/rename/destruction cycles, and an accessibility click followed by focused Space-key activation of the toolbar control. Keyboard access needed explicit `FocusBehavior::ALWAYS`. No sanitizer or cross-thread violation test was run.
-- The packaged patch applied without conflicts at both pins. GN generation, `chrome`, six GN Rust tests and seven bridge checks passed on each. Dependency sync/hooks passed after the second application. The native UI sequence has not yet been repeated after that rebuild. Exact source commits, hashes and limits are in [the evidence record](evidence/foundation.json).
-- Chrome Web Store installation of uBlock Origin Lite `2026.1021.1354`, ID `ddkjiahejlhfcafbddmgiahcphecmpfh`, was observed. Functional/lifecycle acceptance remains unverified: driver reconnection first selected stock Chrome 151, invalidating those results; later the disposable profile lacked extension files while native management still reported ENABLED. Its dashboard returned `net::ERR_FILE_NOT_FOUND`. Cause is unresolved; retest with a fresh native-launched profile before concluding anything about compatibility.
-- Launch emits a duplicate `ANGLESwapCGLLayer` Objective-C class warning from two component libraries. No safety conclusion follows from successful launch. Private-mode/profile boundaries, renderer recovery, native messaging and signed updates remain untested. Maintenance owner, backup runner and budget remain unspecified.
+- The packaged patch applied without conflicts at both pins. GN generation, `chrome`, six GN Rust tests and seven bridge checks passed on each. Dependency sync/hooks passed after the second application. The native accessibility-click/Space-key sequence also passed on the rebuilt second revision. Exact build commits and limits are in [initial evidence](evidence/foundation.json); later runtime cases are [recorded separately](evidence/runtime.json).
+- Fresh native-profile retest: the user installed uBlock Origin Lite `2026.1021.1354`, ID `ddkjiahejlhfcafbddmgiahcphecmpfh`, through Chrome Web Store; native management reported FROM_STORE. Enabled/re-enabled requests returned an extension-local empty resource, while the disabled control reached the expected advertising origin/path. A normal browser close and changed-PID restart preserved the enabled state and filtering. Version-changing updates, removal and native messaging remain untested. Earlier stock-Chrome fallback and missing-file attempts remain invalid compatibility evidence.
+- Renderer crash/reload preserved acknowledged localStorage while the browser PID stayed unchanged. Off-the-record storage was separate from normal storage and absent in a fresh private context after disposal. These are narrow browser checks; production workspace durability, full persistent-Profile/cookie/history isolation and private-data disk forensics remain unverified.
+- A default-context `Target.createTarget` request aborted the browser on a blocking-disallowed assertion in `Profile::CreateProfile`. Trigger conditions and upstream-versus-patch origin remain unisolated. The regression client reuses an existing normal tab; it does not waive the failure or disable thread checks. Launch also emits the unresolved duplicate `ANGLESwapCGLLayer` warning. Signed updates, maintenance owner, backup runner and recurring budget remain open.
 
 ## Rust and page-control findings
 
@@ -124,7 +129,7 @@ For MA-011, inspected these upstream interfaces at the same revision:
 
 Proposed narrow experiment: browser-owned grant selects one ordinary tab/Profile and origin; a restricted in-process client obtains bounded semantic observation, resolves a current element reference, performs one synthetic-site action, then observes the changed result. Map typed commands to an allowlist, reject arbitrary evaluation/target attachment, and keep document revision and scope checks inside the browser. Recheck redirects/frames; Stop must revoke queued/new actions and detach the client. External IPC still needs authenticated same-user access. Test both permitted and denied contexts before claiming feasibility.
 
-This is source-level investigation only. Agent-browser's CDP-based test driver verifies the motion study; it does not implement or prove myarc's scoped adapter, CLI, MCP, consent UI or Stop behavior. See the [control contract](../docs/CONTROL-PROTOCOL.md).
+This product-adapter proposal remains source-level investigation. Agent-browser checks the motion study; a separate developer CDP client now checks bounded native runtime cases in disposable profiles. Neither implements or proves myarc's scoped adapter, CLI, MCP, consent UI or Stop behavior. See the [control contract](../docs/CONTROL-PROTOCOL.md).
 
 ## Export and maintenance blockers
 

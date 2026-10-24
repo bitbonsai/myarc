@@ -36,7 +36,11 @@ Implemented a dependency-free transient workspace and validated rename command, 
 
 ### MA-002.c: reproducible patch reapplication
 
-Packaged the owned sources and upstream integration in one patch. It applies without conflicts at the original pin and immediate child `8d208f20744ac6d4ce00cc3f9de6a14a9b8b926d`. Build plus core/bridge checks passed on both, with sync/hooks on the second. This PHP test-dependency roll does not establish representative security-update porting cost. Native UI rerun on the rebuilt second revision remains pending. Extension lifecycle and foundation acceptance stay open.
+Packaged the owned sources and upstream integration in one patch. It applies without conflicts at the original pin and immediate child `8d208f20744ac6d4ce00cc3f9de6a14a9b8b926d`. Build plus core/bridge checks passed on both, with sync/hooks on the second. This PHP test-dependency roll does not establish representative security-update porting cost. Native accessibility-click/Space-key activation also passed on the rebuilt second revision. Extension update/removal and foundation acceptance stay open.
+
+### MA-002.d: bounded runtime regression checks
+
+User-installed MV3 blocking passed enabled/disabled/re-enabled controls and a changed-PID restart. Renderer crash/reload and explicit off-the-record localStorage separation/disposal passed. [The retained developer client and fixture](../tests/fixtures/browser/README.md) verify the actual candidate version and owned process; unchanged-PID restart and wrong-owner cases fail. A default-context target-creation request still aborts on a profile-initialization thread assertion. Stop at these bounded results, with full Profile/history/private-data guarantees, update delivery and product CLI/MCP authorization explicitly open.
 
 ## MA-003 — Establish real export coverage
 

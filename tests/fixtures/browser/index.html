@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<title>myArc foundation check</title>
+<h1>Foundation test page</h1>
+<form id="form">
+  <label>Note <input id="note" name="note" maxlength="80" required></label>
+  <button>Save note</button>
+</form>
+<p id="result" role="status">Nothing saved</p>
+<script>
+  document.querySelector('#form').addEventListener('submit', event => {
+    event.preventDefault()
+    const value = document.querySelector('#note').value
+    localStorage.setItem('myarc-test-note', value)
+    document.querySelector('#result').textContent = `Saved: ${value}`
+  })
+</script>
+</html>
