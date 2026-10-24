@@ -49,11 +49,14 @@ The same core must serve the standalone preservation CLI and browser integration
 | Browser platform | Rendering, sandbox, processes, network, browser profiles, permissions, extensions, downloads | Upstream services remain authoritative; minimize patches |
 | Workspace model | Stable IDs; Spaces; profile references; folders; pins; temporary tabs; archive; window and split references | No profile cookies/passwords in workspace JSON |
 | Commands | Validated workspace mutations and authorized browser actions | UI and test automation use the same command paths |
+| Control service and adapters | CLI, MCP, scoped real-page observation/interaction, session grants, cancellation and Stop control | Browser-side authorization; common commands and errors; native page adapters reuse upstream mechanisms without exposing unrestricted debugging |
 | Persistence/import | Versioned snapshots/journal; transactional migration; portable export | Reads user-selected sources; never writes into the Arc profile |
 | Presentation | Sidebar, command bar, Peek, splits, animation, accessibility | Renders state; does not independently persist or alter import results |
 | Optional providers | AI adapters and hosted convenience clients | Browser startup, local work, export, and recovery do not require them |
 
 Reuse the upstream browser profile, tab, password, and security machinery. Do not build parallel stores that can disagree. Preserve a mapping between workspace IDs and browser tab/profile IDs across restore without assuming runtime tab IDs are stable.
+
+Browser control is a first-class product surface. CLI and MCP adapters sit outside the pure Rust workspace core and call the same control service. Pure core/preservation work stays usable without a running browser; page actions require a live authorized browser adapter. Built-in/hosted AI does not own this boundary or receive extra privileges. Follow [CONTROL-PROTOCOL.md](CONTROL-PROTOCOL.md).
 
 ## Workspace schema proposal
 

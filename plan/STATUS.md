@@ -13,6 +13,7 @@ Updated: 2026-10-24.
 | Artcraft workflow audit | Behavior contracts, bounded tasks, development log, evidence freshness and regression rules added; standalone core dependency corrected |
 | Executable check today | Relative document-link checker; GitHub Actions workflow added for that same check only |
 | Browser/importer/AI implementation | Not started |
+| CLI and MCP browser control | P0 launch requirement; tools, shared control service, scoped grants and MA-011 specified; no executable implementation yet |
 | Benchmarks/application tests | Not run; budgets are proposals |
 
 Next work: [MA-001 through MA-003](EXECUTION.md). No platform capacity, sample availability, signing capability, maintenance staffing, or subscription revenue is presumed.

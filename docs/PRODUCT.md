@@ -8,7 +8,7 @@ Serve desktop Arc users who have invested in Spaces, folders, named pinned tabs,
 
 ## Requirements carried into this plan
 
-The project brief calls for account-free browsing, Chromium extension compatibility, Arc settings import, an onboarding experience with meaningful animation, Boosts, no Easels, and entirely optional AI through local models, user keys, or a paid hosted service. These are product constraints. The technical choices and dates below are proposals, not prior decisions.
+The project brief calls for account-free browsing, Chromium extension compatibility, Arc settings import, an onboarding experience with meaningful animation, Boosts, no Easels, entirely optional AI through local models/user keys/a paid hosted service, and browser control through CLI and MCP for AI agents. These are product constraints. The technical choices and dates below are proposals, not prior decisions.
 
 ## Why someone switches
 
@@ -30,9 +30,10 @@ Dia already advertises optional AI and Arc migration. Those are baseline competi
 | P0 | Command bar | Open URL/search, find existing tab, dispatch common actions, remain inside the active Profile |
 | P0 | Migration and export | Preview, selection, recoverable commit, truthful coverage report, portable workspace |
 | P0 | Browser essentials | Extensions, permissions, downloads, history, find, private browsing, context menus, DevTools, recovery, updates |
+| P0 | CLI and MCP browser control | An approved agent can inspect and act on real pages, manage tabs/Spaces, capture screenshots and stop/release control through a shared interface; works independently of built-in AI |
 | P1, beta target | Peek and two-pane Split View | Correct focus, navigation, dismissal, persistence; no cross-Profile split |
 | P1, beta target | Boosts | Appearance controls, CSS, element hiding; inspectable and reversible |
-| P2 | Optional AI | Explicit invocation and scope with local/BYOK/hosted providers |
+| P2 | Built-in AI providers | Explicit invocation and scope with local/BYOK/hosted providers; the P0 external-agent control interface does not wait for this |
 | Later | Convenience | Link routing, richer customization, sync, additional platforms, richer Boosts |
 | Excluded | Easels | No implementation or migration work beyond reporting unsupported items |
 

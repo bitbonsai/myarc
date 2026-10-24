@@ -2,6 +2,8 @@
 
 Status: initial specification seeds, not verified application behavior. Each implementation task extends the relevant seed and resolves its unknowns before claiming Arc parity. Use original summaries, sources and synthetic examples. Never publish a real user's browser state here.
 
+CLI/MCP browser control is a myarc product requirement, not a claim of Arc feature parity. BC-004 covers that additional behavior.
+
 ## Required fields
 
 Contract ID and parent task; source URL/date and reference product/version/platform; evidence kind (`documented`, `observed`, `project requirement`, `proposed`, `unknown`); initial state; user action; expected state; keyboard/focus; persistence/restart; cancellation/error; required semantic and visual proof; unresolved questions.
@@ -41,3 +43,14 @@ Parent: MA-004/007. Evidence: project requirement; detailed Arc reset/close/mult
 - Required product invariants: removing a runtime page must not accidentally delete a persistent pin; changing the canonical URL must be deliberate; Profile boundaries apply to moves; failures must not lose the saved organization.
 - Unknowns to settle before implementing: exact reset gesture/shortcut, when navigation persists, focus after closure, duplicate policy, and shared/multiwindow semantics. Record the chosen behavior and its evidence.
 - Proof: a command transition table with final canonical/current URL and ownership for each action; persistence checks; browser focus/navigation checks. Do not infer correctness from a pin icon being visible.
+
+## BC-004 — An authorized agent acts on a real page
+
+Parent: MA-011/007. Evidence: project requirement and proposed [control contract](../docs/CONTROL-PROTOCOL.md); no implementation exists.
+
+- Initial state: built-in AI off; synthetic site in tab T1; a different Profile and tab T2 outside the requested scope; no external control grant.
+- Action: connect an external MCP client, obtain user approval for T1, inspect, fill/click, wait for a real DOM/state result, inspect/screenshot, then Stop control.
+- Expected behavior: only granted context is visible/actionable; the website changes as expected; the browser shows the controller; Stop control rejects queued/new operations immediately. Repeat the same journey through the CLI and compare outcomes.
+- Invalidations: stale references, navigation/redirect outside scope, permission denial, cancellation or disconnect produce explicit results and never automatic repeated submissions. Page instructions cannot expand the grant.
+- Restart: expired/revoked grants never become silently active after relaunch. Ordinary local browsing remains available.
+- Proof: semantic final state plus native browser recording and external-client trace, synthetic data only; record protocol/client/build versions. Listing MCP tools alone is insufficient.

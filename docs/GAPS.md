@@ -12,8 +12,9 @@ Updated: 2026-10-24. No engineering blocker below has been cleared.
 | 6 | No complete browsing slice | An attractive shell is insufficient | MA-007 integrated import → pin → Space → command → restart journey |
 | 7 | Security/update/profile/private-mode guarantees unproven | Blocks any public daily-use promise | MA-009 and [security plan](SECURITY-PLAN.md) evidence |
 | 8 | No extension/platform compatibility matrix | Chromium heritage is not compatibility evidence | MA-002/009 named test cases, versions and outcomes |
-| 9 | Peek/splits and initial Boosts unimplemented | Important workflow fidelity after the core is stable | MA-010 tests, user tasks and recordings |
-| 10 | AI/service economics and demand untested | Revenue must support maintenance, without delaying the browser | Optional provider pilot, cost ledger and limit/billing evidence |
+| 9 | No usable CLI/MCP browser control | P0 user requirement; AI agents must observe and act on real pages | MA-011 both-interface and external-client journeys, grants, isolation and Stop control |
+| 10 | Peek/splits and initial Boosts unimplemented | Important workflow fidelity after the core is stable | MA-010 tests, user tasks and recordings |
+| 11 | Built-in AI/service economics and demand untested | Revenue must support maintenance, without delaying the browser or core control interfaces | Optional provider pilot, cost ledger and limit/billing evidence |
 
 Choose the highest-ranked task whose dependencies and resources are available. Keep MA-001 design progress moving while build/data investigations proceed; this is a sequencing instruction, not authorization to spawn autonomous agents or contact users.
 

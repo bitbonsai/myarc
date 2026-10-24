@@ -13,6 +13,7 @@ An independent browser project for people who love Arc's workflow: a calm sideba
 - Launch with a beautifully animated onboarding experience that teaches by doing.
 - Support Chrome extensions through a proven browser implementation, with published compatibility results.
 - Make AI optional: off by default, with local models, user API keys, and an optional paid hosted service.
+- Make browser control available through both CLI and MCP at launch, so users can connect their own AI agents independently of built-in AI.
 - Include Boosts, beginning with appearance, CSS, and element hiding. No Easels.
 - Keep workspace data local and exportable. Cloud services are optional conveniences.
 
@@ -26,6 +27,7 @@ An independent browser project for people who love Arc's workflow: a calm sideba
 | [Architecture](docs/ARCHITECTURE.md) | Chromium recommendation, alternatives, and foundation experiment |
 | [Arc migration](docs/MIGRATION.md) | Import contract, data boundaries, recovery, and portable export |
 | [AI and services](docs/AI.md) | Provider choices, privacy, and sustainable hosted billing |
+| [CLI and MCP browser control](docs/CONTROL-PROTOCOL.md) | Shared tools, page interaction, user grants, and external AI agents |
 | [Boosts](docs/BOOSTS.md) | Phased scope and safe execution |
 | [Parity register](docs/PARITY.md) | What is wanted, what is known, and what is actually implemented |
 | [Ranked gaps](docs/GAPS.md) | Work order and launch blockers |
@@ -33,7 +35,7 @@ An independent browser project for people who love Arc's workflow: a calm sideba
 | [Agent workflow](AGENTS.md) | How to contribute without drifting from the product |
 | [Artcraft methods applied](docs/ARTCRAFT-WORKFLOW.md) | Practical lessons, current enforcement and implementation triggers |
 | [Behavior contracts](plan/BEHAVIOR-CONTRACTS.md) | Precise interactions and unresolved questions before coding |
-| [Execution plan](plan/EXECUTION.md) | First ten implementation tasks with definitions of done |
+| [Execution plan](plan/EXECUTION.md) | Implementation workstreams and definitions of done |
 | [Research](docs/RESEARCH.md) | Primary sources, limitations, and Artcraft lessons |
 
 ## What makes this plan different

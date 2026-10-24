@@ -15,6 +15,7 @@ Use [docs/ARTCRAFT-WORKFLOW.md](docs/ARTCRAFT-WORKFLOW.md) for the adapted worki
 - Preserve the distinction between Spaces and Profiles. Several Spaces may use one Profile.
 - Keep Boosts in scope and Easels out. Imported executable customization stays disabled until deliberate enablement.
 - AI must support off/local/user-key/hosted choices, with off as the default. No silent cloud fallback or background page uploads.
+- CLI and MCP browser control are P0 product scope. Provide real page observation and interaction through shared, scoped commands; do not defer them behind built-in AI or treat them only as test tooling.
 - Preserve real Chrome extension/browser services. Do not replace the foundation with a generic webview just to simplify the UI.
 
 ## Architecture and style
@@ -40,7 +41,7 @@ Use upstream browser security/profile machinery; do not bypass sandboxing or dup
 5. For motion/interaction changes, inspect a running build, record the relevant sequence and verify reduced motion/focus. Use synthetic data for public artifacts.
 6. Update status, parity and blockers with evidence, then commit a coherent change. Record what remains unmeasured.
 
-Treat MA-001–MA-010 as workstreams. Select one bounded outcome and use a task suffix for implementation slices, with explicit acceptance evidence and a stopping condition. Record significant outcomes and failed attempts in the development log. Verify that filtered tests actually executed and that visual/output artifacts are fresh from the reported run. A zero-test exit or stale screenshot is not proof.
+Treat MA-001–MA-011 as workstreams. Select one bounded outcome and use a task suffix for implementation slices, with explicit acceptance evidence and a stopping condition. Record significant outcomes and failed attempts in the development log. Verify that filtered tests actually executed and that visual/output artifacts are fresh from the reported run. A zero-test exit or stale screenshot is not proof.
 
 Retain regression checks for established behaviors; change baselines only with an explained product/measurement decision. Once browser UI exists, audit visible settings and commands for an observable effect. Disable/explain or omit unsupported controls rather than presenting a working-looking no-op.
 

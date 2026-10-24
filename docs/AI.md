@@ -4,6 +4,12 @@
 
 AI is off by default and never required for onboarding, importing, searching the web normally, restoring a session, or browsing. No background AI classification, page upload, model download, or inference before explicit enablement and action. An AI provider outage must have no effect on browser startup or local data access.
 
+## Browser control is a separate core capability
+
+[CLI and MCP control](CONTROL-PROTOCOL.md) are P0 launch requirements. A user can authorize an external agent to inspect/navigate pages, click/type/scroll, capture screenshots and manage browser state without enabling built-in AI or subscribing to myarc. Enabling external control is a separate deliberate grant: built-in AI being off must not prevent that choice or silently authorize it. The external client/model has its own data handling and provider costs.
+
+The future built-in assistant uses the same granted control operations. Do not implement a privileged backdoor for hosted AI, make local/user-key agents second-class, or wait for a paid model gateway before building browser control. Start with tested local MCP clients; cloud-client connectivity requires a separate authenticated bridge.
+
 ## Provider model
 
 | Mode | Setup | Data destination | Commercial relationship |
@@ -17,7 +23,7 @@ The browser holds a common interface for capabilities, selected model, context s
 
 ## First useful actions
 
-After daily browsing is dependable, pilot selected-text explanations, deliberate current-page summaries, and questions about specifically chosen tabs. Show which page/text will be sent before a first cloud request and whenever scope expands. Broad browser-wide context and autonomous page actions are outside the first AI release.
+After daily browsing is dependable, pilot built-in selected-text explanations, deliberate current-page summaries, and questions about specifically chosen tabs. Show which page/text will be sent before a first cloud request and whenever scope expands. External-agent page actions are already part of the P0 control scope; any built-in agent action must use that same grant/command path. Unscoped browser-wide access is not a default capability.
 
 If an answer contains navigable URLs, show their destination and require a user action to open them. Page content and model output are untrusted. Do not let either alter permissions, read other Profiles, access local files, install Boosts/extensions, or execute browser commands without separately authorized capabilities.
 

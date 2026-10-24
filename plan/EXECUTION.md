@@ -18,6 +18,8 @@ Dependencies: macOS build capacity, signing/update feasibility investigation, ma
 
 Build the unmodified complete Chromium candidate at an exact revision. Exercise a real extension and its lifecycle using the intended install route. Integrate one Rust-owned workspace command and a minimal native UI trigger through an officially supported bridge. Reapply the patch on another upstream revision. Compare a maintained derivative only if it demonstrably reduces total work.
 
+Include a narrow real-page control feasibility slice: identify how an authenticated adapter will inspect a page and perform an observable action without exposing an unrestricted debugging endpoint. Record this for MA-011; no paid AI service is needed to prove the control boundary.
+
 Done: reproducible instructions, machine/build costs and times, extension evidence, interop error/thread/ownership checks, isolation/recovery smoke checks, patch/rebase record, dependency/license inventory, and accepted foundation decision. Unknowns remain explicit. If no affordable maintenance route exists, pause browser release targets and continue preservation/design work.
 
 ## MA-003 — Establish real export coverage
@@ -70,7 +72,7 @@ Done: every [onboarding acceptance criterion](../docs/ONBOARDING.md) passes, wit
 
 ## MA-009 — Establish trustworthy distribution and daily use
 
-Dependencies: MA-002/005/007; public release also needs MA-008.
+Dependencies: MA-002/005/007; public release also needs MA-008 and MA-011.
 
 Implement/rehearse signed distribution and authenticated updates. Publish the extension/OS compatibility matrix and security maintenance plan. Exercise profile isolation, untrusted imports/automation, renderer recovery, and safe rollback/recovery from update failure. Run the daily-use cohort only after these boundaries pass.
 
@@ -83,6 +85,14 @@ Dependencies: MA-007; prioritize after safety blockers.
 Add two-pane Split View, Peek and B1 Boosts with explicit focus, profile, navigation and reversibility rules. Complete recordings and daily-use tasks. Keep full JavaScript sharing and AI services out of this critical path.
 
 Done: working journeys, persistence/restart behavior where applicable, safe scope/permission checks, no core-gate regression, and updated parity rows. Afterward select optional AI adapter and commercial pilot work from demonstrated demand.
+
+## MA-011 — Deliver CLI and MCP browser control (P0)
+
+Dependencies: MA-004 for shared commands; MA-002/007 for live page/tab adapters. Begin command/scope design with the core work and integrate a narrow observation/action slice early. Does not depend on built-in AI providers, hosted billing, sync or a completed import experience.
+
+Deliver both CLI and MCP interfaces to one control service. Cover authorized session attachment, tabs/Spaces, navigation, semantic page observation, click/fill/select/press/scroll/wait, screenshots, structured outcomes and cancellation. Add browser-owned scope approval, a visible controller indicator, expiry/revocation and Stop control. Use local stdio MCP first, with an authenticated same-user browser IPC connection; publish actual client/version/transport compatibility.
+
+Done: all [control launch evidence](../docs/CONTROL-PROTOCOL.md) passes. Show the same real synthetic-site journey through both interfaces and one real external MCP client, with built-in AI off and no hosted myarc account. Verify profile/tab/origin isolation, stale references, hostile page content, disconnect, cancellation and immediate human takeover. Record core, native and external-agent checks separately. A command catalog or developer-only screenshot endpoint cannot close this task.
 
 ## Implementation handoff
 

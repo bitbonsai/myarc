@@ -12,7 +12,7 @@ This document defines work required before supporting daily browsing. It is not 
 | Boost/share → web page/privileged process | Excess permissions, hidden network leaks, silently activated script | Narrow origins, inspectable disabled import, resource controls, no privileged bridge, revocation |
 | Model/page text → tools | Prompt-injected permissions or actions | Treat content/output as data; no ambient automation authority; explicit capability checks |
 | Release/update → installed application | Supply-chain compromise, unsigned update, unsafe downgrade | Isolated signing, reviewed dependencies, signed metadata/artifacts, verification and recovery |
-| Automation → browsing session | A local tool endpoint becoming a web-accessible backdoor | Disabled by default, local authenticated channel, test-profile scope, no permissive CORS, no unauthenticated listener |
+| Automation → browsing session | A control endpoint exceeding the context the user granted | Opt-in controller grants; dedicated Profile by default or deliberately selected normal tabs; authenticated local IPC; scope/expiry/revocation, indicator and Stop control; no unauthenticated listener |
 
 ## Maintenance is product scope
 

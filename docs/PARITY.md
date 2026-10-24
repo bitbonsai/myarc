@@ -16,6 +16,7 @@ Legend: `DOC` = public documentation/index evidence; `BRIEF` = project requireme
 | EXT-01 | Extension install/use/restart/update/remove | P0 | Chromium requirement; compatibility UNKNOWN | Supported platform matrix and real store route |
 | CORE-01 | Permissions, downloads, history, private browsing, DevTools | P0 | Inherit platform; integration UNKNOWN | Native integration smoke tests and private-data non-persistence |
 | REL-01 | Crash recovery, versioned export, secure updates | P0 | BRIEF; project release standard | Fault injection and signed-update rehearsal |
+| AUTO-01 | CLI and MCP for scoped tab/Space and real-page control | P0 | BRIEF; [control contract](CONTROL-PROTOCOL.md) | Both-interface journey and external client evidence; grants, stale references, cancellation, Stop control; not implemented |
 | VIEW-01 | Peek and two-pane Split View | P1 | DOC: Split View index; details UNKNOWN | Navigation/focus, reopen, drag, dismiss, persistence |
 | BST-01 | Appearance/CSS/hiding Boosts | P1 | DOC: Boosts index; BRIEF | Scope, reversibility, SPA/iframe rules, unsafe input checks |
 | BST-02 | JavaScript Boosts and safe sharing | P2 | DOC: disable/release notes; BRIEF | Threat review, disabled imports, revocation |

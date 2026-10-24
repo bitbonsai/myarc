@@ -18,6 +18,7 @@ All results: **not measured**. Numbers below are proposed acceptance budgets to 
 | Accessibility | Core journeys work with keyboard, screen reader, zoom, OS contrast/reduced motion | Manual review plus appropriate automation; no broad compliance claim from a single scan |
 | Daily use | No unresolved P0 issue after a 14-day consenting cohort trial | Redacted issue log, task outcomes, known limitations |
 | AI off / provider failure | No inference/page upload when off; local/BYOK/hosted failure does not affect browsing | Request traces, denied network tests and secret/log review |
+| CLI and MCP control (P0) | Both interfaces complete the same real page journey; external MCP client works with built-in AI off; isolation and Stop control hold | MA-011 evidence: client/version/transport matrix, actual page results, stale/error cases, scope checks, cancellation/revocation and native controller indicator |
 | Visible controls | Zero unexplained no-op settings/actions in supported journeys | Command/control inventory with observed effect, enabled condition and semantic check; unsupported controls disabled/explained or omitted |
 
 ## Extension test categories
