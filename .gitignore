@@ -1,0 +1,25 @@
+# Private source material and credentials
+private/
+local/
+exports/
+profiles/
+research-private/
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+*.p12
+*.pfx
+*.mobileprovision
+
+# Local build/check outputs
+target/
+out/
+upstream/
+node_modules/
+__pycache__/
+*.pyc
+.DS_Store
+
+# Public plan/ is deliberately tracked.

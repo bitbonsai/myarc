@@ -1,0 +1,18 @@
+# Current status
+
+Updated: 2026-10-24.
+
+| Item | State |
+| --- | --- |
+| Product scope and priority | Initial plan documented |
+| Rust direction | myarc-owned core in Rust; upstream Chromium C++ retained; bridge needs proof |
+| Animated onboarding | Explicit launch requirement; storyboard/criteria documented; prototype not built |
+| Arc import | Coverage contract documented; real schema/version evidence still needed |
+| Browser foundation | Recommended approach documented; no local build or integration performed |
+| Agent workflow | Contributor instructions and task sequence prepared |
+| Browser/importer/AI implementation | Not started |
+| Benchmarks/application tests | Not run; budgets are proposals |
+
+Next work: [MA-001 through MA-003](EXECUTION.md). No platform capacity, sample availability, signing capability, maintenance staffing, or subscription revenue is presumed.
+
+Keep this file public and concise. Put local machine state, private source samples and unpublished personal notes outside the committed tree. Do not store user chat transcripts here.
