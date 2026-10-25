@@ -2,6 +2,12 @@
 
 Keep significant outcomes, failures and next actions reproducible. Newest entry first. No private exports, page titles/URLs from real browsing, credentials or raw user transcripts.
 
+## 2026-10-25: Empty-Space header candidate fix
+
+- Traced the native metadata leak to a skipped blank toolbar update plus sidebar layout restoring location-bar visibility. Reload also enabled itself inside `ChangeMode` after the blank-state disable. Updated optional 0012 to refresh neutral address text, hide site information/page actions and page-only navigation buttons, and disable Reload after mode changes. Existing Chromium paths restore the different populated page. No Rust/workspace policy or canonical foundation source changed.
+- Extended the existing two-command-mode transition regression. Its real-header syntax check passes after replacing a private toolbar accessor with the public provider. All three production translation units compiled and the incremental `chrome` target linked; the final null-safe URL-drag follow-up also compiled/linked. Three GN header checks, strict 73-file baseline reverse/replay, formatting, document links, payload freshness and whitespace pass. Seventy captured external files outside this change remain identical.
+- [Run record](../browser/experiments/native-workspace-command-safety.md#empty-header-candidate-fix-2026-10-25) separates this build from the historical smoke. Native cases executed: zero. No app launch, desktop input or profile access. Renderer remains off. Parent must repeat populated -> Empty -> different populated with fresh screenshot/AX and hidden-page Reload checks before accepting the fix.
+
 ## 2026-10-25: Same-origin blog card navigation
 
 - Local blog cards used absolute production URLs, so index-to-post clicks crossed origins and skipped native View Transitions. Title/thumbnail links now use relative routes; canonical metadata and schemas keep production URLs.

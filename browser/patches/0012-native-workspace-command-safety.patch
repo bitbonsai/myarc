@@ -1136,7 +1136,7 @@ index 153345b2dc7ed6e5223e22175245731ad65e3c0f..9a6a7177ddf2443ca78f2c5e13054ded
    PrefChangeRegistrar local_pref_registrar_;
    std::unique_ptr<base::CallbackListSubscription> glic_enabling_subscription_;
 diff --git a/chrome/browser/ui/browser_command_controller_browsertest.cc b/chrome/browser/ui/browser_command_controller_browsertest.cc
-index 54deb1aa44b9e967a5626240ab63a5c24179a7e6..585fd29c2d1f9c8dc4f59c286578a68dfc491799 100644
+index 54deb1aa44b9e967a5626240ab63a5c24179a7e6..3574713c5e693d2ff9fccf90cfe7ff8ed8c05ffa 100644
 --- a/chrome/browser/ui/browser_command_controller_browsertest.cc
 +++ b/chrome/browser/ui/browser_command_controller_browsertest.cc
 @@ -8,13 +8,17 @@
@@ -1176,7 +1176,7 @@ index 54deb1aa44b9e967a5626240ab63a5c24179a7e6..585fd29c2d1f9c8dc4f59c286578a68d
  #include "chrome/browser/ui/profiles/profile_picker.h"
  #include "chrome/browser/ui/profiles/profile_ui_test_utils.h"
  #include "chrome/browser/ui/side_panel/side_panel_action_callback.h"
-@@ -55,13 +64,18 @@
+@@ -55,13 +64,24 @@
  #include "chrome/browser/ui/side_panel/side_panel_enums.h"
  #include "chrome/browser/ui/side_panel/side_panel_ui.h"
  #include "chrome/browser/ui/startup/startup_browser_creator.h"
@@ -1189,13 +1189,19 @@ index 54deb1aa44b9e967a5626240ab63a5c24179a7e6..585fd29c2d1f9c8dc4f59c286578a68d
  #include "chrome/browser/ui/tabs/tab_strip_model.h"
  #include "chrome/browser/ui/ui_features.h"
 +#include "chrome/browser/ui/views/frame/browser_view.h"
++#include "chrome/browser/ui/views/frame/toolbar_button_provider.h"
++#include "chrome/browser/ui/views/location_bar/location_bar_view.h"
++#include "chrome/browser/ui/views/location_bar/location_icon_view.h"
++#include "chrome/browser/ui/views/omnibox/omnibox_view_views.h"
++#include "chrome/browser/ui/views/toolbar/reload_button.h"
++#include "chrome/browser/ui/views/toolbar/toolbar_view.h"
  #include "chrome/common/chrome_features.h"
  #include "chrome/common/chrome_switches.h"
 +#include "chrome/common/content_restriction.h"
  #include "chrome/common/pref_names.h"
  #include "chrome/test/base/in_process_browser_test.h"
  #include "chrome/test/base/testing_profile_manager.h"
-@@ -71,8 +85,10 @@
+@@ -71,8 +91,10 @@
  #include "components/bookmarks/common/bookmark_bar_visibility_state.h"
  #include "components/bookmarks/common/bookmark_pref_names.h"
  #include "components/bookmarks/test/bookmark_test_helpers.h"
@@ -1206,7 +1212,7 @@ index 54deb1aa44b9e967a5626240ab63a5c24179a7e6..585fd29c2d1f9c8dc4f59c286578a68d
  #include "components/optimization_guide/core/feature_registry/feature_registration.h"
  #include "components/policy/core/common/policy_pref_names.h"
  #include "components/prefs/pref_service.h"
-@@ -91,6 +107,16 @@
+@@ -91,6 +113,16 @@
  #include "content/public/test/test_navigation_observer.h"
  #include "content/public/test/test_utils.h"
  #include "google_apis/gaia/gaia_urls.h"
@@ -1223,7 +1229,7 @@ index 54deb1aa44b9e967a5626240ab63a5c24179a7e6..585fd29c2d1f9c8dc4f59c286578a68d
  #include "net/base/network_change_notifier.h"
  #include "ui/actions/actions.h"
  #include "ui/base/base_window.h"
-@@ -1978,4 +2004,798 @@ IN_PROC_BROWSER_TEST_F(BrowserCommandControllerBrowserTestIsolatedTest,
+@@ -1978,4 +2010,838 @@ IN_PROC_BROWSER_TEST_F(BrowserCommandControllerBrowserTestIsolatedTest,
        isolated_browser->GetProfile()->IsEnterpriseIsolatedModeProfile());
  }
  
@@ -1480,6 +1486,20 @@ index 54deb1aa44b9e967a5626240ab63a5c24179a7e6..585fd29c2d1f9c8dc4f59c286578a68d
 +    return adapter_->DisplayedContents() == first_page &&
 +           tabs->GetActiveWebContents() == first_page;
 +  }));
++  auto* toolbar = view_->toolbar();
++  ASSERT_TRUE(toolbar);
++  auto* location = toolbar->location_bar_view();
++  ASSERT_TRUE(location);
++  auto* omnibox = location->omnibox_view();
++  ASSERT_TRUE(omnibox);
++  auto* reload = toolbar->reload_button();
++  ASSERT_TRUE(reload);
++  view_->GetWidget()->LayoutRootViewIfNecessary();
++  ASSERT_TRUE(location->IsDrawn());
++  ASSERT_TRUE(location->location_icon_view()->IsDrawn());
++  ASSERT_TRUE(reload->IsDrawn());
++  EXPECT_NE(std::u16string::npos, omnibox->GetText().find(u"/title1.html"));
++
 +  const auto empty_space = adapter_->CreateSpace("Empty between native tabs");
 +  ASSERT_TRUE(empty_space.ok);
 +  ASSERT_TRUE(adapter_->SelectSpace(empty_space.id).ok);
@@ -1488,6 +1508,23 @@ index 54deb1aa44b9e967a5626240ab63a5c24179a7e6..585fd29c2d1f9c8dc4f59c286578a68d
 +           !lens->GetEnabled();
 +  }));
 +  ASSERT_EQ(first_page, tabs->GetActiveWebContents());
++  // Real toolbar/loading updates and layout must not re-expose retained P1.
++  view_->UpdateToolbar(first_page);
++  view_->UpdateReloadStopState(true, true);
++  view_->GetWidget()->LayoutRootViewIfNecessary();
++  EXPECT_TRUE(location->IsDrawn());
++  EXPECT_TRUE(omnibox->IsDrawn());
++  EXPECT_TRUE(omnibox->GetText().empty());
++  EXPECT_EQ(nullptr, location->GetWebContents());
++  EXPECT_FALSE(location->ShowPageInfoDialog());
++  EXPECT_FALSE(location->location_icon_view()->IsDrawn());
++  EXPECT_FALSE(view_->toolbar_button_provider()->GetBackButton()->IsDrawn());
++  EXPECT_FALSE(toolbar->forward_button()->IsDrawn());
++  EXPECT_FALSE(reload->IsDrawn());
++  EXPECT_FALSE(reload->GetEnabled());
++  EXPECT_EQ(ReloadControl::Mode::kReload, reload->GetVisibleMode());
++  EXPECT_TRUE(IsCommandEnabled(workspace_browser_, IDC_FOCUS_LOCATION));
++  EXPECT_TRUE(IsCommandEnabled(workspace_browser_, IDC_NEW_TAB));
 +
 +  // No manual sidebar or command refresh: P1 -> empty -> P2 must notify
 +  // Actions.
@@ -1502,6 +1539,15 @@ index 54deb1aa44b9e967a5626240ab63a5c24179a7e6..585fd29c2d1f9c8dc4f59c286578a68d
 +  EXPECT_EQ(second_space.id, adapter_->Sidebar().current_space.id);
 +  EXPECT_EQ(zoom_enabled, zoom->GetEnabled());
 +  EXPECT_EQ(lens_enabled, lens->GetEnabled());
++  view_->GetWidget()->LayoutRootViewIfNecessary();
++  EXPECT_TRUE(location->IsDrawn());
++  EXPECT_EQ(second_page, location->GetWebContents());
++  EXPECT_NE(std::u16string::npos, omnibox->GetText().find(u"/title2.html"));
++  EXPECT_TRUE(location->location_icon_view()->IsDrawn());
++  EXPECT_TRUE(view_->toolbar_button_provider()->GetBackButton()->IsDrawn());
++  EXPECT_TRUE(toolbar->forward_button()->IsDrawn());
++  EXPECT_TRUE(reload->IsDrawn());
++  EXPECT_TRUE(reload->GetEnabled());
 +}
 +
 +IN_PROC_BROWSER_TEST_P(MyarcWorkspaceCommandSafetyTest,
@@ -4051,7 +4097,7 @@ index 8f53ac45605d10c921fee6fba53a758b22afa687..471e3163c9116440519c1bf8dcc4152f
        // Forget any existing relationships, we don't want to make things too
        // confusing by having multiple openers active at the same time.
 diff --git a/chrome/browser/ui/views/frame/browser_view.cc b/chrome/browser/ui/views/frame/browser_view.cc
-index 5db011f7a1262f2d8f5f32d7db778787e7d601a0..089e98a401b08b6340e2e93bd35bb1f8f0c6a018 100644
+index 5db011f7a1262f2d8f5f32d7db778787e7d601a0..1c1306e78f5aad8d377bfb8ab72c96635fd970d0 100644
 --- a/chrome/browser/ui/views/frame/browser_view.cc
 +++ b/chrome/browser/ui/views/frame/browser_view.cc
 @@ -970,12 +970,14 @@ class MyarcPaletteView : public views::BoxLayoutView,
@@ -4092,7 +4138,18 @@ index 5db011f7a1262f2d8f5f32d7db778787e7d601a0..089e98a401b08b6340e2e93bd35bb1f8
    WebContents* selected_web_contents = GetActiveWebContents();
    if (selected_web_contents) {
      selected_web_contents->RestoreFocus();
-@@ -3856,7 +3872,7 @@ void BrowserView::CutCopyPaste(int command_id) {
+@@ -2824,6 +2840,10 @@ void BrowserView::UpdateReloadStopState(bool is_loading, bool force) {
+       ToolbarButtonProvider::From(browser_)->GetReloadButton();
+   if (reload_button) {
+     reload_button->ChangeMode(mode, force);
++    // ChangeMode can enable Reload even though the retained tab is hidden.
++    if (IsMyarcWorkspaceBlank() && toolbar_ && toolbar_->reload_button()) {
++      toolbar_->reload_button()->SetEnabled(false);
++    }
+   }
+ }
+ 
+@@ -3856,7 +3876,7 @@ void BrowserView::CutCopyPaste(int command_id) {
    // key events (and not accelerators) to the WebContents so it can give the web
    // page a chance to override them.
    WebContents* contents = browser_->GetTabStripModel()->GetActiveWebContents();
@@ -4101,7 +4158,7 @@ index 5db011f7a1262f2d8f5f32d7db778787e7d601a0..089e98a401b08b6340e2e93bd35bb1f8
      void (WebContents::*method)();
      if (command_id == IDC_CUT) {
        method = &content::WebContents::Cut;
-@@ -4399,7 +4415,10 @@ bool BrowserView::CanChangeWindowIcon() const {
+@@ -4399,7 +4419,10 @@ bool BrowserView::CanChangeWindowIcon() const {
  }
  
  views::View* BrowserView::GetInitiallyFocusedView() {
@@ -4113,7 +4170,7 @@ index 5db011f7a1262f2d8f5f32d7db778787e7d601a0..089e98a401b08b6340e2e93bd35bb1f8
  }
  
  bool BrowserView::ShouldShowWindowTitle() const {
-@@ -5767,6 +5786,115 @@ bool BrowserView::IsMyarcWorkspaceBlank() const {
+@@ -5767,6 +5790,115 @@ bool BrowserView::IsMyarcWorkspaceBlank() const {
           !myarc_workspace_adapter_->DisplayedContents();
  }
  
@@ -4229,7 +4286,7 @@ index 5db011f7a1262f2d8f5f32d7db778787e7d601a0..089e98a401b08b6340e2e93bd35bb1f8
  void BrowserView::RefreshMyarcWorkspaceSidebar() {
    if (!myarc_workspace_adapter_ || !myarc_workspace_sidebar_ ||
        !vertical_tab_strip_region_view_) {
-@@ -5996,6 +6124,16 @@ void BrowserView::UpdateMyarcWorkspaceCanvas() {
+@@ -5996,6 +6128,16 @@ void BrowserView::UpdateMyarcWorkspaceCanvas() {
    }
    const bool blank = IsMyarcWorkspaceBlank();
    const bool was_blank = std::exchange(myarc_workspace_blank_, blank);
@@ -4246,6 +4303,45 @@ index 5db011f7a1262f2d8f5f32d7db778787e7d601a0..089e98a401b08b6340e2e93bd35bb1f8
    if (blank) {
      if (!was_blank && GetFocusManager()) {
        GetFocusManager()->ClearFocus();
+@@ -6029,21 +6171,15 @@ void BrowserView::UpdateMyarcWorkspaceCanvas() {
+     }
+   }
+   if (toolbar_) {
+-    if (!blank) {
+-      auto* displayed =
+-          myarc_workspace_adapter_->ready()
+-              ? myarc_workspace_adapter_->DisplayedContents()
+-              : browser_->GetTabStripModel()->GetActiveWebContents();
+-      if (displayed) {
+-        toolbar_->Update(displayed);
+-        UpdateReloadStopState(displayed->IsLoading(), true);
+-      }
+-    }
+-    // Hide stale URL and security presentation together. Native navigation and
+-    // security services resume unchanged when a real page is displayed.
+-    if (toolbar_->location_bar_view()) {
+-      toolbar_->location_bar_view()->SetVisible(!blank);
+-    }
++    auto* displayed =
++        blank ? nullptr
++        : myarc_workspace_adapter_->ready()
++            ? myarc_workspace_adapter_->DisplayedContents()
++            : browser_->GetTabStripModel()->GetActiveWebContents();
++    // A null update refreshes the neutral omnibox through its blank guards;
++    // hiding the location bar is undone by sidebar layout.
++    toolbar_->Update(displayed);
++    UpdateReloadStopState(displayed && displayed->IsLoading(), true);
+     if (auto* back = ToolbarButtonProvider::From(browser_)->GetBackButton()) {
+       back->SetEnabled(!blank && chrome::IsCommandEnabled(browser_, IDC_BACK));
+     }
+@@ -6057,7 +6193,6 @@ void BrowserView::UpdateMyarcWorkspaceCanvas() {
+     }
+   }
+   if (blank) {
+-    UpdateReloadStopState(false, true);
+     if (auto* frame = GetFrameView()) {
+       frame->UpdateThrobber(false);
+     }
 diff --git a/chrome/browser/ui/views/frame/browser_view.h b/chrome/browser/ui/views/frame/browser_view.h
 index 6b99544a9788167061c5358d7a308be697247854..dcdeb18d6de1c8a8902d589da062dc169310c6a3 100644
 --- a/chrome/browser/ui/views/frame/browser_view.h
@@ -4280,3 +4376,95 @@ index 6b99544a9788167061c5358d7a308be697247854..dcdeb18d6de1c8a8902d589da062dc16
    std::unique_ptr<views::DialogDelegate> myarc_space_dialog_delegate_;
    std::unique_ptr<views::Widget> myarc_space_dialog_widget_;
    raw_ptr<views::Textfield> myarc_space_name_ = nullptr;
+diff --git a/chrome/browser/ui/views/location_bar/location_bar_view.cc b/chrome/browser/ui/views/location_bar/location_bar_view.cc
+index 078dcc67fc431e89ff43a84f7f116390a2cef977..922cc443a9d4a7b2e34f44261cfde81236ed236f 100644
+--- a/chrome/browser/ui/views/location_bar/location_bar_view.cc
++++ b/chrome/browser/ui/views/location_bar/location_bar_view.cc
+@@ -33,6 +33,7 @@
+ #include "chrome/browser/translate/translate_service.h"
+ #include "chrome/browser/ui/actions/chrome_action_id.h"
+ #include "chrome/browser/ui/browser_actions.h"
++#include "chrome/browser/ui/browser_commands.h"
+ #include "chrome/browser/ui/browser_element_identifiers.h"
+ #include "chrome/browser/ui/browser_window.h"
+ #include "chrome/browser/ui/browser_window/public/browser_window_features.h"
+@@ -863,6 +864,8 @@ void LocationBarView::Layout(PassKey) {
+         vertical_padding, location_height, false, kLeadingDecorationMaxFraction,
+         /*intra_item_padding=*/0, icon_left, selected_keyword_view_);
+     selected_keyword_view_->SetKeyword(keyword);
++  } else if (chrome::IsMyarcWorkspaceBlank(browser_)) {
++    location_icon_view_->SetVisible(false);
+   } else if (location_icon_view_->GetShowText() &&
+              !ShouldChipOverrideLocationIcon()) {
+     location_icon_view_->SetVisible(true);
+@@ -1130,7 +1133,8 @@ LocationBarModel* LocationBarView::GetLocationBarModel() {
+ }
+ 
+ WebContents* LocationBarView::GetWebContents() {
+-  return delegate_->GetWebContents();
++  return chrome::IsMyarcWorkspaceBlank(browser_) ? nullptr
++                                                 : delegate_->GetWebContents();
+ }
+ 
+ std::optional<bubble_anchor_util::AnchorConfiguration>
+@@ -1297,6 +1301,9 @@ bool LocationBarView::ShouldUsePopupOpenAppearance() const {
+ }
+ 
+ bool LocationBarView::ShouldHidePageActionIcons() const {
++  if (chrome::IsMyarcWorkspaceBlank(browser_)) {
++    return true;
++  }
+   if (!omnibox_view_) {
+     return false;
+   }
+@@ -1817,6 +1824,9 @@ void LocationBarView::WriteDragDataForView(views::View* sender,
+             ui::DragDropTypes::DRAG_NONE);
+ 
+   WebContents* web_contents = GetWebContents();
++  if (!web_contents) {
++    return;
++  }
+   favicon::FaviconDriver* favicon_driver =
+       favicon::ContentFaviconDriver::FromWebContents(web_contents);
+   gfx::ImageSkia favicon = favicon_driver->GetFavicon().AsImageSkia();
+@@ -1828,7 +1838,7 @@ void LocationBarView::WriteDragDataForView(views::View* sender,
+ int LocationBarView::GetDragOperationsForView(views::View* sender,
+                                               const gfx::Point& p) {
+   DCHECK_EQ(location_icon_view_, sender);
+-  WebContents* web_contents = delegate_->GetWebContents();
++  WebContents* web_contents = GetWebContents();
+   return (web_contents && web_contents->GetVisibleURL().is_valid() &&
+           (!GetOmniboxView()->IsEditingOrEmpty()))
+              ? (ui::DragDropTypes::DRAG_COPY | ui::DragDropTypes::DRAG_LINK)
+diff --git a/chrome/browser/ui/views/toolbar/toolbar_view.cc b/chrome/browser/ui/views/toolbar/toolbar_view.cc
+index 561ebf4de4f5d73ee296e216c9e3d00a22ca8893..0ee1e75700741110d33cf8b26cbf5086e9b8b8aa 100644
+--- a/chrome/browser/ui/views/toolbar/toolbar_view.cc
++++ b/chrome/browser/ui/views/toolbar/toolbar_view.cc
+@@ -1491,11 +1491,13 @@ void ToolbarView::Layout(PassKey) {
+     // shortcut: first-state geometry; review narrow/fullscreen before wider
+     // use.
+     const bool expanded = width() >= 180;
++    const bool has_page = !chrome::IsMyarcWorkspaceBlank(browser_);
+     for (views::View* child : children()) {
+       child->SetVisible(
+           child == myarc_sidebar_toggle_ ||
+-          (expanded && (child == back_ || child == forward_ ||
+-                        child == reload_ || child == location_bar_view_)));
++          (expanded && (child == location_bar_view_ ||
++                        (has_page && (child == back_ || child == forward_ ||
++                                      child == reload_)))));
+     }
+     if (background()) {
+       if (auto* corners = background()->AsA<CustomCornersBackground>()) {
+@@ -1506,11 +1508,8 @@ void ToolbarView::Layout(PassKey) {
+     myarc_sidebar_toggle_->SetBounds(expanded ? 84 : 8, expanded ? 8 : 42, 28,
+                                      28);
+     if (expanded) {
+-      back_->SetVisible(true);
+       back_->SetBounds(width() - 104, 8, 24, 28);
+-      forward_->SetVisible(true);
+       forward_->SetBounds(width() - 70, 8, 24, 28);
+-      reload_->SetVisible(true);
+       reload_->SetBounds(width() - 36, 8, 24, 28);
+       location_bar_view_->SetVisible(true);
+       location_bar_view_->SetBounds(8, 46, width() - 16, 38);

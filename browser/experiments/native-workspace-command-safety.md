@@ -61,3 +61,29 @@ Default workspace renderer remains OFF. Automated native browser regressions rem
 3. Check blank navigation/focus and search-consent behavior, including the Mac Apple Events hidden-page guard. Confirm existing saved-page fade and empty-window lifecycle behavior remain intact.
 
 Cross-Space shortcut/Tab Search policy, extension `activeTab`, cross-window destinations, partial batches and repeated snapshot costs remain open. This attempt adds no policy, memoization or runtime acceptance claim.
+
+## Empty-header candidate fix, 2026-10-25
+
+The smoke observations and [workspace-native.json](../evidence/workspace-native.json) above describe the pre-fix run. They remain historical evidence. This follow-up changes source and verifies compilation only; fresh native acceptance is pending.
+
+Updated complete replacement [0012](../patches/0012-native-workspace-command-safety.patch), SHA-256 `8f8023789fdb66841128879766afdb89866c7e393453185336eba69745f66e53`. Apply it once to the pre-0012 baseline, rather than over the prior version. The external checkout already contains this update.
+
+Four upstream files changed relative to the integrated candidate:
+
+- `views/frame/browser_view.cc`: refresh the neutral omnibox through the existing null-toolbar update and shared blank guards. Disable Reload after `ChangeMode`, which otherwise enables it again. Retain populated-page toolbar restoration.
+- `views/toolbar/toolbar_view.cc`: sidebar layout hides Back, Forward and Reload/Stop while blank, retaining the address field and sidebar toggle. Layout no longer overrides that page-control visibility.
+- `views/location_bar/location_bar_view.cc`: report no page while blank, hide site-information and page actions, and let content-setting updates use the missing-page path. URL drag queries use the same page getter; drag-data writing tolerates a Space becoming empty.
+- `browser_command_controller_browsertest.cc`: extend `DifferentNativeTabRestoresActionState` with first-page URL, neutral empty address, hidden page controls, rejected page information, repeated toolbar/loading updates and different-page restoration assertions. Both existing command-mode parameters remain.
+
+The patch now contains 21 files, adding toolbar/location-bar changes to the previous 19-file patch. Strict reverse restores all 73 pre-0012 baseline files; strict replay matches all 21 installed results. Seventy other captured external files remain byte-identical, including the parent's startup fixes and hover/fade/caption sources. Foundation-owned sources did not change, so canonical 0001 remains unchanged. Generic Unpin and explicit Unsave behavior are untouched.
+
+Verification actually run:
+
+- `autoninja -C out/MyarcM0 -j8 chrome`: exit 0. The first incremental build compiled all three production translation units and relinked `libchrome_dll.dylib`. A final null-drag guard then recompiled the location bar and relinked successfully.
+- Real-header syntax check of the updated browser-test translation unit: exit 0, empty diagnostic log. An initial private toolbar-accessor error was corrected using public `ToolbarButtonProvider`.
+- GN header checks for `//chrome/browser/ui/views/location_bar:impl`, `//chrome/browser/ui/views/toolbar:impl` and `//chrome/browser/ui:browser_tests`: all pass.
+- Strict patch apply/reverse/replay, changed-line clang-format, document links, foundation payload freshness and whitespace checks pass.
+
+Automated native cases executed: **zero**. No `browser_tests` executable was available; its dependency graph was not built. No app, desktop input, Arc interaction or profile access occurred. Executable `comm` paths were checked before building; resource-only notification-service mappings were left untouched. No build remains running at handoff. Renderer default remains OFF.
+
+Parent acceptance: repeat the native Everyday -> Empty -> Reading journey with two distinct synthetic pages. Inspect screenshot and accessibility output after layout settles: Empty must show neutral usable address/new-tab navigation, with prior URL/site information and page buttons absent. Trigger loading/toolbar updates while empty, verify hidden-page URLs/time origins remain unchanged, then confirm Reading restores its own URL/security controls and working Reload. Recheck ordinary same-page return. Existing broader action/lifecycle/privacy gaps remain open until separately accepted.
