@@ -55,7 +55,7 @@ Same-origin page navigation uses native cross-document View Transitions with a o
 
 Offline font/image decoding, no remote page-resource requests, minimum text size, clipping and overflow checks passed at 320/390/768/900/1024/1440. Dark rendering, wordmark switching and sampled AA text contrast passed at 1440/390. Keyboard focus, link hover and the 40-BPM footer heart remain checked. Fresh light/dark desktop and dark mobile screenshots were inspected.
 
-The browser check also serves the generated site over loopback HTTP and follows home → blog → post → blog → home. Chrome `pageswap` evidence confirms transitions in desktop/light and phone/dark modes, and their absence under reduced motion. A fresh navigation recording was inspected. Other-browser transition support remains unmeasured.
+Internal post title/thumbnail links are relative, so localhost navigation stays on localhost while canonical/social URLs remain production HTTPS. The browser check serves generated pages over loopback HTTP and follows actual title and thumbnail links through home → blog → post → blog → home, asserting origin/path without rewriting links. Chrome `pageswap` evidence confirms transitions in desktop/light and phone/dark modes, and their absence under reduced motion. A fresh navigation recording was inspected. Other-browser transition support remains unmeasured.
 
 All six documentation URLs returned anonymous HTTP 200; an actual Roadmap click also opened the expected GitHub document. Safari, Firefox and screen readers remain unmeasured.
 

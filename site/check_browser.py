@@ -379,6 +379,8 @@ try:
             posts = sorted((ROOT / 'blog').glob('*/index.html'))
             if posts:
                 routes += [('.post-preview h2 a', '/blog/' + posts[-1].parent.name + '/'), ('.post-back', '/blog/')]
+                if 'id="image-lightbox"' in posts[-1].read_text():
+                    routes += [('.post-thumb', '/blog/' + posts[-1].parent.name + '/'), ('.post-back', '/blog/')]
             routes += [('.top .mark', '/')]
             for width, theme, reduced in ((1440, 'light', False), (390, 'dark', False), (390, 'dark', True)):
                 browser('set', 'viewport', str(width), '1000')
@@ -386,7 +388,8 @@ try:
                 browser('open', origin + '/')
                 for selector, route in routes:
                     browser(expression=f"""(() => {{
-                      document.querySelector({json.dumps(selector)}).href = {json.dumps(route)}
+                      const link = document.querySelector({json.dumps(selector)})
+                      if (link.origin !== location.origin || link.pathname !== {json.dumps(route)}) throw new Error('Internal link leaves this site: ' + link.href)
                       sessionStorage.removeItem('navigation-transition')
                       addEventListener('pageswap', event => sessionStorage.setItem('navigation-transition', JSON.stringify({{active: Boolean(event.viewTransition)}})), {{once: true}})
                     }})()""")

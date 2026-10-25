@@ -2,6 +2,11 @@
 
 Keep significant outcomes, failures and next actions reproducible. Newest entry first. No private exports, page titles/URLs from real browsing, credentials or raw user transcripts.
 
+## 2026-10-25: Same-origin blog card navigation
+
+- Local blog cards used absolute production URLs, so index-to-post clicks crossed origins and skipped native View Transitions. Title/thumbnail links now use relative routes; canonical metadata and schemas keep production URLs.
+- Previous browser checks rewrote card URLs before clicking, hiding this failure. Removed that rewrite and added actual origin/path assertions. Title and thumbnail journeys now both run unchanged: twelve normal-motion navigations created transitions; six reduced-motion navigations did not. Fourteen unit checks and metadata checks passed. Safari/Firefox remain unchecked.
+
 ## 2026-10-25: Explicit lightbox opening order
 
 - The backdrop-only change was deployed and normal live HTML/JS read-back matched, but the user still observed a blink. Replaced the content starting-style rule with an explicit hidden base state. Normal opening now paints the modal backdrop before revealing content on a later animation frame; reduced motion remains immediate.

@@ -366,8 +366,8 @@ def build_blog(root, template, embed):
                 data = buffer.getvalue()
                 name = post.slug + '.' + hashlib.sha256(data).hexdigest()[:12] + '.webp'
                 (thumbnails / name).write_bytes(data)
-                thumb = f'<a class="post-thumb" href="{post.url}" aria-hidden="true" tabindex="-1"><img src="_thumbnails/{name}" alt="" width="{image.width}" height="{image.height}" loading="lazy"></a>'
-        listing += f'<article class="post-preview">{thumb}<div class="post-preview-copy"><h2><a href="{post.url}">{escape(post.title)}</a></h2><time class="post-date" datetime="{post.published.isoformat()}">{post.published.strftime("%B %d, %Y")}</time><p class="post-summary">{escape(post.summary)}</p></div></article>'
+                thumb = f'<a class="post-thumb" href="{post.slug}/" aria-hidden="true" tabindex="-1"><img src="_thumbnails/{name}" alt="" width="{image.width}" height="{image.height}" loading="lazy"></a>'
+        listing += f'<article class="post-preview">{thumb}<div class="post-preview-copy"><h2><a href="{post.slug}/">{escape(post.title)}</a></h2><time class="post-date" datetime="{post.published.isoformat()}">{post.published.strftime("%B %d, %Y")}</time><p class="post-summary">{escape(post.summary)}</p></div></article>'
     if not listing:
         listing = '<p class="quiet">Progress notes will appear here once published.</p>'
     content = '<h1 class="visually-hidden">Blog</h1><div class="post-list">' + listing + '</div>'

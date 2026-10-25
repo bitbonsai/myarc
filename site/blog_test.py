@@ -63,6 +63,7 @@ class BlogTests(unittest.TestCase):
         self.assertIn('"image": "' + cover_url + '"', html)
         index = (self.root / 'blog/index.html').read_text()
         self.assertIn('class="post-thumb"', index)
+        self.assertEqual(2, index.count(f'href="{posts[0].slug}/"'))
         self.assertIn('<p class="post-month">October 2026</p>', index)
         self.assertLess(index.index('<h2>'), index.index('<time class="post-date"'))
         self.assertLess(index.index('<time class="post-date"'), index.index('<p class="post-summary"'))
