@@ -59,10 +59,10 @@ index 80b0e24263..3067ad4d19 100644
            features::GlicToolbarButtonLocation::kLeftOfProfileChip ||
 diff --git a/myarc/BUILD.gn b/myarc/BUILD.gn
 new file mode 100644
-index 0000000000..e0434f10ae
+index 0000000..98d5e3fec0bea380bffc9139a4588881773f9f63
 --- /dev/null
 +++ b/myarc/BUILD.gn
-@@ -0,0 +1,34 @@
+@@ -0,0 +1,94 @@
 +import("//build/rust/rust_static_library.gni")
 +
 +rust_static_library("workspace") {
@@ -92,14 +92,74 @@ index 0000000000..e0434f10ae
 +  ]
 +}
 +
++source_set("workspace_service") {
++  sources = [
++    "workspace_service.cc",
++    "workspace_service.h",
++  ]
++  public_deps = [
++    ":bridge",
++    "//base",
++  ]
++  deps = [
++    "//chrome/browser/profiles:profile",
++    "//content/public/browser",
++    "//url",
++  ]
++}
++
++source_set("browser_workspace_adapter") {
++  sources = [
++    "browser_workspace_adapter.cc",
++    "browser_workspace_adapter.h",
++  ]
++  public_deps = [
++    ":workspace_service",
++    "//chrome/browser/ui/tabs:tab_strip_model_observer",
++    "//ui/gfx",
++    "//url",
++  ]
++  deps = [
++    "//chrome/browser/lifetime",
++    "//chrome/browser/profiles:profile",
++    "//chrome/browser/sessions",
++    "//chrome/browser/ui/browser_window",
++    "//chrome/browser/ui/navigator",
++    "//chrome/browser/ui/tabs:tab_strip",
++    "//components/sessions",
++    "//components/tabs:public",
++    "//content/public/browser",
++    "//ui/base",
++  ]
++}
++
++source_set("sidebar_view") {
++  sources = [
++    "sidebar_view.cc",
++    "sidebar_view.h",
++  ]
++  public_deps = [
++    "//base",
++    "//ui/base",
++    "//ui/views",
++  ]
++  deps = [
++    ":bridge",
++    "//components/vector_icons",
++    "//ui/color",
++    "//ui/gfx",
++    "//ui/gfx/geometry",
++  ]
++}
++
 +executable("bridge_check") {
 +  testonly = true
 +  sources = [ "bridge_check.cc" ]
-+  deps = [ ":bridge" ]
++  deps = [ ":workspace_service" ]
 +}
 diff --git a/myarc/LICENSE b/myarc/LICENSE
 new file mode 100644
-index 0000000000..5677ab94cd
+index 0000000..5677ab94cd94b410d0844bfcea03b71b0b62b24d
 --- /dev/null
 +++ b/myarc/LICENSE
 @@ -0,0 +1,21 @@
@@ -126,16 +186,18 @@ index 0000000000..5677ab94cd
 +SOFTWARE.
 diff --git a/myarc/bridge.rs b/myarc/bridge.rs
 new file mode 100644
-index 0000000000..1d1fb8d148
+index 0000000..f648ecf9a00de36706a1898c62fe1ec5709c9910
 --- /dev/null
 +++ b/myarc/bridge.rs
-@@ -0,0 +1,41 @@
+@@ -0,0 +1,416 @@
 +chromium::import! {
 +    "//myarc:workspace";
 +}
 +
 +pub struct Workspace(workspace::Workspace);
 +
++// All records own their buffers. Calls are synchronous on the browser UI sequence;
++// only exported records, never Workspace or native runtime IDs, cross to storage.
 +#[cxx::bridge(namespace = "myarc::foundation")]
 +mod ffi {
 +    struct RenameResult {
@@ -144,11 +206,103 @@ index 0000000000..1d1fb8d148
 +        error: String,
 +    }
 +
++    struct MutationResult {
++        ok: bool,
++        id: u64,
++        error: String,
++    }
++
++    enum PlacementKind {
++        Temporary,
++        Pin,
++        Favorite,
++    }
++
++    struct SpaceRecord {
++        id: u64,
++        profile_id: u64,
++        name: String,
++    }
++
++    struct ItemRecord {
++        id: u64,
++        placement: PlacementKind,
++        owner_id: u64,
++        has_url: bool,
++        canonical_url: String,
++    }
++
++    struct WindowRecord {
++        id: u64,
++        space_id: u64,
++        // Zero means no selection; core IDs are always nonzero.
++        selected_item_id: u64,
++    }
++
++    struct StateSnapshot {
++        version: u32,
++        profile_id: u64,
++        next_space_id: u64,
++        next_item_id: u64,
++        next_window_id: u64,
++        spaces: Vec<SpaceRecord>,
++        items: Vec<ItemRecord>,
++        windows: Vec<WindowRecord>,
++    }
++
++    struct SidebarResult {
++        ok: bool,
++        error: String,
++        window_id: u64,
++        current_space: SpaceRecord,
++        selected_item_id: u64,
++        spaces: Vec<SpaceRecord>,
++        favorites: Vec<ItemRecord>,
++        pins: Vec<ItemRecord>,
++        temporary: Vec<ItemRecord>,
++    }
++
++    struct BridgeLimits {
++        version: u32,
++        spaces: usize,
++        items: usize,
++        windows: usize,
++        name_bytes: usize,
++        url_bytes: usize,
++    }
++
 +    extern "Rust" {
 +        type Workspace;
 +        fn new_workspace() -> Box<Workspace>;
 +        fn current_name(workspace: &Workspace) -> String;
 +        fn rename_space(workspace: &mut Workspace, id: u64, name: &str) -> RenameResult;
++        fn bridge_limits() -> BridgeLimits;
++        fn create_space(workspace: &mut Workspace, name: &str) -> MutationResult;
++        fn create_window(workspace: &mut Workspace, space_id: u64) -> MutationResult;
++        fn close_window(workspace: &mut Workspace, window_id: u64) -> MutationResult;
++        fn select_space(workspace: &mut Workspace, window_id: u64, space_id: u64)
++        -> MutationResult;
++        fn add_temporary_item(workspace: &mut Workspace, space_id: u64) -> MutationResult;
++        fn select_item(workspace: &mut Workspace, window_id: u64, item_id: u64) -> MutationResult;
++        fn live_tab_closed(workspace: &mut Workspace, item_id: u64) -> MutationResult;
++        fn set_placement(
++            workspace: &mut Workspace,
++            item_id: u64,
++            placement: PlacementKind,
++            owner_id: u64,
++            has_url: bool,
++            canonical_url: &str,
++        ) -> MutationResult;
++        fn remove_saved_item(workspace: &mut Workspace, item_id: u64) -> MutationResult;
++        fn reveal_item(workspace: &mut Workspace, window_id: u64, item_id: u64) -> MutationResult;
++        // Zero destination means no live page; zero before means append.
++        fn unsave_item(workspace: &mut Workspace, item_id: u64, live_space: u64) -> MutationResult;
++        fn move_item_before(workspace: &mut Workspace, item_id: u64, before: u64)
++        -> MutationResult;
++        fn reconcile_live_items(workspace: &mut Workspace, live: &[u64]) -> MutationResult;
++        fn sidebar_snapshot(workspace: &Workspace, window_id: u64) -> SidebarResult;
++        fn export_snapshot(workspace: &Workspace) -> StateSnapshot;
++        fn restore_snapshot(workspace: &mut Workspace, snapshot: StateSnapshot) -> MutationResult;
 +    }
 +}
 +
@@ -171,16 +325,577 @@ index 0000000000..1d1fb8d148
 +            .unwrap_or_default(),
 +    }
 +}
++
++pub fn bridge_limits() -> ffi::BridgeLimits {
++    ffi::BridgeLimits {
++        version: workspace::SNAPSHOT_VERSION,
++        spaces: workspace::MAX_SPACES,
++        items: workspace::MAX_ITEMS,
++        windows: workspace::MAX_WINDOWS,
++        name_bytes: workspace::MAX_SPACE_NAME_BYTES,
++        url_bytes: workspace::MAX_URL_BYTES,
++    }
++}
++
++fn outcome<E: std::fmt::Display>(result: Result<u64, E>) -> ffi::MutationResult {
++    match result {
++        Ok(id) => ffi::MutationResult {
++            ok: true,
++            id,
++            error: String::new(),
++        },
++        Err(error) => ffi::MutationResult {
++            ok: false,
++            id: 0,
++            error: error.to_string(),
++        },
++    }
++}
++
++fn reject(message: &str) -> ffi::MutationResult {
++    outcome(Err::<u64, _>(message))
++}
++
++pub fn create_space(workspace: &mut Workspace, name: &str) -> ffi::MutationResult {
++    outcome(
++        workspace
++            .0
++            .create_space(workspace::DEFAULT_PROFILE_ID, name),
++    )
++}
++
++pub fn create_window(workspace: &mut Workspace, space_id: u64) -> ffi::MutationResult {
++    outcome(workspace.0.create_window(space_id))
++}
++
++pub fn close_window(workspace: &mut Workspace, window_id: u64) -> ffi::MutationResult {
++    outcome(workspace.0.close_window(window_id).map(|()| 0))
++}
++
++pub fn select_space(
++    workspace: &mut Workspace,
++    window_id: u64,
++    space_id: u64,
++) -> ffi::MutationResult {
++    outcome(workspace.0.select_space(window_id, space_id).map(|()| 0))
++}
++
++pub fn add_temporary_item(workspace: &mut Workspace, space_id: u64) -> ffi::MutationResult {
++    outcome(workspace.0.add_temporary_item(space_id))
++}
++
++pub fn select_item(workspace: &mut Workspace, window_id: u64, item_id: u64) -> ffi::MutationResult {
++    outcome(workspace.0.select_item(window_id, item_id).map(|()| 0))
++}
++
++pub fn live_tab_closed(workspace: &mut Workspace, item_id: u64) -> ffi::MutationResult {
++    outcome(workspace.0.live_tab_closed(item_id).map(|()| 0))
++}
++
++fn placement(
++    kind: ffi::PlacementKind,
++    owner_id: u64,
++) -> Result<workspace::Placement, &'static str> {
++    match kind {
++        ffi::PlacementKind::Temporary => Ok(workspace::Placement::Temporary { space_id: owner_id }),
++        ffi::PlacementKind::Pin => Ok(workspace::Placement::Pin { space_id: owner_id }),
++        ffi::PlacementKind::Favorite => Ok(workspace::Placement::Favorite {
++            profile_id: owner_id,
++        }),
++        _ => Err("Unknown item placement"),
++    }
++}
++
++pub fn set_placement(
++    workspace: &mut Workspace,
++    item_id: u64,
++    kind: ffi::PlacementKind,
++    owner_id: u64,
++    has_url: bool,
++    canonical_url: &str,
++) -> ffi::MutationResult {
++    if !has_url && !canonical_url.is_empty() {
++        return reject("URL supplied without has_url");
++    }
++    let placement = match placement(kind, owner_id) {
++        Ok(value) => value,
++        Err(error) => return reject(error),
++    };
++    outcome(
++        workspace
++            .0
++            .set_placement(item_id, placement, has_url.then_some(canonical_url))
++            .map(|()| 0),
++    )
++}
++
++pub fn remove_saved_item(workspace: &mut Workspace, item_id: u64) -> ffi::MutationResult {
++    outcome(workspace.0.remove_saved_item(item_id).map(|()| 0))
++}
++
++pub fn reveal_item(workspace: &mut Workspace, window_id: u64, item_id: u64) -> ffi::MutationResult {
++    outcome(workspace.0.reveal_item(window_id, item_id).map(|()| 0))
++}
++
++pub fn unsave_item(
++    workspace: &mut Workspace,
++    item_id: u64,
++    live_space: u64,
++) -> ffi::MutationResult {
++    outcome(
++        workspace
++            .0
++            .unsave_item(item_id, (live_space != 0).then_some(live_space))
++            .map(|()| 0),
++    )
++}
++
++pub fn move_item_before(
++    workspace: &mut Workspace,
++    item_id: u64,
++    before: u64,
++) -> ffi::MutationResult {
++    outcome(
++        workspace
++            .0
++            .move_item_before(item_id, (before != 0).then_some(before))
++            .map(|()| 0),
++    )
++}
++
++pub fn reconcile_live_items(workspace: &mut Workspace, live: &[u64]) -> ffi::MutationResult {
++    outcome(workspace.0.reconcile_live_items(live).map(|()| 0))
++}
++
++fn space_record(space: workspace::Space) -> ffi::SpaceRecord {
++    ffi::SpaceRecord {
++        id: space.id,
++        profile_id: space.profile_id,
++        name: space.name,
++    }
++}
++
++fn item_record(item: workspace::Item) -> ffi::ItemRecord {
++    let (placement, owner_id) = match item.placement {
++        workspace::Placement::Temporary { space_id } => (ffi::PlacementKind::Temporary, space_id),
++        workspace::Placement::Pin { space_id } => (ffi::PlacementKind::Pin, space_id),
++        workspace::Placement::Favorite { profile_id } => (ffi::PlacementKind::Favorite, profile_id),
++    };
++    ffi::ItemRecord {
++        id: item.id,
++        placement,
++        owner_id,
++        has_url: item.canonical_url.is_some(),
++        canonical_url: item.canonical_url.unwrap_or_default(),
++    }
++}
++
++pub fn sidebar_snapshot(workspace: &Workspace, window_id: u64) -> ffi::SidebarResult {
++    match workspace.0.sidebar_snapshot(window_id) {
++        Ok(sidebar) => ffi::SidebarResult {
++            ok: true,
++            error: String::new(),
++            window_id: sidebar.window_id,
++            current_space: space_record(sidebar.current_space),
++            selected_item_id: sidebar.selected_item_id.unwrap_or(0),
++            spaces: sidebar.spaces.into_iter().map(space_record).collect(),
++            favorites: sidebar.favorites.into_iter().map(item_record).collect(),
++            pins: sidebar.pins.into_iter().map(item_record).collect(),
++            temporary: sidebar.temporary.into_iter().map(item_record).collect(),
++        },
++        Err(error) => ffi::SidebarResult {
++            ok: false,
++            error: error.to_string(),
++            window_id,
++            current_space: ffi::SpaceRecord {
++                id: 0,
++                profile_id: 0,
++                name: String::new(),
++            },
++            selected_item_id: 0,
++            spaces: Vec::new(),
++            favorites: Vec::new(),
++            pins: Vec::new(),
++            temporary: Vec::new(),
++        },
++    }
++}
++
++pub fn export_snapshot(workspace: &Workspace) -> ffi::StateSnapshot {
++    let state = workspace.0.snapshot();
++    ffi::StateSnapshot {
++        version: state.version,
++        profile_id: state.profile_id,
++        next_space_id: state.next_space_id,
++        next_item_id: state.next_item_id,
++        next_window_id: state.next_window_id,
++        spaces: state.spaces.into_iter().map(space_record).collect(),
++        items: state.items.into_iter().map(item_record).collect(),
++        windows: state
++            .windows
++            .into_iter()
++            .map(|window| ffi::WindowRecord {
++                id: window.id,
++                space_id: window.space_id,
++                selected_item_id: window.selected_item_id.unwrap_or(0),
++            })
++            .collect(),
++    }
++}
++
++pub fn restore_snapshot(
++    workspace: &mut Workspace,
++    snapshot: ffi::StateSnapshot,
++) -> ffi::MutationResult {
++    if snapshot.spaces.len() > workspace::MAX_SPACES
++        || snapshot.items.len() > workspace::MAX_ITEMS
++        || snapshot.windows.len() > workspace::MAX_WINDOWS
++        || snapshot
++            .spaces
++            .iter()
++            .any(|space| space.name.len() > workspace::MAX_SPACE_NAME_BYTES)
++        || snapshot.items.iter().any(|item| {
++            item.canonical_url.len() > workspace::MAX_URL_BYTES
++                || (!item.has_url && !item.canonical_url.is_empty())
++        })
++    {
++        return reject("Snapshot exceeds bridge bounds or has inconsistent URL presence");
++    }
++    let mut items = Vec::with_capacity(snapshot.items.len());
++    for item in snapshot.items {
++        let placement = match placement(item.placement, item.owner_id) {
++            Ok(value) => value,
++            Err(error) => return reject(error),
++        };
++        items.push(workspace::Item {
++            id: item.id,
++            placement,
++            canonical_url: item.has_url.then_some(item.canonical_url),
++        });
++    }
++    outcome(
++        workspace
++            .0
++            .restore(workspace::WorkspaceSnapshot {
++                version: snapshot.version,
++                profile_id: snapshot.profile_id,
++                next_space_id: snapshot.next_space_id,
++                next_item_id: snapshot.next_item_id,
++                next_window_id: snapshot.next_window_id,
++                spaces: snapshot
++                    .spaces
++                    .into_iter()
++                    .map(|space| workspace::Space {
++                        id: space.id,
++                        profile_id: space.profile_id,
++                        name: space.name,
++                    })
++                    .collect(),
++                items,
++                windows: snapshot
++                    .windows
++                    .into_iter()
++                    .map(|window| workspace::WindowState {
++                        id: window.id,
++                        space_id: window.space_id,
++                        selected_item_id: (window.selected_item_id != 0)
++                            .then_some(window.selected_item_id),
++                    })
++                    .collect(),
++            })
++            .map(|()| 0),
++    )
++}
 diff --git a/myarc/bridge_check.cc b/myarc/bridge_check.cc
 new file mode 100644
-index 0000000000..b0135ea30c
+index 0000000..049d636ee50f67539c04828e36230f0179eca28a
 --- /dev/null
 +++ b/myarc/bridge_check.cc
-@@ -0,0 +1,43 @@
+@@ -0,0 +1,340 @@
 +#include <iostream>
++#include <limits>
 +#include <string>
++#include <utility>
 +
++#include "base/json/json_reader.h"
++#include "base/json/json_writer.h"
 +#include "myarc/bridge.rs.h"
++#include "myarc/workspace_service.h"
++
++namespace {
++
++bool CheckWorkspaceRecords() {
++  using namespace myarc::foundation;
++  auto model = new_workspace();
++  auto space = create_space(*model, "Research");
++  auto window = create_window(*model, space.id);
++  auto item = add_temporary_item(*model, 1);
++  if (!space.ok || !window.ok || !item.ok ||
++      select_item(*model, window.id, item.id).ok ||
++      !select_item(*model, 1, item.id).ok) {
++    return false;
++  }
++  if (!set_placement(*model, item.id, PlacementKind::Pin, 1, true,
++                     "https://example.test/saved")
++           .ok ||
++      !live_tab_closed(*model, item.id).ok ||
++      sidebar_snapshot(*model, 1).pins.size() != 1 ||
++      set_placement(*model, item.id, PlacementKind::Pin, 1, true,
++                    "javascript:alert(1)")
++          .ok ||
++      !set_placement(*model, item.id, PlacementKind::Favorite, 1, false, "")
++           .ok ||
++      !select_item(*model, window.id, item.id).ok) {
++    return false;
++  }
++  auto sidebar = sidebar_snapshot(*model, window.id);
++  if (!sidebar.ok || sidebar.current_space.id != space.id ||
++      sidebar.favorites.size() != 1 || sidebar.selected_item_id != item.id ||
++      !sidebar.pins.empty() || !sidebar.temporary.empty() ||
++      std::string(sidebar.favorites[0].canonical_url) !=
++          "https://example.test/saved") {
++    return false;
++  }
++  auto restored = new_workspace();
++  if (!restore_snapshot(*restored, export_snapshot(*model)).ok ||
++      sidebar_snapshot(*restored, window.id).selected_item_id != item.id) {
++    return false;
++  }
++  auto invalid = export_snapshot(*model);
++  invalid.items[0].placement = static_cast<PlacementKind>(255);
++  if (restore_snapshot(*restored, std::move(invalid)).ok ||
++      sidebar_snapshot(*restored, window.id).favorites.size() != 1) {
++    return false;
++  }
++  invalid = export_snapshot(*model);
++  invalid.version++;
++  if (restore_snapshot(*restored, std::move(invalid)).ok)
++    return false;
++  invalid = export_snapshot(*model);
++  invalid.spaces[0].name = std::string(bridge_limits().name_bytes + 1, 'x');
++  if (restore_snapshot(*restored, std::move(invalid)).ok)
++    return false;
++  invalid = export_snapshot(*model);
++  for (size_t i = invalid.items.size(); i <= bridge_limits().items; ++i) {
++    invalid.items.push_back(ItemRecord{});
++  }
++  if (restore_snapshot(*restored, std::move(invalid)).ok)
++    return false;
++  if (!remove_saved_item(*model, item.id).ok ||
++      sidebar_snapshot(*model, window.id).selected_item_id != 0 ||
++      !select_space(*model, window.id, 1).ok ||
++      !close_window(*model, window.id).ok ||
++      sidebar_snapshot(*model, window.id).ok) {
++    return false;
++  }
++  auto temporary = add_temporary_item(*model, 1);
++  return temporary.ok && !remove_saved_item(*model, temporary.id).ok &&
++         live_tab_closed(*model, temporary.id).ok &&
++         sidebar_snapshot(*model, 1).temporary.empty();
++}
++
++bool CheckR2Records() {
++  using namespace myarc::foundation;
++  auto model = new_workspace();
++  auto space = create_space(*model, "Other");
++  auto first = add_temporary_item(*model, space.id);
++  auto second = add_temporary_item(*model, space.id);
++  auto orphan = add_temporary_item(*model, 1);
++  const uint64_t live[] = {first.id, second.id};
++  if (!space.ok || !first.ok || !second.ok || !orphan.ok ||
++      !reconcile_live_items(*model, rust::Slice<const uint64_t>(live, 2)).ok ||
++      !sidebar_snapshot(*model, 1).temporary.empty() ||
++      !reveal_item(*model, 1, first.id).ok ||
++      sidebar_snapshot(*model, 1).current_space.id != space.id ||
++      !move_item_before(*model, second.id, first.id).ok ||
++      sidebar_snapshot(*model, 1).temporary[0].id != second.id ||
++      !set_placement(*model, first.id, PlacementKind::Favorite, 1, true,
++                     "https://example.test/saved")
++           .ok ||
++      !unsave_item(*model, first.id, space.id).ok ||
++      sidebar_snapshot(*model, 1).temporary[1].has_url ||
++      !set_placement(*model, first.id, PlacementKind::Pin, space.id, true,
++                     "about:blank")
++           .ok ||
++      !unsave_item(*model, first.id, 0).ok) {
++    return false;
++  }
++  return !reveal_item(*model, 1, first.id).ok &&
++         sidebar_snapshot(*model, 1).temporary.size() == 1;
++}
++
++bool CheckNativeSnapshotBounds() {
++  using namespace myarc::foundation;
++  using myarc::internal::CanonicalizeUrls;
++  auto model = new_workspace();
++  auto state = export_snapshot(*model);
++  state.items.push_back(
++      {1, PlacementKind::Pin, 1, true, rust::String("HTTPS://EXAMPLE.TEST")});
++  const auto limits = bridge_limits();
++  const auto exceed = [](auto& records, size_t limit) {
++    while (records.size() <= limit)
++      records.push_back({});
++  };
++  for (int field = 0; field < 3; ++field) {
++    auto oversized = state;
++    if (field == 0)
++      exceed(oversized.spaces, limits.spaces);
++    else if (field == 1)
++      exceed(oversized.items, limits.items);
++    else
++      exceed(oversized.windows, limits.windows);
++    if (CanonicalizeUrls(oversized) ||
++        std::string(oversized.items[0].canonical_url) !=
++            "HTTPS://EXAMPLE.TEST") {
++      return false;  // Reject counts before traversing/canonicalizing items.
++    }
++  }
++  if (!CanonicalizeUrls(state) ||
++      std::string(state.items[0].canonical_url) != "https://example.test/")
++    return false;
++  state.items[0].has_url = false;
++  if (CanonicalizeUrls(state) || state.items[0].canonical_url.empty())
++    return false;
++  state.items[0].canonical_url = "";
++  return CanonicalizeUrls(state);
++}
++
++bool CheckMetadataRecords() {
++  using namespace myarc::foundation;
++  using myarc::internal::DecodeWorkspaceMetadata;
++  using myarc::internal::EncodeWorkspaceMetadata;
++  auto model = new_workspace();
++  // Exercise exact u64 counters/IDs beyond JSON's safe double range.
++  auto state = export_snapshot(*model);
++  const uint64_t item_id = (uint64_t{1} << 53) + 17;
++  state.items.push_back({item_id, PlacementKind::Favorite, 1, true,
++                         rust::String("https://example.test/\xc3\xa9")});
++  state.next_item_id = std::numeric_limits<uint64_t>::max();
++  state.windows[0].selected_item_id = item_id;
++  if (!restore_snapshot(*model, state).ok)
++    return false;
++  const auto encoded = EncodeWorkspaceMetadata(state);
++  if (!encoded)
++    return false;
++  auto decoded = DecodeWorkspaceMetadata(*encoded);
++  if (!decoded.snapshot || !decoded.error.empty() ||
++      decoded.snapshot->next_item_id != state.next_item_id ||
++      decoded.snapshot->items[0].id != item_id ||
++      !restore_snapshot(*model, std::move(*decoded.snapshot)).ok) {
++    return false;
++  }
++  auto rejects = [](const base::DictValue& root) {
++    const auto json = base::WriteJson(root);
++    if (!json)
++      return false;
++    auto result = DecodeWorkspaceMetadata(*json);
++    return !result.snapshot && !result.error.empty();
++  };
++  auto root = base::JSONReader::ReadDict(*encoded, base::JSON_PARSE_RFC);
++  if (!root)
++    return false;
++  for (const auto& [field, limit] :
++       {std::pair{"spaces", bridge_limits().spaces},
++        std::pair{"items", bridge_limits().items},
++        std::pair{"windows", bridge_limits().windows}}) {
++    auto oversized = root->Clone();
++    auto* records = oversized.FindList(field);
++    while (records->size() <= limit)
++      records->Append(base::DictValue());
++    if (!rejects(oversized))
++      return false;
++  }
++  // Raw invalid UTF-8 must fail before construction of any rust::String.
++  for (const auto* text : {"Everyday", "https://example.test/"}) {
++    for (const auto* invalid_utf8 : {"\xff", "\xc3\x28"}) {
++      auto invalid_json = *encoded;
++      const auto position = invalid_json.find(text);
++      if (position == std::string::npos)
++        return false;
++      invalid_json.replace(position, std::string(text).size(), invalid_utf8);
++      const auto invalid = DecodeWorkspaceMetadata(invalid_json);
++      if (invalid.snapshot || invalid.error.empty())
++        return false;
++    }
++  }
++  auto* spaces = root->FindList("spaces");
++  (*spaces)[0].GetDict().Set("name",
++                             std::string(bridge_limits().name_bytes + 1, 'x'));
++  if (!rejects(*root))
++    return false;
++  (*spaces)[0].GetDict().Set("name", "Everyday");
++  root->Set("version", 999);
++  if (!rejects(*root))
++    return false;
++  root->Set("version", static_cast<int>(bridge_limits().version));
++  root->Set("future_field", true);
++  if (!rejects(*root))
++    return false;
++  root->Remove("future_field");
++  root->Set("next_item_id", 12);  // Numeric IDs must be rejected.
++  if (!rejects(*root))
++    return false;
++  root->Set("next_item_id", "18446744073709551616");  // u64 overflow.
++  if (!rejects(*root))
++    return false;
++  root->Set("next_item_id", "01");
++  if (!rejects(*root))
++    return false;
++  root->Set("next_item_id", "18446744073709551615");
++  auto* items = root->FindList("items");
++  (*items)[0].GetDict().Set("canonical_url",
++                            std::string(bridge_limits().url_bytes + 1, 'x'));
++  if (!rejects(*root))
++    return false;
++  for (const auto* bad_url :
++       {"https://bad host.test/", "https://user:pass@example.test/",
++        "javascript:alert(1)", "https://[broken/"}) {
++    (*items)[0].GetDict().Set("canonical_url", bad_url);
++    if (!rejects(*root))
++      return false;
++  }
++  (*items)[0].GetDict().Set("canonical_url", "HTTPS://EXAMPLE.TEST");
++  const auto canonical_json = base::WriteJson(*root);
++  auto canonical = canonical_json ? DecodeWorkspaceMetadata(*canonical_json)
++                                  : myarc::internal::MetadataResult{};
++  if (!canonical.snapshot ||
++      std::string(canonical.snapshot->items[0].canonical_url) !=
++          "https://example.test/")
++    return false;
++  (*items)[0].GetDict().Set("canonical_url", "https://example.test/");
++  (*items)[0].GetDict().Set("placement", 77);
++  if (!rejects(*root))
++    return false;
++  (*items)[0].GetDict().Set("placement", 2);
++  (*items)[0].GetDict().Set("has_url", false);
++  if (!rejects(*root))
++    return false;
++  (*items)[0].GetDict().Set("has_url", true);
++  for (size_t i = items->size(); i <= bridge_limits().items; ++i) {
++    items->Append(base::DictValue());
++  }
++  if (!rejects(*root))
++    return false;
++  auto malformed = DecodeWorkspaceMetadata("{broken");
++  auto oversized =
++      DecodeWorkspaceMetadata(std::string(20 * 1024 * 1024 + 1, ' '));
++  auto deep = DecodeWorkspaceMetadata("[[[[[[[[[[]]]]]]]]]]");
++  if (malformed.snapshot || malformed.error.empty() || oversized.snapshot ||
++      oversized.error.empty() || deep.snapshot || deep.error.empty()) {
++    return false;
++  }
++  // Syntactically valid records still need Rust semantic validation.
++  state.windows[0].selected_item_id = 42;
++  const auto semantically_invalid = EncodeWorkspaceMetadata(state);
++  if (!semantically_invalid)
++    return false;
++  decoded = DecodeWorkspaceMetadata(*semantically_invalid);
++  return decoded.snapshot &&
++         !restore_snapshot(*model, std::move(*decoded.snapshot)).ok &&
++         sidebar_snapshot(*model, 1).selected_item_id == item_id;
++}
++
++}  // namespace
 +
 +int main() {
 +  auto workspace = myarc::foundation::new_workspace();
@@ -216,13 +931,816 @@ index 0000000000..b0135ea30c
 +      return 7;
 +    }
 +  }
-+  std::cout << "7 C++/Rust bridge checks passed, including 1000 ownership "
-+               "round trips\n";
++  if (!CheckWorkspaceRecords()) {
++    std::cerr << "Workspace record/transition checks failed\n";
++    return 8;
++  }
++  if (!CheckR2Records()) {
++    std::cerr << "R2 transition checks failed\n";
++    return 10;
++  }
++  if (!CheckNativeSnapshotBounds()) {
++    std::cerr << "Native snapshot count/URL-presence checks failed\n";
++    return 11;
++  }
++  if (!CheckMetadataRecords()) {
++    std::cerr << "Metadata codec/bounds checks failed\n";
++    return 9;
++  }
++  std::cout << "7 legacy C++/Rust checks passed, including 1000 ownership "
++               "round trips; workspace transitions and metadata codec checks "
++               "passed\n";
 +  return 0;
 +}
+diff --git a/myarc/browser_workspace_adapter.cc b/myarc/browser_workspace_adapter.cc
+new file mode 100644
+index 0000000..7e2fb09bbeffb57351c598c704e4422ed01fec2c
+--- /dev/null
++++ b/myarc/browser_workspace_adapter.cc
+@@ -0,0 +1,655 @@
++#include "myarc/browser_workspace_adapter.h"
++
++#include <algorithm>
++#include <memory>
++#include <set>
++#include <utility>
++#include <vector>
++
++#include "base/auto_reset.h"
++#include "base/functional/bind.h"
++#include "base/location.h"
++#include "base/strings/string_number_conversions.h"
++#include "base/task/single_thread_task_runner.h"
++#include "chrome/browser/lifetime/browser_shutdown.h"
++#include "chrome/browser/profiles/profile.h"
++#include "chrome/browser/sessions/session_restore.h"
++#include "chrome/browser/sessions/session_service.h"
++#include "chrome/browser/sessions/session_service_factory.h"
++#include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
++#include "chrome/browser/ui/navigator/browser_navigator.h"
++#include "chrome/browser/ui/navigator/browser_navigator_params.h"
++#include "chrome/browser/ui/tabs/tab_strip_model.h"
++#include "components/sessions/content/session_tab_helper.h"
++#include "content/public/browser/browser_thread.h"
++#include "content/public/browser/favicon_status.h"
++#include "content/public/browser/navigation_controller.h"
++#include "content/public/browser/navigation_entry.h"
++#include "content/public/browser/web_contents.h"
++#include "content/public/browser/web_contents_observer.h"
++
++namespace myarc {
++namespace {
++
++const char kRuntimeKey = 0;
++const char kBindingKey = 0;
++
++foundation::MutationResult Ok(uint64_t id = 0) {
++  return {true, id, {}};
++}
++foundation::MutationResult Fail(std::string_view error) {
++  return {false, 0, rust::String(error.data(), error.size())};
++}
++
++// Runtime pointers locate live projections only, never persisted identities.
++struct Runtime : base::SupportsUserData::Data {
++  std::vector<raw_ptr<BrowserWorkspaceAdapter>> adapters;
++  std::map<content::WebContents*, uint64_t> pages;
++  bool complete = false;
++  bool shutting_down = false;
++};
++
++Runtime& ForProfile(Profile& profile) {
++  DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
++  auto* runtime = static_cast<Runtime*>(profile.GetUserData(&kRuntimeKey));
++  if (!runtime) {
++    auto owned = std::make_unique<Runtime>();
++    runtime = owned.get();
++    profile.SetUserData(&kRuntimeKey, std::move(owned));
++  }
++  return *runtime;
++}
++
++size_t Count(Profile& profile, uint64_t id) {
++  return std::ranges::count_if(
++      ForProfile(profile).pages,
++      [id](const auto& page) { return page.second == id; });
++}
++
++// Survives detach/reinsert. Replacements explicitly transfer the binding before
++// old contents dies. Actual destruction, not temporary detach, is last-close.
++class Binding final : public base::SupportsUserData::Data,
++                      public content::WebContentsObserver {
++ public:
++  Binding(content::WebContents& contents, uint64_t item)
++      : content::WebContentsObserver(&contents),
++        profile_(Profile::FromBrowserContext(contents.GetBrowserContext())),
++        item_(item) {
++    ForProfile(*profile_).pages[&contents] = item;
++  }
++  static Binding* Get(content::WebContents& contents) {
++    return static_cast<Binding*>(contents.GetUserData(&kBindingKey));
++  }
++  static foundation::MutationResult Set(content::WebContents& contents,
++                                        uint64_t item) {
++    if (auto* old = Get(contents)) {
++      if (old->item_ != item)
++        return Fail("Conflicting native item binding.");
++      return Ok(item);
++    }
++    auto& runtime =
++        ForProfile(*Profile::FromBrowserContext(contents.GetBrowserContext()));
++    if (runtime.pages.size() >= 4096)
++      return Fail("Too many live workspace projections.");
++    contents.SetUserData(&kBindingKey,
++                         std::make_unique<Binding>(contents, item));
++    return Ok(item);
++  }
++  uint64_t item() const { return item_; }
++  void PreserveOnDestruction() { preserve_ = true; }
++  void WebContentsDestroyed() override {
++    auto& runtime = ForProfile(*profile_);
++    runtime.pages.erase(web_contents());
++    if (!preserve_ && runtime.complete && !runtime.shutting_down &&
++        !browser_shutdown::IsTryingToQuit() &&
++        !SessionRestore::IsRestoring(profile_) &&
++        Count(*profile_, item_) == 0) {
++      // Unknown IDs can occur only before rejected restore binding finishes.
++      WorkspaceService::ForProfile(*profile_).LiveTabClosed(item_);
++    }
++  }
++
++ private:
++  const raw_ptr<Profile> profile_;
++  const uint64_t item_;
++  bool preserve_ = false;
++};
++
++std::optional<uint64_t> ReadBinding(
++    const std::map<std::string, std::string>& extra_data,
++    const char* key) {
++  auto it = extra_data.find(key);
++  if (it == extra_data.end())
++    return uint64_t{0};
++  uint64_t id = 0;
++  if (it->second.size() > 20 || !base::StringToUint64(it->second, &id) ||
++      id == 0 || base::NumberToString(id) != it->second)
++    return std::nullopt;
++  return id;
++}
++
++content::WebContents* LocalPage(TabStripModel& tabs, uint64_t item) {
++  for (int i = 0; i < tabs.count(); ++i) {
++    auto* contents = tabs.GetWebContentsAt(i);
++    auto* binding = Binding::Get(*contents);
++    if (binding && binding->item() == item)
++      return contents;
++  }
++  return nullptr;
++}
++
++const foundation::ItemRecord* FindItem(const foundation::StateSnapshot& state,
++                                       uint64_t item) {
++  for (const auto& row : state.items) {
++    if (row.id == item)
++      return &row;
++  }
++  return nullptr;
++}
++
++bool IsReady(WorkspaceService& service) {
++  using State = WorkspaceService::StorageState;
++  return service.storage_state() != State::kLoading &&
++         service.storage_state() != State::kLoadError;
++}
++
++}  // namespace
++
++BrowserWorkspaceAdapter::BrowserWorkspaceAdapter(
++    BrowserWindowInterface& browser)
++    : browser_(&browser),
++      profile_(browser.GetProfile()),
++      service_(&WorkspaceService::ForProfile(*profile_)),
++      tabs_(browser.GetTabStripModel()) {
++  DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
++  DCHECK_EQ(browser.GetType(), BrowserWindowInterface::TYPE_NORMAL);
++  ForProfile(*profile_).adapters.push_back(this);
++  tabs_->AddObserver(this);
++  service_subscription_ = service_->Subscribe(base::BindRepeating(
++      &BrowserWorkspaceAdapter::OnServiceChanged, base::Unretained(this)));
++  OnServiceChanged();
++}
++
++BrowserWorkspaceAdapter::~BrowserWorkspaceAdapter() {
++  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
++  if (tabs_)
++    tabs_->RemoveObserver(this);
++  std::erase(ForProfile(*profile_).adapters, this);
++  // Preserve windows/temporary organization for session restore. Ordinary page
++  // close is handled by Binding; startup reconciliation removes stale rows.
++}
++
++foundation::MutationResult BrowserWorkspaceAdapter::RestoreTabBinding(
++    content::WebContents& contents,
++    const std::map<std::string, std::string>& extra_data) {
++  auto id = ReadBinding(extra_data, kItemKey);
++  if (!id)
++    return Fail("Invalid restored workspace item ID.");
++  return *id ? Binding::Set(contents, *id) : Ok();
++}
++
++foundation::MutationResult BrowserWorkspaceAdapter::RestoreWindowBinding(
++    const std::map<std::string, std::string>& extra_data) {
++  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
++  if (bound_)
++    return Fail("Window binding already finalized.");
++  auto id = ReadBinding(extra_data, kWindowKey);
++  if (!id)
++    return Fail("Invalid restored workspace window ID.");
++  restored_window_id_ = *id;
++  return Ok();
++}
++
++foundation::MutationResult BrowserWorkspaceAdapter::BindWindow() {
++  if (window_id_)
++    return Ok(window_id_);
++  auto state = service_->ExportSnapshot();
++  if (!state)
++    return Fail("Workspace metadata is still loading or failed to load.");
++  if (restored_window_id_) {
++    if (std::ranges::none_of(state->windows, [this](const auto& window) {
++          return window.id == restored_window_id_;
++        }))
++      return Fail(
++          "Restored native window references missing workspace window.");
++    for (const auto& adapter : ForProfile(*profile_).adapters) {
++      if (adapter != this && adapter->window_id_ == restored_window_id_)
++        return Fail("Duplicate restored workspace window binding.");
++    }
++    window_id_ = restored_window_id_;
++    return Ok(window_id_);
++  }
++  // Rebind an unclaimed model window, reserving IDs named by restore hooks
++  // even if those adapters have not been processed yet. Never assume Window 1.
++  for (const auto& window : state->windows) {
++    if (std::ranges::none_of(ForProfile(*profile_).adapters,
++                             [&window](const auto& adapter) {
++                               return adapter->window_id_ == window.id ||
++                                      adapter->restored_window_id_ == window.id;
++                             })) {
++      window_id_ = window.id;
++      return Ok(window_id_);
++    }
++  }
++  // Zero model windows is valid; allocation uses the model's existing Space.
++  auto result = service_->CreateWindow(state->spaces[0].id);
++  if (result.ok)
++    window_id_ = result.id;
++  return result;
++}
++
++foundation::MutationResult BrowserWorkspaceAdapter::BindTabs() {
++  auto sidebar = service_->Sidebar(window_id_);
++  auto state = service_->ExportSnapshot();
++  if (!sidebar.ok || !state)
++    return Fail("Workspace window is not ready.");
++  for (int i = 0; i < tabs_->count(); ++i) {
++    auto* contents = tabs_->GetWebContentsAt(i);
++    if (contents->GetBrowserContext() != profile_)
++      return Fail("Native page belongs to a different Profile.");
++    if (auto* binding = Binding::Get(*contents)) {
++      if (!FindItem(*state, binding->item()))
++        return Fail("Restored native page references missing workspace item.");
++    } else {
++      auto result = opening_item_
++                        ? Ok(opening_item_)
++                        : service_->AddTemporaryItem(sidebar.current_space.id);
++      if (!result.ok)
++        return result;
++      result = Binding::Set(*contents, result.id);
++      if (!result.ok)
++        return result;
++    }
++  }
++  return Ok();
++}
++
++foundation::MutationResult BrowserWorkspaceAdapter::FinishSessionRestore(
++    Profile& profile) {
++  auto& runtime = ForProfile(profile);
++  auto& service = WorkspaceService::ForProfile(profile);
++  if (runtime.shutting_down || SessionRestore::IsRestoring(&profile))
++    return Fail(
++        "Native session restore is in flight or browser is shutting down.");
++  if (!IsReady(service))
++    return Fail("Workspace metadata is still loading or failed to load.");
++  runtime.complete = false;
++  for (const auto& adapter : runtime.adapters) {
++    if (!adapter->tabs_)
++      continue;
++    base::AutoReset<bool> changing(&adapter->changing_, true);
++    auto result = adapter->BindWindow();
++    if (result.ok)
++      result = adapter->BindTabs();
++    adapter->error_ = std::string(result.error);
++    if (!result.ok)
++      return result;
++  }
++  std::set<uint64_t> unique;
++  for (const auto& [page, item] : runtime.pages)
++    unique.insert(item);
++  std::vector<uint64_t> live(unique.begin(), unique.end());
++  auto result = service.ReconcileLiveItems(live);
++  if (!result.ok)
++    return result;
++  // Retire windows not rebound by this complete native restoration. In
++  // particular, the default Window 1 is not assumed to have a native peer.
++  auto state = service.ExportSnapshot();
++  if (!state)
++    return Fail("Workspace metadata became unavailable during binding.");
++  for (const auto& window : state->windows) {
++    if (std::ranges::none_of(runtime.adapters, [&window](const auto& adapter) {
++          return adapter->tabs_ && adapter->window_id_ == window.id;
++        })) {
++      result = service.CloseWindow(window.id);
++      if (!result.ok)
++        return result;
++    }
++  }
++  runtime.complete = true;
++  for (const auto& adapter : runtime.adapters) {
++    adapter->bound_ = true;
++    adapter->PersistBindings();
++    adapter->OnServiceChanged();
++  }
++  return Ok();
++}
++
++void BrowserWorkspaceAdapter::BeginShutdown(Profile& profile) {
++  ForProfile(profile).shutting_down = true;
++  WorkspaceService::ForProfile(profile).FlushForShutdown();
++}
++
++void BrowserWorkspaceAdapter::PersistSessionBindings(Profile& profile) {
++  for (const auto& adapter : ForProfile(profile).adapters) {
++    if (adapter->bound_)
++      adapter->PersistBindings();
++  }
++}
++
++bool BrowserWorkspaceAdapter::ready() const {
++  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
++  const auto& runtime = ForProfile(*profile_);
++  return tabs_ && !tabs_->closing_all() && bound_ && runtime.complete &&
++         !runtime.shutting_down && !browser_->IsDeleteScheduled() &&
++         error_.empty() && IsReady(*service_) &&
++         !SessionRestore::IsRestoring(profile_);
++}
++
++std::string BrowserWorkspaceAdapter::error() const {
++  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
++  if (!error_.empty())
++    return error_;
++  if (!IsReady(*service_))
++    return service_->storage_error().empty() ? "Loading workspace metadata."
++                                             : service_->storage_error();
++  if (ForProfile(*profile_).shutting_down || browser_->IsDeleteScheduled() ||
++      !tabs_ || tabs_->closing_all())
++    return "Browser window is closing.";
++  if (SessionRestore::IsRestoring(profile_))
++    return "Native session restoration is still in flight.";
++  return bound_ && ForProfile(*profile_).complete
++             ? std::string()
++             : "Waiting for native session binding.";
++}
++
++foundation::SidebarResult BrowserWorkspaceAdapter::Sidebar() const {
++  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
++  if (ready())
++    return service_->Sidebar(window_id_);
++  foundation::SidebarResult result;
++  result.ok = false;
++  result.error = error();
++  return result;
++}
++
++base::CallbackListSubscription BrowserWorkspaceAdapter::Subscribe(
++    base::RepeatingClosure callback) {
++  return changed_.Add(std::move(callback));
++}
++
++std::optional<BrowserWorkspaceAdapter::LiveMetadata>
++BrowserWorkspaceAdapter::Metadata(uint64_t item) const {
++  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
++  const auto& pages = ForProfile(*profile_).pages;
++  content::WebContents* page = tabs_ ? LocalPage(*tabs_, item) : nullptr;
++  if (!page) {
++    for (const auto& [contents, id] : pages) {
++      if (id == item) {
++        page = contents;
++        break;
++      }
++    }
++  }
++  if (!page)
++    return std::nullopt;
++  LiveMetadata metadata;
++  metadata.title = page->GetTitle();
++  metadata.current_url = page->GetLastCommittedURL();
++  metadata.loading = page->IsLoading();
++  metadata.projections = Count(*profile_, item);
++  if (auto* entry = page->GetController().GetVisibleEntry())
++    metadata.icon = entry->GetFavicon().image;
++  return metadata;
++}
++
++content::WebContents* BrowserWorkspaceAdapter::DisplayedContents() const {
++  if (!ready())
++    return nullptr;
++  auto sidebar = Sidebar();
++  return sidebar.ok && sidebar.selected_item_id
++             ? LocalPage(*tabs_, sidebar.selected_item_id)
++             : nullptr;
++}
++
++void BrowserWorkspaceAdapter::PersistBindings() {
++  if (profile_->IsOffTheRecord() || !tabs_ || !window_id_)
++    return;
++  auto* session = SessionServiceFactory::GetForProfile(profile_);
++  if (!session)
++    return;
++  session->AddWindowExtraData(browser_->GetSessionID(), kWindowKey,
++                              base::NumberToString(window_id_));
++  for (int i = 0; i < tabs_->count(); ++i) {
++    auto* contents = tabs_->GetWebContentsAt(i);
++    if (auto* binding = Binding::Get(*contents)) {
++      session->AddTabExtraData(browser_->GetSessionID(),
++                               sessions::SessionTabHelper::IdForTab(contents),
++                               kItemKey, base::NumberToString(binding->item()));
++    }
++  }
++}
++
++void BrowserWorkspaceAdapter::ShowSelected() {
++  if (!ready() || changing_)
++    return;
++  base::AutoReset<bool> changing(&changing_, true);
++  auto sidebar = Sidebar();
++  if (!sidebar.ok)
++    return;
++  content::WebContents* page = LocalPage(*tabs_, sidebar.selected_item_id);
++  // Selection is UI policy over Rust's supplied rows, never native tab order
++  // or independently computed placement/Profile visibility.
++  if (!page) {
++    for (const auto* section :
++         {&sidebar.favorites, &sidebar.pins, &sidebar.temporary}) {
++      for (const auto& row : *section) {
++        page = LocalPage(*tabs_, row.id);
++        if (page) {
++          Remember(service_->SelectItem(window_id_, row.id));
++          break;
++        }
++      }
++      if (page)
++        break;
++    }
++  }
++  if (page) {
++    const int index = tabs_->GetIndexOfWebContents(page);
++    if (index != tabs_->active_index())
++      tabs_->ActivateTabAt(index);
++  }
++}
++
++void BrowserWorkspaceAdapter::Remember(foundation::MutationResult result) {
++  if (!result.ok)
++    error_ = std::string(result.error);
++}
++
++void BrowserWorkspaceAdapter::OnServiceChanged() {
++  if (refresh_pending_)
++    return;
++  refresh_pending_ = true;
++  base::SingleThreadTaskRunner::GetCurrentDefault()->PostTask(
++      FROM_HERE, base::BindOnce(&BrowserWorkspaceAdapter::Refresh,
++                                weak_factory_.GetWeakPtr()));
++}
++
++void BrowserWorkspaceAdapter::Refresh() {
++  refresh_pending_ = false;
++  auto& runtime = ForProfile(*profile_);
++  if (!bound_ && runtime.complete && tabs_ && IsReady(*service_) &&
++      !SessionRestore::IsRestoring(profile_)) {
++    base::AutoReset<bool> changing(&changing_, true);
++    auto result = BindWindow();
++    if (result.ok)
++      result = BindTabs();
++    error_ = std::string(result.error);
++    bound_ = result.ok;
++    if (bound_)
++      PersistBindings();
++  }
++  ShowSelected();
++  changed_.Notify();
++}
++
++foundation::MutationResult BrowserWorkspaceAdapter::ActivateItem(
++    uint64_t item) {
++  if (!ready())
++    return Fail(error());
++  base::AutoReset<bool> changing(&changing_, true);
++  auto state = service_->ExportSnapshot();
++  const auto* row = state ? FindItem(*state, item) : nullptr;
++  if (!row)
++    return Fail("Workspace item does not exist.");
++  auto* page = LocalPage(*tabs_, item);
++  if (!page) {
++    if (!row->has_url)
++      return Fail("Temporary page is detached or unavailable in this window.");
++    const GURL url(std::string(row->canonical_url));
++    if (!url.is_valid() || url.has_username() || url.has_password() ||
++        !(url.SchemeIsHTTPOrHTTPS() || url.spec() == "about:blank"))
++      return Fail("Saved URL is invalid.");
++    // Native navigation owns security policy and page lifetime. Background
++    // insertion avoids revealing a new item before Rust validates selection.
++    base::AutoReset<uint64_t> opening(&opening_item_, item);
++    NavigateParams params(browser_, url, ui::PAGE_TRANSITION_AUTO_BOOKMARK);
++    params.disposition = WindowOpenDisposition::kNewBackgroundTab;
++    params.tabstrip_add_types = ADD_NONE;
++    Navigate(&params);
++    page = params.navigated_or_inserted_contents;
++    if (!page || params.browser != browser_ ||
++        page->GetBrowserContext() != profile_)
++      return Fail(
++          "Native navigation did not open in the owning window/Profile.");
++    auto result = Binding::Set(*page, item);
++    if (!result.ok)
++      return result;
++  }
++  auto result = service_->RevealItem(window_id_, item);
++  if (!result.ok)
++    return result;
++  tabs_->ActivateTabAt(tabs_->GetIndexOfWebContents(page));
++  page->Focus();
++  PersistBindings();
++  OnServiceChanged();
++  return Ok(item);
++}
++
++foundation::MutationResult BrowserWorkspaceAdapter::CloseItem(uint64_t item) {
++  if (!ready())
++    return Fail(error());
++  auto* page = LocalPage(*tabs_, item);
++  if (!page)
++    return Fail("No live projection of this item in this window.");
++  tabs_->CloseWebContents(page,
++                          CLOSE_USER_GESTURE | CLOSE_CREATE_HISTORICAL_TAB);
++  // Native beforeunload may cancel. Binding destruction acknowledges actual
++  // close.
++  return Ok(item);
++}
++
++foundation::MutationResult BrowserWorkspaceAdapter::CreateSpace(
++    std::string_view name) {
++  return ready() ? service_->CreateSpace(name) : Fail(error());
++}
++foundation::MutationResult BrowserWorkspaceAdapter::RenameSpace(
++    uint64_t space,
++    std::string_view name) {
++  return ready() ? service_->RenameSpace(space, name) : Fail(error());
++}
++foundation::MutationResult BrowserWorkspaceAdapter::SelectSpace(
++    uint64_t space) {
++  if (!ready())
++    return Fail(error());
++  auto result = service_->SelectSpace(window_id_, space);
++  if (result.ok)
++    ShowSelected();
++  return result;
++}
++foundation::MutationResult BrowserWorkspaceAdapter::Save(
++    uint64_t item,
++    foundation::PlacementKind kind) {
++  if (!ready())
++    return Fail(error());
++  auto state = service_->ExportSnapshot();
++  const auto* row = state ? FindItem(*state, item) : nullptr;
++  if (!row)
++    return Fail("Workspace item does not exist.");
++  auto sidebar = Sidebar();
++  if (!sidebar.ok)
++    return Fail("Workspace window is not ready.");
++  const uint64_t owner = kind == foundation::PlacementKind::Favorite
++                             ? sidebar.current_space.profile_id
++                             : sidebar.current_space.id;
++  if (row->has_url)
++    return service_->SetPlacement(item, kind, owner, false, "");
++  auto* page = LocalPage(*tabs_, item);
++  if (!page)
++    return Fail("Save requires an actual live page in this window.");
++  return service_->SetPlacement(item, kind, owner, true,
++                                page->GetLastCommittedURL().spec());
++}
++foundation::MutationResult BrowserWorkspaceAdapter::Pin(uint64_t item) {
++  return Save(item, foundation::PlacementKind::Pin);
++}
++foundation::MutationResult BrowserWorkspaceAdapter::Favorite(uint64_t item) {
++  return Save(item, foundation::PlacementKind::Favorite);
++}
++foundation::MutationResult BrowserWorkspaceAdapter::Unsave(uint64_t item) {
++  if (!ready())
++    return Fail(error());
++  auto sidebar = Sidebar();
++  // Include detached and other-window live projections. Zero is factual
++  // absence.
++  return service_->UnsaveItem(
++      item, Count(*profile_, item) ? sidebar.current_space.id : 0);
++}
++foundation::MutationResult BrowserWorkspaceAdapter::MoveItemBefore(
++    uint64_t item,
++    uint64_t before) {
++  return ready() ? service_->MoveItemBefore(item, before) : Fail(error());
++}
++
++void BrowserWorkspaceAdapter::OnTabStripModelChanged(
++    TabStripModel* model,
++    const TabStripModelChange& change,
++    const TabStripSelectionChange& selection) {
++  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
++  if (const auto* remove = change.GetRemove()) {
++    if (model->closing_all() || browser_shutdown::IsTryingToQuit() ||
++        ForProfile(*profile_).shutting_down) {
++      for (const auto& removed : remove->contents) {
++        if (auto* binding = Binding::Get(*removed.contents))
++          binding->PreserveOnDestruction();
++      }
++    }
++  }
++  if (const auto* replace = change.GetReplace()) {
++    if (auto* binding = Binding::Get(*replace->old_contents)) {
++      Remember(Binding::Set(*replace->new_contents, binding->item()));
++      binding->PreserveOnDestruction();
++      if (bound_)
++        PersistBindings();
++    }
++  }
++  if (bound_ && ForProfile(*profile_).complete && IsReady(*service_) &&
++      !SessionRestore::IsRestoring(profile_) && change.GetInsert()) {
++    base::AutoReset<bool> changing(&changing_, true);
++    Remember(BindTabs());
++    PersistBindings();
++  }
++  if (ready() && !changing_ && selection.active_tab_changed() &&
++      selection.new_contents &&
++      (change.GetInsert() ||
++       change.type() == TabStripModelChange::kSelectionOnly)) {
++    if (auto* binding = Binding::Get(*selection.new_contents))
++      Remember(service_->RevealItem(window_id_, binding->item()));
++  }
++  for (const auto& adapter : ForProfile(*profile_).adapters)
++    adapter->OnServiceChanged();
++}
++
++void BrowserWorkspaceAdapter::OnTabChangedAt(tabs::TabInterface*,
++                                             TabChangeType) {
++  for (const auto& adapter : ForProfile(*profile_).adapters)
++    adapter->OnServiceChanged();
++}
++
++void BrowserWorkspaceAdapter::OnTabStripModelDestroyed(TabStripModel*) {
++  tabs_ = nullptr;
++  bound_ = false;
++  OnServiceChanged();
++}
++
++}  // namespace myarc
+diff --git a/myarc/browser_workspace_adapter.h b/myarc/browser_workspace_adapter.h
+new file mode 100644
+index 0000000..96932786ce8b414a5924fd4b7983549b82a0713a
+--- /dev/null
++++ b/myarc/browser_workspace_adapter.h
+@@ -0,0 +1,119 @@
++#ifndef MYARC_BROWSER_WORKSPACE_ADAPTER_H_
++#define MYARC_BROWSER_WORKSPACE_ADAPTER_H_
++
++#include <cstdint>
++#include <map>
++#include <optional>
++#include <string>
++#include <string_view>
++
++#include "base/callback_list.h"
++#include "base/memory/raw_ptr.h"
++#include "base/sequence_checker.h"
++#include "chrome/browser/ui/tabs/tab_strip_model_observer.h"
++#include "myarc/workspace_service.h"
++#include "ui/gfx/image/image.h"
++#include "url/gurl.h"
++
++class BrowserWindowInterface;
++class Profile;
++
++namespace myarc {
++
++// One owner per normal browser window, destroyed before its TabStripModel and
++// Profile. UI-sequence only. Browser owns every WebContents; Rust owns all IDs,
++// sections and visibility. Parent hides stock body when DisplayedContents() is
++// null, showing an honest blank surface without manufacturing a temporary row.
++class BrowserWorkspaceAdapter final : public TabStripModelObserver {
++ public:
++  static constexpr char kItemKey[] = "myarc.item.v1";
++  static constexpr char kWindowKey[] = "myarc.window.v1";
++
++  explicit BrowserWorkspaceAdapter(BrowserWindowInterface& browser);
++  ~BrowserWorkspaceAdapter() override;
++
++  // Parent restore hooks, before FinishSessionRestore and before tab insertion
++  // where possible. Pass SessionTab/SessionWindow.extra_data unchanged.
++  // Upstream does not generically retain arbitrary window/tab extra_data on
++  // live objects.
++  static foundation::MutationResult RestoreTabBinding(
++      content::WebContents& contents,
++      const std::map<std::string, std::string>& extra_data);
++  foundation::MutationResult RestoreWindowBinding(
++      const std::map<std::string, std::string>& extra_data);
++  // Call once per exact Profile only after all native windows/tabs have been
++  // restored, their hooks applied and adapters constructed. Also call on fresh
++  // startup with zero restored windows. Returns loading/error until service is
++  // ready, and rejects in-flight async session restore. Retry via Subscribe().
++  static foundation::MutationResult FinishSessionRestore(Profile& profile);
++  // Call before application shutdown starts closing tabs; independent of order
++  // of upstream IsTryingToQuit and close notifications. No persistence for OTR.
++  static void BeginShutdown(Profile& profile);
++  // Parent calls after SessionService::ScheduleResetCommands rebuilds its log,
++  // since upstream only preserves its own known extra-data keys during rebuild.
++  static void PersistSessionBindings(Profile& profile);
++
++  bool ready() const;
++  std::string error() const;
++  uint64_t window_id() const { return window_id_; }
++  WorkspaceService& service() const { return *service_; }
++  foundation::SidebarResult Sidebar() const;
++  base::CallbackListSubscription Subscribe(base::RepeatingClosure callback);
++
++  struct LiveMetadata {
++    std::u16string title;
++    GURL current_url;  // Never written back to saved canonical_url.
++    gfx::Image icon;
++    bool loading = false;
++    size_t projections = 0;  // Exact Profile, including detached live pages.
++  };
++  std::optional<LiveMetadata> Metadata(uint64_t item) const;
++  content::WebContents* DisplayedContents() const;
++  foundation::MutationResult ActivateItem(uint64_t item);
++  // Close this window's projection only. Dormant saved rows remain unchanged.
++  foundation::MutationResult CloseItem(uint64_t item);
++  foundation::MutationResult CreateSpace(std::string_view name);
++  foundation::MutationResult RenameSpace(uint64_t space, std::string_view name);
++  foundation::MutationResult SelectSpace(uint64_t space);
++  foundation::MutationResult Pin(uint64_t item);
++  foundation::MutationResult Favorite(uint64_t item);
++  foundation::MutationResult Unsave(uint64_t item);
++  foundation::MutationResult MoveItemBefore(uint64_t item, uint64_t before);
++
++ private:
++  foundation::MutationResult BindWindow();
++  foundation::MutationResult BindTabs();
++  foundation::MutationResult Save(uint64_t item,
++                                  foundation::PlacementKind kind);
++  void PersistBindings();
++  void ShowSelected();
++  void OnServiceChanged();
++  void Refresh();
++  void Remember(foundation::MutationResult result);
++  void OnTabStripModelChanged(
++      TabStripModel* model,
++      const TabStripModelChange& change,
++      const TabStripSelectionChange& selection) override;
++  void OnTabChangedAt(tabs::TabInterface* tab, TabChangeType type) override;
++  void OnTabStripModelDestroyed(TabStripModel* model) override;
++
++  const raw_ptr<BrowserWindowInterface> browser_;
++  const raw_ptr<Profile> profile_;
++  const raw_ptr<WorkspaceService> service_;
++  raw_ptr<TabStripModel> tabs_;
++  uint64_t window_id_ = 0;
++  uint64_t restored_window_id_ = 0;
++  uint64_t opening_item_ = 0;
++  bool changing_ = false;
++  bool bound_ = false;
++  bool refresh_pending_ = false;
++  std::string error_;
++  base::RepeatingClosureList changed_;
++  base::CallbackListSubscription service_subscription_;
++  SEQUENCE_CHECKER(sequence_checker_);
++  base::WeakPtrFactory<BrowserWorkspaceAdapter> weak_factory_{this};
++};
++
++}  // namespace myarc
++
++#endif  // MYARC_BROWSER_WORKSPACE_ADAPTER_H_
 diff --git a/myarc/native_button.cc b/myarc/native_button.cc
 new file mode 100644
-index 0000000000..51745d788b
+index 0000000..51745d788b32b6c3315b4fbde0d4f2a6294707d7
 --- /dev/null
 +++ b/myarc/native_button.cc
 @@ -0,0 +1,66 @@
@@ -294,7 +1812,7 @@ index 0000000000..51745d788b
 +}  // namespace myarc
 diff --git a/myarc/native_button.h b/myarc/native_button.h
 new file mode 100644
-index 0000000000..82fdbf3bd5
+index 0000000..82fdbf3bd5bb0f34e94dd9b9ebced7442e5aed45
 --- /dev/null
 +++ b/myarc/native_button.h
 @@ -0,0 +1,14 @@
@@ -312,6 +1830,421 @@ index 0000000000..82fdbf3bd5
 +}
 +
 +#endif  // MYARC_NATIVE_BUTTON_H_
+diff --git a/myarc/sidebar_view.cc b/myarc/sidebar_view.cc
+new file mode 100644
+index 0000000..764134d428ebd79496b65c55c33717cf3299a2ea
+--- /dev/null
++++ b/myarc/sidebar_view.cc
+@@ -0,0 +1,312 @@
++#include "myarc/sidebar_view.h"
++
++#include <limits>
++#include <memory>
++#include <optional>
++#include <utility>
++
++#include "base/functional/bind.h"
++#include "base/strings/utf_string_conversions.h"
++#include "components/vector_icons/vector_icons.h"
++#include "myarc/bridge.rs.h"
++#include "ui/base/metadata/metadata_impl_macros.h"
++#include "ui/base/models/simple_combobox_model.h"
++#include "ui/color/color_id.h"
++#include "ui/gfx/geometry/insets.h"
++#include "ui/gfx/geometry/size.h"
++#include "ui/views/accessibility/view_accessibility.h"
++#include "ui/views/controls/button/md_text_button.h"
++#include "ui/views/controls/combobox/combobox.h"
++#include "ui/views/controls/label.h"
++#include "ui/views/controls/scroll_view.h"
++#include "ui/views/controls/separator.h"
++#include "ui/views/layout/box_layout.h"
++
++namespace myarc {
++namespace {
++
++using Orientation = views::BoxLayout::Orientation;
++
++std::unique_ptr<views::View> Box(Orientation orientation, int spacing) {
++  auto view = std::make_unique<views::View>();
++  view->SetLayoutManager(
++      std::make_unique<views::BoxLayout>(orientation, gfx::Insets(), spacing));
++  return view;
++}
++
++std::unique_ptr<views::MdTextButton> Button(
++    views::Button::PressedCallback callback,
++    const std::u16string& text) {
++  auto button =
++      std::make_unique<views::MdTextButton>(std::move(callback), text);
++  button->SetStyle(ui::ButtonStyle::kText);
++  // Preserve the parent's material; this API is the available transparent fill.
++  button->SetBgColorOverrideDeprecated(SK_ColorTRANSPARENT);
++  button->SetEnabledTextColors(ui::kColorSysOnSurface);
++  button->SetFocusBehavior(views::View::FocusBehavior::ALWAYS);
++  button->SetCornerRadius(10);
++  button->SetCustomPadding(gfx::Insets::VH(6, 8));
++  button->SetMinSize(gfx::Size(0, 32));
++  button->SetHorizontalAlignment(gfx::ALIGN_LEFT);
++  button->SetElideBehavior(gfx::ELIDE_TAIL);
++  return button;
++}
++
++void AddStatus(views::View& parent, const std::u16string& text) {
++  auto* label = parent.AddChildView(std::make_unique<views::Label>(text));
++  label->SetMultiLine(true);
++  label->SetHorizontalAlignment(gfx::ALIGN_LEFT);
++  label->SetEnabledColor(ui::kColorSysOnSurface);
++}
++
++}  // namespace
++
++SidebarView::SidebarView(Delegate& delegate) : delegate_(delegate) {
++  SetPreferredSize(gfx::Size(230, 400));
++  SetLayoutManager(std::make_unique<views::BoxLayout>(Orientation::kVertical,
++                                                      gfx::Insets(8), 8));
++  GetViewAccessibility().SetName(u"Workspace sidebar");
++  SetUnavailable(u"Loading workspace\u2026");
++}
++
++SidebarView::~SidebarView() {
++  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
++}
++
++void SidebarView::TrackFocus(views::View* view,
++                             FocusAction action,
++                             uint64_t id) {
++  focus_targets_.push_back({action, id, view});
++}
++
++std::unique_ptr<views::View> SidebarView::MakeItem(
++    const foundation::ItemRecord& item,
++    bool tile,
++    bool selected) {
++  ItemPresentation presentation = delegate_->GetItemPresentation(item);
++  // The bridge has no saved-title field yet. Preserve the actual saved record
++  // while dormant instead of substituting a made-up site name.
++  if (presentation.title.empty()) {
++    presentation.title =
++        item.has_url ? base::UTF8ToUTF16(std::string(item.canonical_url))
++                     : u"Untitled tab";
++  }
++  const auto foreground =
++      selected ? ui::kColorSysOnSecondaryContainer : ui::kColorSysOnSurface;
++  auto activate =
++      Button(base::BindRepeating(&Delegate::ActivateItem,
++                                 base::Unretained(&delegate_.get()), item.id),
++             tile ? std::u16string() : presentation.title);
++  if (presentation.icon.IsEmpty()) {
++    presentation.icon = ui::ImageModel::FromVectorIcon(
++        vector_icons::kGlobeIcon, foreground, tile ? 20 : 16);
++  }
++  activate->SetImageModel(views::Button::STATE_NORMAL, presentation.icon);
++  activate->SetImageLabelSpacing(8);
++  activate->SetTooltipText(presentation.title);
++  activate->GetViewAccessibility().SetName(presentation.title);
++  activate->GetViewAccessibility().SetDescription(
++      presentation.is_live ? u"Open tab" : u"Saved site");
++  activate->GetViewAccessibility().SetIsSelected(selected);
++  activate->SetEnabledTextColors(foreground);
++  if (selected || tile) {
++    activate->SetBgColorOverrideDeprecated(std::nullopt);
++    activate->SetBgColorIdOverride(selected ? ui::kColorSysSecondaryContainer
++                                            : ui::kColorSysSurfaceContainer);
++  }
++  TrackFocus(activate.get(), FocusAction::kActivate, item.id);
++  if (tile) {
++    activate->SetHorizontalAlignment(gfx::ALIGN_CENTER);
++    activate->SetImageCentered(true);
++    activate->SetMinSize(gfx::Size(0, 48));
++    activate->SetPreferredSize(gfx::Size(0, 48));
++    return activate;
++  }
++
++  auto row = Box(Orientation::kHorizontal, 0);
++  auto* layout = static_cast<views::BoxLayout*>(row->GetLayoutManager());
++  layout->SetFlexForView(row->AddChildView(std::move(activate)), 1);
++  if (presentation.is_live) {
++    auto close =
++        Button(base::BindRepeating(&Delegate::CloseLiveItem,
++                                   base::Unretained(&delegate_.get()), item.id),
++               u"");
++    close->SetImageModel(
++        views::Button::STATE_NORMAL,
++        ui::ImageModel::FromVectorIcon(vector_icons::kCloseIcon,
++                                       ui::kColorSysOnSurface, 16));
++    close->SetTooltipText(u"Close tab: " + presentation.title);
++    close->GetViewAccessibility().SetName(u"Close tab: " + presentation.title);
++    TrackFocus(close.get(), FocusAction::kClose, item.id);
++    row->AddChildView(std::move(close));
++  }
++  return row;
++}
++
++void SidebarView::SetUnavailable(const std::u16string& reason) {
++  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
++  focus_targets_.clear();
++  RemoveAllChildViews();
++  AddStatus(*this, reason.empty() ? u"Workspace unavailable" : reason);
++}
++
++void SidebarView::SetModel(const foundation::SidebarResult& model,
++                           const std::u16string& status) {
++  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
++  if (!model.ok) {
++    SetUnavailable(u"Workspace unavailable: " +
++                   base::UTF8ToUTF16(std::string(model.error)));
++    return;
++  }
++
++  std::optional<std::pair<FocusAction, uint64_t>> focus;
++  for (const auto& target : focus_targets_) {
++    if (target.view->HasFocus()) {
++      focus = {target.action, target.id};
++      break;
++    }
++  }
++  gfx::PointF offset;
++  if (!children().empty()) {
++    // A usable model always has its ScrollView first; unavailable state has
++    // no focus targets and contains only a status label.
++    if (!focus_targets_.empty()) {
++      offset =
++          static_cast<views::ScrollView*>(children().front())->CurrentOffset();
++    }
++  }
++  focus_targets_.clear();
++  RemoveAllChildViews();
++
++  auto* scroll = AddChildView(std::make_unique<views::ScrollView>());
++  // Bounded mode sizes contents to viewport width and full preferred height.
++  scroll->ClipHeightTo(0, std::numeric_limits<int>::max());
++  scroll->SetHorizontalScrollBarMode(
++      views::ScrollView::ScrollBarMode::kDisabled);
++  scroll->SetBackgroundColor(
++      std::nullopt);  // Preserve parent's native material.
++  scroll->SetDrawOverflowIndicator(false);
++  static_cast<views::BoxLayout*>(GetLayoutManager())->SetFlexForView(scroll, 1);
++  auto* body = scroll->SetContents(Box(Orientation::kVertical, 4));
++  if (!status.empty()) {
++    AddStatus(*body, status);
++  }
++
++  views::View* favorites_row = nullptr;
++  for (size_t i = 0; i < model.favorites.size(); ++i) {
++    if (i % 3 == 0) {
++      favorites_row = body->AddChildView(Box(Orientation::kHorizontal, 6));
++    }
++    auto* tile = favorites_row->AddChildView(
++        MakeItem(model.favorites[i], true,
++                 model.favorites[i].id == model.selected_item_id));
++    static_cast<views::BoxLayout*>(favorites_row->GetLayoutManager())
++        ->SetFlexForView(tile, 1);
++  }
++  // Empty layout cells keep the final row at three columns; never controls.
++  for (size_t i = model.favorites.size(); favorites_row && i % 3 != 0; ++i) {
++    auto* cell = favorites_row->AddChildView(std::make_unique<views::View>());
++    cell->SetPreferredSize(gfx::Size(0, 48));
++    static_cast<views::BoxLayout*>(favorites_row->GetLayoutManager())
++        ->SetFlexForView(cell, 1);
++  }
++
++  const std::u16string name =
++      base::UTF8ToUTF16(std::string(model.current_space.name));
++  auto heading = Button(base::BindRepeating(&Delegate::RenameSpace,
++                                            base::Unretained(&delegate_.get()),
++                                            model.current_space.id),
++                        name);
++  heading->SetLabelStyle(views::style::STYLE_EMPHASIZED);
++  heading->SetTooltipText(u"Rename Space: " + name);
++  heading->GetViewAccessibility().SetName(u"Rename Space: " + name);
++  TrackFocus(heading.get(), FocusAction::kRename, model.current_space.id);
++  body->AddChildView(std::move(heading));
++
++  auto new_tab = Button(base::BindRepeating(&Delegate::NewTab,
++                                            base::Unretained(&delegate_.get())),
++                        u"New Tab");
++  new_tab->SetImageModel(
++      views::Button::STATE_NORMAL,
++      ui::ImageModel::FromVectorIcon(vector_icons::kAdd2Icon,
++                                     ui::kColorSysOnSurface, 16));
++  TrackFocus(new_tab.get(), FocusAction::kNewTab);
++  body->AddChildView(std::move(new_tab));
++  for (const auto& item : model.pins) {
++    body->AddChildView(
++        MakeItem(item, false, item.id == model.selected_item_id));
++  }
++  if (!model.pins.empty() && !model.temporary.empty()) {
++    body->AddChildView(std::make_unique<views::Separator>());
++  }
++  for (const auto& item : model.temporary) {
++    body->AddChildView(
++        MakeItem(item, false, item.id == model.selected_item_id));
++  }
++
++  auto* footer = AddChildView(Box(Orientation::kHorizontal, 4));
++  std::vector<ui::SimpleComboboxModel::Item> choices;
++  std::vector<uint64_t> ids;
++  std::optional<size_t> current;
++  for (const auto& space : model.spaces) {
++    if (space.id == model.current_space.id) {
++      current = choices.size();
++    }
++    choices.emplace_back(base::UTF8ToUTF16(std::string(space.name)));
++    ids.push_back(space.id);
++  }
++  auto* spaces = footer->AddChildView(std::make_unique<views::Combobox>(
++      std::make_unique<ui::SimpleComboboxModel>(std::move(choices))));
++  spaces->SetSizeToLargestLabel(false);
++  spaces->SetSelectedIndex(current);
++  spaces->SetTooltipTextAndAccessibleName(u"Current Space: " + name);
++  spaces->SetBackgroundColorId(ui::kColorSysSurfaceContainer);
++  spaces->SetForegroundColorId(ui::kColorSysOnSurface);
++  spaces->SetFocusBehavior(FocusBehavior::ALWAYS);
++  spaces->SetCallback(base::BindRepeating(
++      [](Delegate* delegate, views::Combobox* combo,
++         const std::vector<uint64_t>& ids, std::optional<size_t> current) {
++        const auto index = combo->GetSelectedIndex();
++        // Wait for the next Rust snapshot before showing a successful switch.
++        combo->SetSelectedIndex(current);
++        if (index && *index < ids.size() && index != current) {
++          delegate->SelectSpace(ids[*index]);
++        }
++      },
++      base::Unretained(&delegate_.get()), base::Unretained(spaces),
++      std::move(ids), current));
++  TrackFocus(spaces, FocusAction::kSpaces);
++  static_cast<views::BoxLayout*>(footer->GetLayoutManager())
++      ->SetFlexForView(spaces, 1);
++
++  auto create = Button(base::BindRepeating(&Delegate::CreateSpace,
++                                           base::Unretained(&delegate_.get())),
++                       u"+");
++  create->SetTooltipText(u"Create Space");
++  create->GetViewAccessibility().SetName(u"Create Space");
++  TrackFocus(create.get(), FocusAction::kCreate);
++  footer->AddChildView(std::move(create));
++
++  scroll->RegisterPostLayoutCallback(base::BindRepeating(
++      [](std::optional<gfx::PointF>& offset, views::ScrollView* scroll) {
++        if (auto saved = std::exchange(offset, std::nullopt)) {
++          scroll->ScrollToOffset(*saved);
++        }
++      },
++      base::OwnedRef(std::optional(offset))));
++  if (focus) {
++    views::View* restore = spaces;
++    for (const auto& target : focus_targets_) {
++      if (target.action == focus->first && target.id == focus->second) {
++        restore = target.view;
++        break;
++      }
++    }
++    restore->RequestFocus();
++  }
++}
++
++BEGIN_METADATA(SidebarView)
++END_METADATA
++
++}  // namespace myarc
+diff --git a/myarc/sidebar_view.h b/myarc/sidebar_view.h
+new file mode 100644
+index 0000000..b8da4491a5843dd56db13a83f7420fc25b3a604f
+--- /dev/null
++++ b/myarc/sidebar_view.h
+@@ -0,0 +1,91 @@
++#ifndef MYARC_SIDEBAR_VIEW_H_
++#define MYARC_SIDEBAR_VIEW_H_
++
++#include <cstdint>
++#include <memory>
++#include <string>
++#include <vector>
++
++#include "base/memory/raw_ptr.h"
++#include "base/memory/raw_ref.h"
++#include "base/sequence_checker.h"
++#include "ui/base/metadata/metadata_header_macros.h"
++#include "ui/base/models/image_model.h"
++#include "ui/views/view.h"
++
++namespace myarc::foundation {
++struct ItemRecord;
++struct SidebarResult;
++}  // namespace myarc::foundation
++
++namespace myarc {
++
++// Presentation only, on the UI sequence. Delegate outlives this view. The
++// parent owns Profile/window scope, Rust mutations, browser tabs, dialogs and
++// failures.
++class SidebarView final : public views::View {
++  METADATA_HEADER(SidebarView, views::View)
++
++ public:
++  struct ItemPresentation {
++    std::u16string title;
++    ui::ImageModel icon;  // Parent supplies a favicon, preferably 16 or 20 DIP.
++    bool is_live = false;
++  };
++
++  class Delegate {
++   public:
++    virtual ~Delegate() = default;
++    // Lookup only: never open a page or fetch a favicon while rendering.
++    virtual ItemPresentation GetItemPresentation(
++        const foundation::ItemRecord& item) const = 0;
++    // IDs are Rust IDs in this view's parent-owned window, not native tab IDs.
++    // Resolve the saved canonical URL in the controller for dormant items.
++    virtual void ActivateItem(uint64_t item_id) = 0;
++    virtual void CloseLiveItem(uint64_t item_id) = 0;
++    virtual void SelectSpace(uint64_t space_id) = 0;
++    virtual void CreateSpace() = 0;
++    virtual void RenameSpace(uint64_t space_id) = 0;
++    virtual void NewTab() = 0;  // Parent opens its real New Tab/palette flow.
++  };
++
++  explicit SidebarView(Delegate& delegate);
++  ~SidebarView() override;
++
++  // Copies display values/IDs, retains no Rust borrows. Sections and order come
++  // directly from Rust. Call again when model or native title/favicon changes.
++  // Optional status explains storage failures without claiming durable success.
++  void SetModel(const foundation::SidebarResult& model,
++                const std::u16string& status = {});
++  // Drops stale controls while loading or after a read/snapshot failure. Parent
++  // owns recovery/retry UI; SetModel restores controls once usable.
++  void SetUnavailable(const std::u16string& reason);
++
++ private:
++  enum class FocusAction {
++    kActivate,
++    kClose,
++    kRename,
++    kNewTab,
++    kSpaces,
++    kCreate
++  };
++  struct FocusTarget {
++    FocusAction action;
++    uint64_t id;
++    raw_ptr<views::View> view;
++  };
++
++  void TrackFocus(views::View* view, FocusAction action, uint64_t id = 0);
++  std::unique_ptr<views::View> MakeItem(const foundation::ItemRecord& item,
++                                        bool tile,
++                                        bool selected);
++
++  const raw_ref<Delegate> delegate_;
++  std::vector<FocusTarget> focus_targets_;
++  SEQUENCE_CHECKER(sequence_checker_);
++};
++
++}  // namespace myarc
++
++#endif  // MYARC_SIDEBAR_VIEW_H_
 diff --git a/myarc/workspace/src/lib.rs b/myarc/workspace/src/lib.rs
 new file mode 100644
 index 0000000..2fa2bd17a496e83e411e75fa3e492dec28a52d6d
@@ -1112,3 +3045,725 @@ index 0000000..2fa2bd17a496e83e411e75fa3e492dec28a52d6d
 +        assert_eq!(second.space_name(), "Everyday");
 +    }
 +}
+diff --git a/myarc/workspace_service.cc b/myarc/workspace_service.cc
+new file mode 100644
+index 0000000..a201c08caff707307b579a905539769903dc909c
+--- /dev/null
++++ b/myarc/workspace_service.cc
+@@ -0,0 +1,586 @@
++#include "myarc/workspace_service.h"
++
++#include <array>
++#include <memory>
++#include <utility>
++
++#include "base/containers/span.h"
++#include "base/files/file.h"
++#include "base/files/important_file_writer.h"
++#include "base/functional/bind.h"
++#include "base/json/json_reader.h"
++#include "base/json/json_writer.h"
++#include "base/location.h"
++#include "base/logging.h"
++#include "base/strings/string_number_conversions.h"
++#include "base/strings/string_util.h"
++#include "base/task/sequenced_task_runner.h"
++#include "base/task/thread_pool.h"
++#include "base/threading/sequence_local_storage_slot.h"
++#include "base/values.h"
++#include "chrome/browser/profiles/profile.h"
++#include "content/public/browser/browser_thread.h"
++#include "url/gurl.h"
++
++namespace myarc {
++namespace {
++
++const char kWorkspaceServiceKey = 0;
++// Covers the core maximum (1024 saved URLs of 8192 bytes), including JSON
++// escaping. JSONReader's input and depth limits bound its intermediate tree;
++// per-field/count checks below precede allocation of owned bridge records.
++constexpr size_t kMaxMetadataBytes = 20 * 1024 * 1024;
++constexpr size_t kMaxJsonDepth = 8;
++
++scoped_refptr<base::SequencedTaskRunner> WorkspaceIoRunner() {
++  DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
++  // Serialize unload/final-write/reload even after the old service is gone.
++  // Sequence-local ownership also avoids retaining a dead test ThreadPool.
++  static base::SequenceLocalStorageSlot<
++      scoped_refptr<base::SequencedTaskRunner>>
++      slot;
++  auto& runner = slot.GetOrCreateValue();
++  if (!runner) {
++    runner = base::ThreadPool::CreateSequencedTaskRunner(
++        {base::MayBlock(), base::TaskPriority::USER_VISIBLE,
++         base::TaskShutdownBehavior::BLOCK_SHUTDOWN});
++  }
++  return runner;
++}
++
++foundation::MutationResult Failure(std::string_view error) {
++  return {false, 0, rust::String(error.data(), error.size())};
++}
++
++bool ReadId(const base::DictValue& dict, std::string_view key, uint64_t& id) {
++  const auto* text = dict.FindString(key);
++  return text && text->size() <= 20 && base::StringToUint64(*text, &id) &&
++         base::NumberToString(id) == *text;
++}
++
++internal::MetadataResult InvalidMetadata() {
++  return {std::nullopt,
++          "Workspace metadata is corrupt, unsupported or exceeds limits. "
++          "File preserved. Recover it or move it aside, then retry loading."};
++}
++
++internal::MetadataResult ReadMetadata(const base::FilePath& path) {
++  base::File file(path, base::File::FLAG_OPEN | base::File::FLAG_READ);
++  if (!file.IsValid()) {
++    if (file.error_details() == base::File::FILE_ERROR_NOT_FOUND) {
++      return {};  // First run, not a failed decode.
++    }
++    return {
++        std::nullopt,
++        "Cannot open workspace metadata. Check permissions and retry loading."};
++  }
++  const int64_t size = file.GetLength();
++  if (size < 0 || static_cast<uint64_t>(size) > kMaxMetadataBytes) {
++    return InvalidMetadata();
++  }
++  std::string json(static_cast<size_t>(size), '\0');
++  std::array<uint8_t, 1> trailing;
++  if (!file.ReadAtCurrentPosAndCheck(base::as_writable_byte_span(json)) ||
++      file.ReadAtCurrentPos(trailing) != 0) {
++    return {std::nullopt,
++            "Workspace metadata read failed or changed while "
++            "reading. Retry loading."};
++  }
++  return internal::DecodeWorkspaceMetadata(json);
++}
++
++bool WriteMetadata(const base::FilePath& path,
++                   foundation::StateSnapshot snapshot) {
++  const auto json = internal::EncodeWorkspaceMetadata(snapshot);
++  const bool ok =
++      json && base::ImportantFileWriter::WriteFileAtomically(path, *json);
++  // The service may have died or the UI loop stopped before the reply runs.
++  if (!ok) {
++    LOG(ERROR) << "Workspace metadata write failed. Check disk space and "
++                  "profile-directory permissions, then retry saving.";
++  }
++  return ok;
++}
++
++// GURL is the parser at both untrusted restore and saved-URL mutation
++// boundaries.
++std::optional<std::string> CanonicalUrl(std::string_view text) {
++  if (text.size() > foundation::bridge_limits().url_bytes)
++    return std::nullopt;
++  const GURL url(text);
++  if (!url.is_valid() || url.has_username() || url.has_password() ||
++      !(url.SchemeIsHTTPOrHTTPS() || url.spec() == "about:blank") ||
++      url.spec().size() > foundation::bridge_limits().url_bytes)
++    return std::nullopt;
++  return url.spec();
++}
++
++bool BoundedText(std::string_view text, size_t limit) {
++  return text.size() <= limit && base::IsStringUTF8(text);
++}
++
++}  // namespace
++
++namespace internal {
++
++bool CanonicalizeUrls(foundation::StateSnapshot& snapshot) {
++  const auto limits = foundation::bridge_limits();
++  if (snapshot.spaces.size() > limits.spaces ||
++      snapshot.items.size() > limits.items ||
++      snapshot.windows.size() > limits.windows) {
++    return false;
++  }
++  for (auto& item : snapshot.items) {
++    if (!item.has_url) {
++      if (!item.canonical_url.empty())
++        return false;
++      continue;
++    }
++    auto url = CanonicalUrl(
++        std::string_view(item.canonical_url.data(), item.canonical_url.size()));
++    if (!url)
++      return false;
++    item.canonical_url = *url;
++  }
++  return true;
++}
++
++std::optional<std::string> EncodeWorkspaceMetadata(
++    const foundation::StateSnapshot& snapshot) {
++  base::DictValue root;
++  root.Set("version", static_cast<int>(snapshot.version));
++  root.Set("profile_id", base::NumberToString(snapshot.profile_id));
++  root.Set("next_space_id", base::NumberToString(snapshot.next_space_id));
++  root.Set("next_item_id", base::NumberToString(snapshot.next_item_id));
++  root.Set("next_window_id", base::NumberToString(snapshot.next_window_id));
++  base::ListValue spaces;
++  for (const auto& space : snapshot.spaces) {
++    base::DictValue record;
++    record.Set("id", base::NumberToString(space.id));
++    record.Set("profile_id", base::NumberToString(space.profile_id));
++    record.Set("name", std::string(space.name));
++    spaces.Append(std::move(record));
++  }
++  root.Set("spaces", std::move(spaces));
++  base::ListValue items;
++  for (const auto& item : snapshot.items) {
++    base::DictValue record;
++    record.Set("id", base::NumberToString(item.id));
++    record.Set("placement", static_cast<int>(item.placement));
++    record.Set("owner_id", base::NumberToString(item.owner_id));
++    record.Set("has_url", item.has_url);
++    record.Set("canonical_url", std::string(item.canonical_url));
++    items.Append(std::move(record));
++  }
++  root.Set("items", std::move(items));
++  base::ListValue windows;
++  for (const auto& window : snapshot.windows) {
++    base::DictValue record;
++    record.Set("id", base::NumberToString(window.id));
++    record.Set("space_id", base::NumberToString(window.space_id));
++    record.Set("selected_item_id",
++               base::NumberToString(window.selected_item_id));
++    windows.Append(std::move(record));
++  }
++  root.Set("windows", std::move(windows));
++  auto json = base::WriteJson(root);
++  if (json && json->size() <= kMaxMetadataBytes) {
++    return json;
++  }
++  return std::nullopt;
++}
++
++MetadataResult DecodeWorkspaceMetadata(std::string_view json) {
++  if (json.size() > kMaxMetadataBytes) {
++    return InvalidMetadata();
++  }
++  auto root =
++      base::JSONReader::ReadDict(json, base::JSON_PARSE_RFC, kMaxJsonDepth);
++  const auto limits = foundation::bridge_limits();
++  if (!root || root->size() != 8 ||
++      root->FindInt("version") != static_cast<int>(limits.version)) {
++    return InvalidMetadata();
++  }
++  const auto* spaces = root->FindList("spaces");
++  const auto* items = root->FindList("items");
++  const auto* windows = root->FindList("windows");
++  if (!spaces || spaces->size() > limits.spaces || !items ||
++      items->size() > limits.items || !windows ||
++      windows->size() > limits.windows) {
++    return InvalidMetadata();
++  }
++  foundation::StateSnapshot snapshot;
++  snapshot.version = limits.version;
++  if (!ReadId(*root, "profile_id", snapshot.profile_id) ||
++      !ReadId(*root, "next_space_id", snapshot.next_space_id) ||
++      !ReadId(*root, "next_item_id", snapshot.next_item_id) ||
++      !ReadId(*root, "next_window_id", snapshot.next_window_id)) {
++    return InvalidMetadata();
++  }
++  for (const auto& value : *spaces) {
++    const auto* record = value.GetIfDict();
++    foundation::SpaceRecord space;
++    const auto* name = record ? record->FindString("name") : nullptr;
++    if (!record || record->size() != 3 || !name ||
++        !BoundedText(*name, limits.name_bytes) ||
++        !ReadId(*record, "id", space.id) ||
++        !ReadId(*record, "profile_id", space.profile_id)) {
++      return InvalidMetadata();
++    }
++    space.name = *name;
++    snapshot.spaces.push_back(std::move(space));
++  }
++  for (const auto& value : *items) {
++    const auto* record = value.GetIfDict();
++    if (!record || record->size() != 5) {
++      return InvalidMetadata();
++    }
++    const auto kind = record->FindInt("placement");
++    const auto has_url = record->FindBool("has_url");
++    const auto* url = record->FindString("canonical_url");
++    foundation::ItemRecord item;
++    if (!kind ||
++        *kind < static_cast<int>(foundation::PlacementKind::Temporary) ||
++        *kind > static_cast<int>(foundation::PlacementKind::Favorite) ||
++        !has_url || !url || !BoundedText(*url, limits.url_bytes) ||
++        (!*has_url && !url->empty()) || !ReadId(*record, "id", item.id) ||
++        !ReadId(*record, "owner_id", item.owner_id)) {
++      return InvalidMetadata();
++    }
++    item.placement = static_cast<foundation::PlacementKind>(*kind);
++    item.has_url = *has_url;
++    item.canonical_url = *url;
++    snapshot.items.push_back(std::move(item));
++  }
++  for (const auto& value : *windows) {
++    const auto* record = value.GetIfDict();
++    foundation::WindowRecord window;
++    if (!record || record->size() != 3 || !ReadId(*record, "id", window.id) ||
++        !ReadId(*record, "space_id", window.space_id) ||
++        !ReadId(*record, "selected_item_id", window.selected_item_id)) {
++      return InvalidMetadata();
++    }
++    snapshot.windows.push_back(std::move(window));
++  }
++  if (!CanonicalizeUrls(snapshot))
++    return InvalidMetadata();
++  return {std::move(snapshot), {}};
++}
++
++}  // namespace internal
++
++WorkspaceService& WorkspaceService::ForProfile(Profile& profile) {
++  DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
++  auto* service = static_cast<WorkspaceService*>(
++      profile.GetUserData(&kWorkspaceServiceKey));
++  if (!service) {
++    auto owned =
++        std::unique_ptr<WorkspaceService>(new WorkspaceService(profile));
++    service = owned.get();
++    profile.SetUserData(&kWorkspaceServiceKey, std::move(owned));
++    if (!service->ephemeral_) {
++      service->StartLoad();
++    }
++  }
++  return *service;
++}
++
++WorkspaceService::WorkspaceService(Profile& profile)
++    : ephemeral_(profile.IsOffTheRecord() || profile.IsGuestSession() ||
++                 profile.IsSystemProfile()),
++      metadata_path_(ephemeral_ ? base::FilePath()
++                                : profile.GetPath().AppendASCII(
++                                      "myarc-workspace-v1.json")),
++      io_runner_(ephemeral_ ? nullptr : WorkspaceIoRunner()),
++      workspace_(foundation::new_workspace()),
++      storage_state_(ephemeral_ ? StorageState::kEphemeral
++                                : StorageState::kLoading) {
++  DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
++}
++
++WorkspaceService::~WorkspaceService() {
++  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
++  // Managed Profiles die in StartTearDown, before ThreadPool::Shutdown.
++  FlushForShutdown();
++}
++
++void WorkspaceService::FlushForShutdown() {
++  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
++  if (ephemeral_ || !CanMutate() || !dirty_) {
++    return;
++  }
++  // W1 may still be in flight. Queue W2 on the same runner without waiting for
++  // its UI reply, which can be cancelled by destruction or normal shutdown.
++  if (!io_runner_->PostTask(
++          FROM_HERE,
++          base::BindOnce(base::IgnoreResult(&WriteMetadata), metadata_path_,
++                         foundation::export_snapshot(*workspace_)))) {
++    LOG(ERROR) << "Final workspace metadata write could not be scheduled. "
++                  "Keep the profile open and retry saving before closing.";
++  }
++}
++
++WorkspaceService::StorageState WorkspaceService::storage_state() const {
++  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
++  return storage_state_;
++}
++
++std::string WorkspaceService::storage_error() const {
++  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
++  return storage_error_;
++}
++
++base::CallbackListSubscription WorkspaceService::Subscribe(
++    base::RepeatingClosure callback) {
++  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
++  return changed_.Add(std::move(callback));
++}
++
++bool WorkspaceService::CanMutate() const {
++  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
++  return storage_state_ != StorageState::kLoading &&
++         storage_state_ != StorageState::kLoadError;
++}
++
++void WorkspaceService::StartLoad() {
++  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
++  storage_state_ = StorageState::kLoading;
++  storage_error_.clear();
++  if (!io_runner_->PostTaskAndReplyWithResult(
++          FROM_HERE, base::BindOnce(&ReadMetadata, metadata_path_),
++          base::BindOnce(&WorkspaceService::OnLoaded,
++                         weak_factory_.GetWeakPtr()))) {
++    storage_state_ = StorageState::kLoadError;
++    storage_error_ = "Workspace load could not be scheduled. Retry loading.";
++  }
++}
++
++void WorkspaceService::RetryLoad() {
++  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
++  if (storage_state_ == StorageState::kLoadError) {
++    StartLoad();
++    changed_.Notify();
++  }
++}
++
++void WorkspaceService::OnLoaded(internal::MetadataResult result) {
++  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
++  if (result.snapshot) {
++    auto restored =
++        foundation::restore_snapshot(*workspace_, std::move(*result.snapshot));
++    if (!restored.ok) {
++      result.error = std::string(restored.error) +
++                     ". Metadata preserved. Recover file and retry loading.";
++    }
++  }
++  storage_error_ = std::move(result.error);
++  storage_state_ =
++      storage_error_.empty() ? StorageState::kReady : StorageState::kLoadError;
++  changed_.Notify();
++}
++
++foundation::MutationResult WorkspaceService::Changed(
++    foundation::MutationResult result) {
++  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
++  if (result.ok) {
++    if (!ephemeral_) {
++      dirty_ = true;
++      if (storage_state_ != StorageState::kWriteError) {
++        ScheduleWrite();
++      }
++    }
++    changed_.Notify();
++  }
++  return result;
++}
++
++void WorkspaceService::ScheduleWrite() {
++  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
++  if (ephemeral_ || write_in_flight_ || !dirty_) {
++    return;
++  }
++  dirty_ = false;
++  write_in_flight_ = true;
++  storage_state_ = StorageState::kWritePending;
++  storage_error_.clear();
++  if (!io_runner_->PostTaskAndReplyWithResult(
++          FROM_HERE,
++          base::BindOnce(&WriteMetadata, metadata_path_,
++                         foundation::export_snapshot(*workspace_)),
++          base::BindOnce(&WorkspaceService::OnWritten,
++                         weak_factory_.GetWeakPtr()))) {
++    write_in_flight_ = false;
++    dirty_ = true;
++    storage_state_ = StorageState::kWriteError;
++    storage_error_ = "Workspace write could not be scheduled. Retry saving.";
++  }
++}
++
++void WorkspaceService::RetrySave() {
++  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
++  if (storage_state_ == StorageState::kWriteError) {
++    ScheduleWrite();
++    changed_.Notify();
++  }
++}
++
++void WorkspaceService::OnWritten(bool ok) {
++  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
++  write_in_flight_ = false;
++  if (!ok) {
++    dirty_ = true;
++    storage_state_ = StorageState::kWriteError;
++    storage_error_ =
++        "Workspace metadata write failed. Changes remain in "
++        "memory. Check disk space/permissions and retry saving.";
++  } else if (dirty_) {
++    ScheduleWrite();
++  } else {
++    storage_state_ = StorageState::kWritten;
++  }
++  changed_.Notify();
++}
++
++foundation::MutationResult WorkspaceService::CreateSpace(
++    std::string_view name) {
++  if (!CanMutate())
++    return Failure("Workspace is not loaded. Check storage state.");
++  if (!BoundedText(name, foundation::bridge_limits().name_bytes))
++    return Failure("Invalid UTF-8 or oversized Space name.");
++  return Changed(foundation::create_space(*workspace_,
++                                          rust::Str(name.data(), name.size())));
++}
++
++foundation::MutationResult WorkspaceService::RenameSpace(
++    uint64_t space,
++    std::string_view name) {
++  if (!CanMutate())
++    return Failure("Workspace is not loaded. Check storage state.");
++  if (!BoundedText(name, foundation::bridge_limits().name_bytes))
++    return Failure("Invalid UTF-8 or oversized Space name.");
++  auto result = foundation::rename_space(*workspace_, space,
++                                         rust::Str(name.data(), name.size()));
++  return Changed({result.ok, 0, std::move(result.error)});
++}
++
++foundation::MutationResult WorkspaceService::CreateWindow(uint64_t space) {
++  if (!CanMutate())
++    return Failure("Workspace is not loaded. Check storage state.");
++  return Changed(foundation::create_window(*workspace_, space));
++}
++
++foundation::MutationResult WorkspaceService::CloseWindow(uint64_t window) {
++  if (!CanMutate())
++    return Failure("Workspace is not loaded. Check storage state.");
++  return Changed(foundation::close_window(*workspace_, window));
++}
++
++foundation::MutationResult WorkspaceService::SelectSpace(uint64_t window,
++                                                         uint64_t space) {
++  if (!CanMutate())
++    return Failure("Workspace is not loaded. Check storage state.");
++  return Changed(foundation::select_space(*workspace_, window, space));
++}
++
++foundation::MutationResult WorkspaceService::AddTemporaryItem(uint64_t space) {
++  if (!CanMutate())
++    return Failure("Workspace is not loaded. Check storage state.");
++  return Changed(foundation::add_temporary_item(*workspace_, space));
++}
++
++foundation::MutationResult WorkspaceService::SelectItem(uint64_t window,
++                                                        uint64_t item) {
++  if (!CanMutate())
++    return Failure("Workspace is not loaded. Check storage state.");
++  return Changed(foundation::select_item(*workspace_, window, item));
++}
++
++foundation::MutationResult WorkspaceService::LiveTabClosed(uint64_t item) {
++  if (!CanMutate())
++    return Failure("Workspace is not loaded. Check storage state.");
++  return Changed(foundation::live_tab_closed(*workspace_, item));
++}
++
++foundation::MutationResult WorkspaceService::SetPlacement(
++    uint64_t item,
++    foundation::PlacementKind placement,
++    uint64_t owner,
++    bool has_url,
++    std::string_view canonical_url) {
++  if (!CanMutate())
++    return Failure("Workspace is not loaded. Check storage state.");
++  if (!BoundedText(canonical_url, foundation::bridge_limits().url_bytes))
++    return Failure("Invalid UTF-8 or oversized saved URL.");
++  auto url = has_url ? CanonicalUrl(canonical_url)
++                     : std::optional<std::string>(std::string(canonical_url));
++  if (!url)
++    return Failure(
++        "Use a valid HTTP(S) saved URL without credentials, or about:blank.");
++  return Changed(
++      foundation::set_placement(*workspace_, item, placement, owner, has_url,
++                                rust::Str(url->data(), url->size())));
++}
++
++foundation::MutationResult WorkspaceService::RemoveSavedItem(uint64_t item) {
++  if (!CanMutate())
++    return Failure("Workspace is not loaded. Check storage state.");
++  return Changed(foundation::remove_saved_item(*workspace_, item));
++}
++
++foundation::MutationResult WorkspaceService::RevealItem(uint64_t window,
++                                                        uint64_t item) {
++  if (!CanMutate())
++    return Failure("Workspace is not loaded. Check storage state.");
++  return Changed(foundation::reveal_item(*workspace_, window, item));
++}
++
++foundation::MutationResult WorkspaceService::UnsaveItem(uint64_t item,
++                                                        uint64_t live_space) {
++  if (!CanMutate())
++    return Failure("Workspace is not loaded. Check storage state.");
++  return Changed(foundation::unsave_item(*workspace_, item, live_space));
++}
++
++foundation::MutationResult WorkspaceService::MoveItemBefore(uint64_t item,
++                                                            uint64_t before) {
++  if (!CanMutate())
++    return Failure("Workspace is not loaded. Check storage state.");
++  return Changed(foundation::move_item_before(*workspace_, item, before));
++}
++
++foundation::MutationResult WorkspaceService::ReconcileLiveItems(
++    base::span<const uint64_t> live) {
++  if (!CanMutate())
++    return Failure("Workspace is not loaded. Check storage state.");
++  return Changed(foundation::reconcile_live_items(
++      *workspace_, rust::Slice<const uint64_t>(live.data(), live.size())));
++}
++
++foundation::SidebarResult WorkspaceService::Sidebar(uint64_t window) const {
++  if (!CanMutate()) {
++    foundation::SidebarResult result;
++    result.ok = false;
++    result.error = "Workspace is not loaded. Check storage state.";
++    return result;
++  }
++  return foundation::sidebar_snapshot(*workspace_, window);
++}
++
++std::optional<foundation::StateSnapshot> WorkspaceService::ExportSnapshot()
++    const {
++  if (!CanMutate())
++    return std::nullopt;
++  return foundation::export_snapshot(*workspace_);
++}
++
++foundation::MutationResult WorkspaceService::RestoreSnapshot(
++    foundation::StateSnapshot snapshot) {
++  if (!CanMutate())
++    return Failure("Workspace is not loaded. Check storage state.");
++  if (!internal::CanonicalizeUrls(snapshot))
++    return Failure("Workspace snapshot exceeds limits or has an invalid URL.");
++  return Changed(
++      foundation::restore_snapshot(*workspace_, std::move(snapshot)));
++}
++
++}  // namespace myarc
+diff --git a/myarc/workspace_service.h b/myarc/workspace_service.h
+new file mode 100644
+index 0000000..5c050bb28a0753d9a4ce5826d390feca9c82bd70
+--- /dev/null
++++ b/myarc/workspace_service.h
+@@ -0,0 +1,124 @@
++#ifndef MYARC_WORKSPACE_SERVICE_H_
++#define MYARC_WORKSPACE_SERVICE_H_
++
++#include <cstdint>
++#include <optional>
++#include <string>
++#include <string_view>
++
++#include "base/callback_list.h"
++#include "base/containers/span.h"
++#include "base/files/file_path.h"
++#include "base/memory/scoped_refptr.h"
++#include "base/memory/weak_ptr.h"
++#include "base/sequence_checker.h"
++#include "base/supports_user_data.h"
++#include "myarc/bridge.rs.h"
++
++class Profile;
++namespace base {
++class SequencedTaskRunner;
++}
++
++namespace myarc {
++
++// Wire-format helpers, shared with bridge_check. Decode bounds owned Cxx
++// buffers; Rust restore remains authoritative for version, identities and model
++// validation.
++namespace internal {
++struct MetadataResult {
++  std::optional<foundation::StateSnapshot> snapshot;
++  std::string error;
++};
++std::optional<std::string> EncodeWorkspaceMetadata(
++    const foundation::StateSnapshot& snapshot);
++MetadataResult DecodeWorkspaceMetadata(std::string_view json);
++bool CanonicalizeUrls(foundation::StateSnapshot& snapshot);
++}  // namespace internal
++
++// UI-sequence only. Exact Profile owns this service and its Rust workspace.
++// Never redirect OTR to GetOriginalProfile(). Controls retain subscriptions,
++// not independent workspaces; callers must stop using the service before
++// Profile dies. Native window/tab pointers and session IDs stay in the browser
++// projection layer.
++class WorkspaceService final : public base::SupportsUserData::Data {
++ public:
++  enum class StorageState {
++    kLoading,
++    kLoadError,  // Read-only until RetryLoad succeeds; file is left untouched.
++    kReady,
++    kWritePending,
++    kWriteError,
++    kWritten,  // Atomic write returned success, NOT OS-crash durable evidence.
++    kEphemeral,
++  };
++  static WorkspaceService& ForProfile(Profile& profile);
++  ~WorkspaceService() override;
++
++  StorageState storage_state() const;
++  std::string storage_error() const;
++  base::CallbackListSubscription Subscribe(base::RepeatingClosure callback);
++  void RetryLoad();
++  void RetrySave();
++  // Queue an owned latest dirty snapshot before ThreadPool shutdown. Leaves
++  // normal write replies/retry state intact if quit is cancelled.
++  void FlushForShutdown();
++
++  // ok means applied in memory only. Observe storage_state separately. All IDs
++  // here are Rust model IDs. Profile 1 is local to each service, not a native
++  // ID.
++  foundation::MutationResult CreateSpace(std::string_view name);
++  foundation::MutationResult RenameSpace(uint64_t space, std::string_view name);
++  foundation::MutationResult CreateWindow(uint64_t space);
++  foundation::MutationResult CloseWindow(uint64_t window);
++  foundation::MutationResult SelectSpace(uint64_t window, uint64_t space);
++  foundation::MutationResult AddTemporaryItem(uint64_t space);
++  foundation::MutationResult SelectItem(uint64_t window, uint64_t item);
++  // Call only when the LAST live projection closes. Saved identity survives.
++  foundation::MutationResult LiveTabClosed(uint64_t item);
++  // has_url=false preserves existing saved URL; first save requires explicit
++  // URL.
++  foundation::MutationResult SetPlacement(uint64_t item,
++                                          foundation::PlacementKind placement,
++                                          uint64_t owner,
++                                          bool has_url,
++                                          std::string_view canonical_url);
++  foundation::MutationResult RemoveSavedItem(uint64_t item);
++  foundation::MutationResult RevealItem(uint64_t window, uint64_t item);
++  foundation::MutationResult UnsaveItem(uint64_t item, uint64_t live_space);
++  foundation::MutationResult MoveItemBefore(uint64_t item, uint64_t before);
++  foundation::MutationResult ReconcileLiveItems(
++      base::span<const uint64_t> live);
++  foundation::SidebarResult Sidebar(uint64_t window) const;
++  std::optional<foundation::StateSnapshot> ExportSnapshot() const;
++  foundation::MutationResult RestoreSnapshot(
++      foundation::StateSnapshot snapshot);
++
++ private:
++  explicit WorkspaceService(Profile& profile);
++  bool CanMutate() const;
++  foundation::MutationResult Changed(foundation::MutationResult result);
++  void StartLoad();
++  void OnLoaded(internal::MetadataResult result);
++  void ScheduleWrite();
++  void OnWritten(bool ok);
++
++  // Copies only, destructor/background work never dereference the dead Profile.
++  const bool ephemeral_;
++  const base::FilePath metadata_path_;
++  const scoped_refptr<base::SequencedTaskRunner> io_runner_;
++  rust::Box<foundation::Workspace> workspace_;
++  StorageState storage_state_;
++  std::string storage_error_;
++  bool dirty_ = false;
++  bool write_in_flight_ = false;
++  base::RepeatingClosureList changed_;
++  SEQUENCE_CHECKER(sequence_checker_);
++  // Invalidates replies on destruction. Queued writes own their path/records
++  // and block normal shutdown. Ephemeral Profiles queue none.
++  base::WeakPtrFactory<WorkspaceService> weak_factory_{this};
++};
++
++}  // namespace myarc
++
++#endif  // MYARC_WORKSPACE_SERVICE_H_

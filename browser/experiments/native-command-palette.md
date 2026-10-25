@@ -44,7 +44,7 @@ An initial HoverButton label paint hit Chromium\'s opaque-layer subpixel asserti
 
 The candidate also registers macOS Cmd/Ctrl+S aliases for the existing collapse command. Full hide/show and truthful Save Page labels require the separate [0008 sidebar patch](../patches/0008-native-sidebar-toggle.patch). The [0006 tile patch](../patches/0006-native-pinned-tiles.patch) retains native pinning and includes corrected split-grid sizing and shared split fill.
 
-The combined native build succeeded before a final omnibox include-layer correction. Frame and tab-layout GN checks passed; the corrected omnibox source also passes its GN check. The six-file 0007 delta reproduces the external source exactly after 0002/0004/0005 and excludes independent layout rounding. A system app-data permission prompt interrupted clean native capture and the remaining interaction checks. No OS permission was approved by the agent. Rebuild the final source and verify the marked profile, PID and foreground window before resuming.
+The combined native build succeeded before a final omnibox include-layer correction. Frame and tab-layout GN checks passed; the corrected omnibox source passes its GN check and standalone object compilation. Full relink and runtime checks remain pending. The six-file 0007 delta reproduces the external source exactly after 0002/0004/0005 and excludes independent layout rounding. A system app-data permission prompt interrupted clean native capture and the remaining interaction checks. No OS permission was approved by the agent. Rebuild the final source and verify the marked profile, PID and foreground window before resuming.
 
 ## Remaining
 

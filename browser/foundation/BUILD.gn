@@ -27,8 +27,68 @@ source_set("native_button") {
   ]
 }
 
+source_set("workspace_service") {
+  sources = [
+    "workspace_service.cc",
+    "workspace_service.h",
+  ]
+  public_deps = [
+    ":bridge",
+    "//base",
+  ]
+  deps = [
+    "//chrome/browser/profiles:profile",
+    "//content/public/browser",
+    "//url",
+  ]
+}
+
+source_set("browser_workspace_adapter") {
+  sources = [
+    "browser_workspace_adapter.cc",
+    "browser_workspace_adapter.h",
+  ]
+  public_deps = [
+    ":workspace_service",
+    "//chrome/browser/ui/tabs:tab_strip_model_observer",
+    "//ui/gfx",
+    "//url",
+  ]
+  deps = [
+    "//chrome/browser/lifetime",
+    "//chrome/browser/profiles:profile",
+    "//chrome/browser/sessions",
+    "//chrome/browser/ui/browser_window",
+    "//chrome/browser/ui/navigator",
+    "//chrome/browser/ui/tabs:tab_strip",
+    "//components/sessions",
+    "//components/tabs:public",
+    "//content/public/browser",
+    "//ui/base",
+  ]
+}
+
+source_set("sidebar_view") {
+  sources = [
+    "sidebar_view.cc",
+    "sidebar_view.h",
+  ]
+  public_deps = [
+    "//base",
+    "//ui/base",
+    "//ui/views",
+  ]
+  deps = [
+    ":bridge",
+    "//components/vector_icons",
+    "//ui/color",
+    "//ui/gfx",
+    "//ui/gfx/geometry",
+  ]
+}
+
 executable("bridge_check") {
   testonly = true
   sources = [ "bridge_check.cc" ]
-  deps = [ ":bridge" ]
+  deps = [ ":workspace_service" ]
 }

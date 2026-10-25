@@ -18,6 +18,12 @@ expected = {
             'bridge_check.cc',
             'native_button.cc',
             'native_button.h',
+            'workspace_service.cc',
+            'workspace_service.h',
+            'browser_workspace_adapter.cc',
+            'browser_workspace_adapter.h',
+            'sidebar_view.cc',
+            'sidebar_view.h',
         )
     },
 }
