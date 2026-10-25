@@ -10,7 +10,20 @@
 //! trigger `live_tab_closed`; closing one of several projections must not remove
 //! a temporary item that still has a live page. This crate stores no live count.
 //! Temporary URLs/titles are browser-owned and absent from the typed snapshot;
-//! restoring their organization does not restore browser sessions.
+//! restoring their organization does not restore browser sessions. After native-session
+//! restoration and stable-ID binding finish, adapters must call `reconcile_live_items`
+//! with all bound live item IDs to prune unbound temporary rows. Saved rows survive.
+//!
+//! Zero windows is valid during a Profile's lifetime. After restore or window close,
+//! adapters must allocate/rebind a model window before requesting `sidebar_snapshot`;
+//! Window 1 is only a default-state convenience, not a restore invariant.
+//!
+//! At untrusted decode and mutation boundaries, adapters must validate/canonicalize
+//! HTTP(S) URLs using native browser URL machinery before passing strings here.
+//! The core gate bounds size, schemes, credentials and whitespace/controls; it is
+//! not a URL parser and cannot establish valid host syntax. `about:blank` is allowed.
+//! Space names retain existing Unicode compatibility. Whether UI/security validation
+//! should reject line separators or format marks remains an open question.
 
 use std::collections::BTreeSet;
 use std::fmt;
@@ -64,6 +77,9 @@ pub enum WorkspaceError {
     CanonicalUrlRequired,
     UnexpectedCanonicalUrl,
     NotSaved(ItemId),
+    ExplicitUnsaveRequired(ItemId),
+    DifferentSection(ItemId),
+    DuplicateLiveItem(ItemId),
     ItemNotVisible(ItemId),
     LimitExceeded(&'static str),
     IdExhausted(&'static str),
@@ -80,11 +96,14 @@ impl fmt::Display for WorkspaceError {
             Self::UnknownWindow(id) => write!(formatter, "Window {id} does not exist; create it first"),
             Self::InvalidName(error) => error.fmt(formatter),
             Self::InvalidUrl => formatter.write_str(
-                "Use a browser-canonicalized HTTP(S) URL without credentials or about:blank, at most 8192 bytes and without whitespace/control characters",
+                "Use either a browser-validated canonical HTTP(S) URL without credentials, or about:blank; at most 8192 bytes and without whitespace/control characters",
             ),
             Self::CanonicalUrlRequired => formatter.write_str("Supply a canonical URL when saving a temporary item"),
             Self::UnexpectedCanonicalUrl => formatter.write_str("Temporary items cannot store a canonical URL"),
             Self::NotSaved(id) => write!(formatter, "Item {id} is temporary; close its live tab instead"),
+            Self::ExplicitUnsaveRequired(id) => write!(formatter, "Item {id} is saved; use unsave_item with its live-page destination"),
+            Self::DifferentSection(id) => write!(formatter, "Item {id} belongs to a different placement or owner section"),
+            Self::DuplicateLiveItem(id) => write!(formatter, "Live item {id} is listed more than once"),
             Self::ItemNotVisible(id) => write!(formatter, "Item {id} does not belong to this window's selected Space or Profile"),
             Self::LimitExceeded(kind) => write!(formatter, "Workspace {kind} limit reached"),
             Self::IdExhausted(kind) => write!(formatter, "Workspace {kind} IDs exhausted"),
@@ -129,8 +148,9 @@ pub struct WindowState {
 
 /// Typed storage boundary, not a disk format or durable acknowledgement.
 ///
-/// Vectors define order. Placement changes preserve that order; equal URLs do not
-/// merge identities. Counters persist even after removal so IDs are not reused.
+/// Vectors define order. Placement changes preserve existing vector order unless
+/// `move_item_before` explicitly reorders a section; equal URLs do not merge
+/// identities. Counters persist even after removal so IDs are not reused.
 /// Adapters must bound decoding before allocating these owned vectors/strings.
 /// `from_snapshot` checks collection counts before allocating validation indexes,
 /// consumes the supplied buffers and performs no unbounded copies.
@@ -303,8 +323,10 @@ impl Workspace {
     }
 
     /// `Some(url)` deliberately replaces the saved URL. `None` preserves a saved
-    /// URL when saving/moving, but demotion to Temporary deliberately clears it.
-    /// A first save requires `Some(url)`. This method never observes navigation.
+    /// URL when saving/moving. A first save requires `Some(url)`.
+    /// Saved-to-Temporary demotion is rejected: use `unsave_item` to report whether
+    /// and where a live page exists. Temporary-to-Temporary moves remain allowed.
+    /// Placement changes keep vector order. This method never observes navigation.
     pub fn set_placement(
         &mut self,
         item_id: ItemId,
@@ -317,6 +339,9 @@ impl Workspace {
             Placement::Temporary { .. } => {
                 if canonical_url.is_some() {
                     return Err(WorkspaceError::UnexpectedCanonicalUrl);
+                }
+                if !matches!(item.placement, Placement::Temporary { .. }) {
+                    return Err(WorkspaceError::ExplicitUnsaveRequired(item_id));
                 }
                 None
             }
@@ -356,6 +381,110 @@ impl Workspace {
         Ok(())
     }
 
+    /// Adapter reports a live page's destination Space, or `None` for a dormant
+    /// saved item. Rust decides the transition: keep identity as Temporary and
+    /// clear its saved URL when live; remove identity when dormant. Vector order
+    /// is preserved, and selections hidden by the transition are cleared.
+    pub fn unsave_item(
+        &mut self,
+        item_id: ItemId,
+        live_destination: Option<SpaceId>,
+    ) -> Result<(), WorkspaceError> {
+        if matches!(self.item(item_id)?.placement, Placement::Temporary { .. }) {
+            return Err(WorkspaceError::NotSaved(item_id));
+        }
+        if let Some(space_id) = live_destination {
+            self.space(space_id)?;
+            for item in &mut self.state.items {
+                if item.id == item_id {
+                    item.placement = Placement::Temporary { space_id };
+                    item.canonical_url = None;
+                    break;
+                }
+            }
+            self.clear_hidden_selections();
+        } else {
+            self.remove_item(item_id);
+        }
+        Ok(())
+    }
+
+    /// Call only after native-session restoration and stable-ID binding complete.
+    /// Supply all bound live item IDs (saved IDs are allowed). Counts, existence
+    /// and uniqueness are checked before mutation. Prunes only unbound Temporary
+    /// items and their selections across all windows; dormant saved items remain.
+    pub fn reconcile_live_items(&mut self, live_item_ids: &[ItemId]) -> Result<(), WorkspaceError> {
+        if live_item_ids.len() > MAX_ITEMS {
+            return Err(WorkspaceError::LimitExceeded("live items"));
+        }
+        let mut live = BTreeSet::new();
+        for &id in live_item_ids {
+            self.item(id)?;
+            if !live.insert(id) {
+                return Err(WorkspaceError::DuplicateLiveItem(id));
+            }
+        }
+        self.state.items.retain(|item| {
+            !matches!(item.placement, Placement::Temporary { .. }) || live.contains(&item.id)
+        });
+        self.clear_hidden_selections();
+        Ok(())
+    }
+
+    /// Reorder within exactly the same placement and owner section. `None` appends
+    /// within that section; moving before oneself is a no-op. Other sections keep
+    /// their relative order. IDs, saved URLs and selections are unchanged.
+    pub fn move_item_before(
+        &mut self,
+        item_id: ItemId,
+        before: Option<ItemId>,
+    ) -> Result<(), WorkspaceError> {
+        let placement = self.item(item_id)?.placement;
+        if let Some(id) = before {
+            if self.item(id)?.placement != placement {
+                return Err(WorkspaceError::DifferentSection(id));
+            }
+        }
+        let source = self
+            .state
+            .items
+            .iter()
+            .position(|item| item.id == item_id)
+            .ok_or(WorkspaceError::UnknownItem(item_id))?;
+        let target = self
+            .state
+            .items
+            .iter()
+            .rposition(|item| match before {
+                Some(id) => item.id == id,
+                None => item.placement == placement,
+            })
+            .ok_or(WorkspaceError::UnknownItem(before.unwrap_or(item_id)))?;
+        if source == target {
+            return Ok(());
+        }
+        // Exclude the before-target when moving forwards, include the last
+        // section item when appending. Both ranges contain the source item.
+        let start = source.min(target);
+        let end = if source < target && before.is_some() {
+            target
+        } else {
+            source.max(target) + 1
+        };
+        let items = self
+            .state
+            .items
+            .get_mut(start..end)
+            .ok_or(WorkspaceError::UnknownItem(item_id))?;
+        if source < target {
+            items.rotate_left(1);
+        } else {
+            items.rotate_right(1);
+        }
+        Ok(())
+    }
+
+    /// Requires an allocated/rebound model window; restore may contain none.
     pub fn sidebar_snapshot(&self, window_id: WindowId) -> Result<SidebarSnapshot, WorkspaceError> {
         let window = self.window(window_id)?;
         let mut sidebar = SidebarSnapshot {
