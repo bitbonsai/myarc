@@ -166,6 +166,9 @@
     .end:hover .heart, .end:focus-within .heart { animation: heartbeat 1.5s ease-in-out infinite }
     @keyframes heartbeat { 0%, 30%, 100% { transform: scale(1) } 15% { transform: scale(1.18) } }
 
+    @view-transition { navigation: auto }
+    ::view-transition-old(root), ::view-transition-new(root) { animation-duration: .18s }
+
     /* Page load. Hero copy rises once, the ribbon follows and then drifts. */
     .rise { animation: rise .9s var(--ease) both }
     .rise:nth-child(2) { animation-delay: .08s }
@@ -177,6 +180,7 @@
     @keyframes drift { 0%, 100% { transform: translateY(0) rotate(0) } 50% { transform: translateY(-.875rem) rotate(1deg) } }
 
     @media (prefers-reduced-motion: reduce) {
+      @view-transition { navigation: none }
       html { scroll-behavior: auto }
       a, .button { transition: none }
       .rise, .hero-art, .hero-art img, .end:hover .heart, .end:focus-within .heart { animation: none }
