@@ -2,6 +2,12 @@
 
 Keep significant outcomes, failures and next actions reproducible. Newest entry first. No private exports, page titles/URLs from real browsing, credentials or raw user transcripts.
 
+## 2026-10-25: Blank-only page material build candidate
+
+- Starting revision: `7e827d5`. Traced ordinary-page translucency to unconditional transparent page-base and renderer-view backgrounds. [Separate 0017 and run record](../browser/experiments/native-page-background.md) restrict material to blank/NTP contents, reset ordinary pages through Chromium's default/theme hooks, and clear outgoing overrides before unobserved navigation. Primary-page notifications cover same-WebContents navigation and page reactivation; workspace-empty remains detached.
+- Added one regression to the existing native fixture for unstyled/authored/dark canvas, navigation/history, detachment, hidden navigation, switching and NTP return. Real-header syntax, two GN header checks, full `chrome` compile/link, formatting, docs/foundation freshness and strict 72-file reverse/replay pass. All 68 unrelated external files and every prior patch remain unchanged, including frozen 0012/0016 and canonical 0001.
+- Native cases executed: zero. No app launch, desktop input, profile access or system-service kill. Build terminated successfully; parent owns fresh native color/screenshot/transition and saved-journey acceptance. Renderer default remains off; recovery/durability and broader gates remain open.
+
 ## 2026-10-25: Native saved-identity acceptance
 
 - Integrated the one-task extension probe and ran it against a fresh marked profile using normal upstream local-extension loading. Real Pin created a persisted Favorite; generic Unpin retained actual pin and saved ID/canonical URL/owner/placement. Four local argument/fixture tests also pass. The native C++ suites remain unrun.

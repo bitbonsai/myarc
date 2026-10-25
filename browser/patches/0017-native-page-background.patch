@@ -1,0 +1,235 @@
+diff --git a/chrome/browser/ui/views/frame/BUILD.gn b/chrome/browser/ui/views/frame/BUILD.gn
+index 3c5a5b6..3454097 100644
+--- a/chrome/browser/ui/views/frame/BUILD.gn
++++ b/chrome/browser/ui/views/frame/BUILD.gn
+@@ -1398,6 +1398,7 @@ source_set("contents_web_view") {
+   deps = [
+     ":safe_invoke",
+     ":web_contents_close_handler",
++    "//chrome/browser/search",
+     "//chrome/browser/ui/color:color_headers",
+     "//chrome/browser/ui/views:status_bubble",
+     "//chrome/browser/ui/views/animations",
+diff --git a/chrome/browser/ui/views/frame/browser_view_browsertest.cc b/chrome/browser/ui/views/frame/browser_view_browsertest.cc
+index da503b8..928092e 100644
+--- a/chrome/browser/ui/views/frame/browser_view_browsertest.cc
++++ b/chrome/browser/ui/views/frame/browser_view_browsertest.cc
+@@ -125,6 +125,7 @@
+ #include "content/public/test/test_navigation_observer.h"
+ #include "media/base/media_switches.h"
+ #include "media/capture/capture_switches.h"
++#include "net/test/embedded_test_server/http_response.h"
+ #include "net/traffic_annotation/network_traffic_annotation_test_helper.h"
+ #include "testing/gmock/include/gmock/gmock.h"
+ #include "third_party/blink/public/mojom/frame/fullscreen.mojom.h"
+@@ -146,6 +147,7 @@
+ #include "ui/base/ui_base_features.h"
+ #include "ui/compositor/layer.h"
+ #include "ui/compositor/layer_animator.h"
++#include "ui/compositor/layer_solid_color.h"
+ #include "ui/events/base_event_utils.h"
+ #include "ui/events/event.h"
+ #include "ui/gfx/animation/animation.h"
+@@ -399,6 +401,91 @@ class BrowserViewPinnedFadeTest : public BrowserViewTest {
+   }
+ };
+ 
++IN_PROC_BROWSER_TEST_F(BrowserViewPinnedFadeTest,
++                       PageBackgroundNavigationAndAttachment) {
++  embedded_test_server()->RegisterRequestHandler(base::BindRepeating(
++      [](const net::test_server::HttpRequest& request)
++          -> std::unique_ptr<net::test_server::HttpResponse> {
++        if (request.relative_url != "/myarc-background.html" &&
++            request.relative_url != "/myarc-dark-canvas.html") {
++          return nullptr;
++        }
++        auto response = std::make_unique<net::test_server::BasicHttpResponse>();
++        response->set_content_type("text/html");
++        response->set_content(
++            request.relative_url == "/myarc-background.html"
++                ? "<style>:root { color-scheme: dark; background: rgb(23, 45, "
++                  "67); }</style><p>Authored canvas</p>"
++                : "<meta name=color-scheme content=dark><p>Dark canvas</p>");
++        return response;
++      }));
++  ASSERT_TRUE(embedded_test_server()->Start());
++  auto* contents = active_web_contents();
++  auto* view = browser_view()->multi_contents_view()->GetActiveContentsView();
++  const GURL blank(url::kAboutBlankURL);
++  const GURL ordinary = embedded_test_server()->GetURL("/title1.html");
++  const GURL authored =
++      embedded_test_server()->GetURL("/myarc-background.html");
++  const GURL dark = embedded_test_server()->GetURL("/myarc-dark-canvas.html");
++  const auto opaque = [&] {
++    const auto color = contents->GetBackgroundColor();
++    return color && SkColorGetA(*color) == SK_AlphaOPAQUE;
++  };
++
++  ASSERT_TRUE(ui_test_utils::NavigateToURL(browser(), blank));
++  ASSERT_TRUE(base::test::RunUntil(
++      [&] { return contents->GetBackgroundColor() == SK_ColorTRANSPARENT; }));
++  EXPECT_LT(view->layer()->AsSolidColor()->background_color().fA, 1.f);
++
++  // Same WebContents: clearing both overrides restores the unstyled canvas.
++  ASSERT_TRUE(ui_test_utils::NavigateToURL(browser(), ordinary));
++  EXPECT_EQ(contents, view->web_contents());
++  ASSERT_TRUE(base::test::RunUntil(opaque));
++  EXPECT_FLOAT_EQ(1.f, view->layer()->AsSolidColor()->background_color().fA);
++  ASSERT_TRUE(ui_test_utils::NavigateToURL(browser(), authored));
++  ASSERT_TRUE(base::test::RunUntil([&] {
++    return contents->GetBackgroundColor() == SkColorSetRGB(23, 45, 67);
++  }));
++  ASSERT_TRUE(ui_test_utils::NavigateToURL(browser(), dark));
++  ASSERT_TRUE(base::test::RunUntil(opaque));
++  EXPECT_NE(SK_ColorWHITE, *contents->GetBackgroundColor());
++
++  // Back/forward can reactivate an existing page, not just commit a new one.
++  ASSERT_TRUE(ui_test_utils::NavigateToURL(browser(), blank));
++  ASSERT_TRUE(base::test::RunUntil(
++      [&] { return contents->GetBackgroundColor() == SK_ColorTRANSPARENT; }));
++  ASSERT_TRUE(content::HistoryGoBack(contents));
++  ASSERT_TRUE(base::test::RunUntil(opaque));
++  ASSERT_TRUE(content::HistoryGoForward(contents));
++
++  // Workspace-empty detaches; a hidden page can then navigate unobserved.
++  ASSERT_TRUE(base::test::RunUntil(
++      [&] { return contents->GetBackgroundColor() == SK_ColorTRANSPARENT; }));
++  view->SetWebContents(nullptr);
++  EXPECT_LT(view->layer()->AsSolidColor()->background_color().fA, 1.f);
++  ASSERT_TRUE(content::NavigateToURL(contents, ordinary));
++  ASSERT_TRUE(base::test::RunUntil(opaque));
++  view->SetWebContents(contents);
++  EXPECT_FLOAT_EQ(1.f, view->layer()->AsSolidColor()->background_color().fA);
++
++  // Switching away from a blank tab must not retain its material on return.
++  AddTab(browser(), blank);
++  ASSERT_TRUE(content::WaitForLoadStop(active_web_contents()));
++  EXPECT_NE(contents, view->web_contents());
++  browser()->GetTabStripModel()->ActivateTabAt(0);
++  EXPECT_EQ(contents, view->web_contents());
++  ASSERT_TRUE(base::test::RunUntil(opaque));
++  EXPECT_FLOAT_EQ(1.f, view->layer()->AsSolidColor()->background_color().fA);
++
++  // NTP's virtual chrome://newtab URL can differ from its committed origin.
++  ASSERT_TRUE(ui_test_utils::NavigateToURL(browser(),
++                                           chrome::ChromeUINewTabURLAsGURL()));
++  EXPECT_LT(view->layer()->AsSolidColor()->background_color().fA, 1.f);
++  ASSERT_TRUE(ui_test_utils::NavigateToURL(browser(), ordinary));
++  ASSERT_TRUE(base::test::RunUntil(opaque));
++  EXPECT_FLOAT_EQ(1.f, view->layer()->AsSolidColor()->background_color().fA);
++}
++
+ IN_PROC_BROWSER_TEST_F(BrowserViewPinnedFadeTest, EligibilityMotionAndReset) {
+   ASSERT_TRUE(embedded_test_server()->Start());
+   auto rich_animation = gfx::AnimationTestApi::SetRichAnimationRenderMode(
+diff --git a/chrome/browser/ui/views/frame/contents_web_view.cc b/chrome/browser/ui/views/frame/contents_web_view.cc
+index 323c283..307767d 100644
+--- a/chrome/browser/ui/views/frame/contents_web_view.cc
++++ b/chrome/browser/ui/views/frame/contents_web_view.cc
+@@ -7,6 +7,7 @@
+ #include "base/command_line.h"
+ #include "base/debug/dump_without_crashing.h"
+ #include "build/build_config.h"
++#include "chrome/browser/search/search.h"
+ #include "chrome/browser/ui/color/chrome_color_id.h"
+ #include "chrome/browser/ui/views/animations/common_animation_values.h"
+ #include "chrome/browser/ui/views/frame/safe_invoke/safe_invoke.h"
+@@ -14,6 +15,7 @@
+ #include "chrome/browser/ui/views/status_bubble_views.h"
+ #include "components/tabs/public/tab_interface.h"
+ #include "components/web_modal/web_contents_modal_dialog_manager.h"
++#include "content/public/browser/render_frame_host.h"
+ #include "content/public/browser/render_widget_host_view.h"
+ #include "content/public/browser/web_contents.h"
+ #include "third_party/blink/public/common/input/web_input_event.h"
+@@ -73,6 +75,10 @@ ContentsWebView::ContentsWebView(content::BrowserContext* browser_context)
+ 
+ ContentsWebView::~ContentsWebView() {
+   ResetMyarcPageFade(holder()->layer());
++  if (base::CommandLine::ForCurrentProcess()->HasSwitch(
++          "myarc-visual-parity")) {
++    SetWebContents(nullptr);
++  }
+ }
+ 
+ StatusBubbleViews* ContentsWebView::GetStatusBubble() const {
+@@ -185,7 +191,15 @@ void ContentsWebView::OnLetterboxingChanged() {
+ void ContentsWebView::SetWebContents(content::WebContents* web_contents) {
+   // Reset before every switch or detach, including empty Spaces.
+   ResetMyarcPageFade(holder()->layer());
++  if (this->web_contents() && this->web_contents() != web_contents &&
++      base::CommandLine::ForCurrentProcess()->HasSwitch(
++          "myarc-visual-parity")) {
++    // Detached pages can navigate without this view observing them.
++    this->web_contents()->SetPageBaseBackgroundColor(std::nullopt);
++    SetBackgroundVisible(true);
++  }
+   views::WebView::SetWebContents(web_contents);
++  UpdateMyarcPageBackground();
+   if (web_contents == nullptr) {
+     status_bubble_.reset();
+     holder()->SetProperty(views::kIsBlockedByModalKey, false);
+@@ -195,12 +209,6 @@ void ContentsWebView::SetWebContents(content::WebContents* web_contents) {
+     return;
+   }
+ 
+-  if (base::CommandLine::ForCurrentProcess()->HasSwitch(
+-          "myarc-visual-parity")) {
+-    SetBackgroundVisible(false);
+-    web_contents->SetPageBaseBackgroundColor(SK_ColorTRANSPARENT);
+-  }
+-
+   UpdateIsBlockedByModal();
+ 
+   if (!status_bubble_) {
+@@ -241,6 +249,30 @@ void ContentsWebView::DidGetUserInteraction(const blink::WebInputEvent& event) {
+ }
+ #endif
+ 
++void ContentsWebView::PrimaryPageChanged(content::Page& page) {
++  WebView::PrimaryPageChanged(page);
++  UpdateMyarcPageBackground();
++}
++
++void ContentsWebView::UpdateMyarcPageBackground() {
++  if (!base::CommandLine::ForCurrentProcess()->HasSwitch(
++          "myarc-visual-parity")) {
++    return;
++  }
++  auto* contents = web_contents();
++  const GURL url = contents
++                       ? contents->GetPrimaryMainFrame()->GetLastCommittedURL()
++                       : GURL();
++  const bool blank =
++      url.is_empty() || url.IsAboutBlank() || search::IsNTPURL(url);
++  if (contents) {
++    // nullopt restores Blink's default canvas, including page color-scheme.
++    contents->SetPageBaseBackgroundColor(
++        blank ? std::make_optional(SK_ColorTRANSPARENT) : std::nullopt);
++  }
++  SetBackgroundVisible(!blank);
++}
++
+ void ContentsWebView::UpdateBackgroundColor() {
+   const SkColor color = GetColorProvider()->GetColor(
+       is_letterboxing() ? kColorWebContentsBackgroundLetterboxing
+diff --git a/chrome/browser/ui/views/frame/contents_web_view.h b/chrome/browser/ui/views/frame/contents_web_view.h
+index af18353..51c4386 100644
+--- a/chrome/browser/ui/views/frame/contents_web_view.h
++++ b/chrome/browser/ui/views/frame/contents_web_view.h
+@@ -59,6 +59,7 @@ class ContentsWebView : public views::WebView,
+   void SetWebContents(content::WebContents* web_contents) override;
+ 
+   // content::WebContentsObserver overrides:
++  void PrimaryPageChanged(content::Page& page) override;
+   // Overridden to track physical interactions (mouse/touch) on the WebContents.
+   // This allows the browser to force focus synchronization in split view even
+   // when native OS focus gets stuck on a different window (like a permission
+@@ -76,6 +77,7 @@ class ContentsWebView : public views::WebView,
+ 
+  private:
+   void UpdateBackgroundColor();
++  void UpdateMyarcPageBackground();
+   std::unique_ptr<StatusBubbleViews> status_bubble_;
+   std::unique_ptr<WebContentsCloseHandler> web_contents_close_handler_;
+ 
