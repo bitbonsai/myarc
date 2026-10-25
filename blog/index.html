@@ -27,7 +27,7 @@
   <meta name="twitter:description" content="Follow myArc development: Chromium and Rust experiments, design decisions, obstacles, and verified progress toward an open-source Arc-inspired browser.">
   <meta name="twitter:image" content="https://myarc.dev/og-image.webp">
   <meta name="twitter:image:alt" content="myArc, forever yours. Colorful ribbon logo on navy.">
-  <script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "Blog", "name": "Development blog", "description": "Follow myArc development: Chromium and Rust experiments, design decisions, obstacles, and verified progress toward an open-source Arc-inspired browser.", "url": "https://myarc.dev/blog/", "inLanguage": "en", "publisher": {"@type": "Person", "name": "bitbonsai", "url": "https://github.com/bitbonsai"}, "blogPost": [{"@type": "BlogPosting", "headline": "Building myArc in public", "url": "https://myarc.dev/blog/2026-10-25-building-in-public/", "datePublished": "2026-10-25", "description": "Why I'm building myArc after Arc's sunset announcement, with account-free browsing, no behavioral tracking and an Artcraft-inspired workflow.", "author": {"@type": "Person", "name": "bitbonsai", "url": "https://github.com/bitbonsai"}}]}, {"@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "myArc", "item": "https://myarc.dev/"}, {"@type": "ListItem", "position": 2, "name": "Blog", "item": "https://myarc.dev/blog/"}]}]}</script>
+  <script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "Blog", "name": "Development blog", "description": "Follow myArc development: Chromium and Rust experiments, design decisions, obstacles, and verified progress toward an open-source Arc-inspired browser.", "url": "https://myarc.dev/blog/", "inLanguage": "en", "publisher": {"@type": "Person", "name": "Mauricio Wolff", "url": "https://github.com/bitbonsai"}, "blogPost": [{"@type": "BlogPosting", "headline": "Building myArc in public", "url": "https://myarc.dev/blog/2026-10-25-building-in-public/", "datePublished": "2026-10-25", "description": "Why I'm building myArc after Arc's sunset announcement, with account-free browsing, no behavioral tracking and an Artcraft-inspired workflow.", "author": {"@type": "Person", "name": "Mauricio Wolff", "url": "https://github.com/bitbonsai"}}]}, {"@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "myArc", "item": "https://myarc.dev/"}, {"@type": "ListItem", "position": 2, "name": "Blog", "item": "https://myarc.dev/blog/"}]}]}</script>
   <style>
     @font-face {
       font-family: Outfit;
@@ -257,7 +257,10 @@
     .post-thumb img { width: 100%; aspect-ratio: 8 / 5; object-fit: contain; border-radius: .75rem; background: var(--panel) }
     .post-date { display: block; color: var(--quiet); font-size: 1rem }
     .post-header .post-date { margin-top: 1rem }
-    .post-author { margin-top: .5rem; color: var(--quiet); font-size: 1rem }
+    .post-author { display: flex; flex-wrap: wrap; align-items: center; gap: .75rem; margin-top: .5rem; color: var(--quiet); font-size: 1rem }
+    .post-author a { display: inline-flex; align-items: center; gap: .5rem }
+    .post-author img { width: 1.75rem; height: 1.75rem; border-radius: 50%; object-fit: cover; flex: none }
+    .post-read-time { white-space: nowrap }
     .post-back { display: inline-block; margin-bottom: 2rem }
     .post-body > * + * { margin-top: 1.5rem }
     .post-body h2 { clear: both; font-size: 2rem; margin-top: 3rem }

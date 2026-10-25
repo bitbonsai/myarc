@@ -6,7 +6,7 @@ HTML: https://myarc.dev/blog/2026-10-25-building-in-public/
 
 October 25, 2026
 
-By [bitbonsai](https://github.com/bitbonsai)
+[Mauricio Wolff](https://github.com/bitbonsai)3 min read
 
 [![Mauricio Wolff's Arc card, dated 25 March 2023, with three anniversary stamps](https://myarc.dev/blog/2026-10-25-building-in-public/mauricio-wolff-arc.c739650f7b1d.webp)](https://myarc.dev/blog/2026-10-25-building-in-public/mauricio-wolff-arc.c739650f7b1d.webp)
 
