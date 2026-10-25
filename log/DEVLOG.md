@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-10-25: Native private workspace lifecycle
+
+- Fresh marked normal Profile saved a Favorite and named Space. Native Cmd+Shift+N opened a distinct private context with its own workspace. The normal Favorite/Space were absent. A real private Space and acknowledged fixture note stayed separate from the normal note; regular workspace bytes remained unchanged.
+- Exact native close of the last private window followed by fresh private reopen discarded the prior note and Space. Normal state remained intact. Inspected the visible memory-only notice and native Incognito accessibility title. [Evidence](../browser/evidence/workspace-native-private.json). No CDP context/target creation or security bypass; raw artifacts stay private.
+- A refreshed blank-row AX action returned failure; the actual tree was inspected before retry. Native apps/helpers and owned server were closed. Two regular Profiles, Guest/system, cookies/credentials and broader extension/privacy guarantees remain open. No implementation changed; renderer stays off.
+
 ## 2026-10-25: Two-window saved identity and actual Restore
 
 - Integrated `2b98a0a`; twenty local API-double tests passed, retaining all thirteen prior checks. Fresh native setup used two Spaces and native Cmd+N. One logical Favorite had one active/pinned page per window, plus one hidden Temporary. Native saved-menu close of one copy settled before assertion; the surviving copy remained pinned and retained saved identity. Native tile reopen restored both projections. Only the developer checkpoint was archived/recreated; backend metadata stayed untouched.

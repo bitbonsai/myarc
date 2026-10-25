@@ -1,0 +1,38 @@
+{
+  "slice": "MA-007.c-native-private",
+  "date": "2026-10-25",
+  "status": "bounded native private workspace and localStorage journey passed",
+  "setup": {
+    "fresh_marked_disposable_profile": true,
+    "native_cmd_shift_n": true,
+    "one_normal_and_one_native_private_window": true,
+    "no_cdp_context_or_target_creation": true
+  },
+  "observed": {
+    "normal_favorite_and_named_space_absent_from_private_workspace": true,
+    "private_named_space_created_through_native_ui": true,
+    "normal_workspace_file_unchanged_through_private_mutations": true,
+    "normal_note_absent_from_private_storage": true,
+    "private_note_write_acknowledged": true,
+    "normal_note_remained_unchanged": true,
+    "last_private_window_closed_through_exact_native_close_button": true,
+    "reopened_private_workspace_lacks_prior_private_space": true,
+    "reopened_private_storage_lacks_prior_private_note": true,
+    "normal_note_and_workspace_retained": true,
+    "distinct_native_browser_contexts_observed": true,
+    "incognito_accessibility_window_title_present": true,
+    "visible_private_memory_only_notice_inspected": true
+  },
+  "driver_notes": [
+    "One blank-tab AX close returned failure during a refresh; actual tree was inspected before retry. No duplicate navigation or blind click retry.",
+    "Numeric workspace IDs are scoped to the exact native Profile, not globally unique across Profiles."
+  ],
+  "limits": [
+    "One native private-window lifecycle, not full private browsing or Profile release acceptance",
+    "Cookies, credentials, every extension/activeTab path, Guest/system and two regular Profiles remain unrun",
+    "No crash/write-boundary or OS/power-loss durability claim",
+    "Raw synthetic profiles, screenshots and context/PID logs stay private outside Git"
+  ],
+  "all_owned_apps_helpers_and_fixture_servers_closed": true,
+  "workspace_renderer_default_enabled": false
+}
