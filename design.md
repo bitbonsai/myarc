@@ -39,7 +39,7 @@ Dark theme:
 - Progress panel: ink, with ivory text
 - Text links and focus rings: `#8FB1FF`, lightened for contrast on navy
 
-Primary buttons keep the same blue fill and white text in both themes. Text links start at 90% opacity and become opaque on hover or keyboard focus. Header navigation uses the theme's main text color without underlines, becoming the theme's link color on hover/focus.
+Primary buttons keep the same blue fill and white text in both themes. Development CTAs place an 1.125rem Lucide GitHub icon before their label, with a .625rem gap; hide this decorative SVG from assistive technology. Text links start at 90% opacity and become opaque on hover or keyboard focus. Header navigation uses the theme's main text color without underlines, becoming the theme's link color on hover/focus.
 
 Semantic CSS variables are `--page`, `--text`, `--quiet`, `--panel`, `--link-rgb` and `--link-solid`. Keep the named brand colors available separately.
 

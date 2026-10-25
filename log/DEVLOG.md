@@ -2,7 +2,7 @@
 
 Keep significant outcomes, failures and next actions reproducible. Newest entry first. No private exports, page titles/URLs from real browsing, credentials or raw user transcripts.
 
-## 2026-10-24: Fable redesign, HTTPS recovery and system themes
+## 2026-10-25: Fable redesign, HTTPS recovery and system themes
 
 - Fable/high (`claude-fable-5-1`, frontend-design Skill) replaced the left-label column layout with headings above content, larger body text and a compact progress panel with dedicated artwork space. Header/footer lockups have 1rem ribbon marks. Parent aligned section/subheading sizes, retained ink navigation without underlines, and verified all six public documentation links plus an actual Roadmap click.
 - Domain provisioning stalled despite valid DNS. With explicit permission, removed/re-saved the Pages custom domain. GitHub automatically created Delete/Create CNAME maintenance commits; the branch-change guard caught this side effect, and read-back confirmed unchanged landing HTML. Certificate became approved for apex and www. Normal TLS, exact deployed bytes, enforced HTTPS and the www redirect then passed.
