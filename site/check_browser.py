@@ -163,7 +163,7 @@ try:
                   if (document.documentElement.scrollWidth > innerWidth) throw new Error('Blog overflow')
                   const nav = document.querySelector('.blog-link')
                   if (!nav.getClientRects().length) throw new Error('Blog navigation hidden')
-                  for (const el of document.querySelectorAll('main h1,main h2,main h3,main p,main li,main time,main code')) {
+                  for (const el of document.querySelectorAll('main h1,main h2,main h3,main p,main li,main time,main code,main figcaption')) {
                     const style = getComputedStyle(el)
                     if (parseFloat(style.fontSize) < 16 || !style.fontFamily.includes('Outfit')) throw new Error('Blog typography regression')
                     const rect = el.getBoundingClientRect()
@@ -219,12 +219,49 @@ try:
                 if width == 1440:
                     name = 'index' if page.parent.name == 'blog' else 'post'
                     browser('screenshot', '/tmp/myarc-blog-' + name + '-' + theme + '.png')
+        has_caption = browser(expression="Boolean(document.querySelector('.post-body figcaption'))")
+        if has_caption:
+            browser('set', 'viewport', '1440', '1000')
+            for theme in ('light', 'dark'):
+                browser('set', 'media', theme)
+                browser('focus', '.top .mark')
+                browser('scrollintoview', '.post-body figcaption')
+                browser('mouse', 'move', '0', '0')
+                print('Caption rest:', browser(expression="""(async () => {
+                  const caption = document.querySelector('.post-body figcaption')
+                  await Promise.all(caption.getAnimations().map(animation => animation.finished))
+                  const style = getComputedStyle(caption)
+                  if (style.fontSize !== '16px' || style.fontStyle !== 'normal' || style.textAlign !== 'center') throw new Error('Caption typography')
+                  if (style.color !== getComputedStyle(document.querySelector('.post-date')).color) throw new Error('Caption muted color')
+                  return {color: style.color, fontSize: style.fontSize}
+                })()"""))
+                browser('screenshot', '/tmp/myarc-caption-rest-' + theme + '.png')
+                browser('hover', '.post-body figure:has(figcaption)')
+                print('Caption hover:', browser(expression="""(async () => {
+                  const caption = document.querySelector('.post-body figcaption')
+                  const image = caption.parentElement.querySelector('img')
+                  await Promise.all([...caption.getAnimations(), ...image.getAnimations()].map(animation => animation.finished))
+                  if (getComputedStyle(caption).color !== getComputedStyle(document.body).color || getComputedStyle(image).opacity !== '1') throw new Error('Figure hover treatment')
+                  return 'PASS'
+                })()"""))
+                browser('screenshot', '/tmp/myarc-caption-hover-' + theme + '.png')
+                browser('mouse', 'move', '0', '0')
+                browser('focus', '.post-body figure:has(figcaption) a')
+                browser(expression="""(async () => {
+                  const caption = document.querySelector('.post-body figcaption')
+                  await Promise.all(caption.getAnimations().map(animation => animation.finished))
+                  if (!caption.parentElement.matches(':focus-within') || getComputedStyle(caption).color !== getComputedStyle(document.body).color) throw new Error('Figure focus treatment')
+                  return true
+                })()""")
         browser('set', 'media', 'light', 'reduced-motion')
         browser('focus', '.skip')
         browser('press', 'Tab')
         browser(expression="""(() => {
           if (!document.activeElement.matches(':focus-visible')) throw new Error('Blog keyboard focus missing')
           if (document.getAnimations().some(a => a.playState === 'running')) throw new Error('Blog reduced motion failed')
+          for (const element of document.querySelectorAll('.post-body figure img,.post-body figcaption')) {
+            if (getComputedStyle(element).transitionDuration !== '0s') throw new Error('Figure reduced motion failed')
+          }
           return true
         })()""")
 finally:

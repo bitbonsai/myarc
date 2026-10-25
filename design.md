@@ -83,6 +83,8 @@ Keep the Blog navigation link visible on mobile. The header development button u
 
 Body links retain underlines. Their underline offset moves from .125rem to .3125rem over .2s ease-in-out. Keyboard focus has a visible .1875rem outline with an offset.
 
+Post figures use a subtle .9-to-1 image opacity change on hover or focus within. Explicit captions are centered, normal-style Outfit at 1rem, with .5rem spacing and line-height 1.4. Caption text changes from the theme quiet color to main text on hover/focus over .15s. This adapts the reference treatment while preserving readable resting contrast. Reduced motion removes figure transitions; alt text never becomes an automatic visible caption.
+
 Intro motion is finite and ends within five seconds. Footer hover/focus produces one heart pulse per 1.5 seconds, 40 BPM. `prefers-reduced-motion` disables animation, transitions and smooth scrolling in both themes.
 
 Verify light and dark rendering, image decoding, text contrast, keyboard focus and mobile overflow. Theme-specific wordmarks must change with the system preference while ribbon artwork stays unchanged.

@@ -12,6 +12,7 @@ import re
 import shutil
 
 from markdown_it import MarkdownIt
+from bs4 import BeautifulSoup
 from PIL import Image
 import yaml
 
@@ -48,6 +49,14 @@ BLOG_CSS = '''
     .post-body ol { padding-left: 1.5rem }
     .post-body li + li { margin-top: .5rem }
     .post-body img { border-radius: 1rem; margin: 2rem 0; max-width: 100% }
+    .post-body figure { margin: 2rem 0 }
+    .post-body figure img { margin: 0; opacity: .9; transition: opacity .15s ease }
+    .post-body figcaption { margin-top: .5rem; color: var(--quiet); font-size: 1rem; line-height: 1.4; font-style: normal; text-align: center; transition: color .15s ease }
+    .post-body figure:hover img, .post-body figure:focus-within img { opacity: 1 }
+    .post-body figure:hover figcaption, .post-body figure:focus-within figcaption { color: var(--text) }
+    @media (prefers-reduced-motion: reduce) {
+      .post-body figure img, .post-body figcaption { transition: none }
+    }
     .post-body blockquote { margin: 2rem 0; padding-left: 1.5rem; color: var(--quiet) }
     .post-body pre { font-family: inherit; padding: 1.25rem; overflow-x: auto; background: var(--panel); color: var(--ivory); border-radius: 1rem }
     .post-body code { font-family: inherit; font-size: 1rem; overflow-wrap: anywhere }
@@ -213,7 +222,19 @@ def load_post(path):
         for child in token.children or []:
             if child.type == 'link_open' and child.attrGet('href') in replacements:
                 child.attrSet('href', replacements[child.attrGet('href')])
-    return Post(slug, published, meta['title'].strip(), meta['summary'].strip(), MD.renderer.render(tokens, MD.options, {}), images, cover_alt, source_bytes)
+    rendered = BeautifulSoup(MD.renderer.render(tokens, MD.options, {}), 'html.parser')
+    for paragraph in list(rendered.find_all('p')):
+        if len(paragraph.find_all('img')) != 1 or paragraph.get_text(strip=True):
+            continue
+        caption = paragraph.find_next_sibling()
+        paragraph.name = 'figure'
+        if caption is not None and caption.name == 'p':
+            content = [child for child in caption.contents if str(child).strip()]
+            if len(content) == 1 and getattr(content[0], 'name', None) == 'em':
+                caption.name = 'figcaption'
+                content[0].unwrap()
+                paragraph.append(caption.extract())
+    return Post(slug, published, meta['title'].strip(), meta['summary'].strip(), str(rendered), images, cover_alt, source_bytes)
 
 
 def page_shell(template, title, summary, url, content, published=None, cover=None, posts=None):

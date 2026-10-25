@@ -2,6 +2,12 @@
 
 Keep significant outcomes, failures and next actions reproducible. Newest entry first. No private exports, page titles/URLs from real browsing, credentials or raw user transcripts.
 
+## 2026-10-25: Shorter journal prose and figure treatment
+
+- Applied unslop to the project entry: shorter sentences, fewer repeated goals and review explanations, with model identifiers and verified development facts preserved. The previously removed first-image caption stays absent.
+- Inspected the public reference blog. Kept the existing underline hover treatment and added semantic figures with explicit captions. Images brighten subtly on hover/focus; captions use normal 1rem quiet text and brighten to main text, preserving resting contrast rather than copying the reference opacity.
+- Thirteen unit checks passed, including explicit caption association and ordinary-emphasis preservation. Retained browser checks passed across themes and widths; fresh figure rest/hover captures, focus and reduced-motion checks passed. Sitemap/schema/local-resource checks pass. Safari/Firefox remain unmeasured.
+
 ## 2026-10-25: Project-first journal, native capture and optimized delivery
 
 - Rewrote the first entry around browser development, bounded delegation and the public bitbonsai context/wrap skills. Verified native-thread model selections before naming GPT-6.1/high thinking and Sonnet 5.5/high effort. Removed website-adjustment and hosting anecdotes. The Arc-like empty shell and nightly artifact are goals, not reported deliveries.

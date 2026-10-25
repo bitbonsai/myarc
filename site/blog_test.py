@@ -130,6 +130,20 @@ class BlogTests(unittest.TestCase):
         self.assertEqual(1, index.count('>September 2026</p>'))
         self.assertEqual(['2026-10-25-test-post', '2026-10-24-earlier', '2026-09-30-older'], [post.slug for post in posts])
 
+    def test_caption_is_explicit_and_belongs_to_its_figure(self):
+        from bs4 import BeautifulSoup
+        Image.new('RGB', (20, 10), 'blue').save(self.folder / 'screen.png')
+        self.post('![Alt stays accessible](screen.png)\n\n## A section\n\n*Ordinary emphasis.*\n\n[![Reference](screen.png)](screen.png)\n\n*Reference caption with a [source](https://example.test/).*')
+        soup = BeautifulSoup(load_post(self.source).html, 'html.parser')
+        figures = soup.find_all('figure')
+        self.assertEqual(2, len(figures))
+        self.assertIsNone(figures[0].find('figcaption'))
+        self.assertEqual('Alt stays accessible', figures[0].img['alt'])
+        self.assertEqual('Ordinary emphasis.', soup.select_one('p > em').text)
+        self.assertEqual('Reference caption with a source.', figures[1].figcaption.text)
+        self.assertIsNone(figures[1].figcaption.find('em'))
+        self.assertEqual('https://example.test/', figures[1].figcaption.a['href'])
+
     def test_raw_html_and_unsafe_links_are_not_executed(self):
         self.post('<script>alert(1)</script>\n\n[Bad](javascript:alert(1))')
         html = load_post(self.source).html
