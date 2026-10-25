@@ -2,6 +2,11 @@
 
 Keep significant outcomes, failures and next actions reproducible. Newest entry first. No private exports, page titles/URLs from real browsing, credentials or raw user transcripts.
 
+## 2026-10-25: Explicit lightbox opening order
+
+- The backdrop-only change was deployed and normal live HTML/JS read-back matched, but the user still observed a blink. Replaced the content starting-style rule with an explicit hidden base state. Normal opening now paints the modal backdrop before revealing content on a later animation frame; reduced motion remains immediate.
+- Closing cancels a queued reveal and clears visible state. Browser checks sampled 20 entry frames: content began at opacity zero, its opacity rose monotonically, and the backdrop stayed fully blurred. Early-close cancellation, keyboard controls, phone layout and native navigation checks passed; fresh sequence inspected. Fourteen unit checks passed. Safari/Firefox remain unchecked.
+
 ## 2026-10-25: Immediate lightbox blur
 
 - Removed the backdrop's transparent starting state and opacity transition, which exposed the clear page before the blur appeared. Kept the content-only 300ms fade/scale entrance and the blur-only background.

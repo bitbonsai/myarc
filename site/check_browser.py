@@ -287,9 +287,20 @@ try:
             browser('set', 'media', 'light')
             browser(expression="document.querySelector('.post-body figure a').scrollIntoView({behavior: 'instant', block: 'center'})")
             browser('focus', '.post-body figure a')
+            browser(expression="""addEventListener('click', () => {
+              window.lightboxFrames = []
+              const sample = () => {
+                const dialog = document.querySelector('#image-lightbox')
+                window.lightboxFrames.push({opacity: Number(getComputedStyle(dialog.querySelector('.lightbox-content')).opacity), blur: getComputedStyle(dialog, '::backdrop').backdropFilter})
+                if (dialog.open && window.lightboxFrames.length < 30) requestAnimationFrame(sample)
+              }
+              requestAnimationFrame(sample)
+            }, {capture: true, once: true})""")
             browser('press', 'Enter')
             print('Lightbox entry:', browser(expression="""(async () => {
               const dialog = document.querySelector('#image-lightbox')
+              await new Promise(requestAnimationFrame)
+              await new Promise(requestAnimationFrame)
               const backdrop = getComputedStyle(dialog, '::backdrop')
               if (backdrop.opacity !== '1' || backdrop.transitionDuration !== '0s' || backdrop.backdropFilter !== 'blur(32px)') throw new Error('Backdrop not fully blurred at entry')
               const animations = dialog.getAnimations({subtree: true})
@@ -297,9 +308,20 @@ try:
               if (!scale || scale.effect.getTiming().duration !== 300 || !scale.effect.getKeyframes().some(frame => frame.transform.includes('0.96'))) throw new Error('Dialog scale entrance missing')
               if (!animations.some(animation => animation.transitionProperty === 'opacity')) throw new Error('Dialog fade entrance missing')
               await Promise.all(animations.map(animation => animation.finished))
-              return 'PASS: 300ms scale/fade entrance'
+              const frames = window.lightboxFrames
+              if (frames.length < 3 || frames[0].opacity !== 0 || frames.some((frame, index) => frame.blur !== 'blur(32px)' || (index && frame.opacity + .002 < frames[index - 1].opacity))) throw new Error('Dialog flashed before reveal')
+              return {entrance: '300ms scale/fade', firstOpacity: frames[0].opacity, sampledFrames: frames.length}
             })()"""))
             browser('press', 'Escape')
+            browser(expression="""(async () => {
+              const dialog = document.querySelector('#image-lightbox')
+              document.querySelector('.post-body figure a').click()
+              dialog.close()
+              await new Promise(requestAnimationFrame)
+              await new Promise(requestAnimationFrame)
+              if (dialog.open || dialog.classList.contains('is-visible')) throw new Error('Closed dialog revealed by a stale frame')
+              return true
+            })()""")
             for width, theme in ((1440, 'light'), (390, 'dark')):
                 browser('close')
                 SESSION = 'myarc-lightbox-' + str(width)
