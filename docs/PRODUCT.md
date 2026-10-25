@@ -18,6 +18,7 @@ These commitments guide product and design tradeoffs. They do not describe shipp
 - Native desktop browser. Build on Chromium's complete browser layer with a Rust-owned workspace core. Use Chromium WebUI where it fits; do not use Electron as the production shell or describe the full browser as pure Rust.
 - Familiar from day one. Preserve Arc's useful layouts, shortcuts, Spaces, and workspace habits. Use onboarding to explain differences rather than ask people to relearn browsing.
 - Your workspace, your machine. Keep workspace state local, exportable, and usable without an account. Do not upload pages or workspace data to AI services in the background. Normal website traffic still uses the network.
+- No behavioral tracking. Do not send browser-usage analytics or create per-install tracking identifiers. Aggregate release-host download totals may measure interest without instrumenting browsing. Keep operational website/download-host logs separately disclosed. Audit Chromium defaults and network behavior before claiming release compliance.
 - Default-on blocking. Block ads and trackers from the first page load, with Profile-scoped per-site exceptions and a clear way to restore protection. Verify engine/filter compatibility and update behavior on the selected Chromium version; the implementation is not chosen yet.
 - Agent-ready. Expose CLI and MCP as supported product interfaces over the same command path as the UI. Scope each grant and give the user a visible way to stop control.
 
@@ -67,4 +68,4 @@ Validate willingness to pay with a small opted-in cohort after the browser is us
 
 Start with five consenting Arc users using representative synthetic or privately held exports. Watch them import, recognize their workspace, open a pinned tab, switch a Space, and use the command bar. Note failures and assistance needed. Follow with a two-week daily-use cohort if the security gates pass. Recruitment and outreach require a separate authorized action; this plan sends no invitations.
 
-Track task completion, import omissions, time to usable workspace, onboarding skips/replays, recovery failures, and return usage. Use local diagnostics or explicit study consent; no background tracking requirement. A small cohort guides design, not a statistically reliable growth forecast.
+Use aggregate release-download totals to follow adoption. For consented studies, observe task completion, import omissions, time to usable workspace, onboarding skips/replays, recovery failures and return usage. Keep diagnostics local or collect them through explicit study consent; do not add background behavioral tracking. A small cohort guides design, not a statistically reliable growth forecast.

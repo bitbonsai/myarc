@@ -2,6 +2,13 @@
 
 Keep significant outcomes, failures and next actions reproducible. Newest entry first. No private exports, page titles/URLs from real browsing, credentials or raw user transcripts.
 
+## 2026-10-25: Project purpose, privacy commitment and visible blur/fade
+
+- Reworked the first post around Arc's announced sunset and the reason to continue its workspace ideas. Added explicit account-free and no-behavioral-tracking commitments, with a release privacy audit still required. Aggregate release-download counts are separate from hosting request logs. Updated the product contract without claiming native privacy compliance or creating tracking infrastructure.
+- Reused the approved build screenshot in the closing build/reference section. Both article images have short explicit captions; first-image social metadata still uses the actual myArc build. Publication rejects missing/empty image captions, verified by fault injection. Captions retain the observed reference treatment with readable 1rem resting text.
+- Inspected karinwolff.com’s public timing/blur behavior. Replaced the hard-to-see .18s fade with original CSS for a 1s blur/fade and a separately captured header. Actual snapshot animations are checked for 1000ms duration and 32px blur; reduced motion creates none. No runtime JavaScript was added.
+- Thirteen unit checks and the retained layout/theme/focus/navigation suite passed. Fresh transition recording inspected. Caption captures now position instantly to avoid sampling an unfinished smooth scroll. Safari/Firefox and native-browser privacy compliance remain unverified.
+
 ## 2026-10-25: Native website View Transitions
 
 - Added shared CSS opt-in for same-origin cross-document transitions, with a .18s root fade. Reduced motion opts out; unsupported browsers retain normal navigation. No runtime JavaScript or router was added.

@@ -167,7 +167,12 @@
     @keyframes heartbeat { 0%, 30%, 100% { transform: scale(1) } 15% { transform: scale(1.18) } }
 
     @view-transition { navigation: auto }
-    ::view-transition-old(root), ::view-transition-new(root) { animation-duration: .18s }
+    .top { view-transition-name: site-header }
+    ::view-transition-group(root) { animation-duration: 1s }
+    ::view-transition-old(root) { animation: page-blur-out 1s ease-in-out both }
+    ::view-transition-new(root) { animation: page-blur-in 1s ease-in-out both }
+    @keyframes page-blur-out { from { opacity: 1; filter: blur(0) } to { opacity: 0; filter: blur(2rem) } }
+    @keyframes page-blur-in { from { opacity: 0; filter: blur(2rem) } to { opacity: 1; filter: blur(0) } }
 
     /* Page load. Hero copy rises once, the ribbon follows and then drifts. */
     .rise { animation: rise .9s var(--ease) both }

@@ -54,6 +54,9 @@ def check():
             assert int(soup.select_one('meta[property="og:image:height"]')['content']) == image.height
             assert soup.select_one('meta[property="og:image:type"]')['content'] == Image.MIME[image.format]
         for image in soup.select('.post-body img'):
+            figure = image.find_parent('figure')
+            caption = figure.find('figcaption', recursive=False) if figure else None
+            assert caption and caption.get_text(strip=True), f'Article image needs an explicit caption: {path} ({image.get("alt")})'
             assert image['src'].endswith('.webp') and image.get('alt')
             assert image.get('width') and image.get('height') and image.get('decoding') == 'async'
         for element in soup.select('[src], source[srcset]'):

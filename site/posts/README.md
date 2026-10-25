@@ -23,6 +23,8 @@ Write the post in Markdown.
 
 ![Describe what the screenshot demonstrates][screen]
 
+*A short caption describing this view.*
+
 [screen]: screenshot.png
 ```
 
@@ -38,7 +40,7 @@ Public screenshots must use synthetic tabs, invented data and disposable profile
 
 PNG, JPEG and static WebP files may sit alongside a post or in its subfolders. Give every screenshot descriptive alt text. The first Markdown image supplies the article Open Graph/Twitter image and alt text, with its actual dimensions and MIME type. A small generated WebP thumbnail appears beside the title on the blog index. Posts without images keep the default brand social card and a text-only listing. Only images referenced by published posts enter the public output, as WebP derivatives with responsive variants where useful. Originals remain in source; draft and unreferenced files stay out of the artifact. Links to referenced images are rewritten to the published derivatives, and Markdown equivalents are generated from the same rendered HTML.
 
-An italic paragraph immediately after a standalone image becomes its caption. The build emits semantic `figure`/`figcaption` markup. Captions use readable muted text and brighten on figure hover or keyboard focus. Images without explicit captions keep their alt text without displaying it as a caption.
+Every article image needs a short, explicit caption. Write an italic paragraph immediately after each standalone image. The build emits semantic `figure`/`figcaption` markup; publication checks reject missing or empty captions. Captions are centered, normal-style 1rem text, muted at rest and brighter on figure hover or keyboard focus. Alt text stays descriptive and is never copied into a visible caption automatically.
 
 Raw HTML is displayed as text, not executed. External screenshot URLs, paths outside the post folder and symlinked post sources are rejected. Limits: 128 KiB Markdown per post, 4 KiB metadata, 20 screenshots per post, 10 MiB/24 megapixels per screenshot and 256 MiB screenshots across the site.
 

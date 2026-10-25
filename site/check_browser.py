@@ -228,7 +228,7 @@ try:
             for theme in ('light', 'dark'):
                 browser('set', 'media', theme)
                 browser('focus', '.top .mark')
-                browser('scrollintoview', '.post-body figcaption')
+                browser(expression="document.querySelector('.post-body figcaption').scrollIntoView({behavior: 'instant', block: 'center'})")
                 browser('mouse', 'move', '0', '0')
                 print('Caption rest:', browser(expression="""(async () => {
                   const caption = document.querySelector('.post-body figcaption')
@@ -292,7 +292,13 @@ try:
                     browser(expression="""(async () => {
                       await new Promise(requestAnimationFrame)
                       await new Promise(requestAnimationFrame)
-                      await Promise.all(document.getAnimations().filter(animation => Number.isFinite(animation.effect.getTiming().iterations)).map(animation => animation.finished))
+                      const animations = document.getAnimations()
+                      const blur = animations.filter(animation => /^page-blur-/.test(animation.animationName || ''))
+                      if (!matchMedia('(prefers-reduced-motion: reduce)').matches) {
+                        if (blur.length !== 2 || blur.some(animation => animation.effect.getTiming().duration !== 1000)) throw new Error('Blur/fade duration or snapshot animations missing')
+                        if (!blur.every(animation => animation.effect.getKeyframes().some(frame => frame.filter === 'blur(32px)'))) throw new Error('Navigation blur missing')
+                      } else if (blur.length) throw new Error('Reduced-motion blur still active')
+                      await Promise.all(animations.filter(animation => Number.isFinite(animation.effect.getTiming().iterations)).map(animation => animation.finished))
                       return true
                     })()""")
                     result = browser(expression="JSON.parse(sessionStorage.getItem('navigation-transition'))")
