@@ -22,7 +22,15 @@
     })
   })
 
-  dialog.querySelector('button').addEventListener('click', () => dialog.close())
+  const close = dialog.querySelector('button')
+  close.addEventListener('click', () => dialog.close())
+  // The close button is the modal's only focusable control.
+  dialog.addEventListener('keydown', event => {
+    if (event.key === 'Tab') {
+      event.preventDefault()
+      close.focus()
+    }
+  })
   dialog.addEventListener('click', event => {
     if (event.target !== dialog) return
     const box = dialog.getBoundingClientRect()
