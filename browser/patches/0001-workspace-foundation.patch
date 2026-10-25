@@ -988,10 +988,10 @@ index 0000000..f560ec8bb5404348b833bcb3378e319887be716a
 +}
 diff --git a/myarc/browser_workspace_adapter.cc b/myarc/browser_workspace_adapter.cc
 new file mode 100644
-index 0000000..f99a1609b364866ade27932fd7e770b67b6d332b
+index 0000000..4df3c8cfeff595cb5f6600f806d5ceb152709776
 --- /dev/null
 +++ b/myarc/browser_workspace_adapter.cc
-@@ -0,0 +1,1332 @@
+@@ -0,0 +1,1333 @@
 +#include "myarc/browser_workspace_adapter.h"
 +
 +#include <algorithm>
@@ -2251,7 +2251,8 @@ index 0000000..f99a1609b364866ade27932fd7e770b67b6d332b
 +    const TabStripModelChange& change,
 +    const TabStripSelectionChange& selection) {
 +  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
-+  if (const auto* replace = change.GetReplace()) {
++  if (change.type() == TabStripModelChange::kReplaced) {
++    const auto* replace = change.GetReplace();
 +    if (auto* binding = Binding::Get(*replace->old_contents)) {
 +      Remember(Binding::Set(*replace->new_contents, binding->item(),
 +                            binding->space(), binding->legacy()));
@@ -2262,10 +2263,10 @@ index 0000000..f99a1609b364866ade27932fd7e770b67b6d332b
 +  // Navigate binds only navigated_or_inserted_contents after it returns.
 +  // Never assign its pending identity by scanning unrelated unbound tabs.
 +  bindings_dirty_ = true;
-+  if (change.GetInsert() && !changing_)
++  if (change.type() == TabStripModelChange::kInserted && !changing_)
 +    bound_ = false;
 +  if (!changing_ && selection.active_tab_changed() && selection.new_contents &&
-+      (change.GetInsert() ||
++      (change.type() == TabStripModelChange::kInserted ||
 +       change.type() == TabStripModelChange::kSelectionOnly)) {
 +    if (ready()) {
 +      if (auto* binding = Binding::Get(*selection.new_contents);
@@ -2582,10 +2583,10 @@ index 0000000..82fdbf3bd5bb0f34e94dd9b9ebced7442e5aed45
 +#endif  // MYARC_NATIVE_BUTTON_H_
 diff --git a/myarc/sidebar_view.cc b/myarc/sidebar_view.cc
 new file mode 100644
-index 0000000..95eb009aa5faf79d929b2174ed86f44046441653
+index 0000000..fd3aad4f789025345f8b6ab585132329a82c489d
 --- /dev/null
 +++ b/myarc/sidebar_view.cc
-@@ -0,0 +1,452 @@
+@@ -0,0 +1,454 @@
 +#include "myarc/sidebar_view.h"
 +
 +#include <algorithm>
@@ -2630,6 +2631,7 @@ index 0000000..95eb009aa5faf79d929b2174ed86f44046441653
 +  auto button =
 +      std::make_unique<views::MdTextButton>(std::move(callback), text);
 +  button->SetStyle(ui::ButtonStyle::kText);
++  button->SetTextSubpixelRenderingEnabled(false);
 +  // Preserve the parent's material; this API is the available transparent fill.
 +  button->SetBgColorOverrideDeprecated(SK_ColorTRANSPARENT);
 +  button->SetEnabledTextColors(ui::kColorSysOnSurface);
@@ -2644,6 +2646,7 @@ index 0000000..95eb009aa5faf79d929b2174ed86f44046441653
 +
 +void AddStatus(views::View& parent, const std::u16string& text) {
 +  auto* label = parent.AddChildView(std::make_unique<views::Label>(text));
++  label->SetSubpixelRenderingEnabled(false);
 +  label->SetMultiLine(true);
 +  label->SetHorizontalAlignment(gfx::ALIGN_LEFT);
 +  label->SetEnabledColor(ui::kColorSysOnSurface);
@@ -2655,6 +2658,7 @@ index 0000000..95eb009aa5faf79d929b2174ed86f44046441653
 +  SetPreferredSize(gfx::Size(230, 400));
 +  SetLayoutManager(std::make_unique<views::BoxLayout>(Orientation::kVertical,
 +                                                      gfx::Insets(8), 8));
++  GetViewAccessibility().SetRole(ax::mojom::Role::kGroup);
 +  GetViewAccessibility().SetName(u"Workspace sidebar");
 +  SetUnavailable(u"Loading workspace\u2026");
 +}
@@ -2904,7 +2908,6 @@ index 0000000..95eb009aa5faf79d929b2174ed86f44046441653
 +                                            base::Unretained(&delegate_.get()),
 +                                            model.current_space.id),
 +                        name);
-+  heading->SetLabelStyle(views::style::STYLE_EMPHASIZED);
 +  heading->SetTooltipText(u"Rename Space: " + name);
 +  heading->GetViewAccessibility().SetName(u"Rename Space: " + name);
 +  TrackFocus(heading.get(), FocusAction::kRename, model.current_space.id);

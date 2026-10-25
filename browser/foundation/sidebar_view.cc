@@ -42,6 +42,7 @@ std::unique_ptr<views::MdTextButton> Button(
   auto button =
       std::make_unique<views::MdTextButton>(std::move(callback), text);
   button->SetStyle(ui::ButtonStyle::kText);
+  button->SetTextSubpixelRenderingEnabled(false);
   // Preserve the parent's material; this API is the available transparent fill.
   button->SetBgColorOverrideDeprecated(SK_ColorTRANSPARENT);
   button->SetEnabledTextColors(ui::kColorSysOnSurface);
@@ -56,6 +57,7 @@ std::unique_ptr<views::MdTextButton> Button(
 
 void AddStatus(views::View& parent, const std::u16string& text) {
   auto* label = parent.AddChildView(std::make_unique<views::Label>(text));
+  label->SetSubpixelRenderingEnabled(false);
   label->SetMultiLine(true);
   label->SetHorizontalAlignment(gfx::ALIGN_LEFT);
   label->SetEnabledColor(ui::kColorSysOnSurface);
@@ -67,6 +69,7 @@ SidebarView::SidebarView(Delegate& delegate) : delegate_(delegate) {
   SetPreferredSize(gfx::Size(230, 400));
   SetLayoutManager(std::make_unique<views::BoxLayout>(Orientation::kVertical,
                                                       gfx::Insets(8), 8));
+  GetViewAccessibility().SetRole(ax::mojom::Role::kGroup);
   GetViewAccessibility().SetName(u"Workspace sidebar");
   SetUnavailable(u"Loading workspace\u2026");
 }
@@ -316,7 +319,6 @@ void SidebarView::SetModel(const foundation::SidebarResult& model,
                                             base::Unretained(&delegate_.get()),
                                             model.current_space.id),
                         name);
-  heading->SetLabelStyle(views::style::STYLE_EMPHASIZED);
   heading->SetTooltipText(u"Rename Space: " + name);
   heading->GetViewAccessibility().SetName(u"Rename Space: " + name);
   TrackFocus(heading.get(), FocusAction::kRename, model.current_space.id);

@@ -1,0 +1,46 @@
+{
+  "slice": "MA-007.c-native-spaces-smoke",
+  "date": "2026-10-25",
+  "status": "basic manual native journey verified; empty-header blocker remains",
+  "build": {
+    "target": "chrome",
+    "command_safety_patch": "0012",
+    "command_safety_sha256": "028b623228355bdcf6d02bc97fa397972c3080361950fccc51229c5ed834409a",
+    "full_build_exit": 0,
+    "startup_fix_incremental_build_exit": 0,
+    "gn_target_families_passed": 6
+  },
+  "manual_native_observations": {
+    "spaces_created_through_native_ui": 3,
+    "distinct_live_synthetic_pages": 2,
+    "populated_space_switch_changes_visible_page": true,
+    "empty_space_hides_both_pages": true,
+    "empty_to_other_native_page_restores_display": true,
+    "blank_reload_preserves_hidden_page_urls_and_time_origins": true,
+    "actual_workspace_metadata_matches_selection": true,
+    "fresh_owned_window_captures_visually_checked": true
+  },
+  "startup_fixes": [
+    "Set valid sidebar accessibility role before naming it",
+    "Check TabStripModelChange type before variant extraction",
+    "Use supported default heading button typography",
+    "Use grayscale text rendering on transparent sidebar controls and status labels"
+  ],
+  "test_setup": {
+    "marked_disposable_profile": true,
+    "vertical_tabs_enabled_before_startup": true,
+    "workspace_renderer_flag": "temporary acceptance profile only",
+    "workspace_renderer_default_enabled": false,
+    "existing_user_qa_profile_modified": false,
+    "raw_profiles_logs_and_captures": "private, outside Git"
+  },
+  "automated_native_browser_cases_executed": 0,
+  "remaining": [
+    "Empty Space header still shows previous page URL and enabled-looking page controls",
+    "Unmapped action-state restoration and generic Unpin preservation need native acceptance",
+    "Cross-Space native shortcuts and Tab Search policy unresolved",
+    "Extension activeTab, cross-window destinations and partial batches unaccepted",
+    "Lifecycle, storage scheduling, crash recovery and durability gates remain open",
+    "Snapshot allocation cost remains unmeasured"
+  ]
+}

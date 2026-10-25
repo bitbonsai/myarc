@@ -1,0 +1,4282 @@
+diff --git a/chrome/browser/ui/BUILD.gn b/chrome/browser/ui/BUILD.gn
+index d9b02bccf39b76d72a740bb7d0f2bd856c04a116..66181f32ed7fcc14b6d88e97cf5f29e604cf02f8 100644
+--- a/chrome/browser/ui/BUILD.gn
++++ b/chrome/browser/ui/BUILD.gn
+@@ -722,6 +722,7 @@ if (!is_android) {
+       "//chrome/browser/translate",
+       "//chrome/browser/ui/actions",
+       "//chrome/browser/ui/actions:actions_headers",
++      "//chrome/browser/ui/actions:command_id_to_action_id",
+       "//chrome/browser/ui/browser_window",
+       "//chrome/browser/ui/customize_chrome",
+       "//chrome/browser/ui/dialogs",
+@@ -917,6 +918,7 @@ if (!is_android) {
+       "//chrome/browser/ui/qrcode_generator",
+       "//chrome/browser/ui/safety_hub",
+       "//chrome/browser/ui/search",
++      "//chrome/browser/ui/search_engines",
+       "//chrome/browser/ui/send_tab_to_self",
+       "//chrome/browser/ui/sharing_hub",
+       "//chrome/browser/ui/side_panel",
+@@ -1837,6 +1839,7 @@ if (!is_android) {
+       "//chrome/browser/resource_coordinator:utils",
+       "//chrome/browser/search:test_support",
+       "//chrome/browser/tab_group_sync:factories",
++      "//chrome/browser/tab_list",
+       "//chrome/browser/ui/actions:actions_util",
+       "//chrome/browser/ui/browser_active_state_manager",
+       "//chrome/browser/ui/browser_ui_controller",
+@@ -1845,11 +1848,13 @@ if (!is_android) {
+       "//chrome/browser/ui/dialogs:browser_dialogs",
+       "//chrome/browser/ui/exclusive_access",
+       "//chrome/browser/ui/fullscreen",
++      "//chrome/browser/ui/omnibox",
+       "//chrome/browser/ui/performance_controls/test_support",
+       "//chrome/browser/ui/search",
+       "//chrome/browser/ui/startup",
+       "//chrome/browser/ui/tabs:tab_strip",
+       "//chrome/browser/ui/tabs/saved_tab_groups:test_support",
++      "//chrome/browser/ui/tabs/tab_strip_api/tab_strip_model_impl",
+       "//chrome/browser/ui/views/frame:browser_view_header",
+       "//chrome/browser/ui/webui/management",
+       "//chrome/browser/ui/window_feature_controller",
+@@ -1864,6 +1869,7 @@ if (!is_android) {
+       "//components/bookmarks/test",
+       "//components/breadcrumbs/core",
+       "//components/breadcrumbs/core:status",
++      "//components/browser_apis/tab_strip/types",
+       "//components/commerce/core:pref_names",
+       "//components/embedder_support",
+       "//components/javascript_dialogs",
+@@ -1875,6 +1881,7 @@ if (!is_android) {
+       "//content/public/browser",
+       "//content/public/common",
+       "//content/test:test_support",
++      "//myarc:browser_workspace_adapter",
+       "//net:test_support",
+       "//testing/gmock",
+       "//testing/gtest",
+@@ -1882,6 +1889,14 @@ if (!is_android) {
+       "//third_party/fuzztest",
+       "//ui/native_window_tracker",
+     ]
++    if (enable_extensions && (is_win || is_mac)) {
++      deps += [
++        "//chrome/browser/ui/search_engines",
++        "//extensions:test_support",
++        "//extensions/browser",
++        "//extensions/common",
++      ]
++    }
+     if (use_aura) {
+       deps += [ ":overscroll_pref_manager" ]
+     }
+diff --git a/chrome/browser/ui/browser_actions.cc b/chrome/browser/ui/browser_actions.cc
+index 4f7697c88ce114cb5bfc7dfa09ade695505291b7..f65ad2122671d6a09fc7574bfa509e9682b72f8d 100644
+--- a/chrome/browser/ui/browser_actions.cc
++++ b/chrome/browser/ui/browser_actions.cc
+@@ -358,8 +358,22 @@ actions::ActionItem::ActionItemBuilder SidePanelAction(
+                         actions::ActionPinnableState::kPinnable)
+                   : std::underlying_type_t<actions::ActionPinnableState>(
+                         actions::ActionPinnableState::kNotPinnable);
+-  return actions::ActionItem::Builder(
+-             CreateToggleSidePanelActionCallback(SidePanelEntryKey(id), bwi))
++  auto callback =
++      CreateToggleSidePanelActionCallback(SidePanelEntryKey(id), bwi);
++  if (action_id == kActionSidePanelShowComments) {
++    callback = base::BindRepeating(
++        [](BrowserWindowInterface* browser,
++           actions::ActionItem::InvokeActionCallback invoke,
++           actions::ActionItem* item,
++           actions::ActionInvocationContext context) {
++          if (chrome::IsMyarcWorkspaceCommandAllowed(
++                  browser, IDC_SHOW_COMMENTS_SIDE_PANEL)) {
++            invoke.Run(item, std::move(context));
++          }
++        },
++        bwi, std::move(callback));
++  }
++  return actions::ActionItem::Builder(std::move(callback))
+       .SetActionId(action_id)
+       .SetText(l10n_util::GetStringUTF16(title_id))
+       .SetTooltipText(l10n_util::GetStringUTF16(tooltip_id))
+@@ -570,6 +584,10 @@ void BrowserActions::InitializeSidePanelActions() {
+           base::BindRepeating(
+               [](BrowserWindowInterface* bwi, actions::ActionItem* item,
+                  actions::ActionInvocationContext context) {
++                if (!chrome::IsMyarcWorkspaceCommandAllowed(
++                        bwi, IDC_SHOW_READING_MODE_KEYBOARD)) {
++                  return;
++                }
+                 read_anything::ReadAnythingEntryPointController::ToggleUI(
+                     bwi, read_anything::mojom::ReadAnythingOpenTrigger::
+                              kKeyboardShortcut);
+@@ -590,6 +608,10 @@ void BrowserActions::InitializeSidePanelActions() {
+           base::BindRepeating(
+               [](BrowserWindowInterface* bwi, actions::ActionItem* item,
+                  actions::ActionInvocationContext context) {
++                if (!chrome::IsMyarcWorkspaceCommandAllowed(
++                        bwi, IDC_SHOW_READING_MODE)) {
++                  return;
++                }
+                 const SidePanelOpenTrigger side_panel_trigger =
+                     static_cast<SidePanelOpenTrigger>(
+                         context.GetProperty(kSidePanelOpenTriggerKey));
+@@ -809,6 +831,10 @@ void BrowserActions::InitializePageActionIconActions() {
+           base::BindRepeating(
+               [](BrowserWindowInterface* bwi, actions::ActionItem* item,
+                  actions::ActionInvocationContext context) {
++                if (!chrome::IsMyarcWorkspaceCommandAllowed(
++                        bwi, IDC_OFFERS_AND_REWARDS_FOR_PAGE)) {
++                  return;
++                }
+                 chrome::ShowOffersAndRewardsForPage(bwi);
+               },
+               bwi))
+@@ -921,6 +947,10 @@ void BrowserActions::InitializePageActionIconActions() {
+           base::BindRepeating(
+               [](BrowserWindowInterface* bwi, actions::ActionItem* item,
+                  actions::ActionInvocationContext context) {
++                if (!chrome::IsMyarcWorkspaceCommandAllowed(bwi,
++                                                            IDC_ZOOM_MENU)) {
++                  return;
++                }
+                 bwi->GetActiveTabInterface()
+                     ->GetTabFeatures()
+                     ->zoom_view_controller()
+@@ -942,6 +972,9 @@ void BrowserActions::InitializePageActionIconActions() {
+           base::BindRepeating(
+               [](BrowserWindowInterface* bwi, actions::ActionItem* item,
+                  actions::ActionInvocationContext context) {
++                if (!chrome::IsMyarcWorkspaceCommandAllowed(bwi, IDC_FIND)) {
++                  return;
++                }
+                 chrome::Find(bwi);
+               },
+               bwi))
+@@ -960,6 +993,10 @@ void BrowserActions::InitializePageActionIconActions() {
+           base::BindRepeating(
+               [](BrowserWindowInterface* bwi, actions::ActionItem* item,
+                  actions::ActionInvocationContext context) {
++                if (!chrome::IsMyarcWorkspaceCommandAllowed(
++                        bwi, IDC_VIRTUAL_CARD_ENROLL)) {
++                  return;
++                }
+                 tabs::TabInterface* tab_interface =
+                     bwi->GetActiveTabInterface();
+                 CHECK(tab_interface);
+@@ -993,6 +1030,10 @@ void BrowserActions::InitializePageActionIconActions() {
+           base::BindRepeating(
+               [](BrowserWindowInterface* bwi, actions::ActionItem* item,
+                  actions::ActionInvocationContext context) {
++                if (!chrome::IsMyarcWorkspaceCommandAllowed(
++                        bwi, IDC_FILLED_CARD_INFORMATION)) {
++                  return;
++                }
+                 tabs::TabInterface* tab_interface =
+                     bwi->GetActiveTabInterface();
+                 CHECK(tab_interface);
+@@ -1087,6 +1128,10 @@ void BrowserActions::InitializePageActionIconActions() {
+           base::BindRepeating(
+               [](BrowserWindowInterface* bwi, actions::ActionItem* item,
+                  actions::ActionInvocationContext context) {
++                if (!chrome::IsMyarcWorkspaceCommandAllowed(
++                        bwi, IDC_AUTOFILL_MANDATORY_REAUTH)) {
++                  return;
++                }
+                 auto* tab_interface = bwi->GetActiveTabInterface();
+                 CHECK(tab_interface);
+ 
+@@ -1363,6 +1408,9 @@ void BrowserActions::InitializeChromeMenuActions() {
+           base::BindRepeating(
+               [](BrowserWindowInterface* bwi, actions::ActionItem* item,
+                  actions::ActionInvocationContext context) {
++                if (!chrome::IsMyarcWorkspaceCommandAllowed(bwi, IDC_PRINT)) {
++                  return;
++                }
+                 chrome::Print(bwi);
+               },
+               bwi),
+@@ -1485,6 +1533,10 @@ void BrowserActions::InitializeChromeMenuActions() {
+           base::BindRepeating(
+               [](BrowserWindowInterface* bwi, actions::ActionItem* item,
+                  actions::ActionInvocationContext context) {
++                if (!chrome::IsMyarcWorkspaceCommandAllowed(bwi,
++                                                            IDC_DEV_TOOLS)) {
++                  return;
++                }
+                 const auto trigger = static_cast<SidePanelOpenTrigger>(
+                     context.GetProperty(kSidePanelOpenTriggerKey));
+                 const auto source =
+@@ -1516,6 +1568,10 @@ void BrowserActions::InitializeChromeMenuActions() {
+                 [](BrowserWindowInterface* bwi, TabStripModel* tab_strip_model,
+                    actions::ActionItem* item,
+                    actions::ActionInvocationContext context) {
++                  if (!chrome::IsMyarcWorkspaceCommandAllowed(
++                          bwi, IDC_SEND_TAB_TO_SELF)) {
++                    return;
++                  }
+                   if (context.GetProperty(chrome::kActionInvocationSourceKey) ==
+                       chrome::ActionInvocationSource::kAppMenu) {
+                     chrome::SendTabToSelf(bwi);
+@@ -1539,6 +1595,10 @@ void BrowserActions::InitializeChromeMenuActions() {
+           base::BindRepeating(
+               [](BrowserWindowInterface* bwi, actions::ActionItem* item,
+                  actions::ActionInvocationContext context) {
++                if (!chrome::IsMyarcWorkspaceCommandAllowed(
++                        bwi, IDC_SHOW_TRANSLATE)) {
++                  return;
++                }
+                 chrome::ShowTranslateBubble(bwi);
+               },
+               bwi),
+@@ -1569,6 +1629,10 @@ void BrowserActions::InitializeChromeMenuActions() {
+           base::BindRepeating(
+               [](BrowserWindowInterface* bwi, actions::ActionItem* item,
+                  actions::ActionInvocationContext context) {
++                if (!chrome::IsMyarcWorkspaceCommandAllowed(
++                        bwi, IDC_BOOKMARK_THIS_TAB)) {
++                  return;
++                }
+                 std::underlying_type_t<page_actions::PageActionTrigger>
+                     page_action_trigger = context.GetProperty(
+                         page_actions::kPageActionTriggerKey);
+@@ -1597,6 +1661,10 @@ void BrowserActions::InitializeChromeMenuActions() {
+           base::BindRepeating(
+               [](BrowserWindowInterface* bwi, actions::ActionItem* item,
+                  actions::ActionInvocationContext context) {
++                if (!chrome::IsMyarcWorkspaceCommandAllowed(
++                        bwi, IDC_QRCODE_GENERATOR)) {
++                  return;
++                }
+                 chrome::GenerateQRCode(bwi);
+               },
+               bwi),
+@@ -1770,6 +1838,10 @@ void BrowserActions::InitializeChromeMenuActions() {
+           base::BindRepeating(
+               [](BrowserWindowInterface* bwi, actions::ActionItem* item,
+                  actions::ActionInvocationContext context) {
++                if (!chrome::IsMyarcWorkspaceCommandAllowed(
++                        bwi, IDC_DEV_TOOLS_INSPECT)) {
++                  return;
++                }
+                 chrome::ToggleDevToolsWindow(
+                     bwi, DevToolsToggleAction::Inspect(),
+                     DevToolsOpenedByAction::kInspectorModeShortcut);
+@@ -1930,6 +2002,10 @@ void BrowserActions::InitializeChromeMenuActions() {
+             base::BindRepeating(
+                 [](BrowserWindowInterface* bwi, actions::ActionItem* item,
+                    actions::ActionInvocationContext context) {
++                  if (!chrome::IsMyarcWorkspaceCommandAllowed(
++                          bwi, IDC_SHOW_TTC_MENU)) {
++                    return;
++                  }
+                   chrome::ShowTtcMenuItem(bwi);
+                 },
+                 bwi),
+@@ -2008,6 +2084,10 @@ void BrowserActions::InitializeToolbarAndMiscActions() {
+               [](BrowserWindowInterface* bwi, TabStripModel* tab_strip_model,
+                  actions::ActionItem* item,
+                  actions::ActionInvocationContext context) {
++                if (!chrome::IsMyarcWorkspaceCommandAllowed(bwi,
++                                                            IDC_COPY_URL)) {
++                  return;
++                }
+                 chrome::CopyURL(bwi, tab_strip_model->GetActiveWebContents());
+               },
+               bwi, tab_strip_model),
+@@ -2026,6 +2106,10 @@ void BrowserActions::InitializeToolbarAndMiscActions() {
+           base::BindRepeating(
+               [](BrowserWindowInterface* bwi, actions::ActionItem* item,
+                  actions::ActionInvocationContext context) {
++                if (!chrome::IsMyarcWorkspaceCommandAllowed(bwi,
++                                                            IDC_ROUTE_MEDIA)) {
++                  return;
++                }
+                 // TODO(crbug.com/356468503): Figure out how to capture
+                 // action invocation location.
+                 auto* cast_browser_controller =
+@@ -2291,6 +2375,10 @@ void BrowserActions::InitializeToolbarAndMiscActions() {
+           base::BindRepeating(
+               [](BrowserWindowInterface* bwi, actions::ActionItem* item,
+                  actions::ActionInvocationContext context) {
++                if (!chrome::IsMyarcWorkspaceCommandAllowed(bwi,
++                                                            IDC_INSTALL_PWA)) {
++                  return;
++                }
+                 base::RecordAction(
+                     base::UserMetricsAction("InstallWebAppFromMenu"));
+                 web_app::CreateWebAppFromCurrentWebContents(
+@@ -2654,6 +2742,10 @@ void BrowserActions::InitializeToolbarAndMiscActions() {
+           base::BindRepeating(
+               [](BrowserWindowInterface* bwi, actions::ActionItem* item,
+                  actions::ActionInvocationContext context) {
++                if (!chrome::IsMyarcWorkspaceCommandAllowed(
++                        bwi, IDC_NEW_SPLIT_TAB)) {
++                  return;
++                }
+                 if (!bwi->GetTabStripModel()->GetActiveTab()->IsSplit()) {
+                   chrome::NewSplitTab(
+                       bwi, split_tabs::SplitTabLayout::kSideBySide,
+@@ -2669,6 +2761,10 @@ void BrowserActions::InitializeToolbarAndMiscActions() {
+           base::BindRepeating(
+               [](BrowserWindowInterface* bwi, actions::ActionItem* item,
+                  actions::ActionInvocationContext context) {
++                if (!chrome::IsMyarcWorkspaceCommandAllowed(
++                        bwi, IDC_MANAGE_PASSWORDS_FOR_PAGE)) {
++                  return;
++                }
+                 chrome::ManagePasswordsForPage(bwi);
+               },
+               bwi))
+@@ -2680,6 +2776,10 @@ void BrowserActions::InitializeToolbarAndMiscActions() {
+           base::BindRepeating(
+               [](BrowserWindowInterface* bwi, actions::ActionItem* item,
+                  actions::ActionInvocationContext context) {
++                if (!chrome::IsMyarcWorkspaceCommandAllowed(
++                        bwi, IDC_SAVE_CREDIT_CARD_FOR_PAGE)) {
++                  return;
++                }
+                 chrome::SaveCreditCard(bwi);
+               },
+               bwi))
+@@ -2691,6 +2791,10 @@ void BrowserActions::InitializeToolbarAndMiscActions() {
+           base::BindRepeating(
+               [](BrowserWindowInterface* bwi, actions::ActionItem* item,
+                  actions::ActionInvocationContext context) {
++                if (!chrome::IsMyarcWorkspaceCommandAllowed(
++                        bwi, IDC_SAVE_IBAN_FOR_PAGE)) {
++                  return;
++                }
+                 chrome::SaveIban(bwi);
+               },
+               bwi))
+@@ -3031,6 +3135,10 @@ void BrowserActions::InitializeToolbarAndMiscActions() {
+           base::BindRepeating(
+               [](BrowserWindowInterface* bwi, actions::ActionItem* item,
+                  actions::ActionInvocationContext context) {
++                if (!chrome::IsMyarcWorkspaceCommandAllowed(
++                        bwi, IDC_OPEN_IN_PWA_WINDOW)) {
++                  return;
++                }
+                 base::RecordAction(
+                     base::UserMetricsAction("OpenActiveTabInPwaWindow"));
+                 web_app::ReparentWebAppForActiveTab(bwi);
+@@ -3057,6 +3165,10 @@ void BrowserActions::InitializeToolbarAndMiscActions() {
+           base::BindRepeating(
+               [](BrowserWindowInterface* bwi, actions::ActionItem* item,
+                  actions::ActionInvocationContext context) {
++                if (!chrome::IsMyarcWorkspaceCommandAllowed(
++                        bwi, IDC_WINDOW_MUTE_SITE)) {
++                  return;
++                }
+                 chrome::MuteSite(bwi);
+               },
+               bwi))
+@@ -3068,6 +3180,10 @@ void BrowserActions::InitializeToolbarAndMiscActions() {
+           base::BindRepeating(
+               [](BrowserWindowInterface* bwi, actions::ActionItem* item,
+                  actions::ActionInvocationContext context) {
++                if (!chrome::IsMyarcWorkspaceCommandAllowed(bwi,
++                                                            IDC_CLOSE_TAB)) {
++                  return;
++                }
+                 base::RecordAction(base::UserMetricsAction("CloseTabByKey"));
+                 chrome::CloseTab(bwi);
+               },
+@@ -3261,6 +3377,10 @@ void BrowserActions::InitializeToolbarAndMiscActions() {
+           base::BindRepeating(
+               [](BrowserWindowInterface* bwi, actions::ActionItem* item,
+                  actions::ActionInvocationContext context) {
++                if (!chrome::IsMyarcWorkspaceCommandAllowed(
++                        bwi, IDC_DUPLICATE_TAB)) {
++                  return;
++                }
+                 chrome::DuplicateTab(bwi);
+               },
+               bwi))
+@@ -3283,6 +3403,10 @@ void BrowserActions::InitializeToolbarAndMiscActions() {
+           base::BindRepeating(
+               [](BrowserWindowInterface* bwi, actions::ActionItem* item,
+                  actions::ActionInvocationContext context) {
++                if (!chrome::IsMyarcWorkspaceCommandAllowed(bwi,
++                                                            IDC_SHOW_AS_TAB)) {
++                  return;
++                }
+                 chrome::ConvertPopupToTabbedBrowser(bwi);
+               },
+               bwi))
+@@ -3294,6 +3418,10 @@ void BrowserActions::InitializeToolbarAndMiscActions() {
+           base::BindRepeating(
+               [](BrowserWindowInterface* bwi, actions::ActionItem* item,
+                  actions::ActionInvocationContext context) {
++                if (!chrome::IsMyarcWorkspaceCommandAllowed(
++                        bwi, IDC_MOVE_TAB_NEXT)) {
++                  return;
++                }
+                 chrome::MoveTabNext(bwi);
+               },
+               bwi))
+@@ -3305,6 +3433,10 @@ void BrowserActions::InitializeToolbarAndMiscActions() {
+           base::BindRepeating(
+               [](BrowserWindowInterface* bwi, actions::ActionItem* item,
+                  actions::ActionInvocationContext context) {
++                if (!chrome::IsMyarcWorkspaceCommandAllowed(
++                        bwi, IDC_MOVE_TAB_PREVIOUS)) {
++                  return;
++                }
+                 chrome::MoveTabPrevious(bwi);
+               },
+               bwi))
+@@ -3316,6 +3448,10 @@ void BrowserActions::InitializeToolbarAndMiscActions() {
+           base::BindRepeating(
+               [](BrowserWindowInterface* bwi, actions::ActionItem* item,
+                  actions::ActionInvocationContext context) {
++                if (!chrome::IsMyarcWorkspaceCommandAllowed(
++                        bwi, IDC_MOVE_TAB_TO_NEW_WINDOW)) {
++                  return;
++                }
+                 chrome::MoveActiveTabToNewWindow(bwi);
+               },
+               bwi))
+@@ -3327,6 +3463,10 @@ void BrowserActions::InitializeToolbarAndMiscActions() {
+           base::BindRepeating(
+               [](BrowserWindowInterface* bwi, actions::ActionItem* item,
+                  actions::ActionInvocationContext context) {
++                if (!chrome::IsMyarcWorkspaceCommandAllowed(
++                        bwi, IDC_BOOKMARK_ALL_TABS)) {
++                  return;
++                }
+                 chrome::BookmarkAllTabs(bwi);
+               },
+               bwi))
+@@ -3345,6 +3485,10 @@ void BrowserActions::InitializeToolbarAndMiscActions() {
+           base::BindRepeating(
+               [](BrowserWindowInterface* bwi, actions::ActionItem* item,
+                  actions::ActionInvocationContext context) {
++                if (!chrome::IsMyarcWorkspaceCommandAllowed(
++                        bwi, IDC_WINDOW_PIN_TAB)) {
++                  return;
++                }
+                 chrome::PinTab(bwi);
+               },
+               bwi))
+@@ -3356,6 +3500,10 @@ void BrowserActions::InitializeToolbarAndMiscActions() {
+           base::BindRepeating(
+               [](BrowserWindowInterface* bwi, actions::ActionItem* item,
+                  actions::ActionInvocationContext context) {
++                if (!chrome::IsMyarcWorkspaceCommandAllowed(
++                        bwi, IDC_WINDOW_GROUP_TAB)) {
++                  return;
++                }
+                 chrome::GroupTab(bwi);
+               },
+               bwi))
+@@ -3367,6 +3515,10 @@ void BrowserActions::InitializeToolbarAndMiscActions() {
+           base::BindRepeating(
+               [](BrowserWindowInterface* bwi, actions::ActionItem* item,
+                  actions::ActionInvocationContext context) {
++                if (!chrome::IsMyarcWorkspaceCommandAllowed(
++                        bwi, IDC_WINDOW_CLOSE_TABS_TO_RIGHT)) {
++                  return;
++                }
+                 chrome::CloseTabsToRight(bwi);
+               },
+               bwi))
+@@ -3378,6 +3530,10 @@ void BrowserActions::InitializeToolbarAndMiscActions() {
+           base::BindRepeating(
+               [](BrowserWindowInterface* bwi, actions::ActionItem* item,
+                  actions::ActionInvocationContext context) {
++                if (!chrome::IsMyarcWorkspaceCommandAllowed(
++                        bwi, IDC_WINDOW_CLOSE_OTHER_TABS)) {
++                  return;
++                }
+                 chrome::CloseOtherTabs(bwi);
+               },
+               bwi))
+@@ -3389,6 +3545,10 @@ void BrowserActions::InitializeToolbarAndMiscActions() {
+           base::BindRepeating(
+               [](BrowserWindowInterface* bwi, actions::ActionItem* item,
+                  actions::ActionInvocationContext context) {
++                if (!chrome::IsMyarcWorkspaceCommandAllowed(
++                        bwi, IDC_NEW_TAB_TO_RIGHT)) {
++                  return;
++                }
+                 chrome::NewTabToRight(bwi);
+               },
+               bwi))
+@@ -3400,6 +3560,10 @@ void BrowserActions::InitializeToolbarAndMiscActions() {
+           base::BindRepeating(
+               [](BrowserWindowInterface* bwi, actions::ActionItem* item,
+                  actions::ActionInvocationContext context) {
++                if (!chrome::IsMyarcWorkspaceCommandAllowed(
++                        bwi, IDC_ADD_NEW_TAB_TO_GROUP)) {
++                  return;
++                }
+                 chrome::AddNewTabToGroup(bwi);
+                 base::UmaHistogramEnumeration(
+                     "TabGroups.Shortcuts",
+@@ -3414,6 +3578,10 @@ void BrowserActions::InitializeToolbarAndMiscActions() {
+           base::BindRepeating(
+               [](BrowserWindowInterface* bwi, actions::ActionItem* item,
+                  actions::ActionInvocationContext context) {
++                if (!chrome::IsMyarcWorkspaceCommandAllowed(
++                        bwi, IDC_CREATE_NEW_TAB_GROUP)) {
++                  return;
++                }
+                 chrome::CreateNewTabGroup(bwi);
+                 base::UmaHistogramEnumeration(
+                     "TabGroups.Shortcuts",
+@@ -3469,6 +3637,10 @@ void BrowserActions::InitializeToolbarAndMiscActions() {
+           base::BindRepeating(
+               [](BrowserWindowInterface* bwi, actions::ActionItem* item,
+                  actions::ActionInvocationContext context) {
++                if (!chrome::IsMyarcWorkspaceCommandAllowed(
++                        bwi, IDC_CLOSE_TAB_GROUP)) {
++                  return;
++                }
+                 chrome::CloseTabGroup(bwi);
+                 base::UmaHistogramEnumeration(
+                     "TabGroups.Shortcuts",
+@@ -3483,6 +3655,10 @@ void BrowserActions::InitializeToolbarAndMiscActions() {
+           base::BindRepeating(
+               [](BrowserWindowInterface* bwi, actions::ActionItem* item,
+                  actions::ActionInvocationContext context) {
++                if (!chrome::IsMyarcWorkspaceCommandAllowed(
++                        bwi, IDC_GROUP_UNGROUPED_TABS)) {
++                  return;
++                }
+                 chrome::GroupAllUngroupedTabs(bwi);
+                 base::RecordAction(
+                     base::UserMetricsAction("TabGroups_GroupAllUngroupedTabs"));
+@@ -3496,6 +3672,10 @@ void BrowserActions::InitializeToolbarAndMiscActions() {
+           base::BindRepeating(
+               [](BrowserWindowInterface* bwi, actions::ActionItem* item,
+                  actions::ActionInvocationContext context) {
++                if (!chrome::IsMyarcWorkspaceCommandAllowed(
++                        bwi, IDC_ADD_NEW_TAB_RECENT_GROUP)) {
++                  return;
++                }
+                 chrome::AddNewTabToRecentGroup(bwi);
+               },
+               bwi))
+@@ -3507,6 +3687,10 @@ void BrowserActions::InitializeToolbarAndMiscActions() {
+           base::BindRepeating(
+               [](BrowserWindowInterface* bwi, actions::ActionItem* item,
+                  actions::ActionInvocationContext context) {
++                if (!chrome::IsMyarcWorkspaceCommandAllowed(
++                        bwi, IDC_PIN_TARGET_TAB)) {
++                  return;
++                }
+                 chrome::PinKeyboardFocusedTab(bwi);
+               },
+               bwi))
+@@ -3518,6 +3702,10 @@ void BrowserActions::InitializeToolbarAndMiscActions() {
+           base::BindRepeating(
+               [](BrowserWindowInterface* bwi, actions::ActionItem* item,
+                  actions::ActionInvocationContext context) {
++                if (!chrome::IsMyarcWorkspaceCommandAllowed(
++                        bwi, IDC_GROUP_TARGET_TAB)) {
++                  return;
++                }
+                 chrome::GroupKeyboardFocusedTab(bwi);
+               },
+               bwi))
+@@ -3529,6 +3717,10 @@ void BrowserActions::InitializeToolbarAndMiscActions() {
+           base::BindRepeating(
+               [](BrowserWindowInterface* bwi, actions::ActionItem* item,
+                  actions::ActionInvocationContext context) {
++                if (!chrome::IsMyarcWorkspaceCommandAllowed(
++                        bwi, IDC_DUPLICATE_TARGET_TAB)) {
++                  return;
++                }
+                 chrome::DuplicateKeyboardFocusedTab(bwi);
+               },
+               bwi))
+@@ -3540,6 +3732,10 @@ void BrowserActions::InitializeToolbarAndMiscActions() {
+           base::BindRepeating(
+               [](BrowserWindowInterface* bwi, actions::ActionItem* item,
+                  actions::ActionInvocationContext context) {
++                if (!chrome::IsMyarcWorkspaceCommandAllowed(
++                        bwi, IDC_TOGGLE_REQUEST_TABLET_SITE)) {
++                  return;
++                }
+                 chrome::ToggleRequestTabletSite(bwi);
+               },
+               bwi))
+@@ -3551,6 +3747,10 @@ void BrowserActions::InitializeToolbarAndMiscActions() {
+           base::BindRepeating(
+               [](BrowserWindowInterface* bwi, actions::ActionItem* item,
+                  actions::ActionInvocationContext context) {
++                if (!chrome::IsMyarcWorkspaceCommandAllowed(
++                        bwi, IDC_READING_LIST_MENU_ADD_TAB)) {
++                  return;
++                }
+                 chrome::MoveCurrentTabToReadLater(bwi);
+               },
+               bwi))
+@@ -3687,6 +3887,10 @@ void BrowserActions::InitializeToolbarAndMiscActions() {
+           base::BindRepeating(
+               [](BrowserWindowInterface* bwi, actions::ActionItem* item,
+                  actions::ActionInvocationContext context) {
++                if (!chrome::IsMyarcWorkspaceCommandAllowed(
++                        bwi, IDC_FOCUS_WEB_CONTENTS_PANE)) {
++                  return;
++                }
+                 chrome::FocusWebContentsPane(bwi);
+               },
+               bwi))
+@@ -3698,6 +3902,10 @@ void BrowserActions::InitializeToolbarAndMiscActions() {
+           base::BindRepeating(
+               [](BrowserWindowInterface* bwi, actions::ActionItem* item,
+                  actions::ActionInvocationContext context) {
++                if (!chrome::IsMyarcWorkspaceCommandAllowed(bwi,
++                                                            IDC_ZOOM_PLUS)) {
++                  return;
++                }
+                 chrome::Zoom(bwi, content::PAGE_ZOOM_IN);
+               },
+               bwi))
+@@ -3713,6 +3921,10 @@ void BrowserActions::InitializeToolbarAndMiscActions() {
+           base::BindRepeating(
+               [](BrowserWindowInterface* bwi, actions::ActionItem* item,
+                  actions::ActionInvocationContext context) {
++                if (!chrome::IsMyarcWorkspaceCommandAllowed(bwi,
++                                                            IDC_ZOOM_MINUS)) {
++                  return;
++                }
+                 chrome::Zoom(bwi, content::PAGE_ZOOM_OUT);
+               },
+               bwi))
+@@ -3728,6 +3940,10 @@ void BrowserActions::InitializeToolbarAndMiscActions() {
+           base::BindRepeating(
+               [](BrowserWindowInterface* bwi, actions::ActionItem* item,
+                  actions::ActionInvocationContext context) {
++                if (!chrome::IsMyarcWorkspaceCommandAllowed(bwi,
++                                                            IDC_ZOOM_NORMAL)) {
++                  return;
++                }
+                 chrome::Zoom(bwi, content::PAGE_ZOOM_RESET);
+               },
+               bwi))
+@@ -3743,6 +3959,10 @@ void BrowserActions::InitializeToolbarAndMiscActions() {
+           base::BindRepeating(
+               [](BrowserWindowInterface* bwi, actions::ActionItem* item,
+                  actions::ActionInvocationContext context) {
++                if (!chrome::IsMyarcWorkspaceCommandAllowed(
++                        bwi, IDC_CONTENT_CONTEXT_LENS_REGION_SEARCH)) {
++                  return;
++                }
+                 tabs::TabInterface* const active_tab =
+                     bwi->GetActiveTabInterface();
+                 if (!active_tab) {
+@@ -3793,6 +4013,10 @@ void BrowserActions::InitializeToolbarAndMiscActions() {
+           base::BindRepeating(
+               [](BrowserWindowInterface* bwi, actions::ActionItem* item,
+                  actions::ActionInvocationContext context) {
++                if (!chrome::IsMyarcWorkspaceCommandAllowed(bwi,
++                                                            IDC_VIEW_SOURCE)) {
++                  return;
++                }
+                 tabs::TabInterface* const active_tab =
+                     bwi->GetActiveTabInterface();
+                 if (!active_tab) {
+@@ -3821,6 +4045,10 @@ void BrowserActions::InitializeToolbarAndMiscActions() {
+           base::BindRepeating(
+               [](BrowserWindowInterface* bwi, actions::ActionItem* item,
+                  actions::ActionInvocationContext context) {
++                if (!chrome::IsMyarcWorkspaceCommandAllowed(bwi,
++                                                            IDC_SAVE_PAGE)) {
++                  return;
++                }
+                 chrome::SavePage(bwi);
+               },
+               bwi))
+@@ -3841,6 +4069,10 @@ void BrowserActions::InitializeToolbarAndMiscActions() {
+           base::BindRepeating(
+               [](BrowserWindowInterface* bwi, actions::ActionItem* item,
+                  actions::ActionInvocationContext context) {
++                if (!chrome::IsMyarcWorkspaceCommandAllowed(bwi,
++                                                            IDC_BASIC_PRINT)) {
++                  return;
++                }
+                 base::RecordAction(
+                     base::UserMetricsAction("Accel_Advanced_Print"));
+                 chrome::BasicPrint(bwi);
+@@ -3855,6 +4087,10 @@ void BrowserActions::InitializeToolbarAndMiscActions() {
+           base::BindRepeating(
+               [](BrowserWindowInterface* bwi, actions::ActionItem* item,
+                  actions::ActionInvocationContext context) {
++                if (!chrome::IsMyarcWorkspaceCommandAllowed(
++                        bwi, IDC_MUTE_TARGET_SITE)) {
++                  return;
++                }
+                 chrome::MuteSiteForKeyboardFocusedTab(bwi);
+               },
+               bwi))
+@@ -3866,6 +4102,10 @@ void BrowserActions::InitializeToolbarAndMiscActions() {
+           base::BindRepeating(
+               [](BrowserWindowInterface* bwi, actions::ActionItem* item,
+                  actions::ActionInvocationContext context) {
++                if (!chrome::IsMyarcWorkspaceCommandAllowed(bwi,
++                                                            IDC_FIND_NEXT)) {
++                  return;
++                }
+                 chrome::FindNext(bwi);
+               },
+               bwi))
+@@ -3877,6 +4117,10 @@ void BrowserActions::InitializeToolbarAndMiscActions() {
+           base::BindRepeating(
+               [](BrowserWindowInterface* bwi, actions::ActionItem* item,
+                  actions::ActionInvocationContext context) {
++                if (!chrome::IsMyarcWorkspaceCommandAllowed(
++                        bwi, IDC_FIND_PREVIOUS)) {
++                  return;
++                }
+                 chrome::FindPrevious(bwi);
+               },
+               bwi))
+@@ -3888,6 +4132,10 @@ void BrowserActions::InitializeToolbarAndMiscActions() {
+           base::BindRepeating(
+               [](BrowserWindowInterface* bwi, actions::ActionItem* item,
+                  actions::ActionInvocationContext context) {
++                if (!chrome::IsMyarcWorkspaceCommandAllowed(
++                        bwi, IDC_CLOSE_FIND_OR_STOP)) {
++                  return;
++                }
+                 if (chrome::CanCloseFind(bwi)) {
+                   chrome::CloseFind(bwi);
+                 } else {
+@@ -3903,6 +4151,10 @@ void BrowserActions::InitializeToolbarAndMiscActions() {
+           base::BindRepeating(
+               [](BrowserWindowInterface* bwi, actions::ActionItem* item,
+                  actions::ActionInvocationContext context) {
++                if (!chrome::IsMyarcWorkspaceCommandAllowed(
++                        bwi, IDC_CREATE_SHORTCUT)) {
++                  return;
++                }
+                 base::RecordAction(base::UserMetricsAction("CreateShortcut"));
+ #if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX)
+                 chrome::CreateDesktopShortcutForActiveWebContents(bwi);
+@@ -3928,6 +4180,10 @@ void BrowserActions::InitializeToolbarAndMiscActions() {
+           base::BindRepeating(
+               [](BrowserWindowInterface* bwi, actions::ActionItem* item,
+                  actions::ActionInvocationContext context) {
++                if (!chrome::IsMyarcWorkspaceCommandAllowed(
++                        bwi, IDC_DEV_TOOLS_CONSOLE)) {
++                  return;
++                }
+                 chrome::ToggleDevToolsWindow(
+                     bwi, DevToolsToggleAction::ShowConsolePanel(),
+                     DevToolsOpenedByAction::kConsoleShortcut);
+@@ -3941,6 +4197,10 @@ void BrowserActions::InitializeToolbarAndMiscActions() {
+           base::BindRepeating(
+               [](BrowserWindowInterface* bwi, actions::ActionItem* item,
+                  actions::ActionInvocationContext context) {
++                if (!chrome::IsMyarcWorkspaceCommandAllowed(
++                        bwi, IDC_DEV_TOOLS_TOGGLE)) {
++                  return;
++                }
+                 chrome::ToggleDevToolsWindow(
+                     bwi, DevToolsToggleAction::Toggle(),
+                     DevToolsOpenedByAction::kToggleShortcut);
+@@ -4041,6 +4301,10 @@ void BrowserActions::InitializeToolbarAndMiscActions() {
+           base::BindRepeating(
+               [](BrowserWindowInterface* bwi, actions::ActionItem* item,
+                  actions::ActionInvocationContext context) {
++                if (!chrome::IsMyarcWorkspaceCommandAllowed(
++                        bwi, IDC_CARET_BROWSING_TOGGLE)) {
++                  return;
++                }
+                 chrome::ToggleCaretBrowsing(bwi);
+               },
+               bwi))
+@@ -4312,6 +4576,10 @@ void BrowserActions::InitializeToolbarAndMiscActions() {
+           base::BindRepeating(
+               [](BrowserWindowInterface* bwi, actions::ActionItem* item,
+                  actions::ActionInvocationContext context) {
++                if (!chrome::IsMyarcWorkspaceCommandAllowed(
++                        bwi, IDC_CONTENT_CONTEXT_LENS_OVERLAY)) {
++                  return;
++                }
+                 if (!bwi) {
+                   return;
+                 }
+@@ -4508,6 +4776,10 @@ void BrowserActions::InitializeToolbarAndMiscActions() {
+           base::BindRepeating(
+               [](BrowserWindowInterface* bwi, actions::ActionItem* item,
+                  actions::ActionInvocationContext context) {
++                if (!chrome::IsMyarcWorkspaceCommandAllowed(
++                        bwi, IDC_OPEN_IN_CHROME)) {
++                  return;
++                }
+                 chrome::OpenInChrome(bwi);
+               },
+               bwi),
+@@ -4606,6 +4878,10 @@ void BrowserActions::InitializeToolbarAndMiscActions() {
+           base::BindRepeating(
+               [](BrowserWindowInterface* bwi, actions::ActionItem* item,
+                  actions::ActionInvocationContext context) {
++                if (!chrome::IsMyarcWorkspaceCommandAllowed(
++                        bwi, IDC_SAVE_AUTOFILL_ADDRESS)) {
++                  return;
++                }
+                 chrome::SaveAutofillAddress(bwi);
+               },
+               bwi))
+@@ -4617,6 +4893,10 @@ void BrowserActions::InitializeToolbarAndMiscActions() {
+           base::BindRepeating(
+               [](BrowserWindowInterface* bwi, actions::ActionItem* item,
+                  actions::ActionInvocationContext context) {
++                if (!chrome::IsMyarcWorkspaceCommandAllowed(bwi,
++                                                            IDC_SHARING_HUB)) {
++                  return;
++                }
+                 chrome::SharingHub(bwi);
+               },
+               bwi))
+@@ -4628,6 +4908,10 @@ void BrowserActions::InitializeToolbarAndMiscActions() {
+           base::BindRepeating(
+               [](BrowserWindowInterface* bwi, actions::ActionItem* item,
+                  actions::ActionInvocationContext context) {
++                if (!chrome::IsMyarcWorkspaceCommandAllowed(
++                        bwi, IDC_SHARING_HUB_SCREENSHOT)) {
++                  return;
++                }
+                 chrome::ScreenshotCapture(bwi);
+               },
+               bwi))
+@@ -4970,6 +5254,10 @@ void BrowserActions::InitializeToolbarAndMiscActions() {
+           base::BindRepeating(
+               [](BrowserWindowInterface* bwi, actions::ActionItem* item,
+                  actions::ActionInvocationContext context) {
++                if (!chrome::IsMyarcWorkspaceCommandAllowed(
++                        bwi, IDC_TOGGLE_JAVASCRIPT_APPLE_EVENTS)) {
++                  return;
++                }
+                 tabs::TabInterface* const active_tab =
+                     bwi->GetActiveTabInterface();
+                 if (!active_tab) {
+@@ -5214,6 +5502,9 @@ void BrowserActions::InitializeNavigationActions() {
+           base::BindRepeating(
+               [](BrowserWindowInterface* bwi, actions::ActionItem* item,
+                  actions::ActionInvocationContext context) {
++                if (!chrome::IsMyarcWorkspaceCommandAllowed(bwi, IDC_BACK)) {
++                  return;
++                }
+                 WindowOpenDisposition disposition =
+                     context.GetProperty(chrome::kDispositionKey);
+                 chrome::GoBack(bwi, disposition);
+@@ -5227,6 +5518,9 @@ void BrowserActions::InitializeNavigationActions() {
+           base::BindRepeating(
+               [](BrowserWindowInterface* bwi, actions::ActionItem* item,
+                  actions::ActionInvocationContext context) {
++                if (!chrome::IsMyarcWorkspaceCommandAllowed(bwi, IDC_RELOAD)) {
++                  return;
++                }
+                 WindowOpenDisposition disposition =
+                     context.GetProperty(chrome::kDispositionKey);
+                 chrome::Reload(bwi, disposition);
+@@ -5240,6 +5534,9 @@ void BrowserActions::InitializeNavigationActions() {
+           base::BindRepeating(
+               [](BrowserWindowInterface* bwi, actions::ActionItem* item,
+                  actions::ActionInvocationContext context) {
++                if (!chrome::IsMyarcWorkspaceCommandAllowed(bwi, IDC_STOP)) {
++                  return;
++                }
+                 chrome::Stop(bwi);
+               },
+               bwi))
+@@ -5251,6 +5548,10 @@ void BrowserActions::InitializeNavigationActions() {
+           base::BindRepeating(
+               [](BrowserWindowInterface* bwi, actions::ActionItem* item,
+                  actions::ActionInvocationContext context) {
++                if (!chrome::IsMyarcWorkspaceCommandAllowed(
++                        bwi, IDC_RELOAD_CLEARING_CACHE)) {
++                  return;
++                }
+                 WindowOpenDisposition disposition =
+                     context.GetProperty(chrome::kDispositionKey);
+                 chrome::ClearCache(bwi);
+@@ -5265,6 +5566,10 @@ void BrowserActions::InitializeNavigationActions() {
+           base::BindRepeating(
+               [](BrowserWindowInterface* bwi, actions::ActionItem* item,
+                  actions::ActionInvocationContext context) {
++                if (!chrome::IsMyarcWorkspaceCommandAllowed(
++                        bwi, IDC_RELOAD_BYPASSING_CACHE)) {
++                  return;
++                }
+                 WindowOpenDisposition disposition =
+                     context.GetProperty(chrome::kDispositionKey);
+                 chrome::ReloadBypassingCache(bwi, disposition);
+@@ -5289,6 +5594,9 @@ void BrowserActions::InitializeNavigationActions() {
+           base::BindRepeating(
+               [](BrowserWindowInterface* bwi, actions::ActionItem* item,
+                  actions::ActionInvocationContext context) {
++                if (!chrome::IsMyarcWorkspaceCommandAllowed(bwi, IDC_HOME)) {
++                  return;
++                }
+                 WindowOpenDisposition disposition =
+                     context.GetProperty(chrome::kDispositionKey);
+                 chrome::Home(bwi, disposition);
+@@ -5302,6 +5610,9 @@ void BrowserActions::InitializeNavigationActions() {
+           base::BindRepeating(
+               [](BrowserWindowInterface* bwi, actions::ActionItem* item,
+                  actions::ActionInvocationContext context) {
++                if (!chrome::IsMyarcWorkspaceCommandAllowed(bwi, IDC_FORWARD)) {
++                  return;
++                }
+                 WindowOpenDisposition disposition =
+                     context.GetProperty(chrome::kDispositionKey);
+                 chrome::GoForward(bwi, disposition);
+@@ -5374,7 +5685,12 @@ void BrowserActions::InitializeSubmenuActions() {
+       ChromeMenuAction(
+           base::BindRepeating(
+               [](BrowserWindowInterface* bwi, actions::ActionItem* item,
+-                 actions::ActionInvocationContext context) {},
++                 actions::ActionInvocationContext context) {
++                if (!chrome::IsMyarcWorkspaceCommandAllowed(bwi,
++                                                            IDC_ZOOM_MENU)) {
++                  return;
++                }
++              },
+               bwi),
+           kActionZoomSubmenu, IDS_ZOOM_MENU, IDS_ZOOM_MENU,
+           features::IsRoundedIconsEnabled() ? kZoomInIcon : kZoomInOldIcon,
+diff --git a/chrome/browser/ui/browser_command_controller.cc b/chrome/browser/ui/browser_command_controller.cc
+index d771f7ffd6d6a10e417455bc67d78a6dd2607706..e875df02da6d93984d2d6edbda0d887efbf94593 100644
+--- a/chrome/browser/ui/browser_command_controller.cc
++++ b/chrome/browser/ui/browser_command_controller.cc
+@@ -60,6 +60,7 @@
+ #include "chrome/browser/ui/actions/chrome_action_id.h"
+ #include "chrome/browser/ui/actions/chrome_action_properties.h"
+ #include "chrome/browser/ui/actions/command_action_updater.h"
++#include "chrome/browser/ui/actions/command_id_to_action_id.h"
+ #include "chrome/browser/ui/browser_actions.h"
+ #include "chrome/browser/ui/browser_commands.h"
+ #include "chrome/browser/ui/browser_element_identifiers.h"
+@@ -284,6 +285,43 @@ actions::ActionItem* FindAction(actions::ActionId action_id,
+   return actions::ActionManager::Get().FindAction(action_id, root_action_item);
+ }
+ 
++// All native update sites, including asynchronous loading/policy updates, pass
++// through this existing updater interface. Keep native eligibility for replay
++// when Space selection changes without a native active-index notification.
++template <typename NativeUpdater>
++class MyarcCommandUpdater final : public NativeUpdater {
++ public:
++  template <typename Delegate>
++  MyarcCommandUpdater(BrowserWindowInterface* browser,
++                      base::flat_map<int, bool>* states,
++                      Delegate* delegate)
++      : NativeUpdater(delegate), browser_(browser), states_(states) {}
++
++  bool UpdateCommandEnabled(int id, bool state) override {
++    if (IsMyarcPageCommand(id)) {
++      (*states_)[id] = state;
++      const bool allowed = IsMyarcWorkspaceCommandAllowed(browser_, id);
++      gated_ |= !allowed;
++      state &= allowed;
++      // Legacy updater does not update Actions. Synchronize only after this
++      // opt-in window has gated a command; stock windows stay unchanged.
++      if (gated_) {
++        if (auto action_id = GetActionIdForCommandId(id)) {
++          if (auto* action = FindAction(*action_id, browser_)) {
++            action->SetEnabled(state);
++          }
++        }
++      }
++    }
++    return NativeUpdater::UpdateCommandEnabled(id, state);
++  }
++
++ private:
++  raw_ptr<BrowserWindowInterface> browser_;
++  raw_ptr<base::flat_map<int, bool>> states_;
++  bool gated_ = false;
++};
++
+ #if BUILDFLAG(IS_CHROMEOS)
+ bool IsLockedForOnTask(BrowserWindowInterface* browser) {
+   if (features::IsUseUnifiedLockedStateControllerEnabled()) {
+@@ -651,7 +689,8 @@ bool BrowserCommandController::SupportsCommand(int id) const {
+ }
+ 
+ bool BrowserCommandController::IsCommandEnabled(int id) const {
+-  return command_updater_->IsCommandEnabled(id);
++  return IsMyarcWorkspaceCommandAllowed(browser_, id) &&
++         command_updater_->IsCommandEnabled(id);
+ }
+ 
+ bool BrowserCommandController::ExecuteCommandWithDispositionAndContext(
+@@ -684,6 +723,9 @@ void BrowserCommandController::HandleCommandWithDisposition(
+     int id,
+     WindowOpenDisposition disposition,
+     base::TimeTicks time_stamp) {
++  if (!IsMyarcWorkspaceCommandAllowed(browser_, id)) {
++    return;
++  }
+   DCHECK(IsCommandEnabled(id)) << "Invalid/disabled command " << id;
+ 
+   // LINT.IfChange
+@@ -2234,6 +2276,51 @@ void BrowserCommandController::UpdateCommandsForExtensionsMenu() {
+                                          /*state=*/true);
+ }
+ 
++void BrowserCommandController::MyarcWorkspaceStateChanged() {
++  // Replay native eligibility for commands initialized once (e.g. Close), then
++  // refresh dynamic tab/policy state. Copy because updates write this map.
++  for (const auto& [id, action_id] : GetCommandIdToActionIdMap()) {
++    if (IsMyarcPageCommand(id) && SupportsCommand(id) &&
++        !myarc_page_command_states_.contains(id)) {
++      myarc_page_command_states_[id] = command_updater_->IsCommandEnabled(id);
++    }
++  }
++  const auto states = myarc_page_command_states_;
++  for (const auto& [id, enabled] : states) {
++    UpdateCommandEnabled(id, enabled);
++  }
++  UpdateCommandsForTabState();
++  UpdateCommandsForFullscreenMode();
++  UpdateCommandsForTabStripStateChanged();
++  if (auto* contents = browser_->GetTabStripModel()->GetActiveWebContents()) {
++    LoadingStateChanged(contents->IsLoading(), true);
++  }
++
++  const auto gate_action = [this](actions::ActionId action_id, int command) {
++    auto* action = FindAction(action_id, browser_);
++    if (!action) {
++      return;
++    }
++    if (!IsMyarcWorkspaceCommandAllowed(browser_, command)) {
++      myarc_page_action_states_.try_emplace(action_id, action->GetEnabled());
++      action->SetEnabled(false);
++    } else if (auto it = myarc_page_action_states_.find(action_id);
++               it != myarc_page_action_states_.end()) {
++      action->SetEnabled(it->second);
++      myarc_page_action_states_.erase(it);
++    }
++  };
++  for (const auto& [id, action_id] : GetCommandIdToActionIdMap()) {
++    if (IsMyarcPageCommand(id) && !SupportsCommand(id)) {
++      gate_action(action_id, id);
++    }
++  }
++  // Zoom's page-action button has no IDC mapping (unlike its menu).
++  gate_action(kActionShowZoomBubble, IDC_ZOOM_MENU);
++  // QR has action-only policy state, independent of legacy command state.
++  UpdateQRCodeGeneratorActionEnabledState();
++}
++
+ void BrowserCommandController::UpdateCommandsForTabState() {
+   // Keep commands disabled when in locked fullscreen so users cannot exit this
+   // mode. Only update navigation ones when the webapp is locked for OnTask
+@@ -2974,8 +3061,10 @@ void BrowserCommandController::UpdateActionsForSharingHubPolicy() {
+ }
+ 
+ void BrowserCommandController::UpdateQRCodeGeneratorActionEnabledState() {
+-  bool qr_code_generator_enabled = g_browser_process->local_state()->GetBoolean(
+-      prefs::kQRCodeGeneratorEnabled);
++  bool qr_code_generator_enabled =
++      g_browser_process->local_state()->GetBoolean(
++          prefs::kQRCodeGeneratorEnabled) &&
++      IsMyarcWorkspaceCommandAllowed(browser_, IDC_QRCODE_GENERATOR);
+   if (auto* qr_code_action_item =
+           FindAction(kActionQrCodeGenerator, browser_)) {
+     qr_code_action_item->SetEnabled(qr_code_generator_enabled);
+@@ -2989,7 +3078,8 @@ void BrowserCommandController::UpdateCommandAndActionEnabled(
+   command_updater_->UpdateCommandEnabled(command_id, enabled);
+   if (!features::ShouldUseActionsForBrowserCommands()) {
+     if (auto* const action = FindAction(action_id, browser_)) {
+-      action->SetEnabled(enabled);
++      action->SetEnabled(enabled &&
++                         IsMyarcWorkspaceCommandAllowed(browser_, command_id));
+     }
+   }
+ }
+@@ -3010,10 +3100,12 @@ bool BrowserCommandController::IsInLockedFullscreenMode(
+ std::unique_ptr<CommandUpdater>
+ BrowserCommandController::CreateCommandUpdater() {
+   if (features::ShouldUseActionsForBrowserCommands()) {
+-    return std::make_unique<CommandActionUpdater>(
++    return std::make_unique<MyarcCommandUpdater<CommandActionUpdater>>(
++        browser_, &myarc_page_command_states_,
+         BrowserActions::From(browser_)->root_action_item());
+   }
+-  return std::make_unique<CommandUpdaterImpl>(this);
++  return std::make_unique<MyarcCommandUpdater<CommandUpdaterImpl>>(
++      browser_, &myarc_page_command_states_, this);
+ }
+ 
+ BrowserWindow* BrowserCommandController::window() {
+diff --git a/chrome/browser/ui/browser_command_controller.h b/chrome/browser/ui/browser_command_controller.h
+index 153345b2dc7ed6e5223e22175245731ad65e3c0f..9a6a7177ddf2443ca78f2c5e13054ded9b828aac 100644
+--- a/chrome/browser/ui/browser_command_controller.h
++++ b/chrome/browser/ui/browser_command_controller.h
+@@ -132,6 +132,9 @@ class BrowserCommandController : public CommandUpdater,
+       CommandUpdater* command_updater,
+       Profile* profile);
+ 
++  // Space selection can change eligibility without changing the native index.
++  void MyarcWorkspaceStateChanged();
++
+  private:
+ #if BUILDFLAG(IS_CHROMEOS)
+   friend class BrowserCommandControllerBrowserTestLockedFullscreen;
+@@ -311,6 +314,11 @@ class BrowserCommandController : public CommandUpdater,
+   // and optionally syncs state to ActionItems.
+   std::unique_ptr<CommandUpdater> command_updater_;
+ 
++  // Native eligibility, before the workspace presentation gate.
++  base::flat_map<int, bool> myarc_page_command_states_;
++  // Action-only controls must not register unsupported legacy commands.
++  base::flat_map<actions::ActionId, bool> myarc_page_action_states_;
++
+   PrefChangeRegistrar profile_pref_registrar_;
+   PrefChangeRegistrar local_pref_registrar_;
+   std::unique_ptr<base::CallbackListSubscription> glic_enabling_subscription_;
+diff --git a/chrome/browser/ui/browser_command_controller_browsertest.cc b/chrome/browser/ui/browser_command_controller_browsertest.cc
+index 54deb1aa44b9e967a5626240ab63a5c24179a7e6..585fd29c2d1f9c8dc4f59c286578a68dfc491799 100644
+--- a/chrome/browser/ui/browser_command_controller_browsertest.cc
++++ b/chrome/browser/ui/browser_command_controller_browsertest.cc
+@@ -8,13 +8,17 @@
+ #include <array>
+ #include <string_view>
+ #include <utility>
++#include <vector>
+ 
+ #include "base/command_line.h"
++#include "base/functional/callback_helpers.h"
+ #include "base/run_loop.h"
++#include "base/strings/utf_string_conversions.h"
+ #include "base/test/metrics/user_action_tester.h"
+ #include "base/test/run_until.h"
+ #include "base/test/scoped_feature_list.h"
+ #include "base/test/task_environment.h"
++#include "base/test/test_future.h"
+ #include "build/branding_buildflags.h"
+ #include "build/build_config.h"
+ #include "chrome/app/chrome_command_ids.h"
+@@ -37,6 +41,7 @@
+ #include "chrome/browser/sessions/tab_restore_service_load_waiter.h"
+ #include "chrome/browser/signin/identity_manager_factory.h"
+ #include "chrome/browser/tab_group_sync/tab_group_sync_service_factory.h"
++#include "chrome/browser/tab_list/tab_list_interface.h"
+ #include "chrome/browser/translate/chrome_translate_client.h"
+ #include "chrome/browser/translate/translate_test_utils.h"
+ #include "chrome/browser/ui/actions/chrome_action_id.h"
+@@ -47,6 +52,10 @@
+ #include "chrome/browser/ui/browser_window/public/create_browser_window.h"
+ #include "chrome/browser/ui/browser_window/public/global_browser_collection.h"
+ #include "chrome/browser/ui/fullscreen/browser_window_fullscreen_controller.h"
++#include "chrome/browser/ui/location_bar/location_bar.h"
++#include "chrome/browser/ui/navigator/browser_navigator.h"
++#include "chrome/browser/ui/navigator/browser_navigator_params.h"
++#include "chrome/browser/ui/omnibox/chrome_omnibox_client.h"
+ #include "chrome/browser/ui/profiles/profile_picker.h"
+ #include "chrome/browser/ui/profiles/profile_ui_test_utils.h"
+ #include "chrome/browser/ui/side_panel/side_panel_action_callback.h"
+@@ -55,13 +64,18 @@
+ #include "chrome/browser/ui/side_panel/side_panel_enums.h"
+ #include "chrome/browser/ui/side_panel/side_panel_ui.h"
+ #include "chrome/browser/ui/startup/startup_browser_creator.h"
++#include "chrome/browser/ui/tab_contents/core_tab_helper.h"
+ #include "chrome/browser/ui/tab_modal_confirm_dialog_browsertest.h"
+ #include "chrome/browser/ui/tabs/saved_tab_groups/tab_group_sync_service_initialized_observer.h"
++#include "chrome/browser/ui/tabs/split_tab_metrics.h"
+ #include "chrome/browser/ui/tabs/tab_enums.h"
++#include "chrome/browser/ui/tabs/tab_strip_api/tab_strip_model_impl/tab_strip_model_adapter_impl.h"
+ #include "chrome/browser/ui/tabs/tab_strip_model.h"
+ #include "chrome/browser/ui/ui_features.h"
++#include "chrome/browser/ui/views/frame/browser_view.h"
+ #include "chrome/common/chrome_features.h"
+ #include "chrome/common/chrome_switches.h"
++#include "chrome/common/content_restriction.h"
+ #include "chrome/common/pref_names.h"
+ #include "chrome/test/base/in_process_browser_test.h"
+ #include "chrome/test/base/testing_profile_manager.h"
+@@ -71,8 +85,10 @@
+ #include "components/bookmarks/common/bookmark_bar_visibility_state.h"
+ #include "components/bookmarks/common/bookmark_pref_names.h"
+ #include "components/bookmarks/test/bookmark_test_helpers.h"
++#include "components/browser_apis/tab_strip/types/position.h"
+ #include "components/enterprise/isolated_mode/isolated_mode_features.h"
+ #include "components/input/native_web_keyboard_event.h"
++#include "components/omnibox/browser/autocomplete_match.h"
+ #include "components/optimization_guide/core/feature_registry/feature_registration.h"
+ #include "components/policy/core/common/policy_pref_names.h"
+ #include "components/prefs/pref_service.h"
+@@ -91,6 +107,16 @@
+ #include "content/public/test/test_navigation_observer.h"
+ #include "content/public/test/test_utils.h"
+ #include "google_apis/gaia/gaia_urls.h"
++#include "myarc/browser_workspace_adapter.h"
++#include "ui/views/controls/textfield/textfield.h"
++#include "ui/views/focus/focus_manager.h"
++
++#if BUILDFLAG(ENABLE_EXTENSIONS) && (BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC))
++#include "chrome/browser/ui/search_engines/default_search_extension_controlled_controller.h"
++#include "extensions/browser/unpacked_installer.h"
++#include "extensions/common/extension_features.h"
++#include "extensions/test/test_extension_dir.h"
++#endif
+ #include "net/base/network_change_notifier.h"
+ #include "ui/actions/actions.h"
+ #include "ui/base/base_window.h"
+@@ -1978,4 +2004,798 @@ IN_PROC_BROWSER_TEST_F(BrowserCommandControllerBrowserTestIsolatedTest,
+       isolated_browser->GetProfile()->IsEnterpriseIsolatedModeProfile());
+ }
+ 
++IN_PROC_BROWSER_TEST_F(BrowserCommandControllerBrowserTest,
++                       MyarcFlagOffKeepsNativeBulkCommands) {
++  ASSERT_FALSE(base::CommandLine::ForCurrentProcess()->HasSwitch(
++      "myarc-workspace-sidebar"));
++  ASSERT_TRUE(ui_test_utils::NavigateToURLWithDisposition(
++      browser(), GURL("about:blank"), WindowOpenDisposition::kNewForegroundTab,
++      ui_test_utils::BROWSER_TEST_WAIT_FOR_LOAD_STOP));
++  auto* tabs = browser()->GetTabStripModel();
++  ASSERT_EQ(2, tabs->count());
++  auto* window = BrowserWindow::FromBrowser(browser());
++  ASSERT_TRUE(window);
++  EXPECT_FALSE(window->IsMyarcWorkspaceActive());
++  EXPECT_FALSE(window->IsMyarcWorkspaceBlank());
++  EXPECT_TRUE(CanCloseOtherTabs(browser()));
++  tabs->ActivateTabAt(0);
++  auto* page = tabs->GetActiveWebContents();
++  MoveTabNext(browser());
++  EXPECT_EQ(page, tabs->GetWebContentsAt(1));
++  CloseOtherTabs(browser());
++  EXPECT_EQ(1, tabs->count());
++  EXPECT_EQ(page, tabs->GetActiveWebContents());
++}
++
++// These use real Rust projection and native tabs, not a mock workspace model.
++// Runtime execution belongs to the disposable-profile native test runner.
++class MyarcWorkspaceCommandSafetyTest
++    : public InProcessBrowserTest,
++      public testing::WithParamInterface<bool> {
++ public:
++  MyarcWorkspaceCommandSafetyTest() {
++    features_.InitWithFeatureStates(
++        {{features::kUseActionsForBrowserCommands, GetParam()},
++         {features::kTabGroupsFocusing, true}});
++#if BUILDFLAG(ENABLE_EXTENSIONS) && (BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC))
++    consent_features_.InitAndEnableFeature(
++        extensions_features::kSearchEngineExplicitChoiceDialog);
++#endif
++  }
++
++  void SetUpCommandLine(base::CommandLine* command_line) override {
++    command_line->AppendSwitch("myarc-visual-parity");
++    command_line->AppendSwitch("myarc-workspace-sidebar");
++  }
++
++  void SetUpOnMainThread() override {
++    InProcessBrowserTest::SetUpOnMainThread();
++    browser()->GetProfile()->GetPrefs()->SetBoolean(prefs::kVerticalTabsEnabled,
++                                                    true);
++    workspace_browser_ = CreateBrowser(browser()->GetProfile());
++    view_ = BrowserView::GetBrowserViewForBrowser(workspace_browser_);
++    ASSERT_TRUE(view_);
++    adapter_ = view_->GetMyarcWorkspaceAdapter();
++    ASSERT_TRUE(adapter_);
++    ASSERT_TRUE(base::test::RunUntil(
++        [&] { return adapter_->service().ExportSnapshot().has_value(); }));
++    // This is a fresh test Profile after native window creation, with no
++    // restore in flight. Production restoration remains owned by the lifecycle
++    // hooks.
++    ASSERT_TRUE(myarc::BrowserWorkspaceAdapter::FinishSessionRestore(
++                    *workspace_browser_->GetProfile())
++                    .ok);
++    ASSERT_TRUE(base::test::RunUntil([&] { return adapter_->ready(); }));
++    ASSERT_TRUE(adapter_->DisplayedContents());
++  }
++
++  void TearDownOnMainThread() override {
++    adapter_ = nullptr;
++    view_ = nullptr;
++    workspace_browser_ = nullptr;
++    InProcessBrowserTest::TearDownOnMainThread();
++  }
++
++ protected:
++  void EnterEmptySpace() {
++    const auto space = adapter_->CreateSpace("Empty command test");
++    ASSERT_TRUE(space.ok);
++    ASSERT_TRUE(adapter_->SelectSpace(space.id).ok);
++    view_->RefreshMyarcWorkspaceSidebar();
++    ASSERT_TRUE(view_->IsMyarcWorkspaceBlank());
++  }
++
++  base::test::ScopedFeatureList features_;
++#if BUILDFLAG(ENABLE_EXTENSIONS) && (BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC))
++  base::test::ScopedFeatureList consent_features_;
++#endif
++  raw_ptr<BrowserWindowInterface> workspace_browser_ = nullptr;
++  raw_ptr<BrowserView> view_ = nullptr;
++  raw_ptr<myarc::BrowserWorkspaceAdapter> adapter_ = nullptr;
++};
++
++IN_PROC_BROWSER_TEST_P(MyarcWorkspaceCommandSafetyTest,
++                       HiddenTabCommandsAndUpdates) {
++  auto* tabs = workspace_browser_->GetTabStripModel();
++  ASSERT_TRUE(ui_test_utils::NavigateToURL(
++      workspace_browser_, GURL("data:text/html,<title>Command test</title>")));
++  auto* hidden = tabs->GetActiveWebContents();
++  auto* root = BrowserActions::From(workspace_browser_)->root_action_item();
++  auto* source =
++      actions::ActionManager::Get().FindAction(kActionViewSource, root);
++  auto* zoom =
++      actions::ActionManager::Get().FindAction(kActionShowZoomBubble, root);
++  ASSERT_TRUE(source);
++  ASSERT_TRUE(zoom);
++  ASSERT_TRUE(CanViewSource(workspace_browser_));
++  const bool source_enabled = source->GetEnabled();
++  const bool zoom_enabled = zoom->GetEnabled();
++  ASSERT_TRUE(source_enabled);
++  auto* helper = CoreTabHelper::FromWebContents(hidden);
++  ASSERT_TRUE(helper);
++  helper->UpdateContentRestrictions(CONTENT_RESTRICTION_COPY |
++                                    CONTENT_RESTRICTION_CUT |
++                                    CONTENT_RESTRICTION_PASTE);
++  EXPECT_FALSE(IsCommandEnabled(workspace_browser_, IDC_COPY));
++  const int index = tabs->active_index();
++  const int count = tabs->count();
++  const GURL old_url = hidden->GetVisibleURL();
++  const auto old_space = adapter_->Sidebar().current_space.id;
++  ASSERT_NO_FATAL_FAILURE(EnterEmptySpace());
++  // Inspect Actions before any command updates can mask missing transition
++  // work.
++  EXPECT_FALSE(source->GetEnabled());
++  EXPECT_FALSE(zoom->GetEnabled());
++  ASSERT_EQ(hidden, tabs->GetActiveWebContents());
++  ASSERT_EQ(index, tabs->active_index());
++
++  constexpr int page_commands[] = {
++      IDC_BACK,
++      IDC_FORWARD,
++      IDC_RELOAD,
++      IDC_STOP,
++      IDC_HOME,
++      IDC_CLOSE_TAB,
++      IDC_DUPLICATE_TAB,
++      IDC_NEW_SPLIT_TAB,
++      IDC_PRINT,
++      IDC_SAVE_PAGE,
++      IDC_VIEW_SOURCE,
++      IDC_FIND,
++      IDC_ZOOM_PLUS,
++      IDC_DEV_TOOLS,
++      IDC_COPY_URL,
++      IDC_BOOKMARK_THIS_TAB,
++      IDC_WINDOW_PIN_TAB,
++#if BUILDFLAG(IS_MAC)
++      IDC_TOGGLE_JAVASCRIPT_APPLE_EVENTS,
++#endif
++  };
++  auto* controller = BrowserCommandController::From(workspace_browser_);
++  for (int id : page_commands) {
++    SCOPED_TRACE(id);
++    // Check the genuine native baseline, without force-enabling test commands.
++    EXPECT_FALSE(IsCommandEnabled(workspace_browser_, id));
++    EXPECT_FALSE(ExecuteCommand(workspace_browser_, id));
++  }
++  // Real updater entry points must retain the blank gate and field editing.
++  controller->TabStateChanged();
++  controller->ContentRestrictionsChanged();
++  controller->FullscreenStateChanged();
++  controller->LoadingStateChanged(true, true);
++  EXPECT_FALSE(source->GetEnabled());
++  EXPECT_FALSE(zoom->GetEnabled());
++  EXPECT_FALSE(IsCommandEnabled(workspace_browser_, IDC_STOP));
++  EXPECT_TRUE(IsCommandEnabled(workspace_browser_, IDC_NEW_TAB));
++  EXPECT_TRUE(IsCommandEnabled(workspace_browser_, IDC_NEW_WINDOW));
++  EXPECT_TRUE(IsCommandEnabled(workspace_browser_, IDC_FOCUS_LOCATION));
++  EXPECT_TRUE(IsCommandEnabled(workspace_browser_, IDC_CUT));
++  EXPECT_TRUE(IsCommandEnabled(workspace_browser_, IDC_COPY));
++  EXPECT_TRUE(IsCommandEnabled(workspace_browser_, IDC_PASTE));
++
++  // Direct helpers bypass ExecuteCommand; they must share the same gate.
++  CloseTab(workspace_browser_);
++  DuplicateTab(workspace_browser_);
++  Home(workspace_browser_, WindowOpenDisposition::kCurrentTab);
++  PinTab(workspace_browser_);
++  NewSplitTab(workspace_browser_, split_tabs::SplitTabLayout::kSideBySide,
++              split_tabs::SplitTabCreatedSource::kKeyboardShortcut);
++  EXPECT_EQ(count, tabs->count());
++  EXPECT_EQ(old_url, hidden->GetVisibleURL());
++  EXPECT_FALSE(tabs->IsTabPinned(index));
++  EXPECT_FALSE(
++      tabs->IsContextMenuCommandEnabled(index, TabStripModel::CommandCloseTab));
++  tabs->ExecuteContextMenuCommand(index, TabStripModel::CommandCloseTab);
++  EXPECT_EQ(count, tabs->count());
++
++  source->InvokeAction();
++#if BUILDFLAG(IS_MAC)
++  EXPECT_TRUE(IsMyarcPageCommand(IDC_TOGGLE_JAVASCRIPT_APPLE_EVENTS));
++  auto* apple_events = actions::ActionManager::Get().FindAction(
++      kActionToggleJavascriptAppleEvents, root);
++  ASSERT_TRUE(apple_events);
++  EXPECT_FALSE(apple_events->GetEnabled());
++  const bool apple_events_allowed =
++      workspace_browser_->GetProfile()->GetPrefs()->GetBoolean(
++          prefs::kAllowJavascriptAppleEvents);
++  apple_events->InvokeAction();
++  EXPECT_EQ(apple_events_allowed,
++            workspace_browser_->GetProfile()->GetPrefs()->GetBoolean(
++                prefs::kAllowJavascriptAppleEvents));
++#endif
++  EXPECT_EQ(old_url, hidden->GetVisibleURL());
++  EXPECT_EQ(count, tabs->count());
++
++  ASSERT_TRUE(adapter_->SelectSpace(old_space).ok);
++  view_->RefreshMyarcWorkspaceSidebar();
++  EXPECT_FALSE(view_->IsMyarcWorkspaceBlank());
++  EXPECT_TRUE(IsCommandEnabled(workspace_browser_, IDC_CLOSE_TAB));
++  EXPECT_TRUE(IsCommandEnabled(workspace_browser_, IDC_RELOAD));
++  EXPECT_EQ(source_enabled, source->GetEnabled());
++  EXPECT_EQ(zoom_enabled, zoom->GetEnabled());
++  EXPECT_FALSE(IsCommandEnabled(workspace_browser_, IDC_COPY));
++  EXPECT_FALSE(IsCommandEnabled(workspace_browser_, IDC_CUT));
++  EXPECT_FALSE(IsCommandEnabled(workspace_browser_, IDC_PASTE));
++  EXPECT_EQ(hidden, adapter_->DisplayedContents());
++}
++
++IN_PROC_BROWSER_TEST_P(MyarcWorkspaceCommandSafetyTest,
++                       DifferentNativeTabRestoresActionState) {
++  ASSERT_TRUE(embedded_test_server()->Start());
++  ASSERT_TRUE(ui_test_utils::NavigateToURL(
++      workspace_browser_, embedded_test_server()->GetURL("/title1.html")));
++  auto* tabs = workspace_browser_->GetTabStripModel();
++  auto* first_page = tabs->GetActiveWebContents();
++  const auto first_space = adapter_->Sidebar().current_space.id;
++  const auto second_space = adapter_->CreateSpace("Second populated Space");
++  ASSERT_TRUE(second_space.ok);
++  ASSERT_TRUE(adapter_->SelectSpace(second_space.id).ok);
++  ASSERT_TRUE(
++      adapter_
++          ->OpenInCurrentSpace(embedded_test_server()->GetURL("/title2.html"))
++          .ok);
++  auto* second_page = tabs->GetActiveWebContents();
++  ASSERT_NE(first_page, second_page);
++  ASSERT_TRUE(content::WaitForLoadStop(second_page));
++  ASSERT_TRUE(base::test::RunUntil([&] {
++    return adapter_->DisplayedContents() == second_page &&
++           !view_->IsMyarcWorkspaceBlank();
++  }));
++  auto* root = BrowserActions::From(workspace_browser_)->root_action_item();
++  auto* zoom =
++      actions::ActionManager::Get().FindAction(kActionShowZoomBubble, root);
++  auto* lens = actions::ActionManager::Get().FindAction(
++      kActionContentContextLensRegionSearch, root);
++  ASSERT_TRUE(zoom);
++  ASSERT_TRUE(lens);
++  const bool zoom_enabled = zoom->GetEnabled();
++  const bool lens_enabled = lens->GetEnabled();
++  ASSERT_TRUE(zoom_enabled);
++
++  ASSERT_TRUE(adapter_->SelectSpace(first_space).ok);
++  ASSERT_TRUE(base::test::RunUntil([&] {
++    return adapter_->DisplayedContents() == first_page &&
++           tabs->GetActiveWebContents() == first_page;
++  }));
++  const auto empty_space = adapter_->CreateSpace("Empty between native tabs");
++  ASSERT_TRUE(empty_space.ok);
++  ASSERT_TRUE(adapter_->SelectSpace(empty_space.id).ok);
++  ASSERT_TRUE(base::test::RunUntil([&] {
++    return view_->IsMyarcWorkspaceBlank() && !zoom->GetEnabled() &&
++           !lens->GetEnabled();
++  }));
++  ASSERT_EQ(first_page, tabs->GetActiveWebContents());
++
++  // No manual sidebar or command refresh: P1 -> empty -> P2 must notify
++  // Actions.
++  ASSERT_TRUE(adapter_->SelectSpace(second_space.id).ok);
++  ASSERT_TRUE(base::test::RunUntil([&] {
++    return adapter_->DisplayedContents() == second_page &&
++           tabs->GetActiveWebContents() == second_page &&
++           !view_->IsMyarcWorkspaceBlank() &&
++           zoom->GetEnabled() == zoom_enabled &&
++           lens->GetEnabled() == lens_enabled;
++  }));
++  EXPECT_EQ(second_space.id, adapter_->Sidebar().current_space.id);
++  EXPECT_EQ(zoom_enabled, zoom->GetEnabled());
++  EXPECT_EQ(lens_enabled, lens->GetEnabled());
++}
++
++IN_PROC_BROWSER_TEST_P(MyarcWorkspaceCommandSafetyTest,
++                       ReselectHiddenActiveTabRevealsOwningSpace) {
++  auto* tabs = workspace_browser_->GetTabStripModel();
++  auto* hidden = tabs->GetActiveWebContents();
++  const auto space = adapter_->Sidebar().current_space.id;
++  ASSERT_NO_FATAL_FAILURE(EnterEmptySpace());
++  tabs->ActivateTabAt(tabs->active_index());
++  EXPECT_EQ(space, adapter_->Sidebar().current_space.id);
++  EXPECT_EQ(hidden, adapter_->DisplayedContents());
++  EXPECT_FALSE(view_->IsMyarcWorkspaceBlank());
++}
++
++IN_PROC_BROWSER_TEST_P(MyarcWorkspaceCommandSafetyTest,
++                       CommitRechecksSpaceAndKeepsHiddenPage) {
++  ASSERT_TRUE(embedded_test_server()->Start());
++  const auto palette_url = embedded_test_server()->GetURL("/title1.html");
++  auto* tabs = workspace_browser_->GetTabStripModel();
++  auto* hidden = tabs->GetActiveWebContents();
++  const auto old_url = hidden->GetVisibleURL();
++  const int count = tabs->count();
++  ASSERT_NO_FATAL_FAILURE(EnterEmptySpace());
++  const auto empty_space = adapter_->Sidebar().current_space.id;
++  // false is the current-tab intent captured before a Space switch.
++  ASSERT_TRUE(NavigateFromMyarcPalette(
++      workspace_browser_, base::UTF8ToUTF16(palette_url.spec()), false));
++  EXPECT_EQ(count + 1, tabs->count());
++  EXPECT_NE(hidden, tabs->GetActiveWebContents());
++  EXPECT_EQ(old_url, hidden->GetVisibleURL());
++  ASSERT_TRUE(base::test::RunUntil([&] {
++    return adapter_->DisplayedContents() == tabs->GetActiveWebContents();
++  }));
++  EXPECT_EQ(empty_space, adapter_->Sidebar().current_space.id);
++  auto* first_commit_page = tabs->GetActiveWebContents();
++  ASSERT_TRUE(content::WaitForLoadStop(first_commit_page));
++  const auto first_commit_url = first_commit_page->GetVisibleURL();
++  ASSERT_EQ(palette_url, first_commit_url);
++
++  ASSERT_NO_FATAL_FAILURE(EnterEmptySpace());
++  const auto omnibox_space = adapter_->Sidebar().current_space.id;
++  auto* location_bar =
++      BrowserWindow::FromBrowser(workspace_browser_)->GetLocationBar();
++  ASSERT_TRUE(location_bar);
++  ChromeOmniboxClient client(location_bar, workspace_browser_,
++                             workspace_browser_->GetProfile());
++  EXPECT_FALSE(client.CurrentPageExists());
++  EXPECT_TRUE(client.GetURL().is_empty());
++  EXPECT_TRUE(client.GetTitle().empty());
++  EXPECT_TRUE(client.GetFormattedFullURL().empty());
++  EXPECT_TRUE(client.GetNavigationEntryURL().is_empty());
++  AutocompleteMatch match;
++  match.destination_url = GURL("about:blank");
++  client.OnAutocompleteAccept(
++      match.destination_url, nullptr, WindowOpenDisposition::kCurrentTab,
++      ui::PAGE_TRANSITION_TYPED, match.type, base::TimeTicks::Now(), false,
++      false, u"about:blank", match, AutocompleteMatch());
++  EXPECT_EQ(count + 2, tabs->count());
++  EXPECT_NE(first_commit_page, tabs->GetActiveWebContents());
++  EXPECT_EQ(first_commit_url, first_commit_page->GetVisibleURL());
++  EXPECT_EQ(old_url, hidden->GetVisibleURL());
++  ASSERT_TRUE(base::test::RunUntil([&] {
++    return adapter_->DisplayedContents() == tabs->GetActiveWebContents();
++  }));
++  EXPECT_EQ(omnibox_space, adapter_->Sidebar().current_space.id);
++}
++
++IN_PROC_BROWSER_TEST_P(MyarcWorkspaceCommandSafetyTest,
++                       ExplicitSaveAndNativeBitAreDifferent) {
++  auto* tabs = workspace_browser_->GetTabStripModel();
++  auto* page = tabs->GetActiveWebContents();
++  ASSERT_TRUE(
++      ui_test_utils::NavigateToURL(workspace_browser_, GURL("about:blank")));
++  const auto id = myarc::BrowserWorkspaceAdapter::ItemIdForContents(*page);
++  ASSERT_NE(0u, id);
++  ASSERT_TRUE(adapter_->Pin(id).ok);
++  view_->RefreshMyarcWorkspaceSidebar();
++  EXPECT_FALSE(tabs->IsTabPinned(tabs->GetIndexOfWebContents(page)));
++  auto state = view_->GetMyarcTabSaveState({tabs->GetIndexOfWebContents(page)});
++  ASSERT_TRUE(state);
++  EXPECT_EQ(u"Remove Space Pins", state->label);
++
++  // Toggle direction comes from Rust membership, not the native pin bit.
++  PinTab(workspace_browser_);
++  EXPECT_TRUE(adapter_->Sidebar().pins.empty());
++  EXPECT_TRUE(adapter_->Sidebar().favorites.empty());
++  EXPECT_EQ(id, myarc::BrowserWorkspaceAdapter::ItemIdForContents(*page));
++  PinTab(workspace_browser_);
++  ASSERT_TRUE(base::test::RunUntil([&] {
++    const auto model = adapter_->Sidebar();
++    const int index = tabs->GetIndexOfWebContents(page);
++    return model.ok && model.favorites.size() == 1u &&
++           model.favorites[0].id == id && tabs->ContainsIndex(index) &&
++           tabs->IsTabPinned(index);
++  }));
++  const auto canonical =
++      std::string(adapter_->Sidebar().favorites[0].canonical_url);
++  auto* tab_list = TabListInterface::From(workspace_browser_);
++  ASSERT_TRUE(tab_list);
++  tab_list->UnpinTab(
++      tabs->GetTabAtIndex(tabs->GetIndexOfWebContents(page))->GetHandle());
++  // Extension API unpin is consumed without deleting managed saved data.
++  auto model = adapter_->Sidebar();
++  ASSERT_EQ(1u, model.favorites.size());
++  EXPECT_EQ(id, model.favorites[0].id);
++  EXPECT_EQ(canonical, std::string(model.favorites[0].canonical_url));
++  EXPECT_TRUE(tabs->IsTabPinned(tabs->GetIndexOfWebContents(page)));
++
++  tabs->SetTabPinned(tabs->GetIndexOfWebContents(page), false);
++  ASSERT_FALSE(tabs->IsTabPinned(tabs->GetIndexOfWebContents(page)));
++  // Generic native bit changes are repaired by the posted projection refresh.
++  ASSERT_TRUE(base::test::RunUntil([&] {
++    const int index = tabs->GetIndexOfWebContents(page);
++    return tabs->ContainsIndex(index) && tabs->IsTabPinned(index);
++  }));
++  model = adapter_->Sidebar();
++  ASSERT_EQ(1u, model.favorites.size());
++  EXPECT_EQ(id, model.favorites[0].id);
++  EXPECT_EQ(canonical, std::string(model.favorites[0].canonical_url));
++  EXPECT_EQ(id, myarc::BrowserWorkspaceAdapter::ItemIdForContents(*page));
++
++  // Explicit UI removal uses Unsave, never just the generic pin bit.
++  tabs->ExecuteContextMenuCommand(tabs->GetIndexOfWebContents(page),
++                                  TabStripModel::CommandTogglePinned);
++  ASSERT_TRUE(base::test::RunUntil([&] {
++    const auto model = adapter_->Sidebar();
++    return model.ok && model.favorites.empty() && model.pins.empty() &&
++           model.temporary.size() == 1u && model.temporary[0].id == id &&
++           adapter_->DisplayedContents() == page &&
++           myarc::BrowserWorkspaceAdapter::ItemIdForContents(*page) == id &&
++           !tabs->IsTabPinned(tabs->GetIndexOfWebContents(page));
++  }));
++  EXPECT_FALSE(view_->IsMyarcWorkspaceBlank());
++  EXPECT_EQ(id, myarc::BrowserWorkspaceAdapter::ItemIdForContents(*page));
++}
++
++IN_PROC_BROWSER_TEST_P(MyarcWorkspaceCommandSafetyTest,
++                       MixedSaveKeepsPinsAndSkipsTemporaryUnsave) {
++  auto* tabs = workspace_browser_->GetTabStripModel();
++  auto* pin_page = tabs->GetActiveWebContents();
++  const auto pin_id =
++      myarc::BrowserWorkspaceAdapter::ItemIdForContents(*pin_page);
++  ASSERT_TRUE(adapter_->Pin(pin_id).ok);
++  ASSERT_TRUE(
++      NavigateFromMyarcPalette(workspace_browser_, u"about:blank", true));
++  auto* temporary_page = tabs->GetActiveWebContents();
++  ASSERT_TRUE(base::test::RunUntil([&] { return adapter_->ready(); }));
++  const auto temporary_id =
++      myarc::BrowserWorkspaceAdapter::ItemIdForContents(*temporary_page);
++  ASSERT_NE(0u, temporary_id);
++  ASSERT_NE(pin_id, temporary_id);
++  EXPECT_TRUE(view_->SetMyarcTabsSaved(
++      {tabs->GetIndexOfWebContents(temporary_page)}, false));
++  EXPECT_TRUE(adapter_->error().empty());
++  EXPECT_EQ(temporary_id,
++            myarc::BrowserWorkspaceAdapter::ItemIdForContents(*temporary_page));
++  EXPECT_TRUE(adapter_->Sidebar().favorites.empty());
++
++  const auto indices = [&] {
++    return std::vector<int>{tabs->GetIndexOfWebContents(pin_page),
++                            tabs->GetIndexOfWebContents(temporary_page),
++                            tabs->GetIndexOfWebContents(temporary_page)};
++  };
++  auto state = view_->GetMyarcTabSaveState(indices());
++  ASSERT_TRUE(state && state->enabled && state->save);
++  // Validate the entire selection before changing even its valid prefix.
++  auto invalid = indices();
++  invalid.push_back(tabs->count());
++  EXPECT_TRUE(view_->SetMyarcTabsSaved(invalid, true));
++  EXPECT_TRUE(adapter_->Sidebar().favorites.empty());
++  EXPECT_TRUE(view_->SetMyarcTabsSaved(indices(), true));
++  ASSERT_TRUE(base::test::RunUntil([&] {
++    const int index = tabs->GetIndexOfWebContents(temporary_page);
++    return tabs->ContainsIndex(index) && tabs->IsTabPinned(index);
++  }));
++  auto model = adapter_->Sidebar();
++  ASSERT_EQ(1u, model.pins.size());
++  EXPECT_EQ(pin_id, model.pins[0].id);
++  ASSERT_EQ(1u, model.favorites.size());
++  EXPECT_EQ(temporary_id, model.favorites[0].id);
++  EXPECT_FALSE(tabs->IsTabPinned(tabs->GetIndexOfWebContents(pin_page)));
++  EXPECT_TRUE(tabs->IsTabPinned(tabs->GetIndexOfWebContents(temporary_page)));
++  EXPECT_TRUE(view_->SetMyarcTabsSaved(indices(), true));
++  EXPECT_EQ(1u, adapter_->Sidebar().pins.size());
++
++  // Unsave a mixed Pin + Temporary selection, without promoting/moving the
++  // already-temporary row. Duplicate indices must dispatch each stable ID once.
++  EXPECT_TRUE(view_->SetMyarcTabsSaved(
++      {tabs->GetIndexOfWebContents(temporary_page)}, false));
++  EXPECT_TRUE(view_->SetMyarcTabsSaved(indices(), false));
++  model = adapter_->Sidebar();
++  EXPECT_TRUE(model.pins.empty());
++  EXPECT_TRUE(model.favorites.empty());
++  EXPECT_EQ(temporary_id,
++            myarc::BrowserWorkspaceAdapter::ItemIdForContents(*temporary_page));
++}
++
++IN_PROC_BROWSER_TEST_P(MyarcWorkspaceCommandSafetyTest,
++                       BlankNavigationHasNoImplicitOpenerOrGroup) {
++  auto* tabs = workspace_browser_->GetTabStripModel();
++  auto* hidden = tabs->GetActiveWebContents();
++  const auto old_url = hidden->GetVisibleURL();
++  const auto group = tabs->AddToNewGroup({tabs->active_index()});
++  tabs->EnterFocusMode(group);
++  ASSERT_EQ(group, tabs->GetFocusedGroup());
++  ASSERT_NO_FATAL_FAILURE(EnterEmptySpace());
++  const auto space = adapter_->Sidebar().current_space.id;
++  NavigateParams params(workspace_browser_, GURL("about:blank"),
++                        ui::PAGE_TRANSITION_TYPED);
++  params.referrer.url = GURL("https://source.example/");
++  params.tabstrip_add_types |= AddTabTypes::ADD_INHERIT_OPENER;
++  Navigate(&params);
++  EXPECT_EQ(WindowOpenDisposition::kNewForegroundTab, params.disposition);
++  EXPECT_TRUE(params.user_gesture);
++  EXPECT_EQ(GURL("https://source.example/"), params.referrer.url);
++  EXPECT_EQ(nullptr, params.source_contents);
++  EXPECT_FALSE(params.source_site_instance);
++  EXPECT_EQ(nullptr, params.opener);
++  EXPECT_FALSE(tabs->GetOpenerOfTabAt(tabs->active_index()));
++  EXPECT_FALSE(tabs->GetTabGroupForTab(tabs->active_index()));
++  EXPECT_NE(hidden, tabs->GetActiveWebContents());
++  EXPECT_EQ(old_url, hidden->GetVisibleURL());
++  ASSERT_TRUE(base::test::RunUntil([&] { return adapter_->ready(); }));
++  EXPECT_EQ(space, adapter_->Sidebar().current_space.id);
++
++  ASSERT_NO_FATAL_FAILURE(EnterEmptySpace());
++  auto* active = tabs->GetActiveWebContents();
++  NavigateParams background(workspace_browser_, GURL("about:blank"),
++                            ui::PAGE_TRANSITION_LINK);
++  background.disposition = WindowOpenDisposition::kNewBackgroundTab;
++  Navigate(&background);
++  EXPECT_EQ(WindowOpenDisposition::kNewBackgroundTab, background.disposition);
++  EXPECT_EQ(active, tabs->GetActiveWebContents());
++  ASSERT_TRUE(background.navigated_or_inserted_contents);
++  const int index =
++      tabs->GetIndexOfWebContents(background.navigated_or_inserted_contents);
++  EXPECT_FALSE(tabs->GetOpenerOfTabAt(index));
++  EXPECT_FALSE(tabs->GetTabGroupForTab(index));
++}
++
++IN_PROC_BROWSER_TEST_P(MyarcWorkspaceCommandSafetyTest,
++                       BlankFocusKeepsChromeFieldAndRejectsTabContext) {
++  ASSERT_NO_FATAL_FAILURE(EnterEmptySpace());
++  auto* field = view_->AddChildView(std::make_unique<views::Textfield>());
++  field->SetBounds(0, 0, 160, 30);
++  field->RequestFocus();
++  ASSERT_EQ(field, view_->GetFocusManager()->GetFocusedView());
++  view_->RestoreFocus();
++  EXPECT_EQ(field, view_->GetFocusManager()->GetFocusedView());
++  auto* tabs = workspace_browser_->GetTabStripModel();
++  const int count = tabs->count();
++  EXPECT_FALSE(tabs->IsContextMenuCommandEnabled(
++      tabs->active_index(), TabStripModel::CommandNewTabToRight));
++  tabs->ExecuteContextMenuCommand(tabs->active_index(),
++                                  TabStripModel::CommandNewTabToRight);
++  EXPECT_EQ(count, tabs->count());
++  tabs_api::TabStripModelAdapterImpl tree(tabs, "workspace-test");
++  auto result =
++      tree.MoveTab(tabs->GetActiveTab()->GetHandle(), tabs_api::Position(0));
++  ASSERT_FALSE(result.has_value());
++  EXPECT_EQ(mojo_base::mojom::Code::kInvalidArgument, result.error()->code);
++  view_->RemoveChildViewT(field);
++  view_->GetFocusManager()->ClearFocus();
++  view_->RestoreFocus();
++  EXPECT_EQ(view_->GetInitiallyFocusedView(),
++            view_->GetFocusManager()->GetFocusedView());
++}
++
++#if BUILDFLAG(ENABLE_EXTENSIONS) && (BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC))
++IN_PROC_BROWSER_TEST_P(MyarcWorkspaceCommandSafetyTest,
++                       BlankSearchKeepsRequiredConsent) {
++  extensions::TestExtensionDir dir;
++  dir.WriteManifest(R"({
++    "name": "Workspace consent test", "version": "1", "manifest_version": 3,
++    "permissions": ["storage"],
++    "chrome_settings_overrides": { "search_provider": {
++      "name": "Consent search", "keyword": "consent",
++      "search_url": "https://search.example/?q={searchTerms}",
++      "encoding": "UTF-8", "is_default": true
++    }}
++  })");
++  auto installer =
++      extensions::UnpackedInstaller::Create(workspace_browser_->GetProfile());
++  base::test::TestFuture<const extensions::Extension*, const base::FilePath&,
++                         const std::u16string&>
++      installed;
++  installer->set_completion_callback(installed.GetCallback());
++  installer->Load(dir.UnpackedPath());
++  ASSERT_TRUE(installed.Get<0>());
++  auto* controller =
++      DefaultSearchExtensionControlledController::From(workspace_browser_);
++  ASSERT_TRUE(controller);
++  const GURL url("https://search.example/?q=test");
++  ASSERT_TRUE(base::test::RunUntil([&] {
++    return controller->ShouldRequestConfirmationForExtensionDse(url);
++  }));
++  ASSERT_NO_FATAL_FAILURE(EnterEmptySpace());
++  EXPECT_FALSE(NavigateFromMyarcPalette(workspace_browser_,
++                                        base::UTF8ToUTF16(url.spec()), false));
++  auto* location_bar =
++      BrowserWindow::FromBrowser(workspace_browser_)->GetLocationBar();
++  ChromeOmniboxClient client(location_bar, workspace_browser_,
++                             workspace_browser_->GetProfile());
++  base::test::TestFuture<OmniboxClient::ExtensionControlledDialogResult> result;
++  EXPECT_TRUE(client.ShowConfirmationDialogIfDefaultSearchExtensionControlled(
++      url, result.GetCallback()));
++  // No decision is synthesized. The test runner closes the native dialog at
++  // teardown; actual accept/reject journeys require an unlocked native run.
++  EXPECT_FALSE(result.IsReady());
++}
++#endif
++
++IN_PROC_BROWSER_TEST_P(MyarcWorkspaceCommandSafetyTest,
++                       BulkCommandsKeepOtherSpaces) {
++  auto* tabs = workspace_browser_->GetTabStripModel();
++  ASSERT_TRUE(adapter_->OpenInCurrentSpace(GURL("about:blank")).ok);
++  ASSERT_NO_FATAL_FAILURE(EnterEmptySpace());
++  ASSERT_TRUE(adapter_->OpenInCurrentSpace(GURL("about:blank")).ok);
++  ASSERT_TRUE(base::test::RunUntil([&] {
++    return adapter_->DisplayedContents() == tabs->GetActiveWebContents();
++  }));
++  view_->RefreshMyarcWorkspaceSidebar();
++  ASSERT_FALSE(view_->IsMyarcWorkspaceBlank());
++  ASSERT_TRUE(view_->IsMyarcWorkspaceActive());
++  ASSERT_EQ(1u, adapter_->Sidebar().temporary.size());
++  ASSERT_GE(tabs->count(), 3);
++  std::vector<content::WebContents*> pages;
++  for (int i = 0; i < tabs->count(); ++i) {
++    pages.push_back(tabs->GetWebContentsAt(i));
++  }
++  const int index = tabs->active_index();
++  constexpr std::pair<int, actions::ActionId> commands[] = {
++      {IDC_WINDOW_CLOSE_OTHER_TABS, kActionWindowCloseOtherTabs},
++      {IDC_WINDOW_CLOSE_TABS_TO_RIGHT, kActionWindowCloseTabsToRight},
++      {IDC_BOOKMARK_ALL_TABS, kActionBookmarkAllTabs},
++      {IDC_GROUP_UNGROUPED_TABS, kActionGroupUngroupedTabs},
++      {IDC_MOVE_TAB_NEXT, kActionMoveTabNext},
++      {IDC_MOVE_TAB_PREVIOUS, kActionMoveTabPrevious},
++      {IDC_MOVE_TAB_TO_NEW_WINDOW, kActionMoveTabToNewWindow},
++      {IDC_WINDOW_GROUP_TAB, kActionWindowGroupTab},
++      {IDC_ADD_NEW_TAB_TO_GROUP, kActionAddNewTabToGroup},
++      {IDC_CREATE_NEW_TAB_GROUP, kActionCreateNewTabGroup}};
++  auto* root = BrowserActions::From(workspace_browser_)->root_action_item();
++  for (const auto& [command, action_id] : commands) {
++    SCOPED_TRACE(command);
++    EXPECT_FALSE(IsCommandEnabled(workspace_browser_, command));
++    EXPECT_FALSE(ExecuteCommand(workspace_browser_, command));
++    auto* action = actions::ActionManager::Get().FindAction(action_id, root);
++    ASSERT_TRUE(action);
++    EXPECT_FALSE(action->GetEnabled());
++    // Even stale ActionItems must recheck execution eligibility.
++    action->SetEnabled(true);
++    action->InvokeAction();
++  }
++  EXPECT_FALSE(CanCloseOtherTabs(workspace_browser_));
++  EXPECT_FALSE(CanCloseTabsToRight(workspace_browser_));
++  EXPECT_FALSE(CanBookmarkAllTabs(workspace_browser_));
++  EXPECT_FALSE(CanGroupAllUngroupedTabs(workspace_browser_));
++  EXPECT_FALSE(CanMoveActiveTabToNewWindow(workspace_browser_));
++  EXPECT_FALSE(CanMoveTabsToNewWindow(workspace_browser_, {index}));
++  CloseOtherTabs(workspace_browser_);
++  CloseTabsToRight(workspace_browser_);
++  BookmarkAllTabs(workspace_browser_);
++  EXPECT_FALSE(GroupAllUngroupedTabs(workspace_browser_));
++  GroupTab(workspace_browser_);
++  MoveTabNext(workspace_browser_);
++  MoveTabPrevious(workspace_browser_);
++  MoveActiveTabToNewWindow(workspace_browser_);
++  MoveTabsToNewWindow(workspace_browser_, {index});
++  MoveTabsToExistingWindow(workspace_browser_, browser(), {index});
++  constexpr TabStripModel::ContextMenuCommand context_commands[] = {
++      TabStripModel::CommandCloseOtherTabs,
++      TabStripModel::CommandCloseTabsToRight,
++      TabStripModel::CommandToggleGrouped,
++      TabStripModel::CommandAddToNewGroup,
++      TabStripModel::CommandAddToExistingGroup,
++      TabStripModel::CommandMoveTabsToNewWindow,
++      TabStripModel::CommandMoveToExistingWindow};
++  for (auto command : context_commands) {
++    SCOPED_TRACE(command);
++    EXPECT_FALSE(tabs->IsContextMenuCommandEnabled(index, command));
++    tabs->ExecuteContextMenuCommand(index, command);
++  }
++  ASSERT_EQ(static_cast<int>(pages.size()), tabs->count());
++  EXPECT_EQ(index, tabs->active_index());
++  for (int i = 0; i < tabs->count(); ++i) {
++    EXPECT_EQ(pages[i], tabs->GetWebContentsAt(i));
++    EXPECT_FALSE(tabs->GetTabGroupForTab(i));
++  }
++}
++
++IN_PROC_BROWSER_TEST_P(MyarcWorkspaceCommandSafetyTest,
++                       ActionReplayPreservesSupportAndPolicy) {
++  ASSERT_TRUE(embedded_test_server()->Start());
++  ASSERT_TRUE(ui_test_utils::NavigateToURL(
++      workspace_browser_, embedded_test_server()->GetURL("/title1.html")));
++  auto* controller = BrowserCommandController::From(workspace_browser_);
++  auto* root = BrowserActions::From(workspace_browser_)->root_action_item();
++  auto* lens = actions::ActionManager::Get().FindAction(
++      kActionContentContextLensRegionSearch, root);
++  auto* qr =
++      actions::ActionManager::Get().FindAction(kActionQrCodeGenerator, root);
++  ASSERT_TRUE(lens);
++  ASSERT_TRUE(qr);
++  const bool supported = SupportsCommand(
++      workspace_browser_, IDC_CONTENT_CONTEXT_LENS_REGION_SEARCH);
++  EXPECT_EQ(GetParam(), supported);
++  const bool lens_enabled = lens->GetEnabled();
++  const auto old_space = adapter_->Sidebar().current_space.id;
++  const bool qr_policy = g_browser_process->local_state()->GetBoolean(
++      prefs::kQRCodeGeneratorEnabled);
++  base::ScopedClosureRunner restore_qr_policy(base::BindOnce(
++      [](bool enabled) {
++        g_browser_process->local_state()->SetBoolean(
++            prefs::kQRCodeGeneratorEnabled, enabled);
++      },
++      qr_policy));
++  for (int pass = 0; pass < 2; ++pass) {
++    g_browser_process->local_state()->SetBoolean(prefs::kQRCodeGeneratorEnabled,
++                                                 true);
++    controller->TabStateChanged();
++    ASSERT_TRUE(qr->GetEnabled());
++    ASSERT_NO_FATAL_FAILURE(EnterEmptySpace());
++    EXPECT_FALSE(lens->GetEnabled());
++    EXPECT_FALSE(qr->GetEnabled());
++    // A policy change while masked must survive native-state replay.
++    g_browser_process->local_state()->SetBoolean(prefs::kQRCodeGeneratorEnabled,
++                                                 false);
++    controller->MyarcWorkspaceStateChanged();
++    EXPECT_FALSE(lens->GetEnabled());
++    EXPECT_EQ(supported,
++              SupportsCommand(workspace_browser_,
++                              IDC_CONTENT_CONTEXT_LENS_REGION_SEARCH));
++    ASSERT_TRUE(adapter_->SelectSpace(old_space).ok);
++    view_->RefreshMyarcWorkspaceSidebar();
++    EXPECT_EQ(lens_enabled, lens->GetEnabled());
++    EXPECT_FALSE(qr->GetEnabled());
++    EXPECT_EQ(supported,
++              SupportsCommand(workspace_browser_,
++                              IDC_CONTENT_CONTEXT_LENS_REGION_SEARCH));
++  }
++  g_browser_process->local_state()->SetBoolean(prefs::kQRCodeGeneratorEnabled,
++                                               qr_policy);
++  EXPECT_FALSE(IsMyarcPageCommand(IDC_TAKE_SCREENSHOT));
++}
++
++IN_PROC_BROWSER_TEST_P(MyarcWorkspaceCommandSafetyTest,
++                       NativeFallbackBeforeProjectionReady) {
++  auto* tabs = workspace_browser_->GetTabStripModel();
++  ASSERT_TRUE(adapter_->OpenInCurrentSpace(GURL("about:blank")).ok);
++  ASSERT_TRUE(base::test::RunUntil([&] {
++    return adapter_->DisplayedContents() == tabs->GetActiveWebContents();
++  }));
++  view_->RefreshMyarcWorkspaceSidebar();
++  EXPECT_FALSE(CanCloseOtherTabs(workspace_browser_));
++  myarc::BrowserWorkspaceAdapter::BeginSessionRestore(
++      *workspace_browser_->GetProfile());
++  view_->RefreshMyarcWorkspaceSidebar();
++  ASSERT_FALSE(adapter_->ready());
++  EXPECT_FALSE(view_->IsMyarcWorkspaceActive());
++  EXPECT_FALSE(view_->IsMyarcWorkspaceBlank());
++  EXPECT_TRUE(CanCloseOtherTabs(workspace_browser_));
++  EXPECT_TRUE(
++      IsCommandEnabled(workspace_browser_, IDC_WINDOW_CLOSE_OTHER_TABS));
++  EXPECT_TRUE(IsCommandEnabled(workspace_browser_, IDC_CLOSE_TAB));
++  ASSERT_TRUE(myarc::BrowserWorkspaceAdapter::FinishSessionRestore(
++                  *workspace_browser_->GetProfile())
++                  .ok);
++  ASSERT_TRUE(base::test::RunUntil([&] { return adapter_->ready(); }));
++  view_->RefreshMyarcWorkspaceSidebar();
++  EXPECT_TRUE(view_->IsMyarcWorkspaceActive());
++  EXPECT_FALSE(
++      IsCommandEnabled(workspace_browser_, IDC_WINDOW_CLOSE_OTHER_TABS));
++}
++
++IN_PROC_BROWSER_TEST_P(MyarcWorkspaceCommandSafetyTest,
++                       LastTemporaryCloseBlanksSpace) {
++  auto* tabs = workspace_browser_->GetTabStripModel();
++  ASSERT_TRUE(ui_test_utils::NavigateToURL(
++      workspace_browser_, GURL("data:text/html,<title>Retained page</title>")));
++  auto* retained = tabs->GetActiveWebContents();
++  const auto retained_item =
++      myarc::BrowserWorkspaceAdapter::ItemIdForContents(*retained);
++  ASSERT_NO_FATAL_FAILURE(EnterEmptySpace());
++  const auto empty_space = adapter_->Sidebar().current_space.id;
++  ASSERT_TRUE(adapter_->OpenInCurrentSpace(GURL("about:blank")).ok);
++  ASSERT_TRUE(base::test::RunUntil([&] {
++    return !view_->IsMyarcWorkspaceBlank() &&
++           adapter_->DisplayedContents() == tabs->GetActiveWebContents();
++  }));
++  const auto item = myarc::BrowserWorkspaceAdapter::ItemIdForContents(
++      *tabs->GetActiveWebContents());
++  auto* source = actions::ActionManager::Get().FindAction(
++      kActionViewSource,
++      BrowserActions::From(workspace_browser_)->root_action_item());
++  ASSERT_TRUE(source);
++  ASSERT_TRUE(adapter_->CloseItem(item).ok);
++  // No SelectSpace or manual command refresh: native close must notify Views.
++  ASSERT_TRUE(base::test::RunUntil([&] {
++    return adapter_->Sidebar().temporary.empty() &&
++           view_->IsMyarcWorkspaceBlank() && !source->GetEnabled();
++  }));
++  EXPECT_EQ(empty_space, adapter_->Sidebar().current_space.id);
++  EXPECT_EQ(retained, tabs->GetActiveWebContents());
++  EXPECT_FALSE(IsCommandEnabled(workspace_browser_, IDC_CLOSE_TAB));
++  EXPECT_FALSE(source->GetEnabled());
++  const int index = tabs->active_index();
++  ASSERT_TRUE(adapter_->ActivateItem(retained_item).ok);
++  ASSERT_TRUE(base::test::RunUntil(
++      [&] { return !view_->IsMyarcWorkspaceBlank() && source->GetEnabled(); }));
++  EXPECT_EQ(index, tabs->active_index());
++  EXPECT_TRUE(IsCommandEnabled(workspace_browser_, IDC_CLOSE_TAB));
++  EXPECT_TRUE(source->GetEnabled());
++}
++
++INSTANTIATE_TEST_SUITE_P(LegacyAndActions,
++                         MyarcWorkspaceCommandSafetyTest,
++                         testing::Bool());
++
+ }  // namespace chrome
+diff --git a/chrome/browser/ui/browser_commands.cc b/chrome/browser/ui/browser_commands.cc
+index 59547456302be7ea54ee665adf3b8e7dbbff3c31..b8a8a715fbad9bf96c528edb773c91ae2d82e4de 100644
+--- a/chrome/browser/ui/browser_commands.cc
++++ b/chrome/browser/ui/browser_commands.cc
+@@ -236,6 +236,10 @@
+ #include "extensions/common/extension_set.h"
+ #endif
+ 
++#if BUILDFLAG(ENABLE_EXTENSIONS) && (BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC))
++#include "chrome/browser/ui/search_engines/default_search_extension_controlled_controller.h"
++#endif
++
+ #if BUILDFLAG(ENABLE_PDF)
+ #include "chrome/browser/pdf/pdf_extension_util.h"
+ #include "pdf/pdf_features.h"
+@@ -722,6 +726,10 @@ tabs::TabInterface* GetTabAndRevertIfNecessary(
+ void ReloadInternal(BrowserWindowInterface* browser,
+                     WindowOpenDisposition disposition,
+                     bool bypass_cache) {
++  if (IsMyarcWorkspaceBlank(browser)) {
++    return;
++  }
++
+   TabStripModel* const tab_strip_model = browser->GetTabStripModel();
+   tabs::TabInterface* const active_tab = tab_strip_model->GetActiveTab();
+ 
+@@ -838,6 +846,133 @@ std::vector<int> GetUngroupedTabIndices(BrowserWindowInterface* browser) {
+ 
+ }  // namespace
+ 
++bool IsMyarcWorkspaceBlank(const BrowserWindowInterface* browser) {
++  auto* window = browser ? BrowserWindow::FromBrowser(browser) : nullptr;
++  return window && window->IsMyarcWorkspaceBlank();
++}
++
++bool IsMyarcPageCommand(int command) {
++  switch (command) {
++    case IDC_BACK:
++    case IDC_FORWARD:
++    case IDC_RELOAD:
++    case IDC_HOME:
++    case IDC_STOP:
++    case IDC_RELOAD_BYPASSING_CACHE:
++    case IDC_RELOAD_CLEARING_CACHE:
++    case IDC_CLOSE_TAB:
++    case IDC_DUPLICATE_TAB:
++    case IDC_MOVE_TAB_NEXT:
++    case IDC_MOVE_TAB_PREVIOUS:
++    case IDC_MOVE_TAB_TO_NEW_WINDOW:
++    case IDC_NEW_SPLIT_TAB:
++    case IDC_OPEN_IN_PWA_WINDOW:
++    case IDC_SHOW_AS_TAB:
++    case IDC_COPY_URL:
++    case IDC_OPEN_IN_CHROME:
++    case IDC_ADD_NEW_TAB_TO_GROUP:
++    case IDC_CREATE_NEW_TAB_GROUP:
++    case IDC_CLOSE_TAB_GROUP:
++    case IDC_GROUP_UNGROUPED_TABS:
++    case IDC_ADD_NEW_TAB_RECENT_GROUP:
++    case IDC_BOOKMARK_THIS_TAB:
++    case IDC_BOOKMARK_ALL_TABS:
++    case IDC_VIEW_SOURCE:
++    case IDC_PRINT:
++    case IDC_SAVE_PAGE:
++    case IDC_EMAIL_PAGE_LOCATION:
++    case IDC_BASIC_PRINT:
++    case IDC_SAVE_CREDIT_CARD_FOR_PAGE:
++    case IDC_SHOW_TRANSLATE:
++    case IDC_MANAGE_PASSWORDS_FOR_PAGE:
++    case IDC_ROUTE_MEDIA:
++    case IDC_WINDOW_MUTE_SITE:
++    case IDC_WINDOW_PIN_TAB:
++    case IDC_WINDOW_GROUP_TAB:
++    case IDC_SEND_TAB_TO_SELF:
++    case IDC_QRCODE_GENERATOR:
++    case IDC_WINDOW_CLOSE_TABS_TO_RIGHT:
++    case IDC_WINDOW_CLOSE_OTHER_TABS:
++    case IDC_NEW_TAB_TO_RIGHT:
++    case IDC_SAVE_AUTOFILL_ADDRESS:
++    case IDC_OFFERS_AND_REWARDS_FOR_PAGE:
++    case IDC_SHARING_HUB:
++    case IDC_FILLED_CARD_INFORMATION:
++    case IDC_SHARING_HUB_SCREENSHOT:
++    case IDC_VIRTUAL_CARD_ENROLL:
++    case IDC_SAVE_IBAN_FOR_PAGE:
++    case IDC_AUTOFILL_MANDATORY_REAUTH:
++    case IDC_MUTE_TARGET_SITE:
++    case IDC_PIN_TARGET_TAB:
++    case IDC_GROUP_TARGET_TAB:
++    case IDC_DUPLICATE_TARGET_TAB:
++    case IDC_FIND:
++    case IDC_FIND_NEXT:
++    case IDC_FIND_PREVIOUS:
++    case IDC_CLOSE_FIND_OR_STOP:
++    case IDC_ZOOM_MENU:
++    case IDC_ZOOM_PLUS:
++    case IDC_ZOOM_NORMAL:
++    case IDC_ZOOM_MINUS:
++    case IDC_FOCUS_WEB_CONTENTS_PANE:
++    case IDC_CREATE_SHORTCUT:
++    case IDC_DEV_TOOLS:
++    case IDC_DEV_TOOLS_CONSOLE:
++    case IDC_DEV_TOOLS_INSPECT:
++    case IDC_DEV_TOOLS_TOGGLE:
++#if BUILDFLAG(IS_MAC)
++    case IDC_TOGGLE_JAVASCRIPT_APPLE_EVENTS:
++#endif
++    case IDC_TOGGLE_REQUEST_TABLET_SITE:
++    case IDC_DISTILL_PAGE:
++    case IDC_INSTALL_PWA:
++    case IDC_CARET_BROWSING_TOGGLE:
++    case IDC_READING_LIST_MENU_ADD_TAB:
++    case IDC_SHOW_READING_MODE:
++    case IDC_SHOW_READING_MODE_KEYBOARD:
++    case IDC_SHOW_COMMENTS_SIDE_PANEL:
++    case IDC_REPORT_UNSAFE_SITE:
++    case IDC_SHOW_TTC_MENU:
++    case IDC_CONTENT_CONTEXT_INSPECTELEMENT_WITH_DEVTOOLS:
++    case IDC_CONTENT_CONTEXT_LENS_REGION_SEARCH:
++    case IDC_CONTENT_CONTEXT_WEB_REGION_SEARCH:
++    case IDC_CONTENT_CONTEXT_LENS_OVERLAY:
++    case IDC_CONTENT_CONTEXT_OPEN_IN_READING_MODE:
++      return true;
++    default:
++      return false;
++  }
++}
++
++bool IsMyarcWorkspaceCommandAllowed(const BrowserWindowInterface* browser,
++                                    int command) {
++  // These operations use the entire native strip, including other Spaces.
++  // Keep native fallback available until the Rust projection is ready.
++  switch (command) {
++    case IDC_MOVE_TAB_NEXT:
++    case IDC_MOVE_TAB_PREVIOUS:
++    case IDC_MOVE_TAB_TO_NEW_WINDOW:
++    case IDC_WINDOW_CLOSE_OTHER_TABS:
++    case IDC_WINDOW_CLOSE_TABS_TO_RIGHT:
++    case IDC_BOOKMARK_ALL_TABS:
++    case IDC_GROUP_UNGROUPED_TABS:
++    case IDC_WINDOW_GROUP_TAB:
++    case IDC_GROUP_TARGET_TAB:
++    case IDC_ADD_NEW_TAB_TO_GROUP:
++    case IDC_CREATE_NEW_TAB_GROUP:
++    case IDC_CLOSE_TAB_GROUP:
++    case IDC_ADD_NEW_TAB_RECENT_GROUP: {
++      const auto* window =
++          browser ? BrowserWindow::FromBrowser(browser) : nullptr;
++      if (window && window->IsMyarcWorkspaceActive()) {
++        return false;
++      }
++      break;
++    }
++  }
++  return !IsMyarcPageCommand(command) || !IsMyarcWorkspaceBlank(browser);
++}
++
+ bool IsCommandEnabled(BrowserWindowInterface* browser, int command) {
+   return BrowserCommandController::From(browser)->IsCommandEnabled(command);
+ }
+@@ -901,6 +1036,9 @@ void RemoveCommandObserver(BrowserWindowInterface* browser,
+ }
+ 
+ int GetContentRestrictions(const BrowserWindowInterface* browser) {
++  if (IsMyarcWorkspaceBlank(browser)) {
++    return 0;  // Hidden page restrictions must not disable native text fields.
++  }
+   int content_restrictions = 0;
+   WebContents* const current_tab =
+       browser->GetTabStripModel()->GetActiveWebContents();
+@@ -1018,6 +1156,10 @@ void OpenURLOffTheRecord(Profile* profile, const GURL& url) {
+ }
+ 
+ bool CanGoBack(const BrowserWindowInterface* browser) {
++  if (IsMyarcWorkspaceBlank(browser)) {
++    return false;
++  }
++
+   return CanGoBack(browser->GetTabStripModel()->GetActiveWebContents());
+ }
+ 
+@@ -1029,6 +1171,10 @@ bool CanGoBack(content::WebContents* web_contents) {
+ }
+ 
+ bool ShouldEnableBackButton(const BrowserWindowInterface* browser) {
++  if (IsMyarcWorkspaceBlank(browser)) {
++    return false;
++  }
++
+   content::WebContents* web_contents =
+       browser->GetTabStripModel()->GetActiveWebContents();
+   if (!web_contents) {
+@@ -1092,6 +1238,10 @@ void MaybeShowFeatureBackNavigationMenuPromo(BrowserWindowInterface* browser,
+ 
+ void GoBack(BrowserWindowInterface* browser,
+             WindowOpenDisposition disposition) {
++  if (IsMyarcWorkspaceBlank(browser)) {
++    return;
++  }
++
+   tabs::TabInterface* tab = GetTabAndRevertIfNecessary(browser, disposition);
+   CHECK(tab);
+   GoBack(tab->GetContents());
+@@ -1121,6 +1271,10 @@ void GoBack(content::WebContents* web_contents) {
+ }
+ 
+ bool CanGoForward(const BrowserWindowInterface* browser) {
++  if (IsMyarcWorkspaceBlank(browser)) {
++    return false;
++  }
++
+   return browser->GetTabStripModel()
+       ->GetActiveWebContents()
+       ->GetController()
+@@ -1132,6 +1286,10 @@ bool CanGoForward(content::WebContents* web_contents) {
+ }
+ 
+ bool ShouldEnableForwardButton(const BrowserWindowInterface* browser) {
++  if (IsMyarcWorkspaceBlank(browser)) {
++    return false;
++  }
++
+   return browser->GetTabStripModel()
+       ->GetActiveWebContents()
+       ->GetController()
+@@ -1140,6 +1298,10 @@ bool ShouldEnableForwardButton(const BrowserWindowInterface* browser) {
+ 
+ void GoForward(BrowserWindowInterface* browser,
+                WindowOpenDisposition disposition) {
++  if (IsMyarcWorkspaceBlank(browser)) {
++    return;
++  }
++
+   base::RecordAction(UserMetricsAction("Forward"));
+   if (CanGoForward(browser)) {
+     tabs::TabInterface* tab = GetTabAndRevertIfNecessary(browser, disposition);
+@@ -1158,6 +1320,10 @@ void GoForward(content::WebContents* web_contents) {
+ void NavigateToIndexWithDisposition(BrowserWindowInterface* browser,
+                                     int index,
+                                     WindowOpenDisposition disposition) {
++  if (IsMyarcWorkspaceBlank(browser)) {
++    return;
++  }
++
+   tabs::TabInterface* tab = GetTabAndRevertIfNecessary(browser, disposition);
+   CHECK(tab);
+   WebContents* web_contents = tab->GetContents();
+@@ -1181,12 +1347,20 @@ void ReloadBypassingCache(BrowserWindowInterface* browser,
+ }
+ 
+ bool CanReload(const BrowserWindowInterface* browser) {
++  if (IsMyarcWorkspaceBlank(browser)) {
++    return false;
++  }
++
+   return browser &&
+          browser->GetType() != BrowserWindowInterface::TYPE_DEVTOOLS &&
+          !DesktopBrowserWindowCapabilities::IsDocumentPictureInPicture(browser);
+ }
+ 
+ void Home(BrowserWindowInterface* browser, WindowOpenDisposition disposition) {
++  if (IsMyarcWorkspaceBlank(browser)) {
++    return;
++  }
++
+   base::RecordAction(UserMetricsAction("Home"));
+ 
+   std::string extra_headers;
+@@ -1280,6 +1454,13 @@ base::WeakPtr<content::NavigationHandle> OpenCurrentURL(
+   params.url_typed_with_http_scheme =
+       location_bar->navigation_params().url_typed_with_http_scheme;
+   params.extra_headers = location_bar->navigation_params().extra_headers;
++  if (IsMyarcWorkspaceBlank(browser)) {
++    if (params.disposition == WindowOpenDisposition::kCurrentTab) {
++      params.disposition = WindowOpenDisposition::kNewForegroundTab;
++    }
++    // Navigate and the tab strip exclude implicit hidden-page context.
++    params.tabstrip_add_types &= ~AddTabTypes::ADD_INHERIT_OPENER;
++  }
+   auto result = Navigate(&params);
+ 
+ #if BUILDFLAG(ENABLE_EXTENSIONS)
+@@ -1302,6 +1483,10 @@ base::WeakPtr<content::NavigationHandle> OpenCurrentURL(
+ }
+ 
+ void Stop(BrowserWindowInterface* browser) {
++  if (IsMyarcWorkspaceBlank(browser)) {
++    return;
++  }
++
+   base::RecordAction(UserMetricsAction("Stop"));
+   browser->GetTabStripModel()->GetActiveWebContents()->Stop();
+ }
+@@ -1409,6 +1594,16 @@ bool NavigateFromMyarcPalette(BrowserWindowInterface* browser,
+                            url.SchemeIs("chrome") || url.IsAboutBlank())) {
+     return false;
+   }
++#if BUILDFLAG(ENABLE_EXTENSIONS) && (BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC))
++  // This prototype has no consent continuation. Keep required search consent
++  // in the native omnibox instead of navigating without it.
++  if (auto* controller =
++          DefaultSearchExtensionControlledController::From(browser);
++      controller && controller->ShouldRequestConfirmationForExtensionDse(url)) {
++    return false;
++  }
++#endif
++  new_tab |= IsMyarcWorkspaceBlank(browser);
+   if (!new_tab) {
+     if (!browser->GetTabStripModel()->GetActiveWebContents()) {
+       return false;
+@@ -1468,6 +1663,10 @@ content::WebContents& NewTab(BrowserWindowInterface* browser,
+ }
+ 
+ void NewTabToRight(BrowserWindowInterface* browser) {
++  if (IsMyarcWorkspaceBlank(browser)) {
++    return;
++  }
++
+   browser->GetTabStripModel()->ExecuteContextMenuCommand(
+       browser->GetTabStripModel()->active_index(),
+       TabStripModel::CommandNewTabToRight);
+@@ -1511,6 +1710,10 @@ void NewTabFromClipboardURL(BrowserWindowInterface* browser) {
+ }
+ 
+ void CloseTab(BrowserWindowInterface* browser) {
++  if (IsMyarcWorkspaceBlank(browser)) {
++    return;
++  }
++
+   base::RecordAction(UserMetricsAction("CloseTab_Accelerator"));
+ 
+   tabs::TabInterface* active_tab = browser->GetTabStripModel()->GetActiveTab();
+@@ -1628,11 +1831,19 @@ void CycleToMruTab(BrowserWindowInterface* browser,
+ }
+ 
+ void MoveTabNext(BrowserWindowInterface* browser) {
++  if (!IsMyarcWorkspaceCommandAllowed(browser, IDC_MOVE_TAB_NEXT)) {
++    return;
++  }
++
+   base::RecordAction(UserMetricsAction("MoveTabNext"));
+   browser->GetTabStripModel()->MoveTabNext();
+ }
+ 
+ void MoveTabPrevious(BrowserWindowInterface* browser) {
++  if (!IsMyarcWorkspaceCommandAllowed(browser, IDC_MOVE_TAB_PREVIOUS)) {
++    return;
++  }
++
+   base::RecordAction(UserMetricsAction("MoveTabPrevious"));
+   browser->GetTabStripModel()->MoveTabPrevious();
+ }
+@@ -1675,16 +1886,28 @@ void SelectLastTab(BrowserWindowInterface* browser,
+ }
+ 
+ void DuplicateTab(BrowserWindowInterface* browser) {
++  if (IsMyarcWorkspaceBlank(browser)) {
++    return;
++  }
++
+   base::RecordAction(UserMetricsAction("Duplicate"));
+   DuplicateTabAt(browser, browser->GetTabStripModel()->active_index());
+ }
+ 
+ bool CanDuplicateTab(const BrowserWindowInterface* browser) {
++  if (IsMyarcWorkspaceBlank(browser)) {
++    return false;
++  }
++
+   return CanDuplicateTabAt(browser,
+                            browser->GetTabStripModel()->active_index());
+ }
+ 
+ bool CanDuplicateKeyboardFocusedTab(const BrowserWindowInterface* browser) {
++  if (IsMyarcWorkspaceBlank(browser)) {
++    return false;
++  }
++
+   if (!HasKeyboardFocusedTab(browser)) {
+     return false;
+   }
+@@ -1692,6 +1915,10 @@ bool CanDuplicateKeyboardFocusedTab(const BrowserWindowInterface* browser) {
+ }
+ 
+ bool CanMoveActiveTabToNewWindow(BrowserWindowInterface* browser) {
++  if (!IsMyarcWorkspaceCommandAllowed(browser, IDC_MOVE_TAB_TO_NEW_WINDOW)) {
++    return false;
++  }
++
+   const ui::ListSelectionModel::SelectedIndices selection =
+       browser->GetTabStripModel()
+           ->selection_model()
+@@ -1703,6 +1930,10 @@ bool CanMoveActiveTabToNewWindow(BrowserWindowInterface* browser) {
+ 
+ // TODO(crbug.com/435178910) Remove this usage of ListSelectionModel.
+ void MoveActiveTabToNewWindow(BrowserWindowInterface* browser) {
++  if (!IsMyarcWorkspaceCommandAllowed(browser, IDC_MOVE_TAB_TO_NEW_WINDOW)) {
++    return;
++  }
++
+   const ui::ListSelectionModel::SelectedIndices selection =
+       browser->GetTabStripModel()
+           ->selection_model()
+@@ -1714,6 +1945,10 @@ void MoveActiveTabToNewWindow(BrowserWindowInterface* browser) {
+ 
+ bool CanMoveTabsToNewWindow(BrowserWindowInterface* browser,
+                             const std::vector<int>& tab_indices) {
++  if (!IsMyarcWorkspaceCommandAllowed(browser, IDC_MOVE_TAB_TO_NEW_WINDOW)) {
++    return false;
++  }
++
+   if (browser->GetType() == BrowserWindowInterface::TYPE_APP) {
+     for (int index : tab_indices) {
+       if (web_app::IsPinnedHomeTab(browser->GetTabStripModel(), index)) {
+@@ -1727,6 +1962,10 @@ bool CanMoveTabsToNewWindow(BrowserWindowInterface* browser,
+ 
+ void MoveGroupToNewWindow(BrowserWindowInterface* browser,
+                           tab_groups::TabGroupId group) {
++  if (!IsMyarcWorkspaceCommandAllowed(browser, IDC_MOVE_TAB_TO_NEW_WINDOW)) {
++    return;
++  }
++
+   BrowserWindowInterface* new_browser;
+   if (browser->GetType() == BrowserWindowInterface::Type::TYPE_APP &&
+       web_app::AppBrowserController::From(browser)->has_tab_strip()) {
+@@ -1745,6 +1984,10 @@ void MoveGroupToNewWindow(BrowserWindowInterface* browser,
+ 
+ void MoveTabsToNewWindow(BrowserWindowInterface* browser,
+                          const std::vector<int>& tab_indices) {
++  if (!IsMyarcWorkspaceCommandAllowed(browser, IDC_MOVE_TAB_TO_NEW_WINDOW)) {
++    return;
++  }
++
+   if (tab_indices.empty()) {
+     return;
+   }
+@@ -1766,12 +2009,21 @@ void MoveTabsToNewWindow(BrowserWindowInterface* browser,
+ }
+ 
+ bool CanCloseTabsToRight(const BrowserWindowInterface* browser) {
++  if (!IsMyarcWorkspaceCommandAllowed(browser,
++                                      IDC_WINDOW_CLOSE_TABS_TO_RIGHT)) {
++    return false;
++  }
++
+   return browser->GetTabStripModel()->IsContextMenuCommandEnabled(
+       browser->GetTabStripModel()->active_index(),
+       TabStripModel::CommandCloseTabsToRight);
+ }
+ 
+ bool CanCloseOtherTabs(const BrowserWindowInterface* browser) {
++  if (!IsMyarcWorkspaceCommandAllowed(browser, IDC_WINDOW_CLOSE_OTHER_TABS)) {
++    return false;
++  }
++
+   return browser->GetTabStripModel()->IsContextMenuCommandEnabled(
+       browser->GetTabStripModel()->active_index(),
+       TabStripModel::CommandCloseOtherTabs);
+@@ -1783,6 +2035,10 @@ WebContents* DuplicateTabAt(BrowserWindowInterface* browser, int index) {
+ 
+ void DuplicateSplit(BrowserWindowInterface* browser,
+                     split_tabs::SplitTabId split) {
++  if (IsMyarcWorkspaceBlank(browser)) {
++    return;
++  }
++
+   CHECK(WindowFeatureController::From(browser)->CanSupportWindowFeature(
+       WindowFeatureController::WindowFeature::kFeatureTabStrip));
+ 
+@@ -1817,6 +2073,10 @@ void DuplicateSplit(BrowserWindowInterface* browser,
+ }
+ 
+ bool CanDuplicateTabAt(const BrowserWindowInterface* browser, int index) {
++  if (IsMyarcWorkspaceBlank(browser)) {
++    return false;
++  }
++
+   if (browser->GetType() == BrowserWindowInterface::TYPE_FLOATING ||
+       browser->GetType() == BrowserWindowInterface::TYPE_APP_POPUP ||
+       browser->GetType() == BrowserWindowInterface::TYPE_DEVTOOLS) {
+@@ -1829,22 +2089,46 @@ bool CanDuplicateTabAt(const BrowserWindowInterface* browser, int index) {
+ void MoveTabsToExistingWindow(BrowserWindowInterface* source,
+                               BrowserWindowInterface* target,
+                               const std::vector<int>& tab_indices) {
++  if (!IsMyarcWorkspaceCommandAllowed(source, IDC_MOVE_TAB_TO_NEW_WINDOW)) {
++    return;
++  }
++
+   MoveTabsToWindowImpl(source, target, tab_indices);
+ }
+ 
+ void MoveGroupToExistingWindow(BrowserWindowInterface* source,
+                                BrowserWindowInterface* target,
+                                tab_groups::TabGroupId group) {
++  if (!IsMyarcWorkspaceCommandAllowed(source, IDC_MOVE_TAB_TO_NEW_WINDOW)) {
++    return;
++  }
++
+   MoveGroupToWindowImpl(source, target, group);
+ }
+ 
+ void PinTab(BrowserWindowInterface* browser) {
++  if (IsMyarcWorkspaceBlank(browser)) {
++    return;
++  }
++  auto* tabs = browser->GetTabStripModel();
++  if (auto* window = BrowserWindow::FromBrowser(browser)) {
++    if (const auto state =
++            window->GetMyarcTabSaveState({tabs->active_index()})) {
++      window->SetMyarcTabsSaved({tabs->active_index()}, state->save);
++      return;
++    }
++  }
++
+   browser->GetTabStripModel()->ExecuteContextMenuCommand(
+       browser->GetTabStripModel()->active_index(),
+       TabStripModel::ContextMenuCommand::CommandTogglePinned);
+ }
+ 
+ void GroupTab(BrowserWindowInterface* browser) {
++  if (!IsMyarcWorkspaceCommandAllowed(browser, IDC_WINDOW_GROUP_TAB)) {
++    return;
++  }
++
+   browser->GetTabStripModel()->ExecuteContextMenuCommand(
+       browser->GetTabStripModel()->active_index(),
+       TabStripModel::ContextMenuCommand::CommandToggleGrouped);
+@@ -1853,6 +2137,10 @@ void GroupTab(BrowserWindowInterface* browser) {
+ void NewSplitTab(BrowserWindowInterface* browser,
+                  split_tabs::SplitTabLayout layout,
+                  split_tabs::SplitTabCreatedSource source) {
++  if (IsMyarcWorkspaceBlank(browser)) {
++    return;
++  }
++
+   TabStripModel* const tab_strip_model = browser->GetTabStripModel();
+   const int active_index = tab_strip_model->active_index();
+   // In Incognito or Enterprise Isolated modes, we can't show the regular Split
+@@ -1873,6 +2161,10 @@ void NewSplitTab(BrowserWindowInterface* browser,
+ }
+ 
+ void AddNewTabToGroup(BrowserWindowInterface* browser) {
++  if (!IsMyarcWorkspaceCommandAllowed(browser, IDC_ADD_NEW_TAB_TO_GROUP)) {
++    return;
++  }
++
+   if (!browser->GetTabStripModel()->SupportsTabGroups()) {
+     return;
+   }
+@@ -1888,6 +2180,10 @@ void AddNewTabToGroup(BrowserWindowInterface* browser) {
+ }
+ 
+ void CreateNewTabGroup(BrowserWindowInterface* browser) {
++  if (!IsMyarcWorkspaceCommandAllowed(browser, IDC_CREATE_NEW_TAB_GROUP)) {
++    return;
++  }
++
+   NewTab(browser, NewTabTypes::kNewTabCommand);
+   browser->GetTabStripModel()->ExecuteContextMenuCommand(
+       browser->GetTabStripModel()->active_index(),
+@@ -1895,6 +2191,10 @@ void CreateNewTabGroup(BrowserWindowInterface* browser) {
+ }
+ 
+ void CloseTabGroup(BrowserWindowInterface* browser) {
++  if (!IsMyarcWorkspaceCommandAllowed(browser, IDC_CLOSE_TAB_GROUP)) {
++    return;
++  }
++
+   const int index = browser->GetTabStripModel()->active_index();
+   std::optional<tab_groups::TabGroupId> group_id =
+       browser->GetTabStripModel()->GetTabGroupForTab(index);
+@@ -1973,6 +2273,10 @@ void FocusPreviousTabGroup(BrowserWindowInterface* browser) {
+ }
+ 
+ bool CanGroupAllUngroupedTabs(BrowserWindowInterface* browser) {
++  if (!IsMyarcWorkspaceCommandAllowed(browser, IDC_GROUP_UNGROUPED_TABS)) {
++    return false;
++  }
++
+   // Only whether such a tab exists matters here; do not build the list.
+   TabStripModel* tab_strip_model = browser->GetTabStripModel();
+   if (!tab_strip_model->SupportsTabGroups()) {
+@@ -1984,6 +2288,10 @@ bool CanGroupAllUngroupedTabs(BrowserWindowInterface* browser) {
+ }
+ 
+ bool GroupAllUngroupedTabs(BrowserWindowInterface* browser) {
++  if (!IsMyarcWorkspaceCommandAllowed(browser, IDC_GROUP_UNGROUPED_TABS)) {
++    return false;
++  }
++
+   std::vector<int> indices = GetUngroupedTabIndices(browser);
+   if (indices.empty()) {
+     return false;
+@@ -1996,6 +2304,10 @@ bool GroupAllUngroupedTabs(BrowserWindowInterface* browser) {
+ }
+ 
+ void AddNewTabToRecentGroup(BrowserWindowInterface* browser) {
++  if (!IsMyarcWorkspaceCommandAllowed(browser, IDC_ADD_NEW_TAB_RECENT_GROUP)) {
++    return;
++  }
++
+   if (!base::FeatureList::IsEnabled(features::kNewTabButtonContextMenu)) {
+     return;
+   }
+@@ -2028,12 +2340,20 @@ void ExitFocusMode(BrowserWindowInterface* browser,
+ }
+ 
+ void MuteSite(BrowserWindowInterface* browser) {
++  if (IsMyarcWorkspaceBlank(browser)) {
++    return;
++  }
++
+   browser->GetTabStripModel()->ExecuteContextMenuCommand(
+       browser->GetTabStripModel()->active_index(),
+       TabStripModel::ContextMenuCommand::CommandToggleSiteMuted);
+ }
+ 
+ void MuteSiteForKeyboardFocusedTab(BrowserWindowInterface* browser) {
++  if (IsMyarcWorkspaceBlank(browser)) {
++    return;
++  }
++
+   if (!HasKeyboardFocusedTab(browser)) {
+     return;
+   }
+@@ -2043,6 +2363,18 @@ void MuteSiteForKeyboardFocusedTab(BrowserWindowInterface* browser) {
+ }
+ 
+ void PinKeyboardFocusedTab(BrowserWindowInterface* browser) {
++  if (IsMyarcWorkspaceBlank(browser)) {
++    return;
++  }
++  if (auto index = GetKeyboardFocusedTabIndex(browser)) {
++    if (auto* window = BrowserWindow::FromBrowser(browser)) {
++      if (const auto state = window->GetMyarcTabSaveState({*index})) {
++        window->SetMyarcTabsSaved({*index}, state->save);
++        return;
++      }
++    }
++  }
++
+   if (!HasKeyboardFocusedTab(browser)) {
+     return;
+   }
+@@ -2052,6 +2384,10 @@ void PinKeyboardFocusedTab(BrowserWindowInterface* browser) {
+ }
+ 
+ void GroupKeyboardFocusedTab(BrowserWindowInterface* browser) {
++  if (!IsMyarcWorkspaceCommandAllowed(browser, IDC_GROUP_TARGET_TAB)) {
++    return;
++  }
++
+   if (!HasKeyboardFocusedTab(browser)) {
+     return;
+   }
+@@ -2061,6 +2397,10 @@ void GroupKeyboardFocusedTab(BrowserWindowInterface* browser) {
+ }
+ 
+ void DuplicateKeyboardFocusedTab(BrowserWindowInterface* browser) {
++  if (IsMyarcWorkspaceBlank(browser)) {
++    return;
++  }
++
+   if (HasKeyboardFocusedTab(browser)) {
+     DuplicateTabAt(browser, *GetKeyboardFocusedTabIndex(browser));
+   }
+@@ -2071,6 +2411,10 @@ bool HasKeyboardFocusedTab(const BrowserWindowInterface* browser) {
+ }
+ 
+ void ConvertPopupToTabbedBrowser(BrowserWindowInterface* browser) {
++  if (IsMyarcWorkspaceBlank(browser)) {
++    return;
++  }
++
+   base::RecordAction(UserMetricsAction("ShowAsTab"));
+   TabStripModel* tab_strip = browser->GetTabStripModel();
+   // If this popup is the last browser object, removing it from the browser-list
+@@ -2098,12 +2442,21 @@ void ConvertPopupToTabbedBrowser(BrowserWindowInterface* browser) {
+ }
+ 
+ void CloseTabsToRight(BrowserWindowInterface* browser) {
++  if (!IsMyarcWorkspaceCommandAllowed(browser,
++                                      IDC_WINDOW_CLOSE_TABS_TO_RIGHT)) {
++    return;
++  }
++
+   browser->GetTabStripModel()->ExecuteContextMenuCommand(
+       browser->GetTabStripModel()->active_index(),
+       TabStripModel::CommandCloseTabsToRight);
+ }
+ 
+ void CloseOtherTabs(BrowserWindowInterface* browser) {
++  if (!IsMyarcWorkspaceCommandAllowed(browser, IDC_WINDOW_CLOSE_OTHER_TABS)) {
++    return;
++  }
++
+   browser->GetTabStripModel()->ExecuteContextMenuCommand(
+       browser->GetTabStripModel()->active_index(),
+       TabStripModel::CommandCloseOtherTabs);
+@@ -2115,6 +2468,10 @@ void Exit() {
+ }
+ 
+ void BookmarkCurrentTab(BrowserWindowInterface* browser) {
++  if (IsMyarcWorkspaceBlank(browser)) {
++    return;
++  }
++
+   base::RecordAction(base::UserMetricsAction("Star"));
+   BookmarkModel* model =
+       BookmarkModelFactory::GetForBrowserContext(browser->GetProfile());
+@@ -2145,6 +2502,10 @@ void BookmarkCurrentTab(BrowserWindowInterface* browser) {
+ void BookmarkCurrentTabInFolder(BrowserWindowInterface* browser,
+                                 BookmarkModel* model,
+                                 int64_t folder_id) {
++  if (IsMyarcWorkspaceBlank(browser)) {
++    return;
++  }
++
+   GURL url;
+   std::u16string title;
+   if (!BookmarkCurrentTabHelper(browser, model, &url, &title)) {
+@@ -2163,6 +2524,10 @@ void BookmarkCurrentTabInFolder(BrowserWindowInterface* browser,
+ }
+ 
+ bool CanBookmarkCurrentTab(BrowserWindowInterface* browser) {
++  if (IsMyarcWorkspaceBlank(browser)) {
++    return false;
++  }
++
+   BookmarkModel* model =
+       BookmarkModelFactory::GetForBrowserContext(browser->GetProfile());
+   return browser_defaults::bookmarks_enabled &&
+@@ -2173,17 +2538,29 @@ bool CanBookmarkCurrentTab(BrowserWindowInterface* browser) {
+ }
+ 
+ void BookmarkAllTabs(BrowserWindowInterface* browser) {
++  if (!IsMyarcWorkspaceCommandAllowed(browser, IDC_BOOKMARK_ALL_TABS)) {
++    return;
++  }
++
+   base::RecordAction(UserMetricsAction("BookmarkAllTabs"));
+ 
+   bookmarks::ShowBookmarkAllTabsDialog(browser);
+ }
+ 
+ bool CanBookmarkAllTabs(BrowserWindowInterface* browser) {
++  if (!IsMyarcWorkspaceCommandAllowed(browser, IDC_BOOKMARK_ALL_TABS)) {
++    return false;
++  }
++
+   return browser->GetTabStripModel()->count() > 1 &&
+          CanBookmarkCurrentTab(browser);
+ }
+ 
+ bool CanMoveActiveTabToReadLater(BrowserWindowInterface* browser) {
++  if (IsMyarcWorkspaceBlank(browser)) {
++    return false;
++  }
++
+   GURL url;
+   std::u16string title;
+   WebContents* web_contents =
+@@ -2194,12 +2571,20 @@ bool CanMoveActiveTabToReadLater(BrowserWindowInterface* browser) {
+ }
+ 
+ void MoveCurrentTabToReadLater(BrowserWindowInterface* browser) {
++  if (IsMyarcWorkspaceBlank(browser)) {
++    return;
++  }
++
+   MoveTabsToReadLater(browser,
+                       {browser->GetTabStripModel()->GetActiveWebContents()});
+ }
+ 
+ void MoveTabsToReadLater(BrowserWindowInterface* browser,
+                          std::vector<content::WebContents*> web_contentses) {
++  if (IsMyarcWorkspaceBlank(browser)) {
++    return;
++  }
++
+   int added_to_read_later = 0;
+   for (WebContents* const web_contents : web_contentses) {
+     GURL url;
+@@ -2241,6 +2626,10 @@ void MoveTabsToReadLater(BrowserWindowInterface* browser,
+ }
+ 
+ bool MarkCurrentTabAsReadInReadLater(BrowserWindowInterface* browser) {
++  if (IsMyarcWorkspaceBlank(browser)) {
++    return false;
++  }
++
+   GURL url;
+   std::u16string title;
+   ReadingListModel* model = GetReadingListModel(browser);
+@@ -2258,6 +2647,10 @@ bool MarkCurrentTabAsReadInReadLater(BrowserWindowInterface* browser) {
+ }
+ 
+ bool IsCurrentTabUnreadInReadLater(BrowserWindowInterface* browser) {
++  if (IsMyarcWorkspaceBlank(browser)) {
++    return false;
++  }
++
+   GURL url;
+   std::u16string title;
+   ReadingListModel* model = GetReadingListModel(browser);
+@@ -2271,6 +2664,10 @@ bool IsCurrentTabUnreadInReadLater(BrowserWindowInterface* browser) {
+ }
+ 
+ void ShowOffersAndRewardsForPage(BrowserWindowInterface* browser) {
++  if (IsMyarcWorkspaceBlank(browser)) {
++    return;
++  }
++
+   WebContents* const web_contents =
+       browser->GetTabStripModel()->GetActiveWebContents();
+   autofill::OfferNotificationBubbleControllerImpl* controller =
+@@ -2281,6 +2678,10 @@ void ShowOffersAndRewardsForPage(BrowserWindowInterface* browser) {
+ }
+ 
+ void SaveCreditCard(BrowserWindowInterface* browser) {
++  if (IsMyarcWorkspaceBlank(browser)) {
++    return;
++  }
++
+   WebContents* web_contents =
+       browser->GetTabStripModel()->GetActiveWebContents();
+   autofill::SaveCardBubbleControllerImpl* controller =
+@@ -2289,6 +2690,10 @@ void SaveCreditCard(BrowserWindowInterface* browser) {
+ }
+ 
+ void SaveIban(BrowserWindowInterface* browser) {
++  if (IsMyarcWorkspaceBlank(browser)) {
++    return;
++  }
++
+   WebContents* web_contents =
+       browser->GetTabStripModel()->GetActiveWebContents();
+   autofill::IbanBubbleControllerImpl* controller =
+@@ -2297,6 +2702,10 @@ void SaveIban(BrowserWindowInterface* browser) {
+ }
+ 
+ void ShowMandatoryReauthOptInPrompt(BrowserWindowInterface* browser) {
++  if (IsMyarcWorkspaceBlank(browser)) {
++    return;
++  }
++
+   WebContents* web_contents =
+       browser->GetTabStripModel()->GetActiveWebContents();
+   autofill::MandatoryReauthBubbleControllerImpl* controller =
+@@ -2306,6 +2715,10 @@ void ShowMandatoryReauthOptInPrompt(BrowserWindowInterface* browser) {
+ }
+ 
+ void SaveAutofillAddress(BrowserWindowInterface* browser) {
++  if (IsMyarcWorkspaceBlank(browser)) {
++    return;
++  }
++
+   WebContents* web_contents =
+       browser->GetTabStripModel()->GetActiveWebContents();
+   autofill::AddressBubblesController* controller =
+@@ -2314,6 +2727,10 @@ void SaveAutofillAddress(BrowserWindowInterface* browser) {
+ }
+ 
+ void ShowFilledCardInformationBubble(BrowserWindowInterface* browser) {
++  if (IsMyarcWorkspaceBlank(browser)) {
++    return;
++  }
++
+   WebContents* web_contents =
+       browser->GetTabStripModel()->GetActiveWebContents();
+   auto* controller =
+@@ -2325,6 +2742,10 @@ void ShowFilledCardInformationBubble(BrowserWindowInterface* browser) {
+ }
+ 
+ void ShowVirtualCardEnrollBubble(BrowserWindowInterface* browser) {
++  if (IsMyarcWorkspaceBlank(browser)) {
++    return;
++  }
++
+   WebContents* web_contents =
+       browser->GetTabStripModel()->GetActiveWebContents();
+   autofill::VirtualCardEnrollBubbleControllerImpl* controller =
+@@ -2336,6 +2757,10 @@ void ShowVirtualCardEnrollBubble(BrowserWindowInterface* browser) {
+ }
+ 
+ void ShowTranslateBubble(BrowserWindowInterface* browser) {
++  if (IsMyarcWorkspaceBlank(browser)) {
++    return;
++  }
++
+   if (!browser->GetWindow()->IsActive()) {
+     return;
+   }
+@@ -2381,6 +2806,10 @@ void ShowTranslateBubble(BrowserWindowInterface* browser) {
+ }
+ 
+ void ManagePasswordsForPage(BrowserWindowInterface* browser) {
++  if (IsMyarcWorkspaceBlank(browser)) {
++    return;
++  }
++
+   auto* const user_education = BrowserUserEducationInterface::From(browser);
+   user_education->NotifyFeaturePromoFeatureUsed(
+       feature_engagement::kIPHPasswordsManagementBubbleAfterSaveFeature,
+@@ -2400,11 +2829,19 @@ void ManagePasswordsForPage(BrowserWindowInterface* browser) {
+ }
+ 
+ bool CanSendTabToSelf(BrowserWindowInterface* browser) {
++  if (IsMyarcWorkspaceBlank(browser)) {
++    return false;
++  }
++
+   return send_tab_to_self::ShouldDisplayEntryPoint(
+       browser->GetTabStripModel()->GetActiveWebContents());
+ }
+ 
+ void SendTabToSelf(BrowserWindowInterface* browser) {
++  if (IsMyarcWorkspaceBlank(browser)) {
++    return;
++  }
++
+   WebContents* web_contents =
+       browser->GetTabStripModel()->GetActiveWebContents();
+   send_tab_to_self::ShowBubble(web_contents,
+@@ -2412,6 +2849,10 @@ void SendTabToSelf(BrowserWindowInterface* browser) {
+ }
+ 
+ bool CanGenerateQrCode(BrowserWindowInterface* browser) {
++  if (IsMyarcWorkspaceBlank(browser)) {
++    return false;
++  }
++
+   return !sharing_hub::SharingIsDisabledByPolicy(browser->GetProfile()) &&
+          qrcode_generator::QRCodeGeneratorBubbleController::
+              IsGeneratorAvailable(browser->GetTabStripModel()
+@@ -2422,6 +2863,10 @@ bool CanGenerateQrCode(BrowserWindowInterface* browser) {
+ }
+ 
+ void GenerateQRCode(BrowserWindowInterface* browser) {
++  if (IsMyarcWorkspaceBlank(browser)) {
++    return;
++  }
++
+   WebContents* web_contents =
+       browser->GetTabStripModel()->GetActiveWebContents();
+   qrcode_generator::QRCodeGeneratorBubbleController* controller =
+@@ -2432,6 +2877,10 @@ void GenerateQRCode(BrowserWindowInterface* browser) {
+ }
+ 
+ void SharingHub(BrowserWindowInterface* browser) {
++  if (IsMyarcWorkspaceBlank(browser)) {
++    return;
++  }
++
+   WebContents* web_contents =
+       browser->GetTabStripModel()->GetActiveWebContents();
+   sharing_hub::SharingHubBubbleController* controller =
+@@ -2441,6 +2890,10 @@ void SharingHub(BrowserWindowInterface* browser) {
+ }
+ 
+ void ScreenshotCapture(BrowserWindowInterface* browser) {
++  if (IsMyarcWorkspaceBlank(browser)) {
++    return;
++  }
++
+   WebContents* web_contents =
+       browser->GetTabStripModel()->GetActiveWebContents();
+   sharing_hub::ScreenshotCapturedBubbleController* controller =
+@@ -2449,6 +2902,10 @@ void ScreenshotCapture(BrowserWindowInterface* browser) {
+ }
+ 
+ void ShowTtcMenuItem(BrowserWindowInterface* browser) {
++  if (IsMyarcWorkspaceBlank(browser)) {
++    return;
++  }
++
+   if (ttc::EntrypointController* controller =
+           ttc::EntrypointController::From(browser)) {
+     controller->EntrypointHandler(ttc::EntrypointType::kAppMenu);
+@@ -2456,6 +2913,10 @@ void ShowTtcMenuItem(BrowserWindowInterface* browser) {
+ }
+ 
+ void SavePage(BrowserWindowInterface* browser) {
++  if (IsMyarcWorkspaceBlank(browser)) {
++    return;
++  }
++
+   base::RecordAction(UserMetricsAction("SavePage"));
+   WebContents* current_tab =
+       browser->GetTabStripModel()->GetActiveWebContents();
+@@ -2475,6 +2936,10 @@ void SavePage(BrowserWindowInterface* browser) {
+ }
+ 
+ bool CanSavePage(const BrowserWindowInterface* browser) {
++  if (IsMyarcWorkspaceBlank(browser)) {
++    return false;
++  }
++
+   // LocalState can be NULL in tests.
+   if (g_browser_process->local_state() &&
+       !g_browser_process->local_state()->GetBoolean(
+@@ -2492,6 +2957,10 @@ bool CanSavePage(const BrowserWindowInterface* browser) {
+ }
+ 
+ void Print(BrowserWindowInterface* browser) {
++  if (IsMyarcWorkspaceBlank(browser)) {
++    return;
++  }
++
+ #if BUILDFLAG(ENABLE_PRINTING)
+   auto* const web_contents = printing::GetWebContentsToPrint(
+       browser->GetTabStripModel()->GetActiveTab());
+@@ -2507,6 +2976,10 @@ void Print(BrowserWindowInterface* browser) {
+ }
+ 
+ bool CanPrint(BrowserWindowInterface* browser) {
++  if (IsMyarcWorkspaceBlank(browser)) {
++    return false;
++  }
++
+ #if BUILDFLAG(ENABLE_PRINTING)
+   // Do not print when printing is disabled via pref or policy.
+   // Do not print when a page has crashed.
+@@ -2529,11 +3002,19 @@ bool CanPrint(BrowserWindowInterface* browser) {
+ 
+ #if BUILDFLAG(ENABLE_PRINTING)
+ void BasicPrint(BrowserWindowInterface* browser) {
++  if (IsMyarcWorkspaceBlank(browser)) {
++    return;
++  }
++
+   printing::StartBasicPrint(printing::GetWebContentsToPrint(
+       browser->GetTabStripModel()->GetActiveTab()));
+ }
+ 
+ bool CanBasicPrint(BrowserWindowInterface* browser) {
++  if (IsMyarcWorkspaceBlank(browser)) {
++    return false;
++  }
++
+ #if BUILDFLAG(ENABLE_BASIC_PRINT_DIALOG)
+   // If printing is not disabled via pref or policy, it is always possible to
+   // advanced print when the print preview is visible.
+@@ -2547,6 +3028,10 @@ bool CanBasicPrint(BrowserWindowInterface* browser) {
+ #endif  // BUILDFLAG(ENABLE_PRINTING)
+ 
+ bool CanRouteMedia(BrowserWindowInterface* browser) {
++  if (IsMyarcWorkspaceBlank(browser)) {
++    return false;
++  }
++
+   // Do not allow user to open Media Router dialog when there is already an
+   // active modal dialog. This avoids overlapping dialogs.
+   return media_router::MediaRouterEnabled(browser->GetProfile()) &&
+@@ -2554,6 +3039,10 @@ bool CanRouteMedia(BrowserWindowInterface* browser) {
+ }
+ 
+ void RouteMediaInvokedFromAppMenu(BrowserWindowInterface* browser) {
++  if (IsMyarcWorkspaceBlank(browser)) {
++    return;
++  }
++
+   CHECK(CanRouteMedia(browser), base::NotFatalUntil::M162);
+ 
+   media_router::MediaRouterDialogController* dialog_controller =
+@@ -2568,16 +3057,28 @@ void RouteMediaInvokedFromAppMenu(BrowserWindowInterface* browser) {
+ }
+ 
+ void Find(BrowserWindowInterface* browser) {
++  if (IsMyarcWorkspaceBlank(browser)) {
++    return;
++  }
++
+   base::RecordAction(UserMetricsAction("Find"));
+   FindInPage(browser, false, true);
+ }
+ 
+ void FindNext(BrowserWindowInterface* browser) {
++  if (IsMyarcWorkspaceBlank(browser)) {
++    return;
++  }
++
+   base::RecordAction(UserMetricsAction("FindNext"));
+   FindInPage(browser, true, true);
+ }
+ 
+ void FindPrevious(BrowserWindowInterface* browser) {
++  if (IsMyarcWorkspaceBlank(browser)) {
++    return;
++  }
++
+   base::RecordAction(UserMetricsAction("FindPrevious"));
+   FindInPage(browser, true, false);
+ }
+@@ -2585,6 +3086,10 @@ void FindPrevious(BrowserWindowInterface* browser) {
+ void FindInPage(BrowserWindowInterface* browser,
+                 bool find_next,
+                 bool forward_direction) {
++  if (IsMyarcWorkspaceBlank(browser)) {
++    return;
++  }
++
+   FindBarController::From(browser)->Show(find_next, forward_direction);
+ }
+ 
+@@ -2691,6 +3196,10 @@ void ToggleCollapseVerticalTabs(BrowserWindowInterface* browser) {
+ }
+ 
+ bool CanCloseFind(BrowserWindowInterface* browser) {
++  if (IsMyarcWorkspaceBlank(browser)) {
++    return false;
++  }
++
+   WebContents* current_tab =
+       browser->GetTabStripModel()->GetActiveWebContents();
+   if (!current_tab) {
+@@ -2703,11 +3212,19 @@ bool CanCloseFind(BrowserWindowInterface* browser) {
+ }
+ 
+ void CloseFind(BrowserWindowInterface* browser) {
++  if (IsMyarcWorkspaceBlank(browser)) {
++    return;
++  }
++
+   FindBarController::From(browser)->EndFindSession(
+       find_in_page::SelectionAction::kKeep, find_in_page::ResultAction::kKeep);
+ }
+ 
+ void Zoom(BrowserWindowInterface* browser, content::PageZoom zoom) {
++  if (IsMyarcWorkspaceBlank(browser)) {
++    return;
++  }
++
+   zoom::PageZoom::Zoom(browser->GetTabStripModel()->GetActiveWebContents(),
+                        zoom);
+ }
+@@ -2802,6 +3319,10 @@ void FocusPreviousPane(BrowserWindowInterface* browser) {
+ }
+ 
+ void FocusWebContentsPane(BrowserWindowInterface* browser) {
++  if (IsMyarcWorkspaceBlank(browser)) {
++    return;
++  }
++
+   base::RecordAction(UserMetricsAction("FocusWebContentsPane"));
+   BrowserFocusController::From(browser)->FocusWebContentsPane();
+ }
+@@ -2809,6 +3330,10 @@ void FocusWebContentsPane(BrowserWindowInterface* browser) {
+ void ToggleDevToolsWindow(BrowserWindowInterface* browser,
+                           DevToolsToggleAction action,
+                           DevToolsOpenedByAction opened_by) {
++  if (IsMyarcWorkspaceBlank(browser)) {
++    return;
++  }
++
+   if (action.type() == DevToolsToggleAction::kShowConsolePanel) {
+     base::RecordAction(UserMetricsAction("DevTools_ToggleConsole"));
+   } else {
+@@ -2847,6 +3372,10 @@ void OpenFeedbackDialog(BrowserWindowInterface* browser,
+ 
+ #if BUILDFLAG(GOOGLE_CHROME_BRANDING)
+ void OpenReportUnsafeSiteDialog(BrowserWindowInterface* browser) {
++  if (IsMyarcWorkspaceBlank(browser)) {
++    return;
++  }
++
+   base::RecordAction(UserMetricsAction("ReportUnsafeSite"));
+   feedback::ReportUnsafeSiteDialog::Show(browser);
+ }
+@@ -2936,6 +3465,10 @@ bool CanRequestTabletSite(WebContents* current_tab) {
+ }
+ 
+ bool IsRequestingTabletSite(BrowserWindowInterface* browser) {
++  if (IsMyarcWorkspaceBlank(browser)) {
++    return false;
++  }
++
+   WebContents* current_tab =
+       browser->GetTabStripModel()->GetActiveWebContents();
+   if (!current_tab) {
+@@ -2950,6 +3483,10 @@ bool IsRequestingTabletSite(BrowserWindowInterface* browser) {
+ }
+ 
+ void ToggleRequestTabletSite(BrowserWindowInterface* browser) {
++  if (IsMyarcWorkspaceBlank(browser)) {
++    return;
++  }
++
+   WebContents* current_tab =
+       browser->GetTabStripModel()->GetActiveWebContents();
+   if (!current_tab) {
+@@ -2997,6 +3534,10 @@ void ToggleFullscreenMode(BrowserWindowInterface* browser,
+ }
+ 
+ void ClearCache(BrowserWindowInterface* browser) {
++  if (IsMyarcWorkspaceBlank(browser)) {
++    return;
++  }
++
+   content::BrowsingDataRemover* remover =
+       browser->GetProfile()->GetBrowsingDataRemover();
+   remover->Remove(base::Time(), base::Time::Max(),
+@@ -3006,6 +3547,10 @@ void ClearCache(BrowserWindowInterface* browser) {
+ }
+ 
+ bool IsDebuggerAttachedToCurrentTab(BrowserWindowInterface* browser) {
++  if (IsMyarcWorkspaceBlank(browser)) {
++    return false;
++  }
++
+   WebContents* contents = browser->GetTabStripModel()->GetActiveWebContents();
+   return contents ? content::DevToolsAgentHost::IsDebuggerAttached(contents)
+                   : false;
+@@ -3013,6 +3558,10 @@ bool IsDebuggerAttachedToCurrentTab(BrowserWindowInterface* browser) {
+ 
+ void CopyURL(BrowserWindowInterface* browser,
+              content::WebContents* web_contents) {
++  if (IsMyarcWorkspaceBlank(browser)) {
++    return;
++  }
++
+   ui::ScopedClipboardWriter scw(ui::ClipboardBuffer::kCopyPaste);
+   scw.WriteText(base::UTF8ToUTF16(web_contents->GetVisibleURL().spec()));
+ 
+@@ -3027,6 +3576,10 @@ void CopyURL(BrowserWindowInterface* browser,
+ }
+ 
+ bool CanCopyUrl(BrowserWindowInterface* browser) {
++  if (IsMyarcWorkspaceBlank(browser)) {
++    return false;
++  }
++
+   return IsWebAppOrCustomTab(browser) ||
+          !sharing_hub::SharingIsDisabledByPolicy(browser->GetProfile());
+ }
+@@ -3056,6 +3609,10 @@ BrowserWindowInterface* OpenInChrome(
+ }
+ 
+ bool CanViewSource(BrowserWindowInterface* browser) {
++  if (IsMyarcWorkspaceBlank(browser)) {
++    return false;
++  }
++
+   if (browser->GetType() == BrowserWindowInterface::TYPE_DEVTOOLS) {
+     return false;
+   }
+@@ -3067,6 +3624,10 @@ bool CanViewSource(BrowserWindowInterface* browser) {
+ }
+ 
+ bool CanToggleCaretBrowsing(BrowserWindowInterface* browser) {
++  if (IsMyarcWorkspaceBlank(browser)) {
++    return false;
++  }
++
+ #if BUILDFLAG(IS_MAC)
+   // On Mac, ignore the keyboard shortcut unless web contents is focused,
+   // because the keyboard shortcut interferes with a Japenese IME when the
+@@ -3085,6 +3646,10 @@ bool CanToggleCaretBrowsing(BrowserWindowInterface* browser) {
+ }
+ 
+ void ToggleCaretBrowsing(BrowserWindowInterface* browser) {
++  if (IsMyarcWorkspaceBlank(browser)) {
++    return;
++  }
++
+   if (!CanToggleCaretBrowsing(browser)) {
+     return;
+   }
+@@ -3170,6 +3735,10 @@ void ProcessInterceptedChromeURLNavigationInIncognito(
+ }
+ 
+ void ExecLensOverlay(BrowserWindowInterface* browser) {
++  if (IsMyarcWorkspaceBlank(browser)) {
++    return;
++  }
++
+   content::WebContents* web_contents =
+       browser->GetTabStripModel()->GetActiveWebContents();
+   CHECK(web_contents);
+@@ -3187,6 +3756,10 @@ void ExecLensOverlay(BrowserWindowInterface* browser) {
+ }
+ 
+ void ExecLensRegionSearch(BrowserWindowInterface* browser) {
++  if (IsMyarcWorkspaceBlank(browser)) {
++    return;
++  }
++
+ #if BUILDFLAG(ENABLE_LENS_DESKTOP_GOOGLE_BRANDED_FEATURES)
+   Profile* profile = browser->GetProfile();
+   TemplateURLService* service =
+@@ -3212,6 +3785,10 @@ void ExecAskGoogleAboutThisPage(
+     BrowserWindowInterface* browser,
+     lens::LensOverlayInvocationSource invocation_source,
+     omnibox::ChromeAimEntryPoint entry_point) {
++  if (IsMyarcWorkspaceBlank(browser)) {
++    return;
++  }
++
+ #if !BUILDFLAG(IS_ANDROID)
+   if (!browser) {
+     return;
+diff --git a/chrome/browser/ui/browser_commands.h b/chrome/browser/ui/browser_commands.h
+index 8d0597603c50ed73b3f3208439a1f157f5c5da9d..791c3844d691d9b4698a7936638f67f49d81d81f 100644
+--- a/chrome/browser/ui/browser_commands.h
++++ b/chrome/browser/ui/browser_commands.h
+@@ -58,6 +58,13 @@ namespace chrome {
+ 
+ // For all commands, where a tab is not specified, the active tab is assumed.
+ 
++// One presentation gate for native commands and direct action callbacks. This
++// does not grant or revoke extension activeTab/context-menu permissions.
++bool IsMyarcWorkspaceBlank(const BrowserWindowInterface* browser);
++bool IsMyarcPageCommand(int command);
++bool IsMyarcWorkspaceCommandAllowed(const BrowserWindowInterface* browser,
++                                    int command);
++
+ bool IsCommandEnabled(BrowserWindowInterface* browser, int command);
+ bool SupportsCommand(BrowserWindowInterface* browser, int command);
+ bool ExecuteCommand(BrowserWindowInterface* browser,
+diff --git a/chrome/browser/ui/browser_window.h b/chrome/browser/ui/browser_window.h
+index 3b0e66f8a95dc0518c74122eec1baab5717c3028..fb7f347d30c64a4304c5229dcaac75de4becba2d 100644
+--- a/chrome/browser/ui/browser_window.h
++++ b/chrome/browser/ui/browser_window.h
+@@ -112,6 +112,25 @@ class BrowserWindow : public ui::BaseWindow {
+  public:
+   virtual ~BrowserWindow() = default;
+ 
++  // Presentation query only. Rust remains authoritative; metadata loading uses
++  // ordinary native browsing. Defaults preserve windows without the experiment.
++  virtual bool IsMyarcWorkspaceBlank() const;
++  // Reselecting the same hidden native tab emits no active-tab change.
++  virtual void RevealMyarcActiveTab();
++  // Native tabs include other Spaces while the Rust projection is ready.
++  virtual bool IsMyarcWorkspaceActive() const;
++
++  struct MyarcTabSaveState {
++    bool enabled = false;
++    bool save = true;
++    std::u16string label;
++  };
++  virtual std::optional<MyarcTabSaveState> GetMyarcTabSaveState(
++      const std::vector<int>& indices) const;
++  // True consumes the explicit user operation, including an actionable failure.
++  // Generic native pin-bit changes (restore/detach) must not unsave metadata.
++  virtual bool SetMyarcTabsSaved(const std::vector<int>& indices, bool saved);
++
+   //////////////////////////////////////////////////////////////////////////////
+   // ui::BaseWindow interface notes:
+ 
+@@ -508,4 +527,24 @@ class BrowserWindow : public ui::BaseWindow {
+   virtual void DeleteBrowserWindow() = 0;
+ };
+ 
++inline bool BrowserWindow::IsMyarcWorkspaceBlank() const {
++  return false;
++}
++
++inline void BrowserWindow::RevealMyarcActiveTab() {}
++
++inline bool BrowserWindow::IsMyarcWorkspaceActive() const {
++  return false;
++}
++
++inline std::optional<BrowserWindow::MyarcTabSaveState>
++BrowserWindow::GetMyarcTabSaveState(const std::vector<int>& indices) const {
++  return std::nullopt;
++}
++
++inline bool BrowserWindow::SetMyarcTabsSaved(const std::vector<int>& indices,
++                                             bool saved) {
++  return false;
++}
++
+ #endif  // CHROME_BROWSER_UI_BROWSER_WINDOW_H_
+diff --git a/chrome/browser/ui/navigator/browser_navigator.cc b/chrome/browser/ui/navigator/browser_navigator.cc
+index d5d5691f0b7dfdb1a8cc5671537826262c96addd..62ab5d02e84ed1ebf89419e2c0a9360493361621 100644
+--- a/chrome/browser/ui/navigator/browser_navigator.cc
++++ b/chrome/browser/ui/navigator/browser_navigator.cc
+@@ -806,8 +806,19 @@ base::WeakPtr<content::NavigationHandle> NavigateImpl(
+   // has a chance to replace |params->browser| with another one, but after the
+   // above check that relies on the original source_contents value.
+   if (!params->source_contents && params->browser) {
+-    params->source_contents =
+-        params->browser->GetTabStripModel()->GetActiveWebContents();
++    auto* window = BrowserWindow::FromBrowser(params->browser);
++    if (window && window->IsMyarcWorkspaceBlank()) {
++      // A blank Space has no implicit page context. Keep explicit sources and
++      // security parameters intact, including user gestures and referrers.
++      if (params->disposition == WindowOpenDisposition::kCurrentTab) {
++        params->disposition = WindowOpenDisposition::kNewForegroundTab;
++      }
++      params->tabstrip_add_types &= ~AddTabTypes::ADD_INHERIT_OPENER;
++      params->tabstrip_add_types |= AddTabTypes::ADD_FORCE_INDEX;
++    } else {
++      params->source_contents =
++          params->browser->GetTabStripModel()->GetActiveWebContents();
++    }
+   }
+ 
+   WebContents* contents_to_navigate_or_insert =
+@@ -1087,7 +1098,8 @@ base::WeakPtr<content::NavigationHandle> NavigateImpl(
+     DCHECK(tab_to_insert);
+     std::optional<tab_groups::TabGroupId> group = params->group;
+     if (!(params->tabstrip_add_types & AddTabTypes::ADD_PINNED)) {
+-      if (!group.has_value()) {
++      auto* window = BrowserWindow::FromBrowser(params->browser);
++      if (!group.has_value() && !(window && window->IsMyarcWorkspaceBlank())) {
+         group = params->browser->GetTabStripModel()->GetFocusedGroup();
+       }
+     }
+diff --git a/chrome/browser/ui/omnibox/chrome_omnibox_client.cc b/chrome/browser/ui/omnibox/chrome_omnibox_client.cc
+index 83d474959c614edfc4bd253328559e8172d1b4b1..b479037e3814b30fb8b3c0b56c52db1e7306be95 100644
+--- a/chrome/browser/ui/omnibox/chrome_omnibox_client.cc
++++ b/chrome/browser/ui/omnibox/chrome_omnibox_client.cc
+@@ -269,12 +269,17 @@ ChromeOmniboxClient::CreateAutocompleteProviderClient() {
+   // `ChromeOmniboxClient` which outlives `AutocompleteController` which owns
+   // `ChromeAutocompleteProviderClient`.
+   return std::make_unique<ChromeAutocompleteProviderClient>(
+-      profile_, base::BindRepeating(&LocationBar::GetWebContents,
+-                                    base::Unretained(location_bar_)));
++      profile_, base::BindRepeating(
++                    [](ChromeOmniboxClient* client, LocationBar* bar) {
++                      return client->CurrentPageExists() ? bar->GetWebContents()
++                                                         : nullptr;
++                    },
++                    base::Unretained(this), base::Unretained(location_bar_)));
+ }
+ 
+ bool ChromeOmniboxClient::CurrentPageExists() const {
+-  return (location_bar_->GetWebContents() != nullptr);
++  return !chrome::IsMyarcWorkspaceBlank(browser_) &&
++         location_bar_->GetWebContents() != nullptr;
+ }
+ 
+ const GURL& ChromeOmniboxClient::GetURL() const {
+@@ -288,6 +293,9 @@ const std::u16string& ChromeOmniboxClient::GetTitle() const {
+ }
+ 
+ gfx::Image ChromeOmniboxClient::GetFavicon() const {
++  if (!CurrentPageExists()) {
++    return gfx::Image();
++  }
+   return favicon::ContentFaviconDriver::FromWebContents(
+              location_bar_->GetWebContents())
+       ->GetFavicon();
+@@ -301,7 +309,7 @@ ukm::SourceId ChromeOmniboxClient::GetUKMSourceId() const {
+ }
+ 
+ bool ChromeOmniboxClient::IsLoading() const {
+-  return location_bar_->GetWebContents()->IsLoading();
++  return CurrentPageExists() && location_bar_->GetWebContents()->IsLoading();
+ }
+ 
+ bool ChromeOmniboxClient::IsPasteAndGoEnabled() const {
+@@ -317,7 +325,9 @@ bool ChromeOmniboxClient::IsDefaultSearchProviderEnabled() const {
+ }
+ 
+ SessionID ChromeOmniboxClient::GetSessionID() const {
+-  return sessions::SessionTabHelper::IdForTab(location_bar_->GetWebContents());
++  return CurrentPageExists() ? sessions::SessionTabHelper::IdForTab(
++                                   location_bar_->GetWebContents())
++                             : SessionID::InvalidValue();
+ }
+ 
+ bool ChromeOmniboxClient::IsChromeOmniboxClient() const {
+@@ -475,47 +485,77 @@ gfx::Image ChromeOmniboxClient::GetSizedIcon(const gfx::Image& icon) const {
+ }
+ 
+ std::u16string ChromeOmniboxClient::GetFormattedFullURL() const {
++  if (chrome::IsMyarcWorkspaceBlank(browser_)) {
++    return std::u16string();
++  }
+   return location_bar_->GetLocationBarModel()->GetFormattedFullURL();
+ }
+ 
+ std::u16string ChromeOmniboxClient::GetURLForDisplay() const {
++  if (chrome::IsMyarcWorkspaceBlank(browser_)) {
++    return std::u16string();
++  }
+   return location_bar_->GetLocationBarModel()->GetURLForDisplay();
+ }
+ 
+ GURL ChromeOmniboxClient::GetNavigationEntryURL() const {
++  if (chrome::IsMyarcWorkspaceBlank(browser_)) {
++    return GURL();
++  }
+   return location_bar_->GetLocationBarModel()->GetURL();
+ }
+ 
+ bool ChromeOmniboxClient::IsContextualTasksPage() const {
++  if (chrome::IsMyarcWorkspaceBlank(browser_)) {
++    return false;
++  }
+   return location_bar_->GetLocationBarModel()->IsContextualTasksPage();
+ }
+ 
+ GURL ChromeOmniboxClient::GetContextualTasksInnerFrameURL() const {
++  if (chrome::IsMyarcWorkspaceBlank(browser_)) {
++    return GURL();
++  }
+   return location_bar_->GetLocationBarModel()
+       ->GetContextualTasksInnerFrameURL();
+ }
+ 
+ metrics::OmniboxEventProto::PageClassification
+ ChromeOmniboxClient::GetPageClassification(bool is_prefetch) const {
++  if (chrome::IsMyarcWorkspaceBlank(browser_)) {
++    return metrics::OmniboxEventProto::BLANK;
++  }
+   return location_bar_->GetLocationBarModel()->GetPageClassification(
+       is_prefetch);
+ }
+ 
+ metrics::OmniboxEventProto::PageClassification
+ ChromeOmniboxClient::GetOmniboxComposeboxPageClassification() const {
++  if (chrome::IsMyarcWorkspaceBlank(browser_)) {
++    return metrics::OmniboxEventProto::BLANK;
++  }
+   return location_bar_->GetLocationBarModel()
+       ->GetOmniboxComposeboxPageClassification();
+ }
+ 
+ security_state::SecurityLevel ChromeOmniboxClient::GetSecurityLevel() const {
++  if (chrome::IsMyarcWorkspaceBlank(browser_)) {
++    return security_state::NONE;
++  }
+   return location_bar_->GetLocationBarModel()->GetSecurityLevel();
+ }
+ 
+ net::CertStatus ChromeOmniboxClient::GetCertStatus() const {
++  if (chrome::IsMyarcWorkspaceBlank(browser_)) {
++    return 0;
++  }
+   return location_bar_->GetLocationBarModel()->GetCertStatus();
+ }
+ 
+ const gfx::VectorIcon& ChromeOmniboxClient::GetVectorIcon() const {
++  if (chrome::IsMyarcWorkspaceBlank(browser_)) {
++    return gfx::VectorIcon::EmptyIcon();
++  }
+   return location_bar_->GetLocationBarModel()->GetVectorIcon();
+ }
+ 
+@@ -524,6 +564,10 @@ void ChromeOmniboxClient::ProcessExtensionMatch(
+     const TemplateURL* template_url,
+     const AutocompleteMatch& match,
+     WindowOpenDisposition disposition) {
++  if (chrome::IsMyarcWorkspaceBlank(browser_)) {
++    return;
++  }
++
+   // Strip the keyword + leading space (if present) off the input.
+   std::u16string remaining_input;
+   AutocompleteInput::SplitKeywordFromInput(match.fill_into_edit, true,
+@@ -541,6 +585,10 @@ void ChromeOmniboxClient::ProcessExtensionMatch(
+ }
+ 
+ void ChromeOmniboxClient::OnInputStateChanged() {
++  if (chrome::IsMyarcWorkspaceBlank(browser_)) {
++    return;
++  }
++
+   if (!location_bar_->GetWebContents()) {
+     return;
+   }
+@@ -552,6 +600,10 @@ void ChromeOmniboxClient::OnInputStateChanged() {
+ 
+ void ChromeOmniboxClient::OnFocusChanged(OmniboxFocusState state,
+                                          OmniboxFocusChangeReason reason) {
++  if (chrome::IsMyarcWorkspaceBlank(browser_)) {
++    return;
++  }
++
+   if (!location_bar_->GetWebContents()) {
+     return;
+   }
+@@ -686,7 +738,7 @@ void ChromeOmniboxClient::OnResultChanged(
+     bool default_match_changed,
+     bool should_preload,
+     const BitmapFetchedCallback& on_bitmap_fetched) {
+-  if (should_preload) {
++  if (should_preload && !chrome::IsMyarcWorkspaceBlank(browser_)) {
+     if (auto* dictionary_preload_service =
+             AutocompleteDictionaryPreloadServiceFactory::GetForProfile(
+                 profile_)) {
+@@ -750,7 +802,8 @@ void ChromeOmniboxClient::OnResultChanged(
+             base::BindOnce(on_bitmap_fetched, result_index, GURL())));
+       }
+     }
+-    if (match.HasTakeoverAction(OmniboxActionId::CONTEXTUAL_SEARCH_OPEN_LENS) &&
++    if (!chrome::IsMyarcWorkspaceBlank(browser_) &&
++        match.HasTakeoverAction(OmniboxActionId::CONTEXTUAL_SEARCH_OPEN_LENS) &&
+         omnibox_feature_configs::ContextualSearch::Get()
+             .open_lens_action_uses_thumbnail) {
+       if (const content::WebContents* web_contents =
+@@ -829,7 +882,7 @@ void ChromeOmniboxClient::OnTextChanged(const AutocompleteMatch& current_match,
+                                         bool has_focus) {
+   AutocompleteActionPredictor::Action recommended_action =
+       AutocompleteActionPredictor::ACTION_NONE;
+-  if (user_input_in_progress) {
++  if (user_input_in_progress && !chrome::IsMyarcWorkspaceBlank(browser_)) {
+     content::WebContents* web_contents = location_bar_->GetWebContents();
+     AutocompleteActionPredictor* action_predictor =
+         predictors::AutocompleteActionPredictorFactory::GetForProfile(profile_);
+@@ -875,6 +928,10 @@ void ChromeOmniboxClient::OnRevert() {
+ }
+ 
+ void ChromeOmniboxClient::OnURLOpenedFromOmnibox(OmniboxLog* log) {
++  if (chrome::IsMyarcWorkspaceBlank(browser_)) {
++    return;
++  }
++
+   // Record the value if prerender for search suggestion was not started. Other
+   // values (kHitFinished, kUnused, kCancelled) are recorded in
+   // PrerenderManager.
+@@ -904,11 +961,15 @@ void ChromeOmniboxClient::OnBookmarkLaunched() {
+ }
+ 
+ void ChromeOmniboxClient::DiscardNonCommittedNavigations() {
++  if (chrome::IsMyarcWorkspaceBlank(browser_)) {
++    return;
++  }
++
+   location_bar_->GetWebContents()->GetController().DiscardNonCommittedEntries();
+ }
+ 
+ void ChromeOmniboxClient::FocusWebContents() {
+-  if (location_bar_->GetWebContents()) {
++  if (CurrentPageExists()) {
+     location_bar_->GetWebContents()->Focus();
+   }
+ }
+@@ -917,6 +978,10 @@ void ChromeOmniboxClient::OnNavigationLikely(
+     size_t index,
+     const AutocompleteMatch& match,
+     omnibox::mojom::NavigationPredictor navigation_predictor) {
++  if (chrome::IsMyarcWorkspaceBlank(browser_)) {
++    return;
++  }
++
+   if (SearchPrefetchService* search_prefetch_service =
+           SearchPrefetchServiceFactory::GetForProfile(profile_)) {
+     search_prefetch_service->OnNavigationLikely(
+@@ -1015,6 +1080,10 @@ void ChromeOmniboxClient::OnAutocompleteAccept(
+ }
+ 
+ void ChromeOmniboxClient::OnInputInProgress(bool in_progress) {
++  if (chrome::IsMyarcWorkspaceBlank(browser_)) {
++    return;
++  }
++
+   location_bar_->UpdateWithoutTabRestore();
+   content::WebContents* const web_contents = location_bar_->GetWebContents();
+   if (web_contents) {
+@@ -1026,6 +1095,10 @@ void ChromeOmniboxClient::OnInputInProgress(bool in_progress) {
+ }
+ 
+ void ChromeOmniboxClient::OnPopupVisibilityChanged(bool popup_is_open) {
++  if (chrome::IsMyarcWorkspaceBlank(browser_)) {
++    return;
++  }
++
+   content::WebContents* const web_contents = location_bar_->GetWebContents();
+   if (web_contents) {
+     auto* const helper =
+@@ -1040,7 +1113,10 @@ void ChromeOmniboxClient::OpenUrl(GURL gurl,
+                                   WindowOpenDisposition disposition) {
+   CHECK(browser_);
+   NavigateParams params(browser_, gurl, ui::PAGE_TRANSITION_GENERATED);
+-  params.disposition = disposition;
++  params.disposition = chrome::IsMyarcWorkspaceBlank(browser_) &&
++                               disposition == WindowOpenDisposition::kCurrentTab
++                           ? WindowOpenDisposition::kNewForegroundTab
++                           : disposition;
+   Navigate(&params);
+ }
+ 
+@@ -1051,7 +1127,10 @@ void ChromeOmniboxClient::OpenUrlWithCallback(
+         callback) {
+   CHECK(browser_);
+   NavigateParams params(browser_, gurl, ui::PAGE_TRANSITION_GENERATED);
+-  params.disposition = disposition;
++  params.disposition = chrome::IsMyarcWorkspaceBlank(browser_) &&
++                               disposition == WindowOpenDisposition::kCurrentTab
++                           ? WindowOpenDisposition::kNewForegroundTab
++                           : disposition;
+ 
+   Navigate(&params, std::move(callback));
+ }
+@@ -1074,6 +1153,9 @@ bool ChromeOmniboxClient::IsAimPopupEnabled() const {
+ 
+ std::optional<lens::proto::LensOverlaySuggestInputs>
+ ChromeOmniboxClient::GetLensOverlaySuggestInputs() const {
++  if (chrome::IsMyarcWorkspaceBlank(browser_)) {
++    return std::nullopt;
++  }
+   if (LensSearchController* lens_search_controller =
+           GetLensSearchController(location_bar_->GetWebContents())) {
+     return lens_search_controller->lens_searchbox_controller()
+@@ -1084,6 +1166,10 @@ ChromeOmniboxClient::GetLensOverlaySuggestInputs() const {
+ 
+ void ChromeOmniboxClient::MaybePrewarmForDefaultSearchEngine(
+     PrewarmTrigger trigger) {
++  if (chrome::IsMyarcWorkspaceBlank(browser_)) {
++    return;
++  }
++
+   CHECK(base::FeatureList::IsEnabled(features::kPrewarm));
+   switch (trigger) {
+     case PrewarmTrigger::kZeroSuggest:
+@@ -1111,6 +1197,10 @@ base::WeakPtr<OmniboxClient> ChromeOmniboxClient::AsWeakPtr() {
+ }
+ 
+ void ChromeOmniboxClient::DoPrerender(const AutocompleteMatch& match) {
++  if (chrome::IsMyarcWorkspaceBlank(browser_)) {
++    return;
++  }
++
+   content::WebContents* web_contents = location_bar_->GetWebContents();
+ 
+   // Don't prerender when DevTools is open in this tab.
+diff --git a/chrome/browser/ui/search_engines/BUILD.gn b/chrome/browser/ui/search_engines/BUILD.gn
+index 7b5d57c5568af1920b4e4ae61a867f064befef20..92b10cfcfc27c304ee50a14451d80b52ab671ec2 100644
+--- a/chrome/browser/ui/search_engines/BUILD.gn
++++ b/chrome/browser/ui/search_engines/BUILD.gn
+@@ -62,6 +62,7 @@ source_set("search_engines") {
+ 
+       deps += [
+         "//chrome/browser/extensions",
++        "//chrome/browser/ui:browser_window_header",
+         "//chrome/browser/ui/extensions",
+         "//chrome/browser/ui/tabs:tabs_public",
+         "//components/tabs:public",
+diff --git a/chrome/browser/ui/search_engines/default_search_extension_controlled_controller.cc b/chrome/browser/ui/search_engines/default_search_extension_controlled_controller.cc
+index cd760a84e42af6f706704eda5a0ff366d6c7744d..5c8562ca81791399538880c039334229470075e5 100644
+--- a/chrome/browser/ui/search_engines/default_search_extension_controlled_controller.cc
++++ b/chrome/browser/ui/search_engines/default_search_extension_controlled_controller.cc
+@@ -11,6 +11,7 @@
+ #include "base/no_destructor.h"
+ #include "chrome/browser/profiles/profile.h"
+ #include "chrome/browser/search_engines/template_url_service_factory.h"
++#include "chrome/browser/ui/browser_window.h"
+ #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
+ #include "chrome/browser/ui/extensions/controlled_home_dialog_controller.h"
+ #include "chrome/browser/ui/extensions/extension_settings_overridden_dialog.h"
+@@ -205,7 +206,13 @@ void DefaultSearchExtensionControlledController::OnParamsLoaded(
+       browser_window_interface_->GetActiveTabInterface()->GetContents();
+   CHECK(web_contents);
+ 
+-  gfx::NativeWindow parent_window = web_contents->GetTopLevelNativeWindow();
++  auto* window = BrowserWindow::FromBrowser(&*browser_window_interface_);
++  // Hidden contents need not have a native parent. Consent belongs to the
++  // browser window even when its selected Space has no page.
++  gfx::NativeWindow parent_window =
++      window && window->IsMyarcWorkspaceBlank()
++          ? window->GetNativeWindow()
++          : web_contents->GetTopLevelNativeWindow();
+   extensions::ShowSettingsOverriddenDialog(std::move(dialog), parent_window);
+ }
+ 
+diff --git a/chrome/browser/ui/tabs/BUILD.gn b/chrome/browser/ui/tabs/BUILD.gn
+index 149191823ab7da4a7c733aa2da57654fc041ff21..d4aaff27a0eb13c7ef5e223f2ab143869100efe2 100644
+--- a/chrome/browser/ui/tabs/BUILD.gn
++++ b/chrome/browser/ui/tabs/BUILD.gn
+@@ -156,7 +156,10 @@ if (!is_android) {
+       "tab_list_bridge.h",
+     ]
+ 
+-    deps = [ "//chrome/browser/tab_group_sync:factories" ]
++    deps = [
++      "//chrome/browser/tab_group_sync:factories",
++      "//chrome/browser/ui:browser_window_header",
++    ]
+ 
+     public_deps = [
+       ":tab_strip",
+@@ -188,6 +191,7 @@ if (!is_android) {
+       "//chrome/browser/glic/browser_ui",
+       "//chrome/browser/profiles:profile",
+       "//chrome/browser/send_tab_to_self",
++      "//chrome/browser/ui:browser_window_header",
+       "//chrome/browser/ui:ui_features",
+       "//chrome/browser/ui/immersive:immersive_mode_controller",
+       "//chrome/browser/ui/send_tab_to_self",
+diff --git a/chrome/browser/ui/tabs/tab_list_bridge.cc b/chrome/browser/ui/tabs/tab_list_bridge.cc
+index 1964f543c3dc0080003dc95a512e0ef75a09a924..40987b5c14bd5de16813e29e61d8eaf7150c49d3 100644
+--- a/chrome/browser/ui/tabs/tab_list_bridge.cc
++++ b/chrome/browser/ui/tabs/tab_list_bridge.cc
+@@ -12,6 +12,7 @@
+ #include "chrome/browser/resource_coordinator/tab_lifecycle_unit_external.h"
+ #include "chrome/browser/tab_group_sync/tab_group_sync_service_factory.h"
+ #include "chrome/browser/tab_list/constants.h"
++#include "chrome/browser/ui/browser_window.h"
+ #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
+ #include "chrome/browser/ui/browser_window/public/browser_window_interface_iterator.h"
+ #include "chrome/browser/ui/tabs/split_tab_metrics.h"
+@@ -303,6 +304,11 @@ void TabListBridge::PinTab(tabs::TabHandle tab) {
+   int index = GetIndexOfTab(tab);
+   CHECK_NE(index, tab_list::kNoTabIndex)
+       << "Trying to pin a tab that doesn't exist in this tab list.";
++  auto* browser = tab_strip_->delegate()->GetBrowserWindowInterface();
++  if (auto* window = browser ? BrowserWindow::FromBrowser(browser) : nullptr;
++      window && window->SetMyarcTabsSaved({index}, true)) {
++    return;
++  }
+   tab_strip_->SetTabPinned(index, true);
+ }
+ 
+@@ -310,6 +316,12 @@ void TabListBridge::UnpinTab(tabs::TabHandle tab) {
+   int index = GetIndexOfTab(tab);
+   CHECK_NE(index, tab_list::kNoTabIndex)
+       << "Trying to unpin a tab that doesn't exist in this tab list.";
++  auto* browser = tab_strip_->delegate()->GetBrowserWindowInterface();
++  if (auto* window = browser ? BrowserWindow::FromBrowser(browser) : nullptr;
++      window && window->GetMyarcTabSaveState({index}).has_value()) {
++    // Generic API unpin must not delete saved identity. UI Unsave is explicit.
++    return;
++  }
+   tab_strip_->SetTabPinned(index, false);
+ }
+ 
+diff --git a/chrome/browser/ui/tabs/tab_menu_model.cc b/chrome/browser/ui/tabs/tab_menu_model.cc
+index d27b04ae75b782dcda5161ba1976d638c4d38457..017a2f5f67a1b261884a6f27665608222fa8a3b1 100644
+--- a/chrome/browser/ui/tabs/tab_menu_model.cc
++++ b/chrome/browser/ui/tabs/tab_menu_model.cc
+@@ -26,6 +26,7 @@
+ #include "chrome/browser/profiles/profile.h"
+ #include "chrome/browser/send_tab_to_self/send_tab_to_self_util.h"
+ #include "chrome/browser/ui/browser_element_identifiers.h"
++#include "chrome/browser/ui/browser_window.h"
+ #include "chrome/browser/ui/browser_window/public/browser_window_features.h"
+ #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
+ #include "chrome/browser/ui/color/chrome_color_id.h"
+@@ -529,9 +530,18 @@ void TabMenuModel::Build(int index) {
+   SetElementIdentifierAt(GetItemCount() - 1, kDuplicateMenuItem);
+ 
+   bool will_pin = tab_strip_->WillContextMenuPin(index);
+-  AddItemWithStringId(
+-      TabStripModel::CommandTogglePinned,
+-      will_pin ? IDS_TAB_CXMENU_PIN_TAB : IDS_TAB_CXMENU_UNPIN_TAB);
++  auto* save_browser = tab_strip_->delegate()->GetBrowserWindowInterface();
++  auto* save_window =
++      save_browser ? BrowserWindow::FromBrowser(save_browser) : nullptr;
++  const auto save_state =
++      save_window ? save_window->GetMyarcTabSaveState(indices) : std::nullopt;
++  if (save_state) {
++    AddItem(TabStripModel::CommandTogglePinned, save_state->label);
++  } else {
++    AddItemWithStringId(
++        TabStripModel::CommandTogglePinned,
++        will_pin ? IDS_TAB_CXMENU_PIN_TAB : IDS_TAB_CXMENU_UNPIN_TAB);
++  }
+ 
+   if (features::IsMenuSimplificationEnabled()) {
+     SetIconForCommandId(
+diff --git a/chrome/browser/ui/tabs/tab_strip_api/tab_strip_model_impl/tab_strip_model_adapter_impl.cc b/chrome/browser/ui/tabs/tab_strip_api/tab_strip_model_impl/tab_strip_model_adapter_impl.cc
+index 24311c6c0b3fa53d4f49dbf5f7d4207cf127eec5..1a81bcb57269c8be14a17380964bdc2790702721 100644
+--- a/chrome/browser/ui/tabs/tab_strip_api/tab_strip_model_impl/tab_strip_model_adapter_impl.cc
++++ b/chrome/browser/ui/tabs/tab_strip_api/tab_strip_model_impl/tab_strip_model_adapter_impl.cc
+@@ -5,6 +5,7 @@
+ #include "chrome/browser/ui/tabs/tab_strip_api/tab_strip_model_impl/tab_strip_model_adapter_impl.h"
+ 
+ #include "base/notimplemented.h"
++#include "chrome/browser/ui/browser_window.h"
+ #include "chrome/browser/ui/tabs/tab_enums.h"
+ #include "chrome/browser/ui/tabs/tab_group_model.h"
+ #include "chrome/browser/ui/tabs/tab_strip_api/tab_strip_model_impl/converters/tab_converters.h"
+@@ -103,6 +104,14 @@ void TabStripModelAdapterImpl::ActivateTab(size_t index) {
+ base::expected<void, mojo_base::mojom::ErrorPtr>
+ TabStripModelAdapterImpl::MoveTab(tabs::TabHandle tab,
+                                   const Position& position) {
++  auto* browser = tab_strip_model_->delegate()->GetBrowserWindowInterface();
++  if (auto* window = browser ? BrowserWindow::FromBrowser(browser) : nullptr;
++      window && window->GetMyarcTabSaveState({})) {
++    // This tree models native pin bits/groups, not Rust's Space ownership.
++    return base::unexpected(mojo_base::mojom::Error::New(
++        mojo_base::mojom::Code::kInvalidArgument,
++        "Use the workspace sidebar to move or save workspace items."));
++  }
+   auto maybe_index = GetIndexForHandle(tab);
+   CHECK(maybe_index.has_value());
+   auto index = maybe_index.value();
+diff --git a/chrome/browser/ui/tabs/tab_strip_model.cc b/chrome/browser/ui/tabs/tab_strip_model.cc
+index 8f53ac45605d10c921fee6fba53a758b22afa687..471e3163c9116440519c1bf8dcc4152f4adf0860 100644
+--- a/chrome/browser/ui/tabs/tab_strip_model.cc
++++ b/chrome/browser/ui/tabs/tab_strip_model.cc
+@@ -1027,6 +1027,13 @@ void TabStripModel::ActivateTabAt(int index,
+ 
+ void TabStripModel::ActivateTab(tabs::TabInterface* tab,
+                                 TabStripUserGestureDetails user_gesture) {
++  if (tab && tab == GetActiveTab()) {
++    auto* browser = delegate_->GetBrowserWindowInterface();
++    if (auto* window = browser ? BrowserWindow::FromBrowser(browser) : nullptr;
++        window && window->IsMyarcWorkspaceBlank()) {
++      window->RevealMyarcActiveTab();
++    }
++  }
+   ReentrancyCheck reentrancy_check(&reentrancy_guard_);
+ 
+   CHECK(tab);
+@@ -1731,9 +1738,16 @@ void TabStripModel::AddTab(std::unique_ptr<tabs::TabModel> tab,
+   // If the newly-opened tab is part of the same task as the parent tab, we want
+   // to inherit the parent's opener attribute, so that if this tab is then
+   // closed we'll jump back to the parent tab.
++  auto* browser = delegate_->GetBrowserWindowInterface();
++  auto* window = browser ? BrowserWindow::FromBrowser(browser) : nullptr;
++  const bool blank = window && window->IsMyarcWorkspaceBlank();
++  if (blank) {
++    add_types &= ~ADD_INHERIT_OPENER;
++  }
+   bool inherit_opener = (add_types & ADD_INHERIT_OPENER) == ADD_INHERIT_OPENER;
+ 
+-  if (ui::PageTransitionTypeIncludingQualifiersIs(transition,
++  if (!blank &&
++      ui::PageTransitionTypeIncludingQualifiersIs(transition,
+                                                   ui::PAGE_TRANSITION_LINK) &&
+       (add_types & ADD_FORCE_INDEX) == 0) {
+     // We assume tabs opened via link clicks are part of the same task as their
+@@ -1788,7 +1802,8 @@ void TabStripModel::AddTab(std::unique_ptr<tabs::TabModel> tab,
+     index = GetIndexRangeOfSplit(split_id.value()).GetMax();
+   }
+ 
+-  if (ui::PageTransitionTypeIncludingQualifiersIs(transition,
++  if (!blank &&
++      ui::PageTransitionTypeIncludingQualifiersIs(transition,
+                                                   ui::PAGE_TRANSITION_TYPED) &&
+       index == count()) {
+     // Also, any tab opened at the end of the TabStrip with a "TYPED"
+@@ -2690,6 +2705,30 @@ bool TabStripModel::IsContextMenuCommandEnabled(
+   if (!ContainsIndex(context_index)) {
+     return false;
+   }
++  auto* browser = delegate_->GetBrowserWindowInterface();
++  auto* window = browser ? BrowserWindow::FromBrowser(browser) : nullptr;
++  if (window && window->IsMyarcWorkspaceBlank() &&
++      command_id != CommandToggleVertical) {
++    return false;
++  }
++  if (window && window->IsMyarcWorkspaceActive()) {
++    // Native bulk/group operations do not understand the visible Rust Space.
++    switch (command_id) {
++      case CommandCloseOtherTabs:
++      case CommandCloseTabsToRight:
++      case CommandToggleGrouped:
++      case CommandAddToNewGroup:
++      case CommandAddToNewGroupFromMenuItem:
++      case CommandAddToExistingGroup:
++      case CommandRemoveFromGroup:
++      case CommandToggleFocusGroup:
++      case CommandMoveToExistingWindow:
++      case CommandMoveTabsToNewWindow:
++        return false;
++      default:
++        break;
++    }
++  }
+   tabs::TabHandle context_tab = GetTabAtIndex(context_index)->GetHandle();
+ 
+   switch (command_id) {
+@@ -2725,6 +2764,12 @@ bool TabStripModel::IsContextMenuCommandEnabled(
+     }
+ 
+     case CommandTogglePinned:
++      if (window) {
++        if (const auto state = window->GetMyarcTabSaveState(
++                GetIndicesForCommand(context_index))) {
++          return state->enabled;
++        }
++      }
+       return true;
+ 
+     case CommandToggleGrouped:
+@@ -2836,6 +2881,14 @@ void TabStripModel::ExecuteContextMenuCommand(int context_index,
+   if (!ContainsIndex(context_index)) {
+     return;
+   }
++  auto* workspace_browser = delegate_->GetBrowserWindowInterface();
++  auto* window = workspace_browser
++                     ? BrowserWindow::FromBrowser(workspace_browser)
++                     : nullptr;
++  if (window && window->IsMyarcWorkspaceActive() &&
++      !IsContextMenuCommandEnabled(context_index, command_id)) {
++    return;
++  }
+   tabs::TabHandle context_tab = GetTabAtIndex(context_index)->GetHandle();
+   switch (command_id) {
+     case CommandNewTabToRight: {
+@@ -2950,11 +3003,14 @@ void TabStripModel::ExecuteContextMenuCommand(int context_index,
+       base::RecordAction(UserMetricsAction("TabContextMenu_TogglePinned"));
+ 
+       std::vector<int> indices = GetIndicesForCommand(context_index);
++      const bool pin = WillContextMenuPin(context_index);
++      if (window && window->SetMyarcTabsSaved(indices, pin)) {
++        break;
++      }
+       std::vector<tab_groups::TabGroupId> groups_to_delete =
+           GetGroupsDestroyedFromRemovingIndices(indices);
+       MarkTabGroupsForClosing(groups_to_delete);
+ 
+-      bool pin = WillContextMenuPin(context_index);
+ 
+       // If there are groups that will be deleted by closing tabs from the
+       // context menu, confirm the group deletion first, and then perform the
+@@ -3525,6 +3581,12 @@ bool TabStripModel::WillContextMenuMuteSites(int index) {
+ 
+ bool TabStripModel::WillContextMenuPin(int index) {
+   std::vector<int> indices = GetIndicesForCommand(index);
++  auto* browser = delegate_->GetBrowserWindowInterface();
++  if (auto* window = browser ? BrowserWindow::FromBrowser(browser) : nullptr) {
++    if (const auto state = window->GetMyarcTabSaveState(indices)) {
++      return state->save;
++    }
++  }
+   // If all tabs are pinned, then we unpin, otherwise we pin.
+   bool all_pinned = true;
+   for (size_t i = 0; i < indices.size() && all_pinned; ++i) {
+@@ -3956,7 +4018,10 @@ int TabStripModel::InsertTabAtImpl(
+   // otherwise we run into problems when we try to change the active contents
+   // since the old contents and the new contents will be the same...
+   CHECK_EQ(this, tab->owning_model());
+-  if ((add_types & ADD_INHERIT_OPENER) && active_tab_model) {
++  auto* browser = delegate_->GetBrowserWindowInterface();
++  auto* window = browser ? BrowserWindow::FromBrowser(browser) : nullptr;
++  if ((add_types & ADD_INHERIT_OPENER) && active_tab_model &&
++      !(window && window->IsMyarcWorkspaceBlank())) {
+     if (active) {
+       // Forget any existing relationships, we don't want to make things too
+       // confusing by having multiple openers active at the same time.
+diff --git a/chrome/browser/ui/views/frame/browser_view.cc b/chrome/browser/ui/views/frame/browser_view.cc
+index 5db011f7a1262f2d8f5f32d7db778787e7d601a0..089e98a401b08b6340e2e93bd35bb1f8f0c6a018 100644
+--- a/chrome/browser/ui/views/frame/browser_view.cc
++++ b/chrome/browser/ui/views/frame/browser_view.cc
+@@ -970,12 +970,14 @@ class MyarcPaletteView : public views::BoxLayoutView,
+     if (!browser_) {
+       return;
+     }
+-    if (!new_tab_ && input_->GetText() == initial_text_) {
++    if (!new_tab_ && !chrome::IsMyarcWorkspaceBlank(browser_.get()) &&
++        input_->GetText() == initial_text_) {
+       chrome::Reload(browser_.get(), WindowOpenDisposition::kCurrentTab);
+     } else if (!chrome::NavigateFromMyarcPalette(browser_.get(),
+                                                  input_->GetText(), new_tab_)) {
+       error_->SetText(
+-          u"Enter a web URL or search. This address is unsupported.");
++          u"Address unsupported. For search confirmation, open a page and "
++          u"use the address bar.");
+       error_->SetVisible(true);
+       Resize();
+       return;
+@@ -2685,6 +2687,20 @@ bool BrowserView::IsFullscreen() const {
+ }
+ 
+ void BrowserView::RestoreFocus() {
++  if (IsMyarcWorkspaceBlank()) {
++    auto* focused = GetFocusManager()->GetFocusedView();
++    auto* active = multi_contents_view_->GetActiveContentsView();
++    auto* inactive = multi_contents_view_->GetInactiveContentsView();
++    if (focused && focused->IsDrawn() &&
++        !(active && active->Contains(focused)) &&
++        !(inactive && inactive->Contains(focused))) {
++      return;
++    }
++    if (auto* view = GetInitiallyFocusedView()) {
++      view->RequestFocus();
++    }
++    return;
++  }
+   WebContents* selected_web_contents = GetActiveWebContents();
+   if (selected_web_contents) {
+     selected_web_contents->RestoreFocus();
+@@ -3856,7 +3872,7 @@ void BrowserView::CutCopyPaste(int command_id) {
+   // key events (and not accelerators) to the WebContents so it can give the web
+   // page a chance to override them.
+   WebContents* contents = browser_->GetTabStripModel()->GetActiveWebContents();
+-  if (contents) {
++  if (contents && !IsMyarcWorkspaceBlank()) {
+     void (WebContents::*method)();
+     if (command_id == IDC_CUT) {
+       method = &content::WebContents::Cut;
+@@ -4399,7 +4415,10 @@ bool BrowserView::CanChangeWindowIcon() const {
+ }
+ 
+ views::View* BrowserView::GetInitiallyFocusedView() {
+-  return nullptr;
++  return IsMyarcWorkspaceBlank() && myarc_workspace_sidebar_ &&
++                 myarc_workspace_sidebar_->IsDrawn()
++             ? myarc_workspace_sidebar_.get()
++             : nullptr;
+ }
+ 
+ bool BrowserView::ShouldShowWindowTitle() const {
+@@ -5767,6 +5786,115 @@ bool BrowserView::IsMyarcWorkspaceBlank() const {
+          !myarc_workspace_adapter_->DisplayedContents();
+ }
+ 
++void BrowserView::RevealMyarcActiveTab() {
++  if (!IsMyarcWorkspaceBlank()) {
++    return;
++  }
++  auto* contents = browser_->GetTabStripModel()->GetActiveWebContents();
++  if (contents) {
++    MyarcWorkspaceResult(myarc_workspace_adapter_->service().RevealItem(
++        myarc_workspace_adapter_->window_id(),
++        myarc::BrowserWorkspaceAdapter::ItemIdForContents(*contents)));
++  }
++}
++
++bool BrowserView::IsMyarcWorkspaceActive() const {
++  return myarc_workspace_adapter_ && myarc_workspace_adapter_->ready();
++}
++
++std::optional<BrowserWindow::MyarcTabSaveState>
++BrowserView::GetMyarcTabSaveState(const std::vector<int>& indices) const {
++  if (!myarc_workspace_adapter_) {
++    return std::nullopt;
++  }
++  MyarcTabSaveState result;
++  result.label = u"Workspace save unavailable";
++  if (!myarc_workspace_adapter_->ready() || IsMyarcWorkspaceBlank() ||
++      indices.empty()) {
++    return result;
++  }
++  const auto model = myarc_workspace_adapter_->Sidebar();
++  if (!model.ok) {
++    return result;
++  }
++  bool all_saved = true;
++  bool all_favorites = true;
++  bool all_pins = true;
++  auto* tabs = browser_->GetTabStripModel();
++  for (int index : indices) {
++    if (!tabs->ContainsIndex(index)) {
++      return result;
++    }
++    const auto id = myarc::BrowserWorkspaceAdapter::ItemIdForContents(
++        *tabs->GetWebContentsAt(index));
++    const auto contains = [id](const auto& rows) {
++      return std::ranges::any_of(
++          rows, [id](const auto& row) { return row.id == id; });
++    };
++    const bool favorite = contains(model.favorites);
++    const bool pin = contains(model.pins);
++    if (!favorite && !pin && !contains(model.temporary)) {
++      return result;
++    }
++    all_saved &= favorite || pin;
++    all_favorites &= favorite;
++    all_pins &= pin;
++  }
++  result.enabled = true;
++  result.save = !all_saved;
++  result.label = result.save     ? u"Add to Profile Favorites"
++                 : all_favorites ? u"Remove from Profile Favorites"
++                 : all_pins      ? u"Remove Space Pins"
++                                 : u"Remove saved items";
++  return result;
++}
++
++bool BrowserView::SetMyarcTabsSaved(const std::vector<int>& indices,
++                                    bool saved) {
++  const auto state = GetMyarcTabSaveState(indices);
++  if (!state) {
++    return false;
++  }
++  if (!state->enabled) {
++    myarc_workspace_action_error_ =
++        u"Workspace save unavailable. Select a live page in this Space.";
++    RefreshMyarcWorkspaceSidebar();
++    return true;
++  }
++  // Resolve before mutations: Favorite can reorder native pinned tabs, and a
++  // stable item may have multiple native projections in the selection.
++  const auto model = myarc_workspace_adapter_->Sidebar();
++  if (!model.ok) {
++    myarc_workspace_action_error_ = u"Workspace save unavailable. Try again.";
++    RefreshMyarcWorkspaceSidebar();
++    return true;
++  }
++  std::set<uint64_t> ids;
++  for (int index : indices) {
++    const auto id = myarc::BrowserWorkspaceAdapter::ItemIdForContents(
++        *browser_->GetTabStripModel()->GetWebContentsAt(index));
++    const auto contains = [id](const auto& rows) {
++      return std::ranges::any_of(
++          rows, [id](const auto& row) { return row.id == id; });
++    };
++    if (saved ? contains(model.temporary)
++              : contains(model.favorites) || contains(model.pins)) {
++      ids.insert(id);
++    }
++  }
++  for (uint64_t id : ids) {
++    auto result = saved ? myarc_workspace_adapter_->Favorite(id)
++                        : myarc_workspace_adapter_->Unsave(id);
++    if (!result.ok) {
++      MyarcWorkspaceResult(std::move(result));
++      return true;
++    }
++  }
++  myarc_workspace_action_error_.clear();
++  RefreshMyarcWorkspaceSidebar();
++  return true;
++}
++
+ void BrowserView::RefreshMyarcWorkspaceSidebar() {
+   if (!myarc_workspace_adapter_ || !myarc_workspace_sidebar_ ||
+       !vertical_tab_strip_region_view_) {
+@@ -5996,6 +6124,16 @@ void BrowserView::UpdateMyarcWorkspaceCanvas() {
+   }
+   const bool blank = IsMyarcWorkspaceBlank();
+   const bool was_blank = std::exchange(myarc_workspace_blank_, blank);
++  const bool active = IsMyarcWorkspaceActive();
++  const bool was_active = std::exchange(myarc_workspace_active_, active);
++  // Native tab changes can clear the visual blank flag before this callback.
++  const bool commands_were_blank =
++      std::exchange(myarc_workspace_commands_blank_, blank);
++  if (blank != commands_were_blank || active != was_active) {
++    if (auto* controller = chrome::BrowserCommandController::From(browser_)) {
++      controller->MyarcWorkspaceStateChanged();
++    }
++  }
+   if (blank) {
+     if (!was_blank && GetFocusManager()) {
+       GetFocusManager()->ClearFocus();
+diff --git a/chrome/browser/ui/views/frame/browser_view.h b/chrome/browser/ui/views/frame/browser_view.h
+index 6b99544a9788167061c5358d7a308be697247854..dcdeb18d6de1c8a8902d589da062dc169310c6a3 100644
+--- a/chrome/browser/ui/views/frame/browser_view.h
++++ b/chrome/browser/ui/views/frame/browser_view.h
+@@ -331,6 +331,12 @@ class BrowserView : public BrowserWindow,
+   // Parent owns session binding/restore barriers and shutdown/resume hooks.
+   myarc::BrowserWorkspaceAdapter* GetMyarcWorkspaceAdapter();
+   void RefreshMyarcWorkspaceSidebar();
++  bool IsMyarcWorkspaceBlank() const override;
++  void RevealMyarcActiveTab() override;
++  bool IsMyarcWorkspaceActive() const override;
++  std::optional<MyarcTabSaveState> GetMyarcTabSaveState(
++      const std::vector<int>& indices) const override;
++  bool SetMyarcTabsSaved(const std::vector<int>& indices, bool saved) override;
+ 
+   base::WeakPtr<BrowserView> GetAsWeakPtr() {
+     return weak_ptr_factory_.GetWeakPtr();
+@@ -1286,7 +1292,6 @@ class BrowserView : public BrowserWindow,
+   void RenameSpace(uint64_t space) override;
+   void NewTab() override;
+   void MyarcWorkspaceResult(myarc::foundation::MutationResult result);
+-  bool IsMyarcWorkspaceBlank() const;
+   void UpdateMyarcWorkspaceCanvas();
+   void ShowMyarcSpaceDialog(uint64_t space);
+   bool AcceptMyarcSpaceDialog(uint64_t space);
+@@ -1301,6 +1306,8 @@ class BrowserView : public BrowserWindow,
+   std::u16string myarc_workspace_action_error_;
+   std::set<std::string> myarc_workspace_live_items_;
+   bool myarc_workspace_blank_ = false;
++  bool myarc_workspace_active_ = false;
++  bool myarc_workspace_commands_blank_ = false;
+   std::unique_ptr<views::DialogDelegate> myarc_space_dialog_delegate_;
+   std::unique_ptr<views::Widget> myarc_space_dialog_widget_;
+   raw_ptr<views::Textfield> myarc_space_name_ = nullptr;

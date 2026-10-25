@@ -1257,7 +1257,8 @@ void BrowserWorkspaceAdapter::OnTabStripModelChanged(
     const TabStripModelChange& change,
     const TabStripSelectionChange& selection) {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
-  if (const auto* replace = change.GetReplace()) {
+  if (change.type() == TabStripModelChange::kReplaced) {
+    const auto* replace = change.GetReplace();
     if (auto* binding = Binding::Get(*replace->old_contents)) {
       Remember(Binding::Set(*replace->new_contents, binding->item(),
                             binding->space(), binding->legacy()));
@@ -1268,10 +1269,10 @@ void BrowserWorkspaceAdapter::OnTabStripModelChanged(
   // Navigate binds only navigated_or_inserted_contents after it returns.
   // Never assign its pending identity by scanning unrelated unbound tabs.
   bindings_dirty_ = true;
-  if (change.GetInsert() && !changing_)
+  if (change.type() == TabStripModelChange::kInserted && !changing_)
     bound_ = false;
   if (!changing_ && selection.active_tab_changed() && selection.new_contents &&
-      (change.GetInsert() ||
+      (change.type() == TabStripModelChange::kInserted ||
        change.type() == TabStripModelChange::kSelectionOnly)) {
     if (ready()) {
       if (auto* binding = Binding::Get(*selection.new_contents);
