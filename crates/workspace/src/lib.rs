@@ -308,6 +308,22 @@ impl Workspace {
         Ok(())
     }
 
+    /// Native keyboard/palette activation reveals the owning Space through the
+    /// same command path as sidebar activation. Favorites keep the current Space.
+    pub fn reveal_item(
+        &mut self,
+        window_id: WindowId,
+        item_id: ItemId,
+    ) -> Result<(), WorkspaceError> {
+        self.window(window_id)?;
+        let space_id = match self.item(item_id)?.placement {
+            Placement::Temporary { space_id } | Placement::Pin { space_id } => space_id,
+            Placement::Favorite { .. } => self.window(window_id)?.space_id,
+        };
+        self.select_space(window_id, space_id)?;
+        self.select_item(window_id, item_id)
+    }
+
     pub fn add_temporary_item(&mut self, space_id: SpaceId) -> Result<ItemId, WorkspaceError> {
         self.space(space_id)?;
         check_limit(self.state.items.len(), MAX_ITEMS, "items")?;

@@ -24,6 +24,42 @@ fn unchanged<T: std::fmt::Debug>(
 }
 
 #[test]
+fn native_activation_reveals_owner_and_keeps_favorite_space() {
+    let mut workspace = Workspace::default();
+    let other = workspace.create_space(P1, "Other").unwrap();
+    let local = pin(&mut workspace, other);
+    let temporary = workspace.add_temporary_item(S1).unwrap();
+    let favorite = pin(&mut workspace, S1);
+    workspace
+        .set_placement(favorite, Placement::Favorite { profile_id: P1 }, None)
+        .unwrap();
+    workspace.reveal_item(W1, local).unwrap();
+    assert_eq!(
+        workspace.sidebar_snapshot(W1).unwrap().current_space.id,
+        other
+    );
+    workspace.reveal_item(W1, favorite).unwrap();
+    assert_eq!(
+        workspace.sidebar_snapshot(W1).unwrap().current_space.id,
+        other
+    );
+    workspace.reveal_item(W1, temporary).unwrap();
+    let sidebar = workspace.sidebar_snapshot(W1).unwrap();
+    assert_eq!(sidebar.current_space.id, S1);
+    assert_eq!(sidebar.selected_item_id, Some(temporary));
+    unchanged(
+        &mut workspace,
+        |w| w.reveal_item(W1, 999),
+        WorkspaceError::UnknownItem(999),
+    );
+    unchanged(
+        &mut workspace,
+        |w| w.reveal_item(999, local),
+        WorkspaceError::UnknownWindow(999),
+    );
+}
+
+#[test]
 fn spaces_share_one_profile_but_keep_local_items_and_order() {
     let mut workspace = Workspace::default();
     let s2 = workspace.create_space(P1, "Research").unwrap();
