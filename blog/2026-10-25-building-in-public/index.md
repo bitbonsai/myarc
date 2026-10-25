@@ -8,60 +8,58 @@ October 25, 2026
 
 By [bitbonsai](https://github.com/bitbonsai) · [Read Markdown](https://myarc.dev/blog/2026-10-25-building-in-public/index.md)
 
-myArc now has a site. This blog is where I'll keep the development record, including the decisions we have to revisit.
+Today's goal for myArc is to get the native shell looking like an empty Arc window and produce a nightly build I can run and share.
 
-The first landing page already gave us something to write about. Tiny section labels occupied an entire column. The progress panel had too much empty space, while its text felt small. Some requested changes were discussed before they were deployed. Reviewing a page gets frustrating when you're looking at an older version than the one being described.
+myArc is an open-source browser project, using Arc as the reference for its interface and browsing workflow. The implementation runs inside Chromium's browser layer, with Rust for the workspace behavior myArc owns.
 
-We changed the layout, made the type larger, and started checking the actual published HTML against the built file. The public page is part of the work to verify.
+[![Current myArc build loading mauriciowolff.com with the native command palette open](https://myarc.dev/blog/2026-10-25-building-in-public/myarc-current-build.f594a2a31d6a.webp)](https://myarc.dev/blog/2026-10-25-building-in-public/myarc-current-build.f594a2a31d6a.webp)
 
-## Where we want to get
+*Current myArc build, captured from its native window. mauriciowolff.com is loaded behind the command palette.*
 
-[![Arc reference showing the sidebar and centered command bar, our visual target for myArc](https://myarc.dev/blog/2026-10-25-building-in-public/arc-reference.3418f314f546.webp)](https://myarc.dev/blog/2026-10-25-building-in-public/arc-reference.3418f314f546.webp)
+## Start with a shell we can judge
 
-*Arc reference, supplied for this post. This is the target appearance; myArc remains a prototype.*
+The empty window gives us a clear visual target. Sidebar proportions and the window material are easier to compare when a page isn't doing most of the visual work.
 
-The sidebar keeps navigation close to the tabs, while the centered command bar gives an address or search room to breathe. This is the experience we want to bring back. Our native Chromium experiment is still working toward it.
+[![Arc reference for the window material, sidebar and centered command bar](https://myarc.dev/blog/2026-10-25-building-in-public/arc-reference.3418f314f546.webp)](https://myarc.dev/blog/2026-10-25-building-in-public/arc-reference.3418f314f546.webp)
 
-## Borrowing a working method from Artcraft
+*Arc reference. This is the appearance we're working toward.*
 
-Artcraft was a useful reference for how to organize the development process. In particular, PhotoCraft's public [development guide](https://github.com/storytold/photocraft/blob/main/docs/development.md) and [scorecard](https://github.com/storytold/photocraft/blob/main/docs/scorecard.md) influenced the approach.
+The current build already opens real pages and shows a centered native command palette. The screenshot above shows that running together. Matching the empty Arc window is the next visual checkpoint; the nightly build should make the result available outside the development checkout.
 
-The useful part is the discipline around evidence: choose a bounded task, make the result observable, and record what actually ran. A successful build should be followed by checking the running application. We also check that visible controls have an effect and that screenshots match the version under review.
+## How I'm delegating the work
 
-We've written down [how we're adapting those practices](https://github.com/bitbonsai/myarc/blob/main/docs/ARTCRAFT-WORKFLOW.md). A browser has different constraints from a graphics editor, especially around profiles, extensions and security updates. Those decisions need their own investigation.
+I split work into tasks with a specific boundary and a result someone can check. Today that includes the Rust Spaces model, a Profile-owned workspace service, and the native sidebar that reads its state.
 
-## Chromium for the browser, Rust for myArc's rules
+An implementation task gets the relevant files and constraints, along with the behavior it needs to demonstrate. A separate reviewer looks at the change before integration. Review findings go back through another implementation pass.
 
-The current direction is to preserve Chromium's complete browser implementation and keep the myArc-owned workspace rules in Rust. That includes the planned workspace model, import, persistence and shared commands.
+The lead agent keeps responsibility for integration and the running build. Parallel tasks help when the ownership boundaries are clear. Browser UI and Rust workspace changes still need to be exercised together.
 
-Chrome extension support depends on browser services beyond the rendering engine. Replacing that platform with a generic webview would create a much bigger compatibility problem to solve.
+## Models and effort
 
-There is a small Rust/native Chromium experiment already. A complete myArc browser and importer remain unimplemented. The [architecture notes](https://github.com/bitbonsai/myarc/blob/main/docs/ARCHITECTURE.md) describe the intended boundaries and the evidence still needed.
+For today's browser work, the lead coding agent is **GPT-6.1**, identified by `gpt-6.1-sol`, with **high thinking**. Independent code reviews use **Claude Sonnet 5.5**, `claude-sonnet-5-5`, at **high effort**.
 
-## Models and effort are part of the record
+The model and reasoning setting are part of the task brief. Implementation and review are separate jobs, and I want a reviewer to question the assumptions in the implementation.
 
-For the website design pass, I asked for Claude Fable 5.1 at **high effort**, using the `/frontend-design` skill. The recorded model identifier was `claude-fable-5-1`. The coding session used to build this blog reports `gpt-6.1-sol`.
+A review response also has to turn into something concrete: a correction, a test, or an explicit decision about the tradeoff. The main agent then builds the integrated result and checks it in the native application.
 
-High effort still needs visual review. The first layout wasted space on small labels. The revised brief asked for headings above their content, a consistent type scale, and a smaller illustration inside the progress panel. We then checked desktop and mobile layouts, along with both color schemes.
+## Context between agents and sessions
 
-Future posts will identify the model and effort setting when those details are verified, alongside the task and how we checked the result.
+I've open-sourced two skills that support this workflow: [context](https://github.com/bitbonsai/context) and [wrap](https://github.com/bitbonsai/wrap), under **bitbonsai**.
 
-## Obstacles worth keeping
+Context keeps agent instructions and architecture notes aligned with the repository. It separates the product's intent from what currently works, so a new agent has a useful starting point.
 
-Certificate provisioning was an early deployment problem. DNS resolved correctly, but GitHub Pages kept serving a certificate for `*.github.io`. Normal HTTPS verification correctly rejected it for `myarc.dev`.
+Wrap handles the handover. It keeps the gotchas worth remembering and records the next concrete step. The next session can continue from that record instead of reconstructing the investigation. Machine-specific and private notes stay outside the public repository.
 
-After checking GitHub's documented recovery steps, we removed and re-saved the Pages custom domain. The certificate was then approved for the apex and `www`. We checked the served page before enabling HTTPS enforcement. The DNS records stayed unchanged during that restart.
+The browser code is [open source too](https://github.com/bitbonsai/myarc). I want the development record to explain the decisions behind the changes, especially when an approach fails.
 
-We also caught a smaller reproducibility issue: font conversion was rewriting timestamps, making unchanged builds produce different HTML. Preserving the source font timestamps made consecutive builds byte-identical.
+## What we're learning from the native work
 
-Those are the kinds of details I want to keep here. The failed attempt often explains the eventual implementation better than the final diff does.
+Moving navigation controls into the sidebar exposed startup and layout failures. Using Chromium's native controls fixed that path. Repeatedly hiding and showing the address field also lost keyboard focus; preserving its visibility fixed the navigation journey.
 
-## A small blog we can maintain
+Those failures are useful checks for the next change. A control can look right while breaking keyboard navigation elsewhere in the window.
 
-Posts are Markdown files with screenshots beside them. A build generates the index and article pages, using the website's branding and system color preference. Publishing stays in Git.
+[Artcraft's public engineering practices](https://github.com/bitbonsai/myarc/blob/main/docs/ARTCRAFT-WORKFLOW.md), particularly PhotoCraft's development guide, helped shape the approach: give each task a bounded outcome and attach evidence to its completion. Native visual checks belong alongside the model and command tests.
 
-The first browser check caught the new Blog link disappearing on smaller screens. Existing mobile navigation rules were winning over its style. We corrected the selector and kept a visibility check at mobile widths.
+## Today's finish line
 
-Raw HTML in posts is disabled. Screenshots must be local files, and drafts stay out of the website until explicitly marked for publication. Draft files in a public repository are still public, so private notes and real browser profiles belong elsewhere.
-
-I'll use these posts to record discoveries, obstacles and the checks behind each change. Native browser screenshots will use synthetic tabs and data. Progress on the website will stay clearly separate from progress on the browser.
+The target is an empty-window shell that matches the Arc reference, followed by a nightly artifact people can try. That gives the next update a concrete build to inspect and a clear account of what changed.

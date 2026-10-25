@@ -8,4 +8,4 @@ October 2026
 
 October 25, 2026
 
-The approach behind myArc, the models we're using, and the first mistakes we're correcting.
+An Arc-like shell and a nightly build are today's target. The current browser, model choices, and how I delegate development with context and wrap.

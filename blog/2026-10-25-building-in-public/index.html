@@ -7,27 +7,27 @@
   <meta name="theme-color" content="#f5f2ec" media="(prefers-color-scheme: light)">
   <meta name="theme-color" content="#0b1420" media="(prefers-color-scheme: dark)">
   <title>Building myArc in public | myArc</title>
-  <meta name="description" content="The approach behind myArc, the models we&#x27;re using, and the first mistakes we&#x27;re correcting.">
+  <meta name="description" content="An Arc-like shell and a nightly build are today&#x27;s target. The current browser, model choices, and how I delegate development with context and wrap.">
   <link rel="canonical" href="https://myarc.dev/blog/2026-10-25-building-in-public/">
   <link rel="icon" type="image/png" href="../_assets/favicon.5bca6dcdff1e.png">
   <meta property="og:type" content="article">
   <meta property="og:site_name" content="myArc">
   <meta property="og:title" content="Building myArc in public">
-  <meta property="og:description" content="The approach behind myArc, the models we&#x27;re using, and the first mistakes we&#x27;re correcting.">
+  <meta property="og:description" content="An Arc-like shell and a nightly build are today&#x27;s target. The current browser, model choices, and how I delegate development with context and wrap.">
   <meta property="og:url" content="https://myarc.dev/blog/2026-10-25-building-in-public/">
   <meta name="robots" content="index, follow, max-image-preview:large">
-  <meta property="og:image" content="https://myarc.dev/blog/2026-10-25-building-in-public/arc-reference.3418f314f546.webp">
-  <meta property="og:image:secure_url" content="https://myarc.dev/blog/2026-10-25-building-in-public/arc-reference.3418f314f546.webp">
+  <meta property="og:image" content="https://myarc.dev/blog/2026-10-25-building-in-public/myarc-current-build.f594a2a31d6a.webp">
+  <meta property="og:image:secure_url" content="https://myarc.dev/blog/2026-10-25-building-in-public/myarc-current-build.f594a2a31d6a.webp">
   <meta property="og:image:type" content="image/webp">
-  <meta property="og:image:width" content="2000">
-  <meta property="og:image:height" content="1310">
-  <meta property="og:image:alt" content="Arc reference showing the sidebar and centered command bar, our visual target for myArc">
+  <meta property="og:image:width" content="2400">
+  <meta property="og:image:height" content="1492">
+  <meta property="og:image:alt" content="Current myArc build loading mauriciowolff.com with the native command palette open">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="Building myArc in public">
-  <meta name="twitter:description" content="The approach behind myArc, the models we&#x27;re using, and the first mistakes we&#x27;re correcting.">
-  <meta name="twitter:image" content="https://myarc.dev/blog/2026-10-25-building-in-public/arc-reference.3418f314f546.webp">
-  <meta name="twitter:image:alt" content="Arc reference showing the sidebar and centered command bar, our visual target for myArc">
-  <script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "BlogPosting", "name": "Building myArc in public", "description": "The approach behind myArc, the models we're using, and the first mistakes we're correcting.", "url": "https://myarc.dev/blog/2026-10-25-building-in-public/", "inLanguage": "en", "publisher": {"@type": "Person", "name": "bitbonsai", "url": "https://github.com/bitbonsai"}, "headline": "Building myArc in public", "datePublished": "2026-10-25", "author": {"@type": "Person", "name": "bitbonsai", "url": "https://github.com/bitbonsai"}, "mainEntityOfPage": "https://myarc.dev/blog/2026-10-25-building-in-public/", "isPartOf": {"@type": "Blog", "name": "myArc Blog", "url": "https://myarc.dev/blog/"}, "image": "https://myarc.dev/blog/2026-10-25-building-in-public/arc-reference.3418f314f546.webp"}, {"@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "myArc", "item": "https://myarc.dev/"}, {"@type": "ListItem", "position": 2, "name": "Blog", "item": "https://myarc.dev/blog/"}, {"@type": "ListItem", "position": 3, "name": "Building myArc in public", "item": "https://myarc.dev/blog/2026-10-25-building-in-public/"}]}]}</script>
+  <meta name="twitter:description" content="An Arc-like shell and a nightly build are today&#x27;s target. The current browser, model choices, and how I delegate development with context and wrap.">
+  <meta name="twitter:image" content="https://myarc.dev/blog/2026-10-25-building-in-public/myarc-current-build.f594a2a31d6a.webp">
+  <meta name="twitter:image:alt" content="Current myArc build loading mauriciowolff.com with the native command palette open">
+  <script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "BlogPosting", "name": "Building myArc in public", "description": "An Arc-like shell and a nightly build are today's target. The current browser, model choices, and how I delegate development with context and wrap.", "url": "https://myarc.dev/blog/2026-10-25-building-in-public/", "inLanguage": "en", "publisher": {"@type": "Person", "name": "bitbonsai", "url": "https://github.com/bitbonsai"}, "headline": "Building myArc in public", "datePublished": "2026-10-25", "author": {"@type": "Person", "name": "bitbonsai", "url": "https://github.com/bitbonsai"}, "mainEntityOfPage": "https://myarc.dev/blog/2026-10-25-building-in-public/", "isPartOf": {"@type": "Blog", "name": "myArc Blog", "url": "https://myarc.dev/blog/"}, "image": "https://myarc.dev/blog/2026-10-25-building-in-public/myarc-current-build.f594a2a31d6a.webp"}, {"@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "myArc", "item": "https://myarc.dev/"}, {"@type": "ListItem", "position": 2, "name": "Blog", "item": "https://myarc.dev/blog/"}, {"@type": "ListItem", "position": 3, "name": "Building myArc in public", "item": "https://myarc.dev/blog/2026-10-25-building-in-public/"}]}]}</script>
   <style>
     @font-face {
       font-family: Outfit;
@@ -286,35 +286,34 @@
         <a class="blog-link" href="/blog/">Blog</a>
         <a class="button" href="https://github.com/bitbonsai/myarc"><svg class="github-icon" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false"><path fill-rule="evenodd" clip-rule="evenodd" d="M8 0C3.58 0 0 3.58 0 8C0 11.54 2.29 14.53 5.47 15.59C5.87 15.66 6.02 15.42 6.02 15.21C6.02 15.02 6.01 14.39 6.01 13.72C4 14.09 3.48 13.23 3.32 12.78C3.23 12.55 2.84 11.84 2.5 11.65C2.22 11.5 1.82 11.13 2.49 11.12C3.12 11.11 3.57 11.7 3.72 11.94C4.44 13.15 5.59 12.81 6.05 12.6C6.12 12.08 6.33 11.73 6.56 11.53C4.78 11.33 2.92 10.64 2.92 7.58C2.92 6.71 3.23 5.99 3.74 5.43C3.66 5.23 3.38 4.41 3.82 3.31C3.82 3.31 4.49 3.1 6.02 4.13C6.66 3.95 7.34 3.86 8.02 3.86C8.7 3.86 9.38 3.95 10.02 4.13C11.55 3.09 12.22 3.31 12.22 3.31C12.66 4.41 12.38 5.23 12.3 5.43C12.81 5.99 13.12 6.7 13.12 7.58C13.12 10.65 11.25 11.33 9.47 11.53C9.76 11.78 10.01 12.26 10.01 13.01C10.01 14.08 10 14.94 10 15.21C10 15.42 10.15 15.67 10.55 15.59C13.71 14.53 16 11.53 16 8C16 3.58 12.42 0 8 0Z" transform="scale(64)" fill="currentColor"/></svg>Follow development</a>
       </nav>
-    </header><main id="main" class="journal"><a class="post-back" href="/blog/">All posts</a><header class="post-header"><h1>Building myArc in public</h1><time class="post-date" datetime="2026-10-25">October 25, 2026</time><p class="post-author">By <a rel="author" href="https://github.com/bitbonsai">bitbonsai</a> · <a href="index.md" type="text/markdown">Read Markdown</a></p></header><article class="post-body"><p>myArc now has a site. This blog is where I'll keep the development record, including the decisions we have to revisit.</p>
-<p>The first landing page already gave us something to write about. Tiny section labels occupied an entire column. The progress panel had too much empty space, while its text felt small. Some requested changes were discussed before they were deployed. Reviewing a page gets frustrating when you're looking at an older version than the one being described.</p>
-<p>We changed the layout, made the type larger, and started checking the actual published HTML against the built file. The public page is part of the work to verify.</p>
-<h2>Where we want to get</h2>
-<p><a href="arc-reference.3418f314f546.webp"><img src="arc-reference.3418f314f546.webp" alt="Arc reference showing the sidebar and centered command bar, our visual target for myArc" width="2000" height="1310" decoding="async" loading="eager" fetchpriority="high" srcset="arc-reference.3418f314f546.960.webp 960w, arc-reference.3418f314f546.webp 2000w" sizes="(max-width: 48rem) calc(100vw - 3rem), 50rem" /></a></p>
-<p><em>Arc reference, supplied for this post. This is the target appearance; myArc remains a prototype.</em></p>
-<p>The sidebar keeps navigation close to the tabs, while the centered command bar gives an address or search room to breathe. This is the experience we want to bring back. Our native Chromium experiment is still working toward it.</p>
-<h2>Borrowing a working method from Artcraft</h2>
-<p>Artcraft was a useful reference for how to organize the development process. In particular, PhotoCraft's public <a href="https://github.com/storytold/photocraft/blob/main/docs/development.md">development guide</a> and <a href="https://github.com/storytold/photocraft/blob/main/docs/scorecard.md">scorecard</a> influenced the approach.</p>
-<p>The useful part is the discipline around evidence: choose a bounded task, make the result observable, and record what actually ran. A successful build should be followed by checking the running application. We also check that visible controls have an effect and that screenshots match the version under review.</p>
-<p>We've written down <a href="https://github.com/bitbonsai/myarc/blob/main/docs/ARTCRAFT-WORKFLOW.md">how we're adapting those practices</a>. A browser has different constraints from a graphics editor, especially around profiles, extensions and security updates. Those decisions need their own investigation.</p>
-<h2>Chromium for the browser, Rust for myArc's rules</h2>
-<p>The current direction is to preserve Chromium's complete browser implementation and keep the myArc-owned workspace rules in Rust. That includes the planned workspace model, import, persistence and shared commands.</p>
-<p>Chrome extension support depends on browser services beyond the rendering engine. Replacing that platform with a generic webview would create a much bigger compatibility problem to solve.</p>
-<p>There is a small Rust/native Chromium experiment already. A complete myArc browser and importer remain unimplemented. The <a href="https://github.com/bitbonsai/myarc/blob/main/docs/ARCHITECTURE.md">architecture notes</a> describe the intended boundaries and the evidence still needed.</p>
-<h2>Models and effort are part of the record</h2>
-<p>For the website design pass, I asked for Claude Fable 5.1 at <strong>high effort</strong>, using the <code>/frontend-design</code> skill. The recorded model identifier was <code>claude-fable-5-1</code>. The coding session used to build this blog reports <code>gpt-6.1-sol</code>.</p>
-<p>High effort still needs visual review. The first layout wasted space on small labels. The revised brief asked for headings above their content, a consistent type scale, and a smaller illustration inside the progress panel. We then checked desktop and mobile layouts, along with both color schemes.</p>
-<p>Future posts will identify the model and effort setting when those details are verified, alongside the task and how we checked the result.</p>
-<h2>Obstacles worth keeping</h2>
-<p>Certificate provisioning was an early deployment problem. DNS resolved correctly, but GitHub Pages kept serving a certificate for <code>*.github.io</code>. Normal HTTPS verification correctly rejected it for <code>myarc.dev</code>.</p>
-<p>After checking GitHub's documented recovery steps, we removed and re-saved the Pages custom domain. The certificate was then approved for the apex and <code>www</code>. We checked the served page before enabling HTTPS enforcement. The DNS records stayed unchanged during that restart.</p>
-<p>We also caught a smaller reproducibility issue: font conversion was rewriting timestamps, making unchanged builds produce different HTML. Preserving the source font timestamps made consecutive builds byte-identical.</p>
-<p>Those are the kinds of details I want to keep here. The failed attempt often explains the eventual implementation better than the final diff does.</p>
-<h2>A small blog we can maintain</h2>
-<p>Posts are Markdown files with screenshots beside them. A build generates the index and article pages, using the website's branding and system color preference. Publishing stays in Git.</p>
-<p>The first browser check caught the new Blog link disappearing on smaller screens. Existing mobile navigation rules were winning over its style. We corrected the selector and kept a visibility check at mobile widths.</p>
-<p>Raw HTML in posts is disabled. Screenshots must be local files, and drafts stay out of the website until explicitly marked for publication. Draft files in a public repository are still public, so private notes and real browser profiles belong elsewhere.</p>
-<p>I'll use these posts to record discoveries, obstacles and the checks behind each change. Native browser screenshots will use synthetic tabs and data. Progress on the website will stay clearly separate from progress on the browser.</p>
+    </header><main id="main" class="journal"><a class="post-back" href="/blog/">All posts</a><header class="post-header"><h1>Building myArc in public</h1><time class="post-date" datetime="2026-10-25">October 25, 2026</time><p class="post-author">By <a rel="author" href="https://github.com/bitbonsai">bitbonsai</a> · <a href="index.md" type="text/markdown">Read Markdown</a></p></header><article class="post-body"><p>Today's goal for myArc is to get the native shell looking like an empty Arc window and produce a nightly build I can run and share.</p>
+<p>myArc is an open-source browser project, using Arc as the reference for its interface and browsing workflow. The implementation runs inside Chromium's browser layer, with Rust for the workspace behavior myArc owns.</p>
+<p><a href="myarc-current-build.f594a2a31d6a.webp"><img src="myarc-current-build.f594a2a31d6a.webp" alt="Current myArc build loading mauriciowolff.com with the native command palette open" width="2400" height="1492" decoding="async" loading="eager" fetchpriority="high" srcset="myarc-current-build.f594a2a31d6a.960.webp 960w, myarc-current-build.f594a2a31d6a.webp 2400w" sizes="(max-width: 48rem) calc(100vw - 3rem), 50rem" /></a></p>
+<p><em>Current myArc build, captured from its native window. mauriciowolff.com is loaded behind the command palette.</em></p>
+<h2>Start with a shell we can judge</h2>
+<p>The empty window gives us a clear visual target. Sidebar proportions and the window material are easier to compare when a page isn't doing most of the visual work.</p>
+<p><a href="arc-reference.3418f314f546.webp"><img src="arc-reference.3418f314f546.webp" alt="Arc reference for the window material, sidebar and centered command bar" width="2000" height="1310" decoding="async" loading="lazy" srcset="arc-reference.3418f314f546.960.webp 960w, arc-reference.3418f314f546.webp 2000w" sizes="(max-width: 48rem) calc(100vw - 3rem), 50rem" /></a></p>
+<p><em>Arc reference. This is the appearance we're working toward.</em></p>
+<p>The current build already opens real pages and shows a centered native command palette. The screenshot above shows that running together. Matching the empty Arc window is the next visual checkpoint; the nightly build should make the result available outside the development checkout.</p>
+<h2>How I'm delegating the work</h2>
+<p>I split work into tasks with a specific boundary and a result someone can check. Today that includes the Rust Spaces model, a Profile-owned workspace service, and the native sidebar that reads its state.</p>
+<p>An implementation task gets the relevant files and constraints, along with the behavior it needs to demonstrate. A separate reviewer looks at the change before integration. Review findings go back through another implementation pass.</p>
+<p>The lead agent keeps responsibility for integration and the running build. Parallel tasks help when the ownership boundaries are clear. Browser UI and Rust workspace changes still need to be exercised together.</p>
+<h2>Models and effort</h2>
+<p>For today's browser work, the lead coding agent is <strong>GPT-6.1</strong>, identified by <code>gpt-6.1-sol</code>, with <strong>high thinking</strong>. Independent code reviews use <strong>Claude Sonnet 5.5</strong>, <code>claude-sonnet-5-5</code>, at <strong>high effort</strong>.</p>
+<p>The model and reasoning setting are part of the task brief. Implementation and review are separate jobs, and I want a reviewer to question the assumptions in the implementation.</p>
+<p>A review response also has to turn into something concrete: a correction, a test, or an explicit decision about the tradeoff. The main agent then builds the integrated result and checks it in the native application.</p>
+<h2>Context between agents and sessions</h2>
+<p>I've open-sourced two skills that support this workflow: <a href="https://github.com/bitbonsai/context">context</a> and <a href="https://github.com/bitbonsai/wrap">wrap</a>, under <strong>bitbonsai</strong>.</p>
+<p>Context keeps agent instructions and architecture notes aligned with the repository. It separates the product's intent from what currently works, so a new agent has a useful starting point.</p>
+<p>Wrap handles the handover. It keeps the gotchas worth remembering and records the next concrete step. The next session can continue from that record instead of reconstructing the investigation. Machine-specific and private notes stay outside the public repository.</p>
+<p>The browser code is <a href="https://github.com/bitbonsai/myarc">open source too</a>. I want the development record to explain the decisions behind the changes, especially when an approach fails.</p>
+<h2>What we're learning from the native work</h2>
+<p>Moving navigation controls into the sidebar exposed startup and layout failures. Using Chromium's native controls fixed that path. Repeatedly hiding and showing the address field also lost keyboard focus; preserving its visibility fixed the navigation journey.</p>
+<p>Those failures are useful checks for the next change. A control can look right while breaking keyboard navigation elsewhere in the window.</p>
+<p><a href="https://github.com/bitbonsai/myarc/blob/main/docs/ARTCRAFT-WORKFLOW.md">Artcraft's public engineering practices</a>, particularly PhotoCraft's development guide, helped shape the approach: give each task a bounded outcome and attach evidence to its completion. Native visual checks belong alongside the model and command tests.</p>
+<h2>Today's finish line</h2>
+<p>The target is an empty-window shell that matches the Arc reference, followed by a nightly artifact people can try. That gives the next update a concrete build to inspect and a clear account of what changed.</p>
 </article></main><footer class="end">
       <a class="mark plain" href="#main" aria-label="Back to top"><img class="ribbon" src="../_assets/logo-matte.300972748816.webp" alt="" width="1254" height="1254"><picture><source media="(prefers-color-scheme: dark)" srcset="../_assets/wordmark-ivory.3a99cf025832.svg"><img class="wordmark" src="../_assets/wordmark-ink.18b9e7ae3785.svg" alt="myArc" width="3056" height="1049"></picture></a>
       <div class="end-copy">
