@@ -2,6 +2,12 @@
 
 Keep significant outcomes, failures and next actions reproducible. Newest entry first. No private exports, page titles/URLs from real browsing, credentials or raw user transcripts.
 
+## 2026-10-25: Recovery popup native acceptance
+
+- Integrated the single-task 0016 candidate and repeated the fresh forced crashed-exit fixture. Actual recovery popup appears instead of the earlier startup CHECK failure. It stays visible with the sidebar hidden and repositions inside the owned window after resize. Fresh screenshot/AX evidence was inspected.
+- Restore invocation dismissed the popup without a crash and kept the synthetic page. A second fresh legacy-shell profile, without the workspace flag, also showed the popup; its close button dismissed the popup without closing the page. The fixture had no prior-session payload, so this establishes popup/actions only. The first Close automation stopped safely on an ambiguous native label; exact recovery-window scoping resolved it.
+- Rechecked the two-page/three-Space neutral-header journey after Restore, including background loading, palette cancellation, hidden-page Cmd+R and working populated-page Reload. [Evidence](../browser/evidence/recovery-anchor.json) separates actual observations from build proof. Automated native cases, real session restoration and durability remain unaccepted; renderer default remains off.
+
 ## 2026-10-25: Recovery anchor build candidate
 
 - Traced the freshly reproduced startup crash to shell layout hiding the app-menu button before its fallback can register against a visible browser widget. Added a shell-only BrowserView child at the existing fallback position and used it through shared menu anchoring. Upstream recovery UI/actions, stock CHECKs and complete 0012 remain unchanged.

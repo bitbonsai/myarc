@@ -2,7 +2,7 @@
 
 ## Scope and cause, 2026-10-25
 
-Bounded MA-007.c fix, based on myarc `2a706ad` and external Chromium `3e117efa80cec1c4e1e6fbfdf44edeb087a279a5` with the current optional shell stack. Native acceptance remains pending; the workspace renderer stays off by default.
+Bounded MA-007.c fix, based on myarc `2a706ad` and external Chromium `3e117efa80cec1c4e1e6fbfdf44edeb087a279a5` with the current optional shell stack. The agent handoff verified the build; the parent's later bounded native popup acceptance is recorded below. The workspace renderer stays off by default.
 
 The parent freshly reproduced `AppMenuButton::GetAnchor` failing `CHECK(element)` while startup inserted its first tab. The disposable fixture forced `profile.exit_type=Crashed` and `exited_cleanly=false`, with vertical tabs and both shell flags enabled. This establishes a recovery-prompt startup crash, not actual session recovery or durability. No crash-loop/relaunch was attempted.
 
@@ -32,6 +32,14 @@ Apply 0016 once after the installed optional stack, including current 0013/0014/
 
 Native cases executed: **zero**. Neither browser test graph was built. No app launch, desktop input, profile access or system-service kill occurred. Actual executable `comm` paths were checked before building/linking; resource-only notification mappings were left untouched. No build remains running. Private scratch retains baseline/result manifests, unrelated-file hashes, strict replay helper, compiler command, logs and process checks.
 
-## Parent acceptance still required
+## Parent native acceptance, 2026-10-25
 
-Use a new marked disposable profile and expected browser PID, following [fixture instructions](../../tests/fixtures/browser/README.md). Repeat the forced crashed-exit preference fixture with sidebar expanded and initially hidden. Verify a visible, correctly positioned recovery bubble, fresh screenshot/AX, working upstream dismissal/Restore actions and resize/hide behavior. Recheck the accepted three-Space/two-page neutral-header flow. Keep actual crash recovery, durability and broader lifecycle/privacy gates open until separately measured.
+Two new marked disposable profiles repeated the forced crashed-exit preference fixture, following [fixture instructions](../../tests/fixtures/browser/README.md). Neither supplied a previous-session payload. Startup now showed the actual Restore pages? popup instead of failing `CHECK(element)`.
+
+With the workspace renderer enabled only for acceptance, the popup remained visible after the native sidebar toggle and after resizing the main window from 1300 x 808 to 1100 x 740. Its native window bounds moved and stayed inside the owned main window. Fresh screenshots and accessibility output were inspected. Pressing the actual Restore button dismissed the popup without a crash and retained the synthetic page. This verifies button invocation and prompt lifetime, not restored session data.
+
+After re-expanding the sidebar, the parent repeated the two-page/three-Space journey. Neutral Empty header, background loading, empty palette input/cancellation and blocked blank Cmd+R still passed. Different-page return restored the right URL/security controls and working native Reload. Same-page return preserved both live pages.
+
+The second fresh profile omitted the workspace-renderer flag, retaining the legacy parity shell. Its recovery popup also appeared. The close button dismissed only that popup and kept its page open. The native Close label was ambiguous with the tab close button, so the automation stopped before input and was scoped to the verified recovery window before retrying.
+
+[Bounded evidence](../evidence/recovery-anchor.json) records both native runs separately from compilation. Raw profiles, captures and logs remain private. Automated native browser cases executed remain zero. Initial collapsed startup, fullscreen and other popup types were not exercised. Actual session restoration, durability and broader lifecycle/privacy acceptance remain open.

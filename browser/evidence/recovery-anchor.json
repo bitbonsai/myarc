@@ -1,0 +1,41 @@
+{
+  "slice": "MA-007.c-recovery-anchor",
+  "date": "2026-10-25",
+  "status": "bounded manual recovery-popup acceptance passed",
+  "patch_sha256": "d394c5e398bc73e820f84a08b758a620020331bf6ac685a8654b9b61bb851ae8",
+  "preserved_command_safety_patch_sha256": "8f8023789fdb66841128879766afdb89866c7e393453185336eba69745f66e53",
+  "build": {
+    "chrome_exit": 0,
+    "interactive_regression_syntax_exit": 0,
+    "gn_target_families_passed": 3,
+    "strict_baseline_reverse_and_replay_files": 72,
+    "unrelated_source_files_unchanged": 67
+  },
+  "manual_native": {
+    "fresh_marked_profiles": 2,
+    "fixture": "forced crashed-exit preferences with synthetic loopback page, no prior-session payload",
+    "startup_recovery_prompt_visible_without_fatal": true,
+    "popup_survives_sidebar_hide": true,
+    "popup_repositions_with_window_resize": true,
+    "popup_bounds_remain_inside_owned_window": true,
+    "restore_button_invoked_and_popup_closed_without_crash": true,
+    "legacy_shell_without_workspace_flag_close_button_dismisses_popup": true,
+    "live_page_retained_after_each_action": true,
+    "two_page_three_space_header_journey_rechecked": true,
+    "neutral_header_after_background_loading_rechecked": true,
+    "palette_cancel_and_hidden_page_command_r_rechecked": true,
+    "populated_url_and_working_reload_rechecked": true,
+    "fresh_owned_window_captures_inspected": true
+  },
+  "automated_native_browser_cases_executed": 0,
+  "actual_session_recovery_tested": false,
+  "durability_proven": false,
+  "workspace_renderer_default_enabled": false,
+  "raw_profiles_logs_and_captures": "private, outside Git",
+  "remaining": [
+    "Prior-session restoration and acknowledged workspace/data recovery after actual crash remain unaccepted",
+    "Initially collapsed startup, fullscreen and other popup types remain unmeasured",
+    "Saved identity, generic Unpin and explicit Unsave still need native acceptance",
+    "Cross-Space search policy, extension activeTab and broader lifecycle/privacy gates remain open"
+  ]
+}
