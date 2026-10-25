@@ -16,18 +16,18 @@
   <meta property="og:description" content="The approach behind myArc, the models we&#x27;re using, and the first mistakes we&#x27;re correcting.">
   <meta property="og:url" content="https://myarc.dev/blog/2026-10-25-building-in-public/">
   <meta name="robots" content="index, follow, max-image-preview:large">
-  <meta property="og:image" content="https://myarc.dev/og-image.png">
-  <meta property="og:image:secure_url" content="https://myarc.dev/og-image.png">
+  <meta property="og:image" content="https://myarc.dev/blog/2026-10-25-building-in-public/arc-reference.png">
+  <meta property="og:image:secure_url" content="https://myarc.dev/blog/2026-10-25-building-in-public/arc-reference.png">
   <meta property="og:image:type" content="image/png">
-  <meta property="og:image:width" content="1200">
-  <meta property="og:image:height" content="630">
-  <meta property="og:image:alt" content="myArc, forever yours. Colorful ribbon logo on navy.">
+  <meta property="og:image:width" content="2000">
+  <meta property="og:image:height" content="1310">
+  <meta property="og:image:alt" content="Arc reference showing the sidebar and centered command bar, our visual target for myArc">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="Building myArc in public">
   <meta name="twitter:description" content="The approach behind myArc, the models we&#x27;re using, and the first mistakes we&#x27;re correcting.">
-  <meta name="twitter:image" content="https://myarc.dev/og-image.png">
-  <meta name="twitter:image:alt" content="myArc, forever yours. Colorful ribbon logo on navy.">
-  <script type="application/ld+json">{"@context": "https://schema.org", "@type": "BlogPosting", "name": "Building myArc in public", "description": "The approach behind myArc, the models we're using, and the first mistakes we're correcting.", "url": "https://myarc.dev/blog/2026-10-25-building-in-public/", "headline": "Building myArc in public", "datePublished": "2026-10-25"}</script>
+  <meta name="twitter:image" content="https://myarc.dev/blog/2026-10-25-building-in-public/arc-reference.png">
+  <meta name="twitter:image:alt" content="Arc reference showing the sidebar and centered command bar, our visual target for myArc">
+  <script type="application/ld+json">{"@context": "https://schema.org", "@type": "BlogPosting", "name": "Building myArc in public", "description": "The approach behind myArc, the models we're using, and the first mistakes we're correcting.", "url": "https://myarc.dev/blog/2026-10-25-building-in-public/", "headline": "Building myArc in public", "datePublished": "2026-10-25", "image": "https://myarc.dev/blog/2026-10-25-building-in-public/arc-reference.png"}</script>
   <style>
     @font-face {
       font-family: Outfit;
@@ -233,10 +233,13 @@
     .journal { padding: 4rem 0 6rem }
     .journal > header { margin-bottom: 3rem }
     .journal h1 { font-size: 3.5rem; line-height: 1.1; max-width: 24ch }
-    .journal .intro { margin-top: 1.25rem; max-width: 42rem; color: var(--quiet) }
+    .journal .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap }
     .post-list, .post-body { max-width: 68ch }
     .post-preview + .post-preview { margin-top: 3rem }
-    .post-preview h2 { font-size: 2rem; margin: .5rem 0 .75rem }
+    .post-preview-heading { display: flex; align-items: center; gap: 1.5rem; margin: .5rem 0 .75rem }
+    .post-preview h2 { font-size: 2rem; min-width: 0; overflow-wrap: anywhere }
+    .post-thumb { display: block; width: 8rem; flex: none }
+    .post-thumb img { width: 100%; aspect-ratio: 8 / 5; object-fit: contain; border-radius: .75rem; background: var(--panel) }
     .post-date { display: block; color: var(--quiet); font-size: 1rem }
     .post-header .post-date { margin-top: 1rem }
     .post-back { display: inline-block; margin-bottom: 2rem }
@@ -254,6 +257,9 @@
     @media (max-width: 48rem) {
       .journal { padding: 2.5rem 0 4rem }
       .journal h1 { font-size: 2.5rem }
+      .post-preview-heading { gap: 1rem }
+      .post-preview h2 { font-size: 1.5rem }
+      .post-thumb { width: 5.5rem }
     }
 
   </style>
@@ -270,6 +276,10 @@
     </header><main id="main" class="journal"><a class="post-back" href="/blog/">All posts</a><header class="post-header"><h1>Building myArc in public</h1><time class="post-date" datetime="2026-10-25">October 25, 2026</time></header><article class="post-body"><p>myArc now has a site. This blog is where I'll keep the development record, including the decisions we have to revisit.</p>
 <p>The first landing page already gave us something to write about. Tiny section labels occupied an entire column. The progress panel had too much empty space, while its text felt small. Some requested changes were discussed before they were deployed. Reviewing a page gets frustrating when you're looking at an older version than the one being described.</p>
 <p>We changed the layout, made the type larger, and started checking the actual published HTML against the built file. The public page is part of the work to verify.</p>
+<h2>Where we want to get</h2>
+<p><a href="arc-reference.png"><img src="arc-reference.png" alt="Arc reference showing the sidebar and centered command bar, our visual target for myArc" /></a></p>
+<p><em>Arc reference, supplied for this post. This is the target appearance; myArc remains a prototype.</em></p>
+<p>The sidebar keeps navigation close to the tabs, while the centered command bar gives an address or search room to breathe. This is the experience we want to bring back. Our native Chromium experiment is still working toward it.</p>
 <h2>Borrowing a working method from Artcraft</h2>
 <p>Artcraft was a useful reference for how to organize the development process. In particular, PhotoCraft's public <a href="https://github.com/storytold/photocraft/blob/main/docs/development.md">development guide</a> and <a href="https://github.com/storytold/photocraft/blob/main/docs/scorecard.md">scorecard</a> influenced the approach.</p>
 <p>The useful part is the discipline around evidence: choose a bounded task, make the result observable, and record what actually ran. A successful build should be followed by checking the running application. We also check that visible controls have an effect and that screenshots match the version under review.</p>
@@ -288,7 +298,6 @@
 <p>We also caught a smaller reproducibility issue: font conversion was rewriting timestamps, making unchanged builds produce different HTML. Preserving the source font timestamps made consecutive builds byte-identical.</p>
 <p>Those are the kinds of details I want to keep here. The failed attempt often explains the eventual implementation better than the final diff does.</p>
 <h2>A small blog we can maintain</h2>
-<p><a href="blog-dark.png"><img src="blog-dark.png" alt="The first version of the progress journal, shown in its dark color scheme" /></a></p>
 <p>Posts are Markdown files with screenshots beside them. A build generates the index and article pages, using the website's branding and system color preference. Publishing stays in Git.</p>
 <p>The first browser check caught the new Blog link disappearing on smaller screens. Existing mobile navigation rules were winning over its style. We corrected the selector and kept a visibility check at mobile widths.</p>
 <p>Raw HTML in posts is disabled. Screenshots must be local files, and drafts stay out of the website until explicitly marked for publication. Draft files in a public repository are still public, so private notes and real browser profiles belong elsewhere.</p>
