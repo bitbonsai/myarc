@@ -76,6 +76,7 @@ source_set("sidebar_view") {
   public_deps = [
     "//base",
     "//ui/base",
+    "//ui/menus",
     "//ui/views",
   ]
   deps = [

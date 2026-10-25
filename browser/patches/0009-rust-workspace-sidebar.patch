@@ -1,0 +1,802 @@
+diff --git a/chrome/browser/ui/views/frame/BUILD.gn b/chrome/browser/ui/views/frame/BUILD.gn
+index 3cbc82117ec48066cff919018d9933888815355b..9fb5fd7088a095ad6510d57de757abcd7c977b0d 100644
+--- a/chrome/browser/ui/views/frame/BUILD.gn
++++ b/chrome/browser/ui/views/frame/BUILD.gn
+@@ -737,6 +737,7 @@ source_set("browser_view_header") {
+     "//components/user_education/common",
+     "//components/viz/common",
+     "//content/public/browser",
++    "//myarc:sidebar_view",
+     "//third_party/blink/public/common:headers",
+     "//ui/base",
+     "//ui/base/identifier",
+@@ -963,6 +964,7 @@ source_set("browser_view") {
+     "//content/public/common",
+     "//extensions/common",
+     "//media/capture:capture_switches",
++    "//myarc:browser_workspace_adapter",
+     "//third_party/blink/public/common:headers",
+     "//ui/accessibility",
+     "//ui/accessibility:ax_base",
+diff --git a/chrome/browser/ui/views/frame/browser_view.cc b/chrome/browser/ui/views/frame/browser_view.cc
+index dfb5574eeaaf44855beb77db8ee2e3db357b6d2f..f6768c92a53ca58a86c7d702ccbc8297d8ef33ba 100644
+--- a/chrome/browser/ui/views/frame/browser_view.cc
++++ b/chrome/browser/ui/views/frame/browser_view.cc
+@@ -35,6 +35,7 @@
+ #include "base/scoped_observation.h"
+ #include "base/strings/string_number_conversions.h"
+ #include "base/strings/stringprintf.h"
++#include "base/strings/utf_string_conversions.h"
+ #include "base/task/cancelable_task_tracker.h"
+ #include "base/task/sequenced_task_runner.h"
+ #include "base/task/single_thread_task_runner.h"
+@@ -237,7 +238,9 @@
+ #include "chrome/browser/ui/views/toolbar/browser_app_menu_button.h"
+ #include "chrome/browser/ui/views/toolbar/chrome_labs/chrome_labs_coordinator.h"
+ #include "chrome/browser/ui/views/toolbar/pinned_toolbar_actions_container.h"
++#include "chrome/browser/ui/views/toolbar/reload_button.h"
+ #include "chrome/browser/ui/views/toolbar/reload_control.h"
++#include "chrome/browser/ui/views/toolbar/toolbar_button.h"
+ #include "chrome/browser/ui/views/toolbar/toolbar_view.h"
+ #include "chrome/browser/ui/views/translate/translate_bubble_controller.h"
+ #include "chrome/browser/ui/views/translate/translate_bubble_view.h"
+@@ -319,6 +322,7 @@
+ #include "content/public/common/drop_data.h"
+ #include "extensions/common/command.h"
+ #include "media/capture/capture_switches.h"
++#include "myarc/browser_workspace_adapter.h"
+ #include "third_party/blink/public/common/features.h"
+ #include "third_party/blink/public/common/permissions/permission_utils.h"
+ #include "ui/accessibility/ax_enums.mojom-shared.h"
+@@ -1463,6 +1467,16 @@ BrowserView::~BrowserView() {
+   // other cleanups that destroy views referenced in the layout manager.
+   SetLayoutManager(nullptr);
+ 
++  myarc_workspace_weak_factory_.InvalidateWeakPtrs();
++  myarc_workspace_subscription_ = {};
++  CloseMyarcSpaceDialog();
++  // Sidebar owns menu runner and callbacks into this delegate/adapter.
++  myarc_workspace_sidebar_ = nullptr;
++  if (vertical_tab_strip_region_view_) {
++    vertical_tab_strip_region_view_->RemoveMyarcWorkspaceSidebar();
++  }
++  myarc_workspace_adapter_.reset();
++
+   if (myarc_command_palette_widget_) {
+     myarc_command_palette_widget_->Close();
+   }
+@@ -2335,6 +2349,15 @@ void BrowserView::OnActiveTabChanged(content::WebContents* old_contents,
+                                      int index,
+                                      int reason) {
+   CHECK(new_contents, base::NotFatalUntil::M162);
++  if (IsMyarcWorkspaceBlank()) {
++    WebContentsObserver::Observe(new_contents);
++    UpdateMyarcWorkspaceCanvas();
++    return;
++  }
++  if (myarc_workspace_blank_) {
++    myarc_workspace_blank_ = false;
++    multi_contents_view_->GetActiveContentsContainerView()->SetVisible(true);
++  }
+   TRACE_EVENT0("ui", "BrowserView::OnActiveTabChanged");
+   views::WebView* active_contents_view = GetActiveContentsWebView();
+   bool tab_change_in_split_view =
+@@ -2482,6 +2505,7 @@ void BrowserView::OnActiveTabChanged(content::WebContents* old_contents,
+   UpdateTitleBar();
+ 
+   CHECK_DEREF(TranslateBubbleController::From(browser_.get())).CloseBubble();
++  UpdateMyarcWorkspaceCanvas();
+ }
+ 
+ void BrowserView::OnTabDetached(content::WebContents* contents,
+@@ -2733,6 +2757,7 @@ void BrowserView::SetFocusToLocationBar(bool is_user_initiated) {
+ }
+ 
+ void BrowserView::UpdateReloadStopState(bool is_loading, bool force) {
++  is_loading &= !IsMyarcWorkspaceBlank();
+   ReloadControl::Mode mode =
+       is_loading ? ReloadControl::Mode::kStop : ReloadControl::Mode::kReload;
+   ReloadControl* reload_button =
+@@ -2743,6 +2768,10 @@ void BrowserView::UpdateReloadStopState(bool is_loading, bool force) {
+ }
+ 
+ void BrowserView::UpdateToolbar(content::WebContents* contents) {
++  if (IsMyarcWorkspaceBlank()) {
++    UpdateMyarcWorkspaceCanvas();
++    return;
++  }
+   // We may end up here during destruction.
+   if (toolbar_) {
+     toolbar_->Update(contents);
+@@ -2754,6 +2783,9 @@ void BrowserView::UpdateToolbar(content::WebContents* contents) {
+ }
+ 
+ bool BrowserView::UpdateToolbarSecurityState() {
++  if (IsMyarcWorkspaceBlank()) {
++    return false;
++  }
+   // We may end up here during destruction.
+   if (toolbar_) {
+     return toolbar_->UpdateSecurityState();
+@@ -3833,6 +3865,10 @@ LocationBarView* BrowserView::GetLocationBarView() const {
+ // BrowserView, TabStripModelObserver implementation:
+ 
+ void BrowserView::OnSplitTabChanged(const SplitTabChange& change) {
++  if (IsMyarcWorkspaceBlank()) {
++    UpdateMyarcWorkspaceCanvas();
++    return;
++  }
+   switch (change.type) {
+     case SplitTabChange::Type::kAdded: {
+       const tabs::TabInterface* active_tab =
+@@ -4040,6 +4076,9 @@ bool BrowserView::CanActivate() const {
+ }
+ 
+ std::u16string BrowserView::GetWindowTitle() const {
++  if (IsMyarcWorkspaceBlank()) {
++    return u"Empty Space - myarc";
++  }
+   std::u16string title =
+       WindowMetadataController::From(browser_.get())
+           ->GetWindowTitleForCurrentTab(true /* include_app_name */);
+@@ -4060,6 +4099,9 @@ std::u16string BrowserView::GetWindowTitle() const {
+ }
+ 
+ std::u16string BrowserView::GetAccessibleWindowTitle() const {
++  if (IsMyarcWorkspaceBlank()) {
++    return GetWindowTitle();
++  }
+   // If there is a focused and visible tab-modal dialog, report the dialog's
+   // title instead of the page title.
+   views::Widget* tab_modal =
+@@ -4321,6 +4363,9 @@ ui::ImageModel BrowserView::GetWindowAppIcon() {
+ }
+ 
+ ui::ImageModel BrowserView::GetWindowIcon() {
++  if (IsMyarcWorkspaceBlank()) {
++    return ui::ImageModel();
++  }
+   // Use the default icon for devtools.
+   if (browser_->GetType() == BrowserWindowInterface::Type::TYPE_DEVTOOLS) {
+     return ui::ImageModel();
+@@ -4686,6 +4731,10 @@ void BrowserView::UpdateTabSearchBubbleHost() {
+ }
+ 
+ void BrowserView::ShowSplitView(bool focus_active_view) {
++  if (IsMyarcWorkspaceBlank()) {
++    UpdateMyarcWorkspaceCanvas();
++    return;
++  }
+   const int active_index = browser_->GetTabStripModel()->active_index();
+ 
+   std::optional<split_tabs::SplitTabId> split_tab_id =
+@@ -5558,6 +5607,27 @@ void BrowserView::AddedToWidget() {
+       kFallbackPopupAnchorElementId, *this);
+ 
+   initialized_ = true;
++  if (base::CommandLine::ForCurrentProcess()->HasSwitch(
++          "myarc-workspace-sidebar") &&
++      base::CommandLine::ForCurrentProcess()->HasSwitch(
++          "myarc-visual-parity") &&
++      browser_->GetType() == BrowserWindowInterface::Type::TYPE_NORMAL &&
++      vertical_tab_strip_region_view_ && ShouldDrawVerticalTabStrip()) {
++    myarc_workspace_adapter_ =
++        std::make_unique<myarc::BrowserWorkspaceAdapter>(*browser_);
++    auto sidebar = std::make_unique<myarc::SidebarView>(
++        static_cast<myarc::SidebarView::Delegate&>(*this));
++    sidebar->SetFocusBehavior(views::View::FocusBehavior::ALWAYS);
++    myarc_workspace_sidebar_ = sidebar.get();
++    vertical_tab_strip_region_view_->SetMyarcWorkspaceSidebar(
++        std::move(sidebar));
++    myarc_workspace_subscription_ = myarc_workspace_adapter_->Subscribe(
++        base::BindRepeating(&BrowserView::RefreshMyarcWorkspaceSidebar,
++                            myarc_workspace_weak_factory_.GetWeakPtr()));
++    // Metadata readiness is NOT the native async session-restore barrier.
++    // Parent calls FinishSessionRestore only after all restore hooks complete.
++    RefreshMyarcWorkspaceSidebar();
++  }
+ }
+ 
+ void BrowserView::RemovedFromWidget() {
+@@ -5628,6 +5698,316 @@ const views::View* BrowserView::GetViewByElementId(
+ ///////////////////////////////////////////////////////////////////////////////
+ // BrowserView, ui::AcceleratorTarget overrides:
+ 
++myarc::BrowserWorkspaceAdapter* BrowserView::GetMyarcWorkspaceAdapter() {
++  return myarc_workspace_adapter_.get();
++}
++
++bool BrowserView::IsMyarcWorkspaceBlank() const {
++  return myarc_workspace_adapter_ && myarc_workspace_adapter_->ready() &&
++         !myarc_workspace_adapter_->DisplayedContents();
++}
++
++void BrowserView::RefreshMyarcWorkspaceSidebar() {
++  if (!myarc_workspace_adapter_ || !myarc_workspace_sidebar_ ||
++      !vertical_tab_strip_region_view_) {
++    return;
++  }
++  auto model = myarc_workspace_adapter_->Sidebar();
++  const bool ready = myarc_workspace_adapter_->ready() && model.ok;
++  // Snapshot local native bindings once per render. Metadata is Profile-wide.
++  myarc_workspace_live_items_.clear();
++  if (ready) {
++    auto* tabs = browser_->GetTabStripModel();
++    for (int i = 0; i < tabs->count(); ++i) {
++      const auto data = myarc::BrowserWorkspaceAdapter::TabExtraData(
++          *tabs->GetWebContentsAt(i));
++      auto binding = data.find(myarc::BrowserWorkspaceAdapter::kItemKey);
++      if (binding != data.end()) {
++        myarc_workspace_live_items_.insert(binding->second);
++      }
++    }
++  }
++  vertical_tab_strip_region_view_->SetMyarcWorkspaceReady(ready);
++  if (!ready) {
++    myarc_workspace_sidebar_->SetUnavailable(
++        u"Workspace unavailable. Native tabs remain available. " +
++        base::UTF8ToUTF16(myarc_workspace_adapter_->error()));
++  } else {
++    using Storage = myarc::WorkspaceService::StorageState;
++    auto& service = myarc_workspace_adapter_->service();
++    std::u16string status = myarc_workspace_action_error_;
++    const auto append = [&status](const std::u16string& message) {
++      if (!message.empty()) {
++        if (!status.empty()) {
++          status += u"\n";
++        }
++        status += message;
++      }
++    };
++    append(base::UTF8ToUTF16(myarc_workspace_adapter_->error()));
++    append(base::UTF8ToUTF16(myarc_workspace_adapter_->binding_warning()));
++    switch (service.storage_state()) {
++      case Storage::kLoading:
++        append(u"Loading workspace metadata.");
++        break;
++      case Storage::kLoadError:
++      case Storage::kWriteError:
++        append(u"Workspace storage error: " +
++               base::UTF8ToUTF16(service.storage_error()));
++        break;
++      case Storage::kWritePending:
++        append(u"Workspace changes pending storage write.");
++        break;
++      case Storage::kEphemeral:
++        append(u"Private workspace. Changes stay in memory.");
++        break;
++      case Storage::kReady:
++      case Storage::kWritten:
++        // A completed atomic write is not an OS-crash durability guarantee.
++        break;
++    }
++    myarc_workspace_sidebar_->SetModel(model, status);
++  }
++  UpdateMyarcWorkspaceCanvas();
++}
++
++myarc::SidebarView::ItemPresentation BrowserView::GetItemPresentation(
++    const myarc::foundation::ItemRecord& item) const {
++  myarc::SidebarView::ItemPresentation result;
++  if (auto metadata = myarc_workspace_adapter_->Metadata(item.id)) {
++    result.title = metadata->title;
++    result.icon = ui::ImageModel::FromImage(metadata->icon);
++    if (metadata->loading) {
++      if (result.title.empty() && item.has_url) {
++        result.title = base::UTF8ToUTF16(std::string(item.canonical_url));
++      }
++      result.title += u" (loading)";
++    }
++  }
++  // Close applies to this window, not another window's live projection.
++  result.is_live =
++      myarc_workspace_live_items_.contains(base::NumberToString(item.id));
++  return result;
++}
++
++void BrowserView::MyarcWorkspaceResult(
++    myarc::foundation::MutationResult result) {
++  myarc_workspace_action_error_ =
++      result.ok ? std::u16string()
++                : base::UTF8ToUTF16(std::string(result.error));
++  // Adapter posts native-selection refresh. Avoid rebuilding row controls or
++  // cancelling menus synchronously inside their own callbacks.
++  base::SingleThreadTaskRunner::GetCurrentDefault()->PostTask(
++      FROM_HERE, base::BindOnce(&BrowserView::RefreshMyarcWorkspaceSidebar,
++                                myarc_workspace_weak_factory_.GetWeakPtr()));
++}
++
++void BrowserView::ActivateItem(uint64_t item) {
++  MyarcWorkspaceResult(myarc_workspace_adapter_->ActivateItem(item));
++}
++
++void BrowserView::CloseLiveItem(uint64_t item) {
++  auto weak = myarc_workspace_weak_factory_.GetWeakPtr();
++  auto result = myarc_workspace_adapter_->CloseItem(item);
++  // Closing the final native tab can synchronously destroy this window.
++  if (weak) {
++    weak->MyarcWorkspaceResult(std::move(result));
++  }
++}
++
++void BrowserView::PinItem(uint64_t item) {
++  MyarcWorkspaceResult(myarc_workspace_adapter_->Pin(item));
++}
++
++void BrowserView::FavoriteItem(uint64_t item) {
++  MyarcWorkspaceResult(myarc_workspace_adapter_->Favorite(item));
++}
++
++void BrowserView::UnsaveItem(uint64_t item) {
++  MyarcWorkspaceResult(myarc_workspace_adapter_->Unsave(item));
++}
++
++void BrowserView::SelectSpace(uint64_t space) {
++  MyarcWorkspaceResult(myarc_workspace_adapter_->SelectSpace(space));
++}
++
++void BrowserView::CreateSpace() {
++  ShowMyarcSpaceDialog(0);
++}
++
++void BrowserView::RenameSpace(uint64_t space) {
++  ShowMyarcSpaceDialog(space);
++}
++
++void BrowserView::NewTab() {
++  ShowMyarcCommandPalette(true);
++}
++
++void BrowserView::ShowMyarcSpaceDialog(uint64_t space) {
++  if (!myarc_workspace_adapter_ || !myarc_workspace_adapter_->ready() ||
++      !GetWidget()) {
++    return;
++  }
++  CloseMyarcSpaceDialog();
++  myarc_space_dialog_delegate_ = std::make_unique<views::DialogDelegate>();
++  auto* dialog = myarc_space_dialog_delegate_.get();
++  dialog->SetOwnershipOfNewWidget(
++      views::Widget::InitParams::CLIENT_OWNS_WIDGET);
++  dialog->SetTitle(space ? u"Rename Space" : u"Create Space");
++  dialog->SetModalType(ui::mojom::ModalType::kWindow);
++  dialog->SetButtonLabel(ui::mojom::DialogButton::kOk,
++                         space ? u"Rename" : u"Create");
++  auto body = std::make_unique<views::BoxLayoutView>();
++  body->SetOrientation(views::BoxLayout::Orientation::kVertical);
++  body->SetInsideBorderInsets(gfx::Insets(16));
++  body->SetBetweenChildSpacing(12);
++  body->SetPreferredSize(gfx::Size(360, 180));
++  myarc_space_name_ = body->AddChildView(std::make_unique<views::Textfield>());
++  myarc_space_name_->GetViewAccessibility().SetName(u"Space name");
++  if (space) {
++    auto model = myarc_workspace_adapter_->Sidebar();
++    if (!model.ok) {
++      myarc_space_name_ = nullptr;
++      myarc_space_dialog_delegate_.reset();
++      return;
++    }
++    for (const auto& record : model.spaces) {
++      if (record.id == space) {
++        myarc_space_name_->SetText(base::UTF8ToUTF16(std::string(record.name)));
++        myarc_space_name_->SelectAll(false);
++        break;
++      }
++    }
++  }
++  myarc_space_error_ = body->AddChildView(std::make_unique<views::Label>(
++      u"Space names allow up to 128 UTF-8 bytes."));
++  myarc_space_error_->SetMultiLine(true);
++  myarc_space_error_->SetHorizontalAlignment(gfx::ALIGN_LEFT);
++  dialog->SetContentsView(std::move(body));
++  dialog->SetInitiallyFocusedView(myarc_space_name_);
++  dialog->SetAcceptCallbackWithClose(base::BindRepeating(
++      [](base::WeakPtr<BrowserView> view, uint64_t space) {
++        return view && view->AcceptMyarcSpaceDialog(space);
++      },
++      myarc_workspace_weak_factory_.GetWeakPtr(), space));
++  myarc_space_dialog_widget_.reset(views::DialogDelegate::CreateDialogWidget(
++      dialog, GetNativeWindow(), GetWidget()->GetNativeView()));
++  myarc_space_dialog_widget_->MakeCloseSynchronous(
++      base::IgnoreArgs<views::Widget::ClosedReason>(
++          base::BindOnce(&BrowserView::CloseMyarcSpaceDialog,
++                         myarc_workspace_weak_factory_.GetWeakPtr())));
++  myarc_space_dialog_widget_->Show();
++}
++
++bool BrowserView::AcceptMyarcSpaceDialog(uint64_t space) {
++  if (!myarc_workspace_adapter_ || !myarc_space_name_ || !myarc_space_error_) {
++    return false;
++  }
++  // Bound UTF-16 before converting. Rust owns the UTF-8 length/name rules.
++  if (myarc_space_name_->GetText().size() > 128) {
++    myarc_space_error_->SetText(u"Space name exceeds 128 UTF-8 bytes.");
++    myarc_space_name_->SetInvalid(true);
++    return false;
++  }
++  const auto name = base::UTF16ToUTF8(myarc_space_name_->GetText());
++  auto result = space ? myarc_workspace_adapter_->RenameSpace(space, name)
++                      : myarc_workspace_adapter_->CreateSpace(name);
++  const bool ok = result.ok;
++  if (!ok) {
++    myarc_space_name_->SetInvalid(true);
++    myarc_space_error_->SetText(base::UTF8ToUTF16(std::string(result.error)));
++    myarc_space_error_->GetViewAccessibility().AnnounceText(
++        myarc_space_error_->GetText());
++  }
++  MyarcWorkspaceResult(std::move(result));
++  return ok;
++}
++
++void BrowserView::CloseMyarcSpaceDialog() {
++  myarc_space_name_ = nullptr;
++  myarc_space_error_ = nullptr;
++  myarc_space_dialog_widget_.reset();
++  myarc_space_dialog_delegate_.reset();
++}
++
++void BrowserView::UpdateMyarcWorkspaceCanvas() {
++  if (!myarc_workspace_adapter_ || !multi_contents_view_) {
++    return;
++  }
++  const bool blank = IsMyarcWorkspaceBlank();
++  const bool was_blank = std::exchange(myarc_workspace_blank_, blank);
++  if (blank) {
++    if (!was_blank && GetFocusManager()) {
++      GetFocusManager()->ClearFocus();
++      GetFocusManager()->SetStoredFocusView(nullptr);
++      restore_focus_on_activation_ = false;
++      if (myarc_workspace_sidebar_ && myarc_workspace_sidebar_->IsDrawn()) {
++        myarc_workspace_sidebar_->RequestFocus();
++      }
++    }
++    // MultiContentsView is required by frame layout and stays visible. Hide its
++    // native hosts instead; keep original tabs/services alive in TabStripModel.
++    multi_contents_view_->CloseSplitView();
++    for (ContentsContainerView* container :
++         multi_contents_view_->contents_container_views()) {
++      container->contents_view()->SetWebContents(nullptr);
++      container->SetVisible(false);
++    }
++    infobar_container_->ChangeInfoBarManager(nullptr);
++    if (bookmark_bar_view_) {
++      bookmark_bar_view_->SetVisible(false);
++    }
++  } else if (was_blank) {
++    multi_contents_view_->GetActiveContentsContainerView()->SetVisible(true);
++    auto* displayed =
++        myarc_workspace_adapter_->ready()
++            ? myarc_workspace_adapter_->DisplayedContents()
++            : browser_->GetTabStripModel()->GetActiveWebContents();
++    if (displayed) {
++      OnActiveTabChanged(nullptr, displayed,
++                         browser_->GetTabStripModel()->active_index(), 0);
++    }
++  }
++  if (toolbar_) {
++    if (!blank) {
++      auto* displayed =
++          myarc_workspace_adapter_->ready()
++              ? myarc_workspace_adapter_->DisplayedContents()
++              : browser_->GetTabStripModel()->GetActiveWebContents();
++      if (displayed) {
++        toolbar_->Update(displayed);
++        UpdateReloadStopState(displayed->IsLoading(), true);
++      }
++    }
++    // Hide stale URL and security presentation together. Native navigation and
++    // security services resume unchanged when a real page is displayed.
++    if (toolbar_->location_bar_view()) {
++      toolbar_->location_bar_view()->SetVisible(!blank);
++    }
++    if (auto* back = ToolbarButtonProvider::From(browser_)->GetBackButton()) {
++      back->SetEnabled(!blank && chrome::IsCommandEnabled(browser_, IDC_BACK));
++    }
++    if (auto* forward = toolbar_->forward_button()) {
++      forward->SetEnabled(!blank &&
++                          chrome::IsCommandEnabled(browser_, IDC_FORWARD));
++    }
++    if (auto* reload = toolbar_->reload_button()) {
++      reload->SetEnabled(!blank &&
++                         chrome::IsCommandEnabled(browser_, IDC_RELOAD));
++    }
++  }
++  if (blank) {
++    UpdateReloadStopState(false, true);
++    if (auto* frame = GetFrameView()) {
++      frame->UpdateThrobber(false);
++    }
++  }
++  if (browser_widget_) {
++    UpdateTitleBar();
++  }
++  InvalidateLayout();
++}
++
+ bool BrowserView::ShowMyarcCommandPalette(bool new_tab) {
+   if (!initialized_ || !GetWidget()) {
+     return false;
+@@ -5636,6 +6016,8 @@ bool BrowserView::ShowMyarcCommandPalette(bool new_tab) {
+     myarc_command_palette_widget_->Close();
+     return true;
+   }
++  // Current-page intent in an empty Space must not target hidden native tab.
++  new_tab |= IsMyarcWorkspaceBlank();
+   const int width = std::clamp(GetBoundsInScreen().width() - 48, 240, 752);
+   myarc_command_palette_delegate_ =
+       std::make_unique<views::BubbleDialogDelegate>(this,
+@@ -5751,7 +6133,8 @@ void BrowserView::LoadingAnimationCallback(base::TimeTicks timestamp) {
+     // GetActiveWebContents can return null for example under Purify when
+     // the animations are running slowly and this function is called on a timer
+     // through LoadingAnimationCallback.
+-    GetFrameView()->UpdateThrobber(web_contents && web_contents->IsLoading());
++    GetFrameView()->UpdateThrobber(!IsMyarcWorkspaceBlank() && web_contents &&
++                                   web_contents->IsLoading());
+   }
+ }
+ 
+@@ -5880,6 +6263,10 @@ bool BrowserView::MaybeUpdateDevtools(content::WebContents* contents) {
+ 
+ void BrowserView::UpdateUIForContents(WebContents* contents,
+                                       bool should_layout_immediately) {
++  if (IsMyarcWorkspaceBlank()) {
++    UpdateMyarcWorkspaceCanvas();
++    return;
++  }
+   TRACE_EVENT0("ui", "BrowserView::UpdateUIForContents");
+   bool needs_layout = MaybeShowBookmarkBar(contents);
+ 
+diff --git a/chrome/browser/ui/views/frame/browser_view.h b/chrome/browser/ui/views/frame/browser_view.h
+index d115bb6cb96c744bda435cd08dc00c8b604aa47d..6b99544a9788167061c5358d7a308be697247854 100644
+--- a/chrome/browser/ui/views/frame/browser_view.h
++++ b/chrome/browser/ui/views/frame/browser_view.h
+@@ -8,6 +8,7 @@
+ #include <map>
+ #include <memory>
+ #include <optional>
++#include <set>
+ #include <string>
+ #include <vector>
+ 
+@@ -52,6 +53,7 @@
+ #include "content/public/browser/permission_result.h"
+ #include "content/public/browser/web_contents.h"
+ #include "content/public/browser/web_contents_observer.h"
++#include "myarc/sidebar_view.h"
+ #include "third_party/blink/public/common/permissions/permission_utils.h"
+ #include "ui/base/accelerators/accelerator.h"
+ #include "ui/base/identifier/typed_identifier.h"
+@@ -104,6 +106,13 @@ class TopControlsSlideControllerTest;
+ class VerticalTabStripRegionView;
+ class WebAppFrameToolbarView;
+ 
++namespace myarc {
++class BrowserWorkspaceAdapter;
++namespace foundation {
++struct MutationResult;
++}
++}  // namespace myarc
++
+ namespace gfx {
+ class AnimationRunner;
+ }  // namespace gfx
+@@ -122,7 +131,10 @@ enum class Channel;
+ 
+ namespace views {
+ class BubbleDialogDelegate;
++class DialogDelegate;
++class Label;
+ class LabelButton;
++class Textfield;
+ class NativeViewHost;
+ class WebView;
+ }  // namespace views
+@@ -144,7 +156,8 @@ class BrowserView : public BrowserWindow,
+                     public ImmersiveModeController::Observer,
+                     public GlobalErrorObserver,
+                     public views::FocusChangeListener,
+-                    public BookmarkBarController::Delegate {
++                    public BookmarkBarController::Delegate,
++                    private myarc::SidebarView::Delegate {
+   METADATA_HEADER(BrowserView, views::ClientView)
+ 
+  public:
+@@ -314,6 +327,11 @@ class BrowserView : public BrowserWindow,
+ 
+   bool ShowMyarcCommandPalette(bool new_tab = true);
+ 
++  // Nullable outside the separate workspace-sidebar + visual-parity opt-in.
++  // Parent owns session binding/restore barriers and shutdown/resume hooks.
++  myarc::BrowserWorkspaceAdapter* GetMyarcWorkspaceAdapter();
++  void RefreshMyarcWorkspaceSidebar();
++
+   base::WeakPtr<BrowserView> GetAsWeakPtr() {
+     return weak_ptr_factory_.GetWeakPtr();
+   }
+@@ -1256,6 +1274,38 @@ class BrowserView : public BrowserWindow,
+ 
+   // Anchor point for help bubbles and other dialogs that want to reliably
+   // anchor outside the content area of the window.
++  myarc::SidebarView::ItemPresentation GetItemPresentation(
++      const myarc::foundation::ItemRecord& item) const override;
++  void ActivateItem(uint64_t item) override;
++  void CloseLiveItem(uint64_t item) override;
++  void PinItem(uint64_t item) override;
++  void FavoriteItem(uint64_t item) override;
++  void UnsaveItem(uint64_t item) override;
++  void SelectSpace(uint64_t space) override;
++  void CreateSpace() override;
++  void RenameSpace(uint64_t space) override;
++  void NewTab() override;
++  void MyarcWorkspaceResult(myarc::foundation::MutationResult result);
++  bool IsMyarcWorkspaceBlank() const;
++  void UpdateMyarcWorkspaceCanvas();
++  void ShowMyarcSpaceDialog(uint64_t space);
++  bool AcceptMyarcSpaceDialog(uint64_t space);
++  void CloseMyarcSpaceDialog();
++
++  // Explicit teardown: subscription, dialog, SidebarView (including menu
++  // runner), then adapter. BrowserView is the delegate and outlives all of
++  // them.
++  std::unique_ptr<myarc::BrowserWorkspaceAdapter> myarc_workspace_adapter_;
++  base::CallbackListSubscription myarc_workspace_subscription_;
++  raw_ptr<myarc::SidebarView> myarc_workspace_sidebar_ = nullptr;
++  std::u16string myarc_workspace_action_error_;
++  std::set<std::string> myarc_workspace_live_items_;
++  bool myarc_workspace_blank_ = false;
++  std::unique_ptr<views::DialogDelegate> myarc_space_dialog_delegate_;
++  std::unique_ptr<views::Widget> myarc_space_dialog_widget_;
++  raw_ptr<views::Textfield> myarc_space_name_ = nullptr;
++  raw_ptr<views::Label> myarc_space_error_ = nullptr;
++
+   void OnMyarcCommandPaletteClosed();
+   std::unique_ptr<views::BubbleDialogDelegate> myarc_command_palette_delegate_;
+   std::unique_ptr<views::Widget> myarc_command_palette_widget_;
+@@ -1418,6 +1468,7 @@ class BrowserView : public BrowserWindow,
+   base::EnumSet<TabStripAndWebAppViewsReparentedState>
+       tab_strip_web_apps_reparented_state_;
+ 
++  base::WeakPtrFactory<BrowserView> myarc_workspace_weak_factory_{this};
+   mutable base::WeakPtrFactory<BrowserView> weak_ptr_factory_{this};
+ };
+ 
+diff --git a/chrome/browser/ui/views/frame/vertical_tab_strip_region_view.cc b/chrome/browser/ui/views/frame/vertical_tab_strip_region_view.cc
+index 92024fddadd4a5d6658cc6c25d9d0d32cb012b87..cade7339c419f0789f9a64b6e8bddbc24200a802 100644
+--- a/chrome/browser/ui/views/frame/vertical_tab_strip_region_view.cc
++++ b/chrome/browser/ui/views/frame/vertical_tab_strip_region_view.cc
+@@ -74,6 +74,7 @@
+ #include "ui/views/controls/button/label_button.h"
+ #include "ui/views/controls/focus_ring.h"
+ #include "ui/views/controls/resize_area.h"
++#include "ui/views/controls/webview/webview.h"
+ #include "ui/views/focus/focus_manager.h"
+ #include "ui/views/interaction/element_tracker_views.h"
+ #include "ui/views/layout/delegating_layout_manager.h"
+@@ -402,6 +403,36 @@ bool VerticalTabStripRegionView::WillWrapDueToOverflow(
+   return top_button_container_->WillWrapDueToOverflow(available_width);
+ }
+ 
++void VerticalTabStripRegionView::SetMyarcWorkspaceSidebar(
++    std::unique_ptr<views::View> sidebar) {
++  CHECK(!myarc_workspace_sidebar_);
++  myarc_workspace_sidebar_ = AddChildView(std::move(sidebar));
++  InvalidateLayout();
++}
++
++void VerticalTabStripRegionView::SetMyarcWorkspaceReady(bool ready) {
++  if (myarc_workspace_ready_ == ready) {
++    return;
++  }
++  if (ready && GetFocusManager() &&
++      content_area_view_->Contains(GetFocusManager()->GetFocusedView())) {
++    GetFocusManager()->ClearFocus();
++    myarc_workspace_sidebar_->RequestFocus();
++  }
++  myarc_workspace_ready_ = ready;
++  content_area_view_->SetVisible(!ready);
++  InvalidateLayout();
++}
++
++void VerticalTabStripRegionView::RemoveMyarcWorkspaceSidebar() {
++  views::View* sidebar = std::exchange(myarc_workspace_sidebar_, nullptr);
++  if (sidebar) {
++    RemoveChildViewT(sidebar);
++  }
++  myarc_workspace_ready_ = false;
++  content_area_view_->SetVisible(true);
++}
++
+ void VerticalTabStripRegionView::AddedToWidget() {
+   BaseTabStripRegionView::AddedToWidget();
+   paint_as_active_subscription_ =
+@@ -490,18 +521,35 @@ views::ProposedLayout VerticalTabStripRegionView::CalculateProposedLayout(
+   if (blending_with_organizer_tray) {
+     available.set_width(blend_target_width);
+   }
++  if (myarc_workspace_sidebar_) {
++    gfx::Rect sidebar_bounds = available;
++    if (!myarc_workspace_ready_) {
++      // Leave native tabs usable while metadata or native session binding
++      // waits.
++      const int status_height = std::min(96, available.height() / 3);
++      sidebar_bounds.set_y(available.bottom() - status_height);
++      sidebar_bounds.set_height(status_height);
++      available.set_height(available.height() - status_height);
++    }
++    layout.child_layouts.push_back(
++        {.child_view = myarc_workspace_sidebar_.get(),
++         .visible = true,
++         .bounds = sidebar_bounds});
++  }
+   layout.child_layouts.push_back(
+       {.child_view = content_area_view_.get(),
+-       .visible = organizer_panel_show_percent_ < 1.0,
++       .visible =
++           !myarc_workspace_ready_ && organizer_panel_show_percent_ < 1.0,
+        .bounds = available});
+   if (organizer_panel_view_) {
+     gfx::Rect organizer_bounds = available;
+     const int adjustment =
+         base::ClampRound(available.width() * organizer_panel_show_percent_);
+     organizer_bounds.Offset(adjustment - available.width(), 0);
+-    layout.child_layouts.push_back({.child_view = organizer_panel_view_.get(),
+-                                    .visible = adjustment > 0,
+-                                    .bounds = organizer_bounds});
++    layout.child_layouts.push_back(
++        {.child_view = organizer_panel_view_.get(),
++         .visible = !myarc_workspace_ready_ && adjustment > 0,
++         .bounds = organizer_bounds});
+   }
+ 
+   return layout;
+@@ -526,6 +574,9 @@ void VerticalTabStripRegionView::Layout(PassKey) {
+ }
+ 
+ views::View* VerticalTabStripRegionView::GetDefaultFocusableChild() {
++  if (myarc_workspace_ready_ && myarc_workspace_sidebar_) {
++    return myarc_workspace_sidebar_;
++  }
+   tabs::TabInterface* active_tab = tab_strip_model()->GetActiveTab();
+   if (active_tab) {
+     return GetTabAnchorView(active_tab->GetHandle());
+@@ -833,7 +884,15 @@ void VerticalTabStripRegionView::RequestCollapse(bool collapse) {
+     if (base::CommandLine::ForCurrentProcess()->HasSwitch(
+             "myarc-visual-parity") &&
+         GetFocusManager() && Contains(GetFocusManager()->GetFocusedView())) {
+-      if (auto* contents = tab_strip_model()->GetActiveWebContents()) {
++      if (myarc_workspace_ready_) {
++        // Empty Spaces detach the native host. Never focus hidden active tab.
++        auto* host = browser_view()->GetActiveContentsWebView();
++        if (host && host->web_contents()) {
++          host->RequestFocus();
++        } else {
++          GetFocusManager()->ClearFocus();
++        }
++      } else if (auto* contents = tab_strip_model()->GetActiveWebContents()) {
+         contents->Focus();
+       }
+     }
+diff --git a/chrome/browser/ui/views/frame/vertical_tab_strip_region_view.h b/chrome/browser/ui/views/frame/vertical_tab_strip_region_view.h
+index 5c8d5a6d2038b452b94656096a0057209ea34d32..5fe822c5be266b58ff8ad84b80f250bbd158fd12 100644
+--- a/chrome/browser/ui/views/frame/vertical_tab_strip_region_view.h
++++ b/chrome/browser/ui/views/frame/vertical_tab_strip_region_view.h
+@@ -81,6 +81,11 @@ class VerticalTabStripRegionView final
+     return bottom_button_container_;
+   }
+ 
++  // Separate body only. Native header and width/collapse state remain upstream.
++  void SetMyarcWorkspaceSidebar(std::unique_ptr<views::View> sidebar);
++  void SetMyarcWorkspaceReady(bool ready);
++  void RemoveMyarcWorkspaceSidebar();
++
+   bool IsPositionInWindowCaption(const gfx::Point& point) override;
+ 
+   // These methods provide the toolbar height and exclusion width, before the
+@@ -224,6 +229,8 @@ class VerticalTabStripRegionView final
+   raw_ptr<views::View> organizer_panel_view_ = nullptr;
+   double organizer_panel_show_percent_ = 0.0;
+ 
++  raw_ptr<views::View> myarc_workspace_sidebar_ = nullptr;
++  bool myarc_workspace_ready_ = false;
+   raw_ptr<views::View> content_area_view_ = nullptr;
+   raw_ptr<VerticalTabStripTopContainer> top_button_container_ = nullptr;
+   raw_ptr<views::Separator> top_button_separator_ = nullptr;

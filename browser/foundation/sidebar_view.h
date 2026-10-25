@@ -3,6 +3,7 @@
 
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -11,7 +12,14 @@
 #include "base/sequence_checker.h"
 #include "ui/base/metadata/metadata_header_macros.h"
 #include "ui/base/models/image_model.h"
+#include "ui/menus/simple_menu_model.h"
+#include "ui/views/context_menu_controller.h"
 #include "ui/views/view.h"
+
+namespace views {
+class MenuRunner;
+class ScrollView;
+}  // namespace views
 
 namespace myarc::foundation {
 struct ItemRecord;
@@ -23,7 +31,9 @@ namespace myarc {
 // Presentation only, on the UI sequence. Delegate outlives this view. The
 // parent owns Profile/window scope, Rust mutations, browser tabs, dialogs and
 // failures.
-class SidebarView final : public views::View {
+class SidebarView final : public views::View,
+                          public views::ContextMenuController,
+                          public ui::SimpleMenuModel::Delegate {
   METADATA_HEADER(SidebarView, views::View)
 
  public:
@@ -43,6 +53,11 @@ class SidebarView final : public views::View {
     // Resolve the saved canonical URL in the controller for dormant items.
     virtual void ActivateItem(uint64_t item_id) = 0;
     virtual void CloseLiveItem(uint64_t item_id) = 0;
+    // Parent resolves the canonical URL and reports errors. Unsave is explicit
+    // removal of saved data, distinct from closing a live page.
+    virtual void PinItem(uint64_t item_id) = 0;
+    virtual void FavoriteItem(uint64_t item_id) = 0;
+    virtual void UnsaveItem(uint64_t item_id) = 0;
     virtual void SelectSpace(uint64_t space_id) = 0;
     virtual void CreateSpace() = 0;
     virtual void RenameSpace(uint64_t space_id) = 0;
@@ -70,19 +85,43 @@ class SidebarView final : public views::View {
     kSpaces,
     kCreate
   };
+  struct ItemMenuState {
+    bool is_pin;
+    bool is_favorite;
+    bool is_live;
+    bool operator==(const ItemMenuState&) const = default;
+  };
   struct FocusTarget {
     FocusAction action;
     uint64_t id;
     raw_ptr<views::View> view;
+    std::optional<ItemMenuState> item_menu;
   };
 
-  void TrackFocus(views::View* view, FocusAction action, uint64_t id = 0);
+  void TrackFocus(views::View* view,
+                  FocusAction action,
+                  uint64_t id = 0,
+                  std::optional<ItemMenuState> item_menu = std::nullopt);
+  void ShowContextMenuForViewImpl(
+      views::View* source,
+      const gfx::Point& point,
+      ui::mojom::MenuSourceType source_type) override;
+  void ExecuteCommand(int command_id, int event_flags) override;
   std::unique_ptr<views::View> MakeItem(const foundation::ItemRecord& item,
                                         bool tile,
                                         bool selected);
 
   const raw_ref<Delegate> delegate_;
   std::vector<FocusTarget> focus_targets_;
+  raw_ptr<views::ScrollView> spaces_scroll_ = nullptr;
+  uint64_t current_space_id_ = 0;
+  uint64_t menu_space_id_ = 0;
+  uint64_t menu_item_id_ = 0;
+  ItemMenuState menu_state_ = {};
+  // Stable sidebar owns both; no menu callback or anchor retains a child row.
+  // Runner must be destroyed before its model and before children.
+  std::unique_ptr<ui::SimpleMenuModel> menu_model_;
+  std::unique_ptr<views::MenuRunner> menu_runner_;
   SEQUENCE_CHECKER(sequence_checker_);
 };
 

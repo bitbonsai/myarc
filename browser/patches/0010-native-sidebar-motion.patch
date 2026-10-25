@@ -1,0 +1,257 @@
+From e5fab02325d13fb8b7796c479916cc29a0ef6f4d Mon Sep 17 00:00:00 2001
+From: bitbonsai <44185+bitbonsai@users.noreply.github.com>
+Date: Sun, 25 Oct 2026 15:49:15 +0100
+Subject: [PATCH] Keep native sidebar contents fixed during slide
+
+Optional 0010 candidate. Apply after 0009-rust-workspace-sidebar.patch
+from project commit 0de7a7f78a807683a0ecf686893a79d614340e7e.
+Baseline: external Chromium 3e117efa80cec1c4e1e6fbfdf44edeb087a279a5
+with the current native parity stack and independent endpoint rounding.
+Full index hashes identify each exact input file.
+
+Keep header, legacy body and optional workspace body at the existing
+expanded target width. Translate logical bounds together inside the
+region clip; leave animation, reversal and reduced-motion ownership with
+BrowserAnimationController. Preserve expanded group, grid and New Tab
+presentation. Reserve the existing trailing gutter in TabStripViewLayout
+instead of subtracting another inset inside each pin or split.
+
+Includes a native bounds regression for the parent to run. Scratch
+source-derived geometry assertions and real-header syntax checks passed;
+native recordings, reduced motion, focus, caption controls, popup anchors
+and fullscreen/RTL runtime acceptance remain unverified.
+---
+ .../frame/vertical_tab_strip_region_view.cc   | 32 ++++++++---
+ ...tical_tab_strip_region_view_browsertest.cc | 57 +++++++++++++++++++
+ .../tabs/common/dragged_tabs_container.cc     |  5 +-
+ .../tabs/common/tab_strip_view_layout.cc      | 10 +++-
+ .../vertical_tab_strip_bottom_container.cc    |  4 +-
+ 5 files changed, 97 insertions(+), 11 deletions(-)
+
+diff --git a/chrome/browser/ui/views/frame/vertical_tab_strip_region_view.cc b/chrome/browser/ui/views/frame/vertical_tab_strip_region_view.cc
+index cade7339c419f0789f9a64b6e8bddbc24200a802..a6e45ef47533d1487002c0cf914afa6969aec903 100644
+--- a/chrome/browser/ui/views/frame/vertical_tab_strip_region_view.cc
++++ b/chrome/browser/ui/views/frame/vertical_tab_strip_region_view.cc
+@@ -456,11 +456,12 @@ views::ProposedLayout VerticalTabStripRegionView::CalculateProposedLayout(
+   views::ProposedLayout layout;
+ 
+   // Get some constants that will be used for calculations.
++  const bool visual_parity =
++      base::CommandLine::ForCurrentProcess()->HasSwitch("myarc-visual-parity");
+   const auto horizontal_padding =
+-      base::CommandLine::ForCurrentProcess()->HasSwitch("myarc-visual-parity")
+-          ? 0
+-          : GetLayoutConstant(
+-                LayoutConstant::kVerticalTabStripHorizontalPadding);
++      visual_parity ? 0
++                    : GetLayoutConstant(
++                          LayoutConstant::kVerticalTabStripHorizontalPadding);
+   const auto vertical_padding = GetLayoutConstant(
+       LayoutConstant::kVerticalTabStripUncollapsedVerticalPadding);
+ 
+@@ -471,7 +472,9 @@ views::ProposedLayout VerticalTabStripRegionView::CalculateProposedLayout(
+                                      : state_controller_->GetUncollapsedWidth();
+ 
+   views::SizeBounds button_available_size = size_bounds;
+-  if (blending_with_organizer_tray) {
++  if (visual_parity) {
++    button_available_size.set_width(target_collapse_state_.uncollapsed_width);
++  } else if (blending_with_organizer_tray) {
+     button_available_size.set_width(blend_target_width -
+                                     2 * horizontal_padding);
+   } else if (button_available_size.width().is_bounded()) {
+@@ -497,6 +500,10 @@ views::ProposedLayout VerticalTabStripRegionView::CalculateProposedLayout(
+           std::max(tab_strip_size.height(), organizer_panel_size.height()) +
+           vertical_padding));
+   gfx::Rect available(layout.host_size);
++  if (visual_parity) {
++    // Resize updates this existing target; hide/show only changes the clip.
++    available.set_width(target_collapse_state_.uncollapsed_width);
++  }
+ 
+   // There's a bit of padding at the bottom of the tabstrip.
+   available.Inset(gfx::Insets::TLBR(0, 0, vertical_padding, 0));
+@@ -518,7 +525,7 @@ views::ProposedLayout VerticalTabStripRegionView::CalculateProposedLayout(
+ 
+   // Lay out the contents and organizer panels (if present) in the remaining
+   // space. A region that is entirely slid out of the visible area is hidden.
+-  if (blending_with_organizer_tray) {
++  if (blending_with_organizer_tray && !visual_parity) {
+     available.set_width(blend_target_width);
+   }
+   if (myarc_workspace_sidebar_) {
+@@ -552,6 +559,15 @@ views::ProposedLayout VerticalTabStripRegionView::CalculateProposedLayout(
+          .bounds = organizer_bounds});
+   }
+ 
++  if (visual_parity) {
++    // Logical leading translation also mirrors with Views in RTL. Real bounds
++    // keep hit testing and popup anchors aligned with the clipped sidebar.
++    const int offset = std::min(
++        0, layout.host_size.width() - target_collapse_state_.uncollapsed_width);
++    for (auto& child : layout.child_layouts) {
++      child.bounds.Offset(offset, 0);
++    }
++  }
+   return layout;
+ }
+ 
+@@ -1019,7 +1035,9 @@ void VerticalTabStripRegionView::OnCollapseStateChanged(
+   resize_area_width_ = collapsed ? kCollapsedResizeAreaWidth : kResizeAreaWidth;
+ 
+   if (tab_strip_view()) {
+-    tab_strip_view()->SetCollapsedState(collapsed);
++    tab_strip_view()->SetCollapsedState(
++        collapsed && !base::CommandLine::ForCurrentProcess()->HasSwitch(
++                         "myarc-visual-parity"));
+   }
+ 
+   if ((state == tabs::VerticalTabStripCollapseState::kCollapsing) ||
+diff --git a/chrome/browser/ui/views/frame/vertical_tab_strip_region_view_browsertest.cc b/chrome/browser/ui/views/frame/vertical_tab_strip_region_view_browsertest.cc
+index 9fa7b0b20c67f3c0ee57ec897f43465926888191..8161e520d8605d395806358c6410ec1052d9a43f 100644
+--- a/chrome/browser/ui/views/frame/vertical_tab_strip_region_view_browsertest.cc
++++ b/chrome/browser/ui/views/frame/vertical_tab_strip_region_view_browsertest.cc
+@@ -4,6 +4,7 @@
+ 
+ #include "chrome/browser/ui/views/frame/vertical_tab_strip_region_view.h"
+ 
++#include "base/command_line.h"
+ #include "base/i18n/language_tag.h"
+ #include "base/i18n/test/scoped_icu_locale.h"
+ #include "base/test/metrics/histogram_tester.h"
+@@ -36,6 +37,7 @@
+ #include "chrome/browser/ui/views/tabs/common/pinned_tab_container_view.h"
+ #include "chrome/browser/ui/views/tabs/common/root_tab_collection_node.h"
+ #include "chrome/browser/ui/views/tabs/common/split_tab_view.h"
++#include "chrome/browser/ui/views/tabs/common/tab_strip_view_layout.h"
+ #include "chrome/browser/ui/views/tabs/common/unpinned_tab_container_view.h"
+ #include "chrome/browser/ui/views/tabs/shared/tab_strip_combo_button.h"
+ #include "chrome/browser/ui/views/tabs/tab_strip.h"
+@@ -180,6 +182,61 @@ class VerticalTabStripRegionViewTest
+   }
+ };
+ 
++class MyarcSlidingSidebarTest : public VerticalTabStripRegionViewTest {
++ public:
++  void SetUpCommandLine(base::CommandLine* command_line) override {
++    VerticalTabStripRegionViewTest::SetUpCommandLine(command_line);
++    command_line->AppendSwitch("myarc-visual-parity");
++  }
++};
++
++IN_PROC_BROWSER_TEST_F(MyarcSlidingSidebarTest,
++                       FixedInnerBoundsAndBothGutters) {
++  SetupExpandedVerticalTabStrip();
++  for (int body = 0; body < 3; ++body) {
++    if (body == 1) {
++      region_view()->SetMyarcWorkspaceSidebar(std::make_unique<views::View>());
++    }
++    if (body == 2) {
++      region_view()->SetMyarcWorkspaceReady(true);
++    }
++    for (int width : {180, 230, 278, 400}) {
++      region_view()->SetBounds(0, 0, width, 600);
++      region_view()->OnResize(0, true);
++      ASSERT_EQ(width, region_view()->uncollapsed_width());
++      const auto expanded =
++          region_view()->CalculateProposedLayout({width, 600});
++      // Both directions must use identical inner geometry at each outer width.
++      for (int direction : {-1, 1}) {
++        for (int step = 0; step <= 100; ++step) {
++          const int outer = width * (direction < 0 ? 100 - step : step) / 100;
++          const auto sliding =
++              region_view()->CalculateProposedLayout({outer, 600});
++          EXPECT_EQ(outer, sliding.host_size.width());
++          ASSERT_EQ(expanded.child_layouts.size(),
++                    sliding.child_layouts.size());
++          for (size_t i = 0; i < expanded.child_layouts.size(); ++i) {
++            auto expected = expanded.child_layouts[i].bounds;
++            expected.Offset(outer - width, 0);
++            EXPECT_EQ(expected, sliding.child_layouts[i].bounds);
++          }
++        }
++      }
++    }
++  }
++  region_view()->RemoveMyarcWorkspaceSidebar();
++  auto* manager =
++      static_cast<TabStripViewLayout*>(tab_strip_view()->GetLayoutManager());
++  for (int width : {0, 12, 24, 64, 230}) {
++    const auto layout = manager->CalculateProposedLayout({width, 600});
++    const auto* pins =
++        layout.GetLayoutFor(tab_strip_view()->pinned_tabs_scroll_view());
++    ASSERT_TRUE(pins);
++    EXPECT_EQ(12, pins->bounds.x());
++    EXPECT_EQ(std::max(0, width - 24), pins->bounds.width());
++  }
++}
++
+ class VerticalTabStripRegionViewGlassFrameTest
+     : public VerticalTabStripRegionViewTest {
+  public:
+diff --git a/chrome/browser/ui/views/tabs/common/dragged_tabs_container.cc b/chrome/browser/ui/views/tabs/common/dragged_tabs_container.cc
+index 1fcbfddf16dde3175572eb3c77f72347d53fcab3..40fc90da75129719f628eefe99b44651d63a42ff 100644
+--- a/chrome/browser/ui/views/tabs/common/dragged_tabs_container.cc
++++ b/chrome/browser/ui/views/tabs/common/dragged_tabs_container.cc
+@@ -8,6 +8,7 @@
+ 
+ #include "base/auto_reset.h"
+ #include "base/callback_list.h"
++#include "base/command_line.h"
+ #include "base/i18n/rtl.h"
+ #include "base/notreached.h"
+ #include "base/time/time.h"
+@@ -670,7 +671,9 @@ tabs::VerticalTabStripCollapseState
+ DraggedTabsContainer::GetTabStripCollapseState() const {
+   const auto* controller =
+       collection_node_ ? collection_node_->GetController() : nullptr;
+-  if (!controller) {
++  // Sliding the full-width sidebar preserves grid, group and drop geometry.
++  if (!controller || base::CommandLine::ForCurrentProcess()->HasSwitch(
++                         "myarc-visual-parity")) {
+     return tabs::VerticalTabStripCollapseState::kExpanded;
+   }
+   return controller->GetStateController()->GetCollapseState();
+diff --git a/chrome/browser/ui/views/tabs/common/tab_strip_view_layout.cc b/chrome/browser/ui/views/tabs/common/tab_strip_view_layout.cc
+index f016525adc1c543d223e2854369a57c8157857f4..a33319899a13969e1bb2759a6b810f1a0a366f94 100644
+--- a/chrome/browser/ui/views/tabs/common/tab_strip_view_layout.cc
++++ b/chrome/browser/ui/views/tabs/common/tab_strip_view_layout.cc
+@@ -6,6 +6,7 @@
+ 
+ #include <algorithm>
+ 
++#include "base/command_line.h"
+ #include "base/logging.h"
+ #include "chrome/browser/ui/layout_constants.h"
+ #include "chrome/browser/ui/tabs/tab_style.h"
+@@ -277,8 +278,13 @@ views::ProposedLayout TabStripViewLayout::CalculateVerticalLayout(
+   int y = 0;
+ 
+   // Determine container preferred heights.
+-  views::SizeBounds pinned_tab_container_size_bounds =
+-      size_bounds.Inset(gfx::Insets::TLBR(0, region_horizontal_padding, 0, 0));
++  // Tiles fill the container; reserve both gutters here, including for splits.
++  const int trailing_padding =
++      base::CommandLine::ForCurrentProcess()->HasSwitch("myarc-visual-parity")
++          ? region_horizontal_padding
++          : 0;
++  views::SizeBounds pinned_tab_container_size_bounds = size_bounds.Inset(
++      gfx::Insets::TLBR(0, region_horizontal_padding, 0, trailing_padding));
+   const int pinned_preferred_height =
+       pinned_tabs_scroll_view
+           ->GetPreferredSize(pinned_tab_container_size_bounds)
+diff --git a/chrome/browser/ui/views/tabs/vertical/vertical_tab_strip_bottom_container.cc b/chrome/browser/ui/views/tabs/vertical/vertical_tab_strip_bottom_container.cc
+index 079e13c97f8879f7ed5210b9aa0a9381edfa92cf..0182ea7b675c2e1ea379ee8986eafffbd2054410 100644
+--- a/chrome/browser/ui/views/tabs/vertical/vertical_tab_strip_bottom_container.cc
++++ b/chrome/browser/ui/views/tabs/vertical/vertical_tab_strip_bottom_container.cc
+@@ -70,7 +70,9 @@ void VerticalTabStripBottomContainer::OnCollapseStateChanged(
+     tabs::VerticalTabStripCollapseState state) {
+   // Updating the styles immediately at start of the animation by including
+   // collapsing state.
+-  UpdateButtonStyles(state != tabs::VerticalTabStripCollapseState::kExpanded);
++  UpdateButtonStyles(!base::CommandLine::ForCurrentProcess()->HasSwitch(
++                         "myarc-visual-parity") &&
++                     state != tabs::VerticalTabStripCollapseState::kExpanded);
+ }
+ 
+ void VerticalTabStripBottomContainer::OnNewTabButtonContextMenuWillShow() {
