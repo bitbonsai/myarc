@@ -99,7 +99,7 @@ My Arc card, 2023\.
 
 I started using Arc in 2023\. I appreciate how Spaces and named pinned tabs make its sidebar feel like a workspace. The command bar gives you a quick way back to those tabs.
 
-[Arc is being sunsetted](https://arc.net/). I'm building myArc to continue that way of browsing, as an independent, open-source browser based on Chromium.
+[Arc is being sunsetted](https://arc.net/). I wanted to keep that way of browsing alive. Why not build an independent, open-source continuation, with privacy as a starting point and AI something people could choose to use? That idea became myArc. I'm starting with a Chromium-based prototype, working toward that kind of browser.
 
 ## A browser should work without an account
 
