@@ -1,0 +1,482 @@
+diff --git a/chrome/browser/ui/views/BUILD.gn b/chrome/browser/ui/views/BUILD.gn
+index d4d26ec..f9efb4b 100644
+--- a/chrome/browser/ui/views/BUILD.gn
++++ b/chrome/browser/ui/views/BUILD.gn
+@@ -1996,6 +1996,8 @@ if (!is_chromeos_device) {
+       "//chrome/browser/ui/find_bar",
+       "//chrome/browser/ui/focus",
+       "//chrome/browser/ui/views/frame:browser_view_header",
++      "//chrome/browser/ui/views/frame:top_container_view",
++      "//chrome/browser/ui/views/tabs/vertical",
+       "//chrome/browser/ui/views/test:view_event_test_base",
+       "//chrome/browser/ui/views/toolbar:interactive_ui_tests",
+       "//chrome/browser/ui/webui:chrome_web_contents_handler",
+@@ -2004,6 +2006,7 @@ if (!is_chromeos_device) {
+       "//components/enterprise/data_controls/content/browser",
+       "//components/enterprise/data_controls/core/browser:test_support",
+       "//content/test:browsertest_support",
++      "//myarc:browser_workspace_adapter",
+       "//myarc:workspace_lifecycle",
+       "//ui/base:ozone_buildflags",
+       "//ui/base/clipboard:clipboard_test_support",
+diff --git a/chrome/browser/ui/views/frame/browser_view.cc b/chrome/browser/ui/views/frame/browser_view.cc
+index d211df4..c4633a9 100644
+--- a/chrome/browser/ui/views/frame/browser_view.cc
++++ b/chrome/browser/ui/views/frame/browser_view.cc
+@@ -1986,6 +1986,7 @@ void BrowserView::OnVerticalTabStripModeChanged(
+     horizontal_tab_strip_region_view_->InitializeTabStrip();
+   }
+ 
++  UpdateMyarcTabStripMode();
+   GetFrameView()->OnTabStripStateChanged();
+ 
+   UpdateTabSearchBubbleHost();
+@@ -5676,34 +5677,87 @@ void BrowserView::AddedToWidget() {
+     }
+   }
+ 
+-  if (base::CommandLine::ForCurrentProcess()->HasSwitch(
+-          "myarc-visual-parity") &&
+-      vertical_tab_strip_region_view_ && ShouldDrawVerticalTabStrip()) {
+-    auto* const sidebar_header =
+-        vertical_tab_strip_region_view_->GetTopContainer();
+-    toolbar_->SetMyarcSidebarToggle(
+-        sidebar_header->RemoveChildViewT(sidebar_header->GetCollapseButton()));
+-    sidebar_header->SetMyarcSidebarToolbar(
+-        top_container_->RemoveChildViewT(toolbar_.get()));
+-    // Keep popup anchoring independent of sidebar visibility and tracker
+-    // registration during startup. Layout uses the upstream fallback position.
+-    myarc_popup_anchor_ = AddChildView(std::make_unique<views::View>());
+-    myarc_popup_anchor_->SetCanProcessEventsWithinSubtree(false);
+-    myarc_popup_anchor_->GetViewAccessibility().SetIsIgnored(true);
+-  }
+-
+   dialog_anchor_ = std::make_unique<views::ViewSubregionAnchor>(
+       kBrowserDialogAnchorElementId, *this);
+   fallback_popup_anchor_ = std::make_unique<views::ViewSubregionAnchor>(
+       kFallbackPopupAnchorElementId, *this);
+ 
+   initialized_ = true;
+-  if (base::CommandLine::ForCurrentProcess()->HasSwitch(
+-          "myarc-workspace-sidebar") &&
++  UpdateMyarcTabStripMode();
++}
++
++void BrowserView::UpdateMyarcTabStripMode() {
++  // Mode notifications can precede toolbar/widget initialization. Startup
++  // calls this again once layout and native dialog anchors are ready.
++  if (!initialized_ || !GetWidget() || GetWidget()->IsClosed() ||
++      !base::CommandLine::ForCurrentProcess()->HasSwitch(
++          "myarc-visual-parity") ||
++      !vertical_tab_strip_region_view_) {
++    return;
++  }
++  if (!myarc_popup_anchor_) {
++    // Keep the 0016 anchor alive across both modes, including recovery UI.
++    myarc_popup_anchor_ = AddChildView(std::make_unique<views::View>());
++    myarc_popup_anchor_->SetCanProcessEventsWithinSubtree(false);
++    myarc_popup_anchor_->GetViewAccessibility().SetIsIgnored(true);
++  }
++
++  auto* const header = vertical_tab_strip_region_view_->GetTopContainer();
++  const bool vertical = ShouldDrawVerticalTabStrip();
++  const bool reparent = vertical ? toolbar_->parent() == top_container_
++                                 : toolbar_->parent() == header;
++  if (reparent) {
++    auto* const focus = GetFocusManager()->GetFocusedView();
++    const bool restore_focus =
++        toolbar_->Contains(focus) ||
++        (!vertical && vertical_tab_strip_region_view_->Contains(focus));
++    if (restore_focus) {
++      GetFocusManager()->ClearFocus();
++      GetFocusManager()->SetStoredFocusView(nullptr);
++    }
++    if (vertical) {
++      toolbar_->SetMyarcSidebarToggle(
++          header->RemoveChildViewT(header->GetCollapseButton()));
++      header->SetMyarcSidebarToolbar(
++          top_container_->RemoveChildViewT(toolbar_.get()));
++    } else {
++      // Clear each borrowed reference before ownership leaves its parent.
++      header->AddChildView(toolbar_->TakeMyarcSidebarToggle());
++      top_container_->AddChildView(header->TakeMyarcSidebarToolbar());
++      toolbar_->SetVisible(true);
++    }
++    EnsureFocusOrder();
++    if (restore_focus) {
++      // Reparenting can hide the old focus target until the new mode lays out.
++      // Never restore into a stale mode, nested UI loop or closing window.
++      base::SingleThreadTaskRunner::GetCurrentDefault()->PostNonNestableTask(
++          FROM_HERE, base::BindOnce(
++                         [](base::WeakPtr<BrowserView> view, bool vertical) {
++                           if (!view || !view->GetWidget() ||
++                               view->GetWidget()->IsClosed() ||
++                               !view->GetWidget()->IsActive() ||
++                               view->ShouldDrawVerticalTabStrip() != vertical ||
++                               view->GetFocusManager()->GetFocusedView()) {
++                             return;
++                           }
++                           view->GetWidget()->LayoutRootViewIfNecessary();
++                           if (!view) {
++                             return;
++                           }
++                           if (view->toolbar_->IsDrawn()) {
++                             view->SetFocusToLocationBar(false);
++                           } else {
++                             view->RestoreFocus();
++                           }
++                         },
++                         myarc_workspace_weak_factory_.GetWeakPtr(), vertical));
++    }
++  }
++
++  if (vertical && !myarc_workspace_adapter_ &&
+       base::CommandLine::ForCurrentProcess()->HasSwitch(
+-          "myarc-visual-parity") &&
+-      browser_->GetType() == BrowserWindowInterface::Type::TYPE_NORMAL &&
+-      vertical_tab_strip_region_view_ && ShouldDrawVerticalTabStrip()) {
++          "myarc-workspace-sidebar") &&
++      browser_->GetType() == BrowserWindowInterface::Type::TYPE_NORMAL) {
+     myarc_workspace_adapter_ =
+         std::make_unique<myarc::BrowserWorkspaceAdapter>(*browser_);
+     auto sidebar = std::make_unique<myarc::SidebarView>(
+diff --git a/chrome/browser/ui/views/frame/browser_view.h b/chrome/browser/ui/views/frame/browser_view.h
+index 0b73634..f35c829 100644
+--- a/chrome/browser/ui/views/frame/browser_view.h
++++ b/chrome/browser/ui/views/frame/browser_view.h
+@@ -1295,6 +1295,7 @@ class BrowserView : public BrowserWindow,
+   void NewTab() override;
+   void MyarcWorkspaceResult(myarc::foundation::MutationResult result);
+   void UpdateMyarcWorkspaceCanvas();
++  void UpdateMyarcTabStripMode();
+   void ShowMyarcSpaceDialog(uint64_t space);
+   bool AcceptMyarcSpaceDialog(uint64_t space);
+   void CloseMyarcSpaceDialog();
+diff --git a/chrome/browser/ui/views/session_crashed_bubble_view_interactive_uitest.cc b/chrome/browser/ui/views/session_crashed_bubble_view_interactive_uitest.cc
+index f1256fd..c2c6b73 100644
+--- a/chrome/browser/ui/views/session_crashed_bubble_view_interactive_uitest.cc
++++ b/chrome/browser/ui/views/session_crashed_bubble_view_interactive_uitest.cc
+@@ -18,16 +18,21 @@
+ #include "chrome/browser/profiles/profile.h"
+ #include "chrome/browser/sessions/exit_type_service.h"
+ #include "chrome/browser/sessions/session_restore.h"
++#include "chrome/browser/ui/browser_commands.h"
+ #include "chrome/browser/ui/browser_element_identifiers.h"
+ #include "chrome/browser/ui/browser_tabstrip.h"
+ #include "chrome/browser/ui/browser_window/public/create_browser_window.h"
+ #include "chrome/browser/ui/focus/browser_focus_controller.h"
+ #include "chrome/browser/ui/tabs/tab_strip_model.h"
++#include "chrome/browser/ui/tabs/vertical_tab_strip_state_controller.h"
+ #include "chrome/browser/ui/test/test_browser_dialog.h"
+ #include "chrome/browser/ui/views/frame/browser_view.h"
+ #include "chrome/browser/ui/views/frame/toolbar_button_provider.h"
++#include "chrome/browser/ui/views/frame/top_container_view.h"
+ #include "chrome/browser/ui/views/frame/vertical_tab_strip_region_view.h"
+ #include "chrome/browser/ui/views/interaction/browser_elements_views.h"
++#include "chrome/browser/ui/views/location_bar/location_bar_view.h"
++#include "chrome/browser/ui/views/tabs/vertical/vertical_tab_strip_top_container.h"
+ #include "chrome/browser/ui/views/toolbar/browser_app_menu_button.h"
+ #include "chrome/browser/ui/views/toolbar/toolbar_view.h"
+ #include "chrome/common/pref_names.h"
+@@ -37,6 +42,7 @@
+ #include "components/prefs/pref_service.h"
+ #include "content/public/common/content_features.h"
+ #include "content/public/test/browser_test.h"
++#include "myarc/browser_workspace_adapter.h"
+ #include "myarc/workspace_lifecycle.h"
+ #include "ui/base/buildflags.h"
+ #include "ui/views/bubble/bubble_dialog_delegate_view.h"
+@@ -178,10 +184,129 @@ IN_PROC_BROWSER_TEST_P(SessionCrashedBubbleMyarcViewTest,
+   CloseBrowserSynchronously(window);
+ }
+ 
++IN_PROC_BROWSER_TEST_P(SessionCrashedBubbleMyarcViewTest,
++                       RuntimeModesKeepWorkspaceAndRecoveryAnchor) {
++  auto* const profile = browser()->GetProfile();
++  profile->GetPrefs()->SetBoolean(prefs::kVerticalTabsEnabled, false);
++  BrowserWindowCreateParams params(profile, /*from_user_gesture=*/true);
++  params.initial_bounds = gfx::Rect(50, 50, 1000, 800);
++  params.vertical_tab_strip_collapsed = GetParam();
++  auto* const window = CreateBrowserWindow(std::move(params));
++  auto* const view = BrowserView::GetBrowserViewForBrowser(window);
++  ASSERT_TRUE(view);
++  chrome::AddTabAt(window, GURL("about:blank"), -1, true);
++  auto* const tabs = window->GetTabStripModel();
++  auto* const page = tabs->GetActiveWebContents();
++  auto* const toolbar = view->toolbar();
++  auto* const header =
++      view->vertical_tab_strip_region_view_for_testing()->GetTopContainer();
++  auto* const anchor = view->myarc_popup_anchor();
++  ASSERT_TRUE(anchor);
++  EXPECT_FALSE(view->GetMyarcWorkspaceAdapter());
++  EXPECT_EQ(view->top_container(), toolbar->parent());
++
++  ExitTypeService::GetInstanceForProfile(profile)
++      ->SetLastSessionExitTypeForTest(ExitType::kCrashed);
++  SessionCrashedBubble::ShowIfNotOffTheRecordProfile(window, false);
++  ASSERT_TRUE(base::test::RunUntil(
++      [] { return SessionCrashedBubbleView::GetInstanceForTest(); }));
++  auto* const bubble = SessionCrashedBubbleView::GetInstanceForTest();
++  ASSERT_TRUE(bubble);
++  chrome::ToggleVerticalTabs(window);
++  auto* const adapter = view->GetMyarcWorkspaceAdapter();
++  ASSERT_TRUE(adapter);
++  EXPECT_FALSE(adapter->ready());
++  EXPECT_TRUE(myarc::WorkspaceLifecycle::HasPendingSessionRestore(profile));
++  EXPECT_EQ(header, toolbar->parent());
++  EXPECT_EQ(anchor, bubble->GetAnchorView());
++  EXPECT_EQ(page, tabs->GetActiveWebContents());
++  bubble->GetWidget()->CloseNow();
++  ASSERT_TRUE(base::test::RunUntil([&] { return adapter->ready(); }));
++  const auto initial = adapter->Sidebar();
++  ASSERT_TRUE(initial.ok);
++  const auto created = adapter->CreateSpace("Mode fixture");
++  ASSERT_TRUE(created.ok);
++  ASSERT_TRUE(adapter->SelectSpace(created.id).ok);
++  EXPECT_TRUE(view->IsMyarcWorkspaceBlank());
++  ASSERT_TRUE(adapter->SelectSpace(initial.current_space.id).ok);
++  EXPECT_EQ(page, adapter->DisplayedContents());
++  const auto baseline = adapter->service().ExportSnapshot();
++  ASSERT_TRUE(baseline);
++  const auto binding = myarc::BrowserWorkspaceAdapter::TabExtraData(*page);
++  const size_t sidebar_children =
++      view->vertical_tab_strip_region_view_for_testing()->children().size();
++
++  view->GetWidget()->Show();
++  for (int cycle = 0; cycle < 3; ++cycle) {
++    chrome::ToggleVerticalTabs(window);
++    view->GetWidget()->LayoutRootViewIfNecessary();
++    EXPECT_FALSE(profile->GetPrefs()->GetBoolean(prefs::kVerticalTabsEnabled));
++    EXPECT_EQ(view->top_container(), toolbar->parent());
++    EXPECT_EQ(header, header->GetCollapseButton()->parent());
++    EXPECT_TRUE(toolbar->IsDrawn());
++    EXPECT_TRUE(toolbar->location_bar_view()->IsDrawn());
++    EXPECT_TRUE(
++        view->toolbar_button_provider()->GetAppMenuControl()->IsDrawn());
++    toolbar->location_bar()->FocusLocation(
++        /*is_user_initiated=*/false, /*clear_focus_if_failed=*/false);
++    EXPECT_TRUE(toolbar->Contains(view->GetFocusManager()->GetFocusedView()));
++    chrome::ToggleVerticalTabs(window);
++    view->GetWidget()->LayoutRootViewIfNecessary();
++    EXPECT_TRUE(profile->GetPrefs()->GetBoolean(prefs::kVerticalTabsEnabled));
++    EXPECT_EQ(header, toolbar->parent());
++    EXPECT_EQ(toolbar, header->GetCollapseButton()->parent());
++    EXPECT_EQ(adapter, view->GetMyarcWorkspaceAdapter());
++    EXPECT_EQ(anchor, view->myarc_popup_anchor());
++    EXPECT_EQ(1, tabs->count());
++    EXPECT_EQ(page, tabs->GetActiveWebContents());
++    EXPECT_EQ(page, adapter->DisplayedContents());
++    EXPECT_EQ(binding, myarc::BrowserWorkspaceAdapter::TabExtraData(*page));
++    const auto current = adapter->Sidebar();
++    EXPECT_EQ(initial.window_id, current.window_id);
++    EXPECT_EQ(initial.current_space.id, current.current_space.id);
++    EXPECT_EQ(initial.selected_item_id, current.selected_item_id);
++    const auto snapshot = adapter->service().ExportSnapshot();
++    ASSERT_TRUE(snapshot);
++    EXPECT_EQ(baseline->next_space_id, snapshot->next_space_id);
++    EXPECT_EQ(baseline->next_item_id, snapshot->next_item_id);
++    EXPECT_EQ(baseline->next_window_id, snapshot->next_window_id);
++    EXPECT_EQ(baseline->items.size(), snapshot->items.size());
++    EXPECT_EQ(baseline->windows.size(), snapshot->windows.size());
++    EXPECT_EQ(
++        sidebar_children,
++        view->vertical_tab_strip_region_view_for_testing()->children().size());
++  }
++  CloseBrowserSynchronously(window);
++}
++
+ INSTANTIATE_TEST_SUITE_P(All,
+                          SessionCrashedBubbleMyarcViewTest,
+                          testing::Bool());
+ 
++IN_PROC_BROWSER_TEST_F(SessionCrashedBubbleViewTest,
++                       RuntimeModesLeaveFlagOffToolbarNative) {
++  auto* const profile = browser()->GetProfile();
++  profile->GetPrefs()->SetBoolean(prefs::kVerticalTabsEnabled, false);
++  auto* const view = BrowserView::GetBrowserViewForBrowser(browser());
++  auto* const toolbar = view->toolbar();
++  auto* const page = browser()->GetTabStripModel()->GetActiveWebContents();
++  for (int cycle = 0; cycle < 2; ++cycle) {
++    chrome::ToggleVerticalTabs(browser());
++    view->GetWidget()->LayoutRootViewIfNecessary();
++    EXPECT_TRUE(profile->GetPrefs()->GetBoolean(prefs::kVerticalTabsEnabled));
++    EXPECT_EQ(view->top_container(), toolbar->parent());
++    EXPECT_FALSE(view->GetMyarcWorkspaceAdapter());
++    EXPECT_FALSE(view->myarc_popup_anchor());
++    chrome::ToggleVerticalTabs(browser());
++    view->GetWidget()->LayoutRootViewIfNecessary();
++    EXPECT_FALSE(profile->GetPrefs()->GetBoolean(prefs::kVerticalTabsEnabled));
++    EXPECT_EQ(view->top_container(), toolbar->parent());
++    EXPECT_TRUE(
++        view->toolbar_button_provider()->GetAppMenuControl()->IsDrawn());
++    EXPECT_EQ(page, browser()->GetTabStripModel()->GetActiveWebContents());
++  }
++}
++
+ IN_PROC_BROWSER_TEST_F(SessionCrashedBubbleViewTest,
+                        InvokeUi_SessionCrashedBubble) {
+   ShowAndVerifyUi();
+diff --git a/chrome/browser/ui/views/tabs/vertical/vertical_tab_strip_top_container.cc b/chrome/browser/ui/views/tabs/vertical/vertical_tab_strip_top_container.cc
+index 40d7470..dcce655 100644
+--- a/chrome/browser/ui/views/tabs/vertical/vertical_tab_strip_top_container.cc
++++ b/chrome/browser/ui/views/tabs/vertical/vertical_tab_strip_top_container.cc
+@@ -97,10 +97,18 @@ VerticalTabStripTopContainer::~VerticalTabStripTopContainer() = default;
+ 
+ void VerticalTabStripTopContainer::SetMyarcSidebarToolbar(
+     std::unique_ptr<views::View> toolbar) {
++  CHECK(!myarc_sidebar_toolbar_);
+   myarc_sidebar_toolbar_ = AddChildView(std::move(toolbar));
+   InvalidateLayout();
+ }
+ 
++std::unique_ptr<views::View>
++VerticalTabStripTopContainer::TakeMyarcSidebarToolbar() {
++  auto* toolbar = myarc_sidebar_toolbar_.get();
++  myarc_sidebar_toolbar_ = nullptr;
++  return RemoveChildViewT(toolbar);
++}
++
+ void VerticalTabStripTopContainer::Layout(PassKey) {
+   LayoutSuperclass<views::View>(this);
+   combo_button_->SetOrientation(combo_button_orientation_);
+diff --git a/chrome/browser/ui/views/tabs/vertical/vertical_tab_strip_top_container.h b/chrome/browser/ui/views/tabs/vertical/vertical_tab_strip_top_container.h
+index 25b549c..8b4f407 100644
+--- a/chrome/browser/ui/views/tabs/vertical/vertical_tab_strip_top_container.h
++++ b/chrome/browser/ui/views/tabs/vertical/vertical_tab_strip_top_container.h
+@@ -61,6 +61,7 @@ class VerticalTabStripTopContainer : public views::View,
+   views::LabelButton* AddChildButtonFor(actions::ActionId action_id);
+ 
+   void SetMyarcSidebarToolbar(std::unique_ptr<views::View> toolbar);
++  std::unique_ptr<views::View> TakeMyarcSidebarToolbar();
+   TabStripComboButton* GetComboButton();
+   VerticalTabStripSegmentedControl* GetSegmentedControl();
+   views::LabelButton* GetCollapseButton() { return collapse_button_; }
+diff --git a/chrome/browser/ui/views/toolbar/toolbar_view.cc b/chrome/browser/ui/views/toolbar/toolbar_view.cc
+index 0ee1e75..058d6ad 100644
+--- a/chrome/browser/ui/views/toolbar/toolbar_view.cc
++++ b/chrome/browser/ui/views/toolbar/toolbar_view.cc
+@@ -191,6 +191,13 @@ using content::WebContents;
+ 
+ DEFINE_UI_CLASS_PROPERTY_KEY(bool, kActionItemUnderlineIndicatorKey, false)
+ 
++// Apply sidebar geometry through Views so temporary layout visibility does not
++// overwrite the upstream controls' externally requested visibility.
++class ToolbarView::ToolbarLayout : public views::FlexLayout {
++ public:
++  using views::FlexLayout::ApplyLayout;
++};
++
+ namespace {
+ 
+ // Gets the display mode for a given browser.
+@@ -1473,12 +1480,29 @@ gfx::Size ToolbarView::GetMinimumSize() const {
+ void ToolbarView::SetMyarcSidebarToggle(std::unique_ptr<views::View> toggle) {
+   CHECK(back_ && forward_ && reload_ && location_bar_view_)
+       << "myarc-visual-parity requires --disable-features=InitialWebUI";
++  CHECK(!myarc_sidebar_toggle_);
+   myarc_sidebar_toggle_ = AddChildView(std::move(toggle));
+-  for (views::LabelButton* button : std::array<views::LabelButton*, 3>{
++  for (ToolbarButton* button : std::array<ToolbarButton*, 3>{
++           back_.get(), forward_.get(), reload_.get()}) {
++    button->SetLayoutInsets(gfx::Insets());
++  }
++}
++
++std::unique_ptr<views::View> ToolbarView::TakeMyarcSidebarToggle() {
++  auto* toggle = myarc_sidebar_toggle_.get();
++  myarc_sidebar_toggle_ = nullptr;
++  auto owned = RemoveChildViewT(toggle);
++  for (ToolbarButton* button : std::array<ToolbarButton*, 3>{
+            back_.get(), forward_.get(), reload_.get()}) {
+-    button->SetBorder(views::CreateEmptyBorder(0));
+-    button->SetHorizontalAlignment(gfx::ALIGN_CENTER);
++    button->SetLayoutInsets(std::nullopt);
+   }
++  if (background()) {
++    if (auto* corners = background()->AsA<CustomCornersBackground>()) {
++      corners->SetVisible(true);
++    }
++  }
++  InvalidateLayout();
++  return owned;
+ }
+ 
+ void ToolbarView::Layout(PassKey) {
+@@ -1492,28 +1516,34 @@ void ToolbarView::Layout(PassKey) {
+     // use.
+     const bool expanded = width() >= 180;
+     const bool has_page = !chrome::IsMyarcWorkspaceBlank(browser_);
++    views::ProposedLayout layout;
++    layout.host_size = size();
+     for (views::View* child : children()) {
+-      child->SetVisible(
++      const bool visible =
+           child == myarc_sidebar_toggle_ ||
+           (expanded && (child == location_bar_view_ ||
+                         (has_page && (child == back_ || child == forward_ ||
+-                                      child == reload_)))));
++                                      child == reload_))));
++      gfx::Rect bounds;
++      if (child == myarc_sidebar_toggle_) {
++        bounds = gfx::Rect(expanded ? 84 : 8, expanded ? 8 : 42, 28, 28);
++      } else if (child == back_) {
++        bounds = gfx::Rect(width() - 104, 8, 24, 28);
++      } else if (child == forward_) {
++        bounds = gfx::Rect(width() - 70, 8, 24, 28);
++      } else if (child == reload_) {
++        bounds = gfx::Rect(width() - 36, 8, 24, 28);
++      } else if (child == location_bar_view_) {
++        bounds = gfx::Rect(8, 46, width() - 16, 38);
++      }
++      layout.child_layouts.emplace_back(child, visible, bounds);
+     }
++    layout_manager_->ApplyLayout(layout);
+     if (background()) {
+       if (auto* corners = background()->AsA<CustomCornersBackground>()) {
+         corners->SetVisible(false);
+       }
+     }
+-    myarc_sidebar_toggle_->SetVisible(true);
+-    myarc_sidebar_toggle_->SetBounds(expanded ? 84 : 8, expanded ? 8 : 42, 28,
+-                                     28);
+-    if (expanded) {
+-      back_->SetBounds(width() - 104, 8, 24, 28);
+-      forward_->SetBounds(width() - 70, 8, 24, 28);
+-      reload_->SetBounds(width() - 36, 8, 24, 28);
+-      location_bar_view_->SetVisible(true);
+-      location_bar_view_->SetBounds(8, 46, width() - 16, 38);
+-    }
+     return;
+   }
+ 
+@@ -1628,7 +1658,7 @@ void ToolbarView::InitLayout() {
+                                views::MaximumFlexSizeRule::kUnbounded)
+           .WithOrder(location_bar_flex_order);
+ 
+-  layout_manager_ = SetLayoutManager(std::make_unique<views::FlexLayout>());
++  layout_manager_ = SetLayoutManager(std::make_unique<ToolbarLayout>());
+ 
+   layout_manager_->SetOrientation(views::LayoutOrientation::kHorizontal)
+       .SetCrossAxisAlignment(views::LayoutAlignment::kCenter)
+diff --git a/chrome/browser/ui/views/toolbar/toolbar_view.h b/chrome/browser/ui/views/toolbar/toolbar_view.h
+index 836e244..1d920d7 100644
+--- a/chrome/browser/ui/views/toolbar/toolbar_view.h
++++ b/chrome/browser/ui/views/toolbar/toolbar_view.h
+@@ -175,6 +175,7 @@ class ToolbarView : public views::AccessiblePaneView,
+   void RecordHitTestMetrics(bool is_caption_area);
+ 
+   void SetMyarcSidebarToggle(std::unique_ptr<views::View> toggle);
++  std::unique_ptr<views::View> TakeMyarcSidebarToggle();
+ 
+   // Accessors.
+   BrowserWindowInterface* browser() const { return browser_; }
+@@ -469,7 +470,8 @@ class ToolbarView : public views::AccessiblePaneView,
+   std::optional<ui::ScopedUnownedUserData<ToolbarButtonProvider>>
+       scoped_unowned_user_data_;
+ 
+-  raw_ptr<views::FlexLayout> layout_manager_ = nullptr;
++  class ToolbarLayout;
++  raw_ptr<ToolbarLayout> layout_manager_ = nullptr;
+ 
+   AppMenuIconController app_menu_icon_controller_;
+ 

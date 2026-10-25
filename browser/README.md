@@ -28,6 +28,8 @@ The executable checks exact-Profile registration, retained metadata and startup/
 
 [Pending recovery choice candidate 0018](experiments/native-recovery-lifecycle.md) extends that shared barrier across consent, dialog deletion and native Restore handoff. Its helper, native fixture syntax/GN checks and full `chrome` link pass. Fresh actual Restore/discard acceptance remains with the parent; the prior process-crash failure stays recorded.
 
+[Runtime mode bootstrap candidate 0019](experiments/native-workspace-mode-bootstrap.md) initializes opted-in controls when an existing horizontal window switches vertical, returns toolbar ownership on horizontal exit, and retains the workspace adapter/bindings across further toggles. Native same-window acceptance remains pending; renderer stays default OFF.
+
 On every Chromium rebase, compare `PreserveUnknownData` against the producers in `BrowserLiveTabContext` and consumers in `browser_tabrestore`, including private glic/send-tab keys. Cleared known fields must stay absent; unrelated historical keys must survive.
 
 ## Local build recipe
