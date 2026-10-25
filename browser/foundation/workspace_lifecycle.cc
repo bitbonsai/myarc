@@ -10,8 +10,8 @@ namespace {
 
 struct Registry {
   std::map<Profile*, WorkspaceLifecycle*> registrations;
-  // Each startup launch and SessionRestoreImpl owns one count. Native
-  // completion observers may start another restore for the same Profile.
+  // Each startup launch, recovery choice and SessionRestoreImpl owns a count.
+  // Recovery transfers to a restorer before releasing its choice count.
   std::map<Profile*, size_t> pending;
   THREAD_CHECKER(thread_checker);
 };
@@ -53,9 +53,11 @@ bool WorkspaceLifecycle::HasPendingSessionRestore(Profile* profile) {
 
 void WorkspaceLifecycle::Notify(Profile* profile, Event event) {
   if (event == Event::kStartupStarted ||
+      event == Event::kRecoveryChoiceStarted ||
       event == Event::kSessionRestoreStarted) {
     ++PendingRestores()[profile];
   } else if (event == Event::kStartupFinished ||
+             event == Event::kRecoveryChoiceFinished ||
              event == Event::kSessionRestoreFinished) {
     auto it = PendingRestores().find(profile);
     if (it != PendingRestores().end() && --it->second == 0) {

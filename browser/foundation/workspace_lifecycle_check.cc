@@ -74,6 +74,58 @@ bool CheckNativeBarrier() {
          !Lifecycle::HasPendingSessionRestore(profile);
 }
 
+bool CheckRecoveryChoice() {
+  using Lifecycle = myarc::WorkspaceLifecycle;
+  using Event = Lifecycle::Event;
+  int token, other_token;
+  auto* profile = reinterpret_cast<Profile*>(&token);
+  auto* other = reinterpret_cast<Profile*>(&other_token);
+  // Consent/show can be pending before the first adapter registers.
+  Lifecycle::Notify(profile, Event::kStartupStarted);
+  Lifecycle::Notify(profile, Event::kRecoveryChoiceStarted);
+  Lifecycle::Notify(profile, Event::kStartupFinished);
+  Probe late(profile);
+  Lifecycle::Notify(profile, Event::kNativeReady);
+  if (!Lifecycle::HasPendingSessionRestore(profile) ||
+      Lifecycle::HasPendingSessionRestore(other)) {
+    return false;
+  }
+  // Restore closes/deletes the dialog first. Its moved choice survives until
+  // RestoreSessionAfterCrash constructs the real restorer, even in UI loops.
+  Lifecycle::Notify(profile, Event::kSessionRestoreStarted);
+  Lifecycle::Notify(profile, Event::kNativeReady);
+  Lifecycle::Notify(profile, Event::kRecoveryChoiceFinished);
+  if (!Lifecycle::HasPendingSessionRestore(profile)) {
+    return false;
+  }
+  Lifecycle::Notify(profile, Event::kSessionRestoreFinished);
+  if (Lifecycle::HasPendingSessionRestore(profile)) {
+    return false;
+  }
+  // Discard/cancel use the same finish event, scoped to the exact Profile.
+  Lifecycle::Notify(profile, Event::kRecoveryChoiceStarted);
+  Lifecycle::Notify(other, Event::kRecoveryChoiceStarted);
+  Lifecycle::Notify(profile, Event::kRecoveryChoiceFinished);
+  if (Lifecycle::HasPendingSessionRestore(profile) ||
+      !Lifecycle::HasPendingSessionRestore(other)) {
+    return false;
+  }
+  Lifecycle::Notify(other, Event::kRecoveryChoiceFinished);
+  // Canceling quit preserves a still-pending choice. Multiple prompts retain
+  // independent counts and no count survives the final owner's cancellation.
+  Lifecycle::Notify(profile, Event::kRecoveryChoiceStarted);
+  Lifecycle::Notify(profile, Event::kRecoveryChoiceStarted);
+  Lifecycle::NotifyAll(Event::kShutdownStarted);
+  Lifecycle::NotifyAll(Event::kShutdownCancelled);
+  Lifecycle::Notify(profile, Event::kRecoveryChoiceFinished);
+  if (!Lifecycle::HasPendingSessionRestore(profile)) {
+    return false;
+  }
+  Lifecycle::Notify(profile, Event::kRecoveryChoiceFinished);
+  return !Lifecycle::HasPendingSessionRestore(profile) &&
+         !Lifecycle::HasPendingSessionRestore(other) && !Lifecycle::Get(other);
+}
+
 bool CheckMetadata() {
   using Lifecycle = myarc::WorkspaceLifecycle;
   const Lifecycle::ExtraData restored = {
@@ -147,10 +199,12 @@ bool CheckRegistration() {
 }  // namespace
 
 int main() {
-  if (!CheckRegistration() || !CheckMetadata() || !CheckNativeBarrier()) {
+  if (!CheckRegistration() || !CheckMetadata() || !CheckNativeBarrier() ||
+      !CheckRecoveryChoice()) {
     std::cerr << "Workspace lifecycle boundary check failed\n";
     return 1;
   }
-  std::cout << "Workspace lifecycle registration, metadata and barrier checks "
-               "passed\n";
+  std::cout
+      << "Workspace lifecycle registration, metadata, startup/restore and "
+         "recovery-choice checks passed\n";
 }

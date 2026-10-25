@@ -317,12 +317,14 @@ void WorkspaceLifecycleBridge::Resume() {
 void WorkspaceLifecycleBridge::OnLifecycleEvent(Event event) {
   switch (event) {
     case Event::kStartupStarted:
+    case Event::kRecoveryChoiceStarted:
     case Event::kRestoreStarted:
     case Event::kSessionRestoreStarted:
       native_ready_ = false;
       BrowserWorkspaceAdapter::BeginSessionRestore(*profile_);
       break;
     case Event::kStartupFinished:
+    case Event::kRecoveryChoiceFinished:
     case Event::kNativeReady:
     case Event::kSessionRestoreFinished:
       // Reconcile after native constructors/destructors and nested UI loops.

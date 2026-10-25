@@ -21,6 +21,8 @@ class WorkspaceLifecycle {
   enum class Event {
     kStartupStarted,
     kStartupFinished,
+    kRecoveryChoiceStarted,
+    kRecoveryChoiceFinished,
     kRestoreStarted,
     kSessionRestoreStarted,
     kSessionRestoreFinished,
@@ -38,8 +40,9 @@ class WorkspaceLifecycle {
   static WorkspaceLifecycle* Get(Profile* profile);
   static void Notify(Profile* profile, Event event);
   static void NotifyAll(Event event);
-  // Covers startup launch and native completion observers, even after upstream
-  // removes its restorer from IsRestoring(). No delegate/service is created.
+  // Covers startup, pending crash recovery choice and native completion
+  // observers, even after upstream removes its restorer from IsRestoring().
+  // No delegate/service is created.
   static bool HasPendingSessionRestore(Profile* profile);
   // Preserve opaque keys, while current native producers and bounded adapter
   // helpers regenerate the keys they own (including deliberately absent ones).

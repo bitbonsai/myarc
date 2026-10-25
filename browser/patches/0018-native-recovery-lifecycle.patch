@@ -1,0 +1,394 @@
+diff --git a/chrome/browser/ui/views/BUILD.gn b/chrome/browser/ui/views/BUILD.gn
+index d0dce2a..d4d26ec 100644
+--- a/chrome/browser/ui/views/BUILD.gn
++++ b/chrome/browser/ui/views/BUILD.gn
+@@ -1609,6 +1609,7 @@ source_set("session_crashed_bubble_view") {
+     "//chrome/installer/util:with_no_strings",
+     "//components/strings:components_strings",
+     "//content/public/browser",
++    "//myarc:workspace_lifecycle",
+     "//ui/base",
+     "//ui/views",
+   ]
+@@ -2003,6 +2004,7 @@ if (!is_chromeos_device) {
+       "//components/enterprise/data_controls/content/browser",
+       "//components/enterprise/data_controls/core/browser:test_support",
+       "//content/test:browsertest_support",
++      "//myarc:workspace_lifecycle",
+       "//ui/base:ozone_buildflags",
+       "//ui/base/clipboard:clipboard_test_support",
+       "//ui/events:test_support",
+diff --git a/chrome/browser/ui/views/session_crashed_bubble_view.cc b/chrome/browser/ui/views/session_crashed_bubble_view.cc
+index 352f951..e44c9f5 100644
+--- a/chrome/browser/ui/views/session_crashed_bubble_view.cc
++++ b/chrome/browser/ui/views/session_crashed_bubble_view.cc
+@@ -21,6 +21,7 @@
+ #include "chrome/browser/metrics/metrics_reporting_state.h"
+ #include "chrome/browser/prefs/session_startup_pref.h"
+ #include "chrome/browser/profiles/profile.h"
++#include "chrome/browser/profiles/profile_observer.h"
+ #include "chrome/browser/sessions/exit_type_service.h"
+ #include "chrome/browser/sessions/session_restore.h"
+ #include "chrome/browser/ui/browser_window/public/browser_collection_observer.h"
+@@ -42,6 +43,7 @@
+ #include "components/strings/grit/components_strings.h"
+ #include "content/public/browser/browser_context.h"
+ #include "content/public/browser/browser_thread.h"
++#include "myarc/workspace_lifecycle.h"
+ #include "ui/base/buildflags.h"
+ #include "ui/base/interaction/element_identifier.h"
+ #include "ui/base/l10n/l10n_util.h"
+@@ -59,6 +61,62 @@
+ #include "ui/views/layout/box_layout.h"
+ #include "ui/views/widget/widget.h"
+ 
++// The recovery choice starts before async consent lookup and outlives the
++// dialog when Restore closes it before constructing the native restorer.
++class SessionCrashedBubbleView::BrowserRemovalObserver
++    : public BrowserCollectionObserver,
++      public ProfileObserver {
++ public:
++  explicit BrowserRemovalObserver(BrowserWindowInterface* browser)
++      : browser_(browser) {
++    CHECK(browser_, base::NotFatalUntil::M162);
++    browser_collection_observation_.Observe(
++        GlobalBrowserCollection::GetInstance());
++    profile_observation_.Observe(browser_->GetProfile());
++    myarc::WorkspaceLifecycle::Notify(
++        profile_observation_.GetSource(),
++        myarc::WorkspaceLifecycle::Event::kRecoveryChoiceStarted);
++  }
++
++  BrowserRemovalObserver(const BrowserRemovalObserver&) = delete;
++  BrowserRemovalObserver& operator=(const BrowserRemovalObserver&) = delete;
++
++  ~BrowserRemovalObserver() override { FinishRecoveryChoice(); }
++
++  void OnBrowserClosed(BrowserWindowInterface* browser) override {
++    if (browser == browser_) {
++      browser_ = nullptr;
++      FinishRecoveryChoice();
++    }
++  }
++
++  void OnProfileWillBeDestroyed(Profile* profile) override {
++    browser_ = nullptr;
++    // Profile teardown can wait for renderers before destroying UserData.
++    myarc::WorkspaceLifecycle::Notify(
++        profile, myarc::WorkspaceLifecycle::Event::kShutdownStarted);
++    FinishRecoveryChoice();
++  }
++
++  BrowserWindowInterface* browser() const { return browser_; }
++
++ private:
++  void FinishRecoveryChoice() {
++    if (!profile_observation_.IsObserving()) {
++      return;
++    }
++    Profile* profile = profile_observation_.GetSource();
++    profile_observation_.Reset();
++    myarc::WorkspaceLifecycle::Notify(
++        profile, myarc::WorkspaceLifecycle::Event::kRecoveryChoiceFinished);
++  }
++
++  raw_ptr<BrowserWindowInterface> browser_;
++  base::ScopedObservation<GlobalBrowserCollection, BrowserCollectionObserver>
++      browser_collection_observation_{this};
++  base::ScopedObservation<Profile, ProfileObserver> profile_observation_{this};
++};
++
+ namespace {
+ 
+ views::BubbleDialogDelegate* g_instance_for_test = nullptr;
+@@ -101,7 +159,11 @@ DEFINE_LOCAL_ELEMENT_IDENTIFIER_VALUE(kUmaConsentCheckboxId);
+ 
+ class SessionCrashedBubbleDelegate : public ui::DialogModelDelegate {
+  public:
+-  explicit SessionCrashedBubbleDelegate(Profile* profile) {
++  explicit SessionCrashedBubbleDelegate(
++      std::unique_ptr<SessionCrashedBubbleView::BrowserRemovalObserver>
++          browser_observer)
++      : browser_observer_(std::move(browser_observer)) {
++    Profile* profile = browser_observer_->browser()->GetProfile();
+     if (ExitTypeService* exit_type_service =
+             ExitTypeService::GetInstanceForProfile(profile)) {
+       crashed_lock_ = exit_type_service->CreateCrashedLock();
+@@ -116,6 +178,7 @@ class SessionCrashedBubbleDelegate : public ui::DialogModelDelegate {
+     }
+     ignored_ = false;
+     MaybeEnableUma();
++    auto recovery_choice = std::move(browser_observer_);
+     dialog_model()->host()->Close();
+ 
+     RecordBubbleHistogramValue(SESSION_CRASHED_BUBBLE_STARTUP_PAGES);
+@@ -142,6 +205,7 @@ class SessionCrashedBubbleDelegate : public ui::DialogModelDelegate {
+     // won't wait for restore to complete.
+     std::unique_ptr<ExitTypeService::CrashedLock> lock =
+         std::move(crashed_lock_);
++    auto recovery_choice = std::move(browser_observer_);
+     dialog_model()->host()->Close();
+ 
+     RecordBubbleHistogramValue(SESSION_CRASHED_BUBBLE_RESTORED);
+@@ -169,7 +233,8 @@ class SessionCrashedBubbleDelegate : public ui::DialogModelDelegate {
+ 
+  private:
+   bool RejectActionIfBrowserClosing(BrowserWindowInterface* browser) {
+-    if (!browser_shutdown::HasShutdownStarted() &&
++    if (browser_observer_->browser() == browser &&
++        !browser_shutdown::HasShutdownStarted() &&
+         !browser->IsDeleteScheduled()) {
+       return false;
+     }
+@@ -181,42 +246,13 @@ class SessionCrashedBubbleDelegate : public ui::DialogModelDelegate {
+   }
+ 
+   bool ignored_ = true;
++  std::unique_ptr<SessionCrashedBubbleView::BrowserRemovalObserver>
++      browser_observer_;
+   std::unique_ptr<ExitTypeService::CrashedLock> crashed_lock_;
+ };
+ 
+ }  // namespace
+ 
+-// A helper class that listens to browser removal event.
+-class SessionCrashedBubbleView::BrowserRemovalObserver
+-    : public BrowserCollectionObserver {
+- public:
+-  explicit BrowserRemovalObserver(BrowserWindowInterface* browser)
+-      : browser_(browser) {
+-    CHECK(browser_, base::NotFatalUntil::M162);
+-    browser_collection_observation_.Observe(
+-        GlobalBrowserCollection::GetInstance());
+-  }
+-
+-  BrowserRemovalObserver(const BrowserRemovalObserver&) = delete;
+-  BrowserRemovalObserver& operator=(const BrowserRemovalObserver&) = delete;
+-
+-  ~BrowserRemovalObserver() override = default;
+-
+-  // BrowserCollectionObserver:
+-  void OnBrowserClosed(BrowserWindowInterface* browser) override {
+-    if (browser == browser_) {
+-      browser_ = nullptr;
+-    }
+-  }
+-
+-  BrowserWindowInterface* browser() const { return browser_; }
+-
+- private:
+-  raw_ptr<BrowserWindowInterface> browser_;
+-  base::ScopedObservation<GlobalBrowserCollection, BrowserCollectionObserver>
+-      browser_collection_observation_{this};
+-};
+-
+ // static
+ void SessionCrashedBubble::ShowIfNotOffTheRecordProfile(
+     BrowserWindowInterface* browser,
+@@ -262,7 +298,8 @@ void SessionCrashedBubbleView::Show(
+ 
+   if (browser && (skip_tab_checking ||
+                   browser->GetTabStripModel()->GetActiveWebContents())) {
+-    ShowBubble(browser, uma_opted_in_already, offer_uma_optin);
++    ShowBubble(browser, uma_opted_in_already, offer_uma_optin,
++               std::move(browser_observer));
+     return;
+   }
+ 
+@@ -278,6 +315,15 @@ views::BubbleDialogDelegate* SessionCrashedBubbleView::ShowBubble(
+     BrowserWindowInterface* browser,
+     bool uma_opted_in_already,
+     bool offer_uma_optin) {
++  return ShowBubble(browser, uma_opted_in_already, offer_uma_optin,
++                    std::make_unique<BrowserRemovalObserver>(browser));
++}
++
++views::BubbleDialogDelegate* SessionCrashedBubbleView::ShowBubble(
++    BrowserWindowInterface* browser,
++    bool uma_opted_in_already,
++    bool offer_uma_optin,
++    std::unique_ptr<BrowserRemovalObserver> browser_observer) {
+   BrowserView* browser_view = BrowserView::GetBrowserViewForBrowser(browser);
+   // TODO(webium): WebUI browser does not use BrowserView. Make an WebUI anchor
+   // for the bubble.
+@@ -289,8 +335,8 @@ views::BubbleDialogDelegate* SessionCrashedBubbleView::ShowBubble(
+   views::BubbleAnchor anchor =
+       control ? control->GetAnchor() : views::BubbleAnchor();
+ 
+-  auto bubble_delegate_unique =
+-      std::make_unique<SessionCrashedBubbleDelegate>(browser->GetProfile());
++  auto bubble_delegate_unique = std::make_unique<SessionCrashedBubbleDelegate>(
++      std::move(browser_observer));
+   SessionCrashedBubbleDelegate* bubble_delegate = bubble_delegate_unique.get();
+ 
+   ui::DialogModel::Builder dialog_builder(std::move(bubble_delegate_unique));
+diff --git a/chrome/browser/ui/views/session_crashed_bubble_view.h b/chrome/browser/ui/views/session_crashed_bubble_view.h
+index fed33ba..e91ab0a 100644
+--- a/chrome/browser/ui/views/session_crashed_bubble_view.h
++++ b/chrome/browser/ui/views/session_crashed_bubble_view.h
+@@ -43,6 +43,11 @@ class SessionCrashedBubbleView : public SessionCrashedBubble {
+       BrowserWindowInterface* browser,
+       bool uma_opted_in_already,
+       bool offer_uma_optin);
++  static views::BubbleDialogDelegate* ShowBubble(
++      BrowserWindowInterface* browser,
++      bool uma_opted_in_already,
++      bool offer_uma_optin,
++      std::unique_ptr<BrowserRemovalObserver> browser_observer);
+ };
+ 
+ #endif  // CHROME_BROWSER_UI_VIEWS_SESSION_CRASHED_BUBBLE_VIEW_H_
+diff --git a/chrome/browser/ui/views/session_crashed_bubble_view_interactive_uitest.cc b/chrome/browser/ui/views/session_crashed_bubble_view_interactive_uitest.cc
+index 6c3d75d..f1256fd 100644
+--- a/chrome/browser/ui/views/session_crashed_bubble_view_interactive_uitest.cc
++++ b/chrome/browser/ui/views/session_crashed_bubble_view_interactive_uitest.cc
+@@ -37,6 +37,7 @@
+ #include "components/prefs/pref_service.h"
+ #include "content/public/common/content_features.h"
+ #include "content/public/test/browser_test.h"
++#include "myarc/workspace_lifecycle.h"
+ #include "ui/base/buildflags.h"
+ #include "ui/views/bubble/bubble_dialog_delegate_view.h"
+ #include "ui/views/focus/focus_manager.h"
+@@ -44,6 +45,41 @@
+ #include "ui/views/view.h"
+ #include "ui/views/widget/widget.h"
+ 
++namespace {
++
++class RecoveryLifecycleProbe : public myarc::WorkspaceLifecycle {
++ public:
++  explicit RecoveryLifecycleProbe(Profile* profile)
++      : WorkspaceLifecycle(profile), profile_(profile) {}
++
++  bool restore_started = false;
++  bool choice_finished = false;
++  bool restore_started_before_choice_finished = false;
++
++  void OnLifecycleEvent(Event event) override {
++    if (event == Event::kSessionRestoreStarted) {
++      restore_started = true;
++      restore_started_before_choice_finished =
++          !choice_finished && HasPendingSessionRestore(profile_);
++    } else if (event == Event::kRecoveryChoiceFinished) {
++      choice_finished = true;
++    }
++  }
++  void RestoreTab(BrowserWindowInterface&,
++                  content::WebContents&,
++                  const ExtraData&) override {}
++  void RestoreWindow(BrowserWindowInterface&, const ExtraData&) override {}
++  ExtraData TabData(BrowserWindowInterface&, content::WebContents&) override {
++    return {};
++  }
++  ExtraData WindowData(BrowserWindowInterface&) override { return {}; }
++
++ private:
++  const raw_ptr<Profile> profile_;
++};
++
++}  // namespace
++
+ class SessionCrashedBubbleViewTest : public DialogBrowserTest {
+  public:
+   SessionCrashedBubbleViewTest() = default;
+@@ -135,7 +171,9 @@ IN_PROC_BROWSER_TEST_P(SessionCrashedBubbleMyarcViewTest,
+       anchor->GetAnchorBoundsInScreen());
+   EXPECT_EQ(anchor->GetAnchorBoundsInScreen(), bubble->GetAnchorRect());
+   EXPECT_TRUE(bubble->GetWidget()->IsVisible());
++  EXPECT_TRUE(myarc::WorkspaceLifecycle::HasPendingSessionRestore(profile));
+   bubble->GetWidget()->CloseNow();
++  EXPECT_FALSE(myarc::WorkspaceLifecycle::HasPendingSessionRestore(profile));
+   EXPECT_EQ(nullptr, SessionCrashedBubbleView::GetInstanceForTest());
+   CloseBrowserSynchronously(window);
+ }
+@@ -213,6 +251,75 @@ IN_PROC_BROWSER_TEST_F(SessionCrashedBubbleViewTest, HasCloseButton) {
+   EXPECT_TRUE(crash_bubble_->ShouldShowCloseButton());
+ }
+ 
++IN_PROC_BROWSER_TEST_F(SessionCrashedBubbleViewTest,
++                       RecoveryChoiceHandsOffAfterDialogDeletion) {
++  Profile* const profile = browser()->GetProfile();
++  RecoveryLifecycleProbe probe(profile);
++  ExitTypeService::GetInstanceForProfile(profile)
++      ->SetLastSessionExitTypeForTest(ExitType::kCrashed);
++  ShowUi("SessionCrashedBubble");
++  ASSERT_TRUE(myarc::WorkspaceLifecycle::HasPendingSessionRestore(profile));
++
++  crash_bubble_->AcceptDialog();
++
++  EXPECT_TRUE(probe.choice_finished);
++  EXPECT_TRUE(probe.restore_started);
++  EXPECT_TRUE(probe.restore_started_before_choice_finished);
++  EXPECT_TRUE(base::test::RunUntil([profile] {
++    return !myarc::WorkspaceLifecycle::HasPendingSessionRestore(profile);
++  }));
++}
++
++IN_PROC_BROWSER_TEST_F(SessionCrashedBubbleViewTest,
++                       StartupPagesReleaseRecoveryChoice) {
++  Profile* const profile = browser()->GetProfile();
++  RecoveryLifecycleProbe probe(profile);
++  SessionStartupPref startup_pref(SessionStartupPref::URLS);
++  startup_pref.urls.emplace_back("about:blank");
++  SessionStartupPref::SetStartupPref(profile, startup_pref);
++  ShowUi("SessionCrashedBubble");
++  ASSERT_TRUE(myarc::WorkspaceLifecycle::HasPendingSessionRestore(profile));
++
++  crash_bubble_->CancelDialog();
++
++  EXPECT_TRUE(probe.choice_finished);
++  EXPECT_FALSE(probe.restore_started);
++  EXPECT_FALSE(myarc::WorkspaceLifecycle::HasPendingSessionRestore(profile));
++}
++
++IN_PROC_BROWSER_TEST_F(SessionCrashedBubbleViewTest,
++                       AbortedRecoveryShowReleasesChoice) {
++  Profile* const profile = browser()->GetProfile();
++  RecoveryLifecycleProbe probe(profile);
++  BrowserWindowCreateParams params(profile, /*from_user_gesture=*/true);
++  auto* const window = CreateBrowserWindow(std::move(params));
++  // No active tab: Show must release the choice without displaying a dialog.
++  SessionCrashedBubble::ShowIfNotOffTheRecordProfile(window, false);
++  EXPECT_TRUE(base::test::RunUntil([&probe] { return probe.choice_finished; }));
++  EXPECT_FALSE(probe.restore_started);
++  EXPECT_FALSE(myarc::WorkspaceLifecycle::HasPendingSessionRestore(profile));
++  CloseBrowserSynchronously(window);
++}
++
++IN_PROC_BROWSER_TEST_F(SessionCrashedBubbleViewTest,
++                       WindowCloseReleasesRecoveryChoice) {
++  Profile* const profile = browser()->GetProfile();
++  RecoveryLifecycleProbe probe(profile);
++  BrowserWindowCreateParams params(profile, /*from_user_gesture=*/true);
++  auto* const window = CreateBrowserWindow(std::move(params));
++  chrome::AddTabAt(window, GURL("about:blank"), -1, true);
++  SessionCrashedBubble::ShowIfNotOffTheRecordProfile(window, false);
++  ASSERT_TRUE(base::test::RunUntil(
++      [] { return SessionCrashedBubbleView::GetInstanceForTest(); }));
++  ASSERT_TRUE(myarc::WorkspaceLifecycle::HasPendingSessionRestore(profile));
++
++  CloseBrowserSynchronously(window);
++
++  EXPECT_TRUE(probe.choice_finished);
++  EXPECT_FALSE(probe.restore_started);
++  EXPECT_FALSE(myarc::WorkspaceLifecycle::HasPendingSessionRestore(profile));
++}
++
+ IN_PROC_BROWSER_TEST_F(SessionCrashedBubbleViewTest,
+                        RejectsRestoreAfterShutdownStarts) {
+   Profile* const profile = browser()->GetProfile();
+@@ -225,6 +332,7 @@ IN_PROC_BROWSER_TEST_F(SessionCrashedBubbleViewTest,
+   crash_bubble_->AcceptDialog();
+ 
+   EXPECT_FALSE(SessionRestore::IsRestoring(profile));
++  EXPECT_FALSE(myarc::WorkspaceLifecycle::HasPendingSessionRestore(profile));
+   EXPECT_FALSE(KeepAliveRegistry::GetInstance()->IsOriginRegistered(
+       KeepAliveOrigin::SESSION_RESTORE));
+ }
+@@ -245,4 +353,5 @@ IN_PROC_BROWSER_TEST_F(SessionCrashedBubbleViewTest,
+   crash_bubble_->CancelDialog();
+ 
+   EXPECT_EQ(initial_tab_count, browser()->tab_strip_model()->count());
++  EXPECT_FALSE(myarc::WorkspaceLifecycle::HasPendingSessionRestore(profile));
+ }

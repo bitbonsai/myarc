@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-10-25: Pending recovery choice build candidate
+
+- Starting revision: `2101a46`. Preserved the actual process-kill failure and strict verifier. [0018 and run record](../browser/experiments/native-recovery-lifecycle.md) add recovery-choice counts to shared lifecycle readiness. The existing exact-browser observer starts before async consent and transfers through Show into the dialog, then into local action ownership before Close deletes the delegate. Restore starts its real restorer before choice release; discard/cancellation use normal reconciliation. Profile teardown releases once under its shutdown gate.
+- Extended the lifecycle helper and existing native fixture for pending/Restore/discard/cancel and window-close paths. Actual opaque-identity helper, native source syntax, two GN checks and full `chrome` link pass. Strict upstream-plus-owned reverse/replay checks all 75 captured files; eight change, 67 remain identical. Canonical payload stays exactly 16 files; 0012/0016/0017 and unrelated optional sources are unchanged.
+- Native cases executed: zero. No app launch, desktop input, actual-profile access or service kills. External source/build ownership returns to parent; no build remains running. Parent must use fresh synthetic data for actual process-kill/Restore/discard acceptance. Renderer remains off; branded consent/Profile teardown are source-audited only, OS/write-boundary durability remains unproven.
+
 Keep significant outcomes, failures and next actions reproducible. Newest entry first. No private exports, page titles/URLs from real browsing, credentials or raw user transcripts.
 
 ## 2026-10-25: Actual process crash exposed early recovery pruning

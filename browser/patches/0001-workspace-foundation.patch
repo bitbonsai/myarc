@@ -988,10 +988,10 @@ index 0000000..f560ec8bb5404348b833bcb3378e319887be716a
 +}
 diff --git a/myarc/browser_workspace_adapter.cc b/myarc/browser_workspace_adapter.cc
 new file mode 100644
-index 0000000..4df3c8cfeff595cb5f6600f806d5ceb152709776
+index 0000000..6faa9ce659bc64a066b1d88e16f48e01703f4e97
 --- /dev/null
 +++ b/myarc/browser_workspace_adapter.cc
-@@ -0,0 +1,1333 @@
+@@ -0,0 +1,1335 @@
 +#include "myarc/browser_workspace_adapter.h"
 +
 +#include <algorithm>
@@ -1311,12 +1311,14 @@ index 0000000..4df3c8cfeff595cb5f6600f806d5ceb152709776
 +void WorkspaceLifecycleBridge::OnLifecycleEvent(Event event) {
 +  switch (event) {
 +    case Event::kStartupStarted:
++    case Event::kRecoveryChoiceStarted:
 +    case Event::kRestoreStarted:
 +    case Event::kSessionRestoreStarted:
 +      native_ready_ = false;
 +      BrowserWorkspaceAdapter::BeginSessionRestore(*profile_);
 +      break;
 +    case Event::kStartupFinished:
++    case Event::kRecoveryChoiceFinished:
 +    case Event::kNativeReady:
 +    case Event::kSessionRestoreFinished:
 +      // Reconcile after native constructors/destructors and nested UI loops.
@@ -3979,10 +3981,10 @@ index 0000000..2fa2bd17a496e83e411e75fa3e492dec28a52d6d
 +}
 diff --git a/myarc/workspace_lifecycle.cc b/myarc/workspace_lifecycle.cc
 new file mode 100644
-index 0000000..832d88cf1c8c81c9e7db00c01a42991846d8d712
+index 0000000..205231f0adf041583f1f951276c77df709a64326
 --- /dev/null
 +++ b/myarc/workspace_lifecycle.cc
-@@ -0,0 +1,98 @@
+@@ -0,0 +1,100 @@
 +#include "myarc/workspace_lifecycle.h"
 +
 +#include <vector>
@@ -3995,8 +3997,8 @@ index 0000000..832d88cf1c8c81c9e7db00c01a42991846d8d712
 +
 +struct Registry {
 +  std::map<Profile*, WorkspaceLifecycle*> registrations;
-+  // Each startup launch and SessionRestoreImpl owns one count. Native
-+  // completion observers may start another restore for the same Profile.
++  // Each startup launch, recovery choice and SessionRestoreImpl owns a count.
++  // Recovery transfers to a restorer before releasing its choice count.
 +  std::map<Profile*, size_t> pending;
 +  THREAD_CHECKER(thread_checker);
 +};
@@ -4038,9 +4040,11 @@ index 0000000..832d88cf1c8c81c9e7db00c01a42991846d8d712
 +
 +void WorkspaceLifecycle::Notify(Profile* profile, Event event) {
 +  if (event == Event::kStartupStarted ||
++      event == Event::kRecoveryChoiceStarted ||
 +      event == Event::kSessionRestoreStarted) {
 +    ++PendingRestores()[profile];
 +  } else if (event == Event::kStartupFinished ||
++             event == Event::kRecoveryChoiceFinished ||
 +             event == Event::kSessionRestoreFinished) {
 +    auto it = PendingRestores().find(profile);
 +    if (it != PendingRestores().end() && --it->second == 0) {
@@ -4083,10 +4087,10 @@ index 0000000..832d88cf1c8c81c9e7db00c01a42991846d8d712
 +}  // namespace myarc
 diff --git a/myarc/workspace_lifecycle.h b/myarc/workspace_lifecycle.h
 new file mode 100644
-index 0000000..8d6bbb5b335be439621357232c0dcd2d893ccf86
+index 0000000..37752643778c06b4866ee5fe3e00ca344b322a36
 --- /dev/null
 +++ b/myarc/workspace_lifecycle.h
-@@ -0,0 +1,61 @@
+@@ -0,0 +1,64 @@
 +#ifndef MYARC_WORKSPACE_LIFECYCLE_H_
 +#define MYARC_WORKSPACE_LIFECYCLE_H_
 +
@@ -4110,6 +4114,8 @@ index 0000000..8d6bbb5b335be439621357232c0dcd2d893ccf86
 +  enum class Event {
 +    kStartupStarted,
 +    kStartupFinished,
++    kRecoveryChoiceStarted,
++    kRecoveryChoiceFinished,
 +    kRestoreStarted,
 +    kSessionRestoreStarted,
 +    kSessionRestoreFinished,
@@ -4127,8 +4133,9 @@ index 0000000..8d6bbb5b335be439621357232c0dcd2d893ccf86
 +  static WorkspaceLifecycle* Get(Profile* profile);
 +  static void Notify(Profile* profile, Event event);
 +  static void NotifyAll(Event event);
-+  // Covers startup launch and native completion observers, even after upstream
-+  // removes its restorer from IsRestoring(). No delegate/service is created.
++  // Covers startup, pending crash recovery choice and native completion
++  // observers, even after upstream removes its restorer from IsRestoring().
++  // No delegate/service is created.
 +  static bool HasPendingSessionRestore(Profile* profile);
 +  // Preserve opaque keys, while current native producers and bounded adapter
 +  // helpers regenerate the keys they own (including deliberately absent ones).
@@ -4150,10 +4157,10 @@ index 0000000..8d6bbb5b335be439621357232c0dcd2d893ccf86
 +#endif  // MYARC_WORKSPACE_LIFECYCLE_H_
 diff --git a/myarc/workspace_lifecycle_check.cc b/myarc/workspace_lifecycle_check.cc
 new file mode 100644
-index 0000000..78e616275d035a42acd5c64d3c3ce708635f8b0f
+index 0000000..63d51ccf30b48cc2bd5bcbb76a5d970de2372205
 --- /dev/null
 +++ b/myarc/workspace_lifecycle_check.cc
-@@ -0,0 +1,156 @@
+@@ -0,0 +1,210 @@
 +#include <functional>
 +#include <iostream>
 +#include <memory>
@@ -4230,6 +4237,58 @@ index 0000000..78e616275d035a42acd5c64d3c3ce708635f8b0f
 +         !Lifecycle::HasPendingSessionRestore(profile);
 +}
 +
++bool CheckRecoveryChoice() {
++  using Lifecycle = myarc::WorkspaceLifecycle;
++  using Event = Lifecycle::Event;
++  int token, other_token;
++  auto* profile = reinterpret_cast<Profile*>(&token);
++  auto* other = reinterpret_cast<Profile*>(&other_token);
++  // Consent/show can be pending before the first adapter registers.
++  Lifecycle::Notify(profile, Event::kStartupStarted);
++  Lifecycle::Notify(profile, Event::kRecoveryChoiceStarted);
++  Lifecycle::Notify(profile, Event::kStartupFinished);
++  Probe late(profile);
++  Lifecycle::Notify(profile, Event::kNativeReady);
++  if (!Lifecycle::HasPendingSessionRestore(profile) ||
++      Lifecycle::HasPendingSessionRestore(other)) {
++    return false;
++  }
++  // Restore closes/deletes the dialog first. Its moved choice survives until
++  // RestoreSessionAfterCrash constructs the real restorer, even in UI loops.
++  Lifecycle::Notify(profile, Event::kSessionRestoreStarted);
++  Lifecycle::Notify(profile, Event::kNativeReady);
++  Lifecycle::Notify(profile, Event::kRecoveryChoiceFinished);
++  if (!Lifecycle::HasPendingSessionRestore(profile)) {
++    return false;
++  }
++  Lifecycle::Notify(profile, Event::kSessionRestoreFinished);
++  if (Lifecycle::HasPendingSessionRestore(profile)) {
++    return false;
++  }
++  // Discard/cancel use the same finish event, scoped to the exact Profile.
++  Lifecycle::Notify(profile, Event::kRecoveryChoiceStarted);
++  Lifecycle::Notify(other, Event::kRecoveryChoiceStarted);
++  Lifecycle::Notify(profile, Event::kRecoveryChoiceFinished);
++  if (Lifecycle::HasPendingSessionRestore(profile) ||
++      !Lifecycle::HasPendingSessionRestore(other)) {
++    return false;
++  }
++  Lifecycle::Notify(other, Event::kRecoveryChoiceFinished);
++  // Canceling quit preserves a still-pending choice. Multiple prompts retain
++  // independent counts and no count survives the final owner's cancellation.
++  Lifecycle::Notify(profile, Event::kRecoveryChoiceStarted);
++  Lifecycle::Notify(profile, Event::kRecoveryChoiceStarted);
++  Lifecycle::NotifyAll(Event::kShutdownStarted);
++  Lifecycle::NotifyAll(Event::kShutdownCancelled);
++  Lifecycle::Notify(profile, Event::kRecoveryChoiceFinished);
++  if (!Lifecycle::HasPendingSessionRestore(profile)) {
++    return false;
++  }
++  Lifecycle::Notify(profile, Event::kRecoveryChoiceFinished);
++  return !Lifecycle::HasPendingSessionRestore(profile) &&
++         !Lifecycle::HasPendingSessionRestore(other) && !Lifecycle::Get(other);
++}
++
 +bool CheckMetadata() {
 +  using Lifecycle = myarc::WorkspaceLifecycle;
 +  const Lifecycle::ExtraData restored = {
@@ -4303,12 +4362,14 @@ index 0000000..78e616275d035a42acd5c64d3c3ce708635f8b0f
 +}  // namespace
 +
 +int main() {
-+  if (!CheckRegistration() || !CheckMetadata() || !CheckNativeBarrier()) {
++  if (!CheckRegistration() || !CheckMetadata() || !CheckNativeBarrier() ||
++      !CheckRecoveryChoice()) {
 +    std::cerr << "Workspace lifecycle boundary check failed\n";
 +    return 1;
 +  }
-+  std::cout << "Workspace lifecycle registration, metadata and barrier checks "
-+               "passed\n";
++  std::cout
++      << "Workspace lifecycle registration, metadata, startup/restore and "
++         "recovery-choice checks passed\n";
 +}
 diff --git a/myarc/workspace_service.cc b/myarc/workspace_service.cc
 new file mode 100644

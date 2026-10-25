@@ -24,7 +24,9 @@ autoninja -C out/MyarcM0 -j 8 workspace_lifecycle_check
 out/MyarcM0/workspace_lifecycle_check
 ```
 
-The executable checks exact-Profile registration, retained metadata and startup/restore counters using opaque identity tokens. It creates no real Profile and establishes no browser recovery or quit durability. Parent compilation of the affected native objects passes; full relink and runtime acceptance remain pending. Verify first-adapter/hint ordering, late first-window creation and reset re-emission with 200 or more tabs before enabling the renderer.
+The executable checks exact-Profile registration, retained metadata and startup/restore/recovery-choice counters using opaque identity tokens. It creates no real Profile and establishes no browser recovery or quit durability. Affected native objects and the later 0018 full relink pass; fresh recovery runtime acceptance remains pending. Verify first-adapter/hint ordering, late first-window creation and reset re-emission with 200 or more tabs before enabling the renderer.
+
+[Pending recovery choice candidate 0018](experiments/native-recovery-lifecycle.md) extends that shared barrier across consent, dialog deletion and native Restore handoff. Its helper, native fixture syntax/GN checks and full `chrome` link pass. Fresh actual Restore/discard acceptance remains with the parent; the prior process-crash failure stays recorded.
 
 On every Chromium rebase, compare `PreserveUnknownData` against the producers in `BrowserLiveTabContext` and consumers in `browser_tabrestore`, including private glic/send-tab keys. Cleared known fields must stay absent; unrelated historical keys must survive.
 
