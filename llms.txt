@@ -12,7 +12,7 @@ A complete myArc browser and importer remain unimplemented. Native integration i
 
 ## Posts
 
-- [Building myArc in public](https://myarc.dev/blog/2026-10-25-building-in-public/index.md): An Arc-like shell and a nightly build are today's target. The current browser, model choices, and how I delegate development with context and wrap.
+- [Building myArc in public](https://myarc.dev/blog/2026-10-25-building-in-public/index.md): Today's targets are an Arc-like shell and a nightly build. How I'm using coding agents, context and wrap to build myArc.
 
 ## Optional
 

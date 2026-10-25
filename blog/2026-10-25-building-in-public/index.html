@@ -7,13 +7,13 @@
   <meta name="theme-color" content="#f5f2ec" media="(prefers-color-scheme: light)">
   <meta name="theme-color" content="#0b1420" media="(prefers-color-scheme: dark)">
   <title>Building myArc in public | myArc</title>
-  <meta name="description" content="An Arc-like shell and a nightly build are today&#x27;s target. The current browser, model choices, and how I delegate development with context and wrap.">
+  <meta name="description" content="Today&#x27;s targets are an Arc-like shell and a nightly build. How I&#x27;m using coding agents, context and wrap to build myArc.">
   <link rel="canonical" href="https://myarc.dev/blog/2026-10-25-building-in-public/">
   <link rel="icon" type="image/png" href="../_assets/favicon.5bca6dcdff1e.png">
   <meta property="og:type" content="article">
   <meta property="og:site_name" content="myArc">
   <meta property="og:title" content="Building myArc in public">
-  <meta property="og:description" content="An Arc-like shell and a nightly build are today&#x27;s target. The current browser, model choices, and how I delegate development with context and wrap.">
+  <meta property="og:description" content="Today&#x27;s targets are an Arc-like shell and a nightly build. How I&#x27;m using coding agents, context and wrap to build myArc.">
   <meta property="og:url" content="https://myarc.dev/blog/2026-10-25-building-in-public/">
   <meta name="robots" content="index, follow, max-image-preview:large">
   <meta property="og:image" content="https://myarc.dev/blog/2026-10-25-building-in-public/myarc-current-build.f594a2a31d6a.webp">
@@ -24,10 +24,10 @@
   <meta property="og:image:alt" content="Current myArc build loading mauriciowolff.com with the native command palette open">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="Building myArc in public">
-  <meta name="twitter:description" content="An Arc-like shell and a nightly build are today&#x27;s target. The current browser, model choices, and how I delegate development with context and wrap.">
+  <meta name="twitter:description" content="Today&#x27;s targets are an Arc-like shell and a nightly build. How I&#x27;m using coding agents, context and wrap to build myArc.">
   <meta name="twitter:image" content="https://myarc.dev/blog/2026-10-25-building-in-public/myarc-current-build.f594a2a31d6a.webp">
   <meta name="twitter:image:alt" content="Current myArc build loading mauriciowolff.com with the native command palette open">
-  <script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "BlogPosting", "name": "Building myArc in public", "description": "An Arc-like shell and a nightly build are today's target. The current browser, model choices, and how I delegate development with context and wrap.", "url": "https://myarc.dev/blog/2026-10-25-building-in-public/", "inLanguage": "en", "publisher": {"@type": "Person", "name": "bitbonsai", "url": "https://github.com/bitbonsai"}, "headline": "Building myArc in public", "datePublished": "2026-10-25", "author": {"@type": "Person", "name": "bitbonsai", "url": "https://github.com/bitbonsai"}, "mainEntityOfPage": "https://myarc.dev/blog/2026-10-25-building-in-public/", "isPartOf": {"@type": "Blog", "name": "myArc Blog", "url": "https://myarc.dev/blog/"}, "image": "https://myarc.dev/blog/2026-10-25-building-in-public/myarc-current-build.f594a2a31d6a.webp"}, {"@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "myArc", "item": "https://myarc.dev/"}, {"@type": "ListItem", "position": 2, "name": "Blog", "item": "https://myarc.dev/blog/"}, {"@type": "ListItem", "position": 3, "name": "Building myArc in public", "item": "https://myarc.dev/blog/2026-10-25-building-in-public/"}]}]}</script>
+  <script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "BlogPosting", "name": "Building myArc in public", "description": "Today's targets are an Arc-like shell and a nightly build. How I'm using coding agents, context and wrap to build myArc.", "url": "https://myarc.dev/blog/2026-10-25-building-in-public/", "inLanguage": "en", "publisher": {"@type": "Person", "name": "bitbonsai", "url": "https://github.com/bitbonsai"}, "headline": "Building myArc in public", "datePublished": "2026-10-25", "author": {"@type": "Person", "name": "bitbonsai", "url": "https://github.com/bitbonsai"}, "mainEntityOfPage": "https://myarc.dev/blog/2026-10-25-building-in-public/", "isPartOf": {"@type": "Blog", "name": "myArc Blog", "url": "https://myarc.dev/blog/"}, "image": "https://myarc.dev/blog/2026-10-25-building-in-public/myarc-current-build.f594a2a31d6a.webp"}, {"@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "myArc", "item": "https://myarc.dev/"}, {"@type": "ListItem", "position": 2, "name": "Blog", "item": "https://myarc.dev/blog/"}, {"@type": "ListItem", "position": 3, "name": "Building myArc in public", "item": "https://myarc.dev/blog/2026-10-25-building-in-public/"}]}]}</script>
   <style>
     @font-face {
       font-family: Outfit;
@@ -256,6 +256,14 @@
     .post-body ol { padding-left: 1.5rem }
     .post-body li + li { margin-top: .5rem }
     .post-body img { border-radius: 1rem; margin: 2rem 0; max-width: 100% }
+    .post-body figure { margin: 2rem 0 }
+    .post-body figure img { margin: 0; opacity: .9; transition: opacity .15s ease }
+    .post-body figcaption { margin-top: .5rem; color: var(--quiet); font-size: 1rem; line-height: 1.4; font-style: normal; text-align: center; transition: color .15s ease }
+    .post-body figure:hover img, .post-body figure:focus-within img { opacity: 1 }
+    .post-body figure:hover figcaption, .post-body figure:focus-within figcaption { color: var(--text) }
+    @media (prefers-reduced-motion: reduce) {
+      .post-body figure img, .post-body figcaption { transition: none }
+    }
     .post-body blockquote { margin: 2rem 0; padding-left: 1.5rem; color: var(--quiet) }
     .post-body pre { font-family: inherit; padding: 1.25rem; overflow-x: auto; background: var(--panel); color: var(--ivory); border-radius: 1rem }
     .post-body code { font-family: inherit; font-size: 1rem; overflow-wrap: anywhere }
@@ -286,33 +294,30 @@
         <a class="blog-link" href="/blog/">Blog</a>
         <a class="button" href="https://github.com/bitbonsai/myarc"><svg class="github-icon" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false"><path fill-rule="evenodd" clip-rule="evenodd" d="M8 0C3.58 0 0 3.58 0 8C0 11.54 2.29 14.53 5.47 15.59C5.87 15.66 6.02 15.42 6.02 15.21C6.02 15.02 6.01 14.39 6.01 13.72C4 14.09 3.48 13.23 3.32 12.78C3.23 12.55 2.84 11.84 2.5 11.65C2.22 11.5 1.82 11.13 2.49 11.12C3.12 11.11 3.57 11.7 3.72 11.94C4.44 13.15 5.59 12.81 6.05 12.6C6.12 12.08 6.33 11.73 6.56 11.53C4.78 11.33 2.92 10.64 2.92 7.58C2.92 6.71 3.23 5.99 3.74 5.43C3.66 5.23 3.38 4.41 3.82 3.31C3.82 3.31 4.49 3.1 6.02 4.13C6.66 3.95 7.34 3.86 8.02 3.86C8.7 3.86 9.38 3.95 10.02 4.13C11.55 3.09 12.22 3.31 12.22 3.31C12.66 4.41 12.38 5.23 12.3 5.43C12.81 5.99 13.12 6.7 13.12 7.58C13.12 10.65 11.25 11.33 9.47 11.53C9.76 11.78 10.01 12.26 10.01 13.01C10.01 14.08 10 14.94 10 15.21C10 15.42 10.15 15.67 10.55 15.59C13.71 14.53 16 11.53 16 8C16 3.58 12.42 0 8 0Z" transform="scale(64)" fill="currentColor"/></svg>Follow development</a>
       </nav>
-    </header><main id="main" class="journal"><a class="post-back" href="/blog/">All posts</a><header class="post-header"><h1>Building myArc in public</h1><time class="post-date" datetime="2026-10-25">October 25, 2026</time><p class="post-author">By <a rel="author" href="https://github.com/bitbonsai">bitbonsai</a> · <a href="index.md" type="text/markdown">Read Markdown</a></p></header><article class="post-body"><p>Today's goal for myArc is to get the native shell looking like an empty Arc window and produce a nightly build I can run and share.</p>
-<p>myArc is an open-source browser project, using Arc as the reference for its interface and browsing workflow. The implementation runs inside Chromium's browser layer, with Rust for the workspace behavior myArc owns.</p>
-<p><a href="myarc-current-build.f594a2a31d6a.webp"><img src="myarc-current-build.f594a2a31d6a.webp" alt="Current myArc build loading mauriciowolff.com with the native command palette open" width="2400" height="1492" decoding="async" loading="eager" fetchpriority="high" srcset="myarc-current-build.f594a2a31d6a.960.webp 960w, myarc-current-build.f594a2a31d6a.webp 2400w" sizes="(max-width: 48rem) calc(100vw - 3rem), 50rem" /></a></p>
-<h2>Start with a shell we can judge</h2>
-<p>The empty window gives us a clear visual target. Sidebar proportions and the window material are easier to compare when a page isn't doing most of the visual work.</p>
-<p><a href="arc-reference.3418f314f546.webp"><img src="arc-reference.3418f314f546.webp" alt="Arc reference for the window material, sidebar and centered command bar" width="2000" height="1310" decoding="async" loading="lazy" srcset="arc-reference.3418f314f546.960.webp 960w, arc-reference.3418f314f546.webp 2000w" sizes="(max-width: 48rem) calc(100vw - 3rem), 50rem" /></a></p>
-<p><em>Arc reference. This is the appearance we're working toward.</em></p>
-<p>The current build already opens real pages and shows a centered native command palette. The screenshot above shows that running together. Matching the empty Arc window is the next visual checkpoint; the nightly build should make the result available outside the development checkout.</p>
-<h2>How I'm delegating the work</h2>
-<p>I split work into tasks with a specific boundary and a result someone can check. Today that includes the Rust Spaces model, a Profile-owned workspace service, and the native sidebar that reads its state.</p>
-<p>An implementation task gets the relevant files and constraints, along with the behavior it needs to demonstrate. A separate reviewer looks at the change before integration. Review findings go back through another implementation pass.</p>
-<p>The lead agent keeps responsibility for integration and the running build. Parallel tasks help when the ownership boundaries are clear. Browser UI and Rust workspace changes still need to be exercised together.</p>
-<h2>Models and effort</h2>
-<p>For today's browser work, the lead coding agent is <strong>GPT-6.1</strong>, identified by <code>gpt-6.1-sol</code>, with <strong>high thinking</strong>. Independent code reviews use <strong>Claude Sonnet 5.5</strong>, <code>claude-sonnet-5-5</code>, at <strong>high effort</strong>.</p>
-<p>The model and reasoning setting are part of the task brief. Implementation and review are separate jobs, and I want a reviewer to question the assumptions in the implementation.</p>
-<p>A review response also has to turn into something concrete: a correction, a test, or an explicit decision about the tradeoff. The main agent then builds the integrated result and checks it in the native application.</p>
-<h2>Context between agents and sessions</h2>
-<p>I've open-sourced two skills that support this workflow: <a href="https://github.com/bitbonsai/context">context</a> and <a href="https://github.com/bitbonsai/wrap">wrap</a>, under <strong>bitbonsai</strong>.</p>
-<p>Context keeps agent instructions and architecture notes aligned with the repository. It separates the product's intent from what currently works, so a new agent has a useful starting point.</p>
-<p>Wrap handles the handover. It keeps the gotchas worth remembering and records the next concrete step. The next session can continue from that record instead of reconstructing the investigation. Machine-specific and private notes stay outside the public repository.</p>
-<p>The browser code is <a href="https://github.com/bitbonsai/myarc">open source too</a>. I want the development record to explain the decisions behind the changes, especially when an approach fails.</p>
-<h2>What we're learning from the native work</h2>
-<p>Moving navigation controls into the sidebar exposed startup and layout failures. Using Chromium's native controls fixed that path. Repeatedly hiding and showing the address field also lost keyboard focus; preserving its visibility fixed the navigation journey.</p>
-<p>Those failures are useful checks for the next change. A control can look right while breaking keyboard navigation elsewhere in the window.</p>
-<p><a href="https://github.com/bitbonsai/myarc/blob/main/docs/ARTCRAFT-WORKFLOW.md">Artcraft's public engineering practices</a>, particularly PhotoCraft's development guide, helped shape the approach: give each task a bounded outcome and attach evidence to its completion. Native visual checks belong alongside the model and command tests.</p>
-<h2>Today's finish line</h2>
-<p>The target is an empty-window shell that matches the Arc reference, followed by a nightly artifact people can try. That gives the next update a concrete build to inspect and a clear account of what changed.</p>
+    </header><main id="main" class="journal"><a class="post-back" href="/blog/">All posts</a><header class="post-header"><h1>Building myArc in public</h1><time class="post-date" datetime="2026-10-25">October 25, 2026</time><p class="post-author">By <a rel="author" href="https://github.com/bitbonsai">bitbonsai</a> · <a href="index.md" type="text/markdown">Read Markdown</a></p></header><article class="post-body"><p>Today's goal is an Arc-like empty window and a nightly build I can run and share.</p>
+<p>I'm building myArc around Arc's interface and browsing workflow. Chromium provides the browser services, with Rust for the workspace logic.</p>
+<figure><a href="myarc-current-build.f594a2a31d6a.webp"><img alt="Current myArc build loading mauriciowolff.com with the native command palette open" decoding="async" fetchpriority="high" height="1492" loading="eager" sizes="(max-width: 48rem) calc(100vw - 3rem), 50rem" src="myarc-current-build.f594a2a31d6a.webp" srcset="myarc-current-build.f594a2a31d6a.960.webp 960w, myarc-current-build.f594a2a31d6a.webp 2400w" width="2400"/></a></figure>
+<h2>Getting the window right</h2>
+<p>An empty window makes spacing mistakes obvious. I can compare the sidebar and window material without a page taking over the screen.</p>
+<figure><a href="arc-reference.3418f314f546.webp"><img alt="Arc reference for the window material, sidebar and centered command bar" decoding="async" height="1310" loading="lazy" sizes="(max-width: 48rem) calc(100vw - 3rem), 50rem" src="arc-reference.3418f314f546.webp" srcset="arc-reference.3418f314f546.960.webp 960w, arc-reference.3418f314f546.webp 2000w" width="2000"/></a><figcaption>Arc, our visual reference.</figcaption></figure>
+
+<p>Page navigation and the centered command palette already work. A nightly will let other people try the same build without compiling Chromium.</p>
+<h2>How I split the work</h2>
+<p>Each agent gets a narrow job and a result I can check. Today, separate tasks cover the Rust Spaces model and a Profile-owned workspace service. Another agent is wiring that state into the native sidebar.</p>
+<p>The brief names the relevant files and the behavior to demonstrate. A separate agent reviews the change. Findings go back for another implementation pass.</p>
+<p>The lead agent brings the Rust and Chromium changes together. It then builds the browser and checks the native window.</p>
+<h2>Models and review</h2>
+<p>GPT-6.1 (<code>gpt-6.1-sol</code>) leads the browser work with high thinking. Claude Sonnet 5.5 (<code>claude-sonnet-5-5</code>) reviews changes at high effort.</p>
+<h2>Keeping context between sessions</h2>
+<p>I've open-sourced two skills under bitbonsai: <a href="https://github.com/bitbonsai/context">context</a> and <a href="https://github.com/bitbonsai/wrap">wrap</a>.</p>
+<p>Context keeps agent instructions and architecture notes current. A new agent needs to know which parts belong to Chromium and which belong to myArc. It also needs to tell planned work from working code.</p>
+<p>Wrap saves the useful gotchas and writes a handover for the next session. Private and machine-specific notes stay outside the public repo.</p>
+<p><a href="https://github.com/bitbonsai/myarc">myArc's code is open source too</a>.</p>
+<h2>What broke along the way</h2>
+<p>Moving navigation controls into the sidebar caused startup and layout failures. Using Chromium's native controls fixed that path.</p>
+<p>The address field had a different problem. Hiding and showing it during layout lost keyboard focus. Keeping it visible fixed navigation.</p>
+<p>Those are now things to recheck when the controls move. Looking right is one check. Typing an address and opening the page is another.</p>
+<p>I borrowed from <a href="https://github.com/bitbonsai/myarc/blob/main/docs/ARTCRAFT-WORKFLOW.md">Artcraft's public engineering practices</a>, especially PhotoCraft's development guide. It keeps native visual checks separate from model tests.</p>
 </article></main><footer class="end">
       <a class="mark plain" href="#main" aria-label="Back to top"><img class="ribbon" src="../_assets/logo-matte.300972748816.webp" alt="" width="1254" height="1254"><picture><source media="(prefers-color-scheme: dark)" srcset="../_assets/wordmark-ivory.3a99cf025832.svg"><img class="wordmark" src="../_assets/wordmark-ink.18b9e7ae3785.svg" alt="myArc" width="3056" height="1049"></picture></a>
       <div class="end-copy">

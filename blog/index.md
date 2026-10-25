@@ -8,4 +8,4 @@ October 2026
 
 October 25, 2026
 
-An Arc-like shell and a nightly build are today's target. The current browser, model choices, and how I delegate development with context and wrap.
+Today's targets are an Arc-like shell and a nightly build. How I'm using coding agents, context and wrap to build myArc.
