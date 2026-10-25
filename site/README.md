@@ -41,6 +41,8 @@ Blog metadata includes author attribution, canonical/social fields, language, Bl
 
 Fable/high produced the layout using `/frontend-design`. Section headings sit above their content. Body text is 1.125rem, section headings share one scale, and subheadings/status labels are 1.5rem. The progress panel gives its smaller artwork a separate grid area.
 
+Blog index and article content use a centered 68ch reading column. Article title, metadata and body share its left edge; text stays left-aligned. Header/footer retain the wider site layout, and phone gutters stay 1.5rem.
+
 Header/footer ribbon marks are 1rem square beside outlined Outfit wordmarks. Header links are ink without underlines at rest; document links remain underlined. Both development CTAs include the user-supplied GitHub SVG mark, with fill inherited from the button text color.
 
 The page follows `prefers-color-scheme` automatically. CSS variables switch surfaces/text and native picture sources select ivory wordmarks in dark mode. Blue primary buttons and colorful artwork remain unchanged. Original grain covers page and panel in both themes. Reduced motion disables animation, transitions and smooth scrolling.

@@ -23,7 +23,7 @@ MAX_TOTAL_IMAGE_BYTES = 256 * 1024 * 1024
 IMAGE_FORMATS = {'.png': 'PNG', '.jpg': 'JPEG', '.jpeg': 'JPEG', '.webp': 'WEBP'}
 
 BLOG_CSS = '''
-    .journal { padding: 4rem 0 6rem }
+    .journal { max-width: 68ch; margin-inline: auto; padding: 4rem 0 6rem }
     .journal > header { margin-bottom: 3rem }
     .journal h1 { font-size: 3.5rem; line-height: 1.1; max-width: 24ch }
     .journal .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap }

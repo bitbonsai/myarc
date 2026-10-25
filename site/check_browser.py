@@ -164,6 +164,12 @@ try:
                   if (document.querySelectorAll('h1').length !== 1) throw new Error('Blog heading structure')
                   if (innerWidth <= 768 && getComputedStyle(document.querySelector('.wrap')).paddingLeft !== '24px') throw new Error('Mobile blog gutter')
                   if (document.documentElement.scrollWidth > innerWidth) throw new Error('Blog overflow')
+                  const journal = document.querySelector('.journal').getBoundingClientRect()
+                  if (Math.abs(journal.left + journal.width / 2 - innerWidth / 2) > 1) throw new Error('Blog reading column not centered')
+                  for (const element of document.querySelectorAll('.post-header,.post-body,.post-list')) {
+                    const rect = element.getBoundingClientRect()
+                    if (Math.abs(rect.left - journal.left) > 1 || Math.abs(rect.width - journal.width) > 1) throw new Error('Blog column alignment')
+                  }
                   const nav = document.querySelector('.blog-link')
                   if (!nav.getClientRects().length) throw new Error('Blog navigation hidden')
                   for (const el of document.querySelectorAll('main h1,main h2,main h3,main p,main li,main time,main code,main figcaption')) {

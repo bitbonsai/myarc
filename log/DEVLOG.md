@@ -2,6 +2,11 @@
 
 Keep significant outcomes, failures and next actions reproducible. Newest entry first. No private exports, page titles/URLs from real browsing, credentials or raw user transcripts.
 
+## 2026-10-25: Centered blog reading column
+
+- Centered the shared journal container at 68ch, aligning article title/metadata/body and blog index content without centering the text. Kept the wider header/footer and 1.5rem phone gutters.
+- Added browser assertions for the column midpoint and matching child widths at every existing viewport/theme. Thirteen unit checks, metadata/caption checks and the retained browser suite passed. Fresh desktop capture inspected; Safari/Firefox remain unchecked.
+
 ## 2026-10-25: Project purpose, privacy commitment and visible blur/fade
 
 - Reworked the first post around Arc's announced sunset and the reason to continue its workspace ideas. Added explicit account-free and no-behavioral-tracking commitments, with a release privacy audit still required. Aggregate release-download counts are separate from hosting request logs. Updated the product contract without claiming native privacy compliance or creating tracking infrastructure.
