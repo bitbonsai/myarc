@@ -1,0 +1,137 @@
+diff --git a/chrome/browser/ui/views/tabs/common/pinned_tab_container_view_vertical_layout.cc b/chrome/browser/ui/views/tabs/common/pinned_tab_container_view_vertical_layout.cc
+index 8b3b8210cdcedadb123b74766170825e48ad8707..e4c98cca3395bb36cea186de2046b88c4545afb1 100644
+--- a/chrome/browser/ui/views/tabs/common/pinned_tab_container_view_vertical_layout.cc
++++ b/chrome/browser/ui/views/tabs/common/pinned_tab_container_view_vertical_layout.cc
+@@ -7,6 +7,7 @@
+ #include <algorithm>
+ #include <cmath>
+ 
++#include "base/command_line.h"
+ #include "base/numerics/safe_conversions.h"
+ #include "chrome/browser/ui/layout_constants.h"
+ #include "chrome/browser/ui/tabs/vertical_tab_strip_state_controller.h"
+@@ -37,9 +38,12 @@ gfx::Size PinnedTabContainerViewVerticalLayout::GetMinimumSize(
+       (collapse_state != tabs::VerticalTabStripCollapseState::kExpanded ? 1.5f
+                                                                         : 1.0f),
+       static_cast<float>(num_children));
++  const int row_height =
++      base::CommandLine::ForCurrentProcess()->HasSwitch("myarc-visual-parity")
++          ? 48
++          : GetLayoutConstant(LayoutConstant::kVerticalTabHeight);
+   const int min_height =
+-      base::ClampCeil(GetLayoutConstant(LayoutConstant::kVerticalTabHeight) *
+-                      min_rows) +
++      base::ClampCeil(row_height * min_rows) +
+       (num_children > 1 ? PinnedTabContainerView::kTabPadding : 0);
+   return gfx::Size(GetLayoutConstant(LayoutConstant::kVerticalTabMinWidth),
+                    min_height);
+@@ -73,13 +77,35 @@ PinnedTabContainerViewVerticalLayout::CalculateProposedLayout(
+       contains_split = true;
+     }
+   }
+-  int child_width = GetLayoutConstant(LayoutConstant::kVerticalTabMinWidth) *
+-                    (contains_split ? 2 : 1);
++  const bool use_pinned_tiles =
++      base::CommandLine::ForCurrentProcess()->HasSwitch("myarc-visual-parity");
++  int child_width =
++      (use_pinned_tiles
++           ? 64
++           : GetLayoutConstant(LayoutConstant::kVerticalTabMinWidth)) *
++      (contains_split ? 2 : 1);
+ 
+   // If the width is bounded, calculate how many children can fit on a row.
+   // Since all children are allocated the same width this will be the same for
+   // every row.
+-  if (size_bounds.width().is_bounded() && size_bounds.width().value() > 0) {
++  if (use_pinned_tiles && size_bounds.width().is_bounded()) {
++    const int available_width = std::max(
++        0, size_bounds.width().value() -
++               GetLayoutConstant(
++                   LayoutConstant::kVerticalTabStripHorizontalPadding));
++    // Keep tile columns stable even when the last row is not full.
++    children_on_row =
++        PinnedTabContainerView().GetTabStripCollapseState() ==
++                tabs::VerticalTabStripCollapseState::kCollapsed
++            ? 1
++            : 1 + std::max(0, available_width - child_width) /
++                      (child_width + PinnedTabContainerView::kTabPadding);
++    child_width =
++        std::max(0, available_width - PinnedTabContainerView::kTabPadding *
++                                          (children_on_row - 1)) /
++        children_on_row;
++  } else if (size_bounds.width().is_bounded() &&
++             size_bounds.width().value() > 0) {
+     auto collapse_state = PinnedTabContainerView().GetTabStripCollapseState();
+ 
+     // Apply horizontal padding immediately at start of collapse animation by
+diff --git a/chrome/browser/ui/views/tabs/common/tab_view_vertical_layout.cc b/chrome/browser/ui/views/tabs/common/tab_view_vertical_layout.cc
+index d2b935e0c80a1a82d08b4da25496f5b0b5360773..8217770ee9867c064ea9f45fcaf92e1870dc8621 100644
+--- a/chrome/browser/ui/views/tabs/common/tab_view_vertical_layout.cc
++++ b/chrome/browser/ui/views/tabs/common/tab_view_vertical_layout.cc
+@@ -4,6 +4,7 @@
+ 
+ #include "chrome/browser/ui/views/tabs/common/tab_view_vertical_layout.h"
+ 
++#include "base/command_line.h"
+ #include "chrome/browser/glic/browser_ui/tab_underline_view.h"
+ #include "chrome/browser/ui/layout_constants.h"
+ #include "chrome/browser/ui/tabs/vertical_tab_strip_state.h"
+@@ -49,9 +50,13 @@ views::ProposedLayout TabViewVerticalLayout::CalculateProposedLayout(
+     const views::SizeBounds& size_bounds) const {
+   const int width =
+       size_bounds.width().value_or(tabs::kVerticalTabStripUncollapsedMaxWidth);
+-  const int height = GetLayoutConstant(
+-      TabView().pinned_ ? LayoutConstant::kVerticalTabPinnedHeight
+-                        : LayoutConstant::kVerticalTabHeight);
++  const int height =
++      TabView().pinned_ && base::CommandLine::ForCurrentProcess()->HasSwitch(
++                               "myarc-visual-parity")
++          ? 48
++          : GetLayoutConstant(TabView().pinned_
++                                  ? LayoutConstant::kVerticalTabPinnedHeight
++                                  : LayoutConstant::kVerticalTabHeight);
+   views::ProposedLayout layouts;
+   layouts.host_size = gfx::Size(width, height);
+ 
+diff --git a/chrome/browser/ui/views/tabs/common/vertical_tab_style_views.cc b/chrome/browser/ui/views/tabs/common/vertical_tab_style_views.cc
+index dd7a0a899fae671287402c2672ffd7931b773636..757459352e216bd831513573467e2c1c86296f85 100644
+--- a/chrome/browser/ui/views/tabs/common/vertical_tab_style_views.cc
++++ b/chrome/browser/ui/views/tabs/common/vertical_tab_style_views.cc
+@@ -7,6 +7,7 @@
+ #include <optional>
+ #include <string>
+ 
++#include "base/command_line.h"
+ #include "chrome/browser/themes/theme_properties.h"
+ #include "chrome/browser/ui/layout_constants.h"
+ #include "chrome/browser/ui/views/frame/browser_frame_view.h"
+@@ -187,7 +188,9 @@ bool VerticalTabStyleViews::ShouldPaintTabBackgroundColor(
+     return false;
+   }
+ 
+-  if (hovered) {
++  if (hovered || (delegate_->IsPinned() &&
++                  base::CommandLine::ForCurrentProcess()->HasSwitch(
++                      "myarc-visual-parity"))) {
+     return true;
+   }
+ 
+@@ -197,9 +200,16 @@ bool VerticalTabStyleViews::ShouldPaintTabBackgroundColor(
+ SkColor VerticalTabStyleViews::GetCurrentTabBackgroundColor(
+     TabStyle::TabSelectionState selection_state) const {
+   const bool frame_glass = delegate_->IsGlassFrame();
++  const bool inactive_tile =
++      delegate_->IsPinned() &&
++      selection_state == TabStyle::TabSelectionState::kInactive &&
++      base::CommandLine::ForCurrentProcess()->HasSwitch("myarc-visual-parity");
++  // Reuse the theme's hover fill, including its glass alpha and animation.
+   return tab_style()->GetCurrentTabBackgroundColor(
+-      selection_state, delegate_->IsHoverAnimationActive(),
+-      delegate_->GetHoverAnimationValue(),
++      selection_state, inactive_tile || delegate_->IsHoverAnimationActive(),
++      inactive_tile
++          ? std::lerp(0.35f, 1.0f, delegate_->GetHoverAnimationValue())
++          : delegate_->GetHoverAnimationValue(),
+       delegate_->GetView()->GetWidget()
+           ? delegate_->GetView()->GetWidget()->ShouldPaintAsActive()
+           : true,
