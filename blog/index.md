@@ -8,4 +8,4 @@ October 2026
 
 October 25, 2026
 
-Today's targets are an Arc-like shell and a nightly build. How I'm using coding agents, context and wrap to build myArc.
+Why I'm building myArc after Arc's sunset announcement, with account-free browsing, no behavioral tracking and an Artcraft-inspired workflow.
