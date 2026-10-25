@@ -1,0 +1,105 @@
+{
+  "slice": "MA-007.c-caption",
+  "status": "native build and basic manual visibility checked; automated regressions UNRUN",
+  "upstream_revision": "3e117efa80cec1c4e1e6fbfdf44edeb087a279a5",
+  "apply_after": [
+    "0002",
+    "0004",
+    "0005",
+    "corrected 0006",
+    "0007",
+    "0008",
+    "0009",
+    "0010",
+    "normalized 0011",
+    "corrected 0013"
+  ],
+  "canonical_payload_context": "16 files from fd3880d, supplied parent baseline",
+  "prerequisite_0013_sha256": "fa512a88bb730860589c92abe3b324c0fa0a84e7638374f23efc90fbe462ca4b",
+  "independent_patches": [
+    "0012",
+    "0014"
+  ],
+  "0014_disjoint_paths_verified": [
+    "chrome/browser/ui/views/frame/browser_view.cc",
+    "chrome/browser/ui/views/frame/browser_view_browsertest.cc",
+    "chrome/browser/ui/views/frame/contents_web_view.cc"
+  ],
+  "patch": "browser/patches/0015-native-hover-caption-controls.patch",
+  "patch_sha256": "bd9b1b7b1e69630843fd2303dace7bc90bc51daf8a0b1c2f3adfc0f401ad9eac",
+  "source_checked_patch_sha256": "da932b333abb17b7f71729eb9d750cae8ad2e800c1d30a2d7fc4512c0528fe05",
+  "files": {
+    "chrome/browser/ui/views/frame/browser_frame_view_mac.mm": {
+      "output_sha256": "658d3cc2fc1d674e034fd76b772598e4b44f8e20ebb12b5d52c3a56be4d4c4af",
+      "output_git_blob": "f1bf9ba32bef93ba0d7c0107d72c36c59f8ba8ea",
+      "input_sha256": "21d50b9bb3450ce2053c687c78315ca5a6a35bac1d73efd5aa9604ff92f4e5f5",
+      "input_git_blob": "94515e1ace01c641dd7a537bfa2e8ec45be1aba8"
+    },
+    "chrome/browser/ui/views/frame/browser_native_widget_mac.mm": {
+      "output_sha256": "5abb9d981bb20e68e5da91e270f1d3e76e32b8e5742b48d5cf6c976d1be9fa3b",
+      "output_git_blob": "a5ddda954d69b5f3fd20ea394a37a51656549bc6",
+      "input_sha256": "7ca8bd6cf2d2b6231674d08f669746e592e10d59effeff4129de77e05cf97739",
+      "input_git_blob": "7d5fe2332ca72ae8df17304eb7c2a540e28eafa7"
+    },
+    "chrome/browser/ui/views/frame/browser_frame_view_mac_browsertest.mm": {
+      "output_sha256": "3156b11d0f6f94990c522993ffd5112c0f5241bf6c1b7d49c1fee8d765ad63bb",
+      "output_git_blob": "13e59a2c7943422e83f9382c5ef1a5b8bedfd711",
+      "input_sha256": "ce1fcb50a315787696a186dd97e682d0b784ecfc8a70434218f0494cea35b3a3",
+      "input_git_blob": "067500b829459e8c86ad12f51c1ed51c3318e135"
+    },
+    "chrome/browser/ui/views/frame/BUILD.gn": {
+      "output_sha256": "6847c3d3c8ea964d645c86bd8df9b007a18b6946ab0d78aa30510b72433b02b7",
+      "output_git_blob": "1d63b08b3680d4fde5cc750689866eb943e99af2",
+      "input_sha256": "66a81e8fda1da86546f9db4344c114f59ee95777c6522f221d1026c75a47d11f",
+      "input_git_blob": "9fb5fd7088a095ad6510d57de757abcd7c977b0d"
+    }
+  },
+  "checks": {
+    "objective_cpp_real_header_syntax": {
+      "browser_frame_view_mac.mm": 0,
+      "browser_native_widget_mac.mm": 0,
+      "browser_frame_view_mac_browsertest.mm": 0
+    },
+    "scratch_gn_generation": 0,
+    "scratch_gn_header_dependencies": {
+      "browser_frame_view_mac": 0,
+      "browser_native_widget_mac_impl": 0,
+      "browser_tests": 0
+    },
+    "changed_line_chromium_clang_format": "23.0.0git 20b6ec66967ac2a8f932863c1abf251e5b17a843",
+    "gn_format_dry_run": 0,
+    "strict_apply_reverse_reapply_byte_proof": {
+      "files": 4,
+      "passes": 3,
+      "status": "PASS"
+    },
+    "changed_line_formatting_idempotent": "PASS",
+    "relative_document_links": "PASS",
+    "external_four_input_files_unchanged_after_checks": "PASS"
+  },
+  "parent_runtime": {
+    "native_chrome_build_exit": 0,
+    "manual_legacy_hover_visibility": "PASS",
+    "app_only_reduced_motion_observed": true,
+    "page_viewport_before_and_during_hover": [1280, 788],
+    "normal_launch_flags_restored": true,
+    "browser_appearance": "Follow System",
+    "os_preferences_changed": false,
+    "workspace_renderer_enabled": false,
+    "caption_translation_and_clipping": "UNVERIFIED",
+    "artifacts": "Owned-window captures and recordings kept private outside Git"
+  },
+  "native_browser_test": {
+    "filter": "VisualParityFlag/MyarcCaptionHoverMacTest.NativeButtonsAndReservationFollowHoverLayout/*",
+    "cases_declared": 2,
+    "cases_executed": 0,
+    "status": "UNRUN, parent owns automated native execution"
+  },
+  "source_candidate_limits": [
+    "Real NSWindow visibility and reservation candidate only; caption translation/clipping/timing unmeasured",
+    "Remote Cocoa and fullscreen mutation excluded; transitions untested",
+    "RTL and partial RTL preserve upstream bounds mirroring; runtime untested",
+    "Existing animation progress/end handles reversal and reduced-motion endpoints; runtime untested",
+    "No external edits/build outputs or desktop/browser interaction performed"
+  ]
+}

@@ -1,0 +1,275 @@
+diff --git a/chrome/browser/ui/views/frame/browser_view.cc b/chrome/browser/ui/views/frame/browser_view.cc
+index f6768c92a53ca58a86c7d702ccbc8297d8ef33ba..5db011f7a1262f2d8f5f32d7db778787e7d601a0 100644
+--- a/chrome/browser/ui/views/frame/browser_view.cc
++++ b/chrome/browser/ui/views/frame/browser_view.cc
+@@ -347,11 +347,14 @@
+ #include "ui/color/color_id.h"
+ #include "ui/compositor/debug_utils.h"
+ #include "ui/compositor/layer.h"
++#include "ui/compositor/layer_animator.h"
+ #include "ui/compositor/paint_recorder.h"
++#include "ui/compositor/scoped_layer_animation_settings.h"
+ #include "ui/content_accelerators/accelerator_util.h"
+ #include "ui/display/screen.h"
+ #include "ui/display/types/display_constants.h"
+ #include "ui/events/event_utils.h"
++#include "ui/gfx/animation/animation.h"
+ #include "ui/gfx/animation/animation_runner.h"
+ #include "ui/gfx/canvas.h"
+ #include "ui/gfx/color_utils.h"
+@@ -2380,6 +2383,47 @@ void BrowserView::OnActiveTabChanged(content::WebContents* old_contents,
+       active_contents_view->web_contents() != new_contents &&
+       !tab_change_in_split_view;
+ 
++#if BUILDFLAG(IS_MAC)
++  const auto is_live_page = [this](content::WebContents* contents) {
++    const auto* tab = tabs::TabInterface::MaybeGetFromContents(contents);
++    return tab && tab->GetBrowserWindowInterface() == browser_.get() &&
++           !tab->IsSplit() && !tab->IsBlocked() &&
++           contents->GetBrowserContext() == browser_->GetProfile() &&
++           !contents->IsBeingDestroyed() && !contents->IsCrashed() &&
++           !contents->IsLoading() &&
++           !contents->GetController().GetPendingEntry() &&
++           contents->GetLastCommittedURL().SchemeIsHTTPOrHTTPS() &&
++           contents->GetPrimaryMainFrame()->IsRenderFrameLive();
++  };
++  bool fade_saved_page =
++      base::CommandLine::ForCurrentProcess()->HasSwitch(
++          "myarc-visual-parity") &&
++      change_tab_contents && old_contents && old_contents != new_contents &&
++      active_contents_view->web_contents() == old_contents &&
++      !multi_contents_view_->IsInSplitView() && !IsFullscreen() &&
++      !browser_->GetTabStripModel()->closing_all() && GetWidget()->IsActive() &&
++      !WidgetHasChildModalDialog(GetWidget()) &&
++      gfx::Animation::ShouldRenderRichAnimation() &&
++      !gfx::Animation::PrefersReducedMotion() && is_live_page(old_contents) &&
++      is_live_page(new_contents);
++  if (fade_saved_page && myarc_workspace_adapter_) {
++    const auto sidebar = myarc_workspace_adapter_->Sidebar();
++    const auto is_saved = [&sidebar](content::WebContents* contents) {
++      const uint64_t id =
++          myarc::BrowserWorkspaceAdapter::ItemIdForContents(*contents);
++      const auto matches = [id](const auto& row) { return row.id == id; };
++      return std::ranges::any_of(sidebar.favorites, matches) ||
++             std::ranges::any_of(sidebar.pins, matches);
++    };
++    fade_saved_page = myarc_workspace_adapter_->ready() && sidebar.ok &&
++                      is_saved(old_contents) && is_saved(new_contents);
++  } else if (fade_saved_page) {
++    fade_saved_page =
++        tabs::TabInterface::GetFromContents(old_contents)->IsPinned() &&
++        tabs::TabInterface::GetFromContents(new_contents)->IsPinned();
++  }
++#endif
++
+   bool will_restore_focus = !browser_->GetTabStripModel()->closing_all() &&
+                             GetWidget()->IsVisible() &&
+                             !tab_change_in_split_view;
+@@ -2506,6 +2550,22 @@ void BrowserView::OnActiveTabChanged(content::WebContents* old_contents,
+ 
+   CHECK_DEREF(TranslateBubbleController::From(browser_.get())).CloseBubble();
+   UpdateMyarcWorkspaceCanvas();
++#if BUILDFLAG(IS_MAC)
++  auto* incoming_view = multi_contents_view_->GetActiveContentsView();
++  ui::Layer* page_layer = incoming_view->holder()->layer();
++  if (fade_saved_page && incoming_view->web_contents() == new_contents &&
++      incoming_view->IsDrawn() && page_layer && page_layer->GetCompositor() &&
++      !page_layer->children().empty()) {
++    // The Mac page compositor is a child of this NativeViewHost layer.
++    // myArc polish: 120 ms is a prototype choice, not measured Arc behavior.
++    page_layer->GetAnimator()->StopAnimatingProperty(
++        ui::LayerAnimationElement::OPACITY);
++    page_layer->SetOpacity(0.f);
++    ui::ScopedLayerAnimationSettings settings(page_layer->GetAnimator());
++    settings.SetTransitionDuration(base::Milliseconds(120));
++    page_layer->SetOpacity(1.f);
++  }
++#endif
+ }
+ 
+ void BrowserView::OnTabDetached(content::WebContents* contents,
+diff --git a/chrome/browser/ui/views/frame/browser_view_browsertest.cc b/chrome/browser/ui/views/frame/browser_view_browsertest.cc
+index 33bcd23f7807e7634e7bb251dcc19b63025fa54a..da503b87ae2767b090fa01914fc897c621f3e370 100644
+--- a/chrome/browser/ui/views/frame/browser_view_browsertest.cc
++++ b/chrome/browser/ui/views/frame/browser_view_browsertest.cc
+@@ -9,6 +9,7 @@
+ 
+ #include "base/byte_size.h"
+ #include "base/callback_list.h"
++#include "base/command_line.h"
+ #include "base/feature_list.h"
+ #include "base/functional/bind.h"
+ #include "base/memory/raw_ptr.h"
+@@ -65,6 +66,7 @@
+ #include "chrome/browser/ui/views/bookmarks/bookmark_bar_view_observer.h"
+ #include "chrome/browser/ui/views/frame/browser_frame_view.h"
+ #include "chrome/browser/ui/views/frame/contents_container_view.h"
++#include "chrome/browser/ui/views/frame/contents_web_view.h"
+ #include "chrome/browser/ui/views/frame/immersive_mode_tester.h"
+ #include "chrome/browser/ui/views/frame/layout/browser_view_layout.h"
+ #include "chrome/browser/ui/views/frame/multi_contents_view.h"
+@@ -142,14 +144,20 @@
+ #include "ui/base/ozone_buildflags.h"
+ #include "ui/base/page_transition_types.h"
+ #include "ui/base/ui_base_features.h"
++#include "ui/compositor/layer.h"
++#include "ui/compositor/layer_animator.h"
+ #include "ui/events/base_event_utils.h"
+ #include "ui/events/event.h"
++#include "ui/gfx/animation/animation.h"
++#include "ui/gfx/animation/animation_test_api.h"
+ #include "ui/gfx/geometry/point.h"
++#include "ui/gfx/scoped_animation_duration_scale_mode.h"
+ #include "ui/views/accessibility/view_accessibility.h"
+ #include "ui/views/bubble/bubble_dialog_delegate_view.h"
+ #include "ui/views/bubble/bubble_dialog_model_host.h"
+ #include "ui/views/controls/button/label_button.h"
+ #include "ui/views/controls/button/md_text_button.h"
++#include "ui/views/controls/native/native_view_host.h"
+ #include "ui/views/controls/webview/webview.h"
+ #include "ui/views/focus/focus_manager.h"
+ #include "ui/views/test/views_test_utils.h"
+@@ -382,6 +390,74 @@ class BrowserViewTest : public InProcessBrowserTest {
+   raw_ptr<DevToolsWindow> devtools_;
+ };
+ 
++#if BUILDFLAG(IS_MAC)
++class BrowserViewPinnedFadeTest : public BrowserViewTest {
++ protected:
++  void SetUpCommandLine(base::CommandLine* command_line) override {
++    BrowserViewTest::SetUpCommandLine(command_line);
++    command_line->AppendSwitch("myarc-visual-parity");
++  }
++};
++
++IN_PROC_BROWSER_TEST_F(BrowserViewPinnedFadeTest, EligibilityMotionAndReset) {
++  ASSERT_TRUE(embedded_test_server()->Start());
++  auto rich_animation = gfx::AnimationTestApi::SetRichAnimationRenderMode(
++      gfx::Animation::RichAnimationRenderMode::FORCE_ENABLED);
++  auto reduced_motion =
++      gfx::AnimationTestApi::SetPrefersReducedMotionForTesting(false);
++  gfx::ScopedAnimationDurationScaleMode duration(
++      gfx::ScopedAnimationDurationScaleMode::NORMAL_DURATION);
++  auto* tabs = browser()->GetTabStripModel();
++  ASSERT_TRUE(ui_test_utils::NavigateToURL(
++      browser(), embedded_test_server()->GetURL("/title1.html")));
++  tabs->SetTabPinned(0, true);
++  AddTab(browser(), embedded_test_server()->GetURL("/title2.html"));
++  ASSERT_TRUE(content::WaitForLoadStop(active_web_contents()));
++  tabs->SetTabPinned(1, true);
++  AddTab(browser(), embedded_test_server()->GetURL("/title3.html"));
++  ASSERT_TRUE(content::WaitForLoadStop(active_web_contents()));
++  ASSERT_TRUE(browser_view()->GetWidget()->IsActive());
++
++  auto* view = browser_view()->multi_contents_view()->GetActiveContentsView();
++  ui::Layer* layer = view->holder()->layer();
++  ASSERT_TRUE(layer);
++  auto* animator = layer->GetAnimator();
++  const auto opacity = ui::LayerAnimationElement::OPACITY;
++  // An ordinary tab entering a saved page stays immediate and opaque.
++  tabs->ActivateTabAt(0);
++  EXPECT_FALSE(animator->IsAnimatingProperty(opacity));
++  EXPECT_FLOAT_EQ(1.f, layer->opacity());
++
++  // Existing live saved pages fade only presentation, including rapid switches.
++  tabs->ActivateTabAt(1);
++  EXPECT_EQ(tabs->GetWebContentsAt(1), view->web_contents());
++  EXPECT_TRUE(animator->IsAnimatingProperty(opacity));
++  EXPECT_FLOAT_EQ(1.f, layer->GetTargetOpacity());
++  tabs->ActivateTabAt(0);
++  EXPECT_EQ(tabs->GetWebContentsAt(0), view->web_contents());
++  EXPECT_TRUE(animator->IsAnimatingProperty(opacity));
++  tabs->ActivateTabAt(2);
++  EXPECT_FALSE(animator->IsAnimatingProperty(opacity));
++  EXPECT_FLOAT_EQ(1.f, layer->opacity());
++
++  {
++    auto reduce =
++        gfx::AnimationTestApi::SetPrefersReducedMotionForTesting(true);
++    tabs->ActivateTabAt(0);
++    tabs->ActivateTabAt(1);
++    EXPECT_FALSE(animator->IsAnimatingProperty(opacity));
++    EXPECT_FLOAT_EQ(1.f, layer->opacity());
++  }
++
++  tabs->ActivateTabAt(0);
++  EXPECT_TRUE(animator->IsAnimatingProperty(opacity));
++  view->SetWebContents(nullptr);
++  EXPECT_FALSE(animator->IsAnimatingProperty(opacity));
++  EXPECT_FLOAT_EQ(1.f, layer->opacity());
++  view->SetWebContents(tabs->GetWebContentsAt(0));
++}
++#endif
++
+ #if BUILDFLAG(IS_CHROMEOS)
+ using BrowserViewChromeOSTest = ChromeOSBrowserUITest;
+ #endif
+diff --git a/chrome/browser/ui/views/frame/contents_web_view.cc b/chrome/browser/ui/views/frame/contents_web_view.cc
+index a4245341f374b00523d0431e593768028c25edbf..323c283b71497f803094d8617915682afed9cb12 100644
+--- a/chrome/browser/ui/views/frame/contents_web_view.cc
++++ b/chrome/browser/ui/views/frame/contents_web_view.cc
+@@ -21,10 +21,12 @@
+ #include "ui/base/metadata/metadata_impl_macros.h"
+ #include "ui/color/color_id.h"
+ #include "ui/color/color_provider.h"
++#include "ui/compositor/layer_animator.h"
+ #include "ui/compositor/layer_solid_color.h"
+ #include "ui/compositor/layer_tree_owner.h"
+ #include "ui/gfx/color_utils.h"
+ #include "ui/gfx/geometry/rounded_corners_f.h"
++#include "ui/views/controls/native/native_view_host.h"
+ #include "ui/views/view_class_properties.h"
+ #include "ui/views/widget/widget.h"
+ 
+@@ -37,6 +39,21 @@
+ #include "chrome/browser/actor/actor_util.h"  // nogncheck
+ #endif
+ 
++namespace {
++
++void ResetMyarcPageFade(ui::Layer* page_layer) {
++#if BUILDFLAG(IS_MAC)
++  if (page_layer && base::CommandLine::ForCurrentProcess()->HasSwitch(
++                        "myarc-visual-parity")) {
++    page_layer->GetAnimator()->StopAnimatingProperty(
++        ui::LayerAnimationElement::OPACITY);
++    page_layer->SetOpacity(1.f);
++  }
++#endif
++}
++
++}  // namespace
++
+ DEFINE_CLASS_ELEMENT_IDENTIFIER_VALUE(ContentsWebView,
+                                       kContentsWebViewElementId);
+ 
+@@ -54,7 +71,9 @@ ContentsWebView::ContentsWebView(content::BrowserContext* browser_context)
+   web_contents_close_handler_ = std::make_unique<WebContentsCloseHandler>(this);
+ }
+ 
+-ContentsWebView::~ContentsWebView() = default;
++ContentsWebView::~ContentsWebView() {
++  ResetMyarcPageFade(holder()->layer());
++}
+ 
+ StatusBubbleViews* ContentsWebView::GetStatusBubble() const {
+   if (status_bubble_) {
+@@ -134,6 +153,9 @@ void ContentsWebView::UpdateIsBlockedByModal() {
+       is_blocked = tab->IsBlocked();
+     }
+   }
++  if (is_blocked) {
++    ResetMyarcPageFade(holder()->layer());
++  }
+   holder()->SetProperty(views::kIsBlockedByModalKey, is_blocked);
+ }
+ 
+@@ -161,6 +183,8 @@ void ContentsWebView::OnLetterboxingChanged() {
+ }
+ 
+ void ContentsWebView::SetWebContents(content::WebContents* web_contents) {
++  // Reset before every switch or detach, including empty Spaces.
++  ResetMyarcPageFade(holder()->layer());
+   views::WebView::SetWebContents(web_contents);
+   if (web_contents == nullptr) {
+     status_bubble_.reset();

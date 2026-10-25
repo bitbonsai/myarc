@@ -1,0 +1,276 @@
+From: bitbonsai <44185+bitbonsai@users.noreply.github.com>
+Subject: [PATCH] Show real macOS caption controls during sidebar hover
+
+Optional MA-007.c-caption candidate. Automated native regressions UNRUN.
+Apply after corrected 0013 on Chromium
+3e117efa80cec1c4e1e6fbfdf44edeb087a279a5 with
+0002/0004/0005/corrected-0006/0007/0008/0009/0010/normalized-0011
+and canonical 16-file foundation payload fd3880d.
+0012 and 0014 are independent, not prerequisites.
+
+Use the existing frame layout invalidated by region animation progress/end.
+Real NSWindow standard buttons and layout reservation share caption bounds;
+nonzero native hover width keeps captions visible through dismissal.
+Remove the collapse-only writer that cannot observe temporary hover.
+Limit ownership to normal in-process windows outside fullscreen.
+
+Three production files, one native browser regression file. No VTSRegion,
+BrowserView command/query, pin layout, model, page or lifecycle changes.
+No added observer, timer, mock button or second animation framework.
+Caption visibility snaps. AppKit translation, clipping and timing remain
+unmeasured; this is not Arc motion parity or native acceptance.
+
+See browser/experiments/native-hover-caption-controls.md and
+browser/evidence/native-hover-caption-controls.json in myarc for exact
+input/output hashes, patch order, checks and parent-owned runtime work.
+
+diff --git a/chrome/browser/ui/views/frame/BUILD.gn b/chrome/browser/ui/views/frame/BUILD.gn
+index 9fb5fd7088a095ad6510d57de757abcd7c977b0d..1d63b08b3680d4fde5cc750689866eb943e99af2 100644
+--- a/chrome/browser/ui/views/frame/BUILD.gn
++++ b/chrome/browser/ui/views/frame/BUILD.gn
+@@ -1948,6 +1948,7 @@ if (is_mac) {
+       "//chrome/browser/ui:fullscreen_util_mac",
+       "//chrome/browser/ui:layout_constants",
+       "//chrome/browser/ui:view_ids",
++      "//chrome/browser/ui/animation",
+       "//chrome/browser/ui/browser_window",
+       "//chrome/browser/ui/cocoa",
+       "//chrome/browser/ui/color:color_headers",
+@@ -1955,6 +1956,7 @@ if (is_mac) {
+       "//chrome/browser/ui/exclusive_access",
+       "//chrome/browser/ui/immersive:immersive_mode_controller",
+       "//chrome/browser/ui/tabs",
++      "//chrome/browser/ui/views/animations",
+       "//chrome/browser/ui/views/bookmarks",
+       "//chrome/browser/ui/views/tabs:tab_strip",
+       "//chrome/browser/ui/views/toolbar",
+diff --git a/chrome/browser/ui/views/frame/browser_frame_view_mac.mm b/chrome/browser/ui/views/frame/browser_frame_view_mac.mm
+index 94515e1ace01c641dd7a537bfa2e8ec45be1aba8..f1bf9ba32bef93ba0d7c0107d72c36c59f8ba8ea 100644
+--- a/chrome/browser/ui/views/frame/browser_frame_view_mac.mm
++++ b/chrome/browser/ui/views/frame/browser_frame_view_mac.mm
+@@ -21,6 +21,7 @@
+ #include "chrome/browser/themes/theme_properties.h"
+ #include "chrome/browser/themes/theme_service.h"
+ #include "chrome/browser/themes/theme_service_factory.h"
++#include "chrome/browser/ui/animation/browser_animation_controller.h"
+ #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
+ #include "chrome/browser/ui/cocoa/fullscreen/fullscreen_menubar_tracker.h"
+ #include "chrome/browser/ui/cocoa/fullscreen/fullscreen_toolbar_controller.h"
+@@ -33,6 +34,7 @@
+ #include "chrome/browser/ui/tabs/tab_style.h"
+ #include "chrome/browser/ui/tabs/vertical_tab_strip_state_controller.h"
+ #include "chrome/browser/ui/view_ids.h"
++#include "chrome/browser/ui/views/animations/tab_strip_animations.h"
+ #include "chrome/browser/ui/views/bookmarks/bookmark_bar_view.h"
+ #include "chrome/browser/ui/views/frame/browser_native_widget.h"
+ #include "chrome/browser/ui/views/frame/browser_view.h"
+@@ -70,6 +72,20 @@
+ 
+ namespace {
+ 
++bool ShouldManageMyarcCaptionButtons(BrowserView* browser_view) {
++  if (!base::CommandLine::ForCurrentProcess()->HasSwitch(
++          "myarc-visual-parity") ||
++      browser_view->browser()->GetType() !=
++          BrowserWindowInterface::Type::TYPE_NORMAL ||
++      browser_view->IsFullscreen() || !browser_view->GetWidget()) {
++    return false;
++  }
++  auto* const host = views::NativeWidgetMacNSWindowHost::GetFromNativeWindow(
++      browser_view->GetWidget()->GetNativeWindow());
++  // Remote Cocoa mirrors stay upstream-owned.
++  return host && !host->application_host();
++}
++
+ FullscreenToolbarStyle GetUserPreferredToolbarStyle(bool always_show) {
+   // In Kiosk mode, we don't show top Chrome UI.
+   if (base::CommandLine::ForCurrentProcess()->HasSwitch(switches::kKioskMode)) {
+@@ -470,14 +486,21 @@ BrowserFrameViewMac::BoundsAndMargins
+ BrowserFrameViewMac::GetCaptionButtonBounds() const {
+   BoundsAndMargins result;
+ 
+-  if (base::CommandLine::ForCurrentProcess()->HasSwitch(
+-          "myarc-visual-parity")) {
++  if (ShouldManageMyarcCaptionButtons(GetBrowserView())) {
+     auto* controller = tabs::VerticalTabStripStateController::From(
+         GetBrowserView()->browser());
+     if (controller && controller->ShouldDisplayVerticalTabs() &&
+         controller->GetCollapseState() !=
+             tabs::VerticalTabStripCollapseState::kExpanded) {
+-      return result;
++      const auto* animation =
++          BrowserAnimationController::From(GetBrowserView()->browser());
++      if (!animation ||
++          animation
++                  ->GetCurrentValue(TabStripAnimations::kVerticalTabStrip,
++                                    TabStripAnimations::kTabStripHoverWidth)
++                  .value_or(0.0) <= 0.0) {
++        return result;
++      }
+     }
+   }
+ 
+@@ -539,6 +562,17 @@ void BrowserFrameViewMac::OnPaint(gfx::Canvas* canvas) {
+ }
+ 
+ void BrowserFrameViewMac::Layout(PassKey) {
++  // Region animation updates invalidate this frame, including hover dismissal.
++  // Share caption bounds with the layout reservation.
++  if (ShouldManageMyarcCaptionButtons(GetBrowserView())) {
++    NSWindow* const window = GetWidget()->GetNativeWindow().GetNativeNSWindow();
++    const bool hidden = GetCaptionButtonBounds().bounds.IsEmpty();
++    // shortcut: visibility snaps, add sliding after native measurement.
++    for (NSWindowButton button :
++         {NSWindowCloseButton, NSWindowMiniaturizeButton, NSWindowZoomButton}) {
++      [[window standardWindowButton:button] setHidden:hidden];
++    }
++  }
+   if (GetBrowserView()->IsWindowControlsOverlayEnabled()) {
+     LayoutWindowControlsOverlay();
+   }
+diff --git a/chrome/browser/ui/views/frame/browser_frame_view_mac_browsertest.mm b/chrome/browser/ui/views/frame/browser_frame_view_mac_browsertest.mm
+index 067500b829459e8c86ad12f51c1ed51c3318e135..13e59a2c7943422e83f9382c5ef1a5b8bedfd711 100644
+--- a/chrome/browser/ui/views/frame/browser_frame_view_mac_browsertest.mm
++++ b/chrome/browser/ui/views/frame/browser_frame_view_mac_browsertest.mm
+@@ -6,6 +6,7 @@
+ 
+ #include <AppKit/AppKit.h>
+ 
++#include "base/command_line.h"
+ #include "base/functional/callback_helpers.h"
+ #include "base/run_loop.h"
+ #include "base/strings/strcat.h"
+@@ -14,12 +15,15 @@
+ #include "build/build_config.h"
+ #include "chrome/app/chrome_command_ids.h"
+ #include "chrome/browser/profiles/profile.h"
++#include "chrome/browser/ui/animation/browser_animation_controller.h"
+ #include "chrome/browser/ui/browser_commands.h"
+ #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
+ #include "chrome/browser/ui/tabs/tab_strip_model.h"
+ #include "chrome/browser/ui/view_ids.h"
++#include "chrome/browser/ui/views/animations/tab_strip_animations.h"
+ #include "chrome/browser/ui/views/frame/browser_frame_view.h"
+ #include "chrome/browser/ui/views/frame/browser_view.h"
++#include "chrome/browser/ui/views/frame/multi_contents_view.h"
+ #include "chrome/browser/ui/views/frame/vertical_tab_strip_region_view.h"
+ #include "chrome/browser/ui/views/test/vertical_tabs_browser_test_mixin.h"
+ #include "chrome/browser/ui/views/web_apps/frame_toolbar/web_app_frame_toolbar_view.h"
+@@ -186,6 +190,93 @@ IN_PROC_BROWSER_TEST_F(BrowserFrameViewMacBrowserTest,
+   EXPECT_TRUE(frame_view_test_api.needs_layout());
+ }
+ 
++class MyarcCaptionHoverMacTest
++    : public VerticalTabsBrowserTestMixin<InProcessBrowserTest>,
++      public testing::WithParamInterface<bool> {
++ public:
++  void SetUpCommandLine(base::CommandLine* command_line) override {
++    VerticalTabsBrowserTestMixin::SetUpCommandLine(command_line);
++    if (GetParam()) {
++      command_line->AppendSwitch("myarc-visual-parity");
++    }
++    command_line->AppendSwitchASCII("disable-features", "InitialWebUI");
++  }
++};
++
++IN_PROC_BROWSER_TEST_P(MyarcCaptionHoverMacTest,
++                       NativeButtonsAndReservationFollowHoverLayout) {
++  auto* const view = BrowserView::GetBrowserViewForBrowser(browser());
++  auto* const region = view->vertical_tab_strip_region_view_for_testing();
++  auto* const state = vertical_tab_strip_state_controller();
++  auto* const animation = BrowserAnimationController::From(browser());
++  auto* const frame = static_cast<BrowserFrameViewMac*>(
++      view->GetWidget()->non_client_view()->frame_view());
++  NSWindow* const window =
++      view->GetWidget()->GetNativeWindow().GetNativeNSWindow();
++  ASSERT_TRUE(window);
++  const auto expect_caption = [&](bool hidden) {
++    for (NSWindowButton kind :
++         {NSWindowCloseButton, NSWindowMiniaturizeButton, NSWindowZoomButton}) {
++      NSButton* const button = [window standardWindowButton:kind];
++      ASSERT_TRUE(button);
++      EXPECT_EQ(hidden, static_cast<bool>(button.hidden));
++      EXPECT_NE(nullptr, button.action);
++    }
++    const auto params = frame->GetBrowserLayoutParams();
++    const float reserved = params.leading_exclusion.content.width() +
++                           params.trailing_exclusion.content.width();
++    EXPECT_EQ(hidden, reserved == 0.0f);
++  };
++  const auto settle = [&](BrowserAnimationMotion motion) {
++    // Native controller endpoint, including its real layout invalidation path.
++    // This does not measure intermediate AppKit motion or reduced motion.
++    animation->Reset(TabStripAnimations::kVerticalTabStrip, motion);
++    EXPECT_TRUE(views::ViewTestApi(frame).needs_layout());
++    RunScheduledLayouts();
++  };
++
++  auto no_peek =
++      region->GetExpandOnHoverLock(ExpandOnHoverLockType::kForceCollapse);
++  state->SetExpandOnHoverEnabled(true);
++  state->RequestCollapse(false);
++  settle(TabStripAnimations::kExpand);
++  expect_caption(false);
++
++  state->RequestCollapse(true);
++  settle(TabStripAnimations::kCollapse);
++  ASSERT_TRUE(state->IsCollapsed());
++  expect_caption(GetParam());
++  const gfx::Rect hidden_contents = view->multi_contents_view()->bounds();
++
++  no_peek.reset();
++  auto peek =
++      region->GetExpandOnHoverLock(ExpandOnHoverLockType::kKeepExpanded);
++  settle(TabStripAnimations::kExpandOnHover);
++  ASSERT_TRUE(region->is_expanded_on_hover());
++  EXPECT_TRUE(state->IsCollapsed());
++  expect_caption(false);
++  EXPECT_EQ(hidden_contents, view->multi_contents_view()->bounds());
++
++  no_peek = region->GetExpandOnHoverLock(ExpandOnHoverLockType::kForceCollapse);
++  settle(TabStripAnimations::kCollapseOnHover);
++  EXPECT_FALSE(region->is_expanded_on_hover());
++  expect_caption(GetParam());
++  EXPECT_EQ(hidden_contents, view->multi_contents_view()->bounds());
++
++  no_peek.reset();
++  settle(TabStripAnimations::kExpandOnHover);
++  expect_caption(false);
++  state->RequestCollapse(false);
++  settle(TabStripAnimations::kExpand);
++  EXPECT_FALSE(state->IsCollapsed());
++  expect_caption(false);
++  EXPECT_LT(view->multi_contents_view()->width(), hidden_contents.width());
++}
++
++INSTANTIATE_TEST_SUITE_P(VisualParityFlag,
++                         MyarcCaptionHoverMacTest,
++                         testing::Bool());
++
+ class VerticalTabStripDoubleClickMacTest
+     : public VerticalTabsBrowserTestMixin<InProcessBrowserTest> {};
+ 
+diff --git a/chrome/browser/ui/views/frame/browser_native_widget_mac.mm b/chrome/browser/ui/views/frame/browser_native_widget_mac.mm
+index 7d5fe2332ca72ae8df17304eb7c2a540e28eafa7..a5ddda954d69b5f3fd20ea394a37a51656549bc6 100644
+--- a/chrome/browser/ui/views/frame/browser_native_widget_mac.mm
++++ b/chrome/browser/ui/views/frame/browser_native_widget_mac.mm
+@@ -1021,19 +1021,6 @@ void BrowserNativeWidgetMac::OnVerticalTabStripModeChanged(
+ 
+ void BrowserNativeWidgetMac::OnVerticalTabStripCollapseChanged(
+     tabs::VerticalTabStripCollapseState state) {
+-  if (base::CommandLine::ForCurrentProcess()->HasSwitch(
+-          "myarc-visual-parity") &&
+-      GetNSWindowHost()) {
+-    NSWindow* const window = GetNSWindowHost()->GetInProcessNSWindow();
+-    auto* controller =
+-        tabs::VerticalTabStripStateController::From(browser_view_->browser());
+-    const bool hidden = controller && controller->ShouldDisplayVerticalTabs() &&
+-                        state != tabs::VerticalTabStripCollapseState::kExpanded;
+-    for (NSWindowButton button :
+-         {NSWindowCloseButton, NSWindowMiniaturizeButton, NSWindowZoomButton}) {
+-      [[window standardWindowButton:button] setHidden:hidden];
+-    }
+-  }
+   UpdateBackgroundGeometry();
+ }
+ 

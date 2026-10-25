@@ -24,7 +24,7 @@ The native candidate must support the existing tab body and the Rust-backed body
 
 The 0009 frame and 0010 motion candidates compile and link in the native Chromium build. Frame/common-tab GN checks, 32 Rust tests and the native bridge/metadata assertions pass. A fresh resting-state capture shows three real favicon tiles with both gutters preserved, and the Profile follows the system dark theme.
 
-Interactive capture stopped when the owned-window focus precondition failed, before sending toggle keys. That recording was rejected and deleted. The changed animation has not yet been accepted from a fresh sequence. AppKit caption-button motion remains unresolved.
+Earlier interactive capture stopped on a locked-desktop focus precondition and was rejected. Later marked-profile interaction verified native hide, edge reveal, inside retention and dismissal. Fresh normal/reduced-motion recordings show pin switching; the page viewport stayed fixed during hover. The [hover run record](native-sidebar-hover.md) separates those observations from still-unrun automated regressions. AppKit caption visibility now works through [0015](native-hover-caption-controls.md); its sliding/clipping motion remains unresolved.
 
 ## Acceptance still required
 
