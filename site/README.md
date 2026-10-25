@@ -41,7 +41,7 @@ Blog metadata includes author attribution, canonical/social fields, language, Bl
 
 Fable/high produced the layout using `/frontend-design`. Section headings sit above their content. Body text is 1.125rem, section headings share one scale, and subheadings/status labels are 1.5rem. The progress panel gives its smaller artwork a separate grid area.
 
-Adjacent article figures form a two-column image grid, including on phones. Captions stay attached. Clicking opens the full published image in a transparent native dialog with a blur-only backdrop. The image/caption group fades and scales from 96% over 300ms; reduced motion opens it instantly. Captions sit in theme-colored pills. Escape, the accessible Lucide X and outside click dismiss it and return focus. The dialog stays outside exported main content.
+Adjacent article figures form a two-column image grid, including on phones. Captions stay attached. Clicking opens the full published image in a transparent native dialog with a blur-only backdrop applied immediately. Only the content animates; the backdrop stays fully blurred from entry. The image/caption group fades and scales from 96% over 300ms; reduced motion opens it instantly. Captions sit in theme-colored pills. Escape, the accessible Lucide X and outside click dismiss it and return focus. The dialog stays outside exported main content.
 
 Blog index and article content use a centered 68ch reading column. Article title, metadata and body share its left edge; text stays left-aligned. Header/footer retain the wider site layout, and phone gutters stay 1.5rem.
 

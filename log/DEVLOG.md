@@ -2,6 +2,11 @@
 
 Keep significant outcomes, failures and next actions reproducible. Newest entry first. No private exports, page titles/URLs from real browsing, credentials or raw user transcripts.
 
+## 2026-10-25: Immediate lightbox blur
+
+- Removed the backdrop's transparent starting state and opacity transition, which exposed the clear page before the blur appeared. Kept the content-only 300ms fade/scale entrance and the blur-only background.
+- Entry checks now require backdrop opacity 1, zero transition duration and the full blur while content is still animating. Fourteen unit checks and the retained browser suite passed. A reused test-session name hit a reopen/wait timeout; interaction phases now use distinct session names. Safari/Firefox remain unchecked.
+
 ## 2026-10-25: Screenshot grid and native lightbox
 
 - Grouped adjacent image/caption pairs into a two-column gallery at desktop and phone widths. Screenshot boxes use contain sizing to preserve the full image; responsive sizes account for the narrower columns.

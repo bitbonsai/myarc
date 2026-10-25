@@ -60,9 +60,8 @@ BLOG_CSS = '''
     .image-lightbox:not([open]) { display: none }
     @starting-style {
       .image-lightbox[open] .lightbox-content { opacity: 0; transform: scale(.96) }
-      .image-lightbox[open]::backdrop { opacity: 0 }
     }
-    .image-lightbox::backdrop { background: transparent; -webkit-backdrop-filter: blur(2rem); backdrop-filter: blur(2rem); transition: opacity .3s ease }
+    .image-lightbox::backdrop { background: transparent; -webkit-backdrop-filter: blur(2rem); backdrop-filter: blur(2rem) }
     .image-lightbox button { display: grid; place-items: center; margin: 0 0 1rem auto; width: 2.75rem; height: 2.75rem; padding: .625rem; border: 0; border-radius: 50%; background: var(--page); color: inherit; font: inherit; cursor: pointer }
     .image-lightbox button svg { width: 1.25rem; height: 1.25rem }
     .image-lightbox img { max-height: calc(100dvh - 10rem); width: 100%; object-fit: contain }
@@ -72,7 +71,7 @@ BLOG_CSS = '''
     .post-body figure:hover img, .post-body figure:focus-within img { opacity: 1 }
     .post-body figure:hover figcaption, .post-body figure:focus-within figcaption { color: var(--text) }
     @media (prefers-reduced-motion: reduce) {
-      .post-body figure img, .post-body figcaption, .lightbox-content, .image-lightbox::backdrop { transition: none }
+      .post-body figure img, .post-body figcaption, .lightbox-content { transition: none }
     }
     .post-body blockquote { margin: 2rem 0; padding-left: 1.5rem; color: var(--quiet) }
     .post-body pre { font-family: inherit; padding: 1.25rem; overflow-x: auto; background: var(--panel); color: var(--ivory); border-radius: 1rem }

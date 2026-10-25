@@ -280,6 +280,7 @@ try:
         })()""")
         if has_caption:
             browser('close')
+            SESSION = 'myarc-lightbox-entry'
             browser('open', page.as_uri())
             browser('wait', '.post-body figure a')
             browser('set', 'viewport', '1440', '1000')
@@ -289,6 +290,8 @@ try:
             browser('press', 'Enter')
             print('Lightbox entry:', browser(expression="""(async () => {
               const dialog = document.querySelector('#image-lightbox')
+              const backdrop = getComputedStyle(dialog, '::backdrop')
+              if (backdrop.opacity !== '1' || backdrop.transitionDuration !== '0s' || backdrop.backdropFilter !== 'blur(32px)') throw new Error('Backdrop not fully blurred at entry')
               const animations = dialog.getAnimations({subtree: true})
               const scale = animations.find(animation => animation.transitionProperty === 'transform')
               if (!scale || scale.effect.getTiming().duration !== 300 || !scale.effect.getKeyframes().some(frame => frame.transform.includes('0.96'))) throw new Error('Dialog scale entrance missing')
@@ -299,6 +302,7 @@ try:
             browser('press', 'Escape')
             for width, theme in ((1440, 'light'), (390, 'dark')):
                 browser('close')
+                SESSION = 'myarc-lightbox-' + str(width)
                 browser('open', page.as_uri())
                 browser('wait', '.post-body figure a')
                 browser('set', 'viewport', str(width), '1000')
@@ -345,6 +349,7 @@ try:
         try:
             origin = 'http://127.0.0.1:' + str(server.server_port)
             browser('close')
+            SESSION = 'myarc-navigation'
             browser('open', origin + '/')
             browser('set', 'offline', 'off')
             browser('record', 'start', '/tmp/myarc-view-transitions.webm')
