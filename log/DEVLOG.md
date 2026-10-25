@@ -2,6 +2,15 @@
 
 Keep significant outcomes, failures and next actions reproducible. Newest entry first. No private exports, page titles/URLs from real browsing, credentials or raw user transcripts.
 
+## 2026-10-24: Fable redesign, HTTPS recovery and system themes
+
+- Fable/high (`claude-fable-5-1`, frontend-design Skill) replaced the left-label column layout with headings above content, larger body text and a compact progress panel with dedicated artwork space. Header/footer lockups have 1rem ribbon marks. Parent aligned section/subheading sizes, retained ink navigation without underlines, and verified all six public documentation links plus an actual Roadmap click.
+- Domain provisioning stalled despite valid DNS. With explicit permission, removed/re-saved the Pages custom domain. GitHub automatically created Delete/Create CNAME maintenance commits; the branch-change guard caught this side effect, and read-back confirmed unchanged landing HTML. Certificate became approved for apex and www. Normal TLS, exact deployed bytes, enforced HTTPS and the www redirect then passed.
+- Added canonical/social metadata, a public 1200 × 630 preview, favicon files, WebSite JSON-LD and crawler files. Website runtime assets remain embedded. These changes are published independently of unrelated native-browser source work.
+- Added CSS-only system light/dark preference support, native wordmark source switching, theme-aware browser colors and contrast-adjusted dark links. Added Lucide GitHub icons to both CTAs with the retained ISC notice. [Branding system](../design.md) records actual colors, typography, spacing and motion.
+- Retained website checks pass at six widths. Fresh light/dark desktop and dark mobile captures were inspected; sampled dark text/link contrast passed AA. Focus/hover and reduced-motion checks passed. Published `aa78b0b` serves exact generated HTML over HTTPS. Safari/Firefox, screen readers and search/social reindexing remain unmeasured.
+
+
 ## 2026-10-24: Native MV3 and runtime smoke checks
 
 - MA-002.d: user installed uBlock Origin Lite `2026.1021.1354` in a newly marked native Chromium profile; native management reported FROM_STORE. Causal enabled/disabled/re-enabled checks and a normal process restart passed. Corrected a measurement mistake: uBlock redirects this XHR to a local noop resource, so a resolved fetch alone proves neither external network access nor blocking. Final response origin/path and a disabled control now determine the result.
@@ -14,6 +23,13 @@ Keep significant outcomes, failures and next actions reproducible. Newest entry 
 - MA-003.a: inspected a user-supplied Markdown sample read-only, with source fingerprint unchanged. Space headings, second-level named groups and ordered bare URLs are present. The file provides no producer/schema version, Profile IDs or tab titles. No URLs were opened.
 - Created [an independent shape fixture](../tests/fixtures/arc-markdown/README.md) using invented labels and reserved `.test` URLs. Repeated `Favorites` groups retain an ownership ambiguity; equal URLs cannot establish shared Profiles or justify global deduplication.
 - Verification covers relative links, fixture structure and separation from private source values. This is evidence preparation, with no production importer or semantic round trip claimed. Follow-up settings screenshot confirms the built-in export action; route is recorded in the fixture inventory. Producing-build binding, favorite-versus-pin scope and nested-folder representation remain open. Personal source bytes, fingerprint and screenshot stay outside the repository.
+
+## 2026-10-24: Panel spacing, shared grain and custom-domain DNS
+
+- Removed the progress panel's empty second column and paragraph/status width caps. Intro and status text now reach the same right inset as the left padding. Reserved lower artwork space without overlapping text.
+- Reused the original grain through one embedded CSS variable on both ivory and navy backgrounds. Browser checks passed at 320/390/768/900/1024/1440, including exact inner-edge alignment, grain reuse and artwork separation. Existing offline assets, typography, focus/hover and reduced-motion checks also passed; inspected fresh desktop/tablet/mobile panel captures.
+- Published the revised 442,021-byte artifact and domain CNAME to `gh-pages` at `3c229713f27a85d0f7c4b62d4424485ecc9f4f53`. Bound `myarc.dev` in GitHub Pages. The signed-in Cloudflare browser profile resolved the earlier access blocker; a fresh owned tab was needed, and read-only DOM inspection replaced timed-out accessibility snapshots.
+- Imported only four apex A records from GitHub's current documentation and `www CNAME bitbonsai.github.io`, DNS-only with TTL 300. The zone initially had zero records. Authoritative/public DNS resolve correctly and the domain returns HTTP 200; certificate issuance and HTTPS enforcement remain pending. A bounded session monitor checks normal TLS, exact deployed bytes and HTTPS activation before reporting readiness.
 
 ## 2026-10-24: Chromium build and bounded Rust/native proof
 

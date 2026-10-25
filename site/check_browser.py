@@ -22,6 +22,7 @@ def browser(*args, expression=None):
 
 try:
     browser('open', (ROOT / 'index.html').as_uri())
+    browser('set', 'media', 'light')
     browser('set', 'offline', 'on')
     browser('reload')
     browser(expression="""(async () => {
@@ -32,13 +33,13 @@ try:
       if (performance.getEntriesByType('resource').some(r => /^https?:/.test(r.name))) throw new Error('External resource request')
       return true
     })()""")
-    for width in (1440, 768, 390, 320):
+    for width in (1440, 1024, 900, 768, 390, 320):
         browser('set', 'viewport', str(width), '1000')
         result = browser(expression="""(() => {
           const base = parseFloat(getComputedStyle(document.body).fontSize)
           const text = Array.from(document.querySelectorAll('h1,h2,h3,p,dt,dd,a')).filter(el => el.getClientRects().length)
           const minimum = Math.min(...text.map(el => parseFloat(getComputedStyle(el).fontSize)))
-          if (base !== 16 || minimum < 14) throw new Error('Typography size regression')
+          if (base !== 18 || minimum < 16) throw new Error('Typography size regression')
           if (document.documentElement.scrollWidth > innerWidth) throw new Error('Horizontal overflow')
           for (const el of text) {
             const range = document.createRange()
@@ -47,9 +48,70 @@ try:
               if (rect.width && (rect.left < -1 || rect.right > innerWidth + 1)) throw new Error('Clipped text: ' + el.textContent.slice(0, 60))
             }
           }
-          return {width: innerWidth, base, minimum}
+          for (const link of document.querySelectorAll('.top nav a:not(.button)')) {
+            if (!link.getClientRects().length) continue
+            const style = getComputedStyle(link)
+            if (style.color !== 'rgb(24, 36, 50)' || style.textDecorationLine !== 'none') throw new Error('Header navigation style regression')
+          }
+          const panel = document.querySelector('.panel')
+          const rows = Array.from(panel.querySelectorAll('.status dd'))
+          if (Array.from(panel.querySelectorAll('.status dt')).some(label => getComputedStyle(label).fontSize !== '24px')) throw new Error('Status label hierarchy regression')
+          const padding = getComputedStyle(panel)
+          const artwork = panel.querySelector('.panel-art').getBoundingClientRect()
+          const overlaps = rect => rect.left < artwork.right - 1 && rect.right > artwork.left + 1 && rect.top < artwork.bottom - 1 && rect.bottom > artwork.top + 1
+          if (Array.from(panel.querySelectorAll('h2,.lead,dt,dd')).some(el => overlaps(el.getBoundingClientRect()))) throw new Error('Panel artwork overlaps text')
+          if (document.querySelector('.split,.eyebrow')) throw new Error('Redundant sidebar headings returned')
+          const headings = Array.from(document.querySelectorAll('main h2'))
+          if (new Set(headings.map(h => getComputedStyle(h).fontSize)).size !== 1) throw new Error('Section heading sizes differ')
+          for (const container of document.querySelectorAll('.top,.end')) {
+            const ribbon = container.querySelector('.ribbon').getBoundingClientRect()
+            const wordmark = container.querySelector('.wordmark').getBoundingClientRect()
+            if (ribbon.right > wordmark.left || Math.abs(ribbon.width - ribbon.height) > 1) throw new Error('Logo lockup geometry')
+          }
+          if (padding.backgroundImage !== getComputedStyle(document.body).backgroundImage ||
+              !padding.backgroundImage.startsWith('url("data:image/png;')) throw new Error('Panel grain missing')
+          return {width: innerWidth, base, minimum, headings: 'consistent', logos: 'aligned', grain: 'shared'}
         })()""")
         print('Layout:', result)
+    browser('set', 'viewport', '1440', '1000')
+    browser('screenshot', '--full', '/tmp/myarc-theme-light.png')
+    browser('set', 'media', 'dark')
+    for width in (1440, 390):
+        browser('set', 'viewport', str(width), '1000')
+        print('Dark theme:', browser(expression="""(async () => {
+          await Promise.all(Array.from(document.images).map(image => image.decode()))
+          if (!matchMedia('(prefers-color-scheme: dark)').matches) throw new Error('System preference not detected')
+          const body = getComputedStyle(document.body)
+          if (body.backgroundColor !== 'rgb(11, 20, 32)' || body.color !== 'rgb(245, 242, 236)') throw new Error('Dark palette missing')
+          for (const lockup of document.querySelectorAll('.top .mark,.end .mark')) {
+            if (lockup.querySelector('.wordmark').currentSrc !== lockup.querySelector('source').srcset) throw new Error('Dark wordmark missing')
+          }
+          const luminance = color => {
+            const rgb = color.match(/[\\d.]+/g).slice(0,3).map(Number).map(v => {
+              v /= 255
+              return v <= .04045 ? v / 12.92 : ((v + .055) / 1.055) ** 2.4
+            })
+            return rgb[0] * .2126 + rgb[1] * .7152 + rgb[2] * .0722
+          }
+          const background = luminance(body.backgroundColor)
+          for (const el of [document.body, document.querySelector('.hero-copy p'), document.querySelector('.cta a:not(.button)')]) {
+            const values = getComputedStyle(el).color.match(/[\\d.]+/g).map(Number)
+            const alpha = values[3] ?? 1
+            const bg = body.backgroundColor.match(/[\\d.]+/g).slice(0,3).map(Number)
+            const blended = values.slice(0,3).map((v,i) => v * alpha + bg[i] * (1-alpha))
+            if ((luminance('rgb(' + blended.join(',') + ')') + .05) / (background + .05) < 4.5) throw new Error('Dark text contrast')
+          }
+          if (document.documentElement.scrollWidth > innerWidth) throw new Error('Dark horizontal overflow')
+          if (document.querySelectorAll('.button .github-icon[aria-hidden="true"]').length !== 2) throw new Error('GitHub CTA icons missing')
+          return {width: innerWidth, preference: 'dark', wordmarks: 'ivory', contrast: 'AA'}
+        })()"""))
+        browser('screenshot', '--full', '/tmp/myarc-theme-dark-' + str(width) + '.png')
+    browser('set', 'media', 'dark', 'reduced-motion')
+    browser(expression="""(() => {
+      if (document.getAnimations().some(a => a.playState === 'running')) throw new Error('Dark reduced motion failed')
+      return true
+    })()""")
+    browser('set', 'media', 'light')
     browser('set', 'viewport', '1440', '1000')
     browser('hover', '.end-copy a')
     print('Hover:', browser(expression="""(async () => {

@@ -24,4 +24,6 @@ Public Artcraft repository conventions informed the development methodology. Pri
 
 `tests/fixtures/browser/` and `tools/check_browser_foundation.mjs` are original developer test code using the installed Node runtime and an external compiled Chromium. uBlock Origin Lite is installed separately through Chrome Web Store for the named compatibility case; its code and assets are not bundled or selected as myarc's default blocker.
 
+The website CTA inlines Lucide’s GitHub icon from [`icons/github.svg` at revision `585b65f28f6383d39f257cb2430912ed6f7903a2`](https://github.com/lucide-icons/lucide/blob/585b65f28f6383d39f257cb2430912ed6f7903a2/icons/github.svg). It shares the retained ISC notice in `design/brand/assets/Lucide-LICENSE.txt` and the published HTML’s asset notices.
+
 Future third-party additions must record path, title/component, author, source URL, exact revision/version, license, and retained notice location. Repository publication does not grant rights to unrelated product names or branding.
