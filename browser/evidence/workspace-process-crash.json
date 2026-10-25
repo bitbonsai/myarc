@@ -1,0 +1,36 @@
+{
+  "slice": "MA-007.c-process-crash",
+  "date": "2026-10-25",
+  "status": "failed: Temporary identity pruned before recovery decision",
+  "baseline_commit": "5bf05df",
+  "setup": {
+    "marked_synthetic_profile": true,
+    "spaces": 2,
+    "live_pages": 2,
+    "profile_favorites": 1,
+    "temporary_pages": 1,
+    "checkpoint_after_observed_metadata": true,
+    "canary_acknowledged_before_kill": true,
+    "actual_browser_sigkill_audited": true,
+    "relaunch_without_startup_urls": true,
+    "restore_last_session_flag": false,
+    "genuine_restore_button_invoked": true
+  },
+  "observed": {
+    "both_page_urls_restored": true,
+    "profile_favorite_id_and_canonical_url_retained": true,
+    "space_ids_and_names_retained": true,
+    "prior_temporary_id_retained": false,
+    "temporary_removed_before_restore_choice": true,
+    "new_temporary_id_allocated_after_restore": true,
+    "full_native_verify_passed": false
+  },
+  "failure": "Original Temporary item ID2 disappeared while the crash-recovery prompt was pending; a startup NTP was recorded as ID3. Native Restore returned the page under ID4.",
+  "remaining": [
+    "Fix lifecycle gate so pending recovery decision cannot prune or overwrite prior workspace organization",
+    "Recheck Restore, explicit discard and shutdown/cancellation paths with fresh synthetic profiles",
+    "Canary/full recovery verification and OS/write-boundary durability remain unaccepted"
+  ],
+  "workspace_renderer_default_enabled": false,
+  "raw_profiles_audits_logs_and_captures": "private, outside Git"
+}

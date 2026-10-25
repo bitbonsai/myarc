@@ -2,6 +2,12 @@
 
 Keep significant outcomes, failures and next actions reproducible. Newest entry first. No private exports, page titles/URLs from real browsing, credentials or raw user transcripts.
 
+## 2026-10-25: Actual process crash exposed early recovery pruning
+
+- Integrated `a9b73b9` as `5bf05df`; reran 13 local probe tests. Prepared real two-Space Favorite/Temporary state, acknowledged a form/localStorage canary, and checkpointed observed native metadata. Audited SIGKILL targeted only the marked disposable browser, followed by normal relaunch without startup URLs or a restore launch flag and actual Restore-button invocation.
+- Both URLs returned, and Favorite/Space identity survived. [Native verification failed](../browser/evidence/workspace-process-crash.json): Temporary ID 2 had already been pruned while the prompt waited, startup NTP became ID 3, and the restored Temporary was rebound to ID 4. The verifier was kept strict. Failure profile/logs remain private; its test app and owned server were closed.
+- Recovery choice is missing from the native readiness barrier. The next bounded source fix must hold pruning/binding/persistence until Restore or deliberate discard resolves, including async prompt/lifetime paths. Default renderer remains off; full crash recovery, write-boundary and OS durability stay unaccepted.
+
 ## 2026-10-25: MA-007.c two-process crash probe handoff
 
 - Starting revision: `d82f4f2`. Extended the retained native developer client with `workspace-crash-checkpoint` and `workspace-crash-verify`, plus an original second loopback page. The [recipe](../tests/fixtures/browser/README.md#two-process-workspace-crash-probe) requires two actual Spaces, one selected Profile Favorite, one live Temporary and already-persisted metadata. Schema comes from the owned `WorkspaceService` encoder/decoder; browser ownership uses upstream command-line/default-context inspection plus bounded single-Profile `Local State` read-back, without navigating saved tabs to a version page.

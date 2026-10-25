@@ -14,8 +14,8 @@ Baseline: `d82f4f2`. [Background and saved journeys](../evidence/page-background
 
 ## Current work
 
-A bounded checkpoint/verify extension of the retained native developer client is delegated. The lead will prepare the synthetic workspace and own the actual process kill, relaunch and recovery UI. No process-crash acceptance run has completed in this window yet.
+Checkpoint/verify probe integrated as `5bf05df`; thirteen local tests passed. The first actual process-kill run restored both URLs but failed stable identity: the pending recovery prompt allowed Temporary item pruning before the user chose Restore. [Failure evidence](../evidence/workspace-process-crash.json) records the narrower result. Lifecycle repair is next; full crash recovery remains unaccepted.
 
 ## Results and handoff
 
-In progress. This record will contain verified commits, actual checks and remaining blockers when the window closes. A stopped or interrupted session must remain distinguishable from eight hours of completed work.
+In progress. Final handoff will include a short change summary with verified commits, actual checks and remaining blockers. It will also provide an exact tested launch command for a fresh disposable preview profile and a short manual test checklist with expected results. Experimental flags, profile protection and known limitations must be explicit. A stopped or interrupted session must remain distinguishable from eight hours of completed work.
