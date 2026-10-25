@@ -1,0 +1,45 @@
+{
+  "slice": "MA-007.c-native-profiles",
+  "date": "2026-10-25",
+  "status": "bounded two-regular-Profile isolation passed using new-window bootstrap workaround",
+  "setup": {
+    "fresh_marked_disposable_user_data_directory": true,
+    "one_browser_process": true,
+    "regular_profiles": [
+      "Default",
+      "Profile 1"
+    ],
+    "native_profiles_menu_add_name_done_without_account": true,
+    "native_profile_switch_used": true,
+    "no_cdp_context_or_target_creation": true
+  },
+  "observed": {
+    "distinct_native_contexts_and_windows_observed": true,
+    "primary_favorite_and_space_absent_from_other_profile": true,
+    "typed_other_palette_query_before_visiting_primary_site_did_not_expose_primary_tab": true,
+    "same_origin_local_storage_values_isolated": true,
+    "other_profile_space_and_different_favorite_persisted_in_its_own_path": true,
+    "primary_workspace_bytes_unchanged_through_other_mutations": true,
+    "numeric_ids_scoped_to_native_profile_not_global": true
+  },
+  "bootstrap_gap": {
+    "new_profile_initial_vertical_preference_disabled": true,
+    "native_view_menu_vertical_toggle_did_not_initialize_myarc_toolbar_or_workspace": true,
+    "source_boundary": "BrowserView::AddedToWidget initializes myarc controls only for initial vertical mode",
+    "workaround": "Close that stock window after native vertical toggle, then reopen Profile through native Profiles menu",
+    "native_ui_with_workaround_passed": true,
+    "repair_pending": true
+  },
+  "failed_attempts": [
+    "Second CLI launch against live marked directory was rejected by ProcessSingleton lock; lock was never removed or overridden. Native Profiles menu was used instead.",
+    "An asynchronous menu request was followed too quickly by another action; final save acceptance waited for actual persisted Favorite projection. AX request return alone was not counted as acknowledgement."
+  ],
+  "limits": [
+    "Two controlled regular Profiles only; cookies/credentials, Guest/system and broad extension/activeTab paths remain unrun",
+    "One pre-navigation palette query, not exhaustive history/index isolation",
+    "No crash/write-boundary/OS durability claim and no direct in-memory Rust inspection",
+    "Raw logs, profile data and captures remain private outside Git"
+  ],
+  "all_owned_apps_helpers_and_fixture_servers_closed": true,
+  "workspace_renderer_default_enabled": false
+}

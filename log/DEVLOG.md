@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-10-25: Two regular Profiles and runtime-mode gap
+
+- Native Profiles menu created a second regular Profile without an account. Separate contexts, UI-selected Spaces, persisted Favorite URLs and same-origin notes stayed isolated in one browser process; the primary workspace bytes stayed unchanged. Before visiting the primary site, a real typed palette query in the other Profile omitted its title. [Evidence](../browser/evidence/workspace-native-profiles.json). Numeric IDs remain scoped to native Profile namespaces.
+- Direct duplicate CLI launch was rejected by ProcessSingleton; no lock deletion/override was attempted. Native profile creation reset the seeded vertical preference. Enabling vertical tabs in that existing window changed stock layout while myarc toolbar/workspace remained uninitialized. Closing/reopening through native Profiles after the real preference change constructed the correct adapter and allowed the bounded isolation checks. `BrowserView::AddedToWidget` currently owns initialization only for initial vertical mode. Runtime bootstrap is the next narrow fix.
+- Native AX/menu returns were followed by actual projection checks; an early uncommitted menu request was not counted as save success. Owned apps/helpers and server closed. No C++ changed in this acceptance slice. Wider privacy, native C++ suites and durability remain open; renderer stays off.
+
 ## 2026-10-25: Native private workspace lifecycle
 
 - Fresh marked normal Profile saved a Favorite and named Space. Native Cmd+Shift+N opened a distinct private context with its own workspace. The normal Favorite/Space were absent. A real private Space and acknowledged fixture note stayed separate from the normal note; regular workspace bytes remained unchanged.
