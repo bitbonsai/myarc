@@ -33,7 +33,10 @@ class Page(HTMLParser):
             if key in attrs:
                 assert attrs[key].startswith('data:'), f'External resource: {tag} {key}'
                 self.assets += 1
-        if tag == 'link' and attrs.get('rel') != 'canonical':
+        if tag == 'link' and attrs.get('rel') == 'alternate':
+            assert attrs.get('type') in ('text/markdown', 'text/plain'), 'Unexpected alternate representation'
+            assert attrs.get('href') in ('https://myarc.dev/index.md', 'https://myarc.dev/llms.txt'), 'Unexpected alternate URL'
+        elif tag == 'link' and attrs.get('rel') != 'canonical':
             assert attrs.get('href', '').startswith('data:'), 'External link resource'
             self.assets += 1
         if tag == 'script':

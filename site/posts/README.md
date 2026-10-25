@@ -36,7 +36,7 @@ Public screenshots must use synthetic tabs, invented data and disposable profile
 
 ## Screenshots and Markdown
 
-PNG, JPEG and static WebP files may sit alongside a post or in its subfolders. Give every screenshot descriptive alt text. The first Markdown image supplies the article Open Graph/Twitter image and alt text, with its actual dimensions and MIME type. A small generated WebP thumbnail appears beside the title on the blog index. Posts without images keep the default brand social card and a text-only listing. Only images referenced by published posts are copied to the public output; draft and unreferenced files stay out of the artifact.
+PNG, JPEG and static WebP files may sit alongside a post or in its subfolders. Give every screenshot descriptive alt text. The first Markdown image supplies the article Open Graph/Twitter image and alt text, with its actual dimensions and MIME type. A small generated WebP thumbnail appears beside the title on the blog index. Posts without images keep the default brand social card and a text-only listing. Only images referenced by published posts enter the public output, as WebP derivatives with responsive variants where useful. Originals remain in source; draft and unreferenced files stay out of the artifact. Links to referenced images are rewritten to the published derivatives, and Markdown equivalents are generated from the same rendered HTML.
 
 Raw HTML is displayed as text, not executed. External screenshot URLs, paths outside the post folder and symlinked post sources are rejected. Limits: 128 KiB Markdown per post, 4 KiB metadata, 20 screenshots per post, 10 MiB/24 megapixels per screenshot and 256 MiB screenshots across the site.
 
@@ -46,6 +46,7 @@ Build with the dependencies in [requirements.txt](../requirements.txt), then run
 python3 site/build.py
 python3 -m unittest discover -s site -p '*_test.py'
 python3 site/check.py
+python3 site/check_seo.py
 python3 site/check_browser.py
 python3 site/publish.py
 ```

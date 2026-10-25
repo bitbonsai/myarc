@@ -40,6 +40,7 @@ try:
           const text = Array.from(document.querySelectorAll('h1,h2,h3,p,dt,dd,a')).filter(el => el.getClientRects().length)
           const minimum = Math.min(...text.map(el => parseFloat(getComputedStyle(el).fontSize)))
           if (base !== 18 || minimum < 16) throw new Error('Typography size regression')
+          if (innerWidth <= 768 && getComputedStyle(document.querySelector('.wrap')).paddingLeft !== '24px') throw new Error('Mobile site gutter')
           if (document.documentElement.scrollWidth > innerWidth) throw new Error('Horizontal overflow')
           for (const el of text) {
             const range = document.createRange()
@@ -152,8 +153,13 @@ try:
                 browser('set', 'viewport', str(width), '1000')
                 result = browser(expression="""(async () => {
                   await document.fonts.ready
-                  await Promise.all(Array.from(document.images).map(image => image.decode()))
+                  await Promise.all(Array.from(document.images).map(image => {
+                    image.loading = 'eager'
+                    return image.decode()
+                  }))
+                  if (!Array.from(document.fonts).some(font => font.family === 'Outfit' && font.status === 'loaded')) throw new Error('Blog Outfit not loaded')
                   if (document.querySelectorAll('h1').length !== 1) throw new Error('Blog heading structure')
+                  if (innerWidth <= 768 && getComputedStyle(document.querySelector('.wrap')).paddingLeft !== '24px') throw new Error('Mobile blog gutter')
                   if (document.documentElement.scrollWidth > innerWidth) throw new Error('Blog overflow')
                   const nav = document.querySelector('.blog-link')
                   if (!nav.getClientRects().length) throw new Error('Blog navigation hidden')
@@ -172,8 +178,11 @@ try:
                     for (const selector of ['meta[property="og:image"]', 'meta[name="twitter:image"]']) {
                       if (document.querySelector(selector).content !== expected) throw new Error('Post social image mismatch')
                     }
-                    if (Number(document.querySelector('meta[property="og:image:width"]').content) !== first.naturalWidth) throw new Error('Social image dimensions')
+                    if (Number(document.querySelector('meta[property="og:image:width"]').content) !== Number(first.getAttribute('width'))) throw new Error('Social image dimensions')
                   }
+                  const schemas = Array.from(document.querySelectorAll('script[type="application/ld+json"]')).flatMap(node => JSON.parse(node.textContent)['@graph'] || [])
+                  if (!schemas.some(node => node['@type'] === 'BreadcrumbList')) throw new Error('Breadcrumb schema missing')
+                  if (!document.querySelector('link[rel="alternate"][type="text/markdown"]')) throw new Error('Markdown discovery missing')
                   const thumbnail = document.querySelector('.post-thumb img')
                   if (thumbnail) {
                     const image = thumbnail.getBoundingClientRect()

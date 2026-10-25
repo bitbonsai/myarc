@@ -1,6 +1,7 @@
 """Real Markdown rendering, draft removal and screenshot boundary checks."""
 from pathlib import Path
 import tempfile
+import json
 import unittest
 
 from PIL import Image
@@ -24,7 +25,7 @@ class BlogTests(unittest.TestCase):
         self.source.write_text(f'---\ntitle: "{title}"\nsummary: "A synthetic test post."\ndraft: {draft}\n---\n\n{body}\n')
 
     def build(self):
-        return build_blog(self.root, TEMPLATE, lambda value: value)
+        return build_blog(self.root, TEMPLATE, lambda value, prefix: value)
 
     def test_empty_index_and_default_draft(self):
         self.build()
@@ -43,16 +44,21 @@ class BlogTests(unittest.TestCase):
         self.assertEqual(1, len(posts))
         self.assertIn('<strong>real</strong>', html)
         self.assertIn('alt="Synthetic blue screenshot"', html)
-        self.assertEqual((self.folder / 'screen.png').read_bytes(), (page.parent / 'screen.png').read_bytes())
+        image_name = next(iter(posts[0].images))
+        self.assertTrue(image_name.endswith('.webp'))
+        self.assertFalse((page.parent / 'screen.png').exists())
+        with Image.open(page.parent / image_name) as image:
+            self.assertEqual('WEBP', image.format)
+            self.assertEqual((20, 10), image.size)
         self.assertIn(posts[0].url, (self.root / 'sitemap.xml').read_text())
         self.assertIn('og:type" content="article"', html)
         self.assertIn('"datePublished": "2026-10-25"', html)
-        cover_url = posts[0].url + 'screen.png'
+        cover_url = posts[0].cover['url']
         for tag in ('property="og:image"', 'property="og:image:secure_url"', 'name="twitter:image"'):
             self.assertIn(tag + ' content="' + cover_url + '"', html)
         self.assertIn('property="og:image:width" content="20"', html)
         self.assertIn('property="og:image:height" content="10"', html)
-        self.assertIn('property="og:image:type" content="image/png"', html)
+        self.assertIn('property="og:image:type" content="image/webp"', html)
         self.assertIn('property="og:image:alt" content="Synthetic blue screenshot"', html)
         self.assertIn('"image": "' + cover_url + '"', html)
         index = (self.root / 'blog/index.html').read_text()
@@ -78,17 +84,32 @@ class BlogTests(unittest.TestCase):
         self.post()
         self.build()
         html = (self.root / 'blog' / self.folder.name / 'index.html').read_text()
-        self.assertIn('property="og:image" content="https://myarc.dev/og-image.png"', html)
+        self.assertIn('property="og:image" content="https://myarc.dev/og-image.webp"', html)
         self.assertNotIn('class="post-thumb"', (self.root / 'blog/index.html').read_text())
         Image.new('RGB', (40, 20), 'red').save(self.folder / 'first image.png')
         Image.new('RGB', (20, 10), 'blue').save(self.folder / 'second.png')
         self.post('![First & target](first%20image.png)\n\n![Second](second.png)')
         post = self.build()[0]
-        self.assertEqual(post.url + 'first%20image.png', post.cover['url'])
+        self.assertTrue(post.cover['url'].startswith(post.url + 'first%20image.'))
+        self.assertTrue(post.cover['url'].endswith('.webp'))
         self.assertEqual('First & target', post.cover['alt'])
         html = (self.root / 'blog' / self.folder.name / 'index.html').read_text()
         self.assertIn('content="First &amp; target"', html)
         self.assertIn('property="og:image:width" content="40"', html)
+
+    def test_responsive_webp_and_link_rewrite(self):
+        Image.new('RGB', (2000, 1300), 'purple').save(self.folder / 'large.png')
+        self.post('[![Reference](large.png)](large.png)')
+        post = self.build()[0]
+        self.assertEqual(2, len(post.images))
+        self.assertTrue(all(name.endswith('.webp') for name in post.images))
+        self.assertIn('960w', post.html)
+        self.assertIn('width="2000"', post.html)
+        self.assertNotIn('large.png', post.html)
+        self.assertIn('loading="eager"', post.html)
+        html = (self.root / 'blog' / self.folder.name / 'index.html').read_text()
+        schema = json.loads(html.split('<script type="application/ld+json">', 1)[1].split('</script>', 1)[0])
+        self.assertEqual('https://github.com/bitbonsai', schema['@graph'][0]['author']['url'])
 
     def test_posts_group_by_month_without_repeated_labels(self):
         self.post()
@@ -144,7 +165,7 @@ class PublisherTests(unittest.TestCase):
         self.assertEqual('e69de29bb2d1d6434b8b29ae775ad8c2e48c5391', blob_sha(b''))
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            for name in ('index.html', 'og-image.png', 'favicon.png', 'favicon.ico', 'robots.txt', 'sitemap.xml'):
+            for name in ('index.html', 'og-image.png', 'og-image.webp', 'favicon.png', 'favicon.ico', 'robots.txt', 'sitemap.xml', 'index.md', 'llms.txt', 'llms-full.txt'):
                 (root / name).write_bytes(b'synthetic artifact')
             (root / 'blog').mkdir()
             (root / 'blog/index.html').write_text('synthetic index')

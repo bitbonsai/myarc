@@ -26,6 +26,10 @@ __pycache__/
 .venv/
 site/blog/
 site/.publish-receipt.json
+site/index.md
+site/og-image.webp
+site/llms.txt
+site/llms-full.txt
 *.pyc
 .DS_Store
 

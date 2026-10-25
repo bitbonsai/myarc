@@ -1,6 +1,7 @@
 """Embed approved brand assets into one independently hostable HTML file."""
 from pathlib import Path
 import base64
+import hashlib
 import io
 import json
 import re
@@ -9,6 +10,7 @@ from PIL import Image
 from fontTools.ttLib import TTFont
 
 from blog import build_blog
+from discovery import build_discovery
 
 ROOT = Path(__file__).resolve().parent
 BRAND = ROOT.parent / 'design' / 'brand'
@@ -52,9 +54,29 @@ notices = {
 notice_json = json.dumps(notices, ensure_ascii=True).replace('<', '\\u003c')
 
 
-def embed(template):
+def embed(template, prefix=None):
     assert len(template.encode()) < 1_000_000, 'Page template is unexpectedly large'
     for token, value in assets.items():
+        if token not in template:
+            continue
+        if prefix is not None and value.startswith('data:'):
+            mime, encoded = value[5:].split(';base64,', 1)
+            data = base64.b64decode(encoded)
+            if token in ('@@LOGO_MATTE@@', '@@GRAIN@@'):
+                with Image.open(io.BytesIO(data)) as image:
+                    image = image.convert('RGBA')
+                    if token == '@@LOGO_MATTE@@':
+                        image.thumbnail((64, 64), Image.Resampling.LANCZOS)
+                    output = io.BytesIO()
+                    image.save(output, format='WEBP', lossless=token == '@@GRAIN@@', quality=90, method=6)
+                    data = output.getvalue()
+                    mime = 'image/webp'
+            suffix = {'font/woff2': 'woff2', 'image/svg+xml': 'svg', 'image/webp': 'webp', 'image/png': 'png'}[mime]
+            name = token.strip('@').lower().replace('_', '-') + '.' + hashlib.sha256(data).hexdigest()[:12] + '.' + suffix
+            folder = ROOT / 'blog/_assets'
+            folder.mkdir(exist_ok=True)
+            (folder / name).write_bytes(data)
+            value = prefix + '_assets/' + name
         template = template.replace(token, value)
     assert not re.search(r'@@[A-Z_]+@@', template), 'Unresolved asset token'
     template = template.replace('</head>', f'<script type="application/json" id="asset-notices">{notice_json}</script>\n</head>', 1)
@@ -62,11 +84,16 @@ def embed(template):
     return template
 
 
+with Image.open(ROOT / 'og-image.png') as image:
+    image.save(ROOT / 'og-image.webp', format='WEBP', quality=90, method=6)
+
 template = (ROOT / 'index.template.html').read_text()
 try:
-    build_blog(ROOT, template, embed)
+    posts = build_blog(ROOT, template, embed)
 except (ValueError, OSError, RecursionError) as error:
     raise SystemExit(f'Blog build failed: {error}') from None
+template = template.replace('</head>', '<link rel="alternate" type="text/markdown" href="https://myarc.dev/index.md" title="Markdown">\n<link rel="alternate" type="text/plain" href="https://myarc.dev/llms.txt" title="Site context">\n</head>', 1)
 html = embed(template)
 (ROOT / 'index.html').write_text(html)
+build_discovery(ROOT, html, posts)
 print(f'Built {ROOT / "index.html"}: {len(html.encode()):,} bytes. All visual assets embedded.')

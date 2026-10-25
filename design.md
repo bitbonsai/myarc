@@ -54,7 +54,7 @@ The page uses HTML/CSS for this behavior. There is no theme toggle, stored overr
 Use the embedded variable **Outfit** font. All font sizes use rem; the root remains 100% so browser text-size preferences work.
 
 - Body: 1.125rem, line-height 1.55
-- Main headline: 5.5rem, stepping down to 4.5rem / 3.75rem / 2.75rem
+- Main headline: 5.5rem, stepping down to 4.5rem / 3.75rem / 2.5rem
 - Section headings: 2.75rem, reduced to 2.25rem below 48rem
 - Subheadings and Now / Next / For launch: 1.5rem, semibold
 - Hero introduction: 1.375rem, reduced to 1.125rem on small screens
@@ -65,7 +65,7 @@ Section headings share a size at each breakpoint and sit above their content. Av
 
 ## Layout and surfaces
 
-The content wrapper is at most 80rem wide. Horizontal padding is 3rem, then 1.5rem below 48rem and 1.25rem below 40rem.
+The content wrapper is at most 80rem wide. Horizontal padding is 3rem, then 1.5rem at mobile widths up to 48rem, including phones below 40rem.
 
 Sections use 6rem vertical padding, reduced to 4.5rem below 48rem. Space separates sections; horizontal divider rules are unnecessary.
 
@@ -75,7 +75,7 @@ Reuse the original monochrome grain at a 16rem tile size on page and progress pa
 
 ## Progress journal
 
-Blog index and articles reuse the homepage shell, embedded Outfit and theme tokens. Article titles use 3.5rem, reduced to 2.5rem below 48rem. Article sections use 2rem; preview titles use 2rem, reduced to 1.5rem below 48rem. The index omits the introductory banner, retaining a visually hidden Blog heading for assistive technology. Muted month/year labels group posts; month text uses #5F6B76 in light mode and #8794A3 in dark mode. Title, full date and abstract share one column beside each thumbnail. Abstracts remain complete in the HTML and use CSS nowrap/overflow/ellipsis to occupy one line. Thumbnails sit beside titles at 8rem wide, reduced to 5.5rem on mobile, with the complete image contained rather than cropped. Body text stays 1.125rem, dates and code use 1rem, and reading columns are capped at 68ch. Code keeps Outfit. Screenshots retain their original pixels and use a 1rem CSS radius.
+Blog index and articles reuse the homepage shell, shared Outfit assets and theme tokens. Article titles use 3.5rem, reduced to 2.5rem below 48rem. Article sections use 2rem; preview titles use 2rem, reduced to 1.5rem below 48rem. The index omits the introductory banner, retaining a visually hidden Blog heading for assistive technology. Muted month/year labels group posts; month text uses #5F6B76 in light mode and #8794A3 in dark mode. Title, full date and abstract share one column beside each thumbnail. Abstracts remain complete in the HTML and use CSS nowrap/overflow/ellipsis to occupy one line. Thumbnails sit beside titles at 8rem wide, reduced to 5.5rem on mobile, with the complete image contained rather than cropped. Body text stays 1.125rem, dates and code use 1rem, and reading columns are capped at 68ch. Code keeps Outfit. Original screenshots remain in source. Published WebP derivatives preserve proportions, are capped at 2400px, provide responsive variants and use a 1rem CSS radius. Blog brand assets are shared/cacheable; the homepage retains embedded visuals.
 
 Keep the Blog navigation link visible on mobile. The header development button uses 1rem text below 48rem so both links fit where possible; the header wraps at narrower widths. Body links, visible focus and reduced-motion behavior remain shared.
 
@@ -89,7 +89,7 @@ Verify light and dark rendering, image decoding, text contrast, keyboard focus a
 
 ## Publishing and social previews
 
-Install [build dependencies](site/requirements.txt), then build with `python3 site/build.py`. Homepage and blog shells embed their visual assets; post screenshots are local static files. Authoring and publishing instructions are in the [website README](site/README.md). Font and visual page assets remain embedded. Public favicon files and the 1200 × 630 `og-image.png` are separate crawler/social-preview assets.
+Install [build dependencies](site/requirements.txt), then build with `python3 site/build.py`. The homepage embeds its visuals. Blog shells use shared first-party assets; post screenshots are optimized static WebP files. Authoring and publishing instructions are in the [website README](site/README.md). Homepage font and visual assets remain embedded; blog assets use content-hashed first-party files. Public favicon files and the 1200 × 630 `og-image.png` are separate crawler/social-preview assets.
 
 Homepage and image-free posts use the approved navy social card, regardless of color preference. Illustrated posts use their first Markdown image for Open Graph/Twitter previews and an optimized WebP derivative for the index thumbnail. Reference images must be labelled clearly as targets, separate from implemented myArc behavior. Canonical URL: `https://myarc.dev/`. GitHub Pages hosts the artifact branch; Cloudflare provides DNS. Hosting is separate from local browser operation.
 

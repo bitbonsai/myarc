@@ -13,10 +13,11 @@ python3 -m pip install -r site/requirements.txt
 python3 site/build.py
 python3 -m unittest discover -s site -p '*_test.py'
 python3 site/check.py
+python3 site/check_seo.py
 python3 site/check_browser.py
 ```
 
-Build dependencies: Python 3.9+, Pillow, fontTools, Brotli, PyYAML and markdown-it-py. The Markdown parser runs only during builds, with raw HTML disabled. The published page has no executable JavaScript or runtime dependencies. Font timestamps are preserved for deterministic builds.
+Build dependencies: Python 3.9+, Pillow, fontTools, Brotli, PyYAML and markdown-it-py. The Markdown parser runs only during builds, with raw HTML disabled. Markdownify/Beautiful Soup export the same rendered main content to Markdown, omitting decorative branding. The website has no executable JavaScript or runtime service dependencies. The homepage remains a standalone HTML file; blog pages use content-hashed first-party assets in their generated `_assets/` folder. Font timestamps are preserved for deterministic builds.
 
 The browser check needs agent-browser and Chrome. It closes agent-browser and Chrome for Testing helpers, including lingering test helpers. These checks exercise the website, not native browser behavior.
 
@@ -25,6 +26,16 @@ The browser check needs agent-browser and Chrome. It closes agent-browser and Ch
 [Authoring instructions](posts/README.md) cover metadata, approval and screenshots. Put each Markdown post and its local images in `site/posts/YYYY-MM-DD-slug/`. Drafts are excluded by default. `site/blog/` is ignored generated output; the sitemap contains only published routes. Source and generated screenshots are separate so deleting a source reference removes the public artifact on the next deployment.
 
 With the environment above activated, publish with `python3 site/publish.py`. The publisher rebuilds and checks the homepage, uses the existing `bitbonsai` GitHub CLI login, and updates the artifact-only branch without force. It preserves the domain/HTTPS configuration and unrelated root files, while replacing the generated blog subtree so unpublishing removes article pages and screenshots. Credentials are never written to the website or receipt. Run the unit/browser checks before publishing.
+
+## Delivery and machine-readable content
+
+Published post images are high-quality WebP derivatives, capped at 2400px, with a 960px responsive variant when useful. HTML dimensions reserve space; first images load eagerly and later images lazily. Original PNG/JPEG sources remain in `site/posts/` and are excluded from deployment. SVG wordmarks and compatible PNG/ICO favicons retain their native formats. Blog font, grain and small ribbon assets are shared and content-hashed for caching.
+
+GitHub Pages negotiates gzip automatically for text responses. Live `Content-Encoding: gzip` and byte-for-byte decompressed read-back were verified; tiny responses may stay uncompressed. Uploading `.gz` sidecars does not configure content negotiation on Pages. Custom cache/security headers and `Accept: text/markdown` negotiation are outside this static host configuration.
+
+Every HTML page links its Markdown equivalent with `rel="alternate"`. Outputs: `/index.md`, `/blog/index.md`, and `/blog/YYYY-MM-DD-slug/index.md`. `/llms.txt` provides project status and discovery links; `/llms-full.txt` contains the generated published text. Drafts and unpublished posts are excluded from both. HTML canonical URLs stay in the sitemap, with post image entries. Source dates are preserved without invented modification timestamps.
+
+Blog metadata includes author attribution, canonical/social fields, language, Blog/BlogPosting and BreadcrumbList JSON-LD. `check_seo.py` checks metadata and local targets before publication. This improves delivery and machine readability; indexing, rankings and AI citations remain unmeasured. Search Console submission and external rich-result validation have not been performed.
 
 ## Design
 

@@ -6,6 +6,7 @@ from itertools import islice
 from pathlib import Path
 from urllib.parse import quote, unquote, urlsplit
 import io
+import hashlib
 import json
 import re
 import shutil
@@ -38,6 +39,7 @@ BLOG_CSS = '''
     .post-thumb img { width: 100%; aspect-ratio: 8 / 5; object-fit: contain; border-radius: .75rem; background: var(--panel) }
     .post-date { display: block; color: var(--quiet); font-size: 1rem }
     .post-header .post-date { margin-top: 1rem }
+    .post-author { margin-top: .5rem; color: var(--quiet); font-size: 1rem }
     .post-back { display: inline-block; margin-bottom: 2rem }
     .post-body > * + * { margin-top: 1.5rem }
     .post-body h2 { font-size: 2rem; margin-top: 3rem }
@@ -72,6 +74,7 @@ class Post:
     html: str
     images: dict
     cover_alt: str = ''
+    source_bytes: int = 0
 
     @property
     def url(self):
@@ -109,6 +112,26 @@ def screenshot(folder, source):
             raise ValueError(f'Use a static screenshot under 24 megapixels: {source}')
         image.verify()
     return relative.as_posix(), data
+
+
+def webp_images(name, data):
+    files = {}
+    with Image.open(io.BytesIO(data)) as original:
+        image = original.convert('RGBA')
+        image.thumbnail((2400, 2400), Image.Resampling.LANCZOS)
+        width, height = image.size
+        output = io.BytesIO()
+        image.save(output, format='WEBP', quality=90, method=6, icc_profile=original.info.get('icc_profile', b''))
+        encoded = output.getvalue()
+        path = Path(name)
+        name = (path.parent / (path.stem + '.' + hashlib.sha256(encoded).hexdigest()[:12] + '.webp')).as_posix()
+        files[name] = encoded
+        if width > 960:
+            image.thumbnail((960, 2400), Image.Resampling.LANCZOS)
+            output = io.BytesIO()
+            image.save(output, format='WEBP', quality=90, method=6, icc_profile=original.info.get('icc_profile', b''))
+            files[str(Path(name).with_suffix('.960.webp'))] = output.getvalue()
+    return name, files, width, height
 
 
 def load_post(path):
@@ -152,6 +175,9 @@ def load_post(path):
     tokens = MD.parse(body)
     images = {}
     cover_alt = ''
+    replacements = {}
+    source_bytes = 0
+    count = 0
     for token in tokens:
         if token.type == 'heading_open' and token.tag == 'h1':
             raise ValueError(f'Title comes from metadata; use ## section headings: {path}')
@@ -159,16 +185,38 @@ def load_post(path):
             if child.type == 'image':
                 if not child.content.strip():
                     raise ValueError(f'Screenshot needs descriptive alt text: {path}')
-                name, data = screenshot(path.parent, child.attrGet('src'))
-                if not images:
-                    cover_alt = child.content.strip()
-                images[name] = data
-                if len(images) > 20:
+                count += 1
+                if count > 20:
                     raise ValueError(f'Maximum 20 screenshots per post: {path}')
-    return Post(slug, published, meta['title'].strip(), meta['summary'].strip(), MD.renderer.render(tokens, MD.options, {}), images, cover_alt)
+                source = child.attrGet('src')
+                name, data = screenshot(path.parent, source)
+                source_bytes += len(data)
+                first = not images
+                if first:
+                    cover_alt = child.content.strip()
+                name, files, width, height = webp_images(name, data)
+                images.update(files)
+                destination = quote(name, safe='/')
+                replacements[source] = destination
+                child.attrSet('src', destination)
+                child.attrSet('width', str(width))
+                child.attrSet('height', str(height))
+                child.attrSet('decoding', 'async')
+                child.attrSet('loading', 'eager' if first else 'lazy')
+                if first:
+                    child.attrSet('fetchpriority', 'high')
+                variant = str(Path(name).with_suffix('.960.webp'))
+                if variant in files:
+                    child.attrSet('srcset', f'{quote(variant, safe="/")} 960w, {destination} {width}w')
+                    child.attrSet('sizes', '(max-width: 48rem) calc(100vw - 3rem), 50rem')
+    for token in tokens:
+        for child in token.children or []:
+            if child.type == 'link_open' and child.attrGet('href') in replacements:
+                child.attrSet('href', replacements[child.attrGet('href')])
+    return Post(slug, published, meta['title'].strip(), meta['summary'].strip(), MD.renderer.render(tokens, MD.options, {}), images, cover_alt, source_bytes)
 
 
-def page_shell(template, title, summary, url, content, published=None, cover=None):
+def page_shell(template, title, summary, url, content, published=None, cover=None, posts=None):
     head, body = template.split('<body>', 1)
     header = re.search(r'<header class="top">.*?</header>', body, re.S).group()
     footer = re.search(r'<footer class="end">.*?</footer>', body, re.S).group()
@@ -178,11 +226,18 @@ def page_shell(template, title, summary, url, content, published=None, cover=Non
         head = re.sub(r'(<meta ' + key + r' content=")[^"]*', lambda match: match[1] + escape(value, quote=True), head, count=1)
     head = head.replace('rel="canonical" href="https://myarc.dev/"', f'rel="canonical" href="{url}"')
     head = head.replace('property="og:url" content="https://myarc.dev/"', f'property="og:url" content="{url}"')
+    head = head.replace('https://myarc.dev/og-image.png', 'https://myarc.dev/og-image.webp')
+    head = head.replace('property="og:image:type" content="image/png"', 'property="og:image:type" content="image/webp"')
     if published:
         head = head.replace('property="og:type" content="website"', 'property="og:type" content="article"')
     schema = {'@context': 'https://schema.org', '@type': 'BlogPosting' if published else 'Blog', 'name': title, 'description': summary, 'url': url}
+    author = {'@type': 'Person', 'name': 'bitbonsai', 'url': 'https://github.com/bitbonsai'}
+    schema.update(inLanguage='en', publisher=author)
     if published:
-        schema.update(headline=title, datePublished=published.isoformat())
+        schema.update(headline=title, datePublished=published.isoformat(), author=author,
+                      mainEntityOfPage=url, isPartOf={'@type': 'Blog', 'name': 'myArc Blog', 'url': 'https://myarc.dev/blog/'})
+    if posts is not None:
+        schema['blogPost'] = [{'@type': 'BlogPosting', 'headline': post.title, 'url': post.url, 'datePublished': post.published.isoformat(), 'description': post.summary, 'author': author} for post in posts]
     if cover:
         for key, value in (('property="og:image"', cover['url']),
                            ('property="og:image:secure_url"', cover['url']),
@@ -194,9 +249,18 @@ def page_shell(template, title, summary, url, content, published=None, cover=Non
                            ('name="twitter:image:alt"', cover['alt'])):
             head = re.sub(r'(<meta ' + key + r' content=")[^"]*', lambda match: match[1] + escape(value, quote=True), head, count=1)
         schema['image'] = cover['url']
-    structured = json.dumps(schema).replace('<', '\\u003c')
+    crumbs = [{'@type': 'ListItem', 'position': 1, 'name': 'myArc', 'item': 'https://myarc.dev/'},
+              {'@type': 'ListItem', 'position': 2, 'name': 'Blog', 'item': 'https://myarc.dev/blog/'}]
+    if published:
+        crumbs.append({'@type': 'ListItem', 'position': 3, 'name': title, 'item': url})
+    schema.pop('@context')
+    structured = json.dumps({'@context': 'https://schema.org', '@graph': [schema, {'@type': 'BreadcrumbList', 'itemListElement': crumbs}]}).replace('<', '\\u003c')
     head = re.sub(r'(<script type="application/ld\+json">).*?(</script>)', lambda match: match[1] + structured + match[2], head, count=1, flags=re.S)
     head = head.replace('</style>', BLOG_CSS + '\n  </style>', 1)
+    alternates = f'<link rel="alternate" type="text/markdown" href="{url}index.md" title="Markdown">\n<link rel="alternate" type="text/plain" href="https://myarc.dev/llms.txt" title="Site context">\n'
+    if published:
+        alternates += f'<meta name="author" content="bitbonsai">\n<meta property="article:published_time" content="{published.isoformat()}">\n'
+    head = head.replace('</head>', alternates + '</head>', 1)
     header = header.replace('href="#main"', 'href="/"').replace('href="#principles"', 'href="/#principles"').replace('href="#building"', 'href="/#building"')
     if published is None:
         header = header.replace('class="blog-link"', 'class="blog-link" aria-current="page"')
@@ -212,7 +276,7 @@ def build_blog(root, template, embed):
     for path in sorted(paths):
         post = load_post(path)
         if post:
-            total += sum(map(len, post.images.values()))
+            total += max(post.source_bytes, sum(map(len, post.images.values())))
             if total > MAX_TOTAL_IMAGE_BYTES:
                 raise ValueError('Published screenshots exceed the 256 MiB site budget')
             posts.append(post)
@@ -243,17 +307,23 @@ def build_blog(root, template, embed):
     if not listing:
         listing = '<p class="quiet">Progress notes will appear here once published.</p>'
     content = '<h1 class="visually-hidden">Blog</h1><div class="post-list">' + listing + '</div>'
-    (output / 'index.html').write_text(embed(page_shell(template, 'Blog', 'Progress notes on building myArc.', 'https://myarc.dev/blog/', content)))
+    (output / 'index.html').write_text(embed(page_shell(template, 'Development blog', 'Follow myArc development: Chromium and Rust experiments, design decisions, obstacles, and verified progress toward an open-source Arc-inspired browser.', 'https://myarc.dev/blog/', content, posts=posts), ''))
     for post in posts:
         folder = output / post.slug
         folder.mkdir()
-        content = '<a class="post-back" href="/blog/">All posts</a><header class="post-header"><h1>' + escape(post.title) + '</h1><time class="post-date" datetime="' + post.published.isoformat() + '">' + post.published.strftime('%B %d, %Y') + '</time></header><article class="post-body">' + post.html + '</article>'
-        (folder / 'index.html').write_text(embed(page_shell(template, post.title, post.summary, post.url, content, post.published, post.cover)))
+        content = '<a class="post-back" href="/blog/">All posts</a><header class="post-header"><h1>' + escape(post.title) + '</h1><time class="post-date" datetime="' + post.published.isoformat() + '">' + post.published.strftime('%B %d, %Y') + '</time><p class="post-author">By <a rel="author" href="https://github.com/bitbonsai">bitbonsai</a> · <a href="index.md" type="text/markdown">Read Markdown</a></p></header><article class="post-body">' + post.html + '</article>'
+        (folder / 'index.html').write_text(embed(page_shell(template, post.title, post.summary, post.url, content, post.published, post.cover), '../'))
         for name, data in post.images.items():
             target = folder / name
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_bytes(data)
     urls = ['https://myarc.dev/', 'https://myarc.dev/blog/'] + [post.url for post in posts]
-    (root / 'sitemap.xml').write_text('<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">' + ''.join('<url><loc>' + url + '</loc></url>' for url in urls) + '</urlset>\n')
+    covers = {post.url: post.cover for post in posts}
+    rows = []
+    for url in urls:
+        image = covers.get(url)
+        image_entry = '<image:image><image:loc>' + escape(image['url']) + '</image:loc></image:image>' if image else ''
+        rows.append('<url><loc>' + url + '</loc>' + image_entry + '</url>')
+    (root / 'sitemap.xml').write_text('<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">' + ''.join(rows) + '</urlset>\n')
     print(f'Built blog index and {len(posts)} approved posts')
     return posts

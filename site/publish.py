@@ -15,7 +15,7 @@ IDENTITY = {'name': 'bitbonsai', 'email': '44185+bitbonsai@users.noreply.github.
 
 
 def artifacts(root):
-    names = ('index.html', 'og-image.png', 'favicon.png', 'favicon.ico', 'robots.txt', 'sitemap.xml')
+    names = ('index.html', 'og-image.png', 'og-image.webp', 'favicon.png', 'favicon.ico', 'robots.txt', 'sitemap.xml', 'index.md', 'llms.txt', 'llms-full.txt')
     files = {'.nojekyll': b'', 'CNAME': b'myarc.dev\n'}
     paths = [root / name for name in names]
     if not (root / 'blog/index.html').is_file():
@@ -38,6 +38,7 @@ def blob_sha(data):
 def main():
     subprocess.run([sys.executable, str(ROOT / 'build.py')], check=True)
     subprocess.run([sys.executable, str(ROOT / 'check.py')], check=True)
+    subprocess.run([sys.executable, str(ROOT / 'check_seo.py')], check=True)
     files = artifacts(ROOT)
     token = subprocess.check_output(['env', '-u', 'GH_TOKEN', '-u', 'GITHUB_TOKEN', 'gh', 'auth', 'token', '--hostname', 'github.com', '--user', 'bitbonsai'], text=True).strip()
 

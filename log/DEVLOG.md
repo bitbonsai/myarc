@@ -2,6 +2,13 @@
 
 Keep significant outcomes, failures and next actions reproducible. Newest entry first. No private exports, page titles/URLs from real browsing, credentials or raw user transcripts.
 
+## 2026-10-25: Project-first journal, native capture and optimized delivery
+
+- Rewrote the first entry around browser development, bounded delegation and the public bitbonsai context/wrap skills. Verified native-thread model selections before naming GPT-6.1/high thinking and Sonnet 5.5/high effort. Removed website-adjustment and hosting anecdotes. The Arc-like empty shell and nightly artifact are goals, not reported deliveries.
+- Captured the requested public homepage behind the native command palette in a separate marked disposable profile. Verified the browser PID before navigating an existing tab, used a window-only capture and closed the owned instance. The approved current-build image now leads the post and social previews; the Arc target remains a separate reference.
+- Completed WebP/responsive post images, content-hashed shared blog assets and automatic Markdown/discovery exports. Preserved the standalone homepage. Added visible author attribution, canonical/social discovery and Blog/BlogPosting/BreadcrumbList data with a pre-publish metadata/resource check. Phone gutters are 1.5rem and the smallest homepage headline is 2.5rem.
+- Twelve unit checks, three generated-page SEO checks, document links and retained layout/theme/focus checks passed. Native capture establishes the shown page/palette state only. The earlier delivery pass verified gzip on live HTML and text/Markdown responses; tiny text responses may remain uncompressed. Published `32d8c3b`; index, article, Markdown and both LLM discovery files match local artifacts over normal HTTPS. Search indexing, AI citation behavior and Safari/Firefox remain unmeasured.
+
 ## 2026-10-25: Command palette history and appearance
 
 - MA-007.b2: combined bounded current-window tab matches with Chromium Profile history, using distinct switch/open actions. History stays local, stale queries are cancelled and private windows skip regular history. Rust was unchanged.
