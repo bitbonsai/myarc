@@ -14,6 +14,8 @@ Target 1:1 Arc visual parity, beginning with the empty/new-tab window and real b
 
 The [current experiment](../browser/experiments/native-shell.md) keeps Chromium browser services and reuses its real controls in a custom layout, with AppKit behind-window material through Objective-C++. It runs with sidebar address controls and a translucent empty canvas; native keyboard navigation passed. Visual parity remains incomplete. Stock vertical tabs and the built-in glass flag did not establish the required appearance. A separate Swift or Tauri host is an alternative to investigate only if this native boundary blocks fidelity; neither embedding route has been proven here. Import work is deferred while this visible slice is built. Release/security gates remain in force.
 
+The [native New Tab palette](../browser/experiments/native-command-palette.md) now handles user-triggered Cmd/Ctrl+T separately from programmatic tab creation. Its temporary Views state calls Chromium navigation and tab activation; Rust workspace rules are unchanged. Full omnibox completion and current-tab editing remain open.
+
 ## Candidate comparison
 
 | Foundation | Why evaluate it | Main cost / disqualifier | Decision posture |

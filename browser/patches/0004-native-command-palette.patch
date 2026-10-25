@@ -1,0 +1,527 @@
+--- a/chrome/browser/ui/browser_actions.cc
++++ b/chrome/browser/ui/browser_actions.cc
+@@ -1315,7 +1315,7 @@
+           base::BindRepeating(
+               [](BrowserWindowInterface* bwi, actions::ActionItem* item,
+                  actions::ActionInvocationContext context) {
+-                chrome::NewTab(bwi, NewTabTypes::kNewTabCommand);
++                chrome::NewTabFromUI(bwi, NewTabTypes::kNewTabCommand);
+               },
+               bwi))
+           .SetActionId(kActionNewTab)
+--- a/chrome/browser/ui/browser_command_controller.cc
++++ b/chrome/browser/ui/browser_command_controller.cc
+@@ -783,7 +783,7 @@
+       CloseWindow(browser_);
+       break;
+     case IDC_NEW_TAB: {
+-      NewTab(browser_, NewTabTypes::kNewTabCommand);
++      NewTabFromUI(browser_, NewTabTypes::kNewTabCommand);
+       break;
+     }
+     case IDC_NEW_TAB_TO_RIGHT: {
+--- a/chrome/browser/ui/browser_commands.cc
++++ b/chrome/browser/ui/browser_commands.cc
+@@ -1367,6 +1367,44 @@
+ }
+ #endif  // BUILDFLAG(IS_WIN)
+ 
++void NewTabFromUI(BrowserWindowInterface* browser, NewTabTypes context) {
++#if defined(TOOLKIT_VIEWS)
++  if (context != NewTabTypes::kNoUserAction &&
++      base::CommandLine::ForCurrentProcess()->HasSwitch(
++          "myarc-visual-parity") &&
++      browser->GetType() == BrowserWindowInterface::Type::TYPE_NORMAL) {
++    auto* view = BrowserView::GetBrowserViewForBrowser(browser);
++    if (view && view->ShowMyarcCommandPalette()) {
++      return;
++    }
++  }
++#endif
++  NewTab(browser, context);
++}
++
++bool NavigateFromMyarcPalette(BrowserWindowInterface* browser,
++                              std::u16string_view text) {
++  if (text.empty() || text.size() > 4096) {
++    return false;
++  }
++  auto* classifier =
++      AutocompleteClassifierFactory::GetForProfile(browser->GetProfile());
++  if (!classifier) {
++    return false;
++  }
++  AutocompleteMatch match;
++  classifier->Classify(std::u16string(text), false, false,
++                       metrics::OmniboxEventProto::BLANK, &match, nullptr);
++  const GURL& url = match.destination_url;
++  if (!url.is_valid() || !(url.SchemeIsHTTPOrHTTPS() ||
++                           url.SchemeIs("chrome") || url.IsAboutBlank())) {
++    return false;
++  }
++  return AddAndReturnTabAt(browser, url, -1, true, std::nullopt, false,
++                           NavigateParams::WindowAction::kShowWindow) !=
++         nullptr;
++}
++
+ content::WebContents& NewTab(BrowserWindowInterface* browser,
+                              NewTabTypes context) {
+   if (context != NewTabTypes::kNoUserAction) {
+--- a/chrome/browser/ui/browser_commands.h
++++ b/chrome/browser/ui/browser_commands.h
+@@ -7,6 +7,7 @@
+ 
+ #include <optional>
+ #include <string>
++#include <string_view>
+ #include <vector>
+ 
+ #include "base/memory/weak_ptr.h"
+@@ -78,9 +79,15 @@
+     WindowOpenDisposition disposition,
+     actions::ActionInvocationContext context,
+     base::TimeTicks time_stamp = base::TimeTicks::Now());
+-void UpdateCommandEnabled(BrowserWindowInterface* browser, int command, bool enabled);
+-void AddCommandObserver(BrowserWindowInterface*, int command, CommandObserver* observer);
+-void RemoveCommandObserver(BrowserWindowInterface*, int command, CommandObserver* observer);
++void UpdateCommandEnabled(BrowserWindowInterface* browser,
++                          int command,
++                          bool enabled);
++void AddCommandObserver(BrowserWindowInterface*,
++                        int command,
++                        CommandObserver* observer);
++void RemoveCommandObserver(BrowserWindowInterface*,
++                           int command,
++                           CommandObserver* observer);
+ 
+ int GetContentRestrictions(const BrowserWindowInterface* browser);
+ 
+@@ -136,6 +143,10 @@
+ void CloseWindow(BrowserWindowInterface* browser);
+ content::WebContents& NewTab(BrowserWindowInterface* browser,
+                              NewTabTypes context);
++// Interactive intent is separate so internal callers still create a real tab.
++void NewTabFromUI(BrowserWindowInterface* browser, NewTabTypes context);
++bool NavigateFromMyarcPalette(BrowserWindowInterface* browser,
++                              std::u16string_view text);
+ void NewTabToRight(BrowserWindowInterface* browser);
+ void NewTabFromClipboardURL(BrowserWindowInterface* browser);
+ void CloseTab(BrowserWindowInterface* browser);
+@@ -300,7 +311,9 @@
+ void Find(BrowserWindowInterface* browser);
+ void FindNext(BrowserWindowInterface* browser);
+ void FindPrevious(BrowserWindowInterface* browser);
+-void FindInPage(BrowserWindowInterface* browser, bool find_next, bool forward_direction);
++void FindInPage(BrowserWindowInterface* browser,
++                bool find_next,
++                bool forward_direction);
+ void ShowTabSearch(BrowserWindowInterface* browser);
+ void CloseTabSearch(BrowserWindowInterface* browser);
+ void ToggleTabSearchPin(BrowserWindowInterface* browser);
+@@ -389,10 +402,12 @@
+ 
+ void ShowIncognitoClearBrowsingDataDialog(BrowserWindowInterface* browser);
+ void ShowIncognitoHistoryDisclaimerDialog(BrowserWindowInterface* browser);
+-bool ShouldInterceptChromeURLNavigationInIncognito(BrowserWindowInterface* browser,
+-                                                   const GURL& url);
+-void ProcessInterceptedChromeURLNavigationInIncognito(BrowserWindowInterface* browser,
+-                                                      const GURL& url);
++bool ShouldInterceptChromeURLNavigationInIncognito(
++    BrowserWindowInterface* browser,
++    const GURL& url);
++void ProcessInterceptedChromeURLNavigationInIncognito(
++    BrowserWindowInterface* browser,
++    const GURL& url);
+ void ExecLensOverlay(BrowserWindowInterface* browser);
+ void ExecLensRegionSearch(BrowserWindowInterface* browser);
+ void ExecAskGoogleAboutThisPage(
+--- a/chrome/browser/ui/views/frame/browser_view.cc
++++ b/chrome/browser/ui/views/frame/browser_view.cc
+@@ -22,6 +22,7 @@
+ #include "base/feature_list.h"
+ #include "base/functional/bind.h"
+ #include "base/functional/callback_helpers.h"
++#include "base/i18n/case_conversion.h"
+ #include "base/i18n/rtl.h"
+ #include "base/location.h"
+ #include "base/memory/raw_ptr.h"
+@@ -291,6 +292,7 @@
+ #include "components/user_education/common/new_badge/new_badge_controller.h"
+ #include "components/user_education/common/user_education_features.h"
+ #include "components/user_education/views/help_bubble_view.h"
++#include "components/vector_icons/vector_icons.h"
+ #include "components/version_info/channel.h"
+ #include "components/web_modal/web_contents_modal_dialog_manager.h"
+ #include "content/public/browser/browser_accessibility_state.h"
+@@ -353,12 +355,20 @@
+ #include "ui/views/accessibility/view_accessibility.h"
+ #include "ui/views/accessibility/view_accessibility_utils.h"
+ #include "ui/views/animation/compositor_animation_runner.h"
++#include "ui/views/background.h"
++#include "ui/views/border.h"
+ #include "ui/views/bubble/bubble_dialog_delegate_view.h"
++#include "ui/views/controls/button/label_button.h"
+ #include "ui/views/controls/button/menu_button.h"
++#include "ui/views/controls/image_view.h"
++#include "ui/views/controls/label.h"
++#include "ui/views/controls/native/native_view_host.h"
+ #include "ui/views/controls/textfield/textfield.h"
++#include "ui/views/controls/textfield/textfield_controller.h"
+ #include "ui/views/controls/webview/webview.h"
+ #include "ui/views/interaction/element_tracker_views.h"
+ #include "ui/views/interaction/view_subregion_anchor.h"
++#include "ui/views/layout/box_layout_view.h"
+ #include "ui/views/layout/fill_layout.h"
+ #include "ui/views/view.h"
+ #include "ui/views/view_class_properties.h"
+@@ -658,6 +668,208 @@
+   views::View::ConvertPointToTarget(src, dst, point);
+   return dst->HitTestPoint(*point);
+ }
++
++class MyarcPaletteView : public views::BoxLayoutView,
++                         public views::TextfieldController {
++  METADATA_HEADER(MyarcPaletteView, views::BoxLayoutView)
++
++ public:
++  MyarcPaletteView(base::WeakPtr<BrowserWindowInterface> browser, int width)
++      : browser_(browser), width_(width) {
++    SetOrientation(views::BoxLayout::Orientation::kVertical);
++    SetBetweenChildSpacing(8);
++    auto* header = AddChildView(std::make_unique<views::BoxLayoutView>());
++    header->SetOrientation(views::BoxLayout::Orientation::kHorizontal);
++    header->SetCrossAxisAlignment(
++        views::BoxLayout::CrossAxisAlignment::kCenter);
++    auto* icon = header->AddChildView(std::make_unique<views::ImageView>());
++    icon->SetImage(ui::ImageModel::FromVectorIcon(vector_icons::kSearchIcon,
++                                                  SK_ColorWHITE, 18));
++    input_ = header->AddChildView(std::make_unique<views::Textfield>());
++    input_->SetController(this);
++    input_->SetPlaceholderText(u"Search or Enter URL...");
++    input_->GetViewAccessibility().SetName(u"Search or Enter URL");
++    input_->SetTextInputType(ui::TEXT_INPUT_TYPE_URL);
++    input_->SetFontList(gfx::FontList().DeriveWithSizeDelta(5));
++    input_->SetBackgroundColor(SkColorSetRGB(30, 28, 32));
++    input_->SetBorder(views::CreateEmptyBorder(gfx::Insets::VH(8, 12)));
++    header->SetFlexForView(input_, 1);
++    header->SetPreferredSize(gfx::Size(width_, 52));
++    rows_ = AddChildView(std::make_unique<views::BoxLayoutView>());
++    rows_->SetOrientation(views::BoxLayout::Orientation::kVertical);
++    rows_->SetBetweenChildSpacing(4);
++    error_ = AddChildView(std::make_unique<views::Label>());
++    error_->SetEnabledColor(SkColorSetRGB(255, 170, 170));
++    error_->SetVisible(false);
++    Rebuild();
++  }
++
++  views::Textfield* input() { return input_; }
++
++  void ContentsChanged(views::Textfield* sender,
++                       const std::u16string& text) override {
++    Rebuild();
++  }
++
++  bool HandleKeyEvent(views::Textfield* sender,
++                      const ui::KeyEvent& event) override {
++    if (event.type() != ui::EventType::kKeyPressed ||
++        sender->IsIMEComposing()) {
++      return false;
++    }
++    if (event.key_code() == ui::VKEY_ESCAPE) {
++      GetWidget()->Close();
++      return true;
++    }
++    if (event.key_code() == ui::VKEY_RETURN) {
++      if (selected_ >= 0) {
++        SwitchToTab(selected_);
++      } else {
++        Submit();
++      }
++      return true;
++    }
++    if (!matches_.empty() && (event.key_code() == ui::VKEY_DOWN ||
++                              event.key_code() == ui::VKEY_UP)) {
++      const int count = static_cast<int>(matches_.size());
++      selected_ =
++          event.key_code() == ui::VKEY_DOWN
++              ? (selected_ + 1) % count
++              : (selected_ < 0 ? count - 1 : (selected_ + count - 1) % count);
++      UpdateSelection();
++      return true;
++    }
++    return false;
++  }
++
++ private:
++  void Resize() {
++    const int row_count = std::max(1, static_cast<int>(matches_.size()));
++    SetPreferredSize(gfx::Size(
++        width_, 60 + row_count * 48 + (error_->GetVisible() ? 32 : 0)));
++    if (GetWidget()) {
++      GetWidget()
++          ->widget_delegate()
++          ->AsBubbleDialogDelegate()
++          ->SizeToContents();
++    }
++  }
++
++  void UpdateSelection() {
++    for (size_t i = 0; i < buttons_.size(); ++i) {
++      buttons_[i]->SetBackground(views::CreateRoundedRectBackground(
++          static_cast<int>(i) == selected_ ? SkColorSetRGB(66, 66, 210)
++                                           : SK_ColorTRANSPARENT,
++          8));
++    }
++  }
++
++  void Rebuild() {
++    buttons_.clear();
++    matches_.clear();
++    rows_->RemoveAllChildViews();
++    selected_ = -1;
++    error_->SetVisible(false);
++    if (input_->GetText().size() > 4096) {
++      error_->SetText(u"Use at most 4096 characters.");
++      error_->SetVisible(true);
++      Resize();
++      return;
++    }
++    const std::u16string query = base::i18n::ToLower(input_->GetText());
++    if (browser_) {
++      auto* model = browser_->GetTabStripModel();
++      // shortcut: scan 512 tabs and show eight; expand for large-workspace
++      // search.
++      for (int i = 0; i < std::min(model->count(), 512) && matches_.size() < 8;
++           ++i) {
++        auto* contents = model->GetWebContentsAt(i);
++        const GURL& url = contents->GetLastCommittedURL();
++        if (url.is_empty() || url.IsAboutBlank()) {
++          continue;
++        }
++        std::u16string title = contents->GetTitle().substr(0, 160);
++        const std::u16string address =
++            base::UTF8ToUTF16(url.spec().substr(0, 512));
++        if (!query.empty() &&
++            base::i18n::ToLower(title + u" " + address).find(query) ==
++                std::u16string::npos) {
++          continue;
++        }
++        if (title.empty()) {
++          title = address;
++        }
++        const int index = static_cast<int>(matches_.size());
++        matches_.push_back(contents->GetWeakPtr());
++        auto* button = rows_->AddChildView(std::make_unique<views::LabelButton>(
++            base::BindRepeating(&MyarcPaletteView::SwitchToTab,
++                                base::Unretained(this), index),
++            title));
++        button->SetHorizontalAlignment(gfx::ALIGN_LEFT);
++        button->SetEnabledTextColors(SK_ColorWHITE);
++        button->SetBorder(views::CreateEmptyBorder(gfx::Insets::VH(10, 12)));
++        button->SetPreferredSize(gfx::Size(width_, 44));
++        button->SetTooltipText(u"Switch to tab: " + address);
++        button->SetFocusBehavior(views::View::FocusBehavior::ALWAYS);
++        buttons_.push_back(button);
++      }
++    }
++    if (matches_.empty()) {
++      auto* hint = rows_->AddChildView(std::make_unique<views::Label>(
++          u"Enter opens a new tab. Esc cancels."));
++      hint->SetEnabledColor(SkColorSetRGB(170, 166, 180));
++      hint->SetPreferredSize(gfx::Size(width_, 44));
++    } else {
++      selected_ = 0;
++      UpdateSelection();
++    }
++    Resize();
++  }
++
++  void SwitchToTab(int index) {
++    if (!browser_ || index < 0 || index >= static_cast<int>(matches_.size()) ||
++        !matches_[index]) {
++      Rebuild();
++      return;
++    }
++    const int current = browser_->GetTabStripModel()->GetIndexOfWebContents(
++        matches_[index].get());
++    if (current < 0) {
++      Rebuild();
++      return;
++    }
++    GetWidget()->Close();
++    if (browser_) {
++      browser_->GetTabStripModel()->ActivateTabAt(current);
++    }
++  }
++
++  void Submit() {
++    if (!browser_ ||
++        !chrome::NavigateFromMyarcPalette(browser_.get(), input_->GetText())) {
++      error_->SetText(
++          u"Enter a web URL or search. This address is unsupported.");
++      error_->SetVisible(true);
++      Resize();
++      return;
++    }
++    if (GetWidget() && !GetWidget()->IsClosed()) {
++      GetWidget()->Close();
++    }
++  }
++
++  base::WeakPtr<BrowserWindowInterface> browser_;
++  const int width_;
++  raw_ptr<views::Textfield> input_ = nullptr;
++  raw_ptr<views::BoxLayoutView> rows_ = nullptr;
++  raw_ptr<views::Label> error_ = nullptr;
++  std::vector<base::WeakPtr<content::WebContents>> matches_;
++  std::vector<raw_ptr<views::LabelButton>> buttons_;
++  int selected_ = -1;
++};
++
++BEGIN_METADATA(MyarcPaletteView)
++END_METADATA
+ 
+ }  // namespace
+ 
+@@ -1124,6 +1336,10 @@
+   // other cleanups that destroy views referenced in the layout manager.
+   SetLayoutManager(nullptr);
+ 
++  if (myarc_command_palette_widget_) {
++    myarc_command_palette_widget_->Close();
++  }
++  OnMyarcCommandPaletteClosed();
+   tab_search_bubble_host_.reset();
+ 
+   global_error_observation_.Reset();
+@@ -5278,6 +5494,74 @@
+ ///////////////////////////////////////////////////////////////////////////////
+ // BrowserView, ui::AcceleratorTarget overrides:
+ 
++bool BrowserView::ShowMyarcCommandPalette() {
++  if (!initialized_ || !GetWidget()) {
++    return false;
++  }
++  if (myarc_command_palette_widget_) {
++    myarc_command_palette_widget_->Close();
++    return true;
++  }
++  const int width = std::clamp(GetBoundsInScreen().width() - 48, 240, 752);
++  myarc_command_palette_delegate_ =
++      std::make_unique<views::BubbleDialogDelegate>(this,
++                                                    views::BubbleBorder::FLOAT);
++  auto* delegate = myarc_command_palette_delegate_.get();
++  delegate->SetButtons(static_cast<int>(ui::mojom::DialogButton::kNone));
++  delegate->SetShowCloseButton(false);
++  delegate->SetShowTitle(false);
++  delegate->SetTitle(u"New Tab");
++  delegate->set_corner_radius(12);
++  delegate->set_margins(gfx::Insets(12));
++  delegate->SetBackgroundColor(SkColorSetRGB(30, 28, 32));
++  auto* content = delegate->SetContentsView(
++      std::make_unique<MyarcPaletteView>(browser_->GetWeakPtr(), width));
++  delegate->SetInitiallyFocusedView(content->input());
++  myarc_command_palette_widget_ = views::BubbleDialogDelegate::CreateBubble(
++      delegate,
++      base::IgnoreArgs<views::Widget::ClosedReason>(base::BindOnce(
++          &BrowserView::OnMyarcCommandPaletteClosed, GetAsWeakPtr())));
++  myarc_command_palette_widget_->SetColorModeOverride(
++      ui::ColorProviderKey::ColorMode::kDark);
++  if (!multi_contents_view_->layer()) {
++    multi_contents_view_->SetPaintToLayer();
++    multi_contents_view_->layer()->SetFillsBoundsOpaquely(false);
++  }
++  multi_contents_view_->layer()->SetOpacity(0.0f);
++  // The layout requires this parent visible; hide native hosts to block page
++  // clicks.
++  for (const auto& container :
++       multi_contents_view_->contents_container_views()) {
++    container->contents_view()->holder()->SetVisible(false);
++  }
++  myarc_command_palette_widget_->Show();
++  content->input()->RequestFocus();
++  return true;
++}
++
++void BrowserView::OnMyarcCommandPaletteClosed() {
++  if (multi_contents_view_ && multi_contents_view_->layer()) {
++    multi_contents_view_->layer()->SetOpacity(1.0f);
++    for (const auto& container :
++         multi_contents_view_->contents_container_views()) {
++      auto* contents = container->contents_view();
++      contents->holder()->SetVisible(contents->web_contents() &&
++                                     !contents->web_contents()->IsCrashed());
++    }
++  }
++  if (myarc_command_palette_delegate_) {
++    myarc_command_palette_delegate_->SetAnchorView(nullptr);
++  }
++  if (myarc_command_palette_widget_) {
++    base::SingleThreadTaskRunner::GetCurrentDefault()->DeleteSoon(
++        FROM_HERE, std::move(myarc_command_palette_widget_));
++  }
++  if (myarc_command_palette_delegate_) {
++    base::SingleThreadTaskRunner::GetCurrentDefault()->DeleteSoon(
++        FROM_HERE, std::move(myarc_command_palette_delegate_));
++  }
++}
++
+ bool BrowserView::AcceleratorPressed(const ui::Accelerator& accelerator) {
+ #if BUILDFLAG(IS_MAC)
+   // Forward accelerators to ExclusiveAccessManager to handle Esc press-and-hold
+@@ -5717,6 +6001,14 @@
+   }
+ 
+ #if BUILDFLAG(IS_MAC)
++  if (base::CommandLine::ForCurrentProcess()->HasSwitch(
++          "myarc-visual-parity")) {
++    ui::Accelerator control_t(ui::VKEY_T, ui::EF_CONTROL_DOWN);
++    accelerator_table_[control_t] = IDC_NEW_TAB;
++    focus_manager->RegisterAccelerator(
++        control_t, ui::AcceleratorManager::kHighPriority, this);
++  }
++
+   // Register the Esc accelerators (both press and release) to ensure they are
+   // sent to the ExclusiveAccessManager for press-and-hold fullscreen exit.
+   // This is only needed on macOS due to AppKit fullscreen transitions leaving
+--- a/chrome/browser/ui/views/frame/browser_view.h
++++ b/chrome/browser/ui/views/frame/browser_view.h
+@@ -121,6 +121,7 @@
+ }
+ 
+ namespace views {
++class BubbleDialogDelegate;
+ class LabelButton;
+ class NativeViewHost;
+ class WebView;
+@@ -310,6 +311,8 @@
+   ContentsWebView* contents_web_view_for_testing();
+ 
+   ScrimView* window_scrim_view() { return window_scrim_view_; }
++
++  bool ShowMyarcCommandPalette();
+ 
+   base::WeakPtr<BrowserView> GetAsWeakPtr() {
+     return weak_ptr_factory_.GetWeakPtr();
+@@ -1253,6 +1256,10 @@
+ 
+   // Anchor point for help bubbles and other dialogs that want to reliably
+   // anchor outside the content area of the window.
++  void OnMyarcCommandPaletteClosed();
++  std::unique_ptr<views::BubbleDialogDelegate> myarc_command_palette_delegate_;
++  std::unique_ptr<views::Widget> myarc_command_palette_widget_;
++
+   std::unique_ptr<views::ViewSubregionAnchor> dialog_anchor_;
+ 
+   // Anchor point for popup dialogs that must be able to appear in content-
+--- a/chrome/browser/ui/views/tabs/browser_tab_strip_controller.cc
++++ b/chrome/browser/ui/views/tabs/browser_tab_strip_controller.cc
+@@ -467,7 +467,7 @@
+ }
+ 
+ void BrowserTabStripController::CreateNewTab(NewTabTypes context) {
+-  chrome::NewTab(browser_view_->browser(), context);
++  chrome::NewTabFromUI(browser_view_->browser(), context);
+ }
+ 
+ void BrowserTabStripController::OnStartedDragging() {

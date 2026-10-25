@@ -2,6 +2,13 @@
 
 Keep significant outcomes, failures and next actions reproducible. Newest entry first. No private exports, page titles/URLs from real browsing, credentials or raw user transcripts.
 
+## 2026-10-25: Basic native New Tab palette
+
+- MA-007.b1: routed interactive New Tab actions to a centered Views palette while retaining programmatic tab creation. Enter uses Chromium classification/navigation or activates a matching existing tab. Input and tab matching are bounded; Rust workspace rules are unchanged.
+- Native build and browser-view GN header checks passed. On macOS, Cmd+T opened the palette without creating a page; submitting a local fixture URL added exactly one tab. Ctrl+T/Escape preserved page IDs and URLs. Selecting an existing fixture tab added no duplicate and restored page focus. Captured the actual window and a native open/close recording outside the repository.
+- An attempted parent-view hide violated a layout visibility check. Kept the layout parent visible and hid native hosts instead, preventing clicks on invisible pages. The resulting crash also exposed a missing app-menu anchor in the existing recovery bubble. A fresh disposable profile allowed the palette checks to continue; recovery remains blocked.
+- Packaged the seven-file palette delta separately from concurrent rounding work. Current-tab Cmd+L, sidebar hide/show and full autocomplete remain pending. Motion is recorded as a baseline; timing, reduced motion and full visual parity are unverified.
+
 ## 2026-10-25: Markdown progress journal and first public post
 
 - Added build-time CommonMark/YAML posts with explicit publication approval, local validated screenshots, a date-sorted index and per-post canonical/social metadata. Homepage and blog share the existing design/theme shell. Generated output excludes drafts and unreferenced files.
