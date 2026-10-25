@@ -20,7 +20,9 @@ Checkpoint/verify probe integrated as `5bf05df`; thirteen local tests passed. Th
 
 A separate persisted-data control passed: clean quit/reopen first proved the same canary existed, then audited SIGKILL, plain relaunch and genuine Restore passed all five strict comparisons. A fresh explicit-discard case retained Favorite/Space identity and released readiness; creating a new Space persisted afterward. These bounded results establish neither immediate acknowledgement nor OS/power-loss durability. [Run details](native-recovery-lifecycle.md).
 
-Safe preview launcher integrated as `c263228`; ten local double-based tests passed. Parent ran its exact command against the real app, observed a marked fresh profile without debugging/test-extension flags, navigated to Example Domain through the native palette, created/switched a Space and inspected its neutral empty header/material. App/helpers closed. Next: multiwindow identity and late restoration.
+Safe preview launcher integrated as `c263228`; ten local double-based tests passed. Parent ran its exact command against the real app, observed a marked fresh profile without debugging/test-extension flags, navigated to Example Domain through the native palette, created/switched a Space and inspected its neutral empty header/material. App/helpers closed.
+
+Two-window probe integrated as `2b98a0a`; all twenty local tests passed, including the original thirteen. [Actual native journey](../evidence/workspace-two-window.json) retained one logical Favorite across two native copies, close-one/reopen and audited process-kill/plain relaunch/genuine Restore. Five strict samples retained both native windows/pins and stable organization. Window-specific activation changed only its own selection. Apps/helpers and owned server closed. Arbitrary late/overlapping restore remains open. Next: native private-window boundaries.
 
 ## Tested preview command
 

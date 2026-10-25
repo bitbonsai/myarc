@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-10-25: Two-window saved identity and actual Restore
+
+- Integrated `2b98a0a`; twenty local API-double tests passed, retaining all thirteen prior checks. Fresh native setup used two Spaces and native Cmd+N. One logical Favorite had one active/pinned page per window, plus one hidden Temporary. Native saved-menu close of one copy settled before assertion; the surviving copy remained pinned and retained saved identity. Native tile reopen restored both projections. Only the developer checkpoint was archived/recreated; backend metadata stayed untouched.
+- Audited SIGKILL, ordinary relaunch without startup URLs/restore flag and genuine Restore passed five strict comparisons. Pending metadata stayed exact; stable logical window/item/Space IDs and both real pins returned. Exact-window Temporary activation changed only its own persisted selection; restoring the original projection passed again. [Evidence](../browser/evidence/workspace-two-window.json). This does not expose direct in-memory Rust bindings or prove arbitrary late/overlapping restoration.
+- Identical initial window bounds required foreground/AX-main disambiguation before moving only the owned second window. Exact Profile/PID/window and unlocked/focus checks remained intact. Owned apps/helpers and server closed. No C++ implementation changed; native C++ suites remain unrun. Recent site-storage acknowledgement, wider Profile/private boundaries and OS durability remain open; renderer stays off.
+
 ## 2026-10-25: Bounded native recovery and preview launch
 
 - Integrated lifecycle repair as `2a0ef32`. First real crash repeat retained exact pending/restored workspace identity, then failed the strict canary comparison. Unchanged upstream DOMStorage configures delayed batching; no storage policy or verifier was weakened. A separate clean-seeded, verified-persisted canary subsequently survived audited SIGKILL, plain relaunch and genuine Restore with five exact comparisons. Fresh explicit discard retained Favorite/Space identity and resumed real Space creation. [Evidence](../browser/evidence/workspace-process-crash.json) distinguishes these scopes; immediate acknowledgement and OS durability stay open.
