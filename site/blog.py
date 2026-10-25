@@ -301,8 +301,12 @@ def build_blog(root, template, embed):
             with Image.open(io.BytesIO(next(iter(post.images.values())))) as image:
                 image = image.convert('RGBA')
                 image.thumbnail((384, 240), Image.Resampling.LANCZOS)
-                image.save(thumbnails / f'{post.slug}.webp', format='WEBP', quality=85, method=6)
-                thumb = f'<a class="post-thumb" href="{post.url}" aria-hidden="true" tabindex="-1"><img src="_thumbnails/{post.slug}.webp" alt="" width="{image.width}" height="{image.height}" loading="lazy"></a>'
+                buffer = io.BytesIO()
+                image.save(buffer, format='WEBP', quality=85, method=6)
+                data = buffer.getvalue()
+                name = post.slug + '.' + hashlib.sha256(data).hexdigest()[:12] + '.webp'
+                (thumbnails / name).write_bytes(data)
+                thumb = f'<a class="post-thumb" href="{post.url}" aria-hidden="true" tabindex="-1"><img src="_thumbnails/{name}" alt="" width="{image.width}" height="{image.height}" loading="lazy"></a>'
         listing += f'<article class="post-preview">{thumb}<div class="post-preview-copy"><h2><a href="{post.url}">{escape(post.title)}</a></h2><time class="post-date" datetime="{post.published.isoformat()}">{post.published.strftime("%B %d, %Y")}</time><p class="post-summary">{escape(post.summary)}</p></div></article>'
     if not listing:
         listing = '<p class="quiet">Progress notes will appear here once published.</p>'

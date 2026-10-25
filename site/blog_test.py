@@ -69,7 +69,7 @@ class BlogTests(unittest.TestCase):
         self.assertIn('<p class="post-summary">A synthetic test post.</p>', index)
         self.assertNotIn('Progress journal', index)
         self.assertNotIn('Notes on building myArc, with screenshots', index)
-        thumbnail = self.root / 'blog/_thumbnails' / (posts[0].slug + '.webp')
+        thumbnail = next((self.root / 'blog/_thumbnails').glob(posts[0].slug + '.*.webp'))
         with Image.open(thumbnail) as image:
             self.assertEqual('WEBP', image.format)
             self.assertLessEqual(image.width, 384)
@@ -96,6 +96,12 @@ class BlogTests(unittest.TestCase):
         html = (self.root / 'blog' / self.folder.name / 'index.html').read_text()
         self.assertIn('content="First &amp; target"', html)
         self.assertIn('property="og:image:width" content="40"', html)
+        previous = next((self.root / 'blog/_thumbnails').glob('*.webp'))
+        Image.new('RGB', (40, 20), 'green').save(self.folder / 'first image.png')
+        self.build()
+        current = next((self.root / 'blog/_thumbnails').glob('*.webp'))
+        self.assertNotEqual(previous.name, current.name)
+        self.assertFalse(previous.exists())
 
     def test_responsive_webp_and_link_rewrite(self):
         Image.new('RGB', (2000, 1300), 'purple').save(self.folder / 'large.png')
