@@ -1,0 +1,8 @@
+{
+  "manifest_version": 3,
+  "name": "myarc workspace pin fixture",
+  "version": "1.0.0",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAk0WsU4PjHFSJKZOhcvIyBOuvCElnB5A5/RGTOHSMG8EmcSgONaGF4r0BulUaCWEtkqqE4th9jec85Yrx7IpWSxQYHAZu+5BERWXodumE61DRo8+qufxUdRbPF6giKcJaJXpGr2AOGHFUhRQUPL9FipBlvgHpHg/ayN7Qw4/h0IQS6PlssDRZZ5qcY/snSJCx4mhmY54uG4wbAmLi7HzjAkzqA8Ci0w5goq+BsKMWXuhO0zaJJhcNzFuDNrdVopyWn/pRBU6be9AUL83fLKu76YMieQTLD/pGX9odRSzDAbDx01WwY49g33CZNG4Fnz4sXVlSfGqiny2hC7gqAbFr1QIDAQAB",
+  "permissions": ["tabs"],
+  "background": { "service_worker": "worker.js" }
+}

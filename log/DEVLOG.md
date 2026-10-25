@@ -2,6 +2,12 @@
 
 Keep significant outcomes, failures and next actions reproducible. Newest entry first. No private exports, page titles/URLs from real browsing, credentials or raw user transcripts.
 
+## 2026-10-25: Executable extension generic Unpin probe
+
+- Starting revision: `87ffa08`. Added one `workspace-pin` mode to the retained [native client](../tools/check_browser_foundation.mjs), with an original, tabs-only MV3 fixture. Existing extension/restart/runtime modes retain their paths. The probe reuses one exact loopback tab, checks its native Profile path and worker identity, then awaits real pin projection and on-disk Favorite adoption before requesting generic API Unpin. Stable saved ID/canonical URL/owner/placement and native pin must survive. It leaves the synthetic Favorite for separate explicit UI Unsave.
+- [Launch/run instructions](../tests/fixtures/browser/README.md#workspace-generic-unpin-probe) seed vertical tabs before startup and enable the optional shell/workspace renderer only in a fresh marked profile. One supported worker start handles idle MV3 lifecycle; bounded observations and detach replace any keepalive. Normal upstream extension-loading restrictions remain intact.
+- Verification: Node syntax for client, fixture worker and test file; four local manifest/argument/fixture tests; document links and whitespace. API doubles test fixture guards/forwarding only. Native executions: zero. No app launch, browser profile access, external source/build edits, desktop input or installs. Renderer default remains off. Parent must run this real-browser probe, then deliberate native UI Unsave; restart/crash durability and native C++ suites remain unaccepted.
+
 ## 2026-10-25: Recovery popup native acceptance
 
 - Integrated the single-task 0016 candidate and repeated the fresh forced crashed-exit fixture. Actual recovery popup appears instead of the earlier startup CHECK failure. It stays visible with the sidebar hidden and repositions inside the owned window after resize. Fresh screenshot/AX evidence was inspected.

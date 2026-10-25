@@ -4,8 +4,8 @@ import fs from 'node:fs'
 import { setTimeout as delay } from 'node:timers/promises'
 
 const [profileArg, pidArg, scenario] = process.argv.slice(2)
-assert.ok(profileArg && /^\d+$/.test(pidArg ?? '') && ['extension', 'restart', 'runtime'].includes(scenario),
-  'Usage: node tools/check_browser_foundation.mjs PROFILE_DIR BROWSER_PID extension|restart|runtime')
+assert.ok(profileArg && /^\d+$/.test(pidArg ?? '') && ['extension', 'restart', 'runtime', 'workspace-pin'].includes(scenario),
+  'Usage: node tools/check_browser_foundation.mjs PROFILE_DIR BROWSER_PID extension|restart|runtime|workspace-pin')
 const profile = fs.realpathSync(profileArg)
 assert.ok(fs.existsSync(`${profile}/.myarc-m0-test-profile`), 'Expected marked, disposable test profile')
 const port = fs.readFileSync(`${profile}/DevToolsActivePort`, 'utf8').trim().split('\n')[0]
@@ -56,13 +56,18 @@ try {
   assert.ok(processInfo.processInfo.some(process => process.type === 'browser' && process.id === ownedPid), 'CDP browser PID does not match the requested test process')
   // shortcut: reuse an open test tab, isolate the default-profile Target.createTarget assertion before extending this path.
   const { targetInfos } = await send('Target.getTargets')
-  const target = targetInfos.find(target => target.type === 'page' && (
+  if (scenario === 'workspace-pin') {
+    assert.equal(targetInfos.filter(target => target.type === 'page').length, 1,
+      'workspace-pin requires a fresh browser with exactly one ordinary fixture tab')
+  }
+  const target = targetInfos.find(target => target.type === 'page' && (scenario === 'workspace-pin'
+    ? target.url === 'http://127.0.0.1:8766/' : (
     target.url.startsWith('http://127.0.0.1:8766/') ||
     target.url.startsWith('https://chromewebstore.google.com/') ||
     target.url.startsWith('https://example.com/') ||
     target.url.startsWith('chrome://extensions/') ||
     target.url.startsWith(`chrome-extension://${extensionId}/`)
-  ))
+  )))
   assert.ok(target, 'Expected an existing test page; refusing to create a new browser target')
   const { targetId } = target
   const { sessionId } = await send('Target.attachToTarget', { targetId, flatten: true })
@@ -123,7 +128,123 @@ try {
   }
   try {
     await pageSend('Network.enable')
-    if (scenario === 'runtime') {
+    if (scenario === 'workspace-pin') {
+      const fixtureURL = 'http://127.0.0.1:8766/'
+      const fixtureId = 'faokaoibbnjigecocmhniflfnkpmacle'
+      const scopeURL = `chrome-extension://${fixtureId}/`
+      const manifest = JSON.parse(fs.readFileSync(new URL('../tests/fixtures/browser/workspace-pin-extension/manifest.json', import.meta.url), 'utf8'))
+      const waitFor = async (check, description) => {
+        const deadline = Date.now() + 10000
+        do {
+          const value = await check()
+          if (value) return value
+          await delay(100)
+        } while (Date.now() < deadline)
+        throw new Error(`Not ready: ${description}`)
+      }
+      // Read the browser-owned Profile path, rather than trusting a copied port file.
+      await navigate('chrome://version/')
+      await until(`Boolean(document.querySelector('#profile_path')?.textContent.trim().startsWith('/'))`, 'native Profile path')
+      assert.equal(fs.realpathSync(await evaluate(`document.querySelector('#profile_path').textContent.trim()`)),
+        fs.realpathSync(`${profile}/Default`), 'Selected tab belongs to a different Profile')
+      const commandLine = await evaluate(`document.querySelector('#command_line').textContent`)
+      for (const flag of ['--myarc-visual-parity', '--myarc-workspace-sidebar']) {
+        assert.ok(commandLine.includes(flag), `Missing temporary test flag: ${flag}`)
+      }
+      await navigate(fixtureURL)
+      assert.equal(await evaluate(`document.title === 'myArc foundation check' && Boolean(document.querySelector('#form #note'))`), true,
+        'Expected original synthetic form')
+      const readMetadata = () => {
+        let fd
+        try {
+          fd = fs.openSync(`${profile}/Default/myarc-workspace-v1.json`, 'r')
+          // shortcut: fresh single-tab probe only, expand this bound for a larger native journey.
+          const buffer = Buffer.alloc(65537)
+          const size = fs.readSync(fd, buffer)
+          assert.ok(size <= 65536, 'Fresh workspace metadata exceeds 64 KiB')
+          const state = JSON.parse(buffer.subarray(0, size).toString('utf8'))
+          assert.equal(state.version, 1)
+          assert.match(state.profile_id, /^[1-9]\d*$/)
+          assert.ok(Array.isArray(state.items) && state.items.length <= 1024)
+          assert.ok(Array.isArray(state.spaces) && Array.isArray(state.windows))
+          return state
+        } catch (error) {
+          if (error.code === 'ENOENT') return null
+          throw error
+        } finally {
+          if (fd !== undefined) fs.closeSync(fd)
+        }
+      }
+      const initial = await waitFor(() => {
+        const state = readMetadata()
+        return state?.items.length === 1 && state.windows.length === 1 && state.spaces.length === 1 &&
+          state.items[0].placement === 0 && state.items[0].has_url === false && state.items[0].canonical_url === '' &&
+          state.windows[0].selected_item_id === state.items[0].id && state
+      }, 'fresh Temporary persisted by the native workspace renderer (renderer must be enabled)')
+      assert.match(initial.items[0].id, /^[1-9]\d*$/)
+      let workerSession
+      try {
+        await pageSend('ServiceWorker.enable')
+        // One supported lifecycle start wakes an idle MV3 worker; attachment lasts only for this probe.
+        await pageSend('ServiceWorker.startWorker', { scopeURL })
+        const worker = await waitFor(async () => {
+          const { targetInfos } = await send('Target.getTargets')
+          const workers = targetInfos.filter(info => info.type === 'service_worker' && info.url === `${scopeURL}worker.js`)
+          assert.ok(workers.length <= 1, 'Ambiguous fixture worker')
+          return workers[0]
+        }, 'loaded fixture service worker; check normal upstream --load-extension support')
+        assert.equal(worker.browserContextId, target.browserContextId, 'Fixture worker belongs to a different browser context')
+        workerSession = (await send('Target.attachToTarget', { targetId: worker.targetId, flatten: true })).sessionId
+        const workerEval = async expression => {
+          const result = await send('Runtime.evaluate', { expression, awaitPromise: true, returnByValue: true }, workerSession)
+          assert.equal(result.exceptionDetails, undefined, JSON.stringify(result.exceptionDetails))
+          return result.result.value
+        }
+        await waitFor(() => workerEval(`typeof myarcWorkspaceFixtureTab === 'function' && typeof myarcWorkspaceFixturePin === 'function'`),
+          'fixture worker initialization')
+        const identity = await workerEval(`({ id: chrome.runtime.id, manifest: chrome.runtime.getManifest(), url: location.href })`)
+        assert.deepEqual(identity, { id: fixtureId, manifest, url: `${scopeURL}worker.js` }, 'Wrong fixture worker')
+        const inspectTab = async () => {
+          const { targetInfos } = await send('Target.getTargets')
+          const pages = targetInfos.filter(info => info.type === 'page')
+          assert.equal(pages.length, 1, 'Fixture browser tab set changed')
+          assert.equal(pages[0].targetId, targetId, 'Fixture target changed')
+          assert.equal(pages[0].url, fixtureURL, 'Fixture target navigated')
+          return workerEval('myarcWorkspaceFixtureTab()')
+        }
+        const tab = await inspectTab()
+        assert.equal(tab.pinned, false, 'Probe requires an initially unpinned fixture tab')
+        const mutate = async pinned => {
+          assert.deepEqual(await inspectTab(), { ...tab, pinned: !pinned }, 'Fixture tab identity/state changed before mutation')
+          return workerEval(`myarcWorkspaceFixturePin(${tab.id}, ${pinned})`)
+        }
+        await mutate(true)
+        const saved = await waitFor(async () => {
+          const live = await inspectTab()
+          assert.equal(live.id, tab.id)
+          const state = readMetadata()
+          const item = state?.items.find(item => item.id === initial.items[0].id)
+          return live.pinned === true && state?.items.length === 1 && state.profile_id === initial.profile_id &&
+            item?.placement === 2 && item.has_url === true && item.canonical_url === fixtureURL &&
+            item.owner_id === state.profile_id && item
+        }, 'real native pin projection and persisted Profile Favorite')
+        const unpinned = await mutate(false)
+        assert.deepEqual(unpinned, { ...tab, pinned: true }, 'Generic extension Unpin must leave native pin true')
+        // Check actual read-backs across queued projection/write turns; elapsed time alone never passes.
+        for (let sample = 0; sample < 5; sample++) {
+          assert.deepEqual(await inspectTab(), { ...tab, pinned: true })
+          const state = readMetadata()
+          assert.equal(state?.profile_id, initial.profile_id)
+          assert.deepEqual(state.items, [saved], 'Generic Unpin changed saved ID, canonical URL, owner or placement')
+          if (sample < 4) await delay(100)
+        }
+        console.log(JSON.stringify({ scenario, browser: version.Browser, browserPid: ownedPid, targetId, tabId: tab.id, favorite: saved }))
+        console.log('PASS: real extension Pin saved a Favorite; generic Unpin retained native pin and persisted identity (Favorite left saved)')
+      } finally {
+        if (workerSession) await send('Target.detachFromTarget', { sessionId: workerSession }).catch(() => {})
+        await pageSend('ServiceWorker.disable').catch(() => {})
+      }
+    } else if (scenario === 'runtime') {
       await navigate('http://127.0.0.1:8766/')
       await until(`Boolean(document.querySelector('#note'))`, 'synthetic form')
       await evaluate(`
