@@ -266,6 +266,17 @@
     .post-body li + li { margin-top: .5rem }
     .post-body img { border-radius: 1rem; margin: 2rem 0; max-width: 100% }
     .post-body figure { margin: 2rem 0 }
+    .post-body figure > a { display: block; cursor: zoom-in }
+    .post-body .image-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1.5rem; margin: 2rem 0 }
+    .post-body .image-grid figure { margin: 0; min-width: 0 }
+    .post-body .image-grid img { width: 100%; aspect-ratio: 16 / 10; object-fit: contain }
+    html:has(.image-lightbox[open]) { overflow: hidden }
+    .image-lightbox { width: min(75rem, calc(100% - 2rem)); max-width: none; max-height: calc(100dvh - 2rem); padding: 1rem; border: 0; border-radius: 1rem; background: var(--page); color: var(--text); font: inherit }
+    .image-lightbox:not([open]) { display: none }
+    .image-lightbox::backdrop { background: rgb(0 0 0 / .7); -webkit-backdrop-filter: blur(2rem); backdrop-filter: blur(2rem) }
+    .image-lightbox button { display: block; margin: 0 0 1rem auto; min-height: 2.75rem; padding: .375rem .75rem; border: .0625rem solid var(--quiet); border-radius: 2rem; background: transparent; color: inherit; font: inherit; font-size: 1rem; cursor: pointer }
+    .image-lightbox img { max-height: calc(100dvh - 10rem); width: 100%; object-fit: contain }
+    .image-lightbox p { margin-top: .75rem; font-size: 1rem; text-align: center }
     .post-body figure img { margin: 0; opacity: .9; transition: opacity .15s ease }
     .post-body figcaption { margin-top: .5rem; color: var(--quiet); font-size: 1rem; line-height: 1.4; font-style: normal; text-align: center; transition: color .15s ease }
     .post-body figure:hover img, .post-body figure:focus-within img { opacity: 1 }
@@ -283,6 +294,7 @@
     @media (max-width: 48rem) {
       .journal { padding: 2.5rem 0 4rem }
       .journal h1 { font-size: 2.5rem }
+      .post-body .image-grid { gap: 1rem }
       .post-preview { gap: 1rem }
       .post-preview h2 { font-size: 1.5rem }
       .post-thumb { width: 5.5rem }
@@ -325,9 +337,9 @@
 <p>Those are now things to recheck when the controls move. Looking right is one check. Typing an address and opening the page is another.</p>
 <h2>The current build and the target</h2>
 <p>Page navigation and the centered native command palette already work. Today's goal is an Arc-like empty window and a nightly build people can try without compiling Chromium.</p>
-<figure><a href="myarc-current-build.f594a2a31d6a.webp"><img alt="Current myArc build loading mauriciowolff.com with the native command palette open" decoding="async" fetchpriority="high" height="1492" loading="eager" sizes="(max-width: 48rem) calc(100vw - 3rem), 50rem" src="myarc-current-build.f594a2a31d6a.webp" srcset="myarc-current-build.f594a2a31d6a.960.webp 960w, myarc-current-build.f594a2a31d6a.webp 2400w" width="2400"/></a><figcaption>myArc, with the native command palette open.</figcaption></figure>
+<div class="image-grid"><figure><a href="myarc-current-build.f594a2a31d6a.webp"><img alt="Current myArc build loading mauriciowolff.com with the native command palette open" decoding="async" fetchpriority="high" height="1492" loading="eager" sizes="(max-width: 48rem) calc((100vw - 4rem) / 2), 24rem" src="myarc-current-build.f594a2a31d6a.webp" srcset="myarc-current-build.f594a2a31d6a.960.webp 960w, myarc-current-build.f594a2a31d6a.webp 2400w" width="2400"/></a><figcaption>myArc, with the native command palette open.</figcaption></figure><figure><a href="arc-reference.3418f314f546.webp"><img alt="Arc reference for the window material, sidebar and centered command bar" decoding="async" height="1310" loading="lazy" sizes="(max-width: 48rem) calc((100vw - 4rem) / 2), 24rem" src="arc-reference.3418f314f546.webp" srcset="arc-reference.3418f314f546.960.webp 960w, arc-reference.3418f314f546.webp 2000w" width="2000"/></a><figcaption>Arc, our visual reference.</figcaption></figure></div>
 
-<figure><a href="arc-reference.3418f314f546.webp"><img alt="Arc reference for the window material, sidebar and centered command bar" decoding="async" height="1310" loading="lazy" sizes="(max-width: 48rem) calc(100vw - 3rem), 50rem" src="arc-reference.3418f314f546.webp" srcset="arc-reference.3418f314f546.960.webp 960w, arc-reference.3418f314f546.webp 2000w" width="2000"/></a><figcaption>Arc, our visual reference.</figcaption></figure>
+
 
 </article></main><footer class="end">
       <a class="mark plain" href="#main" aria-label="Back to top"><img class="ribbon" src="../_assets/logo-matte.300972748816.webp" alt="" width="1254" height="1254"><picture><source media="(prefers-color-scheme: dark)" srcset="../_assets/wordmark-ivory.3a99cf025832.svg"><img class="wordmark" src="../_assets/wordmark-ink.18b9e7ae3785.svg" alt="myArc" width="3056" height="1049"></picture></a>
@@ -347,4 +359,4 @@
 </svg>
  by <a href="https://github.com/bitbonsai">@bitbonsai</a> for Arc enthusiasts.</p>
       </div>
-    </footer></div></body></html>
+    </footer></div><dialog id="image-lightbox" class="image-lightbox" aria-labelledby="lightbox-caption"><button type="button" autofocus>Close image</button><img alt=""><p id="lightbox-caption"></p></dialog><script defer src="../_assets/gallery.61cb3fdd10c5.js"></script></body></html>
