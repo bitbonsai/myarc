@@ -1,0 +1,418 @@
+--- a/chrome/browser/ui/views/frame/BUILD.gn
++++ b/chrome/browser/ui/views/frame/BUILD.gn
+@@ -800,6 +800,7 @@
+     "//chrome/browser/feature_engagement",
+     "//chrome/browser/glic/public:features",
+     "//chrome/browser/headless",
++    "//chrome/browser/history",
+     "//chrome/browser/profiles",
+     "//chrome/browser/profiles:profile",
+     "//chrome/browser/profiles:profile_manager",
+@@ -879,6 +880,7 @@
+     "//chrome/browser/ui/views/accessibility",
+     "//chrome/browser/ui/views/autofill:autofill_bubble_handler_impl",
+     "//chrome/browser/ui/views/bookmarks",
++    "//chrome/browser/ui/views/controls",
+     "//chrome/browser/ui/views/download",
+     "//chrome/browser/ui/views/exclusive_access",
+     "//chrome/browser/ui/views/extensions:extensions_toolbar_desktop",
+@@ -935,6 +937,7 @@
+     "//components/enterprise/buildflags",
+     "//components/feature_engagement/public",
+     "//components/feature_engagement/public:feature_constants",
++    "//components/history/core/browser",
+     "//components/infobars/content",
+     "//components/javascript_dialogs",
+     "//components/performance_manager",
+--- a/chrome/browser/ui/views/frame/browser_view.cc
++++ b/chrome/browser/ui/views/frame/browser_view.cc
+@@ -35,6 +35,7 @@
+ #include "base/scoped_observation.h"
+ #include "base/strings/string_number_conversions.h"
+ #include "base/strings/stringprintf.h"
++#include "base/task/cancelable_task_tracker.h"
+ #include "base/task/sequenced_task_runner.h"
+ #include "base/task/single_thread_task_runner.h"
+ #include "base/trace_event/trace_event.h"
+@@ -56,6 +57,7 @@
+ #include "chrome/browser/feature_engagement/tracker_factory.h"
+ #include "chrome/browser/glic/public/features.h"
+ #include "chrome/browser/headless/headless_mode_util.h"
++#include "chrome/browser/history/history_service_factory.h"
+ #include "chrome/browser/platform_util.h"
+ #include "chrome/browser/profiles/profile.h"
+ #include "chrome/browser/profiles/profile_attributes_entry.h"
+@@ -153,6 +155,7 @@
+ #include "chrome/browser/ui/views/bookmarks/bookmark_page_action_controller.h"
+ #include "chrome/browser/ui/views/bubble_anchor_util_views.h"
+ #include "chrome/browser/ui/views/color_provider_browser_helper.h"
++#include "chrome/browser/ui/views/controls/hover_button.h"
+ #include "chrome/browser/ui/views/download/download_in_progress_dialog_view.h"
+ #include "chrome/browser/ui/views/exclusive_access/exclusive_access_bubble_views.h"
+ #include "chrome/browser/ui/views/exclusive_access/exclusive_access_bubble_views_context.h"
+@@ -264,6 +267,8 @@
+ #include "components/feature_engagement/public/event_constants.h"
+ #include "components/feature_engagement/public/feature_constants.h"
+ #include "components/feature_engagement/public/tracker.h"
++#include "components/history/core/browser/history_service.h"
++#include "components/history/core/browser/history_types.h"
+ #include "components/infobars/content/content_infobar_manager.h"
+ #include "components/javascript_dialogs/app_modal_dialog_controller.h"
+ #include "components/javascript_dialogs/app_modal_dialog_queue.h"
+@@ -684,14 +689,16 @@
+         views::BoxLayout::CrossAxisAlignment::kCenter);
+     auto* icon = header->AddChildView(std::make_unique<views::ImageView>());
+     icon->SetImage(ui::ImageModel::FromVectorIcon(vector_icons::kSearchIcon,
+-                                                  SK_ColorWHITE, 18));
++                                                  ui::kColorSysOnSurface, 18));
+     input_ = header->AddChildView(std::make_unique<views::Textfield>());
+     input_->SetController(this);
+     input_->SetPlaceholderText(u"Search or Enter URL...");
+     input_->GetViewAccessibility().SetName(u"Search or Enter URL");
+     input_->SetTextInputType(ui::TEXT_INPUT_TYPE_URL);
+     input_->SetFontList(gfx::FontList().DeriveWithSizeDelta(5));
+-    input_->SetBackgroundColor(SkColorSetRGB(30, 28, 32));
++    input_->SetBackgroundColor(ui::kColorBubbleBackground);
++    input_->SetTextColorId(ui::kColorSysOnSurface);
++    input_->SetPlaceholderTextColorId(ui::kColorSysOnSurfaceVariant);
+     input_->SetBorder(views::CreateEmptyBorder(gfx::Insets::VH(8, 12)));
+     header->SetFlexForView(input_, 1);
+     header->SetPreferredSize(gfx::Size(width_, 52));
+@@ -699,7 +706,7 @@
+     rows_->SetOrientation(views::BoxLayout::Orientation::kVertical);
+     rows_->SetBetweenChildSpacing(4);
+     error_ = AddChildView(std::make_unique<views::Label>());
+-    error_->SetEnabledColor(SkColorSetRGB(255, 170, 170));
++    error_->SetEnabledColor(ui::kColorSysError);
+     error_->SetVisible(false);
+     Rebuild();
+   }
+@@ -723,15 +730,15 @@
+     }
+     if (event.key_code() == ui::VKEY_RETURN) {
+       if (selected_ >= 0) {
+-        SwitchToTab(selected_);
++        ActivateResult(selected_);
+       } else {
+         Submit();
+       }
+       return true;
+     }
+-    if (!matches_.empty() && (event.key_code() == ui::VKEY_DOWN ||
++    if (!buttons_.empty() && (event.key_code() == ui::VKEY_DOWN ||
+                               event.key_code() == ui::VKEY_UP)) {
+-      const int count = static_cast<int>(matches_.size());
++      const int count = static_cast<int>(buttons_.size());
+       selected_ =
+           event.key_code() == ui::VKEY_DOWN
+               ? (selected_ + 1) % count
+@@ -744,7 +751,7 @@
+ 
+  private:
+   void Resize() {
+-    const int row_count = std::max(1, static_cast<int>(matches_.size()));
++    const int row_count = std::max(1, static_cast<int>(buttons_.size()));
+     SetPreferredSize(gfx::Size(
+         width_, 60 + row_count * 48 + (error_->GetVisible() ? 32 : 0)));
+     if (GetWidget()) {
+@@ -757,16 +764,96 @@
+ 
+   void UpdateSelection() {
+     for (size_t i = 0; i < buttons_.size(); ++i) {
++      const bool selected = static_cast<int>(i) == selected_;
+       buttons_[i]->SetBackground(views::CreateRoundedRectBackground(
+-          static_cast<int>(i) == selected_ ? SkColorSetRGB(66, 66, 210)
+-                                           : SK_ColorTRANSPARENT,
+-          8));
+-    }
++          selected ? SkColorSetRGB(66, 66, 210) : SK_ColorTRANSPARENT, 8));
++      const ui::ColorVariant foreground =
++          selected ? ui::ColorVariant(SK_ColorWHITE)
++                   : ui::ColorVariant(ui::kColorSysOnSurface);
++      buttons_[i]->title()->SetEnabledColor(foreground);
++      actions_[i]->SetEnabledColor(
++          selected ? ui::ColorVariant(SK_ColorWHITE)
++                   : ui::ColorVariant(ui::kColorSysOnSurfaceVariant));
++      icons_[i]->SetImage(ui::ImageModel::FromVectorIcon(
++          i < matches_.size() ? vector_icons::kGlobeIcon
++                              : vector_icons::kHistoryIcon,
++          foreground, 16));
++    }
++  }
++
++  void AddResultRow(const std::u16string& title,
++                    const std::u16string& address,
++                    bool is_tab) {
++    HoverButton::Params params;
++    auto icon =
++        std::make_unique<views::ImageView>(ui::ImageModel::FromVectorIcon(
++            is_tab ? vector_icons::kGlobeIcon : vector_icons::kHistoryIcon,
++            ui::kColorSysOnSurface, 16));
++    icons_.push_back(icon.get());
++    params.icon_view = std::move(icon);
++    params.title = title;
++    params.add_vertical_label_spacing = false;
++    auto action = std::make_unique<views::Label>(
++        is_tab ? u"Switch to Tab  \u2192" : u"Open from History  \u2192");
++    action->SetSubpixelRenderingEnabled(false);
++    action->SetAutoColorReadabilityEnabled(false);
++    actions_.push_back(action.get());
++    params.secondary_view = std::move(action);
++    auto* button = rows_->AddChildView(std::make_unique<HoverButton>(
++        base::BindRepeating(&MyarcPaletteView::ActivateResult,
++                            base::Unretained(this),
++                            static_cast<int>(buttons_.size())),
++        std::move(params)));
++    button->title()->SetSubpixelRenderingEnabled(false);
++    button->title()->SetAutoColorReadabilityEnabled(false);
++    button->title()->SetEnabledColor(ui::kColorSysOnSurface);
++    button->SetBorder(views::CreateEmptyBorder(gfx::Insets::VH(10, 12)));
++    button->SetPreferredSize(gfx::Size(width_, 44));
++    button->SetTooltipText(address);
++    button->AddExtraAccessibleText(is_tab ? u"Switch to Tab"
++                                          : u"Open from History");
++    button->SetFocusBehavior(views::View::FocusBehavior::ALWAYS);
++    buttons_.push_back(button);
++  }
++
++  void AddHistoryResults(history::QueryResults results) {
++    if (!browser_ || (GetWidget() && GetWidget()->IsClosed())) {
++      return;
++    }
++    for (const auto& result : results) {
++      if (buttons_.size() >= 8) {
++        break;
++      }
++      const GURL& url = result.url();
++      if (!url.SchemeIsHTTPOrHTTPS() || url.spec().size() > 4096 ||
++          std::ranges::any_of(matches_, [&url](const auto& tab) {
++            return tab && tab->GetLastCommittedURL() == url;
++          })) {
++        continue;
++      }
++      if (buttons_.empty()) {
++        rows_->RemoveAllChildViews();
++      }
++      history_urls_.push_back(url);
++      const std::u16string address = base::UTF8ToUTF16(url.spec());
++      AddResultRow(result.title().empty() ? address.substr(0, 160)
++                                          : result.title().substr(0, 160),
++                   address, false);
++    }
++    if (!buttons_.empty() && selected_ < 0) {
++      selected_ = 0;
++    }
++    UpdateSelection();
++    Resize();
+   }
+ 
+   void Rebuild() {
++    history_tasks_.TryCancelAll();
+     buttons_.clear();
++    actions_.clear();
++    icons_.clear();
+     matches_.clear();
++    history_urls_.clear();
+     rows_->RemoveAllChildViews();
+     selected_ = -1;
+     error_->SetVisible(false);
+@@ -799,36 +886,53 @@
+         if (title.empty()) {
+           title = address;
+         }
+-        const int index = static_cast<int>(matches_.size());
+         matches_.push_back(contents->GetWeakPtr());
+-        auto* button = rows_->AddChildView(std::make_unique<views::LabelButton>(
+-            base::BindRepeating(&MyarcPaletteView::SwitchToTab,
+-                                base::Unretained(this), index),
+-            title));
+-        button->SetHorizontalAlignment(gfx::ALIGN_LEFT);
+-        button->SetEnabledTextColors(SK_ColorWHITE);
+-        button->SetBorder(views::CreateEmptyBorder(gfx::Insets::VH(10, 12)));
+-        button->SetPreferredSize(gfx::Size(width_, 44));
+-        button->SetTooltipText(u"Switch to tab: " + address);
+-        button->SetFocusBehavior(views::View::FocusBehavior::ALWAYS);
+-        buttons_.push_back(button);
++        AddResultRow(title, address, true);
+       }
+     }
+     if (matches_.empty()) {
+       auto* hint = rows_->AddChildView(std::make_unique<views::Label>(
+           u"Enter opens a new tab. Esc cancels."));
+-      hint->SetEnabledColor(SkColorSetRGB(170, 166, 180));
++      hint->SetEnabledColor(ui::kColorSysOnSurfaceVariant);
+       hint->SetPreferredSize(gfx::Size(width_, 44));
+     } else {
+       selected_ = 0;
+       UpdateSelection();
+     }
+     Resize();
+-  }
+-
+-  void SwitchToTab(int index) {
+-    if (!browser_ || index < 0 || index >= static_cast<int>(matches_.size()) ||
+-        !matches_[index]) {
++    if (browser_ && !browser_->GetProfile()->IsOffTheRecord() &&
++        buttons_.size() < 8) {
++      auto* history_service = HistoryServiceFactory::GetForProfile(
++          browser_->GetProfile(), ServiceAccessType::IMPLICIT_ACCESS);
++      if (history_service) {
++        history::QueryOptions options;
++        options.max_count = 16;
++        options.policy_for_404_visits =
++            history::VisitQuery404sPolicy::kInclude404s;
++        history_service->QueryHistory(
++            std::u16string(input_->GetText()), options,
++            base::BindOnce(&MyarcPaletteView::AddHistoryResults,
++                           weak_factory_.GetWeakPtr()),
++            &history_tasks_);
++      }
++    }
++  }
++
++  void ActivateResult(int index) {
++    if (index >= static_cast<int>(matches_.size())) {
++      const int history_index = index - static_cast<int>(matches_.size());
++      if (browser_ && history_index >= 0 &&
++          history_index < static_cast<int>(history_urls_.size()) &&
++          chrome::NavigateFromMyarcPalette(
++              browser_.get(),
++              base::UTF8ToUTF16(history_urls_[history_index].spec()))) {
++        if (GetWidget() && !GetWidget()->IsClosed()) {
++          GetWidget()->Close();
++        }
++      }
++      return;
++    }
++    if (!browser_ || index < 0 || !matches_[index]) {
+       Rebuild();
+       return;
+     }
+@@ -864,8 +968,13 @@
+   raw_ptr<views::BoxLayoutView> rows_ = nullptr;
+   raw_ptr<views::Label> error_ = nullptr;
+   std::vector<base::WeakPtr<content::WebContents>> matches_;
+-  std::vector<raw_ptr<views::LabelButton>> buttons_;
++  std::vector<raw_ptr<HoverButton>> buttons_;
++  std::vector<raw_ptr<views::Label>> actions_;
++  std::vector<raw_ptr<views::ImageView>> icons_;
++  std::vector<GURL> history_urls_;
++  base::CancelableTaskTracker history_tasks_;
+   int selected_ = -1;
++  base::WeakPtrFactory<MyarcPaletteView> weak_factory_{this};
+ };
+ 
+ BEGIN_METADATA(MyarcPaletteView)
+@@ -5510,10 +5619,9 @@
+   delegate->SetButtons(static_cast<int>(ui::mojom::DialogButton::kNone));
+   delegate->SetShowCloseButton(false);
+   delegate->SetShowTitle(false);
+-  delegate->SetTitle(u"New Tab");
++  delegate->SetTitle(u"Command palette");
+   delegate->set_corner_radius(12);
+   delegate->set_margins(gfx::Insets(12));
+-  delegate->SetBackgroundColor(SkColorSetRGB(30, 28, 32));
+   auto* content = delegate->SetContentsView(
+       std::make_unique<MyarcPaletteView>(browser_->GetWeakPtr(), width));
+   delegate->SetInitiallyFocusedView(content->input());
+@@ -5521,8 +5629,6 @@
+       delegate,
+       base::IgnoreArgs<views::Widget::ClosedReason>(base::BindOnce(
+           &BrowserView::OnMyarcCommandPaletteClosed, GetAsWeakPtr())));
+-  myarc_command_palette_widget_->SetColorModeOverride(
+-      ui::ColorProviderKey::ColorMode::kDark);
+   if (!multi_contents_view_->layer()) {
+     multi_contents_view_->SetPaintToLayer();
+     multi_contents_view_->layer()->SetFillsBoundsOpaquely(false);
+--- a/chrome/browser/ui/views/frame/browser_native_widget_mac.mm
++++ b/chrome/browser/ui/views/frame/browser_native_widget_mac.mm
+@@ -76,6 +76,7 @@
+ #include "ui/base/mojom/window_show_state.mojom.h"
+ #include "ui/base/ui_base_features.h"
+ #include "ui/base/window_open_disposition.h"
++#include "ui/color/color_id.h"
+ #include "ui/compositor/compositor.h"
+ #include "ui/gfx/color_utils.h"
+ #include "ui/native_theme/native_theme.h"
+@@ -1135,21 +1136,7 @@
+       tint_view.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
+       if (base::CommandLine::ForCurrentProcess()->HasSwitch(
+               "myarc-visual-parity")) {
+-        // shortcut: fixed dark reference palette; add Space themes after
+-        // review.
+         CAGradientLayer* const tint = [CAGradientLayer layer];
+-        tint.colors = @[
+-          (__bridge id)[NSColor colorWithSRGBRed:0.10
+-                                           green:0.09
+-                                            blue:0.18
+-                                           alpha:0.75]
+-              .CGColor,
+-          (__bridge id)[NSColor colorWithSRGBRed:0.20
+-                                           green:0.12
+-                                            blue:0.20
+-                                           alpha:0.75]
+-              .CGColor
+-        ];
+         tint.startPoint = CGPointMake(0, 1);
+         tint.endPoint = CGPointMake(1, 0);
+         tint_view.layer = tint;
+@@ -1271,6 +1258,30 @@
+ 
+   const bool is_vertical_tabs = browser_view_->ShouldDrawVerticalTabStrip();
+ 
++  if (base::CommandLine::ForCurrentProcess()->HasSwitch(
++          "myarc-visual-parity")) {
++    CAGradientLayer* const tint =
++        base::apple::ObjCCast<CAGradientLayer>(tint_view_.layer);
++    if (tint) {
++      const bool dark = color_utils::IsDark(
++          browser_view_->GetColorProvider()->GetColor(ui::kColorSysSurface));
++      // shortcut: fixed accent stops per appearance; use Space themes when
++      // available.
++      tint.colors = @[
++        (__bridge id)[NSColor colorWithSRGBRed:dark ? 0.10 : 0.89
++                                         green:dark ? 0.09 : 0.88
++                                          blue:dark ? 0.18 : 0.95
++                                         alpha:dark ? 0.75 : 0.65]
++            .CGColor,
++        (__bridge id)[NSColor colorWithSRGBRed:dark ? 0.20 : 0.94
++                                         green:dark ? 0.12 : 0.90
++                                          blue:dark ? 0.20 : 0.94
++                                         alpha:dark ? 0.75 : 0.65]
++            .CGColor
++      ];
++    }
++  }
++
+   auto* const glass_frame_service = GlassFrameService::GetInstance();
+   const bool are_multiple_profiles_open =
+       glass_frame_service && glass_frame_service->HasMultipleOpenProfiles();
+--- a/chrome/browser/ui/views/location_bar/location_bar_view.cc
++++ b/chrome/browser/ui/views/location_bar/location_bar_view.cc
+@@ -1405,11 +1405,6 @@
+   SkColor normal = color_provider->GetColor(kColorLocationBarBackground);
+   SkColor hovered =
+       color_provider->GetColor(kColorLocationBarBackgroundHovered);
+-  if (!high_contrast && base::CommandLine::ForCurrentProcess()->HasSwitch(
+-                            "myarc-visual-parity")) {
+-    normal = SkColorSetRGB(55, 53, 73);
+-    hovered = SkColorSetRGB(65, 62, 84);
+-  }
+ 
+   background_color_ = gfx::Tween::ColorValueBetween(opacity, normal, hovered);
+   if (is_caret_visible) {
+--- a/chrome/browser/ui/browser_commands.cc
++++ b/chrome/browser/ui/browser_commands.cc
+@@ -987,7 +987,11 @@
+   // Startup tabs could be created during browser creation. Add an empty tab
+   // only if no tabs are created.
+   if (browser->GetTabStripModel()->empty()) {
+-    AddTabAt(browser, GURL(), -1, true);
++    const GURL initial_url =
++        base::CommandLine::ForCurrentProcess()->HasSwitch("myarc-visual-parity")
++            ? GURL(url::kAboutBlankURL)
++            : GURL();
++    AddTabAt(browser, initial_url, -1, true);
+   }
+ 
+   browser->GetWindow()->Show();

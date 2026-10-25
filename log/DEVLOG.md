@@ -2,6 +2,13 @@
 
 Keep significant outcomes, failures and next actions reproducible. Newest entry first. No private exports, page titles/URLs from real browsing, credentials or raw user transcripts.
 
+## 2026-10-25: Command palette history and appearance
+
+- MA-007.b2: combined bounded current-window tab matches with Chromium Profile history, using distinct switch/open actions. History stays local, stale queries are cancelled and private windows skip regular history. Rust was unchanged.
+- Fixed mixed light controls and hardcoded dark surfaces. Palette colors now use browser roles, selected labels disable automatic recoloring, and material tint follows effective Profile colors rather than the system theme alone. Restored themed sidebar address backgrounds. Prototype new windows start at `about:blank`.
+- Native build, frame/browser-command GN checks and five-source patch reproduction passed. A typed local history title reopened the actual fixture URL in one new tab. Explicit light Profile appearance was inspected on a dark system; a private dark palette showed no normal-history entries. Cmd+N produced one blank target. Captures contain invented data and remain private.
+- An initial HoverButton paint failed the opaque-layer subpixel check; disabled subpixel rendering for those labels. Full autocomplete, cached favicons and live appearance switching remain open. Sidebar shortcuts, current-tab palette editing, motion and release recovery are still pending.
+
 ## 2026-10-25: Basic native New Tab palette
 
 - MA-007.b1: routed interactive New Tab actions to a centered Views palette while retaining programmatic tab creation. Enter uses Chromium classification/navigation or activates a matching existing tab. Input and tab matching are bounded; Rust workspace rules are unchanged.
