@@ -94,6 +94,18 @@ Use real Chromium tabs, navigation and security controls. A themed stock sidebar
 
 Evidence: same-size native captures against the reference, with explicit remaining differences, working address/tab controls, and normal/reduced-transparency and keyboard-focus checks. Stop at a reviewed first state; command-bar, populated sidebar and other window states require their own comparisons. Release safety gates remain open. Export work and broad test expansion do not block this slice.
 
+### MA-007.c: populated native sidebar journey
+
+Continue this approved queue autonomously; the lead owns delegation, review feedback, integration and fresh native evidence. A checkpoint does not end the queue.
+
+1. Display real pinned browser tabs as native tiles; exercise activation, pin/unpin and restart. This UI proof does not establish Arc saved-pin lifetime rules.
+2. Integrate Rust-owned Spaces and placements through one Profile-owned service. Show the actual Space title and footer switcher. Switching changes real visible tabs; Profile favorites and Space pins remain distinct. Preserve saved items when their live pages close, then verify restart and rejected/corrupt state.
+3. Finish full sidebar show/hide with Cmd/Ctrl+S, truthful Save Page menus, prior-width restoration and existing native motion. Cmd/Ctrl+L and sidebar location activation use the centered palette in current-tab mode.
+4. Compare populated light/dark states against private references. Keep content/canvas visible behind the palette, match insets and inspect motion/focus under interruption and reduced motion.
+5. Resolve recovery/menu anchoring and audit visible controls. Retain release gates for crash safety, privacy, distribution and CLI/MCP; UI progress does not waive them.
+
+Implement and commit bounded pieces through this journey. Review-agent findings return to implementation, then receive native checks before acceptance. Release timing follows the remaining measured blockers rather than an assumed delivery multiplier.
+
 ## MA-008 — Integrate and finish onboarding animation
 
 Dependencies: MA-001/004/006/007.

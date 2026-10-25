@@ -29,6 +29,8 @@ Prioritize contracts that constrain multiple systems: Spaces/Profiles, pinned-ta
 
 ### Ship a bounded result per work item
 
+For approved scope, the lead agent owns the queue and continues after each verified slice. Delegate isolated implementation where useful, review feedback, integrate and inspect the running native app with fresh captures. Checkpoints report evidence and the next action; they do not wait for another user prompt. Escalate product decisions, authorization boundaries and blockers.
+
 MA-001 through MA-011 are workstreams, not single-agent-sized tickets. Before starting, select a bounded outcome and use a suffix such as `MA-004.a`. Name the files/interfaces involved, dependencies, acceptance evidence and stopping condition. Keep the change small enough to understand in one review. Documentation changes do not require invented application tests.
 
 Useful first slices are: a motion study for the post-import reveal with synthetic state; a reproducible unmodified upstream build; a verified inventory of one actual export version; or a standalone validated workspace round trip. Do not bundle all four into a single completion claim.

@@ -38,6 +38,8 @@ Use upstream browser security/profile machinery; do not bypass sandboxing or dup
 
 ## Working loop
 
+Within the approved native-parity scope, continue implementation and verification without waiting for another user prompt after each checkpoint. Delegate bounded work when useful; retain task IDs and own integration, native checks and fresh captures. Pause for genuine product decisions, safety/authorization boundaries or blockers. Progress reports are checkpoints, not requests to restart work.
+
 1. Select an unblocked task or follow the user's concrete request. State assumptions and acceptance criteria.
 2. Find its evidence/source and affected boundary. If behavior is unknown, record the question and investigate rather than inventing parity.
 3. Implement a complete, narrow journey through model, command and UI where relevant.
