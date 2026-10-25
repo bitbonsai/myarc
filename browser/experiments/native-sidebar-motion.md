@@ -8,6 +8,12 @@ Two user-supplied recordings show Arc at 1714 × 1080 and myArc at 1724 × 1080,
 
 An Arc intermediate frame shows the sidebar translated left with favorite tile dimensions and spacing intact. The corresponding myArc interaction narrows the layout: three tiles become a column, and header controls reposition. Page content and theme differ between clips, so this comparison establishes sidebar geometry only. It does not establish an exact animation curve or duration.
 
+## Hidden-state edge hover
+
+The user also requires revealing a hidden sidebar by hovering the browser's left edge. Around 9.0 seconds the reference remains hidden with the pointer at that edge. Frames around 9.1–9.3 seconds show a rounded, outlined sidebar floating over the page; the page logo and heading keep their previous positions. A later toggle changes it to the persistent sidebar and resizes the page. Treat temporary hover reveal and persistent expansion as distinct layouts.
+
+The sequence does not isolate pointer-exit dismissal without a click. Exact activation-zone width, delay and easing remain unmeasured. Reuse native hover locks and dismissal machinery, then verify pointer/focus/menu behavior in the running build.
+
 ## Implementation boundary
 
 Keep the inner sidebar at its expanded layout width while hide/show changes the outer reserved width. Translate the inner controls together behind a clipped viewport. Genuine user resizing still relayouts the sidebar. Reuse Chromium's animation controller, including reversal and reduced motion. Preserve the zero-width hidden endpoint and previous expanded width.
@@ -22,4 +28,4 @@ Interactive capture stopped when the owned-window focus precondition failed, bef
 
 ## Acceptance still required
 
-Compile and record the actual native app. Verify unchanged inner tile bounds throughout collapse/expand, rapid reversal and resized-width restoration. Inspect focus and pointer behavior, reduced motion and fullscreen. Hover-peek behavior and command-palette motion require their own comparison. Extracted reference frames and static geometry checks cannot close native acceptance.
+Compile and record the actual native app. Verify unchanged inner tile bounds throughout collapse/expand, rapid reversal and resized-width restoration. Inspect focus and pointer behavior, reduced motion and fullscreen. Hover-peek implementation and command-palette motion need their own native acceptance; reference hover overlay is now observed. Extracted reference frames and static geometry checks cannot close native acceptance.
