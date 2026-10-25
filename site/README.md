@@ -45,9 +45,13 @@ Header/footer ribbon marks are 1rem square beside outlined Outfit wordmarks. Hea
 
 The page follows `prefers-color-scheme` automatically. CSS variables switch surfaces/text and native picture sources select ivory wordmarks in dark mode. Blue primary buttons and colorful artwork remain unchanged. Original grain covers page and panel in both themes. Reduced motion disables animation, transitions and smooth scrolling.
 
+Same-origin page navigation uses native cross-document View Transitions with a .18s root crossfade. Shared CSS opts the homepage, index and posts in. Reduced motion opts out entirely. Unsupported browsers retain ordinary navigation; there is no router or runtime JavaScript.
+
 ## Verification
 
 Offline font/image decoding, no remote page-resource requests, minimum text size, clipping and overflow checks passed at 320/390/768/900/1024/1440. Dark rendering, wordmark switching and sampled AA text contrast passed at 1440/390. Keyboard focus, link hover and the 40-BPM footer heart remain checked. Fresh light/dark desktop and dark mobile screenshots were inspected.
+
+The browser check also serves the generated site over loopback HTTP and follows home → blog → post → blog → home. Chrome `pageswap` evidence confirms transitions in desktop/light and phone/dark modes, and their absence under reduced motion. A fresh navigation recording was inspected. Other-browser transition support remains unmeasured.
 
 All six documentation URLs returned anonymous HTTP 200; an actual Roadmap click also opened the expected GitHub document. Safari, Firefox and screen readers remain unmeasured.
 

@@ -2,6 +2,12 @@
 
 Keep significant outcomes, failures and next actions reproducible. Newest entry first. No private exports, page titles/URLs from real browsing, credentials or raw user transcripts.
 
+## 2026-10-25: Native website View Transitions
+
+- Added shared CSS opt-in for same-origin cross-document transitions, with a .18s root fade. Reduced motion opts out; unsupported browsers retain normal navigation. No runtime JavaScript or router was added.
+- Retained checks serve the actual generated pages over loopback HTTP. Eight desktop/light and phone/dark navigations created native transitions; four reduced-motion navigations did not. A fresh navigation recording was inspected. The first test attempt clicked during an active transition; the check now waits for rendered frames and finite animations before its next click.
+- Thirteen unit tests, static resource/metadata checks and the layout/theme/focus/motion suite passed. Safari/Firefox behavior and precise runtime animation timing remain unmeasured.
+
 ## 2026-10-25: Shorter journal prose and figure treatment
 
 - Applied unslop to the project entry: shorter sentences, fewer repeated goals and review explanations, with model identifiers and verified development facts preserved. The previously removed first-image caption stays absent.

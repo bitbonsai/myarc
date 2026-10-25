@@ -76,6 +76,8 @@ def check(html):
         size = size.strip()
         assert size == '100%' or re.fullmatch(r'\d*\.?\d+rem', size), f'Use rem: {size}'
         assert size == '100%' or float(size[:-3]) >= 0.875, f'Tiny font: {size}'
+    assert '@view-transition { navigation: auto }' in css, 'Cross-page transitions missing'
+    assert re.search(r'@media\s*\(prefers-reduced-motion:\s*reduce\)\s*\{\s*@view-transition\s*\{\s*navigation:\s*none\s*\}', css), 'Reduced-motion navigation opt-out missing'
     assert '@import' not in css
     assert not re.search(r'\b(?:fetch|XMLHttpRequest|WebSocket|sendBeacon)\s*\(', html)
     assert 'href="https://myarc.dev/"' in html

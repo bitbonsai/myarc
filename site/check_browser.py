@@ -1,5 +1,8 @@
-"""Exercise the standalone page offline. Requires agent-browser and Chrome."""
+"""Check offline layout and loopback cross-page navigation. Requires agent-browser and Chrome."""
 from pathlib import Path
+from functools import partial
+from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
+from threading import Thread
 import json
 import subprocess
 
@@ -264,6 +267,41 @@ try:
           }
           return true
         })()""")
+    with ThreadingHTTPServer(('127.0.0.1', 0), partial(SimpleHTTPRequestHandler, directory=str(ROOT))) as server:
+        Thread(target=server.serve_forever, daemon=True).start()
+        try:
+            origin = 'http://127.0.0.1:' + str(server.server_port)
+            browser('set', 'offline', 'off')
+            browser('record', 'start', '/tmp/myarc-view-transitions.webm')
+            routes = [('.top .blog-link', '/blog/')]
+            posts = sorted((ROOT / 'blog').glob('*/index.html'))
+            if posts:
+                routes += [('.post-preview h2 a', '/blog/' + posts[-1].parent.name + '/'), ('.post-back', '/blog/')]
+            routes += [('.top .mark', '/')]
+            for width, theme, reduced in ((1440, 'light', False), (390, 'dark', False), (390, 'dark', True)):
+                browser('set', 'viewport', str(width), '1000')
+                browser('set', 'media', theme, *(['reduced-motion'] if reduced else []))
+                browser('open', origin + '/')
+                for selector, route in routes:
+                    browser(expression=f"""(() => {{
+                      document.querySelector({json.dumps(selector)}).href = {json.dumps(route)}
+                      sessionStorage.removeItem('navigation-transition')
+                      addEventListener('pageswap', event => sessionStorage.setItem('navigation-transition', JSON.stringify({{active: Boolean(event.viewTransition)}})), {{once: true}})
+                    }})()""")
+                    browser('click', selector)
+                    browser(expression="""(async () => {
+                      await new Promise(requestAnimationFrame)
+                      await new Promise(requestAnimationFrame)
+                      await Promise.all(document.getAnimations().filter(animation => Number.isFinite(animation.effect.getTiming().iterations)).map(animation => animation.finished))
+                      return true
+                    })()""")
+                    result = browser(expression="JSON.parse(sessionStorage.getItem('navigation-transition'))")
+                    if result is None or result['active'] != (not reduced):
+                        raise AssertionError(f'Native navigation transition: {width}/{theme}/{reduced}/{route}: {result}')
+                    print('Native navigation:', width, theme, 'reduced=' + str(reduced), route, result)
+            browser('record', 'stop')
+        finally:
+            server.shutdown()
 finally:
     subprocess.run(['agent-browser', '--session', SESSION, 'close'], capture_output=True)
     subprocess.run(['pkill', '-f', '/[a]gent-browser-darwin-arm64'], capture_output=True)
