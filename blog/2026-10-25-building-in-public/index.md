@@ -8,23 +8,27 @@ October 25, 2026
 
 By [bitbonsai](https://github.com/bitbonsai) · [Read Markdown](https://myarc.dev/blog/2026-10-25-building-in-public/index.md)
 
-Arc has a lot of ideas worth keeping. Spaces and named pinned tabs make the sidebar feel like a workspace. The command bar gives you a quick way back into it.
+Spaces and named pinned tabs make Arc's sidebar feel like a workspace. The command bar gives you a quick way back to those tabs.
 
-Now [Arc is being sunsetted](https://arc.net/). I want that way of browsing to have a future. That's why I'm building myArc, an independent, open-source browser based on Chromium.
+[Arc is being sunsetted](https://arc.net/). I'm building myArc to continue that way of browsing, as an independent, open-source browser based on Chromium.
 
 ## A browser should work without an account
 
-I'm positive about this one. Opening a browser and using your own workspace should work without signing up for anything. Local browsing, migration and export must stay usable without an account or subscription.
+I'm positive about this one. Local browsing, migration and export must work without an account or subscription.
 
 The privacy commitment is no behavioral tracking. myArc will not send browser-usage analytics or create per-install tracking identifiers. Browsing history and workspace data stay local by default. A release audit must check Chromium's defaults and network behavior against that commitment.
 
-I can follow aggregate release-download counts to see whether people are trying it. GitHub already provides those totals. That gives me a useful signal without instrumenting people's browsing. Website and download hosts may still keep operational request logs, which need separate disclosure.
+I can follow interest through GitHub's aggregate release-download totals, without instrumenting people's browsing. Website and download hosts may still keep operational request logs, which need separate disclosure.
 
 ## Trying Artcraft's way of working
 
-I'm using [Artcraft's public engineering practices](https://github.com/bitbonsai/myarc/blob/main/docs/ARTCRAFT-WORKFLOW.md) as a starting point. PhotoCraft's development guide separates native visual checks from model tests. A passing test and a working application tell you different things.
+I'm using [Artcraft's public engineering practices](https://github.com/bitbonsai/myarc/blob/main/docs/ARTCRAFT-WORKFLOW.md) as a starting point. PhotoCraft's development guide separates native visual checks from model tests.
 
-For myArc, Chromium provides the browser services. Rust handles the workspace logic we own.
+Moving navigation controls into the sidebar caused startup and layout failures. Using Chromium's native controls fixed that path.
+
+The address field had a different problem: hiding and showing it during layout lost keyboard focus. Keeping it visible fixed navigation. Startup and keyboard navigation both need rechecking when those controls move.
+
+In myArc, Chromium provides the browser services and Rust handles the workspace logic we own.
 
 Each coding agent gets a narrow job and a result I can check. Today's tasks cover the Rust Spaces model and a Profile-owned workspace service. Another agent is wiring that state into the native sidebar.
 
@@ -34,19 +38,11 @@ A separate agent reviews the change. Findings go back for another implementation
 
 I've open-sourced two skills under bitbonsai: [context](https://github.com/bitbonsai/context) and [wrap](https://github.com/bitbonsai/wrap).
 
-Context keeps agent instructions and architecture notes current. A new agent needs to know which parts belong to Chromium and which belong to myArc. It also needs to tell planned work from working code.
+Context keeps agent instructions and architecture notes current so a new agent can see which parts belong to Chromium and which belong to myArc. Those notes also need to distinguish planned work from working code.
 
 Wrap saves useful gotchas and writes a handover for the next session. Private and machine-specific notes stay outside the public repo.
 
 [myArc's code is open source too](https://github.com/bitbonsai/myarc).
-
-## What broke along the way
-
-Moving navigation controls into the sidebar caused startup and layout failures. Using Chromium's native controls fixed that path.
-
-The address field had a different problem. Hiding and showing it during layout lost keyboard focus. Keeping it visible fixed navigation.
-
-Those are now things to recheck when the controls move. Looking right is one check. Typing an address and opening the page is another.
 
 ## The current build and the target
 
