@@ -2,24 +2,35 @@
 import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import { setTimeout as delay } from 'node:timers/promises'
+import { readBoundedText, runWorkspaceRecovery } from './browser_workspace_recovery.mjs'
 
 const [profileArg, pidArg, scenario] = process.argv.slice(2)
-assert.ok(profileArg && /^\d+$/.test(pidArg ?? '') && ['extension', 'restart', 'runtime', 'workspace-pin'].includes(scenario),
-  'Usage: node tools/check_browser_foundation.mjs PROFILE_DIR BROWSER_PID extension|restart|runtime|workspace-pin')
+const recoveryScenario = ['workspace-crash-checkpoint', 'workspace-crash-verify'].includes(scenario)
+assert.ok(process.argv.length === 5 && profileArg && /^\d+$/.test(pidArg ?? '') && ['extension', 'restart', 'runtime', 'workspace-pin', 'workspace-crash-checkpoint', 'workspace-crash-verify'].includes(scenario),
+  'Usage: node tools/check_browser_foundation.mjs PROFILE_DIR BROWSER_PID extension|restart|runtime|workspace-pin|workspace-crash-checkpoint|workspace-crash-verify')
+const ownedPid = Number(pidArg)
+assert.ok(Number.isSafeInteger(ownedPid) && ownedPid > 0, 'Expected a positive safe-integer browser PID')
 const profile = fs.realpathSync(profileArg)
 assert.ok(fs.existsSync(`${profile}/.myarc-m0-test-profile`), 'Expected marked, disposable test profile')
-const port = fs.readFileSync(`${profile}/DevToolsActivePort`, 'utf8').trim().split('\n')[0]
+if (recoveryScenario) readBoundedText(`${profile}/.myarc-m0-test-profile`, 256)
+const port = (recoveryScenario ? readBoundedText(`${profile}/DevToolsActivePort`, 256)
+  : fs.readFileSync(`${profile}/DevToolsActivePort`, 'utf8')).trim().split('\n')[0]
 assert.ok(/^\d+$/.test(port))
 const pin = JSON.parse(fs.readFileSync(new URL('../browser/upstream.json', import.meta.url), 'utf8'))
 const version = await (await fetch(`http://127.0.0.1:${port}/json/version`, { signal: AbortSignal.timeout(5000) })).json()
 assert.equal(version.Browser, `Chrome/${pin.version}`)
+const browserEndpoint = new URL(version.webSocketDebuggerUrl)
+if (recoveryScenario) {
+  assert.equal(browserEndpoint.origin, `ws://127.0.0.1:${port}`, 'Recovery requires the owned loopback CDP endpoint')
+  assert.match(browserEndpoint.pathname, /^\/devtools\/browser\/[0-9a-f-]+$/)
+}
 const ws = new WebSocket(version.webSocketDebuggerUrl)
 await new Promise((resolve, reject) => {
   const timer = setTimeout(() => { ws.close(); reject(new Error('Browser connection timed out')) }, 5000)
   ws.addEventListener('open', () => { clearTimeout(timer); resolve() }, { once: true })
   ws.addEventListener('error', error => { clearTimeout(timer); reject(error) }, { once: true })
 })
-try {
+const check = async () => {
   let nextId = 0
   const pending = new Map()
   const requests = new Map()
@@ -41,9 +52,9 @@ try {
     if (message.method === 'Network.loadingFailed' && requests.has(message.params.requestId)) failures.push(message.params.errorText)
     if (message.method === 'Network.responseReceived' && requests.has(message.params.requestId)) responses.push({ url: message.params.response.url, status: message.params.response.status })
   })
-  const send = (method, params = {}, sessionId) => new Promise((resolve, reject) => {
+  const send = (method, params = {}, sessionId, timeoutMs = 15000) => new Promise((resolve, reject) => {
     const id = ++nextId
-    const timer = setTimeout(() => { pending.delete(id); reject(new Error(`Timed out: ${method}`)) }, 15000)
+    const timer = setTimeout(() => { pending.delete(id); reject(new Error(`Timed out: ${method}`)) }, timeoutMs)
     pending.set(id, { resolve, reject, timer })
     ws.send(JSON.stringify({ id, method, params, ...(sessionId ? { sessionId } : {}) }))
   })
@@ -51,9 +62,8 @@ try {
   const extensionId = 'ddkjiahejlhfcafbddmgiahcphecmpfh'
   const detailsURL = `chrome://extensions/?id=${extensionId}`
   const processInfo = await send('SystemInfo.getProcessInfo')
-  const ownedPid = Number(pidArg)
-  assert.ok(Number.isSafeInteger(ownedPid) && ownedPid > 0)
   assert.ok(processInfo.processInfo.some(process => process.type === 'browser' && process.id === ownedPid), 'CDP browser PID does not match the requested test process')
+  if (recoveryScenario) return runWorkspaceRecovery({ send, profile, ownedPid, scenario })
   // shortcut: reuse an open test tab, isolate the default-profile Target.createTarget assertion before extending this path.
   const { targetInfos } = await send('Target.getTargets')
   if (scenario === 'workspace-pin') {
@@ -317,6 +327,9 @@ try {
     if (scenario === 'extension') await setEnabled(true)
     await send('Target.detachFromTarget', { sessionId }).catch(() => {})
   }
+}
+try {
+  await check()
 } finally {
   ws.close()
 }

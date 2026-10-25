@@ -2,6 +2,13 @@
 
 Keep significant outcomes, failures and next actions reproducible. Newest entry first. No private exports, page titles/URLs from real browsing, credentials or raw user transcripts.
 
+## 2026-10-25: MA-007.c two-process crash probe handoff
+
+- Starting revision: `d82f4f2`. Extended the retained native developer client with `workspace-crash-checkpoint` and `workspace-crash-verify`, plus an original second loopback page. The [recipe](../tests/fixtures/browser/README.md#two-process-workspace-crash-probe) requires two actual Spaces, one selected Profile Favorite, one live Temporary and already-persisted metadata. Schema comes from the owned `WorkspaceService` encoder/decoder; browser ownership uses upstream command-line/default-context inspection plus bounded single-Profile `Local State` read-back, without navigating saved tabs to a version page.
+- Checkpoint submits and observes a real form/localStorage canary, retains bounded on-disk metadata and page projection, then exclusively writes a developer file inside the marked directory. Verify requires a changed matching PID/build/Profile and five settled comparisons of both real pages, canary, stable IDs/ownership/canonical URL/Space names/window selection. It rejects duplicates, foreign targets and incomplete restore. Browser lifetime, genuine Restore and crash provenance stay with the parent; no worker, navigation, target creation or metadata mutation is added to these phases.
+- Local checks: 13 Node client/fixture tests passed, including API-double lost-canary, persistent-ID rebind and missing-page failures. Syntax, document links and whitespace checked. Native executions: zero. No actual browser profile access, app launch, external source/build change or desktop action. Parent must integrate, review and run the audited SIGKILL/relaunch/Restore journey against synthetic data.
+- Limits: checkpoint follows observed disk metadata, so acknowledged-write boundaries, SessionService lag, every late-restore race and OS/power-loss durability remain open. Build identity compares reported version/revision and executable path/stat, not content hashes. Source/API doubles establish local validation only. Existing modes and actual MV3 pin probe remain intact; renderer stays off by default.
+
 ## 2026-10-25: Native backgrounds and one clean restart
 
 - Integrated 0017 and checked fresh owned-window pixels across ordinary, blank, authored and dark canvases. Same-target navigation, history back/forward and NTP return preserve the expected background boundary. An Empty Space detached a blank page; privileged hidden HTTP navigation and native Space return restored an ordinary white canvas. No OS appearance or page CSS overrides were used by the driver.

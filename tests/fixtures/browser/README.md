@@ -88,7 +88,66 @@ node --test tools/check_browser_foundation.test.mjs
 python3 tools/check_docs.py
 ```
 
-The four Node tests cover manifest identity/permissions, fixture argument/target guards and API forwarding/errors, plus CLI rejection. Their API doubles establish fixture behavior only. The parent ran the native scenario once successfully, then used the actual sidebar menu to remove the Favorite. The same live item became Temporary, its saved URL cleared and actual extension read-back reported native pin false. A further native close/reopen check retained saved identity while creating a new native tab. These observations establish the named journeys, not restart/crash durability or C++ browser-suite execution. A settled unstyled HTTP fixture also exposed an ordinary-page transparency bug; renderer remains off by default.
+The four existing MV3/CLI tests cover manifest identity/permissions, fixture argument/target guards and API forwarding/errors, plus CLI rejection. Their API doubles establish fixture behavior only. The parent ran the native scenario once successfully, then used the actual sidebar menu to remove the Favorite. The same live item became Temporary, its saved URL cleared and actual extension read-back reported native pin false. A further native close/reopen check retained saved identity while creating a new native tab. These observations establish the named journeys, not restart/crash durability or C++ browser-suite execution. A settled unstyled HTTP fixture also exposed an ordinary-page transparency bug; renderer remains off by default.
+
+## Two-process workspace crash probe
+
+`workspace-crash-checkpoint` and `workspace-crash-verify` reuse the same real CDP transport. [The recovery helper](../../../tools/browser_workspace_recovery.mjs) observes existing pages and the actual native metadata schema from `WorkspaceService`; it supplies no browser backend. These phases are implemented and locally tested only. Actual process-crash recovery remains unproven until the parent records and runs the native journey.
+
+### Exact setup
+
+The parent owns all browser launches, native UI setup, audited process-specific crash, cleanup, relaunch and Restore actions. The client performs none of those operations. Use the current candidate, one marked synthetic user-data directory and the same loopback fixture server as above. Before the first launch, seed vertical tabs as in the workspace-pin recipe. Renderer remains off by default elsewhere.
+
+Both launches need these explicit flags, in addition to the normal disposable-profile flags:
+
+```sh
+--user-data-dir="$PROFILE" --profile-directory=Default \
+  --enable-automation --myarc-visual-parity --myarc-workspace-sidebar \
+  --remote-debugging-address=127.0.0.1 --remote-debugging-port=0
+```
+
+`PROFILE` must be the canonical absolute path, for example `PROFILE=$(cd "$PROFILE" && pwd -P)`. `--enable-automation` permits the existing upstream `Browser.getBrowserCommandLine` inspection. It does not bypass browser privileges. The browser-reported user-data directory must match exactly; the actual default browser context must own every fixture page. Bounded `Local State` inspection additionally requires `profile.last_used` to resolve to `Default` and `profile.info_cache` to contain only `Default`. An absent or empty `last_used` uses upstream's `Default` fallback. Close private contexts. `Default` must not be a symlink. Missing flags, a different Profile, copied port files or a mismatching expected browser PID fail before canary submission.
+
+Through native controls, prepare exactly:
+
+- One regular browser window, two distinctly named synthetic Spaces, such as Everyday and Reading.
+- Original `http://127.0.0.1:8766/` page saved as a Profile Favorite, with its canonical URL unchanged.
+- One other live Temporary page on [recovery.html](recovery.html), exact URL `http://127.0.0.1:8766/recovery.html`, owned by either existing Space. Open it through normal native navigation, never default-context `Target.createTarget`.
+- Select the original Favorite in the desired Space. Its document must be visible and the second page hidden. Close all other page targets, including startup, NTP, version and extension-detail pages. Both fixture pages must remain live in that same native window.
+
+The client also checks persisted `vertical_tabs.enabled` is true; set it before startup, because changing it in a running window does not construct the adapter. The real `Default/myarc-workspace-v1.json` must already contain that setup: two Spaces, two items and one window selecting the Favorite. The tool reads it and rejects a different setup; it never creates, overwrites or repairs workspace metadata. It does not require or start the MV3 worker. Existing `workspace-pin` behavior is unchanged.
+
+### Checkpoint, parent-owned crash, verify
+
+With the fixture server running and original Favorite selected:
+
+```sh
+node tools/check_browser_foundation.mjs "$PROFILE" "$BROWSER_PID" workspace-crash-checkpoint
+```
+
+Checkpoint submits a newly invented canary through the original form, then requires actual localStorage and `Saved:` UI acknowledgement. Five matching real metadata/page observations must retain selection and ownership. Only after those observations does it exclusively create `$PROFILE/.myarc-m0-workspace-crash.json` with mode `0600`. That developer file records the old PID, browser build/executable, Profile path, exact expected URLs, canary, observed metadata with stable IDs/owners/placements/canonical URL/Space names/window selection, and visible/hidden projection. An existing checkpoint is preserved and causes failure; the parent must explicitly remove it only when starting a separate journey.
+
+After checkpoint succeeds, the parent must audit the exact disposable browser PID and command line, record the actual SIGKILL of only that process, and own all helper cleanup. Keep the same Profile, executable/build, flags and fixture server. Relaunch without startup URLs. If upstream presents recovery UI, invoke its genuine **Restore** action and wait for both original pages to load. Record whether restoration was automatic, used Restore UI or used an explicit session-restore launch flag. Do not edit session files, rewrite workspace metadata, suppress recovery protection or open replacement fixture pages to satisfy verification. Close an extra startup/NTP tab through native controls if needed. A successful changed-PID check alone cannot establish that the prior exit was a crash.
+
+Set `BROWSER_PID` to the new, independently audited browser PID, then run:
+
+```sh
+node tools/check_browser_foundation.mjs "$PROFILE" "$BROWSER_PID" workspace-crash-verify
+```
+
+Verify reads the checkpoint and requires a changed PID with the same reported product/revision/runtime and executable path/size/mtime, the same owned Profile, both real restored fixture pages without duplicate URLs, acknowledged canary in localStorage, and matching persisted IDs/owners/placements/canonical URL/Space names/window projection. It checks the original page is actually visible, the other hidden, and both belong to one actual native window. Native target, context and browser-window IDs may change; those are not persistent identity comparisons. The checkpoint remains untouched for diagnosis. Failures identify missing Restore/pages, canary loss or workspace loss/rebinding. Scope violations abort immediately.
+
+Recovery observation has a 20-second total budget after shared transport/PID setup, with individual CDP requests capped at three seconds. Settlement gets at most ten seconds and needs five matching samples separated by 200 ms. The shared connection setup retains its five-second HTTP/WebSocket bounds and fifteen-second initial PID request. File reads reject symlinks/nonregular files and cap marker/port data at 256 bytes, workspace/checkpoint JSON at 64 KiB and `Local State`/`Default/Preferences` at 1 MiB. Native target lists are capped at 32, including exactly two page targets for success. Missing or changing state fails rather than extending the wait indefinitely.
+
+Local verification remains separate from native evidence:
+
+```sh
+node --check tools/browser_workspace_recovery.mjs
+node --test tools/check_browser_foundation.test.mjs
+python3 tools/check_docs.py
+```
+
+Thirteen local tests cover existing MV3 behavior, CLI guards, actual-schema validation, bounded file reads and API-double recovery outcomes. They execute zero native browser journeys. The checkpoint is taken **after observed on-disk metadata**, not at every acknowledged workspace write boundary. This cannot establish SessionService flush timing, every late-restore race, OS/power-loss durability or product CLI/MCP authorization. Disk identity plus native page projection is observed; the client exposes no in-memory Rust inspection API. Build comparison uses reported versions and executable stat identity, not a binary-content hash. The parent must retain actual crash provenance and native output separately before making any process-crash recovery claim.
 
 ## Scope and limits
 
