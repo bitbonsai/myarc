@@ -26,9 +26,14 @@ BLOG_CSS = '''
     .journal h1 { font-size: 3.5rem; line-height: 1.1; max-width: 24ch }
     .journal .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap }
     .post-list, .post-body { max-width: 68ch }
+    .post-month { margin: 3rem 0 1rem; color: #5f6b76; font-size: 1rem }
+    .post-month:first-child { margin-top: 0 }
+    .post-preview { display: flex; align-items: center; gap: 1.5rem }
     .post-preview + .post-preview { margin-top: 3rem }
-    .post-preview-heading { display: flex; align-items: center; gap: 1.5rem; margin: .5rem 0 .75rem }
-    .post-preview h2 { font-size: 2rem; min-width: 0; overflow-wrap: anywhere }
+    .post-preview-copy { flex: 1; min-width: 0 }
+    .post-preview h2 { font-size: 2rem; overflow-wrap: anywhere }
+    .post-preview .post-date { margin-top: .375rem }
+    .post-summary { margin-top: .375rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis }
     .post-thumb { display: block; width: 8rem; flex: none }
     .post-thumb img { width: 100%; aspect-ratio: 8 / 5; object-fit: contain; border-radius: .75rem; background: var(--panel) }
     .post-date { display: block; color: var(--quiet); font-size: 1rem }
@@ -45,10 +50,13 @@ BLOG_CSS = '''
     .post-body pre { font-family: inherit; padding: 1.25rem; overflow-x: auto; background: var(--panel); color: var(--ivory); border-radius: 1rem }
     .post-body code { font-family: inherit; font-size: 1rem; overflow-wrap: anywhere }
     .post-body a, .post-body p { overflow-wrap: anywhere }
+    @media (prefers-color-scheme: dark) {
+      .post-month { color: #8794a3 }
+    }
     @media (max-width: 48rem) {
       .journal { padding: 2.5rem 0 4rem }
       .journal h1 { font-size: 2.5rem }
-      .post-preview-heading { gap: 1rem }
+      .post-preview { gap: 1rem }
       .post-preview h2 { font-size: 1.5rem }
       .post-thumb { width: 5.5rem }
     }
@@ -216,7 +224,12 @@ def build_blog(root, template, embed):
         shutil.rmtree(output)
     output.mkdir()
     listing = ''
+    last_month = None
     for post in posts:
+        month = post.published.strftime('%B %Y')
+        if month != last_month:
+            listing += f'<p class="post-month">{month}</p>'
+            last_month = month
         thumb = ''
         if post.images:
             thumbnails = output / '_thumbnails'
@@ -226,7 +239,7 @@ def build_blog(root, template, embed):
                 image.thumbnail((384, 240), Image.Resampling.LANCZOS)
                 image.save(thumbnails / f'{post.slug}.webp', format='WEBP', quality=85, method=6)
                 thumb = f'<a class="post-thumb" href="{post.url}" aria-hidden="true" tabindex="-1"><img src="_thumbnails/{post.slug}.webp" alt="" width="{image.width}" height="{image.height}" loading="lazy"></a>'
-        listing += f'<article class="post-preview"><time class="post-date" datetime="{post.published.isoformat()}">{post.published.strftime("%B %d, %Y")}</time><div class="post-preview-heading">{thumb}<h2><a href="{post.url}">{escape(post.title)}</a></h2></div><p>{escape(post.summary)}</p></article>'
+        listing += f'<article class="post-preview">{thumb}<div class="post-preview-copy"><h2><a href="{post.url}">{escape(post.title)}</a></h2><time class="post-date" datetime="{post.published.isoformat()}">{post.published.strftime("%B %d, %Y")}</time><p class="post-summary">{escape(post.summary)}</p></div></article>'
     if not listing:
         listing = '<p class="quiet">Progress notes will appear here once published.</p>'
     content = '<h1 class="visually-hidden">Blog</h1><div class="post-list">' + listing + '</div>'

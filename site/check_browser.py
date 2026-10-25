@@ -177,9 +177,32 @@ try:
                   const thumbnail = document.querySelector('.post-thumb img')
                   if (thumbnail) {
                     const image = thumbnail.getBoundingClientRect()
-                    const title = thumbnail.closest('.post-preview-heading').querySelector('h2').getBoundingClientRect()
+                    const title = thumbnail.closest('.post-preview').querySelector('h2').getBoundingClientRect()
                     if (image.right > title.left) throw new Error('Thumbnail overlaps title')
                     if (thumbnail.naturalWidth > 384) throw new Error('Thumbnail not optimized')
+                  }
+                  for (const card of document.querySelectorAll('.post-preview')) {
+                    const title = card.querySelector('h2').getBoundingClientRect()
+                    const date = card.querySelector('.post-date').getBoundingClientRect()
+                    const summary = card.querySelector('.post-summary')
+                    const rect = summary.getBoundingClientRect()
+                    const style = getComputedStyle(summary)
+                    if (date.top < title.bottom - 1 || rect.top < date.bottom - 1) throw new Error('Post text order')
+                    if (Math.abs(title.left - date.left) > 1 || Math.abs(title.left - rect.left) > 1) throw new Error('Post text alignment')
+                    if (style.whiteSpace !== 'nowrap' || style.textOverflow !== 'ellipsis' || style.overflowX !== 'hidden') throw new Error('Abstract truncation missing')
+                    if (rect.height > parseFloat(style.lineHeight) + 1) throw new Error('Abstract wraps')
+                  }
+                  const luminance = color => {
+                    const values = color.match(/[\\d.]+/g).slice(0, 3).map(Number).map(value => {
+                      value /= 255
+                      return value <= .04045 ? value / 12.92 : ((value + .055) / 1.055) ** 2.4
+                    })
+                    return values[0] * .2126 + values[1] * .7152 + values[2] * .0722
+                  }
+                  for (const month of document.querySelectorAll('.post-month')) {
+                    const foreground = luminance(getComputedStyle(month).color)
+                    const background = luminance(getComputedStyle(document.body).backgroundColor)
+                    if ((Math.max(foreground, background) + .05) / (Math.min(foreground, background) + .05) < 4.5) throw new Error('Month text contrast')
                   }
                   return {width: innerWidth, title: document.title, images: document.images.length}
                 })()""")

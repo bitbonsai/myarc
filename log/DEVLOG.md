@@ -9,6 +9,12 @@ Keep significant outcomes, failures and next actions reproducible. Newest entry 
 - An attempted parent-view hide violated a layout visibility check. Kept the layout parent visible and hid native hosts instead, preventing clicks on invisible pages. The resulting crash also exposed a missing app-menu anchor in the existing recovery bubble. A fresh disposable profile allowed the palette checks to continue; recovery remains blocked.
 - Packaged the seven-file palette delta separately from concurrent rounding work. Current-tab Cmd+L, sidebar hide/show and full autocomplete remain pending. Motion is recorded as a baseline; timing, reduced motion and full visual parity are unverified.
 
+## 2026-10-25: Compact monthly blog rows
+
+- Grouped previews by muted month/year labels. Moved each full date below its title and kept the complete abstract in the same text column beside the thumbnail, with CSS single-line ellipsis.
+- Nine unit checks passed, including multi-post month grouping and date/title ordering. Retained browser checks passed across both themes and five blog widths, checking alignment, truncation and month-label contrast. The first light gray measured 4.47:1 and failed; the corrected gray measures 4.88:1 against the plain page surface, with dark mode at 5.99:1.
+- Published `6019c32` to the artifact branch. Native work remains separate; Safari/Firefox remain unmeasured.
+
 ## 2026-10-25: Image-led post previews and Arc target reference
 
 - Removed the visible blog introduction and retained a visually hidden heading for accessibility. Listings use a small, uncropped WebP thumbnail beside the title, derived from the first Markdown image.

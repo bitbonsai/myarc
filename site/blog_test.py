@@ -57,6 +57,10 @@ class BlogTests(unittest.TestCase):
         self.assertIn('"image": "' + cover_url + '"', html)
         index = (self.root / 'blog/index.html').read_text()
         self.assertIn('class="post-thumb"', index)
+        self.assertIn('<p class="post-month">October 2026</p>', index)
+        self.assertLess(index.index('<h2>'), index.index('<time class="post-date"'))
+        self.assertLess(index.index('<time class="post-date"'), index.index('<p class="post-summary"'))
+        self.assertIn('<p class="post-summary">A synthetic test post.</p>', index)
         self.assertNotIn('Progress journal', index)
         self.assertNotIn('Notes on building myArc, with screenshots', index)
         thumbnail = self.root / 'blog/_thumbnails' / (posts[0].slug + '.webp')
@@ -85,6 +89,19 @@ class BlogTests(unittest.TestCase):
         html = (self.root / 'blog' / self.folder.name / 'index.html').read_text()
         self.assertIn('content="First &amp; target"', html)
         self.assertIn('property="og:image:width" content="40"', html)
+
+    def test_posts_group_by_month_without_repeated_labels(self):
+        self.post()
+        for slug in ('2026-10-24-earlier', '2026-09-30-older'):
+            folder = self.root / 'posts' / slug
+            folder.mkdir()
+            (folder / 'index.md').write_text(self.source.read_text())
+        posts = self.build()
+        index = (self.root / 'blog/index.html').read_text()
+        self.assertEqual(2, index.count('class="post-month"'))
+        self.assertEqual(1, index.count('>October 2026</p>'))
+        self.assertEqual(1, index.count('>September 2026</p>'))
+        self.assertEqual(['2026-10-25-test-post', '2026-10-24-earlier', '2026-09-30-older'], [post.slug for post in posts])
 
     def test_raw_html_and_unsafe_links_are_not_executed(self):
         self.post('<script>alert(1)</script>\n\n[Bad](javascript:alert(1))')
