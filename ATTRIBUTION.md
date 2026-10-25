@@ -24,7 +24,7 @@ Public Artcraft repository conventions informed the development methodology. Pri
 
 `tests/fixtures/browser/` and `tools/check_browser_foundation.mjs` are original developer test code using the installed Node runtime and an external compiled Chromium. uBlock Origin Lite is installed separately through Chrome Web Store for the named compatibility case; its code and assets are not bundled or selected as myarc's default blocker.
 
-The website CTA inlines Lucide’s GitHub icon from [`icons/github.svg` at revision `585b65f28f6383d39f257cb2430912ed6f7903a2`](https://github.com/lucide-icons/lucide/blob/585b65f28f6383d39f257cb2430912ed6f7903a2/icons/github.svg). It shares the retained ISC notice in `design/brand/assets/Lucide-LICENSE.txt` and the published HTML’s asset notices.
+The website CTA inlines the user-supplied GitHub SVG mark, preserving its path, 1024-square viewBox and scale transform. Its fill inherits the button text color. It replaces the earlier Lucide GitHub icon. GitHub branding remains the property of its owner; a source revision/license was not supplied with this SVG.
 
 `browser/patches/0002-native-shell-prototype.patch` modifies Chromium native frame, sidebar and location-bar sources at integration `3e117efa80cec1c4e1e6fbfdf44edeb087a279a5`, over upstream `8d208f20744ac6d4ce00cc3f9de6a14a9b8b926d`. These upstream files retain their Chromium BSD-style notices and checkout `LICENSE`. AppKit/QuartzCore are system frameworks, not bundled assets. The styling is independently written from permitted visual references; private Arc screenshots and product artwork are not included.
 

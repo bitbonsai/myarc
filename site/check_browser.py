@@ -103,6 +103,9 @@ try:
           }
           if (document.documentElement.scrollWidth > innerWidth) throw new Error('Dark horizontal overflow')
           if (document.querySelectorAll('.button .github-icon[aria-hidden="true"]').length !== 2) throw new Error('GitHub CTA icons missing')
+          for (const icon of document.querySelectorAll('.github-icon')) {
+            if (icon.viewBox.baseVal.width !== 1024 || getComputedStyle(icon.querySelector('path')).fill !== 'rgb(255, 255, 255)') throw new Error('GitHub supplied mark or color regression')
+          }
           return {width: innerWidth, preference: 'dark', wordmarks: 'ivory', contrast: 'AA'}
         })()"""))
         browser('screenshot', '--full', '/tmp/myarc-theme-dark-' + str(width) + '.png')
