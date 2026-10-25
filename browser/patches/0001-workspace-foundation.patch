@@ -314,10 +314,10 @@ index 0000000000..82fdbf3bd5
 +#endif  // MYARC_NATIVE_BUTTON_H_
 diff --git a/myarc/workspace/src/lib.rs b/myarc/workspace/src/lib.rs
 new file mode 100644
-index 0000000..2391c9053a09cce8fc6c940c3b27a4dbd91a5c9d
+index 0000000..2fa2bd17a496e83e411e75fa3e492dec28a52d6d
 --- /dev/null
 +++ b/myarc/workspace/src/lib.rs
-@@ -0,0 +1,778 @@
+@@ -0,0 +1,794 @@
 +#![forbid(unsafe_code)]
 +
 +//! Dependency-free workspace decisions. Browser services own page lifetimes and URL
@@ -626,6 +626,22 @@ index 0000000..2391c9053a09cce8fc6c940c3b27a4dbd91a5c9d
 +            }
 +        }
 +        Ok(())
++    }
++
++    /// Native keyboard/palette activation reveals the owning Space through the
++    /// same command path as sidebar activation. Favorites keep the current Space.
++    pub fn reveal_item(
++        &mut self,
++        window_id: WindowId,
++        item_id: ItemId,
++    ) -> Result<(), WorkspaceError> {
++        self.window(window_id)?;
++        let space_id = match self.item(item_id)?.placement {
++            Placement::Temporary { space_id } | Placement::Pin { space_id } => space_id,
++            Placement::Favorite { .. } => self.window(window_id)?.space_id,
++        };
++        self.select_space(window_id, space_id)?;
++        self.select_item(window_id, item_id)
 +    }
 +
 +    pub fn add_temporary_item(&mut self, space_id: SpaceId) -> Result<ItemId, WorkspaceError> {
