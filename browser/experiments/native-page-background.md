@@ -1,6 +1,6 @@
 # Blank-only native page material
 
-MA-007.c-page-background, 2026-10-25. Build candidate over myarc `7e827d5d134696060865fee460019af064bfbc39` and external Chromium `3e117efa80cec1c4e1e6fbfdf44edeb087a279a5`, with the installed optional stack through 0016 and independent rounding. Native acceptance remains pending; workspace renderer stays off by default.
+MA-007.c-page-background, 2026-10-25. Build candidate over myarc `7e827d5d134696060865fee460019af064bfbc39` and external Chromium `3e117efa80cec1c4e1e6fbfdf44edeb087a279a5`, with the installed optional stack through 0016 and independent rounding. The agent handoff verified compilation; parent native acceptance is recorded below. Workspace renderer stays off by default.
 
 ## Cause and lifecycle
 
@@ -37,4 +37,14 @@ Apply 0017 once against the frozen installed stack. It is already installed in t
 
 Private proof directory: `/tmp/myarc-m0-runtime/page-background-fix/`. It retains `baseline.json`, source copies, `installed.json`, strict replay helper/log, build log/terminal exit/timestamps, fresh build entries, syntax command/log, GN logs and process snapshots. An initial replay check needed Git's index stat refresh after non-indexed reversal; bytes already matched. An initial multi-label `gn check` invocation was rejected by its CLI; separate checks passed.
 
-Native cases executed: **zero**. No app launch, desktop input, profile access or service kill occurred. Parent owns fresh blank/HTTP/authored-color/light-dark checks, same-page navigation and tab/empty-Space switching, plus saved-page fade/reduced-motion and saved-identity regression acceptance. Existing successful Pin → Favorite → generic Unpin, deliberate Unsave and saved close/reopen observations remain historical evidence, not a runtime recheck of this binary. Recovery/durability, full C++ suites and broader policy gates remain open.
+At agent handoff, native cases executed were **zero**. The agent launched no app and accessed no profiles. Parent follow-up is separate from this build proof.
+
+## Parent native acceptance, 2026-10-25
+
+A new marked profile navigated one actual native target through ordinary unstyled HTTP, `about:blank`, authored CSS color, a dark canvas, history back/forward and native NTP, then back to ordinary HTTP. Fresh owned-window captures showed white ordinary canvas, retained blank material and the authored/dark backgrounds. Interior window samples corroborated those states; these color-managed display samples do not instrument every renderer pixel. No page CSS was injected and no browser/OS appearance settings changed.
+
+The real extension Pin/Unpin probe passed again. Explicit native Unsave and saved close/reopen retained the expected IDs and actual native pin state. A blank Temporary page was then detached by selecting an Empty Space, navigated to HTTP while hidden through privileged test CDP, and reattached by native Space selection. Empty kept material and a neutral header; the returned ordinary page restored white canvas. Graceful teardown produced no fatal assertion. See [bounded background evidence](../evidence/page-background.json).
+
+A separate normal restart of this same disposable profile used `--restore-last-session` without startup URLs. Both actual pages and both Spaces returned under a different browser PID, retaining item/Space IDs and the selected window projection. Native Space controls remained usable afterward. [Clean-restart evidence](../evidence/workspace-clean-restart.json) establishes one explicit clean restoration, not default startup policy or crash durability.
+
+Automated native C++ cases remain unrun. Forced browser-theme and reduced-motion fade variants were not rerun for this binary; source fade/rounding paths remain unchanged. Multiwindow, abrupt crash/OS recovery and broader command/privacy acceptance remain open.

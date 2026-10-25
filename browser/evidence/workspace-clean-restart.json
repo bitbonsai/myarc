@@ -1,0 +1,32 @@
+{
+  "slice": "MA-007.c-clean-restart",
+  "date": "2026-10-25",
+  "status": "one bounded clean restart passed",
+  "setup": {
+    "marked_synthetic_profile": true,
+    "clean_process_specific_quit": true,
+    "explicit_restore_last_session_flag": true,
+    "startup_urls_supplied": false,
+    "changed_native_browser_pid": true
+  },
+  "observed": {
+    "live_pages_restored": 2,
+    "spaces_retained": 2,
+    "stable_item_and_space_ids": true,
+    "profile_and_selected_window_projection_retained": true,
+    "settled_page_urls_and_selected_page_match": true,
+    "native_space_controls_work_after_restart": true,
+    "empty_space_hides_both_pages_and_keeps_neutral_header": true,
+    "return_to_everyday_restores_page": true
+  },
+  "actual_crash_recovery_tested": false,
+  "os_crash_durability_proven": false,
+  "default_startup_policy_accepted": false,
+  "automated_cpp_browser_cases_executed": 0,
+  "workspace_renderer_default_enabled": false,
+  "raw_profiles_logs_and_captures": "private, outside Git",
+  "remaining": [
+    "One explicit clean restart establishes neither abrupt crash recovery nor OS durability",
+    "Multiwindow, late restore, cancellation and foreign metadata remain open"
+  ]
+}

@@ -1,0 +1,38 @@
+{
+  "slice": "MA-007.c-page-background",
+  "date": "2026-10-25",
+  "status": "bounded native background and saved-journey acceptance passed",
+  "patch_sha256": "a0d19e3ca8afc4bbf48e6d45fd8f6261938e56ef7717379281d376bb2614e59b",
+  "build": {
+    "chrome_exit": 0,
+    "test_source_syntax_exit": 0,
+    "gn_checks_passed": 2,
+    "baseline_files_verified": 72,
+    "unrelated_files_unchanged": 68
+  },
+  "native": {
+    "unstyled_http_default_canvas_white": true,
+    "blank_canvas_material_retained": true,
+    "authored_css_background_preserved": true,
+    "per_page_dark_canvas_preserved": true,
+    "same_native_target_blank_http_transitions": true,
+    "history_back_forward_preserved_background": true,
+    "ntp_to_http_restores_default_canvas": true,
+    "empty_space_material_and_neutral_header": true,
+    "hidden_blank_page_http_navigation_and_reattachment": true,
+    "real_extension_pin_unpin_rechecked": true,
+    "explicit_ui_unsave_rechecked": true,
+    "saved_close_reopen_identity_rechecked": true,
+    "graceful_teardown_without_fatal": true,
+    "fresh_owned_window_images_and_interior_samples_checked": true
+  },
+  "measurement_limits": "Native window samples are color-managed display pixels, not exhaustive renderer opacity instrumentation. Browser/OS appearance unchanged.",
+  "automated_cpp_browser_cases_executed": 0,
+  "workspace_renderer_default_enabled": false,
+  "raw_profiles_logs_and_captures": "private, outside Git",
+  "remaining": [
+    "Forced browser-theme variants, reduced-motion fade and fullscreen not rerun for this binary",
+    "Multiwindow and last-live-page close remain unaccepted",
+    "Crash recovery, OS durability and broader command/privacy gates remain open"
+  ]
+}

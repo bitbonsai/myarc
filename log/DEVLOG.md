@@ -2,6 +2,12 @@
 
 Keep significant outcomes, failures and next actions reproducible. Newest entry first. No private exports, page titles/URLs from real browsing, credentials or raw user transcripts.
 
+## 2026-10-25: Native backgrounds and one clean restart
+
+- Integrated 0017 and checked fresh owned-window pixels across ordinary, blank, authored and dark canvases. Same-target navigation, history back/forward and NTP return preserve the expected background boundary. An Empty Space detached a blank page; privileged hidden HTTP navigation and native Space return restored an ordinary white canvas. No OS appearance or page CSS overrides were used by the driver.
+- Real extension Pin/Unpin passed again, followed by explicit UI Unsave and saved close/reopen with stable identity. Native graceful teardown produced no fatal assertion. [Background evidence](../browser/evidence/page-background.json) separates these actual checks from the source-only browser case.
+- One normal restart with explicit `--restore-last-session` and no startup URLs restored two native pages, two Spaces and stable IDs/selection under a new PID. Space controls still worked. [Restart evidence](../browser/evidence/workspace-clean-restart.json) establishes clean restoration only; crash/OS durability, default startup policy and broader lifecycle/privacy gates remain open. Renderer stays off; full C++ suites and motion/theme variants were not rerun.
+
 ## 2026-10-25: Blank-only page material build candidate
 
 - Starting revision: `7e827d5`. Traced ordinary-page translucency to unconditional transparent page-base and renderer-view backgrounds. [Separate 0017 and run record](../browser/experiments/native-page-background.md) restrict material to blank/NTP contents, reset ordinary pages through Chromium's default/theme hooks, and clear outgoing overrides before unobserved navigation. Primary-page notifications cover same-WebContents navigation and page reactivation; workspace-empty remains detached.
