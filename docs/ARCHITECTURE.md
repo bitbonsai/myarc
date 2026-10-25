@@ -8,6 +8,12 @@ Use Chromium's complete browser implementation with a deliberately small, mainta
 
 This adapts Artcraft's Rust-first engineering without pretending a complete Chromium browser can become a pure-Rust application. Chromium documents supported Rust integration and interoperation tools. At the selected revision, follow those tools and GN rules instead of inventing a separate embedding runtime. Sources: [research](RESEARCH.md).
 
+## Native shell, current implementation priority
+
+Target 1:1 Arc visual parity, beginning with the empty/new-tab window and real browsing. The material extends across the sidebar and empty content canvas; address/navigation controls belong inside the sidebar. Ordinary pages retain their explicit painted backgrounds. Match the reference at equal window dimensions before accepting a state.
+
+The [current experiment](../browser/experiments/native-shell.md) keeps Chromium browser services and reuses its real controls in a custom layout, with AppKit behind-window material through Objective-C++. It runs with sidebar address controls and a translucent empty canvas; native keyboard navigation passed. Visual parity remains incomplete. Stock vertical tabs and the built-in glass flag did not establish the required appearance. A separate Swift or Tauri host is an alternative to investigate only if this native boundary blocks fidelity; neither embedding route has been proven here. Import work is deferred while this visible slice is built. Release/security gates remain in force.
+
 ## Candidate comparison
 
 | Foundation | Why evaluate it | Main cost / disqualifier | Decision posture |

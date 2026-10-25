@@ -86,6 +86,14 @@ Wire the sidebar, browser Profiles and tabs, Space switching, pins/folders, arch
 
 Done: import → recognize workspace → open pin → switch Space → find tab/action with Cmd+T → close/relaunch and recover, plus a separate-Profile/private-mode journey. A simulated webpage or screenshot cannot satisfy this task.
 
+### MA-007.a: native visual parity, first state
+
+Current implementation priority. Depends on the compiled MA-002 candidate, not an importer or completed preservation utility. Target 1:1 visual parity with permitted Arc observations, beginning with the empty/new-tab window. Match window proportions, native material across sidebar and empty content canvas, sidebar navigation/address controls, content insets and corner radii. Keep private references and screenshots outside the repository.
+
+Use real Chromium tabs, navigation and security controls. A themed stock sidebar, static webpage replica or inert controls do not meet acceptance. Try the existing Chromium/AppKit boundary before adding another host framework; Swift/Tauri embedding remains unproven. Workspace rules remain Rust-owned.
+
+Evidence: same-size native captures against the reference, with explicit remaining differences, working address/tab controls, and normal/reduced-transparency and keyboard-focus checks. Stop at a reviewed first state; command-bar, populated sidebar and other window states require their own comparisons. Release safety gates remain open. Export work and broad test expansion do not block this slice.
+
 ## MA-008 — Integrate and finish onboarding animation
 
 Dependencies: MA-001/004/006/007.

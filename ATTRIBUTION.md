@@ -26,4 +26,6 @@ Public Artcraft repository conventions informed the development methodology. Pri
 
 The website CTA inlines Lucide’s GitHub icon from [`icons/github.svg` at revision `585b65f28f6383d39f257cb2430912ed6f7903a2`](https://github.com/lucide-icons/lucide/blob/585b65f28f6383d39f257cb2430912ed6f7903a2/icons/github.svg). It shares the retained ISC notice in `design/brand/assets/Lucide-LICENSE.txt` and the published HTML’s asset notices.
 
+`browser/patches/0002-native-shell-prototype.patch` modifies Chromium native frame, sidebar and location-bar sources at integration `3e117efa80cec1c4e1e6fbfdf44edeb087a279a5`, over upstream `8d208f20744ac6d4ce00cc3f9de6a14a9b8b926d`. These upstream files retain their Chromium BSD-style notices and checkout `LICENSE`. AppKit/QuartzCore are system frameworks, not bundled assets. The styling is independently written from permitted visual references; private Arc screenshots and product artwork are not included.
+
 Future third-party additions must record path, title/component, author, source URL, exact revision/version, license, and retained notice location. Repository publication does not grant rights to unrelated product names or branding.

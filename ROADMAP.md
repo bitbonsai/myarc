@@ -4,6 +4,8 @@ Updated: 2026-10-24. Stage: M0 feasibility. Synthetic onboarding runs locally. C
 
 ## Delivery strategy
 
+Current implementation priority, 2026-10-25: [MA-007.a native visual parity](plan/EXECUTION.md#ma-007a-native-visual-parity-first-state), beginning with the empty/new-tab window. Export work and expanded foundation testing follow this visible slice. Existing safety and distribution release gates remain open.
+
 Run two coordinated tracks: **preserve people's setups** and **build a dependable browser**. An export/conversion tool can be useful before the browser is ready; it must never be marketed as a browser replacement. Animated onboarding is in the launch scope, with its design explored immediately and its final quality validated in the real browser.
 
 CLI and MCP browser control are P0 launch scope. Expose useful page observation/actions and tab/Space management to authorized AI agents independently of built-in AI providers. Design the shared command/grant model during M0/M1; integrate both interfaces in M2 and harden them through M3/M4. See [MA-011](plan/EXECUTION.md) and the [control contract](docs/CONTROL-PROTOCOL.md). This added launch scope requires re-estimating the target windows after the foundation experiment; dates are not expanded capacity.

@@ -8,6 +8,10 @@ MA-002.a completed the unmodified `chrome` build and disposable-profile launch. 
 
 MA-001.a has an independent [onboarding motion study](../design/onboarding/README.md). It cannot substitute for native build evidence.
 
+## Native visual iteration
+
+Current work prioritizes [MA-007.a, the native shell experiment](experiments/native-shell.md). Its separate, optional patch adds full-window AppKit material, a translucent empty canvas and sidebar address controls. Native keyboard navigation passed; Arc sidebar structure and command-bar parity remain incomplete. It does not close foundation or release acceptance.
+
 ## Local build recipe
 
 Reviewed upstream instructions at `7ae71de816ba32868ff9f974c2716f04ebd9b860`: [Mac build](https://chromium.googlesource.com/chromium/src/+/7ae71de816ba32868ff9f974c2716f04ebd9b860/docs/mac_build_instructions.md), [Apple Silicon](https://chromium.googlesource.com/chromium/src/+/7ae71de816ba32868ff9f974c2716f04ebd9b860/docs/mac_arm64.md), and [Rust FFI](https://chromium.googlesource.com/chromium/src/+/7ae71de816ba32868ff9f974c2716f04ebd9b860/docs/rust/ffi.md).

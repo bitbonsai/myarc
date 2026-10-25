@@ -60,13 +60,13 @@ These are design commitments, not claims that the planned features work today.
 
 ## What makes this plan different
 
-Migration and animated onboarding lead the work. Browser security, extension support, and data durability decide whether it can ship. AI monetization follows a useful browser rather than determining the browser experience. Feature breadth is tracked separately from demonstrated daily-use reliability.
+An Arc-like native browser shell leads current work, with 1:1 visual parity as the target, including translucent materials and sidebar navigation. Migration follows this visible slice; animated onboarding remains a release requirement. Browser security, extension support, and data durability decide whether it can ship. AI monetization follows a useful browser rather than determining the browser experience. Feature breadth is tracked separately from demonstrated daily-use reliability.
 
 The current recommendation is a **Rust core for myarc's workspace, importer, persistence, and commands**, integrated through a small patch set over Chromium's complete browser layer, subject to a one-week feasibility gate. Chromium's engine and existing browser services remain C++. This is not a commitment to write a browser engine, use Electron, or rebuild Chrome's extension platform.
 
 ## Immediate next step
 
-Continue the pinned [Chromium foundation experiment](browser/README.md) and review the [clickable onboarding study](design/onboarding/README.md). Follow [plan/EXECUTION.md](plan/EXECUTION.md) toward an Arc preservation tool and a safe desktop alpha. The December 2026 milestones are conditional targets, not release promises.
+Continue the [native shell experiment](browser/experiments/native-shell.md) toward Arc visual parity, beginning with the empty/new-tab window. Follow [plan/EXECUTION.md](plan/EXECUTION.md) for the remaining desktop-alpha work and release gates. The December 2026 milestones are conditional targets, not release promises.
 
 ## Contributing
 

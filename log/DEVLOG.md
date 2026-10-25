@@ -2,6 +2,13 @@
 
 Keep significant outcomes, failures and next actions reproducible. Newest entry first. No private exports, page titles/URLs from real browsing, credentials or raw user transcripts.
 
+## 2026-10-25: Native material and sidebar navigation iteration
+
+- Current priority changed to native Arc visual parity, including the empty content canvas. Import investigation and broad test expansion are deferred; release safety gates remain open. [MA-007.a](../plan/EXECUTION.md#ma-007a-native-visual-parity-first-state) defines the first review state.
+- Stock vertical tabs and the built-in glass flag did not establish the required appearance. The [optional native patch](../browser/experiments/native-shell.md) uses explicit AppKit behind-window material and moves existing browser navigation/address controls into the sidebar. A real page and a transparent blank canvas now run in the same Chromium candidate. No additional host framework was introduced.
+- Native builds passed. Mixed web/native toolbar controls initially caused startup crashes; native controls fixed that configuration. Address-field visibility churn then lost keyboard focus; preserving visibility fixed Cmd+L navigation. Captured a real page and return to the translucent empty canvas. A controlled colored backdrop changed the native material across the window.
+- The packaged patch reproduced nine baseline sources exactly. Captures and supplied references remain private. Sidebar contents, centered command bar, complete control styling and other window/accessibility states remain unverified or unimplemented; 1:1 parity is open.
+
 ## 2026-10-25: Fable redesign, HTTPS recovery and system themes
 
 - Fable/high (`claude-fable-5-1`, frontend-design Skill) replaced the left-label column layout with headings above content, larger body text and a compact progress panel with dedicated artwork space. Header/footer lockups have 1rem ribbon marks. Parent aligned section/subheading sizes, retained ink navigation without underlines, and verified all six public documentation links plus an actual Roadmap click.

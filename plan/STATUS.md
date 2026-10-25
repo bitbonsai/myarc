@@ -4,7 +4,7 @@ Updated: 2026-10-25.
 
 | Item | State |
 | --- | --- |
-| Product scope and priority | Initial plan documented |
+| Product scope and priority | Native Arc visual parity leads current work, including full-window material and sidebar navigation; export work deferred |
 | Rust direction | Dependency-free M0 core and Cxx/native toolbar proof implemented; full workspace model remains open |
 | Animated onboarding | [MA-001.a synthetic motion study](../design/onboarding/README.md) implemented and exercised; native integration, performance and user study remain open |
 | Arc import | One private Markdown sample inventoried; [synthetic shape fixture](../tests/fixtures/arc-markdown/README.md) added. Built-in export action confirmed; version binding and Favorites ownership remain unverified; importer unimplemented |
@@ -12,12 +12,12 @@ Updated: 2026-10-25.
 | Agent workflow | Contributor instructions and task sequence prepared |
 | Artcraft workflow audit | Behavior contracts, bounded tasks, development log, evidence freshness and regression rules added; standalone core dependency corrected |
 | Executable checks today | Document links; six storyboard tests and prototype recordings; six Rust core tests; seven C++/Rust checks per pin; retained manual native-runtime client. Rust/patch workflow added; remote CI execution unverified |
-| Browser/importer/AI implementation | Experimental native control only; complete browser, importer and AI remain unimplemented |
+| Browser/importer/AI implementation | [Opt-in native layout/material prototype](../browser/experiments/native-shell.md) runs with sidebar navigation; 1:1 visual parity, complete browser, importer and AI remain unimplemented |
 | Public landing page | [Self-contained HTML](../site/README.md) deployed to GitHub Pages; offline/layout/motion checks passed. `myarc.dev` HTTPS verified/enforced; system light/dark themes, branding lockups and social-preview assets deployed |
 | Brand exploration | Standalone [brand kit](../design/brand/README.md) with supplied raster marks, social cards, wallpapers and lockups; naming/asset rights unverified |
 | CLI and MCP browser control | P0 launch requirement; tools, shared control service, scoped grants and MA-011 specified; no executable implementation yet |
 | Benchmarks/native application tests | Native control on second pin, renderer reload and off-the-record localStorage checks passed; full Profile/privacy/durability guarantees and release budgets remain unverified |
 
-Next work: isolate the default-profile creation assertion, exercise extension update/removal, complete broader isolation and licensing/distribution investigation, and resolve the supplied Markdown export's semantic scope for MA-003. The [326-entry inventory](../browser/evidence/dependency-licenses.json) has eight unresolved metadata/license errors. Signing, maintenance staffing and recurring budget remain unverified; M0 stays open.
+Next work: [MA-007.a](EXECUTION.md#ma-007a-native-visual-parity-first-state), match the Arc empty/new-tab window with real Chromium content, sidebar address controls and full-window translucent material. Import investigation and expanded foundation testing are deferred. Existing crash, isolation and distribution findings remain release blockers. The [326-entry inventory](../browser/evidence/dependency-licenses.json) has eight unresolved metadata/license errors. Signing, maintenance staffing and recurring budget remain unverified; M0 stays open.
 
 Keep this file public and concise. Put local machine state, private source samples and unpublished personal notes outside the committed tree. Do not store user chat transcripts here.

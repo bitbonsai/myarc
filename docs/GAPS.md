@@ -2,6 +2,8 @@
 
 Updated: 2026-10-24. Browser release blockers remain open. Synthetic onboarding and a two-revision Rust/native build experiment now supply bounded evidence.
 
+Current implementation priority is [MA-007.a, native visual parity](../plan/EXECUTION.md#ma-007a-native-visual-parity-first-state). Match the empty/new-tab window before expanding export investigation or the foundation test matrix. The ranking below retains release blockers; it does not override that current visible slice or permit unsafe browsing claims.
+
 | Rank | Gap | Why it leads | Completion evidence |
 | --- | --- | --- | --- |
 | 1 | Foundation acceptance and maintenance capacity unresolved | Build/native interoperation passed; extension lifecycle, runtime boundaries and ownership remain unverified | MA-002 extension/recovery evidence, complete notices and accepted upkeep/signing/budget plan |
