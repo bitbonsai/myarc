@@ -191,7 +191,7 @@ std::optional<std::string> EncodeWorkspaceMetadata(
 }
 
 MetadataResult DecodeWorkspaceMetadata(std::string_view json) {
-  if (json.size() > kMaxMetadataBytes) {
+  if (json.size() > kMaxMetadataBytes || !base::IsStringUTF8(json)) {
     return InvalidMetadata();
   }
   auto root =

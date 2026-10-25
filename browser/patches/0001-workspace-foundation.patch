@@ -608,10 +608,10 @@ index 0000000..f648ecf9a00de36706a1898c62fe1ec5709c9910
 +}
 diff --git a/myarc/bridge_check.cc b/myarc/bridge_check.cc
 new file mode 100644
-index 0000000..049d636ee50f67539c04828e36230f0179eca28a
+index 0000000..f560ec8bb5404348b833bcb3378e319887be716a
 --- /dev/null
 +++ b/myarc/bridge_check.cc
-@@ -0,0 +1,340 @@
+@@ -0,0 +1,358 @@
 +#include <iostream>
 +#include <limits>
 +#include <string>
@@ -782,6 +782,7 @@ index 0000000..049d636ee50f67539c04828e36230f0179eca28a
 +      decoded.snapshot->next_item_id != state.next_item_id ||
 +      decoded.snapshot->items[0].id != item_id ||
 +      !restore_snapshot(*model, std::move(*decoded.snapshot)).ok) {
++    std::cerr << "Metadata round trip failed: " << decoded.error << '\n';
 +    return false;
 +  }
 +  auto rejects = [](const base::DictValue& root) {
@@ -789,7 +790,16 @@ index 0000000..049d636ee50f67539c04828e36230f0179eca28a
 +    if (!json)
 +      return false;
 +    auto result = DecodeWorkspaceMetadata(*json);
-+    return !result.snapshot && !result.error.empty();
++    const bool rejected = !result.snapshot && !result.error.empty();
++    if (!rejected) {
++      std::cerr << "Invalid metadata fixture accepted: " << *json << '\n';
++      if (result.snapshot && !result.snapshot->items.empty()) {
++        std::cerr << "Decoded URL: "
++                  << std::string(result.snapshot->items[0].canonical_url)
++                  << '\n';
++      }
++    }
++    return rejected;
 +  };
 +  auto root = base::JSONReader::ReadDict(*encoded, base::JSON_PARSE_RFC);
 +  if (!root)
@@ -810,12 +820,16 @@ index 0000000..049d636ee50f67539c04828e36230f0179eca28a
 +    for (const auto* invalid_utf8 : {"\xff", "\xc3\x28"}) {
 +      auto invalid_json = *encoded;
 +      const auto position = invalid_json.find(text);
-+      if (position == std::string::npos)
++      if (position == std::string::npos) {
++        std::cerr << "Missing UTF-8 fixture text: " << text << '\n';
 +        return false;
++      }
 +      invalid_json.replace(position, std::string(text).size(), invalid_utf8);
 +      const auto invalid = DecodeWorkspaceMetadata(invalid_json);
-+      if (invalid.snapshot || invalid.error.empty())
++      if (invalid.snapshot || invalid.error.empty()) {
++        std::cerr << "Invalid UTF-8 fixture accepted\n";
 +        return false;
++      }
 +    }
 +  }
 +  auto* spaces = root->FindList("spaces");
@@ -847,21 +861,25 @@ index 0000000..049d636ee50f67539c04828e36230f0179eca28a
 +                            std::string(bridge_limits().url_bytes + 1, 'x'));
 +  if (!rejects(*root))
 +    return false;
-+  for (const auto* bad_url :
-+       {"https://bad host.test/", "https://user:pass@example.test/",
-+        "javascript:alert(1)", "https://[broken/"}) {
++  for (const auto* bad_url : {"https://:80/", "https://user:pass@example.test/",
++                              "javascript:alert(1)", "https://[broken/"}) {
 +    (*items)[0].GetDict().Set("canonical_url", bad_url);
 +    if (!rejects(*root))
 +      return false;
 +  }
-+  (*items)[0].GetDict().Set("canonical_url", "HTTPS://EXAMPLE.TEST");
-+  const auto canonical_json = base::WriteJson(*root);
-+  auto canonical = canonical_json ? DecodeWorkspaceMetadata(*canonical_json)
-+                                  : myarc::internal::MetadataResult{};
-+  if (!canonical.snapshot ||
-+      std::string(canonical.snapshot->items[0].canonical_url) !=
-+          "https://example.test/")
-+    return false;
++  // Follow Chromium canonicalization rather than inventing DNS-name policy.
++  for (const auto& [input, expected] :
++       {std::pair{"HTTPS://EXAMPLE.TEST", "https://example.test/"},
++        std::pair{"https://bad host.test/", "https://bad%20host.test/"}}) {
++    (*items)[0].GetDict().Set("canonical_url", input);
++    const auto canonical_json = base::WriteJson(*root);
++    auto canonical = canonical_json ? DecodeWorkspaceMetadata(*canonical_json)
++                                    : myarc::internal::MetadataResult{};
++    if (!canonical.snapshot ||
++        std::string(canonical.snapshot->items[0].canonical_url) != expected) {
++      return false;
++    }
++  }
 +  (*items)[0].GetDict().Set("canonical_url", "https://example.test/");
 +  (*items)[0].GetDict().Set("placement", 77);
 +  if (!rejects(*root))
@@ -3047,7 +3065,7 @@ index 0000000..2fa2bd17a496e83e411e75fa3e492dec28a52d6d
 +}
 diff --git a/myarc/workspace_service.cc b/myarc/workspace_service.cc
 new file mode 100644
-index 0000000..a201c08caff707307b579a905539769903dc909c
+index 0000000..8a3dfc07516af5cc1a79ca7c925aa50b3378bc19
 --- /dev/null
 +++ b/myarc/workspace_service.cc
 @@ -0,0 +1,586 @@
@@ -3244,7 +3262,7 @@ index 0000000..a201c08caff707307b579a905539769903dc909c
 +}
 +
 +MetadataResult DecodeWorkspaceMetadata(std::string_view json) {
-+  if (json.size() > kMaxMetadataBytes) {
++  if (json.size() > kMaxMetadataBytes || !base::IsStringUTF8(json)) {
 +    return InvalidMetadata();
 +  }
 +  auto root =

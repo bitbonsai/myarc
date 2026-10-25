@@ -168,6 +168,7 @@ bool CheckMetadataRecords() {
       decoded.snapshot->next_item_id != state.next_item_id ||
       decoded.snapshot->items[0].id != item_id ||
       !restore_snapshot(*model, std::move(*decoded.snapshot)).ok) {
+    std::cerr << "Metadata round trip failed: " << decoded.error << '\n';
     return false;
   }
   auto rejects = [](const base::DictValue& root) {
@@ -175,7 +176,16 @@ bool CheckMetadataRecords() {
     if (!json)
       return false;
     auto result = DecodeWorkspaceMetadata(*json);
-    return !result.snapshot && !result.error.empty();
+    const bool rejected = !result.snapshot && !result.error.empty();
+    if (!rejected) {
+      std::cerr << "Invalid metadata fixture accepted: " << *json << '\n';
+      if (result.snapshot && !result.snapshot->items.empty()) {
+        std::cerr << "Decoded URL: "
+                  << std::string(result.snapshot->items[0].canonical_url)
+                  << '\n';
+      }
+    }
+    return rejected;
   };
   auto root = base::JSONReader::ReadDict(*encoded, base::JSON_PARSE_RFC);
   if (!root)
@@ -196,12 +206,16 @@ bool CheckMetadataRecords() {
     for (const auto* invalid_utf8 : {"\xff", "\xc3\x28"}) {
       auto invalid_json = *encoded;
       const auto position = invalid_json.find(text);
-      if (position == std::string::npos)
+      if (position == std::string::npos) {
+        std::cerr << "Missing UTF-8 fixture text: " << text << '\n';
         return false;
+      }
       invalid_json.replace(position, std::string(text).size(), invalid_utf8);
       const auto invalid = DecodeWorkspaceMetadata(invalid_json);
-      if (invalid.snapshot || invalid.error.empty())
+      if (invalid.snapshot || invalid.error.empty()) {
+        std::cerr << "Invalid UTF-8 fixture accepted\n";
         return false;
+      }
     }
   }
   auto* spaces = root->FindList("spaces");
@@ -233,21 +247,25 @@ bool CheckMetadataRecords() {
                             std::string(bridge_limits().url_bytes + 1, 'x'));
   if (!rejects(*root))
     return false;
-  for (const auto* bad_url :
-       {"https://bad host.test/", "https://user:pass@example.test/",
-        "javascript:alert(1)", "https://[broken/"}) {
+  for (const auto* bad_url : {"https://:80/", "https://user:pass@example.test/",
+                              "javascript:alert(1)", "https://[broken/"}) {
     (*items)[0].GetDict().Set("canonical_url", bad_url);
     if (!rejects(*root))
       return false;
   }
-  (*items)[0].GetDict().Set("canonical_url", "HTTPS://EXAMPLE.TEST");
-  const auto canonical_json = base::WriteJson(*root);
-  auto canonical = canonical_json ? DecodeWorkspaceMetadata(*canonical_json)
-                                  : myarc::internal::MetadataResult{};
-  if (!canonical.snapshot ||
-      std::string(canonical.snapshot->items[0].canonical_url) !=
-          "https://example.test/")
-    return false;
+  // Follow Chromium canonicalization rather than inventing DNS-name policy.
+  for (const auto& [input, expected] :
+       {std::pair{"HTTPS://EXAMPLE.TEST", "https://example.test/"},
+        std::pair{"https://bad host.test/", "https://bad%20host.test/"}}) {
+    (*items)[0].GetDict().Set("canonical_url", input);
+    const auto canonical_json = base::WriteJson(*root);
+    auto canonical = canonical_json ? DecodeWorkspaceMetadata(*canonical_json)
+                                    : myarc::internal::MetadataResult{};
+    if (!canonical.snapshot ||
+        std::string(canonical.snapshot->items[0].canonical_url) != expected) {
+      return false;
+    }
+  }
   (*items)[0].GetDict().Set("canonical_url", "https://example.test/");
   (*items)[0].GetDict().Set("placement", 77);
   if (!rejects(*root))
