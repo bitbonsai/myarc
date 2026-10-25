@@ -1,0 +1,320 @@
+diff --git a/chrome/browser/ui/browser_actions.cc b/chrome/browser/ui/browser_actions.cc
+index 0485180..4f7697c 100644
+--- a/chrome/browser/ui/browser_actions.cc
++++ b/chrome/browser/ui/browser_actions.cc
+@@ -12,6 +12,7 @@
+ 
+ #include "base/check_deref.h"
+ #include "base/check_op.h"
++#include "base/command_line.h"
+ #include "base/feature_list.h"
+ #include "base/functional/bind.h"
+ #include "base/functional/callback_helpers.h"
+@@ -1243,8 +1244,13 @@ void BrowserActions::InitializeChromeMenuActions() {
+               },
+               bwi))
+           .SetActionId(kActionToggleCollapseVertical)
+-          .SetAccelerator(ui::Accelerator(
+-              ui::VKEY_L, ui::EF_SHIFT_DOWN | ui::EF_PLATFORM_ACCELERATOR))
++          .SetAccelerator(
++              base::CommandLine::ForCurrentProcess()->HasSwitch(
++                  "myarc-visual-parity")
++                  ? ui::Accelerator(ui::VKEY_S, ui::EF_PLATFORM_ACCELERATOR)
++                  : ui::Accelerator(
++                        ui::VKEY_L,
++                        ui::EF_SHIFT_DOWN | ui::EF_PLATFORM_ACCELERATOR))
+           .SetEnabled(false)
+           .Build());
+ 
+diff --git a/chrome/browser/ui/cocoa/accelerators_cocoa.mm b/chrome/browser/ui/cocoa/accelerators_cocoa.mm
+index 7182077..490f532 100644
+--- a/chrome/browser/ui/cocoa/accelerators_cocoa.mm
++++ b/chrome/browser/ui/cocoa/accelerators_cocoa.mm
+@@ -10,6 +10,7 @@
+ #include <algorithm>
+ #include <utility>
+ 
++#include "base/command_line.h"
+ #include "base/i18n/rtl.h"
+ #include "base/mac/mac_util.h"
+ #include "base/memory/singleton.h"
+@@ -145,6 +146,13 @@ AcceleratorsCocoa::AcceleratorsCocoa() {
+     CHECK(result.second, base::NotFatalUntil::M162);
+   }
+ 
++  if (base::CommandLine::ForCurrentProcess()->HasSwitch(
++          "myarc-visual-parity")) {
++    accelerators_[IDC_TOGGLE_VERTICAL_TABS_COLLAPSE] =
++        ui::Accelerator(ui::VKEY_S, ui::EF_COMMAND_DOWN);
++    accelerators_.erase(IDC_SAVE_PAGE);
++  }
++
+   accelerators_[IDC_CLOSE_WINDOW] = AcceleratorForCloseWindow();
+ 
+   auto result = accelerators_.insert(
+diff --git a/chrome/browser/ui/views/frame/browser_frame_view_mac.mm b/chrome/browser/ui/views/frame/browser_frame_view_mac.mm
+index 8615eb6..94515e1 100644
+--- a/chrome/browser/ui/views/frame/browser_frame_view_mac.mm
++++ b/chrome/browser/ui/views/frame/browser_frame_view_mac.mm
+@@ -31,6 +31,7 @@
+ #include "chrome/browser/ui/immersive/immersive_mode_controller.h"
+ #include "chrome/browser/ui/layout_constants.h"
+ #include "chrome/browser/ui/tabs/tab_style.h"
++#include "chrome/browser/ui/tabs/vertical_tab_strip_state_controller.h"
+ #include "chrome/browser/ui/view_ids.h"
+ #include "chrome/browser/ui/views/bookmarks/bookmark_bar_view.h"
+ #include "chrome/browser/ui/views/frame/browser_native_widget.h"
+@@ -469,6 +470,17 @@ BrowserFrameViewMac::BoundsAndMargins
+ BrowserFrameViewMac::GetCaptionButtonBounds() const {
+   BoundsAndMargins result;
+ 
++  if (base::CommandLine::ForCurrentProcess()->HasSwitch(
++          "myarc-visual-parity")) {
++    auto* controller = tabs::VerticalTabStripStateController::From(
++        GetBrowserView()->browser());
++    if (controller && controller->ShouldDisplayVerticalTabs() &&
++        controller->GetCollapseState() !=
++            tabs::VerticalTabStripCollapseState::kExpanded) {
++      return result;
++    }
++  }
++
+   // In popups, the titlebar is system-drawn and the caption buttons aren't part
+   // of the client area.
+   if (GetBrowserView()->browser()->GetType() ==
+diff --git a/chrome/browser/ui/views/frame/browser_native_widget_mac.mm b/chrome/browser/ui/views/frame/browser_native_widget_mac.mm
+index 1882a6d..7d5fe23 100644
+--- a/chrome/browser/ui/views/frame/browser_native_widget_mac.mm
++++ b/chrome/browser/ui/views/frame/browser_native_widget_mac.mm
+@@ -248,7 +248,9 @@ BrowserNativeWidgetMac::BrowserNativeWidgetMac(BrowserWidget* browser_widget,
+     chrome::AddCommandObserver(browser_view_->browser(), IDC_FORWARD, this);
+   }
+ 
+-  if (features::IsGlassFrameEnabled()) {
++  if (features::IsGlassFrameEnabled() ||
++      base::CommandLine::ForCurrentProcess()->HasSwitch(
++          "myarc-visual-parity")) {
+     if (auto* vertical_tab_strip_state_controller =
+             tabs::VerticalTabStripStateController::From(
+                 browser_view_->browser())) {
+@@ -816,6 +818,13 @@ void BrowserNativeWidgetMac::OnWindowInitialized() {
+ 
+ void BrowserNativeWidgetMac::OnWidgetInitDone() {
+   NativeWidgetMac::OnWidgetInitDone();
++  if (base::CommandLine::ForCurrentProcess()->HasSwitch(
++          "myarc-visual-parity")) {
++    if (auto* controller = tabs::VerticalTabStripStateController::From(
++            browser_view_->browser())) {
++      OnVerticalTabStripCollapseChanged(controller->GetCollapseState());
++    }
++  }
+   if (!GetWidget()->HasObserver(this)) {
+     GetWidget()->AddObserver(this);
+   }
+@@ -1006,12 +1015,25 @@ void BrowserNativeWidgetMac::AnnounceTextInInProcessWindow(
+ void BrowserNativeWidgetMac::OnVerticalTabStripModeChanged(
+     tabs::VerticalTabStripStateController* controller) {
+   last_theme_color_.reset();
+-  UpdateBackgroundGeometry();
++  OnVerticalTabStripCollapseChanged(controller->GetCollapseState());
+   UpdateBackgroundColor();
+ }
+ 
+ void BrowserNativeWidgetMac::OnVerticalTabStripCollapseChanged(
+     tabs::VerticalTabStripCollapseState state) {
++  if (base::CommandLine::ForCurrentProcess()->HasSwitch(
++          "myarc-visual-parity") &&
++      GetNSWindowHost()) {
++    NSWindow* const window = GetNSWindowHost()->GetInProcessNSWindow();
++    auto* controller =
++        tabs::VerticalTabStripStateController::From(browser_view_->browser());
++    const bool hidden = controller && controller->ShouldDisplayVerticalTabs() &&
++                        state != tabs::VerticalTabStripCollapseState::kExpanded;
++    for (NSWindowButton button :
++         {NSWindowCloseButton, NSWindowMiniaturizeButton, NSWindowZoomButton}) {
++      [[window standardWindowButton:button] setHidden:hidden];
++    }
++  }
+   UpdateBackgroundGeometry();
+ }
+ 
+diff --git a/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl.cc b/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl.cc
+index 57b3a53..56cb482 100644
+--- a/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl.cc
++++ b/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl.cc
+@@ -681,10 +681,13 @@ BrowserViewTabbedLayoutImpl::CalculateVerticalTabStripAnimation() {
+   VerticalTabStripAnimation animation;
+   animation.current_motion =
+       controller->GetCurrentMotion(TabStripAnimations::kVerticalTabStrip);
+-  animation.top_offset = base::ClampRound(
+-      leading_exclusion_height *
+-      *controller->GetCurrentValue(TabStripAnimations::kVerticalTabStrip,
+-                                   TabStripAnimations::kTabStripTop));
++  animation.top_offset =
++      base::CommandLine::ForCurrentProcess()->HasSwitch("myarc-visual-parity")
++          ? 0
++          : base::ClampRound(leading_exclusion_height *
++                             *controller->GetCurrentValue(
++                                 TabStripAnimations::kVerticalTabStrip,
++                                 TabStripAnimations::kTabStripTop));
+   animation.expand_on_hover_width =
+       *controller->GetCurrentValue(TabStripAnimations::kVerticalTabStrip,
+                                    TabStripAnimations::kTabStripHoverWidth);
+@@ -898,6 +901,8 @@ BrowserViewTabbedLayoutImpl::CalculateProposedLayout(
+   gfx::Rect unclipped_contents_region = params.visual_client_area;
+ 
+   // Lay out vertical tab strip if visible.
++  const bool visual_parity =
++      base::CommandLine::ForCurrentProcess()->HasSwitch("myarc-visual-parity");
+   int collapsed_vertical_tab_strip_adjustment = 0;
+   const VerticalTabStripAnimation& vertical_tab_strip_animation =
+       layout_data_->vertical_tab_strip_animation;
+@@ -978,16 +983,18 @@ BrowserViewTabbedLayoutImpl::CalculateProposedLayout(
+       if (vertical_tab_strip_animation.current_motion) {
+         clip_content_for_animation =
+             vertical_tab_strip_animation.is_expanding_or_collapsing();
+-        unclipped_contents_region.Inset(
+-            gfx::Insets::TLBR(0, tabs::kVerticalTabStripCollapsedWidth, 0, 0));
++        unclipped_contents_region.Inset(gfx::Insets::TLBR(
++            0, visual_parity ? 0 : tabs::kVerticalTabStripCollapsedWidth, 0,
++            0));
+       } else {
+         unclipped_contents_region.Inset(gfx::Insets::TLBR(
+             0, horizontal_layout.vertical_tab_strip_width, 0, 0));
+       }
+     }
+-    layout.AddChild(views().vertical_tab_strip_region_view,
+-                    vertical_tab_strip_bounds,
+-                    layout_data_->tab_strip_type == TabStripType::kVertical);
++    layout.AddChild(
++        views().vertical_tab_strip_region_view, vertical_tab_strip_bounds,
++        layout_data_->tab_strip_type == TabStripType::kVertical &&
++            (!visual_parity || vertical_tab_strip_bounds.width() > 0));
+   }
+ 
+   if (IsParentedTo(views().vertical_tab_strip_background_blur_backdrop,
+@@ -995,7 +1002,8 @@ BrowserViewTabbedLayoutImpl::CalculateProposedLayout(
+     layout.AddChild(
+         views().vertical_tab_strip_background_blur_backdrop,
+         vertical_tab_strip_bounds,
+-        in_glass_mode() && features::kGlassExpandOnHoverEnabled.Get() &&
++        (!visual_parity || vertical_tab_strip_bounds.width() > 0) &&
++            in_glass_mode() && features::kGlassExpandOnHoverEnabled.Get() &&
+             layout_data_->vertical_tab_strip_animation.expand_on_hover_width >
+                 0.0f);
+   }
+@@ -1007,6 +1015,7 @@ BrowserViewTabbedLayoutImpl::CalculateProposedLayout(
+     const double top_corner = layout_data_->vertical_tabs_top_corner();
+     const bool top_corner_visible =
+         layout_data_->tab_strip_type == TabStripType::kVertical &&
++        (!visual_parity || vertical_tab_strip_bounds.width() > 0) &&
+         top_corner > 0.0;
+ 
+     // The top corner is drawn when the tabstrip goes all the way to the top.
+@@ -1030,6 +1039,7 @@ BrowserViewTabbedLayoutImpl::CalculateProposedLayout(
+     const double bottom_corner = layout_data_->vertical_tabs_bottom_corner();
+     const bool bottom_corner_visible =
+         layout_data_->tab_strip_type == TabStripType::kVertical &&
++        (!visual_parity || vertical_tab_strip_bounds.width() > 0) &&
+         bottom_corner > 0.0;
+     if (bottom_corner_visible) {
+       auto preferred =
+@@ -1196,10 +1206,11 @@ BrowserViewTabbedLayoutImpl::CalculateProposedLayout(
+     params.SetTop(top_container_layout.bounds.bottom());
+   }
+ 
+-  if (base::CommandLine::ForCurrentProcess()->HasSwitch(
+-          "myarc-visual-parity") &&
++  if (visual_parity &&
+       layout_data_->tab_strip_type == TabStripType::kVertical) {
+-    params.Inset(gfx::Insets::TLBR(10, 0, 10, 10));
++    const int leading_inset = base::ClampRound(
++        10 * (1.0 - vertical_tab_strip_animation.tab_strip_width));
++    params.Inset(gfx::Insets::TLBR(10, leading_inset, 10, 10));
+   }
+ 
+   // Lay out infobar container.
+diff --git a/chrome/browser/ui/views/frame/vertical_tab_strip_region_view.cc b/chrome/browser/ui/views/frame/vertical_tab_strip_region_view.cc
+index 5cd433c..92024fd 100644
+--- a/chrome/browser/ui/views/frame/vertical_tab_strip_region_view.cc
++++ b/chrome/browser/ui/views/frame/vertical_tab_strip_region_view.cc
+@@ -62,6 +62,7 @@
+ #include "chrome/grit/generated_resources.h"
+ #include "components/tabs/public/tab_group.h"
+ #include "components/tabs/public/tab_interface.h"
++#include "content/public/browser/web_contents.h"
+ #include "ui/base/dragdrop/os_exchange_data.h"
+ #include "ui/base/interaction/element_tracker.h"
+ #include "ui/base/l10n/l10n_util.h"
+@@ -135,6 +136,8 @@ VerticalTabStripRegionView::VerticalTabStripRegionView(
+   SetPaintToLayer();
+   // Because corners may be transparent, this must be set to false.
+   layer()->SetFillsBoundsOpaquely(false);
++  layer()->SetMasksToBounds(
++      base::CommandLine::ForCurrentProcess()->HasSwitch("myarc-visual-parity"));
+ 
+   SetLayoutManager(std::make_unique<views::DelegatingLayoutManager>(this));
+ 
+@@ -533,8 +536,12 @@ views::View* VerticalTabStripRegionView::GetDefaultFocusableChild() {
+ 
+ gfx::Size VerticalTabStripRegionView::GetMinimumSize() const {
+   auto min_size = BaseTabStripRegionView::GetMinimumSize();
++  const int collapsed_width =
++      base::CommandLine::ForCurrentProcess()->HasSwitch("myarc-visual-parity")
++          ? 0
++          : tabs::kVerticalTabStripCollapsedWidth;
+   min_size.set_width((state_controller_->IsCollapsed() || IsAnimatingSize())
+-                         ? tabs::kVerticalTabStripCollapsedWidth
++                         ? collapsed_width
+                          : tabs::kVerticalTabStripUncollapsedMinWidth);
+   return min_size;
+ }
+@@ -546,13 +553,16 @@ gfx::Size VerticalTabStripRegionView::CalculatePreferredSize(
+       BrowserAnimationController::From(browser_view()->browser());
+   const auto motion =
+       controller->GetCurrentMotion(TabStripAnimations::kVerticalTabStrip);
++  const int collapsed_width =
++      base::CommandLine::ForCurrentProcess()->HasSwitch("myarc-visual-parity")
++          ? 0
++          : tabs::kVerticalTabStripCollapsedWidth;
+   const int expand_amount =
+-      std::max(0, target_collapse_state_.uncollapsed_width -
+-                      tabs::kVerticalTabStripCollapsedWidth);
++      std::max(0, target_collapse_state_.uncollapsed_width - collapsed_width);
+   const double expand_percent =
+       *controller->GetCurrentValue(TabStripAnimations::kVerticalTabStrip,
+                                    TabStripAnimations::kTabStripWidth);
+-  size.set_width(tabs::kVerticalTabStripCollapsedWidth +
++  size.set_width(collapsed_width +
+                  (motion == TabStripAnimations::kExpand
+                       ? std::floor<double>
+                       : std::ceil<double>)(expand_amount * expand_percent));
+@@ -820,6 +830,13 @@ bool VerticalTabStripRegionView::IsCollapsing() {
+ void VerticalTabStripRegionView::RequestCollapse(bool collapse) {
+   target_collapse_state_.collapsed = collapse;
+   if (collapse) {
++    if (base::CommandLine::ForCurrentProcess()->HasSwitch(
++            "myarc-visual-parity") &&
++        GetFocusManager() && Contains(GetFocusManager()->GetFocusedView())) {
++      if (auto* contents = tab_strip_model()->GetActiveWebContents()) {
++        contents->Focus();
++      }
++    }
+     suppress_expand_on_hover_ = IsCollapseButtonHovered();
+     ResetExpandOnHoverTimers();
+   } else {
+@@ -998,6 +1015,14 @@ void VerticalTabStripRegionView::OnExpandOnHoverEnabledChanged(bool enabled) {
+ 
+ void VerticalTabStripRegionView::UpdateExpandOnHoverState(
+     std::optional<bool> hovered) {
++  if (base::CommandLine::ForCurrentProcess()->HasSwitch(
++          "myarc-visual-parity")) {
++    mouse_exit_timer_.Stop();
++    ResetExpandOnHoverTimers();
++    is_expanded_on_hover_ = false;
++    return;
++  }
++
+   // If not collapsed, then we shouldn't be in or entering the expand on hover
+   // state.
+   if (!state_controller_->ShouldDisplayVerticalTabs() ||
