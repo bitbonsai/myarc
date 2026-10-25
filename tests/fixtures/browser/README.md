@@ -2,6 +2,82 @@
 
 [index.html](index.html) is an original local form that writes one invented note to browser localStorage. It implements no myarc workspace rules. The [developer test client](../../../tools/check_browser_foundation.mjs) exercises real browser behavior, separate from production CLI/MCP control.
 
+## Native preview: five-minute manual smoke
+
+From the repository root, on the existing macOS 26+ Apple Silicon build host:
+
+```sh
+python3 tools/launch_native_preview.py
+```
+
+Requires Python 3 and the already-built optional native stack, currently through
+0018, at `$HOME/.cache/myarc-m0/chromium/src/out/MyarcM0/Chromium.app/Contents/MacOS/Chromium`.
+The launcher does no build, patching or installation. Missing/nonexecutable builds
+fail with that exact path. Ask the build owner to finish verification before use.
+
+Each run creates a new marked, private `native-preview-*` directory beneath
+`$HOME/.cache/myarc-m0`, seeds vertical tabs before startup and opens `about:blank`.
+It prints the exact profile, browser PID, `preview.pid` and `preview.log` locations.
+The log and PID file live inside that directory, outside Git. A started process
+alone does not verify a working window. If it exits or shows stock UI, retain the
+log and report the build/launch mismatch.
+
+This command explicitly enables the experimental workspace sidebar; ordinary
+launches still leave that renderer off. It adds no debugging endpoint, extension,
+automation flag or security bypass. Developer preview convenience is separate
+from the planned product CLI/MCP browser controls. Keep important data in your
+normal browser. Use invented browsing content in this isolated disposable profile.
+Leave OS settings and permissions unchanged; cancel unexpected permission prompts
+and report them. Account sign-in and AI are unnecessary.
+
+Check these in the preview window, recording failures rather than assuming parity:
+
+1. Press Cmd+T, type `https://example.com`, then Enter. Expect one new real page.
+   Press Cmd+L, change its URL to `https://example.org`, then Enter. Expect the same
+   tab to navigate, with no duplicate. Escape should dismiss an unused palette.
+2. Use the footer `+` (Create Space), then switch with its Space dots. A fresh
+   Space should show empty material and a neutral header, without the prior URL
+   or page. Returning to the populated Space should show its actual page.
+3. Right-click a live row. Where exposed, try Pin to Space / Unpin from Space,
+   then Add to Profile Favorites / Remove from Profile Favorites. Explicit Remove
+   should keep the live page as Temporary. Save again, open another Temporary page,
+   then choose Close live page (keep Favorite) on the saved item. Its tile should
+   remain; clicking it should reopen its URL. Favorites belong to the Profile and
+   can appear across Spaces. Last-live-page and multiwindow behavior remain open.
+4. Press Cmd+S to hide/show the full sidebar. While hidden, hover at the left
+   edge: expect a usable overlay without shifting the page. Move back onto the
+   page to dismiss it. Cmd+S should restore persistent visibility. This shortcut
+   toggles the sidebar rather than Save Page.
+5. Ordinary white pages should remain opaque white; authored dark pages should
+   retain their background. `about:blank` and an empty Space use shell material.
+   Browser theme alone need not recolor websites. Check with pages you can inspect;
+   this smoke does not measure pixel parity, motion timing or accessibility.
+6. Focus the preview app, then Cmd+Q to quit its windows. Leave your normal browser
+   running. Running the launcher again intentionally creates another fresh profile.
+   Persistence testing requires explicitly reusing a marked test profile and the
+   parent's verified restore procedure, separately from this launcher.
+
+Recovery/durability remain unaccepted: recent acknowledged localStorage writes
+have failed the process-crash probe. This smoke establishes neither recovery nor
+release readiness. See [the recovery candidate](../../../browser/experiments/native-recovery-lifecycle.md)
+and the parent's [current run report](../../../browser/experiments/overnight-2026-10-25.md).
+
+Cleanup is manual. After the exact preview app and its helpers have exited, inspect
+only the printed directory and marker. If no evidence is needed, move that one
+`native-preview-*` directory to Trash in Finder. Keep it if process ownership or
+exit is uncertain. The launcher never deletes profiles or stops other processes.
+Profiles/logs may contain browsing data; keep them out of Git and public reports.
+
+Local launcher checks, using synthetic files and a process double only:
+
+```sh
+python3 -m unittest discover -s tools -p 'test_launch_native_preview.py' -v
+python3 tools/check_docs.py
+```
+
+These checks execute zero native browser launches. Parent native smoke remains
+separate from their pass/fail result.
+
 ## Run
 
 Requires Node 22+, Python 3 and the compiled Chromium candidate from [the foundation recipe](../../../browser/README.md). Use a fresh, disposable profile and keep an ordinary test tab open. The client checks the candidate version and expected browser PID before navigation. A marker prevents accidental use of an unmarked profile; these privileged checks remain developer tooling, not an authorization system.
