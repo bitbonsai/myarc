@@ -9,6 +9,13 @@ Keep significant outcomes, failures and next actions reproducible. Newest entry 
 - An attempted parent-view hide violated a layout visibility check. Kept the layout parent visible and hid native hosts instead, preventing clicks on invisible pages. The resulting crash also exposed a missing app-menu anchor in the existing recovery bubble. A fresh disposable profile allowed the palette checks to continue; recovery remains blocked.
 - Packaged the seven-file palette delta separately from concurrent rounding work. Current-tab Cmd+L, sidebar hide/show and full autocomplete remain pending. Motion is recorded as a baseline; timing, reduced motion and full visual parity are unverified.
 
+## 2026-10-25: Image-led post previews and Arc target reference
+
+- Removed the visible blog introduction and retained a visually hidden heading for accessibility. Listings use a small, uncropped WebP thumbnail beside the title, derived from the first Markdown image.
+- Post Open Graph/Twitter image URLs, alt text, MIME type and dimensions now follow that first image; structured article data uses the same image. Image-free posts retain the default brand card. Added coverage for first-image ordering, encoded filenames, fallback previews and thumbnail removal when unpublishing.
+- Replaced the initial blog screenshot with the specifically approved Arc reference and labelled it as the target appearance, separate from the myArc prototype. Recorded provenance and ownership limits in attribution.
+- Eight unit checks and retained homepage/blog browser checks passed, including two themes, mobile widths, metadata/image agreement and non-overlapping thumbnails. Published `0ec3936`; normal TLS read-back matches the index, article, original reference and 5,526-byte thumbnail. Social-platform rendering/cache refresh and Safari/Firefox remain unmeasured.
+
 ## 2026-10-25: Markdown progress journal and first public post
 
 - Added build-time CommonMark/YAML posts with explicit publication approval, local validated screenshots, a date-sorted index and per-post canonical/social metadata. Homepage and blog share the existing design/theme shell. Generated output excludes drafts and unreferenced files.

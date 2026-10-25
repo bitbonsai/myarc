@@ -166,6 +166,21 @@ try:
                   if (performance.getEntriesByType('resource').some(r => /^https?:/.test(r.name))) throw new Error('Blog remote resource request')
                   const canonical = document.querySelector('link[rel="canonical"]').href
                   if (!canonical.startsWith('https://myarc.dev/blog/')) throw new Error('Blog canonical URL')
+                  const first = document.querySelector('.post-body img')
+                  if (first) {
+                    const expected = new URL(first.getAttribute('src'), canonical).href
+                    for (const selector of ['meta[property="og:image"]', 'meta[name="twitter:image"]']) {
+                      if (document.querySelector(selector).content !== expected) throw new Error('Post social image mismatch')
+                    }
+                    if (Number(document.querySelector('meta[property="og:image:width"]').content) !== first.naturalWidth) throw new Error('Social image dimensions')
+                  }
+                  const thumbnail = document.querySelector('.post-thumb img')
+                  if (thumbnail) {
+                    const image = thumbnail.getBoundingClientRect()
+                    const title = thumbnail.closest('.post-preview-heading').querySelector('h2').getBoundingClientRect()
+                    if (image.right > title.left) throw new Error('Thumbnail overlaps title')
+                    if (thumbnail.naturalWidth > 384) throw new Error('Thumbnail not optimized')
+                  }
                   return {width: innerWidth, title: document.title, images: document.images.length}
                 })()""")
                 print('Blog:', theme, result)

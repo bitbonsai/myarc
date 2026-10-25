@@ -4,7 +4,7 @@ from datetime import date
 from html import escape
 from itertools import islice
 from pathlib import Path
-from urllib.parse import unquote, urlsplit
+from urllib.parse import quote, unquote, urlsplit
 import io
 import json
 import re
@@ -24,10 +24,13 @@ BLOG_CSS = '''
     .journal { padding: 4rem 0 6rem }
     .journal > header { margin-bottom: 3rem }
     .journal h1 { font-size: 3.5rem; line-height: 1.1; max-width: 24ch }
-    .journal .intro { margin-top: 1.25rem; max-width: 42rem; color: var(--quiet) }
+    .journal .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap }
     .post-list, .post-body { max-width: 68ch }
     .post-preview + .post-preview { margin-top: 3rem }
-    .post-preview h2 { font-size: 2rem; margin: .5rem 0 .75rem }
+    .post-preview-heading { display: flex; align-items: center; gap: 1.5rem; margin: .5rem 0 .75rem }
+    .post-preview h2 { font-size: 2rem; min-width: 0; overflow-wrap: anywhere }
+    .post-thumb { display: block; width: 8rem; flex: none }
+    .post-thumb img { width: 100%; aspect-ratio: 8 / 5; object-fit: contain; border-radius: .75rem; background: var(--panel) }
     .post-date { display: block; color: var(--quiet); font-size: 1rem }
     .post-header .post-date { margin-top: 1rem }
     .post-back { display: inline-block; margin-bottom: 2rem }
@@ -45,6 +48,9 @@ BLOG_CSS = '''
     @media (max-width: 48rem) {
       .journal { padding: 2.5rem 0 4rem }
       .journal h1 { font-size: 2.5rem }
+      .post-preview-heading { gap: 1rem }
+      .post-preview h2 { font-size: 1.5rem }
+      .post-thumb { width: 5.5rem }
     }
 '''
 
@@ -57,10 +63,20 @@ class Post:
     summary: str
     html: str
     images: dict
+    cover_alt: str = ''
 
     @property
     def url(self):
         return f'https://myarc.dev/blog/{self.slug}/'
+
+    @property
+    def cover(self):
+        if not self.images:
+            return None
+        name, data = next(iter(self.images.items()))
+        with Image.open(io.BytesIO(data)) as image:
+            return {'url': self.url + quote(name, safe='/'), 'width': image.width,
+                    'height': image.height, 'type': Image.MIME[image.format], 'alt': self.cover_alt}
 
 
 def screenshot(folder, source):
@@ -127,6 +143,7 @@ def load_post(path):
         raise ValueError(f'Published post has no body: {path}')
     tokens = MD.parse(body)
     images = {}
+    cover_alt = ''
     for token in tokens:
         if token.type == 'heading_open' and token.tag == 'h1':
             raise ValueError(f'Title comes from metadata; use ## section headings: {path}')
@@ -135,13 +152,15 @@ def load_post(path):
                 if not child.content.strip():
                     raise ValueError(f'Screenshot needs descriptive alt text: {path}')
                 name, data = screenshot(path.parent, child.attrGet('src'))
+                if not images:
+                    cover_alt = child.content.strip()
                 images[name] = data
                 if len(images) > 20:
                     raise ValueError(f'Maximum 20 screenshots per post: {path}')
-    return Post(slug, published, meta['title'].strip(), meta['summary'].strip(), MD.renderer.render(tokens, MD.options, {}), images)
+    return Post(slug, published, meta['title'].strip(), meta['summary'].strip(), MD.renderer.render(tokens, MD.options, {}), images, cover_alt)
 
 
-def page_shell(template, title, summary, url, content, published=None):
+def page_shell(template, title, summary, url, content, published=None, cover=None):
     head, body = template.split('<body>', 1)
     header = re.search(r'<header class="top">.*?</header>', body, re.S).group()
     footer = re.search(r'<footer class="end">.*?</footer>', body, re.S).group()
@@ -156,6 +175,17 @@ def page_shell(template, title, summary, url, content, published=None):
     schema = {'@context': 'https://schema.org', '@type': 'BlogPosting' if published else 'Blog', 'name': title, 'description': summary, 'url': url}
     if published:
         schema.update(headline=title, datePublished=published.isoformat())
+    if cover:
+        for key, value in (('property="og:image"', cover['url']),
+                           ('property="og:image:secure_url"', cover['url']),
+                           ('property="og:image:type"', cover['type']),
+                           ('property="og:image:width"', str(cover['width'])),
+                           ('property="og:image:height"', str(cover['height'])),
+                           ('property="og:image:alt"', cover['alt']),
+                           ('name="twitter:image"', cover['url']),
+                           ('name="twitter:image:alt"', cover['alt'])):
+            head = re.sub(r'(<meta ' + key + r' content=")[^"]*', lambda match: match[1] + escape(value, quote=True), head, count=1)
+        schema['image'] = cover['url']
     structured = json.dumps(schema).replace('<', '\\u003c')
     head = re.sub(r'(<script type="application/ld\+json">).*?(</script>)', lambda match: match[1] + structured + match[2], head, count=1, flags=re.S)
     head = head.replace('</style>', BLOG_CSS + '\n  </style>', 1)
@@ -185,16 +215,27 @@ def build_blog(root, template, embed):
     if output.exists():
         shutil.rmtree(output)
     output.mkdir()
-    listing = ''.join(f'<article class="post-preview"><time class="post-date" datetime="{post.published.isoformat()}">{post.published.strftime("%B %d, %Y")}</time><h2><a href="{post.url}">{escape(post.title)}</a></h2><p>{escape(post.summary)}</p></article>' for post in posts)
+    listing = ''
+    for post in posts:
+        thumb = ''
+        if post.images:
+            thumbnails = output / '_thumbnails'
+            thumbnails.mkdir(exist_ok=True)
+            with Image.open(io.BytesIO(next(iter(post.images.values())))) as image:
+                image = image.convert('RGBA')
+                image.thumbnail((384, 240), Image.Resampling.LANCZOS)
+                image.save(thumbnails / f'{post.slug}.webp', format='WEBP', quality=85, method=6)
+                thumb = f'<a class="post-thumb" href="{post.url}" aria-hidden="true" tabindex="-1"><img src="_thumbnails/{post.slug}.webp" alt="" width="{image.width}" height="{image.height}" loading="lazy"></a>'
+        listing += f'<article class="post-preview"><time class="post-date" datetime="{post.published.isoformat()}">{post.published.strftime("%B %d, %Y")}</time><div class="post-preview-heading">{thumb}<h2><a href="{post.url}">{escape(post.title)}</a></h2></div><p>{escape(post.summary)}</p></article>'
     if not listing:
         listing = '<p class="quiet">Progress notes will appear here once published.</p>'
-    content = '<header><h1>Progress journal</h1><p class="intro">Notes on building myArc, with screenshots and implementation updates.</p></header><div class="post-list">' + listing + '</div>'
+    content = '<h1 class="visually-hidden">Blog</h1><div class="post-list">' + listing + '</div>'
     (output / 'index.html').write_text(embed(page_shell(template, 'Blog', 'Progress notes on building myArc.', 'https://myarc.dev/blog/', content)))
     for post in posts:
         folder = output / post.slug
         folder.mkdir()
         content = '<a class="post-back" href="/blog/">All posts</a><header class="post-header"><h1>' + escape(post.title) + '</h1><time class="post-date" datetime="' + post.published.isoformat() + '">' + post.published.strftime('%B %d, %Y') + '</time></header><article class="post-body">' + post.html + '</article>'
-        (folder / 'index.html').write_text(embed(page_shell(template, post.title, post.summary, post.url, content, post.published)))
+        (folder / 'index.html').write_text(embed(page_shell(template, post.title, post.summary, post.url, content, post.published, post.cover)))
         for name, data in post.images.items():
             target = folder / name
             target.parent.mkdir(parents=True, exist_ok=True)

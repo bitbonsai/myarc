@@ -10,6 +10,14 @@ The first landing page already gave us something to write about. Tiny section la
 
 We changed the layout, made the type larger, and started checking the actual published HTML against the built file. The public page is part of the work to verify.
 
+## Where we want to get
+
+[![Arc reference showing the sidebar and centered command bar, our visual target for myArc](arc-reference.png)](arc-reference.png)
+
+*Arc reference, supplied for this post. This is the target appearance; myArc remains a prototype.*
+
+The sidebar keeps navigation close to the tabs, while the centered command bar gives an address or search room to breathe. This is the experience we want to bring back. Our native Chromium experiment is still working toward it.
+
 ## Borrowing a working method from Artcraft
 
 Artcraft was a useful reference for how to organize the development process. In particular, PhotoCraft's public [development guide](https://github.com/storytold/photocraft/blob/main/docs/development.md) and [scorecard](https://github.com/storytold/photocraft/blob/main/docs/scorecard.md) influenced the approach.
@@ -45,8 +53,6 @@ We also caught a smaller reproducibility issue: font conversion was rewriting ti
 Those are the kinds of details I want to keep here. The failed attempt often explains the eventual implementation better than the final diff does.
 
 ## A small blog we can maintain
-
-[![The first version of the progress journal, shown in its dark color scheme](blog-dark.png)](blog-dark.png)
 
 Posts are Markdown files with screenshots beside them. A build generates the index and article pages, using the website's branding and system color preference. Publishing stays in Git.
 

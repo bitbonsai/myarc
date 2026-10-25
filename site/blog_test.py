@@ -47,10 +47,44 @@ class BlogTests(unittest.TestCase):
         self.assertIn(posts[0].url, (self.root / 'sitemap.xml').read_text())
         self.assertIn('og:type" content="article"', html)
         self.assertIn('"datePublished": "2026-10-25"', html)
+        cover_url = posts[0].url + 'screen.png'
+        for tag in ('property="og:image"', 'property="og:image:secure_url"', 'name="twitter:image"'):
+            self.assertIn(tag + ' content="' + cover_url + '"', html)
+        self.assertIn('property="og:image:width" content="20"', html)
+        self.assertIn('property="og:image:height" content="10"', html)
+        self.assertIn('property="og:image:type" content="image/png"', html)
+        self.assertIn('property="og:image:alt" content="Synthetic blue screenshot"', html)
+        self.assertIn('"image": "' + cover_url + '"', html)
+        index = (self.root / 'blog/index.html').read_text()
+        self.assertIn('class="post-thumb"', index)
+        self.assertNotIn('Progress journal', index)
+        self.assertNotIn('Notes on building myArc, with screenshots', index)
+        thumbnail = self.root / 'blog/_thumbnails' / (posts[0].slug + '.webp')
+        with Image.open(thumbnail) as image:
+            self.assertEqual('WEBP', image.format)
+            self.assertLessEqual(image.width, 384)
+            self.assertLessEqual(image.height, 240)
         self.post(draft='true')
         self.build()
         self.assertFalse(page.exists())
+        self.assertFalse(thumbnail.exists())
         self.assertNotIn(posts[0].url, (self.root / 'sitemap.xml').read_text())
+
+    def test_first_image_wins_and_no_image_keeps_brand_preview(self):
+        self.post()
+        self.build()
+        html = (self.root / 'blog' / self.folder.name / 'index.html').read_text()
+        self.assertIn('property="og:image" content="https://myarc.dev/og-image.png"', html)
+        self.assertNotIn('class="post-thumb"', (self.root / 'blog/index.html').read_text())
+        Image.new('RGB', (40, 20), 'red').save(self.folder / 'first image.png')
+        Image.new('RGB', (20, 10), 'blue').save(self.folder / 'second.png')
+        self.post('![First & target](first%20image.png)\n\n![Second](second.png)')
+        post = self.build()[0]
+        self.assertEqual(post.url + 'first%20image.png', post.cover['url'])
+        self.assertEqual('First & target', post.cover['alt'])
+        html = (self.root / 'blog' / self.folder.name / 'index.html').read_text()
+        self.assertIn('content="First &amp; target"', html)
+        self.assertIn('property="og:image:width" content="40"', html)
 
     def test_raw_html_and_unsafe_links_are_not_executed(self):
         self.post('<script>alert(1)</script>\n\n[Bad](javascript:alert(1))')
