@@ -8,7 +8,11 @@ October 25, 2026
 
 By [bitbonsai](https://github.com/bitbonsai) · [Read Markdown](https://myarc.dev/blog/2026-10-25-building-in-public/index.md)
 
-Spaces and named pinned tabs make Arc's sidebar feel like a workspace. The command bar gives you a quick way back to those tabs.
+[![Mauricio Wolff's Arc card, dated 25 March 2023, with three anniversary stamps](https://myarc.dev/blog/2026-10-25-building-in-public/mauricio-wolff-arc.c739650f7b1d.webp)](https://myarc.dev/blog/2026-10-25-building-in-public/mauricio-wolff-arc.c739650f7b1d.webp)
+
+My Arc card, 2023\.
+
+I started using Arc in 2023\. I appreciate how Spaces and named pinned tabs make its sidebar feel like a workspace. The command bar gives you a quick way back to those tabs.
 
 [Arc is being sunsetted](https://arc.net/). I'm building myArc to continue that way of browsing, as an independent, open-source browser based on Chromium.
 
