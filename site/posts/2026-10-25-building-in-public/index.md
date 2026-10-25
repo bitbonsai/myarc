@@ -10,8 +10,6 @@ myArc is an open-source browser project, using Arc as the reference for its inte
 
 [![Current myArc build loading mauriciowolff.com with the native command palette open](myarc-current-build.png)](myarc-current-build.png)
 
-*Current myArc build, captured from its native window. mauriciowolff.com is loaded behind the command palette.*
-
 ## Start with a shell we can judge
 
 The empty window gives us a clear visual target. Sidebar proportions and the window material are easier to compare when a page isn't doing most of the visual work.
