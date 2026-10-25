@@ -39,7 +39,7 @@ The extension scenario saves its browser PID in the marked profile. The restart 
 
 ## Workspace generic Unpin probe
 
-`workspace-pin` exercises the established generic extension Unpin contract through the original [MV3 fixture manifest](workspace-pin-extension/manifest.json) and [worker](workspace-pin-extension/worker.js). It requires the current native stack, including command-safety 0012 and recovery-anchor 0016. The workspace renderer stays off by default; these flags enable it only in this disposable test browser. This probe has not yet run against Chromium.
+`workspace-pin` exercises the established generic extension Unpin contract through the original [MV3 fixture manifest](workspace-pin-extension/manifest.json) and [worker](workspace-pin-extension/worker.js). It requires the current native stack, including command-safety 0012 and recovery-anchor 0016. The workspace renderer stays off by default; these flags enable it only in this disposable test browser. One real Chromium run passed; see [bounded native evidence](../../../browser/evidence/workspace-saved-identity.json).
 
 Use a fresh marked profile with exactly one ordinary tab, opened on the standard loopback fixture. Seed the real vertical-tabs preference **before startup**; changing it in an already running window does not construct the adapter. Run from the repository root, with no existing process using this new profile:
 
@@ -56,6 +56,7 @@ SERVER_PID=$!
 "$SRC/out/MyarcM0/Chromium.app/Contents/MacOS/Chromium" \
   --user-data-dir="$PROFILE" --no-first-run --no-default-browser-check \
   --myarc-visual-parity --myarc-workspace-sidebar \
+  --enable-features=GlassFrame --disable-features=InitialWebUI \
   --load-extension="$REPO/tests/fixtures/browser/workspace-pin-extension" \
   --remote-debugging-address=127.0.0.1 --remote-debugging-port=0 \
   http://127.0.0.1:8766/ &
@@ -87,7 +88,7 @@ node --test tools/check_browser_foundation.test.mjs
 python3 tools/check_docs.py
 ```
 
-The four Node tests cover manifest identity/permissions, fixture argument/target guards and API forwarding/errors, plus CLI rejection. Their API doubles establish fixture behavior only. Native executions remain zero until the parent runs the command above against real Chromium.
+The four Node tests cover manifest identity/permissions, fixture argument/target guards and API forwarding/errors, plus CLI rejection. Their API doubles establish fixture behavior only. The parent ran the native scenario once successfully, then used the actual sidebar menu to remove the Favorite. The same live item became Temporary, its saved URL cleared and actual extension read-back reported native pin false. A further native close/reopen check retained saved identity while creating a new native tab. These observations establish the named journeys, not restart/crash durability or C++ browser-suite execution. A settled unstyled HTTP fixture also exposed an ordinary-page transparency bug; renderer remains off by default.
 
 ## Scope and limits
 

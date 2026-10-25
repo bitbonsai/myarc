@@ -1,0 +1,36 @@
+{
+  "slice": "MA-007.c-native-saved-identity",
+  "date": "2026-10-25",
+  "status": "bounded saved-identity journeys passed; page-background blocker remains",
+  "native_workspace_pin_probe": {
+    "successful_executions": 1,
+    "browser": "Chrome/158.0.8122.0",
+    "real_mv3_extension_api": true,
+    "pin_creates_persisted_profile_favorite": true,
+    "generic_unpin_retains_native_pin": true,
+    "saved_id_canonical_url_owner_and_placement_unchanged": true,
+    "bounded_native_and_disk_readbacks": true
+  },
+  "manual_native": {
+    "remove_from_profile_favorites_invoked": true,
+    "explicit_unsave_preserves_selected_item_id_as_temporary": true,
+    "explicit_unsave_clears_saved_url_and_native_pin": true,
+    "original_live_page_and_native_tab_id_retained_on_unsave": true,
+    "saved_page_closed_while_another_live_page_remained": true,
+    "dormant_favorite_keeps_id_and_canonical_url": true,
+    "dormant_favorite_reopened_through_native_sidebar": true,
+    "reopen_creates_different_native_tab_id_with_same_saved_identity": true,
+    "reopened_native_pin_and_selected_page_correct": true,
+    "fresh_owned_window_captures_inspected": true
+  },
+  "local_argument_and_fixture_tests_passed": 4,
+  "automated_cpp_browser_suite_cases_executed": 0,
+  "workspace_renderer_default_enabled": false,
+  "raw_profiles_logs_and_captures": "private, outside Git",
+  "remaining": [
+    "Ordinary unstyled HTTP page background is translucent at rest; only blank canvas should use material",
+    "Last-live-page close and multiwindow saved-item propagation remain unaccepted",
+    "Restart/crash durability and actual prior-session recovery remain unproven",
+    "Cross-Space search/shortcut policy, extension activeTab and broader lifecycle/privacy gates remain open"
+  ]
+}

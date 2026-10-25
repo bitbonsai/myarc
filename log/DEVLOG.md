@@ -2,6 +2,12 @@
 
 Keep significant outcomes, failures and next actions reproducible. Newest entry first. No private exports, page titles/URLs from real browsing, credentials or raw user transcripts.
 
+## 2026-10-25: Native saved-identity acceptance
+
+- Integrated the one-task extension probe and ran it against a fresh marked profile using normal upstream local-extension loading. Real Pin created a persisted Favorite; generic Unpin retained actual pin and saved ID/canonical URL/owner/placement. Four local argument/fixture tests also pass. The native C++ suites remain unrun.
+- Actual sidebar Remove from Profile Favorites converted the same selected live item to Temporary and cleared saved URL/native pin. Native close/reopen with another page retained saved identity but created a new native tab ID. [Evidence](../browser/evidence/workspace-saved-identity.json) records real API, metadata and UI observations. Asynchronous close was checked after settlement rather than counting its first still-open snapshot.
+- Fresh resting captures revealed normal unstyled HTTP pages inheriting material. The cause is unconditional transparent base/background setup for visual-parity contents, so the next bounded task restores ordinary page opacity while retaining blank translucency. Existing QA profile stayed untouched. Multiwindow, real recovery and durability remain open; renderer default remains off.
+
 ## 2026-10-25: Executable extension generic Unpin probe
 
 - Starting revision: `87ffa08`. Added one `workspace-pin` mode to the retained [native client](../tools/check_browser_foundation.mjs), with an original, tabs-only MV3 fixture. Existing extension/restart/runtime modes retain their paths. The probe reuses one exact loopback tab, checks its native Profile path and worker identity, then awaits real pin projection and on-disk Favorite adoption before requesting generic API Unpin. Stable saved ID/canonical URL/owner/placement and native pin must survive. It leaves the synthetic Favorite for separate explicit UI Unsave.
