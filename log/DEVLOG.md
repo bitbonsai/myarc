@@ -2,6 +2,12 @@
 
 Keep significant outcomes, failures and next actions reproducible. Newest entry first. No private exports, page titles/URLs from real browsing, credentials or raw user transcripts.
 
+## 2026-10-25: Empty-Space header native acceptance
+
+- Integrated the one-task header fix and repeated the actual two-page/three-Space journey in a fresh marked profile. Empty now shows an enabled neutral address field, with prior URL/site information and page-only navigation controls absent from pixels and accessibility output. Both actual pages remain hidden.
+- A privileged synthetic background-page reload exercised loading updates without re-exposing the header. New Tab opened an empty-input native palette; Escape kept the page count unchanged. Native Cmd+R in Empty preserved both hidden URLs/time origins. Different-page return restored Reading metadata and working native Reload; same-page return retained both live pages.
+- Fresh private captures and bounded observation assertions passed. [Evidence](../browser/evidence/workspace-empty-header.json) records this manual acceptance separately from the original leaking-header run. Automated native browser cases remain unrun. Palette still offers other-Space live tabs; broader command, saved identity and lifecycle/privacy acceptance remain open. Renderer default remains off. Next bounded source task targets the existing recovery-bubble anchor crash.
+
 ## 2026-10-25: Empty-Space header candidate fix
 
 - Traced the native metadata leak to a skipped blank toolbar update plus sidebar layout restoring location-bar visibility. Reload also enabled itself inside `ChangeMode` after the blank-state disable. Updated optional 0012 to refresh neutral address text, hide site information/page actions and page-only navigation buttons, and disable Reload after mode changes. Existing Chromium paths restore the different populated page. No Rust/workspace policy or canonical foundation source changed.

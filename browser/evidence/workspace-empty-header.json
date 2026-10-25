@@ -1,0 +1,39 @@
+{
+  "slice": "MA-007.c-empty-space-header",
+  "date": "2026-10-25",
+  "status": "bounded manual native acceptance passed",
+  "command_safety_patch_sha256": "8f8023789fdb66841128879766afdb89866c7e393453185336eba69745f66e53",
+  "build": {
+    "incremental_chrome_exit": 0,
+    "browser_test_translation_unit_syntax_exit": 0,
+    "gn_target_families_passed": 3,
+    "strict_patch_replay": true
+  },
+  "manual_native": {
+    "fresh_marked_disposable_profile": true,
+    "spaces": 3,
+    "live_synthetic_pages": 2,
+    "empty_address_value_blank_and_enabled": true,
+    "prior_url_and_site_information_absent": true,
+    "page_only_navigation_controls_absent": true,
+    "both_pages_hidden_in_empty": true,
+    "neutral_header_survives_privileged_background_page_reload": true,
+    "empty_palette_prefill_blank": true,
+    "palette_escape_keeps_two_pages": true,
+    "native_command_r_preserves_hidden_urls_and_time_origins": true,
+    "different_page_restores_own_url_and_security_controls": true,
+    "native_reload_after_restoration_changes_only_displayed_page_time_origin": true,
+    "same_page_return_preserves_live_pages": true,
+    "actual_workspace_metadata_matches_selection": true,
+    "fresh_empty_and_restored_window_captures_inspected": true
+  },
+  "automated_native_browser_cases_executed": 0,
+  "workspace_renderer_default_enabled": false,
+  "raw_profiles_logs_and_captures": "private, outside Git",
+  "remaining": [
+    "Palette still offers other-Space live tabs; cross-Space search and shortcut policy remains open",
+    "Recovery bubble can still crash when its app-menu fallback anchor is absent",
+    "Unmapped action restoration, generic Unpin, explicit Unsave and broader native regressions remain unaccepted",
+    "Extension activeTab, cross-window destinations, lifecycle and durability gates remain open"
+  ]
+}

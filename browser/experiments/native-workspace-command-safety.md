@@ -52,7 +52,7 @@ Vertical tabs must be enabled before this optional sidebar initializes. A fresh-
 
 Through actual native controls, the parent created Reading and Empty beside Everyday, opened a second synthetic HTTP page using the command palette, and switched between the two populated Spaces. Page observation confirmed exactly one visible page in each populated Space and both pages hidden in Empty. Empty-to-Reading selected the different native page correctly. Pressing Reload in Empty preserved both hidden pages' URLs and `performance.timeOrigin`. Actual persisted workspace metadata matched three Spaces, two live items and the selected Reading item. Fresh owned-window captures were inspected. This is a manual native smoke journey, not execution of the browser regression suite; see [bounded evidence](../evidence/workspace-native.json).
 
-**Open blocker:** Empty still exposes the previous page URL/site-information controls and enabled-looking page buttons. Page pixels are hidden and the observed Reload action is blocked, but the visible/accessibility state is misleading and leaks prior page metadata. Keep the renderer off outside disposable acceptance runs until this is fixed. This run does not establish unmapped action restoration, extension API Unpin behavior or complete command/privacy safety.
+**Original smoke blocker:** Empty exposed the previous page URL/site-information controls and enabled-looking page buttons. Page pixels were hidden and the observed Reload action was blocked, but visible/accessibility state leaked prior metadata. The follow-up below fixes and manually checks this bounded path. The original run does not establish unmapped action restoration, extension API Unpin behavior or complete command/privacy safety.
 
 Default workspace renderer remains OFF. Automated native browser regressions remain UNRUN. The basic Space-switch/empty-page path below now has the manual evidence above; the broader action/save/consent checks remain open:
 
@@ -64,7 +64,7 @@ Cross-Space shortcut/Tab Search policy, extension `activeTab`, cross-window dest
 
 ## Empty-header candidate fix, 2026-10-25
 
-The smoke observations and [workspace-native.json](../evidence/workspace-native.json) above describe the pre-fix run. They remain historical evidence. This follow-up changes source and verifies compilation only; fresh native acceptance is pending.
+The smoke observations and [workspace-native.json](../evidence/workspace-native.json) above describe the pre-fix run. They remain historical evidence. The agent handoff verified compilation only; the parent's later native acceptance is recorded below.
 
 Updated complete replacement [0012](../patches/0012-native-workspace-command-safety.patch), SHA-256 `8f8023789fdb66841128879766afdb89866c7e393453185336eba69745f66e53`. Apply it once to the pre-0012 baseline, rather than over the prior version. The external checkout already contains this update.
 
@@ -86,4 +86,12 @@ Verification actually run:
 
 Automated native cases executed: **zero**. No `browser_tests` executable was available; its dependency graph was not built. No app, desktop input, Arc interaction or profile access occurred. Executable `comm` paths were checked before building; resource-only notification-service mappings were left untouched. No build remains running at handoff. Renderer default remains OFF.
 
-Parent acceptance: repeat the native Everyday -> Empty -> Reading journey with two distinct synthetic pages. Inspect screenshot and accessibility output after layout settles: Empty must show neutral usable address/new-tab navigation, with prior URL/site information and page buttons absent. Trigger loading/toolbar updates while empty, verify hidden-page URLs/time origins remain unchanged, then confirm Reading restores its own URL/security controls and working Reload. Recheck ordinary same-page return. Existing broader action/lifecycle/privacy gaps remain open until separately accepted.
+## Parent native acceptance, 2026-10-25
+
+A new marked disposable profile repeated Reading -> Everyday -> Empty -> Reading with two actual synthetic HTTP pages. Empty showed an enabled, empty address field with a neutral placeholder. Fresh screenshot and accessibility output contained no prior URL, site-information popup or page-only Back/Forward/Reload/Stop controls. Both actual pages were hidden.
+
+A privileged test-only CDP reload of the retained Workshop page triggered real background loading while Empty remained selected. Its time origin changed as intended; Reading's did not. The header remained neutral with page controls absent. New Tab opened the native palette with empty input; Escape returned without adding a page. Native Cmd+R in Empty then left both hidden URLs and time origins unchanged.
+
+Returning to Reading restored its own URL, site information and page controls. Pressing native Reload changed Reading's time origin while Workshop stayed unchanged. Reading -> Empty -> Reading retained both live pages without another reload. Actual persisted metadata matched three Spaces, two items and the selected Reading item. Fresh Empty/Reading captures were inspected. See [current bounded evidence](../evidence/workspace-empty-header.json).
+
+The palette still lists both live pages as Switch to Tab results, including while Empty is selected. This check establishes empty input and cancellation, not a stronger cross-Space search policy. Automated native browser cases executed remain zero. The existing QA/public-pin profile was untouched. Renderer stays off by default while broader action/save/lifecycle/privacy gates remain open. The next bounded implementation targets the known recovery-bubble anchor crash.
