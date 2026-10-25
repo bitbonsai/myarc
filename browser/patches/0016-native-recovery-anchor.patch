@@ -1,0 +1,241 @@
+From: bitbonsai <44185+bitbonsai@users.noreply.github.com>
+Subject: [PATCH] Keep native shell recovery anchoring ready before window show
+
+Optional shell-only MA-007.c recovery-anchor candidate. Native cases UNRUN.
+Apply after the currently installed optional stack on Chromium
+3e117efa80cec1c4e1e6fbfdf44edeb087a279a5, including complete replacement
+0012 SHA-256 8f8023789fdb66841128879766afdb89866c7e393453185336eba69745f66e53
+and current 0013/0014/0015. Preserve independent layout rounding.
+This delta does not replace 0012 or change the canonical foundation payload.
+
+Sidebar layout hides the app-menu button before startup requests recovery.
+The tracked fallback is unavailable until its browser widget becomes visible.
+Use a noninteractive BrowserView child at the existing fallback coordinates
+only when the opt-in shell reparents the toolbar. A Views anchor is available
+before window show and remains drawn when the sidebar is hidden. Keep stock
+anchor checks, upstream recovery prompt/actions and browser services intact.
+
+See browser/experiments/native-recovery-anchor.md in myarc for build proof,
+regression scope and parent-owned native acceptance still required.
+
+diff --git a/chrome/browser/ui/views/frame/BUILD.gn b/chrome/browser/ui/views/frame/BUILD.gn
+index 1d63b08b3680d4fde5cc750689866eb943e99af2..3c5a5b678a34d132a91af138ba676801c3c629d5 100644
+--- a/chrome/browser/ui/views/frame/BUILD.gn
++++ b/chrome/browser/ui/views/frame/BUILD.gn
+@@ -591,6 +591,7 @@ source_set("app_menu_button_impl") {
+   public_deps = [ ":app_menu_button" ]
+   deps = [
+     ":app_menu_button_observer",
++    ":browser_view",
+     "//chrome/browser/ui:browser_actions",
+     "//chrome/browser/ui:browser_element_identifiers",
+     "//chrome/browser/ui:browser_window_header",
+diff --git a/chrome/browser/ui/views/frame/app_menu_button.cc b/chrome/browser/ui/views/frame/app_menu_button.cc
+index 0b93b7416104b077ccb4f5e8e3d86285830f5590..a07ec25197f450b21125ec5ed80fcf140eb8919a 100644
+--- a/chrome/browser/ui/views/frame/app_menu_button.cc
++++ b/chrome/browser/ui/views/frame/app_menu_button.cc
+@@ -20,6 +20,7 @@
+ #include "chrome/browser/ui/views/app_menu/action_app_menu.h"
+ #include "chrome/browser/ui/views/chrome_typography.h"
+ #include "chrome/browser/ui/views/frame/app_menu_button_observer.h"
++#include "chrome/browser/ui/views/frame/browser_view.h"
+ #include "chrome/browser/ui/views/interaction/browser_elements_views.h"
+ #include "chrome/browser/ui/views/toolbar/app_menu.h"
+ #include "chrome/browser/ui/views/toolbar/toolbar_ink_drop_util.h"
+@@ -57,6 +58,14 @@ views::BubbleAnchor AppMenuButton::GetAnchor() {
+   // anchor instead.
+   auto* const elements = BrowserElementsViews::From(this);
+   CHECK(elements);
++  // The opt-in shell hides this button before the window is shown, when the
++  // tracked fallback is not registered yet. Its View anchor also survives a
++  // hidden sidebar.
++  auto* const browser_view =
++      elements->GetViewAs<BrowserView>(kBrowserViewElementId);
++  if (browser_view && browser_view->myarc_popup_anchor()) {
++    return views::BubbleAnchor(browser_view->myarc_popup_anchor());
++  }
+   auto* const element = elements->GetElement(kFallbackPopupAnchorElementId);
+   CHECK(element);
+   return views::BubbleAnchor(element);
+diff --git a/chrome/browser/ui/views/frame/browser_view.cc b/chrome/browser/ui/views/frame/browser_view.cc
+index 1c1306e78f5aad8d377bfb8ab72c96635fd970d0..d211df41b83d58d1cb820555565bedb7f7d9b21d 100644
+--- a/chrome/browser/ui/views/frame/browser_view.cc
++++ b/chrome/browser/ui/views/frame/browser_view.cc
+@@ -5436,6 +5436,9 @@ void BrowserView::Layout(PassKey) {
+     if (fallback_popup_anchor_) {
+       fallback_popup_anchor_->MaybeUpdateAnchor(rect);
+     }
++    if (myarc_popup_anchor_) {
++      myarc_popup_anchor_->SetBoundsRect(rect);
++    }
+ 
+     if (dialog_anchor_) {
+       rect.Offset(0, -kAdditionalDialogToolbarOverlap);
+@@ -5682,6 +5685,11 @@ void BrowserView::AddedToWidget() {
+         sidebar_header->RemoveChildViewT(sidebar_header->GetCollapseButton()));
+     sidebar_header->SetMyarcSidebarToolbar(
+         top_container_->RemoveChildViewT(toolbar_.get()));
++    // Keep popup anchoring independent of sidebar visibility and tracker
++    // registration during startup. Layout uses the upstream fallback position.
++    myarc_popup_anchor_ = AddChildView(std::make_unique<views::View>());
++    myarc_popup_anchor_->SetCanProcessEventsWithinSubtree(false);
++    myarc_popup_anchor_->GetViewAccessibility().SetIsIgnored(true);
+   }
+ 
+   dialog_anchor_ = std::make_unique<views::ViewSubregionAnchor>(
+diff --git a/chrome/browser/ui/views/frame/browser_view.h b/chrome/browser/ui/views/frame/browser_view.h
+index dcdeb18d6de1c8a8902d589da062dc169310c6a3..0b7363434cad11428dd8b6f1edf9c4af4684bd8b 100644
+--- a/chrome/browser/ui/views/frame/browser_view.h
++++ b/chrome/browser/ui/views/frame/browser_view.h
+@@ -248,6 +248,8 @@ class BrowserView : public BrowserWindow,
+   // Container for the tabstrip, toolbar, etc.
+   TopContainerView* top_container() { return top_container_; }
+ 
++  views::View* myarc_popup_anchor() { return myarc_popup_anchor_; }
++
+   std::optional<int> theme_background_y_offset() const {
+     return theme_background_y_offset_;
+   }
+@@ -1323,6 +1325,7 @@ class BrowserView : public BrowserWindow,
+   // fullscreen and can anchor inside the content area of the window if
+   // necessary (such as the translate bubble).
+   std::unique_ptr<views::ViewSubregionAnchor> fallback_popup_anchor_;
++  raw_ptr<views::View> myarc_popup_anchor_ = nullptr;
+ 
+   // A mapping between accelerators and command IDs.
+   std::map<ui::Accelerator, int> accelerator_table_;
+diff --git a/chrome/browser/ui/views/session_crashed_bubble_view_interactive_uitest.cc b/chrome/browser/ui/views/session_crashed_bubble_view_interactive_uitest.cc
+index c30c90bfe44ba4c558688af71f1d3b8ba1320544..6c3d75d4d6847f028303c1ab1277dd806680107d 100644
+--- a/chrome/browser/ui/views/session_crashed_bubble_view_interactive_uitest.cc
++++ b/chrome/browser/ui/views/session_crashed_bubble_view_interactive_uitest.cc
+@@ -5,8 +5,12 @@
+ #include "chrome/browser/ui/views/session_crashed_bubble_view.h"
+ 
+ #include <string>
++#include <utility>
+ 
++#include "base/command_line.h"
+ #include "base/memory/raw_ptr.h"
++#include "base/test/run_until.h"
++#include "base/test/scoped_feature_list.h"
+ #include "build/build_config.h"
+ #include "build/buildflag.h"
+ #include "chrome/browser/lifetime/browser_shutdown.h"
+@@ -14,21 +18,31 @@
+ #include "chrome/browser/profiles/profile.h"
+ #include "chrome/browser/sessions/exit_type_service.h"
+ #include "chrome/browser/sessions/session_restore.h"
++#include "chrome/browser/ui/browser_element_identifiers.h"
++#include "chrome/browser/ui/browser_tabstrip.h"
++#include "chrome/browser/ui/browser_window/public/create_browser_window.h"
+ #include "chrome/browser/ui/focus/browser_focus_controller.h"
+ #include "chrome/browser/ui/tabs/tab_strip_model.h"
+ #include "chrome/browser/ui/test/test_browser_dialog.h"
+ #include "chrome/browser/ui/views/frame/browser_view.h"
++#include "chrome/browser/ui/views/frame/toolbar_button_provider.h"
++#include "chrome/browser/ui/views/frame/vertical_tab_strip_region_view.h"
++#include "chrome/browser/ui/views/interaction/browser_elements_views.h"
+ #include "chrome/browser/ui/views/toolbar/browser_app_menu_button.h"
+ #include "chrome/browser/ui/views/toolbar/toolbar_view.h"
++#include "chrome/common/pref_names.h"
+ #include "chrome/test/base/in_process_browser_test.h"
+ #include "components/keep_alive_registry/keep_alive_registry.h"
+ #include "components/keep_alive_registry/keep_alive_types.h"
++#include "components/prefs/pref_service.h"
++#include "content/public/common/content_features.h"
+ #include "content/public/test/browser_test.h"
+ #include "ui/base/buildflags.h"
+ #include "ui/views/bubble/bubble_dialog_delegate_view.h"
+ #include "ui/views/focus/focus_manager.h"
+ #include "ui/views/test/ax_event_counter.h"
+ #include "ui/views/view.h"
++#include "ui/views/widget/widget.h"
+ 
+ class SessionCrashedBubbleViewTest : public DialogBrowserTest {
+  public:
+@@ -51,6 +65,85 @@ class SessionCrashedBubbleViewTest : public DialogBrowserTest {
+   raw_ptr<views::BubbleDialogDelegate, DanglingUntriaged> crash_bubble_;
+ };
+ 
++class SessionCrashedBubbleMyarcViewTest
++    : public SessionCrashedBubbleViewTest,
++      public testing::WithParamInterface<bool> {
++ public:
++  SessionCrashedBubbleMyarcViewTest() {
++    features_.InitAndDisableFeature(features::kInitialWebUI);
++  }
++
++  void SetUpCommandLine(base::CommandLine* command_line) override {
++    SessionCrashedBubbleViewTest::SetUpCommandLine(command_line);
++    command_line->AppendSwitch("myarc-visual-parity");
++    command_line->AppendSwitch("myarc-workspace-sidebar");
++  }
++
++ private:
++  base::test::ScopedFeatureList features_;
++};
++
++IN_PROC_BROWSER_TEST_P(SessionCrashedBubbleMyarcViewTest,
++                       RecoveryBeforeWindowShownAndWithHiddenSidebar) {
++  Profile* const profile = browser()->GetProfile();
++  profile->GetPrefs()->SetBoolean(prefs::kVerticalTabsEnabled, true);
++  BrowserWindowCreateParams params(profile, /*from_user_gesture=*/true);
++  params.initial_bounds = gfx::Rect(50, 50, 1000, 800);
++  params.vertical_tab_strip_collapsed = GetParam();
++  auto* const window = CreateBrowserWindow(std::move(params));
++  auto* const view = BrowserView::GetBrowserViewForBrowser(window);
++  ASSERT_TRUE(view);
++  chrome::AddTabAt(window, GURL("about:blank"), -1, true);
++  view->GetWidget()->LayoutRootViewIfNecessary();
++
++  ASSERT_FALSE(view->GetWidget()->IsVisible());
++  auto* const elements = BrowserElementsViews::From(window);
++  ASSERT_FALSE(elements->GetElement(kFallbackPopupAnchorElementId));
++  auto* const menu = view->toolbar_button_provider()->GetAppMenuControl();
++  ASSERT_FALSE(menu->IsDrawn());
++  auto* const anchor = view->myarc_popup_anchor();
++  ASSERT_TRUE(anchor);
++  EXPECT_EQ(view, anchor->parent());
++  EXPECT_FALSE(anchor->bounds().IsEmpty());
++  EXPECT_EQ(anchor, menu->GetAnchor().GetIfView());
++
++  // Exercise the startup entry point, with a forced exit type rather than an
++  // actual browser crash. The tracked fallback does not exist yet.
++  ExitTypeService::GetInstanceForProfile(profile)
++      ->SetLastSessionExitTypeForTest(ExitType::kCrashed);
++  SessionCrashedBubble::ShowIfNotOffTheRecordProfile(window, false);
++  ASSERT_TRUE(base::test::RunUntil(
++      [] { return SessionCrashedBubbleView::GetInstanceForTest(); }));
++  auto* const bubble = SessionCrashedBubbleView::GetInstanceForTest();
++  ASSERT_TRUE(bubble);
++  EXPECT_EQ(anchor, bubble->GetAnchorView());
++  EXPECT_TRUE(bubble->ShouldShowCloseButton());
++  EXPECT_TRUE(bubble->IsDialogButtonEnabled(ui::mojom::DialogButton::kOk));
++
++  view->GetWidget()->Show();
++  EXPECT_TRUE(bubble->GetWidget()->IsVisible());
++  EXPECT_TRUE(anchor->IsDrawn());
++  // Even an entirely hidden sidebar must not hide the popup anchor.
++  view->vertical_tab_strip_region_view_for_testing()->SetVisible(false);
++  view->GetWidget()->SetBounds(gfx::Rect(50, 50, 1100, 700));
++  view->GetWidget()->LayoutRootViewIfNecessary();
++  EXPECT_TRUE(anchor->IsDrawn());
++  EXPECT_EQ(anchor, menu->GetAnchor().GetIfView());
++  ASSERT_TRUE(elements->GetElement(kFallbackPopupAnchorElementId));
++  EXPECT_EQ(
++      elements->GetElement(kFallbackPopupAnchorElementId)->GetScreenBounds(),
++      anchor->GetAnchorBoundsInScreen());
++  EXPECT_EQ(anchor->GetAnchorBoundsInScreen(), bubble->GetAnchorRect());
++  EXPECT_TRUE(bubble->GetWidget()->IsVisible());
++  bubble->GetWidget()->CloseNow();
++  EXPECT_EQ(nullptr, SessionCrashedBubbleView::GetInstanceForTest());
++  CloseBrowserSynchronously(window);
++}
++
++INSTANTIATE_TEST_SUITE_P(All,
++                         SessionCrashedBubbleMyarcViewTest,
++                         testing::Bool());
++
+ IN_PROC_BROWSER_TEST_F(SessionCrashedBubbleViewTest,
+                        InvokeUi_SessionCrashedBubble) {
+   ShowAndVerifyUi();

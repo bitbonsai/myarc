@@ -2,6 +2,12 @@
 
 Keep significant outcomes, failures and next actions reproducible. Newest entry first. No private exports, page titles/URLs from real browsing, credentials or raw user transcripts.
 
+## 2026-10-25: Recovery anchor build candidate
+
+- Traced the freshly reproduced startup crash to shell layout hiding the app-menu button before its fallback can register against a visible browser widget. Added a shell-only BrowserView child at the existing fallback position and used it through shared menu anchoring. Upstream recovery UI/actions, stock CHECKs and complete 0012 remain unchanged.
+- [Separate 0016 and run record](../browser/experiments/native-recovery-anchor.md) retain a two-parameter regression in the existing recovery fixture. Real-header syntax, three GN header checks, full `chrome` compile/link, formatting, payload freshness and strict 72-file reverse/replay pass; 67 unrelated external files remain identical. Initial test declaration/accessor errors were corrected using existing APIs.
+- Native cases executed: zero. No app launch, desktop input or profile access. Renderer remains off. Parent owns forced-exit fixture, screenshot/AX and action acceptance; actual crash recovery and durability remain open.
+
 ## 2026-10-25: Empty-Space header native acceptance
 
 - Integrated the one-task header fix and repeated the actual two-page/three-Space journey in a fresh marked profile. Empty now shows an enabled neutral address field, with prior URL/site information and page-only navigation controls absent from pixels and accessibility output. Both actual pages remain hidden.
