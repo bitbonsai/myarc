@@ -272,11 +272,9 @@
     .post-body .image-grid img { width: 100%; aspect-ratio: 16 / 10; object-fit: contain }
     html:has(.image-lightbox[open]) { overflow: hidden }
     .image-lightbox { width: min(75rem, calc(100% - 2rem)); max-width: none; max-height: calc(100dvh - 2rem); padding: 1rem; border: 0; border-radius: 1rem; background: transparent; color: var(--text); font: inherit }
-    .lightbox-content { transition: opacity .3s ease, transform .3s var(--ease) }
+    .lightbox-content { opacity: 0; transform: scale(.96); transition: opacity .3s ease, transform .3s var(--ease) }
+    .image-lightbox.is-visible .lightbox-content { opacity: 1; transform: scale(1) }
     .image-lightbox:not([open]) { display: none }
-    @starting-style {
-      .image-lightbox[open] .lightbox-content { opacity: 0; transform: scale(.96) }
-    }
     .image-lightbox::backdrop { background: transparent; -webkit-backdrop-filter: blur(2rem); backdrop-filter: blur(2rem) }
     .image-lightbox button { display: grid; place-items: center; margin: 0 0 1rem auto; width: 2.75rem; height: 2.75rem; padding: .625rem; border: 0; border-radius: 50%; background: var(--page); color: inherit; font: inherit; cursor: pointer }
     .image-lightbox button svg { width: 1.25rem; height: 1.25rem }

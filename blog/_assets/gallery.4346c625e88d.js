@@ -5,6 +5,7 @@
   const enlarged = dialog.querySelector('img')
   const caption = dialog.querySelector('p')
   let opener = null
+  let revealFrame = 0
 
   document.querySelectorAll('.post-body figure a').forEach(link => {
     const image = link.querySelector('img')
@@ -19,6 +20,14 @@
       enlarged.alt = image.alt
       caption.textContent = link.closest('figure').querySelector('figcaption')?.textContent || image.alt
       dialog.showModal()
+      if (matchMedia('(prefers-reduced-motion: reduce)').matches) {
+        dialog.classList.add('is-visible')
+      } else {
+        // Paint the backdrop before starting the content transition.
+        revealFrame = requestAnimationFrame(() => {
+          revealFrame = requestAnimationFrame(() => dialog.classList.add('is-visible'))
+        })
+      }
     })
   })
 
@@ -37,6 +46,8 @@
     if (event.clientX < box.left || event.clientX > box.right || event.clientY < box.top || event.clientY > box.bottom) dialog.close()
   })
   dialog.addEventListener('close', () => {
+    cancelAnimationFrame(revealFrame)
+    dialog.classList.remove('is-visible')
     enlarged.removeAttribute('src')
     opener?.focus({ preventScroll: true })
   })
