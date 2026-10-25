@@ -31,13 +31,13 @@ export const readBoundedText = (path, limit) => {
 export const readBoundedJSON = (path, limit = 65536) => JSON.parse(readBoundedText(path, limit))
 
 // This intentionally accepts only the two-page native journey, not general workspace data.
-export const workspaceProjection = state => {
+const projectWorkspace = (state, windowCount) => {
   keys(state, 'version profile_id next_space_id next_item_id next_window_id spaces items windows')
   assert.equal(state.version, 1)
   for (const field of ['profile_id', 'next_space_id', 'next_item_id', 'next_window_id']) id(state[field])
   assert.ok(Array.isArray(state.spaces) && state.spaces.length === 2, 'Require exactly two persisted Spaces')
   assert.ok(Array.isArray(state.items) && state.items.length === 2, 'Require exactly two persisted items')
-  assert.ok(Array.isArray(state.windows) && state.windows.length === 1, 'Require exactly one persisted window')
+  assert.ok(Array.isArray(state.windows) && state.windows.length === windowCount, `Require exactly ${windowCount} persisted window(s)`)
   for (const space of state.spaces) {
     keys(space, 'id profile_id name')
     id(space.id)
@@ -61,15 +61,25 @@ export const workspaceProjection = state => {
   assert.equal(temporary.has_url, false)
   assert.equal(temporary.canonical_url, '')
   assert.ok(state.spaces.some(space => space.id === temporary.owner_id), 'Temporary must belong to an existing Space')
-  const [window] = state.windows
-  keys(window, 'id space_id selected_item_id')
-  id(window.id)
-  assert.ok(state.spaces.some(space => space.id === window.space_id), 'Window references a missing Space')
-  assert.equal(window.selected_item_id, favorite.id, 'Select original fixture Favorite before running probe')
+  for (const window of state.windows) {
+    keys(window, 'id space_id selected_item_id')
+    id(window.id)
+    assert.ok(state.spaces.some(space => space.id === window.space_id), 'Window references a missing Space')
+    assert.equal(window.selected_item_id, favorite.id, 'Select original fixture Favorite before running probe')
+  }
+  assert.equal(new Set(state.windows.map(window => window.id)).size, windowCount, 'Duplicate stable window ID')
   for (const [field, rows] of [['next_space_id', state.spaces], ['next_item_id', state.items], ['next_window_id', state.windows]]) {
     assert.ok(rows.every(row => BigInt(state[field]) > BigInt(row.id)), 'Native next-ID counter must exceed retained IDs')
   }
   return { version: state.version, profile_id: state.profile_id, spaces: state.spaces, items: state.items, windows: state.windows }
+}
+
+export const workspaceProjection = state => projectWorkspace(state, 1)
+
+export const twoWindowWorkspaceProjection = state => {
+  const workspace = projectWorkspace(state, 2)
+  assert.equal(new Set(workspace.windows.map(window => window.space_id)).size, 2, 'Select a different Space in each window')
+  return workspace
 }
 
 export const validateOwnership = (args, profile, localState, contexts) => {
@@ -104,26 +114,29 @@ export const validateTargets = (targets, contextId) => {
   return pages
 }
 
-export const validateCheckpoint = checkpoint => {
-  keys(checkpoint, 'format browserPid build profilePath expectedURLs canary metadata projection recordedAt')
+export const validateCheckpointIdentity = checkpoint => {
   assert.equal(checkpoint.format, 1)
   assert.ok(Number.isSafeInteger(checkpoint.browserPid) && checkpoint.browserPid > 0)
   assert.deepEqual(checkpoint.expectedURLs, fixtureURLs)
-  assert.match(checkpoint.canary, /^M0 crash canary [0-9a-f-]{36}$/)
   assert.ok(typeof checkpoint.profilePath === 'string')
   assert.ok(typeof checkpoint.recordedAt === 'string' && Number.isFinite(Date.parse(checkpoint.recordedAt)))
   keys(checkpoint.build, 'product revision protocolVersion jsVersion executable executableSize executableMtimeNs')
   assert.ok(Object.values(checkpoint.build).every(value => typeof value === 'string' && value.length > 0 && value.length <= 4096))
+  return checkpoint
+}
+
+export const validateCheckpoint = checkpoint => {
+  keys(checkpoint, 'format browserPid build profilePath expectedURLs canary metadata projection recordedAt')
+  validateCheckpointIdentity(checkpoint)
+  assert.match(checkpoint.canary, /^M0 crash canary [0-9a-f-]{36}$/)
   workspaceProjection(checkpoint.metadata)
   assert.deepEqual(checkpoint.projection, { visibleURL: fixtureURLs[0], hiddenURL: fixtureURLs[1], nativeWindowCount: 1 })
   return checkpoint
 }
 
-export const runWorkspaceRecovery = async ({ send, profile, ownedPid, scenario }) => {
-  assert.ok(['workspace-crash-checkpoint', 'workspace-crash-verify'].includes(scenario), 'Unknown recovery phase')
+export const openWorkspaceObservation = async ({ send, profile }) => {
   assert.equal(fs.realpathSync(profile), profile, 'Use the canonical marked profile path')
   readBoundedText(`${profile}/.myarc-m0-test-profile`, 256)
-  const verifying = scenario === 'workspace-crash-verify'
   const deadline = Date.now() + 20000
   const cdp = (method, params = {}, sessionId) => {
     const remaining = deadline - Date.now()
@@ -142,16 +155,6 @@ export const runWorkspaceRecovery = async ({ send, profile, ownedPid, scenario }
   assert.ok(binary.isFile() && binary.size > 0n, 'Expected the owned browser executable')
   const build = { product: version.product, revision: version.revision, protocolVersion: version.protocolVersion,
     jsVersion: version.jsVersion, executable, executableSize: String(binary.size), executableMtimeNs: String(binary.mtimeNs) }
-  const path = `${profile}/${checkpointName}`
-  const previous = verifying ? validateCheckpoint(readBoundedJSON(path)) : null
-  if (previous) {
-    assert.notEqual(previous.browserPid, ownedPid, 'Browser PID unchanged: parent must crash/relaunch only the owned disposable browser')
-    assert.equal(previous.profilePath, `${profile}/Default`, 'Checkpoint belongs to another Profile')
-    assert.deepEqual(build, previous.build, 'Restored browser build/executable differs from checkpoint')
-  } else {
-    assert.ok(!fs.existsSync(path), 'Checkpoint already exists; preserve it for verify or explicitly remove it before a new journey')
-  }
-  const canary = previous?.canary ?? `M0 crash canary ${randomUUID()}`
   const evaluatePage = async (targetId, expression) => {
     const { sessionId } = await cdp('Target.attachToTarget', { targetId, flatten: true })
     try {
@@ -162,11 +165,29 @@ export const runWorkspaceRecovery = async ({ send, profile, ownedPid, scenario }
       await cdp('Target.detachFromTarget', { sessionId })
     }
   }
-  const scopedPages = async () => {
+  const scopedTargets = async () => {
     const currentContext = validateOwnership(args, profile, localState(), await cdp('Target.getBrowserContexts'))
     assert.equal(currentContext, contextId, 'Default Profile context changed during probe')
-    return validateTargets((await cdp('Target.getTargets')).targetInfos, contextId)
+    return (await cdp('Target.getTargets')).targetInfos
   }
+  return { cdp, deadline, build, contextId, evaluatePage, scopedTargets }
+}
+
+export const runWorkspaceRecovery = async ({ send, profile, ownedPid, scenario }) => {
+  assert.ok(['workspace-crash-checkpoint', 'workspace-crash-verify'].includes(scenario), 'Unknown recovery phase')
+  const { cdp, deadline, build, contextId, evaluatePage, scopedTargets } = await openWorkspaceObservation({ send, profile })
+  const verifying = scenario === 'workspace-crash-verify'
+  const path = `${profile}/${checkpointName}`
+  const previous = verifying ? validateCheckpoint(readBoundedJSON(path)) : null
+  if (previous) {
+    assert.notEqual(previous.browserPid, ownedPid, 'Browser PID unchanged: parent must crash/relaunch only the owned disposable browser')
+    assert.equal(previous.profilePath, `${profile}/Default`, 'Checkpoint belongs to another Profile')
+    assert.deepEqual(build, previous.build, 'Restored browser build/executable differs from checkpoint')
+  } else {
+    assert.ok(!fs.existsSync(path), 'Checkpoint already exists; preserve it for verify or explicitly remove it before a new journey')
+  }
+  const canary = previous?.canary ?? `M0 crash canary ${randomUUID()}`
+  const scopedPages = async () => validateTargets(await scopedTargets(), contextId)
   const observe = async pages => {
     if (pages.length !== 2) throw new Error('Restore not ready: require both real fixture pages; parent may need native Restore')
     const metadata = readBoundedJSON(`${profile}/${metadataName}`)

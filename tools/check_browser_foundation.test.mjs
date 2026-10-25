@@ -86,7 +86,8 @@ test('CLI preserves existing modes and rejects unsafe arguments before connectin
     assert.match(result.stderr, /positive safe-integer browser PID/)
   }
   assert.match(run(['.', '1', 'runtime', 'unexpected']).stderr, /Usage:/)
-  for (const mode of ['extension', 'restart', 'runtime', 'workspace-pin', 'workspace-crash-checkpoint', 'workspace-crash-verify']) {
+  for (const mode of ['extension', 'restart', 'runtime', 'workspace-pin', 'workspace-crash-checkpoint', 'workspace-crash-verify',
+    'workspace-two-window-checkpoint', 'workspace-two-window-verify']) {
     const result = run(['.', '1', mode])
     assert.equal(result.status, 1)
     assert.match(result.stderr, /Expected marked, disposable test profile/)

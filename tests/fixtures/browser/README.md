@@ -225,6 +225,92 @@ python3 tools/check_docs.py
 
 Thirteen local tests cover existing MV3 behavior, CLI guards, actual-schema validation, bounded file reads and API-double recovery outcomes. They execute zero native browser journeys. The checkpoint is taken **after observed on-disk metadata**, not at every acknowledged workspace write boundary. This cannot establish SessionService flush timing, every late-restore race, OS/power-loss durability or product CLI/MCP authorization. Disk identity plus native page projection is observed; the client exposes no in-memory Rust inspection API. Build comparison uses reported versions and executable stat identity, not a binary-content hash. The parent must retain actual crash provenance and native output separately before making any process-crash recovery claim.
 
+## Two-window disk-checkpoint probe
+
+`workspace-two-window-checkpoint` and `workspace-two-window-verify` add a separate,
+read-only page journey through [the two-window helper](../../../tools/browser_workspace_two_window.mjs).
+They reuse the crash probe's bounded JSON/schema parser, ownership/build checks
+and CDP transport. Existing modes keep their contracts. This is developer
+acceptance tooling, separate from product P0 CLI/MCP.
+
+The parent owns native setup and every close/reopen, crash, launch and Restore.
+Use a fresh canonical marked Profile with only `Default`, vertical tabs seeded
+before startup, the current native stack through 0018, and the same explicit
+flags and loopback server as the two-process recipe. Also load the existing
+`workspace-pin-extension` fixture through its supported `--load-extension` route.
+The helper wakes only that MV3 worker using the existing `ServiceWorker` lifecycle
+API, verifies its identity/manifest/context, and reads `chrome.tabs.query({})`.
+It never invokes the fixture's Pin/Unpin functions. Missing worker support fails;
+keep browser protections intact.
+
+Prepare through native controls:
+
+- Two distinctly named Spaces sharing one regular Profile. Save the original
+  `http://127.0.0.1:8766/` page (served by `index.html`) as one Profile Favorite.
+  Keep exactly one Temporary on `http://127.0.0.1:8766/recovery.html`.
+- Create window two with native Cmd+N, then activate the same saved Favorite tile
+  there. This intentionally creates two native projections of one logical saved
+  item. Parent separately verifies close-one/reopen retains its saved ID and the
+  surviving projection, then returns to this final two-window setup.
+- Select a different Space in each window and select the global Favorite in both.
+  Both Favorite documents must be visible, natively pinned and active in their
+  own windows. The Temporary must be hidden and unpinned in one of those windows.
+  Parent checks its actual window/Space placement. Close all other tabs/windows.
+
+Wait for native on-disk metadata to contain exactly two Spaces, one Favorite,
+one Temporary and two distinct stable Rust window IDs, both selecting that same
+Favorite, with one window per Space. Never manufacture or repair that file.
+Global Favorite selection across Space switches remains the provisional existing
+policy; the probe does not impose a single global live URL.
+
+```sh
+node tools/check_browser_foundation.mjs "$PROFILE" "$BROWSER_PID" workspace-two-window-checkpoint
+# Parent records actual owned-process crash, ordinary relaunch and genuine Restore.
+# Set BROWSER_PID to the independently audited new browser PID afterward.
+node tools/check_browser_foundation.mjs "$PROFILE" "$BROWSER_PID" workspace-two-window-verify
+```
+
+Checkpoint exclusively creates `$PROFILE/.myarc-m0-workspace-two-window.json`
+with mode `0600` after five matching disk/page/native-pin samples. It submits no
+form, writes no fresh canary and never touches workspace/session metadata or
+Profile exit state. An existing checkpoint is preserved. Verify requires changed
+PID, unchanged build/executable identity and exact logical IDs, owners, saved
+canonical URL/placement, Space names and both Rust window selections/Spaces.
+Native tab/context/session-window IDs can change or be reused. Actual restored
+pages must still occupy exactly two distinct native windows, one Favorite per
+window and one Temporary total, with both Favorite pins read back independently.
+
+Checkpoint allows zero startup tabs. Verify tolerates at most one exact
+`chrome://newtab/` only while waiting; it must disappear before any successful
+sample. Foreign contexts, unknown URLs or excess duplicate projections abort.
+Verify never accepts a subset. Existing 20-second observation, three-second CDP
+request and ten-second settle budgets apply. Each successful run needs five
+samples separated by 200 ms; file/target bounds match the crash probe. The helper
+creates/closes/moves/navigates no tab or window, launches no browser/server and
+performs no process control.
+
+Local checks, API doubles only, zero native launches:
+
+```sh
+node --check tools/browser_workspace_two_window.mjs
+node --test tools/check_browser_foundation.test.mjs tools/browser_workspace_two_window.test.mjs
+python3 tools/check_docs.py
+```
+
+The original 13 tests remain; seven added tests cover two-window schema, native
+pins and target scope, checkpoint/changed-PID verification, missing restoration,
+valid identity/owner/window-selection rebinding and malformed/oversized metadata.
+The client observes disk Rust organization and real native projections separately;
+it cannot directly inspect each native page/window's in-memory Rust binding.
+Parent native UI/readbacks remain necessary for that association and close-one
+provenance. Changed PID alone proves no crash. This covers an observed on-disk
+checkpoint only, without site-storage acknowledgement, OS durability or release
+claims. Previously persisted canary/metadata Restore and separate discard passed
+in [0018's bounded journey](../../../browser/experiments/native-recovery-lifecycle.md);
+fresh acknowledged localStorage still failed. Upstream's five-second default
+commit delay is source configuration, not measured durability. Renderer stays
+off by default.
+
 ## Scope and limits
 
 - Renderer check deliberately crashes the selected renderer, reloads it and checks acknowledged localStorage, with the browser PID unchanged. It does not prove automatic workspace recovery.
