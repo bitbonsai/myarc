@@ -10,6 +10,22 @@ Open [index.html](index.html) directly in a browser. Static identity exploration
 - Two transparent horizontal lockups at 1550 × 480, both marks at 128, 256, 512 and 1024 pixels, and dark/light vector wordmarks with the custom A.
 - Editable [HTML artboards](artwork/), local Outfit font and its [SIL Open Font License](assets/Outfit-OFL.txt).
 
+## Small-size mark study
+
+[Actual-size proof and downloads](small-mark-preview.html). Draft flat marks reuse the wordmark's original barless A, in blue and ivory. Transparent PNGs are exactly 16, 24 and 33 pixels square. [Download the six PNGs and two SVG masters](exports/small-mark.zip). The live website identity is unchanged; favicon/tab testing and approval remain open.
+
+Regenerate these PNGs from repository root with the existing SVG renderer:
+
+```sh
+for color in blue ivory; do
+  for size in 16 24 33; do
+    rsvg-convert --width "$size" --height "$size" \\
+      "design/brand/assets/small-mark-$color.svg" \\
+      --output "design/brand/exports/small-mark/$color-$size.png"
+  done
+done
+```
+
 ## Branding and type
 
 Follow the repository README: **myArc, forever yours.** Outfit is the selected typeface, with ExtraBold 800 for wordmarks and 600 for headings. Display text uses `myArc`; filenames remain lowercase. The page uses a 1rem body and a 0.875rem minimum at every breakpoint. CSS font sizes use rem. Artwork uses larger source text so shared images remain readable when reduced. A short ethos section records product principles, not shipped-feature claims.

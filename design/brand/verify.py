@@ -107,4 +107,17 @@ for finish in ('matte', 'glass'):
         with Image.open(ROOT / 'exports' / f'mark-{finish}-{size}.png') as image:
             assert image.size == (size, size) and image.getextrema()[3] == (0, 255)
 
-print('PASS: 10 HTML pages, rem type/minimum/casing checks, 6 artwork dimensions/content checks, 10 transparent PNGs')
+for color in ('blue', 'ivory'):
+    small = ElementTree.parse(ROOT / 'assets' / f'small-mark-{color}.svg').getroot()
+    assert small.find('svg:path', ns).attrib['d'] == a.attrib['d'], 'Small mark differs from wordmark A'
+    assert small.attrib['viewBox'] == '-6 -6 92 92'
+    for size in (16, 24, 33):
+        with Image.open(ROOT / 'exports' / 'small-mark' / f'{color}-{size}.png') as image:
+            assert image.size == (size, size) and image.mode == 'RGBA'
+            alpha = image.getchannel('A')
+            box = alpha.getbbox()
+            assert box and min(box[:2]) > 0 and max(box[2:]) < size, 'Small mark clipped'
+            assert alpha.getextrema() == (0, 255)
+Links(ROOT / 'small-mark-preview.html').feed((ROOT / 'small-mark-preview.html').read_text())
+
+print('PASS: 10 brand HTML pages, rem type/minimum/casing checks, 6 artwork dimensions/content checks, 16 transparent PNGs and small-mark proof')
