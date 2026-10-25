@@ -13,7 +13,7 @@ Updated: 2026-10-25.
 | Artcraft workflow audit | Behavior contracts, bounded tasks, development log, evidence freshness and regression rules added; standalone core dependency corrected |
 | Executable checks today | Document links; six storyboard tests and prototype recordings; six Rust core tests; seven C++/Rust checks per pin; retained manual native-runtime client. Rust/patch workflow added; remote CI execution unverified |
 | Browser/importer/AI implementation | [Opt-in native layout/material prototype](../browser/experiments/native-shell.md) runs with sidebar navigation; 1:1 visual parity, complete browser, importer and AI remain unimplemented |
-| Public landing page | [Self-contained HTML](../site/README.md) deployed to GitHub Pages; offline/layout/motion checks passed. `myarc.dev` HTTPS verified/enforced; system light/dark themes, branding lockups and social-preview assets deployed |
+| Public website and blog | [Static website and Markdown journal](../site/README.md) deployed to GitHub Pages; first build-in-public post live. Seven blog/publisher tests and local layout/theme/focus checks pass; published HTML/screenshot bytes verified. HTTPS remains enforced; browser product behavior is separate |
 | Brand exploration | Standalone [brand kit](../design/brand/README.md) with supplied raster marks, social cards, wallpapers and lockups; naming/asset rights unverified |
 | CLI and MCP browser control | P0 launch requirement; tools, shared control service, scoped grants and MA-011 specified; no executable implementation yet |
 | Benchmarks/native application tests | Native control on second pin, renderer reload and off-the-record localStorage checks passed; full Profile/privacy/durability guarantees and release budgets remain unverified |

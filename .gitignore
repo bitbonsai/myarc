@@ -23,6 +23,9 @@ out/
 upstream/
 node_modules/
 __pycache__/
+.venv/
+site/blog/
+site/.publish-receipt.json
 *.pyc
 .DS_Store
 

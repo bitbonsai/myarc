@@ -8,6 +8,8 @@ import re
 from PIL import Image
 from fontTools.ttLib import TTFont
 
+from blog import build_blog
+
 ROOT = Path(__file__).resolve().parent
 BRAND = ROOT.parent / 'design' / 'brand'
 ASSETS = BRAND / 'assets'
@@ -42,19 +44,29 @@ assets = {
     '@@FAVICON@@': uri('image/png', (BRAND / 'exports' / 'mark-matte-128.png').read_bytes()),
     '@@HEART@@': heart,
 }
-html = (ROOT / 'index.template.html').read_text()
-assert len(html) < 200_000, 'Template is unexpectedly large'
-for token, value in assets.items():
-    html = html.replace(token, value)
-assert not re.search(r'@@[A-Z_]+@@', html), 'Unresolved asset token'
-
 notices = {
     'Outfit': (ASSETS / 'Outfit-OFL.txt').read_text(),
     'Lucide': (ASSETS / 'Lucide-LICENSE.txt').read_text(),
     'artwork': 'User-supplied ribbon logos. Original grain and custom wordmark generated for myArc. See repository ATTRIBUTION.md for provenance and rights limitations.',
 }
 notice_json = json.dumps(notices, ensure_ascii=True).replace('<', '\\u003c')
-html = html.replace('</head>', f'<script type="application/json" id="asset-notices">{notice_json}</script>\n</head>', 1)
-assert html.endswith('</html>\n') or html.endswith('</html>'), 'Incomplete HTML document'
+
+
+def embed(template):
+    assert len(template.encode()) < 1_000_000, 'Page template is unexpectedly large'
+    for token, value in assets.items():
+        template = template.replace(token, value)
+    assert not re.search(r'@@[A-Z_]+@@', template), 'Unresolved asset token'
+    template = template.replace('</head>', f'<script type="application/json" id="asset-notices">{notice_json}</script>\n</head>', 1)
+    assert template.rstrip().endswith('</html>'), 'Incomplete HTML document'
+    return template
+
+
+template = (ROOT / 'index.template.html').read_text()
+try:
+    build_blog(ROOT, template, embed)
+except (ValueError, OSError, RecursionError) as error:
+    raise SystemExit(f'Blog build failed: {error}') from None
+html = embed(template)
 (ROOT / 'index.html').write_text(html)
 print(f'Built {ROOT / "index.html"}: {len(html.encode()):,} bytes. All visual assets embedded.')

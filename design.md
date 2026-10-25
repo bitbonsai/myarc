@@ -73,6 +73,12 @@ Principles and document lists may use useful content columns. Headings stay abov
 
 Reuse the original monochrome grain at a 16rem tile size on page and progress panel. Keep it static. Rounded panels use a 1.75rem radius, reduced to 1.25rem on mobile. Primary buttons are pills.
 
+## Progress journal
+
+Blog index and articles reuse the homepage shell, embedded Outfit and theme tokens. Titles use 3.5rem, reduced to 2.5rem below 48rem; article sections and preview titles use 2rem. Body text stays 1.125rem, dates and code use 1rem, and reading columns are capped at 68ch. Code keeps Outfit. Screenshots retain their original pixels and use a 1rem CSS radius.
+
+Keep the Blog navigation link visible on mobile. The header development button uses 1rem text below 48rem so both links fit where possible; the header wraps at narrower widths. Body links, visible focus and reduced-motion behavior remain shared.
+
 ## Interaction and accessibility
 
 Body links retain underlines. Their underline offset moves from .125rem to .3125rem over .2s ease-in-out. Keyboard focus has a visible .1875rem outline with an offset.
@@ -83,7 +89,7 @@ Verify light and dark rendering, image decoding, text contrast, keyboard focus a
 
 ## Publishing and social previews
 
-Build the independently usable HTML with `python3 site/build.py`. Font and visual page assets remain embedded. Public favicon files and the 1200 × 630 `og-image.png` are separate crawler/social-preview assets.
+Install [build dependencies](site/requirements.txt), then build with `python3 site/build.py`. Homepage and blog shells embed their visual assets; post screenshots are local static files. Authoring and publishing instructions are in the [website README](site/README.md). Font and visual page assets remain embedded. Public favicon files and the 1200 × 630 `og-image.png` are separate crawler/social-preview assets.
 
 Open Graph and Twitter previews use the approved navy card consistently, regardless of the visitor's color preference. Canonical URL: `https://myarc.dev/`. GitHub Pages hosts the artifact branch; Cloudflare provides DNS. Hosting is separate from local browser operation.
 

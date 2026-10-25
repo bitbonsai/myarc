@@ -144,6 +144,42 @@ try:
       }
       return 'PASS'
     })()"""))
+    for page in [(ROOT / 'blog/index.html'), *sorted((ROOT / 'blog').glob('*/index.html'))]:
+        browser('open', page.as_uri())
+        for theme in ('light', 'dark'):
+            browser('set', 'media', theme)
+            for width in (1440, 1024, 768, 390, 320):
+                browser('set', 'viewport', str(width), '1000')
+                result = browser(expression="""(async () => {
+                  await document.fonts.ready
+                  await Promise.all(Array.from(document.images).map(image => image.decode()))
+                  if (document.querySelectorAll('h1').length !== 1) throw new Error('Blog heading structure')
+                  if (document.documentElement.scrollWidth > innerWidth) throw new Error('Blog overflow')
+                  const nav = document.querySelector('.blog-link')
+                  if (!nav.getClientRects().length) throw new Error('Blog navigation hidden')
+                  for (const el of document.querySelectorAll('main h1,main h2,main h3,main p,main li,main time,main code')) {
+                    const style = getComputedStyle(el)
+                    if (parseFloat(style.fontSize) < 16 || !style.fontFamily.includes('Outfit')) throw new Error('Blog typography regression')
+                    const rect = el.getBoundingClientRect()
+                    if (rect.left < -1 || rect.right > innerWidth + 1) throw new Error('Blog content clipped')
+                  }
+                  if (performance.getEntriesByType('resource').some(r => /^https?:/.test(r.name))) throw new Error('Blog remote resource request')
+                  const canonical = document.querySelector('link[rel="canonical"]').href
+                  if (!canonical.startsWith('https://myarc.dev/blog/')) throw new Error('Blog canonical URL')
+                  return {width: innerWidth, title: document.title, images: document.images.length}
+                })()""")
+                print('Blog:', theme, result)
+                if width == 1440:
+                    name = 'index' if page.parent.name == 'blog' else 'post'
+                    browser('screenshot', '/tmp/myarc-blog-' + name + '-' + theme + '.png')
+        browser('set', 'media', 'light', 'reduced-motion')
+        browser('focus', '.skip')
+        browser('press', 'Tab')
+        browser(expression="""(() => {
+          if (!document.activeElement.matches(':focus-visible')) throw new Error('Blog keyboard focus missing')
+          if (document.getAnimations().some(a => a.playState === 'running')) throw new Error('Blog reduced motion failed')
+          return true
+        })()""")
 finally:
     subprocess.run(['agent-browser', '--session', SESSION, 'close'], capture_output=True)
     subprocess.run(['pkill', '-f', '/[a]gent-browser-darwin-arm64'], capture_output=True)

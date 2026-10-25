@@ -2,6 +2,13 @@
 
 Keep significant outcomes, failures and next actions reproducible. Newest entry first. No private exports, page titles/URLs from real browsing, credentials or raw user transcripts.
 
+## 2026-10-25: Markdown progress journal and first public post
+
+- Added build-time CommonMark/YAML posts with explicit publication approval, local validated screenshots, a date-sorted index and per-post canonical/social metadata. Homepage and blog share the existing design/theme shell. Generated output excludes drafts and unreferenced files.
+- Added a checked-in artifact-only publisher. It preserves domain/HTTPS settings and unrelated root artifacts, updates without force and replaces the generated blog subtree so unpublished posts and removed images disappear. The current post was explicitly approved for publication.
+- Seven real parser/filesystem/publisher unit checks passed, including publish-to-draft removal, unsafe HTML/link handling and image path boundaries. Retained homepage checks passed; blog index/article checks passed at five widths in both themes, with keyboard focus and reduced motion. A first run caught hidden mobile navigation caused by selector specificity; corrected the selector and retained the visibility check.
+- Published `5e8d269` to the Pages artifact branch. Normal HTTPS read-back matches the homepage, blog index, first article and screenshot byte-for-byte. Four cited public source URLs returned anonymous HTTP 200. Safari/Firefox, screen readers and social cache refresh remain unmeasured. Native-browser work stayed outside this slice.
+
 ## 2026-10-25: Native header and New Tab control refinement
 
 - Found stock horizontal padding shrinking the custom sidebar header and overlapping its controls. Removed that padding for the prototype, centered the navigation buttons and reused the native dock-to-left glyph. Kept the existing navigation callbacks and security indicators.

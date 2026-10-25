@@ -1,20 +1,30 @@
-# myarc.dev landing page
+# myarc.dev website and progress journal
 
-Public landing page for myArc. [Live site](https://myarc.dev/). Current visual rules and theme tokens are in [design.md](../design.md).
+Public website and Markdown progress journal for myArc. [Live site](https://myarc.dev/). Current visual rules and theme tokens are in [design.md](../design.md).
 
 ## Build
 
-`index.template.html` is the source. `build.py` embeds Outfit, wordmarks, ribbon artwork, grain and license notices into `index.html`. Edit the template and rebuild:
+`index.template.html` supplies the shared layout and theme. `build.py` embeds Outfit, wordmarks, ribbon artwork, grain and license notices, then builds the homepage, blog index and approved posts. Install build dependencies in an isolated environment:
 
 ```sh
+python3 -m venv .venv
+. .venv/bin/activate
+python3 -m pip install -r site/requirements.txt
 python3 site/build.py
+python3 -m unittest discover -s site -p '*_test.py'
 python3 site/check.py
 python3 site/check_browser.py
 ```
 
-Build dependencies: Python 3, Pillow, fontTools and Brotli. The published page has no executable JavaScript or runtime dependencies. Font timestamps are preserved for deterministic builds.
+Build dependencies: Python 3.9+, Pillow, fontTools, Brotli, PyYAML and markdown-it-py. The Markdown parser runs only during builds, with raw HTML disabled. The published page has no executable JavaScript or runtime dependencies. Font timestamps are preserved for deterministic builds.
 
 The browser check needs agent-browser and Chrome. It closes agent-browser and Chrome for Testing helpers, including lingering test helpers. These checks exercise the website, not native browser behavior.
+
+## Progress posts and publishing
+
+[Authoring instructions](posts/README.md) cover metadata, approval and screenshots. Put each Markdown post and its local images in `site/posts/YYYY-MM-DD-slug/`. Drafts are excluded by default. `site/blog/` is ignored generated output; the sitemap contains only published routes. Source and generated screenshots are separate so deleting a source reference removes the public artifact on the next deployment.
+
+With the environment above activated, publish with `python3 site/publish.py`. The publisher rebuilds and checks the homepage, uses the existing `bitbonsai` GitHub CLI login, and updates the artifact-only branch without force. It preserves the domain/HTTPS configuration and unrelated root files, while replacing the generated blog subtree so unpublishing removes article pages and screenshots. Credentials are never written to the website or receipt. Run the unit/browser checks before publishing.
 
 ## Design
 

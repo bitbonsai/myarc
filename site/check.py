@@ -59,6 +59,11 @@ def check(html):
         assert href, 'Empty link'
         if href.startswith('#'):
             assert href[1:] in page.ids, f'Missing anchor: {href}'
+        elif href.startswith('/') and not href.startswith('//'):
+            target = ROOT / urlsplit(href).path.lstrip('/')
+            if target.is_dir():
+                target /= 'index.html'
+            assert target.is_file(), f'Missing local page: {href}'
         else:
             assert urlsplit(href).scheme == 'https', f'Unexpected link: {href}'
     css = '\n'.join(re.findall(r'<style\b[^>]*>(.*?)</style>', html, re.S))
