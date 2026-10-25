@@ -157,6 +157,7 @@ try:
                 result = browser(expression="""(async () => {
                   await document.fonts.ready
                   await Promise.all(Array.from(document.images).map(image => {
+                    if (!image.getAttribute('src')) return Promise.resolve()
                     image.loading = 'eager'
                     return image.decode()
                   }))
@@ -169,6 +170,10 @@ try:
                   for (const element of document.querySelectorAll('.post-header,.post-body,.post-list')) {
                     const rect = element.getBoundingClientRect()
                     if (Math.abs(rect.left - journal.left) > 1 || Math.abs(rect.width - journal.width) > 1) throw new Error('Blog column alignment')
+                  }
+                  for (const grid of document.querySelectorAll('.image-grid')) {
+                    const [first, second] = [...grid.children].map(figure => figure.getBoundingClientRect())
+                    if (Math.abs(first.top - second.top) > 1 || second.left < first.right) throw new Error('Gallery columns overlap or stack')
                   }
                   const nav = document.querySelector('.blog-link')
                   if (!nav.getClientRects().length) throw new Error('Blog navigation hidden')
@@ -273,10 +278,74 @@ try:
           }
           return true
         })()""")
+        if has_caption:
+            browser('close')
+            browser('open', page.as_uri())
+            browser('wait', '.post-body figure a')
+            browser('set', 'viewport', '1440', '1000')
+            browser('set', 'media', 'light')
+            browser(expression="document.querySelector('.post-body figure a').scrollIntoView({behavior: 'instant', block: 'center'})")
+            browser('focus', '.post-body figure a')
+            browser('press', 'Enter')
+            print('Lightbox entry:', browser(expression="""(async () => {
+              const dialog = document.querySelector('#image-lightbox')
+              const animations = dialog.getAnimations({subtree: true})
+              const scale = animations.find(animation => animation.transitionProperty === 'transform')
+              if (!scale || scale.effect.getTiming().duration !== 300 || !scale.effect.getKeyframes().some(frame => frame.transform.includes('0.96'))) throw new Error('Dialog scale entrance missing')
+              if (!animations.some(animation => animation.transitionProperty === 'opacity')) throw new Error('Dialog fade entrance missing')
+              await Promise.all(animations.map(animation => animation.finished))
+              return 'PASS: 300ms scale/fade entrance'
+            })()"""))
+            browser('press', 'Escape')
+            for width, theme in ((1440, 'light'), (390, 'dark')):
+                browser('close')
+                browser('open', page.as_uri())
+                browser('wait', '.post-body figure a')
+                browser('set', 'viewport', str(width), '1000')
+                browser('set', 'media', theme, 'reduced-motion')
+                browser(expression="document.querySelector('.post-body figure a').scrollIntoView({behavior: 'instant', block: 'center'})")
+                browser('focus', '.post-body figure a')
+                browser('press', 'Enter')
+                print('Lightbox:', browser(expression="""(async () => {
+                  const dialog = document.querySelector('#image-lightbox')
+                  const image = dialog.querySelector('img')
+                  await image.decode()
+                  if (!dialog.matches(':modal') || !dialog.contains(document.activeElement)) throw new Error('Native modal focus missing')
+                  const backdrop = getComputedStyle(dialog, '::backdrop')
+                  if (backdrop.backdropFilter !== 'blur(32px)' || backdrop.backgroundColor !== 'rgba(0, 0, 0, 0)') throw new Error('Blur-only backdrop missing')
+                  if (getComputedStyle(dialog).backgroundColor !== 'rgba(0, 0, 0, 0)') throw new Error('Solid dialog panel returned')
+                  if (getComputedStyle(dialog.querySelector('.lightbox-content')).transitionDuration !== '0s' || backdrop.transitionDuration !== '0s') throw new Error('Dialog reduced motion')
+                  const button = dialog.querySelector('button')
+                  if (!button.querySelector('svg') || button.getAttribute('aria-label') !== 'Close image' || button.getBoundingClientRect().width < 44) throw new Error('Accessible icon close control missing')
+                  if (parseFloat(getComputedStyle(dialog.querySelector('p')).borderRadius) < 24) throw new Error('Caption pill missing')
+                  const box = dialog.getBoundingClientRect()
+                  if (box.left < 0 || box.right > innerWidth || box.top < 0 || box.bottom > innerHeight) throw new Error('Lightbox exceeds viewport')
+                  const source = document.querySelector('.post-body figure')
+                  if (image.alt !== source.querySelector('img').alt || dialog.querySelector('p').textContent !== source.querySelector('figcaption').textContent) throw new Error('Lightbox alt/caption mismatch')
+                  if (document.getAnimations().some(animation => animation.playState === 'running')) throw new Error('Lightbox reduced motion')
+                  return {width: innerWidth, caption: dialog.querySelector('p').textContent}
+                })()"""))
+                browser('screenshot', '/tmp/myarc-lightbox-' + theme + '.png')
+                browser('press', 'Tab')
+                browser(expression="document.querySelector('#image-lightbox').contains(document.activeElement) ? true : (() => {throw new Error('Focus escaped modal')})()")
+                browser('press', 'Escape')
+                browser(expression="!document.querySelector('#image-lightbox').open && document.activeElement.matches('.post-body figure a') ? true : (() => {throw new Error('Escape/focus restore failed')})()")
+                browser(expression="[...document.querySelectorAll('.post-body figure a')].filter(link => link.querySelector('img')).at(-1).focus()")
+                browser('press', 'Enter')
+                browser(expression="document.querySelector('#image-lightbox p').textContent === [...document.querySelectorAll('.post-body figcaption')].at(-1).textContent ? true : (() => {throw new Error('Second lightbox caption mismatch')})()")
+                browser('click', '#image-lightbox button')
+                browser(expression="!document.querySelector('#image-lightbox').open ? true : (() => {throw new Error('Close button failed')})()")
+                browser('click', '.post-body figure a')
+                browser('mouse', 'move', '1', '1')
+                browser('mouse', 'down', 'left')
+                browser('mouse', 'up', 'left')
+                browser(expression="!document.querySelector('#image-lightbox').open ? true : (() => {throw new Error('Backdrop close failed')})()")
     with ThreadingHTTPServer(('127.0.0.1', 0), partial(SimpleHTTPRequestHandler, directory=str(ROOT))) as server:
         Thread(target=server.serve_forever, daemon=True).start()
         try:
             origin = 'http://127.0.0.1:' + str(server.server_port)
+            browser('close')
+            browser('open', origin + '/')
             browser('set', 'offline', 'off')
             browser('record', 'start', '/tmp/myarc-view-transitions.webm')
             routes = [('.top .blog-link', '/blog/')]

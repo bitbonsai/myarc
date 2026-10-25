@@ -2,6 +2,14 @@
 
 Keep significant outcomes, failures and next actions reproducible. Newest entry first. No private exports, page titles/URLs from real browsing, credentials or raw user transcripts.
 
+## 2026-10-25: Screenshot grid and native lightbox
+
+- Grouped adjacent image/caption pairs into a two-column gallery at desktop and phone widths. Screenshot boxes use contain sizing to preserve the full image; responsive sizes account for the narrower columns.
+- Added one small content-hashed first-party script on image-bearing articles. Native dialog supplies modal behavior with a blurred backdrop, full-size image and retained caption. Escape, outside click and close button restore focus. Real image links remain as fallback; modified clicks retain normal behavior. Theme selection and navigation still need no JavaScript.
+- Follow-up styling uses a transparent, blur-only backdrop and no solid dialog panel. Captions have pill surfaces; Lucide’s X retains a 44px accessible close target. The content group opens with a 300ms fade/96%-to-100% scale transition, disabled under reduced motion.
+- Chrome for Testing 151 hit repeated long-session timeouts and one macOS menu-stack crash during keyboard checks. Browser phases now use fresh sessions with explicit DOM readiness; the final retained run passed. The single-control modal keeps Tab on its close control.
+- Fourteen unit checks passed, including gallery grouping, section boundaries, ordinary image links and runtime inclusion. Browser checks passed across existing themes/widths; keyboard opening, both images, native modal focus, Escape, close button and backdrop close were exercised. Fresh grid and phone-dialog captures inspected. Metadata/caption/resource checks passed. Safari/Firefox and screen-reader testing remain open.
+
 ## 2026-10-25: Centered blog reading column
 
 - Centered the shared journal container at 68ch, aligning article title/metadata/body and blog index content without centering the text. Kept the wider header/footer and 1.5rem phone gutters.

@@ -50,12 +50,29 @@ BLOG_CSS = '''
     .post-body li + li { margin-top: .5rem }
     .post-body img { border-radius: 1rem; margin: 2rem 0; max-width: 100% }
     .post-body figure { margin: 2rem 0 }
+    .post-body figure > a { display: block; cursor: zoom-in }
+    .post-body .image-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1.5rem; margin: 2rem 0 }
+    .post-body .image-grid figure { margin: 0; min-width: 0 }
+    .post-body .image-grid img { width: 100%; aspect-ratio: 16 / 10; object-fit: contain }
+    html:has(.image-lightbox[open]) { overflow: hidden }
+    .image-lightbox { width: min(75rem, calc(100% - 2rem)); max-width: none; max-height: calc(100dvh - 2rem); padding: 1rem; border: 0; border-radius: 1rem; background: transparent; color: var(--text); font: inherit }
+    .lightbox-content { transition: opacity .3s ease, transform .3s var(--ease) }
+    .image-lightbox:not([open]) { display: none }
+    @starting-style {
+      .image-lightbox[open] .lightbox-content { opacity: 0; transform: scale(.96) }
+      .image-lightbox[open]::backdrop { opacity: 0 }
+    }
+    .image-lightbox::backdrop { background: transparent; -webkit-backdrop-filter: blur(2rem); backdrop-filter: blur(2rem); transition: opacity .3s ease }
+    .image-lightbox button { display: grid; place-items: center; margin: 0 0 1rem auto; width: 2.75rem; height: 2.75rem; padding: .625rem; border: 0; border-radius: 50%; background: var(--page); color: inherit; font: inherit; cursor: pointer }
+    .image-lightbox button svg { width: 1.25rem; height: 1.25rem }
+    .image-lightbox img { max-height: calc(100dvh - 10rem); width: 100%; object-fit: contain }
+    .image-lightbox p { display: table; max-width: 100%; margin: .75rem auto 0; padding: .5rem 1rem; border-radius: 999rem; background: var(--page); font-size: 1rem; text-align: center }
     .post-body figure img { margin: 0; opacity: .9; transition: opacity .15s ease }
     .post-body figcaption { margin-top: .5rem; color: var(--quiet); font-size: 1rem; line-height: 1.4; font-style: normal; text-align: center; transition: color .15s ease }
     .post-body figure:hover img, .post-body figure:focus-within img { opacity: 1 }
     .post-body figure:hover figcaption, .post-body figure:focus-within figcaption { color: var(--text) }
     @media (prefers-reduced-motion: reduce) {
-      .post-body figure img, .post-body figcaption { transition: none }
+      .post-body figure img, .post-body figcaption, .lightbox-content, .image-lightbox::backdrop { transition: none }
     }
     .post-body blockquote { margin: 2rem 0; padding-left: 1.5rem; color: var(--quiet) }
     .post-body pre { font-family: inherit; padding: 1.25rem; overflow-x: auto; background: var(--panel); color: var(--ivory); border-radius: 1rem }
@@ -67,6 +84,7 @@ BLOG_CSS = '''
     @media (max-width: 48rem) {
       .journal { padding: 2.5rem 0 4rem }
       .journal h1 { font-size: 2.5rem }
+      .post-body .image-grid { gap: 1rem }
       .post-preview { gap: 1rem }
       .post-preview h2 { font-size: 1.5rem }
       .post-thumb { width: 5.5rem }
@@ -234,6 +252,23 @@ def load_post(path):
                 caption.name = 'figcaption'
                 content[0].unwrap()
                 paragraph.append(caption.extract())
+    for figure in rendered.find_all('figure'):
+        image = figure.find('img')
+        if image and not image.find_parent('a'):
+            image.wrap(rendered.new_tag('a', href=image['src']))
+    for figure in list(rendered.find_all('figure')):
+        if 'image-grid' in figure.parent.get('class', []):
+            continue
+        following = figure.find_next_sibling()
+        if following is None or following.name != 'figure':
+            continue
+        grid = rendered.new_tag('div', attrs={'class': 'image-grid'})
+        figure.insert_before(grid)
+        while figure is not None and figure.name == 'figure':
+            following = figure.find_next_sibling()
+            figure.img['sizes'] = '(max-width: 48rem) calc((100vw - 4rem) / 2), 24rem'
+            grid.append(figure.extract())
+            figure = following
     return Post(slug, published, meta['title'].strip(), meta['summary'].strip(), str(rendered), images, cover_alt, source_bytes)
 
 
@@ -308,6 +343,13 @@ def build_blog(root, template, embed):
     if output.exists():
         shutil.rmtree(output)
     output.mkdir()
+    gallery_name = None
+    if any(post.images for post in posts):
+        script = Path(__file__).with_name('gallery.js').read_bytes()
+        gallery_name = 'gallery.' + hashlib.sha256(script).hexdigest()[:12] + '.js'
+        (output / '_assets').mkdir()
+        (output / '_assets' / gallery_name).write_bytes(script)
+        close_icon = (Path(__file__).resolve().parents[1] / 'design/brand/assets/x.svg').read_text().replace('<svg\n', '<svg aria-hidden="true" focusable="false"\n', 1)
     listing = ''
     last_month = None
     for post in posts:
@@ -337,7 +379,11 @@ def build_blog(root, template, embed):
         folder = output / post.slug
         folder.mkdir()
         content = '<a class="post-back" href="/blog/">All posts</a><header class="post-header"><h1>' + escape(post.title) + '</h1><time class="post-date" datetime="' + post.published.isoformat() + '">' + post.published.strftime('%B %d, %Y') + '</time><p class="post-author">By <a rel="author" href="https://github.com/bitbonsai">bitbonsai</a> · <a href="index.md" type="text/markdown">Read Markdown</a></p></header><article class="post-body">' + post.html + '</article>'
-        (folder / 'index.html').write_text(embed(page_shell(template, post.title, post.summary, post.url, content, post.published, post.cover), '../'))
+        page = page_shell(template, post.title, post.summary, post.url, content, post.published, post.cover)
+        if post.images:
+            lightbox = '<dialog id="image-lightbox" class="image-lightbox" aria-labelledby="lightbox-caption"><div class="lightbox-content"><button type="button" aria-label="Close image" autofocus>' + close_icon + '</button><img alt=""><p id="lightbox-caption"></p></div></dialog>'
+            page = page.replace('</body>', lightbox + f'<script defer src="../_assets/{gallery_name}"></script></body>')
+        (folder / 'index.html').write_text(embed(page, '../'))
         for name, data in post.images.items():
             target = folder / name
             target.parent.mkdir(parents=True, exist_ok=True)

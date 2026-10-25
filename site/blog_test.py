@@ -144,6 +144,23 @@ class BlogTests(unittest.TestCase):
         self.assertIsNone(figures[1].figcaption.find('em'))
         self.assertEqual('https://example.test/', figures[1].figcaption.a['href'])
 
+    def test_adjacent_figures_form_gallery_with_link_fallbacks(self):
+        from bs4 import BeautifulSoup
+        Image.new('RGB', (20, 10), 'blue').save(self.folder / 'screen.png')
+        self.post('![First](screen.png)\n\n*First caption.*\n\n![Second](screen.png)\n\n*Second caption.*\n\n## Separate section\n\n![Third](screen.png)\n\n*Third caption.*')
+        post = self.build()[0]
+        soup = BeautifulSoup(post.html, 'html.parser')
+        self.assertEqual(1, len(soup.select('.image-grid')))
+        self.assertEqual(2, len(soup.select('.image-grid > figure')))
+        self.assertEqual(3, len(soup.select('figure > a > img')))
+        for image in soup.find_all('img'):
+            self.assertEqual(image['src'], image.parent['href'])
+        page = BeautifulSoup((self.root / 'blog' / self.folder.name / 'index.html').read_text(), 'html.parser')
+        self.assertIsNotNone(page.select_one('dialog#image-lightbox'))
+        script = page.select_one('script[src]')['src']
+        self.assertEqual((Path(__file__).parent / 'gallery.js').read_bytes(), (self.root / 'blog' / self.folder.name / script).read_bytes())
+        self.assertIsNone(BeautifulSoup((self.root / 'blog/index.html').read_text(), 'html.parser').select_one('script[src]'))
+
     def test_raw_html_and_unsafe_links_are_not_executed(self):
         self.post('<script>alert(1)</script>\n\n[Bad](javascript:alert(1))')
         html = load_post(self.source).html

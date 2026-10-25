@@ -17,7 +17,7 @@ python3 site/check_seo.py
 python3 site/check_browser.py
 ```
 
-Build dependencies: Python 3.9+, Pillow, fontTools, Brotli, PyYAML and markdown-it-py. The Markdown parser runs only during builds, with raw HTML disabled. Markdownify/Beautiful Soup export the same rendered main content to Markdown, omitting decorative branding. The website has no executable JavaScript or runtime service dependencies. The homepage remains a standalone HTML file; blog pages use content-hashed first-party assets in their generated `_assets/` folder. Font timestamps are preserved for deterministic builds.
+Build dependencies: Python 3.9+, Pillow, fontTools, Brotli, PyYAML and markdown-it-py. The Markdown parser runs only during builds, with raw HTML disabled. Markdownify/Beautiful Soup export the same rendered main content to Markdown, omitting decorative branding. The website has no runtime service dependencies. Image-bearing articles load a small content-hashed first-party script for native-dialog lightboxes. Image links remain usable when JavaScript or dialog support is unavailable; homepage/index browsing and theme selection need no JavaScript. The homepage remains a standalone HTML file; blog pages use content-hashed first-party assets in their generated `_assets/` folder. Font timestamps are preserved for deterministic builds.
 
 The browser check needs agent-browser and Chrome. It closes agent-browser and Chrome for Testing helpers, including lingering test helpers. These checks exercise the website, not native browser behavior.
 
@@ -41,13 +41,15 @@ Blog metadata includes author attribution, canonical/social fields, language, Bl
 
 Fable/high produced the layout using `/frontend-design`. Section headings sit above their content. Body text is 1.125rem, section headings share one scale, and subheadings/status labels are 1.5rem. The progress panel gives its smaller artwork a separate grid area.
 
+Adjacent article figures form a two-column image grid, including on phones. Captions stay attached. Clicking opens the full published image in a transparent native dialog with a blur-only backdrop. The image/caption group fades and scales from 96% over 300ms; reduced motion opens it instantly. Captions sit in theme-colored pills. Escape, the accessible Lucide X and outside click dismiss it and return focus. The dialog stays outside exported main content.
+
 Blog index and article content use a centered 68ch reading column. Article title, metadata and body share its left edge; text stays left-aligned. Header/footer retain the wider site layout, and phone gutters stay 1.5rem.
 
 Header/footer ribbon marks are 1rem square beside outlined Outfit wordmarks. Header links are ink without underlines at rest; document links remain underlined. Both development CTAs include the user-supplied GitHub SVG mark, with fill inherited from the button text color.
 
 The page follows `prefers-color-scheme` automatically. CSS variables switch surfaces/text and native picture sources select ivory wordmarks in dark mode. Blue primary buttons and colorful artwork remain unchanged. Original grain covers page and panel in both themes. Reduced motion disables animation, transitions and smooth scrolling.
 
-Same-origin page navigation uses native cross-document View Transitions with a one-second blur/fade. The root snapshots animate between clear and 2rem blur while the header stays separately captured. Shared CSS opts the homepage, index and posts in. Reduced motion opts out entirely. Unsupported browsers retain ordinary navigation; there is no router or runtime JavaScript.
+Same-origin page navigation uses native cross-document View Transitions with a one-second blur/fade. The root snapshots animate between clear and 2rem blur while the header stays separately captured. Shared CSS opts the homepage, index and posts in. Reduced motion opts out entirely. Unsupported browsers retain ordinary navigation; page transitions need no router or runtime JavaScript.
 
 ## Verification
 
