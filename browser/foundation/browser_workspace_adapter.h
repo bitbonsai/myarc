@@ -103,6 +103,7 @@ class BrowserWorkspaceAdapter final : public TabStripModelObserver {
   foundation::MutationResult MoveItemBefore(uint64_t item, uint64_t before);
 
  private:
+  friend class WorkspaceLifecycleBridge;
   static foundation::MutationResult ReconcileBindings(Profile& profile);
   foundation::MutationResult BindWindow();
   foundation::MutationResult BindTabs();
@@ -140,6 +141,7 @@ class BrowserWorkspaceAdapter final : public TabStripModelObserver {
   bool bindings_dirty_ = true;
   bool legacy_pending_ = false;
   bool reveal_active_ = false;
+  std::map<std::string, std::string> restored_extra_data_;
   std::map<std::string, std::string> persisted_window_;
   std::map<int, std::map<std::string, std::string>> persisted_tabs_;
   std::string binding_error_;

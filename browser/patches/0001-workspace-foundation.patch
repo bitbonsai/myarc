@@ -59,10 +59,10 @@ index 80b0e24263..3067ad4d19 100644
            features::GlicToolbarButtonLocation::kLeftOfProfileChip ||
 diff --git a/myarc/BUILD.gn b/myarc/BUILD.gn
 new file mode 100644
-index 0000000..104372f0cdc98307bc132fa0ceade146c5314ea6
+index 0000000..c80d531dddb02eae2a8ef5185b47c2b92c80ed46
 --- /dev/null
 +++ b/myarc/BUILD.gn
-@@ -0,0 +1,95 @@
+@@ -0,0 +1,110 @@
 +import("//build/rust/rust_static_library.gni")
 +
 +rust_static_library("workspace") {
@@ -108,6 +108,20 @@ index 0000000..104372f0cdc98307bc132fa0ceade146c5314ea6
 +  ]
 +}
 +
++source_set("workspace_lifecycle") {
++  sources = [
++    "workspace_lifecycle.cc",
++    "workspace_lifecycle.h",
++  ]
++  deps = [ "//base" ]
++}
++
++executable("workspace_lifecycle_check") {
++  testonly = true
++  sources = [ "workspace_lifecycle_check.cc" ]
++  deps = [ ":workspace_lifecycle" ]
++}
++
 +source_set("browser_workspace_adapter") {
 +  sources = [
 +    "browser_workspace_adapter.cc",
@@ -120,6 +134,7 @@ index 0000000..104372f0cdc98307bc132fa0ceade146c5314ea6
 +    "//url",
 +  ]
 +  deps = [
++    ":workspace_lifecycle",
 +    "//chrome/browser/lifetime",
 +    "//chrome/browser/profiles:profile",
 +    "//chrome/browser/sessions",
@@ -973,10 +988,10 @@ index 0000000..f560ec8bb5404348b833bcb3378e319887be716a
 +}
 diff --git a/myarc/browser_workspace_adapter.cc b/myarc/browser_workspace_adapter.cc
 new file mode 100644
-index 0000000..50157509fc40034dc026a687a3d6fe26aa080062
+index 0000000..f99a1609b364866ade27932fd7e770b67b6d332b
 --- /dev/null
 +++ b/myarc/browser_workspace_adapter.cc
-@@ -0,0 +1,1104 @@
+@@ -0,0 +1,1332 @@
 +#include "myarc/browser_workspace_adapter.h"
 +
 +#include <algorithm>
@@ -1007,12 +1022,49 @@ index 0000000..50157509fc40034dc026a687a3d6fe26aa080062
 +#include "content/public/browser/navigation_entry.h"
 +#include "content/public/browser/web_contents.h"
 +#include "content/public/browser/web_contents_observer.h"
++#include "myarc/workspace_lifecycle.h"
 +
 +namespace myarc {
++
++class WorkspaceLifecycleBridge final : public WorkspaceLifecycle {
++ public:
++  explicit WorkspaceLifecycleBridge(Profile& profile)
++      : WorkspaceLifecycle(&profile), profile_(&profile) {}
++  void OnLifecycleEvent(Event event) override;
++  void RestoreTab(BrowserWindowInterface& browser,
++                  content::WebContents& contents,
++                  const ExtraData& data) override;
++  void RestoreWindow(BrowserWindowInterface& browser,
++                     const ExtraData& data) override;
++  ExtraData TabData(BrowserWindowInterface& browser,
++                    content::WebContents& contents) override;
++  ExtraData WindowData(BrowserWindowInterface& browser) override;
++  void Retry();
++
++ private:
++  friend class BrowserWorkspaceAdapter;
++  BrowserWorkspaceAdapter* Find(BrowserWindowInterface& browser);
++  void Resume();
++  void NativeReady();
++  const raw_ptr<Profile> profile_;
++  bool native_ready_ = false;
++  bool finishing_ = false;
++  base::WeakPtrFactory<WorkspaceLifecycleBridge> weak_factory_{this};
++};
++
 +namespace {
 +
 +const char kRuntimeKey = 0;
 +const char kBindingKey = 0;
++const char kHistoricalDataKey = 0;
++
++// Keep foreign keys across restore/UndoClose. Current upstream metadata wins
++// when BrowserLiveTabContext merges this historical data into its result.
++struct HistoricalData : base::SupportsUserData::Data {
++  explicit HistoricalData(const WorkspaceLifecycle::ExtraData& data)
++      : extra(WorkspaceLifecycle::PreserveUnknownData(data)) {}
++  WorkspaceLifecycle::ExtraData extra;
++};
 +
 +foundation::MutationResult Ok(uint64_t id = 0) {
 +  return {true, id, {}};
@@ -1023,6 +1075,7 @@ index 0000000..50157509fc40034dc026a687a3d6fe26aa080062
 +
 +// Runtime pointers locate live projections only, never persisted identities.
 +struct Runtime : base::SupportsUserData::Data {
++  std::unique_ptr<WorkspaceLifecycleBridge> lifecycle;
 +  std::vector<raw_ptr<BrowserWorkspaceAdapter>> adapters;
 +  std::map<content::WebContents*, uint64_t> pages;
 +  bool complete = false;
@@ -1154,6 +1207,138 @@ index 0000000..50157509fc40034dc026a687a3d6fe26aa080062
 +
 +}  // namespace
 +
++BrowserWorkspaceAdapter* WorkspaceLifecycleBridge::Find(
++    BrowserWindowInterface& browser) {
++  for (const auto& adapter : ForProfile(*profile_).adapters) {
++    if (adapter->browser_ == &browser) {
++      return adapter;
++    }
++  }
++  return nullptr;
++}
++
++void WorkspaceLifecycleBridge::RestoreTab(BrowserWindowInterface& browser,
++                                          content::WebContents& contents,
++                                          const ExtraData& data) {
++  if (auto* adapter = Find(browser)) {
++    auto result = BrowserWorkspaceAdapter::RestoreTabBinding(contents, data);
++    if (!result.ok) {
++      adapter->binding_warning_ = std::string(result.error);
++      adapter->OnServiceChanged();
++    }
++  }
++}
++
++void WorkspaceLifecycleBridge::RestoreWindow(BrowserWindowInterface& browser,
++                                             const ExtraData& data) {
++  if (auto* adapter = Find(browser)) {
++    auto result = adapter->RestoreWindowBinding(data);
++    if (!result.ok) {
++      adapter->binding_warning_ = std::string(result.error);
++      adapter->OnServiceChanged();
++    }
++  }
++}
++
++WorkspaceLifecycle::ExtraData WorkspaceLifecycleBridge::TabData(
++    BrowserWindowInterface& browser,
++    content::WebContents& contents) {
++  if (!Find(browser)) {
++    return {};
++  }
++  ExtraData data;
++  if (auto* historical = static_cast<HistoricalData*>(
++          contents.GetUserData(&kHistoricalDataKey))) {
++    data = historical->extra;
++  }
++  data.merge(BrowserWorkspaceAdapter::TabExtraData(contents));
++  return data;
++}
++
++WorkspaceLifecycle::ExtraData WorkspaceLifecycleBridge::WindowData(
++    BrowserWindowInterface& browser) {
++  auto* adapter = Find(browser);
++  if (!adapter) {
++    return {};
++  }
++  auto data = adapter->restored_extra_data_;
++  data.merge(adapter->WindowExtraData());
++  return data;
++}
++
++void WorkspaceLifecycleBridge::Retry() {
++  auto& runtime = ForProfile(*profile_);
++  if (!native_ready_ || finishing_ || runtime.complete ||
++      runtime.shutting_down || browser_shutdown::IsTryingToQuit() ||
++      HasPendingSessionRestore(profile_) ||
++      SessionRestore::IsRestoring(profile_) ||
++      !IsReady(WorkspaceService::ForProfile(*profile_))) {
++    return;
++  }
++  base::AutoReset<bool> finishing(&finishing_, true);
++  auto result = BrowserWorkspaceAdapter::FinishSessionRestore(*profile_);
++  // Global reconciliation errors keep every window on native fallback. Later
++  // per-window allocation errors are already reported by FinishSessionRestore.
++  if (!result.ok && !runtime.complete) {
++    for (const auto& adapter : runtime.adapters) {
++      const std::string error(result.error);
++      if (adapter->binding_error_ != error) {
++        adapter->binding_error_ = error;
++        adapter->OnServiceChanged();
++      }
++    }
++  }
++}
++
++void WorkspaceLifecycleBridge::NativeReady() {
++  if (HasPendingSessionRestore(profile_) ||
++      SessionRestore::IsRestoring(profile_)) {
++    return;
++  }
++  native_ready_ = true;
++  Retry();
++}
++
++void WorkspaceLifecycleBridge::Resume() {
++  if (browser_shutdown::IsTryingToQuit()) {
++    return;
++  }
++  // Clears the shutdown latch even if metadata/another restorer is not ready.
++  // Retry still requires an actual native-completion notification.
++  BrowserWorkspaceAdapter::ResumeAfterCancelledShutdown(*profile_);
++}
++
++void WorkspaceLifecycleBridge::OnLifecycleEvent(Event event) {
++  switch (event) {
++    case Event::kStartupStarted:
++    case Event::kRestoreStarted:
++    case Event::kSessionRestoreStarted:
++      native_ready_ = false;
++      BrowserWorkspaceAdapter::BeginSessionRestore(*profile_);
++      break;
++    case Event::kStartupFinished:
++    case Event::kNativeReady:
++    case Event::kSessionRestoreFinished:
++      // Reconcile after native constructors/destructors and nested UI loops.
++      base::SingleThreadTaskRunner::GetCurrentDefault()->PostNonNestableTask(
++          FROM_HERE, base::BindOnce(&WorkspaceLifecycleBridge::NativeReady,
++                                    weak_factory_.GetWeakPtr()));
++      break;
++    case Event::kSessionReset:
++      BrowserWorkspaceAdapter::PersistSessionBindings(*profile_);
++      break;
++    case Event::kShutdownStarted:
++      BrowserWorkspaceAdapter::BeginShutdown(*profile_);
++      break;
++    case Event::kShutdownCancelled:
++      // Run after caller unload/confirmation cleanup, even in nested UI loops.
++      base::SingleThreadTaskRunner::GetCurrentDefault()->PostNonNestableTask(
++          FROM_HERE, base::BindOnce(&WorkspaceLifecycleBridge::Resume,
++                                    weak_factory_.GetWeakPtr()));
++      break;
++  }
++}
++
 +BrowserWorkspaceAdapter::BrowserWorkspaceAdapter(
 +    BrowserWindowInterface& browser)
 +    : browser_(&browser),
@@ -1162,7 +1347,14 @@ index 0000000..50157509fc40034dc026a687a3d6fe26aa080062
 +      tabs_(browser.GetTabStripModel()) {
 +  DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
 +  DCHECK_EQ(browser.GetType(), BrowserWindowInterface::TYPE_NORMAL);
-+  ForProfile(*profile_).adapters.push_back(this);
++  auto& runtime = ForProfile(*profile_);
++  runtime.adapters.push_back(this);
++  if (!runtime.lifecycle) {
++    runtime.lifecycle = std::make_unique<WorkspaceLifecycleBridge>(*profile_);
++  }
++  if (browser_shutdown::IsTryingToQuit()) {
++    BeginShutdown(*profile_);
++  }
 +  tabs_->AddObserver(this);
 +  service_subscription_ = service_->Subscribe(base::BindRepeating(
 +      [](BrowserWorkspaceAdapter* adapter) {
@@ -1185,6 +1377,8 @@ index 0000000..50157509fc40034dc026a687a3d6fe26aa080062
 +foundation::MutationResult BrowserWorkspaceAdapter::RestoreTabBinding(
 +    content::WebContents& contents,
 +    const std::map<std::string, std::string>& extra_data) {
++  contents.SetUserData(&kHistoricalDataKey,
++                       std::make_unique<HistoricalData>(extra_data));
 +  const auto id = ReadBinding(extra_data, kItemKey);
 +  const auto space = ReadBinding(extra_data, kSpaceKey);
 +  // Even malformed/stale metadata marks this as a restore, not legacy pin
@@ -1199,6 +1393,7 @@ index 0000000..50157509fc40034dc026a687a3d6fe26aa080062
 +  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
 +  if (bound_)
 +    return Fail("Window binding already finalized.");
++  restored_extra_data_ = HistoricalData(extra_data).extra;
 +  const auto id = ReadBinding(extra_data, kWindowKey);
 +  restored_window_id_ = id.value_or(0);
 +  restored_space_id_ = ReadBinding(extra_data, kSpaceKey).value_or(0);
@@ -1424,9 +1619,11 @@ index 0000000..50157509fc40034dc026a687a3d6fe26aa080062
 +  auto& runtime = ForProfile(profile);
 +  auto& service = WorkspaceService::ForProfile(profile);
 +  if (runtime.shutting_down || browser_shutdown::IsTryingToQuit() ||
-+      SessionRestore::IsRestoring(&profile))
++      WorkspaceLifecycle::HasPendingSessionRestore(&profile) ||
++      SessionRestore::IsRestoring(&profile)) {
 +    return Fail(
 +        "Native session restore is in flight or browser is shutting down.");
++  }
 +  if (!IsReady(service))
 +    return Fail("Workspace metadata is still loading or failed to load.");
 +  // Only the parent may release the native-restore/hints barrier. After
@@ -1456,6 +1653,11 @@ index 0000000..50157509fc40034dc026a687a3d6fe26aa080062
 +    if (!result.ok && failure.ok)
 +      failure = std::move(result);
 +  }
++  // Preserve completed bindings even if retiring an obsolete model window fails.
++  for (const auto& adapter : runtime.adapters) {
++    if (adapter->bound_)
++      adapter->PersistBindings();
++  }
 +  auto result = Ok();
 +  // Retire windows not rebound by this complete native restoration. In
 +  // particular, the default Window 1 is not assumed to have a native peer.
@@ -1470,10 +1672,6 @@ index 0000000..50157509fc40034dc026a687a3d6fe26aa080062
 +      if (!result.ok)
 +        return result;
 +    }
-+  }
-+  for (const auto& adapter : runtime.adapters) {
-+    if (adapter->bound_)
-+      adapter->PersistBindings();
 +  }
 +  return failure;
 +}
@@ -1490,12 +1688,37 @@ index 0000000..50157509fc40034dc026a687a3d6fe26aa080062
 +  if (browser_shutdown::IsTryingToQuit())
 +    return Fail(
 +        "Quit is still pending. Resume only after SetTryingToQuit(false).");
-+  ForProfile(profile).shutting_down = false;
++  auto& runtime = ForProfile(profile);
++  if (!runtime.shutting_down)
++    return Ok();
++  runtime.shutting_down = false;
++  // Pages may have closed while quit was pending. Gate commands until the
++  // surviving projections reconcile, including after a metadata-load retry.
++  runtime.complete = false;
++  for (const auto& adapter : runtime.adapters) {
++    adapter->OnServiceChanged();
++  }
++  if (runtime.lifecycle && !runtime.lifecycle->native_ready_) {
++    return Fail("Native session insertion has not completed.");
++  }
 +  return FinishSessionRestore(profile);
 +}
 +
 +void BrowserWorkspaceAdapter::PersistSessionBindings(Profile& profile) {
-+  for (const auto& adapter : ForProfile(profile).adapters) {
++  auto& runtime = ForProfile(profile);
++  // Invalidate now; the completed binding pass must re-emit after a reset
++  // that arrived before its restore barrier opened.
++  for (const auto& adapter : runtime.adapters) {
++    adapter->persisted_window_.clear();
++    adapter->persisted_tabs_.clear();
++  }
++  if (!runtime.complete || runtime.shutting_down ||
++      browser_shutdown::IsTryingToQuit() ||
++      WorkspaceLifecycle::HasPendingSessionRestore(&profile) ||
++      SessionRestore::IsRestoring(&profile)) {
++    return;
++  }
++  for (const auto& adapter : runtime.adapters) {
 +    // A partial allocation failure still has valid existing native bindings.
 +    if (adapter->window_id_)
 +      adapter->PersistBindings(true);
@@ -1584,8 +1807,20 @@ index 0000000..50157509fc40034dc026a687a3d6fe26aa080062
 +    content::WebContents& contents) {
 +  auto* profile = Profile::FromBrowserContext(contents.GetBrowserContext());
 +  auto state = WorkspaceService::ForProfile(*profile).ExportSnapshot();
-+  if (!state)
-+    return {};
++  if (!state) {
++    // UndoClose may capture a restored tab before metadata loads. Keep only
++    // already bounded hints; reconciliation will validate them when ready.
++    const auto* binding = Binding::Get(contents);
++    if (!binding || !binding->item() || binding->legacy()) {
++      return {};
++    }
++    std::map<std::string, std::string> data = {
++        {kItemKey, base::NumberToString(binding->item())}};
++    if (binding->space()) {
++      data[kSpaceKey] = base::NumberToString(binding->space());
++    }
++    return data;
++  }
 +  uint64_t space = 0;
 +  for (const auto& adapter : ForProfile(*profile).adapters) {
 +    if (adapter->tabs_ &&
@@ -1655,7 +1890,8 @@ index 0000000..50157509fc40034dc026a687a3d6fe26aa080062
 +  auto state = service_->ExportSnapshot();
 +  if (!state)
 +    return;
-+  const auto window = WindowExtraData();
++  auto window = WindowExtraData();
++  window.insert(restored_extra_data_.begin(), restored_extra_data_.end());
 +  for (const auto& [key, value] : window) {
 +    if (force || !persisted_window_.contains(key) ||
 +        persisted_window_.at(key) != value)
@@ -1681,6 +1917,10 @@ index 0000000..50157509fc40034dc026a687a3d6fe26aa080062
 +    const auto row = items.find(item);
 +    auto data = TabBindingExtraData(
 +        *contents, row == items.end() ? nullptr : row->second, space);
++    if (auto* historical = static_cast<HistoricalData*>(
++            contents->GetUserData(&kHistoricalDataKey))) {
++      data.insert(historical->extra.begin(), historical->extra.end());
++    }
 +    auto& previous = persisted_tabs_[session_id.id()];
 +    for (const auto& [key, value] : data) {
 +      if (force || !previous.contains(key) || previous.at(key) != value)
@@ -1779,6 +2019,9 @@ index 0000000..50157509fc40034dc026a687a3d6fe26aa080062
 +  // Navigate can run a nested UI loop before returning its exact contents.
 +  if (changing_)
 +    return;
++  // Metadata readiness retries a pending native completion; it never releases
++  // the restore barrier by itself.
++  ForProfile(*profile_).lifecycle->Retry();
 +  base::AutoReset<bool> refreshing(&refreshing_, true);
 +  auto& runtime = ForProfile(*profile_);
 +  const bool dirty = bindings_dirty_;
@@ -2083,10 +2326,10 @@ index 0000000..50157509fc40034dc026a687a3d6fe26aa080062
 +}  // namespace myarc
 diff --git a/myarc/browser_workspace_adapter.h b/myarc/browser_workspace_adapter.h
 new file mode 100644
-index 0000000..1849376576a70df6ddbd9ed7b8e5f8bc0a565113
+index 0000000..1f3de4225d085710e9623b64794c5e4afe1998f0
 --- /dev/null
 +++ b/myarc/browser_workspace_adapter.h
-@@ -0,0 +1,156 @@
+@@ -0,0 +1,158 @@
 +#ifndef MYARC_BROWSER_WORKSPACE_ADAPTER_H_
 +#define MYARC_BROWSER_WORKSPACE_ADAPTER_H_
 +
@@ -2192,6 +2435,7 @@ index 0000000..1849376576a70df6ddbd9ed7b8e5f8bc0a565113
 +  foundation::MutationResult MoveItemBefore(uint64_t item, uint64_t before);
 +
 + private:
++  friend class WorkspaceLifecycleBridge;
 +  static foundation::MutationResult ReconcileBindings(Profile& profile);
 +  foundation::MutationResult BindWindow();
 +  foundation::MutationResult BindTabs();
@@ -2229,6 +2473,7 @@ index 0000000..1849376576a70df6ddbd9ed7b8e5f8bc0a565113
 +  bool bindings_dirty_ = true;
 +  bool legacy_pending_ = false;
 +  bool reveal_active_ = false;
++  std::map<std::string, std::string> restored_extra_data_;
 +  std::map<std::string, std::string> persisted_window_;
 +  std::map<int, std::map<std::string, std::string>> persisted_tabs_;
 +  std::string binding_error_;
@@ -3728,6 +3973,339 @@ index 0000000..2fa2bd17a496e83e411e75fa3e492dec28a52d6d
 +        assert_eq!(first.space_name(), "Research");
 +        assert_eq!(second.space_name(), "Everyday");
 +    }
++}
+diff --git a/myarc/workspace_lifecycle.cc b/myarc/workspace_lifecycle.cc
+new file mode 100644
+index 0000000..832d88cf1c8c81c9e7db00c01a42991846d8d712
+--- /dev/null
++++ b/myarc/workspace_lifecycle.cc
+@@ -0,0 +1,98 @@
++#include "myarc/workspace_lifecycle.h"
++
++#include <vector>
++
++#include "base/no_destructor.h"
++#include "base/threading/thread_checker.h"
++
++namespace myarc {
++namespace {
++
++struct Registry {
++  std::map<Profile*, WorkspaceLifecycle*> registrations;
++  // Each startup launch and SessionRestoreImpl owns one count. Native
++  // completion observers may start another restore for the same Profile.
++  std::map<Profile*, size_t> pending;
++  THREAD_CHECKER(thread_checker);
++};
++
++Registry& GetRegistry() {
++  static base::NoDestructor<Registry> registry;
++  DCHECK_CALLED_ON_VALID_THREAD(registry->thread_checker);
++  return *registry;
++}
++
++std::map<Profile*, WorkspaceLifecycle*>& Registrations() {
++  return GetRegistry().registrations;
++}
++
++std::map<Profile*, size_t>& PendingRestores() {
++  return GetRegistry().pending;
++}
++
++}  // namespace
++
++WorkspaceLifecycle::WorkspaceLifecycle(Profile* profile) {
++  const bool inserted = Registrations().emplace(profile, this).second;
++  DCHECK(inserted);
++}
++
++WorkspaceLifecycle::~WorkspaceLifecycle() {
++  std::erase_if(Registrations(),
++                [this](const auto& entry) { return entry.second == this; });
++}
++
++WorkspaceLifecycle* WorkspaceLifecycle::Get(Profile* profile) {
++  auto it = Registrations().find(profile);
++  return it == Registrations().end() ? nullptr : it->second;
++}
++
++bool WorkspaceLifecycle::HasPendingSessionRestore(Profile* profile) {
++  return PendingRestores().contains(profile);
++}
++
++void WorkspaceLifecycle::Notify(Profile* profile, Event event) {
++  if (event == Event::kStartupStarted ||
++      event == Event::kSessionRestoreStarted) {
++    ++PendingRestores()[profile];
++  } else if (event == Event::kStartupFinished ||
++             event == Event::kSessionRestoreFinished) {
++    auto it = PendingRestores().find(profile);
++    if (it != PendingRestores().end() && --it->second == 0) {
++      PendingRestores().erase(it);
++    }
++  }
++  if (auto* lifecycle = Get(profile)) {
++    lifecycle->OnLifecycleEvent(event);
++  }
++}
++
++void WorkspaceLifecycle::NotifyAll(Event event) {
++  // A callback may tear down another Profile in a nested UI loop.
++  const std::vector<std::pair<Profile*, WorkspaceLifecycle*>> registrations(
++      Registrations().begin(), Registrations().end());
++  for (const auto& [profile, lifecycle] : registrations) {
++    if (Get(profile) == lifecycle) {
++      lifecycle->OnLifecycleEvent(event);
++    }
++  }
++}
++
++WorkspaceLifecycle::ExtraData WorkspaceLifecycle::PreserveUnknownData(
++    const ExtraData& data) {
++  ExtraData unknown = data;
++  // shortcut: private upstream keys require auditing on each Chromium rebase.
++  // Mirrors browser_tabrestore, BrowserLiveTabContext and the adapter.
++  for (const char* key :
++       {"myarc.item.v1", "myarc.window.v1", "myarc.space.v1",
++        "glic.instance_id", "glic.conversation_id", "glic.panel_open",
++        "glic.pinned_instances", "contextual_tasks.task_id",
++        "contextual_tasks.thread_url", "send_tab_to_self.entry_guid",
++        "vertical_tab_strip_collapsed", "vertical_tab_strip_uncollapsed_width",
++        "focused_tab_group_id"}) {
++    unknown.erase(key);
++  }
++  return unknown;
++}
++
++}  // namespace myarc
+diff --git a/myarc/workspace_lifecycle.h b/myarc/workspace_lifecycle.h
+new file mode 100644
+index 0000000..8d6bbb5b335be439621357232c0dcd2d893ccf86
+--- /dev/null
++++ b/myarc/workspace_lifecycle.h
+@@ -0,0 +1,61 @@
++#ifndef MYARC_WORKSPACE_LIFECYCLE_H_
++#define MYARC_WORKSPACE_LIFECYCLE_H_
++
++#include <map>
++#include <string>
++
++class BrowserWindowInterface;
++class Profile;
++namespace content {
++class WebContents;
++}
++
++namespace myarc {
++
++// UI-sequence, exact-Profile registration owned by that Profile's runtime.
++// Chrome sessions/lifetime call this boundary without depending on the adapter.
++// Lookup never constructs a service or opts a Profile/window into myarc.
++class WorkspaceLifecycle {
++ public:
++  using ExtraData = std::map<std::string, std::string>;
++  enum class Event {
++    kStartupStarted,
++    kStartupFinished,
++    kRestoreStarted,
++    kSessionRestoreStarted,
++    kSessionRestoreFinished,
++    kNativeReady,
++    kSessionReset,
++    kShutdownStarted,
++    kShutdownCancelled,
++  };
++
++  explicit WorkspaceLifecycle(Profile* profile);
++  virtual ~WorkspaceLifecycle();
++  WorkspaceLifecycle(const WorkspaceLifecycle&) = delete;
++  WorkspaceLifecycle& operator=(const WorkspaceLifecycle&) = delete;
++
++  static WorkspaceLifecycle* Get(Profile* profile);
++  static void Notify(Profile* profile, Event event);
++  static void NotifyAll(Event event);
++  // Covers startup launch and native completion observers, even after upstream
++  // removes its restorer from IsRestoring(). No delegate/service is created.
++  static bool HasPendingSessionRestore(Profile* profile);
++  // Preserve opaque keys, while current native producers and bounded adapter
++  // helpers regenerate the keys they own (including deliberately absent ones).
++  static ExtraData PreserveUnknownData(const ExtraData& data);
++
++  virtual void OnLifecycleEvent(Event event) = 0;
++  virtual void RestoreTab(BrowserWindowInterface& browser,
++                          content::WebContents& contents,
++                          const ExtraData& data) = 0;
++  virtual void RestoreWindow(BrowserWindowInterface& browser,
++                             const ExtraData& data) = 0;
++  virtual ExtraData TabData(BrowserWindowInterface& browser,
++                            content::WebContents& contents) = 0;
++  virtual ExtraData WindowData(BrowserWindowInterface& browser) = 0;
++};
++
++}  // namespace myarc
++
++#endif  // MYARC_WORKSPACE_LIFECYCLE_H_
+diff --git a/myarc/workspace_lifecycle_check.cc b/myarc/workspace_lifecycle_check.cc
+new file mode 100644
+index 0000000..78e616275d035a42acd5c64d3c3ce708635f8b0f
+--- /dev/null
++++ b/myarc/workspace_lifecycle_check.cc
+@@ -0,0 +1,156 @@
++#include <functional>
++#include <iostream>
++#include <memory>
++
++#include "myarc/workspace_lifecycle.h"
++
++namespace {
++
++class Probe final : public myarc::WorkspaceLifecycle {
++ public:
++  explicit Probe(Profile* profile) : WorkspaceLifecycle(profile) {}
++  int calls = 0;
++  Event last = Event::kRestoreStarted;
++  std::function<void()> on_event;
++  void OnLifecycleEvent(Event event) override {
++    ++calls;
++    last = event;
++    if (on_event) {
++      on_event();
++    }
++  }
++  void RestoreTab(BrowserWindowInterface&,
++                  content::WebContents&,
++                  const ExtraData&) override {}
++  void RestoreWindow(BrowserWindowInterface&, const ExtraData&) override {}
++  ExtraData TabData(BrowserWindowInterface&, content::WebContents&) override {
++    return {};
++  }
++  ExtraData WindowData(BrowserWindowInterface&) override { return {}; }
++};
++
++bool CheckNativeBarrier() {
++  using Lifecycle = myarc::WorkspaceLifecycle;
++  int token;
++  auto* profile = reinterpret_cast<Profile*>(&token);
++  Lifecycle::Notify(profile, Lifecycle::Event::kStartupStarted);
++  if (!Lifecycle::HasPendingSessionRestore(profile) ||
++      Lifecycle::Get(profile)) {
++    return false;
++  }
++  {
++    // A window/delegate can arrive before the restorer is even constructed.
++    // Fresh-window readiness must not release the enclosing startup barrier.
++    Probe late(profile);
++    Lifecycle::Notify(profile, Lifecycle::Event::kNativeReady);
++    if (!Lifecycle::HasPendingSessionRestore(profile)) {
++      return false;
++    }
++    Lifecycle::Notify(profile, Lifecycle::Event::kSessionRestoreStarted);
++    Lifecycle::Notify(profile, Lifecycle::Event::kStartupFinished);
++    if (!Lifecycle::HasPendingSessionRestore(profile)) {
++      return false;
++    }
++    Lifecycle::Notify(profile, Lifecycle::Event::kSessionRestoreStarted);
++    Lifecycle::Notify(profile, Lifecycle::Event::kSessionRestoreFinished);
++    if (!Lifecycle::HasPendingSessionRestore(profile)) {
++      return false;
++    }
++    Lifecycle::Notify(profile, Lifecycle::Event::kSessionRestoreFinished);
++    if (Lifecycle::HasPendingSessionRestore(profile) ||
++        late.last != Lifecycle::Event::kSessionRestoreFinished) {
++      return false;
++    }
++  }
++  // Fresh launch without any restorer, including nested launches.
++  Lifecycle::Notify(profile, Lifecycle::Event::kStartupStarted);
++  Lifecycle::Notify(profile, Lifecycle::Event::kStartupStarted);
++  Lifecycle::Notify(profile, Lifecycle::Event::kStartupFinished);
++  if (!Lifecycle::HasPendingSessionRestore(profile)) {
++    return false;
++  }
++  Lifecycle::Notify(profile, Lifecycle::Event::kStartupFinished);
++  return !Lifecycle::Get(profile) &&
++         !Lifecycle::HasPendingSessionRestore(profile);
++}
++
++bool CheckMetadata() {
++  using Lifecycle = myarc::WorkspaceLifecycle;
++  const Lifecycle::ExtraData restored = {
++      {"myarc.item.v1", "18446744073709551616"},
++      {"glic.panel_open", "true"},
++      {"focused_tab_group_id", "closed-group"},
++      {"foreign.future.v2", "keep byte-for-byte"},
++      {"foreign.current.v2", "historical"}};
++  auto unknown = Lifecycle::PreserveUnknownData(restored);
++  if (unknown.size() != 2 || restored.size() != 5 ||
++      unknown.at("foreign.future.v2") != "keep byte-for-byte") {
++    return false;
++  }
++  Lifecycle::ExtraData current = {{"foreign.current.v2", "current"},
++                                  {"myarc.item.v1", "8"}};
++  current.merge(unknown);
++  return current.at("foreign.current.v2") == "current" &&
++         current.at("myarc.item.v1") == "8" &&
++         current.at("foreign.future.v2") == "keep byte-for-byte" &&
++         !current.contains("glic.panel_open") &&
++         !current.contains("focused_tab_group_id");
++}
++
++bool CheckRegistration() {
++  using Lifecycle = myarc::WorkspaceLifecycle;
++  // Only opaque identity tokens: this check never constructs native Profiles.
++  int regular_token, otr_token, unconsented_token;
++  auto* regular = reinterpret_cast<Profile*>(&regular_token);
++  auto* otr = reinterpret_cast<Profile*>(&otr_token);
++  auto* unconsented = reinterpret_cast<Profile*>(&unconsented_token);
++  if (Lifecycle::Get(regular) || Lifecycle::Get(unconsented)) {
++    return false;
++  }
++  {
++    Probe a(regular);
++    auto b = std::make_unique<Probe>(otr);
++    if (Lifecycle::Get(regular) != &a || Lifecycle::Get(otr) != b.get()) {
++      return false;
++    }
++    Lifecycle::Notify(regular, Lifecycle::Event::kNativeReady);
++    if (a.calls != 1 || a.last != Lifecycle::Event::kNativeReady || b->calls) {
++      return false;
++    }
++    Lifecycle::Notify(unconsented, Lifecycle::Event::kSessionReset);
++    if (Lifecycle::Get(unconsented)) {
++      return false;
++    }
++    Lifecycle::NotifyAll(Lifecycle::Event::kShutdownStarted);
++    if (a.calls != 2 || b->calls != 1) {
++      return false;
++    }
++    Lifecycle::NotifyAll(Lifecycle::Event::kShutdownCancelled);
++    if (a.calls != 3 || b->calls != 2 ||
++        a.last != Lifecycle::Event::kShutdownCancelled) {
++      return false;
++    }
++    // Registry mutation during notification, in either address order.
++    a.on_event = [&b] { b.reset(); };
++    Lifecycle::NotifyAll(Lifecycle::Event::kShutdownStarted);
++    if (b || Lifecycle::Get(otr)) {
++      return false;
++    }
++  }
++  if (Lifecycle::Get(regular)) {
++    return false;
++  }
++  Lifecycle::NotifyAll(Lifecycle::Event::kShutdownCancelled);
++  return true;
++}
++
++}  // namespace
++
++int main() {
++  if (!CheckRegistration() || !CheckMetadata() || !CheckNativeBarrier()) {
++    std::cerr << "Workspace lifecycle boundary check failed\n";
++    return 1;
++  }
++  std::cout << "Workspace lifecycle registration, metadata and barrier checks "
++               "passed\n";
 +}
 diff --git a/myarc/workspace_service.cc b/myarc/workspace_service.cc
 new file mode 100644

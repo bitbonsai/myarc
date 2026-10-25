@@ -24,6 +24,9 @@ expected = {
             'browser_workspace_adapter.h',
             'sidebar_view.cc',
             'sidebar_view.h',
+            'workspace_lifecycle.cc',
+            'workspace_lifecycle.h',
+            'workspace_lifecycle_check.cc',
         )
     },
 }

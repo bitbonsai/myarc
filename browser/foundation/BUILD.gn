@@ -43,6 +43,20 @@ source_set("workspace_service") {
   ]
 }
 
+source_set("workspace_lifecycle") {
+  sources = [
+    "workspace_lifecycle.cc",
+    "workspace_lifecycle.h",
+  ]
+  deps = [ "//base" ]
+}
+
+executable("workspace_lifecycle_check") {
+  testonly = true
+  sources = [ "workspace_lifecycle_check.cc" ]
+  deps = [ ":workspace_lifecycle" ]
+}
+
 source_set("browser_workspace_adapter") {
   sources = [
     "browser_workspace_adapter.cc",
@@ -55,6 +69,7 @@ source_set("browser_workspace_adapter") {
     "//url",
   ]
   deps = [
+    ":workspace_lifecycle",
     "//chrome/browser/lifetime",
     "//chrome/browser/profiles:profile",
     "//chrome/browser/sessions",

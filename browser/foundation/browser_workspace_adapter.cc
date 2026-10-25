@@ -28,12 +28,49 @@
 #include "content/public/browser/navigation_entry.h"
 #include "content/public/browser/web_contents.h"
 #include "content/public/browser/web_contents_observer.h"
+#include "myarc/workspace_lifecycle.h"
 
 namespace myarc {
+
+class WorkspaceLifecycleBridge final : public WorkspaceLifecycle {
+ public:
+  explicit WorkspaceLifecycleBridge(Profile& profile)
+      : WorkspaceLifecycle(&profile), profile_(&profile) {}
+  void OnLifecycleEvent(Event event) override;
+  void RestoreTab(BrowserWindowInterface& browser,
+                  content::WebContents& contents,
+                  const ExtraData& data) override;
+  void RestoreWindow(BrowserWindowInterface& browser,
+                     const ExtraData& data) override;
+  ExtraData TabData(BrowserWindowInterface& browser,
+                    content::WebContents& contents) override;
+  ExtraData WindowData(BrowserWindowInterface& browser) override;
+  void Retry();
+
+ private:
+  friend class BrowserWorkspaceAdapter;
+  BrowserWorkspaceAdapter* Find(BrowserWindowInterface& browser);
+  void Resume();
+  void NativeReady();
+  const raw_ptr<Profile> profile_;
+  bool native_ready_ = false;
+  bool finishing_ = false;
+  base::WeakPtrFactory<WorkspaceLifecycleBridge> weak_factory_{this};
+};
+
 namespace {
 
 const char kRuntimeKey = 0;
 const char kBindingKey = 0;
+const char kHistoricalDataKey = 0;
+
+// Keep foreign keys across restore/UndoClose. Current upstream metadata wins
+// when BrowserLiveTabContext merges this historical data into its result.
+struct HistoricalData : base::SupportsUserData::Data {
+  explicit HistoricalData(const WorkspaceLifecycle::ExtraData& data)
+      : extra(WorkspaceLifecycle::PreserveUnknownData(data)) {}
+  WorkspaceLifecycle::ExtraData extra;
+};
 
 foundation::MutationResult Ok(uint64_t id = 0) {
   return {true, id, {}};
@@ -44,6 +81,7 @@ foundation::MutationResult Fail(std::string_view error) {
 
 // Runtime pointers locate live projections only, never persisted identities.
 struct Runtime : base::SupportsUserData::Data {
+  std::unique_ptr<WorkspaceLifecycleBridge> lifecycle;
   std::vector<raw_ptr<BrowserWorkspaceAdapter>> adapters;
   std::map<content::WebContents*, uint64_t> pages;
   bool complete = false;
@@ -175,6 +213,138 @@ bool IsReady(WorkspaceService& service) {
 
 }  // namespace
 
+BrowserWorkspaceAdapter* WorkspaceLifecycleBridge::Find(
+    BrowserWindowInterface& browser) {
+  for (const auto& adapter : ForProfile(*profile_).adapters) {
+    if (adapter->browser_ == &browser) {
+      return adapter;
+    }
+  }
+  return nullptr;
+}
+
+void WorkspaceLifecycleBridge::RestoreTab(BrowserWindowInterface& browser,
+                                          content::WebContents& contents,
+                                          const ExtraData& data) {
+  if (auto* adapter = Find(browser)) {
+    auto result = BrowserWorkspaceAdapter::RestoreTabBinding(contents, data);
+    if (!result.ok) {
+      adapter->binding_warning_ = std::string(result.error);
+      adapter->OnServiceChanged();
+    }
+  }
+}
+
+void WorkspaceLifecycleBridge::RestoreWindow(BrowserWindowInterface& browser,
+                                             const ExtraData& data) {
+  if (auto* adapter = Find(browser)) {
+    auto result = adapter->RestoreWindowBinding(data);
+    if (!result.ok) {
+      adapter->binding_warning_ = std::string(result.error);
+      adapter->OnServiceChanged();
+    }
+  }
+}
+
+WorkspaceLifecycle::ExtraData WorkspaceLifecycleBridge::TabData(
+    BrowserWindowInterface& browser,
+    content::WebContents& contents) {
+  if (!Find(browser)) {
+    return {};
+  }
+  ExtraData data;
+  if (auto* historical = static_cast<HistoricalData*>(
+          contents.GetUserData(&kHistoricalDataKey))) {
+    data = historical->extra;
+  }
+  data.merge(BrowserWorkspaceAdapter::TabExtraData(contents));
+  return data;
+}
+
+WorkspaceLifecycle::ExtraData WorkspaceLifecycleBridge::WindowData(
+    BrowserWindowInterface& browser) {
+  auto* adapter = Find(browser);
+  if (!adapter) {
+    return {};
+  }
+  auto data = adapter->restored_extra_data_;
+  data.merge(adapter->WindowExtraData());
+  return data;
+}
+
+void WorkspaceLifecycleBridge::Retry() {
+  auto& runtime = ForProfile(*profile_);
+  if (!native_ready_ || finishing_ || runtime.complete ||
+      runtime.shutting_down || browser_shutdown::IsTryingToQuit() ||
+      HasPendingSessionRestore(profile_) ||
+      SessionRestore::IsRestoring(profile_) ||
+      !IsReady(WorkspaceService::ForProfile(*profile_))) {
+    return;
+  }
+  base::AutoReset<bool> finishing(&finishing_, true);
+  auto result = BrowserWorkspaceAdapter::FinishSessionRestore(*profile_);
+  // Global reconciliation errors keep every window on native fallback. Later
+  // per-window allocation errors are already reported by FinishSessionRestore.
+  if (!result.ok && !runtime.complete) {
+    for (const auto& adapter : runtime.adapters) {
+      const std::string error(result.error);
+      if (adapter->binding_error_ != error) {
+        adapter->binding_error_ = error;
+        adapter->OnServiceChanged();
+      }
+    }
+  }
+}
+
+void WorkspaceLifecycleBridge::NativeReady() {
+  if (HasPendingSessionRestore(profile_) ||
+      SessionRestore::IsRestoring(profile_)) {
+    return;
+  }
+  native_ready_ = true;
+  Retry();
+}
+
+void WorkspaceLifecycleBridge::Resume() {
+  if (browser_shutdown::IsTryingToQuit()) {
+    return;
+  }
+  // Clears the shutdown latch even if metadata/another restorer is not ready.
+  // Retry still requires an actual native-completion notification.
+  BrowserWorkspaceAdapter::ResumeAfterCancelledShutdown(*profile_);
+}
+
+void WorkspaceLifecycleBridge::OnLifecycleEvent(Event event) {
+  switch (event) {
+    case Event::kStartupStarted:
+    case Event::kRestoreStarted:
+    case Event::kSessionRestoreStarted:
+      native_ready_ = false;
+      BrowserWorkspaceAdapter::BeginSessionRestore(*profile_);
+      break;
+    case Event::kStartupFinished:
+    case Event::kNativeReady:
+    case Event::kSessionRestoreFinished:
+      // Reconcile after native constructors/destructors and nested UI loops.
+      base::SingleThreadTaskRunner::GetCurrentDefault()->PostNonNestableTask(
+          FROM_HERE, base::BindOnce(&WorkspaceLifecycleBridge::NativeReady,
+                                    weak_factory_.GetWeakPtr()));
+      break;
+    case Event::kSessionReset:
+      BrowserWorkspaceAdapter::PersistSessionBindings(*profile_);
+      break;
+    case Event::kShutdownStarted:
+      BrowserWorkspaceAdapter::BeginShutdown(*profile_);
+      break;
+    case Event::kShutdownCancelled:
+      // Run after caller unload/confirmation cleanup, even in nested UI loops.
+      base::SingleThreadTaskRunner::GetCurrentDefault()->PostNonNestableTask(
+          FROM_HERE, base::BindOnce(&WorkspaceLifecycleBridge::Resume,
+                                    weak_factory_.GetWeakPtr()));
+      break;
+  }
+}
+
 BrowserWorkspaceAdapter::BrowserWorkspaceAdapter(
     BrowserWindowInterface& browser)
     : browser_(&browser),
@@ -183,7 +353,14 @@ BrowserWorkspaceAdapter::BrowserWorkspaceAdapter(
       tabs_(browser.GetTabStripModel()) {
   DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
   DCHECK_EQ(browser.GetType(), BrowserWindowInterface::TYPE_NORMAL);
-  ForProfile(*profile_).adapters.push_back(this);
+  auto& runtime = ForProfile(*profile_);
+  runtime.adapters.push_back(this);
+  if (!runtime.lifecycle) {
+    runtime.lifecycle = std::make_unique<WorkspaceLifecycleBridge>(*profile_);
+  }
+  if (browser_shutdown::IsTryingToQuit()) {
+    BeginShutdown(*profile_);
+  }
   tabs_->AddObserver(this);
   service_subscription_ = service_->Subscribe(base::BindRepeating(
       [](BrowserWorkspaceAdapter* adapter) {
@@ -206,6 +383,8 @@ BrowserWorkspaceAdapter::~BrowserWorkspaceAdapter() {
 foundation::MutationResult BrowserWorkspaceAdapter::RestoreTabBinding(
     content::WebContents& contents,
     const std::map<std::string, std::string>& extra_data) {
+  contents.SetUserData(&kHistoricalDataKey,
+                       std::make_unique<HistoricalData>(extra_data));
   const auto id = ReadBinding(extra_data, kItemKey);
   const auto space = ReadBinding(extra_data, kSpaceKey);
   // Even malformed/stale metadata marks this as a restore, not legacy pin
@@ -220,6 +399,7 @@ foundation::MutationResult BrowserWorkspaceAdapter::RestoreWindowBinding(
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
   if (bound_)
     return Fail("Window binding already finalized.");
+  restored_extra_data_ = HistoricalData(extra_data).extra;
   const auto id = ReadBinding(extra_data, kWindowKey);
   restored_window_id_ = id.value_or(0);
   restored_space_id_ = ReadBinding(extra_data, kSpaceKey).value_or(0);
@@ -445,9 +625,11 @@ foundation::MutationResult BrowserWorkspaceAdapter::FinishSessionRestore(
   auto& runtime = ForProfile(profile);
   auto& service = WorkspaceService::ForProfile(profile);
   if (runtime.shutting_down || browser_shutdown::IsTryingToQuit() ||
-      SessionRestore::IsRestoring(&profile))
+      WorkspaceLifecycle::HasPendingSessionRestore(&profile) ||
+      SessionRestore::IsRestoring(&profile)) {
     return Fail(
         "Native session restore is in flight or browser is shutting down.");
+  }
   if (!IsReady(service))
     return Fail("Workspace metadata is still loading or failed to load.");
   // Only the parent may release the native-restore/hints barrier. After
@@ -477,6 +659,11 @@ foundation::MutationResult BrowserWorkspaceAdapter::FinishSessionRestore(
     if (!result.ok && failure.ok)
       failure = std::move(result);
   }
+  // Preserve completed bindings even if retiring an obsolete model window fails.
+  for (const auto& adapter : runtime.adapters) {
+    if (adapter->bound_)
+      adapter->PersistBindings();
+  }
   auto result = Ok();
   // Retire windows not rebound by this complete native restoration. In
   // particular, the default Window 1 is not assumed to have a native peer.
@@ -491,10 +678,6 @@ foundation::MutationResult BrowserWorkspaceAdapter::FinishSessionRestore(
       if (!result.ok)
         return result;
     }
-  }
-  for (const auto& adapter : runtime.adapters) {
-    if (adapter->bound_)
-      adapter->PersistBindings();
   }
   return failure;
 }
@@ -511,12 +694,37 @@ BrowserWorkspaceAdapter::ResumeAfterCancelledShutdown(Profile& profile) {
   if (browser_shutdown::IsTryingToQuit())
     return Fail(
         "Quit is still pending. Resume only after SetTryingToQuit(false).");
-  ForProfile(profile).shutting_down = false;
+  auto& runtime = ForProfile(profile);
+  if (!runtime.shutting_down)
+    return Ok();
+  runtime.shutting_down = false;
+  // Pages may have closed while quit was pending. Gate commands until the
+  // surviving projections reconcile, including after a metadata-load retry.
+  runtime.complete = false;
+  for (const auto& adapter : runtime.adapters) {
+    adapter->OnServiceChanged();
+  }
+  if (runtime.lifecycle && !runtime.lifecycle->native_ready_) {
+    return Fail("Native session insertion has not completed.");
+  }
   return FinishSessionRestore(profile);
 }
 
 void BrowserWorkspaceAdapter::PersistSessionBindings(Profile& profile) {
-  for (const auto& adapter : ForProfile(profile).adapters) {
+  auto& runtime = ForProfile(profile);
+  // Invalidate now; the completed binding pass must re-emit after a reset
+  // that arrived before its restore barrier opened.
+  for (const auto& adapter : runtime.adapters) {
+    adapter->persisted_window_.clear();
+    adapter->persisted_tabs_.clear();
+  }
+  if (!runtime.complete || runtime.shutting_down ||
+      browser_shutdown::IsTryingToQuit() ||
+      WorkspaceLifecycle::HasPendingSessionRestore(&profile) ||
+      SessionRestore::IsRestoring(&profile)) {
+    return;
+  }
+  for (const auto& adapter : runtime.adapters) {
     // A partial allocation failure still has valid existing native bindings.
     if (adapter->window_id_)
       adapter->PersistBindings(true);
@@ -605,8 +813,20 @@ std::map<std::string, std::string> BrowserWorkspaceAdapter::TabExtraData(
     content::WebContents& contents) {
   auto* profile = Profile::FromBrowserContext(contents.GetBrowserContext());
   auto state = WorkspaceService::ForProfile(*profile).ExportSnapshot();
-  if (!state)
-    return {};
+  if (!state) {
+    // UndoClose may capture a restored tab before metadata loads. Keep only
+    // already bounded hints; reconciliation will validate them when ready.
+    const auto* binding = Binding::Get(contents);
+    if (!binding || !binding->item() || binding->legacy()) {
+      return {};
+    }
+    std::map<std::string, std::string> data = {
+        {kItemKey, base::NumberToString(binding->item())}};
+    if (binding->space()) {
+      data[kSpaceKey] = base::NumberToString(binding->space());
+    }
+    return data;
+  }
   uint64_t space = 0;
   for (const auto& adapter : ForProfile(*profile).adapters) {
     if (adapter->tabs_ &&
@@ -676,7 +896,8 @@ void BrowserWorkspaceAdapter::PersistBindings(bool force) {
   auto state = service_->ExportSnapshot();
   if (!state)
     return;
-  const auto window = WindowExtraData();
+  auto window = WindowExtraData();
+  window.insert(restored_extra_data_.begin(), restored_extra_data_.end());
   for (const auto& [key, value] : window) {
     if (force || !persisted_window_.contains(key) ||
         persisted_window_.at(key) != value)
@@ -702,6 +923,10 @@ void BrowserWorkspaceAdapter::PersistBindings(bool force) {
     const auto row = items.find(item);
     auto data = TabBindingExtraData(
         *contents, row == items.end() ? nullptr : row->second, space);
+    if (auto* historical = static_cast<HistoricalData*>(
+            contents->GetUserData(&kHistoricalDataKey))) {
+      data.insert(historical->extra.begin(), historical->extra.end());
+    }
     auto& previous = persisted_tabs_[session_id.id()];
     for (const auto& [key, value] : data) {
       if (force || !previous.contains(key) || previous.at(key) != value)
@@ -800,6 +1025,9 @@ void BrowserWorkspaceAdapter::Refresh() {
   // Navigate can run a nested UI loop before returning its exact contents.
   if (changing_)
     return;
+  // Metadata readiness retries a pending native completion; it never releases
+  // the restore barrier by itself.
+  ForProfile(*profile_).lifecycle->Retry();
   base::AutoReset<bool> refreshing(&refreshing_, true);
   auto& runtime = ForProfile(*profile_);
   const bool dirty = bindings_dirty_;

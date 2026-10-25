@@ -12,6 +12,22 @@ MA-001.a has an independent [onboarding motion study](../design/onboarding/READM
 
 Current work prioritizes [MA-007.a, the native shell experiment](experiments/native-shell.md). Its separate, optional patch adds full-window AppKit material, a translucent empty canvas and sidebar address controls. Native keyboard navigation passed; Arc sidebar structure and command-bar parity remain incomplete. It does not close foundation or release acceptance.
 
+## Candidate workspace lifecycle hooks
+
+[Patch 0011](patches/0011-native-workspace-lifecycle.patch) connects native startup/restore and shutdown to the Profile-owned adapter. Its base-only [dispatch boundary](foundation/workspace_lifecycle.h) avoids a reverse dependency from sessions/lifetime to the adapter. It registers only when the optional workspace sidebar creates an adapter. Keep `--myarc-workspace-sidebar` disabled until command safety and native restoration checks pass.
+
+The canonical foundation payload now includes 16 owned files. Patch 0011 contains upstream hooks only; its owned helper and adapter changes live in that payload. After applying the optional native stack through 0011, run from Chromium's source root:
+
+```sh
+gn gen out/MyarcM0
+autoninja -C out/MyarcM0 -j 8 workspace_lifecycle_check
+out/MyarcM0/workspace_lifecycle_check
+```
+
+The executable checks exact-Profile registration, retained metadata and startup/restore counters using opaque identity tokens. It creates no real Profile and establishes no browser recovery or quit durability. Parent compilation of the affected native objects passes; full relink and runtime acceptance remain pending. Verify first-adapter/hint ordering, late first-window creation and reset re-emission with 200 or more tabs before enabling the renderer.
+
+On every Chromium rebase, compare `PreserveUnknownData` against the producers in `BrowserLiveTabContext` and consumers in `browser_tabrestore`, including private glic/send-tab keys. Cleared known fields must stay absent; unrelated historical keys must survive.
+
 ## Local build recipe
 
 Reviewed upstream instructions at `7ae71de816ba32868ff9f974c2716f04ebd9b860`: [Mac build](https://chromium.googlesource.com/chromium/src/+/7ae71de816ba32868ff9f974c2716f04ebd9b860/docs/mac_build_instructions.md), [Apple Silicon](https://chromium.googlesource.com/chromium/src/+/7ae71de816ba32868ff9f974c2716f04ebd9b860/docs/mac_arm64.md), and [Rust FFI](https://chromium.googlesource.com/chromium/src/+/7ae71de816ba32868ff9f974c2716f04ebd9b860/docs/rust/ffi.md).

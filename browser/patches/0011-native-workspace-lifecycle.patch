@@ -1,0 +1,344 @@
+diff --git a/chrome/browser/lifetime/BUILD.gn b/chrome/browser/lifetime/BUILD.gn
+index 3416c27..341b9df 100644
+--- a/chrome/browser/lifetime/BUILD.gn
++++ b/chrome/browser/lifetime/BUILD.gn
+@@ -96,6 +96,7 @@ source_set("impl") {
+     "//components/tracing:tracing_config",
+     "//content/public/browser",
+     "//content/public/common",
++    "//myarc:workspace_lifecycle",
+     "//printing/buildflags",
+     "//rlz/buildflags",
+   ]
+diff --git a/chrome/browser/lifetime/browser_shutdown.cc b/chrome/browser/lifetime/browser_shutdown.cc
+index e972784..2ca6ff8 100644
+--- a/chrome/browser/lifetime/browser_shutdown.cc
++++ b/chrome/browser/lifetime/browser_shutdown.cc
+@@ -39,6 +39,7 @@
+ #include "content/public/browser/render_process_host.h"
+ #include "content/public/browser/tracing_controller.h"
+ #include "content/public/common/content_switches.h"
++#include "myarc/workspace_lifecycle.h"
+ #include "printing/buildflags/buildflags.h"
+ #include "rlz/buildflags/buildflags.h"
+ 
+@@ -199,6 +200,13 @@ void OnShutdownStarting(ShutdownType type) {
+     return;
+   }
+ 
++  // Silent exit/system session end can bypass SetTryingToQuit(true).
++  // Ordinary window closure retains its normal last-projection semantics.
++  if (type != ShutdownType::kWindowClose && type != ShutdownType::kNotValid) {
++    myarc::WorkspaceLifecycle::NotifyAll(
++        myarc::WorkspaceLifecycle::Event::kShutdownStarted);
++  }
++
+   static crash_reporter::CrashKeyString<11> shutdown_type_key("shutdown-type");
+   shutdown_type_key.Set(ToShutdownTypeString(type));
+ 
+@@ -488,6 +496,9 @@ void SetTryingToQuit(bool quitting) {
+   g_trying_to_quit = quitting;
+ 
+   if (quitting) {
++    // Application quit precedes ShutdownSessionServices and native tab closure.
++    myarc::WorkspaceLifecycle::NotifyAll(
++        myarc::WorkspaceLifecycle::Event::kShutdownStarted);
+     return;
+   }
+ 
+@@ -505,6 +516,9 @@ void SetTryingToQuit(bool quitting) {
+ #if BUILDFLAG(ENABLE_BACKGROUND_MODE)
+   BackgroundModeManager::set_should_restart_in_background(false);
+ #endif  // BUILDFLAG(ENABLE_BACKGROUND_MODE)
++  // Delegates post cancellable work, after caller-side unload cleanup too.
++  myarc::WorkspaceLifecycle::NotifyAll(
++      myarc::WorkspaceLifecycle::Event::kShutdownCancelled);
+ }
+ 
+ bool IsTryingToQuit() {
+diff --git a/chrome/browser/sessions/BUILD.gn b/chrome/browser/sessions/BUILD.gn
+index f69c5d5..1dd60e0 100644
+--- a/chrome/browser/sessions/BUILD.gn
++++ b/chrome/browser/sessions/BUILD.gn
+@@ -86,6 +86,7 @@ source_set("impl") {
+     "//chrome/browser:buildflags",
+     "//chrome/browser/glic",
+     "//chrome/browser/lifetime",
++    "//myarc:workspace_lifecycle",
+   ]
+ 
+   if (enable_extensions_core) {
+diff --git a/chrome/browser/sessions/session_restore.cc b/chrome/browser/sessions/session_restore.cc
+index ea1990e..a1c748c 100644
+--- a/chrome/browser/sessions/session_restore.cc
++++ b/chrome/browser/sessions/session_restore.cc
+@@ -115,6 +115,7 @@
+ #include "content/public/browser/web_contents.h"
+ #include "extensions/browser/extension_registry.h"
+ #include "extensions/common/extension_set.h"
++#include "myarc/workspace_lifecycle.h"
+ #include "ui/base/mojom/window_show_state.mojom.h"
+ #include "ui/base/page_transition_types.h"
+ #include "ui/base/window_open_disposition.h"
+@@ -364,6 +365,8 @@ class SessionRestoreImpl : public BrowserCollectionObserver {
+         KeepAliveOrigin::SESSION_RESTORE, KeepAliveRestartOption::DISABLED);
+     profile_keep_alive_ = std::make_unique<ScopedProfileKeepAlive>(
+         profile, ProfileKeepAliveOrigin::kBrowserWindow);
++    myarc::WorkspaceLifecycle::Notify(
++        profile_, myarc::WorkspaceLifecycle::Event::kSessionRestoreStarted);
+   }
+ 
+   bool synchronous() const { return synchronous_; }
+@@ -532,17 +535,20 @@ class SessionRestoreImpl : public BrowserCollectionObserver {
+     // IsAnySessionCurrentlyRestoring() from OnProfileSessionRestored() to
+     // decide whether the last in-flight restore has completed.
+     GetActiveSessionRestorers().erase(this);
++    weak_factory_.InvalidateWeakPtrs();
+ 
+     // Restores of a session from another device are not restores of this
+     // profile's own session, and are not reported to observers.
+-    if (is_foreign_session_restore_) {
+-      return;
+-    }
+-
+-    for (auto& observer : *SessionRestore::observers()) {
+-      observer.OnProfileSessionRestored(profile_, counts_.normal_windows,
+-                                        counts_.app_windows);
++    if (!is_foreign_session_restore_) {
++      for (auto& observer : *SessionRestore::observers()) {
++        observer.OnProfileSessionRestored(profile_, counts_.normal_windows,
++                                          counts_.app_windows);
++      }
+     }
++    // Includes cancellation: pending callbacks are invalidated, so only the
++    // windows/tabs actually inserted can remain. Notify after native observers.
++    myarc::WorkspaceLifecycle::Notify(
++        profile_, myarc::WorkspaceLifecycle::Event::kSessionRestoreFinished);
+   }
+ 
+   bool is_foreign_session_restore() const {
+@@ -879,6 +885,9 @@ class SessionRestoreImpl : public BrowserCollectionObserver {
+           ShouldRestoreToExistingBrowser()) {
+         // The first set of tabs is added to the existing browser.
+         browser = browser_;
++        if (auto* lifecycle = myarc::WorkspaceLifecycle::Get(profile_)) {
++          lifecycle->RestoreWindow(*browser, window->extra_data);
++        }
+       } else {
+ #if BUILDFLAG(IS_CHROMEOS)
+         ash::BootTimesRecorder::Get()->AddLoginTimeMarker(
+@@ -1404,6 +1413,9 @@ class SessionRestoreImpl : public BrowserCollectionObserver {
+       manager->SetWindowCreationInfo(
+           waap::NewWindowCreationSource::kSessionRestore, now);
+     }
++    if (auto* lifecycle = myarc::WorkspaceLifecycle::Get(profile_)) {
++      lifecycle->RestoreWindow(*browser_window, extra_data);
++    }
+     g_is_any_session_restored = true;
+     return browser_window;
+   }
+diff --git a/chrome/browser/sessions/session_service.cc b/chrome/browser/sessions/session_service.cc
+index de4c894..5885cd6 100644
+--- a/chrome/browser/sessions/session_service.cc
++++ b/chrome/browser/sessions/session_service.cc
+@@ -17,6 +17,7 @@
+ #include "base/debug/dump_without_crashing.h"
+ #include "base/functional/bind.h"
+ #include "base/metrics/histogram_functions.h"
++#include "base/task/single_thread_task_runner.h"
+ #include "base/values.h"
+ #include "build/build_config.h"
+ #include "chrome/browser/apps/app_service/launch_utils.h"
+@@ -67,6 +68,7 @@
+ #include "content/public/browser/navigation_entry.h"
+ #include "content/public/browser/session_storage_namespace_handle.h"
+ #include "content/public/browser/web_contents.h"
++#include "myarc/workspace_lifecycle.h"
+ 
+ #if BUILDFLAG(IS_CHROMEOS)
+ #include "chrome/browser/ash/crostini/crostini_util.h"
+@@ -699,6 +701,18 @@ void SessionService::ScheduleResetCommands() {
+     move_on_new_browser_ = true;
+   }
+   command_storage_manager()->StartSaveTimer();
++  // Reset can run inside the factory constructor. Re-enter only after it has
++  // returned, including nested UI loops. Cancel if the service is destroyed.
++  base::SingleThreadTaskRunner::GetCurrentDefault()->PostNonNestableTask(
++      FROM_HERE, base::BindOnce(
++                     [](base::WeakPtr<SessionService> service) {
++                       if (service) {
++                         myarc::WorkspaceLifecycle::Notify(
++                             service->profile(),
++                             myarc::WorkspaceLifecycle::Event::kSessionReset);
++                       }
++                     },
++                     weak_factory_.GetWeakPtr()));
+ }
+ 
+ void SessionService::CommitPendingCloses() {
+diff --git a/chrome/browser/ui/BUILD.gn b/chrome/browser/ui/BUILD.gn
+index 0772e0c..d9b02bc 100644
+--- a/chrome/browser/ui/BUILD.gn
++++ b/chrome/browser/ui/BUILD.gn
+@@ -516,6 +516,7 @@ if (!is_android) {
+       "//components/tab_groups",
+       "//components/tabs:public",
+       "//content/public/browser",
++      "//myarc:workspace_lifecycle",
+       "//third_party/blink/public/common:headers",
+       "//ui/gfx/geometry",
+       "//ui/gfx/range",
+@@ -582,6 +583,7 @@ if (!is_android) {
+       "//components/tab_groups",
+       "//components/tabs:public",
+       "//content/public/browser",
++      "//myarc:workspace_lifecycle",
+       "//ui/base",
+       "//ui/base/mojom:ui_base_types",
+     ]
+@@ -975,6 +977,7 @@ if (!is_android) {
+       "//content/public/browser",
+       "//content/public/common",
+       "//extensions/buildflags",
++      "//myarc:workspace_lifecycle",
+       "//pdf:features",
+       "//printing/buildflags",
+       "//ui/actions",
+diff --git a/chrome/browser/ui/browser_commands.cc b/chrome/browser/ui/browser_commands.cc
+index 0efb18f..5954745 100644
+--- a/chrome/browser/ui/browser_commands.cc
++++ b/chrome/browser/ui/browser_commands.cc
+@@ -207,6 +207,7 @@
+ #include "content/public/common/url_constants.h"
+ #include "content/public/common/url_utils.h"
+ #include "extensions/buildflags/buildflags.h"
++#include "myarc/workspace_lifecycle.h"
+ #include "pdf/buildflags.h"
+ #include "printing/buildflags/buildflags.h"
+ #include "rlz/buildflags/buildflags.h"
+@@ -994,6 +995,9 @@ BrowserWindowInterface* OpenEmptyWindow(Profile* profile,
+     AddTabAt(browser, initial_url, -1, true);
+   }
+ 
++  // Also covers the first OTR/Guest window, which has no SessionRestoreImpl.
++  myarc::WorkspaceLifecycle::Notify(
++      profile, myarc::WorkspaceLifecycle::Event::kNativeReady);
+   browser->GetWindow()->Show();
+   return browser;
+ }
+diff --git a/chrome/browser/ui/browser_live_tab_context.cc b/chrome/browser/ui/browser_live_tab_context.cc
+index cc8786f..87d75f1 100644
+--- a/chrome/browser/ui/browser_live_tab_context.cc
++++ b/chrome/browser/ui/browser_live_tab_context.cc
+@@ -61,6 +61,7 @@
+ #include "content/public/browser/navigation_controller.h"
+ #include "content/public/browser/session_storage_namespace_handle.h"
+ #include "content/public/browser/web_contents.h"
++#include "myarc/workspace_lifecycle.h"
+ #include "ui/base/mojom/window_show_state.mojom.h"
+ #include "ui/base/window_open_disposition.h"
+ 
+@@ -158,6 +159,9 @@ BrowserLiveTabContext::~BrowserLiveTabContext() {
+ }
+ 
+ void BrowserLiveTabContext::ShowBrowserWindow() {
++  // TabRestoreService calls this after inserting all tabs in the context.
++  myarc::WorkspaceLifecycle::Notify(
++      &profile_.get(), myarc::WorkspaceLifecycle::Event::kNativeReady);
+   base_window_->Show();
+ }
+ 
+@@ -208,6 +212,9 @@ std::map<std::string, std::string> BrowserLiveTabContext::GetExtraDataForTab(
+     extra_data.merge(contextual_tasks_controller->GetTabRestoreData(tab));
+   }
+ 
++  if (auto* lifecycle = myarc::WorkspaceLifecycle::Get(&profile_.get())) {
++    extra_data.merge(lifecycle->TabData(browser_.get(), *tab->GetContents()));
++  }
+   return extra_data;
+ }
+ 
+@@ -233,6 +240,9 @@ BrowserLiveTabContext::GetExtraDataForWindow() const {
+     }
+   }
+ 
++  if (auto* lifecycle = myarc::WorkspaceLifecycle::Get(&profile_.get())) {
++    data.merge(lifecycle->WindowData(browser_.get()));
++  }
+   return data;
+ }
+ 
+@@ -579,8 +589,13 @@ sessions::LiveTabContext* BrowserLiveTabContext::Create(
+     }
+   }
+ 
++  myarc::WorkspaceLifecycle::Notify(
++      profile, myarc::WorkspaceLifecycle::Event::kRestoreStarted);
+   BrowserWindowInterface* browser =
+       CreateBrowserWindow(std::move(*create_params));
++  if (auto* lifecycle = myarc::WorkspaceLifecycle::Get(profile)) {
++    lifecycle->RestoreWindow(*browser, extra_data);
++  }
+ 
+   return BrowserLiveTabContext::From(browser);
+ }
+diff --git a/chrome/browser/ui/browser_tabrestore.cc b/chrome/browser/ui/browser_tabrestore.cc
+index f2a9542..f2ff909 100644
+--- a/chrome/browser/ui/browser_tabrestore.cc
++++ b/chrome/browser/ui/browser_tabrestore.cc
+@@ -37,6 +37,7 @@
+ #include "content/public/browser/restore_type.h"
+ #include "content/public/browser/session_storage_namespace_handle.h"
+ #include "content/public/browser/web_contents.h"
++#include "myarc/workspace_lifecycle.h"
+ #include "third_party/blink/public/common/user_agent/user_agent_metadata.h"
+ #include "ui/gfx/geometry/size.h"
+ #include "ui/gfx/range/range.h"
+@@ -83,6 +84,10 @@ std::unique_ptr<WebContents> CreateRestoredTab(
+   apps::SetAppIdForWebContents(browser->GetProfile(), web_contents.get(),
+                                extension_app_id);
+ 
++  if (auto* lifecycle = myarc::WorkspaceLifecycle::Get(browser->GetProfile())) {
++    lifecycle->RestoreTab(*browser, *web_contents, extra_data);
++  }
++
+   glic::RestoreGlicStateFromExtraData(web_contents.get(), extra_data);
+   contextual_tasks::ContextualTasksTabRestoreData::RestoreFromExtraData(
+       web_contents.get(), extra_data);
+diff --git a/chrome/browser/ui/startup/BUILD.gn b/chrome/browser/ui/startup/BUILD.gn
+index d554afb..bbebbf9 100644
+--- a/chrome/browser/ui/startup/BUILD.gn
++++ b/chrome/browser/ui/startup/BUILD.gn
+@@ -179,6 +179,7 @@ source_set("impl") {
+     "//gpu/config",
+     "//media",
+     "//media:media_buildflags",
++    "//myarc:workspace_lifecycle",
+     "//sandbox/policy",
+     "//services/device/public/cpp/hid",
+     "//services/network/public/cpp:flags_and_switches",
+diff --git a/chrome/browser/ui/startup/startup_browser_creator_impl.cc b/chrome/browser/ui/startup/startup_browser_creator_impl.cc
+index 1d9b0f0..c615660 100644
+--- a/chrome/browser/ui/startup/startup_browser_creator_impl.cc
++++ b/chrome/browser/ui/startup/startup_browser_creator_impl.cc
+@@ -69,6 +69,7 @@
+ #include "content/public/browser/dom_storage_context.h"
+ #include "content/public/browser/storage_partition.h"
+ #include "content/public/common/content_switches.h"
++#include "myarc/workspace_lifecycle.h"
+ #include "ui/base/page_transition_types.h"
+ #include "ui/base/window_open_disposition.h"
+ #include "url/origin.h"
+@@ -264,7 +265,12 @@ void StartupBrowserCreatorImpl::Launch(
+   }
+ #endif
+ 
++  myarc::WorkspaceLifecycle::Notify(
++      profile_, myarc::WorkspaceLifecycle::Event::kStartupStarted);
+   DetermineURLsAndLaunch(process_startup, restore_tabbed_browser);
++  // Window creation cannot release the barrier before a later restorer starts.
++  myarc::WorkspaceLifecycle::Notify(
++      profile_, myarc::WorkspaceLifecycle::Event::kStartupFinished);
+ 
+   // It's possible for there to be no browser window, e.g. if someone
+   // specified a non-sensical combination of options
