@@ -12,7 +12,7 @@ Interactive command, action and tab-strip entrypoints call `NewTabFromUI()`. Pro
 
 Input is limited to 4,096 UTF-16 code units before classification. Existing-tab matching scans at most 512 tabs in the current window and displays up to eight results. HTTP(S), Chromium internal URLs and `about:blank` are accepted. Complete omnibox providers, inline completion and browser commands remain unimplemented.
 
-The browser layout requires the content parent to remain visible. The palette makes it transparent and hides its native hosts while open, then restores them on close.
+The browser layout requires the content parent to remain visible. The original palette makes it transparent and hides its native hosts while open, then restores them on close. The 0007 candidate below removes that workaround so the real page stays visible behind the palette.
 
 ## Observed on macOS 26.7
 
@@ -38,8 +38,16 @@ Verification on the native build:
 
 An initial HoverButton label paint hit Chromium\'s opaque-layer subpixel assertion; grayscale label rendering fixed it. Live theme switching while the palette stays open remains unverified.
 
+## Current-tab editing candidate
+
+[0007-current-tab-palette.patch](../patches/0007-current-tab-palette.patch) follows 0005. Cmd/Ctrl+L and a sidebar URL click route to the same centered palette with the current full URL selected. Enter with unchanged input reloads; changed input and history submission navigate the current tab. Interactive New Tab retains its separate new-tab mode. The real page stays visible behind the bubble, and the light blank canvas uses a near-white translucent fill.
+
+The candidate also registers macOS Cmd/Ctrl+S aliases for the existing collapse command. Full hide/show and truthful Save Page labels require the separate [0008 sidebar patch](../patches/0008-native-sidebar-toggle.patch). The [0006 tile patch](../patches/0006-native-pinned-tiles.patch) retains native pinning and includes corrected split-grid sizing and shared split fill.
+
+The combined native build succeeded before a final omnibox include-layer correction. Frame and tab-layout GN checks passed; the corrected omnibox source also passes its GN check. The six-file 0007 delta reproduces the external source exactly after 0002/0004/0005 and excludes independent layout rounding. A system app-data permission prompt interrupted clean native capture and the remaining interaction checks. No OS permission was approved by the agent. Rebuild the final source and verify the marked profile, PID and foreground window before resuming.
+
 ## Remaining
 
-Cmd/Ctrl+L current-tab editing and sidebar URL activation still use the older sidebar editor. Sidebar show/hide, complete autocomplete and the broader command catalog remain pending. Motion timing, interruption, reduced motion, full accessibility and Windows behavior are unverified.
+Current-tab editing, sidebar URL activation and full sidebar hide/show still need native acceptance. Complete autocomplete and the broader command catalog remain pending. Motion timing, interruption, reduced motion, full accessibility and Windows behavior are unverified.
 
 A crash during development exposed the existing recovery bubble failing to find an omitted app-menu anchor. A fresh disposable profile was used for the final checks. Recovery and popup anchoring remain release blockers; use this prototype only with disposable profiles.

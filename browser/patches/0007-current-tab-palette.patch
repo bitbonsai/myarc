@@ -1,0 +1,331 @@
+diff --git a/chrome/browser/ui/browser_commands.cc b/chrome/browser/ui/browser_commands.cc
+index 9bce28e..0efb18f 100644
+--- a/chrome/browser/ui/browser_commands.cc
++++ b/chrome/browser/ui/browser_commands.cc
+@@ -1387,7 +1387,8 @@ void NewTabFromUI(BrowserWindowInterface* browser, NewTabTypes context) {
+ }
+ 
+ bool NavigateFromMyarcPalette(BrowserWindowInterface* browser,
+-                              std::u16string_view text) {
++                              std::u16string_view text,
++                              bool new_tab) {
+   if (text.empty() || text.size() > 4096) {
+     return false;
+   }
+@@ -1404,6 +1405,15 @@ bool NavigateFromMyarcPalette(BrowserWindowInterface* browser,
+                            url.SchemeIs("chrome") || url.IsAboutBlank())) {
+     return false;
+   }
++  if (!new_tab) {
++    if (!browser->GetTabStripModel()->GetActiveWebContents()) {
++      return false;
++    }
++    NavigateParams params(browser, url, ui::PAGE_TRANSITION_TYPED);
++    params.disposition = WindowOpenDisposition::kCurrentTab;
++    Navigate(&params);
++    return true;
++  }
+   return AddAndReturnTabAt(browser, url, -1, true, std::nullopt, false,
+                            NavigateParams::WindowAction::kShowWindow) !=
+          nullptr;
+diff --git a/chrome/browser/ui/browser_commands.h b/chrome/browser/ui/browser_commands.h
+index df3dae9..8d05976 100644
+--- a/chrome/browser/ui/browser_commands.h
++++ b/chrome/browser/ui/browser_commands.h
+@@ -146,7 +146,8 @@ content::WebContents& NewTab(BrowserWindowInterface* browser,
+ // Interactive intent is separate so internal callers still create a real tab.
+ void NewTabFromUI(BrowserWindowInterface* browser, NewTabTypes context);
+ bool NavigateFromMyarcPalette(BrowserWindowInterface* browser,
+-                              std::u16string_view text);
++                              std::u16string_view text,
++                              bool new_tab = true);
+ void NewTabToRight(BrowserWindowInterface* browser);
+ void NewTabFromClipboardURL(BrowserWindowInterface* browser);
+ void CloseTab(BrowserWindowInterface* browser);
+diff --git a/chrome/browser/ui/views/frame/browser_view.cc b/chrome/browser/ui/views/frame/browser_view.cc
+index b657854..dfb5574 100644
+--- a/chrome/browser/ui/views/frame/browser_view.cc
++++ b/chrome/browser/ui/views/frame/browser_view.cc
+@@ -273,6 +273,7 @@
+ #include "components/javascript_dialogs/app_modal_dialog_controller.h"
+ #include "components/javascript_dialogs/app_modal_dialog_queue.h"
+ #include "components/javascript_dialogs/app_modal_dialog_view.h"
++#include "components/omnibox/browser/location_bar_model.h"
+ #include "components/performance_manager/public/features.h"
+ #include "components/permissions/permission_request_manager.h"
+ #include "components/prefs/pref_service.h"
+@@ -679,8 +680,14 @@ class MyarcPaletteView : public views::BoxLayoutView,
+   METADATA_HEADER(MyarcPaletteView, views::BoxLayoutView)
+ 
+  public:
+-  MyarcPaletteView(base::WeakPtr<BrowserWindowInterface> browser, int width)
+-      : browser_(browser), width_(width) {
++  MyarcPaletteView(base::WeakPtr<BrowserWindowInterface> browser,
++                   int width,
++                   bool new_tab,
++                   std::u16string initial_text)
++      : browser_(browser),
++        width_(width),
++        new_tab_(new_tab),
++        initial_text_(std::move(initial_text)) {
+     SetOrientation(views::BoxLayout::Orientation::kVertical);
+     SetBetweenChildSpacing(8);
+     auto* header = AddChildView(std::make_unique<views::BoxLayoutView>());
+@@ -708,6 +715,8 @@ class MyarcPaletteView : public views::BoxLayoutView,
+     error_ = AddChildView(std::make_unique<views::Label>());
+     error_->SetEnabledColor(ui::kColorSysError);
+     error_->SetVisible(false);
++    input_->SetText(initial_text_);
++    input_->SelectAll(false);
+     Rebuild();
+   }
+ 
+@@ -729,7 +738,7 @@ class MyarcPaletteView : public views::BoxLayoutView,
+       return true;
+     }
+     if (event.key_code() == ui::VKEY_RETURN) {
+-      if (selected_ >= 0) {
++      if (selected_ >= 0 && (new_tab_ || input_->GetText() != initial_text_)) {
+         ActivateResult(selected_);
+       } else {
+         Submit();
+@@ -892,7 +901,8 @@ class MyarcPaletteView : public views::BoxLayoutView,
+     }
+     if (matches_.empty()) {
+       auto* hint = rows_->AddChildView(std::make_unique<views::Label>(
+-          u"Enter opens a new tab. Esc cancels."));
++          new_tab_ ? u"Enter opens a new tab. Esc cancels."
++                   : u"Enter updates the current tab. Esc cancels."));
+       hint->SetEnabledColor(ui::kColorSysOnSurfaceVariant);
+       hint->SetPreferredSize(gfx::Size(width_, 44));
+     } else {
+@@ -925,7 +935,8 @@ class MyarcPaletteView : public views::BoxLayoutView,
+           history_index < static_cast<int>(history_urls_.size()) &&
+           chrome::NavigateFromMyarcPalette(
+               browser_.get(),
+-              base::UTF8ToUTF16(history_urls_[history_index].spec()))) {
++              base::UTF8ToUTF16(history_urls_[history_index].spec()),
++              new_tab_)) {
+         if (GetWidget() && !GetWidget()->IsClosed()) {
+           GetWidget()->Close();
+         }
+@@ -949,8 +960,13 @@ class MyarcPaletteView : public views::BoxLayoutView,
+   }
+ 
+   void Submit() {
+-    if (!browser_ ||
+-        !chrome::NavigateFromMyarcPalette(browser_.get(), input_->GetText())) {
++    if (!browser_) {
++      return;
++    }
++    if (!new_tab_ && input_->GetText() == initial_text_) {
++      chrome::Reload(browser_.get(), WindowOpenDisposition::kCurrentTab);
++    } else if (!chrome::NavigateFromMyarcPalette(browser_.get(),
++                                                 input_->GetText(), new_tab_)) {
+       error_->SetText(
+           u"Enter a web URL or search. This address is unsupported.");
+       error_->SetVisible(true);
+@@ -964,6 +980,8 @@ class MyarcPaletteView : public views::BoxLayoutView,
+ 
+   base::WeakPtr<BrowserWindowInterface> browser_;
+   const int width_;
++  const bool new_tab_;
++  const std::u16string initial_text_;
+   raw_ptr<views::Textfield> input_ = nullptr;
+   raw_ptr<views::BoxLayoutView> rows_ = nullptr;
+   raw_ptr<views::Label> error_ = nullptr;
+@@ -2688,6 +2706,13 @@ PinnedToolbarActions* BrowserView::GetPinnedToolbarActions() {
+ }
+ 
+ void BrowserView::SetFocusToLocationBar(bool is_user_initiated) {
++  if (is_user_initiated &&
++      base::CommandLine::ForCurrentProcess()->HasSwitch(
++          "myarc-visual-parity") &&
++      browser_->GetType() == BrowserWindowInterface::Type::TYPE_NORMAL &&
++      ShowMyarcCommandPalette(false)) {
++    return;
++  }
+   // On Windows, changing focus to the location bar causes the browser window to
+   // become active. This can steal focus if the user has another window open
+   // already. On Chrome OS, changing focus makes a view believe it has a focus
+@@ -5603,7 +5628,7 @@ const views::View* BrowserView::GetViewByElementId(
+ ///////////////////////////////////////////////////////////////////////////////
+ // BrowserView, ui::AcceleratorTarget overrides:
+ 
+-bool BrowserView::ShowMyarcCommandPalette() {
++bool BrowserView::ShowMyarcCommandPalette(bool new_tab) {
+   if (!initialized_ || !GetWidget()) {
+     return false;
+   }
+@@ -5622,39 +5647,22 @@ bool BrowserView::ShowMyarcCommandPalette() {
+   delegate->SetTitle(u"Command palette");
+   delegate->set_corner_radius(12);
+   delegate->set_margins(gfx::Insets(12));
+-  auto* content = delegate->SetContentsView(
+-      std::make_unique<MyarcPaletteView>(browser_->GetWeakPtr(), width));
++  const auto* location_model = LocationBarModel::From(browser_.get());
++  const std::u16string initial_text =
++      !new_tab && location_model ? location_model->GetFormattedFullURL() : u"";
++  auto* content = delegate->SetContentsView(std::make_unique<MyarcPaletteView>(
++      browser_->GetWeakPtr(), width, new_tab, initial_text));
+   delegate->SetInitiallyFocusedView(content->input());
+   myarc_command_palette_widget_ = views::BubbleDialogDelegate::CreateBubble(
+       delegate,
+       base::IgnoreArgs<views::Widget::ClosedReason>(base::BindOnce(
+           &BrowserView::OnMyarcCommandPaletteClosed, GetAsWeakPtr())));
+-  if (!multi_contents_view_->layer()) {
+-    multi_contents_view_->SetPaintToLayer();
+-    multi_contents_view_->layer()->SetFillsBoundsOpaquely(false);
+-  }
+-  multi_contents_view_->layer()->SetOpacity(0.0f);
+-  // The layout requires this parent visible; hide native hosts to block page
+-  // clicks.
+-  for (const auto& container :
+-       multi_contents_view_->contents_container_views()) {
+-    container->contents_view()->holder()->SetVisible(false);
+-  }
+   myarc_command_palette_widget_->Show();
+   content->input()->RequestFocus();
+   return true;
+ }
+ 
+ void BrowserView::OnMyarcCommandPaletteClosed() {
+-  if (multi_contents_view_ && multi_contents_view_->layer()) {
+-    multi_contents_view_->layer()->SetOpacity(1.0f);
+-    for (const auto& container :
+-         multi_contents_view_->contents_container_views()) {
+-      auto* contents = container->contents_view();
+-      contents->holder()->SetVisible(contents->web_contents() &&
+-                                     !contents->web_contents()->IsCrashed());
+-    }
+-  }
+   if (myarc_command_palette_delegate_) {
+     myarc_command_palette_delegate_->SetAnchorView(nullptr);
+   }
+@@ -6109,10 +6117,19 @@ void BrowserView::LoadAccelerators() {
+ #if BUILDFLAG(IS_MAC)
+   if (base::CommandLine::ForCurrentProcess()->HasSwitch(
+           "myarc-visual-parity")) {
+-    ui::Accelerator control_t(ui::VKEY_T, ui::EF_CONTROL_DOWN);
+-    accelerator_table_[control_t] = IDC_NEW_TAB;
+-    focus_manager->RegisterAccelerator(
+-        control_t, ui::AcceleratorManager::kHighPriority, this);
++    for (const auto& [accelerator, command] :
++         {std::pair{ui::Accelerator(ui::VKEY_T, ui::EF_CONTROL_DOWN),
++                    IDC_NEW_TAB},
++          std::pair{ui::Accelerator(ui::VKEY_L, ui::EF_CONTROL_DOWN),
++                    IDC_FOCUS_LOCATION},
++          std::pair{ui::Accelerator(ui::VKEY_S, ui::EF_COMMAND_DOWN),
++                    IDC_TOGGLE_VERTICAL_TABS_COLLAPSE},
++          std::pair{ui::Accelerator(ui::VKEY_S, ui::EF_CONTROL_DOWN),
++                    IDC_TOGGLE_VERTICAL_TABS_COLLAPSE}}) {
++      accelerator_table_[accelerator] = command;
++      focus_manager->RegisterAccelerator(
++          accelerator, ui::AcceleratorManager::kHighPriority, this);
++    }
+   }
+ 
+   // Register the Esc accelerators (both press and release) to ensure they are
+diff --git a/chrome/browser/ui/views/frame/browser_view.h b/chrome/browser/ui/views/frame/browser_view.h
+index 67b5ca6..d115bb6 100644
+--- a/chrome/browser/ui/views/frame/browser_view.h
++++ b/chrome/browser/ui/views/frame/browser_view.h
+@@ -312,7 +312,7 @@ class BrowserView : public BrowserWindow,
+ 
+   ScrimView* window_scrim_view() { return window_scrim_view_; }
+ 
+-  bool ShowMyarcCommandPalette();
++  bool ShowMyarcCommandPalette(bool new_tab = true);
+ 
+   base::WeakPtr<BrowserView> GetAsWeakPtr() {
+     return weak_ptr_factory_.GetWeakPtr();
+diff --git a/chrome/browser/ui/views/frame/contents_web_view.cc b/chrome/browser/ui/views/frame/contents_web_view.cc
+index 6a29f7a..a424534 100644
+--- a/chrome/browser/ui/views/frame/contents_web_view.cc
++++ b/chrome/browser/ui/views/frame/contents_web_view.cc
+@@ -19,9 +19,11 @@
+ #include "third_party/blink/public/common/input/web_input_event.h"
+ #include "third_party/skia/include/core/SkColor.h"
+ #include "ui/base/metadata/metadata_impl_macros.h"
++#include "ui/color/color_id.h"
+ #include "ui/color/color_provider.h"
+ #include "ui/compositor/layer_solid_color.h"
+ #include "ui/compositor/layer_tree_owner.h"
++#include "ui/gfx/color_utils.h"
+ #include "ui/gfx/geometry/rounded_corners_f.h"
+ #include "ui/views/view_class_properties.h"
+ #include "ui/views/widget/widget.h"
+@@ -231,11 +233,13 @@ void ContentsWebView::UpdateBackgroundColor() {
+ 
+   const bool visual_parity =
+       base::CommandLine::ForCurrentProcess()->HasSwitch("myarc-visual-parity");
++  const bool dark =
++      color_utils::IsDark(GetColorProvider()->GetColor(ui::kColorSysSurface));
+   auto* background_layer = layer()->AsSolidColor();
+-  background_layer->SetColor(
+-      SkColor4f::FromColor(background_visible_ ? color
+-                           : visual_parity ? SkColorSetARGB(18, 255, 255, 255)
+-                                           : SK_ColorTRANSPARENT));
++  background_layer->SetColor(SkColor4f::FromColor(
++      background_visible_ ? color
++      : visual_parity     ? SkColorSetARGB(dark ? 18 : 220, 255, 255, 255)
++                          : SK_ColorTRANSPARENT));
+   if (visual_parity) {
+     layer()->SetRoundedCornerRadius(gfx::RoundedCornersF(10));
+     layer()->SetIsFastRoundedCorner(true);
+diff --git a/chrome/browser/ui/views/omnibox/omnibox_view_views.cc b/chrome/browser/ui/views/omnibox/omnibox_view_views.cc
+index 1bc7b41..841768e 100644
+--- a/chrome/browser/ui/views/omnibox/omnibox_view_views.cc
++++ b/chrome/browser/ui/views/omnibox/omnibox_view_views.cc
+@@ -57,6 +57,7 @@
+ #include "chrome/browser/ui/ui_features.h"
+ #include "chrome/browser/ui/view_ids.h"
+ #include "chrome/browser/ui/views/chrome_layout_provider.h"
++#include "chrome/browser/ui/views/frame/browser_view.h"
+ #include "chrome/browser/ui/views/frame/contents_web_view.h"
+ #include "chrome/browser/ui/views/location_bar/icon_label_bubble_view.h"
+ #include "chrome/browser/ui/views/location_bar/location_bar_view.h"
+@@ -400,8 +401,7 @@ void OmniboxViewViews::InstallPlaceholderText() {
+   SetPlaceholderText(placeholder_text);
+   const std::u16string a11y_text =
+       maybe_a11y_placeholder_text.value_or(placeholder_text);
+-  const bool is_focused =
+-      controller()->edit_model()->has_focus() || HasFocus();
++  const bool is_focused = controller()->edit_model()->has_focus() || HasFocus();
+ 
+   if (is_focused) {
+     if (!a11y_text.empty()) {
+@@ -1424,6 +1424,14 @@ bool OmniboxViewViews::SupportsDrag() const {
+ }
+ 
+ bool OmniboxViewViews::OnMousePressed(const ui::MouseEvent& event) {
++  if (base::CommandLine::ForCurrentProcess()->HasSwitch(
++          "myarc-visual-parity") &&
++      location_bar_view_ && location_bar_view_->browser() &&
++      location_bar_view_->browser()->GetType() ==
++          BrowserWindowInterface::Type::TYPE_NORMAL &&
++      event.IsOnlyLeftMouseButton()) {
++    return true;
++  }
+   PermitExternalProtocolHandler();
+ 
+   // Clear focus of buttons, but do not clear keyword mode.
+@@ -1591,6 +1599,18 @@ bool OmniboxViewViews::OnMouseDragged(const ui::MouseEvent& event) {
+ }
+ 
+ void OmniboxViewViews::OnMouseReleased(const ui::MouseEvent& event) {
++  if (base::CommandLine::ForCurrentProcess()->HasSwitch(
++          "myarc-visual-parity") &&
++      location_bar_view_ && location_bar_view_->browser() &&
++      location_bar_view_->browser()->GetType() ==
++          BrowserWindowInterface::Type::TYPE_NORMAL &&
++      event.IsOnlyLeftMouseButton()) {
++    if (auto* view = BrowserView::GetBrowserViewForBrowser(
++            location_bar_view_->browser())) {
++      view->SetFocusToLocationBar(true);
++    }
++    return;
++  }
+   PermitExternalProtocolHandler();
+ 
+   views::Textfield::OnMouseReleased(event);
