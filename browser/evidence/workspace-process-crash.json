@@ -1,7 +1,7 @@
 {
   "slice": "MA-007.c-process-crash",
   "date": "2026-10-25",
-  "status": "failed: Temporary identity pruned before recovery decision",
+  "status": "baseline identity failure corrected in bounded Restore/discard; fresh site-storage acknowledgement still fails",
   "baseline_commit": "5bf05df",
   "setup": {
     "marked_synthetic_profile": true,
@@ -27,10 +27,53 @@
   },
   "failure": "Original Temporary item ID2 disappeared while the crash-recovery prompt was pending; a startup NTP was recorded as ID3. Native Restore returned the page under ID4.",
   "remaining": [
-    "Fix lifecycle gate so pending recovery decision cannot prune or overwrite prior workspace organization",
-    "Recheck Restore, explicit discard and shutdown/cancellation paths with fresh synthetic profiles",
-    "Canary/full recovery verification and OS/write-boundary durability remain unaccepted"
+    "Freshly acknowledged site-storage process-crash loss; no changed durability policy or weakened verifier",
+    "Branded consent, real Profile teardown, canceled quit and wider late/multiwindow restore acceptance",
+    "Acknowledged workspace-write boundaries and OS/power-loss durability"
   ],
   "workspace_renderer_default_enabled": false,
-  "raw_profiles_audits_logs_and_captures": "private, outside Git"
+  "raw_profiles_audits_logs_and_captures": "private, outside Git",
+  "followup": {
+    "implementation_commit": "2a0ef32",
+    "patch": "0018-native-recovery-lifecycle.patch",
+    "fresh_immediate_canary_case": {
+      "pending_metadata_exact": true,
+      "restored_metadata_and_original_ids_exact": true,
+      "full_verify_passed": false,
+      "failure": "Freshly acknowledged localStorage canary missing after actual process kill"
+    },
+    "persisted_canary_control": {
+      "fresh_synthetic_profile": true,
+      "clean_seed_roundtrip_before_crash": true,
+      "canary_and_metadata_verified_after_clean_reopen": true,
+      "subsequent_actual_browser_sigkill_audited": true,
+      "normal_relaunch_without_startup_urls_or_restore_flag": true,
+      "genuine_restore_invoked": true,
+      "pending_metadata_exact": true,
+      "unchanged_strict_verifier_passed": true,
+      "stable_samples": 5,
+      "restored_ids_owners_selection_urls_canary_match": true,
+      "actual_restored_pages_selectable": true,
+      "scope": "previously persisted site storage and on-disk workspace checkpoint, not immediate acknowledgement durability"
+    },
+    "explicit_discard_case": {
+      "fresh_synthetic_profile": true,
+      "actual_browser_sigkill_audited": true,
+      "pending_metadata_exact": true,
+      "exact_recovery_popup_close_invoked": true,
+      "favorite_identity_and_original_spaces_retained": true,
+      "old_temporary_pruned_after_choice": true,
+      "prior_pages_not_restored": true,
+      "readiness_released_actual_new_space_created": true
+    },
+    "upstream_storage_source": {
+      "unchanged_from_external_HEAD": true,
+      "file": "components/services/storage/dom_storage/local_storage_impl.cc",
+      "configured_default_commit_delay_seconds": 5,
+      "rate_limiting_may_delay_further": true,
+      "runtime_commit_latency_measured": false,
+      "unmodified_full_browser_native_control_run": false
+    },
+    "all_owned_browser_helpers_and_fixture_servers_closed": true
+  }
 }

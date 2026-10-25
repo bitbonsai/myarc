@@ -14,7 +14,21 @@ Baseline: `d82f4f2`. [Background and saved journeys](../evidence/page-background
 
 ## Current work
 
-Checkpoint/verify probe integrated as `5bf05df`; thirteen local tests passed. The first actual process-kill run restored both URLs but failed stable identity: the pending recovery prompt allowed Temporary item pruning before the user chose Restore. [Failure evidence](../evidence/workspace-process-crash.json) records the narrower result. Lifecycle repair is next; full crash recovery remains unaccepted.
+Checkpoint/verify probe integrated as `5bf05df`; thirteen local tests passed. The first actual process-kill run restored both URLs but failed stable identity: the pending recovery prompt allowed Temporary pruning before Restore. [Failure evidence](../evidence/workspace-process-crash.json) records that baseline.
+
+0018 integrated as `2a0ef32`. Its first actual Restore retained pending metadata and original IDs, but full verification failed on a freshly acknowledged localStorage canary. Unmodified upstream DOMStorage configures a five-second default commit delay, with further rate limiting possible. No durability policy or verifier was weakened.
+
+A separate persisted-data control passed: clean quit/reopen first proved the same canary existed, then audited SIGKILL, plain relaunch and genuine Restore passed all five strict comparisons. A fresh explicit-discard case retained Favorite/Space identity and released readiness; creating a new Space persisted afterward. These bounded results establish neither immediate acknowledgement nor OS/power-loss durability. [Run details](native-recovery-lifecycle.md).
+
+Safe preview launcher integrated as `c263228`; ten local double-based tests passed. Parent ran its exact command against the real app, observed a marked fresh profile without debugging/test-extension flags, navigated to Example Domain through the native palette, created/switched a Space and inspected its neutral empty header/material. App/helpers closed. Next: multiwindow identity and late restoration.
+
+## Tested preview command
+
+```sh
+python3 tools/launch_native_preview.py
+```
+
+Existing build host only. Each run creates a fresh disposable profile and prints its PID/log paths. Experimental sidebar flags are explicit; ordinary app launches remain unchanged. Keep important data in the normal browser. Follow the [short manual checklist and cleanup instructions](../../tests/fixtures/browser/README.md#native-preview-five-minute-manual-smoke). This developer launcher and acceptance CDP probes do not implement the P0 product CLI/MCP controls.
 
 ## Results and handoff
 

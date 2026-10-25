@@ -1,6 +1,6 @@
 # Pending native recovery choice
 
-MA-007.c-recovery-lifecycle, 2026-10-25. Build candidate over myarc `2101a464fba1cf64dca0c1fd6bfdedcb4fff7e2c` and external Chromium `3e117efa80cec1c4e1e6fbfdf44edeb087a279a5`, with the frozen optional stack through 0017. Renderer remains off by default. Native recovery acceptance is pending.
+MA-007.c-recovery-lifecycle, 2026-10-25. Build candidate over myarc `2101a464fba1cf64dca0c1fd6bfdedcb4fff7e2c` and external Chromium `3e117efa80cec1c4e1e6fbfdf44edeb087a279a5`, with the frozen optional stack through 0017. Renderer remains off by default. Bounded persisted-state Restore and explicit-discard checks passed; recent site-storage acknowledgement and broader durability remain open.
 
 ## Cause and bounded fix
 
@@ -38,10 +38,22 @@ Four canonical files change: `workspace_lifecycle.h`, `.cc`, `workspace_lifecycl
 
 Private proof: `/tmp/myarc-m0-runtime/recovery18/`. Baseline/installed manifests, source copies, `package.py`, private `owned-foundation.delta.patch`, `replay.log`, adjusted payload refresh script, helper logs, final syntax command/log, GN checks, build log/exit/timestamps and process snapshots remain there. The refresh script writes this prepared worktree, never the parent's checkout.
 
-## Parent handoff and limits
+## Parent native checks
 
-No app launch, desktop input, actual-profile access, installs or service kills occurred. No build remains running. External source/build ownership returns to the parent after this candidate handoff.
+Integrated as `2a0ef32`. Three fresh marked synthetic profiles exercised real process-kill recovery:
+
+- First repeat retained exact metadata while the genuine prompt waited, then restored the original IDs and both URLs. Full verification failed on a freshly acknowledged localStorage canary. The verifier stayed strict. Upstream DOMStorage source is unchanged and configures a five-second default commit delay, with further rate limiting possible. This is source configuration, not a measured persistence guarantee or a stock-browser runtime comparison.
+- Persisted-data control seeded its checkpoint, quit normally, reopened with explicit session restoration and verified the same canary/metadata. Only then did the parent audit and SIGKILL that live browser. Its subsequent ordinary relaunch supplied neither URLs nor a restore flag; genuine Restore passed the unchanged verifier for five samples, including stable IDs/owners/selection, actual pages and canary. Crash provenance records the intervening clean seed, so this proves previously persisted storage recovery only.
+- Separate fresh crash/discard retained exact pending metadata. Closing only the genuine recovery popup released readiness, preserved the saved Favorite and original Spaces, and pruned the discarded Temporary afterward. A real new Space was created and persisted, proving the adapter resumed. Prior page URLs were not restored.
+
+[Structured evidence](../evidence/workspace-process-crash.json) preserves the original failure and these narrower followups. Private artifacts are under `/tmp/myarc-m0-runtime/recovery18-acceptance-20261025T221946Z`, `recovery18-persisted-control-20261025T223056Z` and `recovery18-discard-20261025T223451Z`. Native applications/helpers and owned fixture servers were closed. Exact Profile/PID/window and unlocked/focus guards remained intact; QA and Arc were untouched.
+
+Native selection checks confirmed an already-selected global Favorite may remain selected across a Space switch. An earlier scratch expectation that switching must replace it was rejected against the Rust rule. Explicit row activation selected the correct restored pages. Profile ownership checks waited for the actual native on-disk cache rather than manufacturing it.
+
+## Implementation handoff and limits
+
+The implementation delegate performed no app launch, desktop input, actual-profile access, installs or service kills. No build remains running. External source/build ownership returns to the parent after this candidate handoff.
 
 Use a fresh marked synthetic fixture: the failed fixture already lost ID 2 and this change does not repair overwritten metadata. Before Restore, confirm prior metadata IDs, owners, canonical URL and selection remain unchanged while the prompt waits. Invoke genuine native Restore after a new audited process-kill and normal relaunch without startup URLs or `--restore-last-session`, then run the unchanged strict verifier. Separately dismiss/open startup pages and confirm normal readiness resumes while Favorites/Spaces survive. Exercise pending consent/window-close and canceled-quit paths where available.
 
-Source/helper/build checks are not native runtime proof. Branded async consent and real Profile teardown remain source-audited only. Fresh actual Restore/discard, broader multiwindow races, acknowledged-write boundaries and OS/power-loss durability remain unaccepted.
+Source/helper/build checks are not native runtime proof. Branded async consent and real Profile teardown remain source-audited only. Branded consent/window teardown and canceled-quit native cases, broader multiwindow races, acknowledged-write boundaries and OS/power-loss durability remain unaccepted. Fresh site-storage acknowledgement still fails the process-crash probe.

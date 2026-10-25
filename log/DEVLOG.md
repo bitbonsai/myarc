@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-10-25: Bounded native recovery and preview launch
+
+- Integrated lifecycle repair as `2a0ef32`. First real crash repeat retained exact pending/restored workspace identity, then failed the strict canary comparison. Unchanged upstream DOMStorage configures delayed batching; no storage policy or verifier was weakened. A separate clean-seeded, verified-persisted canary subsequently survived audited SIGKILL, plain relaunch and genuine Restore with five exact comparisons. Fresh explicit discard retained Favorite/Space identity and resumed real Space creation. [Evidence](../browser/evidence/workspace-process-crash.json) distinguishes these scopes; immediate acknowledgement and OS durability stay open.
+- Corrected scratch expectations against actual contracts: global Favorites may retain selection across Spaces, and the persisted no-selection sentinel is string `0`. Native Profile cache readiness was observed rather than written by the driver. Raw failure/control artifacts remain private. Owned apps/helpers and fixture servers were closed.
+- Integrated safe launcher `c263228`; ten local process-double tests passed. Parent ran `python3 tools/launch_native_preview.py`, verified its real isolated window and absent debugging/test-extension flags, navigated a public example page, created/switched an empty Space and inspected fresh native material/header. This is preview tooling, separate from P0 product CLI/MCP. Full native C++ suites, broader focus/motion and multiwindow cases remain unrun; renderer stays off by default.
+
 ## 2026-10-25: Pending recovery choice build candidate
 
 - Starting revision: `2101a46`. Preserved the actual process-kill failure and strict verifier. [0018 and run record](../browser/experiments/native-recovery-lifecycle.md) add recovery-choice counts to shared lifecycle readiness. The existing exact-browser observer starts before async consent and transfers through Show into the dialog, then into local action ownership before Close deletes the delegate. Restore starts its real restorer before choice release; discard/cancellation use normal reconciliation. Profile teardown releases once under its shutdown gate.
