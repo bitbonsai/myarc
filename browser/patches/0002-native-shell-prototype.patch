@@ -226,7 +226,7 @@ index 184614e93db97174631601f8b34dd1f9ecec550b..6a29f7a224c5184ef3d30f173d3b4224
    SafeInvoke(web_contents())
        .Then(&content::WebContents::GetRenderWidgetHostView)
 diff --git a/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl.cc b/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl.cc
-index b1ea4a69f42333b238abbf67b0278467ea41bb28..19137ee5029a7bf4fb46aef00bc424414ae659f7 100644
+index b1ea4a69f42333b238abbf67b0278467ea41bb28..57b3a53367650b4ce98717b3cd29f3a6d8c44fcf 100644
 --- a/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl.cc
 +++ b/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl.cc
 @@ -9,6 +9,7 @@
@@ -268,8 +268,75 @@ index b1ea4a69f42333b238abbf67b0278467ea41bb28..19137ee5029a7bf4fb46aef00bc42441
        separator_info.multi_contents_separator);
  
    // Updating the top, left and right insets for contents container view when
+@@ -1602,6 +1611,12 @@ void BrowserViewTabbedLayoutImpl::DoPostLayoutVisualAdjustments(
+         content_corners.set_lower_left(radius);
+       }
+     }
++    if (base::CommandLine::ForCurrentProcess()->HasSwitch(
++            "myarc-visual-parity") &&
++        layout_data_->tab_strip_type == TabStripType::kVertical &&
++        !is_fullscreen(layout_data_->window_state)) {
++      content_corners = gfx::RoundedCornersF(10);
++    }
+     views().multi_contents_view->SetBackgroundRadii(content_corners);
+   }
+ 
+diff --git a/chrome/browser/ui/views/frame/vertical_tab_strip_region_view.cc b/chrome/browser/ui/views/frame/vertical_tab_strip_region_view.cc
+index 252172ef9e07498c1ade0fbe972afc7c6472116c..5cd433c04b2879a6f8fd2e9c6964c0324596154f 100644
+--- a/chrome/browser/ui/views/frame/vertical_tab_strip_region_view.cc
++++ b/chrome/browser/ui/views/frame/vertical_tab_strip_region_view.cc
+@@ -9,6 +9,7 @@
+ #include <utility>
+ 
+ #include "base/callback_list.h"
++#include "base/command_line.h"
+ #include "base/functional/bind.h"
+ #include "base/i18n/number_formatting.h"
+ #include "base/i18n/rtl.h"
+@@ -161,7 +162,10 @@ VerticalTabStripRegionView::VerticalTabStripRegionView(
+   // Views that go into the content area below
+ 
+   const int region_horizontal_padding =
+-      GetLayoutConstant(LayoutConstant::kVerticalTabStripHorizontalPadding);
++      base::CommandLine::ForCurrentProcess()->HasSwitch("myarc-visual-parity")
++          ? 8
++          : GetLayoutConstant(
++                LayoutConstant::kVerticalTabStripHorizontalPadding);
+ 
+   auto* const top_button_separator =
+       content_area_view_->AddChildView(std::make_unique<FrameSeparator>());
+@@ -419,7 +423,10 @@ views::ProposedLayout VerticalTabStripRegionView::CalculateProposedLayout(
+ 
+   // Get some constants that will be used for calculations.
+   const auto horizontal_padding =
+-      GetLayoutConstant(LayoutConstant::kVerticalTabStripHorizontalPadding);
++      base::CommandLine::ForCurrentProcess()->HasSwitch("myarc-visual-parity")
++          ? 0
++          : GetLayoutConstant(
++                LayoutConstant::kVerticalTabStripHorizontalPadding);
+   const auto vertical_padding = GetLayoutConstant(
+       LayoutConstant::kVerticalTabStripUncollapsedVerticalPadding);
+ 
+@@ -880,7 +887,16 @@ void VerticalTabStripRegionView::AddTabStripView(
+   std::optional<size_t> separator_index =
+       content_parent->GetIndexOf(top_button_separator_);
+   CHECK(separator_index.has_value());
+-  content_parent->AddChildViewAt(std::move(view), separator_index.value() + 1);
++  const bool visual_parity =
++      base::CommandLine::ForCurrentProcess()->HasSwitch("myarc-visual-parity");
++  if (visual_parity) {
++    bottom_button_container_->SetProperty(
++        views::kFlexBehaviorKey,
++        views::FlexSpecification(views::MinimumFlexSizeRule::kPreferred,
++                                 views::MaximumFlexSizeRule::kPreferred));
++  }
++  content_parent->AddChildViewAt(
++      std::move(view), separator_index.value() + (visual_parity ? 2 : 1));
+ 
+   // Pre-set the animation values to the appropriate state.
+   auto* const animation_controller =
 diff --git a/chrome/browser/ui/views/location_bar/location_bar_view.cc b/chrome/browser/ui/views/location_bar/location_bar_view.cc
-index 972bd7bc04d240f23d4c527bdb6faa81272421e5..078dcc67fc431e89ff43a84f7f116390a2cef977 100644
+index 972bd7bc04d240f23d4c527bdb6faa81272421e5..c84a66163d0fd7a49171fb315b6628728b27db6f 100644
 --- a/chrome/browser/ui/views/location_bar/location_bar_view.cc
 +++ b/chrome/browser/ui/views/location_bar/location_bar_view.cc
 @@ -11,6 +11,7 @@
@@ -291,7 +358,19 @@ index 972bd7bc04d240f23d4c527bdb6faa81272421e5..078dcc67fc431e89ff43a84f7f116390
    return ChromeLayoutProvider::Get()->GetCornerRadiusMetric(
        views::Emphasis::kMaximum, size);
  }
-@@ -2502,7 +2507,6 @@ void LocationBarView::OnAppShimChanged(const webapps::AppId& app_id) {
+@@ -1400,6 +1405,11 @@ void LocationBarView::RefreshBackground() {
+   SkColor normal = color_provider->GetColor(kColorLocationBarBackground);
+   SkColor hovered =
+       color_provider->GetColor(kColorLocationBarBackgroundHovered);
++  if (!high_contrast && base::CommandLine::ForCurrentProcess()->HasSwitch(
++                            "myarc-visual-parity")) {
++    normal = SkColorSetRGB(55, 53, 73);
++    hovered = SkColorSetRGB(65, 62, 84);
++  }
+ 
+   background_color_ = gfx::Tween::ColorValueBetween(opacity, normal, hovered);
+   if (is_caret_visible) {
+@@ -2502,7 +2512,6 @@ void LocationBarView::OnAppShimChanged(const webapps::AppId& app_id) {
  }
  #endif
  
@@ -299,6 +378,104 @@ index 972bd7bc04d240f23d4c527bdb6faa81272421e5..078dcc67fc431e89ff43a84f7f116390
  BEGIN_METADATA(LocationBarView)
  ADD_READONLY_PROPERTY_METADATA(int, BorderRadius)
  ADD_READONLY_PROPERTY_METADATA(gfx::Point, OmniboxViewOrigin)
+diff --git a/chrome/browser/ui/views/tabs/vertical/BUILD.gn b/chrome/browser/ui/views/tabs/vertical/BUILD.gn
+index e88955ec6cbceadcdb2aab8cd7ea96dc90b0e5d1..872c4f22b63a2799eaeb0dcf4791e087bf48f010 100644
+--- a/chrome/browser/ui/views/tabs/vertical/BUILD.gn
++++ b/chrome/browser/ui/views/tabs/vertical/BUILD.gn
+@@ -47,6 +47,7 @@ source_set("impl") {
+   ]
+ 
+   deps = [
++    "//chrome/app/vector_icons",
+     "//chrome/browser:primitives",
+     "//chrome/browser/glic",
+     "//chrome/browser/glic/browser_ui:glow",
+diff --git a/chrome/browser/ui/views/tabs/vertical/top_container_button.cc b/chrome/browser/ui/views/tabs/vertical/top_container_button.cc
+index 1029f4c7295e812797ee0a3c6c84d69f13707b14..0268170b6269b36d5012fd7fb00157889901620f 100644
+--- a/chrome/browser/ui/views/tabs/vertical/top_container_button.cc
++++ b/chrome/browser/ui/views/tabs/vertical/top_container_button.cc
+@@ -4,12 +4,15 @@
+ 
+ #include "chrome/browser/ui/views/tabs/vertical/top_container_button.h"
+ 
++#include "base/command_line.h"
++#include "chrome/app/vector_icons/vector_icons.h"
+ #include "chrome/browser/ui/color/chrome_color_id.h"
+ #include "chrome/browser/ui/layout_constants.h"
+ #include "chrome/browser/ui/views/toolbar/toolbar_ink_drop_util.h"
+ #include "ui/base/metadata/metadata_impl_macros.h"
+ #include "ui/compositor/layer.h"
+ #include "ui/views/actions/action_view_interface.h"
++#include "ui/views/border.h"
+ #include "ui/views/widget/widget.h"
+ 
+ namespace {
+@@ -41,6 +44,11 @@ class TopContainerButtonActionViewInterface
+ }  // namespace
+ 
+ TopContainerButton::TopContainerButton() {
++  if (base::CommandLine::ForCurrentProcess()->HasSwitch(
++          "myarc-visual-parity")) {
++    SetBorder(views::CreateEmptyBorder(0));
++    SetHorizontalAlignment(gfx::ALIGN_CENTER);
++  }
+   views::FocusRing::Get(this)->SetColorId(kColorNewTabButtonFocusRing);
+   ConfigureInkDrop(this);
+   SetPaintToLayer();
+@@ -57,9 +65,15 @@ void TopContainerButton::UpdateIcon(const ui::ImageModel& icon_image) {
+     return;
+   }
+ 
++  const bool visual_parity =
++      base::CommandLine::ForCurrentProcess()->HasSwitch("myarc-visual-parity");
+   const ui::ImageModel image_model = ui::ImageModel::FromVectorIcon(
+-      *icon_image.GetVectorIcon().vector_icon(), GetForegroundColor(),
+-      GetLayoutConstant(LayoutConstant::kVerticalTabStripButtonIconSize));
++      visual_parity ? kDockToLeftIcon
++                    : *icon_image.GetVectorIcon().vector_icon(),
++      GetForegroundColor(),
++      visual_parity
++          ? 16
++          : GetLayoutConstant(LayoutConstant::kVerticalTabStripButtonIconSize));
+ 
+   SetImageModel(views::Button::STATE_NORMAL, image_model);
+   SetImageModel(views::Button::STATE_HOVERED, image_model);
+diff --git a/chrome/browser/ui/views/tabs/vertical/vertical_tab_strip_bottom_container.cc b/chrome/browser/ui/views/tabs/vertical/vertical_tab_strip_bottom_container.cc
+index 64150f80cfea3a21442eea1138e77e538dad21a9..079e13c97f8879f7ed5210b9aa0a9381edfa92cf 100644
+--- a/chrome/browser/ui/views/tabs/vertical/vertical_tab_strip_bottom_container.cc
++++ b/chrome/browser/ui/views/tabs/vertical/vertical_tab_strip_bottom_container.cc
+@@ -4,6 +4,7 @@
+ 
+ #include "chrome/browser/ui/views/tabs/vertical/vertical_tab_strip_bottom_container.h"
+ 
++#include "base/command_line.h"
+ #include "base/functional/bind.h"
+ #include "chrome/browser/ui/browser_element_identifiers.h"
+ #include "chrome/browser/ui/layout_constants.h"
+@@ -50,7 +51,6 @@ VerticalTabStripBottomContainer::VerticalTabStripBottomContainer(
+ 
+ VerticalTabStripBottomContainer::~VerticalTabStripBottomContainer() = default;
+ 
+-
+ bool VerticalTabStripBottomContainer::IsPositionInWindowCaption(
+     const gfx::Point& point) {
+   for (views::View* child : children()) {
+@@ -105,6 +105,15 @@ void VerticalTabStripBottomContainer::UpdateButtonStyles(bool collapsed) {
+   new_tab_button_->SetInsets(GetLayoutInsets(
+       collapsed ? LayoutInset::VERTICAL_TAB_STRIP_BOTTOM_BUTTON_COLLAPSED
+                 : LayoutInset::VERTICAL_TAB_STRIP_BOTTOM_BUTTON_UNCOLLAPSED));
++  if (base::CommandLine::ForCurrentProcess()->HasSwitch(
++          "myarc-visual-parity")) {
++    new_tab_button_->SetShouldShowLabel(!collapsed);
++    if (collapsed) {
++      new_tab_button_->SetText(u"");
++    }
++    new_tab_button_->SetPaintTransparent(true);
++    new_tab_button_->SetImageLabelSpacing(8);
++  }
+ }
+ 
+ BEGIN_METADATA(VerticalTabStripBottomContainer)
 diff --git a/chrome/browser/ui/views/tabs/vertical/vertical_tab_strip_top_container.cc b/chrome/browser/ui/views/tabs/vertical/vertical_tab_strip_top_container.cc
 index 485aa1faf322a7cab9f33c029986c373caccaf8a..40d74709538dd21d810263512bb6ca1c15115958 100644
 --- a/chrome/browser/ui/views/tabs/vertical/vertical_tab_strip_top_container.cc
@@ -356,10 +533,26 @@ index 3037c96db977d6224787b48f4da03d55dedc5d31..25b549c632eb91959c45480f7b07afa8
    raw_ptr<VerticalTabStripSegmentedControl> segmented_control_ = nullptr;
    raw_ptr<views::LabelButton> collapse_button_ = nullptr;
 diff --git a/chrome/browser/ui/views/toolbar/toolbar_view.cc b/chrome/browser/ui/views/toolbar/toolbar_view.cc
-index 3067ad4d19c8f6259297dce2cc8ffe30b9df6c3a..59f9aacd4d690f90b73c41498f50bf8bc02a8142 100644
+index 3067ad4d19c8f6259297dce2cc8ffe30b9df6c3a..561ebf4de4f5d73ee296e216c9e3d00a22ca8893 100644
 --- a/chrome/browser/ui/views/toolbar/toolbar_view.cc
 +++ b/chrome/browser/ui/views/toolbar/toolbar_view.cc
-@@ -1468,12 +1468,49 @@ gfx::Size ToolbarView::GetMinimumSize() const {
+@@ -5,6 +5,7 @@
+ #include "chrome/browser/ui/views/toolbar/toolbar_view.h"
+ 
+ #include <algorithm>
++#include <array>
+ #include <memory>
+ #include <utility>
+ 
+@@ -163,6 +164,7 @@
+ #include "ui/views/accessibility/view_accessibility.h"
+ #include "ui/views/actions/action_view_controller.h"
+ #include "ui/views/background.h"
++#include "ui/views/border.h"
+ #include "ui/views/cascading_property.h"
+ #include "ui/views/controls/button/label_button.h"
+ #include "ui/views/controls/separator.h"
+@@ -1468,12 +1470,54 @@ gfx::Size ToolbarView::GetMinimumSize() const {
    return size;
  }
  
@@ -367,6 +560,11 @@ index 3067ad4d19c8f6259297dce2cc8ffe30b9df6c3a..59f9aacd4d690f90b73c41498f50bf8b
 +  CHECK(back_ && forward_ && reload_ && location_bar_view_)
 +      << "myarc-visual-parity requires --disable-features=InitialWebUI";
 +  myarc_sidebar_toggle_ = AddChildView(std::move(toggle));
++  for (views::LabelButton* button : std::array<views::LabelButton*, 3>{
++           back_.get(), forward_.get(), reload_.get()}) {
++    button->SetBorder(views::CreateEmptyBorder(0));
++    button->SetHorizontalAlignment(gfx::ALIGN_CENTER);
++  }
 +}
 +
  void ToolbarView::Layout(PassKey) {
@@ -391,15 +589,15 @@ index 3067ad4d19c8f6259297dce2cc8ffe30b9df6c3a..59f9aacd4d690f90b73c41498f50bf8b
 +      }
 +    }
 +    myarc_sidebar_toggle_->SetVisible(true);
-+    myarc_sidebar_toggle_->SetBounds(expanded ? 84 : 8, expanded ? 6 : 42, 28,
++    myarc_sidebar_toggle_->SetBounds(expanded ? 84 : 8, expanded ? 8 : 42, 28,
 +                                     28);
 +    if (expanded) {
 +      back_->SetVisible(true);
-+      back_->SetBounds(width() - 108, 6, 28, 28);
++      back_->SetBounds(width() - 104, 8, 24, 28);
 +      forward_->SetVisible(true);
-+      forward_->SetBounds(width() - 76, 6, 28, 28);
++      forward_->SetBounds(width() - 70, 8, 24, 28);
 +      reload_->SetVisible(true);
-+      reload_->SetBounds(width() - 44, 6, 28, 28);
++      reload_->SetBounds(width() - 36, 8, 24, 28);
 +      location_bar_view_->SetVisible(true);
 +      location_bar_view_->SetBounds(8, 46, width() - 16, 38);
 +    }

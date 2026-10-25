@@ -1,6 +1,6 @@
 # Native shell experiment
 
-MA-007.a targets 1:1 Arc visual parity. This first native iteration is incomplete. It keeps the full Chromium browser implementation and uses AppKit material through Objective-C++, with the existing navigation controls moved into the sidebar. Rust workspace rules are unchanged. A separate Swift/Tauri host has not been needed for this material/layout experiment.
+MA-007.a targets 1:1 Arc visual parity. The current native iteration is incomplete. It keeps the full Chromium browser implementation and uses AppKit material through Objective-C++, with the existing navigation controls moved into the sidebar. Rust workspace rules are unchanged. A separate Swift/Tauri host has not been needed for this material/layout experiment.
 
 ## Reproduce the current iteration
 
@@ -32,15 +32,16 @@ out/MyarcM0/Chromium.app/Contents/MacOS/Chromium \
 
 ## Observed results
 
-- Native compilation passed. The packaged patch was applied to copies of all nine baseline sources and the resulting bytes matched the modified checkout.
+- Native compilation passed. The packaged patch was applied to copies of all thirteen baseline sources and the resulting bytes matched the modified checkout.
 - AppKit behind-window material was installed. A controlled colored background visibly changed the sidebar and transparent empty content area; the reference palette and content inset were then refined.
 - Native Cmd+L input navigated to a real page. Its explicit CSS background painted normally. Returning to `about:blank` restored the translucent empty canvas.
+- A later controls pass removed the stock sidebar padding from the custom header, centered the existing navigation buttons and reused the native dock-to-left glyph. The address surface uses the dark reference palette outside high-contrast mode. The existing New Tab action now has a left-aligned label above the tab list. A native mouse click created exactly one page; sidebar Cmd+L then navigated that page to `about:blank`.
 - Two relocation attempts crashed during layout. The first background access was guarded; the remaining crash was traced to missing native buttons in the mixed web/native toolbar. Consistent native controls fixed startup. Hiding and re-showing the address field during each layout also lost focus; preserving its visibility fixed keyboard navigation.
 
 Original captures, supplied Arc references and raw logs remain private and outside the repository. The screenshots shown in the thread are actual native windows, not HTML browser mockups.
 
 ## Remaining differences and limits
 
-The sidebar still uses upstream tab rows and its New Tab button. Arc's Favorites/Spaces arrangement and centered command bar remain unimplemented. Icon geometry, typography and interaction details need comparison; 1:1 parity has not been accepted.
+The sidebar still uses upstream tab rows and a restyled native New Tab button. Arc's Favorites/Spaces arrangement and centered command bar remain unimplemented. Icon geometry, typography and interaction details need comparison; 1:1 parity has not been accepted.
 
 The dark palette and expanded layout cover the first reference state only. Light mode, Reduce Transparency, collapsed/hover/fullscreen behavior, complete keyboard/VoiceOver behavior and extension/permission popup anchoring remain unverified. Several stock toolbar controls are omitted from this preview. It is unsuitable for daily-use acceptance. Existing foundation security/distribution gates remain open; import work and broader test expansion are deferred.

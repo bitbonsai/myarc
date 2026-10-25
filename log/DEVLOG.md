@@ -2,6 +2,12 @@
 
 Keep significant outcomes, failures and next actions reproducible. Newest entry first. No private exports, page titles/URLs from real browsing, credentials or raw user transcripts.
 
+## 2026-10-25: Native header and New Tab control refinement
+
+- Found stock horizontal padding shrinking the custom sidebar header and overlapping its controls. Removed that padding for the prototype, centered the navigation buttons and reused the native dock-to-left glyph. Kept the existing navigation callbacks and security indicators.
+- Matched the unfocused address surface to the dark reference palette while retaining high-contrast colors. Exposed the native New Tab label, removed its persistent tile background and placed it above the tab list. A native mouse click added exactly one page; Cmd+L navigation still passed.
+- Native build passed after correcting an empty-border API argument. Refreshed the private native capture and optional patch. Full sidebar structure, centered command bar and other window states remain open; visual parity is not accepted.
+
 ## 2026-10-25: Native material and sidebar navigation iteration
 
 - Current priority changed to native Arc visual parity, including the empty content canvas. Import investigation and broad test expansion are deferred; release safety gates remain open. [MA-007.a](../plan/EXECUTION.md#ma-007a-native-visual-parity-first-state) defines the first review state.
