@@ -30,8 +30,6 @@ Each coding agent gets a narrow job and a result I can check. Today's tasks cove
 
 A separate agent reviews the change. Findings go back for another implementation pass. The lead agent brings the Rust and Chromium changes together, builds the browser and checks the native window.
 
-GPT-6.1 (`gpt-6.1-sol`) leads the browser work with high thinking. Claude Sonnet 5.5 (`claude-sonnet-5-5`) reviews changes at high effort.
-
 ## Keeping context between sessions
 
 I've open-sourced two skills under bitbonsai: [context](https://github.com/bitbonsai/context) and [wrap](https://github.com/bitbonsai/wrap).
