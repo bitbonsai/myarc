@@ -927,7 +927,7 @@ fn reorder_rejects_unknown_ids_and_cross_placement_or_owner_without_mutation() {
 }
 
 #[test]
-fn missing_default_space_rejects_with_all_other_references_valid() {
+fn snapshot_without_space_one_restores_and_round_trips() {
     let mut workspace = Workspace::default();
     let s2 = workspace.create_space(P1, "Research").unwrap();
     let saved = pin(&mut workspace, s2);
@@ -935,15 +935,63 @@ fn missing_default_space_rejects_with_all_other_references_valid() {
     workspace.select_item(W1, saved).unwrap();
     let mut snapshot = workspace.snapshot();
     snapshot.spaces.retain(|space| space.id != S1);
-    assert_eq!(
+    let mut restored = Workspace::from_snapshot(snapshot.clone()).unwrap();
+    assert_eq!(restored.snapshot(), snapshot);
+    assert_eq!(restored.space_name(), "Research");
+    assert_eq!(restored.sidebar_snapshot(W1).unwrap().pins[0].id, saved);
+    let mut target = Workspace::default();
+    target.restore(snapshot).unwrap();
+    assert_eq!(target, restored);
+    assert_eq!(restored.create_space(P1, "Next"), Ok(s2 + 1));
+}
+
+#[test]
+fn snapshot_without_any_space_rejects_without_replacement() {
+    let mut snapshot = Workspace::default().snapshot();
+    snapshot.spaces.clear();
+    snapshot.windows.clear();
+    assert!(matches!(
         Workspace::from_snapshot(snapshot.clone()),
-        Err(WorkspaceError::UnknownSpace(S1))
-    );
-    unchanged(
-        &mut workspace,
-        |w| w.restore(snapshot),
-        WorkspaceError::UnknownSpace(S1),
-    );
+        Err(WorkspaceError::InvalidSnapshot(_))
+    ));
+    assert_bad_snapshot(snapshot);
+}
+
+#[test]
+fn old_snapshot_with_space_one_loads_unchanged() {
+    // Shape written before Space 1 became deletable: Space 1 plus one more.
+    let snapshot = WorkspaceSnapshot {
+        version: SNAPSHOT_VERSION,
+        profile_id: P1,
+        spaces: vec![
+            Space {
+                id: S1,
+                profile_id: P1,
+                name: "Everyday".into(),
+            },
+            Space {
+                id: 2,
+                profile_id: P1,
+                name: "Work".into(),
+            },
+        ],
+        items: vec![Item {
+            id: 1,
+            placement: Placement::Pin { space_id: S1 },
+            canonical_url: Some(URL.into()),
+        }],
+        windows: vec![WindowState {
+            id: W1,
+            space_id: S1,
+            selected_item_id: Some(1),
+        }],
+        next_space_id: 3,
+        next_item_id: 2,
+        next_window_id: 2,
+    };
+    let workspace = Workspace::from_snapshot(snapshot.clone()).unwrap();
+    assert_eq!(workspace.snapshot(), snapshot);
+    assert_eq!(workspace.space_name(), "Everyday");
 }
 
 #[test]
@@ -1119,7 +1167,7 @@ fn delete_space_moves_windows_keeps_favorites_and_round_trips() {
 }
 
 #[test]
-fn delete_space_rejects_unknown_last_and_default_without_mutation() {
+fn delete_space_rejects_unknown_and_last_without_mutation() {
     let mut workspace = Workspace::default();
     unchanged(
         &mut workspace,
@@ -1128,11 +1176,6 @@ fn delete_space_rejects_unknown_last_and_default_without_mutation() {
     );
     let s2 = workspace.create_space(P1, "Two").unwrap();
     pin(&mut workspace, s2);
-    unchanged(
-        &mut workspace,
-        |w| w.delete_space(S1),
-        WorkspaceError::DefaultSpaceProtected(S1),
-    );
     unchanged(
         &mut workspace,
         |w| w.delete_space(999),
@@ -1144,6 +1187,45 @@ fn delete_space_rejects_unknown_last_and_default_without_mutation() {
         |w| w.delete_space(S1),
         WorkspaceError::LastSpaceInProfile(S1),
     );
+}
+
+#[test]
+fn delete_space_one_when_others_exist_then_last_is_protected() {
+    let mut workspace = Workspace::default();
+    let s2 = workspace.create_space(P1, "Two").unwrap();
+    let s3 = workspace.create_space(P1, "Three").unwrap();
+    let doomed = pin(&mut workspace, S1);
+    let kept = pin(&mut workspace, s2);
+    let favorite = pin(&mut workspace, S1);
+    workspace
+        .set_placement(favorite, Placement::Favorite { profile_id: P1 }, None)
+        .unwrap();
+    let w2 = workspace.create_window(s3).unwrap();
+    workspace.select_item(W1, doomed).unwrap();
+
+    let deletion = workspace.delete_space(S1).unwrap();
+    assert_eq!(deletion.fallback_space, s2);
+    assert_eq!(deletion.removed_items, vec![doomed]);
+    assert_eq!(deletion.moved_windows, vec![W1]);
+    let sidebar = workspace.sidebar_snapshot(W1).unwrap();
+    assert_eq!(sidebar.current_space.id, s2);
+    assert_eq!(sidebar.selected_item_id, None);
+    assert_eq!(sidebar.pins[0].id, kept);
+    assert_eq!(sidebar.favorites[0].id, favorite);
+    assert_eq!(workspace.sidebar_snapshot(w2).unwrap().current_space.id, s3);
+    assert_eq!(workspace.space_name(), "Two");
+    assert_eq!(
+        Workspace::from_snapshot(workspace.snapshot()).unwrap(),
+        workspace
+    );
+
+    workspace.delete_space(s2).unwrap();
+    unchanged(
+        &mut workspace,
+        |w| w.delete_space(s3),
+        WorkspaceError::LastSpaceInProfile(s3),
+    );
+    assert_eq!(workspace.create_space(P1, "Four"), Ok(s3 + 1));
 }
 
 #[test]

@@ -4,7 +4,9 @@
 //! canonicalization; this crate owns organization and stable identities, never live tabs.
 //! Successful mutations are in-memory only. Storage adapters must persist separately.
 //!
-//! Default state is Space 1 (Everyday), Profile 1 and Window 1. Additional windows
+//! Default state is Space 1 (Everyday), Profile 1 and Window 1. Space 1 is only the
+//! starting Space of a new Profile and can be deleted like any other; restore needs
+//! at least one Space, not Space 1. Additional windows
 //! use model-generated IDs via `create_window`; adapters map them to native windows.
 //! Multiple windows can select the same item. Closing the last live page should
 //! trigger `live_tab_closed`; closing one of several projections must not remove
@@ -85,8 +87,6 @@ pub enum WorkspaceError {
     NoCanonicalUrl(ItemId),
     /// A Profile must keep at least one Space.
     LastSpaceInProfile(SpaceId),
-    /// Restore requires Space 1, so it cannot be deleted yet.
-    DefaultSpaceProtected(SpaceId),
     ExplicitUnsaveRequired(ItemId),
     DifferentSection(ItemId),
     DuplicateLiveItem(ItemId),
@@ -113,7 +113,6 @@ impl fmt::Display for WorkspaceError {
             Self::NotSaved(id) => write!(formatter, "Item {id} is temporary; close its live tab instead"),
             Self::NoCanonicalUrl(id) => write!(formatter, "Item {id} is temporary and has no pinned URL; pin or favorite it first"),
             Self::LastSpaceInProfile(id) => write!(formatter, "Space {id} is the last Space in its Profile; create another Space before deleting it"),
-            Self::DefaultSpaceProtected(id) => write!(formatter, "Space {id} is the default Space and cannot be deleted yet"),
             Self::ExplicitUnsaveRequired(id) => write!(formatter, "Item {id} is saved; use unsave_item with its live-page destination"),
             Self::DifferentSection(id) => write!(formatter, "Item {id} belongs to a different placement or owner section"),
             Self::DuplicateLiveItem(id) => write!(formatter, "Live item {id} is listed more than once"),
@@ -235,13 +234,12 @@ impl Default for Workspace {
 }
 
 impl Workspace {
-    /// Legacy bridge view of Space 1, independent of any window selection.
+    /// Legacy bridge view of the first Space in order, independent of any window
+    /// selection. That is Space 1 until it is deleted; restore guarantees one Space.
     pub fn space_name(&self) -> &str {
-        // Space 1 is required by restore and cannot be removed by commands.
         self.state
             .spaces
-            .iter()
-            .find(|space| space.id == DEFAULT_SPACE_ID)
+            .first()
             .map(|space| space.name.as_str())
             .unwrap_or_default()
     }
@@ -277,8 +275,8 @@ impl Workspace {
         Ok(id)
     }
 
-    /// Delete a Space with the Temporary and Pin items it owns (BC-009). Rejects
-    /// the last Space of its Profile and Space 1. Favorites are Profile-scoped and
+    /// Delete a Space with the Temporary and Pin items it owns (BC-009). Any Space
+    /// can go except the last of its Profile. Favorites are Profile-scoped and
     /// stay. Windows showing it move to the previous Space in vector order, or the
     /// next one when it was first; a selection hidden by the move is cleared.
     /// Atomic: every check runs before mutation. The caller confirms with the user
@@ -294,9 +292,6 @@ impl Workspace {
             .collect();
         if siblings.len() < 2 {
             return Err(WorkspaceError::LastSpaceInProfile(space_id));
-        }
-        if space_id == DEFAULT_SPACE_ID {
-            return Err(WorkspaceError::DefaultSpaceProtected(space_id));
         }
         let position = siblings
             .iter()
@@ -739,7 +734,11 @@ impl Workspace {
             state.windows.iter().map(|window| window.id),
             state.next_window_id,
         )?;
-        self.space(DEFAULT_SPACE_ID)?;
+        if state.spaces.is_empty() {
+            return Err(WorkspaceError::InvalidSnapshot(
+                "a Profile needs at least one Space",
+            ));
+        }
         for space in &state.spaces {
             validate_profile(space.profile_id)?;
             validate_name(&space.name).map_err(WorkspaceError::InvalidName)?;
@@ -1036,6 +1035,19 @@ mod tests {
     }
 
     #[test]
+    fn delete_space_one_when_others_exist_renames_legacy_view() {
+        let mut workspace = Workspace::default();
+        let s2 = workspace.create_space(DEFAULT_PROFILE_ID, "Two").unwrap();
+        let deletion = workspace.delete_space(DEFAULT_SPACE_ID).unwrap();
+        assert_eq!(deletion.fallback_space, s2);
+        assert_eq!(workspace.space_name(), "Two");
+        assert_eq!(
+            Workspace::from_snapshot(workspace.snapshot()).unwrap(),
+            workspace
+        );
+    }
+
+    #[test]
     fn delete_space_rejects_without_mutation() {
         let mut workspace = Workspace::default();
         assert_eq!(
@@ -1045,10 +1057,6 @@ mod tests {
         let s2 = workspace.create_space(DEFAULT_PROFILE_ID, "Two").unwrap();
         pin(&mut workspace, s2);
         let before = workspace.snapshot();
-        assert_eq!(
-            workspace.delete_space(DEFAULT_SPACE_ID),
-            Err(WorkspaceError::DefaultSpaceProtected(DEFAULT_SPACE_ID))
-        );
         assert_eq!(
             workspace.delete_space(99),
             Err(WorkspaceError::UnknownSpace(99))

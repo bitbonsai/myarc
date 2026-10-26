@@ -11,6 +11,11 @@
 - GN `myarc_nightly` plus `branding_file_path = "//myarc/nightly/BRANDING"` builds `myArc.app` with bundle id `dev.myarc.nightly`, profile directory `~/Library/Application Support/myArc Nightly` and the matte icon, and adds the myArc switches, `GlassFrame`, disabled `InitialWebUI` and `--no-first-run` at startup. In myArc mode a new profile now defaults to vertical tabs. `browser/args-nightly.gn` is a static arm64 build with H.264/AAC; `tools/package_nightly.sh` ad-hoc signs it into a DMG outside the repo. Committed Chromium `75dc6484eb` and `3db8054e1f`.
 - Verification: full `chrome` build in `out/MyarcNightly` took 1h 34m 06s at nice 10 with 14 jobs, the follow-up incremental 30 s. `codesign --verify --deep --strict` passes, and no Mach-O in the bundle loads from the build tree. Launched from the staging copy with only `--user-data-dir`, a fresh profile shows the myArc sidebar, and a `file://` page reports `H264=probably AAC=probably MSE=true`.
 - Open: menus, settings and the window title still say Chromium, because those strings come from Chromium's resources. Not notarized, no updater. The nightly was not opened from the DMG, and no video was actually played.
+## 2026-10-26: Any Space but the last can be deleted
+
+- `Workspace::delete_space` no longer protects Space 1 (`DefaultSpaceProtected` removed); only the last Space of a Profile is rejected. `validate` requires at least one Space instead of Space 1, and `space_name` reads the first Space. New Profiles still start with Space 1; old snapshots load unchanged, ones without Space 1 now load. No `bridge.rs` signature change.
+- Verification: new semantics tests for deleting Space 1, last-Space rejection, a snapshot without Space 1 and an old-snapshot shape; BC-009 updated. Rust only: C++ still hardcodes Space 1 in `native_button.cc` (M0 test button) and `bridge_check.cc`, and `rename_space`'s `name` field reports the first Space.
+- Open: Chromium lane should drop the hardcoded id 1 where listed in the task report; no menu or dialog exists to delete a Space yet.
 
 ## 2026-10-26: Command bar search suggestions
 
