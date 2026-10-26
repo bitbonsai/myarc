@@ -76,6 +76,19 @@
     },
     "all_owned_browser_helpers_and_fixture_servers_closed": true
   },
+  "fresh_through0023_regression": {
+    "date": "2026-10-26",
+    "fresh_marked_profile_no_storage_fault_injection": true,
+    "clean_seed_roundtrip_strict_verify_passed": true,
+    "actual_native_crashed_marker_observed_not_edited": true,
+    "audited_sigkill_plain_relaunch_no_urls_or_restore_flag": true,
+    "pending_workspace_bytes_exact_and_no_storage_retry_controls": true,
+    "genuine_restore_then_unchanged_strict_verifier_passed": true,
+    "stable_samples": 5,
+    "persisted_canary_ids_owners_selection_urls_retained": true,
+    "owned_apps_helpers_server_closed": true,
+    "acknowledgement_and_power_loss_durability_not_claimed": true
+  },
   "flag_off_site_storage_control": {
     "date": "2026-10-26",
     "same_patched_binary_not_pristine_upstream": true,

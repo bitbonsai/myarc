@@ -34,6 +34,8 @@ A fresh palette interruption check found Cmd+L dismissing an existing Cmd+T draf
 
 A controlled owned-file collision produced real workspace write/read errors with preserved original bytes. Native warnings requested retry, but no retry controls existed. [Baseline](../evidence/workspace-storage-retry.json) retained. 0023 integrated as `a8de00d`; real keyboard failed retries retained bad bytes/memory, and successful Retry saving after removing the empty fault directory wrote the latest model. Explicit known-backup restoration plus Retry loading restored controls/IDs without changing the live page target/time origin. Full warning/action bounds at normal/small sizes and native private NTP omission passed. This manual file repair is not automatic recovery or durability evidence. Native fixtures/deferred callback overlap remain unrun. Apps/helpers/server closed.
 
+Fresh through0023 process-crash regression also passed after a clean persisted seed: actual Crashed marker, audited SIGKILL/plain relaunch, exact pending metadata and genuine Restore retained the strict checkpoint for five samples. During setup, [current-address matching failure](../evidence/native-palette-address.json) was captured: typing an existing other tab URL in Cmd+L switched targets instead of navigating the current one. Unmatched navigation remains separately accepted. Narrow default-selection correction is next; explicit global result activation and Cmd+T defaults stay unchanged. Apps/helpers/server closed.
+
 ## Tested preview command
 
 ```sh

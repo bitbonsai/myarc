@@ -70,6 +70,14 @@ Private run `/tmp/myarc-m0-runtime/palette22-20261026T015329Z/` retains semantic
 
 [Structured evidence](../evidence/native-palette-interruption.json) retains the failure and this bounded correction. Existing global open-tab/history matching is unchanged. A typed URI alias left its prior page unchanged during setup; its matched-result provenance was not captured, so broad URI-literal editing semantics remain unaccepted. A separately recorded existing-target developer navigation prepared the later saved fixture; it does not accept that UI route or implement product CLI/MCP.
 
+## Current-address default submission defect through0023
+
+A later fresh native two-page run captured the previously unmeasured matching case. With the Reading Temporary active, Cmd+L showed its actual URL. Typing the full URL of the other existing Favorite and pressing Enter, without choosing a result, switched to that old target. The original Temporary kept its prior URL/time origin. Page count stayed two. The visible row explicitly said Switch to Tab; no implicit navigation was counted. [Baseline](../evidence/native-palette-address.json).
+
+The current-address contract requires changed input to navigate that same target. Proposed narrow repair leaves current-intent matches initially unselected, retaining explicit arrow/mouse activation and the existing new-intent default. Matching/ranking and provisional global scope remain unchanged. No URI classifier or Rust policy change is needed.
+
+The same0023 build separately passed a clean persisted seed and audited SIGKILL/plain relaunch/genuine Restore with five unchanged strict samples. Pending metadata stayed byte-exact; no storage retry appeared during the recovery hold. This independent [crash regression](../evidence/workspace-process-crash.json) used a fresh profile without the storage-fault experiment. Owned apps/helpers/server closed.
+
 ## Remaining parent acceptance
 
 Use a marked disposable profile and exact foreground owned palette. Reproduce native Cmd+T, draft, Cmd+L and verify selected displayed URL; repeat both same-intent shortcuts without losing edits; switch back with Cmd+T and verify no page until submit. Check current-tab reload/edit, Empty-Space hidden-page protection, Escape/immediate reopen and owner-window close. Inspect normal/reduced-motion focus and a real history response across interruption where feasible. Compilation cannot accept these journeys.

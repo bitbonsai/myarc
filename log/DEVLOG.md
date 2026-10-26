@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-10-26: Fresh0023 crash regression and literal-address match defect
+
+Fresh marked two-page/two-Space profile, separate from storage fault injection: clean persisted seed and audited SIGKILL/plain relaunch/genuine Restore passed five strict samples. Native Crashed marker observed, pending metadata byte-exact and no storage retry during hold. [Evidence](../browser/evidence/workspace-process-crash.json). Apps/helpers/server closed.
+
+During setup, Cmd+L from active Reading Temporary plus the full other Favorite URL selected an auto-highlighted Switch to Tab row. Enter switched native targets; original Temporary URL/time origin stayed unchanged. [Actual baseline](../browser/evidence/native-palette-address.json). Changed current-address input must default to same-target submission; deliberate row activation and new-intent global defaults remain provisional. Minimal correction can reuse existing unselected index state, leaving matching/Rust rules unchanged.
+
 ## 2026-10-26: Native storage retry actions verified
 
 0023 integrated as `a8de00d` after installed83/canonical16/compiled-hash checks. Real directory fault plus two keyboard failed save retries retained backup/memory. Removing only the empty fault directory let actual Retry saving write both latest memory Spaces, preserving saved/window identity. Separate malformed bytes stayed exact after failed keyboard load retry; explicit valid-backup restoration plus native Retry loading restored full model/controls and allowed a new Space write. Each journey kept live page target/URL/time origin. [Evidence](../browser/evidence/workspace-storage-retry.json).

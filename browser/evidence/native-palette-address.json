@@ -1,0 +1,31 @@
+{
+  "slice": "MA-007.c-native-current-address-submission",
+  "date": "2026-10-26",
+  "baseline_stack_through": "0023",
+  "status": "native current-intent literal submission defect reproduced",
+  "journey": {
+    "two_existing_real_page_targets_in_one_marked_profile": true,
+    "active_temporary_page_in_reading": true,
+    "cmd_l_prefilled_actual_current_url": true,
+    "typed_full_other_saved_pages_url_without_result_navigation": true,
+    "native_match_row_said_switch_to_tab": true,
+    "enter_activated_other_existing_favorite": true,
+    "original_current_target_url_and_time_origin_unchanged": true,
+    "page_count_unchanged": true,
+    "expected": "Changed current-address input navigates that same target; existing result activation requires deliberate choice"
+  },
+  "repair_scope": {
+    "current_intent_default_enter": "submit input rather than auto-selected result",
+    "explicit_arrow_or_mouse_result_activation": "retain existing global behavior",
+    "new_intent_default_matching": "unchanged provisionally",
+    "matching_ranking_profile_boundaries_rust_core": "unchanged"
+  },
+  "limits": [
+    "Earlier unmatched-URL navigation and shortcut intent acceptance remain separate",
+    "No broader literal parsing or Arc global-search parity claim",
+    "Strict process-crash recovery on the same0023 build passed independently after a clean persisted seed"
+  ],
+  "raw_proof": "private outside Git",
+  "owned_apps_helpers_server_closed": true,
+  "workspace_renderer_default_enabled": false
+}
