@@ -255,7 +255,7 @@
     .post-preview .post-date { margin-top: .375rem }
     .post-summary { margin-top: .375rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis }
     .post-thumb { display: block; width: 8rem; flex: none }
-    .post-thumb img { width: 100%; aspect-ratio: 8 / 5; object-fit: cover; border-radius: .75rem; background: var(--panel) }
+    .post-thumb img { width: 100%; aspect-ratio: 8 / 5; object-fit: cover; border-radius: .75rem; background: transparent }
     .post-date { display: block; color: var(--quiet); font-size: 1rem }
     .post-header .post-date { margin-top: 1rem }
     .post-author { display: flex; flex-wrap: wrap; align-items: center; gap: .75rem; margin-top: .5rem; color: var(--quiet); font-size: 1rem }
@@ -333,26 +333,25 @@
       </nav>
     </header><main id="main" class="journal"><a class="post-back" href="/blog/">All posts</a><header class="post-header"><h1>Building myArc in public</h1><time class="post-date" datetime="2026-10-25">October 25, 2026</time><p class="post-author"><a rel="author" href="https://github.com/bitbonsai"><img src="../_assets/mauricio-wolff.19cc16ecf8b8.webp" alt="" width="28" height="28">Mauricio Wolff</a><span class="post-read-time">3 min read</span></p></header><article class="post-body"><figure class="portrait"><a href="mauricio-wolff-arc.c739650f7b1d.webp"><img alt="Mauricio Wolff's Arc card, dated 25 March 2023, with three anniversary stamps" decoding="async" fetchpriority="high" height="1426" loading="eager" sizes="(max-width: 48rem) 6rem, 9rem" src="mauricio-wolff-arc.c739650f7b1d.webp" width="950"/></a><figcaption>My Arc card, 2023.</figcaption></figure>
 
-<p>I started using Arc in 2023. I appreciate how Spaces and named pinned tabs make its sidebar feel like a workspace. The command bar gives you a quick way back to those tabs.</p>
-<p><a href="https://arc.net/">Arc is being sunsetted</a>. I wanted to keep that way of browsing alive. Why not build an independent, open-source continuation, with privacy as a starting point and AI something people could choose to use? That idea became myArc. For now, it's a Chromium-based prototype.</p>
-<h2>A browser should work without an account</h2>
-<p>Local browsing, migration and export must work without an account or subscription.</p>
-<p>I'm committing to no behavioral tracking: myArc will not send browser-usage analytics or create per-install tracking identifiers. Browsing history and workspace data stay local by default. Before release, an audit must check Chromium's defaults and network behavior against those commitments.</p>
-<p>I can follow interest through GitHub's aggregate release-download totals, without instrumenting people's browsing. Website and download hosts may still keep operational request logs. Those need separate disclosure.</p>
+<p>I started using Arc in 2023. I like how its sidebar works. Spaces and named pinned tabs turn it into something closer to a desk than a strip of tabs, and the command bar gets me back to any of those tabs fast.</p>
+<p><a href="https://arc.net/">Arc is being sunsetted</a>. I didn't want to lose that way of browsing, so I asked myself the obvious question: why not make an open, private-first version of Arc, with AI as an option? That's how myArc was born. Right now it's a Chromium-based prototype, and this post is where I write down what I'm trying and what breaks along the way.</p>
+<h2>What I want from it</h2>
+<p>I want to open myArc and start browsing without creating an account or paying for a subscription. Moving a workspace in or exporting it out should work the same way, on my own machine.</p>
+<p>I also want it to be private. myArc won't send analytics about how you browse, and it won't create an identifier per install to track you with. History and workspace data stay on your disk by default. I haven't verified all of this yet, though. Chromium ships with its own defaults and network behavior, and before any release I need to go through them and check what actually leaves the machine.</p>
+<p>I do want to know whether people try it. GitHub's aggregate download totals per release are enough for that. The website and download host may keep ordinary request logs, which I'll disclose separately.</p>
 <h2>Trying Artcraft's way of working</h2>
-<p>I'm using <a href="https://github.com/bitbonsai/myarc/blob/main/docs/ARTCRAFT-WORKFLOW.md">Artcraft's public engineering practices</a> as a starting point. PhotoCraft's development guide separates model tests from visual checks in the native app.</p>
-<p>Moving navigation controls into the sidebar caused startup and layout failures. Using Chromium's native controls fixed those failures.</p>
-<p>The address field lost keyboard focus when it was hidden and shown during layout. Keeping it visible fixed navigation. When those controls move, startup and keyboard navigation both need rechecking in the native app.</p>
-<p>Chromium provides myArc's browser services, while Rust handles the workspace logic we own. The agent tasks follow that split.</p>
-<p>Each coding agent gets a narrow job and a result I can check. Today's tasks cover the Rust Spaces model and a workspace service owned by a Chromium Profile. Another agent is wiring that state into the native sidebar.</p>
-<p>A separate agent reviews the change. Findings go back for another implementation pass. The lead agent brings the Rust and Chromium changes together, builds the browser and checks the native window.</p>
+<p>I'm borrowing <a href="https://github.com/bitbonsai/myarc/blob/main/docs/ARTCRAFT-WORKFLOW.md">Artcraft's public engineering practices</a> as a starting point. PhotoCraft's development guide separates those checks: model tests run on their own, and visual checks happen in the native app.</p>
+<p>Moving the navigation controls into the sidebar broke startup and layout. Going back to Chromium's native controls fixed both.</p>
+<p>The address field also lost keyboard focus when layout hid it and showed it again. Keeping it visible brought navigation back. The lesson for me is that any time those controls move, I recheck startup and keyboard navigation in the native app.</p>
+<p>Chromium provides the browser services, and Rust handles the workspace logic that's ours. Agent tasks follow that line.</p>
+<p>Each coding agent gets a narrow job with a result I can check myself. Right now that's the Rust Spaces model and a workspace service owned by a Chromium Profile, while another agent wires that state into the native sidebar. A separate agent reviews the change, and its findings go back for another implementation pass. The lead agent then merges the Rust and Chromium pieces, builds the browser and looks at the native window.</p>
 <h2>Keeping context between sessions</h2>
-<p>I've open-sourced two skills under bitbonsai: <a href="https://github.com/bitbonsai/context">context</a> and <a href="https://github.com/bitbonsai/wrap">wrap</a>.</p>
-<p>Context keeps agent instructions and architecture notes current. A new agent needs to see which parts belong to Chromium and which belong to myArc, and distinguish planned work from working code.</p>
-<p>Wrap saves useful gotchas and writes a handover for the next session, so the startup and focus failures can inform the next pass. Private and machine-specific notes stay outside the public repo.</p>
+<p>Working this way means every new agent starts without the last one's context. I've open-sourced two skills under bitbonsai for that: <a href="https://github.com/bitbonsai/context">context</a> and <a href="https://github.com/bitbonsai/wrap">wrap</a>.</p>
+<p>Context keeps the agent instructions and architecture notes current, so a new agent can tell Chromium's parts from myArc's, and plans from working code.</p>
+<p>Wrap saves the gotchas from a session and writes a handover for the next one. That's how the startup and focus failures above feed into the next pass instead of getting rediscovered. Private and machine-specific notes stay out of the public repo.</p>
 <p><a href="https://github.com/bitbonsai/myarc">myArc's code is open source too</a>.</p>
-<h2>The current build and the target</h2>
-<p>Page navigation and the centered native command palette already work in the prototype. Today's goal is an Arc-like empty window and a native nightly build people can try without compiling Chromium.</p>
+<h2>Where the build is</h2>
+<p>Page navigation works, and so does the centered native command palette. What I'm going for today is an Arc-like empty window and a native nightly build, so people can try it without compiling Chromium themselves.</p>
 <div class="image-grid"><figure><a href="arc-mauriciowolff-reference-transparent.bd89b079035b.webp"><img alt="Arc displaying mauriciowolff.com, our reference for the window material and sidebar" decoding="async" height="1171" loading="lazy" sizes="(max-width: 48rem) calc((100vw - 4rem) / 2), 24rem" src="arc-mauriciowolff-reference-transparent.bd89b079035b.webp" srcset="arc-mauriciowolff-reference-transparent.bd89b079035b.960.webp 960w, arc-mauriciowolff-reference-transparent.bd89b079035b.webp 1864w" width="1864"/></a><figcaption>Arc, our visual reference.</figcaption></figure><figure><a href="myarc-current-build.f594a2a31d6a.webp"><img alt="Current myArc build loading mauriciowolff.com with the native command palette open" decoding="async" height="1492" loading="lazy" sizes="(max-width: 48rem) calc((100vw - 4rem) / 2), 24rem" src="myarc-current-build.f594a2a31d6a.webp" srcset="myarc-current-build.f594a2a31d6a.960.webp 960w, myarc-current-build.f594a2a31d6a.webp 2400w" width="2400"/></a><figcaption>myArc, with the native command palette open.</figcaption></figure></div>
 
 
