@@ -1,5 +1,5 @@
 diff --git a/chrome/browser/global_keyboard_shortcuts_mac_unittest.mm b/chrome/browser/global_keyboard_shortcuts_mac_unittest.mm
-index f8c8b532d45ec8a4f07e65ff017a81e7be6bcf4a..6fb397a276eaa56f0972ca673fc7e9ee1fcb7db8 100644
+index f8c8b532d45ec8a4f07e65ff017a81e7be6bcf4a..5cfaab1e8b00901785dd41389779460f77bcfce2 100644
 --- a/chrome/browser/global_keyboard_shortcuts_mac_unittest.mm
 +++ b/chrome/browser/global_keyboard_shortcuts_mac_unittest.mm
 @@ -11,6 +11,7 @@
@@ -10,7 +10,27 @@ index f8c8b532d45ec8a4f07e65ff017a81e7be6bcf4a..6fb397a276eaa56f0972ca673fc7e9ee
  #include "chrome/app/chrome_command_ids.h"
  #include "testing/gtest/include/gtest/gtest.h"
  #include "ui/base/buildflags.h"
-@@ -129,6 +130,15 @@ TEST(GlobalKeyboardShortcuts, BasicFunctionality) {
+@@ -39,7 +40,8 @@ int CommandForKeys(int vkey_code,
+                    CommandKeyState command,
+                    ShiftKeyState shift = ShiftKeyState::kUp,
+                    OptionKeyState option = OptionKeyState::kUp,
+-                   ControlKeyState control = ControlKeyState::kUp) {
++                   ControlKeyState control = ControlKeyState::kUp,
++                   bool delayed = false) {
+   NSUInteger modifier_flags = 0;
+   if (command == CommandKeyState::kDown)
+     modifier_flags |= NSEventModifierFlagCommand;
+@@ -92,7 +94,8 @@ int CommandForKeys(int vkey_code,
+                         isARepeat:NO
+                           keyCode:vkey_code];
+ 
+-  return CommandForKeyEvent(event).chrome_command;
++  return delayed ? DelayedWebContentsCommandForKeyEvent(event)
++                 : CommandForKeyEvent(event).chrome_command;
+ }
+ 
+ }  // namespace
+@@ -129,6 +132,26 @@ TEST(GlobalKeyboardShortcuts, BasicFunctionality) {
                       OptionKeyState::kUp, ControlKeyState::kUp));
  }
  
@@ -21,6 +41,17 @@ index f8c8b532d45ec8a4f07e65ff017a81e7be6bcf4a..6fb397a276eaa56f0972ca673fc7e9ee
 +          : IDC_DEV_TOOLS_INSPECT;
 +  EXPECT_EQ(expected, CommandForKeys(kVK_ANSI_C, CommandKeyState::kDown,
 +                                     ShiftKeyState::kDown));
++}
++
++TEST(GlobalKeyboardShortcuts, BlankWindowShortcutFollowsMyarcMode) {
++  const int expected =
++      base::CommandLine::ForCurrentProcess()->HasSwitch("myarc-visual-parity")
++          ? IDC_NEW_WINDOW
++          : NO_COMMAND;
++  EXPECT_EQ(expected,
++            CommandForKeys(kVK_ANSI_N, CommandKeyState::kDown,
++                           ShiftKeyState::kUp, OptionKeyState::kUp,
++                           ControlKeyState::kDown, true));
 +}
 +
  TEST(GlobalKeyboardShortcuts, KeypadNumberKeysMatch) {

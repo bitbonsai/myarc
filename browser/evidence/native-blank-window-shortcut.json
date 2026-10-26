@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-26",
+  "slice": "MA-007.c.blank-window-shortcut",
+  "status": "native_second_blank_window_passed",
+  "source_commit": "5c5c1f76e7ddf2bdc323fbb27e228e7a2c306f98",
+  "reference": "research-private/arc/parent-capture/05-shortcuts.png",
+  "behavior": {
+    "shortcut": "Ctrl+Cmd+N",
+    "arc_label": "Blank Window",
+    "stock_chromium_binding": "none",
+    "myarc_command": "IDC_NEW_WINDOW",
+    "window_count_before": 1,
+    "window_count_after": 2,
+    "original_window_title": "myArc foundation check",
+    "new_window_title": "about:blank",
+    "blank_content_visible": true
+  },
+  "checks": {
+    "chrome_and_unit_tests_build": "exit 0",
+    "shortcut_unit_stock": "passed, unbound",
+    "shortcut_unit_myarc": "passed, IDC_NEW_WINDOW",
+    "native_background_launch": true,
+    "screen_capture_kit_window_count": "1 to 2",
+    "private_capture": "research-private/captures/blank-window-20261026T202613Z/blank-window.png",
+    "patch_exports": "passed",
+    "native_cpp_browser_tests": "UNRUN"
+  },
+  "limits": [
+    "The second window shows blank content and an active about:blank item, but the original page remains listed through the shared Profile projection",
+    "Per-window Arc tab isolation and restart behavior remain unverified",
+    "Shortcut is macOS-only",
+    "Private disposable profile, capture and raw logs remain outside Git"
+  ]
+}

@@ -52,9 +52,11 @@ Check these in the preview window, recording failures rather than assuming parit
 1. Press Cmd+T, type `https://example.com`, then Enter. Expect one new real page.
    Press Cmd+L, change its URL to `https://example.org`, then Enter. Expect the same
    tab to navigate, with no duplicate. Press Cmd+Shift+C and paste into a disposable
-   text field; expect the full current URL. Hover a result without clicking; input
-   should keep focus. Arrow/click selection deliberately activates that result.
-   Escape should dismiss an unused palette.
+   text field; expect the full current URL. Press Ctrl+Cmd+N; expect a second
+   window with blank content and an active `about:blank` row. The original page
+   may remain listed through the current shared Profile projection. Hover a result
+   without clicking; input should keep focus. Arrow/click selection deliberately
+   activates that result. Escape should dismiss an unused palette.
 2. Library opens a native menu for Downloads and existing Space actions. The
    footer Library/current Space/`+` controls stay square. Use `+` (Create Space),
    then switch with its Space dots. A fresh

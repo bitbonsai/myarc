@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-10-26: Ctrl+Cmd+N opens a blank window
+
+- Arc's Shortcuts reference labels Ctrl+Cmd+N as “Blank Window”. myArc now routes that secondary macOS shortcut to `IDC_NEW_WINDOW` through delayed command dispatch, leaving Cmd+N and stock Chromium unchanged.
+- Chrome and focused stock/myArc unit modes passed. A background marked-profile run measured one owned window before and two after the shortcut. The original title stayed `myArc foundation check`; the new title was `about:blank`, with blank content visible in a fresh capture.
+- Committed Chromium `5c5c1f76e7ddf2bdc323fbb27e228e7a2c306f98`. The new window still lists the original page through shared Profile projection, so per-window Arc tab isolation and restart behavior remain open. Native C++ browser tests remain unrun.
+
 ## 2026-10-26: Arc-matching quit-warning default
 
 - Arc's General settings reference shows “Warn before quitting” off. Chromium defaulted the existing `browser.confirm_to_quit` pref on. Under `--myarc-visual-parity` it now defaults off while stock Chromium and explicit user values stay unchanged; the existing app-menu toggle remains the control.
