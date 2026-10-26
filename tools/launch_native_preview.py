@@ -30,10 +30,11 @@ def running_review_pid(executable: Path, profile: Path):
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
-        '--review', action='store_true',
-        help='reuse the marked native-preview-review profile; quit it before relaunching',
+        '--review', nargs='?', const='native-preview-review', metavar='PROFILE_NAME',
+        help='reuse a marked native-preview-* cache profile; quit it before relaunching',
     )
     args = parser.parse_args(argv)
+    review = args.review is not None
     work = Path.home() / '.cache/myarc-m0'
     executable = work / 'chromium/src/out/MyarcM0/Chromium.app/Contents/MacOS/Chromium'
     if not executable.is_file() or not os.access(executable, os.X_OK):
@@ -48,8 +49,12 @@ def main(argv=None) -> int:
     previous_umask = os.umask(0o077)
     try:
         marker_text = 'Owned synthetic M0 browser test profile\n'
-        if args.review:
-            profile = work / 'native-preview-review'
+        if review:
+            if (not args.review.startswith('native-preview-')
+                    or Path(args.review).name != args.review
+                    or len(args.review.encode('utf-8')) > 128):
+                raise OSError('Review profile must name a direct native-preview-* cache directory')
+            profile = work / args.review
             if profile.is_symlink():
                 raise OSError(f'Review profile must not be a symlink: {profile}')
             fresh = not profile.exists()
@@ -72,7 +77,7 @@ def main(argv=None) -> int:
         else:
             profile = Path(tempfile.mkdtemp(prefix='native-preview-', dir=work)).resolve()
             fresh = True
-        print(f'{"Review" if args.review else "Disposable"} profile: {profile}', flush=True)
+        print(f'{"Review" if review else "Disposable"} profile: {profile}', flush=True)
         pid_file = profile / 'preview.pid'
         print('Keep important data in your normal browser. UI remains unverified.', flush=True)
         if fresh:
@@ -86,7 +91,7 @@ def main(argv=None) -> int:
                 mode='w', prefix='preview-', suffix='.log', dir=profile,
                 encoding='utf-8', delete=False,
             )
-            if args.review else (profile / 'preview.log').open('x', encoding='utf-8')
+            if review else (profile / 'preview.log').open('x', encoding='utf-8')
         )
         with output_file as output:
             log = Path(output.name)
@@ -101,7 +106,7 @@ def main(argv=None) -> int:
                     '--disable-features=InitialWebUI',
                     '--no-first-run',
                     '--no-default-browser-check',
-                    *(['--profile-directory=Default'] if args.review else []),
+                    *(['--profile-directory=Default'] if review else []),
                     *(['--restore-last-session'] if not fresh else ['about:blank']),
                 ],
                 stdin=subprocess.DEVNULL,

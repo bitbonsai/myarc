@@ -28,8 +28,10 @@ For repeated UI review, keep one marked profile instead of creating a fresh one:
 python3 tools/launch_native_preview.py --review
 ```
 
-Review mode uses `$HOME/.cache/myarc-m0/native-preview-review`, with `Default`
-selected explicitly. Its first launch seeds vertical tabs; later launches preserve
+Review mode defaults to `$HOME/.cache/myarc-m0/native-preview-review`, with
+`Default` selected explicitly. To keep an existing marked disposable profile,
+pass its cache directory name, for example `--review native-preview-EXAMPLE`.
+Paths outside this cache and other directory names are rejected. Its first launch seeds vertical tabs; later launches preserve
 preferences and saved workspace data, use native `--restore-last-session` without
 startup URLs, and retain separate private logs. Unmarked directories and symlinks
 are rejected. Quit that preview before relaunching: a matching live process is

@@ -164,6 +164,25 @@ class NativePreviewTests(unittest.TestCase):
         for log in profile.glob('preview-*.log'):
             self.assertEqual(stat.S_IMODE(log.stat().st_mode), 0o600)
 
+    def test_review_can_reuse_existing_disposable_profile_without_moving_data(self):
+        self.assertEqual(self.run_launcher(), 0)
+        profile, = self.profiles()
+        state = profile / 'Default/myarc-workspace-v1.json'
+        state.write_text('Existing synthetic Space Pin\n')
+        self.assertEqual(self.run_launcher(['--review', profile.name]), 0)
+        self.assertEqual(self.profiles(), [profile])
+        self.assertEqual(state.read_text(), 'Existing synthetic Space Pin\n')
+        self.assertIn(f'--user-data-dir={profile}', self.popen.call_args.args[0])
+        self.assertIn('--restore-last-session', self.popen.call_args.args[0])
+
+    def test_review_rejects_paths_and_nonpreview_names(self):
+        for name in ('', '/tmp/native-preview-real', '../native-preview-other', 'qa-profile',
+                     'native-preview-' + 'x' * 128):
+            with self.subTest(name=name):
+                self.assertEqual(self.run_launcher(['--review', name]), 1)
+        self.popen.assert_not_called()
+        self.assertEqual(self.profiles(), [])
+
     def test_review_refuses_unmarked_or_invalid_marker_without_writing(self):
         profile = self.work / 'native-preview-review'
         profile.mkdir()
