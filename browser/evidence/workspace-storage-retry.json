@@ -2,7 +2,7 @@
   "slice": "MA-007.c-native-storage-retry",
   "date": "2026-10-26",
   "baseline_stack_through": "0022",
-  "status": "native retry UI gap open",
+  "status": "baseline gap retained; bounded native retry repair accepted through0023",
   "fault": {
     "marked_disposable_profile_only": true,
     "known_written_metadata_retained_exactly_in_owned_backup": true,
@@ -32,6 +32,32 @@
   "cleanup": {
     "owned_apps_helpers_fixture_server_closed": true,
     "fault_profile_and_backup_retained_privately": true
+  },
+  "repair": {
+    "implementation_commit": "a8de00d",
+    "stack_through": "0023",
+    "real_keyboard_space_activates_each_named_retry": true,
+    "failed_save_retries": 2,
+    "failed_save_keeps_original_backup_and_current_memory_spaces": true,
+    "failed_save_focus_falls_back_to_current_space": true,
+    "after_only_removing_empty_fault_directory_actual_writer_saves_latest_two_memory_spaces": true,
+    "saved_items_and_window_identity_unchanged_by_write_retry": true,
+    "failed_load_preserves_exact_invalid_input_and_mutation_controls_absent": true,
+    "manual_exact_valid_backup_restore_then_real_load_retry": true,
+    "bad_input_retained_privately_after_manual_repair": true,
+    "full_backed_up_model_ids_restored_and_new_native_space_written": true,
+    "failed_load_retry_focus_retained": true,
+    "native_page_target_url_time_origin_unchanged_by_either_retry_journey": true,
+    "normal_and_900x600_warning_and_retry_bounds_inspected": true,
+    "native_private_ntp_omits_retries_and_regular_bytes_unchanged": true,
+    "private_form_attempt_stopped_by_exact_overlap_guard_canceled_not_counted_as_mutation": true,
+    "owned_apps_helpers_server_closed": true,
+    "limitations": [
+      "Manual backup restoration is explicit, not automatic recovery or durability acceptance",
+      "Native C++ fixtures remain UNRUN; fast pending-state UI and deferred destruction overlap unmeasured",
+      "Full assistive-technology navigation, actual overflow scrolling and complete motion/OS preference matrix unmeasured",
+      "Initial private helper action allowlist and same-button-focus assumptions were corrected privately; guards not relaxed"
+    ]
   },
   "workspace_renderer_default_enabled": false
 }

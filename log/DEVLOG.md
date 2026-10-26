@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-10-26: Native storage retry actions verified
+
+0023 integrated as `a8de00d` after installed83/canonical16/compiled-hash checks. Real directory fault plus two keyboard failed save retries retained backup/memory. Removing only the empty fault directory let actual Retry saving write both latest memory Spaces, preserving saved/window identity. Separate malformed bytes stayed exact after failed keyboard load retry; explicit valid-backup restoration plus native Retry loading restored full model/controls and allowed a new Space write. Each journey kept live page target/URL/time origin. [Evidence](../browser/evidence/workspace-storage-retry.json).
+
+Normal/small-window full warnings and named focused actions inspected; private NTP omitted retries with regular bytes unchanged. Private form attempt stopped at overlap guard, canceled and excluded. Save retry focus followed existing current-Space fallback; initial helper allowlist/focus assumptions corrected privately, guards intact. No automatic recovery/durability or native fixture-suite claim. Owned apps/helpers/server closed; raw backups/input retained privately.
+
 ## 2026-10-26: State-specific storage retry build candidate
 
 From `7045dda`, [0023](../browser/experiments/native-storage-retry.md) wires native load/save retry actions to existing exact-Profile service methods through deferred weak dispatch. Unavailable status scrolls above its action while native tabs retain at least half the remaining region. Canonical SidebarView changes only; service/core/schema and recovery holds stay unchanged. Baseline evidence remains untouched.
