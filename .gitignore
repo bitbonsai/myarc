@@ -34,3 +34,5 @@ site/llms-full.txt
 .DS_Store
 
 # Public plan/ is deliberately tracked.
+.plans/next.md
+.plans/next.prev.md
