@@ -1,0 +1,37 @@
+{
+  "slice": "MA-007.c-native-storage-retry",
+  "date": "2026-10-26",
+  "baseline_stack_through": "0022",
+  "status": "native retry UI gap open",
+  "fault": {
+    "marked_disposable_profile_only": true,
+    "known_written_metadata_retained_exactly_in_owned_backup": true,
+    "metadata_file_path_replaced_with_empty_directory": true,
+    "no_serialized_workspace_ids_or_fields_forged": true
+  },
+  "write_error": {
+    "real_native_create_space_remained_in_memory": true,
+    "actual_atomic_writer_failure_logged": true,
+    "error_warning_visually_inspected": true,
+    "original_backup_unchanged": true,
+    "retry_saving_button_absent": true
+  },
+  "read_error": {
+    "same_fault_profile_clean_relaunched_with_native_session": true,
+    "real_page_available_in_native_fallback": true,
+    "workspace_mutation_controls_absent": true,
+    "invalid_path_and_original_backup_preserved": true,
+    "error_warning_visually_inspected": true,
+    "retry_loading_button_absent": true
+  },
+  "limits": [
+    "Controlled filesystem fault, not automatic recovery, crash durability or power-loss evidence",
+    "Bounded AX walk did not return status label text; native captures and writer output inspected",
+    "No retry action was claimed from service APIs alone"
+  ],
+  "cleanup": {
+    "owned_apps_helpers_fixture_server_closed": true,
+    "fault_profile_and_backup_retained_privately": true
+  },
+  "workspace_renderer_default_enabled": false
+}

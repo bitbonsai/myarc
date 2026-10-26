@@ -32,6 +32,8 @@ A fresh palette interruption check found Cmd+L dismissing an existing Cmd+T draf
 
 [Two sequential native Reopen Closed Window cycles](../evidence/workspace-native-late-restore.json) then passed in the same process while the other window survived. Saved/window identity and both actual pins stayed exact. Removed Temporaries returned under fresh IDs with their original Space owner. A survivor-palette invocation closed on deactivation and kept its page target/time origin/position. This is late Undo Closed Window, not another process crash or simultaneous-restorer acceptance. Owned apps/helpers/server closed; no new patch needed.
 
+A controlled owned-file collision produced real workspace write/read errors with preserved original bytes. Native warnings requested retry, but no retry controls existed. [Baseline](../evidence/workspace-storage-retry.json) retained before a narrow service-backed UI repair; this fault injection is not automatic recovery or durability evidence. Apps/helpers/server closed.
+
 ## Tested preview command
 
 ```sh

@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-10-26: Native storage warnings have no retry action
+
+Controlled own-profile metadata-path directory collision retained exact original bytes and triggered a real writer error after Create Space. Native warning reported memory-only changes and requested retry saving; no retry control. Clean relaunch against the same path showed load error/native fallback with mutations unavailable and no retry loading control. [Baseline](../browser/evidence/workspace-storage-retry.json).
+
+Actual captures inspected; bounded AX walk omitted warning text. No input IDs/fields fabricated or recovery/durability pass claimed. Unsaved mutation intentionally stayed unsaved. Fault profile/backup retained privately, owned apps/helpers/server closed. Existing Profile-bound RetryLoad/RetrySave APIs provide the narrow next UI action.
+
 ## 2026-10-26: Same-process native late window restoration
 
 Two sequential actual close/Cmd+Shift+T cycles on0022 retained saved ID/owner/URL, both logical window IDs/Spaces/selections and two real native pins. Original closed Temporary2 was removed, then native restoration allocated4/5 with the original Reading owner2. The second restore came from the survivor palette; deactivation closed it and survivor target/URL/time origin/position stayed exact. [Evidence](../browser/evidence/workspace-native-late-restore.json).
