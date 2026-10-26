@@ -1,5 +1,5 @@
 diff --git a/chrome/browser/ui/views/toolbar/toolbar_view.cc b/chrome/browser/ui/views/toolbar/toolbar_view.cc
-index 80b0e24263170de768a6684c8aabf106018710e7..e4cbca7c75cdffdf75f5f29e23c13914920cd19f 100644
+index 80b0e24263170de768a6684c8aabf106018710e7..233169c5c16073fe2b1d77690d53773bf4b8c519 100644
 --- a/chrome/browser/ui/views/toolbar/toolbar_view.cc
 +++ b/chrome/browser/ui/views/toolbar/toolbar_view.cc
 @@ -5,6 +5,7 @@
@@ -51,7 +51,7 @@ index 80b0e24263170de768a6684c8aabf106018710e7..e4cbca7c75cdffdf75f5f29e23c13914
    bool is_glic_left_of_profile =
        features::kGlicToolbarButtonLocationParam.Get() ==
            features::GlicToolbarButtonLocation::kLeftOfProfileChip ||
-@@ -1463,12 +1477,81 @@ gfx::Size ToolbarView::GetMinimumSize() const {
+@@ -1463,12 +1477,78 @@ gfx::Size ToolbarView::GetMinimumSize() const {
    return size;
  }
  
@@ -90,21 +90,18 @@ index 80b0e24263170de768a6684c8aabf106018710e7..e4cbca7c75cdffdf75f5f29e23c13914
    }
  
 +  if (myarc_sidebar_toggle_ && location_bar_view_) {
-+    // shortcut: first-state geometry; review narrow/fullscreen before wider
-+    // use.
-+    const bool expanded = width() >= 180;
-+    const bool has_page = !chrome::IsMyarcWorkspaceBlank(browser_);
++    // Like Arc, the header keeps every control at any allowed sidebar width
++    // (tabs::kMyarcSidebarMinWidth) and on blank Spaces, where navigation is
++    // disabled rather than hidden.
 +    views::ProposedLayout layout;
 +    layout.host_size = size();
 +    for (views::View* child : children()) {
-+      const bool visible =
-+          child == myarc_sidebar_toggle_ ||
-+          (expanded && (child == location_bar_view_ ||
-+                        (has_page && (child == back_ || child == forward_ ||
-+                                      child == reload_))));
++      const bool visible = child == myarc_sidebar_toggle_ ||
++                           child == location_bar_view_ || child == back_ ||
++                           child == forward_ || child == reload_;
 +      gfx::Rect bounds;
 +      if (child == myarc_sidebar_toggle_) {
-+        bounds = gfx::Rect(expanded ? 84 : 8, expanded ? 8 : 42, 28, 28);
++        bounds = gfx::Rect(84, 8, 28, 28);
 +      } else if (child == back_) {
 +        bounds = gfx::Rect(width() - 104, 8, 24, 28);
 +      } else if (child == forward_) {
@@ -133,7 +130,7 @@ index 80b0e24263170de768a6684c8aabf106018710e7..e4cbca7c75cdffdf75f5f29e23c13914
    if (display_mode_ == DisplayMode::kCustomTab) {
      custom_tab_bar_->SetBounds(0, 0, width(),
                                 custom_tab_bar_->GetPreferredSize().height());
-@@ -1580,7 +1663,7 @@ void ToolbarView::InitLayout() {
+@@ -1580,7 +1660,7 @@ void ToolbarView::InitLayout() {
                                 views::MaximumFlexSizeRule::kUnbounded)
            .WithOrder(location_bar_flex_order);
  

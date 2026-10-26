@@ -1,5 +1,5 @@
 diff --git a/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl.cc b/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl.cc
-index b1ea4a69f42333b238abbf67b0278467ea41bb28..12b377f8d6798cf724596e2b29993335ce8cea18 100644
+index b1ea4a69f42333b238abbf67b0278467ea41bb28..a7f614e3099092e2196608b59da6f48a01d0ea9c 100644
 --- a/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl.cc
 +++ b/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl.cc
 @@ -9,6 +9,7 @@
@@ -10,7 +10,21 @@ index b1ea4a69f42333b238abbf67b0278467ea41bb28..12b377f8d6798cf724596e2b29993335
  #include "base/functional/bind.h"
  #include "base/i18n/rtl.h"
  #include "base/numerics/safe_conversions.h"
-@@ -680,10 +681,13 @@ BrowserViewTabbedLayoutImpl::CalculateVerticalTabStripAnimation() {
+@@ -454,7 +455,12 @@ BrowserViewTabbedLayoutImpl::CalculateHorizontalLayout(
+   layout.min_content_width = kContentsContainerMinimumWidth;
+ 
+   // Get information about the vertical tabstrip, if present.
+-  const int toolbar_minimum_width = views().toolbar->GetMinimumSize().width();
++  // myArc moves the toolbar into the sidebar header, so it no longer competes
++  // with the sidebar for horizontal space.
++  const int toolbar_minimum_width =
++      IsParentedTo(views().toolbar, views().top_container)
++          ? views().toolbar->GetMinimumSize().width()
++          : 0;
+   int min_vertical_tab_strip_width = 0;
+   int preferred_vertical_tab_strip_width = 0;
+   if (layout_data_->tab_strip_type == TabStripType::kVertical) {
+@@ -680,10 +686,13 @@ BrowserViewTabbedLayoutImpl::CalculateVerticalTabStripAnimation() {
    VerticalTabStripAnimation animation;
    animation.current_motion =
        controller->GetCurrentMotion(TabStripAnimations::kVerticalTabStrip);
@@ -28,7 +42,7 @@ index b1ea4a69f42333b238abbf67b0278467ea41bb28..12b377f8d6798cf724596e2b29993335
    animation.expand_on_hover_width =
        *controller->GetCurrentValue(TabStripAnimations::kVerticalTabStrip,
                                     TabStripAnimations::kTabStripHoverWidth);
-@@ -727,7 +731,7 @@ gfx::Size BrowserViewTabbedLayoutImpl::GetMinimumMainAreaSize(
+@@ -727,7 +736,7 @@ gfx::Size BrowserViewTabbedLayoutImpl::GetMinimumMainAreaSize(
  
    int width = std::max({toolbar_size.width(), bookmark_bar_size.width(),
                          infobar_container_size.width(),
@@ -37,7 +51,7 @@ index b1ea4a69f42333b238abbf67b0278467ea41bb28..12b377f8d6798cf724596e2b29993335
    const int height = toolbar_size.height() + bookmark_bar_size.height() +
                       infobar_container_size.height() + contents_size.height();
  
-@@ -897,6 +901,8 @@ BrowserViewTabbedLayoutImpl::CalculateProposedLayout(
+@@ -897,6 +906,8 @@ BrowserViewTabbedLayoutImpl::CalculateProposedLayout(
    gfx::Rect unclipped_contents_region = params.visual_client_area;
  
    // Lay out vertical tab strip if visible.
@@ -46,7 +60,7 @@ index b1ea4a69f42333b238abbf67b0278467ea41bb28..12b377f8d6798cf724596e2b29993335
    int collapsed_vertical_tab_strip_adjustment = 0;
    const VerticalTabStripAnimation& vertical_tab_strip_animation =
        layout_data_->vertical_tab_strip_animation;
-@@ -909,8 +915,14 @@ BrowserViewTabbedLayoutImpl::CalculateProposedLayout(
+@@ -909,8 +920,14 @@ BrowserViewTabbedLayoutImpl::CalculateProposedLayout(
              horizontal_layout.vertical_tab_strip_width;
        }
  
@@ -62,7 +76,7 @@ index b1ea4a69f42333b238abbf67b0278467ea41bb28..12b377f8d6798cf724596e2b29993335
                            horizontal_layout.vertical_tab_strip_width) *
            vertical_tab_strip_animation.expand_on_hover_width;
  
-@@ -977,16 +989,18 @@ BrowserViewTabbedLayoutImpl::CalculateProposedLayout(
+@@ -977,16 +994,18 @@ BrowserViewTabbedLayoutImpl::CalculateProposedLayout(
        if (vertical_tab_strip_animation.current_motion) {
          clip_content_for_animation =
              vertical_tab_strip_animation.is_expanding_or_collapsing();
@@ -86,7 +100,7 @@ index b1ea4a69f42333b238abbf67b0278467ea41bb28..12b377f8d6798cf724596e2b29993335
    }
  
    if (IsParentedTo(views().vertical_tab_strip_background_blur_backdrop,
-@@ -994,7 +1008,8 @@ BrowserViewTabbedLayoutImpl::CalculateProposedLayout(
+@@ -994,7 +1013,8 @@ BrowserViewTabbedLayoutImpl::CalculateProposedLayout(
      layout.AddChild(
          views().vertical_tab_strip_background_blur_backdrop,
          vertical_tab_strip_bounds,
@@ -96,7 +110,7 @@ index b1ea4a69f42333b238abbf67b0278467ea41bb28..12b377f8d6798cf724596e2b29993335
              layout_data_->vertical_tab_strip_animation.expand_on_hover_width >
                  0.0f);
    }
-@@ -1006,7 +1021,7 @@ BrowserViewTabbedLayoutImpl::CalculateProposedLayout(
+@@ -1006,7 +1026,7 @@ BrowserViewTabbedLayoutImpl::CalculateProposedLayout(
      const double top_corner = layout_data_->vertical_tabs_top_corner();
      const bool top_corner_visible =
          layout_data_->tab_strip_type == TabStripType::kVertical &&
@@ -105,7 +119,7 @@ index b1ea4a69f42333b238abbf67b0278467ea41bb28..12b377f8d6798cf724596e2b29993335
  
      // The top corner is drawn when the tabstrip goes all the way to the top.
      if (top_corner_visible) {
-@@ -1029,7 +1044,7 @@ BrowserViewTabbedLayoutImpl::CalculateProposedLayout(
+@@ -1029,7 +1049,7 @@ BrowserViewTabbedLayoutImpl::CalculateProposedLayout(
      const double bottom_corner = layout_data_->vertical_tabs_bottom_corner();
      const bool bottom_corner_visible =
          layout_data_->tab_strip_type == TabStripType::kVertical &&
@@ -114,7 +128,7 @@ index b1ea4a69f42333b238abbf67b0278467ea41bb28..12b377f8d6798cf724596e2b29993335
      if (bottom_corner_visible) {
        auto preferred =
            views().vertical_tab_strip_bottom_corner->GetPreferredSize();
-@@ -1195,6 +1210,13 @@ BrowserViewTabbedLayoutImpl::CalculateProposedLayout(
+@@ -1195,6 +1215,13 @@ BrowserViewTabbedLayoutImpl::CalculateProposedLayout(
      params.SetTop(top_container_layout.bounds.bottom());
    }
  
@@ -128,7 +142,7 @@ index b1ea4a69f42333b238abbf67b0278467ea41bb28..12b377f8d6798cf724596e2b29993335
    // Lay out infobar container.
    const bool infobar_visible = delegate().IsInfobarVisible();
    if (IsParentedTo(views().infobar_container, views().browser_view)) {
-@@ -1227,6 +1249,8 @@ BrowserViewTabbedLayoutImpl::CalculateProposedLayout(
+@@ -1227,6 +1254,8 @@ BrowserViewTabbedLayoutImpl::CalculateProposedLayout(
    // the required top padding.
    const auto& separator_info = layout_data_->separator_info;
    views().multi_contents_view->SetShouldShowTopSeparator(
@@ -137,7 +151,7 @@ index b1ea4a69f42333b238abbf67b0278467ea41bb28..12b377f8d6798cf724596e2b29993335
        separator_info.multi_contents_separator);
  
    // Updating the top, left and right insets for contents container view when
-@@ -1602,6 +1626,12 @@ void BrowserViewTabbedLayoutImpl::DoPostLayoutVisualAdjustments(
+@@ -1602,6 +1631,12 @@ void BrowserViewTabbedLayoutImpl::DoPostLayoutVisualAdjustments(
          content_corners.set_lower_left(radius);
        }
      }
@@ -150,7 +164,7 @@ index b1ea4a69f42333b238abbf67b0278467ea41bb28..12b377f8d6798cf724596e2b29993335
      views().multi_contents_view->SetBackgroundRadii(content_corners);
    }
  
-@@ -1726,19 +1756,26 @@ void BrowserViewTabbedLayoutImpl::DoPostLayoutVisualAdjustments(
+@@ -1726,19 +1761,26 @@ void BrowserViewTabbedLayoutImpl::DoPostLayoutVisualAdjustments(
      if (animation.expand_on_hover_width > 0.0) {
        vertical_tabs_outline.bottom = true;
      }

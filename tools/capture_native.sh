@@ -30,7 +30,7 @@ if [ "${1:-}" = "--inner" ]; then
   trap cleanup EXIT
   mkdir -p "$PROFILE/Default"
   touch "$PROFILE/.myarc-m0-test-profile"
-  printf '%s\n' '{"vertical_tabs":{"enabled":true,"collapsed_state":false,"uncollapsed_width":230,"enabled_first_time":true}}' > "$PROFILE/Default/Preferences"
+  printf '%s\n' '{"vertical_tabs":{"enabled":true,"collapsed_state":false,"enabled_first_time":true}}' > "$PROFILE/Default/Preferences"
   read -r -a URLS <<< "$URL"
   EXTRA=()
   { [ -n "$KEYS" ] || [ -n "${PALETTE:-}" ]; } && EXTRA+=(--myarc-capture-open-palette)

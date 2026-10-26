@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-10-26: Sidebar keeps its width and full header
+
+- Root cause: the header hid back/forward/reload and the address field below 180 pt, but resize-area drags and arrow keys could save widths down to the stock 126 pt minimum. A saved width in that range left only the toggle. The tabbed layout also capped the sidebar by the toolbar's minimum width, though the toolbar now lives in the sidebar header. Under `--myarc-visual-parity` the default is now 270 pt (Arc). Saved and dragged widths clamp to 220 pt, the narrowest width where the toggle clears the nav cluster. The header always shows every control, including on blank Spaces. The toolbar no longer caps the sidebar.
+- Measured the content-card edge in fresh `tools/capture_native.sh` captures: 270 pt at 1440×900, at 2200×1300 (clamped to the 1512×949 pt screen) and at 900×700. A seeded 150 pt width opens at 220 pt with all controls. `about:blank` keeps back/forward/reload. Blog scene: 6.56% differing pixels at 5% fuzz, RMSE 0.170.
+- Still differs: Arc fits its header at about 198 pt because its traffic lights and nav buttons sit tighter, so the scene's 200 pt seed renders at 220 pt. A live window drag was not run, since captures stay background-only.
+
 ## 2026-10-26: Palette favicons, Lucide magnifier and review fixes
 
 - Changed: palette tab rows show the tab's own favicon (ContentFaviconDriver, the tab strip's source) at 16 pt, with the globe only when a page has none; the magnifier is Lucide's search icon as inline vector path commands. `--myarc-capture-open-palette=<ms>` takes an optional delay (default 2000) and opens once per window, and `tools/capture_scene.sh` opens it after 30 s, once the Favorites are live and the startup New tab row is closed. Review fixes: rows get icons, chips and colors in current-tab mode too; presses in the shadow band of the bubble window close the palette on Mac; arrow chips are ignored by accessibility.

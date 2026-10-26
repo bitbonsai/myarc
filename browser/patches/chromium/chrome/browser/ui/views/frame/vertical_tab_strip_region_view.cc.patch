@@ -1,5 +1,5 @@
 diff --git a/chrome/browser/ui/views/frame/vertical_tab_strip_region_view.cc b/chrome/browser/ui/views/frame/vertical_tab_strip_region_view.cc
-index 252172ef9e07498c1ade0fbe972afc7c6472116c..cb6923cd0a52d532ad0f1614febeb3907fbfa1cd 100644
+index 252172ef9e07498c1ade0fbe972afc7c6472116c..e4cf639f2eedea515a4c33b1d310f1d41af31e72 100644
 --- a/chrome/browser/ui/views/frame/vertical_tab_strip_region_view.cc
 +++ b/chrome/browser/ui/views/frame/vertical_tab_strip_region_view.cc
 @@ -9,6 +9,7 @@
@@ -212,7 +212,7 @@ index 252172ef9e07498c1ade0fbe972afc7c6472116c..cb6923cd0a52d532ad0f1614febeb390
    tabs::TabInterface* active_tab = tab_strip_model()->GetActiveTab();
    if (active_tab) {
      return GetTabAnchorView(active_tab->GetHandle());
-@@ -526,8 +614,12 @@ views::View* VerticalTabStripRegionView::GetDefaultFocusableChild() {
+@@ -526,9 +614,16 @@ views::View* VerticalTabStripRegionView::GetDefaultFocusableChild() {
  
  gfx::Size VerticalTabStripRegionView::GetMinimumSize() const {
    auto min_size = BaseTabStripRegionView::GetMinimumSize();
@@ -222,11 +222,16 @@ index 252172ef9e07498c1ade0fbe972afc7c6472116c..cb6923cd0a52d532ad0f1614febeb390
 +          : tabs::kVerticalTabStripCollapsedWidth;
    min_size.set_width((state_controller_->IsCollapsed() || IsAnimatingSize())
 -                         ? tabs::kVerticalTabStripCollapsedWidth
+-                         : tabs::kVerticalTabStripUncollapsedMinWidth);
 +                         ? collapsed_width
-                          : tabs::kVerticalTabStripUncollapsedMinWidth);
++                         : (base::CommandLine::ForCurrentProcess()->HasSwitch(
++                                "myarc-visual-parity")
++                                ? tabs::kMyarcSidebarMinWidth
++                                : tabs::kVerticalTabStripUncollapsedMinWidth));
    return min_size;
  }
-@@ -539,13 +631,16 @@ gfx::Size VerticalTabStripRegionView::CalculatePreferredSize(
+ 
+@@ -539,13 +634,16 @@ gfx::Size VerticalTabStripRegionView::CalculatePreferredSize(
        BrowserAnimationController::From(browser_view()->browser());
    const auto motion =
        controller->GetCurrentMotion(TabStripAnimations::kVerticalTabStrip);
@@ -246,7 +251,7 @@ index 252172ef9e07498c1ade0fbe972afc7c6472116c..cb6923cd0a52d532ad0f1614febeb390
                   (motion == TabStripAnimations::kExpand
                        ? std::floor<double>
                        : std::ceil<double>)(expand_amount * expand_percent));
-@@ -604,6 +699,47 @@ void VerticalTabStripRegionView::OnMouseExited(const ui::MouseEvent& event) {
+@@ -604,6 +702,47 @@ void VerticalTabStripRegionView::OnMouseExited(const ui::MouseEvent& event) {
    HandleMouseExited();
  }
  
@@ -294,7 +299,33 @@ index 252172ef9e07498c1ade0fbe972afc7c6472116c..cb6923cd0a52d532ad0f1614febeb390
  void VerticalTabStripRegionView::SetOrganizerPanelView(
      std::unique_ptr<views::View> panel_view) {
    CHECK(!organizer_panel_view_);
-@@ -813,6 +949,21 @@ bool VerticalTabStripRegionView::IsCollapsing() {
+@@ -753,14 +892,19 @@ void VerticalTabStripRegionView::OnResize(int resize_amount,
+       proposed_width <= tabs::kVerticalTabStripCollapseSnapWidth;
+   new_state.uncollapsed_width = target_collapse_state_.uncollapsed_width;
+   if (!new_state.collapsed) {
++    const bool visual_parity =
++        base::CommandLine::ForCurrentProcess()->HasSwitch(
++            "myarc-visual-parity");
++    const int default_width =
++        visual_parity ? tabs::kMyarcSidebarDefaultWidth
++                      : tabs::kVerticalTabStripDefaultUncollapsedWidth;
+     new_state.uncollapsed_width =
+-        std::clamp(proposed_width, tabs::kVerticalTabStripUncollapsedMinWidth,
++        std::clamp(proposed_width,
++                   visual_parity ? tabs::kMyarcSidebarMinWidth
++                                 : tabs::kVerticalTabStripUncollapsedMinWidth,
+                    tabs::kVerticalTabStripUncollapsedMaxWidth);
+-    if (std::abs(new_state.uncollapsed_width -
+-                 tabs::kVerticalTabStripDefaultUncollapsedWidth) <
+-        kSnapDistance) {
+-      new_state.uncollapsed_width =
+-          tabs::kVerticalTabStripDefaultUncollapsedWidth;
++    if (std::abs(new_state.uncollapsed_width - default_width) < kSnapDistance) {
++      new_state.uncollapsed_width = default_width;
+     }
+     if (done_resizing) {
+       // We only want to save the uncollapsed width to the state controller if
+@@ -813,6 +957,21 @@ bool VerticalTabStripRegionView::IsCollapsing() {
  void VerticalTabStripRegionView::RequestCollapse(bool collapse) {
    target_collapse_state_.collapsed = collapse;
    if (collapse) {
@@ -316,7 +347,7 @@ index 252172ef9e07498c1ade0fbe972afc7c6472116c..cb6923cd0a52d532ad0f1614febeb390
      suppress_expand_on_hover_ = IsCollapseButtonHovered();
      ResetExpandOnHoverTimers();
    } else {
-@@ -880,7 +1031,16 @@ void VerticalTabStripRegionView::AddTabStripView(
+@@ -880,7 +1039,16 @@ void VerticalTabStripRegionView::AddTabStripView(
    std::optional<size_t> separator_index =
        content_parent->GetIndexOf(top_button_separator_);
    CHECK(separator_index.has_value());
@@ -334,7 +365,7 @@ index 252172ef9e07498c1ade0fbe972afc7c6472116c..cb6923cd0a52d532ad0f1614febeb390
  
    // Pre-set the animation values to the appropriate state.
    auto* const animation_controller =
-@@ -927,7 +1087,9 @@ void VerticalTabStripRegionView::OnCollapseStateChanged(
+@@ -927,7 +1095,9 @@ void VerticalTabStripRegionView::OnCollapseStateChanged(
    resize_area_width_ = collapsed ? kCollapsedResizeAreaWidth : kResizeAreaWidth;
  
    if (tab_strip_view()) {
@@ -345,7 +376,7 @@ index 252172ef9e07498c1ade0fbe972afc7c6472116c..cb6923cd0a52d532ad0f1614febeb390
    }
  
    if ((state == tabs::VerticalTabStripCollapseState::kCollapsing) ||
-@@ -988,6 +1150,18 @@ void VerticalTabStripRegionView::UpdateExpandOnHoverState(
+@@ -988,6 +1158,18 @@ void VerticalTabStripRegionView::UpdateExpandOnHoverState(
        !state_controller_->IsCollapsed()) {
      ResetExpandOnHoverTimers();
      is_expanded_on_hover_ = false;
@@ -364,7 +395,7 @@ index 252172ef9e07498c1ade0fbe972afc7c6472116c..cb6923cd0a52d532ad0f1614febeb390
      return;
    }
  
-@@ -1022,6 +1196,10 @@ void VerticalTabStripRegionView::UpdateExpandOnHoverState(
+@@ -1022,6 +1204,10 @@ void VerticalTabStripRegionView::UpdateExpandOnHoverState(
    // locks because IsFrameActive can also return false when a WebUI bubble is
    // open.
    if (GetWidget() && !GetWidget()->ShouldPaintAsActive()) {
@@ -375,7 +406,7 @@ index 252172ef9e07498c1ade0fbe972afc7c6472116c..cb6923cd0a52d532ad0f1614febeb390
      if (is_expanded_on_hover_) {
        AnimateExpandOnHover(/*expand=*/false);
      }
-@@ -1031,7 +1209,7 @@ void VerticalTabStripRegionView::UpdateExpandOnHoverState(
+@@ -1031,7 +1217,7 @@ void VerticalTabStripRegionView::UpdateExpandOnHoverState(
    const bool should_expand =
        !suppress_expand_on_hover_ &&
        state_controller_->IsExpandOnHoverEnabled() &&
@@ -384,7 +415,7 @@ index 252172ef9e07498c1ade0fbe972afc7c6472116c..cb6923cd0a52d532ad0f1614febeb390
         (GetFocusManager() && Contains(GetFocusManager()->GetFocusedView())));
  
    if (!should_expand) {
-@@ -1057,6 +1235,15 @@ void VerticalTabStripRegionView::UpdateExpandOnHoverState(
+@@ -1057,6 +1243,15 @@ void VerticalTabStripRegionView::UpdateExpandOnHoverState(
  }
  
  void VerticalTabStripRegionView::OnMouseVelocityHeuristicInterval() {
@@ -400,7 +431,7 @@ index 252172ef9e07498c1ade0fbe972afc7c6472116c..cb6923cd0a52d532ad0f1614febeb390
    const bool should_expand =
        state_controller_->IsExpandOnHoverEnabled() &&
        (IsMouseHovered() ||
-@@ -1214,8 +1401,10 @@ void VerticalTabStripRegionView::UnregisterExpandOnHoverLock(
+@@ -1214,8 +1409,10 @@ void VerticalTabStripRegionView::UnregisterExpandOnHoverLock(
  void VerticalTabStripRegionView::OnOmniboxPopupVisibilityChanged(bool is_open) {
    if (is_open) {
      if (!omnibox_open_lock_) {

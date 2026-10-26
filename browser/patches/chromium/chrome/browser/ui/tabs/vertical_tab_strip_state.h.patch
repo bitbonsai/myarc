@@ -1,0 +1,16 @@
+diff --git a/chrome/browser/ui/tabs/vertical_tab_strip_state.h b/chrome/browser/ui/tabs/vertical_tab_strip_state.h
+index 1cc98a4df8a6f3c2c5b394cfac44d826eb85bc9c..5527a65ab1061aa5f8d900ba8fc8385f4b0a597a 100644
+--- a/chrome/browser/ui/tabs/vertical_tab_strip_state.h
++++ b/chrome/browser/ui/tabs/vertical_tab_strip_state.h
+@@ -15,6 +15,11 @@ inline constexpr int kVerticalTabStripUncollapsedMinWidth = 126;
+ // view.
+ inline constexpr int kVerticalTabStripUncollapsedMaxWidth = 400;
+ inline constexpr int kVerticalTabStripCollapsedWidth = 56;
++// myArc sidebar widths (--myarc-visual-parity). The minimum keeps the header
++// toggle (after the traffic lights, x 84-112) clear of the right-aligned
++// back/forward/reload cluster (104 wide) with a 4 pt gap.
++inline constexpr int kMyarcSidebarDefaultWidth = 270;
++inline constexpr int kMyarcSidebarMinWidth = 220;
+ // TODO(crbug.com/465833741): Determine snapping behavior.
+ inline constexpr int kVerticalTabStripCollapseSnapWidth =
+     (kVerticalTabStripUncollapsedMinWidth + kVerticalTabStripCollapsedWidth) /
