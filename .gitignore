@@ -26,6 +26,7 @@ __pycache__/
 .venv/
 .wrangler/
 site/blog/
+site/download/
 site/.publish-receipt.json
 site/index.md
 site/og-image.webp

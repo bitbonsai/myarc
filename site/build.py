@@ -11,6 +11,7 @@ from fontTools.ttLib import TTFont
 
 from blog import build_blog
 from discovery import build_discovery
+from download import apply_release, build_download, read_release
 
 ROOT = Path(__file__).resolve().parent
 BRAND = ROOT.parent / 'design' / 'brand'
@@ -87,11 +88,16 @@ def embed(template, prefix=None):
 with Image.open(ROOT / 'og-image.png') as image:
     image.save(ROOT / 'og-image.webp', format='WEBP', quality=90, method=6)
 
-template = (ROOT / 'index.template.html').read_text()
 try:
-    posts = build_blog(ROOT, template, embed)
+    release = read_release(ROOT)
+except ValueError as error:
+    raise SystemExit(f'Release data invalid: {error}') from None
+template = apply_release((ROOT / 'index.template.html').read_text(), release)
+try:
+    posts = build_blog(ROOT, template, embed, ['https://myarc.dev/download/'])
 except (ValueError, OSError, RecursionError) as error:
     raise SystemExit(f'Blog build failed: {error}') from None
+build_download(ROOT, template, embed, release)
 template = template.replace('</head>', '<link rel="alternate" type="text/markdown" href="https://myarc.dev/index.md" title="Markdown">\n<link rel="alternate" type="text/plain" href="https://myarc.dev/llms.txt" title="Site context">\n</head>', 1)
 html = embed(template)
 (ROOT / 'index.html').write_text(html)

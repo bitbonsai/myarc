@@ -346,7 +346,7 @@ def page_shell(template, title, summary, url, content, published=None, cover=Non
     return head + '<body><a class="skip" href="#main">Skip to content</a><div class="wrap">' + header + '<main id="main" class="journal">' + content + '</main>' + footer + '</div></body></html>\n'
 
 
-def build_blog(root, template, embed):
+def build_blog(root, template, embed, extra_urls=()):
     paths = list(islice((root / 'posts').glob('*/index.md'), MAX_POSTS + 1))
     if len(paths) > MAX_POSTS:
         raise ValueError(f'Maximum {MAX_POSTS} posts per build')
@@ -424,7 +424,7 @@ def build_blog(root, template, embed):
             target = folder / name
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_bytes(data)
-    urls = ['https://myarc.dev/', 'https://myarc.dev/blog/'] + [post.url for post in posts]
+    urls = ['https://myarc.dev/', 'https://myarc.dev/blog/', *extra_urls] + [post.url for post in posts]
     covers = {post.url: post.cover for post in posts}
     rows = []
     for url in urls:

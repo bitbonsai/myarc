@@ -22,6 +22,10 @@ Build dependencies: Python 3.9+, Pillow, fontTools, Brotli, PyYAML and markdown-
 
 The browser check needs agent-browser and Chrome. It closes agent-browser and Chrome for Testing helpers, including lingering test helpers. These checks exercise the website, not native browser behavior.
 
+## Downloads page and release data
+
+`download.py` builds `/download/` for the pre-alpha nightly. Every release-specific value comes from `release.json`: `published`, `version`, `date` (YYYY-MM-DD), `dmg_url` (a `.dmg` asset under the repository's `releases/download/`), `size_bytes`, `sha256`, `release_url`, `min_macos` and `proprietary_codecs` (state H.264/AAC only if the build has them). While `published` is `false`, or the file is missing, the page says "First nightly coming soon", has no download button or first-launch steps, and the homepage and header do not link to it. To publish a nightly: upload the DMG to a GitHub prerelease, fill in `release.json`, set `published` to `true`, then rebuild, check and publish as below. A published file is validated and the build stops on bad values. `check_seo.py` asserts the button is the only `.dmg` link in the site. Draft prerelease notes with the same warnings: `python3 site/release_notes.py > /tmp/notes.md` (works once the values are filled, whatever `published` says).
+
 ## Progress posts and publishing
 
 [Authoring instructions](posts/README.md) cover metadata, approval and screenshots. Put each Markdown post and its local images in `site/posts/YYYY-MM-DD-slug/`. Drafts are excluded by default. `site/blog/` is ignored generated output; the sitemap contains only published routes. Source and generated screenshots are separate so deleting a source reference removes the public artifact on the next deployment.

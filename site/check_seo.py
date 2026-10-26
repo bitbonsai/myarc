@@ -7,6 +7,8 @@ import xml.etree.ElementTree as ET
 from bs4 import BeautifulSoup
 from PIL import Image
 
+from download import read_release
+
 ROOT = Path(__file__).resolve().parent
 
 
@@ -25,7 +27,7 @@ def local_file(url):
 
 def check():
     titles = set()
-    pages = [ROOT / 'index.html', ROOT / 'blog/index.html', *sorted((ROOT / 'blog').glob('*/index.html'))]
+    pages = [ROOT / 'index.html', ROOT / 'blog/index.html', ROOT / 'download/index.html', *sorted((ROOT / 'blog').glob('*/index.html'))]
     for path in pages:
         soup = BeautifulSoup(path.read_text(), 'html.parser')
         expected = 'https://myarc.dev/' + path.relative_to(ROOT).as_posix().removesuffix('index.html')
@@ -44,9 +46,10 @@ def check():
         assert local_file(markdown).read_text().startswith('HTML: ' + canonical)
         schema = json.loads(soup.select_one('script[type="application/ld+json"]').string)
         nodes = schema.get('@graph', [schema])
-        assert any(node.get('@type') in ('WebSite', 'Blog', 'BlogPosting') for node in nodes)
+        assert any(node.get('@type') in ('WebSite', 'WebPage', 'Blog', 'BlogPosting') for node in nodes)
         if path.parent != ROOT:
             assert any(node.get('@type') == 'BreadcrumbList' for node in nodes)
+        if path.relative_to(ROOT).parts[0] == 'blog':
             author = {'@type': 'Person', 'name': 'Mauricio Wolff', 'url': 'https://github.com/bitbonsai'}
             blog = next(node for node in nodes if node.get('@type') in ('Blog', 'BlogPosting'))
             assert blog['publisher'] == author
@@ -85,6 +88,15 @@ def check():
             for candidate in element.get('srcset', '').split(','):
                 if candidate.strip():
                     local_file(urljoin(canonical, candidate.strip().split()[0]))
+    release = read_release(ROOT)
+    page = BeautifulSoup((ROOT / 'download/index.html').read_text(), 'html.parser')
+    links = {link['href'] for path in pages for link in BeautifulSoup(path.read_text(), 'html.parser').select('a[href$=".dmg"]')}
+    if release:
+        assert [button['href'] for button in page.select('.download-box a.button')] == [release['dmg_url']] and links == {release['dmg_url']}, 'Download button must be the one release asset'
+        assert release['sha256'] in page.get_text() and page.select_one('a.download-link[href="/download/"]') and 'Download pre-alpha' in (ROOT / 'index.html').read_text()
+    else:
+        assert not links and not page.select('.download-box a.button') and 'First nightly coming soon' in page.get_text(), 'Unpublished release must not link a download'
+        assert not (ROOT / 'index.html').read_text().count('href="/download/"'), 'Unpublished release must not be linked from the homepage'
     sitemap = ET.parse(ROOT / 'sitemap.xml')
     listed = {node.text for node in sitemap.findall('.//{http://www.sitemaps.org/schemas/sitemap/0.9}loc')}
     assert listed == {'https://myarc.dev/' + path.relative_to(ROOT).as_posix().removesuffix('index.html') for path in pages}
