@@ -1,5 +1,9 @@
 # Development log
 
+## 2026-10-26: Bounded run terminal handoff
+
+[Morning report](../browser/experiments/overnight-2026-10-25.md) records integrated slices, native checks and retained failures. Final standalone32 Rust/20 client/10 launcher/6 storyboard plus bridge/lifecycle, fmt/clippy/payload/links passed. Native C++ suites remain unrun. Owned apps/helpers/debug endpoints/fixture server closed, exact owned idle assertion released and recurring prompt stopped before the deadline. Profiles/private evidence retained; concurrent site/brand work untouched. Release gates remain open; no complete parity or eight uninterrupted hours claimed.
+
 ## 2026-10-26: Final native hover/input and preview verification
 
 0025 integrated as `8b52f25` after source/artifact/global-HoverButton/canonical hashes matched. Normal and actual app-only reduced motion passed real pointer enter/exit, opening/rebuilding under pointer, continued input and semantic address sequences. Actual Tab/Enter and mouse down/up revealed the other Space target, closed palette and preserved both targets/URLs/time origins. Explicit row focus survived pointer exit. [Evidence](../browser/evidence/native-palette-hover-focus.json).

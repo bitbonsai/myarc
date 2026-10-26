@@ -39,7 +39,7 @@ Check these in the preview window, recording failures rather than assuming parit
    should dismiss an unused palette.
 2. Use the footer `+` (Create Space), then switch with its Space dots. A fresh
    Space should show empty material and a neutral header, without the prior URL
-   or page. Returning to the populated Space should show its actual page.
+   or page. Return to the populated Space and select its row to show the actual page.
 3. Right-click a live row. Where exposed, try Pin to Space / Unpin from Space,
    then Add to Profile Favorites / Remove from Profile Favorites. Explicit Remove
    should keep the live page as Temporary. Save again, open another Temporary page,

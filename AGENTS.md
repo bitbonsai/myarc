@@ -59,6 +59,10 @@ Write original behavior specs from public documentation and appropriately permit
 
 Commit publishable `plan/` tasks and decisions. Never commit real browser profiles, raw user exports, browsing screenshots, cookies, API keys, machine-specific credentials or private research notes. Synthetic fixtures must use invented content. A public-repo request is not permission to publish unrelated personal context.
 
+## Native evidence gotcha
+
+A clean session seed becomes stale after later URL/selection exercises. Re-prove the final session before a persisted-state crash control; retain immediate-acknowledgement failures separately. See [native navigation loss](browser/experiments/native-session-navigation-crash.md). A clean-seeded pass does not close acknowledgement durability.
+
 ## Actual verification available now
 
 Run `python3 tools/check_docs.py` from the repository root for relative document links. Run `node --test design/onboarding/state.test.mjs` for storyboard state checks and `python3 tools/check_onboarding.py` for local prototype interactions, focus and recordings. The browser check needs agent-browser/Chrome and ffprobe; it closes agent-browser and Chrome for Testing helpers. Read [study instructions](design/onboarding/README.md) before running it.
