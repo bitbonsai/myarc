@@ -27,7 +27,7 @@ index 5e1d137..acc3379 100644
  
    if (use_ozone) {
 diff --git a/chrome/browser/ui/views/frame/browser_view_browsertest.cc b/chrome/browser/ui/views/frame/browser_view_browsertest.cc
-index 9fc6c76..996b031 100644
+index 9fc6c76..40fdc34 100644
 --- a/chrome/browser/ui/views/frame/browser_view_browsertest.cc
 +++ b/chrome/browser/ui/views/frame/browser_view_browsertest.cc
 @@ -25,6 +25,7 @@
@@ -94,7 +94,7 @@ index 9fc6c76..996b031 100644
 +    for (views::View* child : bar()->children()) {
 +      if (auto* button = views::AsViewClass<views::Button>(child);
 +          button && button->GetTooltipText() ==
-+                        l10n_util::GetStringUTF16(IDS_APP_MENU_COPY_LINK)) {
++                        l10n_util::GetStringUTF16(IDS_COPY_URL)) {
 +        return button;
 +      }
 +    }
@@ -306,7 +306,7 @@ index 9fc6c76..996b031 100644
 +  EXPECT_LT(bar->location_icon_view()->x(), bar->omnibox_view()->x());
 +  EXPECT_FALSE(bar->GetNotifyEnterExitOnChild());
 +  for (views::View* child : bar->children()) {
-+    EXPECT_NE(l10n_util::GetStringUTF16(IDS_APP_MENU_COPY_LINK),
++    EXPECT_NE(l10n_util::GetStringUTF16(IDS_COPY_URL),
 +              child->GetTooltipText());
 +  }
 +}
@@ -315,10 +315,18 @@ index 9fc6c76..996b031 100644
   protected:
    void SetUpCommandLine(base::CommandLine* command_line) override {
 diff --git a/chrome/browser/ui/views/location_bar/location_bar_view.cc b/chrome/browser/ui/views/location_bar/location_bar_view.cc
-index 922cc44..c7c8d5d 100644
+index 922cc44..2daffdd 100644
 --- a/chrome/browser/ui/views/location_bar/location_bar_view.cc
 +++ b/chrome/browser/ui/views/location_bar/location_bar_view.cc
-@@ -353,6 +353,21 @@ void LocationBarView::Init() {
+@@ -58,6 +58,7 @@
+ #include "chrome/browser/ui/tabs/public/tab_features.h"
+ #include "chrome/browser/ui/tabs/saved_tab_groups/saved_tab_group_utils.h"
+ #include "chrome/browser/ui/tabs/tab_strip_model.h"
++#include "chrome/browser/ui/tabs/vertical_tab_strip_state_controller.h"
+ #include "chrome/browser/ui/ui_features.h"
+ #include "chrome/browser/ui/views/bubble_anchor_util_views.h"
+ #include "chrome/browser/ui/views/chrome_layout_provider.h"
+@@ -353,6 +354,22 @@ void LocationBarView::Init() {
    omnibox_view_ = AddChildView(std::move(omnibox_view));
    omnibox_view_->Init();
  
@@ -330,7 +338,8 @@ index 922cc44..c7c8d5d 100644
 +        base::BindRepeating(&LocationBarView::CopyMyarcCurrentUrl,
 +                            base::Unretained(this)),
 +        kLinkChromeRefreshOldIcon, 16, kColorOmniboxActionIcon);
-+    copy->SetTooltipText(l10n_util::GetStringUTF16(IDS_APP_MENU_COPY_LINK));
++    copy->SetTooltipText(
++        gfx::RemoveAccelerator(l10n_util::GetStringUTF16(IDS_COPY_URL)));
 +    copy->SetFocusBehavior(FocusBehavior::ALWAYS);
 +    copy->SetPreferredSize(gfx::Size(28, 28));
 +    copy->SetVisible(false);
@@ -340,7 +349,7 @@ index 922cc44..c7c8d5d 100644
    if (CanHostWebUIOmnibox(browser_, is_popup_mode_)) {
      if (omnibox::IsAimPopupFeatureEnabled() &&
          !CreateOmniboxPopupAimPresenterIfEligible() && profile_) {
-@@ -680,6 +695,9 @@ void LocationBarView::RemovedFromWidget() {
+@@ -680,6 +697,9 @@ void LocationBarView::RemovedFromWidget() {
  }
  
  void LocationBarView::OnDidChangeFocus(views::View* before, views::View* now) {
@@ -350,7 +359,7 @@ index 922cc44..c7c8d5d 100644
    if (Contains(before) != Contains(now)) {
      NotifyFocusChanged();
    }
-@@ -785,6 +803,31 @@ void LocationBarView::Layout(PassKey) {
+@@ -785,6 +805,35 @@ void LocationBarView::Layout(PassKey) {
  
    selected_keyword_view_->SetVisible(false);
  
@@ -372,6 +381,10 @@ index 922cc44..c7c8d5d 100644
 +    myarc_copy_url_button_->SetVisible(myarc_has_page && reveal_myarc_actions);
 +    myarc_copy_url_button_->SetEnabled(myarc_has_page &&
 +                                       chrome::CanCopyUrl(browser_));
++    if (auto* bookmark =
++            page_action_container_->GetPageActionView(kActionBookmarkThisTab)) {
++      bookmark->SetVisible(!myarc_pill && bookmark->GetDeclaredVisible());
++    }
 +  }
 +  // Keep warnings, editing decorations and permission overrides upstream-owned.
 +  const bool myarc_quiet_site_info =
@@ -382,7 +395,7 @@ index 922cc44..c7c8d5d 100644
    // The padding between the left edges of the location bar and the LHS icon,
    // e.g. the page info icon, the google G icon, the selected suggestion icon.
    int icon_left = GetLayoutConstant(
-@@ -866,6 +909,8 @@ void LocationBarView::Layout(PassKey) {
+@@ -866,6 +915,8 @@ void LocationBarView::Layout(PassKey) {
      selected_keyword_view_->SetKeyword(keyword);
    } else if (chrome::IsMyarcWorkspaceBlank(browser_)) {
      location_icon_view_->SetVisible(false);
@@ -391,7 +404,7 @@ index 922cc44..c7c8d5d 100644
    } else if (location_icon_view_->GetShowText() &&
               !ShouldChipOverrideLocationIcon()) {
      location_icon_view_->SetVisible(true);
-@@ -890,6 +935,15 @@ void LocationBarView::Layout(PassKey) {
+@@ -890,6 +941,15 @@ void LocationBarView::Layout(PassKey) {
      }
    };
  
@@ -407,27 +420,7 @@ index 922cc44..c7c8d5d 100644
    if (features::IsPageActionsElevatedToolbarEnabled()) {
      if (page_action_container_ && page_action_container_->GetVisible()) {
        const bool is_capsule_active = page_action_container_->IsCapsuleActive();
-@@ -1027,6 +1081,9 @@ void LocationBarView::Layout(PassKey) {
-     position_view(omnibox_additional_text_view_, omnibox_additional_text_width);
-   }
- 
-+  if (myarc_copy_url_button_) {
-+    RefreshBackground();
-+  }
-   LayoutSuperclass<View>(this);
- }
- 
-@@ -1412,6 +1469,9 @@ void LocationBarView::RefreshBackground() {
-   SkColor normal = color_provider->GetColor(kColorLocationBarBackground);
-   SkColor hovered =
-       color_provider->GetColor(kColorLocationBarBackgroundHovered);
-+  if (IsMyarcUrlPill() && !high_contrast) {
-+    normal = IsFocusWithin() ? hovered : SK_ColorTRANSPARENT;
-+  }
- 
-   background_color_ = gfx::Tween::ColorValueBetween(opacity, normal, hovered);
-   if (is_caret_visible) {
-@@ -1804,11 +1864,41 @@ void LocationBarView::OnMouseReleased(const ui::MouseEvent& event) {
+@@ -1804,11 +1864,42 @@ void LocationBarView::OnMouseReleased(const ui::MouseEvent& event) {
    omnibox_view_->OnMouseReleased(AdjustMouseEventLocationForOmniboxView(event));
  }
  
@@ -435,8 +428,9 @@ index 922cc44..c7c8d5d 100644
 +  if (!myarc_copy_url_button_ || !browser_) {
 +    return false;
 +  }
-+  const auto* browser_view = BrowserView::GetBrowserViewForBrowser(browser_);
-+  return browser_view && browser_view->ShouldDrawVerticalTabStrip();
++  const auto* controller =
++      tabs::VerticalTabStripStateController::From(browser_);
++  return controller && controller->ShouldDisplayVerticalTabs();
 +}
 +
 +void LocationBarView::CopyMyarcCurrentUrl() {
@@ -469,7 +463,7 @@ index 922cc44..c7c8d5d 100644
    OnOmniboxHovered(false);
  }
  
-@@ -2188,6 +2278,9 @@ bool LocationBarView::IsFullWebUiOmniboxReady() const {
+@@ -2188,6 +2279,9 @@ bool LocationBarView::IsFullWebUiOmniboxReady() const {
  }
  
  void LocationBarView::OnOmniboxHovered(bool is_hovering) {
@@ -510,3 +504,21 @@ index 856d9d7..afb91f9 100644
  
    // Views to show inline autocompletion when an IME is active.  In this case,
    // we shouldn't change the text or selection inside the OmniboxView itself,
+diff --git a/chrome/browser/ui/views/toolbar/toolbar_view.cc b/chrome/browser/ui/views/toolbar/toolbar_view.cc
+index 058d6ad..e4cbca7 100644
+--- a/chrome/browser/ui/views/toolbar/toolbar_view.cc
++++ b/chrome/browser/ui/views/toolbar/toolbar_view.cc
+@@ -1536,7 +1536,12 @@ void ToolbarView::Layout(PassKey) {
+       } else if (child == location_bar_view_) {
+         bounds = gfx::Rect(8, 46, width() - 16, 38);
+       }
+-      layout.child_layouts.emplace_back(child, visible, bounds);
++      // Constrain the pill so unchanged bounds still lay out hover/focus
++      // actions.
++      layout.child_layouts.emplace_back(child, visible, bounds,
++                                        child == location_bar_view_
++                                            ? views::SizeBounds(bounds.size())
++                                            : views::SizeBounds());
+     }
+     layout_manager_->ApplyLayout(layout);
+     if (background()) {
