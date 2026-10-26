@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-10-26: Pure Clear Unpinned and recent-tab rules
+
+- Added `crates/workspace/src/tab_ops.rs`: `clear_unpinned` lists the Temporary items of a Space to close, skipping media, and says what stays selected; `RecentTabs` keeps a bounded per-window MRU list with `touch`, `remove` and `cycle` over the five most recent. Contracts BC-007 and BC-008; backlog lines for Cmd+Shift+K and Ctrl+Tab are now partial.
+- Unknown: what Arc selects after the selected unpinned tab closes, and whether the MRU list is per window; both use the simplest reading, listed in the contracts.
+- Verification: unit tests in `tab_ops::tests`; rule only, no shortcut, close adapter or switcher UI.
+
 ## 2026-10-26: Header fits at 198 pt, footer sits lower
 
 - Arc on this Mac (macOS 26 reference, 228 pt sidebar) places the traffic lights exactly where native does and spaces back/forward/reload 34 pt apart, so the lights stay put. The older blog reference uses a 30 pt pitch at 200 pt, so navigation now tightens from 34 to 30 pt below 228 pt and the toggle chip moves to x 77. The minimum sidebar width drops from 220 to 198 pt, and the blog scene renders at 200 pt with back/forward/reload centers at 121/150.5/181 (Arc 121/151/181). The footer lost Chromium's 12 pt bottom padding: Library sits 23.2 pt above the window bottom (Arc 22.7 in the blog reference, 25.5 on macOS 26). Its icons are white at 60% (#ABA8AE, Arc #A9A2AF), black at 60% in light mode. The toggle chip and URL pill now pick light/dark from `kColorSysSurface` like the tiles, and Increase Contrast gives the selected Favorite a 1 px outline.

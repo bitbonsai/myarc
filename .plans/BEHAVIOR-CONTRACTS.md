@@ -79,3 +79,27 @@ Parent: TAB-02, backlog "Tabs lifecycle". Evidence: documented in Arc's [Auto Ar
 - Persistence/restart: last-viewed times are not persisted by this crate yet. On relaunch the adapter must restore or reset them before the first call; resetting is the safe choice (nothing archives early).
 - Proof: unit tests in `crates/workspace/src/archive.rs` cover each rule. Browser timer, archive store, restore and UI are still unproven.
 - Unresolved: whether Little Arc overrides a `never` Profile; exact timing source (Arc may count foreground time, not wall time); form-input and Split View exclusions; folder items (the model has no folder placement yet, so no folder case exists to test); the downloads schedule.
+
+## BC-007: Clear unpinned closes temporary tabs that are not playing media
+
+Parent: TAB-02, backlog "Tabs lifecycle" and Next 15 item 7. Evidence: documented in Arc's [Keyboard Shortcuts article](https://resources.arc.net/hc/en-us/articles/20595231349911-Keyboard-Shortcuts) (Cmd+Shift+K clears unpinned tabs) and the [2022 release notes](https://resources.arc.net/hc/en-us/articles/20498417809815-Arc-for-macOS-2022-Release-Notes) (media tabs are skipped). Pins and Favorites staying put follows the [Pinned Tabs article](https://resources.arc.net/hc/en-us/articles/19231060187159-Pinned-Tabs-Tabs-you-want-to-stick-around). Rule implemented and tested in `crates/workspace/src/tab_ops.rs`; the shortcut, close path and animation do not exist.
+
+- Initial state: the current Space's items with placement, media state and the window's selection.
+- Action: `tab_ops::clear_unpinned(space_id, items)` when the shortcut fires.
+- Expected: close the ids that are `Placement::Temporary` in that Space and not playing media, in input order, each once. Favorites, Pins and Temporary items of other Spaces stay. A selected item that plays media stays selected, as does a selected pin or favorite. If the selected item closes, nothing is selected afterwards.
+- Cancellation/error: empty input, all pinned or all playing return an empty list. Duplicate ids close once. Work is linear in the input.
+- Persistence/restart: the rule returns ids only; the adapter closes or archives them through the usual mutations.
+- Proof: unit tests in `tab_ops.rs`. Shortcut, close, animation and undo need a real-build capture before any parity claim.
+- Unknowns (simplest reading chosen): what Arc selects after the selected unpinned tab closes is not in the sources. The rule leaves the selection empty and the adapter picks the empty state, matching `clear_hidden_selections`. Whether closed tabs go to the Archive or are discarded is undocumented; the rule is agnostic. Cmd+Z undo is not modeled. Whether Little Arc windows, Split View members or tabs inside folders count is unknown; the model has no folder placement yet. Whether "playing" includes muted or paused media is left to the caller's `media_playing`.
+
+## BC-008: Recent-tab switcher reaches the five most recent tabs
+
+Parent: TAB-02, backlog "Keyboard shortcut behavior" and Next 15 item 13. Evidence: documented in Arc's [Keyboard Shortcuts article](https://resources.arc.net/hc/en-us/articles/20595231349911-Keyboard-Shortcuts) (Ctrl+Tab toggles between the five most recent tabs). Order, wrapping and bounds are `project requirement`. Rule implemented and tested in `crates/workspace/src/tab_ops.rs`; the switcher UI and shortcut do not exist.
+
+- Initial state: one `RecentTabs` per window, filled by `touch(id)` each time the window shows an item.
+- Action: each Ctrl+Tab press calls `cycle(1)`, Ctrl+Shift+Tab calls `cycle(-1)`. Releasing Ctrl selects the target and calls `touch(target)`. Closing or archiving an item calls `remove(id)`.
+- Expected: the list is newest first and holds each id once. `cycle` moves a cursor through the first five ids and wraps. The first `cycle(1)` after a `touch` returns the previous tab, so one press toggles between the two latest. Older ids are unreachable. With fewer than two ids, `cycle` returns nothing.
+- Cancellation/error: `touch` and `remove` end a cycle in progress; `remove` of an unknown id does nothing. Escape cancels by not calling `touch`. The list holds at most `MAX_ITEMS` ids, dropping the oldest. All functions are total, including extreme steps.
+- Persistence/restart: not persisted. After restore the adapter rebuilds the list from the selected item, so the first press may find nothing.
+- Proof: unit tests in `tab_ops.rs`. The switcher overlay and key release handling need a real-build capture.
+- Unknowns (simplest reading chosen): whether Arc's list is per window or per Profile, whether it spans Spaces and whether it includes Favorites is undocumented; one list per window, any placement. Whether the first press shows an overlay or switches at once is unknown. Behavior when a tab closes while the switcher is open is not documented; the cursor resets.

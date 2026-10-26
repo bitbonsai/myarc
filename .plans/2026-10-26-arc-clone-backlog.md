@@ -87,7 +87,7 @@ Feature lines: 159 total, 23 done, 30 partial, 106 missing. Shortcut table: 44 r
 - [ ] The caret next to the Space title collapses the Pinned section and expands it again. | status: missing | evidence: none | source: https://resources.arc.net/hc/en-us/articles/19231060187159-Pinned-Tabs-Tabs-you-want-to-stick-around
 - [ ] Closing a pinned tab's page keeps the pin; closing never deletes saved organization. | status: done | evidence: browser/experiments/native-sidebar-row-footer.md (close live page keeps saved record), crates/workspace/src/lib.rs live_tab_closed | source: https://resources.arc.net/hc/en-us/articles/19231060187159-Pinned-Tabs-Tabs-you-want-to-stick-around
 - [ ] Unpinned tabs sit below the divider under a New Tab row; new tabs land here. | status: done | evidence: browser/experiments/native-sidebar-row-footer.md (Temporary below New Tab; Arc docs call this section Unpinned, older notes call it Explore; no "Today" name found in public docs) | source: https://resources.arc.net/hc/en-us/articles/20498463803799-Arc-for-macOS-2021-Release-Notes
-- [ ] Clear Unpinned (Cmd+Shift+K) closes the unpinned tabs with an animation, skipping tabs that play media; Cmd+Z undoes. | status: missing | evidence: none | source: https://resources.arc.net/hc/en-us/articles/20595231349911-Keyboard-Shortcuts
+- [ ] Clear Unpinned (Cmd+Shift+K) closes the unpinned tabs with an animation, skipping tabs that play media; Cmd+Z undoes. | status: partial | evidence: crates/workspace/src/tab_ops.rs clear_unpinned and BC-007 (pure rule with unit tests; no shortcut, close adapter, animation or undo) | source: https://resources.arc.net/hc/en-us/articles/20595231349911-Keyboard-Shortcuts
 - [ ] Auto Archive moves idle unpinned tabs to the Archive after 12 hours by default; viewing a tab resets the timer. | status: partial | evidence: crates/workspace/src/archive.rs decide_archive and BC-006 (pure rule with unit tests; no browser timer, archive store or UI; docs/PARITY.md TAB-02 time model now specified, timings unverified) | source: https://resources.arc.net/hc/en-us/articles/19228855311127-Auto-Archive-Clean-as-you-go
 - [ ] Tabs playing media are never archived or cleared. | status: missing | evidence: none | source: https://resources.arc.net/hc/en-us/articles/20498417809815-Arc-for-macOS-2022-Release-Notes
 - [ ] Archive timing is configurable per Profile; Little Arc windows archive after 6 hours. | status: missing | evidence: none | source: https://resources.arc.net/hc/en-us/articles/19228855311127-Auto-Archive-Clean-as-you-go
@@ -228,10 +228,10 @@ From the public shortcuts article ([source](https://resources.arc.net/hc/en-us/a
 | Cmd+Option+Shift+C | Copy current tab URL as Markdown | missing | none |
 | Cmd+L | Change current tab URL | done | browser/experiments/native-interactions.md |
 | Cmd+S | Show / hide sidebar | done | browser/experiments/native-interactions.md |
-| Cmd+Shift+K | Clear unpinned tabs | missing | none |
+| Cmd+Shift+K | Clear unpinned tabs | partial | crates/workspace/src/tab_ops.rs clear_unpinned (rule only, BC-007) |
 | Cmd+1 ... Cmd+8 | Go to sidebar item N (Cmd+9 last or ninth; option to leave Favorites out) | partial | stock tab-index shortcut; sidebar order not verified |
 | Ctrl+1 ... Ctrl+9 | Focus Space N | missing | none |
-| Ctrl+Tab | Toggle between five most recent tabs | missing | none (stock cycles tab order) |
+| Ctrl+Tab | Toggle between five most recent tabs | partial | crates/workspace/src/tab_ops.rs RecentTabs (rule only, BC-008; stock still cycles tab order) |
 | Option+Cmd+Up / Down | Previous / next tab in sidebar order | missing | none |
 | Option+Cmd+Left / Right | Previous / next Space | missing | none (stock binds these to tab switching) |
 | Cmd+[ or Cmd+Left | Back (public table lists back and forward with swapped arrow labels; standard directions assumed) | partial | stock |
@@ -271,13 +271,13 @@ Ordered for a daily Arc user. Each is one small task (1-3 files). "Rust" means [
 4. Collapse and expand the Pinned section with a caret beside the Space title. Code: `sidebar_view.cc` (in-memory first, persist later).
 5. Ctrl+1..9 focuses Space N; Option+Cmd+Left/Right moves between Spaces (and drop the stock tab-switch meaning in myArc mode). Code: `accelerators_cocoa.mm`, `browser_command_controller.cc`, adapter `SelectSpace`.
 6. Cmd+1..8 jumps to sidebar item N in sidebar order, Cmd+9 to the last, and Option+Cmd+Up/Down steps through tabs in that order. Code: `browser_command_controller.cc`, `accelerators_cocoa.mm`, Rust `sidebar_snapshot` order.
-7. Cmd+Shift+K clears unpinned (temporary) tabs, skipping any that play audio. Code: `browser_command_controller.cc`, adapter close of temporary items, `accelerators_cocoa.mm`.
+7. Cmd+Shift+K clears unpinned (temporary) tabs, skipping any that play audio. Core rule done (`tab_ops::clear_unpinned`, BC-007). Code: `browser_command_controller.cc`, adapter close of temporary items, `accelerators_cocoa.mm`.
 8. Drag a tab onto the Pinned or Favorites area to pin it, and reorder rows by drag. Code: `sidebar_view.cc` drag handling, Rust `set_placement` and `move_item_before` (already exist).
 9. Delete a Space with a confirmation, keeping at least one Space. Code: Rust `delete_space` rule with tests (what happens to its items must be decided and written in BC-001), `sidebar_view.cc` Space menu.
 10. Auto Archive core rule: a pure Rust function that lists idle temporary items older than a cutoff, excluding pinned, favorite, active and media-playing items. Code: Rust only, with tests. Defines the time model open in PARITY.md TAB-02.
 11. View Archive in the command bar and Library: list archived items and restore one to its original Space. Code: palette in `chrome/browser/ui/views/frame/browser_view.cc`, adapter, depends on item 10.
 12. Peek decision rule: a pure Rust function deciding whether a link click from a pinned or favorite tab stays, opens as a new temporary tab or opens in Peek (cross-site only). Code: Rust only, with tests; the overlay UI follows as separate tasks.
-13. Ctrl+Tab switcher over the five most recent tabs. Code: `browser_command_controller.cc`, a small MRU list in the adapter, `accelerators_cocoa.mm`.
+13. Ctrl+Tab switcher over the five most recent tabs. Core MRU rule done (`tab_ops::RecentTabs`, BC-008). Code: `browser_command_controller.cc`, a small MRU list in the adapter, `accelerators_cocoa.mm`.
 14. Command-bar actions: type "pin", "unpin", "reset", "new space" and "archive" to run them, plus the `/` action filter. Code: palette in `browser_view.cc`, adapter commands; reuses items 1, 2 and 9.
 15. Two-finger horizontal swipe over the sidebar switches Space. Code: `sidebar_view.cc` scroll-event handling, adapter `SelectSpace`.
 
