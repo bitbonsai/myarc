@@ -1,5 +1,9 @@
 # Development log
 
+## 2026-10-26: Existing palette drops current-tab shortcut intent
+
+Real Cmd+T/draft/Cmd+L dismissed the palette on `fdc20a3`; page URL/count/time origin stayed exact. Source closes any existing palette before considering new intent. [Failure](../browser/evidence/native-palette-interruption.json) retained. Routine repair assumption: switch intent in the same live widget, preserve same-intent drafts, keep empty-Space hidden-URL guards. Native owner close closed its palette; outstanding-history race was not directly observed. Apps/helpers/server closed before source transfer.
+
 ## 2026-10-26: Native AI Mode omission accepted narrowly
 
 Integrated `5627bb3`, then personally checked fresh NTP, native address menu, regular/private/new-Profile contexts and horizontal/vertical changes. AI Mode button/toggle omitted with both prototype switches; default flag-off positively retained them without a workspace file/UI. [Evidence](../browser/evidence/native-ai-entrypoints-off.json).

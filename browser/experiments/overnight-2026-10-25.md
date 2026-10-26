@@ -28,6 +28,8 @@ Found a runtime-mode bootstrap gap: a newly created Profile starts horizontal, a
 
 0021 integrated as `5627bb3`, one shared prototype-only eligibility override with unchanged prefs. [Bounded native checks](../evidence/native-ai-entrypoints-off.json) omitted AI Mode UI/toggle through NTP, recovery, private/new-Profile and mode changes; default flag-off positively retained both controls. Native URL/query navigation and pin behavior worked. Google challenged the search, so results were not accepted. Another actual crash/genuine Restore passed persisted state verification. Owned apps/helpers/server closed after native menu dismissal. This UI fix does not block background eligibility requests or deliver provider modes/network enforcement.
 
+A fresh palette interruption check found Cmd+L dismissing an existing Cmd+T draft instead of switching to current-URL editing. Real page stayed intact. Owner-window close closed its palette; callback races remain unmeasured. [Failure and repair assumptions](../evidence/native-palette-interruption.json) retained before a bounded repair.
+
 ## Tested preview command
 
 ```sh

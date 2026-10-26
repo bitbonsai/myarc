@@ -46,6 +46,12 @@ The candidate also registers macOS Cmd/Ctrl+S aliases for the existing collapse 
 
 The combined native build succeeded before a final omnibox include-layer correction. Frame and tab-layout GN checks passed; the corrected omnibox source passes its GN check and standalone object compilation. Full relink and runtime checks remain pending. The six-file 0007 delta reproduces the external source exactly after 0002/0004/0005 and excludes independent layout rounding. A system app-data permission prompt interrupted clean native capture and the remaining interaction checks. No OS permission was approved by the agent. Rebuild the final source and verify the marked profile, PID and foreground window before resuming.
 
+## Interruption follow-up, 2026-10-26
+
+Later [empty-header](../evidence/workspace-empty-header.json), [saved identity](../evidence/workspace-saved-identity.json) and [late-binding](../evidence/workspace-late-bindings.json) runs accepted named current-tab/sidebar journeys beyond the historical candidate notes below. Full parity remains open.
+
+Fresh [interruption evidence](../evidence/native-palette-interruption.json) found a distinct shortcut defect on `fdc20a3`: native Cmd+T, typed draft, then Cmd+L dismissed the palette instead of keeping a current-URL editor. The real page count/URL/time origin stayed unchanged. Source closes and returns whenever a palette already exists. Repair should update different intent in place and preserve same-intent drafts. Empty-Space URL protection still applies. Actual owner-window close also closed its open palette; this bounded smoke does not establish an outstanding-history callback race. Private run `/tmp/myarc-m0-runtime/palette-interrupt-20261026T013508Z/`; apps/helpers/server closed.
+
 ## Remaining
 
 Current-tab editing, sidebar URL activation and full sidebar hide/show still need native acceptance. Complete autocomplete and the broader command catalog remain pending. Motion timing, interruption, reduced motion, full accessibility and Windows behavior are unverified.

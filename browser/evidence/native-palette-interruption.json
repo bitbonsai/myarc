@@ -1,0 +1,26 @@
+{
+  "slice": "MA-007.c-palette-interruption",
+  "date": "2026-10-26",
+  "baseline_commit": "fdc20a3",
+  "status": "native shortcut intent defect open",
+  "observed_failure": {
+    "native_cmd_t_opened_palette_without_page": true,
+    "typed_synthetic_query": true,
+    "native_cmd_l_from_owned_focused_palette_dismissed_it": true,
+    "current_url_editor_did_not_remain_open": true,
+    "real_page_url_count_and_time_origin_unchanged": true
+  },
+  "owner_close_smoke": {
+    "native_owner_close_with_palette_open_closed_both_windows": true,
+    "app_helpers_server_cleaned_up": true,
+    "pending_history_callback_race_not_directly_observed": true
+  },
+  "repair_assumptions": [
+    "Different shortcut intent updates existing live palette instead of toggling it closed",
+    "Same-intent shortcut focuses/selects existing draft without discarding it",
+    "Switch to current-tab mode uses real displayed URL; empty Space must not expose hidden URL",
+    "Switch from current-tab mode to new-tab mode starts empty and creates no page until submission"
+  ],
+  "workspace_renderer_default_enabled": false,
+  "raw_ui_logs_profiles_and_shortcut_driver": "private outside Git"
+}
