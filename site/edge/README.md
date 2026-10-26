@@ -1,0 +1,45 @@
+# Markdown negotiation edge
+
+Status: implemented and checked locally; activation awaits authorized Cloudflare access. Existing login expired. No live route or DNS change has been made. Logo remains parked.
+
+GitHub Pages remains the content origin. This Worker adds a route in front of the existing `myarc.dev` DNS records. Cloudflare DNS proxy (orange cloud) is required. Preserve the GitHub Pages DNS targets, Pages custom domain and HTTPS configuration. Do not create a Worker Custom Domain, change origin hostname, or fetch a `github.io` hostname.
+
+## Behavior
+
+GET/HEAD page requests choose generated Markdown only when an explicit `text/markdown` range has positive quality strictly above HTML. Specific media ranges override wildcards; equal quality keeps HTML. Browsers, wildcard-only requests, direct `.md` links, dotted/encoded asset paths and other methods retain ordinary delivery. No User-Agent inspection.
+
+Mappings: `/` and `/index.html` use `/index.md`; `/blog`, `/blog/` and `/blog/index.html` use `/blog/index.md`; article directories use their existing `index.md`. Unknown extensionless paths try the same convention. Only a Markdown 404 falls back to the original URL. Other statuses, redirects and fetch errors pass through. Query strings and HEAD survive both requests. Origin response bodies stream without buffering.
+
+Accept parsing is limited to 8 KiB and 64 ranges. Malformed input conservatively selects HTML. UTF-8 is the only supported media parameter; unmatched media parameters cannot select a representation. Duplicate ranges of equal specificity use highest quality. Accept extensions after quality do not affect matching.
+
+Negotiated page responses, including HTML and errors, preserve origin headers except cache controls. They include `Vary: Accept` (or retain `Vary: *`) and `Cache-Control: private, no-cache`; CDN-specific cache headers are removed. Origin subrequests use `cache: 'no-store'`. This prevents shared-cache mixing without relying on Cloudflare honoring Vary in its default cache key. Browsers may retain variants for revalidation, and HTML conditional responses preserve their origin validators. Assets and direct Markdown keep origin caching. Markdown 200 responses receive `Content-Type: text/markdown;charset=utf-8` and `Content-Location` with the Markdown path/query. Markdown subrequests omit conditional/range headers so HTML validators cannot produce an incorrect 304 or partial representation; HTML requests retain them.
+
+Cloudflare's [route documentation](https://developers.cloudflare.com/workers/configuration/routing/routes/) states that route `fetch()` reaches the application server configured in zone DNS, and routes cannot be targets of same-zone fetch calls. Keeping the same hostname therefore reaches GitHub Pages without recursively invoking this route. The [fetch documentation](https://developers.cloudflare.com/workers/runtime-apis/fetch/) documents `cache: 'no-store'` bypass for external origins. Redirects from Markdown subrequests remain manual, preserving origin behavior and avoiding cross-host header forwarding.
+
+## Focused checks
+
+From repository root, with Node 22+:
+
+```sh
+node --check site/edge/worker.mjs
+node --test site/edge/worker.test.mjs
+```
+
+Tests use Web APIs and a mocked origin. No dependencies, browser tests or app suites. These checks do not establish live Cloudflare routing or GitHub Pages behavior.
+
+## Deploy when authorized
+
+1. Confirm existing GitHub Pages custom-domain HTTPS works. Enable DNS proxy on existing apex records while keeping their GitHub Pages targets. Review zone rules so none override the Worker's private cache policy or change the origin host. Preserve end-to-end TLS with Full (strict).
+2. Authenticate Wrangler with an authorized Cloudflare account outside this repository. Account selection comes from deploy authentication/environment. Commit no tokens, account identifiers or credentials.
+3. Run focused checks, then deploy from repository root:
+
+   ```sh
+   npx --yes wrangler@4.153.0 deploy --config site/edge/wrangler.toml
+   ```
+
+   Route must be `myarc.dev/*`, zone `myarc.dev`, Worker `myarc-markdown`. `workers.dev` and preview URLs are disabled. Existing `site/publish.py` continues publishing generated content to GitHub Pages independently; it does not publish this Worker.
+4. Verify live GET and HEAD at `/`, `/blog/` and a published article, including query strings. Compare negotiated body with its direct `.md` file. Verify HTML for browser Accept, wildcards, `q=0` and HTML ties; check `Vary`, content type, Content-Location and private revalidation. Confirm an unknown route retains origin 404 and assets remain unchanged. Clear pre-existing page cache entries if necessary. Live checks remain outstanding.
+
+## Rollback
+
+Remove only the `myarc.dev/*` route assigned to `myarc-markdown` in Cloudflare Workers settings. Requests then reach the same GitHub Pages origin normally; direct Markdown URLs remain available. Leave origin DNS targets and Pages content intact. Revert proxy status separately only if authorized and needed. Removing the route suffices to stop negotiation; deleting the Worker is optional. Redeploying this config would reattach the route.

@@ -1,0 +1,9 @@
+name = 'myarc-markdown'
+main = 'worker.mjs'
+compatibility_date = '2026-01-01'
+workers_dev = false
+preview_urls = false
+
+[[routes]]
+pattern = 'myarc.dev/*'
+zone_name = 'myarc.dev'

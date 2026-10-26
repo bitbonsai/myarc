@@ -1,5 +1,13 @@
 # Development log
 
+## 2026-10-26: Website source checkpoint and Markdown negotiation
+
+The published site now includes Mauricio Wolff author metadata, portrait and reading time, a transparent logo index thumbnail, the personal Arc-preservation post, and the user-approved alpha Arc reference. Gallery arrows use bounded blur/fade swaps with reduced-motion handling; zoom sources preload at low priority. Dark body text is softer, and CTA hover scaling respects pointer capability and reduced motion. The existing live logo remains unchanged; studies are parked.
+
+Verification: 20 Python blog/discovery tests, six gallery Node tests and 13 Markdown Worker tests passed. Wrangler 4.153.0 deployment dry-run passed. Earlier publication ran the static homepage and SEO/resource checks. Latest browser appearance and interaction review remains with the user; no native-browser behavior is established by these site checks.
+
+The optional Cloudflare route Worker selects Markdown only for an explicit preferred `Accept` range, preserves ordinary HTML and assets, and separates representations from shared caching. Origin bodies stream and missing Markdown falls back to HTML. Cloudflare activation remains blocked by expired authentication; no live route, DNS target or proxy status was changed. Website source commits preserve concurrent native work.
+
 ## 2026-10-26: Saved-section placement and native review correction
 
 [0026 acceptance](../browser/experiments/native-sidebar-row-footer.md) follows explicit UI feedback. The original alias change launched the same compiled UI; the row/footer fixes had been paused instead of implemented. A delegate built composite rows, fixed footer controls and a real Library menu. Lead native inspection caught a remaining inner hover pill, corrected row-owned paint and inset close-chip geometry, then moved Space Pins above New Tab. A read-only audit confirmed the reported pin was already saved; its old section position made the action look unchanged.
