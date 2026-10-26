@@ -32,6 +32,12 @@ class NativePreviewTests(unittest.TestCase):
         process_patch = patch.object(launcher.subprocess, 'Popen', return_value=Mock(pid=43210))
         self.popen = process_patch.start()
         self.addCleanup(process_patch.stop)
+        ps_patch = patch.object(
+            launcher.subprocess, 'run',
+            return_value=subprocess.CompletedProcess([], 0, stdout='', stderr=''),
+        )
+        self.ps = ps_patch.start()
+        self.addCleanup(ps_patch.stop)
         self.stdout = io.StringIO()
         self.stderr = io.StringIO()
 
@@ -129,6 +135,115 @@ class NativePreviewTests(unittest.TestCase):
             with self.subTest(args=args), self.assertRaises(SystemExit) as raised:
                 self.run_launcher(args)
             self.assertEqual(raised.exception.code, 2)
+        self.popen.assert_not_called()
+        self.assertEqual(self.profiles(), [])
+
+    def test_review_reuses_marked_profile_without_replacing_saved_state(self):
+        self.assertEqual(self.run_launcher(['--review']), 0)
+        profile, = self.profiles()
+        self.assertEqual(profile.name, 'native-preview-review')
+        first = self.popen.call_args.args[0]
+        self.assertIn('--profile-directory=Default', first)
+        self.assertIn('about:blank', first)
+        preferences = profile / 'Default/Preferences'
+        preferences.write_text('{"vertical_tabs":{"enabled":false},"sentinel":1}\n')
+        state = profile / 'Default/myarc-workspace-v1.json'
+        state.write_text('Synthetic saved-state sentinel\n')
+        first_log, = profile.glob('preview-*.log')
+        first_log.write_text('Existing log sentinel\n')
+        self.assertEqual(self.run_launcher(['--review']), 0)
+        self.assertEqual(self.profiles(), [profile])
+        second = self.popen.call_args.args[0]
+        self.assertEqual(first[1], second[1])
+        self.assertIn('--restore-last-session', second)
+        self.assertNotIn('about:blank', second)
+        self.assertEqual(preferences.read_text(), '{"vertical_tabs":{"enabled":false},"sentinel":1}\n')
+        self.assertEqual(state.read_text(), 'Synthetic saved-state sentinel\n')
+        self.assertEqual(first_log.read_text(), 'Existing log sentinel\n')
+        self.assertEqual(len(list(profile.glob('preview-*.log'))), 2)
+        for log in profile.glob('preview-*.log'):
+            self.assertEqual(stat.S_IMODE(log.stat().st_mode), 0o600)
+
+    def test_review_refuses_unmarked_or_invalid_marker_without_writing(self):
+        profile = self.work / 'native-preview-review'
+        profile.mkdir()
+        sentinel = profile / 'sentinel'
+        sentinel.write_text('Existing directory\n')
+        self.assertEqual(self.run_launcher(['--review']), 1)
+        marker = profile / '.myarc-m0-test-profile'
+        marker.write_text('Different owner\n')
+        self.assertEqual(self.run_launcher(['--review']), 1)
+        self.assertEqual(sentinel.read_text(), 'Existing directory\n')
+        self.assertEqual(marker.read_text(), 'Different owner\n')
+        self.assertFalse((profile / 'Default').exists())
+        self.popen.assert_not_called()
+
+    def test_review_rejects_binary_and_oversized_markers(self):
+        profile = self.work / 'native-preview-review'
+        profile.mkdir()
+        marker = profile / '.myarc-m0-test-profile'
+        for content in (b'\xff' * 38, b'Owned synthetic M0 browser test profile\n' + b'x' * 10000):
+            with self.subTest(length=len(content)):
+                marker.write_bytes(content)
+                self.assertEqual(self.run_launcher(['--review']), 1)
+                self.assertEqual(marker.read_bytes(), content)
+        self.popen.assert_not_called()
+
+    def test_review_rejects_symlinked_default_and_marker(self):
+        self.assertEqual(self.run_launcher(['--review']), 0)
+        profile, = self.profiles()
+        other = self.work / 'qa-profile'
+        other.mkdir()
+        (other / 'sentinel').write_text('Untouched\n')
+        (profile / 'Default').rename(profile / 'saved-default')
+        (profile / 'Default').symlink_to(other, target_is_directory=True)
+        self.popen.reset_mock()
+        self.assertEqual(self.run_launcher(['--review']), 1)
+        (profile / 'Default').unlink()
+        (profile / 'saved-default').rename(profile / 'Default')
+        marker = profile / '.myarc-m0-test-profile'
+        marker.rename(profile / 'saved-marker')
+        marker.symlink_to(profile / 'saved-marker')
+        self.assertEqual(self.run_launcher(['--review']), 1)
+        self.popen.assert_not_called()
+        self.assertEqual((other / 'sentinel').read_text(), 'Untouched\n')
+        self.assertEqual(len(list(other.iterdir())), 1)
+
+    def test_review_refuses_symlink_to_other_profile(self):
+        other = self.work / 'qa-profile'
+        other.mkdir()
+        (self.work / 'native-preview-review').symlink_to(other, target_is_directory=True)
+        self.assertEqual(self.run_launcher(['--review']), 1)
+        self.assertEqual(list(other.iterdir()), [])
+        self.popen.assert_not_called()
+
+    def test_review_refuses_live_exact_profile_without_reusing_old_process(self):
+        self.assertEqual(self.run_launcher(['--review']), 0)
+        profile, = self.profiles()
+        before = {p.name: p.read_bytes() for p in profile.iterdir() if p.is_file()}
+        self.popen.reset_mock()
+        self.ps.side_effect = [
+            subprocess.CompletedProcess([], 0, stdout=f'123 {self.executable}\n'),
+            subprocess.CompletedProcess([], 0, stdout=f'{self.executable} --user-data-dir={profile}\n'),
+        ]
+        self.assertEqual(self.run_launcher(['--review']), 1)
+        self.popen.assert_not_called()
+        self.assertEqual(before, {p.name: p.read_bytes() for p in profile.iterdir() if p.is_file()})
+        self.assertIn('Quit its window', self.stderr.getvalue())
+
+    def test_review_ignores_other_executables_and_profile_name_prefix_matches(self):
+        profile = self.work / 'native-preview-review'
+        self.ps.side_effect = [
+            subprocess.CompletedProcess([], 0, stdout=f'12 /unrelated\n34 {self.executable}\n'),
+            subprocess.CompletedProcess([], 0, stdout=f'{self.executable} --user-data-dir={profile}-other\n'),
+        ]
+        self.assertEqual(self.run_launcher(['--review']), 0)
+        self.popen.assert_called_once()
+        self.assertEqual(self.ps.call_count, 2)
+
+    def test_review_process_inspection_failure_does_not_launch(self):
+        self.ps.side_effect = subprocess.CalledProcessError(1, 'ps')
+        self.assertEqual(self.run_launcher(['--review']), 1)
         self.popen.assert_not_called()
         self.assertEqual(self.profiles(), [])
 

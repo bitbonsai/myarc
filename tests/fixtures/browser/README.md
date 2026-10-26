@@ -22,6 +22,21 @@ The log and PID file live inside that directory, outside Git. A started process
 alone does not verify a working window. If it exits or shows stock UI, retain the
 log and report the build/launch mismatch.
 
+For repeated UI review, keep one marked profile instead of creating a fresh one:
+
+```sh
+python3 tools/launch_native_preview.py --review
+```
+
+Review mode uses `$HOME/.cache/myarc-m0/native-preview-review`, with `Default`
+selected explicitly. Its first launch seeds vertical tabs; later launches preserve
+preferences and saved workspace data, use native `--restore-last-session` without
+startup URLs, and retain separate private logs. Unmarked directories and symlinks
+are rejected. Quit that preview before relaunching: a matching live process is
+rejected so an older running build cannot silently handle the request. The launcher
+never kills a process or changes singleton locks. Both modes use the current
+compiled `out/MyarcM0` build; neither compiles pending source changes.
+
 This command explicitly enables the experimental workspace sidebar; ordinary
 launches still leave that renderer off. It adds no debugging endpoint, extension,
 automation flag or security bypass. Developer preview convenience is separate
