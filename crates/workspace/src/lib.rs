@@ -28,6 +28,8 @@
 use std::collections::BTreeSet;
 use std::fmt;
 
+pub mod archive;
+
 pub const MAX_SPACE_NAME_BYTES: usize = 128;
 pub const MAX_URL_BYTES: usize = 8192;
 pub const MAX_SPACES: usize = 64;

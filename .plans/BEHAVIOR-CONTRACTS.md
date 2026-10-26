@@ -10,7 +10,7 @@ Contract ID and parent task; source URL/date and reference product/version/platf
 
 Source evidence and our product decision must remain distinguishable. If no reference version or timing has been measured, write unknown rather than implying an exact reproduction. References are inventoried in [RESEARCH.md](../docs/RESEARCH.md).
 
-## BC-001 — Spaces share a Profile without becoming one Space
+## BC-001: Spaces share a Profile without becoming one Space
 
 Parent: MA-004/007. Evidence: Arc's publicly documented [Profile model](https://resources.arc.net/hc/en-us/articles/19227964556183-Profiles-Separate-Work-Personal-Browsing); current behavior across supported Arc versions still needs confirmation.
 
@@ -22,7 +22,7 @@ Parent: MA-004/007. Evidence: Arc's publicly documented [Profile model](https://
 - Failure: invalid/missing Profile references are reported and recovered without silently merging browser data.
 - Proof: pure-core ownership/serialization checks plus browser integration checks for cookies, history, extensions and command suggestions. Core checks alone cannot demonstrate browser isolation.
 
-## BC-002 — Import success drives the reveal
+## BC-002: Import success drives the reveal
 
 Parent: MA-001/006/008. Evidence: project requirement and original [onboarding storyboard](../docs/ONBOARDING.md); historical Arc motion timings are unknown.
 
@@ -34,7 +34,7 @@ Parent: MA-001/006/008. Evidence: project requirement and original [onboarding s
 - Failure: permission denial, malformed input, cancellation or disk failure shows a recoverable error without false success animation.
 - Proof: semantic state/receipt checks, interruption cases, and a fresh real-build recording in normal/reduced motion. A prototype satisfies design exploration only.
 
-## BC-003 — A pinned tab has explicit navigation and closure rules
+## BC-003: A pinned tab has explicit navigation and closure rules
 
 Parent: MA-004/007. Evidence: project requirement; detailed Arc reset/close/multiwindow behavior remains unknown. This is a required investigation rather than a completed parity specification.
 
@@ -44,7 +44,7 @@ Parent: MA-004/007. Evidence: project requirement; detailed Arc reset/close/mult
 - Unknowns to settle before implementing: exact reset gesture/shortcut, when navigation persists, focus after closure, duplicate policy, and shared/multiwindow semantics. Record the chosen behavior and its evidence.
 - Proof: a command transition table with final canonical/current URL and ownership for each action; persistence checks; browser focus/navigation checks. Do not infer correctness from a pin icon being visible.
 
-## BC-004 — An authorized agent acts on a real page
+## BC-004: An authorized agent acts on a real page
 
 Parent: MA-011/007. Evidence: project requirement and proposed [control contract](../docs/CONTROL-PROTOCOL.md); no implementation exists.
 
@@ -55,7 +55,7 @@ Parent: MA-011/007. Evidence: project requirement and proposed [control contract
 - Restart: expired/revoked grants never become silently active after relaunch. Ordinary local browsing remains available.
 - Proof: semantic final state plus native browser recording and external-client trace, synthetic data only; record protocol/client/build versions. Listing MCP tools alone is insufficient.
 
-## BC-005 — Peek routing
+## BC-005: Peek routing
 
 Parent: MA-007. Evidence: documented, Arc's Peek article ([source](https://resources.arc.net/hc/en-us/articles/19335302900887-Peek-Preview-Sites-From-Pinned-Tabs), Internet Archive copy 2024, see the [backlog](2026-10-26-arc-clone-backlog.md) Peek & Split View section) and the [Pinned Tabs article](https://resources.arc.net/hc/en-us/articles/19231060187159-Pinned-Tabs-Tabs-you-want-to-stick-around). Rule implemented and tested in `crates/workspace/src/peek.rs`; the overlay UI does not exist.
 
@@ -66,3 +66,16 @@ Parent: MA-007. Evidence: documented, Arc's Peek article ([source](https://resou
 - Keyboard/focus, persistence, error: Peek pages are not workspace items and are never persisted. The core only returns a decision; focus handling is the adapter's job.
 - Proof: unit tests in `peek.rs`. Native overlay behavior, focus and reopen need a fresh real-build capture before any parity claim.
 - Unknowns (simplest reading chosen): Shift-click opening Peek is not in the sources, so it is not modeled. Option-click (Split View) and expanding Peek into a split are out of scope. Whether the setting also covers links from Temporary tabs is undocumented; Temporary tabs never Peek here. Whether subdomain or cross-scheme moves count as the same site is undocumented; same registrable domain counts as same site, scheme is ignored. Reopening a closed Peek (Cmd+Z/Cmd+Shift+T) is not modeled. What happens to Peek on window close or Space switch is unknown.
+
+## BC-006: Auto Archive moves idle temporary tabs out of the sidebar
+
+Parent: TAB-02, backlog "Tabs lifecycle". Evidence: documented in Arc's [Auto Archive article](https://resources.arc.net/hc/en-us/articles/19228855311127-Auto-Archive-Clean-as-you-go) (12 hours by default, viewing resets the timer, timing per Profile, Little Arc windows after 6 hours; 2024 snapshot), the [Pinned Tabs article](https://resources.arc.net/hc/en-us/articles/19231060187159-Pinned-Tabs-Tabs-you-want-to-stick-around) (pins never archive), the [Folders article](https://resources.arc.net/hc/en-us/articles/19228419623447-Folders-Stash-Similar-Tabs-Together) (folders never archive) and the [2022 release notes](https://resources.arc.net/hc/en-us/articles/20498417809815-Arc-for-macOS-2022-Release-Notes) (media tabs are skipped). Interval choices 24 hours, 7 days, 30 days and never are `proposed`: the saved sources give no option list. Selected-item exclusion and clock handling are `project requirement`.
+
+- Initial state: temporary items with last-viewed times, one Profile policy, `now` from the caller's clock.
+- Action: `archive::decide_archive(items, selected, policy, now_secs)` at launch, at each wake-up, and after any change to selection, media state, placement or last-viewed time.
+- Expected: archive the item ids that are `Placement::Temporary`, not playing media, not selected in any window, and idle for at least the interval (`now >= last_viewed + interval`). Favorites, Pins and any other placement never archive. The result also names the earliest future deadline so the browser keeps one timer. Items excluded by selection or media add no deadline, which is why those events force a new call.
+- Interval: 12 hours by default, per Profile; Little Arc windows use 6 hours whatever the Profile says.
+- Cancellation/error: a clock that moved backwards (`now < last_viewed`) means not yet due. Time arithmetic saturates. Empty input and `never` return nothing and no wake-up. The rule never reads a clock, so the caller owns the time source; mixing monotonic and wall values across calls is the caller's bug.
+- Persistence/restart: last-viewed times are not persisted by this crate yet. On relaunch the adapter must restore or reset them before the first call; resetting is the safe choice (nothing archives early).
+- Proof: unit tests in `crates/workspace/src/archive.rs` cover each rule. Browser timer, archive store, restore and UI are still unproven.
+- Unresolved: whether Little Arc overrides a `never` Profile; exact timing source (Arc may count foreground time, not wall time); form-input and Split View exclusions; folder items (the model has no folder placement yet, so no folder case exists to test); the downloads schedule.

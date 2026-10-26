@@ -16,7 +16,7 @@ This is a checklist for dispatching one small task per line, not a parity claim.
 
 The ordered dispatch list, [Next 15](#next-15), is at the end.
 
-Feature lines: 159 total, 23 done, 29 partial, 107 missing. Shortcut table: 44 rows, 6 done, 13 partial, 25 missing.
+Feature lines: 159 total, 23 done, 30 partial, 106 missing. Shortcut table: 44 rows, 6 done, 13 partial, 25 missing.
 
 ## Window & sidebar
 
@@ -88,7 +88,7 @@ Feature lines: 159 total, 23 done, 29 partial, 107 missing. Shortcut table: 44 r
 - [ ] Closing a pinned tab's page keeps the pin; closing never deletes saved organization. | status: done | evidence: browser/experiments/native-sidebar-row-footer.md (close live page keeps saved record), crates/workspace/src/lib.rs live_tab_closed | source: https://resources.arc.net/hc/en-us/articles/19231060187159-Pinned-Tabs-Tabs-you-want-to-stick-around
 - [ ] Unpinned tabs sit below the divider under a New Tab row; new tabs land here. | status: done | evidence: browser/experiments/native-sidebar-row-footer.md (Temporary below New Tab; Arc docs call this section Unpinned, older notes call it Explore; no "Today" name found in public docs) | source: https://resources.arc.net/hc/en-us/articles/20498463803799-Arc-for-macOS-2021-Release-Notes
 - [ ] Clear Unpinned (Cmd+Shift+K) closes the unpinned tabs with an animation, skipping tabs that play media; Cmd+Z undoes. | status: missing | evidence: none | source: https://resources.arc.net/hc/en-us/articles/20595231349911-Keyboard-Shortcuts
-- [ ] Auto Archive moves idle unpinned tabs to the Archive after 12 hours by default; viewing a tab resets the timer. | status: missing | evidence: none (docs/PARITY.md TAB-02 time model open) | source: https://resources.arc.net/hc/en-us/articles/19228855311127-Auto-Archive-Clean-as-you-go
+- [ ] Auto Archive moves idle unpinned tabs to the Archive after 12 hours by default; viewing a tab resets the timer. | status: partial | evidence: crates/workspace/src/archive.rs decide_archive and BC-006 (pure rule with unit tests; no browser timer, archive store or UI; docs/PARITY.md TAB-02 time model now specified, timings unverified) | source: https://resources.arc.net/hc/en-us/articles/19228855311127-Auto-Archive-Clean-as-you-go
 - [ ] Tabs playing media are never archived or cleared. | status: missing | evidence: none | source: https://resources.arc.net/hc/en-us/articles/20498417809815-Arc-for-macOS-2022-Release-Notes
 - [ ] Archive timing is configurable per Profile; Little Arc windows archive after 6 hours. | status: missing | evidence: none | source: https://resources.arc.net/hc/en-us/articles/19228855311127-Auto-Archive-Clean-as-you-go
 - [ ] View Archive from the command bar or Library, restore a tab with the un-archive icon, and Clear Archive after confirmation. | status: missing | evidence: none | source: https://resources.arc.net/hc/en-us/articles/19228855311127-Auto-Archive-Clean-as-you-go
