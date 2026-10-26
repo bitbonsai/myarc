@@ -54,3 +54,8 @@ The next keyboard/command-bar slice is specified in [native interactions](native
 The sidebar still uses upstream tab rows and a restyled native New Tab button. Arc's Favorites/Spaces arrangement and centered command bar remain unimplemented. Icon geometry, typography and interaction details need comparison; 1:1 parity has not been accepted.
 
 The dark palette and expanded layout cover the first reference state only. Light mode, Reduce Transparency, collapsed/hover/fullscreen behavior, complete keyboard/VoiceOver behavior and extension/permission popup anchoring remain unverified. Several stock toolbar controls are omitted from this preview. It is unsuitable for daily-use acceptance. Existing foundation security/distribution gates remain open; import work and broader test expansion are deferred.
+
+## Scripted capture comparison
+
+`OUTDIR=<dir> tools/capture_native.sh` launches the native build in a marked disposable profile and captures only its window (holds `/tmp/myarc-build.lock`); `tools/capture_arc.sh` captures a new Arc window by window ID and closes only that window (needs Accessibility and Automation for Arc).
+`tools/compare_captures.sh native.png arc.png <outdir>` writes `side-by-side.png`, `diff.png` and a mismatch metric. Outputs go under the git-ignored `research-private/captures/<timestamp>/`.
