@@ -1,0 +1,304 @@
+diff --git a/chrome/browser/ui/views/frame/browser_view.cc b/chrome/browser/ui/views/frame/browser_view.cc
+index 9bce1c9..7de11d4 100644
+--- a/chrome/browser/ui/views/frame/browser_view.cc
++++ b/chrome/browser/ui/views/frame/browser_view.cc
+@@ -6191,6 +6191,19 @@ void BrowserView::NewTab() {
+   ShowMyarcCommandPalette(true);
+ }
+ 
++void BrowserView::OpenDownloads() {
++  // Menu dispatch unwinds before tab selection can rebuild sidebar children.
++  base::SingleThreadTaskRunner::GetCurrentDefault()->PostTask(
++      FROM_HERE, base::BindOnce(
++                     [](base::WeakPtr<BrowserView> view) {
++                       if (view) {
++                         chrome::ExecuteCommand(view->browser_.get(),
++                                                IDC_SHOW_DOWNLOADS);
++                       }
++                     },
++                     myarc_workspace_weak_factory_.GetWeakPtr()));
++}
++
+ void BrowserView::ShowMyarcSpaceDialog(uint64_t space) {
+   if (!myarc_workspace_adapter_ || !myarc_workspace_adapter_->ready() ||
+       !GetWidget()) {
+diff --git a/chrome/browser/ui/views/frame/browser_view.h b/chrome/browser/ui/views/frame/browser_view.h
+index b509e72..79a7e4c 100644
+--- a/chrome/browser/ui/views/frame/browser_view.h
++++ b/chrome/browser/ui/views/frame/browser_view.h
+@@ -1294,6 +1294,7 @@ class BrowserView : public BrowserWindow,
+   void RenameSpace(uint64_t space) override;
+   void NewTab() override;
+   void RetryWorkspaceStorage(myarc::SidebarView::StorageRetry retry) override;
++  void OpenDownloads() override;
+   void MyarcWorkspaceResult(myarc::foundation::MutationResult result);
+   void UpdateMyarcWorkspaceCanvas();
+   void UpdateMyarcTabStripMode();
+diff --git a/chrome/browser/ui/views/frame/browser_view_browsertest.cc b/chrome/browser/ui/views/frame/browser_view_browsertest.cc
+index b3cd428..c29cc9d 100644
+--- a/chrome/browser/ui/views/frame/browser_view_browsertest.cc
++++ b/chrome/browser/ui/views/frame/browser_view_browsertest.cc
+@@ -6,6 +6,7 @@
+ 
+ #include <memory>
+ #include <optional>
++#include <vector>
+ 
+ #include "base/byte_size.h"
+ #include "base/callback_list.h"
+@@ -19,6 +20,7 @@
+ #include "base/path_service.h"
+ #include "base/run_loop.h"
+ #include "base/strings/strcat.h"
++#include "base/strings/string_number_conversions.h"
+ #include "base/strings/utf_string_conversions.h"
+ #include "base/test/bind.h"
+ #include "base/test/metrics/histogram_tester.h"
+@@ -157,6 +159,7 @@
+ #include "ui/base/ozone_buildflags.h"
+ #include "ui/base/page_transition_types.h"
+ #include "ui/base/ui_base_features.h"
++#include "ui/color/color_id.h"
+ #include "ui/compositor/layer.h"
+ #include "ui/compositor/layer_animator.h"
+ #include "ui/compositor/layer_solid_color.h"
+@@ -172,7 +175,9 @@
+ #include "ui/views/controls/button/button.h"
+ #include "ui/views/controls/button/label_button.h"
+ #include "ui/views/controls/button/md_text_button.h"
++#include "ui/views/controls/label.h"
+ #include "ui/views/controls/native/native_view_host.h"
++#include "ui/views/controls/scroll_view.h"
+ #include "ui/views/controls/textfield/textfield.h"
+ #include "ui/views/controls/webview/webview.h"
+ #include "ui/views/focus/focus_manager.h"
+@@ -181,6 +186,7 @@
+ #include "ui/views/test/widget_activation_waiter.h"
+ #include "ui/views/view_class_properties.h"
+ #include "ui/views/view_utils.h"
++#include "ui/views/widget/widget_delegate.h"
+ #include "ui/views/window/dialog_client_view.h"
+ #include "url/url_constants.h"
+ 
+@@ -407,6 +413,18 @@ class BrowserViewTest : public InProcessBrowserTest {
+   raw_ptr<DevToolsWindow> devtools_;
+ };
+ 
++namespace myarc {
++
++class SidebarViewTestApi {
++ public:
++  static ui::SimpleMenuModel* LibraryMenu(SidebarView* sidebar) {
++    sidebar->BuildLibraryMenu();
++    return sidebar->menu_model_.get();
++  }
++};
++
++}  // namespace myarc
++
+ class BrowserViewStorageRetryTest : public BrowserViewTest {
+  protected:
+   using Storage = myarc::WorkspaceService::StorageState;
+@@ -621,6 +639,202 @@ IN_PROC_BROWSER_TEST_F(BrowserViewStorageRetryTest,
+   CloseBrowserSynchronously(private_browser);
+ }
+ 
++class BrowserViewSidebarPresentationTest : public BrowserViewStorageRetryTest {
++ protected:
++  void SetUpOnMainThread() override {
++    BrowserViewStorageRetryTest::SetUpOnMainThread();
++    ASSERT_TRUE(base::test::RunUntil(
++        [&] { return browser_view()->GetMyarcWorkspaceAdapter()->ready(); }));
++  }
++
++  myarc::SidebarView* sidebar(views::View* root = nullptr) {
++    if (!root) {
++      root = browser_view();
++    }
++    if (auto* result = views::AsViewClass<myarc::SidebarView>(root)) {
++      return result;
++    }
++    for (const auto& child : root->children()) {
++      if (auto* result = sidebar(child)) {
++        return result;
++      }
++    }
++    return nullptr;
++  }
++
++  std::vector<gfx::Rect> ChildBounds(views::View* button) {
++    std::vector<gfx::Rect> result;
++    for (const auto& child : button->children()) {
++      result.push_back(child->bounds());
++    }
++    return result;
++  }
++};
++
++IN_PROC_BROWSER_TEST_F(BrowserViewSidebarPresentationTest,
++                       CloseStaysInsideHighlightWithoutTitleShift) {
++  const GURL url("data:text/html,<title>Sidebar row fixture</title>");
++  ASSERT_TRUE(ui_test_utils::NavigateToURL(browser(), url));
++  browser_view()->RefreshMyarcWorkspaceSidebar();
++  RunScheduledLayouts();
++  auto* activate = Button(u"Sidebar row fixture");
++  auto* close = Button(u"Close live page: Sidebar row fixture");
++  ASSERT_TRUE(activate);
++  ASSERT_TRUE(close);
++  auto* row = activate->parent();
++  ASSERT_EQ(row, close->parent());
++  ASSERT_TRUE(row->background());
++  EXPECT_TRUE(row->GetLocalBounds().Contains(close->bounds()));
++  EXPECT_TRUE(row->GetLocalBounds().Contains(activate->bounds()));
++  EXPECT_EQ(activate->width() + close->width(), row->width());
++  EXPECT_EQ(gfx::Size(32, 32), close->size());
++  EXPECT_EQ(activate->context_menu_controller(),
++            close->context_menu_controller());
++  EXPECT_TRUE(close->context_menu_controller());
++  browser_view()->GetFocusManager()->ClearFocus();
++  ui::MouseEvent exit(ui::EventType::kMouseExited, gfx::PointF(), gfx::PointF(),
++                      ui::EventTimeForNow(), 0, 0);
++  row->OnMouseExited(exit);
++  EXPECT_TRUE(close->GetImage(views::Button::STATE_NORMAL).isNull());
++  const auto child_bounds = ChildBounds(activate);
++  const gfx::Rect target = close->bounds();
++  ui::MouseEvent enter(ui::EventType::kMouseEntered, gfx::PointF(),
++                       gfx::PointF(), ui::EventTimeForNow(), 0, 0);
++  row->OnMouseEntered(enter);
++  RunScheduledLayouts();
++  EXPECT_EQ(gfx::Size(20, 20),
++            close->GetImage(views::Button::STATE_NORMAL).size());
++  EXPECT_EQ(child_bounds, ChildBounds(activate));
++  EXPECT_EQ(target, close->bounds());
++  row->OnMouseExited(exit);
++  activate->RequestFocus();
++  EXPECT_FALSE(close->GetImage(views::Button::STATE_NORMAL).isNull());
++  close->RequestFocus();
++  EXPECT_TRUE(close->HasFocus());
++  EXPECT_FALSE(close->GetImage(views::Button::STATE_NORMAL).isNull());
++  EXPECT_EQ(child_bounds, ChildBounds(activate));
++  browser_view()->RefreshMyarcWorkspaceSidebar();
++  RunScheduledLayouts();
++  close = Button(u"Close live page: Sidebar row fixture");
++  ASSERT_TRUE(close);
++  EXPECT_TRUE(close->HasFocus());
++  EXPECT_FALSE(close->GetImage(views::Button::STATE_NORMAL).isNull());
++  ASSERT_TRUE(Button(u"Library"));
++  Button(u"Library")->RequestFocus();
++  close->parent()->OnMouseExited(exit);
++  EXPECT_TRUE(close->GetImage(views::Button::STATE_NORMAL).isNull());
++}
++
++IN_PROC_BROWSER_TEST_F(BrowserViewSidebarPresentationTest,
++                       FooterUsesFixedSquaresAndRevealsCurrentSpace) {
++  for (int i = 0; i < 18; ++i) {
++    ASSERT_TRUE(service().CreateSpace("Footer " + base::NumberToString(i)).ok);
++  }
++  auto* adapter = browser_view()->GetMyarcWorkspaceAdapter();
++  auto model = adapter->Sidebar();
++  ASSERT_TRUE(model.ok);
++  const auto last = model.spaces[model.spaces.size() - 1].id;
++  ASSERT_TRUE(adapter->SelectSpace(last).ok);
++  browser_view()->RefreshMyarcWorkspaceSidebar();
++  RunScheduledLayouts();
++  auto* library = Button(u"Library");
++  auto* create = Button(u"Create Space");
++  auto* current = Button(u"Space: Footer 17");
++  ASSERT_TRUE(library);
++  ASSERT_TRUE(create);
++  ASSERT_TRUE(current);
++  EXPECT_EQ(gfx::Size(32, 32), library->size());
++  EXPECT_EQ(gfx::Size(32, 32), create->size());
++  EXPECT_EQ(gfx::Size(32, 32), current->size());
++  EXPECT_FALSE(library->GetImage(views::Button::STATE_NORMAL).isNull());
++  EXPECT_FALSE(current->GetImage(views::Button::STATE_NORMAL).isNull());
++  EXPECT_EQ(ui::kColorSysSurfaceContainer, current->GetBgColorIdOverride());
++  EXPECT_EQ(library->GetBoundsInScreen().CenterPoint().y(),
++            current->GetBoundsInScreen().CenterPoint().y());
++  EXPECT_EQ(create->GetBoundsInScreen().CenterPoint().y(),
++            current->GetBoundsInScreen().CenterPoint().y());
++  auto* scroll = views::ScrollView::GetScrollViewForContents(current->parent());
++  ASSERT_TRUE(scroll);
++  EXPECT_GT(scroll->CurrentOffset().x(), 0);
++  EXPECT_TRUE(
++      scroll->GetVisibleRect().Contains(views::View::ConvertRectToTarget(
++          current, scroll, current->GetLocalBounds())));
++  for (const auto& space : adapter->Sidebar().spaces) {
++    auto* choice =
++        Button(u"Space: " + base::UTF8ToUTF16(std::string(space.name)));
++    ASSERT_TRUE(choice);
++    EXPECT_EQ(gfx::Size(32, 32), choice->size());
++    if (space.id != last) {
++      EXPECT_EQ(u"\u2022", choice->GetText());
++      EXPECT_TRUE(choice->GetImage(views::Button::STATE_NORMAL).isNull());
++    }
++  }
++}
++
++IN_PROC_BROWSER_TEST_F(BrowserViewSidebarPresentationTest,
++                       LibraryDispatchesDownloadsAndExistingSpaceActions) {
++  ASSERT_TRUE(service().CreateSpace("Library target").ok);
++  browser_view()->RefreshMyarcWorkspaceSidebar();
++  auto* view = sidebar();
++  ASSERT_TRUE(view);
++  auto* menu = myarc::SidebarViewTestApi::LibraryMenu(view);
++  ASSERT_EQ(u"Downloads", menu->GetLabelAt(0));
++  auto* other = CreateBrowser(profile());
++  const GURL other_url =
++      other->GetTabStripModel()->GetActiveWebContents()->GetLastCommittedURL();
++  const int other_count = other->GetTabStripModel()->count();
++  menu->ActivatedAt(0, 0);
++  ASSERT_TRUE(base::test::RunUntil([&] {
++    return active_web_contents()->GetLastCommittedURL() ==
++           GURL(chrome::kChromeUIDownloadsURL);
++  }));
++  EXPECT_EQ(other_count, other->GetTabStripModel()->count());
++  EXPECT_EQ(
++      other_url,
++      other->GetTabStripModel()->GetActiveWebContents()->GetLastCommittedURL());
++  browser_view()->RefreshMyarcWorkspaceSidebar();
++  menu = myarc::SidebarViewTestApi::LibraryMenu(sidebar());
++  bool selected = false;
++  for (size_t i = 0; i < menu->GetItemCount(); ++i) {
++    if (menu->GetLabelAt(i) == u"Switch to Space: Library target") {
++      menu->ActivatedAt(i, 0);
++      selected = true;
++      break;
++    }
++  }
++  ASSERT_TRUE(selected);
++  EXPECT_EQ("Library target", std::string(browser_view()
++                                              ->GetMyarcWorkspaceAdapter()
++                                              ->Sidebar()
++                                              .current_space.name));
++  browser_view()->RefreshMyarcWorkspaceSidebar();
++  menu = myarc::SidebarViewTestApi::LibraryMenu(sidebar());
++  ASSERT_EQ(u"Create Space", menu->GetLabelAt(menu->GetItemCount() - 1));
++  menu->ActivatedAt(menu->GetItemCount() - 1, 0);
++  views::DialogDelegate* dialog = nullptr;
++  for (const auto& widget : views::Widget::GetAllOwnedWidgets(
++           browser_view()->GetWidget()->GetNativeView())) {
++    if (widget->widget_delegate()->GetWindowTitle() == u"Create Space") {
++      dialog = widget->widget_delegate()->AsDialogDelegate();
++      break;
++    }
++  }
++  ASSERT_TRUE(dialog);
++  auto* name =
++      views::AsViewClass<views::Textfield>(dialog->GetInitiallyFocusedView());
++  ASSERT_TRUE(name);
++  name->SetText(u"Library created");
++  dialog->AcceptDialog();
++  const auto after_create =
++      browser_view()->GetMyarcWorkspaceAdapter()->Sidebar();
++  bool created = false;
++  for (const auto& space : after_create.spaces) {
++    created |= std::string(space.name) == "Library created";
++  }
++  EXPECT_TRUE(created);
++  CloseBrowserSynchronously(other);
++}
++
+ class BrowserViewPaletteIntentTest : public BrowserViewTest {
+  protected:
+   void SetUpCommandLine(base::CommandLine* command_line) override {

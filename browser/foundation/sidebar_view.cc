@@ -7,19 +7,23 @@
 #include <utility>
 
 #include "base/functional/bind.h"
+#include "base/scoped_observation.h"
 #include "base/strings/utf_string_conversions.h"
 #include "components/vector_icons/vector_icons.h"
 #include "myarc/bridge.rs.h"
 #include "ui/base/metadata/metadata_impl_macros.h"
+#include "ui/base/mojom/menu_source_type.mojom.h"
 #include "ui/color/color_id.h"
 #include "ui/gfx/geometry/insets.h"
 #include "ui/gfx/geometry/size.h"
 #include "ui/views/accessibility/view_accessibility.h"
+#include "ui/views/background.h"
 #include "ui/views/controls/button/md_text_button.h"
 #include "ui/views/controls/label.h"
 #include "ui/views/controls/menu/menu_runner.h"
 #include "ui/views/controls/scroll_view.h"
 #include "ui/views/controls/separator.h"
+#include "ui/views/focus/focus_manager.h"
 #include "ui/views/layout/box_layout.h"
 
 namespace myarc {
@@ -27,7 +31,90 @@ namespace {
 
 using Orientation = views::BoxLayout::Orientation;
 
-enum ItemCommand { kPin = 1, kFavorite, kUnsave, kClose };
+enum ItemCommand {
+  kPin = 1,
+  kFavorite,
+  kUnsave,
+  kClose,
+  kDownloads,
+  kCreateSpace,
+  kFirstSpace = 100
+};
+
+// The row owns its highlight and reserves the close target even when its glyph
+// is hidden. Native child enter/exit and focus notifications cover both
+// buttons.
+class ItemRow final : public views::View, public views::FocusChangeListener {
+  METADATA_HEADER(ItemRow, views::View)
+
+ public:
+  ItemRow(std::unique_ptr<views::MdTextButton> activate,
+          std::unique_ptr<views::MdTextButton> close,
+          bool selected) {
+    auto* layout = SetLayoutManager(std::make_unique<views::BoxLayout>(
+        Orientation::kHorizontal, gfx::Insets(), 0));
+    layout->SetFlexForView(AddChildView(std::move(activate)), 1);
+    if (selected) {
+      SetBackground(views::CreateRoundedRectBackground(
+          ui::kColorSysSecondaryContainer, 10));
+    }
+    if (close) {
+      close_ = AddChildView(std::move(close));
+      close_->SetImageModel(views::Button::STATE_NORMAL, ui::ImageModel());
+    }
+    SetNotifyEnterExitOnChild(true);
+  }
+
+  void AddedToWidget() override {
+    views::View::AddedToWidget();
+    focus_observation_.Observe(GetFocusManager());
+    UpdateClose();
+  }
+
+  void RemovedFromWidget() override {
+    focus_observation_.Reset();
+    views::View::RemovedFromWidget();
+  }
+
+  void WillClearFocusManager() override {
+    focus_observation_.Reset();
+    views::View::WillClearFocusManager();
+  }
+
+  void OnMouseEntered(const ui::MouseEvent& event) override {
+    hovered_ = true;
+    UpdateClose();
+  }
+
+  void OnMouseExited(const ui::MouseEvent& event) override {
+    hovered_ = false;
+    UpdateClose();
+  }
+
+  void OnDidChangeFocus(views::View*, views::View*) override { UpdateClose(); }
+
+ private:
+  void UpdateClose() {
+    if (close_) {
+      auto* manager = GetFocusManager();
+      const bool reveal =
+          hovered_ || (manager && Contains(manager->GetFocusedView()));
+      close_->SetImageModel(
+          views::Button::STATE_NORMAL,
+          reveal ? ui::ImageModel::FromVectorIcon(vector_icons::kCloseIcon,
+                                                  ui::kColorSysOnSurface, 20)
+                 : ui::ImageModel());
+    }
+  }
+
+  raw_ptr<views::MdTextButton> close_ = nullptr;
+  bool hovered_ = false;
+  base::ScopedObservation<views::FocusManager, views::FocusChangeListener>
+      focus_observation_{this};
+};
+
+BEGIN_METADATA(ItemRow)
+END_METADATA
 
 std::unique_ptr<views::View> Box(Orientation orientation, int spacing) {
   auto view = std::make_unique<views::View>();
@@ -52,6 +139,23 @@ std::unique_ptr<views::MdTextButton> Button(
   button->SetMinSize(gfx::Size(0, 32));
   button->SetHorizontalAlignment(gfx::ALIGN_LEFT);
   button->SetElideBehavior(gfx::ELIDE_TAIL);
+  return button;
+}
+
+std::unique_ptr<views::MdTextButton> IconButton(
+    views::Button::PressedCallback callback,
+    const gfx::VectorIcon& icon) {
+  auto button = Button(std::move(callback), u"");
+  button->SetMinSize(gfx::Size(32, 32));
+  button->SetMaxSize(gfx::Size(32, 32));
+  button->SetPreferredSize(gfx::Size(32, 32));
+  button->SetCustomPadding(gfx::Insets());
+  button->SetHorizontalAlignment(gfx::ALIGN_CENTER);
+  button->SetImageCentered(true);
+  button->SetCornerRadius(8);
+  button->SetImageModel(
+      views::Button::STATE_NORMAL,
+      ui::ImageModel::FromVectorIcon(icon, ui::kColorSysOnSurface, 20));
   return button;
 }
 
@@ -126,8 +230,61 @@ void SidebarView::ShowContextMenuForViewImpl(
                           views::MenuAnchorPosition::kTopLeft, source_type);
 }
 
+void SidebarView::BuildLibraryMenu() {
+  menu_item_id_ = 0;
+  menu_runner_.reset();
+  menu_model_ = std::make_unique<ui::SimpleMenuModel>(this);
+  menu_model_->AddItem(kDownloads, u"Downloads");
+  menu_model_->AddSeparator(ui::NORMAL_SEPARATOR);
+  library_space_ids_.clear();
+  for (const auto& [id, name] : spaces_) {
+    menu_model_->AddItem(
+        kFirstSpace + library_space_ids_.size(),
+        (id == current_space_id_ ? u"Current Space: " : u"Switch to Space: ") +
+            name);
+    library_space_ids_.push_back(id);
+  }
+  menu_model_->AddSeparator(ui::NORMAL_SEPARATOR);
+  menu_model_->AddItem(kCreateSpace, u"Create Space");
+}
+
+void SidebarView::ShowLibrary(const ui::Event& event) {
+  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
+  if (!GetWidget() || (menu_runner_ && menu_runner_->IsRunning())) {
+    return;
+  }
+  const auto target = std::ranges::find(focus_targets_, FocusAction::kLibrary,
+                                        &FocusTarget::action);
+  if (target == focus_targets_.end()) {
+    return;
+  }
+  const gfx::Rect anchor = target->view->GetBoundsInScreen();
+  BuildLibraryMenu();
+  menu_runner_ = std::make_unique<views::MenuRunner>(
+      menu_model_.get(), views::MenuRunner::CONTEXT_MENU);
+  menu_runner_->RunMenuAt(
+      GetWidget(), nullptr, anchor, views::MenuAnchorPosition::kTopLeft,
+      event.IsKeyEvent() ? ui::mojom::MenuSourceType::kKeyboard
+                         : ui::mojom::MenuSourceType::kMouse);
+}
+
 void SidebarView::ExecuteCommand(int command_id, int event_flags) {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
+  if (command_id == kDownloads) {
+    delegate_->OpenDownloads();
+    return;
+  }
+  if (command_id == kCreateSpace) {
+    delegate_->CreateSpace();
+    return;
+  }
+  if (command_id >= kFirstSpace) {
+    const size_t index = command_id - kFirstSpace;
+    if (index < library_space_ids_.size()) {
+      delegate_->SelectSpace(library_space_ids_[index]);
+    }
+    return;
+  }
   const uint64_t id = std::exchange(menu_item_id_, 0);
   if (!id) {
     return;
@@ -191,7 +348,7 @@ std::unique_ptr<views::View> SidebarView::MakeItem(
       presentation.is_live ? u"Open tab" : u"Saved site");
   activate->GetViewAccessibility().SetIsSelected(selected);
   activate->SetEnabledTextColors(foreground);
-  if (selected || tile) {
+  if (tile) {
     activate->SetBgColorOverrideDeprecated(std::nullopt);
     activate->SetBgColorIdOverride(selected ? ui::kColorSysSecondaryContainer
                                             : ui::kColorSysSurfaceContainer);
@@ -209,18 +366,12 @@ std::unique_ptr<views::View> SidebarView::MakeItem(
     return activate;
   }
 
-  auto row = Box(Orientation::kHorizontal, 0);
-  auto* layout = static_cast<views::BoxLayout*>(row->GetLayoutManager());
-  layout->SetFlexForView(row->AddChildView(std::move(activate)), 1);
+  std::unique_ptr<views::MdTextButton> close;
   if (presentation.is_live) {
-    auto close =
-        Button(base::BindRepeating(&Delegate::CloseLiveItem,
-                                   base::Unretained(&delegate_.get()), item.id),
-               u"");
-    close->SetImageModel(
-        views::Button::STATE_NORMAL,
-        ui::ImageModel::FromVectorIcon(vector_icons::kCloseIcon,
-                                       ui::kColorSysOnSurface, 16));
+    close = IconButton(
+        base::BindRepeating(&Delegate::CloseLiveItem,
+                            base::Unretained(&delegate_.get()), item.id),
+        vector_icons::kCloseIcon);
     const std::u16string close_name =
         (menu_state.is_pin        ? u"Close live page, keep Space Pin: "
          : menu_state.is_favorite ? u"Close live page, keep Favorite: "
@@ -229,9 +380,9 @@ std::unique_ptr<views::View> SidebarView::MakeItem(
     close->SetTooltipText(close_name);
     close->GetViewAccessibility().SetName(close_name);
     TrackFocus(close.get(), FocusAction::kClose, item.id, menu_state);
-    row->AddChildView(std::move(close));
   }
-  return row;
+  return std::make_unique<ItemRow>(std::move(activate), std::move(close),
+                                   selected);
 }
 
 views::View* SidebarView::AddStorageRetry(views::View& parent,
@@ -259,6 +410,8 @@ void SidebarView::SetUnavailable(const std::u16string& reason,
   focus_targets_.clear();
   spaces_scroll_ = nullptr;
   current_space_id_ = 0;
+  spaces_.clear();
+  library_space_ids_.clear();
   RemoveAllChildViews();
   auto* scroll = AddChildView(std::make_unique<views::ScrollView>());
   scroll->ClipHeightTo(0, std::numeric_limits<int>::max());
@@ -393,43 +546,56 @@ void SidebarView::SetModel(const foundation::SidebarResult& model,
   }
 
   auto* footer = AddChildView(Box(Orientation::kHorizontal, 4));
+  static_cast<views::BoxLayout*>(footer->GetLayoutManager())
+      ->set_cross_axis_alignment(views::BoxLayout::CrossAxisAlignment::kCenter);
+  auto library = IconButton(
+      base::BindRepeating(&SidebarView::ShowLibrary, base::Unretained(this)),
+      vector_icons::kFolderOpenIcon);
+  library->SetTooltipText(u"Library");
+  library->GetViewAccessibility().SetName(u"Library");
+  library->GetViewAccessibility().SetHasPopup(ax::mojom::HasPopup::kMenu);
+  TrackFocus(library.get(), FocusAction::kLibrary);
+  footer->AddChildView(std::move(library));
   spaces_scroll_ = footer->AddChildView(std::make_unique<views::ScrollView>());
   spaces_scroll_->SetBackgroundColor(std::nullopt);
   spaces_scroll_->SetVerticalScrollBarMode(
       views::ScrollView::ScrollBarMode::kDisabled);
   spaces_scroll_->SetHorizontalScrollBarMode(
-      views::ScrollView::ScrollBarMode::kEnabled);
+      views::ScrollView::ScrollBarMode::kHiddenButEnabled);
   spaces_scroll_->SetTreatAllScrollEventsAsHorizontal(true);
   spaces_scroll_->SetUseContentsPreferredSize(true);
-  // Leave room for the non-overlay horizontal scrollbar as well as 32-DIP dots.
-  spaces_scroll_->SetPreferredSize(gfx::Size(0, 48));
+  // Keep all footer controls on one 32-DIP line while retaining wheel/focus
+  // scrolling and the current-Space reveal callback.
+  spaces_scroll_->SetPreferredSize(gfx::Size(0, 32));
   auto* spaces = spaces_scroll_->SetContents(Box(Orientation::kHorizontal, 2));
+  static_cast<views::BoxLayout*>(spaces->GetLayoutManager())
+      ->set_cross_axis_alignment(views::BoxLayout::CrossAxisAlignment::kCenter);
   spaces->GetViewAccessibility().SetRole(ax::mojom::Role::kGroup);
   spaces->GetViewAccessibility().SetName(u"Spaces");
   views::View* current_space = nullptr;
   std::optional<size_t> current_space_index;
+  spaces_.clear();
   for (const auto& space : model.spaces) {
     const bool current = space.id == model.current_space.id;
     // Button presses request a switch; only a Rust snapshot changes selection.
-    auto choice = Button(
+    auto choice = IconButton(
         base::BindRepeating(&Delegate::SelectSpace,
                             base::Unretained(&delegate_.get()), space.id),
-        u"\u2022");
-    choice->SetMinSize(gfx::Size(32, 32));
-    choice->SetPreferredSize(gfx::Size(32, 32));
-    choice->SetCustomPadding(gfx::Insets());
-    choice->SetHorizontalAlignment(gfx::ALIGN_CENTER);
-    choice->SetCornerRadius(16);
-    choice->SetEnabledTextColors(current ? ui::kColorSysOnSecondaryContainer
-                                         : ui::kColorSysOnSurfaceVariant);
+        vector_icons::kGlobeIcon);
+    if (!current) {
+      choice->SetImageModel(views::Button::STATE_NORMAL, ui::ImageModel());
+      choice->SetText(u"\u2022");
+    }
+    choice->SetEnabledTextColors(ui::kColorSysOnSurfaceVariant);
     if (current) {
       choice->SetBgColorOverrideDeprecated(std::nullopt);
-      choice->SetBgColorIdOverride(ui::kColorSysSecondaryContainer);
+      choice->SetBgColorIdOverride(ui::kColorSysSurfaceContainer);
       current_space = choice.get();
       current_space_index = spaces->children().size();
     }
     const std::u16string space_name =
         base::UTF8ToUTF16(std::string(space.name));
+    spaces_.emplace_back(space.id, space_name);
     choice->SetTooltipText(
         (current ? u"Current Space: " : u"Switch to Space: ") + space_name);
     choice->GetViewAccessibility().SetName(u"Space: " + space_name);
@@ -457,9 +623,10 @@ void SidebarView::SetModel(const foundation::SidebarResult& model,
       base::OwnedRef(std::optional(spaces_offset)), space_changed,
       current_space_index));
 
-  auto create = Button(base::BindRepeating(&Delegate::CreateSpace,
-                                           base::Unretained(&delegate_.get())),
-                       u"+");
+  auto create =
+      IconButton(base::BindRepeating(&Delegate::CreateSpace,
+                                     base::Unretained(&delegate_.get())),
+                 vector_icons::kAdd2Icon);
   create->SetTooltipText(u"Create Space");
   create->GetViewAccessibility().SetName(u"Create Space");
   TrackFocus(create.get(), FocusAction::kCreate);

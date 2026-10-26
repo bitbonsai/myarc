@@ -5,6 +5,7 @@
 #include <memory>
 #include <optional>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "base/memory/raw_ptr.h"
@@ -64,6 +65,7 @@ class SidebarView final : public views::View,
     virtual void CreateSpace() = 0;
     virtual void RenameSpace(uint64_t space_id) = 0;
     virtual void NewTab() = 0;  // Parent opens its real New Tab/palette flow.
+    virtual void OpenDownloads() = 0;  // Exact owning browser's Chrome command.
     virtual void RetryWorkspaceStorage(StorageRetry retry) = 0;
   };
 
@@ -82,6 +84,8 @@ class SidebarView final : public views::View,
                       StorageRetry retry = StorageRetry::kNone);
 
  private:
+  friend class SidebarViewTestApi;
+
   enum class FocusAction {
     kActivate,
     kClose,
@@ -89,6 +93,7 @@ class SidebarView final : public views::View,
     kNewTab,
     kSpaces,
     kCreate,
+    kLibrary,
     kRetryLoad,
     kRetrySave,
     kStatus
@@ -115,6 +120,8 @@ class SidebarView final : public views::View,
       views::View* source,
       const gfx::Point& point,
       ui::mojom::MenuSourceType source_type) override;
+  void BuildLibraryMenu();
+  void ShowLibrary(const ui::Event& event);
   void ExecuteCommand(int command_id, int event_flags) override;
   std::unique_ptr<views::View> MakeItem(const foundation::ItemRecord& item,
                                         bool tile,
@@ -126,6 +133,8 @@ class SidebarView final : public views::View,
   uint64_t current_space_id_ = 0;
   uint64_t menu_space_id_ = 0;
   uint64_t menu_item_id_ = 0;
+  std::vector<std::pair<uint64_t, std::u16string>> spaces_;
+  std::vector<uint64_t> library_space_ids_;
   ItemMenuState menu_state_ = {};
   // Stable sidebar owns both; no menu callback or anchor retains a child row.
   // Runner must be destroyed before its model and before children.
