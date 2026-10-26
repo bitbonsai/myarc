@@ -1,0 +1,64 @@
+{
+  "slice": "MA-007.c-runtime-mode",
+  "date": "2026-10-26",
+  "status": "warm runtime mode pass after correction; cold horizontal restore identity FAIL",
+  "initial_implementation_commit": "78b303f",
+  "first_native_attempt": {
+    "toolbar_reparented": true,
+    "late_workspace_stayed_unavailable": true,
+    "metadata_file_absent": true,
+    "cause": "Late lifecycle bridge missed startup completion"
+  },
+  "parent_correction": {
+    "native_ready_notification_after_first_setup": true,
+    "counted_startup_recovery_restore_guards_preserved": true,
+    "direct_gn_dependency_added": true,
+    "normal_first_activation_native_fixture_added_but_unrun": true,
+    "full_chrome_build_and_fixture_syntax_passed": true,
+    "strict_reverse_replay_files": 78,
+    "changed_files": 9,
+    "unrelated_unchanged_files": 69,
+    "canonical_payload_files_unchanged": 16
+  },
+  "warm_native_results": {
+    "initial_real_vertical_preference_false": true,
+    "same_window_full_workspace_initialized": true,
+    "real_space_create_switch": true,
+    "three_bidirectional_mode_cycles": true,
+    "horizontal_toolbar_and_address_focus_usable": true,
+    "hidden_sidebar_exit_usable": true,
+    "sidebar_toggle_usable_after_return": true,
+    "prior_hidden_state_preservation_across_modes_not_asserted": true,
+    "page_target_ids_and_time_origins_retained": true,
+    "metadata_ids_selection_and_counters_exact": true
+  },
+  "cold_native_failure": {
+    "normal_quit_then_explicit_restore_last_session": true,
+    "initial_horizontal_mode": true,
+    "late_vertical_activation": true,
+    "expected_item_ids": [
+      "1",
+      "2"
+    ],
+    "observed_item_ids": [
+      "1",
+      "3",
+      "4"
+    ],
+    "original_temporary_pruned": true,
+    "duplicate_favorite_created": true,
+    "temporary_rebound_to_wrong_space": true,
+    "strict_verify_passed": false,
+    "metadata_not_written_by_driver": true,
+    "app_only_reduced_motion_reported_true": true
+  },
+  "remaining": [
+    "Restore hints/bindings must survive before UI activation; investigate native consumer lifetime",
+    "Fresh pending-recovery late-enable, Profile/OTR and flag-off acceptance after final repair",
+    "Native interactive suites, fullscreen/immersive and queued-focus shutdown races remain unrun",
+    "Full reduced-motion sequence acceptance and durability remain open"
+  ],
+  "all_owned_apps_helpers_fixture_servers_closed": true,
+  "workspace_renderer_default_enabled": false,
+  "raw_profiles_logs_and_captures": "private, outside Git"
+}

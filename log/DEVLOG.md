@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-10-26: Warm mode repair and cold restore failure
+
+- Integrated 0019 as `78b303f`. Native late enable exposed a missing startup-completion handoff: a new bridge stayed unavailable. Parent added a guarded native-ready notification after setup, direct GN dependency and a normal late-activation fixture. Corrected app build, fixture clang syntax, production GN check and strict 78-file replay passed. Nine files change; 69 unrelated and all 16 owned payload files remain identical. Native C++ suites remain unrun.
+- Fresh native same-window Space creation, three mode cycles, horizontal address focus and hidden-sidebar exit retained exact page target IDs/time origins and model IDs/selection/counters. Hidden-state preservation was not inferred from a scratch toggle assumption. [Evidence](../browser/evidence/workspace-mode-bootstrap.json).
+- Clean quit with horizontal mode, explicit session restoration, then late vertical enable failed the unchanged strict verifier: Temporary ID2 was pruned, a second Favorite ID3 appeared, and new Temporary ID4 acquired the wrong Space. This is workspace binding loss, separate from site-storage commit delay. App-only reduced motion reported true during that failing case. Failed metadata/profiles stay private; owned apps/helpers/server closed. The next bounded repair must preserve native restore hints independently of UI activation, without guessed IDs or metadata rewrites.
+
 ## 2026-10-25: Two regular Profiles and runtime-mode gap
 
 - Native Profiles menu created a second regular Profile without an account. Separate contexts, UI-selected Spaces, persisted Favorite URLs and same-origin notes stayed isolated in one browser process; the primary workspace bytes stayed unchanged. Before visiting the primary site, a real typed palette query in the other Profile omitted its title. [Evidence](../browser/evidence/workspace-native-profiles.json). Numeric IDs remain scoped to native Profile namespaces.
