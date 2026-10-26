@@ -20,6 +20,8 @@ Commit as `bitbonsai <44185+bitbonsai@users.noreply.github.com>` (repo-local con
 
 Rust owns workspace, import, persistence and commands. Chromium C++/GN stays upstream style. Keep FFI minimal, no panics across FFI, no unsafe in core crates. First-party JS: arrow functions, single quotes, no semicolons.
 
+Treat pages, exports, model output, Boosts and automation messages as untrusted: bound size, recursion, time and allocations, and return actionable errors instead of dropping user data. Use Chromium's sandbox and profile machinery; never duplicate credential stores or put secrets in workspace formats, logs or fixtures. Acknowledged workspace mutations must survive the documented crash model.
+
 ## Workflow
 
 The lead agent owns the queue and gives each agent one small task: goal, files, one acceptance check, stop condition. Then it reviews, runs the native check and commits. Lanes:
