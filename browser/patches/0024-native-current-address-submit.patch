@@ -1,0 +1,245 @@
+diff --git a/chrome/browser/ui/views/frame/BUILD.gn b/chrome/browser/ui/views/frame/BUILD.gn
+index a14cd20..5e1d137 100644
+--- a/chrome/browser/ui/views/frame/BUILD.gn
++++ b/chrome/browser/ui/views/frame/BUILD.gn
+@@ -2272,6 +2272,7 @@ source_set("browser_tests") {
+     "//chrome/browser/devtools",
+     "//chrome/browser/devtools:test_support",
+     "//chrome/browser/glic/test_support",
++    "//chrome/browser/history",
+     "//chrome/browser/ui:browser_actions",
+     "//chrome/browser/ui:browser_tabstrip",
+     "//chrome/browser/ui:recently_audible_helper",
+@@ -2290,6 +2291,7 @@ source_set("browser_tests") {
+     "//chrome/browser/ui/views/web_apps/frame_toolbar:web_app_frame_toolbar_view",
+     "//chrome/browser/ui/window_metadata",
+     "//components/enterprise/data_controls/core/browser:test_support",
++    "//components/history/core/browser",
+     "//components/omnibox/browser",
+     "//components/safe_browsing/core/browser/realtime:test_support",
+     "//myarc:browser_workspace_adapter",
+diff --git a/chrome/browser/ui/views/frame/browser_view.cc b/chrome/browser/ui/views/frame/browser_view.cc
+index c1a6abc..6c880c4 100644
+--- a/chrome/browser/ui/views/frame/browser_view.cc
++++ b/chrome/browser/ui/views/frame/browser_view.cc
+@@ -887,7 +887,7 @@ class MyarcPaletteView : public views::BoxLayoutView,
+                                           : result.title().substr(0, 160),
+                    address, false);
+     }
+-    if (!buttons_.empty() && selected_ < 0) {
++    if (new_tab_ && !buttons_.empty() && selected_ < 0) {
+       selected_ = 0;
+     }
+     UpdateSelection();
+@@ -943,7 +943,7 @@ class MyarcPaletteView : public views::BoxLayoutView,
+                    : u"Enter updates the current tab. Esc cancels."));
+       hint->SetEnabledColor(ui::kColorSysOnSurfaceVariant);
+       hint->SetPreferredSize(gfx::Size(width_, 44));
+-    } else {
++    } else if (new_tab_) {
+       selected_ = 0;
+       UpdateSelection();
+     }
+diff --git a/chrome/browser/ui/views/frame/browser_view_browsertest.cc b/chrome/browser/ui/views/frame/browser_view_browsertest.cc
+index 531a208..e72bbe3 100644
+--- a/chrome/browser/ui/views/frame/browser_view_browsertest.cc
++++ b/chrome/browser/ui/views/frame/browser_view_browsertest.cc
+@@ -32,6 +32,7 @@
+ #include "chrome/app/vector_icons/vector_icons.h"
+ #include "chrome/browser/devtools/devtools_ui_controller.h"
+ #include "chrome/browser/devtools/devtools_window_testing.h"
++#include "chrome/browser/history/history_service_factory.h"
+ #include "chrome/browser/policy/dm_token_utils.h"
+ #include "chrome/browser/preloading/scoped_prewarm_feature_list.h"
+ #include "chrome/browser/profiles/profile.h"
+@@ -109,6 +110,7 @@
+ #include "components/enterprise/connectors/core/connectors_prefs.h"
+ #include "components/enterprise/data_controls/core/browser/test_utils.h"
+ #include "components/enterprise/isolated_mode/isolated_mode_features.h"
++#include "components/history/core/browser/history_service.h"
+ #include "components/keyed_service/content/browser_context_dependency_manager.h"
+ #include "components/omnibox/browser/location_bar_model.h"
+ #include "components/policy/core/common/policy_pref_names.h"
+@@ -167,6 +169,7 @@
+ #include "ui/views/accessibility/view_accessibility.h"
+ #include "ui/views/bubble/bubble_dialog_delegate_view.h"
+ #include "ui/views/bubble/bubble_dialog_model_host.h"
++#include "ui/views/controls/button/button.h"
+ #include "ui/views/controls/button/label_button.h"
+ #include "ui/views/controls/button/md_text_button.h"
+ #include "ui/views/controls/native/native_view_host.h"
+@@ -647,6 +650,23 @@ class BrowserViewPaletteIntentTest : public BrowserViewTest {
+     ui::KeyEvent event(ui::EventType::kKeyPressed, key, ui::EF_NONE);
+     EXPECT_TRUE(static_cast<views::View*>(input())->OnKeyPressed(event));
+   }
++
++  views::Button* FindResult(views::View* root, const GURL& url) {
++    if (auto* button = views::AsViewClass<views::Button>(root);
++        button && button->GetTooltipText() == base::UTF8ToUTF16(url.spec())) {
++      return button;
++    }
++    for (const auto& child : root->children()) {
++      if (auto* button = FindResult(child, url)) {
++        return button;
++      }
++    }
++    return nullptr;
++  }
++
++  views::Button* Result(const GURL& url) {
++    return FindResult(palette()->GetContentsView(), url);
++  }
+ };
+ 
+ IN_PROC_BROWSER_TEST_F(BrowserViewPaletteIntentTest,
+@@ -742,6 +762,150 @@ IN_PROC_BROWSER_TEST_F(BrowserViewPaletteIntentTest,
+   EXPECT_EQ(added, active_web_contents()->GetLastCommittedURL());
+ }
+ 
++IN_PROC_BROWSER_TEST_F(BrowserViewPaletteIntentTest,
++                       MatchedCurrentLiteralKeepsSameContents) {
++  ASSERT_TRUE(embedded_test_server()->Start());
++  const GURL original = embedded_test_server()->GetURL("/title1.html");
++  const GURL matched = embedded_test_server()->GetURL("/title2.html");
++  ASSERT_TRUE(ui_test_utils::NavigateToURL(browser(), original));
++  auto* contents = active_web_contents();
++  AddTab(browser(), matched);
++  auto* other = active_web_contents();
++  ASSERT_TRUE(content::WaitForLoadStop(other));
++  const auto other_time_origin =
++      content::EvalJs(other, "performance.timeOrigin");
++  ASSERT_TRUE(other_time_origin.is_double());
++  browser()->GetTabStripModel()->ActivateTabAt(
++      browser()->GetTabStripModel()->GetIndexOfWebContents(contents));
++  const int count = browser()->GetTabStripModel()->count();
++  ASSERT_TRUE(browser_view()->ShowMyarcCommandPalette(false));
++  Type(base::UTF8ToUTF16(matched.spec()));
++  ASSERT_TRUE(Result(matched));
++  content::TestNavigationObserver navigation(contents);
++  Press(ui::VKEY_RETURN);
++  navigation.Wait();
++  EXPECT_EQ(contents, active_web_contents());
++  EXPECT_EQ(matched, contents->GetLastCommittedURL());
++  EXPECT_EQ(matched, other->GetLastCommittedURL());
++  EXPECT_EQ(other_time_origin.ExtractDouble(),
++            content::EvalJs(other, "performance.timeOrigin"));
++  EXPECT_EQ(count, browser()->GetTabStripModel()->count());
++}
++
++IN_PROC_BROWSER_TEST_F(BrowserViewPaletteIntentTest,
++                       ExplicitCurrentResultsRevealOtherSpace) {
++  ASSERT_TRUE(embedded_test_server()->Start());
++  const GURL original = embedded_test_server()->GetURL("/title1.html");
++  const GURL matched = embedded_test_server()->GetURL("/title2.html");
++  ASSERT_TRUE(ui_test_utils::NavigateToURL(browser(), original));
++  auto* contents = active_web_contents();
++  auto* adapter = browser_view()->GetMyarcWorkspaceAdapter();
++  ASSERT_TRUE(adapter);
++  ASSERT_TRUE(base::test::RunUntil([&] { return adapter->ready(); }));
++  const uint64_t original_space = adapter->Sidebar().current_space.id;
++  const auto other_space =
++      adapter->CreateSpace("Palette global result fixture");
++  ASSERT_TRUE(other_space.ok);
++  ASSERT_TRUE(adapter->SelectSpace(other_space.id).ok);
++  ASSERT_TRUE(adapter->OpenInCurrentSpace(matched).ok);
++  auto* other = active_web_contents();
++  ASSERT_NE(contents, other);
++  ASSERT_TRUE(content::WaitForLoadStop(other));
++  const int count = browser()->GetTabStripModel()->count();
++  ASSERT_TRUE(adapter->SelectSpace(original_space).ok);
++  ASSERT_EQ(contents, adapter->DisplayedContents());
++  ASSERT_TRUE(browser_view()->ShowMyarcCommandPalette(false));
++  Type(base::UTF8ToUTF16(matched.spec()));
++  ASSERT_TRUE(Result(matched));
++  Press(ui::VKEY_DOWN);
++  Press(ui::VKEY_RETURN);
++  EXPECT_EQ(other, active_web_contents());
++  EXPECT_EQ(other, adapter->DisplayedContents());
++  EXPECT_EQ(other_space.id, adapter->Sidebar().current_space.id);
++
++  ASSERT_TRUE(adapter->SelectSpace(original_space).ok);
++  ASSERT_TRUE(browser_view()->ShowMyarcCommandPalette(false));
++  Type(base::UTF8ToUTF16(matched.spec()));
++  auto* row = Result(matched);
++  ASSERT_TRUE(row);
++  views::test::ButtonTestApi(row).NotifyClick(
++      ui::MouseEvent(ui::EventType::kMouseReleased, gfx::Point(), gfx::Point(),
++                     ui::EventTimeForNow(), ui::EF_LEFT_MOUSE_BUTTON,
++                     ui::EF_LEFT_MOUSE_BUTTON));
++  EXPECT_EQ(other, active_web_contents());
++  EXPECT_EQ(other, adapter->DisplayedContents());
++  EXPECT_EQ(other_space.id, adapter->Sidebar().current_space.id);
++  EXPECT_EQ(original, contents->GetLastCommittedURL());
++  EXPECT_EQ(matched, other->GetLastCommittedURL());
++  EXPECT_EQ(count, browser()->GetTabStripModel()->count());
++}
++
++IN_PROC_BROWSER_TEST_F(BrowserViewPaletteIntentTest,
++                       NewIntentKeepsDefaultOpenTabMatch) {
++  ASSERT_TRUE(embedded_test_server()->Start());
++  const GURL original = embedded_test_server()->GetURL("/title1.html");
++  const GURL matched = embedded_test_server()->GetURL("/title2.html");
++  ASSERT_TRUE(ui_test_utils::NavigateToURL(browser(), original));
++  auto* contents = active_web_contents();
++  AddTab(browser(), matched);
++  auto* other = active_web_contents();
++  ASSERT_TRUE(content::WaitForLoadStop(other));
++  browser()->GetTabStripModel()->ActivateTabAt(
++      browser()->GetTabStripModel()->GetIndexOfWebContents(contents));
++  const int count = browser()->GetTabStripModel()->count();
++  ASSERT_TRUE(browser_view()->ShowMyarcCommandPalette(true));
++  Type(base::UTF8ToUTF16(matched.spec()));
++  ASSERT_TRUE(Result(matched));
++  Press(ui::VKEY_RETURN);
++  EXPECT_EQ(other, active_web_contents());
++  EXPECT_EQ(original, contents->GetLastCommittedURL());
++  EXPECT_EQ(matched, other->GetLastCommittedURL());
++  EXPECT_EQ(count, browser()->GetTabStripModel()->count());
++}
++
++IN_PROC_BROWSER_TEST_F(BrowserViewPaletteIntentTest,
++                       LateHistoryDoesNotSelectCurrentButDefaultsNew) {
++  ASSERT_TRUE(embedded_test_server()->Start());
++  ASSERT_TRUE(ui_test_utils::NavigateToURL(
++      browser(), embedded_test_server()->GetURL("/title1.html")));
++  auto* contents = active_web_contents();
++  const GURL literal = embedded_test_server()->GetURL("/title2.html");
++  const GURL history_match =
++      embedded_test_server()->GetURL("/title2.html?history-only");
++  const GURL new_literal = embedded_test_server()->GetURL("/title3.html");
++  const GURL new_history_match =
++      embedded_test_server()->GetURL("/title3.html?history-default");
++  auto* history_service = HistoryServiceFactory::GetForProfile(
++      profile(), ServiceAccessType::EXPLICIT_ACCESS);
++  ASSERT_TRUE(history_service);
++  history_service->AddPage(history_match, base::Time::Now(),
++                           history::SOURCE_BROWSED);
++  history_service->AddPage(new_history_match, base::Time::Now(),
++                           history::SOURCE_BROWSED);
++  const int count = browser()->GetTabStripModel()->count();
++  ASSERT_TRUE(browser_view()->ShowMyarcCommandPalette(false));
++  Type(base::UTF8ToUTF16(literal.spec()));
++  EXPECT_FALSE(Result(history_match));
++  ASSERT_TRUE(base::test::RunUntil([&] { return Result(history_match); }));
++  content::TestNavigationObserver navigation(contents);
++  Press(ui::VKEY_RETURN);
++  navigation.Wait();
++  EXPECT_EQ(contents, active_web_contents());
++  EXPECT_EQ(literal, contents->GetLastCommittedURL());
++  EXPECT_EQ(count, browser()->GetTabStripModel()->count());
++
++  ASSERT_TRUE(browser_view()->ShowMyarcCommandPalette(true));
++  Type(base::UTF8ToUTF16(new_literal.spec()));
++  EXPECT_FALSE(Result(new_history_match));
++  ASSERT_TRUE(base::test::RunUntil([&] { return Result(new_history_match); }));
++  Press(ui::VKEY_RETURN);
++  ASSERT_NE(contents, active_web_contents());
++  ASSERT_TRUE(content::WaitForLoadStop(active_web_contents()));
++  EXPECT_EQ(new_history_match, active_web_contents()->GetLastCommittedURL());
++  EXPECT_EQ(literal, contents->GetLastCommittedURL());
++  EXPECT_EQ(count + 1, browser()->GetTabStripModel()->count());
++}
++
+ IN_PROC_BROWSER_TEST_F(BrowserViewPaletteIntentTest,
+                        EmptySpaceGuardsExistingCurrentIntent) {
+   ASSERT_TRUE(embedded_test_server()->Start());

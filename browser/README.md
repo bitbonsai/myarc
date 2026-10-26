@@ -36,6 +36,8 @@ The executable checks exact-Profile registration, retained metadata and startup/
 
 [Storage retry candidate 0023](experiments/native-storage-retry.md) exposes state-specific Retry loading/saving actions through the existing Profile-owned service. Its unavailable warning scrolls while native tabs remain available. Source checks and the full build pass; native fixtures and desktop acceptance remain UNRUN. Canonical 0001 carries the two SidebarView changes; apply 0023 after the unchanged optional stack through 0022.
 
+[Current-address submission candidate 0024](experiments/native-palette-intent.md#candidate-0024-current-address-literal-submission) follows frozen 0023. Current intent leaves matches unselected until deliberate choice; new intent retains default selection. Full build, real-context syntax and fresh 83-file stack replay pass. Added native fixtures and fresh desktop acceptance remain UNRUN; canonical16 and all prior patch bytes are unchanged.
+
 On every Chromium rebase, compare `PreserveUnknownData` against the producers in `BrowserLiveTabContext` and consumers in `browser_tabrestore`, including private glic/send-tab keys. Cleared known fields must stay absent; unrelated historical keys must survive.
 
 ## Local build recipe

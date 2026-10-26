@@ -78,7 +78,34 @@ The current-address contract requires changed input to navigate that same target
 
 The same0023 build separately passed a clean persisted seed and audited SIGKILL/plain relaunch/genuine Restore with five unchanged strict samples. Pending metadata stayed byte-exact; no storage retry appeared during the recovery hold. This independent [crash regression](../evidence/workspace-process-crash.json) used a fresh profile without the storage-fault experiment. Owned apps/helpers/server closed.
 
-## Remaining parent acceptance
+## Candidate 0024: current-address literal submission
+
+From parent `5f2b76a`, optional [0024-native-current-address-submit.patch](../patches/0024-native-current-address-submit.patch) follows frozen 0023. Two existing automatic-selection sites now require new-tab intent: synchronous open-tab rebuilding and asynchronous history arrival. Current intent retains `selected_ = -1` until deliberate arrow selection; row mouse callbacks still activate directly. Every text edit resets selection through the existing rebuild path.
+
+Plain changed current-address Enter therefore calls the existing `Submit()` path even when rows match. Unchanged current input still reloads. Explicit result activation retains global cross-Space selection/reveal within the native window. New-intent matching, ranking and default selection remain unchanged provisionally. No classifier, controller or Rust policy was added. Empty-Space guarding before reuse, same-widget drafts/focus, history bounds/cancellation, weak ownership, saved destination policy and flags-off/default-OFF behavior are unchanged.
+
+Four added `BrowserViewPaletteIntentTest` fixtures remain **UNRUN**:
+
+- `MatchedCurrentLiteralKeepsSameContents`: an existing open-tab URL is submitted literally to the original WebContents/count; the other page retains its URL/time origin.
+- `ExplicitCurrentResultsRevealOtherSpace`: Down/Enter and a row mouse callback activate a real page in another adapter-created Space, revealing its owner while retaining both URLs/count.
+- `NewIntentKeepsDefaultOpenTabMatch`: plain Enter still activates the matched existing page without adding a tab.
+- `LateHistoryDoesNotSelectCurrentButDefaultsNew`: waits for real asynchronous history rows; current intent submits the typed URL rather than the longer history URL, while new intent still opens its default history destination.
+
+Existing reload, intent/draft, Empty-Space and owner-close fixtures are retained. These use production entrypoints and Views dispatch, not OS keyboard/mouse input. Real-context syntax checks pass for production and fixture sources. Owning `//chrome/browser/ui/views/frame:browser_view` and `:browser_tests` source lists are nonzero and their GN checks pass. Two history dependencies were added only to the existing fixture target; no browser-test graph was built.
+
+Strict indexed incremental reverse/replay passes twice. A fresh full stack from original upstream `8d208f20744ac6d4ce00cc3f9de6a14a9b8b926d` matches all 83 installed files at external HEAD `3e117efa80cec1c4e1e6fbfdf44edeb087a279a5`. Only `browser_view.cc`, `browser_view_browsertest.cc` and frame `BUILD.gn` change; the other 80 files, canonical16, 0001 and every prior optional patch remain byte-identical. The frozen independent0003 residual is empty; existing layout bytes are already in the prior stack. An initial replay-script assertion incorrectly required a nonempty residual; the fresh retry skips it and verifies every installed hash without copying over replay output. Baseline evidence above remains unchanged.
+
+`autoninja -C out/MyarcM0 -j 8 chrome` completed with terminal exit `0`, 03:33:16Z to 03:33:37Z on 2026-10-26. Frozen source hashes match before/after build; the 421,608-byte `browser_view.o` and 165,343,424-byte `libchrome_dll.dylib` are newer than final production source. Exact executable-comm prelink checks found no owned app process; none was killed. Private proof `/tmp/myarc-m0-runtime/mode24/` contains source/build manifests, commands and terminal logs.
+
+0024 SHA-256: `757c67756796d4377021c909aa3b0a81c78784ee2da529a5d98059e061163f33`.
+
+Changed-line Chromium clang-format, GN formatting, lifecycle helper, Rust formatting/clippy/32 tests, canonical foundation-payload freshness, document links and whitespace checks pass. Unchanged native-runtime client, launcher, storyboard and legacy bridge/codec suites reuse prior checks; they were not rerun here. Native browser/interactive suites remain UNRUN.
+
+Native acceptance for 0024 remains with the parent: repeat the actual two-target matched-current submission, then deliberate global result activation and unchanged new-intent behavior. Recheck unchanged-current reload and saved destination retention. The prior 0023 crash regression above does not accept this build. No native app/input/desktop check or server was launched by this implementation task.
+
+## Historical 0022 delegate handoff
+
+The following remaining-acceptance and ownership notes are retained from the 0022 source-only handoff. Later parent acceptance above supersedes its named desktop cases; they are not 0024 build acceptance.
 
 Use a marked disposable profile and exact foreground owned palette. Reproduce native Cmd+T, draft, Cmd+L and verify selected displayed URL; repeat both same-intent shortcuts without losing edits; switch back with Cmd+T and verify no page until submit. Check current-tab reload/edit, Empty-Space hidden-page protection, Escape/immediate reopen and owner-window close. Inspect normal/reduced-motion focus and a real history response across interruption where feasible. Compilation cannot accept these journeys.
 

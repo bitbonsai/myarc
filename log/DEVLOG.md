@@ -1,5 +1,13 @@
 # Development log
 
+## 2026-10-26: Current-address submission build candidate
+
+From `5f2b76a`, [0024](../browser/experiments/native-palette-intent.md#candidate-0024-current-address-literal-submission) gates both automatic row-selection sites on new intent. Current edits use existing unselected state until deliberate arrows/mouse; matching, classifier, global reveal, Rust rules and default-OFF flags stay unchanged. Baseline actual defect evidence is retained byte-exact.
+
+Four added browser fixtures cover matched literal submission to the same WebContents/count, explicit cross-Space activation, unchanged new-intent default and late history selection. All remain UNRUN. Real-context production/fixture syntax, nonzero owning GN checks and full Chrome build pass, terminal exit `0` at 03:33:37Z. Fresh object/dylib hashes and frozen source manifest are retained in `/tmp/myarc-m0-runtime/mode24/`.
+
+Strict fresh indexed full-stack replay from original upstream matches installed83; only three frame files change, preserving the other80, canonical16, 0001 and all earlier patches. The frozen independent layout residual is empty; a script assertion expecting nonempty bytes was corrected before a fresh successful replay. Lifecycle helper, Rust formatting/clippy/32 tests, payload freshness, document links and changed-line formatting pass. No native apps/input/servers or browser-test graph; parent owns fresh same-target/global/new-intent acceptance and final crash smoke. Prior0023 crash acceptance does not accept this build. Source/build ownership returns explicitly at handoff with build terminal.
+
 ## 2026-10-26: Fresh0023 crash regression and literal-address match defect
 
 Fresh marked two-page/two-Space profile, separate from storage fault injection: clean persisted seed and audited SIGKILL/plain relaunch/genuine Restore passed five strict samples. Native Crashed marker observed, pending metadata byte-exact and no storage retry during hold. [Evidence](../browser/evidence/workspace-process-crash.json). Apps/helpers/server closed.
