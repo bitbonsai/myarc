@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-10-27: Nightly pages stuck loading
+
+- Cause: the nightly read Chromium's `Chromium Safe Storage` Keychain item, which the dev build's signature owns. macOS queued a login-password prompt that background launches never showed, the persistent cookie store waited on the key, and every request stopped after `URL_REQUEST_START_JOB` (net-log: no `COOKIE_PERSISTENT_STORE_LOAD` end, no HTTP cache events). The nightly now uses its own `myArc Nightly Safe Storage` item. Committed Chromium `38c468b970`.
+- Packaging: `codesign --force --deep --sign -` loses nothing, because the build output is linker-signed with no entitlements. The deep-signed app ran from `/tmp` and from the mounted DMG with live renderers. The one `aperitif: Failed to initialize sandbox` line came from a run that was quit by PID and never showed up before the kill, so `tools/package_nightly.sh` stays as it is. Incremental build 34 s, packaging 12 s.
+- Verification: the DMG copy (quarantine added, then removed with `xattr -dr`) rendered https://example.com and https://mauriciowolff.com with the sidebar, and its stderr had no sandbox error. Open: every ad-hoc rebuild changes the code hash, so each new nightly asks once for Keychain access to the item the previous one created.
+
 ## 2026-10-27: Pre-alpha nightly build and DMG
 
 - GN `myarc_nightly` plus `branding_file_path = "//myarc/nightly/BRANDING"` builds `myArc.app` with bundle id `dev.myarc.nightly`, profile directory `~/Library/Application Support/myArc Nightly` and the matte icon, and adds the myArc switches, `GlassFrame`, disabled `InitialWebUI` and `--no-first-run` at startup. In myArc mode a new profile now defaults to vertical tabs. `browser/args-nightly.gn` is a static arm64 build with H.264/AAC; `tools/package_nightly.sh` ad-hoc signs it into a DMG outside the repo. Committed Chromium `75dc6484eb` and `3db8054e1f`.
