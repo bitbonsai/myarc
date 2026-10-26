@@ -1,5 +1,5 @@
 diff --git a/chrome/browser/ui/views/frame/browser_view.cc b/chrome/browser/ui/views/frame/browser_view.cc
-index 7b568f6de760af21d6e9d2aa44415a7cef617c51..69c83861b4037359a9d8569f02f11f509b66c03f 100644
+index 7b568f6de760af21d6e9d2aa44415a7cef617c51..5b554596be69af1b5991e5708f9fa09c55db6706 100644
 --- a/chrome/browser/ui/views/frame/browser_view.cc
 +++ b/chrome/browser/ui/views/frame/browser_view.cc
 @@ -22,6 +22,7 @@
@@ -1723,7 +1723,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..69c83861b4037359a9d8569f02f11f50
    TRACE_EVENT0("ui", "BrowserView::UpdateUIForContents");
    bool needs_layout = MaybeShowBookmarkBar(contents);
  
-@@ -5706,6 +7154,23 @@ void BrowserView::LoadAccelerators() {
+@@ -5706,6 +7154,26 @@ void BrowserView::LoadAccelerators() {
    }
  
  #if BUILDFLAG(IS_MAC)
@@ -1737,7 +1737,10 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..69c83861b4037359a9d8569f02f11f50
 +          std::pair{ui::Accelerator(ui::VKEY_S, ui::EF_COMMAND_DOWN),
 +                    IDC_TOGGLE_VERTICAL_TABS_COLLAPSE},
 +          std::pair{ui::Accelerator(ui::VKEY_S, ui::EF_CONTROL_DOWN),
-+                    IDC_TOGGLE_VERTICAL_TABS_COLLAPSE}}) {
++                    IDC_TOGGLE_VERTICAL_TABS_COLLAPSE},
++          std::pair{ui::Accelerator(ui::VKEY_C,
++                                    ui::EF_COMMAND_DOWN | ui::EF_SHIFT_DOWN),
++                    IDC_COPY_URL}}) {
 +      accelerator_table_[accelerator] = command;
 +      focus_manager->RegisterAccelerator(
 +          accelerator, ui::AcceleratorManager::kHighPriority, this);

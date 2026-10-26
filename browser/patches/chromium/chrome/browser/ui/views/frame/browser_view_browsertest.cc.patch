@@ -1,5 +1,5 @@
 diff --git a/chrome/browser/ui/views/frame/browser_view_browsertest.cc b/chrome/browser/ui/views/frame/browser_view_browsertest.cc
-index 33bcd23f7807e7634e7bb251dcc19b63025fa54a..99f6693e53a5658343ef681df01b34517edef564 100644
+index 33bcd23f7807e7634e7bb251dcc19b63025fa54a..c335e8dd89e3dd2aeb792953f19c960efde6a224 100644
 --- a/chrome/browser/ui/views/frame/browser_view_browsertest.cc
 +++ b/chrome/browser/ui/views/frame/browser_view_browsertest.cc
 @@ -6,19 +6,28 @@
@@ -147,7 +147,7 @@ index 33bcd23f7807e7634e7bb251dcc19b63025fa54a..99f6693e53a5658343ef681df01b3451
  #include "ui/views/window/dialog_client_view.h"
  #include "url/url_constants.h"
  
-@@ -382,6 +424,1350 @@ class BrowserViewTest : public InProcessBrowserTest {
+@@ -382,6 +424,1361 @@ class BrowserViewTest : public InProcessBrowserTest {
    raw_ptr<DevToolsWindow> devtools_;
  };
  
@@ -767,6 +767,17 @@ index 33bcd23f7807e7634e7bb251dcc19b63025fa54a..99f6693e53a5658343ef681df01b3451
 +  Hover(true);
 +  PressCopy();
 +  EXPECT_EQ(base::UTF8ToUTF16(first.spec()), ClipboardText());
++}
++
++IN_PROC_BROWSER_TEST_F(BrowserViewUrlPillTest, CopyURLShortcut) {
++  const GURL url =
++      https_server_.GetURL("/title1.html?shortcut=copy%20url#current");
++  ASSERT_TRUE(ui_test_utils::NavigateToURL(browser(), url));
++  const ui::Accelerator accelerator(
++      ui::VKEY_C, ui::EF_COMMAND_DOWN | ui::EF_SHIFT_DOWN);
++  EXPECT_TRUE(browser_view()->IsAcceleratorRegistered(accelerator));
++  EXPECT_TRUE(browser_view()->AcceleratorPressed(accelerator));
++  EXPECT_EQ(base::UTF8ToUTF16(url.spec()), ClipboardText());
 +}
 +
 +IN_PROC_BROWSER_TEST_F(BrowserViewUrlPillTest,

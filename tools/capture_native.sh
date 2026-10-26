@@ -10,7 +10,7 @@ set -euo pipefail
 BASE="$(cd "$(dirname "$0")/.." && pwd)/research-private/captures"
 APP="$HOME/.cache/myarc-m0/chromium/src/out/MyarcM0/Chromium.app"
 BIN="$APP/Contents/MacOS/Chromium"
-W=${W:-1440}; H=${H:-900}; URL=${URL:-about:blank}; SETTLE=${SETTLE:-3}
+W=${W:-1440}; H=${H:-900}; URL=${URL:-about:blank}; SETTLE=${SETTLE:-5}
 KEYS=${KEYS:-}; KEY_SETTLE=${KEY_SETTLE:-2}
 
 if [ "${1:-}" = "--inner" ]; then

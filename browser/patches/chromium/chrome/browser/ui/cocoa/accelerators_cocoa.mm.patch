@@ -1,5 +1,5 @@
 diff --git a/chrome/browser/ui/cocoa/accelerators_cocoa.mm b/chrome/browser/ui/cocoa/accelerators_cocoa.mm
-index 7182077016dc6e932a039a6f0fd75f939dca50a9..490f5325270e7143762e70b36f381bc413b08def 100644
+index 7182077016dc6e932a039a6f0fd75f939dca50a9..f68f95abcfafcd8e439d9b498801e555617ed1ca 100644
 --- a/chrome/browser/ui/cocoa/accelerators_cocoa.mm
 +++ b/chrome/browser/ui/cocoa/accelerators_cocoa.mm
 @@ -10,6 +10,7 @@
@@ -10,7 +10,7 @@ index 7182077016dc6e932a039a6f0fd75f939dca50a9..490f5325270e7143762e70b36f381bc4
  #include "base/i18n/rtl.h"
  #include "base/mac/mac_util.h"
  #include "base/memory/singleton.h"
-@@ -145,6 +146,13 @@ AcceleratorsCocoa::AcceleratorsCocoa() {
+@@ -145,6 +146,15 @@ AcceleratorsCocoa::AcceleratorsCocoa() {
      CHECK(result.second, base::NotFatalUntil::M162);
    }
  
@@ -18,6 +18,8 @@ index 7182077016dc6e932a039a6f0fd75f939dca50a9..490f5325270e7143762e70b36f381bc4
 +          "myarc-visual-parity")) {
 +    accelerators_[IDC_TOGGLE_VERTICAL_TABS_COLLAPSE] =
 +        ui::Accelerator(ui::VKEY_S, ui::EF_COMMAND_DOWN);
++    accelerators_[IDC_COPY_URL] = ui::Accelerator(
++        ui::VKEY_C, ui::EF_COMMAND_DOWN | ui::EF_SHIFT_DOWN);
 +    accelerators_.erase(IDC_SAVE_PAGE);
 +  }
 +
