@@ -91,6 +91,7 @@ def limitations(release):
     codecs = (release or DEFAULTS)['proprietary_codecs']
     return ['Built from a Chromium 158 development revision, not a stable release.',
             'No automatic updates and no security updates. Install each new nightly by hand.',
+            'After you install a newer nightly, macOS asks once for your login password so it can read the saved-data key. Choose Always Allow.',
             'The app is ad-hoc signed and not notarized by Apple.',
             'Recent tabs and navigation can be lost after a crash or force quit.',
             'Private window, Profile, cookie and credential guarantees are not verified.',
