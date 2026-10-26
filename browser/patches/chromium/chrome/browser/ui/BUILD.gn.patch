@@ -1,5 +1,5 @@
 diff --git a/chrome/browser/ui/BUILD.gn b/chrome/browser/ui/BUILD.gn
-index 0772e0c6b5cd4c0577f9d89ee0820fc7fc8d7c5f..66181f32ed7fcc14b6d88e97cf5f29e604cf02f8 100644
+index 0772e0c6b5cd4c0577f9d89ee0820fc7fc8d7c5f..2c98ede4c81d6983b809e1a1283620fbf3664384 100644
 --- a/chrome/browser/ui/BUILD.gn
 +++ b/chrome/browser/ui/BUILD.gn
 @@ -516,6 +516,7 @@ if (!is_android) {
@@ -26,7 +26,16 @@ index 0772e0c6b5cd4c0577f9d89ee0820fc7fc8d7c5f..66181f32ed7fcc14b6d88e97cf5f29e6
        "//chrome/browser/ui/browser_window",
        "//chrome/browser/ui/customize_chrome",
        "//chrome/browser/ui/dialogs",
-@@ -915,6 +918,7 @@ if (!is_android) {
+@@ -776,6 +779,8 @@ if (!is_android) {
+       "//content/public/browser",
+       "//content/public/common",
+       "//extensions/buildflags",
++      "//myarc:browser_workspace_adapter",
++      "//myarc:command_ids",
+       "//printing/buildflags",
+       "//ui/actions",
+       "//ui/base",
+@@ -915,6 +920,7 @@ if (!is_android) {
        "//chrome/browser/ui/qrcode_generator",
        "//chrome/browser/ui/safety_hub",
        "//chrome/browser/ui/search",
@@ -34,7 +43,7 @@ index 0772e0c6b5cd4c0577f9d89ee0820fc7fc8d7c5f..66181f32ed7fcc14b6d88e97cf5f29e6
        "//chrome/browser/ui/send_tab_to_self",
        "//chrome/browser/ui/sharing_hub",
        "//chrome/browser/ui/side_panel",
-@@ -975,6 +979,7 @@ if (!is_android) {
+@@ -975,6 +981,7 @@ if (!is_android) {
        "//content/public/browser",
        "//content/public/common",
        "//extensions/buildflags",
@@ -42,7 +51,7 @@ index 0772e0c6b5cd4c0577f9d89ee0820fc7fc8d7c5f..66181f32ed7fcc14b6d88e97cf5f29e6
        "//pdf:features",
        "//printing/buildflags",
        "//ui/actions",
-@@ -1834,6 +1839,7 @@ if (!is_android) {
+@@ -1834,6 +1841,7 @@ if (!is_android) {
        "//chrome/browser/resource_coordinator:utils",
        "//chrome/browser/search:test_support",
        "//chrome/browser/tab_group_sync:factories",
@@ -50,7 +59,7 @@ index 0772e0c6b5cd4c0577f9d89ee0820fc7fc8d7c5f..66181f32ed7fcc14b6d88e97cf5f29e6
        "//chrome/browser/ui/actions:actions_util",
        "//chrome/browser/ui/browser_active_state_manager",
        "//chrome/browser/ui/browser_ui_controller",
-@@ -1842,11 +1848,13 @@ if (!is_android) {
+@@ -1842,11 +1850,13 @@ if (!is_android) {
        "//chrome/browser/ui/dialogs:browser_dialogs",
        "//chrome/browser/ui/exclusive_access",
        "//chrome/browser/ui/fullscreen",
@@ -64,7 +73,7 @@ index 0772e0c6b5cd4c0577f9d89ee0820fc7fc8d7c5f..66181f32ed7fcc14b6d88e97cf5f29e6
        "//chrome/browser/ui/views/frame:browser_view_header",
        "//chrome/browser/ui/webui/management",
        "//chrome/browser/ui/window_feature_controller",
-@@ -1861,6 +1869,7 @@ if (!is_android) {
+@@ -1861,6 +1871,7 @@ if (!is_android) {
        "//components/bookmarks/test",
        "//components/breadcrumbs/core",
        "//components/breadcrumbs/core:status",
@@ -72,15 +81,16 @@ index 0772e0c6b5cd4c0577f9d89ee0820fc7fc8d7c5f..66181f32ed7fcc14b6d88e97cf5f29e6
        "//components/commerce/core:pref_names",
        "//components/embedder_support",
        "//components/javascript_dialogs",
-@@ -1872,6 +1881,7 @@ if (!is_android) {
+@@ -1872,6 +1883,8 @@ if (!is_android) {
        "//content/public/browser",
        "//content/public/common",
        "//content/test:test_support",
 +      "//myarc:browser_workspace_adapter",
++      "//myarc:command_ids",
        "//net:test_support",
        "//testing/gmock",
        "//testing/gtest",
-@@ -1879,6 +1889,14 @@ if (!is_android) {
+@@ -1879,6 +1892,14 @@ if (!is_android) {
        "//third_party/fuzztest",
        "//ui/native_window_tracker",
      ]

@@ -1,0 +1,19 @@
+#ifndef MYARC_COMMAND_IDS_H_
+#define MYARC_COMMAND_IDS_H_
+
+// myArc-only browser commands, kept out of chrome_command_ids.h so adding one
+// does not rebuild every includer. The range is unused upstream.
+#define IDC_MYARC_TOGGLE_PIN 35400
+#define IDC_MYARC_SELECT_SPACE_0 35401
+#define IDC_MYARC_SELECT_SPACE_1 35402
+#define IDC_MYARC_SELECT_SPACE_2 35403
+#define IDC_MYARC_SELECT_SPACE_3 35404
+#define IDC_MYARC_SELECT_SPACE_4 35405
+#define IDC_MYARC_SELECT_SPACE_5 35406
+#define IDC_MYARC_SELECT_SPACE_6 35407
+#define IDC_MYARC_SELECT_SPACE_7 35408
+#define IDC_MYARC_SELECT_LAST_SPACE 35409
+#define IDC_MYARC_SELECT_NEXT_SPACE 35410
+#define IDC_MYARC_SELECT_PREVIOUS_SPACE 35411
+
+#endif  // MYARC_COMMAND_IDS_H_

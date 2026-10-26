@@ -1,5 +1,5 @@
 diff --git a/chrome/browser/ui/cocoa/accelerators_cocoa.mm b/chrome/browser/ui/cocoa/accelerators_cocoa.mm
-index 7182077016dc6e932a039a6f0fd75f939dca50a9..f68f95abcfafcd8e439d9b498801e555617ed1ca 100644
+index 7182077016dc6e932a039a6f0fd75f939dca50a9..747dcedb9be7bc404533877fadfa664474c90029 100644
 --- a/chrome/browser/ui/cocoa/accelerators_cocoa.mm
 +++ b/chrome/browser/ui/cocoa/accelerators_cocoa.mm
 @@ -10,6 +10,7 @@
@@ -10,7 +10,7 @@ index 7182077016dc6e932a039a6f0fd75f939dca50a9..f68f95abcfafcd8e439d9b498801e555
  #include "base/i18n/rtl.h"
  #include "base/mac/mac_util.h"
  #include "base/memory/singleton.h"
-@@ -145,6 +146,15 @@ AcceleratorsCocoa::AcceleratorsCocoa() {
+@@ -145,6 +146,20 @@ AcceleratorsCocoa::AcceleratorsCocoa() {
      CHECK(result.second, base::NotFatalUntil::M162);
    }
  
@@ -21,6 +21,11 @@ index 7182077016dc6e932a039a6f0fd75f939dca50a9..f68f95abcfafcd8e439d9b498801e555
 +    accelerators_[IDC_COPY_URL] = ui::Accelerator(
 +        ui::VKEY_C, ui::EF_COMMAND_DOWN | ui::EF_SHIFT_DOWN);
 +    accelerators_.erase(IDC_SAVE_PAGE);
++    // Cmd+D pins the current tab through a hidden workspace shortcut.
++    if (base::CommandLine::ForCurrentProcess()->HasSwitch(
++            "myarc-workspace-sidebar")) {
++      accelerators_.erase(IDC_BOOKMARK_THIS_TAB);
++    }
 +  }
 +
    accelerators_[IDC_CLOSE_WINDOW] = AcceleratorForCloseWindow();

@@ -16,7 +16,7 @@ This is a checklist for dispatching one small task per line, not a parity claim.
 
 The ordered dispatch list, [Next 15](#next-15), is at the end.
 
-Feature lines: 159 total, 23 done, 30 partial, 106 missing. Shortcut table: 44 rows, 6 done, 13 partial, 25 missing.
+Feature lines: 159 total, 25 done, 35 partial, 99 missing. Shortcut table: 44 rows, 10 done, 15 partial, 19 missing.
 
 ## Window & sidebar
 
@@ -50,7 +50,7 @@ Feature lines: 159 total, 23 done, 30 partial, 106 missing. Shortcut table: 44 r
 - [ ] Create a Space from the footer plus button. | status: done | evidence: browser/experiments/native-sidebar-row-footer.md (real Create Space dialog) | source: https://resources.arc.net/hc/en-us/articles/19228064149143-Spaces-Distinct-Browsing-Areas
 - [ ] Switch Space by clicking its icon at the bottom of the sidebar. | status: done | evidence: browser/experiments/native-sidebar-row-footer.md, crates/workspace/src/lib.rs select_space | source: https://resources.arc.net/hc/en-us/articles/19228064149143-Spaces-Distinct-Browsing-Areas
 - [ ] Switch Space with a two-finger horizontal swipe over the sidebar, with an icon transition animation. | status: missing | evidence: none | source: https://resources.arc.net/hc/en-us/articles/19228064149143-Spaces-Distinct-Browsing-Areas
-- [ ] Switch Space with Control+1..9 and with Option-Cmd-Left/Right. | status: missing | evidence: none | source: https://resources.arc.net/hc/en-us/articles/20595231349911-Keyboard-Shortcuts
+- [ ] Switch Space with Control+1..9 and with Option-Cmd-Left/Right. | status: done | evidence: browser_command_controller_browsertest.cc MyarcWorkspaceCommandSafetyTest.{PinShortcut,SpaceShortcuts,ItemShortcuts}*, global_keyboard_shortcuts_mac_unittest.mm, log/DEVLOG.md 2026-10-26 "Pin, Space and sidebar item shortcuts" (steps wrap; Arc wrap behavior unverified) | source: https://resources.arc.net/hc/en-us/articles/20595231349911-Keyboard-Shortcuts
 - [ ] Switch Space by typing its name in the command bar. | status: missing | evidence: none (palette lists tabs only, browser/experiments/native-command-palette.md) | source: https://resources.arc.net/hc/en-us/articles/19228064149143-Spaces-Distinct-Browsing-Areas
 - [ ] Mouse buttons 3 and 4 cycle Spaces. | status: missing | evidence: none | source: https://resources.arc.net/hc/en-us/articles/20498417809815-Arc-for-macOS-2022-Release-Notes
 - [ ] Rename a Space inline from its heading. | status: done | evidence: browser/foundation/sidebar_view.cc (heading button), crates/workspace/src/lib.rs rename_space | source: https://resources.arc.net/hc/en-us/articles/19228064149143-Spaces-Distinct-Browsing-Areas
@@ -77,7 +77,7 @@ Feature lines: 159 total, 23 done, 30 partial, 106 missing. Shortcut table: 44 r
 - [ ] Favoriting can be undone by dragging the tile back or Move To a section. | status: done | evidence: browser/foundation/sidebar_view.cc context menu "Remove from Profile Favorites" / "Move to Space Pins" | source: https://resources.arc.net/hc/en-us/articles/19230755904151-Favorites-Top-Tabs-Across-Every-Space
 - [ ] Favorites can be empty, with no placeholder tiles. | status: partial | evidence: crates/workspace/src/lib.rs (Favorites optional in the model); no placeholder tiles seen in captures, not asserted | source: https://resources.arc.net/hc/en-us/articles/20498377604887-Arc-for-macOS-2023-Release-Notes
 - [ ] Pinned tabs live above the divider, are per Space, can sit in folders, and never auto archive. | status: partial | evidence: crates/workspace/src/lib.rs Placement::Pin, browser/experiments/native-sidebar-row-footer.md; folders and archive missing | source: https://resources.arc.net/hc/en-us/articles/19231060187159-Pinned-Tabs-Tabs-you-want-to-stick-around
-- [ ] Pin or unpin the current tab with Cmd+D. | status: missing | evidence: none (stock Cmd+D bookmarks) | source: https://resources.arc.net/hc/en-us/articles/20595231349911-Keyboard-Shortcuts
+- [ ] Pin or unpin the current tab with Cmd+D. | status: done | evidence: browser_command_controller_browsertest.cc MyarcWorkspaceCommandSafetyTest.{PinShortcut,SpaceShortcuts,ItemShortcuts}*, global_keyboard_shortcuts_mac_unittest.mm, log/DEVLOG.md 2026-10-26 "Pin, Space and sidebar item shortcuts" (a selected Favorite is left unchanged) | source: https://resources.arc.net/hc/en-us/articles/20595231349911-Keyboard-Shortcuts
 - [ ] Pin through the context menu or by dragging above the divider. | status: partial | evidence: browser/foundation/sidebar_view.cc context menu "Pin to Space"; drag-to-pin unverified | source: https://resources.arc.net/hc/en-us/articles/19231060187159-Pinned-Tabs-Tabs-you-want-to-stick-around
 - [ ] Clicking a pinned tab icon resets it to the pinned URL; a slash after its name marks a page that differs from the pin. | status: missing | evidence: none (canonical_url stored and never updated by navigation per crates/workspace/src/lib.rs; reset gesture is open in BC-003) | source: https://resources.arc.net/hc/en-us/articles/25625148480279-Why-is-There-a-Slash-Next-to-My-Pinned-Tab-s-Name
 - [ ] Reset Tab is also a command-bar action and can get a custom shortcut. | status: missing | evidence: none | source: https://resources.arc.net/hc/en-us/articles/19231060187159-Pinned-Tabs-Tabs-you-want-to-stick-around
@@ -223,17 +223,17 @@ From the public shortcuts article ([source](https://resources.arc.net/hc/en-us/a
 | Cmd+Option+N | Open Little Arc | missing | none |
 | Ctrl+Cmd+N | Blank window (from Arc Shortcuts settings; not in public docs) | done | browser/experiments/native-blank-window-shortcut.md |
 | Cmd+Shift+T | Reopen last closed tab | done | browser/experiments/native-late-window-restore.md |
-| Cmd+D | Pin / unpin current tab | missing | none (stock bookmarks) |
+| Cmd+D | Pin / unpin current tab | done | MyarcWorkspaceCommandSafetyTest.PinShortcutTogglesSpacePin; Bookmark This Tab loses Cmd+D in myArc mode |
 | Cmd+Shift+C | Copy current tab URL | done | browser/experiments/native-copy-url-shortcut.md |
 | Cmd+Option+Shift+C | Copy current tab URL as Markdown | missing | none |
 | Cmd+L | Change current tab URL | done | browser/experiments/native-interactions.md |
 | Cmd+S | Show / hide sidebar | done | browser/experiments/native-interactions.md |
 | Cmd+Shift+K | Clear unpinned tabs | partial | crates/workspace/src/tab_ops.rs clear_unpinned (rule only, BC-007) |
-| Cmd+1 ... Cmd+8 | Go to sidebar item N (Cmd+9 last or ninth; option to leave Favorites out) | partial | stock tab-index shortcut; sidebar order not verified |
-| Ctrl+1 ... Ctrl+9 | Focus Space N | missing | none |
+| Cmd+1 ... Cmd+8 | Go to sidebar item N (Cmd+9 last or ninth; option to leave Favorites out) | partial | MyarcWorkspaceCommandSafetyTest.ItemShortcutsFollowSidebarOrder (Favorites, Pins, then unpinned; Cmd+9 last); ninth-tab and Favorites-exclusion settings missing |
+| Ctrl+1 ... Ctrl+9 | Focus Space N | done | MyarcWorkspaceCommandSafetyTest.SpaceShortcutsFollowFooterOrder (Ctrl+9 last) |
 | Ctrl+Tab | Toggle between five most recent tabs | partial | crates/workspace/src/tab_ops.rs RecentTabs (rule only, BC-008; stock still cycles tab order) |
-| Option+Cmd+Up / Down | Previous / next tab in sidebar order | missing | none |
-| Option+Cmd+Left / Right | Previous / next Space | missing | none (stock binds these to tab switching) |
+| Option+Cmd+Up / Down | Previous / next tab in sidebar order | done | MyarcWorkspaceCommandSafetyTest.ItemShortcutsFollowSidebarOrder (wraps; replaces stock pane focus) |
+| Option+Cmd+Left / Right | Previous / next Space | done | MyarcWorkspaceCommandSafetyTest.SpaceShortcutsFollowFooterOrder (wraps; replaces stock tab switching) |
 | Cmd+[ or Cmd+Left | Back (public table lists back and forward with swapped arrow labels; standard directions assumed) | partial | stock |
 | Cmd+] or Cmd+Right | Forward | partial | stock |
 | Ctrl+Shift++ | Add Split View | missing | none |

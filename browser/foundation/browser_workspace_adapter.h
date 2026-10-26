@@ -102,6 +102,17 @@ class BrowserWorkspaceAdapter final : public TabStripModelObserver {
   foundation::MutationResult Unsave(uint64_t item);
   foundation::MutationResult MoveItemBefore(uint64_t item, uint64_t before);
 
+  // Keyboard commands over Rust's sidebar order: Favorites, Pins, then
+  // temporary items, and Spaces in footer order. Index -1 means the last row;
+  // an index past the end does nothing. Steps wrap around.
+  static BrowserWorkspaceAdapter* ForBrowser(BrowserWindowInterface& browser);
+  // Pins the selected temporary item or unpins the selected Space Pin.
+  foundation::MutationResult TogglePin();
+  foundation::MutationResult SelectSpaceAt(int index);
+  foundation::MutationResult StepSpace(int delta);
+  foundation::MutationResult ActivateSidebarItemAt(int index);
+  foundation::MutationResult StepSidebarItem(int delta);
+
  private:
   friend class WorkspaceLifecycleBridge;
   static foundation::MutationResult ReconcileBindings(Profile& profile);
@@ -119,6 +130,7 @@ class BrowserWorkspaceAdapter final : public TabStripModelObserver {
   void OnServiceChanged();
   void Refresh();
   foundation::MutationResult Remember(foundation::MutationResult result);
+  foundation::MutationResult StepOrSelectItem(int index, int delta);
   void OnTabStripModelChanged(
       TabStripModel* model,
       const TabStripModelChange& change,

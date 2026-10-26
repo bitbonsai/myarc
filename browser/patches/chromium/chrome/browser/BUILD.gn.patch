@@ -1,0 +1,20 @@
+diff --git a/chrome/browser/BUILD.gn b/chrome/browser/BUILD.gn
+index 1075a4d691e2f861adc1e4f1abac7e689bd12867..b73f65c36b6e80c54fa8f56fb3e28d5d6b1d0a47 100644
+--- a/chrome/browser/BUILD.gn
++++ b/chrome/browser/BUILD.gn
+@@ -1855,6 +1855,7 @@ source_set("core") {
+       "//services/video_capture/public/mojom:constants",
+       "//third_party/crashpad/crashpad/client",
+     ]
++    deps += [ "//myarc:command_ids" ]
+ 
+     frameworks = [
+       "Accelerate.framework",
+@@ -5146,6 +5147,7 @@ source_set("core_unit_tests") {
+       "//chrome/browser/profiles:profile",
+       "//chrome/common:channel_info",
+       "//components/version_info:channel",
++      "//myarc:command_ids",
+     ]
+   }
+ 

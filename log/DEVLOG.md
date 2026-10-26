@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-10-26: Pin, Space and sidebar item shortcuts
+
+- With `--myarc-visual-parity` and `--myarc-workspace-sidebar`, Cmd+D pins or unpins the current tab, Ctrl+1..9 and Option+Cmd+Left/Right select Spaces, and Cmd+1..9 plus Option+Cmd+Up/Down follow sidebar order (Favorites, Pins, unpinned; 9 is last). The adapter reads order from Rust `sidebar_snapshot`; new command IDs live in `myarc/command_ids.h` so `chrome_command_ids.h` stays untouched. Committed Chromium `634ce5fc20`.
+- Verification: `GlobalKeyboardShortcuts.*` 5/5 in stock and myArc modes; browser tests 9/9 (`MyarcWorkspaceCommandSafetyTest.{PinShortcut,SpaceShortcuts,ItemShortcuts}*` legacy and actions, `AcceleratorsCocoaBrowserTest.*`, `MyarcAcceleratorsCocoaBrowserTest.*`); background capture launches with the sidebar drawn. Keystrokes were not sent. Seven older `MyarcWorkspaceCommandSafetyTest` cases fail with or without this change.
+- Open: steps wrap, and Arc's wrap behavior is unverified. Cmd+D leaves a Favorite unchanged. Option+Cmd+Up/Down replaces stock pane focus, and Bookmark This Tab loses Cmd+D. Also added the committed `archive`, `peek` and `tab_ops` modules to the GN `workspace` sources, which the native build needed.
+
 ## 2026-10-26: Pure Clear Unpinned and recent-tab rules
 
 - Added `crates/workspace/src/tab_ops.rs`: `clear_unpinned` lists the Temporary items of a Space to close, skipping media, and says what stays selected; `RecentTabs` keeps a bounded per-window MRU list with `touch`, `remove` and `cycle` over the five most recent. Contracts BC-007 and BC-008; backlog lines for Cmd+Shift+K and Ctrl+Tab are now partial.

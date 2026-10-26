@@ -1254,6 +1254,115 @@ foundation::MutationResult BrowserWorkspaceAdapter::MoveItemBefore(
                           : Fail(error()));
 }
 
+BrowserWorkspaceAdapter* BrowserWorkspaceAdapter::ForBrowser(
+    BrowserWindowInterface& browser) {
+  // Never create Profile runtime state for windows without myArc adapters.
+  auto* runtime = static_cast<Runtime*>(
+      browser.GetProfile()->GetUserData(&kRuntimeKey));
+  if (!runtime)
+    return nullptr;
+  for (const auto& adapter : runtime->adapters) {
+    if (adapter->browser_ == &browser)
+      return adapter;
+  }
+  return nullptr;
+}
+
+foundation::MutationResult BrowserWorkspaceAdapter::TogglePin() {
+  const auto sidebar = Sidebar();
+  if (!sidebar.ok)
+    return Fail(std::string(sidebar.error));
+  const uint64_t item = sidebar.selected_item_id;
+  const auto contains = [item](const auto& rows) {
+    return item && std::ranges::any_of(
+                       rows, [item](const auto& row) { return row.id == item; });
+  };
+  if (contains(sidebar.temporary))
+    return Pin(item);
+  if (contains(sidebar.pins))
+    return Unsave(item);
+  return Remember(Fail(contains(sidebar.favorites)
+                           ? "Favorites stay saved. Use Remove from Profile "
+                             "Favorites to unpin."
+                           : "Select a page in this Space to pin it."));
+}
+
+namespace {
+
+// Resolves a keyboard index or step against `count` rows. Returns -1 when
+// there is nothing to select.
+int ResolveRow(int count, int current, int index, int delta) {
+  if (count == 0)
+    return -1;
+  if (delta == 0)
+    return index < 0 ? count - 1 : (index < count ? index : -1);
+  if (current < 0)
+    return delta > 0 ? 0 : count - 1;
+  return ((current + delta) % count + count) % count;
+}
+
+}  // namespace
+
+foundation::MutationResult BrowserWorkspaceAdapter::SelectSpaceAt(int index) {
+  const auto sidebar = Sidebar();
+  if (!sidebar.ok)
+    return Fail(std::string(sidebar.error));
+  const int row =
+      ResolveRow(static_cast<int>(sidebar.spaces.size()), -1, index, 0);
+  if (row < 0 || sidebar.spaces[row].id == sidebar.current_space.id)
+    return Ok(sidebar.current_space.id);
+  return SelectSpace(sidebar.spaces[row].id);
+}
+
+foundation::MutationResult BrowserWorkspaceAdapter::StepSpace(int delta) {
+  const auto sidebar = Sidebar();
+  if (!sidebar.ok)
+    return Fail(std::string(sidebar.error));
+  const auto it =
+      std::ranges::find(sidebar.spaces, sidebar.current_space.id,
+                        [](const auto& space) { return space.id; });
+  const int current = it == sidebar.spaces.end()
+                          ? -1
+                          : static_cast<int>(it - sidebar.spaces.begin());
+  const int row =
+      ResolveRow(static_cast<int>(sidebar.spaces.size()), current, 0, delta);
+  if (row < 0 || row == current)
+    return Ok(sidebar.current_space.id);
+  return SelectSpace(sidebar.spaces[row].id);
+}
+
+foundation::MutationResult BrowserWorkspaceAdapter::ActivateSidebarItemAt(
+    int index) {
+  return StepOrSelectItem(index, 0);
+}
+
+foundation::MutationResult BrowserWorkspaceAdapter::StepSidebarItem(
+    int delta) {
+  return StepOrSelectItem(0, delta);
+}
+
+foundation::MutationResult BrowserWorkspaceAdapter::StepOrSelectItem(
+    int index,
+    int delta) {
+  const auto sidebar = Sidebar();
+  if (!sidebar.ok)
+    return Fail(std::string(sidebar.error));
+  std::vector<uint64_t> order;
+  for (const auto* rows : {&sidebar.favorites, &sidebar.pins,
+                           &sidebar.temporary}) {
+    for (const auto& row : *rows)
+      order.push_back(row.id);
+  }
+  const auto it = std::ranges::find(order, sidebar.selected_item_id);
+  const int current =
+      it == order.end() ? -1 : static_cast<int>(it - order.begin());
+  const int row = ResolveRow(static_cast<int>(order.size()), current, index,
+                             delta);
+  if (row < 0 || row == current)
+    return Ok(sidebar.selected_item_id);
+  return ActivateItem(order[row]);
+}
+
 void BrowserWorkspaceAdapter::OnTabStripModelChanged(
     TabStripModel*,
     const TabStripModelChange& change,
