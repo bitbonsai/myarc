@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-10-26: Unsupported AI Mode entrypoint build candidate
+
+- Starting revision `fbdf96e`. Parent native AX found an enabled AI Mode button despite absent built-in enablement/providers. [0021 and run record](../browser/experiments/native-ai-entrypoints-off.md) override Chrome's existing feature/policy eligibility gate only with both prototype switches. Existing Google/non-Google entrypoint and popup/menu callers suppress unsupported controls. Prefs, factory Profile/OTR routing, navigation/search, Rust policy and command guards are untouched.
+- Added four switch-combination browser cases for regular/OTR eligibility, menu omission, native policy fallback and non-Google controls. Real-context clang syntax, actual production/fixture GN checks and full `chrome -j8` terminal build pass. Native browser suites remain unrun. The unchanged lifecycle helper executes successfully; strict 82-file replay preserves all 78 unrelated files, canonical16 and every prior patch artifact.
+- No apps/helpers/servers launched or actual Profiles/OS settings touched. Parent owns integration and native acceptance. Renderer remains off; provider modes and denied background AI traffic remain unimplemented/unproven. External source/build ownership returns at handoff.
+
 ## 2026-10-26: Flag-off native site-storage crash control
 
 Same patched build, fresh marked Profile, both myarc flags absent and no workspace file. Real fixture acknowledgement followed by owned browser SIGKILL after 12.098ms lost the note through plain relaunch/genuine Restore. Another write followed by 7225.205ms retained its note through the same actual recovery journey. One trial per condition, not commit-latency measurement or durability acceptance. [Record](../browser/experiments/native-site-storage-crash-control.md).

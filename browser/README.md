@@ -30,6 +30,8 @@ The executable checks exact-Profile registration, retained metadata and startup/
 
 [Runtime mode bootstrap candidate 0019](experiments/native-workspace-mode-bootstrap.md) initializes opted-in controls when an existing horizontal window switches vertical, returns toolbar ownership on horizontal exit, and retains bindings across further toggles. Warm native switching passed; clean horizontal restore then late activation lost workspace identity. [Late-binding candidate 0020](experiments/native-late-workspace-bindings.md) separates adapter lifetime from sidebar presentation so native restore hints have a consumer. Its full build passes; fresh native acceptance remains pending. Renderer stays default OFF.
 
+[AI Mode entrypoint candidate 0021](experiments/native-ai-entrypoints-off.md) suppresses unsupported native AI Mode controls only when both prototype switches are present. Its shared eligibility gate also omits the associated context-menu toggle. Full build and source checks pass; native acceptance remains pending. This does not implement provider modes or prove AI network/privacy enforcement.
+
 On every Chromium rebase, compare `PreserveUnknownData` against the producers in `BrowserLiveTabContext` and consumers in `browser_tabrestore`, including private glic/send-tab keys. Cleared known fields must stay absent; unrelated historical keys must survive.
 
 ## Local build recipe
