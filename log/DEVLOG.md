@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-10-26: State-specific storage retry build candidate
+
+From `7045dda`, [0023](../browser/experiments/native-storage-retry.md) wires native load/save retry actions to existing exact-Profile service methods through deferred weak dispatch. Unavailable status scrolls above its action while native tabs retain at least half the remaining region. Canonical SidebarView changes only; service/core/schema and recovery holds stay unchanged. Baseline evidence remains untouched.
+
+Full Chrome build exits `0`; four real-context syntax/GN-owner checks, bridge/lifecycle helpers, Rust fmt/clippy/32 tests, payload freshness and document links pass. Strict fresh full-stack replay matches 83 files, preserving 76 unowned files and all earlier optional patches. Three browser fixtures remain UNRUN. No app launches or native input; parent owns fresh fault/explicit-repair/retry acceptance. Private proof `/tmp/myarc-m0-runtime/mode23/` retains hashes and terminal logs. External source/build ownership returns at handoff with no build running.
+
 ## 2026-10-26: Native storage warnings have no retry action
 
 Controlled own-profile metadata-path directory collision retained exact original bytes and triggered a real writer error after Create Space. Native warning reported memory-only changes and requested retry saving; no retry control. Clean relaunch against the same path showed load error/native fallback with mutations unavailable and no retry loading control. [Baseline](../browser/evidence/workspace-storage-retry.json).

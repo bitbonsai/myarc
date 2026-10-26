@@ -37,6 +37,8 @@ class SidebarView final : public views::View,
   METADATA_HEADER(SidebarView, views::View)
 
  public:
+  enum class StorageRetry { kNone, kLoad, kSave };
+
   struct ItemPresentation {
     std::u16string title;
     ui::ImageModel icon;  // Parent supplies a favicon, preferably 16 or 20 DIP.
@@ -62,6 +64,7 @@ class SidebarView final : public views::View,
     virtual void CreateSpace() = 0;
     virtual void RenameSpace(uint64_t space_id) = 0;
     virtual void NewTab() = 0;  // Parent opens its real New Tab/palette flow.
+    virtual void RetryWorkspaceStorage(StorageRetry retry) = 0;
   };
 
   explicit SidebarView(Delegate& delegate);
@@ -71,10 +74,12 @@ class SidebarView final : public views::View,
   // directly from Rust. Call again when model or native title/favicon changes.
   // Optional status explains storage failures without claiming durable success.
   void SetModel(const foundation::SidebarResult& model,
-                const std::u16string& status = {});
-  // Drops stale controls while loading or after a read/snapshot failure. Parent
-  // owns recovery/retry UI; SetModel restores controls once usable.
-  void SetUnavailable(const std::u16string& reason);
+                const std::u16string& status = {},
+                StorageRetry retry = StorageRetry::kNone);
+  // Drops mutation controls while loading or after a read/snapshot failure.
+  // Parent supplies only a retry supported by its current storage state.
+  void SetUnavailable(const std::u16string& reason,
+                      StorageRetry retry = StorageRetry::kNone);
 
  private:
   enum class FocusAction {
@@ -83,7 +88,10 @@ class SidebarView final : public views::View,
     kRename,
     kNewTab,
     kSpaces,
-    kCreate
+    kCreate,
+    kRetryLoad,
+    kRetrySave,
+    kStatus
   };
   struct ItemMenuState {
     bool is_pin;
@@ -98,6 +106,7 @@ class SidebarView final : public views::View,
     std::optional<ItemMenuState> item_menu;
   };
 
+  views::View* AddStorageRetry(views::View& parent, StorageRetry retry);
   void TrackFocus(views::View* view,
                   FocusAction action,
                   uint64_t id = 0,

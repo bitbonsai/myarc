@@ -234,8 +234,24 @@ std::unique_ptr<views::View> SidebarView::MakeItem(
   return row;
 }
 
-void SidebarView::SetUnavailable(const std::u16string& reason) {
+views::View* SidebarView::AddStorageRetry(views::View& parent,
+                                          StorageRetry retry) {
+  auto button =
+      Button(base::BindRepeating(&Delegate::RetryWorkspaceStorage,
+                                 base::Unretained(&delegate_.get()), retry),
+             retry == StorageRetry::kLoad ? u"Retry loading" : u"Retry saving");
+  TrackFocus(button.get(), retry == StorageRetry::kLoad
+                               ? FocusAction::kRetryLoad
+                               : FocusAction::kRetrySave);
+  return parent.AddChildView(std::move(button));
+}
+
+void SidebarView::SetUnavailable(const std::u16string& reason,
+                                 StorageRetry retry) {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
+  const bool restore_focus = std::ranges::any_of(
+      focus_targets_,
+      [](const FocusTarget& target) { return target.view->HasFocus(); });
   menu_item_id_ = 0;
   if (menu_runner_) {
     menu_runner_->Cancel();
@@ -244,11 +260,29 @@ void SidebarView::SetUnavailable(const std::u16string& reason) {
   spaces_scroll_ = nullptr;
   current_space_id_ = 0;
   RemoveAllChildViews();
-  AddStatus(*this, reason.empty() ? u"Workspace unavailable" : reason);
+  auto* scroll = AddChildView(std::make_unique<views::ScrollView>());
+  scroll->ClipHeightTo(0, std::numeric_limits<int>::max());
+  scroll->SetHorizontalScrollBarMode(
+      views::ScrollView::ScrollBarMode::kDisabled);
+  scroll->SetBackgroundColor(std::nullopt);
+  scroll->SetDrawOverflowIndicator(false);
+  scroll->SetFocusBehavior(FocusBehavior::ALWAYS);
+  scroll->GetViewAccessibility().SetName(u"Workspace status");
+  TrackFocus(scroll, FocusAction::kStatus);
+  static_cast<views::BoxLayout*>(GetLayoutManager())->SetFlexForView(scroll, 1);
+  auto* body = scroll->SetContents(Box(Orientation::kVertical, 4));
+  AddStatus(*body, reason.empty() ? u"Workspace unavailable" : reason);
+  // Keep the action visible while a long error scrolls independently.
+  auto* focus =
+      retry == StorageRetry::kLoad ? AddStorageRetry(*this, retry) : scroll;
+  if (restore_focus) {
+    focus->RequestFocus();
+  }
 }
 
 void SidebarView::SetModel(const foundation::SidebarResult& model,
-                           const std::u16string& status) {
+                           const std::u16string& status,
+                           StorageRetry retry) {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
   if (!model.ok) {
     SetUnavailable(u"Workspace unavailable: " +
@@ -265,9 +299,8 @@ void SidebarView::SetModel(const foundation::SidebarResult& model,
   }
   gfx::PointF offset;
   if (!children().empty()) {
-    // A usable model always has its ScrollView first; unavailable state has
-    // no focus targets and contains only a status label.
-    if (!focus_targets_.empty()) {
+    // A usable model always has its ScrollView first.
+    if (current_space_id_) {
       offset =
           static_cast<views::ScrollView*>(children().front())->CurrentOffset();
     }
@@ -290,6 +323,9 @@ void SidebarView::SetModel(const foundation::SidebarResult& model,
   scroll->SetDrawOverflowIndicator(false);
   static_cast<views::BoxLayout*>(GetLayoutManager())->SetFlexForView(scroll, 1);
   auto* body = scroll->SetContents(Box(Orientation::kVertical, 4));
+  if (retry == StorageRetry::kSave) {
+    AddStorageRetry(*body, retry);
+  }
   if (!status.empty()) {
     AddStatus(*body, status);
   }

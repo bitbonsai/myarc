@@ -34,6 +34,8 @@ The executable checks exact-Profile registration, retained metadata and startup/
 
 [Palette intent candidate 0022](experiments/native-palette-intent.md) reuses the live palette for shortcut intent changes, preserves same-intent drafts and applies the empty-Space guard before reuse. Source checks and the full build pass; native fixtures and desktop acceptance remain UNRUN.
 
+[Storage retry candidate 0023](experiments/native-storage-retry.md) exposes state-specific Retry loading/saving actions through the existing Profile-owned service. Its unavailable warning scrolls while native tabs remain available. Source checks and the full build pass; native fixtures and desktop acceptance remain UNRUN. Canonical 0001 carries the two SidebarView changes; apply 0023 after the unchanged optional stack through 0022.
+
 On every Chromium rebase, compare `PreserveUnknownData` against the producers in `BrowserLiveTabContext` and consumers in `browser_tabrestore`, including private glic/send-tab keys. Cleared known fields must stay absent; unrelated historical keys must survive.
 
 ## Local build recipe

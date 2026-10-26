@@ -1,0 +1,387 @@
+diff --git a/chrome/browser/ui/views/frame/BUILD.gn b/chrome/browser/ui/views/frame/BUILD.gn
+index 00662ea..a14cd20 100644
+--- a/chrome/browser/ui/views/frame/BUILD.gn
++++ b/chrome/browser/ui/views/frame/BUILD.gn
+@@ -2279,6 +2279,7 @@ source_set("browser_tests") {
+     "//chrome/browser/ui/actions:actions_util",
+     "//chrome/browser/ui/browser_web_contents_delegate",
+     "//chrome/browser/ui/find_bar",
++    "//chrome/browser/ui/tabs",
+     "//chrome/browser/ui/views:tab_modal_confirm_dialog_views",
+     "//chrome/browser/ui/views/accessibility:dump_accessibility_events_views_browsertest_base",
+     "//chrome/browser/ui/views/animations",
+diff --git a/chrome/browser/ui/views/frame/browser_view.cc b/chrome/browser/ui/views/frame/browser_view.cc
+index 74ea531..c1a6abc 100644
+--- a/chrome/browser/ui/views/frame/browser_view.cc
++++ b/chrome/browser/ui/views/frame/browser_view.cc
+@@ -6022,14 +6022,20 @@ void BrowserView::RefreshMyarcWorkspaceSidebar() {
+       }
+     }
+   }
++  using Storage = myarc::WorkspaceService::StorageState;
++  using Retry = myarc::SidebarView::StorageRetry;
++  auto& service = myarc_workspace_adapter_->service();
+   vertical_tab_strip_region_view_->SetMyarcWorkspaceReady(ready);
+   if (!ready) {
+-    myarc_workspace_sidebar_->SetUnavailable(
++    const std::u16string reason =
+         u"Workspace unavailable. Native tabs remain available. " +
+-        base::UTF8ToUTF16(myarc_workspace_adapter_->error()));
++        base::UTF8ToUTF16(service.storage_state() == Storage::kLoadError
++                              ? service.storage_error()
++                              : myarc_workspace_adapter_->error());
++    myarc_workspace_sidebar_->SetUnavailable(
++        reason, service.storage_state() == Storage::kLoadError ? Retry::kLoad
++                                                               : Retry::kNone);
+   } else {
+-    using Storage = myarc::WorkspaceService::StorageState;
+-    auto& service = myarc_workspace_adapter_->service();
+     std::u16string status = myarc_workspace_action_error_;
+     const auto append = [&status](const std::u16string& message) {
+       if (!message.empty()) {
+@@ -6061,7 +6067,10 @@ void BrowserView::RefreshMyarcWorkspaceSidebar() {
+         // A completed atomic write is not an OS-crash durability guarantee.
+         break;
+     }
+-    myarc_workspace_sidebar_->SetModel(model, status);
++    myarc_workspace_sidebar_->SetModel(
++        model, status,
++        service.storage_state() == Storage::kWriteError ? Retry::kSave
++                                                        : Retry::kNone);
+   }
+   UpdateMyarcWorkspaceCanvas();
+ }
+@@ -6097,6 +6106,33 @@ void BrowserView::MyarcWorkspaceResult(
+                                 myarc_workspace_weak_factory_.GetWeakPtr()));
+ }
+ 
++void BrowserView::RetryWorkspaceStorage(
++    myarc::SidebarView::StorageRetry retry) {
++  // Let the pressed button unwind before service notifications rebuild rows.
++  base::SingleThreadTaskRunner::GetCurrentDefault()->PostTask(
++      FROM_HERE,
++      base::BindOnce(
++          [](base::WeakPtr<BrowserView> view,
++             myarc::SidebarView::StorageRetry retry) {
++            if (!view || !view->myarc_workspace_adapter_ ||
++                !view->myarc_workspace_sidebar_) {
++              return;
++            }
++            auto& adapter = *view->myarc_workspace_adapter_;
++            auto& service = adapter.service();
++            using Storage = myarc::WorkspaceService::StorageState;
++            using Retry = myarc::SidebarView::StorageRetry;
++            if (retry == Retry::kLoad &&
++                service.storage_state() == Storage::kLoadError) {
++              service.RetryLoad();
++            } else if (retry == Retry::kSave && adapter.ready() &&
++                       service.storage_state() == Storage::kWriteError) {
++              service.RetrySave();
++            }
++          },
++          myarc_workspace_weak_factory_.GetWeakPtr(), retry));
++}
++
+ void BrowserView::ActivateItem(uint64_t item) {
+   MyarcWorkspaceResult(myarc_workspace_adapter_->ActivateItem(item));
+ }
+diff --git a/chrome/browser/ui/views/frame/browser_view.h b/chrome/browser/ui/views/frame/browser_view.h
+index 24366bd..b509e72 100644
+--- a/chrome/browser/ui/views/frame/browser_view.h
++++ b/chrome/browser/ui/views/frame/browser_view.h
+@@ -1293,6 +1293,7 @@ class BrowserView : public BrowserWindow,
+   void CreateSpace() override;
+   void RenameSpace(uint64_t space) override;
+   void NewTab() override;
++  void RetryWorkspaceStorage(myarc::SidebarView::StorageRetry retry) override;
+   void MyarcWorkspaceResult(myarc::foundation::MutationResult result);
+   void UpdateMyarcWorkspaceCanvas();
+   void UpdateMyarcTabStripMode();
+diff --git a/chrome/browser/ui/views/frame/browser_view_browsertest.cc b/chrome/browser/ui/views/frame/browser_view_browsertest.cc
+index 784cba2..531a208 100644
+--- a/chrome/browser/ui/views/frame/browser_view_browsertest.cc
++++ b/chrome/browser/ui/views/frame/browser_view_browsertest.cc
+@@ -11,16 +11,20 @@
+ #include "base/callback_list.h"
+ #include "base/command_line.h"
+ #include "base/feature_list.h"
++#include "base/files/file_util.h"
+ #include "base/functional/bind.h"
+ #include "base/memory/raw_ptr.h"
+ #include "base/memory/scoped_refptr.h"
+ #include "base/numerics/safe_conversions.h"
++#include "base/path_service.h"
+ #include "base/run_loop.h"
+ #include "base/strings/strcat.h"
+ #include "base/strings/utf_string_conversions.h"
++#include "base/test/bind.h"
+ #include "base/test/metrics/histogram_tester.h"
+ #include "base/test/run_until.h"
+ #include "base/test/values_test_util.h"
++#include "base/threading/thread_restrictions.h"
+ #include "base/time/time.h"
+ #include "build/branding_buildflags.h"
+ #include "build/build_config.h"
+@@ -61,6 +65,7 @@
+ #include "chrome/browser/ui/tabs/tab_data.h"
+ #include "chrome/browser/ui/tabs/tab_strip_model.h"
+ #include "chrome/browser/ui/tabs/tab_strip_user_gesture_details.h"
++#include "chrome/browser/ui/tabs/vertical_tab_strip_state_controller.h"
+ #include "chrome/browser/ui/test/test_browser_ui.h"
+ #include "chrome/browser/ui/ui_features.h"
+ #include "chrome/browser/ui/views/bookmarks/bookmark_bar_view.h"
+@@ -87,7 +92,9 @@
+ #include "chrome/browser/ui/views/toolbar/app_menu_control.h"
+ #include "chrome/browser/ui/views/toolbar/toolbar_view.h"
+ #include "chrome/browser/ui/window_metadata/window_metadata_controller.h"
++#include "chrome/common/chrome_constants.h"
+ #include "chrome/common/chrome_features.h"
++#include "chrome/common/chrome_paths.h"
+ #include "chrome/common/pref_names.h"
+ #include "chrome/common/url_constants.h"
+ #include "chrome/grit/branded_strings.h"
+@@ -166,6 +173,7 @@
+ #include "ui/views/controls/textfield/textfield.h"
+ #include "ui/views/controls/webview/webview.h"
+ #include "ui/views/focus/focus_manager.h"
++#include "ui/views/test/button_test_api.h"
+ #include "ui/views/test/views_test_utils.h"
+ #include "ui/views/test/widget_activation_waiter.h"
+ #include "ui/views/view_class_properties.h"
+@@ -396,6 +404,220 @@ class BrowserViewTest : public InProcessBrowserTest {
+   raw_ptr<DevToolsWindow> devtools_;
+ };
+ 
++class BrowserViewStorageRetryTest : public BrowserViewTest {
++ protected:
++  using Storage = myarc::WorkspaceService::StorageState;
++
++  void SetUpCommandLine(base::CommandLine* command_line) override {
++    BrowserViewTest::SetUpCommandLine(command_line);
++    command_line->AppendSwitch("myarc-visual-parity");
++    command_line->AppendSwitch("myarc-workspace-sidebar");
++  }
++
++  void SetUpOnMainThread() override {
++    BrowserViewTest::SetUpOnMainThread();
++    tabs::VerticalTabStripStateController::From(browser())
++        ->SetVerticalTabsEnabled(true);
++    RunScheduledLayouts();
++  }
++
++  myarc::WorkspaceService& service() {
++    return browser_view()->GetMyarcWorkspaceAdapter()->service();
++  }
++
++  views::MdTextButton* FindButton(views::View* root,
++                                  const std::u16string& name) {
++    if (auto* button = views::AsViewClass<views::MdTextButton>(root);
++        button && button->GetViewAccessibility().GetCachedName() == name) {
++      return button;
++    }
++    for (const auto& child : root->children()) {
++      if (auto* button = FindButton(child, name)) {
++        return button;
++      }
++    }
++    return nullptr;
++  }
++
++  views::MdTextButton* Button(const std::u16string& name) {
++    return FindButton(browser_view(), name);
++  }
++
++  void ExpectNoRetry() {
++    browser_view()->RefreshMyarcWorkspaceSidebar();
++    EXPECT_FALSE(Button(u"Retry loading"));
++    EXPECT_FALSE(Button(u"Retry saving"));
++  }
++
++  void PressRetry(const std::u16string& name) {
++    auto* button = Button(name);
++    ASSERT_TRUE(button);
++    EXPECT_EQ(views::View::FocusBehavior::ALWAYS, button->GetFocusBehavior());
++    button->RequestFocus();
++    EXPECT_TRUE(button->HasFocus());
++    views::test::ButtonTestApi(button).NotifyClick(
++        ui::KeyEvent(ui::EventType::kKeyPressed, ui::VKEY_SPACE, ui::EF_NONE));
++  }
++
++  base::FilePath metadata_path() {
++    return profile()->GetPath().AppendASCII("myarc-workspace-v1.json");
++  }
++};
++
++class BrowserViewStorageLoadRetryTest : public BrowserViewStorageRetryTest {
++ protected:
++  bool SetUpUserDataDirectory() override {
++    if (!BrowserViewStorageRetryTest::SetUpUserDataDirectory()) {
++      return false;
++    }
++    base::FilePath user_data;
++    if (!base::PathService::Get(chrome::DIR_USER_DATA, &user_data)) {
++      return false;
++    }
++    const auto path = user_data.AppendASCII(chrome::kInitialProfile)
++                          .AppendASCII("myarc-workspace-v1.json");
++    return base::CreateDirectory(path.DirName()) &&
++           base::WriteFile(path, "invalid synthetic workspace input");
++  }
++};
++
++IN_PROC_BROWSER_TEST_F(BrowserViewStorageLoadRetryTest,
++                       RetryPreservesBadInputThenLoadsRepairedFile) {
++  ASSERT_TRUE(base::test::RunUntil(
++      [&] { return service().storage_state() == Storage::kLoadError; }));
++  browser_view()->RefreshMyarcWorkspaceSidebar();
++  ASSERT_TRUE(Button(u"Retry loading"));
++  EXPECT_FALSE(Button(u"Retry saving"));
++  EXPECT_FALSE(Button(u"Create Space"));
++  EXPECT_FALSE(service().CreateSpace("Blocked").ok);
++  const int native_tabs = browser()->GetTabStripModel()->count();
++  auto* page = active_web_contents();
++  const GURL url = page->GetLastCommittedURL();
++  bool saw_loading = false;
++  auto subscription = service().Subscribe(base::BindLambdaForTesting([&] {
++    if (service().storage_state() == Storage::kLoading) {
++      saw_loading = true;
++      ExpectNoRetry();
++    }
++  }));
++  PressRetry(u"Retry loading");
++  ASSERT_TRUE(base::test::RunUntil([&] {
++    return saw_loading && service().storage_state() == Storage::kLoadError;
++  }));
++  {
++    base::ScopedAllowBlockingForTesting allow_io;
++    std::string bytes;
++    ASSERT_TRUE(base::ReadFileToString(metadata_path(), &bytes));
++    EXPECT_EQ("invalid synthetic workspace input", bytes);
++    // Fixture repair uses a real core-produced snapshot; UI never edits input.
++    auto workspace = myarc::foundation::new_workspace();
++    auto repaired = myarc::internal::EncodeWorkspaceMetadata(
++        myarc::foundation::export_snapshot(*workspace));
++    ASSERT_TRUE(repaired);
++    ASSERT_TRUE(base::WriteFile(metadata_path(), *repaired));
++  }
++  browser_view()->RefreshMyarcWorkspaceSidebar();
++  saw_loading = false;
++  PressRetry(u"Retry loading");
++  ASSERT_TRUE(base::test::RunUntil([&] {
++    return saw_loading && browser_view()->GetMyarcWorkspaceAdapter()->ready();
++  }));
++  ExpectNoRetry();
++  EXPECT_TRUE(service().storage_error().empty());
++  EXPECT_EQ(native_tabs, browser()->GetTabStripModel()->count());
++  EXPECT_EQ(page, active_web_contents());
++  EXPECT_EQ(url, page->GetLastCommittedURL());
++}
++
++IN_PROC_BROWSER_TEST_F(BrowserViewStorageRetryTest,
++                       RetrySavingRetainsMemoryAndUsesActualWriter) {
++  ASSERT_TRUE(base::test::RunUntil([&] {
++    return browser_view()->GetMyarcWorkspaceAdapter()->ready() &&
++           service().storage_state() == Storage::kWritten;
++  }));
++  ExpectNoRetry();
++  const auto backup = metadata_path().AddExtensionASCII("fixture-backup");
++  std::string original;
++  {
++    base::ScopedAllowBlockingForTesting allow_io;
++    ASSERT_TRUE(base::ReadFileToString(metadata_path(), &original));
++    ASSERT_TRUE(base::Move(metadata_path(), backup));
++    ASSERT_TRUE(base::CreateDirectory(metadata_path()));
++  }
++  ASSERT_TRUE(service().CreateSpace("Memory-only retry Space").ok);
++  ASSERT_TRUE(base::test::RunUntil(
++      [&] { return service().storage_state() == Storage::kWriteError; }));
++  auto snapshot = service().ExportSnapshot();
++  ASSERT_TRUE(snapshot);
++  auto expected = myarc::internal::EncodeWorkspaceMetadata(*snapshot);
++  ASSERT_TRUE(expected);
++  browser_view()->RefreshMyarcWorkspaceSidebar();
++  ASSERT_TRUE(Button(u"Retry saving"));
++  EXPECT_FALSE(Button(u"Retry loading"));
++  bool saw_pending = false;
++  auto subscription = service().Subscribe(base::BindLambdaForTesting([&] {
++    if (service().storage_state() == Storage::kWritePending) {
++      saw_pending = true;
++      ExpectNoRetry();
++    }
++  }));
++  PressRetry(u"Retry saving");
++  ASSERT_TRUE(base::test::RunUntil([&] {
++    return saw_pending && service().storage_state() == Storage::kWriteError;
++  }));
++  snapshot = service().ExportSnapshot();
++  ASSERT_TRUE(snapshot);
++  EXPECT_EQ(expected, myarc::internal::EncodeWorkspaceMetadata(*snapshot));
++  {
++    base::ScopedAllowBlockingForTesting allow_io;
++    EXPECT_TRUE(base::DirectoryExists(metadata_path()));
++    std::string bytes;
++    ASSERT_TRUE(base::ReadFileToString(backup, &bytes));
++    EXPECT_EQ(original, bytes);
++    ASSERT_TRUE(base::DeleteFile(metadata_path()));  // Empty fixture directory.
++    ASSERT_TRUE(base::Move(backup, metadata_path()));
++  }
++  browser_view()->RefreshMyarcWorkspaceSidebar();
++  saw_pending = false;
++  PressRetry(u"Retry saving");
++  ASSERT_TRUE(base::test::RunUntil([&] {
++    return saw_pending && service().storage_state() == Storage::kWritten;
++  }));
++  ExpectNoRetry();
++  EXPECT_TRUE(service().storage_error().empty());
++  {
++    base::ScopedAllowBlockingForTesting allow_io;
++    std::string bytes;
++    ASSERT_TRUE(base::ReadFileToString(metadata_path(), &bytes));
++    EXPECT_EQ(*expected, bytes);
++  }
++}
++
++IN_PROC_BROWSER_TEST_F(BrowserViewStorageRetryTest,
++                       RestoreHoldAndPrivateWorkspaceHaveNoRetry) {
++  ASSERT_TRUE(base::test::RunUntil(
++      [&] { return browser_view()->GetMyarcWorkspaceAdapter()->ready(); }));
++  ExpectNoRetry();
++  myarc::BrowserWorkspaceAdapter::BeginSessionRestore(*profile());
++  ExpectNoRetry();
++  EXPECT_FALSE(Button(u"Create Space"));
++  ASSERT_TRUE(
++      myarc::BrowserWorkspaceAdapter::FinishSessionRestore(*profile()).ok);
++  auto* private_browser = CreateIncognitoBrowser(profile());
++  auto* private_view = BrowserView::GetBrowserViewForBrowser(private_browser);
++  tabs::VerticalTabStripStateController::From(private_browser)
++      ->SetVerticalTabsEnabled(true);
++  ASSERT_TRUE(base::test::RunUntil(
++      [&] { return private_view->GetMyarcWorkspaceAdapter()->ready(); }));
++  EXPECT_EQ(
++      Storage::kEphemeral,
++      private_view->GetMyarcWorkspaceAdapter()->service().storage_state());
++  private_view->RefreshMyarcWorkspaceSidebar();
++  EXPECT_FALSE(FindButton(private_view, u"Retry loading"));
++  EXPECT_FALSE(FindButton(private_view, u"Retry saving"));
++  CloseBrowserSynchronously(private_browser);
++}
++
+ class BrowserViewPaletteIntentTest : public BrowserViewTest {
+  protected:
+   void SetUpCommandLine(base::CommandLine* command_line) override {
+diff --git a/chrome/browser/ui/views/frame/vertical_tab_strip_region_view.cc b/chrome/browser/ui/views/frame/vertical_tab_strip_region_view.cc
+index e6a6525..cb6923c 100644
+--- a/chrome/browser/ui/views/frame/vertical_tab_strip_region_view.cc
++++ b/chrome/browser/ui/views/frame/vertical_tab_strip_region_view.cc
+@@ -543,9 +543,8 @@ views::ProposedLayout VerticalTabStripRegionView::CalculateProposedLayout(
+   if (myarc_workspace_sidebar_) {
+     gfx::Rect sidebar_bounds = available;
+     if (!myarc_workspace_ready_) {
+-      // Leave native tabs usable while metadata or native session binding
+-      // waits.
+-      const int status_height = std::min(96, available.height() / 3);
++      // Leave at least half for native tabs. Status text scrolls above retry.
++      const int status_height = std::min(192, available.height() / 2);
+       sidebar_bounds.set_y(available.bottom() - status_height);
+       sidebar_bounds.set_height(status_height);
+       available.set_height(available.height() - status_height);

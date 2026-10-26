@@ -2585,10 +2585,10 @@ index 0000000..82fdbf3bd5bb0f34e94dd9b9ebced7442e5aed45
 +#endif  // MYARC_NATIVE_BUTTON_H_
 diff --git a/myarc/sidebar_view.cc b/myarc/sidebar_view.cc
 new file mode 100644
-index 0000000..fd3aad4f789025345f8b6ab585132329a82c489d
+index 0000000..ddbf390e9ca61ae64b48f63584a7a2d41b051007
 --- /dev/null
 +++ b/myarc/sidebar_view.cc
-@@ -0,0 +1,454 @@
+@@ -0,0 +1,490 @@
 +#include "myarc/sidebar_view.h"
 +
 +#include <algorithm>
@@ -2825,8 +2825,24 @@ index 0000000..fd3aad4f789025345f8b6ab585132329a82c489d
 +  return row;
 +}
 +
-+void SidebarView::SetUnavailable(const std::u16string& reason) {
++views::View* SidebarView::AddStorageRetry(views::View& parent,
++                                          StorageRetry retry) {
++  auto button =
++      Button(base::BindRepeating(&Delegate::RetryWorkspaceStorage,
++                                 base::Unretained(&delegate_.get()), retry),
++             retry == StorageRetry::kLoad ? u"Retry loading" : u"Retry saving");
++  TrackFocus(button.get(), retry == StorageRetry::kLoad
++                               ? FocusAction::kRetryLoad
++                               : FocusAction::kRetrySave);
++  return parent.AddChildView(std::move(button));
++}
++
++void SidebarView::SetUnavailable(const std::u16string& reason,
++                                 StorageRetry retry) {
 +  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
++  const bool restore_focus = std::ranges::any_of(
++      focus_targets_,
++      [](const FocusTarget& target) { return target.view->HasFocus(); });
 +  menu_item_id_ = 0;
 +  if (menu_runner_) {
 +    menu_runner_->Cancel();
@@ -2835,11 +2851,29 @@ index 0000000..fd3aad4f789025345f8b6ab585132329a82c489d
 +  spaces_scroll_ = nullptr;
 +  current_space_id_ = 0;
 +  RemoveAllChildViews();
-+  AddStatus(*this, reason.empty() ? u"Workspace unavailable" : reason);
++  auto* scroll = AddChildView(std::make_unique<views::ScrollView>());
++  scroll->ClipHeightTo(0, std::numeric_limits<int>::max());
++  scroll->SetHorizontalScrollBarMode(
++      views::ScrollView::ScrollBarMode::kDisabled);
++  scroll->SetBackgroundColor(std::nullopt);
++  scroll->SetDrawOverflowIndicator(false);
++  scroll->SetFocusBehavior(FocusBehavior::ALWAYS);
++  scroll->GetViewAccessibility().SetName(u"Workspace status");
++  TrackFocus(scroll, FocusAction::kStatus);
++  static_cast<views::BoxLayout*>(GetLayoutManager())->SetFlexForView(scroll, 1);
++  auto* body = scroll->SetContents(Box(Orientation::kVertical, 4));
++  AddStatus(*body, reason.empty() ? u"Workspace unavailable" : reason);
++  // Keep the action visible while a long error scrolls independently.
++  auto* focus =
++      retry == StorageRetry::kLoad ? AddStorageRetry(*this, retry) : scroll;
++  if (restore_focus) {
++    focus->RequestFocus();
++  }
 +}
 +
 +void SidebarView::SetModel(const foundation::SidebarResult& model,
-+                           const std::u16string& status) {
++                           const std::u16string& status,
++                           StorageRetry retry) {
 +  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
 +  if (!model.ok) {
 +    SetUnavailable(u"Workspace unavailable: " +
@@ -2856,9 +2890,8 @@ index 0000000..fd3aad4f789025345f8b6ab585132329a82c489d
 +  }
 +  gfx::PointF offset;
 +  if (!children().empty()) {
-+    // A usable model always has its ScrollView first; unavailable state has
-+    // no focus targets and contains only a status label.
-+    if (!focus_targets_.empty()) {
++    // A usable model always has its ScrollView first.
++    if (current_space_id_) {
 +      offset =
 +          static_cast<views::ScrollView*>(children().front())->CurrentOffset();
 +    }
@@ -2881,6 +2914,9 @@ index 0000000..fd3aad4f789025345f8b6ab585132329a82c489d
 +  scroll->SetDrawOverflowIndicator(false);
 +  static_cast<views::BoxLayout*>(GetLayoutManager())->SetFlexForView(scroll, 1);
 +  auto* body = scroll->SetContents(Box(Orientation::kVertical, 4));
++  if (retry == StorageRetry::kSave) {
++    AddStorageRetry(*body, retry);
++  }
 +  if (!status.empty()) {
 +    AddStatus(*body, status);
 +  }
@@ -3045,10 +3081,10 @@ index 0000000..fd3aad4f789025345f8b6ab585132329a82c489d
 +}  // namespace myarc
 diff --git a/myarc/sidebar_view.h b/myarc/sidebar_view.h
 new file mode 100644
-index 0000000..04b57aeeafe3404d0e3237c40041618ffeeecb18
+index 0000000..0e84724d354de9b4e2a3415d5998c2b47e33d4e3
 --- /dev/null
 +++ b/myarc/sidebar_view.h
-@@ -0,0 +1,130 @@
+@@ -0,0 +1,139 @@
 +#ifndef MYARC_SIDEBAR_VIEW_H_
 +#define MYARC_SIDEBAR_VIEW_H_
 +
@@ -3088,6 +3124,8 @@ index 0000000..04b57aeeafe3404d0e3237c40041618ffeeecb18
 +  METADATA_HEADER(SidebarView, views::View)
 +
 + public:
++  enum class StorageRetry { kNone, kLoad, kSave };
++
 +  struct ItemPresentation {
 +    std::u16string title;
 +    ui::ImageModel icon;  // Parent supplies a favicon, preferably 16 or 20 DIP.
@@ -3113,6 +3151,7 @@ index 0000000..04b57aeeafe3404d0e3237c40041618ffeeecb18
 +    virtual void CreateSpace() = 0;
 +    virtual void RenameSpace(uint64_t space_id) = 0;
 +    virtual void NewTab() = 0;  // Parent opens its real New Tab/palette flow.
++    virtual void RetryWorkspaceStorage(StorageRetry retry) = 0;
 +  };
 +
 +  explicit SidebarView(Delegate& delegate);
@@ -3122,10 +3161,12 @@ index 0000000..04b57aeeafe3404d0e3237c40041618ffeeecb18
 +  // directly from Rust. Call again when model or native title/favicon changes.
 +  // Optional status explains storage failures without claiming durable success.
 +  void SetModel(const foundation::SidebarResult& model,
-+                const std::u16string& status = {});
-+  // Drops stale controls while loading or after a read/snapshot failure. Parent
-+  // owns recovery/retry UI; SetModel restores controls once usable.
-+  void SetUnavailable(const std::u16string& reason);
++                const std::u16string& status = {},
++                StorageRetry retry = StorageRetry::kNone);
++  // Drops mutation controls while loading or after a read/snapshot failure.
++  // Parent supplies only a retry supported by its current storage state.
++  void SetUnavailable(const std::u16string& reason,
++                      StorageRetry retry = StorageRetry::kNone);
 +
 + private:
 +  enum class FocusAction {
@@ -3134,7 +3175,10 @@ index 0000000..04b57aeeafe3404d0e3237c40041618ffeeecb18
 +    kRename,
 +    kNewTab,
 +    kSpaces,
-+    kCreate
++    kCreate,
++    kRetryLoad,
++    kRetrySave,
++    kStatus
 +  };
 +  struct ItemMenuState {
 +    bool is_pin;
@@ -3149,6 +3193,7 @@ index 0000000..04b57aeeafe3404d0e3237c40041618ffeeecb18
 +    std::optional<ItemMenuState> item_menu;
 +  };
 +
++  views::View* AddStorageRetry(views::View& parent, StorageRetry retry);
 +  void TrackFocus(views::View* view,
 +                  FocusAction action,
 +                  uint64_t id = 0,
