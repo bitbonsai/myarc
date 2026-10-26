@@ -29,7 +29,7 @@ The lead agent owns the queue and gives each agent one small task: goal, files, 
 - Observe: scripted Arc/native captures. References stay in `research-private/`.
 - Off-Chromium: Rust core, CLI/MCP, site, docs.
 
-Wrap builds and browser launches in `/usr/bin/lockf -k /tmp/myarc-build.lock`. Each task logs 3 lines in [log/DEVLOG.md](log/DEVLOG.md). Update `.plans/INDEX.md` at most daily.
+Wrap builds and browser launches in `/usr/bin/lockf -k /tmp/myarc-build.lock`. Launch the native build only in the background (`open -g`, as in `tools/capture_native.sh`) and capture with `tools/bgcapture.swift`; never run the binary directly or activate it, because windows pop over the user's work. Never `git fetch` in the Chromium checkout. Each task logs 3 lines in [log/DEVLOG.md](log/DEVLOG.md). Update `.plans/INDEX.md` at most daily.
 
 ## Commands
 
