@@ -56,12 +56,27 @@
   },
   "limits": [
     "Bounded observed-disk/persisted-storage scope; fresh site-storage acknowledgement and OS/power-loss durability remain open",
-    "Profile/OTR and flag-off followups on this revision remain pending",
+    "Bounded regular-Profile/OTR and flag-off followups passed; cookies, credentials, Guest/system, all extension combinations and broader lifecycle remain unproven",
     "Native interactive C++ suites, arbitrary overlap/fullscreen and queued-focus shutdown races remain unrun",
     "Native-to-Rust in-memory associations are not directly exposed by the developer probes",
     "Developer tools do not implement P0 product CLI/MCP"
   ],
   "all_owned_apps_helpers_and_fixture_servers_closed": true,
   "workspace_renderer_default_enabled": false,
-  "raw_profiles_canaries_logs_and_recordings": "private, outside Git"
+  "raw_profiles_canaries_logs_and_recordings": "private, outside Git",
+  "profile_private_and_flag_off_followups": {
+    "fresh_native_two_regular_profiles_created_without_account": true,
+    "other_profile_horizontal_core_file_before_sidebar": true,
+    "same_other_native_window_late_enable_worked_without_reopen": true,
+    "separate_files_spaces_favorite_urls_and_same_origin_notes": true,
+    "primary_workspace_byte_identical_through_other_actions": true,
+    "overlapping_numeric_saved_id_1_separated_by_profile": true,
+    "native_private_space_and_storage_separate": true,
+    "private_space_survived_mode_cycle_then_last_private_close_discarded_space_and_note": true,
+    "regular_state_retained": true,
+    "real_cmd_t_cancel_and_cmd_l_same_tab_navigation": true,
+    "flag_off_native_horizontal_vertical_horizontal_without_workspace_ui_or_file": true,
+    "flag_off_url_and_time_origin_retained": true,
+    "all_owned_apps_helpers_and_servers_closed": true
+  }
 }

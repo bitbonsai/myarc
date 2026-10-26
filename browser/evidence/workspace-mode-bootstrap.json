@@ -67,6 +67,7 @@
     "bounded_cold_horizontal_restore_corrected": true,
     "strict_single_clean_and_actual_crash_verifiers_passed": true,
     "strict_two_window_horizontal_restore_passed": true,
-    "profile_otr_flag_off_followups_pending": true
+    "profile_otr_flag_off_followups_pending": false,
+    "bounded_profile_otr_flag_off_followups_passed": true
   }
 }
