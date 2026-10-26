@@ -1,5 +1,13 @@
 # Development log
 
+## 2026-10-26: Palette-local hover-focus build candidate
+
+From `4d23a67`, optional [0025](../browser/experiments/native-palette-hover-focus.md#candidate-0025-palette-local-hover-focus) specializes only palette result state changes, calling LabelButton directly instead of HoverButton's menu-specific focus behavior. Shared control bytes and result focusability stay unchanged. Two added browser fixtures cover hover enter/exit, draft/focus, hovered rebuild plus same-target literal submission, and explicit Tab/Enter/mouse activation; all native browser/interactive fixtures remain UNRUN.
+
+Full Chrome build exits `0` at 04:05:09Z with fresh object/dylib hashes. Real-context production/fixture syntax, owning GN source/dependency checks, changed-line formatting, strict indexed incremental and fresh full-stack replay83 pass. Only two frame files change; other81, canonical16, all earlier patches, independent0003 and baseline evidence remain intact. Rust fmt/clippy/32 tests, bridge/lifecycle helpers, payload freshness and document links pass. Private proof: `/tmp/myarc-m0-runtime/focus25/`.
+
+No native app/input/server or process killing. Parent owns final-build normal/reduced pointer, literal/global/default verification and exact preview. Recent-navigation crash failure remains unchanged; this UI fix claims no session durability repair. Source/build ownership returns explicitly at handoff with no build running.
+
 ## 2026-10-26: Address defaults, hover focus and navigation crash boundary
 
 0024 `e47b824` passed native normal matched-current same-target navigation, explicit global arrow/mouse reveal, unchanged new-intent matching and real history literal/default cases. Reduced matched-current passed; two further rapid reopens stopped on result-row focus with unchanged input. Cmd+L refocused; specific input-focus precondition now stops before typing. [Address evidence](../browser/evidence/native-palette-address.json).

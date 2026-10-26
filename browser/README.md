@@ -38,6 +38,8 @@ The executable checks exact-Profile registration, retained metadata and startup/
 
 [Current-address submission candidate 0024](experiments/native-palette-intent.md#candidate-0024-current-address-literal-submission) follows frozen 0023. Current intent leaves matches unselected until deliberate choice; new intent retains default selection. Full build, real-context syntax and fresh 83-file stack replay pass. Added native fixtures and fresh desktop acceptance remain UNRUN; canonical16 and all prior patch bytes are unchanged.
 
+[Palette hover-focus candidate 0025](experiments/native-palette-hover-focus.md#candidate-0025-palette-local-hover-focus) follows frozen 0024. Palette results retain standard LabelButton state painting without menu-style hover focus changes. Full build, real-context syntax and fresh 83-file stack replay pass; added native fixtures and final-build desktop acceptance remain UNRUN. Shared HoverButton, canonical16, prior patches and baseline evidence are unchanged.
+
 On every Chromium rebase, compare `PreserveUnknownData` against the producers in `BrowserLiveTabContext` and consumers in `browser_tabrestore`, including private glic/send-tab keys. Cleared known fields must stay absent; unrelated historical keys must survive.
 
 ## Local build recipe

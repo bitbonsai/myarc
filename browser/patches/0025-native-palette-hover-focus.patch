@@ -1,0 +1,177 @@
+diff --git a/chrome/browser/ui/views/frame/browser_view.cc b/chrome/browser/ui/views/frame/browser_view.cc
+index 6c880c4..9bce1c9 100644
+--- a/chrome/browser/ui/views/frame/browser_view.cc
++++ b/chrome/browser/ui/views/frame/browser_view.cc
+@@ -683,6 +683,22 @@ bool ConvertedHitTest(views::View* src, views::View* dst, gfx::Point* point) {
+   return dst->HitTestPoint(*point);
+ }
+ 
++class MyarcPaletteResultButton : public HoverButton {
++  METADATA_HEADER(MyarcPaletteResultButton, HoverButton)
++
++ public:
++  using HoverButton::HoverButton;
++
++ protected:
++  void StateChanged(ButtonState old_state) override {
++    // Address results keep explicit focus; menu-style hover must not move it.
++    views::LabelButton::StateChanged(old_state);
++  }
++};
++
++BEGIN_METADATA(MyarcPaletteResultButton)
++END_METADATA
++
+ class MyarcPaletteView : public views::BoxLayoutView,
+                          public views::TextfieldController {
+   METADATA_HEADER(MyarcPaletteView, views::BoxLayoutView)
+@@ -846,11 +862,12 @@ class MyarcPaletteView : public views::BoxLayoutView,
+     action->SetAutoColorReadabilityEnabled(false);
+     actions_.push_back(action.get());
+     params.secondary_view = std::move(action);
+-    auto* button = rows_->AddChildView(std::make_unique<HoverButton>(
+-        base::BindRepeating(&MyarcPaletteView::ActivateResult,
+-                            base::Unretained(this),
+-                            static_cast<int>(buttons_.size())),
+-        std::move(params)));
++    auto* button =
++        rows_->AddChildView(std::make_unique<MyarcPaletteResultButton>(
++            base::BindRepeating(&MyarcPaletteView::ActivateResult,
++                                base::Unretained(this),
++                                static_cast<int>(buttons_.size())),
++            std::move(params)));
+     button->title()->SetSubpixelRenderingEnabled(false);
+     button->title()->SetAutoColorReadabilityEnabled(false);
+     button->title()->SetEnabledColor(ui::kColorSysOnSurface);
+diff --git a/chrome/browser/ui/views/frame/browser_view_browsertest.cc b/chrome/browser/ui/views/frame/browser_view_browsertest.cc
+index e72bbe3..b3cd428 100644
+--- a/chrome/browser/ui/views/frame/browser_view_browsertest.cc
++++ b/chrome/browser/ui/views/frame/browser_view_browsertest.cc
+@@ -792,6 +792,127 @@ IN_PROC_BROWSER_TEST_F(BrowserViewPaletteIntentTest,
+   EXPECT_EQ(count, browser()->GetTabStripModel()->count());
+ }
+ 
++IN_PROC_BROWSER_TEST_F(BrowserViewPaletteIntentTest,
++                       HoverKeepsDraftFocusAndCurrentLiteralTarget) {
++  ASSERT_TRUE(embedded_test_server()->Start());
++  const GURL original = embedded_test_server()->GetURL("/title1.html");
++  const GURL matched = embedded_test_server()->GetURL("/title2.html");
++  ASSERT_TRUE(ui_test_utils::NavigateToURL(browser(), original));
++  auto* contents = active_web_contents();
++  AddTab(browser(), matched);
++  auto* other = active_web_contents();
++  ASSERT_TRUE(content::WaitForLoadStop(other));
++  const auto other_time_origin =
++      content::EvalJs(other, "performance.timeOrigin");
++  ASSERT_TRUE(other_time_origin.is_double());
++  browser()->GetTabStripModel()->ActivateTabAt(
++      browser()->GetTabStripModel()->GetIndexOfWebContents(contents));
++  const int count = browser()->GetTabStripModel()->count();
++  ASSERT_TRUE(browser_view()->ShowMyarcCommandPalette(false));
++  const std::u16string draft = base::UTF8ToUTF16(matched.spec());
++  Type(draft.substr(0, draft.size() - 1));
++  input()->SelectAll(false);
++  auto* row = Result(matched);
++  ASSERT_TRUE(row);
++  auto* focus = palette()->GetWidget()->GetFocusManager();
++  ASSERT_EQ(input(), focus->GetFocusedView());
++  const std::u16string selected(input()->GetSelectedText());
++  const gfx::Point point = row->GetLocalBounds().CenterPoint();
++  row->OnMouseEntered(ui::MouseEvent(ui::EventType::kMouseEntered, point, point,
++                                     ui::EventTimeForNow(), ui::EF_NONE,
++                                     ui::EF_NONE));
++  EXPECT_EQ(views::Button::STATE_HOVERED, row->GetState());
++  EXPECT_EQ(input(), focus->GetFocusedView());
++  EXPECT_EQ(selected, input()->GetText());
++  EXPECT_EQ(selected, input()->GetSelectedText());
++  row->OnMouseExited(ui::MouseEvent(ui::EventType::kMouseExited, point, point,
++                                    ui::EventTimeForNow(), ui::EF_NONE,
++                                    ui::EF_NONE));
++  EXPECT_EQ(views::Button::STATE_NORMAL, row->GetState());
++  EXPECT_EQ(input(), focus->GetFocusedView());
++  EXPECT_EQ(selected, input()->GetSelectedText());
++
++  row->OnMouseEntered(ui::MouseEvent(ui::EventType::kMouseEntered, point, point,
++                                     ui::EventTimeForNow(), ui::EF_NONE,
++                                     ui::EF_NONE));
++  Type(draft);  // Rebuild while the pointer is over the old result.
++  row = Result(matched);
++  ASSERT_TRUE(row);
++  row->OnMouseEntered(ui::MouseEvent(ui::EventType::kMouseEntered, point, point,
++                                     ui::EventTimeForNow(), ui::EF_NONE,
++                                     ui::EF_NONE));
++  EXPECT_EQ(views::Button::STATE_HOVERED, row->GetState());
++  EXPECT_EQ(input(), focus->GetFocusedView());
++  EXPECT_EQ(draft, input()->GetText());
++  content::TestNavigationObserver navigation(contents);
++  Press(ui::VKEY_RETURN);
++  navigation.Wait();
++  EXPECT_EQ(contents, active_web_contents());
++  EXPECT_EQ(matched, contents->GetLastCommittedURL());
++  EXPECT_EQ(matched, other->GetLastCommittedURL());
++  EXPECT_EQ(other_time_origin.ExtractDouble(),
++            content::EvalJs(other, "performance.timeOrigin"));
++  EXPECT_EQ(count, browser()->GetTabStripModel()->count());
++}
++
++IN_PROC_BROWSER_TEST_F(BrowserViewPaletteIntentTest,
++                       HoverRetainsExplicitTabEnterAndMouseActivation) {
++  ASSERT_TRUE(embedded_test_server()->Start());
++  const GURL original = embedded_test_server()->GetURL("/title1.html");
++  const GURL matched = embedded_test_server()->GetURL("/title2.html");
++  ASSERT_TRUE(ui_test_utils::NavigateToURL(browser(), original));
++  auto* contents = active_web_contents();
++  AddTab(browser(), matched);
++  auto* other = active_web_contents();
++  ASSERT_TRUE(content::WaitForLoadStop(other));
++  browser()->GetTabStripModel()->ActivateTabAt(
++      browser()->GetTabStripModel()->GetIndexOfWebContents(contents));
++  const int count = browser()->GetTabStripModel()->count();
++  ASSERT_TRUE(browser_view()->ShowMyarcCommandPalette(false));
++  Type(base::UTF8ToUTF16(matched.spec()));
++  auto* row = Result(matched);
++  ASSERT_TRUE(row);
++  EXPECT_EQ(views::View::FocusBehavior::ALWAYS, row->GetFocusBehavior());
++  auto* focus = palette()->GetWidget()->GetFocusManager();
++  ASSERT_EQ(input(), focus->GetFocusedView());
++  focus->SetKeyboardAccessible(true);
++  focus->AdvanceFocus(false);  // Same traversal used by Tab.
++  ASSERT_EQ(row, focus->GetFocusedView());
++  const gfx::Point point = row->GetLocalBounds().CenterPoint();
++  row->OnMouseEntered(ui::MouseEvent(ui::EventType::kMouseEntered, point, point,
++                                     ui::EventTimeForNow(), ui::EF_NONE,
++                                     ui::EF_NONE));
++  row->OnMouseExited(ui::MouseEvent(ui::EventType::kMouseExited, point, point,
++                                    ui::EventTimeForNow(), ui::EF_NONE,
++                                    ui::EF_NONE));
++  EXPECT_EQ(row, focus->GetFocusedView());
++  EXPECT_TRUE(row->OnKeyPressed(
++      ui::KeyEvent(ui::EventType::kKeyPressed, ui::VKEY_RETURN, ui::EF_NONE)));
++  EXPECT_EQ(other, active_web_contents());
++
++  browser()->GetTabStripModel()->ActivateTabAt(
++      browser()->GetTabStripModel()->GetIndexOfWebContents(contents));
++  ASSERT_TRUE(browser_view()->ShowMyarcCommandPalette(false));
++  Type(base::UTF8ToUTF16(matched.spec()));
++  row = Result(matched);
++  ASSERT_TRUE(row);
++  row->OnMouseEntered(ui::MouseEvent(ui::EventType::kMouseEntered, point, point,
++                                     ui::EventTimeForNow(), ui::EF_NONE,
++                                     ui::EF_NONE));
++  EXPECT_EQ(input(),
++            palette()->GetWidget()->GetFocusManager()->GetFocusedView());
++  ASSERT_TRUE(row->OnMousePressed(ui::MouseEvent(
++      ui::EventType::kMousePressed, point, point, ui::EventTimeForNow(),
++      ui::EF_LEFT_MOUSE_BUTTON, ui::EF_LEFT_MOUSE_BUTTON)));
++  row->OnMouseReleased(ui::MouseEvent(
++      ui::EventType::kMouseReleased, point, point, ui::EventTimeForNow(),
++      ui::EF_LEFT_MOUSE_BUTTON, ui::EF_LEFT_MOUSE_BUTTON));
++  EXPECT_EQ(other, active_web_contents());
++  EXPECT_EQ(original, contents->GetLastCommittedURL());
++  EXPECT_EQ(matched, other->GetLastCommittedURL());
++  EXPECT_EQ(count, browser()->GetTabStripModel()->count());
++}
++
+ IN_PROC_BROWSER_TEST_F(BrowserViewPaletteIntentTest,
+                        ExplicitCurrentResultsRevealOtherSpace) {
+   ASSERT_TRUE(embedded_test_server()->Start());
