@@ -3,7 +3,7 @@
 # Usage: tools/capture_native.sh [out.png]   env: W=1440 H=900 URL=about:blank SETTLE=3
 set -euo pipefail
 
-BASE=/Users/mwolff/.t3/projects/myarc/research-private/captures
+BASE="$(cd "$(dirname "$0")/.." && pwd)/research-private/captures"
 APP="$HOME/.cache/myarc-m0/chromium/src/out/MyarcM0/Chromium.app"
 BIN="$APP/Contents/MacOS/Chromium"
 W=${W:-1440}; H=${H:-900}; URL=${URL:-about:blank}; SETTLE=${SETTLE:-3}
@@ -28,7 +28,7 @@ if [ "${1:-}" = "--inner" ]; then
   printf '%s\n' '{"vertical_tabs":{"enabled":true,"collapsed_state":false,"uncollapsed_width":230,"enabled_first_time":true}}' > "$PROFILE/Default/Preferences"
   "$BIN" --user-data-dir="$PROFILE" --no-first-run --no-default-browser-check \
     --enable-features=GlassFrame --disable-features=InitialWebUI \
-    --myarc-visual-parity --window-size="$W,$H" --window-position=40,60 "$URL" \
+    --myarc-visual-parity --myarc-workspace-sidebar --window-size="$W,$H" --window-position=40,60 "$URL" \
     >/dev/null 2>&1 &
   PID=$!
   WID=""

@@ -3,7 +3,7 @@
 # Usage: tools/capture_arc.sh [out.png]   env: W=1440 H=900 SETTLE=3
 set -euo pipefail
 
-BASE=/Users/mwolff/.t3/projects/myarc/research-private/captures
+BASE="$(cd "$(dirname "$0")/.." && pwd)/research-private/captures"
 W=${W:-1440}; H=${H:-900}; SETTLE=${SETTLE:-3}
 X=40; Y=60
 
