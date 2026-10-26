@@ -1,5 +1,5 @@
 diff --git a/chrome/browser/ui/views/frame/browser_view.cc b/chrome/browser/ui/views/frame/browser_view.cc
-index 7b568f6de760af21d6e9d2aa44415a7cef617c51..5b554596be69af1b5991e5708f9fa09c55db6706 100644
+index 7b568f6de760af21d6e9d2aa44415a7cef617c51..ea19d8bd29aabf6e10a01dbf743ff93acf3bbb23 100644
 --- a/chrome/browser/ui/views/frame/browser_view.cc
 +++ b/chrome/browser/ui/views/frame/browser_view.cc
 @@ -22,6 +22,7 @@
@@ -1122,7 +1122,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..5b554596be69af1b5991e5708f9fa09c
  }
  
  void BrowserView::RemovedFromWidget() {
-@@ -5267,6 +6137,579 @@ const views::View* BrowserView::GetViewByElementId(
+@@ -5267,6 +6137,585 @@ const views::View* BrowserView::GetViewByElementId(
  ///////////////////////////////////////////////////////////////////////////////
  // BrowserView, ui::AcceleratorTarget overrides:
  
@@ -1637,6 +1637,9 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..5b554596be69af1b5991e5708f9fa09c
 +      myarc_command_palette_widget_->IsClosed()) {
 +    OnMyarcCommandPaletteClosed(myarc_command_palette_delegate_.get());
 +  }
++  if (myarc_workspace_sidebar_) {
++    myarc_workspace_sidebar_->SetNewTabIntent(new_tab);
++  }
 +  if (myarc_command_palette_widget_) {
 +    auto* content = static_cast<MyarcPaletteView*>(
 +        myarc_command_palette_delegate_->GetContentsView());
@@ -1688,6 +1691,9 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..5b554596be69af1b5991e5708f9fa09c
 +    return;
 +  }
 +  static_cast<MyarcPaletteView*>(delegate->GetContentsView())->PrepareToClose();
++  if (myarc_workspace_sidebar_) {
++    myarc_workspace_sidebar_->SetNewTabIntent(false);
++  }
 +  delegate->SetAnchorView(nullptr);
 +  if (myarc_command_palette_widget_) {
 +    base::SingleThreadTaskRunner::GetCurrentDefault()->DeleteSoon(
@@ -1702,7 +1708,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..5b554596be69af1b5991e5708f9fa09c
  bool BrowserView::AcceleratorPressed(const ui::Accelerator& accelerator) {
  #if BUILDFLAG(IS_MAC)
    // Forward accelerators to ExclusiveAccessManager to handle Esc press-and-hold
-@@ -5342,7 +6785,8 @@ void BrowserView::LoadingAnimationCallback(base::TimeTicks timestamp) {
+@@ -5342,7 +6791,8 @@ void BrowserView::LoadingAnimationCallback(base::TimeTicks timestamp) {
      // GetActiveWebContents can return null for example under Purify when
      // the animations are running slowly and this function is called on a timer
      // through LoadingAnimationCallback.
@@ -1712,7 +1718,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..5b554596be69af1b5991e5708f9fa09c
    }
  }
  
-@@ -5471,6 +6915,10 @@ bool BrowserView::MaybeUpdateDevtools(content::WebContents* contents) {
+@@ -5471,6 +6921,10 @@ bool BrowserView::MaybeUpdateDevtools(content::WebContents* contents) {
  
  void BrowserView::UpdateUIForContents(WebContents* contents,
                                        bool should_layout_immediately) {
@@ -1723,7 +1729,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..5b554596be69af1b5991e5708f9fa09c
    TRACE_EVENT0("ui", "BrowserView::UpdateUIForContents");
    bool needs_layout = MaybeShowBookmarkBar(contents);
  
-@@ -5706,6 +7154,26 @@ void BrowserView::LoadAccelerators() {
+@@ -5706,6 +7160,26 @@ void BrowserView::LoadAccelerators() {
    }
  
  #if BUILDFLAG(IS_MAC)

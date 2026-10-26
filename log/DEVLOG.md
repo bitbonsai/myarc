@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-10-26: Sidebar tiles and URL field read lighter, like Arc
+
+- Favorite tiles, the URL field and the New Tab row now use translucent white over the window material instead of dark container colors. In dark mode they measure #3A3745 (Arc #3B3A4D), the selected tile #83828B instead of blue #1D4973 (Arc #83848F) and the New Tab row #514F5C (Arc #505060). New Tab fills only while the New Tab palette is open, as in the blog reference; Arc's idle references show it unfilled. Tiles are 46 pt tall with 8 pt gaps, and the Space title sits 41 pt above New Tab. Sidebar icons keep their own colors, so an inactive Mac window no longer greys them.
+- Blog scene, sidebar crop 280×1170 px: pixels differing at 5% fuzz fell from 3.03% to 2.86% (RMSE 0.100 both); top 280×420 px: 7.79% to 7.30%, RMSE 0.158 to 0.157. Whole window: 9.54% to 6.52%, RMSE 0.206 to 0.169, but the baseline capture lost GitHub's favicon, so against the previous entry's 6.56% the window gain is small. A light-mode capture shows white tiles and field on the #E3E1EC sidebar.
+- Still differs: the sidebar renders at 220 pt instead of 200 pt, so tiles sit right of Arc's; the inactive-window palette and footer icons are unchanged. Focus rings were not exercised, since captures stay background-only. Committed Chromium `a40bf3cd5695ea694b0e35d05161403256cb7833`.
+
 ## 2026-10-26: Ctrl+Cmd+N opens a blank window
 
 - Arc's Shortcuts reference labels Ctrl+Cmd+N as “Blank Window”. myArc now routes that secondary macOS shortcut to `IDC_NEW_WINDOW` through delayed command dispatch, leaving Cmd+N and stock Chromium unchanged.

@@ -11,9 +11,12 @@
 #include "base/strings/utf_string_conversions.h"
 #include "components/vector_icons/vector_icons.h"
 #include "myarc/bridge.rs.h"
+#include "third_party/skia/include/core/SkColor.h"
 #include "ui/base/metadata/metadata_impl_macros.h"
 #include "ui/base/mojom/menu_source_type.mojom.h"
 #include "ui/color/color_id.h"
+#include "ui/color/color_provider.h"
+#include "ui/gfx/color_utils.h"
 #include "ui/gfx/geometry/insets.h"
 #include "ui/gfx/geometry/size.h"
 #include "ui/views/accessibility/view_accessibility.h"
@@ -28,11 +31,33 @@
 #include "ui/views/controls/separator.h"
 #include "ui/views/focus/focus_manager.h"
 #include "ui/views/layout/box_layout.h"
+#include "ui/views/style/typography.h"
+#include "ui/views/view_class_properties.h"
 
 namespace myarc {
 namespace {
 
 using Orientation = views::BoxLayout::Orientation;
+
+constexpr int kTileHeight = 46;
+
+struct Fills {
+  SkColor tile;
+  SkColor selected_tile;
+  SkColor new_tab;
+};
+
+// Arc lifts sidebar controls with white over the window material, so they read
+// lighter than the sidebar. Dark values are sampled from Arc's dark sidebar.
+Fills GetFills(const ui::ColorProvider* provider) {
+  const bool dark = !provider || color_utils::IsDark(
+                                     provider->GetColor(ui::kColorSysSurface));
+  return dark ? Fills{SkColorSetA(SK_ColorWHITE, 0x18),
+                      SkColorSetA(SK_ColorWHITE, 0x6F),
+                      SkColorSetA(SK_ColorWHITE, 0x33)}
+              : Fills{SkColorSetA(SK_ColorWHITE, 0x80), SK_ColorWHITE,
+                      SkColorSetA(SK_ColorWHITE, 0xB3)};
+}
 
 enum ItemCommand {
   kPin = 1,
@@ -137,8 +162,11 @@ std::unique_ptr<views::View> Box(Orientation orientation, int spacing) {
 std::unique_ptr<views::MdTextButton> Button(
     views::Button::PressedCallback callback,
     const std::u16string& text) {
-  auto button =
-      std::make_unique<views::MdTextButton>(std::move(callback), text);
+  // Icons keep their explicit colors. Retinting them with the text color bakes
+  // in the disabled color whenever colors update in an inactive Mac window.
+  auto button = std::make_unique<views::MdTextButton>(
+      std::move(callback), text, views::style::CONTEXT_BUTTON_MD,
+      /*use_text_color_for_icon=*/false);
   button->SetStyle(ui::ButtonStyle::kText);
   button->SetTextSubpixelRenderingEnabled(false);
   // Preserve the parent's material; this API is the available transparent fill.
@@ -412,8 +440,7 @@ std::unique_ptr<views::View> SidebarView::MakeItem(
         item.has_url ? base::UTF8ToUTF16(std::string(item.canonical_url))
                      : u"Untitled tab";
   }
-  const auto foreground = selected && tile ? ui::kColorSysOnSecondaryContainer
-                                           : ui::kColorSysOnSurface;
+  const auto foreground = ui::kColorSysOnSurface;
   auto activate =
       Button(base::BindRepeating(&Delegate::ActivateItem,
                                  base::Unretained(&delegate_.get()), item.id),
@@ -431,9 +458,7 @@ std::unique_ptr<views::View> SidebarView::MakeItem(
   activate->GetViewAccessibility().SetIsSelected(selected);
   activate->SetEnabledTextColors(foreground);
   if (tile) {
-    activate->SetBgColorOverrideDeprecated(std::nullopt);
-    activate->SetBgColorIdOverride(selected ? ui::kColorSysSecondaryContainer
-                                            : ui::kColorSysSurfaceContainer);
+    tiles_.emplace_back(activate.get(), selected);
   }
   const ItemMenuState menu_state = {
       item.placement == foundation::PlacementKind::Pin,
@@ -443,8 +468,8 @@ std::unique_ptr<views::View> SidebarView::MakeItem(
   if (tile) {
     activate->SetHorizontalAlignment(gfx::ALIGN_CENTER);
     activate->SetImageCentered(true);
-    activate->SetMinSize(gfx::Size(0, 48));
-    activate->SetPreferredSize(gfx::Size(0, 48));
+    activate->SetMinSize(gfx::Size(0, kTileHeight));
+    activate->SetPreferredSize(gfx::Size(0, kTileHeight));
     return activate;
   }
 
@@ -493,6 +518,8 @@ void SidebarView::SetUnavailable(const std::u16string& reason,
   }
   focus_targets_.clear();
   spaces_scroll_ = nullptr;
+  new_tab_ = nullptr;
+  tiles_.clear();
   current_space_id_ = 0;
   spaces_.clear();
   library_space_ids_.clear();
@@ -548,6 +575,8 @@ void SidebarView::SetModel(const foundation::SidebarResult& model,
   current_space_id_ = model.current_space.id;
   focus_targets_.clear();
   spaces_scroll_ = nullptr;
+  new_tab_ = nullptr;
+  tiles_.clear();
   RemoveAllChildViews();
 
   auto* scroll = AddChildView(std::make_unique<views::ScrollView>());
@@ -570,7 +599,7 @@ void SidebarView::SetModel(const foundation::SidebarResult& model,
   views::View* favorites_row = nullptr;
   for (size_t i = 0; i < model.favorites.size(); ++i) {
     if (i % 3 == 0) {
-      favorites_row = body->AddChildView(Box(Orientation::kHorizontal, 6));
+      favorites_row = body->AddChildView(Box(Orientation::kHorizontal, 8));
     }
     auto* tile = favorites_row->AddChildView(
         MakeItem(model.favorites[i], true,
@@ -581,7 +610,7 @@ void SidebarView::SetModel(const foundation::SidebarResult& model,
   // Empty layout cells keep the final row at three columns; never controls.
   for (size_t i = model.favorites.size(); favorites_row && i % 3 != 0; ++i) {
     auto* cell = favorites_row->AddChildView(std::make_unique<views::View>());
-    cell->SetPreferredSize(gfx::Size(0, 48));
+    cell->SetPreferredSize(gfx::Size(0, kTileHeight));
     static_cast<views::BoxLayout*>(favorites_row->GetLayoutManager())
         ->SetFlexForView(cell, 1);
   }
@@ -613,7 +642,10 @@ void SidebarView::SetModel(const foundation::SidebarResult& model,
       ui::ImageModel::FromVectorIcon(vector_icons::kAdd2Icon,
                                      ui::kColorSysOnSurface, 16));
   TrackFocus(new_tab.get(), FocusAction::kNewTab);
-  body->AddChildView(std::move(new_tab));
+  // Arc keeps 41 DIP between the Space title and New Tab row centers.
+  new_tab->SetProperty(views::kMarginsKey, gfx::Insets::TLBR(5, 0, 0, 0));
+  new_tab_ = body->AddChildView(std::move(new_tab));
+  UpdateFills();
   for (const auto& item : model.temporary) {
     body->AddChildView(
         MakeItem(item, false, item.id == model.selected_item_id));
@@ -735,6 +767,29 @@ void SidebarView::SetModel(const foundation::SidebarResult& model,
       }
     }
     restore->RequestFocus();
+  }
+}
+
+void SidebarView::SetNewTabIntent(bool intent) {
+  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
+  new_tab_intent_ = intent;
+  UpdateFills();
+}
+
+void SidebarView::OnThemeChanged() {
+  views::View::OnThemeChanged();
+  UpdateFills();
+}
+
+void SidebarView::UpdateFills() {
+  const Fills fills = GetFills(GetColorProvider());
+  for (const auto& [tile, selected] : tiles_) {
+    tile->SetBgColorOverrideDeprecated(selected ? fills.selected_tile
+                                                : fills.tile);
+  }
+  if (new_tab_) {
+    new_tab_->SetBgColorOverrideDeprecated(
+        new_tab_intent_ ? fills.new_tab : SK_ColorTRANSPARENT);
   }
 }
 

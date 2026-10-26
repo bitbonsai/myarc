@@ -19,6 +19,7 @@
 #include "ui/views/view.h"
 
 namespace views {
+class MdTextButton;
 class MenuRunner;
 class ScrollView;
 }  // namespace views
@@ -86,6 +87,8 @@ class SidebarView final : public views::View,
   // Parent supplies only a retry supported by its current storage state.
   void SetUnavailable(const std::u16string& reason,
                       StorageRetry retry = StorageRetry::kNone);
+  // Fills the New Tab row while the parent's New Tab palette is open.
+  void SetNewTabIntent(bool intent);
 
  private:
   friend class SidebarViewTestApi;
@@ -120,6 +123,10 @@ class SidebarView final : public views::View,
                   FocusAction action,
                   uint64_t id = 0,
                   std::optional<ItemMenuState> item_menu = std::nullopt);
+  // views::View:
+  void OnThemeChanged() override;
+  // Applies the scheme's tile and New Tab fills to the current rows.
+  void UpdateFills();
   void ShowContextMenuForViewImpl(
       views::View* source,
       const gfx::Point& point,
@@ -137,6 +144,10 @@ class SidebarView final : public views::View,
   const raw_ref<Delegate> delegate_;
   std::vector<FocusTarget> focus_targets_;
   raw_ptr<views::ScrollView> spaces_scroll_ = nullptr;
+  raw_ptr<views::MdTextButton> new_tab_ = nullptr;
+  // Favorite tiles and whether each is selected.
+  std::vector<std::pair<raw_ptr<views::MdTextButton>, bool>> tiles_;
+  bool new_tab_intent_ = false;
   uint64_t current_space_id_ = 0;
   uint64_t menu_space_id_ = 0;
   uint64_t menu_item_id_ = 0;

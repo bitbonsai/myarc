@@ -1,5 +1,5 @@
 diff --git a/chrome/browser/ui/views/location_bar/location_bar_view.cc b/chrome/browser/ui/views/location_bar/location_bar_view.cc
-index 972bd7bc04d240f23d4c527bdb6faa81272421e5..2daffdd505df498e04edd302f4ef36bf131b6a64 100644
+index 972bd7bc04d240f23d4c527bdb6faa81272421e5..28bbf0cf53a218f7ffa1865a43fba7bca547a272 100644
 --- a/chrome/browser/ui/views/location_bar/location_bar_view.cc
 +++ b/chrome/browser/ui/views/location_bar/location_bar_view.cc
 @@ -11,6 +11,7 @@
@@ -153,7 +153,35 @@ index 972bd7bc04d240f23d4c527bdb6faa81272421e5..2daffdd505df498e04edd302f4ef36bf
    if (!omnibox_view_) {
      return false;
    }
-@@ -1792,11 +1864,42 @@ void LocationBarView::OnMouseReleased(const ui::MouseEvent& event) {
+@@ -1400,6 +1472,13 @@ void LocationBarView::RefreshBackground() {
+   SkColor normal = color_provider->GetColor(kColorLocationBarBackground);
+   SkColor hovered =
+       color_provider->GetColor(kColorLocationBarBackgroundHovered);
++  if (IsMyarcUrlPill()) {
++    // Arc's sidebar URL field is white over the window material, lighter than
++    // the sidebar around it.
++    const bool dark = color_utils::IsDark(normal);
++    normal = SkColorSetA(SK_ColorWHITE, dark ? 0x18 : 0x80);
++    hovered = SkColorSetA(SK_ColorWHITE, dark ? 0x24 : 0xA0);
++  }
+ 
+   background_color_ = gfx::Tween::ColorValueBetween(opacity, normal, hovered);
+   if (is_caret_visible) {
+@@ -1440,8 +1519,11 @@ void LocationBarView::RefreshBackground() {
+   }
+ 
+   // Keep the views::Textfield in sync. It needs an opaque background to
+-  // correctly enable subpixel AA.
+-  omnibox_view_->SetBackgroundColor(background_color_);
++  // correctly enable subpixel AA. A translucent myArc fill is painted once, by
++  // this view.
++  omnibox_view_->SetBackgroundColor(
++      SkColorGetA(background_color_) == SK_AlphaOPAQUE ? background_color_
++                                                       : SK_ColorTRANSPARENT);
+ 
+   // The divider between indicators and request chips should have the same color
+   // as the omnibox.
+@@ -1792,11 +1874,42 @@ void LocationBarView::OnMouseReleased(const ui::MouseEvent& event) {
    omnibox_view_->OnMouseReleased(AdjustMouseEventLocationForOmniboxView(event));
  }
  
@@ -196,7 +224,7 @@ index 972bd7bc04d240f23d4c527bdb6faa81272421e5..2daffdd505df498e04edd302f4ef36bf
    OnOmniboxHovered(false);
  }
  
-@@ -1812,6 +1915,9 @@ void LocationBarView::WriteDragDataForView(views::View* sender,
+@@ -1812,6 +1925,9 @@ void LocationBarView::WriteDragDataForView(views::View* sender,
              ui::DragDropTypes::DRAG_NONE);
  
    WebContents* web_contents = GetWebContents();
@@ -206,7 +234,7 @@ index 972bd7bc04d240f23d4c527bdb6faa81272421e5..2daffdd505df498e04edd302f4ef36bf
    favicon::FaviconDriver* favicon_driver =
        favicon::ContentFaviconDriver::FromWebContents(web_contents);
    gfx::ImageSkia favicon = favicon_driver->GetFavicon().AsImageSkia();
-@@ -1823,7 +1929,7 @@ void LocationBarView::WriteDragDataForView(views::View* sender,
+@@ -1823,7 +1939,7 @@ void LocationBarView::WriteDragDataForView(views::View* sender,
  int LocationBarView::GetDragOperationsForView(views::View* sender,
                                                const gfx::Point& p) {
    DCHECK_EQ(location_icon_view_, sender);
@@ -215,7 +243,7 @@ index 972bd7bc04d240f23d4c527bdb6faa81272421e5..2daffdd505df498e04edd302f4ef36bf
    return (web_contents && web_contents->GetVisibleURL().is_valid() &&
            (!GetOmniboxView()->IsEditingOrEmpty()))
               ? (ui::DragDropTypes::DRAG_COPY | ui::DragDropTypes::DRAG_LINK)
-@@ -2173,6 +2279,9 @@ bool LocationBarView::IsFullWebUiOmniboxReady() const {
+@@ -2173,6 +2289,9 @@ bool LocationBarView::IsFullWebUiOmniboxReady() const {
  }
  
  void LocationBarView::OnOmniboxHovered(bool is_hovering) {
@@ -225,7 +253,7 @@ index 972bd7bc04d240f23d4c527bdb6faa81272421e5..2daffdd505df498e04edd302f4ef36bf
    if (is_hovering) {
      // Only show the hover animation when omnibox is in unfocused steady state.
      if (!omnibox_view_->HasFocus()) {
-@@ -2502,7 +2611,6 @@ void LocationBarView::OnAppShimChanged(const webapps::AppId& app_id) {
+@@ -2502,7 +2621,6 @@ void LocationBarView::OnAppShimChanged(const webapps::AppId& app_id) {
  }
  #endif
  
