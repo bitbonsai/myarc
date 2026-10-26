@@ -5,6 +5,7 @@ Tracker for active work. Release evidence lives in docs/SCORECARD.md; ranked blo
 ## Active
 
 - [MA-007](EXECUTION.md#ma-007a-native-visual-parity-first-state) native visual parity, Chromium lane. Palette match in progress, then empty address field, empty-window state, Space header, content tint, footer icons.
+- [Arc clone backlog](2026-10-26-arc-clone-backlog.md): feature and shortcut checklist from Arc's public docs with myArc status and a Next 15 dispatch list.
 
 ## Planned
 
