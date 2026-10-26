@@ -14,7 +14,7 @@ Current work prioritizes [MA-007.a, the native shell experiment](experiments/nat
 
 ## Candidate workspace lifecycle hooks
 
-[Patch 0011](patches/0011-native-workspace-lifecycle.patch) connects native startup/restore and shutdown to the Profile-owned adapter. Its base-only [dispatch boundary](foundation/workspace_lifecycle.h) avoids a reverse dependency from sessions/lifetime to the adapter. It registers only when the optional workspace sidebar creates an adapter. Keep `--myarc-workspace-sidebar` disabled until command safety and native restoration checks pass.
+[Patch 0011](patches/0011-native-workspace-lifecycle.patch) connects native startup/restore and shutdown to the Profile-owned adapter. Its base-only [dispatch boundary](foundation/workspace_lifecycle.h) avoids a reverse dependency from sessions/lifetime to the adapter. With optional 0020 applied, each opted-in normal window registers its adapter during BrowserView initialization, before native restore hints, even while horizontal. Sidebar presentation still waits for vertical mode. Keep `--myarc-workspace-sidebar` disabled until command safety and native restoration checks pass.
 
 The canonical foundation payload now includes 16 owned files. Patch 0011 contains upstream hooks only; its owned helper and adapter changes live in that payload. After applying the optional native stack through 0011, run from Chromium's source root:
 
@@ -28,7 +28,7 @@ The executable checks exact-Profile registration, retained metadata and startup/
 
 [Pending recovery choice candidate 0018](experiments/native-recovery-lifecycle.md) extends that shared barrier across consent, dialog deletion and native Restore handoff. Its helper, native fixture syntax/GN checks and full `chrome` link pass. Fresh actual Restore/discard acceptance remains with the parent; the prior process-crash failure stays recorded.
 
-[Runtime mode bootstrap candidate 0019](experiments/native-workspace-mode-bootstrap.md) initializes opted-in controls when an existing horizontal window switches vertical, returns toolbar ownership on horizontal exit, and retains the workspace adapter/bindings across further toggles. Native same-window acceptance remains pending; renderer stays default OFF.
+[Runtime mode bootstrap candidate 0019](experiments/native-workspace-mode-bootstrap.md) initializes opted-in controls when an existing horizontal window switches vertical, returns toolbar ownership on horizontal exit, and retains bindings across further toggles. Warm native switching passed; clean horizontal restore then late activation lost workspace identity. [Late-binding candidate 0020](experiments/native-late-workspace-bindings.md) separates adapter lifetime from sidebar presentation so native restore hints have a consumer. Its full build passes; fresh native acceptance remains pending. Renderer stays default OFF.
 
 On every Chromium rebase, compare `PreserveUnknownData` against the producers in `BrowserLiveTabContext` and consumers in `browser_tabrestore`, including private glic/send-tab keys. Cleared known fields must stay absent; unrelated historical keys must survive.
 
