@@ -10,6 +10,7 @@ The [optional prototype patch](../patches/0002-native-shell-prototype.patch) is 
 
 ```sh
 git apply "$MYARC_REPO/browser/patches/0002-native-shell-prototype.patch"
+git apply "$MYARC_REPO/browser/patches/0003-rounded-content.patch"
 autoninja -C out/MyarcM0 -j 8 chrome
 ```
 
@@ -39,6 +40,14 @@ out/MyarcM0/Chromium.app/Contents/MacOS/Chromium \
 - Two relocation attempts crashed during layout. The first background access was guarded; the remaining crash was traced to missing native buttons in the mixed web/native toolbar. Consistent native controls fixed startup. Hiding and re-showing the address field during each layout also lost focus; preserving its visibility fixed keyboard navigation.
 
 Original captures, supplied Arc references and raw logs remain private and outside the repository. The screenshots shown in the thread are actual native windows, not HTML browser mockups.
+
+## Rounded content follow-up
+
+The [corner follow-up patch](../patches/0003-rounded-content.patch) supplies all four 10-DIP radii through Chromium's existing multi-content layout path, which propagates clipping to native web views and overlays. Rounding only the background layer was insufficient and could be overwritten by layout. The change is limited to the visual-parity flag, vertical tabs and non-fullscreen windows.
+
+The external native build reports success after this change. Fresh native corner-pixel checks, resizing and tab-switch verification remain pending; compilation alone does not establish the visual result.
+
+The next keyboard/command-bar slice is specified in [native interactions](native-interactions.md).
 
 ## Remaining differences and limits
 

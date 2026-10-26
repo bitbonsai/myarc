@@ -1,0 +1,15 @@
+--- a/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl.cc
++++ b/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl.cc
+@@ -1611,6 +1611,12 @@
+         content_corners.set_lower_left(radius);
+       }
+     }
++    if (base::CommandLine::ForCurrentProcess()->HasSwitch(
++            "myarc-visual-parity") &&
++        layout_data_->tab_strip_type == TabStripType::kVertical &&
++        !is_fullscreen(layout_data_->window_state)) {
++      content_corners = gfx::RoundedCornersF(10);
++    }
+     views().multi_contents_view->SetBackgroundRadii(content_corners);
+   }
+ 
