@@ -75,5 +75,26 @@
       "unmodified_full_browser_native_control_run": false
     },
     "all_owned_browser_helpers_and_fixture_servers_closed": true
+  },
+  "flag_off_site_storage_control": {
+    "date": "2026-10-26",
+    "same_patched_binary_not_pristine_upstream": true,
+    "both_experiment_flags_absent": true,
+    "workspace_metadata_file_absent": true,
+    "native_marker_prerequisite_observed_without_edit": true,
+    "actual_sigkill_plain_relaunch_genuine_restore": true,
+    "immediate_ack_to_signal_ms": 12.097708,
+    "immediate_acknowledged_note_lost": true,
+    "requested_dwell_ms": 7000,
+    "delayed_ack_to_signal_ms": 7225.204791,
+    "delayed_note_retained": true,
+    "trials_per_reported_condition": 1,
+    "exact_commit_latency_and_reliability_unmeasured": true,
+    "early_startup_normal_marker_missing_prompt_attempt_excluded": true,
+    "initial_no_prompt_revisit_reused_existing_ntp_target_not_session_restore": true,
+    "focused_stock_omnibox_popup_guard_failure_stopped_before_typing": true,
+    "storage_source_and_verifiers_unchanged": true,
+    "all_owned_apps_helpers_server_closed": true,
+    "record": "../experiments/native-site-storage-crash-control.md"
   }
 }

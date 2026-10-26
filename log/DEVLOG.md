@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-10-26: Flag-off native site-storage crash control
+
+Same patched build, fresh marked Profile, both myarc flags absent and no workspace file. Real fixture acknowledgement followed by owned browser SIGKILL after 12.098ms lost the note through plain relaunch/genuine Restore. Another write followed by 7225.205ms retained its note through the same actual recovery journey. One trial per condition, not commit-latency measurement or durability acceptance. [Record](../browser/experiments/native-site-storage-crash-control.md).
+
+An earlier near-startup kill left native `Normal` on disk and offered no prompt; excluded from recovery-choice acceptance. A separately recorded existing-target revisit found no note. Exact-window input also stopped before typing when stock omnibox created another window; no guard weakened. Later controls waited for the real native crash marker, without editing it. Apps/helpers/server closed. No storage-source change, pristine upstream comparison, immediate acknowledgement or power-loss guarantee.
+
 ## 2026-10-26: Restore consumer lifetime native acceptance
 
 - Integrated `7a14927`. Fresh horizontal setup, clean native restoration before sidebar presentation and late vertical enable passed the unchanged single-window verifier. A subsequent audited SIGKILL/plain relaunch retained metadata through vertical enable during the genuine recovery prompt; actual Restore passed again with the previously persisted canary. [Evidence](../browser/evidence/workspace-late-bindings.json).
