@@ -29,7 +29,7 @@ xattr -cr "$APP"
 BIN="$APP/Contents/MacOS/myArc"
 FRAMEWORK=$(find "$APP/Contents/Frameworks/myArc Framework.framework/Versions" -maxdepth 2 -type f -name 'myArc Framework' | head -1)
 [ -n "$FRAMEWORK" ] || { echo "framework binary missing in $APP" >&2; exit 1; }
-if otool -L "$BIN" "$FRAMEWORK" | grep -E '/out/|/Users/' ; then
+if otool -XL "$BIN" "$FRAMEWORK" | grep -E '/out/|/Users/' ; then
   echo "binary references the build tree" >&2; exit 1
 fi
 echo "otool: no build-tree references in $(basename "$BIN") or $(basename "$FRAMEWORK")"

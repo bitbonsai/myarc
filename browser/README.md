@@ -147,6 +147,26 @@ The first command rewrites `browser/patches/chromium/` and deletes stale patches
 
 MA-002.c reapplied the legacy 0001 patch on a new branch at `8d208f20744ac6d4ce00cc3f9de6a14a9b8b926d`, then ran dependency sync/hooks, GN generation and the build/check commands again. Keep the root checkout unmanaged during sync, as in the generated `.gclient`, so sync preserves applied changes. Verify the checked-out commit and identity before compiling. The recorded run reused the output directory; it was an incremental rebuild, not a second fresh-output timing measurement. This immediate-child revision rolls a PHP test dependency and is a weak measure of future browser/security-update porting cost.
 
+## Nightly build
+
+The pre-alpha nightly is a static release build from [args-nightly.gn](args-nightly.gn): arm64, no symbols, H.264/AAC (`proprietary_codecs`, `ffmpeg_branding = "Chrome"`), no Widevine. Its GN arg `myarc_nightly` does three things, and dev builds without it are unchanged:
+
+- Branding: `branding_file_path` selects [nightly/BRANDING](foundation/nightly/BRANDING), so the build produces `myArc.app` with bundle id `dev.myarc.nightly`. A merged plist key sets the profile directory to `~/Library/Application Support/myArc Nightly`, apart from Chromium and dev builds. The icon comes from `design/brand/assets/myarc-matte.png`; regenerate it with `tools/make_nightly_icons.sh`. Menus and settings still say Chromium, since those strings come from Chromium's resources.
+- myArc mode: at startup, before features load, [nightly_switches.cc](foundation/nightly_switches.cc) adds `--myarc-visual-parity`, `--myarc-workspace-sidebar`, `GlassFrame`, disabled `InitialWebUI` and `--no-first-run` to the browser command line unless already given. Skipping first run hides Chromium's branded welcome page. With both myArc switches, a new profile starts with vertical tabs, so the sidebar shows on first launch.
+- Packaging: `tools/package_nightly.sh` copies the app to `~/.cache/myarc-m0/release/<date>/stage/myArc Nightly.app`, checks `otool -L` for build-tree paths, ad-hoc signs and verifies it, then writes a compressed DMG with an Applications link. It prints the size, SHA-256 and the `site/release.json` values.
+
+From Chromium's source root:
+
+```sh
+mkdir -p out/MyarcNightly
+cp "$REPO/browser/args-nightly.gn" out/MyarcNightly/args.gn
+gn gen out/MyarcNightly
+nice -n 10 autoninja -C out/MyarcNightly -j 14 chrome
+"$REPO/tools/package_nightly.sh"
+```
+
+The build uses its own output directory, so it does not take `/tmp/myarc-build.lock`. The app is not notarized and has no updater.
+
 ## Runtime regression checks
 
 The [native fixture instructions](../tests/fixtures/browser/README.md) cover marked disposable profiles, expected-PID/version checks, causal extension on/off probes, process-restart verification and renderer/private-storage smoke checks. `tools/check_browser_foundation.mjs` is a privileged developer test client. It is separate from product CLI/MCP authorization and runs manually against the external browser build.

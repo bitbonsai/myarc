@@ -33,7 +33,9 @@ void AddFeature(base::CommandLine& command_line,
 
 void MaybeEnableNightlyMode(base::CommandLine& command_line) {
 #if BUILDFLAG(MYARC_NIGHTLY)
-  for (const char* name : {"myarc-visual-parity", "myarc-workspace-sidebar"}) {
+  // no-first-run skips Chromium's branded welcome page.
+  for (const char* name :
+       {"myarc-visual-parity", "myarc-workspace-sidebar", "no-first-run"}) {
     if (!command_line.HasSwitch(name)) {
       command_line.AppendSwitch(name);
     }

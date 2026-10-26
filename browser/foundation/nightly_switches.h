@@ -7,9 +7,10 @@ class CommandLine;
 
 namespace myarc {
 
-// In nightly builds (GN myarc_nightly), adds the myArc mode switches and
-// features to the browser process command line unless already present.
-// Call before the FeatureList is created. Other builds are unchanged.
+// In nightly builds (GN myarc_nightly), adds the myArc mode switches,
+// --no-first-run and features to the browser process command line unless
+// already present. Call before the FeatureList is created. Other builds are
+// unchanged.
 void MaybeEnableNightlyMode(base::CommandLine& command_line);
 
 }  // namespace myarc
