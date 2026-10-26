@@ -47,12 +47,30 @@ def check():
         assert any(node.get('@type') in ('WebSite', 'Blog', 'BlogPosting') for node in nodes)
         if path.parent != ROOT:
             assert any(node.get('@type') == 'BreadcrumbList' for node in nodes)
+            author = {'@type': 'Person', 'name': 'Mauricio Wolff', 'url': 'https://github.com/bitbonsai'}
+            blog = next(node for node in nodes if node.get('@type') in ('Blog', 'BlogPosting'))
+            assert blog['publisher'] == author
+            if blog['@type'] == 'BlogPosting':
+                assert blog['author'] == author
+                assert soup.select_one('meta[name="author"]')['content'] == author['name']
+                row = soup.select_one('.post-author')
+                assert row.a.get_text(strip=True) == author['name'] and row.a['href'] == author['url']
+                assert row.img['alt'] == '' and row.img['width'] == row.img['height'] == '28'
+                assert row.select_one('.post-read-time').get_text(strip=True).endswith(' min read')
+            else:
+                assert all(post['author'] == author for post in blog['blogPost'])
         image_url = soup.select_one('meta[property="og:image"]')['content']
         assert soup.select_one('meta[name="twitter:image"]')['content'] == image_url
         with Image.open(local_file(image_url)) as image:
             assert int(soup.select_one('meta[property="og:image:width"]')['content']) == image.width
             assert int(soup.select_one('meta[property="og:image:height"]')['content']) == image.height
             assert soup.select_one('meta[property="og:image:type"]')['content'] == Image.MIME[image.format]
+        preloads = soup.select('link[rel="preload"][as="image"]')
+        for preload in preloads:
+            assert preload.get('fetchpriority') == 'low', 'Zoom preload must not outrank visible content'
+            local_file(urljoin(canonical, preload['href']))
+        zoom_sources = {image['src'] for image in soup.select('.post-body img') if image.find_parent('a') and image.find_parent('a').get('href') == image['src']}
+        assert {preload['href'] for preload in preloads} == zoom_sources, f'Zoom preload mismatch: {path}'
         for image in soup.select('.post-body img'):
             figure = image.find_parent('figure')
             caption = figure.find('figcaption', recursive=False) if figure else None

@@ -171,6 +171,13 @@ try:
                     const rect = element.getBoundingClientRect()
                     if (Math.abs(rect.left - journal.left) > 1 || Math.abs(rect.width - journal.width) > 1) throw new Error('Blog column alignment')
                   }
+                  for (const portrait of document.querySelectorAll('.post-body > figure.portrait')) {
+                    const box = portrait.getBoundingClientRect()
+                    const expected = innerWidth <= 768 ? 96 : 144
+                    if (Math.abs(box.width - expected) > 1 || getComputedStyle(portrait).float !== 'right') throw new Error('Portrait size/alignment')
+                    if (portrait.nextElementSibling && Math.abs(portrait.nextElementSibling.getBoundingClientRect().top - box.top) > 1) throw new Error('Portrait not beside introduction')
+                    if (document.querySelector('.post-body h2').getBoundingClientRect().top < box.bottom) throw new Error('Section overlaps portrait')
+                  }
                   for (const grid of document.querySelectorAll('.image-grid')) {
                     const [first, second] = [...grid.children].map(figure => figure.getBoundingClientRect())
                     if (Math.abs(first.top - second.top) > 1 || second.left < first.right) throw new Error('Gallery columns overlap or stack')
@@ -410,6 +417,13 @@ try:
                     if result is None or result['active'] != (not reduced):
                         raise AssertionError(f'Native navigation transition: {width}/{theme}/{reduced}/{route}: {result}')
                     print('Native navigation:', width, theme, 'reduced=' + str(reduced), route, result)
+                    if route not in ('/', '/blog/'):
+                        browser('wait', '--fn', "[...document.querySelectorAll('link[rel=preload][as=image]')].every(link => performance.getEntriesByName(link.href).some(entry => entry.initiatorType === 'link'))")
+                        print('Zoom preloads before click:', browser(expression="""(() => {
+                          const sources = [...document.querySelectorAll('.post-body figure a')].filter(link => link.querySelector('img') && link.href === link.querySelector('img').src).map(link => link.href)
+                          if (!sources.length || sources.some(source => !performance.getEntriesByName(source).some(entry => entry.initiatorType === 'link'))) throw new Error('Full-size zoom image not preloaded')
+                          return sources.length
+                        })()"""))
             browser('record', 'stop')
         finally:
             server.shutdown()

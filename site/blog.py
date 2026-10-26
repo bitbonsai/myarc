@@ -28,6 +28,7 @@ BLOG_CSS = '''
     .journal h1 { font-size: 3.5rem; line-height: 1.1; max-width: 24ch }
     .journal .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap }
     .post-list, .post-body { max-width: 68ch }
+    .post-body { display: flow-root }
     .post-month { margin: 3rem 0 1rem; color: #5f6b76; font-size: 1rem }
     .post-month:first-child { margin-top: 0 }
     .post-preview { display: flex; align-items: center; gap: 1.5rem }
@@ -37,19 +38,24 @@ BLOG_CSS = '''
     .post-preview .post-date { margin-top: .375rem }
     .post-summary { margin-top: .375rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis }
     .post-thumb { display: block; width: 8rem; flex: none }
-    .post-thumb img { width: 100%; aspect-ratio: 8 / 5; object-fit: contain; border-radius: .75rem; background: var(--panel) }
+    .post-thumb img { width: 100%; aspect-ratio: 8 / 5; object-fit: cover; border-radius: .75rem; background: transparent }
     .post-date { display: block; color: var(--quiet); font-size: 1rem }
     .post-header .post-date { margin-top: 1rem }
-    .post-author { margin-top: .5rem; color: var(--quiet); font-size: 1rem }
+    .post-author { display: flex; flex-wrap: wrap; align-items: center; gap: .75rem; margin-top: .5rem; color: var(--quiet); font-size: 1rem }
+    .post-author a { display: inline-flex; align-items: center; gap: .5rem }
+    .post-author img { width: 1.75rem; height: 1.75rem; border-radius: 50%; object-fit: cover; flex: none }
+    .post-read-time { white-space: nowrap }
     .post-back { display: inline-block; margin-bottom: 2rem }
     .post-body > * + * { margin-top: 1.5rem }
-    .post-body h2 { font-size: 2rem; margin-top: 3rem }
+    .post-body h2 { clear: both; font-size: 2rem; margin-top: 3rem }
     .post-body h3 { margin-top: 2.5rem }
     .post-body ul { padding-left: 1.5rem; list-style: disc }
     .post-body ol { padding-left: 1.5rem }
     .post-body li + li { margin-top: .5rem }
     .post-body img { border-radius: 1rem; margin: 2rem 0; max-width: 100% }
     .post-body figure { margin: 2rem 0 }
+    .post-body > figure.portrait { float: right; width: 9rem; margin: 0 0 1.5rem 1.5rem }
+    .post-body > figure.portrait:first-child + p { margin-top: 0 }
     .post-body figure > a { display: block; cursor: zoom-in }
     .post-body .image-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1.5rem; margin: 2rem 0 }
     .post-body .image-grid figure { margin: 0; min-width: 0 }
@@ -64,12 +70,14 @@ BLOG_CSS = '''
     .image-lightbox button svg { width: 1.25rem; height: 1.25rem }
     .image-lightbox img { max-height: calc(100dvh - 10rem); width: 100%; object-fit: contain }
     .image-lightbox p { display: table; max-width: 100%; margin: .75rem auto 0; padding: .5rem 1rem; border-radius: 999rem; background: var(--page); font-size: 1rem; text-align: center }
+    .image-lightbox img, .image-lightbox p { transition: opacity .15s ease, filter .15s ease }
+    .image-lightbox.is-swapping img, .image-lightbox.is-swapping p { opacity: 0; filter: blur(.75rem) }
     .post-body figure img { margin: 0; opacity: .9; transition: opacity .15s ease }
     .post-body figcaption { margin-top: .5rem; color: var(--quiet); font-size: 1rem; line-height: 1.4; font-style: normal; text-align: center; transition: color .15s ease }
     .post-body figure:hover img, .post-body figure:focus-within img { opacity: 1 }
     .post-body figure:hover figcaption, .post-body figure:focus-within figcaption { color: var(--text) }
     @media (prefers-reduced-motion: reduce) {
-      .post-body figure img, .post-body figcaption, .lightbox-content { transition: none }
+      .post-body figure img, .post-body figcaption, .lightbox-content, .image-lightbox img, .image-lightbox p { transition: none }
     }
     .post-body blockquote { margin: 2rem 0; padding-left: 1.5rem; color: var(--quiet) }
     .post-body pre { font-family: inherit; padding: 1.25rem; overflow-x: auto; background: var(--panel); color: var(--ivory); border-radius: 1rem }
@@ -81,6 +89,7 @@ BLOG_CSS = '''
     @media (max-width: 48rem) {
       .journal { padding: 2.5rem 0 4rem }
       .journal h1 { font-size: 2.5rem }
+      .post-body > figure.portrait { width: 6rem; margin-left: 1rem }
       .post-body .image-grid { gap: 1rem }
       .post-preview { gap: 1rem }
       .post-preview h2 { font-size: 1.5rem }
@@ -99,10 +108,19 @@ class Post:
     images: dict
     cover_alt: str = ''
     source_bytes: int = 0
+    thumbnail: bytes = b''
 
     @property
     def url(self):
         return f'https://myarc.dev/blog/{self.slug}/'
+
+    @property
+    def reading_minutes(self):
+        body = BeautifulSoup(self.html, 'html.parser')
+        for element in body.select('img, figcaption'):
+            element.decompose()
+        words = len(body.get_text(' ', strip=True).split())
+        return max(1, (words + 199) // 200)
 
     @property
     def cover(self):
@@ -180,8 +198,8 @@ def load_post(path):
         meta = yaml.safe_load(front)
     except yaml.YAMLError:
         raise ValueError(f'Invalid YAML front matter: {path}') from None
-    if not isinstance(meta, dict) or set(meta) - {'title', 'summary', 'draft'}:
-        raise ValueError(f'Use only title, summary and draft metadata: {path}')
+    if not isinstance(meta, dict) or set(meta) - {'title', 'summary', 'draft', 'thumbnail'}:
+        raise ValueError(f'Use only title, summary, draft and thumbnail metadata: {path}')
     if type(meta.get('draft', True)) is not bool:
         raise ValueError(f'draft must be true or false: {path}')
     if meta.get('draft', True):
@@ -200,7 +218,12 @@ def load_post(path):
     images = {}
     cover_alt = ''
     replacements = {}
-    source_bytes = 0
+    thumbnail = b''
+    if 'thumbnail' in meta:
+        if not isinstance(meta['thumbnail'], str) or not meta['thumbnail'].strip():
+            raise ValueError(f'thumbnail needs a local image path: {path}')
+        _, thumbnail = screenshot(path.parent, meta['thumbnail'])
+    source_bytes = len(thumbnail)
     count = 0
     for token in tokens:
         if token.type == 'heading_open' and token.tag == 'h1':
@@ -251,7 +274,10 @@ def load_post(path):
                 paragraph.append(caption.extract())
     for figure in rendered.find_all('figure'):
         image = figure.find('img')
-        if image and not image.find_parent('a'):
+        if int(image['height']) > int(image['width']):
+            figure['class'] = ['portrait']
+            image['sizes'] = '(max-width: 48rem) 6rem, 9rem'
+        if not image.find_parent('a'):
             image.wrap(rendered.new_tag('a', href=image['src']))
     for figure in list(rendered.find_all('figure')):
         if 'image-grid' in figure.parent.get('class', []):
@@ -266,7 +292,7 @@ def load_post(path):
             figure.img['sizes'] = '(max-width: 48rem) calc((100vw - 4rem) / 2), 24rem'
             grid.append(figure.extract())
             figure = following
-    return Post(slug, published, meta['title'].strip(), meta['summary'].strip(), str(rendered), images, cover_alt, source_bytes)
+    return Post(slug, published, meta['title'].strip(), meta['summary'].strip(), str(rendered), images, cover_alt, source_bytes, thumbnail)
 
 
 def page_shell(template, title, summary, url, content, published=None, cover=None, posts=None):
@@ -284,7 +310,7 @@ def page_shell(template, title, summary, url, content, published=None, cover=Non
     if published:
         head = head.replace('property="og:type" content="website"', 'property="og:type" content="article"')
     schema = {'@context': 'https://schema.org', '@type': 'BlogPosting' if published else 'Blog', 'name': title, 'description': summary, 'url': url}
-    author = {'@type': 'Person', 'name': 'bitbonsai', 'url': 'https://github.com/bitbonsai'}
+    author = {'@type': 'Person', 'name': 'Mauricio Wolff', 'url': 'https://github.com/bitbonsai'}
     schema.update(inLanguage='en', publisher=author)
     if published:
         schema.update(headline=title, datePublished=published.isoformat(), author=author,
@@ -312,7 +338,7 @@ def page_shell(template, title, summary, url, content, published=None, cover=Non
     head = head.replace('</style>', BLOG_CSS + '\n  </style>', 1)
     alternates = f'<link rel="alternate" type="text/markdown" href="{url}index.md" title="Markdown">\n<link rel="alternate" type="text/plain" href="https://myarc.dev/llms.txt" title="Site context">\n'
     if published:
-        alternates += f'<meta name="author" content="bitbonsai">\n<meta property="article:published_time" content="{published.isoformat()}">\n'
+        alternates += f'<meta name="author" content="Mauricio Wolff">\n<meta property="article:published_time" content="{published.isoformat()}">\n'
     head = head.replace('</head>', alternates + '</head>', 1)
     header = header.replace('href="#main"', 'href="/"').replace('href="#principles"', 'href="/#principles"').replace('href="#building"', 'href="/#building"')
     if published is None:
@@ -340,11 +366,17 @@ def build_blog(root, template, embed):
     if output.exists():
         shutil.rmtree(output)
     output.mkdir()
+    avatar_name = None
+    if posts:
+        avatar = (Path(__file__).parent / 'assets/mauricio-wolff.webp').read_bytes()
+        avatar_name = 'mauricio-wolff.' + hashlib.sha256(avatar).hexdigest()[:12] + '.webp'
+        (output / '_assets').mkdir()
+        (output / '_assets' / avatar_name).write_bytes(avatar)
     gallery_name = None
     if any(post.images for post in posts):
         script = Path(__file__).with_name('gallery.js').read_bytes()
         gallery_name = 'gallery.' + hashlib.sha256(script).hexdigest()[:12] + '.js'
-        (output / '_assets').mkdir()
+        (output / '_assets').mkdir(exist_ok=True)
         (output / '_assets' / gallery_name).write_bytes(script)
         close_icon = (Path(__file__).resolve().parents[1] / 'design/brand/assets/x.svg').read_text().replace('<svg\n', '<svg aria-hidden="true" focusable="false"\n', 1)
     listing = ''
@@ -355,10 +387,10 @@ def build_blog(root, template, embed):
             listing += f'<p class="post-month">{month}</p>'
             last_month = month
         thumb = ''
-        if post.images:
+        if post.thumbnail or post.images:
             thumbnails = output / '_thumbnails'
             thumbnails.mkdir(exist_ok=True)
-            with Image.open(io.BytesIO(next(iter(post.images.values())))) as image:
+            with Image.open(io.BytesIO(post.thumbnail or next(iter(post.images.values())))) as image:
                 image = image.convert('RGBA')
                 image.thumbnail((384, 240), Image.Resampling.LANCZOS)
                 buffer = io.BytesIO()
@@ -375,9 +407,16 @@ def build_blog(root, template, embed):
     for post in posts:
         folder = output / post.slug
         folder.mkdir()
-        content = '<a class="post-back" href="/blog/">All posts</a><header class="post-header"><h1>' + escape(post.title) + '</h1><time class="post-date" datetime="' + post.published.isoformat() + '">' + post.published.strftime('%B %d, %Y') + '</time><p class="post-author">By <a rel="author" href="https://github.com/bitbonsai">bitbonsai</a> · <a href="index.md" type="text/markdown">Read Markdown</a></p></header><article class="post-body">' + post.html + '</article>'
+        content = '<a class="post-back" href="/blog/">All posts</a><header class="post-header"><h1>' + escape(post.title) + '</h1><time class="post-date" datetime="' + post.published.isoformat() + '">' + post.published.strftime('%B %d, %Y') + '</time><p class="post-author"><a rel="author" href="https://github.com/bitbonsai"><img src="../_assets/' + avatar_name + '" alt="" width="28" height="28">Mauricio Wolff</a><span class="post-read-time">' + str(post.reading_minutes) + ' min read</span></p></header><article class="post-body">' + post.html + '</article>'
         page = page_shell(template, post.title, post.summary, post.url, content, post.published, post.cover)
         if post.images:
+            zoom_sources = []
+            for image in BeautifulSoup(post.html, 'html.parser').find_all('img'):
+                link = image.find_parent('a')
+                if link and link.get('href') == image['src'] and image['src'] not in zoom_sources:
+                    zoom_sources.append(image['src'])
+            preloads = ''.join(f'<link rel="preload" as="image" href="{escape(source, quote=True)}" fetchpriority="low">\n' for source in zoom_sources)
+            page = page.replace('</head>', preloads + '</head>')
             lightbox = '<dialog id="image-lightbox" class="image-lightbox" aria-labelledby="lightbox-caption"><div class="lightbox-content"><button type="button" aria-label="Close image" autofocus>' + close_icon + '</button><img alt=""><p id="lightbox-caption"></p></div></dialog>'
             page = page.replace('</body>', lightbox + f'<script defer src="../_assets/{gallery_name}"></script></body>')
         (folder / 'index.html').write_text(embed(page, '../'))

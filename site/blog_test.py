@@ -5,6 +5,7 @@ import json
 import unittest
 
 from PIL import Image
+from bs4 import BeautifulSoup
 from blog import build_blog, load_post
 
 TEMPLATE = (Path(__file__).parent / 'index.template.html').read_text()
@@ -98,11 +99,76 @@ class BlogTests(unittest.TestCase):
         self.assertIn('content="First &amp; target"', html)
         self.assertIn('property="og:image:width" content="40"', html)
         previous = next((self.root / 'blog/_thumbnails').glob('*.webp'))
+        with Image.open(previous) as image:
+            self.assertGreater(image.getpixel((20, 10))[0], 240)
+            self.assertLess(image.getpixel((20, 10))[2], 20)
         Image.new('RGB', (40, 20), 'green').save(self.folder / 'first image.png')
         self.build()
         current = next((self.root / 'blog/_thumbnails').glob('*.webp'))
         self.assertNotEqual(previous.name, current.name)
         self.assertFalse(previous.exists())
+
+    def test_thumbnail_override_preserves_article_and_social_cover(self):
+        Image.new('RGB', (40, 20), 'red').save(self.folder / 'first.png')
+        self.post('![First](first.png)\n\n*First caption.*')
+        baseline = self.build()[0]
+        page = self.root / 'blog' / self.folder.name / 'index.html'
+        original_page = page.read_bytes()
+        original_sitemap = (self.root / 'sitemap.xml').read_bytes()
+        logo = Image.new('RGBA', (800, 500))
+        logo.paste((0, 0, 255, 255), (200, 50, 600, 450))
+        logo.save(self.folder / 'logo.png')
+        self.source.write_text(self.source.read_text().replace('draft: false', 'draft: false\nthumbnail: logo.png'))
+        post = self.build()[0]
+        self.assertEqual(baseline.html, post.html)
+        self.assertEqual(baseline.images, post.images)
+        self.assertEqual(baseline.cover, post.cover)
+        self.assertEqual(original_page, page.read_bytes())
+        self.assertEqual(original_sitemap, (self.root / 'sitemap.xml').read_bytes())
+        self.assertEqual(baseline.source_bytes + (self.folder / 'logo.png').stat().st_size, post.source_bytes)
+        thumbnail = next((self.root / 'blog/_thumbnails').glob('*.webp'))
+        with Image.open(thumbnail) as image:
+            self.assertEqual((384, 240), image.size)
+            self.assertEqual('RGBA', image.mode)
+            self.assertEqual(0, image.getpixel((0, 0))[3])
+            self.assertEqual(255, image.getpixel((192, 120))[3])
+            self.assertGreater(image.getpixel((192, 120))[2], 240)
+        import hashlib
+        self.assertIn(hashlib.sha256(thumbnail.read_bytes()).hexdigest()[:12], thumbnail.name)
+        index = BeautifulSoup((self.root / 'blog/index.html').read_text(), 'html.parser')
+        self.assertIn('background: transparent', index.style.string.split('.post-thumb img {', 1)[1].split('}', 1)[0])
+        self.assertEqual([next(iter(post.images))], [p.name for p in page.parent.glob('*.webp')])
+
+    def test_thumbnail_without_article_images_keeps_brand_social_cover(self):
+        Image.new('RGBA', (80, 50), (0, 0, 255, 128)).save(self.folder / 'logo.png')
+        self.post()
+        self.source.write_text(self.source.read_text().replace('draft: false', 'draft: false\nthumbnail: logo.png'))
+        post = self.build()[0]
+        self.assertFalse(post.images)
+        self.assertIsNone(post.cover)
+        page = (self.root / 'blog' / self.folder.name / 'index.html').read_text()
+        self.assertIn('property="og:image" content="https://myarc.dev/og-image.webp"', page)
+        self.assertNotIn('<dialog', page)
+        self.assertIn('class="post-thumb"', (self.root / 'blog/index.html').read_text())
+
+    def test_thumbnail_reuses_screenshot_validation_and_site_budget(self):
+        from unittest.mock import patch
+        Image.new('RGBA', (80, 50)).save(self.folder / 'logo.png')
+        (self.folder / 'fake.png').write_text('<svg/>')
+        Image.new('RGB', (2, 2)).save(self.root / 'outside.png')
+        (self.folder / 'alias.png').symlink_to(self.root / 'outside.png')
+        for value in ('null', 'false', '[]', '""', 'https://example.test/image.png', '../outside.png', 'alias.png', 'fake.png', 'logo.svg'):
+            with self.subTest(value=value):
+                self.post()
+                self.source.write_text(self.source.read_text().replace('draft: false', f'draft: false\nthumbnail: {value}'))
+                with self.assertRaises((ValueError, OSError)):
+                    load_post(self.source)
+        self.post()
+        self.source.write_text(self.source.read_text().replace('draft: false', 'draft: false\nthumbnail: logo.png'))
+        with patch('blog.MAX_IMAGE_BYTES', 1), self.assertRaisesRegex(ValueError, '10 MiB'):
+            load_post(self.source)
+        with patch('blog.MAX_TOTAL_IMAGE_BYTES', 1), self.assertRaisesRegex(ValueError, 'site budget'):
+            self.build()
 
     def test_responsive_webp_and_link_rewrite(self):
         Image.new('RGB', (2000, 1300), 'purple').save(self.folder / 'large.png')
@@ -117,6 +183,55 @@ class BlogTests(unittest.TestCase):
         html = (self.root / 'blog' / self.folder.name / 'index.html').read_text()
         schema = json.loads(html.split('<script type="application/ld+json">', 1)[1].split('</script>', 1)[0])
         self.assertEqual('https://github.com/bitbonsai', schema['@graph'][0]['author']['url'])
+
+    def test_reading_minutes_round_up_and_exclude_image_text(self):
+        Image.new('RGB', (20, 10), 'blue').save(self.folder / 'screen.png')
+        for words, minutes in ((0, 1), (1, 1), (200, 1), (201, 2), (400, 2), (401, 3)):
+            with self.subTest(words=words):
+                self.post(' '.join(['word'] * words) + '\n\n![' + 'alt ' * 220 + '](screen.png)\n\n*' + ' '.join(['caption'] * 220) + '*')
+                self.assertEqual(minutes, load_post(self.source).reading_minutes)
+        self.post('## Heading\n\n' + ' '.join(['word'] * 199))
+        self.assertEqual(1, load_post(self.source).reading_minutes)
+        self.post('## Two words\n\n' + ' '.join(['word'] * 199))
+        self.assertEqual(2, load_post(self.source).reading_minutes)
+
+    def test_author_row_metadata_and_shared_portrait(self):
+        self.post(' '.join(['word'] * 201))
+        other = self.root / 'posts/2026-10-24-other'
+        other.mkdir()
+        (other / 'index.md').write_text(self.source.read_text())
+        posts = self.build()
+        avatars = list((self.root / 'blog/_assets').glob('mauricio-wolff.*.webp'))
+        self.assertEqual(1, len(avatars))
+        with Image.open(avatars[0]) as image:
+            self.assertEqual('WEBP', image.format)
+            self.assertEqual((84, 84), image.size)
+        author = {'@type': 'Person', 'name': 'Mauricio Wolff', 'url': 'https://github.com/bitbonsai'}
+        for post in posts:
+            page = self.root / 'blog' / post.slug / 'index.html'
+            soup = BeautifulSoup(page.read_text(), 'html.parser')
+            row = soup.select_one('.post-author')
+            self.assertEqual('Mauricio Wolff', row.a.get_text())
+            self.assertEqual(author['url'], row.a['href'])
+            self.assertEqual(['author'], row.a['rel'])
+            self.assertEqual('2 min read', row.select_one('.post-read-time').text)
+            self.assertEqual('', row.img['alt'])
+            self.assertEqual(('28', '28'), (row.img['width'], row.img['height']))
+            self.assertEqual(avatars[0].resolve(), (page.parent / row.img['src']).resolve())
+            self.assertEqual('time', row.find_previous_sibling().name)
+            self.assertFalse(post.images)
+            self.assertIsNone(post.cover)
+            self.assertFalse(soup.select('.post-body img'))
+            self.assertFalse(soup.select('dialog, link[rel="preload"][as="image"]'))
+            self.assertEqual(author['name'], soup.select_one('meta[name="author"]')['content'])
+            schema = json.loads(soup.select_one('script[type="application/ld+json"]').string)['@graph'][0]
+            self.assertEqual(author, schema['author'])
+            self.assertEqual(author, schema['publisher'])
+        index = BeautifulSoup((self.root / 'blog/index.html').read_text(), 'html.parser')
+        schema = json.loads(index.select_one('script[type="application/ld+json"]').string)['@graph'][0]
+        self.assertEqual(author, schema['publisher'])
+        self.assertTrue(all(entry['author'] == author for entry in schema['blogPost']))
+        self.assertFalse(index.select('.post-thumb'))
 
     def test_posts_group_by_month_without_repeated_labels(self):
         self.post()
@@ -158,9 +273,25 @@ class BlogTests(unittest.TestCase):
             self.assertEqual(image['src'], image.parent['href'])
         page = BeautifulSoup((self.root / 'blog' / self.folder.name / 'index.html').read_text(), 'html.parser')
         self.assertIsNotNone(page.select_one('dialog#image-lightbox'))
+        preloads = page.select('link[rel="preload"][as="image"]')
+        self.assertEqual(1, len(preloads))
+        self.assertEqual(soup.img['src'], preloads[0]['href'])
+        self.assertEqual('low', preloads[0]['fetchpriority'])
         script = page.select_one('script[src]')['src']
         self.assertEqual((Path(__file__).parent / 'gallery.js').read_bytes(), (self.root / 'blog' / self.folder.name / script).read_bytes())
         self.assertIsNone(BeautifulSoup((self.root / 'blog/index.html').read_text(), 'html.parser').select_one('script[src]'))
+
+    def test_standalone_portrait_keeps_intrinsic_ratio(self):
+        from bs4 import BeautifulSoup
+        Image.new('RGB', (100, 150), 'orange').save(self.folder / 'card.png')
+        self.post('![Synthetic card](card.png)\n\n*Card caption.*\n\nOpening paragraph.\n\n## Next section')
+        soup = BeautifulSoup(load_post(self.source).html, 'html.parser')
+        self.assertEqual(['portrait'], soup.figure['class'])
+        self.assertEqual('100', soup.img['width'])
+        self.assertEqual('150', soup.img['height'])
+        self.assertEqual('(max-width: 48rem) 6rem, 9rem', soup.img['sizes'])
+        self.assertEqual(soup.img['src'], soup.figure.a['href'])
+        self.assertIsNone(soup.select_one('.image-grid'))
 
     def test_raw_html_and_unsafe_links_are_not_executed(self):
         self.post('<script>alert(1)</script>\n\n[Bad](javascript:alert(1))')

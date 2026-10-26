@@ -34,12 +34,13 @@ Light theme:
 Dark theme:
 
 - Page: `#0B1420`
-- Main text: ivory
+- Main text: `#D2D9E1`
+- Headings: ivory
 - Secondary text: `#B1BCC9`
 - Progress panel: ink, with ivory text
 - Text links and focus rings: `#8FB1FF`, lightened for contrast on navy
 
-Primary buttons keep the same blue fill and white text in both themes. Development CTAs place the user-supplied GitHub SVG mark at 1.125rem before their label, with a .625rem gap; hide this decorative SVG from assistive technology. Text links start at 90% opacity and become opaque on hover or keyboard focus. Header navigation uses the theme's main text color without underlines, becoming the theme's link color on hover/focus.
+Primary buttons keep the same blue fill and white text in both themes. Hover scales them to 1.02 over 180ms with ease-out on hover-capable fine pointers; reduced motion disables scaling. Development CTAs place the user-supplied GitHub SVG mark at 1.125rem before their label, with a .625rem gap; hide this decorative SVG from assistive technology. Text links start at 90% opacity and become opaque on hover or keyboard focus. Header navigation uses the theme's main text color without underlines, becoming the theme's link color on hover/focus.
 
 Semantic CSS variables are `--page`, `--text`, `--quiet`, `--panel`, `--link-rgb` and `--link-solid`. Keep the named brand colors available separately.
 
