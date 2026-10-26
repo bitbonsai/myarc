@@ -1016,3 +1016,142 @@ fn names_retain_line_separator_and_format_mark_compatibility_for_this_slice() {
         );
     }
 }
+
+#[test]
+fn replace_canonical_url_is_explicit_and_survives_snapshot() {
+    let mut workspace = Workspace::default();
+    let id = pin(&mut workspace, S1);
+    let temporary = workspace.add_temporary_item(S1).unwrap();
+    assert_eq!(workspace.differs_from_canonical(id, URL), Ok(false));
+    assert_eq!(
+        workspace.differs_from_canonical(id, "https://example.test/elsewhere"),
+        Ok(true)
+    );
+    workspace
+        .set_canonical_url(id, "https://example.test/elsewhere")
+        .unwrap();
+    assert_eq!(
+        workspace.differs_from_canonical(id, "https://example.test/elsewhere"),
+        Ok(false)
+    );
+    assert_eq!(workspace.differs_from_canonical(id, URL), Ok(true));
+    unchanged(
+        &mut workspace,
+        |w| w.set_canonical_url(temporary, URL),
+        WorkspaceError::NoCanonicalUrl(temporary),
+    );
+    unchanged(
+        &mut workspace,
+        |w| w.set_canonical_url(id, "javascript:alert(1)"),
+        WorkspaceError::InvalidUrl,
+    );
+    unchanged(
+        &mut workspace,
+        |w| w.set_canonical_url(999, URL),
+        WorkspaceError::UnknownItem(999),
+    );
+    let restored = Workspace::from_snapshot(workspace.snapshot()).unwrap();
+    assert_eq!(restored, workspace);
+    assert_eq!(
+        restored.differs_from_canonical(id, "https://example.test/elsewhere"),
+        Ok(false)
+    );
+}
+
+#[test]
+fn delete_space_moves_windows_keeps_favorites_and_round_trips() {
+    let mut workspace = Workspace::default();
+    let s2 = workspace.create_space(P1, "Two").unwrap();
+    let s3 = workspace.create_space(P1, "Three").unwrap();
+    let favorite = pin(&mut workspace, s2);
+    workspace
+        .set_placement(favorite, Placement::Favorite { profile_id: P1 }, None)
+        .unwrap();
+    let doomed = pin(&mut workspace, s2);
+    let doomed_temporary = workspace.add_temporary_item(s2).unwrap();
+    let survivor = pin(&mut workspace, S1);
+    let w2 = workspace.create_window(s2).unwrap();
+    let w3 = workspace.create_window(s2).unwrap();
+    let w4 = workspace.create_window(s3).unwrap();
+    workspace.select_item(W1, survivor).unwrap();
+    workspace.select_item(w2, favorite).unwrap();
+    workspace.select_item(w3, doomed).unwrap();
+    workspace.select_item(w4, doomed_temporary).unwrap_err();
+
+    let deletion = workspace.delete_space(s2).unwrap();
+    assert_eq!(deletion.fallback_space, S1);
+    assert_eq!(deletion.removed_items, vec![doomed, doomed_temporary]);
+    assert_eq!(deletion.moved_windows, vec![w2, w3]);
+
+    let sidebar = workspace.sidebar_snapshot(w2).unwrap();
+    assert_eq!(sidebar.current_space.id, S1);
+    assert_eq!(
+        sidebar.spaces.iter().map(|s| s.id).collect::<Vec<_>>(),
+        vec![S1, s3]
+    );
+    assert_eq!(
+        sidebar.favorites.iter().map(|i| i.id).collect::<Vec<_>>(),
+        vec![favorite]
+    );
+    assert_eq!(
+        sidebar.pins.iter().map(|i| i.id).collect::<Vec<_>>(),
+        vec![survivor]
+    );
+    assert_eq!(sidebar.selected_item_id, Some(favorite));
+    assert_eq!(
+        workspace.sidebar_snapshot(w3).unwrap().selected_item_id,
+        None
+    );
+    assert_eq!(
+        workspace.sidebar_snapshot(W1).unwrap().selected_item_id,
+        Some(survivor)
+    );
+    let other = workspace.sidebar_snapshot(w4).unwrap();
+    assert_eq!(other.current_space.id, s3);
+    assert_eq!(other.favorites.len(), 1);
+
+    let restored = Workspace::from_snapshot(workspace.snapshot()).unwrap();
+    assert_eq!(restored, workspace);
+    assert_eq!(restored.snapshot().next_space_id, s3 + 1);
+    assert_eq!(restored.snapshot().next_item_id, doomed_temporary + 2);
+    let mut restored = restored;
+    assert_eq!(restored.create_space(P1, "Four"), Ok(s3 + 1));
+}
+
+#[test]
+fn delete_space_rejects_unknown_last_and_default_without_mutation() {
+    let mut workspace = Workspace::default();
+    unchanged(
+        &mut workspace,
+        |w| w.delete_space(S1),
+        WorkspaceError::LastSpaceInProfile(S1),
+    );
+    let s2 = workspace.create_space(P1, "Two").unwrap();
+    pin(&mut workspace, s2);
+    unchanged(
+        &mut workspace,
+        |w| w.delete_space(S1),
+        WorkspaceError::DefaultSpaceProtected(S1),
+    );
+    unchanged(
+        &mut workspace,
+        |w| w.delete_space(999),
+        WorkspaceError::UnknownSpace(999),
+    );
+    workspace.delete_space(s2).unwrap();
+    unchanged(
+        &mut workspace,
+        |w| w.delete_space(S1),
+        WorkspaceError::LastSpaceInProfile(S1),
+    );
+}
+
+#[test]
+fn delete_space_with_zero_windows_still_works() {
+    let mut workspace = Workspace::default();
+    let s2 = workspace.create_space(P1, "Two").unwrap();
+    workspace.close_window(W1).unwrap();
+    let deletion = workspace.delete_space(s2).unwrap();
+    assert!(deletion.moved_windows.is_empty());
+    assert!(Workspace::from_snapshot(workspace.snapshot()).is_ok());
+}

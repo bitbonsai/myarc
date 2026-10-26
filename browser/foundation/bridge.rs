@@ -102,6 +102,17 @@ mod ffi {
             canonical_url: &str,
         ) -> MutationResult;
         fn remove_saved_item(workspace: &mut Workspace, item_id: u64) -> MutationResult;
+        // Saved items only. Navigation never calls this implicitly.
+        fn set_canonical_url(workspace: &mut Workspace, item_id: u64, url: &str) -> MutationResult;
+        // Saved items only. `id` is 1 when current_url differs from the saved URL, else 0.
+        fn differs_from_canonical(
+            workspace: &Workspace,
+            item_id: u64,
+            current_url: &str,
+        ) -> MutationResult;
+        // `id` is the Space that windows showing the deleted one now show. The caller
+        // confirms first and closes live pages of the deleted Space's items.
+        fn delete_space(workspace: &mut Workspace, space_id: u64) -> MutationResult;
         fn reveal_item(workspace: &mut Workspace, window_id: u64, item_id: u64) -> MutationResult;
         // Zero destination means no live page; zero before means append.
         fn unsave_item(workspace: &mut Workspace, item_id: u64, live_space: u64) -> MutationResult;
@@ -239,6 +250,36 @@ pub fn set_placement(
 
 pub fn remove_saved_item(workspace: &mut Workspace, item_id: u64) -> ffi::MutationResult {
     outcome(workspace.0.remove_saved_item(item_id).map(|()| 0))
+}
+
+pub fn set_canonical_url(
+    workspace: &mut Workspace,
+    item_id: u64,
+    url: &str,
+) -> ffi::MutationResult {
+    outcome(workspace.0.set_canonical_url(item_id, url).map(|()| 0))
+}
+
+pub fn differs_from_canonical(
+    workspace: &Workspace,
+    item_id: u64,
+    current_url: &str,
+) -> ffi::MutationResult {
+    outcome(
+        workspace
+            .0
+            .differs_from_canonical(item_id, current_url)
+            .map(u64::from),
+    )
+}
+
+pub fn delete_space(workspace: &mut Workspace, space_id: u64) -> ffi::MutationResult {
+    outcome(
+        workspace
+            .0
+            .delete_space(space_id)
+            .map(|deletion| deletion.fallback_space),
+    )
 }
 
 pub fn reveal_item(workspace: &mut Workspace, window_id: u64, item_id: u64) -> ffi::MutationResult {

@@ -81,6 +81,12 @@ pub enum WorkspaceError {
     CanonicalUrlRequired,
     UnexpectedCanonicalUrl,
     NotSaved(ItemId),
+    /// Temporary items have no canonical URL to replace or compare.
+    NoCanonicalUrl(ItemId),
+    /// A Profile must keep at least one Space.
+    LastSpaceInProfile(SpaceId),
+    /// Restore requires Space 1, so it cannot be deleted yet.
+    DefaultSpaceProtected(SpaceId),
     ExplicitUnsaveRequired(ItemId),
     DifferentSection(ItemId),
     DuplicateLiveItem(ItemId),
@@ -105,6 +111,9 @@ impl fmt::Display for WorkspaceError {
             Self::CanonicalUrlRequired => formatter.write_str("Supply a canonical URL when saving a temporary item"),
             Self::UnexpectedCanonicalUrl => formatter.write_str("Temporary items cannot store a canonical URL"),
             Self::NotSaved(id) => write!(formatter, "Item {id} is temporary; close its live tab instead"),
+            Self::NoCanonicalUrl(id) => write!(formatter, "Item {id} is temporary and has no pinned URL; pin or favorite it first"),
+            Self::LastSpaceInProfile(id) => write!(formatter, "Space {id} is the last Space in its Profile; create another Space before deleting it"),
+            Self::DefaultSpaceProtected(id) => write!(formatter, "Space {id} is the default Space and cannot be deleted yet"),
             Self::ExplicitUnsaveRequired(id) => write!(formatter, "Item {id} is saved; use unsave_item with its live-page destination"),
             Self::DifferentSection(id) => write!(formatter, "Item {id} belongs to a different placement or owner section"),
             Self::DuplicateLiveItem(id) => write!(formatter, "Live item {id} is listed more than once"),
@@ -169,6 +178,18 @@ pub struct WorkspaceSnapshot {
     pub next_space_id: SpaceId,
     pub next_item_id: ItemId,
     pub next_window_id: WindowId,
+}
+
+/// What `Workspace::delete_space` changed, so adapters can close live pages and
+/// refresh the windows it moved.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SpaceDeletion {
+    /// Space that windows showing the deleted Space now show.
+    pub fallback_space: SpaceId,
+    /// Temporary and Pin items the deleted Space owned, in vector order.
+    pub removed_items: Vec<ItemId>,
+    /// Windows moved to `fallback_space`, in vector order.
+    pub moved_windows: Vec<WindowId>,
 }
 
 /// Owned, bounded projection. Native callers render these sections as supplied.
@@ -254,6 +275,66 @@ impl Workspace {
         });
         self.state.next_space_id = next;
         Ok(id)
+    }
+
+    /// Delete a Space with the Temporary and Pin items it owns (BC-009). Rejects
+    /// the last Space of its Profile and Space 1. Favorites are Profile-scoped and
+    /// stay. Windows showing it move to the previous Space in vector order, or the
+    /// next one when it was first; a selection hidden by the move is cleared.
+    /// Atomic: every check runs before mutation. The caller confirms with the user
+    /// first and closes live pages for `removed_items`. IDs are never reused.
+    pub fn delete_space(&mut self, space_id: SpaceId) -> Result<SpaceDeletion, WorkspaceError> {
+        let profile_id = self.space(space_id)?.profile_id;
+        let siblings: Vec<SpaceId> = self
+            .state
+            .spaces
+            .iter()
+            .filter(|space| space.profile_id == profile_id)
+            .map(|space| space.id)
+            .collect();
+        if siblings.len() < 2 {
+            return Err(WorkspaceError::LastSpaceInProfile(space_id));
+        }
+        if space_id == DEFAULT_SPACE_ID {
+            return Err(WorkspaceError::DefaultSpaceProtected(space_id));
+        }
+        let position = siblings
+            .iter()
+            .position(|&id| id == space_id)
+            .ok_or(WorkspaceError::UnknownSpace(space_id))?;
+        let fallback_space = *siblings
+            .get(position.wrapping_sub(1))
+            .or_else(|| siblings.get(position + 1))
+            .ok_or(WorkspaceError::LastSpaceInProfile(space_id))?;
+        let owned = |placement: Placement| {
+            matches!(
+                placement,
+                Placement::Temporary { space_id: owner } | Placement::Pin { space_id: owner }
+                    if owner == space_id
+            )
+        };
+        let removed_items = self
+            .state
+            .items
+            .iter()
+            .filter(|item| owned(item.placement))
+            .map(|item| item.id)
+            .collect();
+        let mut moved_windows = Vec::new();
+        for window in &mut self.state.windows {
+            if window.space_id == space_id {
+                window.space_id = fallback_space;
+                moved_windows.push(window.id);
+            }
+        }
+        self.state.items.retain(|item| !owned(item.placement));
+        self.state.spaces.retain(|space| space.id != space_id);
+        self.clear_hidden_selections();
+        Ok(SpaceDeletion {
+            fallback_space,
+            removed_items,
+            moved_windows,
+        })
     }
 
     pub fn create_window(&mut self, space_id: SpaceId) -> Result<WindowId, WorkspaceError> {
@@ -382,6 +463,42 @@ impl Workspace {
         }
         self.clear_hidden_selections();
         Ok(())
+    }
+
+    /// Replace a saved item's canonical URL, like Arc's "Replace Pinned URL with
+    /// Current" (BC-003). The caller passes the live page's browser-canonicalized
+    /// URL; this is the only way a saved URL changes besides `set_placement`.
+    /// Temporary items reject with `NoCanonicalUrl`. The same URL is a no-op success.
+    pub fn set_canonical_url(&mut self, item_id: ItemId, url: &str) -> Result<(), WorkspaceError> {
+        if matches!(self.item(item_id)?.placement, Placement::Temporary { .. }) {
+            return Err(WorkspaceError::NoCanonicalUrl(item_id));
+        }
+        validate_url(url)?;
+        for item in &mut self.state.items {
+            if item.id == item_id {
+                item.canonical_url = Some(url.to_owned());
+                break;
+            }
+        }
+        Ok(())
+    }
+
+    /// True when a live saved item shows a page other than its canonical URL, which
+    /// drives Arc's slash next to the pinned name (BC-003). Comparison is exact string
+    /// equality, so the caller must normalize `current_url` the same way as the saved
+    /// URL; a trailing slash or fragment difference counts as navigated away. The
+    /// string is not validated (pages may show any scheme) and is never stored.
+    /// Temporary items reject with `NoCanonicalUrl`.
+    pub fn differs_from_canonical(
+        &self,
+        item_id: ItemId,
+        current_url: &str,
+    ) -> Result<bool, WorkspaceError> {
+        self.item(item_id)?
+            .canonical_url
+            .as_deref()
+            .map(|canonical| canonical != current_url)
+            .ok_or(WorkspaceError::NoCanonicalUrl(item_id))
     }
 
     /// Temporary identity ends on close. Saved identity and selection survive;
@@ -794,5 +911,148 @@ mod tests {
         assert_eq!(first.rename_space(TEST_SPACE_ID, "Research"), Ok(()));
         assert_eq!(first.space_name(), "Research");
         assert_eq!(second.space_name(), "Everyday");
+    }
+
+    const URL_A: &str = "https://example.test/a";
+    const URL_B: &str = "https://example.test/b";
+
+    fn pin(workspace: &mut Workspace, space: SpaceId) -> ItemId {
+        let id = workspace.add_temporary_item(space).unwrap();
+        workspace
+            .set_placement(id, Placement::Pin { space_id: space }, Some(URL_A))
+            .unwrap();
+        id
+    }
+
+    #[test]
+    fn set_canonical_url_replaces_pin_and_favorite() {
+        let mut workspace = Workspace::default();
+        let id = pin(&mut workspace, DEFAULT_SPACE_ID);
+        assert_eq!(workspace.set_canonical_url(id, URL_B), Ok(()));
+        assert_eq!(
+            workspace.item(id).unwrap().canonical_url.as_deref(),
+            Some(URL_B)
+        );
+        assert_eq!(workspace.set_canonical_url(id, URL_B), Ok(()));
+        let placement = Placement::Favorite {
+            profile_id: DEFAULT_PROFILE_ID,
+        };
+        workspace.set_placement(id, placement, None).unwrap();
+        assert_eq!(workspace.set_canonical_url(id, URL_A), Ok(()));
+        let item = workspace.item(id).unwrap();
+        assert_eq!(item.placement, placement);
+        assert_eq!(item.canonical_url.as_deref(), Some(URL_A));
+    }
+
+    #[test]
+    fn set_canonical_url_rejects_without_mutation() {
+        let mut workspace = Workspace::default();
+        let id = pin(&mut workspace, DEFAULT_SPACE_ID);
+        let temporary = workspace.add_temporary_item(DEFAULT_SPACE_ID).unwrap();
+        let before = workspace.snapshot();
+        assert_eq!(
+            workspace.set_canonical_url(99, URL_B),
+            Err(WorkspaceError::UnknownItem(99))
+        );
+        assert_eq!(
+            workspace.set_canonical_url(temporary, URL_B),
+            Err(WorkspaceError::NoCanonicalUrl(temporary))
+        );
+        for bad in [
+            "",
+            "ftp://example.test",
+            "https://u@example.test",
+            "https://a b",
+        ] {
+            assert_eq!(
+                workspace.set_canonical_url(id, bad),
+                Err(WorkspaceError::InvalidUrl)
+            );
+        }
+        assert_eq!(workspace.snapshot(), before);
+    }
+
+    #[test]
+    fn differs_from_canonical_is_exact_comparison() {
+        let mut workspace = Workspace::default();
+        let id = pin(&mut workspace, DEFAULT_SPACE_ID);
+        assert_eq!(workspace.differs_from_canonical(id, URL_A), Ok(false));
+        assert_eq!(workspace.differs_from_canonical(id, URL_B), Ok(true));
+        assert_eq!(
+            workspace.differs_from_canonical(id, "https://example.test/a/"),
+            Ok(true)
+        );
+        assert_eq!(workspace.differs_from_canonical(id, ""), Ok(true));
+        assert_eq!(
+            workspace.differs_from_canonical(id, "chrome://settings"),
+            Ok(true)
+        );
+        workspace.set_canonical_url(id, URL_B).unwrap();
+        assert_eq!(workspace.differs_from_canonical(id, URL_B), Ok(false));
+        let temporary = workspace.add_temporary_item(DEFAULT_SPACE_ID).unwrap();
+        assert_eq!(
+            workspace.differs_from_canonical(temporary, URL_A),
+            Err(WorkspaceError::NoCanonicalUrl(temporary))
+        );
+        assert_eq!(
+            workspace.differs_from_canonical(99, URL_A),
+            Err(WorkspaceError::UnknownItem(99))
+        );
+    }
+
+    #[test]
+    fn delete_space_removes_owned_items_and_keeps_others() {
+        let mut workspace = Workspace::default();
+        let s2 = workspace.create_space(DEFAULT_PROFILE_ID, "Two").unwrap();
+        let s3 = workspace.create_space(DEFAULT_PROFILE_ID, "Three").unwrap();
+        let kept = pin(&mut workspace, DEFAULT_SPACE_ID);
+        let owned_pin = pin(&mut workspace, s2);
+        let owned_temporary = workspace.add_temporary_item(s2).unwrap();
+        let other = pin(&mut workspace, s3);
+        let deletion = workspace.delete_space(s2).unwrap();
+        assert_eq!(deletion.removed_items, vec![owned_pin, owned_temporary]);
+        assert_eq!(deletion.fallback_space, DEFAULT_SPACE_ID);
+        let state = workspace.snapshot();
+        let ids: Vec<ItemId> = state.items.iter().map(|item| item.id).collect();
+        assert_eq!(ids, vec![kept, other]);
+        let spaces: Vec<SpaceId> = state.spaces.iter().map(|space| space.id).collect();
+        assert_eq!(spaces, vec![DEFAULT_SPACE_ID, s3]);
+        assert_eq!(
+            workspace.create_space(DEFAULT_PROFILE_ID, "Four"),
+            Ok(s3 + 1)
+        );
+    }
+
+    #[test]
+    fn delete_space_picks_previous_then_next_neighbor() {
+        let mut workspace = Workspace::default();
+        let s2 = workspace.create_space(DEFAULT_PROFILE_ID, "Two").unwrap();
+        let s3 = workspace.create_space(DEFAULT_PROFILE_ID, "Three").unwrap();
+        assert_eq!(workspace.delete_space(s3).unwrap().fallback_space, s2);
+        assert_eq!(
+            workspace.delete_space(s2).unwrap().fallback_space,
+            DEFAULT_SPACE_ID
+        );
+    }
+
+    #[test]
+    fn delete_space_rejects_without_mutation() {
+        let mut workspace = Workspace::default();
+        assert_eq!(
+            workspace.delete_space(DEFAULT_SPACE_ID),
+            Err(WorkspaceError::LastSpaceInProfile(DEFAULT_SPACE_ID))
+        );
+        let s2 = workspace.create_space(DEFAULT_PROFILE_ID, "Two").unwrap();
+        pin(&mut workspace, s2);
+        let before = workspace.snapshot();
+        assert_eq!(
+            workspace.delete_space(DEFAULT_SPACE_ID),
+            Err(WorkspaceError::DefaultSpaceProtected(DEFAULT_SPACE_ID))
+        );
+        assert_eq!(
+            workspace.delete_space(99),
+            Err(WorkspaceError::UnknownSpace(99))
+        );
+        assert_eq!(workspace.snapshot(), before);
     }
 }

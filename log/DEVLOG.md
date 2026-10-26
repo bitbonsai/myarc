@@ -5,6 +5,11 @@
 - With `--myarc-visual-parity` and `--myarc-workspace-sidebar`, Cmd+D pins or unpins the current tab, Ctrl+1..9 and Option+Cmd+Left/Right select Spaces, and Cmd+1..9 plus Option+Cmd+Up/Down follow sidebar order (Favorites, Pins, unpinned; 9 is last). The adapter reads order from Rust `sidebar_snapshot`; new command IDs live in `myarc/command_ids.h` so `chrome_command_ids.h` stays untouched. Committed Chromium `634ce5fc20`.
 - Verification: `GlobalKeyboardShortcuts.*` 5/5 in stock and myArc modes; browser tests 9/9 (`MyarcWorkspaceCommandSafetyTest.{PinShortcut,SpaceShortcuts,ItemShortcuts}*` legacy and actions, `AcceleratorsCocoaBrowserTest.*`, `MyarcAcceleratorsCocoaBrowserTest.*`); background capture launches with the sidebar drawn. Keystrokes were not sent. Seven older `MyarcWorkspaceCommandSafetyTest` cases fail with or without this change.
 - Open: steps wrap, and Arc's wrap behavior is unverified. Cmd+D leaves a Favorite unchanged. Option+Cmd+Up/Down replaces stock pane focus, and Bookmark This Tab loses Cmd+D. Also added the committed `archive`, `peek` and `tab_ops` modules to the GN `workspace` sources, which the native build needed.
+## 2026-10-26: Canonical URL replacement and Space deletion rules
+
+- Added to `crates/workspace/src/lib.rs` and `browser/foundation/bridge.rs`: `set_canonical_url` (Replace Pinned URL with Current), `differs_from_canonical` (exact-string query for the pinned slash) and `delete_space` (removes the Space's pins and temporary items, keeps Favorites, moves windows to the previous Space). Contracts BC-003 and new BC-009; backlog lines and Next 15 items 2, 3, 9 marked partial.
+- Unknown: Arc's saved sources do not say what happens to pinned tabs on Space deletion or whether the slash ignores fragments; Space 1 stays undeletable because restore requires it. Both are listed in the contracts.
+- Verification: unit and semantics tests for each rule, errors and snapshot round trip. Rules only; no menu, dialog, slash or live-page close, and bridge.rs is format-checked but not compiled here.
 
 ## 2026-10-26: Pure Clear Unpinned and recent-tab rules
 
