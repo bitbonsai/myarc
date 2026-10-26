@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-10-26: Command palette matches Arc's geometry
+
+- Changed: the palette is now 766×328.5 pt at x=337 pt, centered 5 pt above window center like Arc. It has a 1 pt #454646 border, #181919 fill, 12 pt radius, 63 pt input row with medium 18 pt text, hairline separator and 46 pt rows on a 50 pt pitch with medium 14 pt text. Selected rows use #4248CF with a white icon tile and arrow chip, and the shadow is a larger elevation-40 one. Light mode keeps Chromium color roles.
+- Measured in the 1540×665 px region around Arc's palette against a fresh native capture with five synthetic tabs: pixels differing at 5% fuzz fell from 6.64% to 2.10%, RMSE from 0.208 to 0.108. Border, separator, row, chip and arrow positions match to 1 px; light mode rendered, and typing plus Enter switched to the matching tab.
+- Still differs: rows sit 0.5 pt low and the palette is 0.5 pt taller because views lay out in whole DIPs. Text runs about 3% wider since Arc tracks tighter. The placeholder is #8E9098 rather than #979797 because textfields only accept color ids. The magnifier glyph and globe icons (no favicons yet) differ, and the shadow is lighter than Arc's.
+
 ## 2026-10-26: Website source checkpoint and Markdown negotiation
 
 The published site now includes Mauricio Wolff author metadata, portrait and reading time, a transparent logo index thumbnail, the personal Arc-preservation post, and the user-approved alpha Arc reference. Gallery arrows use bounded blur/fade swaps with reduced-motion handling; zoom sources preload at low priority. Dark body text is softer, and CTA hover scaling respects pointer capability and reduced motion. The existing live logo remains unchanged; studies are parked.

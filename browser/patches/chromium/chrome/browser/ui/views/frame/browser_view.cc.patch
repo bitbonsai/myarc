@@ -1,5 +1,5 @@
 diff --git a/chrome/browser/ui/views/frame/browser_view.cc b/chrome/browser/ui/views/frame/browser_view.cc
-index 7b568f6de760af21d6e9d2aa44415a7cef617c51..dd50027bad1b699bec17aaba7dccc961dc25aade 100644
+index 7b568f6de760af21d6e9d2aa44415a7cef617c51..a63b1e8fefcd7a84d9bf23116798dc5363cab14b 100644
 --- a/chrome/browser/ui/views/frame/browser_view.cc
 +++ b/chrome/browser/ui/views/frame/browser_view.cc
 @@ -22,6 +22,7 @@
@@ -91,13 +91,15 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..dd50027bad1b699bec17aaba7dccc961
  #include "ui/gfx/animation/animation_runner.h"
  #include "ui/gfx/canvas.h"
  #include "ui/gfx/color_utils.h"
-@@ -353,12 +369,20 @@
+@@ -353,12 +369,22 @@
  #include "ui/views/accessibility/view_accessibility.h"
  #include "ui/views/accessibility/view_accessibility_utils.h"
  #include "ui/views/animation/compositor_animation_runner.h"
 +#include "ui/views/background.h"
 +#include "ui/views/border.h"
++#include "ui/views/bubble/bubble_border.h"
  #include "ui/views/bubble/bubble_dialog_delegate_view.h"
++#include "ui/views/bubble/bubble_frame_view.h"
 +#include "ui/views/controls/button/label_button.h"
  #include "ui/views/controls/button/menu_button.h"
 +#include "ui/views/controls/image_view.h"
@@ -112,7 +114,15 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..dd50027bad1b699bec17aaba7dccc961
  #include "ui/views/layout/fill_layout.h"
  #include "ui/views/view.h"
  #include "ui/views/view_class_properties.h"
-@@ -659,6 +683,378 @@ bool ConvertedHitTest(views::View* src, views::View* dst, gfx::Point* point) {
+@@ -370,6 +396,7 @@
+ #include "ui/views/widget/widget.h"
+ #include "ui/views/window/dialog_delegate.h"
+ #include "ui/views/window/hit_test_utils.h"
++#include "ui/views/window/non_client_view.h"
+ 
+ #if BUILDFLAG(IS_CHROMEOS)
+ #include "ash/constants/ash_switches.h"
+@@ -659,6 +686,512 @@ bool ConvertedHitTest(views::View* src, views::View* dst, gfx::Point* point) {
    return dst->HitTestPoint(*point);
  }
  
@@ -132,6 +142,57 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..dd50027bad1b699bec17aaba7dccc961
 +BEGIN_METADATA(MyarcPaletteResultButton)
 +END_METADATA
 +
++// Paints a single device-pixel line across its contents bounds.
++class MyarcPaletteHairline : public views::View {
++  METADATA_HEADER(MyarcPaletteHairline, views::View)
++
++ public:
++  void SetColor(SkColor color) {
++    color_ = color;
++    SchedulePaint();
++  }
++
++  void OnPaint(gfx::Canvas* canvas) override {
++    gfx::ScopedCanvas scoped_canvas(canvas);
++    const float dsf = canvas->UndoDeviceScaleFactor();
++    const gfx::Rect bounds = GetContentsBounds();
++    const int x = std::ceil(bounds.x() * dsf);
++    canvas->FillRect(gfx::Rect(x, std::floor(bounds.y() * dsf),
++                               std::floor(bounds.right() * dsf) - x, 1),
++                     color_);
++  }
++
++ private:
++  SkColor color_ = SK_ColorTRANSPARENT;
++};
++
++BEGIN_METADATA(MyarcPaletteHairline)
++END_METADATA
++
++// Centers the visible palette, not its shadow, 5 DIP above the browser
++// window's center like Arc.
++class MyarcPaletteBubbleDelegate : public views::BubbleDialogDelegate {
++ public:
++  explicit MyarcPaletteBubbleDelegate(views::View* anchor)
++      : views::BubbleDialogDelegate(anchor, views::BubbleBorder::FLOAT) {}
++
++  gfx::Rect GetAnchorRect() const override {
++    gfx::Rect rect = views::BubbleDialogDelegate::GetAnchorRect();
++    int offset = -5;
++    auto* frame = GetWidget() && GetWidget()->non_client_view()
++                      ? static_cast<views::BubbleFrameView*>(
++                            GetWidget()->non_client_view()->frame_view())
++                      : nullptr;
++    if (frame && frame->bubble_border()) {
++      // FLOAT centers the whole frame; the shadow is taller below the bubble.
++      const gfx::Insets shadow = frame->bubble_border()->GetInsets();
++      offset += (shadow.bottom() - shadow.top()) / 2;
++    }
++    rect.Offset(0, offset);
++    return rect;
++  }
++};
++
 +class MyarcPaletteView : public views::BoxLayoutView,
 +                         public views::TextfieldController {
 +  METADATA_HEADER(MyarcPaletteView, views::BoxLayoutView)
@@ -146,28 +207,31 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..dd50027bad1b699bec17aaba7dccc961
 +        new_tab_(new_tab),
 +        initial_text_(std::move(initial_text)) {
 +    SetOrientation(views::BoxLayout::Orientation::kVertical);
-+    SetBetweenChildSpacing(8);
++    // Geometry follows the Arc reference: 1 DIP border, 63 DIP input row,
++    // hairline separator, 46 DIP rows on a 50 DIP pitch.
 +    auto* header = AddChildView(std::make_unique<views::BoxLayoutView>());
 +    header->SetOrientation(views::BoxLayout::Orientation::kHorizontal);
 +    header->SetCrossAxisAlignment(
 +        views::BoxLayout::CrossAxisAlignment::kCenter);
-+    auto* icon = header->AddChildView(std::make_unique<views::ImageView>());
-+    icon->SetImage(ui::ImageModel::FromVectorIcon(vector_icons::kSearchIcon,
-+                                                  ui::kColorSysOnSurface, 18));
++    header->SetInsideBorderInsets(gfx::Insets::TLBR(0, 23, 0, 12));
++    search_icon_ = header->AddChildView(std::make_unique<views::ImageView>());
 +    input_ = header->AddChildView(std::make_unique<views::Textfield>());
 +    input_->SetController(this);
 +    input_->SetPlaceholderText(u"Search or Enter URL...");
 +    input_->GetViewAccessibility().SetName(u"Search or Enter URL");
 +    input_->SetTextInputType(ui::TEXT_INPUT_TYPE_URL);
-+    input_->SetFontList(gfx::FontList().DeriveWithSizeDelta(5));
-+    input_->SetBackgroundColor(ui::kColorBubbleBackground);
-+    input_->SetTextColorId(ui::kColorSysOnSurface);
-+    input_->SetPlaceholderTextColorId(ui::kColorSysOnSurfaceVariant);
-+    input_->SetBorder(views::CreateEmptyBorder(gfx::Insets::VH(8, 12)));
++    input_->SetFontList(gfx::FontList().DeriveWithSizeDelta(5).DeriveWithWeight(
++        gfx::Font::Weight::MEDIUM));
++    input_->SetBorder(views::CreateEmptyBorder(gfx::Insets::TLBR(8, 10, 8, 0)));
 +    header->SetFlexForView(input_, 1);
-+    header->SetPreferredSize(gfx::Size(width_, 52));
++    header->SetPreferredSize(gfx::Size(width_ - 2, 63));
++    separator_ = AddChildView(std::make_unique<MyarcPaletteHairline>());
++    separator_->SetBorder(
++        views::CreateEmptyBorder(gfx::Insets::TLBR(0, 11, 0, 11)));
++    separator_->SetPreferredSize(gfx::Size(width_ - 2, 1));
 +    rows_ = AddChildView(std::make_unique<views::BoxLayoutView>());
 +    rows_->SetOrientation(views::BoxLayout::Orientation::kVertical);
++    rows_->SetInsideBorderInsets(gfx::Insets::TLBR(6, 9, 11, 9));
 +    rows_->SetBetweenChildSpacing(4);
 +    error_ = AddChildView(std::make_unique<views::Label>());
 +    error_->SetEnabledColor(ui::kColorSysError);
@@ -178,6 +242,41 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..dd50027bad1b699bec17aaba7dccc961
 +  }
 +
 +  views::Textfield* input() { return input_; }
++
++  void OnThemeChanged() override {
++    views::BoxLayoutView::OnThemeChanged();
++    dark_ = color_utils::IsDark(
++        GetColorProvider()->GetColor(ui::kColorBubbleBackground));
++    const ui::ColorVariant background =
++        dark_ ? ui::ColorVariant(kDarkBackground)
++              : ui::ColorVariant(ui::kColorBubbleBackground);
++    if (GetWidget() &&
++        GetWidget()->widget_delegate()->AsBubbleDialogDelegate()) {
++      GetWidget()
++          ->widget_delegate()
++          ->AsBubbleDialogDelegate()
++          ->SetBackgroundColor(background);
++    }
++    SetBorder(views::CreateRoundedRectBorder(
++        1, 12,
++        dark_ ? ui::ColorVariant(kDarkBorder)
++              : ui::ColorVariant(ui::kColorBubbleBorder)));
++    search_icon_->SetImage(ui::ImageModel::FromVectorIcon(
++        vector_icons::kSearchChromeRefreshOldIcon,
++        dark_ ? ui::ColorVariant(SK_ColorWHITE)
++              : ui::ColorVariant(ui::kColorSysOnSurface),
++        17));
++    input_->SetBackgroundColor(background);
++    input_->SetTextColorId(ui::kColorSysOnSurface);
++    // Textfield placeholders only take color ids; this is the nearest dark
++    // neutral to Arc's #979797.
++    input_->SetPlaceholderTextColorId(dark_ ? ui::kColorSysOutline
++                                            : ui::kColorSysOnSurfaceVariant);
++    separator_->SetColor(
++        dark_ ? kDarkSeparator
++              : GetColorProvider()->GetColor(ui::kColorSeparator));
++    UpdateSelection();
++  }
 +
 +  void SetIntent(bool new_tab, std::u16string initial_text) {
 +    if (new_tab_ != new_tab) {
@@ -246,10 +345,21 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..dd50027bad1b699bec17aaba7dccc961
 +  }
 +
 + private:
++  // Dark palette colors measured from Arc captures.
++  static constexpr SkColor kDarkBackground = SkColorSetRGB(0x18, 0x19, 0x19);
++  static constexpr SkColor kDarkBorder = SkColorSetRGB(0x45, 0x46, 0x46);
++  static constexpr SkColor kDarkSeparator = SkColorSetRGB(0x2F, 0x30, 0x30);
++  static constexpr SkColor kDarkTitle = SkColorSetRGB(0xD1, 0xD1, 0xD1);
++  static constexpr SkColor kDarkHint = SkColorSetRGB(0x64, 0x65, 0x65);
++  static constexpr SkColor kDarkChip = SkColorSetRGB(0x24, 0x25, 0x25);
++  static constexpr SkColor kDarkChipArrow = SkColorSetRGB(0xB5, 0xB5, 0xB5);
++  static constexpr SkColor kSelected = SkColorSetRGB(0x41, 0x48, 0xD7);
++
 +  void Resize() {
 +    const int row_count = std::max(1, static_cast<int>(buttons_.size()));
++    // Border, input row, separator and row insets plus a 50 DIP row pitch.
 +    SetPreferredSize(gfx::Size(
-+        width_, 60 + row_count * 48 + (error_->GetVisible() ? 32 : 0)));
++        width_, 79 + row_count * 50 + (error_->GetVisible() ? 32 : 0)));
 +    if (GetWidget()) {
 +      GetWidget()
 +          ->widget_delegate()
@@ -262,50 +372,79 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..dd50027bad1b699bec17aaba7dccc961
 +    for (size_t i = 0; i < buttons_.size(); ++i) {
 +      const bool selected = static_cast<int>(i) == selected_;
 +      buttons_[i]->SetBackground(views::CreateRoundedRectBackground(
-+          selected ? SkColorSetRGB(66, 66, 210) : SK_ColorTRANSPARENT, 8));
++          selected ? kSelected : SK_ColorTRANSPARENT, 6));
 +      const ui::ColorVariant foreground =
 +          selected ? ui::ColorVariant(SK_ColorWHITE)
++          : dark_  ? ui::ColorVariant(kDarkTitle)
 +                   : ui::ColorVariant(ui::kColorSysOnSurface);
 +      buttons_[i]->title()->SetEnabledColor(foreground);
 +      actions_[i]->SetEnabledColor(
 +          selected ? ui::ColorVariant(SK_ColorWHITE)
++          : dark_  ? ui::ColorVariant(kDarkHint)
 +                   : ui::ColorVariant(ui::kColorSysOnSurfaceVariant));
++      // Selected rows put the icon on a white tile, as Arc does for favicons.
++      icons_[i]->SetBackground(
++          selected ? views::CreateRoundedRectBackground(SK_ColorWHITE, 6)
++                   : nullptr);
 +      icons_[i]->SetImage(ui::ImageModel::FromVectorIcon(
 +          i < matches_.size() ? vector_icons::kGlobeIcon
 +                              : vector_icons::kHistoryIcon,
-+          foreground, 16));
++          selected ? ui::ColorVariant(kSelected) : foreground, 17));
++      chips_[i]->SetBackground(views::CreateRoundedRectBackground(
++          selected ? ui::ColorVariant(SK_ColorWHITE)
++          : dark_  ? ui::ColorVariant(kDarkChip)
++                   : ui::ColorVariant(ui::kColorSysSurfaceVariant),
++          4));
++      chips_[i]->SetImage(ui::ImageModel::FromVectorIcon(
++          vector_icons::kArrowForwardIcon,
++          selected ? ui::ColorVariant(kSelected)
++          : dark_  ? ui::ColorVariant(kDarkChipArrow)
++                   : ui::ColorVariant(ui::kColorSysOnSurfaceVariant),
++          20));
 +    }
 +  }
 +
 +  void AddResultRow(const std::u16string& title,
 +                    const std::u16string& address,
 +                    bool is_tab) {
++    const gfx::FontList row_font =
++        gfx::FontList().DeriveWithSizeDelta(1).DeriveWithWeight(
++            gfx::Font::Weight::MEDIUM);
 +    HoverButton::Params params;
-+    auto icon =
-+        std::make_unique<views::ImageView>(ui::ImageModel::FromVectorIcon(
-+            is_tab ? vector_icons::kGlobeIcon : vector_icons::kHistoryIcon,
-+            ui::kColorSysOnSurface, 16));
++    auto icon = std::make_unique<views::ImageView>();
++    icon->SetPreferredSize(gfx::Size(24, 24));
 +    icons_.push_back(icon.get());
 +    params.icon_view = std::move(icon);
 +    params.title = title;
 +    params.add_vertical_label_spacing = false;
-+    auto action = std::make_unique<views::Label>(
-+        is_tab ? u"Switch to Tab  \u2192" : u"Open from History  \u2192");
++    params.icon_label_spacing = 8;
++    auto secondary = std::make_unique<views::BoxLayoutView>();
++    secondary->SetBetweenChildSpacing(8);
++    secondary->SetCrossAxisAlignment(
++        views::BoxLayout::CrossAxisAlignment::kCenter);
++    auto* action = secondary->AddChildView(std::make_unique<views::Label>(
++        is_tab ? u"Switch to Tab" : u"Open from History"));
++    action->SetFontList(row_font);
 +    action->SetSubpixelRenderingEnabled(false);
 +    action->SetAutoColorReadabilityEnabled(false);
-+    actions_.push_back(action.get());
-+    params.secondary_view = std::move(action);
++    actions_.push_back(action);
++    auto* chip = secondary->AddChildView(std::make_unique<views::ImageView>());
++    chip->SetPreferredSize(gfx::Size(24, 24));
++    chips_.push_back(chip);
++    params.secondary_view = std::move(secondary);
 +    auto* button =
 +        rows_->AddChildView(std::make_unique<MyarcPaletteResultButton>(
 +            base::BindRepeating(&MyarcPaletteView::ActivateResult,
 +                                base::Unretained(this),
 +                                static_cast<int>(buttons_.size())),
 +            std::move(params)));
++    button->title()->SetFontList(row_font);
 +    button->title()->SetSubpixelRenderingEnabled(false);
 +    button->title()->SetAutoColorReadabilityEnabled(false);
 +    button->title()->SetEnabledColor(ui::kColorSysOnSurface);
-+    button->SetBorder(views::CreateEmptyBorder(gfx::Insets::VH(10, 12)));
-+    button->SetPreferredSize(gfx::Size(width_, 44));
++    button->SetBorder(
++        views::CreateEmptyBorder(gfx::Insets::TLBR(0, 10, 0, 13)));
++    button->SetPreferredSize(gfx::Size(width_ - 20, 46));
 +    button->SetTooltipText(address);
 +    button->AddExtraAccessibleText(is_tab ? u"Switch to Tab"
 +                                          : u"Open from History");
@@ -349,6 +488,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..dd50027bad1b699bec17aaba7dccc961
 +    buttons_.clear();
 +    actions_.clear();
 +    icons_.clear();
++    chips_.clear();
 +    matches_.clear();
 +    history_urls_.clear();
 +    rows_->RemoveAllChildViews();
@@ -392,7 +532,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..dd50027bad1b699bec17aaba7dccc961
 +          new_tab_ ? u"Enter opens a new tab. Esc cancels."
 +                   : u"Enter updates the current tab. Esc cancels."));
 +      hint->SetEnabledColor(ui::kColorSysOnSurfaceVariant);
-+      hint->SetPreferredSize(gfx::Size(width_, 44));
++      hint->SetPreferredSize(gfx::Size(width_ - 20, 46));
 +    } else if (new_tab_) {
 +      selected_ = 0;
 +      UpdateSelection();
@@ -472,14 +612,18 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..dd50027bad1b699bec17aaba7dccc961
 +  const int width_;
 +  bool new_tab_;
 +  std::u16string initial_text_;
++  raw_ptr<views::ImageView> search_icon_ = nullptr;
 +  raw_ptr<views::Textfield> input_ = nullptr;
++  raw_ptr<MyarcPaletteHairline> separator_ = nullptr;
 +  raw_ptr<views::BoxLayoutView> rows_ = nullptr;
 +  raw_ptr<views::Label> error_ = nullptr;
 +  std::vector<base::WeakPtr<content::WebContents>> matches_;
 +  std::vector<raw_ptr<HoverButton>> buttons_;
 +  std::vector<raw_ptr<views::Label>> actions_;
 +  std::vector<raw_ptr<views::ImageView>> icons_;
++  std::vector<raw_ptr<views::ImageView>> chips_;
 +  std::vector<GURL> history_urls_;
++  bool dark_ = true;
 +  base::CancelableTaskTracker history_tasks_;
 +  int selected_ = -1;
 +  base::WeakPtrFactory<MyarcPaletteView> weak_factory_{this};
@@ -491,7 +635,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..dd50027bad1b699bec17aaba7dccc961
  }  // namespace
  
  // Implements the exclusive access context and bubble context.
-@@ -1124,6 +1520,20 @@ BrowserView::~BrowserView() {
+@@ -1124,6 +1657,20 @@ BrowserView::~BrowserView() {
    // other cleanups that destroy views referenced in the layout manager.
    SetLayoutManager(nullptr);
  
@@ -512,7 +656,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..dd50027bad1b699bec17aaba7dccc961
    tab_search_bubble_host_.reset();
  
    global_error_observation_.Reset();
-@@ -1624,6 +2034,7 @@ void BrowserView::OnVerticalTabStripModeChanged(
+@@ -1624,6 +2171,7 @@ void BrowserView::OnVerticalTabStripModeChanged(
      horizontal_tab_strip_region_view_->InitializeTabStrip();
    }
  
@@ -520,7 +664,30 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..dd50027bad1b699bec17aaba7dccc961
    GetFrameView()->OnTabStripStateChanged();
  
    UpdateTabSearchBubbleHost();
-@@ -1992,6 +2403,15 @@ void BrowserView::OnActiveTabChanged(content::WebContents* old_contents,
+@@ -1681,6 +2229,22 @@ void BrowserView::Show() {
+ 
+   OnWindowDidShow();
+ 
++  // Capture scripts open the palette without keystrokes, so the window can
++  // stay in the background instead of taking focus from the user.
++  if (base::CommandLine::ForCurrentProcess()->HasSwitch(
++          "myarc-capture-open-palette")) {
++    base::SingleThreadTaskRunner::GetCurrentDefault()->PostDelayedTask(
++        FROM_HERE,
++        base::BindOnce(
++            [](base::WeakPtr<BrowserView> view) {
++              if (view) {
++                view->ShowMyarcCommandPalette(true);
++              }
++            },
++            weak_ptr_factory_.GetWeakPtr()),
++        base::Seconds(2));
++  }
++
+   // The fullscreen transition clears out focus, but there are some cases (for
+   // example, new window in Mac fullscreen with toolbar showing) where we need
+   // restore it.
+@@ -1992,6 +2556,15 @@ void BrowserView::OnActiveTabChanged(content::WebContents* old_contents,
                                       int index,
                                       int reason) {
    CHECK(new_contents, base::NotFatalUntil::M162);
@@ -536,7 +703,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..dd50027bad1b699bec17aaba7dccc961
    TRACE_EVENT0("ui", "BrowserView::OnActiveTabChanged");
    views::WebView* active_contents_view = GetActiveContentsWebView();
    bool tab_change_in_split_view =
-@@ -2014,6 +2434,47 @@ void BrowserView::OnActiveTabChanged(content::WebContents* old_contents,
+@@ -2014,6 +2587,47 @@ void BrowserView::OnActiveTabChanged(content::WebContents* old_contents,
        active_contents_view->web_contents() != new_contents &&
        !tab_change_in_split_view;
  
@@ -584,7 +751,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..dd50027bad1b699bec17aaba7dccc961
    bool will_restore_focus = !browser_->GetTabStripModel()->closing_all() &&
                              GetWidget()->IsVisible() &&
                              !tab_change_in_split_view;
-@@ -2139,6 +2600,23 @@ void BrowserView::OnActiveTabChanged(content::WebContents* old_contents,
+@@ -2139,6 +2753,23 @@ void BrowserView::OnActiveTabChanged(content::WebContents* old_contents,
    UpdateTitleBar();
  
    CHECK_DEREF(TranslateBubbleController::From(browser_.get())).CloseBubble();
@@ -608,7 +775,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..dd50027bad1b699bec17aaba7dccc961
  }
  
  void BrowserView::OnTabDetached(content::WebContents* contents,
-@@ -2258,6 +2736,20 @@ bool BrowserView::IsFullscreen() const {
+@@ -2258,6 +2889,20 @@ bool BrowserView::IsFullscreen() const {
  }
  
  void BrowserView::RestoreFocus() {
@@ -629,7 +796,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..dd50027bad1b699bec17aaba7dccc961
    WebContents* selected_web_contents = GetActiveWebContents();
    if (selected_web_contents) {
      selected_web_contents->RestoreFocus();
-@@ -2363,6 +2855,13 @@ PinnedToolbarActions* BrowserView::GetPinnedToolbarActions() {
+@@ -2363,6 +3008,13 @@ PinnedToolbarActions* BrowserView::GetPinnedToolbarActions() {
  }
  
  void BrowserView::SetFocusToLocationBar(bool is_user_initiated) {
@@ -643,7 +810,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..dd50027bad1b699bec17aaba7dccc961
    // On Windows, changing focus to the location bar causes the browser window to
    // become active. This can steal focus if the user has another window open
    // already. On Chrome OS, changing focus makes a view believe it has a focus
-@@ -2383,16 +2882,25 @@ void BrowserView::SetFocusToLocationBar(bool is_user_initiated) {
+@@ -2383,16 +3035,25 @@ void BrowserView::SetFocusToLocationBar(bool is_user_initiated) {
  }
  
  void BrowserView::UpdateReloadStopState(bool is_loading, bool force) {
@@ -669,7 +836,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..dd50027bad1b699bec17aaba7dccc961
    // We may end up here during destruction.
    if (toolbar_) {
      toolbar_->Update(contents);
-@@ -2404,6 +2912,9 @@ void BrowserView::UpdateToolbar(content::WebContents* contents) {
+@@ -2404,6 +3065,9 @@ void BrowserView::UpdateToolbar(content::WebContents* contents) {
  }
  
  bool BrowserView::UpdateToolbarSecurityState() {
@@ -679,7 +846,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..dd50027bad1b699bec17aaba7dccc961
    // We may end up here during destruction.
    if (toolbar_) {
      return toolbar_->UpdateSecurityState();
-@@ -3414,7 +3925,7 @@ void BrowserView::CutCopyPaste(int command_id) {
+@@ -3414,7 +4078,7 @@ void BrowserView::CutCopyPaste(int command_id) {
    // key events (and not accelerators) to the WebContents so it can give the web
    // page a chance to override them.
    WebContents* contents = browser_->GetTabStripModel()->GetActiveWebContents();
@@ -688,7 +855,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..dd50027bad1b699bec17aaba7dccc961
      void (WebContents::*method)();
      if (command_id == IDC_CUT) {
        method = &content::WebContents::Cut;
-@@ -3483,6 +3994,10 @@ LocationBarView* BrowserView::GetLocationBarView() const {
+@@ -3483,6 +4147,10 @@ LocationBarView* BrowserView::GetLocationBarView() const {
  // BrowserView, TabStripModelObserver implementation:
  
  void BrowserView::OnSplitTabChanged(const SplitTabChange& change) {
@@ -699,7 +866,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..dd50027bad1b699bec17aaba7dccc961
    switch (change.type) {
      case SplitTabChange::Type::kAdded: {
        const tabs::TabInterface* active_tab =
-@@ -3690,6 +4205,9 @@ bool BrowserView::CanActivate() const {
+@@ -3690,6 +4358,9 @@ bool BrowserView::CanActivate() const {
  }
  
  std::u16string BrowserView::GetWindowTitle() const {
@@ -709,7 +876,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..dd50027bad1b699bec17aaba7dccc961
    std::u16string title =
        WindowMetadataController::From(browser_.get())
            ->GetWindowTitleForCurrentTab(true /* include_app_name */);
-@@ -3710,6 +4228,9 @@ std::u16string BrowserView::GetWindowTitle() const {
+@@ -3710,6 +4381,9 @@ std::u16string BrowserView::GetWindowTitle() const {
  }
  
  std::u16string BrowserView::GetAccessibleWindowTitle() const {
@@ -719,7 +886,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..dd50027bad1b699bec17aaba7dccc961
    // If there is a focused and visible tab-modal dialog, report the dialog's
    // title instead of the page title.
    views::Widget* tab_modal =
-@@ -3947,7 +4468,10 @@ bool BrowserView::CanChangeWindowIcon() const {
+@@ -3947,7 +4621,10 @@ bool BrowserView::CanChangeWindowIcon() const {
  }
  
  views::View* BrowserView::GetInitiallyFocusedView() {
@@ -731,7 +898,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..dd50027bad1b699bec17aaba7dccc961
  }
  
  bool BrowserView::ShouldShowWindowTitle() const {
-@@ -3971,6 +4495,9 @@ ui::ImageModel BrowserView::GetWindowAppIcon() {
+@@ -3971,6 +4648,9 @@ ui::ImageModel BrowserView::GetWindowAppIcon() {
  }
  
  ui::ImageModel BrowserView::GetWindowIcon() {
@@ -741,7 +908,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..dd50027bad1b699bec17aaba7dccc961
    // Use the default icon for devtools.
    if (browser_->GetType() == BrowserWindowInterface::Type::TYPE_DEVTOOLS) {
      return ui::ImageModel();
-@@ -4336,6 +4863,10 @@ void BrowserView::UpdateTabSearchBubbleHost() {
+@@ -4336,6 +5016,10 @@ void BrowserView::UpdateTabSearchBubbleHost() {
  }
  
  void BrowserView::ShowSplitView(bool focus_active_view) {
@@ -752,7 +919,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..dd50027bad1b699bec17aaba7dccc961
    const int active_index = browser_->GetTabStripModel()->active_index();
  
    std::optional<split_tabs::SplitTabId> split_tab_id =
-@@ -4954,6 +5485,9 @@ void BrowserView::Layout(PassKey) {
+@@ -4954,6 +5638,9 @@ void BrowserView::Layout(PassKey) {
      if (fallback_popup_anchor_) {
        fallback_popup_anchor_->MaybeUpdateAnchor(rect);
      }
@@ -762,7 +929,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..dd50027bad1b699bec17aaba7dccc961
  
      if (dialog_anchor_) {
        rect.Offset(0, -kAdditionalDialogToolbarOverlap);
-@@ -5197,6 +5731,103 @@ void BrowserView::AddedToWidget() {
+@@ -5197,6 +5884,103 @@ void BrowserView::AddedToWidget() {
        kFallbackPopupAnchorElementId, *this);
  
    initialized_ = true;
@@ -866,7 +1033,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..dd50027bad1b699bec17aaba7dccc961
  }
  
  void BrowserView::RemovedFromWidget() {
-@@ -5267,6 +5898,570 @@ const views::View* BrowserView::GetViewByElementId(
+@@ -5267,6 +6051,579 @@ const views::View* BrowserView::GetViewByElementId(
  ///////////////////////////////////////////////////////////////////////////////
  // BrowserView, ui::AcceleratorTarget overrides:
  
@@ -1391,17 +1558,26 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..dd50027bad1b699bec17aaba7dccc961
 +    }
 +    return true;
 +  }
-+  const int width = std::clamp(GetBoundsInScreen().width() - 48, 240, 752);
++  const int width = std::clamp(GetBoundsInScreen().width() - 48, 240, 766);
 +  myarc_command_palette_delegate_ =
-+      std::make_unique<views::BubbleDialogDelegate>(this,
-+                                                    views::BubbleBorder::FLOAT);
++      std::make_unique<MyarcPaletteBubbleDelegate>(this);
 +  auto* delegate = myarc_command_palette_delegate_.get();
 +  delegate->SetButtons(static_cast<int>(ui::mojom::DialogButton::kNone));
 +  delegate->SetShowCloseButton(false);
 +  delegate->SetShowTitle(false);
 +  delegate->SetTitle(u"Command palette");
++  // Background captures never activate the app; keep the bubble open anyway.
++  if (base::CommandLine::ForCurrentProcess()->HasSwitch(
++          "myarc-capture-open-palette")) {
++    delegate->set_close_on_deactivate(false);
++  }
 +  delegate->set_corner_radius(12);
-+  delegate->set_margins(gfx::Insets(12));
++  delegate->set_margins(gfx::Insets());
++  // The palette paints its own 1 DIP border.
++  delegate->set_border_style({.draw_border_stroke = false});
++  // Arc's palette shadow is large and soft with a downward bias.
++  delegate->set_shadow_config(
++      {.shadow_type = views::BubbleBorder::STANDARD_SHADOW, .elevation = 40});
 +  auto* content = delegate->SetContentsView(std::make_unique<MyarcPaletteView>(
 +      browser_->GetWeakPtr(), width, new_tab, initial_text));
 +  delegate->SetInitiallyFocusedView(content->input());
@@ -1437,7 +1613,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..dd50027bad1b699bec17aaba7dccc961
  bool BrowserView::AcceleratorPressed(const ui::Accelerator& accelerator) {
  #if BUILDFLAG(IS_MAC)
    // Forward accelerators to ExclusiveAccessManager to handle Esc press-and-hold
-@@ -5342,7 +6537,8 @@ void BrowserView::LoadingAnimationCallback(base::TimeTicks timestamp) {
+@@ -5342,7 +6699,8 @@ void BrowserView::LoadingAnimationCallback(base::TimeTicks timestamp) {
      // GetActiveWebContents can return null for example under Purify when
      // the animations are running slowly and this function is called on a timer
      // through LoadingAnimationCallback.
@@ -1447,7 +1623,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..dd50027bad1b699bec17aaba7dccc961
    }
  }
  
-@@ -5471,6 +6667,10 @@ bool BrowserView::MaybeUpdateDevtools(content::WebContents* contents) {
+@@ -5471,6 +6829,10 @@ bool BrowserView::MaybeUpdateDevtools(content::WebContents* contents) {
  
  void BrowserView::UpdateUIForContents(WebContents* contents,
                                        bool should_layout_immediately) {
@@ -1458,7 +1634,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..dd50027bad1b699bec17aaba7dccc961
    TRACE_EVENT0("ui", "BrowserView::UpdateUIForContents");
    bool needs_layout = MaybeShowBookmarkBar(contents);
  
-@@ -5706,6 +6906,23 @@ void BrowserView::LoadAccelerators() {
+@@ -5706,6 +7068,23 @@ void BrowserView::LoadAccelerators() {
    }
  
  #if BUILDFLAG(IS_MAC)
