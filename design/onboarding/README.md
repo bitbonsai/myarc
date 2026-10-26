@@ -45,7 +45,7 @@ Scene and lesson changes focus the heading. Pin and Space actions retain their c
 
 `state.mjs` owns storyboard navigation only. It is not a JavaScript copy of production workspace rules. `study.mjs` reads fixed fixtures and renders them; it never performs a real import or browser command.
 
-Replace fixture results with shared Rust import/receipt state after MA-004/005/006. Reveal must read the committed generation's stable IDs. Practice must call the same native commands as daily browsing. Persist completion before playback, resume without re-importing, and verify cancellation/restart in the actual browser. Keep source parsing and persistence outside motion code. Details: [BC-002](../../plan/BEHAVIOR-CONTRACTS.md) and [onboarding acceptance](../../docs/ONBOARDING.md).
+Replace fixture results with shared Rust import/receipt state after MA-004/005/006. Reveal must read the committed generation's stable IDs. Practice must call the same native commands as daily browsing. Persist completion before playback, resume without re-importing, and verify cancellation/restart in the actual browser. Keep source parsing and persistence outside motion code. Details: [BC-002](../../.plans/BEHAVIOR-CONTRACTS.md) and [onboarding acceptance](../../docs/ONBOARDING.md).
 
 ## Evidence and limits
 

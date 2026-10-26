@@ -9,4 +9,4 @@ This is an original adaptation of public practices from the [photocraft reposito
 - Harnesses fail honestly. A run that selects no tests is not a success, and a check must say what it covered.
 - Once a behavior passes, keep a regression check for it. Don't weaken a baseline to clear a failing change.
 
-Interactions are specified first in [behavior contracts](../plan/BEHAVIOR-CONTRACTS.md). Significant outcomes and failed attempts go in [the development log](../log/DEVLOG.md).
+Interactions are specified first in [behavior contracts](../.plans/BEHAVIOR-CONTRACTS.md). Significant outcomes and failed attempts go in [the development log](../log/DEVLOG.md).

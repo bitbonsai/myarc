@@ -1,6 +1,6 @@
 # Working on myarc
 
-Read [README.md](README.md), [plan/STATUS.md](plan/STATUS.md) and [docs/GAPS.md](docs/GAPS.md) first. Current work is MA-007 native visual parity ([plan/EXECUTION.md](plan/EXECUTION.md)).
+Read [README.md](README.md), [.plans/INDEX.md](.plans/INDEX.md) and [docs/GAPS.md](docs/GAPS.md) first. Current work is MA-007 native visual parity ([.plans/EXECUTION.md](.plans/EXECUTION.md)).
 
 ## Product guardrails
 
@@ -29,7 +29,7 @@ The lead agent owns the queue and gives each agent one small task: goal, files, 
 - Observe: scripted Arc/native captures. References stay in `research-private/`.
 - Off-Chromium: Rust core, CLI/MCP, site, docs.
 
-Wrap builds and browser launches in `/usr/bin/lockf -k /tmp/myarc-build.lock`. Each task logs 3 lines in [log/DEVLOG.md](log/DEVLOG.md). Update `plan/STATUS.md` at most daily.
+Wrap builds and browser launches in `/usr/bin/lockf -k /tmp/myarc-build.lock`. Each task logs 3 lines in [log/DEVLOG.md](log/DEVLOG.md). Update `.plans/INDEX.md` at most daily.
 
 ## Commands
 

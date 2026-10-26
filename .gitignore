@@ -33,6 +33,6 @@ site/llms-full.txt
 *.pyc
 .DS_Store
 
-# Public plan/ is deliberately tracked.
+# Public .plans/ is deliberately tracked.
 .plans/next.md
 .plans/next.prev.md

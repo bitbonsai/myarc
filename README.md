@@ -54,8 +54,8 @@ These are design commitments, not claims that the planned features work today.
 | [Scorecard](docs/SCORECARD.md) | Proposed budgets and evidence needed to ship |
 | [Agent workflow](AGENTS.md) | How to contribute without drifting from the product |
 | [Artcraft methods applied](docs/ARTCRAFT-WORKFLOW.md) | Practical lessons, current enforcement and implementation triggers |
-| [Behavior contracts](plan/BEHAVIOR-CONTRACTS.md) | Precise interactions and unresolved questions before coding |
-| [Execution plan](plan/EXECUTION.md) | Implementation workstreams and definitions of done |
+| [Behavior contracts](.plans/BEHAVIOR-CONTRACTS.md) | Precise interactions and unresolved questions before coding |
+| [Execution plan](.plans/EXECUTION.md) | Implementation workstreams and definitions of done |
 | [Research](docs/RESEARCH.md) | Primary sources, limitations, and Artcraft lessons |
 
 ## What makes this plan different
@@ -66,7 +66,7 @@ The current recommendation is a **Rust core for myarc's workspace, importer, per
 
 ## Immediate next step
 
-Continue the [native shell experiment](browser/experiments/native-shell.md) toward Arc visual parity, beginning with the empty/new-tab window. Follow [plan/EXECUTION.md](plan/EXECUTION.md) for the remaining desktop-alpha work and release gates. The December 2026 milestones are conditional targets, not release promises.
+Continue the [native shell experiment](browser/experiments/native-shell.md) toward Arc visual parity, beginning with the empty/new-tab window. Follow [.plans/EXECUTION.md](.plans/EXECUTION.md) for the remaining desktop-alpha work and release gates. The December 2026 milestones are conditional targets, not release promises.
 
 ## Contributing
 

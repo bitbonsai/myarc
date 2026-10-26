@@ -4,7 +4,7 @@ Status: unmodified Chromium built and launched; a Rust-owned rename command work
 
 ## Bounded outcomes
 
-MA-002.a completed the unmodified `chrome` build and disposable-profile launch. MA-002.b proves one transient Rust workspace command through Cxx and a native Views control. MA-002.c reapplies that patch and runs the integrated checks on a second revision. These bounded slices leave the full [MA-002 gate](../plan/EXECUTION.md) open for extension lifecycle, isolation/recovery, licensing and maintenance evidence.
+MA-002.a completed the unmodified `chrome` build and disposable-profile launch. MA-002.b proves one transient Rust workspace command through Cxx and a native Views control. MA-002.c reapplies that patch and runs the integrated checks on a second revision. These bounded slices leave the full [MA-002 gate](../.plans/EXECUTION.md) open for extension lifecycle, isolation/recovery, licensing and maintenance evidence.
 
 MA-001.a has an independent [onboarding motion study](../design/onboarding/README.md). It cannot substitute for native build evidence.
 

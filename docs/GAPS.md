@@ -2,7 +2,7 @@
 
 Updated: 2026-10-26. Browser release blockers remain open. Synthetic onboarding and the opt-in Rust/native browser experiment supply bounded evidence.
 
-Current implementation priority is [MA-007.a, native visual parity](../plan/EXECUTION.md#ma-007a-native-visual-parity-first-state). Match the empty/new-tab window before expanding export investigation or the foundation test matrix. The ranking below retains release blockers; it does not override that current visible slice or permit unsafe browsing claims.
+Current implementation priority is [MA-007.a, native visual parity](../.plans/EXECUTION.md#ma-007a-native-visual-parity-first-state). Match the empty/new-tab window before expanding export investigation or the foundation test matrix. The ranking below retains release blockers; it does not override that current visible slice or permit unsafe browsing claims.
 
 [Native crash evidence](../browser/evidence/workspace-process-crash.json) now distinguishes successful clean-persisted session restoration from actual recent localStorage/navigation loss. [Navigation run details](../browser/experiments/native-session-navigation-crash.md) retain the failed strict duplicate-URL result. Acknowledgement and power-loss durability remain blockers despite stable-ID recovery controls. Renderer stays off by default; native browser/interactive suites remain unrun.
 
@@ -22,6 +22,6 @@ Current implementation priority is [MA-007.a, native visual parity](../plan/EXEC
 
 Choose the highest-ranked task whose dependencies and resources are available. Keep MA-001 design progress moving while build/data investigations proceed; this is a sequencing instruction, not authorization to spawn autonomous agents or contact users.
 
-The standalone Rust model and preservation path may progress while the browser foundation is blocked; MA-004 no longer treats a completed Chromium build as a prerequisite. Use [behavior contracts](../plan/BEHAVIOR-CONTRACTS.md) to settle cross-system rules and retain useful failed-attempt context in [the development log](../log/DEVLOG.md).
+The standalone Rust model and preservation path may progress while the browser foundation is blocked; MA-004 no longer treats a completed Chromium build as a prerequisite. Use [behavior contracts](../.plans/BEHAVIOR-CONTRACTS.md) to settle cross-system rules and retain useful failed-attempt context in [the development log](../log/DEVLOG.md).
 
 Security, data loss, cross-Profile leakage, an invalid updater, or import corruption outrank feature work. A blocked task produces a concrete blocker record, not pretend completion.
