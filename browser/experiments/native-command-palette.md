@@ -54,6 +54,8 @@ Fresh [interruption evidence](../evidence/native-palette-interruption.json) foun
 
 [0022 intent repair](native-palette-intent.md) implements live-widget intent changes and draft-preserving focus, with empty-Space protection before reuse and bounded close/history cleanup. Source checks and full build pass; its four browser fixtures and fresh native interruption acceptance remain UNRUN. The original failure above remains the observed baseline.
 
+[0022 native followup](native-palette-intent.md) corrected existing-palette shortcut dismissal and accepted named normal/reduced focus, submit and owner-close journeys. Its four browser fixtures remain unrun. Existing global result matching and broader URI-literal editing remain unaccepted; the historical remaining notes below are not a full current status.
+
 ## Remaining
 
 Current-tab editing, sidebar URL activation and full sidebar hide/show still need native acceptance. Complete autocomplete and the broader command catalog remain pending. Motion timing, interruption, reduced motion, full accessibility and Windows behavior are unverified.

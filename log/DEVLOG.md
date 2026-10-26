@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-10-26: Palette intent native followup
+
+Integrated `2c1f49d`. Same native widget retained both shortcut intents, selected/focused drafts and unchanged-current reload; changed unmatched URL kept the target and new intent added one only on submit. Empty Space selection closed the prior palette; fresh current shortcut exposed no hidden URL. [Evidence](../browser/evidence/native-palette-interruption.json). Normal/app-only reduced sequences inspected, OS prefs unchanged. Capture guards stopped on an owned 66x20 non-key indicator; exact AX focus verification and release-before-postcondition checks fixed the private harness, not product code.
+
+Two-window horizontal clean restoration/late enable passed the unchanged strict verifier with both pins/IDs. Owner-window close with an open palette retained the surviving saved ID and actual native pin; its shortcuts still worked. Saved destination remained stable on live navigation until deliberate Unsave/resave; no metadata repair. Outer-timeout/no-output and wrong harness field/literal-format assumptions were excluded/corrected. Existing global result matching remains unchanged; URI-alias UI route left the prior page, so broad URI semantics are unaccepted. Queued callback/deletion overlap and native browser fixtures remain unrun. Owned apps/helpers/server closed.
+
 ## 2026-10-26: Palette intent reuse build candidate
 
 - Starting revision `9426f9e`. [0022](../browser/experiments/native-palette-intent.md) updates the live native palette when shortcut intent changes, preserves same-intent drafts and applies the Empty-Space guard before reuse. Existing reload/navigation and Rust policy remain intact. Close cleanup cancels history callbacks, checks delegate identity and retains anchor clearing/widget-before-delegate deferred deletion. Weak view checks protect focus across native activation.

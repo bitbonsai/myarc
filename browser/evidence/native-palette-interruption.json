@@ -2,7 +2,7 @@
   "slice": "MA-007.c-palette-interruption",
   "date": "2026-10-26",
   "baseline_commit": "fdc20a3",
-  "status": "native shortcut intent defect open",
+  "status": "baseline intent defect corrected for bounded native journeys; broader matcher/lifecycle gates open",
   "observed_failure": {
     "native_cmd_t_opened_palette_without_page": true,
     "typed_synthetic_query": true,
@@ -22,5 +22,28 @@
     "Switch from current-tab mode to new-tab mode starts empty and creates no page until submission"
   ],
   "workspace_renderer_default_enabled": false,
-  "raw_ui_logs_profiles_and_shortcut_driver": "private outside Git"
+  "raw_ui_logs_profiles_and_shortcut_driver": "private outside Git",
+  "followup": {
+    "implementation_commit": "2c1f49d",
+    "same_widget_new_current_and_repeat_intents": true,
+    "native_ax_focus_and_full_selection_verified": true,
+    "same_intent_drafts_retained": true,
+    "native_formatted_url_used_not_literal_canonical_string": true,
+    "cancel_restored_page_focus_without_navigation": true,
+    "unchanged_current_enter_reloaded_same_target": true,
+    "unmatched_changed_current_url_kept_same_target_count": true,
+    "new_tab_created_once_only_on_submission": true,
+    "space_change_closed_existing_palette_before_fresh_empty_cmd_l": true,
+    "fresh_empty_input_and_repeat_draft_did_not_expose_hidden_url": true,
+    "empty_submission_kept_hidden_targets_urls_time_origins": true,
+    "normal_and_app_only_reduced_sequences_recorded_and_inspected": true,
+    "os_preferences_unchanged": true,
+    "two_window_native_checkpoint_then_clean_horizontal_restore_late_enable_strict_verifier_passed": true,
+    "both_favorite_pins_and_ids_retained": true,
+    "owner_close_with_palette_and_surviving_window_kept_saved_id_and_actual_native_pin": true,
+    "survivor_shortcuts_work": true,
+    "direct_pending_history_overlap_and_native_browser_fixtures_unrun": true,
+    "global_open_tab_history_matching_unchanged_and_uri_literal_behavior_not_fully_accepted": true,
+    "all_owned_apps_helpers_server_closed": true
+  }
 }

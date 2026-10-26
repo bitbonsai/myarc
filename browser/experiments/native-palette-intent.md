@@ -1,6 +1,6 @@
 # Native palette shortcut intent
 
-MA-007.c bounded repair from parent `9426f9e`. Optional [0022-native-palette-intent.patch](../patches/0022-native-palette-intent.patch) follows the frozen stack through 0021. It addresses the [observed Cmd+T/draft/Cmd+L dismissal](../evidence/native-palette-interruption.json). Source and fixture syntax checks and the full Chrome build pass. Desktop acceptance and browser fixtures are **UNRUN**. Workspace renderer stays default OFF.
+MA-007.c bounded repair from parent `9426f9e`. Optional [0022-native-palette-intent.patch](../patches/0022-native-palette-intent.patch) follows the frozen stack through 0021. It addresses the [observed Cmd+T/draft/Cmd+L dismissal](../evidence/native-palette-interruption.json). Source and fixture syntax checks and the full Chrome build pass. Parent bounded desktop acceptance passed below. Browser fixtures remain **UNRUN**. Workspace renderer stays default OFF.
 
 ## Behavior and boundary
 
@@ -56,7 +56,21 @@ Private proof: `/tmp/myarc-m0-runtime/mode22/`. The mode21 snapshot, packaging a
 
 Changed-line clang-format, GN formatting, document links, canonical foundation-payload freshness and whitespace checks pass. Both real-context syntax checks were repeated successfully after the build against final source. The lifecycle helper and Rust suites were not rerun because their sources and policy are unchanged.
 
-## Parent acceptance still required
+## Parent bounded native acceptance
+
+Integrated as `2c1f49d`; installed 82-file hashes match. A fresh marked native run retained the same actual palette window through Cmd+T/new draft, repeated Cmd+T, Cmd+L/current URL, repeated current draft and back to empty new-tab mode. Native AX reported input focus and full selection; same-intent drafts survived. Chromium formatted the local URL without scheme/trailing slash, correcting a scratch literal-string expectation.
+
+Escape restored real page focus without reload. Unchanged current Enter reloaded the same target; an unmatched changed URL navigated the same target/count. New intent created exactly one target only on submit. Selecting the empty Space natively closed the existing palette, so the driver stopped when its old window disappeared. Fresh empty Cmd+L exposed no hidden URL, retained its repeated draft and created a separate page while hidden targets/URLs/time origins stayed exact. The forced direct-reuse/empty transition remains a source-only fixture.
+
+Fresh normal and app-only reduced-motion owned-window sequences were recorded and inspected. Source capture initially put a 66x20 same-PID non-key indicator ahead of the window; guards stopped input. The private driver then verified exact AX focused-window bounds/nonmodal state under that bounded overlay, retaining PID/marker/unlocked/foreground checks. Its old post-transition key-release ordering was corrected so cleanup releases the key before checking a changed window. No production guard was relaxed. Exact animation timing and the OS preference matrix remain unmeasured.
+
+The same run also passed the unchanged two-window checkpoint and changed-PID verifier after graceful horizontal quit/restoration and late vertical enable, with app-only reduced motion. IDs, both native Favorite pins and the Temporary projection survived. An earlier outer command timeout produced no verifier result and was excluded. Closing one actual owner window with its palette open removed both while the other window retained saved item `3`, its actual extension-observed native pin and working Cmd+T/Cmd+L focus. Escape/reopen also worked; true pending-history callback overlap and deferred-deletion overlap are not claimed.
+
+Private run `/tmp/myarc-m0-runtime/palette22-20261026T015329Z/` retains semantic snapshots, AX fields, native pin observation and fresh media. A saved destination stayed unchanged through actual live-page navigation; deliberate Unsave/resave captured the new committed destination under the same logical ID. AX request return alone was never counted as persisted save acknowledgement. No workspace metadata was edited to make a check pass. All owned apps/helpers/server closed.
+
+[Structured evidence](../evidence/native-palette-interruption.json) retains the failure and this bounded correction. Existing global open-tab/history matching is unchanged. A typed URI alias left its prior page unchanged during setup; its matched-result provenance was not captured, so broad URI-literal editing semantics remain unaccepted. A separately recorded existing-target developer navigation prepared the later saved fixture; it does not accept that UI route or implement product CLI/MCP.
+
+## Remaining parent acceptance
 
 Use a marked disposable profile and exact foreground owned palette. Reproduce native Cmd+T, draft, Cmd+L and verify selected displayed URL; repeat both same-intent shortcuts without losing edits; switch back with Cmd+T and verify no page until submit. Check current-tab reload/edit, Empty-Space hidden-page protection, Escape/immediate reopen and owner-window close. Inspect normal/reduced-motion focus and a real history response across interruption where feasible. Compilation cannot accept these journeys.
 
