@@ -1,5 +1,5 @@
 diff --git a/chrome/browser/ui/views/location_bar/location_bar_view.cc b/chrome/browser/ui/views/location_bar/location_bar_view.cc
-index 972bd7bc04d240f23d4c527bdb6faa81272421e5..28bbf0cf53a218f7ffa1865a43fba7bca547a272 100644
+index 972bd7bc04d240f23d4c527bdb6faa81272421e5..d43dd855644007b29f5278ca5a5bd9f6e368ad9b 100644
 --- a/chrome/browser/ui/views/location_bar/location_bar_view.cc
 +++ b/chrome/browser/ui/views/location_bar/location_bar_view.cc
 @@ -11,6 +11,7 @@
@@ -167,7 +167,7 @@ index 972bd7bc04d240f23d4c527bdb6faa81272421e5..28bbf0cf53a218f7ffa1865a43fba7bc
  
    background_color_ = gfx::Tween::ColorValueBetween(opacity, normal, hovered);
    if (is_caret_visible) {
-@@ -1440,8 +1519,11 @@ void LocationBarView::RefreshBackground() {
+@@ -1440,8 +1519,12 @@ void LocationBarView::RefreshBackground() {
    }
  
    // Keep the views::Textfield in sync. It needs an opaque background to
@@ -175,13 +175,14 @@ index 972bd7bc04d240f23d4c527bdb6faa81272421e5..28bbf0cf53a218f7ffa1865a43fba7bc
 -  omnibox_view_->SetBackgroundColor(background_color_);
 +  // correctly enable subpixel AA. A translucent myArc fill is painted once, by
 +  // this view.
-+  omnibox_view_->SetBackgroundColor(
-+      SkColorGetA(background_color_) == SK_AlphaOPAQUE ? background_color_
-+                                                       : SK_ColorTRANSPARENT);
++  const bool myarc_translucent =
++      IsMyarcUrlPill() && SkColorGetA(background_color_) != SK_AlphaOPAQUE;
++  omnibox_view_->SetBackgroundColor(myarc_translucent ? SK_ColorTRANSPARENT
++                                                      : background_color_);
  
    // The divider between indicators and request chips should have the same color
    // as the omnibox.
-@@ -1792,11 +1874,42 @@ void LocationBarView::OnMouseReleased(const ui::MouseEvent& event) {
+@@ -1792,11 +1875,42 @@ void LocationBarView::OnMouseReleased(const ui::MouseEvent& event) {
    omnibox_view_->OnMouseReleased(AdjustMouseEventLocationForOmniboxView(event));
  }
  
@@ -224,7 +225,7 @@ index 972bd7bc04d240f23d4c527bdb6faa81272421e5..28bbf0cf53a218f7ffa1865a43fba7bc
    OnOmniboxHovered(false);
  }
  
-@@ -1812,6 +1925,9 @@ void LocationBarView::WriteDragDataForView(views::View* sender,
+@@ -1812,6 +1926,9 @@ void LocationBarView::WriteDragDataForView(views::View* sender,
              ui::DragDropTypes::DRAG_NONE);
  
    WebContents* web_contents = GetWebContents();
@@ -234,7 +235,7 @@ index 972bd7bc04d240f23d4c527bdb6faa81272421e5..28bbf0cf53a218f7ffa1865a43fba7bc
    favicon::FaviconDriver* favicon_driver =
        favicon::ContentFaviconDriver::FromWebContents(web_contents);
    gfx::ImageSkia favicon = favicon_driver->GetFavicon().AsImageSkia();
-@@ -1823,7 +1939,7 @@ void LocationBarView::WriteDragDataForView(views::View* sender,
+@@ -1823,7 +1940,7 @@ void LocationBarView::WriteDragDataForView(views::View* sender,
  int LocationBarView::GetDragOperationsForView(views::View* sender,
                                                const gfx::Point& p) {
    DCHECK_EQ(location_icon_view_, sender);
@@ -243,7 +244,7 @@ index 972bd7bc04d240f23d4c527bdb6faa81272421e5..28bbf0cf53a218f7ffa1865a43fba7bc
    return (web_contents && web_contents->GetVisibleURL().is_valid() &&
            (!GetOmniboxView()->IsEditingOrEmpty()))
               ? (ui::DragDropTypes::DRAG_COPY | ui::DragDropTypes::DRAG_LINK)
-@@ -2173,6 +2289,9 @@ bool LocationBarView::IsFullWebUiOmniboxReady() const {
+@@ -2173,6 +2290,9 @@ bool LocationBarView::IsFullWebUiOmniboxReady() const {
  }
  
  void LocationBarView::OnOmniboxHovered(bool is_hovering) {
@@ -253,7 +254,7 @@ index 972bd7bc04d240f23d4c527bdb6faa81272421e5..28bbf0cf53a218f7ffa1865a43fba7bc
    if (is_hovering) {
      // Only show the hover animation when omnibox is in unfocused steady state.
      if (!omnibox_view_->HasFocus()) {
-@@ -2502,7 +2621,6 @@ void LocationBarView::OnAppShimChanged(const webapps::AppId& app_id) {
+@@ -2502,7 +2622,6 @@ void LocationBarView::OnAppShimChanged(const webapps::AppId& app_id) {
  }
  #endif
  
