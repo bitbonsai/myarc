@@ -41,6 +41,7 @@ enum ItemCommand {
   kClose,
   kDownloads,
   kCreateSpace,
+  kNewTab,
   kFirstSpace = 100
 };
 
@@ -190,6 +191,7 @@ SidebarView::SidebarView(Delegate& delegate) : delegate_(delegate) {
 
 SidebarView::~SidebarView() {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
+  weak_factory_.InvalidateWeakPtrs();
   menu_runner_.reset();
 }
 
@@ -278,6 +280,70 @@ void SidebarView::ShowLibrary(const ui::Event& event) {
                          : ui::mojom::MenuSourceType::kMouse);
 }
 
+void SidebarView::BuildCreateMenu() {
+  menu_item_id_ = 0;
+  menu_runner_.reset();
+  menu_model_ = std::make_unique<ui::SimpleMenuModel>(this);
+  menu_model_->AddItem(kCreateSpace, u"New Space");
+  menu_model_->AddItem(kNewTab, u"New Tab");
+}
+
+void SidebarView::SetCreateMenuOpen(bool open) {
+  create_menu_open_ = open;
+  const auto target = std::ranges::find(focus_targets_, FocusAction::kCreate,
+                                        &FocusTarget::action);
+  if (target == focus_targets_.end()) {
+    return;
+  }
+  auto* button = static_cast<views::MdTextButton*>(target->view.get());
+  button->SetImageModel(
+      views::Button::STATE_NORMAL,
+      ui::ImageModel::FromVectorIcon(
+          open ? vector_icons::kCloseIcon : vector_icons::kAdd2Icon,
+          ui::kColorSysOnSurface, 20));
+  button->SetTooltipText(open ? u"Close creation menu" : u"Create Space");
+  if (open) {
+    button->GetViewAccessibility().SetIsExpanded();
+  } else {
+    button->GetViewAccessibility().SetIsCollapsed();
+  }
+}
+
+void SidebarView::ShowCreateMenu(const ui::Event& event) {
+  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
+  if (!GetWidget()) {
+    return;
+  }
+  if (menu_runner_ && menu_runner_->IsRunning()) {
+    if (create_menu_open_) {
+      menu_runner_->Cancel();
+    }
+    return;
+  }
+  const auto target = std::ranges::find(focus_targets_, FocusAction::kCreate,
+                                        &FocusTarget::action);
+  if (target == focus_targets_.end()) {
+    return;
+  }
+  const gfx::Rect anchor = target->view->GetBoundsInScreen();
+  BuildCreateMenu();
+  // Views menus honor the above-footer anchor on macOS; context menus do not.
+  menu_runner_ = std::make_unique<views::MenuRunner>(
+      menu_model_.get(), views::MenuRunner::NO_FLAGS,
+      base::BindRepeating(&SidebarView::SetCreateMenuOpen,
+                          weak_factory_.GetWeakPtr(), false));
+  SetCreateMenuOpen(true);
+  auto weak = weak_factory_.GetWeakPtr();
+  menu_runner_->RunMenuAt(
+      GetWidget(), nullptr, anchor, views::MenuAnchorPosition::kBottomCenter,
+      event.IsKeyEvent() ? ui::mojom::MenuSourceType::kKeyboard
+                         : ui::mojom::MenuSourceType::kMouse);
+  // Dispatch can rebuild rows or destroy this view. Resolve the current button.
+  if (weak && (!weak->menu_runner_ || !weak->menu_runner_->IsRunning())) {
+    weak->SetCreateMenuOpen(false);
+  }
+}
+
 void SidebarView::ExecuteCommand(int command_id, int event_flags) {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
   if (command_id == kDownloads) {
@@ -285,7 +351,13 @@ void SidebarView::ExecuteCommand(int command_id, int event_flags) {
     return;
   }
   if (command_id == kCreateSpace) {
+    SetCreateMenuOpen(false);
     delegate_->CreateSpace();
+    return;
+  }
+  if (command_id == kNewTab) {
+    SetCreateMenuOpen(false);
+    delegate_->NewTab();
     return;
   }
   if (command_id >= kFirstSpace) {
@@ -636,14 +708,16 @@ void SidebarView::SetModel(const foundation::SidebarResult& model,
       base::OwnedRef(std::optional(spaces_offset)), space_changed,
       current_space_index));
 
-  auto create =
-      IconButton(base::BindRepeating(&Delegate::CreateSpace,
-                                     base::Unretained(&delegate_.get())),
-                 vector_icons::kAdd2Icon);
+  auto create = IconButton(
+      base::BindRepeating(&SidebarView::ShowCreateMenu,
+                          weak_factory_.GetWeakPtr()),
+      create_menu_open_ ? vector_icons::kCloseIcon : vector_icons::kAdd2Icon);
   create->SetTooltipText(u"Create Space");
   create->GetViewAccessibility().SetName(u"Create Space");
+  create->GetViewAccessibility().SetHasPopup(ax::mojom::HasPopup::kMenu);
   TrackFocus(create.get(), FocusAction::kCreate);
   footer->AddChildView(std::move(create));
+  SetCreateMenuOpen(create_menu_open_);
 
   scroll->RegisterPostLayoutCallback(base::BindRepeating(
       [](std::optional<gfx::PointF>& offset, views::ScrollView* scroll) {

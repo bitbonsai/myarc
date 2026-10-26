@@ -1,0 +1,111 @@
+diff --git a/chrome/browser/ui/views/frame/browser_view_browsertest.cc b/chrome/browser/ui/views/frame/browser_view_browsertest.cc
+index 40fdc34..99f6693 100644
+--- a/chrome/browser/ui/views/frame/browser_view_browsertest.cc
++++ b/chrome/browser/ui/views/frame/browser_view_browsertest.cc
+@@ -432,6 +432,13 @@ class SidebarViewTestApi {
+     sidebar->BuildLibraryMenu();
+     return sidebar->menu_model_.get();
+   }
++  static ui::SimpleMenuModel* CreateMenu(SidebarView* sidebar) {
++    sidebar->BuildCreateMenu();
++    return sidebar->menu_model_.get();
++  }
++  static void SetCreateMenuOpen(SidebarView* sidebar, bool open) {
++    sidebar->SetCreateMenuOpen(open);
++  }
+ };
+ 
+ }  // namespace myarc
+@@ -766,6 +773,39 @@ IN_PROC_BROWSER_TEST_F(BrowserViewSidebarPresentationTest,
+             temporary->GetBoundsInScreen().y());
+ }
+ 
++IN_PROC_BROWSER_TEST_F(BrowserViewSidebarPresentationTest,
++                       CreationMenuSurvivesRowRebuildAndUsesExistingDialog) {
++  auto* view = sidebar();
++  ASSERT_TRUE(view);
++  auto* menu = myarc::SidebarViewTestApi::CreateMenu(view);
++  ASSERT_EQ(2u, menu->GetItemCount());
++  EXPECT_EQ(u"New Space", menu->GetLabelAt(0));
++  EXPECT_EQ(u"New Tab", menu->GetLabelAt(1));
++  myarc::SidebarViewTestApi::SetCreateMenuOpen(view, true);
++  browser_view()->RefreshMyarcWorkspaceSidebar();
++  auto* create = Button(u"Create Space");
++  ASSERT_TRUE(create);
++  EXPECT_EQ(u"Close creation menu", create->GetTooltipText());
++  myarc::SidebarViewTestApi::SetCreateMenuOpen(view, false);
++  EXPECT_EQ(u"Create Space", create->GetTooltipText());
++  const auto spaces_before =
++      browser_view()->GetMyarcWorkspaceAdapter()->Sidebar().spaces.size();
++  menu->ActivatedAt(0, 0);
++  views::DialogDelegate* dialog = nullptr;
++  for (const auto& widget : views::Widget::GetAllOwnedWidgets(
++           browser_view()->GetWidget()->GetNativeView())) {
++    if (widget->widget_delegate()->GetWindowTitle() == u"Create Space") {
++      dialog = widget->widget_delegate()->AsDialogDelegate();
++      break;
++    }
++  }
++  ASSERT_TRUE(dialog);
++  dialog->CancelDialog();
++  EXPECT_EQ(
++      spaces_before,
++      browser_view()->GetMyarcWorkspaceAdapter()->Sidebar().spaces.size());
++}
++
+ IN_PROC_BROWSER_TEST_F(BrowserViewSidebarPresentationTest,
+                        FooterUsesFixedSquaresAndRevealsCurrentSpace) {
+   for (int i = 0; i < 18; ++i) {
+diff --git a/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl.cc b/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl.cc
+index 3290e4b..12b377f 100644
+--- a/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl.cc
++++ b/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl.cc
+@@ -1021,8 +1021,7 @@ BrowserViewTabbedLayoutImpl::CalculateProposedLayout(
+     const double top_corner = layout_data_->vertical_tabs_top_corner();
+     const bool top_corner_visible =
+         layout_data_->tab_strip_type == TabStripType::kVertical &&
+-        (!visual_parity || vertical_tab_strip_bounds.width() > 0) &&
+-        top_corner > 0.0;
++        !visual_parity && top_corner > 0.0;
+ 
+     // The top corner is drawn when the tabstrip goes all the way to the top.
+     if (top_corner_visible) {
+@@ -1045,8 +1044,7 @@ BrowserViewTabbedLayoutImpl::CalculateProposedLayout(
+     const double bottom_corner = layout_data_->vertical_tabs_bottom_corner();
+     const bool bottom_corner_visible =
+         layout_data_->tab_strip_type == TabStripType::kVertical &&
+-        (!visual_parity || vertical_tab_strip_bounds.width() > 0) &&
+-        bottom_corner > 0.0;
++        !visual_parity && bottom_corner > 0.0;
+     if (bottom_corner_visible) {
+       auto preferred =
+           views().vertical_tab_strip_bottom_corner->GetPreferredSize();
+@@ -1758,19 +1756,26 @@ void BrowserViewTabbedLayoutImpl::DoPostLayoutVisualAdjustments(
+     if (animation.expand_on_hover_width > 0.0) {
+       vertical_tabs_outline.bottom = true;
+     }
++    // The prototype clips the page once, without the stock sidebar edge stroke.
++    if (base::CommandLine::ForCurrentProcess()->HasSwitch(
++            "myarc-visual-parity")) {
++      vertical_tabs_outline = {};
++    }
+     vertical_tabs_background->SetOutline(vertical_tabs_outline);
+ 
+     // Cut the vertical tab strip out of the top container.
+     if (!frame_color.is_opaque()) {
+       top_container_cutout_views.push_back(
+           views().vertical_tab_strip_region_view);
+-      if (top_corner > 0) {
++      if (top_corner > 0 &&
++          views().vertical_tab_strip_top_corner->GetVisible()) {
+         top_container_cutout_views.push_back(
+             views().vertical_tab_strip_top_corner);
+         tab_strip_cutout_views.push_back(views().vertical_tab_strip_top_corner);
+       }
+       main_background_cutout_views = top_container_cutout_views;
+-      if (bottom_corner > 0) {
++      if (bottom_corner > 0 &&
++          views().vertical_tab_strip_bottom_corner->GetVisible()) {
+         main_background_cutout_views.push_back(
+             views().vertical_tab_strip_bottom_corner);
+         tab_strip_cutout_views.push_back(

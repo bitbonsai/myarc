@@ -10,6 +10,7 @@
 
 #include "base/memory/raw_ptr.h"
 #include "base/memory/raw_ref.h"
+#include "base/memory/weak_ptr.h"
 #include "base/sequence_checker.h"
 #include "ui/base/metadata/metadata_header_macros.h"
 #include "ui/base/models/image_model.h"
@@ -122,6 +123,9 @@ class SidebarView final : public views::View,
       ui::mojom::MenuSourceType source_type) override;
   void BuildLibraryMenu();
   void ShowLibrary(const ui::Event& event);
+  void BuildCreateMenu();
+  void ShowCreateMenu(const ui::Event& event);
+  void SetCreateMenuOpen(bool open);
   void ExecuteCommand(int command_id, int event_flags) override;
   std::unique_ptr<views::View> MakeItem(const foundation::ItemRecord& item,
                                         bool tile,
@@ -140,7 +144,9 @@ class SidebarView final : public views::View,
   // Runner must be destroyed before its model and before children.
   std::unique_ptr<ui::SimpleMenuModel> menu_model_;
   std::unique_ptr<views::MenuRunner> menu_runner_;
+  bool create_menu_open_ = false;
   SEQUENCE_CHECKER(sequence_checker_);
+  base::WeakPtrFactory<SidebarView> weak_factory_{this};
 };
 
 }  // namespace myarc
