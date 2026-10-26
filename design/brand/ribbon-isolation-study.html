@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>myArc ribbon isolation study</title>
+<style>
+@font-face{font-family:Outfit;src:url("file:///Users/mwolff/.t3/projects/myarc/design/brand/assets/Outfit.ttf") format("truetype");font-weight:300 800;font-display:swap}
+:root{--ivory:#F5F2EC;--midnight:#0B1420;--ink:#1a2030;--dim:#6b7080;--blue:#1f6bff}
+*{box-sizing:border-box}
+body{margin:0;background:var(--ivory);color:var(--ink);font:1rem/1.5 Outfit,system-ui,sans-serif;padding:1.25rem 1rem 3rem}
+h1{font-weight:800;font-size:1.5rem;letter-spacing:-.02em;margin:0 0 .25rem}
+h2{font-weight:600;font-size:1.05rem;margin:2rem 0 .5rem}
+p{margin:.25rem 0 .75rem;color:var(--dim);font-size:.9375rem}
+p b{color:var(--ink);font-weight:600}
+.tag{display:inline-block;font-size:.75rem;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--blue);margin-bottom:.5rem}
+.big{display:grid;grid-template-columns:1fr 1fr;gap:.5rem}
+.big figure,.row figure{margin:0;text-align:center}
+.big img{width:100%;height:auto;display:block;border-radius:.5rem}
+.big figcaption,.row figcaption,.zoom figcaption{font-size:.75rem;color:var(--dim);margin-top:.25rem}
+.big .wide{grid-column:1/-1}
+.panel{border-radius:.75rem;padding:1rem;display:flex;flex-wrap:wrap;align-items:flex-end;gap:1.25rem}
+.panel.l{background:#fff;box-shadow:inset 0 0 0 1px rgba(0,0,0,.06)}
+.panel.d{background:var(--midnight)}
+.panel.d figcaption{color:#8e95a6}
+.panel.ivory{background:var(--ivory);box-shadow:inset 0 0 0 1px rgba(0,0,0,.08)}
+.row img{display:block;margin:0 auto;image-rendering:auto}
+.sep{width:1px;align-self:stretch;background:rgba(128,128,128,.25)}
+.zoom{display:flex;gap:1rem;flex-wrap:wrap;margin-top:.5rem}
+.zoom figure{margin:0;text-align:center}
+.px{image-rendering:pixelated;display:block;border-radius:.25rem;background:
+ conic-gradient(rgba(128,128,128,.12) 25%,transparent 0 50%,rgba(128,128,128,.12) 0 75%,transparent 0) 0 0/8px 8px}
+ul{padding-left:1.1rem;color:var(--dim);font-size:.9375rem;margin:.25rem 0}
+li{margin:.2rem 0} li b{color:var(--ink);font-weight:600}
+code{font-family:ui-monospace,Menlo,monospace;font-size:.85em;background:rgba(0,0,0,.05);padding:.05em .3em;border-radius:.25rem}
+</style></head><body>
+<span class="tag">Ribbon isolation study · reconstruction</span>
+<h1>The ribbon, without the A</h1>
+<p>The horizontal twisted ribbon from the existing mark, traced in its own pixel space and rebuilt as two gradient surfaces. <b>Vector reconstruction, not extracted pixels.</b> Nothing new added: no rings, no extra lines.</p>
+
+<h2>Enlarged shape check</h2>
+<p>All three at the same scale so you can judge geometry. Left: original. Middle: original ghosted under the reconstruction, to show the trace. Right: the isolated ribbon alone.</p>
+<div class="big">
+<figure><img src="/Users/mwolff/.t3/projects/myarc/design/brand/exports/ribbon-isolation/ribbon-isolation-full-logo-627.png" alt="Original mark"><figcaption>original, enlarged</figcaption></figure>
+<figure><img src="/Users/mwolff/.t3/projects/myarc/design/brand/exports/ribbon-isolation/ribbon-isolation-overlay-627.png" alt="Trace overlay"><figcaption>trace over ghosted original</figcaption></figure>
+<figure class="wide"><img src="/Users/mwolff/.t3/projects/myarc/design/brand/exports/ribbon-isolation/ribbon-isolation-reconstruction-627.png" alt="Isolated ribbon"><figcaption>isolated ribbon, enlarged · what the icon is cut from</figcaption></figure>
+</div>
+
+<h2>A · faithful, original angle</h2>
+<p>Ribbon as it sits in the mark, fitted to a square box. Aspect is about 2.2:1, so at 16 px it is 16 by 7 pixels.</p>
+<div class="panel ivory row"><figure><img src="/Users/mwolff/.t3/projects/myarc/design/brand/exports/ribbon-isolation/ribbon-isolation-flat-16.png" width="16" height="16" alt=""><figcaption>16</figcaption></figure><figure><img src="/Users/mwolff/.t3/projects/myarc/design/brand/exports/ribbon-isolation/ribbon-isolation-flat-24.png" width="24" height="24" alt=""><figcaption>24</figcaption></figure><figure><img src="/Users/mwolff/.t3/projects/myarc/design/brand/exports/ribbon-isolation/ribbon-isolation-flat-32.png" width="32" height="32" alt=""><figcaption>32</figcaption></figure><figure><img src="/Users/mwolff/.t3/projects/myarc/design/brand/exports/ribbon-isolation/ribbon-isolation-flat-48.png" width="48" height="48" alt=""><figcaption>48</figcaption></figure><span class="sep"></span><figure><img src="/Users/mwolff/.t3/projects/myarc/design/brand/exports/ribbon-isolation/ribbon-isolation-full-logo-32.png" width="32" height="32" alt=""><figcaption>full 32</figcaption></figure><figure><img src="/Users/mwolff/.t3/projects/myarc/design/brand/exports/ribbon-isolation/ribbon-isolation-full-logo-48.png" width="48" height="48" alt=""><figcaption>full 48</figcaption></figure></div>
+<div class="panel d row" style="margin-top:.5rem"><figure><img src="/Users/mwolff/.t3/projects/myarc/design/brand/exports/ribbon-isolation/ribbon-isolation-flat-16.png" width="16" height="16" alt=""><figcaption>16</figcaption></figure><figure><img src="/Users/mwolff/.t3/projects/myarc/design/brand/exports/ribbon-isolation/ribbon-isolation-flat-24.png" width="24" height="24" alt=""><figcaption>24</figcaption></figure><figure><img src="/Users/mwolff/.t3/projects/myarc/design/brand/exports/ribbon-isolation/ribbon-isolation-flat-32.png" width="32" height="32" alt=""><figcaption>32</figcaption></figure><figure><img src="/Users/mwolff/.t3/projects/myarc/design/brand/exports/ribbon-isolation/ribbon-isolation-flat-48.png" width="48" height="48" alt=""><figcaption>48</figcaption></figure><span class="sep"></span><figure><img src="/Users/mwolff/.t3/projects/myarc/design/brand/exports/ribbon-isolation/ribbon-isolation-full-logo-32.png" width="32" height="32" alt=""><figcaption>full 32</figcaption></figure><figure><img src="/Users/mwolff/.t3/projects/myarc/design/brand/exports/ribbon-isolation/ribbon-isolation-full-logo-48.png" width="48" height="48" alt=""><figcaption>full 48</figcaption></figure></div>
+<div class="zoom"><figure><img class="px" src="/Users/mwolff/.t3/projects/myarc/design/brand/exports/ribbon-isolation/ribbon-isolation-flat-16.png" width="64" height="64" alt=""><figcaption>16 px at 4×</figcaption></figure><figure><img class="px" src="/Users/mwolff/.t3/projects/myarc/design/brand/exports/ribbon-isolation/ribbon-isolation-flat-24.png" width="96" height="96" alt=""><figcaption>24 px at 4×</figcaption></figure><figure><img class="px" src="/Users/mwolff/.t3/projects/myarc/design/brand/exports/ribbon-isolation/ribbon-isolation-flat-32.png" width="128" height="128" alt=""><figcaption>32 px at 4×</figcaption></figure></div>
+
+<h2>B · same ribbon, tilted 20°</h2>
+<p>Identical geometry rotated counter-clockwise so the loop fills more of the box. Front sweep flattens, back band carries the diagonal. Nothing redrawn.</p>
+<div class="panel ivory row"><figure><img src="/Users/mwolff/.t3/projects/myarc/design/brand/exports/ribbon-isolation/ribbon-isolation-tilted-16.png" width="16" height="16" alt=""><figcaption>16</figcaption></figure><figure><img src="/Users/mwolff/.t3/projects/myarc/design/brand/exports/ribbon-isolation/ribbon-isolation-tilted-24.png" width="24" height="24" alt=""><figcaption>24</figcaption></figure><figure><img src="/Users/mwolff/.t3/projects/myarc/design/brand/exports/ribbon-isolation/ribbon-isolation-tilted-32.png" width="32" height="32" alt=""><figcaption>32</figcaption></figure><figure><img src="/Users/mwolff/.t3/projects/myarc/design/brand/exports/ribbon-isolation/ribbon-isolation-tilted-48.png" width="48" height="48" alt=""><figcaption>48</figcaption></figure><span class="sep"></span><figure><img src="/Users/mwolff/.t3/projects/myarc/design/brand/exports/ribbon-isolation/ribbon-isolation-full-logo-32.png" width="32" height="32" alt=""><figcaption>full 32</figcaption></figure><figure><img src="/Users/mwolff/.t3/projects/myarc/design/brand/exports/ribbon-isolation/ribbon-isolation-full-logo-48.png" width="48" height="48" alt=""><figcaption>full 48</figcaption></figure></div>
+<div class="panel d row" style="margin-top:.5rem"><figure><img src="/Users/mwolff/.t3/projects/myarc/design/brand/exports/ribbon-isolation/ribbon-isolation-tilted-16.png" width="16" height="16" alt=""><figcaption>16</figcaption></figure><figure><img src="/Users/mwolff/.t3/projects/myarc/design/brand/exports/ribbon-isolation/ribbon-isolation-tilted-24.png" width="24" height="24" alt=""><figcaption>24</figcaption></figure><figure><img src="/Users/mwolff/.t3/projects/myarc/design/brand/exports/ribbon-isolation/ribbon-isolation-tilted-32.png" width="32" height="32" alt=""><figcaption>32</figcaption></figure><figure><img src="/Users/mwolff/.t3/projects/myarc/design/brand/exports/ribbon-isolation/ribbon-isolation-tilted-48.png" width="48" height="48" alt=""><figcaption>48</figcaption></figure><span class="sep"></span><figure><img src="/Users/mwolff/.t3/projects/myarc/design/brand/exports/ribbon-isolation/ribbon-isolation-full-logo-32.png" width="32" height="32" alt=""><figcaption>full 32</figcaption></figure><figure><img src="/Users/mwolff/.t3/projects/myarc/design/brand/exports/ribbon-isolation/ribbon-isolation-full-logo-48.png" width="48" height="48" alt=""><figcaption>full 48</figcaption></figure></div>
+<div class="zoom"><figure><img class="px" src="/Users/mwolff/.t3/projects/myarc/design/brand/exports/ribbon-isolation/ribbon-isolation-tilted-16.png" width="64" height="64" alt=""><figcaption>16 px at 4×</figcaption></figure><figure><img class="px" src="/Users/mwolff/.t3/projects/myarc/design/brand/exports/ribbon-isolation/ribbon-isolation-tilted-24.png" width="96" height="96" alt=""><figcaption>24 px at 4×</figcaption></figure><figure><img class="px" src="/Users/mwolff/.t3/projects/myarc/design/brand/exports/ribbon-isolation/ribbon-isolation-tilted-32.png" width="128" height="128" alt=""><figcaption>32 px at 4×</figcaption></figure></div>
+
+<h2>Both at 512</h2>
+<div class="big">
+<figure><img src="/Users/mwolff/.t3/projects/myarc/design/brand/exports/ribbon-isolation/ribbon-isolation-flat-512.png" alt=""><figcaption>A · 512, enlarged</figcaption></figure>
+<figure><img src="/Users/mwolff/.t3/projects/myarc/design/brand/exports/ribbon-isolation/ribbon-isolation-tilted-512.png" alt=""><figcaption>B · 512, enlarged</figcaption></figure>
+</div>
+
+<h2>How it was made</h2>
+<ul>
+<li><b>Trace.</b> Both ribbon edges traced by hand over <code>myarc-matte.png</code> at 1254 px, including the left curl, the front crossing sweep, the right curl with its small hole, and the seam where the front band ends over the curl.</li>
+<li><b>Colour.</b> Gradient stops sampled from the original along each band: front cyan → blue → violet → magenta → pink → peach; back band bright blue → deep blue → blue-violet → pale pink. A soft contact shadow under the front band restores the fold depth.</li>
+<li><b>Reconstructed, not visible in the original.</b> Back band segments hidden behind both A legs and under the front sweep (roughly x 350–640 and 900–1050). Everything else follows visible edges.</li>
+<li><b>Known gaps.</b> Flat gradients, no specular sheen or inner glow from the original render. Edge wobble on the left inner fold is from the trace, not the original.</li>
+<li><b>Files.</b> Master <code>assets/ribbon-isolation-source.svg</code>, icon artwork <code>ribbon-isolation-icon.svg</code> and <code>ribbon-isolation-icon-tilted.svg</code>, PNGs in <code>exports/ribbon-isolation/</code>, generator <code>ribbon-isolation-build.py</code>.</li>
+</ul>
+</body></html>

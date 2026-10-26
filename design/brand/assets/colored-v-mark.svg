@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="92" height="92" viewBox="-6 -6 92 92">
+  <title>myArc small-size A, colored V (study)</title>
+  <defs>
+    <linearGradient id="v" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="80" y2="0">
+      <stop offset="0" stop-color="#6A3DFF"/>
+      <stop offset="0.26" stop-color="#2E7BFF"/>
+      <stop offset="0.5" stop-color="#FF7A4A"/>
+      <stop offset="0.74" stop-color="#FF3E8E"/>
+      <stop offset="1" stop-color="#FF8A6A"/>
+    </linearGradient>
+  </defs>
+  <path fill="url(#v)" d="M0 80 L32 6 C35.46 -2 44.54 -2 48 6 L80 80 L60 80 L40 34 L20 80 Z"/>
+</svg>
