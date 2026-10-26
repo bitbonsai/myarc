@@ -36,6 +36,10 @@ A controlled owned-file collision produced real workspace write/read errors with
 
 Fresh through0023 process-crash regression also passed after a clean persisted seed: actual Crashed marker, audited SIGKILL/plain relaunch, exact pending metadata and genuine Restore retained the strict checkpoint for five samples. During setup, [current-address matching failure](../evidence/native-palette-address.json) was captured: typing an existing other tab URL in Cmd+L switched targets instead of navigating the current one. Unmatched navigation remains separately accepted. Narrow default-selection correction is next; explicit global result activation and Cmd+T defaults stay unchanged. Apps/helpers/server closed.
 
+0024 integrated as `e47b824`; normal native matched current input, explicit global arrow/mouse choice and new-intent/history defaults passed. Reduced matched-current navigation passed, but rapid reopen twice focused a result row rather than the field. Guard stopped submission; Cmd+L refocus recovered. A [separate normal pointer-only probe](../evidence/native-palette-hover-focus.json) reproduced the menu HoverButton focus behavior. Palette-local focus repair is next; shared menu behavior stays intact.
+
+A [recent-navigation crash failure](native-session-navigation-crash.md) retained IDs/model but restored duplicate root URLs after post-seed URL changes. Separate fresh clean-persisted/no-later-navigation control passed five strict samples. Native session commands configure2500ms saves; actual latency/cause remains unmeasured. Immediate navigation/site-storage durability stays open. Owned apps/helpers/servers closed.
+
 ## Tested preview command
 
 ```sh

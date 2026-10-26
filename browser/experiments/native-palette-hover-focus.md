@@ -1,0 +1,7 @@
+# Palette hover and input focus
+
+On0024, a fresh normal-motion marked Profile isolated the focus loss seen during reduced-motion rapid reopen. The parent moved the real pointer only within the exact foreground owned palette. With text input focused/selected, entering the first result without clicking moved focus to that button. Leaving the row cleared focus instead of restoring input. Draft, real page target/URL and time origin stayed unchanged. [Baseline](../evidence/native-palette-hover-focus.json).
+
+`HoverButton::StateChanged()` explicitly requests focus on hover and clears it on returning to normal. That menu/list behavior conflicts with an editable address field. The shared upstream control should retain its behavior. A palette-local result specialization can keep standard LabelButton painting/state while leaving input focus alone. Explicit row click, Tab access and input arrow/Enter activation must remain real and accessible. No focus timer/controller is needed.
+
+Private `/tmp/myarc-m0-runtime/hover24-20261026T035803Z/` retains exact pointer guards, before/after AX focus, untouched page observations and a fresh capture. Earlier two reduced-repeat focus stops remain in the address run; their exact pointer positions were not recorded, so the original causal sequence is not asserted. All owned apps/helpers/server closed. Repair and native acceptance pending; default renderer stays off.

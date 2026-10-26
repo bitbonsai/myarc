@@ -1,0 +1,29 @@
+{
+  "slice": "MA-007.c-native-palette-hover-focus",
+  "date": "2026-10-26",
+  "baseline_stack_through": "0024",
+  "status": "native hover focus defect reproduced; scoped repair pending",
+  "observed": {
+    "fresh_marked_profile_normal_motion": true,
+    "native_mouse_move_only_within_exact_foreground_owned_palette": true,
+    "input_initially_focused_and_selected": true,
+    "move_to_result_without_click_focuses_button_and_blurs_input": true,
+    "row_exit_clears_focus_instead_of_returning_to_input": true,
+    "draft_url_page_target_and_time_origin_unchanged": true,
+    "same_intent_cmd_l_can_refocus": true
+  },
+  "source": {
+    "file": "chrome/browser/ui/views/controls/hover_button.cc",
+    "method": "HoverButton::StateChanged",
+    "purpose": "menu/list focus on hover; normal state clears its focused view",
+    "global_upstream_control_should_stay_unchanged": true
+  },
+  "scope": {
+    "palette_result_only_behavior_needed": true,
+    "explicit_keyboard_tab_arrow_and_click_activation_must_stay_accessible": true,
+    "no_new_controller_or_focus_timer": true
+  },
+  "raw_proof": "private outside Git",
+  "owned_apps_helpers_server_closed": true,
+  "workspace_renderer_default_enabled": false
+}

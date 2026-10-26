@@ -1,5 +1,13 @@
 # Development log
 
+## 2026-10-26: Address defaults, hover focus and navigation crash boundary
+
+0024 `e47b824` passed native normal matched-current same-target navigation, explicit global arrow/mouse reveal, unchanged new-intent matching and real history literal/default cases. Reduced matched-current passed; two further rapid reopens stopped on result-row focus with unchanged input. Cmd+L refocused; specific input-focus precondition now stops before typing. [Address evidence](../browser/evidence/native-palette-address.json).
+
+Fresh normal pointer-only probe reproduced input focus moving to result on hover, then clearing on exit, with draft/page unchanged. Shared HoverButton::StateChanged deliberately implements this menu behavior; repair should be palette-local and retain keyboard/click access. [Baseline](../browser/evidence/native-palette-hover-focus.json).
+
+Actual post-seed recent-navigation SIGKILL/Restore retained model but restored duplicate root URLs; unchanged verifier failed. Independent fresh no-post-seed-navigation persisted control passed five samples. Unmodified session command source configures2500ms saves, not measured causal proof. [Durability record](../browser/experiments/native-session-navigation-crash.md). All owned apps/helpers/servers closed; no metadata/verifier repairs or durability claim.
+
 ## 2026-10-26: Current-address submission build candidate
 
 From `5f2b76a`, [0024](../browser/experiments/native-palette-intent.md#candidate-0024-current-address-literal-submission) gates both automatic row-selection sites on new intent. Current edits use existing unselected state until deliberate arrows/mouse; matching, classifier, global reveal, Rust rules and default-OFF flags stay unchanged. Baseline actual defect evidence is retained byte-exact.

@@ -89,6 +89,35 @@
     "owned_apps_helpers_server_closed": true,
     "acknowledgement_and_power_loss_durability_not_claimed": true
   },
+  "through0024_followups": {
+    "recent_navigation_case": {
+      "clean_seed_verified_then_page_urls_changed_and_reset": true,
+      "runtime_urls_canary_and_model_verified_before_actual_sigkill": true,
+      "plain_relaunch_genuine_restore_pending_metadata_exact": true,
+      "logical_ids_and_model_retained": true,
+      "latest_temporary_recovery_url_not_retained_two_root_urls_restored": true,
+      "unchanged_strict_verifier_failed_duplicate_fixture_target": true,
+      "failure_persisted_in_later_complete_page_observation": true,
+      "acknowledged_navigation_crash_boundary_and_cause_unaccepted": true
+    },
+    "independent_no_post_seed_navigation_control": {
+      "fresh_marked_profile_same_build": true,
+      "clean_persisted_session_roundtrip_verified": true,
+      "no_page_url_navigation_after_that_seed": true,
+      "actual_crashed_marker_audited_sigkill_plain_relaunch_genuine_restore": true,
+      "pending_metadata_byte_exact_no_storage_retry": true,
+      "unchanged_strict_verifier_passed_five_samples": true,
+      "urls_canary_ids_owners_selection_retained": true
+    },
+    "source_context": {
+      "command_storage_manager_unchanged_from_upstream_head": true,
+      "configured_command_save_delay_ms": 2500,
+      "actual_flush_latency_or_causality_measured": false,
+      "pristine_upstream_runtime_comparison": "UNRUN"
+    },
+    "owned_apps_helpers_servers_closed": true,
+    "record": "../experiments/native-session-navigation-crash.md"
+  },
   "flag_off_site_storage_control": {
     "date": "2026-10-26",
     "same_patched_binary_not_pristine_upstream": true,

@@ -103,6 +103,14 @@ Changed-line Chromium clang-format, GN formatting, lifecycle helper, Rust format
 
 Native acceptance for 0024 remains with the parent: repeat the actual two-target matched-current submission, then deliberate global result activation and unchanged new-intent behavior. Recheck unchanged-current reload and saved destination retention. The prior 0023 crash regression above does not accept this build. No native app/input/desktop check or server was launched by this implementation task.
 
+## Parent bounded native0024 followups
+
+Integrated as `e47b824`; all83 source/artifact hashes match and canonical16 stayed unchanged. Actual normal-mode matched current input navigated the original target while the other target/time origin stayed exact. Deliberate Down/Enter and row mouse activation revealed the Reading owner without navigation/extra pages. Cmd+T default matching still activated the existing result. An actual history-only row arrived: current intent used the literal URL without its history query suffix; new intent retained the history default and created one real page. Closing that Temporary retained the original two-item saved model.
+
+Reduced mode observed actual reduced motion and passed matched-current same-target navigation. Two rapid-reopen repeats then stopped with the result row focused and the input unchanged. Repeated native Cmd+L refocused it. The second driver added a specific input-focus precondition and stopped before typing. Full reduced-repeat acceptance is withheld. A separate [normal native hover probe](native-palette-hover-focus.md) reproduced focus moving to a result on pointer entry without clicking, with draft/page untouched.
+
+A post-seed recent-navigation crash failed on duplicate restored URLs; an independent no-post-seed-navigation clean-persisted control passed. [Durability evidence](native-session-navigation-crash.md) retains both. Private address run `/tmp/myarc-m0-runtime/address24-20261026T034121Z/` holds AX/page/history captures and failed logs. Apps/helpers/servers closed. Native C++ fixtures and broader focus/durability remain unaccepted.
+
 ## Historical 0022 delegate handoff
 
 The following remaining-acceptance and ownership notes are retained from the 0022 source-only handoff. Later parent acceptance above supersedes its named desktop cases; they are not 0024 build acceptance.

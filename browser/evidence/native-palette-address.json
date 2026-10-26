@@ -2,7 +2,7 @@
   "slice": "MA-007.c-native-current-address-submission",
   "date": "2026-10-26",
   "baseline_stack_through": "0023",
-  "status": "native current-intent literal submission defect reproduced",
+  "status": "baseline retained; bounded normal literal/default correction accepted, hover focus gap open",
   "journey": {
     "two_existing_real_page_targets_in_one_marked_profile": true,
     "active_temporary_page_in_reading": true,
@@ -27,5 +27,25 @@
   ],
   "raw_proof": "private outside Git",
   "owned_apps_helpers_server_closed": true,
+  "native_followup": {
+    "implementation_commit": "e47b824",
+    "stack_through": "0024",
+    "normal_matched_current_url_keeps_original_target_and_other_time_origin": true,
+    "normal_explicit_arrow_and_mouse_results_reveal_other_space": true,
+    "normal_new_intent_default_still_activates_existing_match": true,
+    "normal_actual_history_row_arrived_current_submits_literal_without_history_query_suffix": true,
+    "normal_new_intent_history_default_opens_history_url": true,
+    "temporary_history_page_closed_original_two_item_model_retained": true,
+    "reduced_matched_current_literal_case_passed": true,
+    "full_reduced_repeat_failed_twice_when_input_focus_was_on_result_row": true,
+    "same_intent_cmd_l_refocus_restored_input_without_lost_prefill": true,
+    "stronger_specific_input_focus_precondition_stopped_second_repeat_before_typing": true,
+    "separate_normal_mouse_hover_without_click_reproduced_focus_loss": true,
+    "reference": "native-palette-hover-focus.json",
+    "recent_post_seed_navigation_crash_failure_retained": true,
+    "separate_clean_persisted_session_crash_control_passed": true,
+    "native_fixture_suites": "UNRUN",
+    "owned_apps_helpers_servers_closed": true
+  },
   "workspace_renderer_default_enabled": false
 }
