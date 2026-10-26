@@ -1,0 +1,512 @@
+diff --git a/chrome/browser/ui/views/frame/BUILD.gn b/chrome/browser/ui/views/frame/BUILD.gn
+index 5e1d137..acc3379 100644
+--- a/chrome/browser/ui/views/frame/BUILD.gn
++++ b/chrome/browser/ui/views/frame/BUILD.gn
+@@ -2285,6 +2285,9 @@ source_set("browser_tests") {
+     "//chrome/browser/ui/views/accessibility:dump_accessibility_events_views_browsertest_base",
+     "//chrome/browser/ui/views/animations",
+     "//chrome/browser/ui/views/infobars",
++    "//chrome/browser/ui/views/location_bar",
++    "//chrome/browser/ui/views/omnibox",
++    "//chrome/browser/ui/views/page_info",
+     "//chrome/browser/ui/views/tabs:new_tab_button",
+     "//chrome/browser/ui/views/tabs:tab_style_views",
+     "//chrome/browser/ui/views/tabs:test_support",
+@@ -2294,10 +2297,13 @@ source_set("browser_tests") {
+     "//components/history/core/browser",
+     "//components/omnibox/browser",
+     "//components/safe_browsing/core/browser/realtime:test_support",
++    "//components/security_state/core",
+     "//myarc:browser_workspace_adapter",
++    "//net:test_support",
+     "//ui/accessibility:test_support",
+     "//ui/base:data_exchange",
+     "//ui/base:ozone_buildflags",
++    "//ui/base/clipboard",
+   ]
+ 
+   if (use_ozone) {
+diff --git a/chrome/browser/ui/views/frame/browser_view_browsertest.cc b/chrome/browser/ui/views/frame/browser_view_browsertest.cc
+index 9fc6c76..996b031 100644
+--- a/chrome/browser/ui/views/frame/browser_view_browsertest.cc
++++ b/chrome/browser/ui/views/frame/browser_view_browsertest.cc
+@@ -25,6 +25,7 @@
+ #include "base/test/bind.h"
+ #include "base/test/metrics/histogram_tester.h"
+ #include "base/test/run_until.h"
++#include "base/test/test_future.h"
+ #include "base/test/values_test_util.h"
+ #include "base/threading/thread_restrictions.h"
+ #include "base/time/time.h"
+@@ -87,6 +88,9 @@
+ #include "chrome/browser/ui/views/infobars/infobar_container_view.h"
+ #include "chrome/browser/ui/views/interaction/browser_elements_views.h"
+ #include "chrome/browser/ui/views/location_bar/location_bar_view.h"
++#include "chrome/browser/ui/views/location_bar/location_icon_view.h"
++#include "chrome/browser/ui/views/omnibox/omnibox_view_views.h"
++#include "chrome/browser/ui/views/page_info/page_info_bubble_view_base.h"
+ #include "chrome/browser/ui/views/side_panel/side_panel.h"
+ #include "chrome/browser/ui/views/side_panel/side_panel_coordinator.h"
+ #include "chrome/browser/ui/views/tab_modal_confirm_dialog_views.h"
+@@ -120,6 +124,7 @@
+ #include "components/prefs/pref_service.h"
+ #include "components/safe_browsing/core/browser/realtime/fake_url_lookup_service.h"
+ #include "components/search/ntp_features.h"
++#include "components/security_state/core/security_state.h"
+ #include "components/sessions/core/session_id.h"
+ #include "components/split_tabs/split_tab_visual_data.h"
+ #include "components/tabs/public/split_tab_collection.h"
+@@ -139,6 +144,8 @@
+ #include "media/base/media_switches.h"
+ #include "media/capture/capture_switches.h"
+ #include "myarc/browser_workspace_adapter.h"
++#include "net/dns/mock_host_resolver.h"
++#include "net/test/embedded_test_server/embedded_test_server.h"
+ #include "net/test/embedded_test_server/http_response.h"
+ #include "net/traffic_annotation/network_traffic_annotation_test_helper.h"
+ #include "testing/gmock/include/gmock/gmock.h"
+@@ -150,6 +157,8 @@
+ #include "ui/base/accelerators/accelerator.h"
+ #include "ui/base/base_window.h"
+ #include "ui/base/buildflags.h"
++#include "ui/base/clipboard/clipboard.h"
++#include "ui/base/clipboard/scoped_clipboard_writer.h"
+ #include "ui/base/interaction/element_identifier.h"
+ #include "ui/base/interaction/element_tracker.h"
+ #include "ui/base/l10n/l10n_util.h"
+@@ -868,6 +877,239 @@ IN_PROC_BROWSER_TEST_F(BrowserViewSidebarPresentationTest,
+   CloseBrowserSynchronously(other);
+ }
+ 
++class BrowserViewUrlPillTest : public BrowserViewStorageRetryTest {
++ protected:
++  void SetUpOnMainThread() override {
++    BrowserViewStorageRetryTest::SetUpOnMainThread();
++    ASSERT_TRUE(base::test::RunUntil(
++        [&] { return browser_view()->GetMyarcWorkspaceAdapter()->ready(); }));
++    https_server_.ServeFilesFromSourceDirectory("chrome/test/data");
++    ASSERT_TRUE(https_server_.Start());
++  }
++
++  LocationBarView* bar() { return browser_view()->GetLocationBarView(); }
++
++  views::Button* CopyButton() {
++    for (views::View* child : bar()->children()) {
++      if (auto* button = views::AsViewClass<views::Button>(child);
++          button && button->GetTooltipText() ==
++                        l10n_util::GetStringUTF16(IDS_APP_MENU_COPY_LINK)) {
++        return button;
++      }
++    }
++    return nullptr;
++  }
++
++  void Hover(bool hovered) {
++    ui::MouseEvent event(
++        hovered ? ui::EventType::kMouseEntered : ui::EventType::kMouseExited,
++        gfx::PointF(), gfx::PointF(), ui::EventTimeForNow(), 0, 0);
++    auto* view = static_cast<views::View*>(bar());
++    if (hovered) {
++      view->OnMouseEntered(event);
++    } else {
++      view->OnMouseExited(event);
++    }
++    RunScheduledLayouts();
++  }
++
++  void Idle() {
++    bar()->GetFocusManager()->ClearFocus();
++    bar()->Revert();
++    Hover(false);
++  }
++
++  void PressCopy() {
++    views::test::ButtonTestApi(CopyButton())
++        .NotifyClick(ui::KeyEvent(ui::EventType::kKeyPressed, ui::VKEY_SPACE,
++                                  ui::EF_NONE));
++  }
++
++  std::u16string ClipboardText() {
++    base::test::TestFuture<std::u16string> text;
++    ui::Clipboard::GetForCurrentThread()->ReadText(
++        ui::ClipboardBuffer::kCopyPaste, std::nullopt, text.GetCallback());
++    return text.Get();
++  }
++
++  net::EmbeddedTestServer https_server_{net::EmbeddedTestServer::TYPE_HTTPS};
++};
++
++IN_PROC_BROWSER_TEST_F(BrowserViewUrlPillTest,
++                       HttpsIdleHoverFocusAndRealSiteInfo) {
++  ASSERT_TRUE(ui_test_utils::NavigateToURL(
++      browser(), https_server_.GetURL("/title1.html")));
++  Idle();
++  ASSERT_EQ(security_state::SECURE,
++            bar()->GetLocationBarModel()->GetSecurityLevel());
++  auto* copy = CopyButton();
++  auto* site = bar()->location_icon_view();
++  ASSERT_TRUE(copy);
++  EXPECT_FALSE(copy->GetVisible());
++  EXPECT_FALSE(site->GetVisible());
++  EXPECT_TRUE(bar()->GetNotifyEnterExitOnChild());
++  Hover(true);
++  EXPECT_TRUE(copy->GetVisible());
++  EXPECT_TRUE(site->GetVisible());
++  EXPECT_LE(bar()->omnibox_view()->bounds().right(), copy->x());
++  EXPECT_LE(copy->bounds().right(), site->x());
++  EXPECT_EQ(views::View::FocusBehavior::ALWAYS, copy->GetFocusBehavior());
++  Idle();
++  auto* focus = bar()->GetFocusManager();
++  focus->SetKeyboardAccessible(true);
++  bar()->omnibox_view()->RequestFocus();
++  RunScheduledLayouts();
++  ASSERT_TRUE(copy->GetVisible());
++  focus->AdvanceFocus(false);
++  RunScheduledLayouts();
++  EXPECT_TRUE(copy->HasFocus());
++  EXPECT_TRUE(site->GetVisible());
++  focus->AdvanceFocus(false);
++  EXPECT_TRUE(site->HasFocus());
++  views::test::ButtonTestApi(site).NotifyClick(
++      ui::KeyEvent(ui::EventType::kKeyPressed, ui::VKEY_SPACE, ui::EF_NONE));
++  ASSERT_TRUE(PageInfoBubbleViewBase::IsShowing(active_web_contents()));
++  PageInfoBubbleViewBase::GetPageInfoBubbleForTesting(active_web_contents())
++      ->GetWidget()
++      ->CloseNow();
++  Idle();
++  EXPECT_FALSE(copy->GetVisible());
++  EXPECT_FALSE(site->GetVisible());
++}
++
++IN_PROC_BROWSER_TEST_F(BrowserViewUrlPillTest,
++                       CopyUsesFullCurrentPageAtInvocation) {
++  const GURL first =
++      https_server_.GetURL("/title1.html?full=one%20two#fragment");
++  const GURL second =
++      https_server_.GetURL("/title2.html?actual=second#current");
++  ASSERT_TRUE(ui_test_utils::NavigateToURL(browser(), first));
++  Idle();
++  Hover(true);
++  ASSERT_TRUE(CopyButton()->GetVisible());
++  PressCopy();
++  EXPECT_EQ(base::UTF8ToUTF16(first.spec()), ClipboardText());
++  chrome::AddTabAt(browser(), second, -1, true);
++  ASSERT_TRUE(content::WaitForLoadStop(active_web_contents()));
++  Idle();
++  Hover(true);
++  PressCopy();
++  EXPECT_EQ(base::UTF8ToUTF16(second.spec()), ClipboardText());
++  browser()->GetTabStripModel()->ActivateTabAt(0);
++  Idle();
++  Hover(true);
++  PressCopy();
++  EXPECT_EQ(base::UTF8ToUTF16(first.spec()), ClipboardText());
++}
++
++IN_PROC_BROWSER_TEST_F(BrowserViewUrlPillTest,
++                       InsecureStatusStaysVisibleAtIdle) {
++  host_resolver()->AddRule("insecure.test", "127.0.0.1");
++  ASSERT_TRUE(embedded_test_server()->Start());
++  ASSERT_TRUE(ui_test_utils::NavigateToURL(
++      browser(),
++      embedded_test_server()->GetURL("insecure.test", "/title1.html")));
++  Idle();
++  EXPECT_EQ(security_state::WARNING,
++            bar()->GetLocationBarModel()->GetSecurityLevel());
++  EXPECT_TRUE(bar()->location_icon_view()->GetVisible());
++  EXPECT_TRUE(bar()->location_icon_view()->GetShowText());
++  EXPECT_FALSE(CopyButton()->GetVisible());
++}
++
++IN_PROC_BROWSER_TEST_F(BrowserViewUrlPillTest,
++                       DangerousStatusStaysVisibleAtIdle) {
++  net::EmbeddedTestServer expired(net::EmbeddedTestServer::TYPE_HTTPS);
++  expired.SetSSLConfig(net::EmbeddedTestServer::CERT_EXPIRED);
++  expired.ServeFilesFromSourceDirectory("chrome/test/data");
++  ASSERT_TRUE(expired.Start());
++  ASSERT_TRUE(
++      ui_test_utils::NavigateToURL(browser(), expired.GetURL("/title1.html")));
++  Idle();
++  EXPECT_EQ(security_state::DANGEROUS,
++            bar()->GetLocationBarModel()->GetSecurityLevel());
++  EXPECT_TRUE(bar()->location_icon_view()->GetVisible());
++  EXPECT_TRUE(bar()->location_icon_view()->GetShowText());
++  EXPECT_FALSE(CopyButton()->GetVisible());
++}
++
++IN_PROC_BROWSER_TEST_F(BrowserViewUrlPillTest, EmptyNeverCopiesHiddenPage) {
++  const GURL url = https_server_.GetURL("/title1.html?hidden=old#private");
++  ASSERT_TRUE(ui_test_utils::NavigateToURL(browser(), url));
++  auto* adapter = browser_view()->GetMyarcWorkspaceAdapter();
++  const auto original = adapter->Sidebar().current_space.id;
++  const auto empty = adapter->CreateSpace("URL pill empty fixture");
++  ASSERT_TRUE(empty.ok);
++  ASSERT_TRUE(adapter->SelectSpace(empty.id).ok);
++  browser_view()->RefreshMyarcWorkspaceSidebar();
++  Idle();
++  Hover(true);
++  ASSERT_TRUE(browser_view()->IsMyarcWorkspaceBlank());
++  EXPECT_EQ(url, active_web_contents()->GetVisibleURL());
++  EXPECT_FALSE(bar()->GetWebContents());
++  EXPECT_FALSE(CopyButton()->GetVisible());
++  EXPECT_FALSE(CopyButton()->GetEnabled());
++  EXPECT_FALSE(bar()->location_icon_view()->GetVisible());
++  EXPECT_FALSE(bar()->ShowPageInfoDialog());
++  {
++    ui::ScopedClipboardWriter writer(ui::ClipboardBuffer::kCopyPaste);
++    writer.WriteText(u"unchanged clipboard");
++  }
++  // Exercise a stale queued callback as well as the hidden/disabled control.
++  PressCopy();
++  EXPECT_EQ(u"unchanged clipboard", ClipboardText());
++  ASSERT_TRUE(adapter->SelectSpace(original).ok);
++  browser_view()->RefreshMyarcWorkspaceSidebar();
++  Idle();
++  Hover(true);
++  EXPECT_TRUE(CopyButton()->GetVisible());
++  EXPECT_TRUE(bar()->location_icon_view()->GetVisible());
++  PressCopy();
++  EXPECT_EQ(base::UTF8ToUTF16(url.spec()), ClipboardText());
++}
++
++IN_PROC_BROWSER_TEST_F(BrowserViewUrlPillTest,
++                       HorizontalKeepsUpstreamLocationIcon) {
++  ASSERT_TRUE(ui_test_utils::NavigateToURL(
++      browser(), https_server_.GetURL("/title1.html")));
++  tabs::VerticalTabStripStateController::From(browser())
++      ->SetVerticalTabsEnabled(false);
++  Idle();
++  Hover(true);
++  EXPECT_FALSE(CopyButton()->GetVisible());
++  EXPECT_TRUE(bar()->location_icon_view()->GetVisible());
++  EXPECT_FALSE(bar()->GetNotifyEnterExitOnChild());
++  EXPECT_LT(bar()->location_icon_view()->x(), bar()->omnibox_view()->x());
++  tabs::VerticalTabStripStateController::From(browser())
++      ->SetVerticalTabsEnabled(true);
++  Idle();
++  EXPECT_FALSE(bar()->location_icon_view()->GetVisible());
++  Hover(true);
++  EXPECT_TRUE(CopyButton()->GetVisible());
++}
++
++IN_PROC_BROWSER_TEST_F(BrowserViewTest, UrlPillFlagOffKeepsUpstreamLayout) {
++  net::EmbeddedTestServer https(net::EmbeddedTestServer::TYPE_HTTPS);
++  https.ServeFilesFromSourceDirectory("chrome/test/data");
++  ASSERT_TRUE(https.Start());
++  ASSERT_TRUE(
++      ui_test_utils::NavigateToURL(browser(), https.GetURL("/title1.html")));
++  tabs::VerticalTabStripStateController::From(browser())
++      ->SetVerticalTabsEnabled(true);
++  RunScheduledLayouts();
++  auto* bar = browser_view()->GetLocationBarView();
++  bar->GetFocusManager()->ClearFocus();
++  bar->Revert();
++  RunScheduledLayouts();
++  EXPECT_TRUE(bar->location_icon_view()->GetVisible());
++  EXPECT_LT(bar->location_icon_view()->x(), bar->omnibox_view()->x());
++  EXPECT_FALSE(bar->GetNotifyEnterExitOnChild());
++  for (views::View* child : bar->children()) {
++    EXPECT_NE(l10n_util::GetStringUTF16(IDS_APP_MENU_COPY_LINK),
++              child->GetTooltipText());
++  }
++}
++
+ class BrowserViewPaletteIntentTest : public BrowserViewTest {
+  protected:
+   void SetUpCommandLine(base::CommandLine* command_line) override {
+diff --git a/chrome/browser/ui/views/location_bar/location_bar_view.cc b/chrome/browser/ui/views/location_bar/location_bar_view.cc
+index 922cc44..c7c8d5d 100644
+--- a/chrome/browser/ui/views/location_bar/location_bar_view.cc
++++ b/chrome/browser/ui/views/location_bar/location_bar_view.cc
+@@ -353,6 +353,21 @@ void LocationBarView::Init() {
+   omnibox_view_ = AddChildView(std::move(omnibox_view));
+   omnibox_view_->Init();
+ 
++  if (browser_ &&
++      browser_->GetType() == BrowserWindowInterface::Type::TYPE_NORMAL &&
++      base::CommandLine::ForCurrentProcess()->HasSwitch(
++          "myarc-visual-parity")) {
++    auto copy = views::CreateVectorImageButtonWithNativeTheme(
++        base::BindRepeating(&LocationBarView::CopyMyarcCurrentUrl,
++                            base::Unretained(this)),
++        kLinkChromeRefreshOldIcon, 16, kColorOmniboxActionIcon);
++    copy->SetTooltipText(l10n_util::GetStringUTF16(IDS_APP_MENU_COPY_LINK));
++    copy->SetFocusBehavior(FocusBehavior::ALWAYS);
++    copy->SetPreferredSize(gfx::Size(28, 28));
++    copy->SetVisible(false);
++    myarc_copy_url_button_ = AddChildView(std::move(copy));
++  }
++
+   if (CanHostWebUIOmnibox(browser_, is_popup_mode_)) {
+     if (omnibox::IsAimPopupFeatureEnabled() &&
+         !CreateOmniboxPopupAimPresenterIfEligible() && profile_) {
+@@ -680,6 +695,9 @@ void LocationBarView::RemovedFromWidget() {
+ }
+ 
+ void LocationBarView::OnDidChangeFocus(views::View* before, views::View* now) {
++  if (IsMyarcUrlPill() && (Contains(before) || Contains(now))) {
++    InvalidateLayout();
++  }
+   if (Contains(before) != Contains(now)) {
+     NotifyFocusChanged();
+   }
+@@ -785,6 +803,31 @@ void LocationBarView::Layout(PassKey) {
+ 
+   selected_keyword_view_->SetVisible(false);
+ 
++  const bool myarc_pill = IsMyarcUrlPill();
++  SetNotifyEnterExitOnChild(myarc_pill);
++  if (!myarc_pill) {
++    myarc_url_hovered_ = false;
++  }
++  if (myarc_copy_url_button_) {
++    // Match focus traversal to the pill's text, copy, site-info order.
++    ReorderChildView(location_icon_view_, myarc_pill ? 3 : 1);
++  }
++  const bool reveal_myarc_actions = myarc_url_hovered_ || IsFocusWithin();
++  WebContents* const myarc_page = myarc_pill ? GetWebContents() : nullptr;
++  const bool myarc_has_page =
++      myarc_page && !myarc_page->GetVisibleURL().is_empty() &&
++      !myarc_page->GetController().GetVisibleEntry()->IsInitialEntry();
++  if (myarc_copy_url_button_) {
++    myarc_copy_url_button_->SetVisible(myarc_has_page && reveal_myarc_actions);
++    myarc_copy_url_button_->SetEnabled(myarc_has_page &&
++                                       chrome::CanCopyUrl(browser_));
++  }
++  // Keep warnings, editing decorations and permission overrides upstream-owned.
++  const bool myarc_quiet_site_info =
++      myarc_has_page && !IsEditingOrEmpty() &&
++      GetLocationBarModel()->GetSecurityLevel() == security_state::SECURE &&
++      !location_icon_view_->GetShowText() && !ShouldChipOverrideLocationIcon();
++
+   // The padding between the left edges of the location bar and the LHS icon,
+   // e.g. the page info icon, the google G icon, the selected suggestion icon.
+   int icon_left = GetLayoutConstant(
+@@ -866,6 +909,8 @@ void LocationBarView::Layout(PassKey) {
+     selected_keyword_view_->SetKeyword(keyword);
+   } else if (chrome::IsMyarcWorkspaceBlank(browser_)) {
+     location_icon_view_->SetVisible(false);
++  } else if (myarc_quiet_site_info) {
++    location_icon_view_->SetVisible(reveal_myarc_actions);
+   } else if (location_icon_view_->GetShowText() &&
+              !ShouldChipOverrideLocationIcon()) {
+     location_icon_view_->SetVisible(true);
+@@ -890,6 +935,15 @@ void LocationBarView::Layout(PassKey) {
+     }
+   };
+ 
++  if (myarc_quiet_site_info) {
++    add_trailing_decoration(location_icon_view_, /*intra_item_padding=*/0,
++                            trailing_decorations_edge_padding);
++  }
++  if (myarc_copy_url_button_) {
++    add_trailing_decoration(myarc_copy_url_button_, /*intra_item_padding=*/0,
++                            trailing_decorations_edge_padding);
++  }
++
+   if (features::IsPageActionsElevatedToolbarEnabled()) {
+     if (page_action_container_ && page_action_container_->GetVisible()) {
+       const bool is_capsule_active = page_action_container_->IsCapsuleActive();
+@@ -1027,6 +1081,9 @@ void LocationBarView::Layout(PassKey) {
+     position_view(omnibox_additional_text_view_, omnibox_additional_text_width);
+   }
+ 
++  if (myarc_copy_url_button_) {
++    RefreshBackground();
++  }
+   LayoutSuperclass<View>(this);
+ }
+ 
+@@ -1412,6 +1469,9 @@ void LocationBarView::RefreshBackground() {
+   SkColor normal = color_provider->GetColor(kColorLocationBarBackground);
+   SkColor hovered =
+       color_provider->GetColor(kColorLocationBarBackgroundHovered);
++  if (IsMyarcUrlPill() && !high_contrast) {
++    normal = IsFocusWithin() ? hovered : SK_ColorTRANSPARENT;
++  }
+ 
+   background_color_ = gfx::Tween::ColorValueBetween(opacity, normal, hovered);
+   if (is_caret_visible) {
+@@ -1804,11 +1864,41 @@ void LocationBarView::OnMouseReleased(const ui::MouseEvent& event) {
+   omnibox_view_->OnMouseReleased(AdjustMouseEventLocationForOmniboxView(event));
+ }
+ 
++bool LocationBarView::IsMyarcUrlPill() const {
++  if (!myarc_copy_url_button_ || !browser_) {
++    return false;
++  }
++  const auto* browser_view = BrowserView::GetBrowserViewForBrowser(browser_);
++  return browser_view && browser_view->ShouldDrawVerticalTabStrip();
++}
++
++void LocationBarView::CopyMyarcCurrentUrl() {
++  WebContents* const page = GetWebContents();
++  if (IsMyarcUrlPill() && page && !page->GetVisibleURL().is_empty() &&
++      !page->GetController().GetVisibleEntry()->IsInitialEntry() &&
++      chrome::CanCopyUrl(browser_)) {
++    chrome::CopyURL(browser_, page);
++  }
++}
++
++void LocationBarView::OnMouseEntered(const ui::MouseEvent& event) {
++  if (IsMyarcUrlPill()) {
++    myarc_url_hovered_ = true;
++    InvalidateLayout();
++    OnOmniboxHovered(true);
++  }
++  View::OnMouseEntered(event);
++}
++
+ void LocationBarView::OnMouseMoved(const ui::MouseEvent& event) {
+   OnOmniboxHovered(true);
+ }
+ 
+ void LocationBarView::OnMouseExited(const ui::MouseEvent& event) {
++  if (myarc_url_hovered_) {
++    myarc_url_hovered_ = false;
++    InvalidateLayout();
++  }
+   OnOmniboxHovered(false);
+ }
+ 
+@@ -2188,6 +2278,9 @@ bool LocationBarView::IsFullWebUiOmniboxReady() const {
+ }
+ 
+ void LocationBarView::OnOmniboxHovered(bool is_hovering) {
++  if (IsMyarcUrlPill()) {
++    is_hovering = myarc_url_hovered_;
++  }
+   if (is_hovering) {
+     // Only show the hover animation when omnibox is in unfocused steady state.
+     if (!omnibox_view_->HasFocus()) {
+diff --git a/chrome/browser/ui/views/location_bar/location_bar_view.h b/chrome/browser/ui/views/location_bar/location_bar_view.h
+index 856d9d7..afb91f9 100644
+--- a/chrome/browser/ui/views/location_bar/location_bar_view.h
++++ b/chrome/browser/ui/views/location_bar/location_bar_view.h
+@@ -449,6 +449,7 @@ class LocationBarView
+   bool OnMousePressed(const ui::MouseEvent& event) override;
+   bool OnMouseDragged(const ui::MouseEvent& event) override;
+   void OnMouseReleased(const ui::MouseEvent& event) override;
++  void OnMouseEntered(const ui::MouseEvent& event) override;
+   void OnMouseMoved(const ui::MouseEvent& event) override;
+   void OnMouseExited(const ui::MouseEvent& event) override;
+   void ShowContextMenu(const gfx::Point& p,
+@@ -463,6 +464,9 @@ class LocationBarView
+                            const gfx::Point& press_pt,
+                            const gfx::Point& p) override;
+ 
++  bool IsMyarcUrlPill() const;
++  void CopyMyarcCurrentUrl();
++
+   bool ShouldUsePopupOpenAppearance() const;
+ 
+   bool ShouldHidePageActionIcons() const;
+@@ -575,6 +579,8 @@ class LocationBarView
+   // An icon to the left of the edit field: the HTTPS lock, blank page icon,
+   // search icon, EV HTTPS bubble, etc.
+   raw_ptr<LocationIconView> location_icon_view_ = nullptr;
++  raw_ptr<views::ImageButton> myarc_copy_url_button_ = nullptr;
++  bool myarc_url_hovered_ = false;
+ 
+   // Views to show inline autocompletion when an IME is active.  In this case,
+   // we shouldn't change the text or selection inside the OmniboxView itself,
