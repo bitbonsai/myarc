@@ -1,0 +1,53 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-26",
+  "slice": "MA-007.c.sidebar26",
+  "status": "bounded_native_ui_and_clean_review_restart_passed",
+  "source_commits": ["2b8ab75", "42711dde71b88c45042c25b9db19d87e2b7d5932"],
+  "launcher_commits": ["137acc8", "72a609d"],
+  "patch": "browser/patches/0026-native-sidebar-row-footer.patch",
+  "patch_sha256": "83c305404d61f14ea36b50e7cbea0ee72f0a18b78bf501fb69ea33f3b36f6db6",
+  "native_component_sha256": "6601f15e8ed7b8f9666a6d5c90fb29361fa1902e3a1ef5654190238f0090c724",
+  "installed_source_inventory": 83,
+  "canonical_payload_inventory": 16,
+  "changed_installed_sources": 5,
+  "native_observations": {
+    "full_width_neutral_row_and_separate_inset_close_chip": true,
+    "hover_exit_and_focus_exit_hide_close_glyph": true,
+    "actual_tab_reached_close_button": true,
+    "close_and_footer_hit_targets_dip": [32, 32],
+    "space_pin_above_new_tab": true,
+    "profile_favorite_tile_above_space_heading": true,
+    "existing_space_pin_saved_record_preserved": true,
+    "requested_favorite_saved_through_native_context_menu": true,
+    "requested_address_redirected_to_existing_saved_destination": true,
+    "library_opened_real_chromium_downloads_page": true,
+    "only_created_downloads_temporary_closed": true,
+    "library_opened_real_create_space_dialog_then_cancelled": true,
+    "native_graceful_quit_and_new_pid_same_profile_relaunch": true,
+    "saved_ids_owners_and_canonical_urls_retained": true,
+    "separate_app_only_reduced_motion_renderer_media_query_true": true,
+    "reduced_motion_hover_and_actual_tab_focus": true,
+    "OS_preferences_unchanged": true,
+    "debug_endpoint_or_test_extension_added": false
+  },
+  "checks": {
+    "full_chrome_build": "exit 0",
+    "production_and_fixture_real_context_syntax": "passed",
+    "nonzero_GN_owners_and_header_checks": "passed",
+    "strict_indexed_full_replay83": "passed",
+    "canonical16_freshness": "passed",
+    "launcher_synthetic_tests": 20,
+    "unchanged_Rust_core_tests_from_implementation_run": 32,
+    "bridge_and_lifecycle_helpers_from_implementation_run": "passed",
+    "native_Cpp_browser_and_interactive_suites": "UNRUN"
+  },
+  "limits": [
+    "Library is a working native menu, not the complete Arc overview",
+    "Full accessibility, IME, display matrix and motion timing remain unmeasured",
+    "Clean restart does not close recent-navigation or acknowledgement crash-durability failures",
+    "Workspace renderer remains off by default"
+  ],
+  "private_evidence_root": "/tmp/myarc-m0-runtime/sidebar26-parent/",
+  "raw_profiles_urls_captures_and_logs_committed": false
+}

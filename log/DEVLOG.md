@@ -1,5 +1,13 @@
 # Development log
 
+## 2026-10-26: Saved-section placement and native review correction
+
+[0026 acceptance](../browser/experiments/native-sidebar-row-footer.md) follows explicit UI feedback. The original alias change launched the same compiled UI; the row/footer fixes had been paused instead of implemented. A delegate built composite rows, fixed footer controls and a real Library menu. Lead native inspection caught a remaining inner hover pill, corrected row-owned paint and inset close-chip geometry, then moved Space Pins above New Tab. A read-only audit confirmed the reported pin was already saved; its old section position made the action look unchanged.
+
+Actual native pointer/focus and Tab, Library Downloads/Create dialog, saved placement and an app-only reduced-motion renderer check passed. A separate Favorite was saved through the native menu. Audited graceful quit and new-PID relaunch retained both saved IDs/owners/URLs in the existing marked profile. The review launcher now reuses marked cache profiles without moving data or resetting preferences. Full Chrome, syntax/GN, payload/replay83 and 20 launcher checks passed; four native browser fixtures remain unrun. Initial fixture syntax used a private API/old enum and was corrected through the public adapter/current enum. Loading-label races stopped guarded input and resumed after settled observation, without metadata repairs.
+
+The requested review window remains available; the separate reduced-motion app was closed. Earlier bounded-run terminal cleanup below remains historical. Crash-durability and release blockers stay open; private browsing artifacts remain outside Git.
+
 ## 2026-10-26: Bounded run terminal handoff
 
 [Morning report](../browser/experiments/overnight-2026-10-25.md) records integrated slices, native checks and retained failures. Final standalone32 Rust/20 client/10 launcher/6 storyboard plus bridge/lifecycle, fmt/clippy/payload/links passed. Native C++ suites remain unrun. Owned apps/helpers/debug endpoints/fixture server closed, exact owned idle assertion released and recurring prompt stopped before the deadline. Profiles/private evidence retained; concurrent site/brand work untouched. Release gates remain open; no complete parity or eight uninterrupted hours claimed.

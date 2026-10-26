@@ -11,7 +11,7 @@ python3 tools/launch_native_preview.py
 ```
 
 Requires Python 3 and the already-built optional native stack, currently through
-0025, at `$HOME/.cache/myarc-m0/chromium/src/out/MyarcM0/Chromium.app/Contents/MacOS/Chromium`.
+0026, at `$HOME/.cache/myarc-m0/chromium/src/out/MyarcM0/Chromium.app/Contents/MacOS/Chromium`.
 The launcher does no build, patching or installation. Missing/nonexecutable builds
 fail with that exact path. Ask the build owner to finish verification before use.
 
@@ -54,12 +54,17 @@ Check these in the preview window, recording failures rather than assuming parit
    tab to navigate, with no duplicate. Hover a result without clicking; input should
    keep focus. Arrow/click selection deliberately activates that result. Escape
    should dismiss an unused palette.
-2. Use the footer `+` (Create Space), then switch with its Space dots. A fresh
+2. Library opens a native menu for Downloads and existing Space actions. The
+   footer Library/current Space/`+` controls stay square. Use `+` (Create Space),
+   then switch with its Space dots. A fresh
    Space should show empty material and a neutral header, without the prior URL
    or page. Return to the populated Space and select its row to show the actual page.
 3. Right-click a live row. Where exposed, try Pin to Space / Unpin from Space,
    then Add to Profile Favorites / Remove from Profile Favorites. Explicit Remove
-   should keep the live page as Temporary. Save again, open another Temporary page,
+   should keep the live page as Temporary. Space Pins appear above New Tab;
+   Profile Favorites are top tiles above the Space heading. A row's separate inset
+   close chip appears on hover/focus, with a fixed hit target inside the row.
+   Save again, open another Temporary page,
    then choose Close live page (keep Favorite) on the saved item. Its tile should
    remain; clicking it should reopen its URL. Favorites belong to the Profile and
    can appear across Spaces. Broader last-live-page and multiwindow behavior remain open.
@@ -73,10 +78,11 @@ Check these in the preview window, recording failures rather than assuming parit
    this smoke does not measure pixel parity, motion timing or accessibility.
 6. Focus the preview app, then Cmd+Q to quit its windows. Leave your normal browser
    running. Running the launcher again intentionally creates another fresh profile.
-   Persistence testing requires explicitly reusing a marked test profile and the
-   parent's verified restore procedure, separately from this launcher.
+   Use `--review` with the same marked cache directory name for clean-restart
+   review. Confirm the saved rows and tiles return; this does not establish crash
+   durability.
 
-[Fresh native smoke through0025](../../../browser/evidence/native-preview.json) used this exact command without an endpoint/test extension. Latest run covered actual URL/current-item editing, pointer focus, neutral Empty and Cmd+S. Favorite/Unsave/close-reopen and held sidebar-hover evidence is retained from0022, rather than counted as repeated. Numeric viewport geometry and complete accessibility were not measured in the no-debug run. Provisional global result scope remains separate from current-address literal submission.
+[Native review acceptance through0026](../../../browser/evidence/native-sidebar-row-footer.json) checked row/chip pointer and actual Tab focus, app-only reduced motion, real Library Downloads/Create dialog, saved-section order and same-profile clean relaunch. [Earlier fresh-profile smoke through0025](../../../browser/evidence/native-preview.json) used the default command without an endpoint/test extension and covered actual URL/current-item editing, pointer focus, neutral Empty and Cmd+S. Favorite/Unsave/close-reopen and held sidebar-hover evidence is retained from0022, rather than counted as repeated. Numeric viewport geometry and complete accessibility were not measured in the no-debug run. Provisional global result scope remains separate from current-address literal submission.
 
 Recovery/durability remain unaccepted: recent acknowledged localStorage writes
 and recent navigation have failed process-crash probes. This smoke establishes neither recovery nor
