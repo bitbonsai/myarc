@@ -1,5 +1,5 @@
 diff --git a/chrome/browser/ui/views/frame/browser_view.cc b/chrome/browser/ui/views/frame/browser_view.cc
-index 7b568f6de760af21d6e9d2aa44415a7cef617c51..ea19d8bd29aabf6e10a01dbf743ff93acf3bbb23 100644
+index 7b568f6de760af21d6e9d2aa44415a7cef617c51..ae75d50ff6780cdb5ee4102f6e83aac365eb3f1e 100644
 --- a/chrome/browser/ui/views/frame/browser_view.cc
 +++ b/chrome/browser/ui/views/frame/browser_view.cc
 @@ -22,6 +22,7 @@
@@ -19,15 +19,24 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..ea19d8bd29aabf6e10a01dbf743ff93a
  #include "base/task/sequenced_task_runner.h"
  #include "base/task/single_thread_task_runner.h"
  #include "base/trace_event/trace_event.h"
-@@ -55,6 +58,7 @@
+@@ -41,6 +44,8 @@
+ #include "chrome/app/chrome_command_ids.h"
+ #include "chrome/browser/actor/ui/actor_overlay_web_view.h"
+ #include "chrome/browser/app_mode/app_mode_utils.h"
++#include "chrome/browser/autocomplete/chrome_autocomplete_provider_client.h"
++#include "chrome/browser/autocomplete/chrome_autocomplete_scheme_classifier.h"
+ #include "chrome/browser/browser_process.h"
+ #include "chrome/browser/browsing_data/browsing_data_important_sites_util.h"
+ #include "chrome/browser/desktop_to_mobile_promos/promos_utils.h"
+@@ -52,6 +57,7 @@
+ #include "chrome/browser/enterprise/watermark/settings.h"
+ #include "chrome/browser/extensions/browser_extension_window_controller.h"
+ #include "chrome/browser/extensions/extension_util.h"
++#include "chrome/browser/favicon/favicon_service_factory.h"
  #include "chrome/browser/feature_engagement/tracker_factory.h"
  #include "chrome/browser/glic/public/features.h"
  #include "chrome/browser/headless/headless_mode_util.h"
-+#include "chrome/browser/history/history_service_factory.h"
- #include "chrome/browser/platform_util.h"
- #include "chrome/browser/profiles/profile.h"
- #include "chrome/browser/profiles/profile_attributes_entry.h"
-@@ -152,6 +156,7 @@
+@@ -152,6 +158,7 @@
  #include "chrome/browser/ui/views/bookmarks/bookmark_page_action_controller.h"
  #include "chrome/browser/ui/views/bubble_anchor_util_views.h"
  #include "chrome/browser/ui/views/color_provider_browser_helper.h"
@@ -35,7 +44,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..ea19d8bd29aabf6e10a01dbf743ff93a
  #include "chrome/browser/ui/views/download/download_in_progress_dialog_view.h"
  #include "chrome/browser/ui/views/exclusive_access/exclusive_access_bubble_views.h"
  #include "chrome/browser/ui/views/exclusive_access/exclusive_access_bubble_views_context.h"
-@@ -233,7 +238,9 @@
+@@ -233,7 +240,9 @@
  #include "chrome/browser/ui/views/toolbar/browser_app_menu_button.h"
  #include "chrome/browser/ui/views/toolbar/chrome_labs/chrome_labs_coordinator.h"
  #include "chrome/browser/ui/views/toolbar/pinned_toolbar_actions_container.h"
@@ -45,25 +54,29 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..ea19d8bd29aabf6e10a01dbf743ff93a
  #include "chrome/browser/ui/views/toolbar/toolbar_view.h"
  #include "chrome/browser/ui/views/translate/translate_bubble_controller.h"
  #include "chrome/browser/ui/views/translate/translate_bubble_view.h"
-@@ -260,13 +267,17 @@
+@@ -260,6 +269,8 @@
  #include "components/autofill/core/common/autofill_payments_features.h"
  #include "components/collaboration/public/messaging/message.h"
  #include "components/enterprise/buildflags/buildflags.h"
 +#include "components/favicon/content/content_favicon_driver.h"
++#include "components/favicon/core/favicon_service.h"
  #include "components/feature_engagement/public/event_constants.h"
  #include "components/feature_engagement/public/feature_constants.h"
  #include "components/feature_engagement/public/tracker.h"
-+#include "components/history/core/browser/history_service.h"
-+#include "components/history/core/browser/history_types.h"
- #include "components/infobars/content/content_infobar_manager.h"
+@@ -267,6 +278,12 @@
  #include "components/javascript_dialogs/app_modal_dialog_controller.h"
  #include "components/javascript_dialogs/app_modal_dialog_queue.h"
  #include "components/javascript_dialogs/app_modal_dialog_view.h"
++#include "components/omnibox/browser/autocomplete_controller.h"
++#include "components/omnibox/browser/autocomplete_input.h"
++#include "components/omnibox/browser/autocomplete_match.h"
++#include "components/omnibox/browser/autocomplete_provider.h"
++#include "components/omnibox/browser/autocomplete_result.h"
 +#include "components/omnibox/browser/location_bar_model.h"
  #include "components/performance_manager/public/features.h"
  #include "components/permissions/permission_request_manager.h"
  #include "components/prefs/pref_service.h"
-@@ -291,6 +302,7 @@
+@@ -291,6 +308,7 @@
  #include "components/user_education/common/new_badge/new_badge_controller.h"
  #include "components/user_education/common/user_education_features.h"
  #include "components/user_education/views/help_bubble_view.h"
@@ -71,7 +84,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..ea19d8bd29aabf6e10a01dbf743ff93a
  #include "components/version_info/channel.h"
  #include "components/web_modal/web_contents_modal_dialog_manager.h"
  #include "content/public/browser/browser_accessibility_state.h"
-@@ -311,6 +323,8 @@
+@@ -311,6 +329,8 @@
  #include "content/public/common/drop_data.h"
  #include "extensions/common/command.h"
  #include "media/capture/capture_switches.h"
@@ -80,7 +93,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..ea19d8bd29aabf6e10a01dbf743ff93a
  #include "third_party/blink/public/common/features.h"
  #include "third_party/blink/public/common/permissions/permission_utils.h"
  #include "ui/accessibility/ax_enums.mojom-shared.h"
-@@ -335,11 +349,14 @@
+@@ -335,11 +355,14 @@
  #include "ui/color/color_id.h"
  #include "ui/compositor/debug_utils.h"
  #include "ui/compositor/layer.h"
@@ -95,7 +108,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..ea19d8bd29aabf6e10a01dbf743ff93a
  #include "ui/gfx/animation/animation_runner.h"
  #include "ui/gfx/canvas.h"
  #include "ui/gfx/color_utils.h"
-@@ -353,12 +370,22 @@
+@@ -353,12 +376,22 @@
  #include "ui/views/accessibility/view_accessibility.h"
  #include "ui/views/accessibility/view_accessibility_utils.h"
  #include "ui/views/animation/compositor_animation_runner.h"
@@ -118,7 +131,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..ea19d8bd29aabf6e10a01dbf743ff93a
  #include "ui/views/layout/fill_layout.h"
  #include "ui/views/view.h"
  #include "ui/views/view_class_properties.h"
-@@ -370,6 +397,7 @@
+@@ -370,6 +403,7 @@
  #include "ui/views/widget/widget.h"
  #include "ui/views/window/dialog_delegate.h"
  #include "ui/views/window/hit_test_utils.h"
@@ -126,12 +139,14 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..ea19d8bd29aabf6e10a01dbf743ff93a
  
  #if BUILDFLAG(IS_CHROMEOS)
  #include "ash/constants/ash_switches.h"
-@@ -659,6 +687,585 @@ bool ConvertedHitTest(views::View* src, views::View* dst, gfx::Point* point) {
+@@ -659,6 +693,711 @@ bool ConvertedHitTest(views::View* src, views::View* dst, gfx::Point* point) {
    return dst->HitTestPoint(*point);
  }
  
 +// Opens the command palette once, after an optional delay in milliseconds.
 +constexpr char kMyarcCaptureOpenPalette[] = "myarc-capture-open-palette";
++// Pre-fills a new-tab palette so captures can show results for typed text.
++constexpr char kMyarcCapturePaletteText[] = "myarc-capture-palette-text";
 +
 +// Arc's large shadow makes the Mac bubble window much bigger than the visible
 +// palette, and BubbleCloser ignores clicks inside the bubble window. Presses
@@ -235,8 +250,20 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..ea19d8bd29aabf6e10a01dbf743ff93a
 +  }
 +};
 +
++// Rows come from the omnibox engine: typed text, search suggestions, history
++// and bookmarks. Open tabs keep the palette's own matching.
++constexpr int kMyarcPaletteProviders =
++    static_cast<int>(AutocompleteProvider::Type::kBookmark |
++                     AutocompleteProvider::Type::kHistoryQuick |
++                     AutocompleteProvider::Type::kHistoryUrl |
++                     AutocompleteProvider::Type::kSearch |
++                     AutocompleteProvider::Type::kShortcuts);
++// Arc shows at most five or six rows.
++constexpr size_t kMyarcPaletteMaxRows = 6;
++
 +class MyarcPaletteView : public views::BoxLayoutView,
-+                         public views::TextfieldController {
++                         public views::TextfieldController,
++                         public AutocompleteController::Observer {
 +  METADATA_HEADER(MyarcPaletteView, views::BoxLayoutView)
 +
 + public:
@@ -278,6 +305,14 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..ea19d8bd29aabf6e10a01dbf743ff93a
 +    error_ = AddChildView(std::make_unique<views::Label>());
 +    error_->SetEnabledColor(ui::kColorSysError);
 +    error_->SetVisible(false);
++    if (browser_) {
++      autocomplete_ = std::make_unique<AutocompleteController>(
++          std::make_unique<ChromeAutocompleteProviderClient>(
++              browser_->GetProfile()),
++          AutocompleteControllerConfig{.provider_types =
++                                           kMyarcPaletteProviders});
++      autocomplete_observation_.Observe(autocomplete_.get());
++    }
 +    input_->SetText(initial_text_);
 +    input_->SelectAll(false);
 +    Rebuild();
@@ -354,7 +389,11 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..ea19d8bd29aabf6e10a01dbf743ff93a
 +  }
 +
 +  void PrepareToClose() {
-+    history_tasks_.TryCancelAll();
++    autocomplete_observation_.Reset();
++    if (autocomplete_) {
++      autocomplete_->Stop(AutocompleteStopReason::kClobbered);
++    }
++    favicon_tasks_.TryCancelAll();
 +    weak_factory_.InvalidateWeakPtrs();
 +  }
 +
@@ -392,13 +431,34 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..ea19d8bd29aabf6e10a01dbf743ff93a
 +          event.key_code() == ui::VKEY_DOWN
 +              ? (selected_ + 1) % count
 +              : (selected_ < 0 ? count - 1 : (selected_ + count - 1) % count);
++      selection_moved_ = true;
 +      UpdateSelection();
 +      return true;
 +    }
 +    return false;
 +  }
 +
++  void OnResultChanged(AutocompleteController* controller,
++                       bool default_match_changed) override {
++    RenderResults();
++  }
++
 + private:
++  // A palette row: an open tab, or an omnibox match's destination.
++  struct Result {
++    base::WeakPtr<content::WebContents> tab;
++    GURL url;
++    bool is_search = false;
++  };
++
++  struct TabMatch {
++    base::WeakPtr<content::WebContents> tab;
++    GURL url;
++    std::u16string title;
++    std::u16string address;
++    ui::ImageModel favicon;
++  };
++
 +  // Dark palette colors measured from Arc captures.
 +  static constexpr SkColor kDarkBackground = SkColorSetRGB(0x18, 0x19, 0x19);
 +  static constexpr SkColor kDarkBorder = SkColorSetRGB(0x45, 0x46, 0x46);
@@ -436,11 +496,14 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..ea19d8bd29aabf6e10a01dbf743ff93a
 +          selected ? ui::ColorVariant(SK_ColorWHITE)
 +          : dark_  ? ui::ColorVariant(kDarkHint)
 +                   : ui::ColorVariant(ui::kColorSysOnSurfaceVariant));
-+      // Selected rows put the icon on a white tile, as Arc does for favicons.
++      // Selected page rows put the icon on a white tile, as Arc does for
++      // favicons; search rows keep a bare icon in the title color.
++      const bool search = results_[i].is_search;
 +      icons_[i]->SetBackground(
-+          selected ? views::CreateRoundedRectBackground(SK_ColorWHITE, 6)
-+                   : nullptr);
-+      // Tab rows show the site favicon at 16 DIP, like the tab strip; the
++          selected && !search
++              ? views::CreateRoundedRectBackground(SK_ColorWHITE, 6)
++              : nullptr);
++      // Page rows show the site favicon at 16 DIP, like the tab strip; the
 +      // globe stands in only when the page has none.
 +      if (!favicons_[i].IsEmpty()) {
 +        icons_[i]->SetImage(favicons_[i]);
@@ -448,9 +511,9 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..ea19d8bd29aabf6e10a01dbf743ff93a
 +      } else {
 +        icons_[i]->ResetImageSize();
 +        icons_[i]->SetImage(ui::ImageModel::FromVectorIcon(
-+            i < matches_.size() ? vector_icons::kGlobeIcon
-+                                : vector_icons::kHistoryIcon,
-+            selected ? ui::ColorVariant(kSelected) : foreground, 17));
++            search ? kMyarcSearchIcon : vector_icons::kGlobeIcon,
++            selected && !search ? ui::ColorVariant(kSelected) : foreground,
++            17));
 +      }
 +      chips_[i]->SetBackground(views::CreateRoundedRectBackground(
 +          selected ? ui::ColorVariant(SK_ColorWHITE)
@@ -468,8 +531,11 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..ea19d8bd29aabf6e10a01dbf743ff93a
 +
 +  void AddResultRow(const std::u16string& title,
 +                    const std::u16string& address,
-+                    bool is_tab,
++                    const std::u16string& action_text,
++                    Result result,
 +                    ui::ImageModel favicon = ui::ImageModel()) {
++    const bool is_tab = result.url.is_empty();
++    results_.push_back(std::move(result));
 +    const gfx::FontList row_font =
 +        gfx::FontList().DeriveWithSizeDelta(1).DeriveWithWeight(
 +            gfx::Font::Weight::MEDIUM);
@@ -486,8 +552,9 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..ea19d8bd29aabf6e10a01dbf743ff93a
 +    secondary->SetBetweenChildSpacing(8);
 +    secondary->SetCrossAxisAlignment(
 +        views::BoxLayout::CrossAxisAlignment::kCenter);
-+    auto* action = secondary->AddChildView(std::make_unique<views::Label>(
-+        is_tab ? u"Switch to Tab" : u"Open from History"));
++    auto* action =
++        secondary->AddChildView(std::make_unique<views::Label>(action_text));
++    action->SetVisible(!action_text.empty());
 +    action->SetFontList(row_font);
 +    action->SetSubpixelRenderingEnabled(false);
 +    action->SetAutoColorReadabilityEnabled(false);
@@ -495,6 +562,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..ea19d8bd29aabf6e10a01dbf743ff93a
 +    auto* chip = secondary->AddChildView(std::make_unique<views::ImageView>());
 +    chip->SetPreferredSize(gfx::Size(24, 24));
 +    chip->GetViewAccessibility().SetIsIgnored(true);
++    chip->SetVisible(is_tab);
 +    chips_.push_back(chip);
 +    params.secondary_view = std::move(secondary);
 +    auto* button =
@@ -511,68 +579,35 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..ea19d8bd29aabf6e10a01dbf743ff93a
 +        views::CreateEmptyBorder(gfx::Insets::TLBR(0, 10, 0, 13)));
 +    button->SetPreferredSize(gfx::Size(width_ - 20, 46));
 +    button->SetTooltipText(address);
-+    button->AddExtraAccessibleText(is_tab ? u"Switch to Tab"
-+                                          : u"Open from History");
++    if (!action_text.empty()) {
++      button->AddExtraAccessibleText(action_text);
++    }
 +    button->SetFocusBehavior(views::View::FocusBehavior::ALWAYS);
 +    buttons_.push_back(button);
 +  }
 +
-+  void AddHistoryResults(history::QueryResults results) {
-+    if (!browser_ || (GetWidget() && GetWidget()->IsClosed())) {
-+      return;
-+    }
-+    for (const auto& result : results) {
-+      if (buttons_.size() >= 8) {
-+        break;
-+      }
-+      const GURL& url = result.url();
-+      if (!url.SchemeIsHTTPOrHTTPS() || url.spec().size() > 4096 ||
-+          std::ranges::any_of(matches_, [&url](const auto& tab) {
-+            return tab && tab->GetLastCommittedURL() == url;
-+          })) {
-+        continue;
-+      }
-+      if (buttons_.empty()) {
-+        rows_->RemoveAllChildViews();
-+      }
-+      history_urls_.push_back(url);
-+      const std::u16string address = base::UTF8ToUTF16(url.spec());
-+      AddResultRow(result.title().empty() ? address.substr(0, 160)
-+                                          : result.title().substr(0, 160),
-+                   address, false);
-+    }
-+    if (new_tab_ && !buttons_.empty() && selected_ < 0) {
-+      selected_ = 0;
-+    }
-+    UpdateSelection();
-+    Resize();
-+  }
-+
 +  void Rebuild() {
-+    history_tasks_.TryCancelAll();
-+    buttons_.clear();
-+    actions_.clear();
-+    icons_.clear();
-+    favicons_.clear();
-+    chips_.clear();
-+    matches_.clear();
-+    history_urls_.clear();
-+    rows_->RemoveAllChildViews();
-+    selected_ = -1;
++    tabs_.clear();
++    selection_moved_ = false;
 +    error_->SetVisible(false);
 +    if (input_->GetText().size() > 4096) {
++      if (autocomplete_) {
++        autocomplete_->Stop(AutocompleteStopReason::kClobbered);
++      }
++      ClearRows();
 +      error_->SetText(u"Use at most 4096 characters.");
 +      error_->SetVisible(true);
 +      Resize();
 +      return;
 +    }
 +    const std::u16string query = base::i18n::ToLower(input_->GetText());
++    // Typed text leaves room for search suggestions below the tab rows.
++    const size_t max_tabs = query.empty() ? kMyarcPaletteMaxRows : 3;
 +    if (browser_) {
 +      auto* model = browser_->GetTabStripModel();
-+      // shortcut: scan 512 tabs and show eight; expand for large-workspace
-+      // search.
-+      for (int i = 0; i < std::min(model->count(), 512) && matches_.size() < 8;
-+           ++i) {
++      // shortcut: scan 512 tabs; expand for large-workspace search.
++      for (int i = 0;
++           i < std::min(model->count(), 512) && tabs_.size() < max_tabs; ++i) {
 +        auto* contents = model->GetWebContentsAt(i);
 +        const GURL& url = contents->GetLastCommittedURL();
 +        if (url.is_empty() || url.IsAboutBlank()) {
@@ -589,68 +624,171 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..ea19d8bd29aabf6e10a01dbf743ff93a
 +        if (title.empty()) {
 +          title = address;
 +        }
-+        matches_.push_back(contents->GetWeakPtr());
 +        auto* favicon_driver =
 +            favicon::ContentFaviconDriver::FromWebContents(contents);
-+        AddResultRow(title, address, true,
-+                     favicon_driver && favicon_driver->FaviconIsValid()
-+                         ? ui::ImageModel::FromImage(
-+                               favicon_driver->GetFavicon())
-+                         : ui::ImageModel());
++        tabs_.push_back(
++            {contents->GetWeakPtr(), url, std::move(title), address,
++             favicon_driver && favicon_driver->FaviconIsValid()
++                 ? ui::ImageModel::FromImage(favicon_driver->GetFavicon())
++                 : ui::ImageModel()});
 +      }
 +    }
-+    if (matches_.empty()) {
++    if (!autocomplete_ || query.empty()) {
++      if (autocomplete_) {
++        autocomplete_->Stop(AutocompleteStopReason::kClobbered);
++      }
++      RenderResults();
++      return;
++    }
++    // Start() reports results synchronously, then again as providers finish.
++    AutocompleteInput input(
++        std::u16string(input_->GetText()), metrics::OmniboxEventProto::OTHER,
++        ChromeAutocompleteSchemeClassifier(browser_->GetProfile()));
++    input.set_prevent_inline_autocomplete(true);
++    autocomplete_->Start(input);
++  }
++
++  void ClearRows() {
++    favicon_tasks_.TryCancelAll();
++    buttons_.clear();
++    actions_.clear();
++    icons_.clear();
++    favicons_.clear();
++    chips_.clear();
++    results_.clear();
++    rows_->RemoveAllChildViews();
++  }
++
++  // Shows the omnibox's top match, then open tabs, then the other matches.
++  void RenderResults() {
++    if (!browser_ || (GetWidget() && GetWidget()->IsClosed())) {
++      return;
++    }
++    const int previous = selected_;
++    ClearRows();
++    selected_ = -1;
++    std::vector<const AutocompleteMatch*> matches;
++    if (autocomplete_ && !input_->GetText().empty()) {
++      for (const AutocompleteMatch& match : autocomplete_->result()) {
++        const GURL& url = match.destination_url;
++        if (!url.is_valid() || url.spec().size() > 4096 ||
++            !(url.SchemeIsHTTPOrHTTPS() || url.SchemeIs("chrome")) ||
++            std::ranges::any_of(
++                tabs_, [&url](const auto& tab) { return tab.url == url; }) ||
++            std::ranges::any_of(matches, [&url](const auto* other) {
++              return other->destination_url == url;
++            })) {
++          continue;
++        }
++        matches.push_back(&match);
++      }
++    }
++    auto add_match = [this](const AutocompleteMatch& match) {
++      const bool search = AutocompleteMatch::IsSearchType(match.type);
++      const std::u16string address =
++          base::UTF8ToUTF16(match.destination_url.spec().substr(0, 512));
++      std::u16string title =
++          (search || match.description.empty() ? match.contents
++                                               : match.description)
++              .substr(0, 160);
++      if (title.empty()) {
++        title = address;
++      }
++      // Page rows name their address on the right, like Arc's hint text.
++      AddResultRow(title, address,
++                   search || match.description.empty()
++                       ? std::u16string()
++                       : match.contents.substr(0, 160),
++                   {nullptr, match.destination_url, search});
++      if (!search) {
++        RequestFavicon(buttons_.size() - 1, match.destination_url);
++      }
++    };
++    size_t next_match = 0;
++    if (!matches.empty()) {
++      add_match(*matches[next_match++]);
++    }
++    for (const auto& tab : tabs_) {
++      if (buttons_.size() >= kMyarcPaletteMaxRows) {
++        break;
++      }
++      AddResultRow(tab.title, tab.address, u"Switch to Tab", {tab.tab, GURL()},
++                   tab.favicon);
++    }
++    while (next_match < matches.size() &&
++           buttons_.size() < kMyarcPaletteMaxRows) {
++      add_match(*matches[next_match++]);
++    }
++    const int count = static_cast<int>(buttons_.size());
++    if (count == 0) {
 +      auto* hint = rows_->AddChildView(std::make_unique<views::Label>(
 +          new_tab_ ? u"Enter opens a new tab. Esc cancels."
 +                   : u"Enter updates the current tab. Esc cancels."));
 +      hint->SetEnabledColor(ui::kColorSysOnSurfaceVariant);
 +      hint->SetPreferredSize(gfx::Size(width_ - 20, 46));
-+    } else if (new_tab_) {
++    } else if (selection_moved_ && previous >= 0) {
++      // Late suggestions must not undo the user's arrow-key choice.
++      selected_ = std::min(previous, count - 1);
++    } else if (new_tab_ || (!input_->GetText().empty() &&
++                            input_->GetText() != initial_text_)) {
 +      selected_ = 0;
 +    }
-+    // Icons, chips and colors are set here for both intents, not only after
-+    // history results arrive.
++    // Icons, chips and colors are set here for both intents.
 +    UpdateSelection();
 +    Resize();
-+    if (browser_ && !browser_->GetProfile()->IsOffTheRecord() &&
-+        buttons_.size() < 8) {
-+      auto* history_service = HistoryServiceFactory::GetForProfile(
-+          browser_->GetProfile(), ServiceAccessType::IMPLICIT_ACCESS);
-+      if (history_service) {
-+        history::QueryOptions options;
-+        options.max_count = 16;
-+        options.policy_for_404_visits =
-+            history::VisitQuery404sPolicy::kInclude404s;
-+        history_service->QueryHistory(
-+            std::u16string(input_->GetText()), options,
-+            base::BindOnce(&MyarcPaletteView::AddHistoryResults,
-+                           weak_factory_.GetWeakPtr()),
-+            &history_tasks_);
-+      }
++  }
++
++  void RequestFavicon(size_t index, const GURL& url) {
++    auto* favicon_service = FaviconServiceFactory::GetForProfile(
++        browser_->GetProfile(), ServiceAccessType::EXPLICIT_ACCESS);
++    if (!favicon_service) {
++      return;
 +    }
++    favicon_service->GetFaviconImageForPageURL(
++        url,
++        base::BindOnce(&MyarcPaletteView::OnFavicon, weak_factory_.GetWeakPtr(),
++                       index),
++        &favicon_tasks_);
++  }
++
++  void OnFavicon(size_t index, const favicon_base::FaviconImageResult& result) {
++    if (index >= favicons_.size() || result.image.IsEmpty()) {
++      return;
++    }
++    favicons_[index] = ui::ImageModel::FromImage(result.image);
++    UpdateSelection();
++  }
++
++  void ShowNavigationError() {
++    error_->SetText(
++        u"Address unsupported. For search confirmation, open a page and "
++        u"use the address bar.");
++    error_->SetVisible(true);
++    Resize();
 +  }
 +
 +  void ActivateResult(int index) {
-+    if (index >= static_cast<int>(matches_.size())) {
-+      const int history_index = index - static_cast<int>(matches_.size());
-+      if (browser_ && history_index >= 0 &&
-+          history_index < static_cast<int>(history_urls_.size()) &&
-+          chrome::NavigateFromMyarcPalette(
-+              browser_.get(),
-+              base::UTF8ToUTF16(history_urls_[history_index].spec()),
-+              new_tab_)) {
-+        if (GetWidget() && !GetWidget()->IsClosed()) {
-+          GetWidget()->Close();
-+        }
++    if (!browser_ || index < 0 || index >= static_cast<int>(results_.size())) {
++      return;
++    }
++    if (!results_[index].url.is_empty()) {
++      const GURL url = results_[index].url;
++      if (!chrome::NavigateFromMyarcPalette(
++              browser_.get(), base::UTF8ToUTF16(url.spec()), new_tab_)) {
++        ShowNavigationError();
++        return;
++      }
++      if (GetWidget() && !GetWidget()->IsClosed()) {
++        GetWidget()->Close();
 +      }
 +      return;
 +    }
-+    if (!browser_ || index < 0 || !matches_[index]) {
++    if (!results_[index].tab) {
 +      Rebuild();
 +      return;
 +    }
 +    const int current = browser_->GetTabStripModel()->GetIndexOfWebContents(
-+        matches_[index].get());
++        results_[index].tab.get());
 +    if (current < 0) {
 +      Rebuild();
 +      return;
@@ -670,11 +808,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..ea19d8bd29aabf6e10a01dbf743ff93a
 +      chrome::Reload(browser_.get(), WindowOpenDisposition::kCurrentTab);
 +    } else if (!chrome::NavigateFromMyarcPalette(browser_.get(),
 +                                                 input_->GetText(), new_tab_)) {
-+      error_->SetText(
-+          u"Address unsupported. For search confirmation, open a page and "
-+          u"use the address bar.");
-+      error_->SetVisible(true);
-+      Resize();
++      ShowNavigationError();
 +      return;
 +    }
 +    if (GetWidget() && !GetWidget()->IsClosed()) {
@@ -691,16 +825,21 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..ea19d8bd29aabf6e10a01dbf743ff93a
 +  raw_ptr<MyarcPaletteHairline> separator_ = nullptr;
 +  raw_ptr<views::BoxLayoutView> rows_ = nullptr;
 +  raw_ptr<views::Label> error_ = nullptr;
-+  std::vector<base::WeakPtr<content::WebContents>> matches_;
++  std::vector<TabMatch> tabs_;
++  std::vector<Result> results_;
 +  std::vector<raw_ptr<HoverButton>> buttons_;
 +  std::vector<raw_ptr<views::Label>> actions_;
 +  std::vector<raw_ptr<views::ImageView>> icons_;
 +  std::vector<ui::ImageModel> favicons_;
 +  std::vector<raw_ptr<views::ImageView>> chips_;
-+  std::vector<GURL> history_urls_;
 +  bool dark_ = true;
-+  base::CancelableTaskTracker history_tasks_;
++  base::CancelableTaskTracker favicon_tasks_;
 +  int selected_ = -1;
++  bool selection_moved_ = false;
++  std::unique_ptr<AutocompleteController> autocomplete_;
++  base::ScopedObservation<AutocompleteController,
++                          AutocompleteController::Observer>
++      autocomplete_observation_{this};
 +  MyarcPaletteOutsideClickCloser outside_click_closer_{this};
 +  raw_ptr<views::View> root_view_ = nullptr;
 +  base::WeakPtrFactory<MyarcPaletteView> weak_factory_{this};
@@ -712,7 +851,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..ea19d8bd29aabf6e10a01dbf743ff93a
  }  // namespace
  
  // Implements the exclusive access context and bubble context.
-@@ -1124,6 +1731,20 @@ BrowserView::~BrowserView() {
+@@ -1124,6 +1863,20 @@ BrowserView::~BrowserView() {
    // other cleanups that destroy views referenced in the layout manager.
    SetLayoutManager(nullptr);
  
@@ -733,7 +872,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..ea19d8bd29aabf6e10a01dbf743ff93a
    tab_search_bubble_host_.reset();
  
    global_error_observation_.Reset();
-@@ -1624,6 +2245,7 @@ void BrowserView::OnVerticalTabStripModeChanged(
+@@ -1624,6 +2377,7 @@ void BrowserView::OnVerticalTabStripModeChanged(
      horizontal_tab_strip_region_view_->InitializeTabStrip();
    }
  
@@ -741,7 +880,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..ea19d8bd29aabf6e10a01dbf743ff93a
    GetFrameView()->OnTabStripStateChanged();
  
    UpdateTabSearchBubbleHost();
-@@ -1681,6 +2303,34 @@ void BrowserView::Show() {
+@@ -1681,6 +2435,34 @@ void BrowserView::Show() {
  
    OnWindowDidShow();
  
@@ -776,7 +915,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..ea19d8bd29aabf6e10a01dbf743ff93a
    // The fullscreen transition clears out focus, but there are some cases (for
    // example, new window in Mac fullscreen with toolbar showing) where we need
    // restore it.
-@@ -1992,6 +2642,15 @@ void BrowserView::OnActiveTabChanged(content::WebContents* old_contents,
+@@ -1992,6 +2774,15 @@ void BrowserView::OnActiveTabChanged(content::WebContents* old_contents,
                                       int index,
                                       int reason) {
    CHECK(new_contents, base::NotFatalUntil::M162);
@@ -792,7 +931,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..ea19d8bd29aabf6e10a01dbf743ff93a
    TRACE_EVENT0("ui", "BrowserView::OnActiveTabChanged");
    views::WebView* active_contents_view = GetActiveContentsWebView();
    bool tab_change_in_split_view =
-@@ -2014,6 +2673,47 @@ void BrowserView::OnActiveTabChanged(content::WebContents* old_contents,
+@@ -2014,6 +2805,47 @@ void BrowserView::OnActiveTabChanged(content::WebContents* old_contents,
        active_contents_view->web_contents() != new_contents &&
        !tab_change_in_split_view;
  
@@ -840,7 +979,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..ea19d8bd29aabf6e10a01dbf743ff93a
    bool will_restore_focus = !browser_->GetTabStripModel()->closing_all() &&
                              GetWidget()->IsVisible() &&
                              !tab_change_in_split_view;
-@@ -2139,6 +2839,23 @@ void BrowserView::OnActiveTabChanged(content::WebContents* old_contents,
+@@ -2139,6 +2971,23 @@ void BrowserView::OnActiveTabChanged(content::WebContents* old_contents,
    UpdateTitleBar();
  
    CHECK_DEREF(TranslateBubbleController::From(browser_.get())).CloseBubble();
@@ -864,7 +1003,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..ea19d8bd29aabf6e10a01dbf743ff93a
  }
  
  void BrowserView::OnTabDetached(content::WebContents* contents,
-@@ -2258,6 +2975,20 @@ bool BrowserView::IsFullscreen() const {
+@@ -2258,6 +3107,20 @@ bool BrowserView::IsFullscreen() const {
  }
  
  void BrowserView::RestoreFocus() {
@@ -885,7 +1024,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..ea19d8bd29aabf6e10a01dbf743ff93a
    WebContents* selected_web_contents = GetActiveWebContents();
    if (selected_web_contents) {
      selected_web_contents->RestoreFocus();
-@@ -2363,6 +3094,13 @@ PinnedToolbarActions* BrowserView::GetPinnedToolbarActions() {
+@@ -2363,6 +3226,13 @@ PinnedToolbarActions* BrowserView::GetPinnedToolbarActions() {
  }
  
  void BrowserView::SetFocusToLocationBar(bool is_user_initiated) {
@@ -899,7 +1038,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..ea19d8bd29aabf6e10a01dbf743ff93a
    // On Windows, changing focus to the location bar causes the browser window to
    // become active. This can steal focus if the user has another window open
    // already. On Chrome OS, changing focus makes a view believe it has a focus
-@@ -2383,16 +3121,25 @@ void BrowserView::SetFocusToLocationBar(bool is_user_initiated) {
+@@ -2383,16 +3253,25 @@ void BrowserView::SetFocusToLocationBar(bool is_user_initiated) {
  }
  
  void BrowserView::UpdateReloadStopState(bool is_loading, bool force) {
@@ -925,7 +1064,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..ea19d8bd29aabf6e10a01dbf743ff93a
    // We may end up here during destruction.
    if (toolbar_) {
      toolbar_->Update(contents);
-@@ -2404,6 +3151,9 @@ void BrowserView::UpdateToolbar(content::WebContents* contents) {
+@@ -2404,6 +3283,9 @@ void BrowserView::UpdateToolbar(content::WebContents* contents) {
  }
  
  bool BrowserView::UpdateToolbarSecurityState() {
@@ -935,7 +1074,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..ea19d8bd29aabf6e10a01dbf743ff93a
    // We may end up here during destruction.
    if (toolbar_) {
      return toolbar_->UpdateSecurityState();
-@@ -3414,7 +4164,7 @@ void BrowserView::CutCopyPaste(int command_id) {
+@@ -3414,7 +4296,7 @@ void BrowserView::CutCopyPaste(int command_id) {
    // key events (and not accelerators) to the WebContents so it can give the web
    // page a chance to override them.
    WebContents* contents = browser_->GetTabStripModel()->GetActiveWebContents();
@@ -944,7 +1083,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..ea19d8bd29aabf6e10a01dbf743ff93a
      void (WebContents::*method)();
      if (command_id == IDC_CUT) {
        method = &content::WebContents::Cut;
-@@ -3483,6 +4233,10 @@ LocationBarView* BrowserView::GetLocationBarView() const {
+@@ -3483,6 +4365,10 @@ LocationBarView* BrowserView::GetLocationBarView() const {
  // BrowserView, TabStripModelObserver implementation:
  
  void BrowserView::OnSplitTabChanged(const SplitTabChange& change) {
@@ -955,7 +1094,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..ea19d8bd29aabf6e10a01dbf743ff93a
    switch (change.type) {
      case SplitTabChange::Type::kAdded: {
        const tabs::TabInterface* active_tab =
-@@ -3690,6 +4444,9 @@ bool BrowserView::CanActivate() const {
+@@ -3690,6 +4576,9 @@ bool BrowserView::CanActivate() const {
  }
  
  std::u16string BrowserView::GetWindowTitle() const {
@@ -965,7 +1104,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..ea19d8bd29aabf6e10a01dbf743ff93a
    std::u16string title =
        WindowMetadataController::From(browser_.get())
            ->GetWindowTitleForCurrentTab(true /* include_app_name */);
-@@ -3710,6 +4467,9 @@ std::u16string BrowserView::GetWindowTitle() const {
+@@ -3710,6 +4599,9 @@ std::u16string BrowserView::GetWindowTitle() const {
  }
  
  std::u16string BrowserView::GetAccessibleWindowTitle() const {
@@ -975,7 +1114,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..ea19d8bd29aabf6e10a01dbf743ff93a
    // If there is a focused and visible tab-modal dialog, report the dialog's
    // title instead of the page title.
    views::Widget* tab_modal =
-@@ -3947,7 +4707,10 @@ bool BrowserView::CanChangeWindowIcon() const {
+@@ -3947,7 +4839,10 @@ bool BrowserView::CanChangeWindowIcon() const {
  }
  
  views::View* BrowserView::GetInitiallyFocusedView() {
@@ -987,7 +1126,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..ea19d8bd29aabf6e10a01dbf743ff93a
  }
  
  bool BrowserView::ShouldShowWindowTitle() const {
-@@ -3971,6 +4734,9 @@ ui::ImageModel BrowserView::GetWindowAppIcon() {
+@@ -3971,6 +4866,9 @@ ui::ImageModel BrowserView::GetWindowAppIcon() {
  }
  
  ui::ImageModel BrowserView::GetWindowIcon() {
@@ -997,7 +1136,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..ea19d8bd29aabf6e10a01dbf743ff93a
    // Use the default icon for devtools.
    if (browser_->GetType() == BrowserWindowInterface::Type::TYPE_DEVTOOLS) {
      return ui::ImageModel();
-@@ -4336,6 +5102,10 @@ void BrowserView::UpdateTabSearchBubbleHost() {
+@@ -4336,6 +5234,10 @@ void BrowserView::UpdateTabSearchBubbleHost() {
  }
  
  void BrowserView::ShowSplitView(bool focus_active_view) {
@@ -1008,7 +1147,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..ea19d8bd29aabf6e10a01dbf743ff93a
    const int active_index = browser_->GetTabStripModel()->active_index();
  
    std::optional<split_tabs::SplitTabId> split_tab_id =
-@@ -4954,6 +5724,9 @@ void BrowserView::Layout(PassKey) {
+@@ -4954,6 +5856,9 @@ void BrowserView::Layout(PassKey) {
      if (fallback_popup_anchor_) {
        fallback_popup_anchor_->MaybeUpdateAnchor(rect);
      }
@@ -1018,7 +1157,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..ea19d8bd29aabf6e10a01dbf743ff93a
  
      if (dialog_anchor_) {
        rect.Offset(0, -kAdditionalDialogToolbarOverlap);
-@@ -5197,6 +5970,103 @@ void BrowserView::AddedToWidget() {
+@@ -5197,6 +6102,103 @@ void BrowserView::AddedToWidget() {
        kFallbackPopupAnchorElementId, *this);
  
    initialized_ = true;
@@ -1122,7 +1261,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..ea19d8bd29aabf6e10a01dbf743ff93a
  }
  
  void BrowserView::RemovedFromWidget() {
-@@ -5267,6 +6137,585 @@ const views::View* BrowserView::GetViewByElementId(
+@@ -5267,6 +6269,592 @@ const views::View* BrowserView::GetViewByElementId(
  ///////////////////////////////////////////////////////////////////////////////
  // BrowserView, ui::AcceleratorTarget overrides:
  
@@ -1631,8 +1770,15 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..ea19d8bd29aabf6e10a01dbf743ff93a
 +  // Current-page intent in an empty Space must not target hidden native tab.
 +  new_tab |= IsMyarcWorkspaceBlank();
 +  const auto* location_model = LocationBarModel::From(browser_.get());
-+  const std::u16string initial_text =
++  std::u16string initial_text =
 +      !new_tab && location_model ? location_model->GetFormattedFullURL() : u"";
++  if (new_tab && base::CommandLine::ForCurrentProcess()->HasSwitch(
++                     kMyarcCapturePaletteText)) {
++    initial_text =
++        base::UTF8ToUTF16(base::CommandLine::ForCurrentProcess()
++                              ->GetSwitchValueASCII(kMyarcCapturePaletteText)
++                              .substr(0, 256));
++  }
 +  if (myarc_command_palette_widget_ &&
 +      myarc_command_palette_widget_->IsClosed()) {
 +    OnMyarcCommandPaletteClosed(myarc_command_palette_delegate_.get());
@@ -1708,7 +1854,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..ea19d8bd29aabf6e10a01dbf743ff93a
  bool BrowserView::AcceleratorPressed(const ui::Accelerator& accelerator) {
  #if BUILDFLAG(IS_MAC)
    // Forward accelerators to ExclusiveAccessManager to handle Esc press-and-hold
-@@ -5342,7 +6791,8 @@ void BrowserView::LoadingAnimationCallback(base::TimeTicks timestamp) {
+@@ -5342,7 +6930,8 @@ void BrowserView::LoadingAnimationCallback(base::TimeTicks timestamp) {
      // GetActiveWebContents can return null for example under Purify when
      // the animations are running slowly and this function is called on a timer
      // through LoadingAnimationCallback.
@@ -1718,7 +1864,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..ea19d8bd29aabf6e10a01dbf743ff93a
    }
  }
  
-@@ -5471,6 +6921,10 @@ bool BrowserView::MaybeUpdateDevtools(content::WebContents* contents) {
+@@ -5471,6 +7060,10 @@ bool BrowserView::MaybeUpdateDevtools(content::WebContents* contents) {
  
  void BrowserView::UpdateUIForContents(WebContents* contents,
                                        bool should_layout_immediately) {
@@ -1729,7 +1875,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..ea19d8bd29aabf6e10a01dbf743ff93a
    TRACE_EVENT0("ui", "BrowserView::UpdateUIForContents");
    bool needs_layout = MaybeShowBookmarkBar(contents);
  
-@@ -5706,6 +7160,26 @@ void BrowserView::LoadAccelerators() {
+@@ -5706,6 +7299,26 @@ void BrowserView::LoadAccelerators() {
    }
  
  #if BUILDFLAG(IS_MAC)

@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-10-26: Command bar search suggestions
+
+- The palette's rows now come from Chromium's `AutocompleteController` (bookmark, history quick/URL, search and shortcuts providers) instead of a direct history query: the typed search first and selected, then open tabs with Switch to Tab, then search suggestions, history and bookmarks, six rows at most like Arc. Search rows use the Lucide search icon, page rows the history favicon. A match already open in a tab shows only as the tab row. Suggestions follow the search-suggest pref, with no requests beyond what the omnibox already sends. Committed Chromium `86bee6c2d5`.
+- Verification: `chrome` builds; `PALETTE=1 PALETTE_TEXT="claude plans" tools/capture_native.sh` (new `--myarc-capture-palette-text` switch) shows "claude plans" selected over five Google suggestions, matching Arc's rows; with example.com open, "example" shows the tab row and no duplicate history row. Enter and arrow keys were not exercised, since background captures can't type.
+- Open: tab rows sit in a fixed slot instead of ranking with the matches, page rows have no title/URL second line, and history suggestions can't be removed (X, Cmd+Option+Delete).
+
 ## 2026-10-26: Pin, Space and sidebar item shortcuts
 
 - With `--myarc-visual-parity` and `--myarc-workspace-sidebar`, Cmd+D pins or unpins the current tab, Ctrl+1..9 and Option+Cmd+Left/Right select Spaces, and Cmd+1..9 plus Option+Cmd+Up/Down follow sidebar order (Favorites, Pins, unpinned; 9 is last). The adapter reads order from Rust `sidebar_snapshot`; new command IDs live in `myarc/command_ids.h` so `chrome_command_ids.h` stays untouched. Committed Chromium `634ce5fc20`.
