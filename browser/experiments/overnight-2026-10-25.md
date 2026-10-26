@@ -30,6 +30,8 @@ Found a runtime-mode bootstrap gap: a newly created Profile starts horizontal, a
 
 A fresh palette interruption check found Cmd+L dismissing an existing Cmd+T draft instead of switching to current-URL editing. Real page stayed intact. Owner-window close closed its palette; callback races remain unmeasured. [Failure and repair assumptions](../evidence/native-palette-interruption.json) retained. 0022 integrated as `2c1f49d`; actual same-widget intent/draft/selection focus, reload/edit/new-tab submission and empty protection passed. Normal/reduced native sequences were inspected. Another two-window horizontal clean restore retained both pins/IDs, and closing a palette owner retained the other window's saved identity/native pin. Apps/helpers/server closed. Native queued-history overlap and browser suites remain unrun; existing global result matching and broader URI-literal semantics remain unaccepted.
 
+[Two sequential native Reopen Closed Window cycles](../evidence/workspace-native-late-restore.json) then passed in the same process while the other window survived. Saved/window identity and both actual pins stayed exact. Removed Temporaries returned under fresh IDs with their original Space owner. A survivor-palette invocation closed on deactivation and kept its page target/time origin/position. This is late Undo Closed Window, not another process crash or simultaneous-restorer acceptance. Owned apps/helpers/server closed; no new patch needed.
+
 ## Tested preview command
 
 ```sh

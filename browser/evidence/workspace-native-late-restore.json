@@ -1,0 +1,35 @@
+{
+  "slice": "MA-007.c-native-late-window-restore",
+  "date": "2026-10-26",
+  "build_stack_through": "0022",
+  "status": "bounded sequential same-process native window restoration passed",
+  "journey": {
+    "native_windows_on_different_spaces_select_one_logical_favorite": true,
+    "original_owner_window_closed_while_other_copy_survived": true,
+    "native_cmd_shift_t_restored_closed_window": true,
+    "sequential_cycles": 2,
+    "browser_pid_unchanged": true,
+    "saved_id_1_owner_and_canonical_url_retained": true,
+    "logical_window_ids_1_and_2_spaces_selections_retained": true,
+    "closed_temporary_id_2_removed_then_fresh_ids_4_and_5_allocated": true,
+    "temporary_original_space_owner_2_retained": true,
+    "no_guessed_id_resurrection_or_product_metadata_edits": true,
+    "two_actual_native_pins_urls_and_projection_strictly_observed_each_cycle": true,
+    "stable_samples_per_cycle": 5,
+    "second_restore_invoked_from_survivor_palette": true,
+    "palette_closed_on_native_deactivation": true,
+    "survivor_actual_target_url_time_origin_window_position_unchanged_in_cycle2": true
+  },
+  "evidence_limits": [
+    "Initial checkpoint observed a still-loading real fixture and failed; only settled complete checks counted",
+    "Developer checkpoint files archived/recreated; underlying workspace metadata never edited",
+    "Sequential Undo Closed Window, not actual process crash or simultaneous restoration overlap",
+    "No site-storage acknowledgement, power-loss, native C++ suite or general lifecycle guarantee",
+    "CLI/MCP remains P0 and unimplemented by these developer probes"
+  ],
+  "cleanup": {
+    "owned_apps_helpers_and_fixture_server_closed": true,
+    "raw_profiles_logs_ids_and_ui_records": "private outside Git"
+  },
+  "workspace_renderer_default_enabled": false
+}

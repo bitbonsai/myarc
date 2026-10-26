@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-10-26: Same-process native late window restoration
+
+Two sequential actual close/Cmd+Shift+T cycles on0022 retained saved ID/owner/URL, both logical window IDs/Spaces/selections and two real native pins. Original closed Temporary2 was removed, then native restoration allocated4/5 with the original Reading owner2. The second restore came from the survivor palette; deactivation closed it and survivor target/URL/time origin/position stayed exact. [Evidence](../browser/evidence/workspace-native-late-restore.json).
+
+An initial checkpoint caught a loading page and failed; settled full checks passed five samples each. Only developer checkpoint artifacts were archived, never product metadata/IDs. Same browser PID, not crash or concurrent-restorer proof. Existing lifecycle hooks/consumer lifetime handled this case without a patch. Apps/helpers/server closed. Native suites, general abort/overlap and durability remain open.
+
 ## 2026-10-26: Exact preview command rechecked through0022
 
 Ran `python3 tools/launch_native_preview.py` unchanged. Fresh marked profile had neither debugging/automation/test-extension flags nor DevToolsActivePort. Native Cmd+T and same-item Cmd+L reached actual Example Domain sites; save/pin, last saved-live close/reopen under the same logical ID/counter, explicit Unsave and new empty Space/header passed. Cmd+S and a held edge/inside/exit sequence were recorded/inspected. [Evidence](../browser/evidence/native-preview.json).
