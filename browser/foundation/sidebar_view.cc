@@ -17,8 +17,11 @@
 #include "ui/gfx/geometry/insets.h"
 #include "ui/gfx/geometry/size.h"
 #include "ui/views/accessibility/view_accessibility.h"
+#include "ui/views/animation/ink_drop.h"
+#include "ui/views/animation/ink_drop_host.h"
 #include "ui/views/background.h"
 #include "ui/views/controls/button/md_text_button.h"
+#include "ui/views/controls/highlight_path_generator.h"
 #include "ui/views/controls/label.h"
 #include "ui/views/controls/menu/menu_runner.h"
 #include "ui/views/controls/scroll_view.h"
@@ -50,14 +53,14 @@ class ItemRow final : public views::View, public views::FocusChangeListener {
  public:
   ItemRow(std::unique_ptr<views::MdTextButton> activate,
           std::unique_ptr<views::MdTextButton> close,
-          bool selected) {
+          bool selected)
+      : selected_(selected) {
+    // The composite row owns hover paint, including the close target.
+    views::InkDrop::Get(activate.get())
+        ->SetMode(views::InkDropHost::InkDropMode::OFF);
     auto* layout = SetLayoutManager(std::make_unique<views::BoxLayout>(
         Orientation::kHorizontal, gfx::Insets(), 0));
     layout->SetFlexForView(AddChildView(std::move(activate)), 1);
-    if (selected) {
-      SetBackground(views::CreateRoundedRectBackground(
-          ui::kColorSysSecondaryContainer, 10));
-    }
     if (close) {
       close_ = AddChildView(std::move(close));
       close_->SetImageModel(views::Button::STATE_NORMAL, ui::ImageModel());
@@ -95,10 +98,16 @@ class ItemRow final : public views::View, public views::FocusChangeListener {
 
  private:
   void UpdateClose() {
+    auto* manager = GetFocusManager();
+    const bool reveal =
+        hovered_ || (manager && Contains(manager->GetFocusedView()));
+    SetBackground(selected_ || reveal
+                      ? views::CreateRoundedRectBackground(
+                            selected_ ? ui::kColorSysSurfaceContainerHighest
+                                      : ui::kColorSysSurfaceContainer,
+                            10)
+                      : nullptr);
     if (close_) {
-      auto* manager = GetFocusManager();
-      const bool reveal =
-          hovered_ || (manager && Contains(manager->GetFocusedView()));
       close_->SetImageModel(
           views::Button::STATE_NORMAL,
           reveal ? ui::ImageModel::FromVectorIcon(vector_icons::kCloseIcon,
@@ -108,6 +117,7 @@ class ItemRow final : public views::View, public views::FocusChangeListener {
   }
 
   raw_ptr<views::MdTextButton> close_ = nullptr;
+  const bool selected_;
   bool hovered_ = false;
   base::ScopedObservation<views::FocusManager, views::FocusChangeListener>
       focus_observation_{this};
@@ -330,8 +340,8 @@ std::unique_ptr<views::View> SidebarView::MakeItem(
         item.has_url ? base::UTF8ToUTF16(std::string(item.canonical_url))
                      : u"Untitled tab";
   }
-  const auto foreground =
-      selected ? ui::kColorSysOnSecondaryContainer : ui::kColorSysOnSurface;
+  const auto foreground = selected && tile ? ui::kColorSysOnSecondaryContainer
+                                           : ui::kColorSysOnSurface;
   auto activate =
       Button(base::BindRepeating(&Delegate::ActivateItem,
                                  base::Unretained(&delegate_.get()), item.id),
@@ -372,6 +382,8 @@ std::unique_ptr<views::View> SidebarView::MakeItem(
         base::BindRepeating(&Delegate::CloseLiveItem,
                             base::Unretained(&delegate_.get()), item.id),
         vector_icons::kCloseIcon);
+    views::InstallRoundRectHighlightPathGenerator(close.get(), gfx::Insets(4),
+                                                  6);
     const std::u16string close_name =
         (menu_state.is_pin        ? u"Close live page, keep Space Pin: "
          : menu_state.is_favorite ? u"Close live page, keep Favorite: "
@@ -513,6 +525,14 @@ void SidebarView::SetModel(const foundation::SidebarResult& model,
   TrackFocus(heading.get(), FocusAction::kRename, model.current_space.id);
   body->AddChildView(std::move(heading));
 
+  for (const auto& item : model.pins) {
+    body->AddChildView(
+        MakeItem(item, false, item.id == model.selected_item_id));
+  }
+  if (!model.pins.empty()) {
+    body->AddChildView(std::make_unique<views::Separator>());
+  }
+
   auto new_tab = Button(base::BindRepeating(&Delegate::NewTab,
                                             base::Unretained(&delegate_.get())),
                         u"New Tab");
@@ -522,13 +542,6 @@ void SidebarView::SetModel(const foundation::SidebarResult& model,
                                      ui::kColorSysOnSurface, 16));
   TrackFocus(new_tab.get(), FocusAction::kNewTab);
   body->AddChildView(std::move(new_tab));
-  for (const auto& item : model.pins) {
-    body->AddChildView(
-        MakeItem(item, false, item.id == model.selected_item_id));
-  }
-  if (!model.pins.empty() && !model.temporary.empty()) {
-    body->AddChildView(std::make_unique<views::Separator>());
-  }
   for (const auto& item : model.temporary) {
     body->AddChildView(
         MakeItem(item, false, item.id == model.selected_item_id));
@@ -589,7 +602,7 @@ void SidebarView::SetModel(const foundation::SidebarResult& model,
     choice->SetEnabledTextColors(ui::kColorSysOnSurfaceVariant);
     if (current) {
       choice->SetBgColorOverrideDeprecated(std::nullopt);
-      choice->SetBgColorIdOverride(ui::kColorSysSurfaceContainer);
+      choice->SetBgColorIdOverride(ui::kColorSysSurfaceContainerHighest);
       current_space = choice.get();
       current_space_index = spaces->children().size();
     }

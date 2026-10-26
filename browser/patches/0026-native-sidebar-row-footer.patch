@@ -35,7 +35,7 @@ index b509e72..79a7e4c 100644
    void UpdateMyarcWorkspaceCanvas();
    void UpdateMyarcTabStripMode();
 diff --git a/chrome/browser/ui/views/frame/browser_view_browsertest.cc b/chrome/browser/ui/views/frame/browser_view_browsertest.cc
-index b3cd428..c29cc9d 100644
+index b3cd428..9fc6c76 100644
 --- a/chrome/browser/ui/views/frame/browser_view_browsertest.cc
 +++ b/chrome/browser/ui/views/frame/browser_view_browsertest.cc
 @@ -6,6 +6,7 @@
@@ -62,7 +62,14 @@ index b3cd428..c29cc9d 100644
  #include "ui/compositor/layer.h"
  #include "ui/compositor/layer_animator.h"
  #include "ui/compositor/layer_solid_color.h"
-@@ -172,7 +175,9 @@
+@@ -167,12 +170,16 @@
+ #include "ui/gfx/geometry/point.h"
+ #include "ui/gfx/scoped_animation_duration_scale_mode.h"
+ #include "ui/views/accessibility/view_accessibility.h"
++#include "ui/views/animation/ink_drop.h"
++#include "ui/views/animation/ink_drop_host.h"
+ #include "ui/views/bubble/bubble_dialog_delegate_view.h"
+ #include "ui/views/bubble/bubble_dialog_model_host.h"
  #include "ui/views/controls/button/button.h"
  #include "ui/views/controls/button/label_button.h"
  #include "ui/views/controls/button/md_text_button.h"
@@ -72,7 +79,7 @@ index b3cd428..c29cc9d 100644
  #include "ui/views/controls/textfield/textfield.h"
  #include "ui/views/controls/webview/webview.h"
  #include "ui/views/focus/focus_manager.h"
-@@ -181,6 +186,7 @@
+@@ -181,6 +188,7 @@
  #include "ui/views/test/widget_activation_waiter.h"
  #include "ui/views/view_class_properties.h"
  #include "ui/views/view_utils.h"
@@ -80,7 +87,7 @@ index b3cd428..c29cc9d 100644
  #include "ui/views/window/dialog_client_view.h"
  #include "url/url_constants.h"
  
-@@ -407,6 +413,18 @@ class BrowserViewTest : public InProcessBrowserTest {
+@@ -407,6 +415,18 @@ class BrowserViewTest : public InProcessBrowserTest {
    raw_ptr<DevToolsWindow> devtools_;
  };
  
@@ -99,7 +106,7 @@ index b3cd428..c29cc9d 100644
  class BrowserViewStorageRetryTest : public BrowserViewTest {
   protected:
    using Storage = myarc::WorkspaceService::StorageState;
-@@ -621,6 +639,202 @@ IN_PROC_BROWSER_TEST_F(BrowserViewStorageRetryTest,
+@@ -621,6 +641,233 @@ IN_PROC_BROWSER_TEST_F(BrowserViewStorageRetryTest,
    CloseBrowserSynchronously(private_browser);
  }
  
@@ -145,6 +152,8 @@ index b3cd428..c29cc9d 100644
 +  auto* close = Button(u"Close live page: Sidebar row fixture");
 +  ASSERT_TRUE(activate);
 +  ASSERT_TRUE(close);
++  EXPECT_EQ(views::InkDropHost::InkDropMode::OFF,
++            views::InkDrop::Get(activate)->GetMode());
 +  auto* row = activate->parent();
 +  ASSERT_EQ(row, close->parent());
 +  ASSERT_TRUE(row->background());
@@ -190,6 +199,34 @@ index b3cd428..c29cc9d 100644
 +}
 +
 +IN_PROC_BROWSER_TEST_F(BrowserViewSidebarPresentationTest,
++                       SpacePinsPrecedeNewTabAndTemporaryRows) {
++  ASSERT_TRUE(embedded_test_server()->Start());
++  ASSERT_TRUE(ui_test_utils::NavigateToURL(
++      browser(), embedded_test_server()->GetURL("/title1.html")));
++  const std::u16string pin_title = active_web_contents()->GetTitle();
++  auto* adapter = browser_view()->GetMyarcWorkspaceAdapter();
++  ASSERT_TRUE(adapter->Pin(adapter->Sidebar().selected_item_id).ok);
++  ASSERT_TRUE(base::test::RunUntil(
++      [&] { return adapter->Sidebar().pins.size() == 1; }));
++  ui_test_utils::NavigateToURLWithDisposition(
++      browser(), embedded_test_server()->GetURL("/title2.html"),
++      WindowOpenDisposition::kNewForegroundTab,
++      ui_test_utils::BROWSER_TEST_WAIT_FOR_LOAD_STOP);
++  const std::u16string temporary_title = active_web_contents()->GetTitle();
++  browser_view()->RefreshMyarcWorkspaceSidebar();
++  RunScheduledLayouts();
++  auto* pin = Button(pin_title);
++  auto* new_tab = Button(u"New Tab");
++  auto* temporary = Button(temporary_title);
++  ASSERT_TRUE(pin);
++  ASSERT_TRUE(new_tab);
++  ASSERT_TRUE(temporary);
++  EXPECT_LT(pin->GetBoundsInScreen().y(), new_tab->GetBoundsInScreen().y());
++  EXPECT_LT(new_tab->GetBoundsInScreen().y(),
++            temporary->GetBoundsInScreen().y());
++}
++
++IN_PROC_BROWSER_TEST_F(BrowserViewSidebarPresentationTest,
 +                       FooterUsesFixedSquaresAndRevealsCurrentSpace) {
 +  for (int i = 0; i < 18; ++i) {
 +    ASSERT_TRUE(service().CreateSpace("Footer " + base::NumberToString(i)).ok);
@@ -212,7 +249,8 @@ index b3cd428..c29cc9d 100644
 +  EXPECT_EQ(gfx::Size(32, 32), current->size());
 +  EXPECT_FALSE(library->GetImage(views::Button::STATE_NORMAL).isNull());
 +  EXPECT_FALSE(current->GetImage(views::Button::STATE_NORMAL).isNull());
-+  EXPECT_EQ(ui::kColorSysSurfaceContainer, current->GetBgColorIdOverride());
++  EXPECT_EQ(ui::kColorSysSurfaceContainerHighest,
++            current->GetBgColorIdOverride());
 +  EXPECT_EQ(library->GetBoundsInScreen().CenterPoint().y(),
 +            current->GetBoundsInScreen().CenterPoint().y());
 +  EXPECT_EQ(create->GetBoundsInScreen().CenterPoint().y(),

@@ -2585,10 +2585,10 @@ index 0000000..82fdbf3bd5bb0f34e94dd9b9ebced7442e5aed45
 +#endif  // MYARC_NATIVE_BUTTON_H_
 diff --git a/myarc/sidebar_view.cc b/myarc/sidebar_view.cc
 new file mode 100644
-index 0000000..97375a484a86eebdd9abb4578de7fe13f1eba820
+index 0000000..0a230b0599b160701dfc2b5440f04146a572ceee
 --- /dev/null
 +++ b/myarc/sidebar_view.cc
-@@ -0,0 +1,657 @@
+@@ -0,0 +1,670 @@
 +#include "myarc/sidebar_view.h"
 +
 +#include <algorithm>
@@ -2608,8 +2608,11 @@ index 0000000..97375a484a86eebdd9abb4578de7fe13f1eba820
 +#include "ui/gfx/geometry/insets.h"
 +#include "ui/gfx/geometry/size.h"
 +#include "ui/views/accessibility/view_accessibility.h"
++#include "ui/views/animation/ink_drop.h"
++#include "ui/views/animation/ink_drop_host.h"
 +#include "ui/views/background.h"
 +#include "ui/views/controls/button/md_text_button.h"
++#include "ui/views/controls/highlight_path_generator.h"
 +#include "ui/views/controls/label.h"
 +#include "ui/views/controls/menu/menu_runner.h"
 +#include "ui/views/controls/scroll_view.h"
@@ -2641,14 +2644,14 @@ index 0000000..97375a484a86eebdd9abb4578de7fe13f1eba820
 + public:
 +  ItemRow(std::unique_ptr<views::MdTextButton> activate,
 +          std::unique_ptr<views::MdTextButton> close,
-+          bool selected) {
++          bool selected)
++      : selected_(selected) {
++    // The composite row owns hover paint, including the close target.
++    views::InkDrop::Get(activate.get())
++        ->SetMode(views::InkDropHost::InkDropMode::OFF);
 +    auto* layout = SetLayoutManager(std::make_unique<views::BoxLayout>(
 +        Orientation::kHorizontal, gfx::Insets(), 0));
 +    layout->SetFlexForView(AddChildView(std::move(activate)), 1);
-+    if (selected) {
-+      SetBackground(views::CreateRoundedRectBackground(
-+          ui::kColorSysSecondaryContainer, 10));
-+    }
 +    if (close) {
 +      close_ = AddChildView(std::move(close));
 +      close_->SetImageModel(views::Button::STATE_NORMAL, ui::ImageModel());
@@ -2686,10 +2689,16 @@ index 0000000..97375a484a86eebdd9abb4578de7fe13f1eba820
 +
 + private:
 +  void UpdateClose() {
++    auto* manager = GetFocusManager();
++    const bool reveal =
++        hovered_ || (manager && Contains(manager->GetFocusedView()));
++    SetBackground(selected_ || reveal
++                      ? views::CreateRoundedRectBackground(
++                            selected_ ? ui::kColorSysSurfaceContainerHighest
++                                      : ui::kColorSysSurfaceContainer,
++                            10)
++                      : nullptr);
 +    if (close_) {
-+      auto* manager = GetFocusManager();
-+      const bool reveal =
-+          hovered_ || (manager && Contains(manager->GetFocusedView()));
 +      close_->SetImageModel(
 +          views::Button::STATE_NORMAL,
 +          reveal ? ui::ImageModel::FromVectorIcon(vector_icons::kCloseIcon,
@@ -2699,6 +2708,7 @@ index 0000000..97375a484a86eebdd9abb4578de7fe13f1eba820
 +  }
 +
 +  raw_ptr<views::MdTextButton> close_ = nullptr;
++  const bool selected_;
 +  bool hovered_ = false;
 +  base::ScopedObservation<views::FocusManager, views::FocusChangeListener>
 +      focus_observation_{this};
@@ -2921,8 +2931,8 @@ index 0000000..97375a484a86eebdd9abb4578de7fe13f1eba820
 +        item.has_url ? base::UTF8ToUTF16(std::string(item.canonical_url))
 +                     : u"Untitled tab";
 +  }
-+  const auto foreground =
-+      selected ? ui::kColorSysOnSecondaryContainer : ui::kColorSysOnSurface;
++  const auto foreground = selected && tile ? ui::kColorSysOnSecondaryContainer
++                                           : ui::kColorSysOnSurface;
 +  auto activate =
 +      Button(base::BindRepeating(&Delegate::ActivateItem,
 +                                 base::Unretained(&delegate_.get()), item.id),
@@ -2963,6 +2973,8 @@ index 0000000..97375a484a86eebdd9abb4578de7fe13f1eba820
 +        base::BindRepeating(&Delegate::CloseLiveItem,
 +                            base::Unretained(&delegate_.get()), item.id),
 +        vector_icons::kCloseIcon);
++    views::InstallRoundRectHighlightPathGenerator(close.get(), gfx::Insets(4),
++                                                  6);
 +    const std::u16string close_name =
 +        (menu_state.is_pin        ? u"Close live page, keep Space Pin: "
 +         : menu_state.is_favorite ? u"Close live page, keep Favorite: "
@@ -3104,6 +3116,14 @@ index 0000000..97375a484a86eebdd9abb4578de7fe13f1eba820
 +  TrackFocus(heading.get(), FocusAction::kRename, model.current_space.id);
 +  body->AddChildView(std::move(heading));
 +
++  for (const auto& item : model.pins) {
++    body->AddChildView(
++        MakeItem(item, false, item.id == model.selected_item_id));
++  }
++  if (!model.pins.empty()) {
++    body->AddChildView(std::make_unique<views::Separator>());
++  }
++
 +  auto new_tab = Button(base::BindRepeating(&Delegate::NewTab,
 +                                            base::Unretained(&delegate_.get())),
 +                        u"New Tab");
@@ -3113,13 +3133,6 @@ index 0000000..97375a484a86eebdd9abb4578de7fe13f1eba820
 +                                     ui::kColorSysOnSurface, 16));
 +  TrackFocus(new_tab.get(), FocusAction::kNewTab);
 +  body->AddChildView(std::move(new_tab));
-+  for (const auto& item : model.pins) {
-+    body->AddChildView(
-+        MakeItem(item, false, item.id == model.selected_item_id));
-+  }
-+  if (!model.pins.empty() && !model.temporary.empty()) {
-+    body->AddChildView(std::make_unique<views::Separator>());
-+  }
 +  for (const auto& item : model.temporary) {
 +    body->AddChildView(
 +        MakeItem(item, false, item.id == model.selected_item_id));
@@ -3180,7 +3193,7 @@ index 0000000..97375a484a86eebdd9abb4578de7fe13f1eba820
 +    choice->SetEnabledTextColors(ui::kColorSysOnSurfaceVariant);
 +    if (current) {
 +      choice->SetBgColorOverrideDeprecated(std::nullopt);
-+      choice->SetBgColorIdOverride(ui::kColorSysSurfaceContainer);
++      choice->SetBgColorIdOverride(ui::kColorSysSurfaceContainerHighest);
 +      current_space = choice.get();
 +      current_space_index = spaces->children().size();
 +    }
