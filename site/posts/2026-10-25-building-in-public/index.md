@@ -47,10 +47,6 @@ Wrap saves the gotchas from a session and writes a handover for the next one. Th
 
 Page navigation works, and so does the centered native command palette. What I'm going for today is an Arc-like empty window and a native nightly build, so people can try it without compiling Chromium themselves.
 
-[![Arc displaying mauriciowolff.com with its command bar open, our visual reference](arc-command-bar-reference.webp)](arc-command-bar-reference.webp)
+[![Arc on the left and the current myArc nightly on the right, both displaying mauriciowolff.com with their command bars open](scene-sbs.png)](scene-sbs.png)
 
-*Arc, our visual reference.*
-
-[![Current myArc build loading mauriciowolff.com with the native command palette open](myarc-current-build.png)](myarc-current-build.png)
-
-*myArc, with the native command palette open.*
+*Arc on the left. The current myArc nightly on the right.*
