@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-10-26: Restore consumer lifetime native acceptance
+
+- Integrated `7a14927`. Fresh horizontal setup, clean native restoration before sidebar presentation and late vertical enable passed the unchanged single-window verifier. A subsequent audited SIGKILL/plain relaunch retained metadata through vertical enable during the genuine recovery prompt; actual Restore passed again with the previously persisted canary. [Evidence](../browser/evidence/workspace-late-bindings.json).
+- Two real windows restored horizontally with stable logical IDs and both native Favorite pins, then passed the two-window verifier after late presentation. Three app-only reduced-motion cycles preserved page target IDs/time origins, model counters and horizontal address focus. Fresh owned-window held-state recordings were inspected; exact timing remains unmeasured and OS preferences unchanged.
+- Closing one window preserved saved identity and a usable survivor. Closed logical rows intentionally remain candidates until startup; complete native restart retired the closed candidate and retained surviving state. A scratch immediate-retirement assertion was discarded against that existing contract. An inactive visibility failure was excluded; exact owned activation preceded successful verification. All owned apps/helpers/servers closed. Native C++ suites, fresh-write/OS durability and broader Profile/OTR/flag-off regressions remain open; renderer stays off.
+
 ## 2026-10-26: Warm mode repair and cold restore failure
 
 - Integrated 0019 as `78b303f`. Native late enable exposed a missing startup-completion handoff: a new bridge stayed unavailable. Parent added a guarded native-ready notification after setup, direct GN dependency and a normal late-activation fixture. Corrected app build, fixture clang syntax, production GN check and strict 78-file replay passed. Nine files change; 69 unrelated and all 16 owned payload files remain identical. Native C++ suites remain unrun.

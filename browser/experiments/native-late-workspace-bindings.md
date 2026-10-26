@@ -1,6 +1,6 @@
 # Native restore bindings before sidebar presentation
 
-MA-007.c bounded follow-up to [0019](native-workspace-mode-bootstrap.md), based on parent `0dfa2f6`. Optional [0020](../patches/0020-native-late-workspace-bindings.patch) changes consumer lifetime. Full build and source checks pass. Actual clean native restart acceptance remains pending with the parent; workspace renderer stays default OFF.
+MA-007.c bounded follow-up to [0019](native-workspace-mode-bootstrap.md), based on parent `0dfa2f6`. Optional [0020](../patches/0020-native-late-workspace-bindings.patch) changes consumer lifetime. Full build and source checks pass. Parent bounded native clean/crash and two-window restoration checks passed; workspace renderer stays default OFF.
 
 ## Failure and boundary
 
@@ -43,10 +43,23 @@ Verification on 2026-10-26:
 
 0020 SHA-256: `52e86645175697aadbdb9351525eb8058fc6c7890ed1efd332bd75a577487636`.
 
-## Parent handoff
+## Parent native results
+
+Integrated as `7a14927`. [Structured acceptance](../evidence/workspace-late-bindings.json) distinguishes these actual journeys from source-checked fixtures:
+
+- Fresh horizontal startup, native vertical enable and real two-Space Favorite/Temporary setup. After native horizontal choice and graceful quit, changed-PID session restoration retained exact metadata before sidebar presentation. Late vertical enable in the same window passed the unchanged verifier for five samples, including the persisted canary.
+- Audited SIGKILL after that verified persisted seed, plain relaunch without URLs/restore flag and genuine recovery prompt. Vertical enable while the prompt waited preserved metadata and withheld workspace readiness. Genuine Restore then passed the unchanged strict verifier. This establishes previously persisted storage recovery, not immediate acknowledgement durability.
+- Two actual windows with one logical Favorite, two native pins and one hidden Temporary. Both restored horizontally after normal quit, retained original metadata before presentation, then passed the two-window verifier after late vertical enable. No new logical Favorite, reassigned Temporary or replacement window ID appeared.
+- Three reduced-motion mode cycles retained native page target IDs/time origins and model counters. Horizontal toolbar/address focus worked. Fresh owned-window recordings, including held horizontal/vertical states and saved/Temporary activation, were inspected. App-only forced reduced motion was reported by real pages; OS preferences stayed unchanged. Exact motion timing was not measured.
+
+Closing the second native window retained saved identity and left the survivor usable. Its logical record remained a session candidate, matching the existing adapter destructor contract. A later complete startup retired that candidate and passed the single-window verifier. Immediate logical removal was a rejected scratch expectation. One inactive page-visibility sample failed; exact owned activation restored the visibility prerequisite before the successful strict run, without metadata repair/navigation.
+
+Private artifacts: `/tmp/myarc-m0-runtime/mode20-acceptance-20261026T002201Z/`. Source/patch manifests still match. All owned app/helper processes and fixture servers were closed. Profile/OTR, flag-off, arbitrary overlap/fullscreen and queued-focus shutdown regressions remain pending on this revision; renderer stays off.
+
+## Implementation handoff
 
 External source/build: `/Users/mwolff/.cache/myarc-m0/chromium/src`, output `out/MyarcM0`. Executable comm paths were checked before linking. No browser app, desktop automation or server was launched. Actual profiles, OS settings, permissions, services and singleton locks were untouched. Source/build ownership is relinquished at handoff, with no build left running.
 
 Use a fresh explicitly experimental disposable profile. Create a two-Space Favorite/Temporary checkpoint, choose horizontal through native controls, quit gracefully, then perform actual native restore with no URL arguments under a changed PID. Enable vertical tabs in that same window. Compare strict unchanged metadata, including IDs/owners/placement/canonical URL/selection, and confirm actual pages remain. Repeat warm switches, pending recovery and regular-Profile/OTR/flag-off checks. Preserve the failed profile and its original checkpoint.
 
-Compilation cannot establish native acceptance. Actual clean/crash restart, Profile/OTR isolation, reduced motion, shutdown races and durability remain with the parent. The failed cold run's app-only reduced-motion flag was true; this implementation launched no motion test and changes no OS preference.
+Compilation cannot establish native acceptance. The implementation delegate performed no runtime acceptance. Parent results above cover the named bounded clean/crash and reduced-motion journeys; remaining Profile/OTR/flag-off checks, shutdown races and broader durability remain open. The failed cold run's app-only reduced-motion flag was true; this implementation launched no motion test and changes no OS preference.

@@ -60,5 +60,13 @@
   ],
   "all_owned_apps_helpers_fixture_servers_closed": true,
   "workspace_renderer_default_enabled": false,
-  "raw_profiles_logs_and_captures": "private, outside Git"
+  "raw_profiles_logs_and_captures": "private, outside Git",
+  "followup": {
+    "implementation_commit": "7a14927",
+    "evidence": "workspace-late-bindings.json",
+    "bounded_cold_horizontal_restore_corrected": true,
+    "strict_single_clean_and_actual_crash_verifiers_passed": true,
+    "strict_two_window_horizontal_restore_passed": true,
+    "profile_otr_flag_off_followups_pending": true
+  }
 }

@@ -1,0 +1,67 @@
+{
+  "slice": "MA-007.c-late-bindings",
+  "date": "2026-10-26",
+  "implementation_commit": "7a14927",
+  "status": "bounded native clean/crash and two-window horizontal restoration passed",
+  "single_clean": {
+    "initial_native_horizontal_choice": true,
+    "normal_quit_and_changed_pid": true,
+    "explicit_restore_last_session_without_urls": true,
+    "metadata_retained_before_vertical_presentation": true,
+    "same_window_late_vertical_enable": true,
+    "unchanged_strict_verifier_passed": true,
+    "stable_samples": 5,
+    "original_ids_owners_placement_canonical_url_selection_and_canary_retained": true
+  },
+  "single_actual_crash": {
+    "canary_previously_persisted_by_verified_clean_roundtrip": true,
+    "actual_marked_browser_sigkill_audited": true,
+    "horizontal_preference_persisted_before_kill": true,
+    "plain_relaunch_no_urls_no_restore_flag": true,
+    "genuine_recovery_prompt_observed": true,
+    "vertical_enabled_while_prompt_pending": true,
+    "metadata_unchanged_and_workspace_readiness_withheld_before_choice": true,
+    "genuine_restore_invoked": true,
+    "unchanged_strict_verifier_passed": true
+  },
+  "two_window_clean": {
+    "native_cmd_n": true,
+    "one_logical_favorite_two_live_pinned_copies": true,
+    "one_hidden_unpinned_temporary": true,
+    "zero_extra_tabs_at_checkpoint": true,
+    "normal_quit_then_horizontal_native_session_restore": true,
+    "stable_metadata_before_late_presentation": true,
+    "late_vertical_change_applied_to_both_windows": true,
+    "two_distinct_native_windows_and_both_pins_retained": true,
+    "unchanged_strict_verifier_passed": true,
+    "stable_samples": 5
+  },
+  "runtime_focus_and_motion": {
+    "three_reduced_motion_mode_cycles": true,
+    "horizontal_toolbar_and_native_address_focus_work": true,
+    "page_target_ids_time_origins_and_model_counters_retained": true,
+    "app_only_forced_reduced_motion_reported": true,
+    "fresh_owned_window_recordings_and_held_sequence_inspected": true,
+    "os_preferences_unchanged": true,
+    "exact_transition_timing_unmeasured": true
+  },
+  "closed_window": {
+    "native_second_window_closed": true,
+    "saved_identity_and_surviving_window_mutations_retained": true,
+    "closed_logical_record_retained_as_session_candidate_by_existing_contract": true,
+    "subsequent_complete_native_startup_retired_closed_candidate": true,
+    "remaining_single_window_strict_verify_passed": true,
+    "initial_inactive_visibility_failure_excluded_and_owned_activation_used": true,
+    "long_session_candidate_allocation_limit_behavior_unmeasured": true
+  },
+  "limits": [
+    "Bounded observed-disk/persisted-storage scope; fresh site-storage acknowledgement and OS/power-loss durability remain open",
+    "Profile/OTR and flag-off followups on this revision remain pending",
+    "Native interactive C++ suites, arbitrary overlap/fullscreen and queued-focus shutdown races remain unrun",
+    "Native-to-Rust in-memory associations are not directly exposed by the developer probes",
+    "Developer tools do not implement P0 product CLI/MCP"
+  ],
+  "all_owned_apps_helpers_and_fixture_servers_closed": true,
+  "workspace_renderer_default_enabled": false,
+  "raw_profiles_canaries_logs_and_recordings": "private, outside Git"
+}
