@@ -54,3 +54,15 @@ Parent: MA-011/007. Evidence: project requirement and proposed [control contract
 - Invalidations: stale references, navigation/redirect outside scope, permission denial, cancellation or disconnect produce explicit results and never automatic repeated submissions. Page instructions cannot expand the grant.
 - Restart: expired/revoked grants never become silently active after relaunch. Ordinary local browsing remains available.
 - Proof: semantic final state plus native browser recording and external-client trace, synthetic data only; record protocol/client/build versions. Listing MCP tools alone is insufficient.
+
+## BC-005 — Peek routing
+
+Parent: MA-007. Evidence: documented, Arc's Peek article ([source](https://resources.arc.net/hc/en-us/articles/19335302900887-Peek-Preview-Sites-From-Pinned-Tabs), Internet Archive copy 2024, see the [backlog](2026-10-26-arc-clone-backlog.md) Peek & Split View section) and the [Pinned Tabs article](https://resources.arc.net/hc/en-us/articles/19231060187159-Pinned-Tabs-Tabs-you-want-to-stick-around). Rule implemented and tested in `crates/workspace/src/peek.rs`; the overlay UI does not exist.
+
+- Initial state: a synthetic pinned or favorite item showing a page on site A; Peek enabled.
+- Action: a link to site B is activated. The caller passes scheme and registrable domain for source and target.
+- Expected behavior, in this order: Cmd-click opens a new tab. Otherwise a Temporary source, a non-http(s) scheme on either side, an unknown (empty) site or the same site keeps the navigation in the current tab. Otherwise a cross-site link from a pinned or favorite item opens in Peek, or in a new tab when the Advanced Peek setting is off.
+- Peek actions: "open in tab" (Cmd+O) promotes the Peek page into a new Temporary item in the current Space; close (outside click, X, Cmd+W) dismisses Peek and returns to the source item.
+- Keyboard/focus, persistence, error: Peek pages are not workspace items and are never persisted. The core only returns a decision; focus handling is the adapter's job.
+- Proof: unit tests in `peek.rs`. Native overlay behavior, focus and reopen need a fresh real-build capture before any parity claim.
+- Unknowns (simplest reading chosen): Shift-click opening Peek is not in the sources, so it is not modeled. Option-click (Split View) and expanding Peek into a split are out of scope. Whether the setting also covers links from Temporary tabs is undocumented; Temporary tabs never Peek here. Whether subdomain or cross-scheme moves count as the same site is undocumented; same registrable domain counts as same site, scheme is ignored. Reopening a closed Peek (Cmd+Z/Cmd+Shift+T) is not modeled. What happens to Peek on window close or Space switch is unknown.

@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-10-26: Pure Peek routing rule
+
+- Added `crates/workspace/src/peek.rs`: `route_navigation` returns Peek, current tab or new tab from source kind, scheme and site keys, Cmd-click and the Peek setting; `resolve_peek_action` maps Cmd+O to a new Temporary item in the current Space and close to the source item. Contract BC-005.
+- Verification: 14 unit tests in `peek::tests` (cross-site, same site, subdomain keys, non-web schemes, unknown site, setting off, modifier). Rule only; no overlay UI or native capture.
+- Open: Shift-click Peek, Split expansion and reopening a closed Peek are not modeled; see BC-005 unknowns.
+
 ## 2026-10-26: Lucide footer and sidebar toggle, like Arc
 
 - The sidebar footer now shows Lucide `archive` for Library and `plus` for Create, with one dot per Space centered between them; the current Space's dot is brighter and the filled chip is gone, so one Space shows one dot. The header toggle is Lucide `panel-left` at 18 DIP in a subtle 28 DIP chip 5 DIP right of the traffic lights. Back and forward already match Arc. Reload differs, but Lucide `rotate-cw` has the same corner arrow as Chromium's, so it stays.

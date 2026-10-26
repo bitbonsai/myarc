@@ -44,6 +44,7 @@ pub type SpaceId = u64;
 pub type ProfileId = u64;
 pub type ItemId = u64;
 pub type WindowId = u64;
+pub mod peek;
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum RenameError {
