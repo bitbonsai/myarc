@@ -1,5 +1,5 @@
 diff --git a/chrome/browser/ui/views/frame/browser_view.h b/chrome/browser/ui/views/frame/browser_view.h
-index 750e46c97b64dccccf4268e912df5dbdb6516b3c..ba44fd1ba4d782d5e229be0e87a7eb15cb35a124 100644
+index 750e46c97b64dccccf4268e912df5dbdb6516b3c..a0423aa303876e1f7042977b5dc343bfb0ddc098 100644
 --- a/chrome/browser/ui/views/frame/browser_view.h
 +++ b/chrome/browser/ui/views/frame/browser_view.h
 @@ -8,6 +8,7 @@
@@ -83,7 +83,7 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..ba44fd1ba4d782d5e229be0e87a7eb15
    base::WeakPtr<BrowserView> GetAsWeakPtr() {
      return weak_ptr_factory_.GetWeakPtr();
    }
-@@ -1253,12 +1282,54 @@ class BrowserView : public BrowserWindow,
+@@ -1253,12 +1282,56 @@ class BrowserView : public BrowserWindow,
  
    // Anchor point for help bubbles and other dialogs that want to reliably
    // anchor outside the content area of the window.
@@ -127,6 +127,8 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..ba44fd1ba4d782d5e229be0e87a7eb15
 +  void OnMyarcCommandPaletteClosed(views::BubbleDialogDelegate* delegate);
 +  std::unique_ptr<views::BubbleDialogDelegate> myarc_command_palette_delegate_;
 +  std::unique_ptr<views::Widget> myarc_command_palette_widget_;
++  // --myarc-capture-open-palette opens the palette once per window.
++  bool myarc_capture_palette_scheduled_ = false;
 +
    std::unique_ptr<views::ViewSubregionAnchor> dialog_anchor_;
  
@@ -138,7 +140,7 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..ba44fd1ba4d782d5e229be0e87a7eb15
  
    // A mapping between accelerators and command IDs.
    std::map<ui::Accelerator, int> accelerator_table_;
-@@ -1411,6 +1482,7 @@ class BrowserView : public BrowserWindow,
+@@ -1411,6 +1484,7 @@ class BrowserView : public BrowserWindow,
    base::EnumSet<TabStripAndWebAppViewsReparentedState>
        tab_strip_web_apps_reparented_state_;
  

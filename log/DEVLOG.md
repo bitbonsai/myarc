@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-10-26: Palette favicons, Lucide magnifier and review fixes
+
+- Changed: palette tab rows show the tab's own favicon (ContentFaviconDriver, the tab strip's source) at 16 pt, with the globe only when a page has none; the magnifier is Lucide's search icon as inline vector path commands. `--myarc-capture-open-palette=<ms>` takes an optional delay (default 2000) and opens once per window, and `tools/capture_scene.sh` opens it after 30 s, once the Favorites are live and the startup New tab row is closed. Review fixes: rows get icons, chips and colors in current-tab mode too; presses in the shadow band of the bubble window close the palette on Mac; arrow chips are ignored by accessibility.
+- Measured on the palette crop (950×415+455+370 px) against `arc-palette-favorites.png`: pixels differing at 5% fuzz fell from 26.3% to 20.5%, RMSE from 0.357 to 0.316. The fresh capture shows GitHub, Cloudflare and mauriciowolff.com rows with their favicons and no stale New tab row.
+- Still differs: the shadow-band fix closes the palette but does not pass the click through to the page, and no runtime click test ran because captures stay background-only. Arc lists five results (history included) to our three tabs, the palette sits about 20 pt lower, and GitHub's dark-scheme favicon is white on the white selected tile, as in Arc.
+
 ## 2026-10-26: Command palette matches Arc's geometry
 
 - Changed: the palette is now 766×328.5 pt at x=337 pt, centered 5 pt above window center like Arc. It has a 1 pt #454646 border, #181919 fill, 12 pt radius, 63 pt input row with medium 18 pt text, hairline separator and 46 pt rows on a 50 pt pitch with medium 14 pt text. Selected rows use #4248CF with a white icon tile and arrow chip, and the shadow is a larger elevation-40 one. Light mode keeps Chromium color roles.

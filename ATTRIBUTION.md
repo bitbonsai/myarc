@@ -18,6 +18,8 @@ Public Artcraft repository conventions informed the development methodology. Pri
 
 `design/brand/assets/x.svg` is Lucide's X from [`icons/x.svg` at revision `585b65f28f6383d39f257cb2430912ed6f7903a2`](https://github.com/lucide-icons/lucide/blob/585b65f28f6383d39f257cb2430912ed6f7903a2/icons/x.svg), under the same ISC notice in `design/brand/assets/Lucide-LICENSE.txt`. Its hash is recorded in `assets/SHA256SUMS`. Articles inline its paths inside an accessible lightbox-close button.
 
+The native command palette's magnifier (`kMyarcSearchIcon` in `browser/patches/chromium/`) converts Lucide's search icon from [`lucide-static` 1.61.0 `icons/search.svg`](https://unpkg.com/lucide-static@1.61.0/icons/search.svg), by Lucide Icons and Contributors, into Chromium vector-icon path commands at its 24-unit canvas and stroke 2. It is under ISC; the full notice is in `design/brand/assets/Lucide-LICENSE.txt`.
+
 The one-second page transition and 2rem blur treatment were observed on [karinwolff.com](https://karinwolff.com/). myArc independently implements blur/fade on native transition snapshots with CSS and a separate header capture. Reference scripts, overlays and artwork are not bundled.
 
 `design/onboarding/` contains original HTML/CSS choreography, invented sample content and locally recorded synthetic-study evidence. It loads no Arc or brand-kit artwork and distributes no font files. Browser checks use separately installed agent-browser and Chrome for Testing; those tools are not bundled. The Chromium feasibility checkout is also external; `browser/upstream.json` records its exact source/tooling revisions. Full upstream dependency/license inventory remains a foundation acceptance requirement.

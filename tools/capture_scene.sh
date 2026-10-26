@@ -8,17 +8,18 @@
 # Favorites are seeded in the workspace's own persisted format (myarc-workspace-v1.json,
 # see EncodeWorkspaceMetadata in browser/foundation/workspace_service.cc) in a marked
 # disposable profile; AXPress on each tile opens it. The browser launches in the
-# background (open -g), the palette opens via --myarc-capture-open-palette and
+# background (open -g), the palette opens via --myarc-capture-open-palette=PALETTE_MS
+# once the Favorites are live and the startup "New tab" row is closed, and
 # ScreenCaptureKit captures the window, so nothing takes focus and no keystroke,
 # click or menu is sent. By-PID cleanup.
-# Usage: tools/capture_scene.sh [outdir]   env: W=1330 H=836 PAGE_SETTLE=10
+# Usage: tools/capture_scene.sh [outdir]   env: W=1330 H=836 PAGE_SETTLE=10 PALETTE_MS=30000
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 REF="$ROOT/research-private/arc/blog-reference/arc-palette-favorites.png"
 APP="$HOME/.cache/myarc-m0/chromium/src/out/MyarcM0/Chromium.app"
 BIN="$APP/Contents/MacOS/Chromium"
-W=${W:-1330}; H=${H:-836}; PAGE_SETTLE=${PAGE_SETTLE:-10}
+W=${W:-1330}; H=${H:-836}; PAGE_SETTLE=${PAGE_SETTLE:-10}; PALETTE_MS=${PALETTE_MS:-30000}
 
 if [ "${1:-}" = "--inner" ]; then
   OUT=$2
@@ -49,9 +50,11 @@ if [ "${1:-}" = "--inner" ]; then
 "windows":[{"id":"1","space_id":"1","selected_item_id":"1"}]}
 JSON
   # -g: launch without activating, so the user's frontmost app keeps focus.
+  # The palette timer starts when the window shows, after this point.
+  LAUNCHED=$SECONDS
   open -g -n -a "$APP" --args --user-data-dir="$PROFILE" --no-first-run --no-default-browser-check \
     --enable-features=GlassFrame --disable-features=InitialWebUI \
-    --disable-backgrounding-occluded-windows --myarc-capture-open-palette \
+    --disable-backgrounding-occluded-windows --myarc-capture-open-palette="$PALETTE_MS" \
     --myarc-visual-parity --myarc-workspace-sidebar --window-size="$W,$H" --window-position=40,60 ${START_URL:-}
   for _ in $(seq 1 60); do
     for p in $(pgrep -f -- "--user-data-dir=$PROFILE" || true); do
@@ -93,7 +96,14 @@ SWIFT
   sleep 3
   # The startup page is a Temporary "New tab" row the reference does not have.
   swift "$PROFILE/press.swift" "$PID" github cloudflare bitbonsai "=close live page: new tab"
+  # The palette lists tabs when it opens; opening before this point keeps the stale row.
+  if [ $((SECONDS - LAUNCHED)) -ge $((PALETTE_MS / 1000)) ]; then
+    echo "palette opened before the scene was staged; raise PALETTE_MS" >&2; exit 1
+  fi
   sleep "$PAGE_SETTLE"
+  # Wait for the palette (window show + PALETTE_MS) plus 2 s to paint.
+  WAIT=$((LAUNCHED + PALETTE_MS / 1000 + 4 - SECONDS))
+  [ "$WAIT" -gt 0 ] && sleep "$WAIT"
   kill -0 "$PID" 2>/dev/null || { echo "native process exited early" >&2; exit 1; }
   swift "$ROOT/tools/bgcapture.swift" shot "$PID" "$OUT"
   echo "pid=$PID"
