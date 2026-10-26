@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-26",
+  "slice": "MA-007.c.confirm-quit",
+  "status": "arc_default_and_enabled_native_paths_passed",
+  "source_commit": "0f100db8975107fbe780029200a54bc5075cff98",
+  "reference": "research-private/arc/parent-capture/settings-overview.jpg",
+  "behavior": {
+    "myarc_default_warn_before_quitting": false,
+    "stock_chromium_default_retained": true,
+    "fresh_profile_single_cmd_q_exit": true,
+    "enabled_single_cmd_q_stayed_open": true,
+    "enabled_hold_overlay_visible": true,
+    "enabled_double_tap_exit": true,
+    "enabled_pref_persisted_across_new_pid_relaunch": true
+  },
+  "checks": {
+    "chrome_and_unit_tests_build": "exit 0",
+    "default_pref_unit_stock": "passed",
+    "default_pref_unit_myarc": "passed",
+    "default_off_native_pid": 96548,
+    "enabled_first_native_pid": 96629,
+    "enabled_second_native_pid": 96734,
+    "enabled_pref_readback": true,
+    "private_overlay_capture": "research-private/captures/confirm-quit-20261026T201736Z/warn-enabled.png",
+    "patch_exports": "passed",
+    "native_cpp_browser_and_interactive_suites": "UNRUN"
+  },
+  "limits": [
+    "The existing Chromium app-menu toggle was source-verified but not clicked through automation",
+    "Enabled native acceptance seeded the same Local State preference written by the app-menu toggle",
+    "Synthetic PID-posted events cannot maintain physical key state, so native completion used Chromium's supported double-tap path after the hold overlay was captured",
+    "No custom myArc settings window was added",
+    "Private disposable profiles, capture and raw logs remain outside Git"
+  ]
+}

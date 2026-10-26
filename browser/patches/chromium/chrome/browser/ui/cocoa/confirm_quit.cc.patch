@@ -1,0 +1,24 @@
+diff --git a/chrome/browser/ui/cocoa/confirm_quit.cc b/chrome/browser/ui/cocoa/confirm_quit.cc
+index e28f7554e2783428124eb4a0f65763572b56c078..590df5521c439aa7e62fdf0f6f34985be9e2b9db 100644
+--- a/chrome/browser/ui/cocoa/confirm_quit.cc
++++ b/chrome/browser/ui/cocoa/confirm_quit.cc
+@@ -4,6 +4,7 @@
+ 
+ #include "chrome/browser/ui/cocoa/confirm_quit.h"
+ 
++#include "base/command_line.h"
+ #include "base/metrics/histogram_macros.h"
+ #include "chrome/common/pref_names.h"
+ #include "components/prefs/pref_registry_simple.h"
+@@ -15,7 +16,10 @@ void RecordHistogram(ConfirmQuitMetric sample) {
+ }
+ 
+ void RegisterLocalState(PrefRegistrySimple* registry) {
+-  registry->RegisterBooleanPref(prefs::kConfirmToQuitEnabled, true);
++  registry->RegisterBooleanPref(
++      prefs::kConfirmToQuitEnabled,
++      !base::CommandLine::ForCurrentProcess()->HasSwitch(
++          "myarc-visual-parity"));
+ }
+ 
+ }  // namespace confirm_quit

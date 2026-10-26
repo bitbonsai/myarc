@@ -1,0 +1,24 @@
+diff --git a/chrome/browser/ui/cocoa/confirm_quit_unittest.cc b/chrome/browser/ui/cocoa/confirm_quit_unittest.cc
+new file mode 100644
+index 0000000000000000000000000000000000000000..aad94a8de9846c9892811fabe4a08e18617db930
+--- /dev/null
++++ b/chrome/browser/ui/cocoa/confirm_quit_unittest.cc
+@@ -0,0 +1,18 @@
++// Copyright 2026 The Chromium Authors
++// Use of this source code is governed by a BSD-style license that can be
++// found in the LICENSE file.
++
++#include "chrome/browser/ui/cocoa/confirm_quit.h"
++
++#include "base/command_line.h"
++#include "chrome/common/pref_names.h"
++#include "components/prefs/testing_pref_service.h"
++#include "testing/gtest/include/gtest/gtest.h"
++
++TEST(ConfirmQuitTest, DefaultFollowsMyarcMode) {
++  TestingPrefServiceSimple prefs;
++  confirm_quit::RegisterLocalState(prefs.registry());
++  EXPECT_EQ(!base::CommandLine::ForCurrentProcess()->HasSwitch(
++                "myarc-visual-parity"),
++            prefs.GetBoolean(prefs::kConfirmToQuitEnabled));
++}

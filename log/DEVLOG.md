@@ -1,5 +1,17 @@
 # Development log
 
+## 2026-10-26: Arc-matching quit-warning default
+
+- Arc's General settings reference shows “Warn before quitting” off. Chromium defaulted the existing `browser.confirm_to_quit` pref on. Under `--myarc-visual-parity` it now defaults off while stock Chromium and explicit user values stay unchanged; the existing app-menu toggle remains the control.
+- Chrome and the focused unit test built. Stock and myArc default modes passed. A fresh marked profile quit on one Cmd+Q tap. An enabled profile showed the native hold panel, quit through Chromium's double-tap route and retained the enabled pref across a new-PID relaunch.
+- Committed Chromium `0f100db8975107fbe780029200a54bc5075cff98`. The app-menu toggle was source-verified but not clicked through automation. Native C++ browser/interactive suites remain unrun; no custom settings window was added.
+
+## 2026-10-26: Cmd+Shift+C copies current URL
+
+- Chromium already had the guarded `IDC_COPY_URL` command, but macOS Cmd+Shift+C still invoked DevTools inspect. myArc mode now replaces that hidden shortcut and registers the BrowserView accelerator; stock Chromium keeps its original command.
+- Chrome, browser tests and unit tests built. Default/myArc routing tests passed. A background marked-profile run copied `http://127.0.0.1:8876/?copy=myarc#nightly` exactly, including query and fragment; the check restored all prior pasteboard items.
+- Committed Chromium `52c9f57bc1634483ba7cac70cc718c76bf1d2940`. Native C++ browser tests compiled but remain unrun. No clipboard notification or non-macOS mapping was added.
+
 ## 2026-10-26: Sidebar keeps its width and full header
 
 - Root cause: the header hid back/forward/reload and the address field below 180 pt, but resize-area drags and arrow keys could save widths down to the stock 126 pt minimum. A saved width in that range left only the toggle. The tabbed layout also capped the sidebar by the toolbar's minimum width, though the toolbar now lives in the sidebar header. Under `--myarc-visual-parity` the default is now 270 pt (Arc). Saved and dragged widths clamp to 220 pt, the narrowest width where the toggle clears the nav cluster. The header always shows every control, including on blank Spaces. The toolbar no longer caps the sidebar.
@@ -344,6 +356,12 @@ Keep significant outcomes, failures and next actions reproducible. Newest entry 
 - Fixed mixed light controls and hardcoded dark surfaces. Palette colors now use browser roles, selected labels disable automatic recoloring, and material tint follows effective Profile colors rather than the system theme alone. Restored themed sidebar address backgrounds. Prototype new windows start at `about:blank`.
 - Native build, frame/browser-command GN checks and five-source patch reproduction passed. A typed local history title reopened the actual fixture URL in one new tab. Explicit light Profile appearance was inspected on a dark system; a private dark palette showed no normal-history entries. Cmd+N produced one blank target. Captures contain invented data and remain private.
 - An initial HoverButton paint failed the opaque-layer subpixel check; disabled subpixel rendering for those labels. Full autocomplete, cached favicons and live appearance switching remain open. Sidebar shortcuts, current-tab palette editing, motion and release recovery are still pending.
+
+## 2026-10-26: Nightly build wording
+
+- Replaced "current myArc prototype" with "current myArc nightly" in the public post image alt text and caption.
+- Updated the stale dark-theme browser assertion to match the documented `#D2D9E1` body text; measured headings remain `#F5F2EC`. Build, 20 unit tests, structural, SEO and browser checks passed; one lightbox timing run was flaky and passed unchanged on rerun.
+- Published `37b61e456f762f49c93c22db9650c0d2cbfcd384` to `gh-pages` as bitbonsai. Live HTTPS read-back contains the new wording.
 
 ## 2026-10-25: Basic native New Tab palette
 

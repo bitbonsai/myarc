@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-26",
+  "slice": "MA-007.c.copy-url-shortcut",
+  "status": "native_copy_url_shortcut_passed",
+  "source_commit": "52c9f57bc1634483ba7cac70cc718c76bf1d2940",
+  "behavior": {
+    "shortcut": "Cmd+Shift+C",
+    "stock_chromium_command": "IDC_DEV_TOOLS_INSPECT",
+    "myarc_command": "IDC_COPY_URL",
+    "copied_url": "http://127.0.0.1:8876/?copy=myarc#nightly",
+    "query_and_fragment_preserved": true,
+    "blank_workspace_command_gate_retained": true
+  },
+  "checks": {
+    "chrome_browser_tests_unit_tests_build": "exit 0",
+    "global_keyboard_shortcuts_default_tests": 2,
+    "copy_url_mode_unit_default": "passed, DevTools inspect retained",
+    "copy_url_mode_unit_myarc": "passed, Copy URL selected",
+    "native_background_launch": true,
+    "native_targeted_shortcut": true,
+    "exact_clipboard_match": true,
+    "clipboard_items_restored_after_check": true,
+    "patch_exports": "passed",
+    "native_cpp_browser_test_execution": "UNRUN"
+  },
+  "limits": [
+    "macOS shortcut only",
+    "Native browser tests compiled but were not executed because app launches must remain background-only",
+    "No clipboard toast or other new UI was added",
+    "Private disposable profile and raw logs remain outside Git"
+  ]
+}
