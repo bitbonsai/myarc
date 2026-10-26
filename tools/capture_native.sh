@@ -1,12 +1,17 @@
 #!/bin/bash
 # Capture the native myArc build window (disposable profile, by-PID cleanup).
 # Usage: tools/capture_native.sh [out.png]   env: W=1440 H=900 URL=about:blank SETTLE=3
+#   URL may list several space-separated URLs. KEYS=cmd+t (or PALETTE=1) opens the
+#   command palette via --myarc-capture-open-palette and waits KEY_SETTLE (default 2).
+#   The browser launches in the background (open -g) and is captured with
+#   ScreenCaptureKit (tools/bgcapture.swift), so it never takes focus.
 set -euo pipefail
 
 BASE="$(cd "$(dirname "$0")/.." && pwd)/research-private/captures"
 APP="$HOME/.cache/myarc-m0/chromium/src/out/MyarcM0/Chromium.app"
 BIN="$APP/Contents/MacOS/Chromium"
 W=${W:-1440}; H=${H:-900}; URL=${URL:-about:blank}; SETTLE=${SETTLE:-3}
+KEYS=${KEYS:-}; KEY_SETTLE=${KEY_SETTLE:-2}
 
 if [ "${1:-}" = "--inner" ]; then
   OUT=$2
@@ -26,38 +31,28 @@ if [ "${1:-}" = "--inner" ]; then
   mkdir -p "$PROFILE/Default"
   touch "$PROFILE/.myarc-m0-test-profile"
   printf '%s\n' '{"vertical_tabs":{"enabled":true,"collapsed_state":false,"uncollapsed_width":230,"enabled_first_time":true}}' > "$PROFILE/Default/Preferences"
-  "$BIN" --user-data-dir="$PROFILE" --no-first-run --no-default-browser-check \
+  read -r -a URLS <<< "$URL"
+  EXTRA=()
+  { [ -n "$KEYS" ] || [ -n "${PALETTE:-}" ]; } && EXTRA+=(--myarc-capture-open-palette)
+  # -g: launch without activating, so the user's frontmost app keeps focus.
+  open -g -n -a "$APP" --args --user-data-dir="$PROFILE" --no-first-run --no-default-browser-check \
     --enable-features=GlassFrame --disable-features=InitialWebUI \
-    --myarc-visual-parity --myarc-workspace-sidebar --window-size="$W,$H" --window-position=40,60 "$URL" \
-    >/dev/null 2>&1 &
-  PID=$!
-  WID=""
-  for _ in $(seq 1 100); do
-    WID=$(swift - "$PID" <<'SWIFT' 2>/dev/null || true
-import CoreGraphics
-import Foundation
-let pid = Int32(CommandLine.arguments[1])!
-let list = (CGWindowListCopyWindowInfo([.optionAll], kCGNullWindowID) as? [[String: Any]]) ?? []
-var best = (0.0, 0)
-for w in list {
-  guard (w[kCGWindowOwnerPID as String] as? Int32) == pid,
-        (w[kCGWindowLayer as String] as? Int) == 0,
-        let b = w[kCGWindowBounds as String] as? [String: Double],
-        (b["Width"] ?? 0) > 400, (b["Height"] ?? 0) > 300 else { continue }
-  let area = (b["Width"] ?? 0) * (b["Height"] ?? 0)
-  if area > best.0 { best = (area, w[kCGWindowNumber as String] as! Int) }
-}
-if best.1 != 0 { print(best.1) }
-SWIFT
-)
-    [ -n "$WID" ] && break
-    kill -0 "$PID" 2>/dev/null || { echo "native process exited early" >&2; exit 1; }
-    sleep 0.5
+    --disable-backgrounding-occluded-windows ${EXTRA[@]+"${EXTRA[@]}"} \
+    --myarc-visual-parity --myarc-workspace-sidebar --window-size="$W,$H" --window-position=40,60 "${URLS[@]}"
+  for _ in $(seq 1 60); do
+    for p in $(pgrep -f -- "--user-data-dir=$PROFILE" || true); do
+      ps -o command= -p "$p" | grep -q -- '--type=' || { PID=$p; break; }
+    done
+    [ -n "$PID" ] && break
+    sleep 0.25
   done
-  [ -n "$WID" ] || { echo "no window for PID $PID" >&2; exit 1; }
+  [ -n "$PID" ] || { echo "native process did not start" >&2; exit 1; }
   sleep "$SETTLE"
-  screencapture -x -o -l "$WID" "$OUT"
-  echo "pid=$PID window=$WID"
+  [ -n "${EXTRA[*]-}" ] && sleep "$KEY_SETTLE"
+  kill -0 "$PID" 2>/dev/null || { echo "native process exited early" >&2; exit 1; }
+  swift "$(dirname "$0")/bgcapture.swift" shot "$PID" "$OUT"
+  WID=bg; RECT=window
+  echo "pid=$PID window=$WID rect=$RECT"
   exit 0
 fi
 
