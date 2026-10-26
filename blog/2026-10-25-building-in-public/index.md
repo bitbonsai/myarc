@@ -52,7 +52,7 @@ Wrap saves useful gotchas and writes a handover for the next session, so the sta
 
 Page navigation and the centered native command palette already work in the prototype. Today's goal is an Arc-like empty window and a native nightly build people can try without compiling Chromium.
 
-[![Arc displaying mauriciowolff.com, our reference for the window material and sidebar](https://myarc.dev/blog/2026-10-25-building-in-public/arc-mauriciowolff-reference.893322b7d09e.webp)](https://myarc.dev/blog/2026-10-25-building-in-public/arc-mauriciowolff-reference.893322b7d09e.webp)
+[![Arc displaying mauriciowolff.com, our reference for the window material and sidebar](https://myarc.dev/blog/2026-10-25-building-in-public/arc-mauriciowolff-reference-transparent.bd89b079035b.webp)](https://myarc.dev/blog/2026-10-25-building-in-public/arc-mauriciowolff-reference-transparent.bd89b079035b.webp)
 
 Arc, our visual reference.
 
