@@ -1,0 +1,539 @@
+diff --git a/chrome/browser/ui/views/session_crashed_bubble_view_interactive_uitest.cc b/chrome/browser/ui/views/session_crashed_bubble_view_interactive_uitest.cc
+index c30c90bfe44ba4c558688af71f1d3b8ba1320544..43defda0650074c248c5d8a477bd2e10c003b5ce 100644
+--- a/chrome/browser/ui/views/session_crashed_bubble_view_interactive_uitest.cc
++++ b/chrome/browser/ui/views/session_crashed_bubble_view_interactive_uitest.cc
+@@ -5,8 +5,16 @@
+ #include "chrome/browser/ui/views/session_crashed_bubble_view.h"
+ 
+ #include <string>
++#include <utility>
++#include <vector>
+ 
++#include "base/command_line.h"
++#include "base/functional/bind.h"
++#include "base/functional/callback_helpers.h"
+ #include "base/memory/raw_ptr.h"
++#include "base/run_loop.h"
++#include "base/test/run_until.h"
++#include "base/test/scoped_feature_list.h"
+ #include "build/build_config.h"
+ #include "build/buildflag.h"
+ #include "chrome/browser/lifetime/browser_shutdown.h"
+@@ -14,21 +22,81 @@
+ #include "chrome/browser/profiles/profile.h"
+ #include "chrome/browser/sessions/exit_type_service.h"
+ #include "chrome/browser/sessions/session_restore.h"
++#include "chrome/browser/ui/browser_commands.h"
++#include "chrome/browser/ui/browser_element_identifiers.h"
++#include "chrome/browser/ui/browser_tabrestore.h"
++#include "chrome/browser/ui/browser_tabstrip.h"
++#include "chrome/browser/ui/browser_window/public/create_browser_window.h"
+ #include "chrome/browser/ui/focus/browser_focus_controller.h"
+ #include "chrome/browser/ui/tabs/tab_strip_model.h"
++#include "chrome/browser/ui/tabs/vertical_tab_strip_state_controller.h"
+ #include "chrome/browser/ui/test/test_browser_dialog.h"
+ #include "chrome/browser/ui/views/frame/browser_view.h"
++#include "chrome/browser/ui/views/frame/toolbar_button_provider.h"
++#include "chrome/browser/ui/views/frame/top_container_view.h"
++#include "chrome/browser/ui/views/frame/vertical_tab_strip_region_view.h"
++#include "chrome/browser/ui/views/interaction/browser_elements_views.h"
++#include "chrome/browser/ui/views/location_bar/location_bar_view.h"
++#include "chrome/browser/ui/views/tabs/vertical/vertical_tab_strip_top_container.h"
+ #include "chrome/browser/ui/views/toolbar/browser_app_menu_button.h"
+ #include "chrome/browser/ui/views/toolbar/toolbar_view.h"
++#include "chrome/common/pref_names.h"
+ #include "chrome/test/base/in_process_browser_test.h"
+ #include "components/keep_alive_registry/keep_alive_registry.h"
+ #include "components/keep_alive_registry/keep_alive_types.h"
++#include "components/prefs/pref_service.h"
++#include "components/sessions/content/content_serialized_navigation_builder.h"
++#include "components/sessions/core/serialized_navigation_entry.h"
++#include "components/sessions/core/serialized_user_agent_override.h"
++#include "content/public/browser/navigation_controller.h"
++#include "content/public/browser/navigation_entry.h"
++#include "content/public/browser/web_contents.h"
++#include "content/public/common/content_features.h"
+ #include "content/public/test/browser_test.h"
++#include "content/public/test/browser_test_utils.h"
++#include "myarc/browser_workspace_adapter.h"
++#include "myarc/workspace_lifecycle.h"
+ #include "ui/base/buildflags.h"
+ #include "ui/views/bubble/bubble_dialog_delegate_view.h"
+ #include "ui/views/focus/focus_manager.h"
+ #include "ui/views/test/ax_event_counter.h"
+ #include "ui/views/view.h"
++#include "ui/views/widget/widget.h"
++
++namespace {
++
++class RecoveryLifecycleProbe : public myarc::WorkspaceLifecycle {
++ public:
++  explicit RecoveryLifecycleProbe(Profile* profile)
++      : WorkspaceLifecycle(profile), profile_(profile) {}
++
++  bool restore_started = false;
++  bool choice_finished = false;
++  bool restore_started_before_choice_finished = false;
++
++  void OnLifecycleEvent(Event event) override {
++    if (event == Event::kSessionRestoreStarted) {
++      restore_started = true;
++      restore_started_before_choice_finished =
++          !choice_finished && HasPendingSessionRestore(profile_);
++    } else if (event == Event::kRecoveryChoiceFinished) {
++      choice_finished = true;
++    }
++  }
++  void RestoreTab(BrowserWindowInterface&,
++                  content::WebContents&,
++                  const ExtraData&) override {}
++  void RestoreWindow(BrowserWindowInterface&, const ExtraData&) override {}
++  ExtraData TabData(BrowserWindowInterface&, content::WebContents&) override {
++    return {};
++  }
++  ExtraData WindowData(BrowserWindowInterface&) override { return {}; }
++
++ private:
++  const raw_ptr<Profile> profile_;
++};
++
++}  // namespace
+ 
+ class SessionCrashedBubbleViewTest : public DialogBrowserTest {
+  public:
+@@ -51,6 +119,345 @@ class SessionCrashedBubbleViewTest : public DialogBrowserTest {
+   raw_ptr<views::BubbleDialogDelegate, DanglingUntriaged> crash_bubble_;
+ };
+ 
++class SessionCrashedBubbleMyarcViewTest
++    : public SessionCrashedBubbleViewTest,
++      public testing::WithParamInterface<bool> {
++ public:
++  SessionCrashedBubbleMyarcViewTest() {
++    features_.InitAndDisableFeature(features::kInitialWebUI);
++  }
++
++  void SetUpCommandLine(base::CommandLine* command_line) override {
++    SessionCrashedBubbleViewTest::SetUpCommandLine(command_line);
++    command_line->AppendSwitch("myarc-visual-parity");
++    command_line->AppendSwitch("myarc-workspace-sidebar");
++  }
++
++ private:
++  base::test::ScopedFeatureList features_;
++};
++
++IN_PROC_BROWSER_TEST_P(SessionCrashedBubbleMyarcViewTest,
++                       RecoveryBeforeWindowShownAndWithHiddenSidebar) {
++  Profile* const profile = browser()->GetProfile();
++  profile->GetPrefs()->SetBoolean(prefs::kVerticalTabsEnabled, true);
++  BrowserWindowCreateParams params(profile, /*from_user_gesture=*/true);
++  params.initial_bounds = gfx::Rect(50, 50, 1000, 800);
++  params.vertical_tab_strip_collapsed = GetParam();
++  auto* const window = CreateBrowserWindow(std::move(params));
++  auto* const view = BrowserView::GetBrowserViewForBrowser(window);
++  ASSERT_TRUE(view);
++  chrome::AddTabAt(window, GURL("about:blank"), -1, true);
++  view->GetWidget()->LayoutRootViewIfNecessary();
++
++  ASSERT_FALSE(view->GetWidget()->IsVisible());
++  auto* const elements = BrowserElementsViews::From(window);
++  ASSERT_FALSE(elements->GetElement(kFallbackPopupAnchorElementId));
++  auto* const menu = view->toolbar_button_provider()->GetAppMenuControl();
++  ASSERT_FALSE(menu->IsDrawn());
++  auto* const anchor = view->myarc_popup_anchor();
++  ASSERT_TRUE(anchor);
++  EXPECT_EQ(view, anchor->parent());
++  EXPECT_FALSE(anchor->bounds().IsEmpty());
++  EXPECT_EQ(anchor, menu->GetAnchor().GetIfView());
++
++  // Exercise the startup entry point, with a forced exit type rather than an
++  // actual browser crash. The tracked fallback does not exist yet.
++  ExitTypeService::GetInstanceForProfile(profile)
++      ->SetLastSessionExitTypeForTest(ExitType::kCrashed);
++  SessionCrashedBubble::ShowIfNotOffTheRecordProfile(window, false);
++  ASSERT_TRUE(base::test::RunUntil(
++      [] { return SessionCrashedBubbleView::GetInstanceForTest(); }));
++  auto* const bubble = SessionCrashedBubbleView::GetInstanceForTest();
++  ASSERT_TRUE(bubble);
++  EXPECT_EQ(anchor, bubble->GetAnchorView());
++  EXPECT_TRUE(bubble->ShouldShowCloseButton());
++  EXPECT_TRUE(bubble->IsDialogButtonEnabled(ui::mojom::DialogButton::kOk));
++
++  view->GetWidget()->Show();
++  EXPECT_TRUE(bubble->GetWidget()->IsVisible());
++  EXPECT_TRUE(anchor->IsDrawn());
++  // Even an entirely hidden sidebar must not hide the popup anchor.
++  view->vertical_tab_strip_region_view_for_testing()->SetVisible(false);
++  view->GetWidget()->SetBounds(gfx::Rect(50, 50, 1100, 700));
++  view->GetWidget()->LayoutRootViewIfNecessary();
++  EXPECT_TRUE(anchor->IsDrawn());
++  EXPECT_EQ(anchor, menu->GetAnchor().GetIfView());
++  ASSERT_TRUE(elements->GetElement(kFallbackPopupAnchorElementId));
++  EXPECT_EQ(
++      elements->GetElement(kFallbackPopupAnchorElementId)->GetScreenBounds(),
++      anchor->GetAnchorBoundsInScreen());
++  EXPECT_EQ(anchor->GetAnchorBoundsInScreen(), bubble->GetAnchorRect());
++  EXPECT_TRUE(bubble->GetWidget()->IsVisible());
++  EXPECT_TRUE(myarc::WorkspaceLifecycle::HasPendingSessionRestore(profile));
++  bubble->GetWidget()->CloseNow();
++  EXPECT_FALSE(myarc::WorkspaceLifecycle::HasPendingSessionRestore(profile));
++  EXPECT_EQ(nullptr, SessionCrashedBubbleView::GetInstanceForTest());
++  CloseBrowserSynchronously(window);
++}
++
++IN_PROC_BROWSER_TEST_P(SessionCrashedBubbleMyarcViewTest,
++                       FirstRuntimeModeWithoutRecoveryBecomesReady) {
++  auto* const profile = browser()->GetProfile();
++  profile->GetPrefs()->SetBoolean(prefs::kVerticalTabsEnabled, false);
++  BrowserWindowCreateParams params(profile, /*from_user_gesture=*/true);
++  auto* const window = CreateBrowserWindow(std::move(params));
++  auto* const view = BrowserView::GetBrowserViewForBrowser(window);
++  ASSERT_TRUE(view);
++  chrome::AddTabAt(window, GURL("about:blank"), -1, true);
++  auto* const page = window->GetTabStripModel()->GetActiveWebContents();
++  auto* const adapter = view->GetMyarcWorkspaceAdapter();
++  ASSERT_TRUE(adapter);
++  ASSERT_FALSE(myarc::WorkspaceLifecycle::HasPendingSessionRestore(profile));
++  ASSERT_TRUE(base::test::RunUntil([&] { return adapter->ready(); }));
++  const auto binding = myarc::BrowserWorkspaceAdapter::TabExtraData(*page);
++  const auto window_binding = adapter->WindowExtraData();
++
++  chrome::ToggleVerticalTabs(window);
++
++  EXPECT_EQ(adapter, view->GetMyarcWorkspaceAdapter());
++  EXPECT_TRUE(adapter->ready());
++  EXPECT_EQ(binding, myarc::BrowserWorkspaceAdapter::TabExtraData(*page));
++  EXPECT_EQ(window_binding, adapter->WindowExtraData());
++  EXPECT_EQ(page, adapter->DisplayedContents());
++  EXPECT_TRUE(adapter->CreateSpace("Late mode fixture").ok);
++  CloseBrowserSynchronously(window);
++}
++
++IN_PROC_BROWSER_TEST_P(SessionCrashedBubbleMyarcViewTest,
++                       RuntimeModesKeepWorkspaceAndRecoveryAnchor) {
++  auto* const profile = browser()->GetProfile();
++  profile->GetPrefs()->SetBoolean(prefs::kVerticalTabsEnabled, false);
++  BrowserWindowCreateParams params(profile, /*from_user_gesture=*/true);
++  params.initial_bounds = gfx::Rect(50, 50, 1000, 800);
++  params.vertical_tab_strip_collapsed = GetParam();
++  auto* const window = CreateBrowserWindow(std::move(params));
++  auto* const view = BrowserView::GetBrowserViewForBrowser(window);
++  ASSERT_TRUE(view);
++  chrome::AddTabAt(window, GURL("about:blank"), -1, true);
++  auto* const tabs = window->GetTabStripModel();
++  auto* const page = tabs->GetActiveWebContents();
++  auto* const toolbar = view->toolbar();
++  auto* const header =
++      view->vertical_tab_strip_region_view_for_testing()->GetTopContainer();
++  auto* const anchor = view->myarc_popup_anchor();
++  ASSERT_TRUE(anchor);
++  ASSERT_TRUE(view->GetMyarcWorkspaceAdapter());
++  EXPECT_EQ(view->top_container(), toolbar->parent());
++
++  ExitTypeService::GetInstanceForProfile(profile)
++      ->SetLastSessionExitTypeForTest(ExitType::kCrashed);
++  SessionCrashedBubble::ShowIfNotOffTheRecordProfile(window, false);
++  ASSERT_TRUE(base::test::RunUntil(
++      [] { return SessionCrashedBubbleView::GetInstanceForTest(); }));
++  auto* const bubble = SessionCrashedBubbleView::GetInstanceForTest();
++  ASSERT_TRUE(bubble);
++  chrome::ToggleVerticalTabs(window);
++  auto* const adapter = view->GetMyarcWorkspaceAdapter();
++  ASSERT_TRUE(adapter);
++  EXPECT_FALSE(adapter->ready());
++  EXPECT_TRUE(myarc::WorkspaceLifecycle::HasPendingSessionRestore(profile));
++  EXPECT_EQ(header, toolbar->parent());
++  EXPECT_EQ(anchor, bubble->GetAnchorView());
++  EXPECT_EQ(page, tabs->GetActiveWebContents());
++  bubble->GetWidget()->CloseNow();
++  ASSERT_TRUE(base::test::RunUntil([&] { return adapter->ready(); }));
++  const auto initial = adapter->Sidebar();
++  ASSERT_TRUE(initial.ok);
++  const auto created = adapter->CreateSpace("Mode fixture");
++  ASSERT_TRUE(created.ok);
++  ASSERT_TRUE(adapter->SelectSpace(created.id).ok);
++  EXPECT_TRUE(view->IsMyarcWorkspaceBlank());
++  ASSERT_TRUE(adapter->SelectSpace(initial.current_space.id).ok);
++  EXPECT_EQ(page, adapter->DisplayedContents());
++  const auto baseline = adapter->service().ExportSnapshot();
++  ASSERT_TRUE(baseline);
++  const auto binding = myarc::BrowserWorkspaceAdapter::TabExtraData(*page);
++  const size_t sidebar_children =
++      view->vertical_tab_strip_region_view_for_testing()->children().size();
++
++  view->GetWidget()->Show();
++  for (int cycle = 0; cycle < 3; ++cycle) {
++    chrome::ToggleVerticalTabs(window);
++    view->GetWidget()->LayoutRootViewIfNecessary();
++    EXPECT_FALSE(profile->GetPrefs()->GetBoolean(prefs::kVerticalTabsEnabled));
++    EXPECT_EQ(view->top_container(), toolbar->parent());
++    EXPECT_EQ(header, header->GetCollapseButton()->parent());
++    EXPECT_TRUE(toolbar->IsDrawn());
++    EXPECT_TRUE(toolbar->location_bar_view()->IsDrawn());
++    EXPECT_TRUE(
++        view->toolbar_button_provider()->GetAppMenuControl()->IsDrawn());
++    toolbar->location_bar()->FocusLocation(
++        /*is_user_initiated=*/false, /*clear_focus_if_failed=*/false);
++    EXPECT_TRUE(toolbar->Contains(view->GetFocusManager()->GetFocusedView()));
++    chrome::ToggleVerticalTabs(window);
++    view->GetWidget()->LayoutRootViewIfNecessary();
++    EXPECT_TRUE(profile->GetPrefs()->GetBoolean(prefs::kVerticalTabsEnabled));
++    EXPECT_EQ(header, toolbar->parent());
++    EXPECT_EQ(toolbar, header->GetCollapseButton()->parent());
++    EXPECT_EQ(adapter, view->GetMyarcWorkspaceAdapter());
++    EXPECT_EQ(anchor, view->myarc_popup_anchor());
++    EXPECT_EQ(1, tabs->count());
++    EXPECT_EQ(page, tabs->GetActiveWebContents());
++    EXPECT_EQ(page, adapter->DisplayedContents());
++    EXPECT_EQ(binding, myarc::BrowserWorkspaceAdapter::TabExtraData(*page));
++    const auto current = adapter->Sidebar();
++    EXPECT_EQ(initial.window_id, current.window_id);
++    EXPECT_EQ(initial.current_space.id, current.current_space.id);
++    EXPECT_EQ(initial.selected_item_id, current.selected_item_id);
++    const auto snapshot = adapter->service().ExportSnapshot();
++    ASSERT_TRUE(snapshot);
++    EXPECT_EQ(baseline->next_space_id, snapshot->next_space_id);
++    EXPECT_EQ(baseline->next_item_id, snapshot->next_item_id);
++    EXPECT_EQ(baseline->next_window_id, snapshot->next_window_id);
++    EXPECT_EQ(baseline->items.size(), snapshot->items.size());
++    EXPECT_EQ(baseline->windows.size(), snapshot->windows.size());
++    EXPECT_EQ(
++        sidebar_children,
++        view->vertical_tab_strip_region_view_for_testing()->children().size());
++  }
++  CloseBrowserSynchronously(window);
++}
++
++IN_PROC_BROWSER_TEST_P(SessionCrashedBubbleMyarcViewTest,
++                       HorizontalRestoreHintsSurviveLateVerticalPresentation) {
++  using Adapter = myarc::BrowserWorkspaceAdapter;
++  using Lifecycle = myarc::WorkspaceLifecycle;
++  auto* const profile = browser()->GetProfile();
++  profile->GetPrefs()->SetBoolean(prefs::kVerticalTabsEnabled, false);
++  auto* const main_adapter = BrowserView::GetBrowserViewForBrowser(browser())
++                                 ->GetMyarcWorkspaceAdapter();
++  ASSERT_TRUE(main_adapter);
++  ASSERT_TRUE(base::test::RunUntil([&] { return main_adapter->ready(); }));
++
++  BrowserWindowCreateParams source_params(profile, true);
++  auto* const source = CreateBrowserWindow(std::move(source_params));
++  auto* const source_adapter =
++      BrowserView::GetBrowserViewForBrowser(source)->GetMyarcWorkspaceAdapter();
++  ASSERT_TRUE(source_adapter);
++  chrome::AddTabAt(source, GURL("about:blank"), -1, true);
++  auto* const favorite = source->GetTabStripModel()->GetActiveWebContents();
++  ASSERT_TRUE(content::WaitForLoadStop(favorite));
++  ASSERT_TRUE(base::test::RunUntil([&] { return source_adapter->ready(); }));
++  const auto original_space = source_adapter->Sidebar().current_space.id;
++  ASSERT_TRUE(
++      source_adapter->Favorite(Adapter::ItemIdForContents(*favorite)).ok);
++  const auto reading = source_adapter->CreateSpace("Reading");
++  ASSERT_TRUE(reading.ok);
++  ASSERT_TRUE(source_adapter->SelectSpace(reading.id).ok);
++  ASSERT_TRUE(source_adapter->OpenInCurrentSpace(GURL("about:blank")).ok);
++  auto* const temporary = source->GetTabStripModel()->GetActiveWebContents();
++  ASSERT_NE(favorite, temporary);
++  ASSERT_TRUE(content::WaitForLoadStop(temporary));
++  ASSERT_TRUE(source_adapter->SelectSpace(original_space).ok);
++  ASSERT_TRUE(base::test::RunUntil([&] { return source_adapter->ready(); }));
++
++  auto* const lifecycle = Lifecycle::Get(profile);
++  ASSERT_TRUE(lifecycle);
++  const auto window_data = lifecycle->WindowData(*source);
++  const auto favorite_data = lifecycle->TabData(*source, *favorite);
++  const auto temporary_data = lifecycle->TabData(*source, *temporary);
++  ASSERT_FALSE(window_data.empty());
++  ASSERT_FALSE(favorite_data.empty());
++  ASSERT_FALSE(temporary_data.empty());
++  const auto favorite_id = Adapter::ItemIdForContents(*favorite);
++  const auto temporary_id = Adapter::ItemIdForContents(*temporary);
++  const auto snapshot = source_adapter->service().ExportSnapshot();
++  ASSERT_TRUE(snapshot);
++  const auto checkpoint = myarc::internal::EncodeWorkspaceMetadata(*snapshot);
++  ASSERT_TRUE(checkpoint);
++  const std::vector<sessions::SerializedNavigationEntry> favorite_navigation = {
++      sessions::ContentSerializedNavigationBuilder::FromNavigationEntry(
++          0, favorite->GetController().GetLastCommittedEntry())};
++  const std::vector<sessions::SerializedNavigationEntry> temporary_navigation =
++      {sessions::ContentSerializedNavigationBuilder::FromNavigationEntry(
++          0, temporary->GetController().GetLastCommittedEntry())};
++
++  // Use captured native hints, never URL matching or reconstructed model IDs.
++  // This counted hold models insertion, not an actual disk/PID session restore.
++  Lifecycle::Notify(profile, Lifecycle::Event::kSessionRestoreStarted);
++  base::ScopedClosureRunner finish_restore(base::BindOnce(
++      &Lifecycle::Notify, profile, Lifecycle::Event::kSessionRestoreFinished));
++  CloseBrowserSynchronously(source);
++  BrowserWindowCreateParams params(profile, true);
++  params.vertical_tab_strip_collapsed = GetParam();
++  auto* const window = CreateBrowserWindow(std::move(params));
++  auto* const view = BrowserView::GetBrowserViewForBrowser(window);
++  auto* const adapter = view->GetMyarcWorkspaceAdapter();
++  ASSERT_TRUE(adapter);
++  EXPECT_FALSE(adapter->ready());
++  EXPECT_EQ(view->top_container(), view->toolbar()->parent());
++  lifecycle->RestoreWindow(*window, window_data);
++  auto* const restored_favorite = chrome::AddRestoredTab(
++      window, favorite_navigation, 0, 0, std::string(), std::nullopt,
++      /*select=*/true, /*pin=*/true, base::TimeTicks::Now(), base::Time::Now(),
++      nullptr, sessions::SerializedUserAgentOverride(), favorite_data,
++      /*from_session_restore=*/true, /*is_active_browser=*/false);
++  auto* const restored_temporary = chrome::AddRestoredTab(
++      window, temporary_navigation, 1, 0, std::string(), std::nullopt,
++      /*select=*/false, /*pin=*/false, base::TimeTicks::Now(),
++      base::Time::Now(), nullptr, sessions::SerializedUserAgentOverride(),
++      temporary_data,
++      /*from_session_restore=*/true, /*is_active_browser=*/false);
++  EXPECT_EQ(favorite_id, Adapter::ItemIdForContents(*restored_favorite));
++  EXPECT_EQ(temporary_id, Adapter::ItemIdForContents(*restored_temporary));
++  Lifecycle::Notify(profile, Lifecycle::Event::kNativeReady);
++  base::RunLoop().RunUntilIdle();
++  EXPECT_FALSE(adapter->ready());
++  EXPECT_EQ(checkpoint, myarc::internal::EncodeWorkspaceMetadata(
++                            *adapter->service().ExportSnapshot()));
++  finish_restore.RunAndReset();
++  ASSERT_TRUE(base::test::RunUntil([&] { return adapter->ready(); }));
++  ASSERT_FALSE(profile->GetPrefs()->GetBoolean(prefs::kVerticalTabsEnabled));
++
++  for (int cycle = 0; cycle < 3; ++cycle) {
++    chrome::ToggleVerticalTabs(window);
++    view->GetWidget()->LayoutRootViewIfNecessary();
++    EXPECT_EQ(adapter, view->GetMyarcWorkspaceAdapter());
++    EXPECT_EQ(restored_favorite, adapter->DisplayedContents());
++    EXPECT_EQ(2, window->GetTabStripModel()->count());
++    EXPECT_EQ(window_data, lifecycle->WindowData(*window));
++    EXPECT_EQ(favorite_data, lifecycle->TabData(*window, *restored_favorite));
++    EXPECT_EQ(temporary_data, lifecycle->TabData(*window, *restored_temporary));
++    EXPECT_EQ(checkpoint, myarc::internal::EncodeWorkspaceMetadata(
++                              *adapter->service().ExportSnapshot()));
++    EXPECT_EQ(GURL("about:blank"),
++              restored_favorite->GetController().GetVisibleEntry()->GetURL());
++    EXPECT_EQ(GURL("about:blank"),
++              restored_temporary->GetController().GetVisibleEntry()->GetURL());
++    chrome::ToggleVerticalTabs(window);
++  }
++  CloseBrowserSynchronously(window);
++}
++
++INSTANTIATE_TEST_SUITE_P(All,
++                         SessionCrashedBubbleMyarcViewTest,
++                         testing::Bool());
++
++IN_PROC_BROWSER_TEST_F(SessionCrashedBubbleViewTest,
++                       RuntimeModesLeaveFlagOffToolbarNative) {
++  auto* const profile = browser()->GetProfile();
++  profile->GetPrefs()->SetBoolean(prefs::kVerticalTabsEnabled, false);
++  auto* const view = BrowserView::GetBrowserViewForBrowser(browser());
++  auto* const toolbar = view->toolbar();
++  auto* const page = browser()->GetTabStripModel()->GetActiveWebContents();
++  for (int cycle = 0; cycle < 2; ++cycle) {
++    chrome::ToggleVerticalTabs(browser());
++    view->GetWidget()->LayoutRootViewIfNecessary();
++    EXPECT_TRUE(profile->GetPrefs()->GetBoolean(prefs::kVerticalTabsEnabled));
++    EXPECT_EQ(view->top_container(), toolbar->parent());
++    EXPECT_FALSE(view->GetMyarcWorkspaceAdapter());
++    EXPECT_FALSE(view->myarc_popup_anchor());
++    chrome::ToggleVerticalTabs(browser());
++    view->GetWidget()->LayoutRootViewIfNecessary();
++    EXPECT_FALSE(profile->GetPrefs()->GetBoolean(prefs::kVerticalTabsEnabled));
++    EXPECT_EQ(view->top_container(), toolbar->parent());
++    EXPECT_TRUE(
++        view->toolbar_button_provider()->GetAppMenuControl()->IsDrawn());
++    EXPECT_EQ(page, browser()->GetTabStripModel()->GetActiveWebContents());
++  }
++}
++
+ IN_PROC_BROWSER_TEST_F(SessionCrashedBubbleViewTest,
+                        InvokeUi_SessionCrashedBubble) {
+   ShowAndVerifyUi();
+@@ -120,6 +527,75 @@ IN_PROC_BROWSER_TEST_F(SessionCrashedBubbleViewTest, HasCloseButton) {
+   EXPECT_TRUE(crash_bubble_->ShouldShowCloseButton());
+ }
+ 
++IN_PROC_BROWSER_TEST_F(SessionCrashedBubbleViewTest,
++                       RecoveryChoiceHandsOffAfterDialogDeletion) {
++  Profile* const profile = browser()->GetProfile();
++  RecoveryLifecycleProbe probe(profile);
++  ExitTypeService::GetInstanceForProfile(profile)
++      ->SetLastSessionExitTypeForTest(ExitType::kCrashed);
++  ShowUi("SessionCrashedBubble");
++  ASSERT_TRUE(myarc::WorkspaceLifecycle::HasPendingSessionRestore(profile));
++
++  crash_bubble_->AcceptDialog();
++
++  EXPECT_TRUE(probe.choice_finished);
++  EXPECT_TRUE(probe.restore_started);
++  EXPECT_TRUE(probe.restore_started_before_choice_finished);
++  EXPECT_TRUE(base::test::RunUntil([profile] {
++    return !myarc::WorkspaceLifecycle::HasPendingSessionRestore(profile);
++  }));
++}
++
++IN_PROC_BROWSER_TEST_F(SessionCrashedBubbleViewTest,
++                       StartupPagesReleaseRecoveryChoice) {
++  Profile* const profile = browser()->GetProfile();
++  RecoveryLifecycleProbe probe(profile);
++  SessionStartupPref startup_pref(SessionStartupPref::URLS);
++  startup_pref.urls.emplace_back("about:blank");
++  SessionStartupPref::SetStartupPref(profile, startup_pref);
++  ShowUi("SessionCrashedBubble");
++  ASSERT_TRUE(myarc::WorkspaceLifecycle::HasPendingSessionRestore(profile));
++
++  crash_bubble_->CancelDialog();
++
++  EXPECT_TRUE(probe.choice_finished);
++  EXPECT_FALSE(probe.restore_started);
++  EXPECT_FALSE(myarc::WorkspaceLifecycle::HasPendingSessionRestore(profile));
++}
++
++IN_PROC_BROWSER_TEST_F(SessionCrashedBubbleViewTest,
++                       AbortedRecoveryShowReleasesChoice) {
++  Profile* const profile = browser()->GetProfile();
++  RecoveryLifecycleProbe probe(profile);
++  BrowserWindowCreateParams params(profile, /*from_user_gesture=*/true);
++  auto* const window = CreateBrowserWindow(std::move(params));
++  // No active tab: Show must release the choice without displaying a dialog.
++  SessionCrashedBubble::ShowIfNotOffTheRecordProfile(window, false);
++  EXPECT_TRUE(base::test::RunUntil([&probe] { return probe.choice_finished; }));
++  EXPECT_FALSE(probe.restore_started);
++  EXPECT_FALSE(myarc::WorkspaceLifecycle::HasPendingSessionRestore(profile));
++  CloseBrowserSynchronously(window);
++}
++
++IN_PROC_BROWSER_TEST_F(SessionCrashedBubbleViewTest,
++                       WindowCloseReleasesRecoveryChoice) {
++  Profile* const profile = browser()->GetProfile();
++  RecoveryLifecycleProbe probe(profile);
++  BrowserWindowCreateParams params(profile, /*from_user_gesture=*/true);
++  auto* const window = CreateBrowserWindow(std::move(params));
++  chrome::AddTabAt(window, GURL("about:blank"), -1, true);
++  SessionCrashedBubble::ShowIfNotOffTheRecordProfile(window, false);
++  ASSERT_TRUE(base::test::RunUntil(
++      [] { return SessionCrashedBubbleView::GetInstanceForTest(); }));
++  ASSERT_TRUE(myarc::WorkspaceLifecycle::HasPendingSessionRestore(profile));
++
++  CloseBrowserSynchronously(window);
++
++  EXPECT_TRUE(probe.choice_finished);
++  EXPECT_FALSE(probe.restore_started);
++  EXPECT_FALSE(myarc::WorkspaceLifecycle::HasPendingSessionRestore(profile));
++}
++
+ IN_PROC_BROWSER_TEST_F(SessionCrashedBubbleViewTest,
+                        RejectsRestoreAfterShutdownStarts) {
+   Profile* const profile = browser()->GetProfile();
+@@ -132,6 +608,7 @@ IN_PROC_BROWSER_TEST_F(SessionCrashedBubbleViewTest,
+   crash_bubble_->AcceptDialog();
+ 
+   EXPECT_FALSE(SessionRestore::IsRestoring(profile));
++  EXPECT_FALSE(myarc::WorkspaceLifecycle::HasPendingSessionRestore(profile));
+   EXPECT_FALSE(KeepAliveRegistry::GetInstance()->IsOriginRegistered(
+       KeepAliveOrigin::SESSION_RESTORE));
+ }
+@@ -152,4 +629,5 @@ IN_PROC_BROWSER_TEST_F(SessionCrashedBubbleViewTest,
+   crash_bubble_->CancelDialog();
+ 
+   EXPECT_EQ(initial_tab_count, browser()->tab_strip_model()->count());
++  EXPECT_FALSE(myarc::WorkspaceLifecycle::HasPendingSessionRestore(profile));
+ }

@@ -1,0 +1,97 @@
+diff --git a/chrome/browser/ui/BUILD.gn b/chrome/browser/ui/BUILD.gn
+index 0772e0c6b5cd4c0577f9d89ee0820fc7fc8d7c5f..66181f32ed7fcc14b6d88e97cf5f29e604cf02f8 100644
+--- a/chrome/browser/ui/BUILD.gn
++++ b/chrome/browser/ui/BUILD.gn
+@@ -516,6 +516,7 @@ if (!is_android) {
+       "//components/tab_groups",
+       "//components/tabs:public",
+       "//content/public/browser",
++      "//myarc:workspace_lifecycle",
+       "//third_party/blink/public/common:headers",
+       "//ui/gfx/geometry",
+       "//ui/gfx/range",
+@@ -582,6 +583,7 @@ if (!is_android) {
+       "//components/tab_groups",
+       "//components/tabs:public",
+       "//content/public/browser",
++      "//myarc:workspace_lifecycle",
+       "//ui/base",
+       "//ui/base/mojom:ui_base_types",
+     ]
+@@ -720,6 +722,7 @@ if (!is_android) {
+       "//chrome/browser/translate",
+       "//chrome/browser/ui/actions",
+       "//chrome/browser/ui/actions:actions_headers",
++      "//chrome/browser/ui/actions:command_id_to_action_id",
+       "//chrome/browser/ui/browser_window",
+       "//chrome/browser/ui/customize_chrome",
+       "//chrome/browser/ui/dialogs",
+@@ -915,6 +918,7 @@ if (!is_android) {
+       "//chrome/browser/ui/qrcode_generator",
+       "//chrome/browser/ui/safety_hub",
+       "//chrome/browser/ui/search",
++      "//chrome/browser/ui/search_engines",
+       "//chrome/browser/ui/send_tab_to_self",
+       "//chrome/browser/ui/sharing_hub",
+       "//chrome/browser/ui/side_panel",
+@@ -975,6 +979,7 @@ if (!is_android) {
+       "//content/public/browser",
+       "//content/public/common",
+       "//extensions/buildflags",
++      "//myarc:workspace_lifecycle",
+       "//pdf:features",
+       "//printing/buildflags",
+       "//ui/actions",
+@@ -1834,6 +1839,7 @@ if (!is_android) {
+       "//chrome/browser/resource_coordinator:utils",
+       "//chrome/browser/search:test_support",
+       "//chrome/browser/tab_group_sync:factories",
++      "//chrome/browser/tab_list",
+       "//chrome/browser/ui/actions:actions_util",
+       "//chrome/browser/ui/browser_active_state_manager",
+       "//chrome/browser/ui/browser_ui_controller",
+@@ -1842,11 +1848,13 @@ if (!is_android) {
+       "//chrome/browser/ui/dialogs:browser_dialogs",
+       "//chrome/browser/ui/exclusive_access",
+       "//chrome/browser/ui/fullscreen",
++      "//chrome/browser/ui/omnibox",
+       "//chrome/browser/ui/performance_controls/test_support",
+       "//chrome/browser/ui/search",
+       "//chrome/browser/ui/startup",
+       "//chrome/browser/ui/tabs:tab_strip",
+       "//chrome/browser/ui/tabs/saved_tab_groups:test_support",
++      "//chrome/browser/ui/tabs/tab_strip_api/tab_strip_model_impl",
+       "//chrome/browser/ui/views/frame:browser_view_header",
+       "//chrome/browser/ui/webui/management",
+       "//chrome/browser/ui/window_feature_controller",
+@@ -1861,6 +1869,7 @@ if (!is_android) {
+       "//components/bookmarks/test",
+       "//components/breadcrumbs/core",
+       "//components/breadcrumbs/core:status",
++      "//components/browser_apis/tab_strip/types",
+       "//components/commerce/core:pref_names",
+       "//components/embedder_support",
+       "//components/javascript_dialogs",
+@@ -1872,6 +1881,7 @@ if (!is_android) {
+       "//content/public/browser",
+       "//content/public/common",
+       "//content/test:test_support",
++      "//myarc:browser_workspace_adapter",
+       "//net:test_support",
+       "//testing/gmock",
+       "//testing/gtest",
+@@ -1879,6 +1889,14 @@ if (!is_android) {
+       "//third_party/fuzztest",
+       "//ui/native_window_tracker",
+     ]
++    if (enable_extensions && (is_win || is_mac)) {
++      deps += [
++        "//chrome/browser/ui/search_engines",
++        "//extensions:test_support",
++        "//extensions/browser",
++        "//extensions/common",
++      ]
++    }
+     if (use_aura) {
+       deps += [ ":overscroll_pref_manager" ]
+     }

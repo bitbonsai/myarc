@@ -1,0 +1,27 @@
+diff --git a/chrome/browser/ui/tabs/tab_strip_api/tab_strip_model_impl/tab_strip_model_adapter_impl.cc b/chrome/browser/ui/tabs/tab_strip_api/tab_strip_model_impl/tab_strip_model_adapter_impl.cc
+index 24311c6c0b3fa53d4f49dbf5f7d4207cf127eec5..1a81bcb57269c8be14a17380964bdc2790702721 100644
+--- a/chrome/browser/ui/tabs/tab_strip_api/tab_strip_model_impl/tab_strip_model_adapter_impl.cc
++++ b/chrome/browser/ui/tabs/tab_strip_api/tab_strip_model_impl/tab_strip_model_adapter_impl.cc
+@@ -5,6 +5,7 @@
+ #include "chrome/browser/ui/tabs/tab_strip_api/tab_strip_model_impl/tab_strip_model_adapter_impl.h"
+ 
+ #include "base/notimplemented.h"
++#include "chrome/browser/ui/browser_window.h"
+ #include "chrome/browser/ui/tabs/tab_enums.h"
+ #include "chrome/browser/ui/tabs/tab_group_model.h"
+ #include "chrome/browser/ui/tabs/tab_strip_api/tab_strip_model_impl/converters/tab_converters.h"
+@@ -103,6 +104,14 @@ void TabStripModelAdapterImpl::ActivateTab(size_t index) {
+ base::expected<void, mojo_base::mojom::ErrorPtr>
+ TabStripModelAdapterImpl::MoveTab(tabs::TabHandle tab,
+                                   const Position& position) {
++  auto* browser = tab_strip_model_->delegate()->GetBrowserWindowInterface();
++  if (auto* window = browser ? BrowserWindow::FromBrowser(browser) : nullptr;
++      window && window->GetMyarcTabSaveState({})) {
++    // This tree models native pin bits/groups, not Rust's Space ownership.
++    return base::unexpected(mojo_base::mojom::Error::New(
++        mojo_base::mojom::Code::kInvalidArgument,
++        "Use the workspace sidebar to move or save workspace items."));
++  }
+   auto maybe_index = GetIndexForHandle(tab);
+   CHECK(maybe_index.has_value());
+   auto index = maybe_index.value();

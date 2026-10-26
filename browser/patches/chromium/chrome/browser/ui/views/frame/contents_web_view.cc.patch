@@ -1,0 +1,155 @@
+diff --git a/chrome/browser/ui/views/frame/contents_web_view.cc b/chrome/browser/ui/views/frame/contents_web_view.cc
+index 184614e93db97174631601f8b34dd1f9ecec550b..307767d3c0d06f988752bc11778678ba0dfe6e67 100644
+--- a/chrome/browser/ui/views/frame/contents_web_view.cc
++++ b/chrome/browser/ui/views/frame/contents_web_view.cc
+@@ -4,8 +4,10 @@
+ 
+ #include "chrome/browser/ui/views/frame/contents_web_view.h"
+ 
++#include "base/command_line.h"
+ #include "base/debug/dump_without_crashing.h"
+ #include "build/build_config.h"
++#include "chrome/browser/search/search.h"
+ #include "chrome/browser/ui/color/chrome_color_id.h"
+ #include "chrome/browser/ui/views/animations/common_animation_values.h"
+ #include "chrome/browser/ui/views/frame/safe_invoke/safe_invoke.h"
+@@ -13,14 +15,20 @@
+ #include "chrome/browser/ui/views/status_bubble_views.h"
+ #include "components/tabs/public/tab_interface.h"
+ #include "components/web_modal/web_contents_modal_dialog_manager.h"
++#include "content/public/browser/render_frame_host.h"
+ #include "content/public/browser/render_widget_host_view.h"
+ #include "content/public/browser/web_contents.h"
+ #include "third_party/blink/public/common/input/web_input_event.h"
+ #include "third_party/skia/include/core/SkColor.h"
+ #include "ui/base/metadata/metadata_impl_macros.h"
++#include "ui/color/color_id.h"
+ #include "ui/color/color_provider.h"
++#include "ui/compositor/layer_animator.h"
+ #include "ui/compositor/layer_solid_color.h"
+ #include "ui/compositor/layer_tree_owner.h"
++#include "ui/gfx/color_utils.h"
++#include "ui/gfx/geometry/rounded_corners_f.h"
++#include "ui/views/controls/native/native_view_host.h"
+ #include "ui/views/view_class_properties.h"
+ #include "ui/views/widget/widget.h"
+ 
+@@ -33,6 +41,21 @@
+ #include "chrome/browser/actor/actor_util.h"  // nogncheck
+ #endif
+ 
++namespace {
++
++void ResetMyarcPageFade(ui::Layer* page_layer) {
++#if BUILDFLAG(IS_MAC)
++  if (page_layer && base::CommandLine::ForCurrentProcess()->HasSwitch(
++                        "myarc-visual-parity")) {
++    page_layer->GetAnimator()->StopAnimatingProperty(
++        ui::LayerAnimationElement::OPACITY);
++    page_layer->SetOpacity(1.f);
++  }
++#endif
++}
++
++}  // namespace
++
+ DEFINE_CLASS_ELEMENT_IDENTIFIER_VALUE(ContentsWebView,
+                                       kContentsWebViewElementId);
+ 
+@@ -50,7 +73,13 @@ ContentsWebView::ContentsWebView(content::BrowserContext* browser_context)
+   web_contents_close_handler_ = std::make_unique<WebContentsCloseHandler>(this);
+ }
+ 
+-ContentsWebView::~ContentsWebView() = default;
++ContentsWebView::~ContentsWebView() {
++  ResetMyarcPageFade(holder()->layer());
++  if (base::CommandLine::ForCurrentProcess()->HasSwitch(
++          "myarc-visual-parity")) {
++    SetWebContents(nullptr);
++  }
++}
+ 
+ StatusBubbleViews* ContentsWebView::GetStatusBubble() const {
+   if (status_bubble_) {
+@@ -130,6 +159,9 @@ void ContentsWebView::UpdateIsBlockedByModal() {
+       is_blocked = tab->IsBlocked();
+     }
+   }
++  if (is_blocked) {
++    ResetMyarcPageFade(holder()->layer());
++  }
+   holder()->SetProperty(views::kIsBlockedByModalKey, is_blocked);
+ }
+ 
+@@ -157,7 +189,17 @@ void ContentsWebView::OnLetterboxingChanged() {
+ }
+ 
+ void ContentsWebView::SetWebContents(content::WebContents* web_contents) {
++  // Reset before every switch or detach, including empty Spaces.
++  ResetMyarcPageFade(holder()->layer());
++  if (this->web_contents() && this->web_contents() != web_contents &&
++      base::CommandLine::ForCurrentProcess()->HasSwitch(
++          "myarc-visual-parity")) {
++    // Detached pages can navigate without this view observing them.
++    this->web_contents()->SetPageBaseBackgroundColor(std::nullopt);
++    SetBackgroundVisible(true);
++  }
+   views::WebView::SetWebContents(web_contents);
++  UpdateMyarcPageBackground();
+   if (web_contents == nullptr) {
+     status_bubble_.reset();
+     holder()->SetProperty(views::kIsBlockedByModalKey, false);
+@@ -207,6 +249,30 @@ void ContentsWebView::DidGetUserInteraction(const blink::WebInputEvent& event) {
+ }
+ #endif
+ 
++void ContentsWebView::PrimaryPageChanged(content::Page& page) {
++  WebView::PrimaryPageChanged(page);
++  UpdateMyarcPageBackground();
++}
++
++void ContentsWebView::UpdateMyarcPageBackground() {
++  if (!base::CommandLine::ForCurrentProcess()->HasSwitch(
++          "myarc-visual-parity")) {
++    return;
++  }
++  auto* contents = web_contents();
++  const GURL url = contents
++                       ? contents->GetPrimaryMainFrame()->GetLastCommittedURL()
++                       : GURL();
++  const bool blank =
++      url.is_empty() || url.IsAboutBlank() || search::IsNTPURL(url);
++  if (contents) {
++    // nullopt restores Blink's default canvas, including page color-scheme.
++    contents->SetPageBaseBackgroundColor(
++        blank ? std::make_optional(SK_ColorTRANSPARENT) : std::nullopt);
++  }
++  SetBackgroundVisible(!blank);
++}
++
+ void ContentsWebView::UpdateBackgroundColor() {
+   const SkColor color = GetColorProvider()->GetColor(
+       is_letterboxing() ? kColorWebContentsBackgroundLetterboxing
+@@ -221,9 +287,20 @@ void ContentsWebView::UpdateBackgroundColor() {
+     }
+   }
+ 
++  const bool visual_parity =
++      base::CommandLine::ForCurrentProcess()->HasSwitch("myarc-visual-parity");
++  const bool dark =
++      color_utils::IsDark(GetColorProvider()->GetColor(ui::kColorSysSurface));
+   auto* background_layer = layer()->AsSolidColor();
+-  background_layer->SetColor(
+-      SkColor4f::FromColor(background_visible_ ? color : SK_ColorTRANSPARENT));
++  background_layer->SetColor(SkColor4f::FromColor(
++      background_visible_ ? color
++      : visual_parity     ? SkColorSetARGB(dark ? 18 : 220, 255, 255, 255)
++                          : SK_ColorTRANSPARENT));
++  if (visual_parity) {
++    layer()->SetRoundedCornerRadius(gfx::RoundedCornersF(10));
++    layer()->SetIsFastRoundedCorner(true);
++    layer()->SetMasksToBounds(true);
++  }
+ 
+   SafeInvoke(web_contents())
+       .Then(&content::WebContents::GetRenderWidgetHostView)

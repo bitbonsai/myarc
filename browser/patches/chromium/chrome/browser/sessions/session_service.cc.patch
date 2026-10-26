@@ -1,0 +1,39 @@
+diff --git a/chrome/browser/sessions/session_service.cc b/chrome/browser/sessions/session_service.cc
+index de4c89419883674428e398c44c290efd16151d66..5885cd6c3e6a650e8876eafecd4be0bcef17108b 100644
+--- a/chrome/browser/sessions/session_service.cc
++++ b/chrome/browser/sessions/session_service.cc
+@@ -17,6 +17,7 @@
+ #include "base/debug/dump_without_crashing.h"
+ #include "base/functional/bind.h"
+ #include "base/metrics/histogram_functions.h"
++#include "base/task/single_thread_task_runner.h"
+ #include "base/values.h"
+ #include "build/build_config.h"
+ #include "chrome/browser/apps/app_service/launch_utils.h"
+@@ -67,6 +68,7 @@
+ #include "content/public/browser/navigation_entry.h"
+ #include "content/public/browser/session_storage_namespace_handle.h"
+ #include "content/public/browser/web_contents.h"
++#include "myarc/workspace_lifecycle.h"
+ 
+ #if BUILDFLAG(IS_CHROMEOS)
+ #include "chrome/browser/ash/crostini/crostini_util.h"
+@@ -699,6 +701,18 @@ void SessionService::ScheduleResetCommands() {
+     move_on_new_browser_ = true;
+   }
+   command_storage_manager()->StartSaveTimer();
++  // Reset can run inside the factory constructor. Re-enter only after it has
++  // returned, including nested UI loops. Cancel if the service is destroyed.
++  base::SingleThreadTaskRunner::GetCurrentDefault()->PostNonNestableTask(
++      FROM_HERE, base::BindOnce(
++                     [](base::WeakPtr<SessionService> service) {
++                       if (service) {
++                         myarc::WorkspaceLifecycle::Notify(
++                             service->profile(),
++                             myarc::WorkspaceLifecycle::Event::kSessionReset);
++                       }
++                     },
++                     weak_factory_.GetWeakPtr()));
+ }
+ 
+ void SessionService::CommitPendingCloses() {

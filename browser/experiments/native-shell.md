@@ -6,11 +6,11 @@ MA-007.a targets 1:1 Arc visual parity. The current native iteration is incomple
 
 Use the [foundation toolchain and build](../README.md). Start from its clean second integration, `3e117efa80cec1c4e1e6fbfdf44edeb087a279a5`, over upstream `8d208f20744ac6d4ce00cc3f9de6a14a9b8b926d`. This experiment was exercised on macOS 26.7, Apple Silicon. Its existing glass-frame integration requires macOS 26 or later.
 
-The [optional prototype patch](../patches/0002-native-shell-prototype.patch) is separate from `upstream.json` and the accepted foundation patch payload. Apply it once in the external Chromium checkout, with `MYARC_REPO` set to this repository:
+The [optional prototype patch](../patches/legacy/0002-native-shell-prototype.patch) is separate from `upstream.json` and the accepted foundation patch payload. Apply it once in the external Chromium checkout, with `MYARC_REPO` set to this repository:
 
 ```sh
-git apply "$MYARC_REPO/browser/patches/0002-native-shell-prototype.patch"
-git apply "$MYARC_REPO/browser/patches/0003-rounded-content.patch"
+git apply "$MYARC_REPO/browser/patches/legacy/0002-native-shell-prototype.patch"
+git apply "$MYARC_REPO/browser/patches/legacy/0003-rounded-content.patch"
 autoninja -C out/MyarcM0 -j 8 chrome
 ```
 
@@ -43,7 +43,7 @@ Original captures, supplied Arc references and raw logs remain private and outsi
 
 ## Rounded content follow-up
 
-The [corner follow-up patch](../patches/0003-rounded-content.patch) supplies all four 10-DIP radii through Chromium's existing multi-content layout path, which propagates clipping to native web views and overlays. Rounding only the background layer was insufficient and could be overwritten by layout. The change is limited to the visual-parity flag, vertical tabs and non-fullscreen windows.
+The [corner follow-up patch](../patches/legacy/0003-rounded-content.patch) supplies all four 10-DIP radii through Chromium's existing multi-content layout path, which propagates clipping to native web views and overlays. Rounding only the background layer was insufficient and could be overwritten by layout. The change is limited to the visual-parity flag, vertical tabs and non-fullscreen windows.
 
 The external native build reports success after this change. Fresh native corner-pixel checks, resizing and tab-switch verification remain pending; compilation alone does not establish the visual result.
 

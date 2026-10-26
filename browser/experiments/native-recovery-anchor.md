@@ -10,7 +10,7 @@ Shell `ToolbarView::Layout` hides the app-menu button. Startup's tab observer re
 
 ## Narrow change
 
-[0016-native-recovery-anchor.patch](../patches/0016-native-recovery-anchor.patch) changes five external files under `chrome/browser/ui/views/`:
+[0016-native-recovery-anchor.patch](../patches/legacy/0016-native-recovery-anchor.patch) changes five external files under `chrome/browser/ui/views/`:
 
 - `frame/browser_view.cc` and `.h`: create a noninteractive, accessibility-ignored child only when the opt-in shell reparents its toolbar. Position it using the existing fallback rectangle on each layout. BrowserView owns it independently of the sidebar.
 - `frame/app_menu_button.cc`: retain the drawn-button path, then use that shell child through supported Views anchoring. Stock tracked fallback and both CHECKs remain intact.

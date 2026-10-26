@@ -1,0 +1,44 @@
+diff --git a/chrome/browser/ui/views/tabs/vertical/vertical_tab_strip_top_container.cc b/chrome/browser/ui/views/tabs/vertical/vertical_tab_strip_top_container.cc
+index 485aa1faf322a7cab9f33c029986c373caccaf8a..dcce655c61fe0b1953ad3d1149963e5ba7d100e7 100644
+--- a/chrome/browser/ui/views/tabs/vertical/vertical_tab_strip_top_container.cc
++++ b/chrome/browser/ui/views/tabs/vertical/vertical_tab_strip_top_container.cc
+@@ -95,6 +95,20 @@ VerticalTabStripTopContainer::VerticalTabStripTopContainer(
+ 
+ VerticalTabStripTopContainer::~VerticalTabStripTopContainer() = default;
+ 
++void VerticalTabStripTopContainer::SetMyarcSidebarToolbar(
++    std::unique_ptr<views::View> toolbar) {
++  CHECK(!myarc_sidebar_toolbar_);
++  myarc_sidebar_toolbar_ = AddChildView(std::move(toolbar));
++  InvalidateLayout();
++}
++
++std::unique_ptr<views::View>
++VerticalTabStripTopContainer::TakeMyarcSidebarToolbar() {
++  auto* toolbar = myarc_sidebar_toolbar_.get();
++  myarc_sidebar_toolbar_ = nullptr;
++  return RemoveChildViewT(toolbar);
++}
++
+ void VerticalTabStripTopContainer::Layout(PassKey) {
+   LayoutSuperclass<views::View>(this);
+   combo_button_->SetOrientation(combo_button_orientation_);
+@@ -103,6 +117,18 @@ void VerticalTabStripTopContainer::Layout(PassKey) {
+ views::ProposedLayout VerticalTabStripTopContainer::CalculateProposedLayout(
+     const views::SizeBounds& size_bounds) const {
+   views::ProposedLayout layout;
++  if (myarc_sidebar_toolbar_) {
++    const int width = size_bounds.width().is_bounded()
++                          ? size_bounds.width().value()
++                          : parent()->width();
++    layout.host_size = gfx::Size(width, 88);
++    for (views::View* child : children()) {
++      const bool toolbar = child == myarc_sidebar_toolbar_;
++      layout.child_layouts.emplace_back(
++          child, toolbar, toolbar ? gfx::Rect(layout.host_size) : gfx::Rect());
++    }
++    return layout;
++  }
+   gfx::Size host_size =
+       gfx::Size(size_bounds.width().is_bounded() ? size_bounds.width().value()
+                                                  : parent()->width(),

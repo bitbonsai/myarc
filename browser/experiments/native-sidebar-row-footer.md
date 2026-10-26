@@ -4,7 +4,7 @@ MA-007.c.sidebar26, 2026-10-26. Bounded native UI acceptance passed. Complete Ar
 
 ## Boundary and correction
 
-[0026](../patches/0026-native-sidebar-row-footer.patch), with the refreshed [owned payload](../patches/0001-workspace-foundation.patch), changes native presentation and Library dispatch. Rust placement rules, storage, session restoration and the default-off workspace switch remain unchanged.
+[0026](../patches/legacy/0026-native-sidebar-row-footer.patch), with the refreshed [owned payload](../patches/legacy/0001-workspace-foundation.patch), changes native presentation and Library dispatch. Rust placement rules, storage, session restoration and the default-off workspace switch remain unchanged.
 
 A row owns its full-width rounded background. Its separate close button has a 32-DIP hit target, an inset 24-DIP rounded hover chip and a 20-DIP icon. The glyph appears on row hover or focus within. The activation button's own ink drop is disabled so its hover paint cannot end before the close target. Keyboard focus remains available; title bounds stay fixed through hover.
 

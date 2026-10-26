@@ -1,0 +1,12 @@
+diff --git a/chrome/browser/lifetime/BUILD.gn b/chrome/browser/lifetime/BUILD.gn
+index 3416c277cc47e7fb34695dec788db4380997dcb2..341b9df8a3560972086cee09731b90c781bb02dd 100644
+--- a/chrome/browser/lifetime/BUILD.gn
++++ b/chrome/browser/lifetime/BUILD.gn
+@@ -96,6 +96,7 @@ source_set("impl") {
+     "//components/tracing:tracing_config",
+     "//content/public/browser",
+     "//content/public/common",
++    "//myarc:workspace_lifecycle",
+     "//printing/buildflags",
+     "//rlz/buildflags",
+   ]

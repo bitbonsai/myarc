@@ -1,0 +1,26 @@
+diff --git a/chrome/browser/ui/browser_command_controller.h b/chrome/browser/ui/browser_command_controller.h
+index 153345b2dc7ed6e5223e22175245731ad65e3c0f..9a6a7177ddf2443ca78f2c5e13054ded9b828aac 100644
+--- a/chrome/browser/ui/browser_command_controller.h
++++ b/chrome/browser/ui/browser_command_controller.h
+@@ -132,6 +132,9 @@ class BrowserCommandController : public CommandUpdater,
+       CommandUpdater* command_updater,
+       Profile* profile);
+ 
++  // Space selection can change eligibility without changing the native index.
++  void MyarcWorkspaceStateChanged();
++
+  private:
+ #if BUILDFLAG(IS_CHROMEOS)
+   friend class BrowserCommandControllerBrowserTestLockedFullscreen;
+@@ -311,6 +314,11 @@ class BrowserCommandController : public CommandUpdater,
+   // and optionally syncs state to ActionItems.
+   std::unique_ptr<CommandUpdater> command_updater_;
+ 
++  // Native eligibility, before the workspace presentation gate.
++  base::flat_map<int, bool> myarc_page_command_states_;
++  // Action-only controls must not register unsupported legacy commands.
++  base::flat_map<actions::ActionId, bool> myarc_page_action_states_;
++
+   PrefChangeRegistrar profile_pref_registrar_;
+   PrefChangeRegistrar local_pref_registrar_;
+   std::unique_ptr<base::CallbackListSubscription> glic_enabling_subscription_;

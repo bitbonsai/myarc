@@ -1,0 +1,24 @@
+diff --git a/chrome/browser/ui/views/tabs/common/tab_view.cc b/chrome/browser/ui/views/tabs/common/tab_view.cc
+index 7ad4897a7557b7f5559a66356ec8b2078a1c3039..a67ee62da37541236918a6573cc117fe728c2585 100644
+--- a/chrome/browser/ui/views/tabs/common/tab_view.cc
++++ b/chrome/browser/ui/views/tabs/common/tab_view.cc
+@@ -7,6 +7,7 @@
+ #include <optional>
+ #include <string>
+ 
++#include "base/command_line.h"
+ #include "base/functional/callback_helpers.h"
+ #include "base/metrics/histogram_functions.h"
+ #include "base/metrics/user_metrics.h"
+@@ -524,7 +525,10 @@ bool TabView::IsHoverAnimationActive() const {
+ 
+ std::optional<SkColor> TabView::GetBackgroundColor() {
+   if (active_ || IsHoverAnimationActive() ||
+-      should_fill_background_tab_color_) {
++      should_fill_background_tab_color_ ||
++      (orientation_ == TabStripOrientation::kVertical && pinned_ && split_ &&
++       base::CommandLine::ForCurrentProcess()->HasSwitch(
++           "myarc-visual-parity"))) {
+     return tab_styling()->CalculateTargetColors().background_color;
+   }
+   return std::nullopt;

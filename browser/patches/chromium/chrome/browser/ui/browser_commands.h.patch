@@ -1,0 +1,85 @@
+diff --git a/chrome/browser/ui/browser_commands.h b/chrome/browser/ui/browser_commands.h
+index cd5696602ed1556fed1d92ef118ce73bb3ff5bba..791c3844d691d9b4698a7936638f67f49d81d81f 100644
+--- a/chrome/browser/ui/browser_commands.h
++++ b/chrome/browser/ui/browser_commands.h
+@@ -7,6 +7,7 @@
+ 
+ #include <optional>
+ #include <string>
++#include <string_view>
+ #include <vector>
+ 
+ #include "base/memory/weak_ptr.h"
+@@ -57,6 +58,13 @@ namespace chrome {
+ 
+ // For all commands, where a tab is not specified, the active tab is assumed.
+ 
++// One presentation gate for native commands and direct action callbacks. This
++// does not grant or revoke extension activeTab/context-menu permissions.
++bool IsMyarcWorkspaceBlank(const BrowserWindowInterface* browser);
++bool IsMyarcPageCommand(int command);
++bool IsMyarcWorkspaceCommandAllowed(const BrowserWindowInterface* browser,
++                                    int command);
++
+ bool IsCommandEnabled(BrowserWindowInterface* browser, int command);
+ bool SupportsCommand(BrowserWindowInterface* browser, int command);
+ bool ExecuteCommand(BrowserWindowInterface* browser,
+@@ -78,9 +86,15 @@ bool ExecuteCommandWithDispositionAndContext(
+     WindowOpenDisposition disposition,
+     actions::ActionInvocationContext context,
+     base::TimeTicks time_stamp = base::TimeTicks::Now());
+-void UpdateCommandEnabled(BrowserWindowInterface* browser, int command, bool enabled);
+-void AddCommandObserver(BrowserWindowInterface*, int command, CommandObserver* observer);
+-void RemoveCommandObserver(BrowserWindowInterface*, int command, CommandObserver* observer);
++void UpdateCommandEnabled(BrowserWindowInterface* browser,
++                          int command,
++                          bool enabled);
++void AddCommandObserver(BrowserWindowInterface*,
++                        int command,
++                        CommandObserver* observer);
++void RemoveCommandObserver(BrowserWindowInterface*,
++                           int command,
++                           CommandObserver* observer);
+ 
+ int GetContentRestrictions(const BrowserWindowInterface* browser);
+ 
+@@ -136,6 +150,11 @@ void NewIncognitoWindow(Profile* profile);
+ void CloseWindow(BrowserWindowInterface* browser);
+ content::WebContents& NewTab(BrowserWindowInterface* browser,
+                              NewTabTypes context);
++// Interactive intent is separate so internal callers still create a real tab.
++void NewTabFromUI(BrowserWindowInterface* browser, NewTabTypes context);
++bool NavigateFromMyarcPalette(BrowserWindowInterface* browser,
++                              std::u16string_view text,
++                              bool new_tab = true);
+ void NewTabToRight(BrowserWindowInterface* browser);
+ void NewTabFromClipboardURL(BrowserWindowInterface* browser);
+ void CloseTab(BrowserWindowInterface* browser);
+@@ -300,7 +319,9 @@ void RouteMediaInvokedFromAppMenu(BrowserWindowInterface* browser);
+ void Find(BrowserWindowInterface* browser);
+ void FindNext(BrowserWindowInterface* browser);
+ void FindPrevious(BrowserWindowInterface* browser);
+-void FindInPage(BrowserWindowInterface* browser, bool find_next, bool forward_direction);
++void FindInPage(BrowserWindowInterface* browser,
++                bool find_next,
++                bool forward_direction);
+ void ShowTabSearch(BrowserWindowInterface* browser);
+ void CloseTabSearch(BrowserWindowInterface* browser);
+ void ToggleTabSearchPin(BrowserWindowInterface* browser);
+@@ -389,10 +410,12 @@ std::optional<int> GetKeyboardFocusedTabIndex(
+ 
+ void ShowIncognitoClearBrowsingDataDialog(BrowserWindowInterface* browser);
+ void ShowIncognitoHistoryDisclaimerDialog(BrowserWindowInterface* browser);
+-bool ShouldInterceptChromeURLNavigationInIncognito(BrowserWindowInterface* browser,
+-                                                   const GURL& url);
+-void ProcessInterceptedChromeURLNavigationInIncognito(BrowserWindowInterface* browser,
+-                                                      const GURL& url);
++bool ShouldInterceptChromeURLNavigationInIncognito(
++    BrowserWindowInterface* browser,
++    const GURL& url);
++void ProcessInterceptedChromeURLNavigationInIncognito(
++    BrowserWindowInterface* browser,
++    const GURL& url);
+ void ExecLensOverlay(BrowserWindowInterface* browser);
+ void ExecLensRegionSearch(BrowserWindowInterface* browser);
+ void ExecAskGoogleAboutThisPage(

@@ -1,0 +1,12 @@
+diff --git a/chrome/browser/ui/startup/BUILD.gn b/chrome/browser/ui/startup/BUILD.gn
+index d554afbea2e9361d7d1214de373204adff0f6f5f..bbebbf94c822cdfaf8abfe5e8d75bdc3ca39fc06 100644
+--- a/chrome/browser/ui/startup/BUILD.gn
++++ b/chrome/browser/ui/startup/BUILD.gn
+@@ -179,6 +179,7 @@ source_set("impl") {
+     "//gpu/config",
+     "//media",
+     "//media:media_buildflags",
++    "//myarc:workspace_lifecycle",
+     "//sandbox/policy",
+     "//services/device/public/cpp/hid",
+     "//services/network/public/cpp:flags_and_switches",

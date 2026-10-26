@@ -1,0 +1,148 @@
+diff --git a/chrome/browser/ui/views/frame/browser_view.h b/chrome/browser/ui/views/frame/browser_view.h
+index 750e46c97b64dccccf4268e912df5dbdb6516b3c..ba44fd1ba4d782d5e229be0e87a7eb15cb35a124 100644
+--- a/chrome/browser/ui/views/frame/browser_view.h
++++ b/chrome/browser/ui/views/frame/browser_view.h
+@@ -8,6 +8,7 @@
+ #include <map>
+ #include <memory>
+ #include <optional>
++#include <set>
+ #include <string>
+ #include <vector>
+ 
+@@ -52,6 +53,7 @@
+ #include "content/public/browser/permission_result.h"
+ #include "content/public/browser/web_contents.h"
+ #include "content/public/browser/web_contents_observer.h"
++#include "myarc/sidebar_view.h"
+ #include "third_party/blink/public/common/permissions/permission_utils.h"
+ #include "ui/base/accelerators/accelerator.h"
+ #include "ui/base/identifier/typed_identifier.h"
+@@ -104,6 +106,13 @@ class TopControlsSlideControllerTest;
+ class VerticalTabStripRegionView;
+ class WebAppFrameToolbarView;
+ 
++namespace myarc {
++class BrowserWorkspaceAdapter;
++namespace foundation {
++struct MutationResult;
++}
++}  // namespace myarc
++
+ namespace gfx {
+ class AnimationRunner;
+ }  // namespace gfx
+@@ -121,7 +130,11 @@ enum class Channel;
+ }
+ 
+ namespace views {
++class BubbleDialogDelegate;
++class DialogDelegate;
++class Label;
+ class LabelButton;
++class Textfield;
+ class NativeViewHost;
+ class WebView;
+ }  // namespace views
+@@ -143,7 +156,8 @@ class BrowserView : public BrowserWindow,
+                     public ImmersiveModeController::Observer,
+                     public GlobalErrorObserver,
+                     public views::FocusChangeListener,
+-                    public BookmarkBarController::Delegate {
++                    public BookmarkBarController::Delegate,
++                    private myarc::SidebarView::Delegate {
+   METADATA_HEADER(BrowserView, views::ClientView)
+ 
+  public:
+@@ -234,6 +248,8 @@ class BrowserView : public BrowserWindow,
+   // Container for the tabstrip, toolbar, etc.
+   TopContainerView* top_container() { return top_container_; }
+ 
++  views::View* myarc_popup_anchor() { return myarc_popup_anchor_; }
++
+   std::optional<int> theme_background_y_offset() const {
+     return theme_background_y_offset_;
+   }
+@@ -311,6 +327,19 @@ class BrowserView : public BrowserWindow,
+ 
+   ScrimView* window_scrim_view() { return window_scrim_view_; }
+ 
++  bool ShowMyarcCommandPalette(bool new_tab = true);
++
++  // Nullable outside the separate workspace-sidebar + visual-parity opt-in.
++  // Parent owns session binding/restore barriers and shutdown/resume hooks.
++  myarc::BrowserWorkspaceAdapter* GetMyarcWorkspaceAdapter();
++  void RefreshMyarcWorkspaceSidebar();
++  bool IsMyarcWorkspaceBlank() const override;
++  void RevealMyarcActiveTab() override;
++  bool IsMyarcWorkspaceActive() const override;
++  std::optional<MyarcTabSaveState> GetMyarcTabSaveState(
++      const std::vector<int>& indices) const override;
++  bool SetMyarcTabsSaved(const std::vector<int>& indices, bool saved) override;
++
+   base::WeakPtr<BrowserView> GetAsWeakPtr() {
+     return weak_ptr_factory_.GetWeakPtr();
+   }
+@@ -1253,12 +1282,54 @@ class BrowserView : public BrowserWindow,
+ 
+   // Anchor point for help bubbles and other dialogs that want to reliably
+   // anchor outside the content area of the window.
++  myarc::SidebarView::ItemPresentation GetItemPresentation(
++      const myarc::foundation::ItemRecord& item) const override;
++  void ActivateItem(uint64_t item) override;
++  void CloseLiveItem(uint64_t item) override;
++  void PinItem(uint64_t item) override;
++  void FavoriteItem(uint64_t item) override;
++  bool DropFavorite(uint64_t item, uint64_t before) override;
++  void UnsaveItem(uint64_t item) override;
++  void SelectSpace(uint64_t space) override;
++  void CreateSpace() override;
++  void RenameSpace(uint64_t space) override;
++  void NewTab() override;
++  void RetryWorkspaceStorage(myarc::SidebarView::StorageRetry retry) override;
++  void OpenDownloads() override;
++  void MyarcWorkspaceResult(myarc::foundation::MutationResult result);
++  void UpdateMyarcWorkspaceCanvas();
++  void UpdateMyarcTabStripMode();
++  void ShowMyarcSpaceDialog(uint64_t space);
++  bool AcceptMyarcSpaceDialog(uint64_t space);
++  void CloseMyarcSpaceDialog();
++
++  // Explicit teardown: subscription, dialog, SidebarView (including menu
++  // runner), then adapter. BrowserView is the delegate and outlives all of
++  // them.
++  std::unique_ptr<myarc::BrowserWorkspaceAdapter> myarc_workspace_adapter_;
++  base::CallbackListSubscription myarc_workspace_subscription_;
++  raw_ptr<myarc::SidebarView> myarc_workspace_sidebar_ = nullptr;
++  std::u16string myarc_workspace_action_error_;
++  std::set<std::string> myarc_workspace_live_items_;
++  bool myarc_workspace_blank_ = false;
++  bool myarc_workspace_active_ = false;
++  bool myarc_workspace_commands_blank_ = false;
++  std::unique_ptr<views::DialogDelegate> myarc_space_dialog_delegate_;
++  std::unique_ptr<views::Widget> myarc_space_dialog_widget_;
++  raw_ptr<views::Textfield> myarc_space_name_ = nullptr;
++  raw_ptr<views::Label> myarc_space_error_ = nullptr;
++
++  void OnMyarcCommandPaletteClosed(views::BubbleDialogDelegate* delegate);
++  std::unique_ptr<views::BubbleDialogDelegate> myarc_command_palette_delegate_;
++  std::unique_ptr<views::Widget> myarc_command_palette_widget_;
++
+   std::unique_ptr<views::ViewSubregionAnchor> dialog_anchor_;
+ 
+   // Anchor point for popup dialogs that must be able to appear in content-
+   // fullscreen and can anchor inside the content area of the window if
+   // necessary (such as the translate bubble).
+   std::unique_ptr<views::ViewSubregionAnchor> fallback_popup_anchor_;
++  raw_ptr<views::View> myarc_popup_anchor_ = nullptr;
+ 
+   // A mapping between accelerators and command IDs.
+   std::map<ui::Accelerator, int> accelerator_table_;
+@@ -1411,6 +1482,7 @@ class BrowserView : public BrowserWindow,
+   base::EnumSet<TabStripAndWebAppViewsReparentedState>
+       tab_strip_web_apps_reparented_state_;
+ 
++  base::WeakPtrFactory<BrowserView> myarc_workspace_weak_factory_{this};
+   mutable base::WeakPtrFactory<BrowserView> weak_ptr_factory_{this};
+ };
+ 

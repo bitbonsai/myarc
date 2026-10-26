@@ -1,0 +1,37 @@
+diff --git a/chrome/browser/ui/tabs/tab_list_bridge.cc b/chrome/browser/ui/tabs/tab_list_bridge.cc
+index 1964f543c3dc0080003dc95a512e0ef75a09a924..40987b5c14bd5de16813e29e61d8eaf7150c49d3 100644
+--- a/chrome/browser/ui/tabs/tab_list_bridge.cc
++++ b/chrome/browser/ui/tabs/tab_list_bridge.cc
+@@ -12,6 +12,7 @@
+ #include "chrome/browser/resource_coordinator/tab_lifecycle_unit_external.h"
+ #include "chrome/browser/tab_group_sync/tab_group_sync_service_factory.h"
+ #include "chrome/browser/tab_list/constants.h"
++#include "chrome/browser/ui/browser_window.h"
+ #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
+ #include "chrome/browser/ui/browser_window/public/browser_window_interface_iterator.h"
+ #include "chrome/browser/ui/tabs/split_tab_metrics.h"
+@@ -303,6 +304,11 @@ void TabListBridge::PinTab(tabs::TabHandle tab) {
+   int index = GetIndexOfTab(tab);
+   CHECK_NE(index, tab_list::kNoTabIndex)
+       << "Trying to pin a tab that doesn't exist in this tab list.";
++  auto* browser = tab_strip_->delegate()->GetBrowserWindowInterface();
++  if (auto* window = browser ? BrowserWindow::FromBrowser(browser) : nullptr;
++      window && window->SetMyarcTabsSaved({index}, true)) {
++    return;
++  }
+   tab_strip_->SetTabPinned(index, true);
+ }
+ 
+@@ -310,6 +316,12 @@ void TabListBridge::UnpinTab(tabs::TabHandle tab) {
+   int index = GetIndexOfTab(tab);
+   CHECK_NE(index, tab_list::kNoTabIndex)
+       << "Trying to unpin a tab that doesn't exist in this tab list.";
++  auto* browser = tab_strip_->delegate()->GetBrowserWindowInterface();
++  if (auto* window = browser ? BrowserWindow::FromBrowser(browser) : nullptr;
++      window && window->GetMyarcTabSaveState({index}).has_value()) {
++    // Generic API unpin must not delete saved identity. UI Unsave is explicit.
++    return;
++  }
+   tab_strip_->SetTabPinned(index, false);
+ }
+ 

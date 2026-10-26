@@ -1,0 +1,13 @@
+diff --git a/chrome/browser/ui/views/tabs/browser_tab_strip_controller.cc b/chrome/browser/ui/views/tabs/browser_tab_strip_controller.cc
+index ecdaefd9080ff03ea64faa8c5453ece813c5e94e..96f849ab869461cc7d4c256c436c773b925df6a2 100644
+--- a/chrome/browser/ui/views/tabs/browser_tab_strip_controller.cc
++++ b/chrome/browser/ui/views/tabs/browser_tab_strip_controller.cc
+@@ -467,7 +467,7 @@ void BrowserTabStripController::OnDropIndexUpdate(
+ }
+ 
+ void BrowserTabStripController::CreateNewTab(NewTabTypes context) {
+-  chrome::NewTab(browser_view_->browser(), context);
++  chrome::NewTabFromUI(browser_view_->browser(), context);
+ }
+ 
+ void BrowserTabStripController::OnStartedDragging() {

@@ -1,0 +1,86 @@
+diff --git a/chrome/browser/ui/views/frame/browser_frame_view_mac.mm b/chrome/browser/ui/views/frame/browser_frame_view_mac.mm
+index 8615eb60acaf1a7a9a23a08b505577c8eefb700b..f1bf9ba32bef93ba0d7c0107d72c36c59f8ba8ea 100644
+--- a/chrome/browser/ui/views/frame/browser_frame_view_mac.mm
++++ b/chrome/browser/ui/views/frame/browser_frame_view_mac.mm
+@@ -21,6 +21,7 @@
+ #include "chrome/browser/themes/theme_properties.h"
+ #include "chrome/browser/themes/theme_service.h"
+ #include "chrome/browser/themes/theme_service_factory.h"
++#include "chrome/browser/ui/animation/browser_animation_controller.h"
+ #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
+ #include "chrome/browser/ui/cocoa/fullscreen/fullscreen_menubar_tracker.h"
+ #include "chrome/browser/ui/cocoa/fullscreen/fullscreen_toolbar_controller.h"
+@@ -31,7 +32,9 @@
+ #include "chrome/browser/ui/immersive/immersive_mode_controller.h"
+ #include "chrome/browser/ui/layout_constants.h"
+ #include "chrome/browser/ui/tabs/tab_style.h"
++#include "chrome/browser/ui/tabs/vertical_tab_strip_state_controller.h"
+ #include "chrome/browser/ui/view_ids.h"
++#include "chrome/browser/ui/views/animations/tab_strip_animations.h"
+ #include "chrome/browser/ui/views/bookmarks/bookmark_bar_view.h"
+ #include "chrome/browser/ui/views/frame/browser_native_widget.h"
+ #include "chrome/browser/ui/views/frame/browser_view.h"
+@@ -69,6 +72,20 @@
+ 
+ namespace {
+ 
++bool ShouldManageMyarcCaptionButtons(BrowserView* browser_view) {
++  if (!base::CommandLine::ForCurrentProcess()->HasSwitch(
++          "myarc-visual-parity") ||
++      browser_view->browser()->GetType() !=
++          BrowserWindowInterface::Type::TYPE_NORMAL ||
++      browser_view->IsFullscreen() || !browser_view->GetWidget()) {
++    return false;
++  }
++  auto* const host = views::NativeWidgetMacNSWindowHost::GetFromNativeWindow(
++      browser_view->GetWidget()->GetNativeWindow());
++  // Remote Cocoa mirrors stay upstream-owned.
++  return host && !host->application_host();
++}
++
+ FullscreenToolbarStyle GetUserPreferredToolbarStyle(bool always_show) {
+   // In Kiosk mode, we don't show top Chrome UI.
+   if (base::CommandLine::ForCurrentProcess()->HasSwitch(switches::kKioskMode)) {
+@@ -469,6 +486,24 @@ BrowserFrameViewMac::BoundsAndMargins
+ BrowserFrameViewMac::GetCaptionButtonBounds() const {
+   BoundsAndMargins result;
+ 
++  if (ShouldManageMyarcCaptionButtons(GetBrowserView())) {
++    auto* controller = tabs::VerticalTabStripStateController::From(
++        GetBrowserView()->browser());
++    if (controller && controller->ShouldDisplayVerticalTabs() &&
++        controller->GetCollapseState() !=
++            tabs::VerticalTabStripCollapseState::kExpanded) {
++      const auto* animation =
++          BrowserAnimationController::From(GetBrowserView()->browser());
++      if (!animation ||
++          animation
++                  ->GetCurrentValue(TabStripAnimations::kVerticalTabStrip,
++                                    TabStripAnimations::kTabStripHoverWidth)
++                  .value_or(0.0) <= 0.0) {
++        return result;
++      }
++    }
++  }
++
+   // In popups, the titlebar is system-drawn and the caption buttons aren't part
+   // of the client area.
+   if (GetBrowserView()->browser()->GetType() ==
+@@ -527,6 +562,17 @@ void BrowserFrameViewMac::OnPaint(gfx::Canvas* canvas) {
+ }
+ 
+ void BrowserFrameViewMac::Layout(PassKey) {
++  // Region animation updates invalidate this frame, including hover dismissal.
++  // Share caption bounds with the layout reservation.
++  if (ShouldManageMyarcCaptionButtons(GetBrowserView())) {
++    NSWindow* const window = GetWidget()->GetNativeWindow().GetNativeNSWindow();
++    const bool hidden = GetCaptionButtonBounds().bounds.IsEmpty();
++    // shortcut: visibility snaps, add sliding after native measurement.
++    for (NSWindowButton button :
++         {NSWindowCloseButton, NSWindowMiniaturizeButton, NSWindowZoomButton}) {
++      [[window standardWindowButton:button] setHidden:hidden];
++    }
++  }
+   if (GetBrowserView()->IsWindowControlsOverlayEnabled()) {
+     LayoutWindowControlsOverlay();
+   }

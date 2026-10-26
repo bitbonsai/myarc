@@ -1,0 +1,12 @@
+diff --git a/chrome/browser/sessions/BUILD.gn b/chrome/browser/sessions/BUILD.gn
+index f69c5d5cebce4a21b90acf4d76e609e50ede9046..1dd60e0dd7dbb5f45e3f53430b30acb28682c356 100644
+--- a/chrome/browser/sessions/BUILD.gn
++++ b/chrome/browser/sessions/BUILD.gn
+@@ -86,6 +86,7 @@ source_set("impl") {
+     "//chrome/browser:buildflags",
+     "//chrome/browser/glic",
+     "//chrome/browser/lifetime",
++    "//myarc:workspace_lifecycle",
+   ]
+ 
+   if (enable_extensions_core) {

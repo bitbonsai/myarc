@@ -12,7 +12,7 @@ Private run `/tmp/myarc-m0-runtime/storage-fault-20261026T024335Z/` retains the 
 
 ## Candidate 0023
 
-MA-007.c bounded repair from parent `7045dda`. Updated canonical [SidebarView](../foundation/sidebar_view.h) and optional [0023](../patches/0023-native-workspace-storage-retry.patch) expose:
+MA-007.c bounded repair from parent `7045dda`. Updated canonical [SidebarView](../foundation/sidebar_view.h) and optional [0023](../patches/legacy/0023-native-workspace-storage-retry.patch) expose:
 
 - `Retry loading` only for service `kLoadError`, with workspace mutations unavailable and native tabs retained.
 - `Retry saving` only for service `kWriteError` with a usable workspace model. Memory remains authoritative until the existing asynchronous writer finishes.

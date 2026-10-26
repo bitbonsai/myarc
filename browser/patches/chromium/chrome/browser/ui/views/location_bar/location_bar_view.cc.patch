@@ -1,0 +1,235 @@
+diff --git a/chrome/browser/ui/views/location_bar/location_bar_view.cc b/chrome/browser/ui/views/location_bar/location_bar_view.cc
+index 972bd7bc04d240f23d4c527bdb6faa81272421e5..2daffdd505df498e04edd302f4ef36bf131b6a64 100644
+--- a/chrome/browser/ui/views/location_bar/location_bar_view.cc
++++ b/chrome/browser/ui/views/location_bar/location_bar_view.cc
+@@ -11,6 +11,7 @@
+ #include <utility>
+ 
+ #include "base/auto_reset.h"
++#include "base/command_line.h"
+ #include "base/feature_list.h"
+ #include "base/functional/bind.h"
+ #include "base/functional/callback_helpers.h"
+@@ -32,6 +33,7 @@
+ #include "chrome/browser/translate/translate_service.h"
+ #include "chrome/browser/ui/actions/chrome_action_id.h"
+ #include "chrome/browser/ui/browser_actions.h"
++#include "chrome/browser/ui/browser_commands.h"
+ #include "chrome/browser/ui/browser_element_identifiers.h"
+ #include "chrome/browser/ui/browser_window.h"
+ #include "chrome/browser/ui/browser_window/public/browser_window_features.h"
+@@ -56,6 +58,7 @@
+ #include "chrome/browser/ui/tabs/public/tab_features.h"
+ #include "chrome/browser/ui/tabs/saved_tab_groups/saved_tab_group_utils.h"
+ #include "chrome/browser/ui/tabs/tab_strip_model.h"
++#include "chrome/browser/ui/tabs/vertical_tab_strip_state_controller.h"
+ #include "chrome/browser/ui/ui_features.h"
+ #include "chrome/browser/ui/views/bubble_anchor_util_views.h"
+ #include "chrome/browser/ui/views/chrome_layout_provider.h"
+@@ -351,6 +354,22 @@ void LocationBarView::Init() {
+   omnibox_view_ = AddChildView(std::move(omnibox_view));
+   omnibox_view_->Init();
+ 
++  if (browser_ &&
++      browser_->GetType() == BrowserWindowInterface::Type::TYPE_NORMAL &&
++      base::CommandLine::ForCurrentProcess()->HasSwitch(
++          "myarc-visual-parity")) {
++    auto copy = views::CreateVectorImageButtonWithNativeTheme(
++        base::BindRepeating(&LocationBarView::CopyMyarcCurrentUrl,
++                            base::Unretained(this)),
++        kLinkChromeRefreshOldIcon, 16, kColorOmniboxActionIcon);
++    copy->SetTooltipText(
++        gfx::RemoveAccelerator(l10n_util::GetStringUTF16(IDS_COPY_URL)));
++    copy->SetFocusBehavior(FocusBehavior::ALWAYS);
++    copy->SetPreferredSize(gfx::Size(28, 28));
++    copy->SetVisible(false);
++    myarc_copy_url_button_ = AddChildView(std::move(copy));
++  }
++
+   if (CanHostWebUIOmnibox(browser_, is_popup_mode_)) {
+     if (omnibox::IsAimPopupFeatureEnabled() &&
+         !CreateOmniboxPopupAimPresenterIfEligible() && profile_) {
+@@ -525,6 +544,10 @@ int LocationBarView::GetBorderRadius() const {
+ 
+ // static
+ int LocationBarView::ComputeBorderRadius(gfx::Size size) {
++  if (base::CommandLine::ForCurrentProcess()->HasSwitch(
++          "myarc-visual-parity")) {
++    return std::min(12, size.height() / 2);
++  }
+   return ChromeLayoutProvider::Get()->GetCornerRadiusMetric(
+       views::Emphasis::kMaximum, size);
+ }
+@@ -674,6 +697,9 @@ void LocationBarView::RemovedFromWidget() {
+ }
+ 
+ void LocationBarView::OnDidChangeFocus(views::View* before, views::View* now) {
++  if (IsMyarcUrlPill() && (Contains(before) || Contains(now))) {
++    InvalidateLayout();
++  }
+   if (Contains(before) != Contains(now)) {
+     NotifyFocusChanged();
+   }
+@@ -779,6 +805,35 @@ void LocationBarView::Layout(PassKey) {
+ 
+   selected_keyword_view_->SetVisible(false);
+ 
++  const bool myarc_pill = IsMyarcUrlPill();
++  SetNotifyEnterExitOnChild(myarc_pill);
++  if (!myarc_pill) {
++    myarc_url_hovered_ = false;
++  }
++  if (myarc_copy_url_button_) {
++    // Match focus traversal to the pill's text, copy, site-info order.
++    ReorderChildView(location_icon_view_, myarc_pill ? 3 : 1);
++  }
++  const bool reveal_myarc_actions = myarc_url_hovered_ || IsFocusWithin();
++  WebContents* const myarc_page = myarc_pill ? GetWebContents() : nullptr;
++  const bool myarc_has_page =
++      myarc_page && !myarc_page->GetVisibleURL().is_empty() &&
++      !myarc_page->GetController().GetVisibleEntry()->IsInitialEntry();
++  if (myarc_copy_url_button_) {
++    myarc_copy_url_button_->SetVisible(myarc_has_page && reveal_myarc_actions);
++    myarc_copy_url_button_->SetEnabled(myarc_has_page &&
++                                       chrome::CanCopyUrl(browser_));
++    if (auto* bookmark =
++            page_action_container_->GetPageActionView(kActionBookmarkThisTab)) {
++      bookmark->SetVisible(!myarc_pill && bookmark->GetDeclaredVisible());
++    }
++  }
++  // Keep warnings, editing decorations and permission overrides upstream-owned.
++  const bool myarc_quiet_site_info =
++      myarc_has_page && !IsEditingOrEmpty() &&
++      GetLocationBarModel()->GetSecurityLevel() == security_state::SECURE &&
++      !location_icon_view_->GetShowText() && !ShouldChipOverrideLocationIcon();
++
+   // The padding between the left edges of the location bar and the LHS icon,
+   // e.g. the page info icon, the google G icon, the selected suggestion icon.
+   int icon_left = GetLayoutConstant(
+@@ -858,6 +913,10 @@ void LocationBarView::Layout(PassKey) {
+         vertical_padding, location_height, false, kLeadingDecorationMaxFraction,
+         /*intra_item_padding=*/0, icon_left, selected_keyword_view_);
+     selected_keyword_view_->SetKeyword(keyword);
++  } else if (chrome::IsMyarcWorkspaceBlank(browser_)) {
++    location_icon_view_->SetVisible(false);
++  } else if (myarc_quiet_site_info) {
++    location_icon_view_->SetVisible(reveal_myarc_actions);
+   } else if (location_icon_view_->GetShowText() &&
+              !ShouldChipOverrideLocationIcon()) {
+     location_icon_view_->SetVisible(true);
+@@ -882,6 +941,15 @@ void LocationBarView::Layout(PassKey) {
+     }
+   };
+ 
++  if (myarc_quiet_site_info) {
++    add_trailing_decoration(location_icon_view_, /*intra_item_padding=*/0,
++                            trailing_decorations_edge_padding);
++  }
++  if (myarc_copy_url_button_) {
++    add_trailing_decoration(myarc_copy_url_button_, /*intra_item_padding=*/0,
++                            trailing_decorations_edge_padding);
++  }
++
+   if (features::IsPageActionsElevatedToolbarEnabled()) {
+     if (page_action_container_ && page_action_container_->GetVisible()) {
+       const bool is_capsule_active = page_action_container_->IsCapsuleActive();
+@@ -1125,7 +1193,8 @@ LocationBarModel* LocationBarView::GetLocationBarModel() {
+ }
+ 
+ WebContents* LocationBarView::GetWebContents() {
+-  return delegate_->GetWebContents();
++  return chrome::IsMyarcWorkspaceBlank(browser_) ? nullptr
++                                                 : delegate_->GetWebContents();
+ }
+ 
+ std::optional<bubble_anchor_util::AnchorConfiguration>
+@@ -1292,6 +1361,9 @@ bool LocationBarView::ShouldUsePopupOpenAppearance() const {
+ }
+ 
+ bool LocationBarView::ShouldHidePageActionIcons() const {
++  if (chrome::IsMyarcWorkspaceBlank(browser_)) {
++    return true;
++  }
+   if (!omnibox_view_) {
+     return false;
+   }
+@@ -1792,11 +1864,42 @@ void LocationBarView::OnMouseReleased(const ui::MouseEvent& event) {
+   omnibox_view_->OnMouseReleased(AdjustMouseEventLocationForOmniboxView(event));
+ }
+ 
++bool LocationBarView::IsMyarcUrlPill() const {
++  if (!myarc_copy_url_button_ || !browser_) {
++    return false;
++  }
++  const auto* controller =
++      tabs::VerticalTabStripStateController::From(browser_);
++  return controller && controller->ShouldDisplayVerticalTabs();
++}
++
++void LocationBarView::CopyMyarcCurrentUrl() {
++  WebContents* const page = GetWebContents();
++  if (IsMyarcUrlPill() && page && !page->GetVisibleURL().is_empty() &&
++      !page->GetController().GetVisibleEntry()->IsInitialEntry() &&
++      chrome::CanCopyUrl(browser_)) {
++    chrome::CopyURL(browser_, page);
++  }
++}
++
++void LocationBarView::OnMouseEntered(const ui::MouseEvent& event) {
++  if (IsMyarcUrlPill()) {
++    myarc_url_hovered_ = true;
++    InvalidateLayout();
++    OnOmniboxHovered(true);
++  }
++  View::OnMouseEntered(event);
++}
++
+ void LocationBarView::OnMouseMoved(const ui::MouseEvent& event) {
+   OnOmniboxHovered(true);
+ }
+ 
+ void LocationBarView::OnMouseExited(const ui::MouseEvent& event) {
++  if (myarc_url_hovered_) {
++    myarc_url_hovered_ = false;
++    InvalidateLayout();
++  }
+   OnOmniboxHovered(false);
+ }
+ 
+@@ -1812,6 +1915,9 @@ void LocationBarView::WriteDragDataForView(views::View* sender,
+             ui::DragDropTypes::DRAG_NONE);
+ 
+   WebContents* web_contents = GetWebContents();
++  if (!web_contents) {
++    return;
++  }
+   favicon::FaviconDriver* favicon_driver =
+       favicon::ContentFaviconDriver::FromWebContents(web_contents);
+   gfx::ImageSkia favicon = favicon_driver->GetFavicon().AsImageSkia();
+@@ -1823,7 +1929,7 @@ void LocationBarView::WriteDragDataForView(views::View* sender,
+ int LocationBarView::GetDragOperationsForView(views::View* sender,
+                                               const gfx::Point& p) {
+   DCHECK_EQ(location_icon_view_, sender);
+-  WebContents* web_contents = delegate_->GetWebContents();
++  WebContents* web_contents = GetWebContents();
+   return (web_contents && web_contents->GetVisibleURL().is_valid() &&
+           (!GetOmniboxView()->IsEditingOrEmpty()))
+              ? (ui::DragDropTypes::DRAG_COPY | ui::DragDropTypes::DRAG_LINK)
+@@ -2173,6 +2279,9 @@ bool LocationBarView::IsFullWebUiOmniboxReady() const {
+ }
+ 
+ void LocationBarView::OnOmniboxHovered(bool is_hovering) {
++  if (IsMyarcUrlPill()) {
++    is_hovering = myarc_url_hovered_;
++  }
+   if (is_hovering) {
+     // Only show the hover animation when omnibox is in unfocused steady state.
+     if (!omnibox_view_->HasFocus()) {
+@@ -2502,7 +2611,6 @@ void LocationBarView::OnAppShimChanged(const webapps::AppId& app_id) {
+ }
+ #endif
+ 
+-
+ BEGIN_METADATA(LocationBarView)
+ ADD_READONLY_PROPERTY_METADATA(int, BorderRadius)
+ ADD_READONLY_PROPERTY_METADATA(gfx::Point, OmniboxViewOrigin)

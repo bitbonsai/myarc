@@ -1,0 +1,16 @@
+diff --git a/chrome/browser/ui/views/session_crashed_bubble_view.h b/chrome/browser/ui/views/session_crashed_bubble_view.h
+index fed33baf8a04db3105040ef191f7bc67b64fa91f..e91ab0ab21250e5b84b939691c5d6c646ff4f0c1 100644
+--- a/chrome/browser/ui/views/session_crashed_bubble_view.h
++++ b/chrome/browser/ui/views/session_crashed_bubble_view.h
+@@ -43,6 +43,11 @@ class SessionCrashedBubbleView : public SessionCrashedBubble {
+       BrowserWindowInterface* browser,
+       bool uma_opted_in_already,
+       bool offer_uma_optin);
++  static views::BubbleDialogDelegate* ShowBubble(
++      BrowserWindowInterface* browser,
++      bool uma_opted_in_already,
++      bool offer_uma_optin,
++      std::unique_ptr<BrowserRemovalObserver> browser_observer);
+ };
+ 
+ #endif  // CHROME_BROWSER_UI_VIEWS_SESSION_CRASHED_BUBBLE_VIEW_H_

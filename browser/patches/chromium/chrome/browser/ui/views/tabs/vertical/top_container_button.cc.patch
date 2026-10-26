@@ -1,0 +1,50 @@
+diff --git a/chrome/browser/ui/views/tabs/vertical/top_container_button.cc b/chrome/browser/ui/views/tabs/vertical/top_container_button.cc
+index 1029f4c7295e812797ee0a3c6c84d69f13707b14..0268170b6269b36d5012fd7fb00157889901620f 100644
+--- a/chrome/browser/ui/views/tabs/vertical/top_container_button.cc
++++ b/chrome/browser/ui/views/tabs/vertical/top_container_button.cc
+@@ -4,12 +4,15 @@
+ 
+ #include "chrome/browser/ui/views/tabs/vertical/top_container_button.h"
+ 
++#include "base/command_line.h"
++#include "chrome/app/vector_icons/vector_icons.h"
+ #include "chrome/browser/ui/color/chrome_color_id.h"
+ #include "chrome/browser/ui/layout_constants.h"
+ #include "chrome/browser/ui/views/toolbar/toolbar_ink_drop_util.h"
+ #include "ui/base/metadata/metadata_impl_macros.h"
+ #include "ui/compositor/layer.h"
+ #include "ui/views/actions/action_view_interface.h"
++#include "ui/views/border.h"
+ #include "ui/views/widget/widget.h"
+ 
+ namespace {
+@@ -41,6 +44,11 @@ class TopContainerButtonActionViewInterface
+ }  // namespace
+ 
+ TopContainerButton::TopContainerButton() {
++  if (base::CommandLine::ForCurrentProcess()->HasSwitch(
++          "myarc-visual-parity")) {
++    SetBorder(views::CreateEmptyBorder(0));
++    SetHorizontalAlignment(gfx::ALIGN_CENTER);
++  }
+   views::FocusRing::Get(this)->SetColorId(kColorNewTabButtonFocusRing);
+   ConfigureInkDrop(this);
+   SetPaintToLayer();
+@@ -57,9 +65,15 @@ void TopContainerButton::UpdateIcon(const ui::ImageModel& icon_image) {
+     return;
+   }
+ 
++  const bool visual_parity =
++      base::CommandLine::ForCurrentProcess()->HasSwitch("myarc-visual-parity");
+   const ui::ImageModel image_model = ui::ImageModel::FromVectorIcon(
+-      *icon_image.GetVectorIcon().vector_icon(), GetForegroundColor(),
+-      GetLayoutConstant(LayoutConstant::kVerticalTabStripButtonIconSize));
++      visual_parity ? kDockToLeftIcon
++                    : *icon_image.GetVectorIcon().vector_icon(),
++      GetForegroundColor(),
++      visual_parity
++          ? 16
++          : GetLayoutConstant(LayoutConstant::kVerticalTabStripButtonIconSize));
+ 
+   SetImageModel(views::Button::STATE_NORMAL, image_model);
+   SetImageModel(views::Button::STATE_HOVERED, image_model);

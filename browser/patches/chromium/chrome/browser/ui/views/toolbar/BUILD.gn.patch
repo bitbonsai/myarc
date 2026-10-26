@@ -1,0 +1,12 @@
+diff --git a/chrome/browser/ui/views/toolbar/BUILD.gn b/chrome/browser/ui/views/toolbar/BUILD.gn
+index a5019f2ad2d118a2d5e0f028bb3e50e04ab636b5..c5519acf5c7aa5616ff06fc23150735e1c0073f6 100644
+--- a/chrome/browser/ui/views/toolbar/BUILD.gn
++++ b/chrome/browser/ui/views/toolbar/BUILD.gn
+@@ -365,6 +365,7 @@ source_set("impl") {
+     "//media",
+     "//media/capture/mojom:video_capture",
+     "//media/capture/mojom:video_capture_buffer",
++    "//myarc:native_button",
+     "//skia",
+     "//third_party/abseil-cpp:absl",
+     "//ui/accessibility:ax_base",

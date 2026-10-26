@@ -1,6 +1,6 @@
 # Unsupported native AI Mode entrypoints
 
-MA-007.c visible-control slice from parent `fbdf96e`. Optional [0021](../patches/0021-native-ai-entrypoints-off.patch) suppresses unsupported browser-owned AI Mode entrypoints when both `--myarc-visual-parity` and `--myarc-workspace-sidebar` are present. Full Chrome build passes. Parent bounded desktop/native checks passed; [structured evidence](../evidence/native-ai-entrypoints-off.json) records their limits. Workspace renderer stays default OFF.
+MA-007.c visible-control slice from parent `fbdf96e`. Optional [0021](../patches/legacy/0021-native-ai-entrypoints-off.patch) suppresses unsupported browser-owned AI Mode entrypoints when both `--myarc-visual-parity` and `--myarc-workspace-sidebar` are present. Full Chrome build passes. Parent bounded desktop/native checks passed; [structured evidence](../evidence/native-ai-entrypoints-off.json) records their limits. Workspace renderer stays default OFF.
 
 ## Observed gap and repair
 

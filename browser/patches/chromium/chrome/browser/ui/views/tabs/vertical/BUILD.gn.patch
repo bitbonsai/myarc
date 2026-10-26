@@ -1,0 +1,12 @@
+diff --git a/chrome/browser/ui/views/tabs/vertical/BUILD.gn b/chrome/browser/ui/views/tabs/vertical/BUILD.gn
+index e88955ec6cbceadcdb2aab8cd7ea96dc90b0e5d1..872c4f22b63a2799eaeb0dcf4791e087bf48f010 100644
+--- a/chrome/browser/ui/views/tabs/vertical/BUILD.gn
++++ b/chrome/browser/ui/views/tabs/vertical/BUILD.gn
+@@ -47,6 +47,7 @@ source_set("impl") {
+   ]
+ 
+   deps = [
++    "//chrome/app/vector_icons",
+     "//chrome/browser:primitives",
+     "//chrome/browser/glic",
+     "//chrome/browser/glic/browser_ui:glow",

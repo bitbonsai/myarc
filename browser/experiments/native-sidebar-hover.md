@@ -1,6 +1,6 @@
 # Hidden sidebar hover candidate
 
-MA-007.c-hover uses [patch 0013](../patches/0013-native-sidebar-hover-peek.patch) to add edge activation to Chromium's existing expand-on-hover path. The parent built it and verified the basic legacy-sidebar journey in the actual browser. Automated native regressions and full visual/motion acceptance remain open.
+MA-007.c-hover uses [patch 0013](../patches/legacy/0013-native-sidebar-hover-peek.patch) to add edge activation to Chromium's existing expand-on-hover path. The parent built it and verified the basic legacy-sidebar journey in the actual browser. Automated native regressions and full visual/motion acceptance remain open.
 
 ## Behavior and evidence
 

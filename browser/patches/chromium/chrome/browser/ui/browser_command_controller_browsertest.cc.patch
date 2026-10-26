@@ -1,0 +1,933 @@
+diff --git a/chrome/browser/ui/browser_command_controller_browsertest.cc b/chrome/browser/ui/browser_command_controller_browsertest.cc
+index 54deb1aa44b9e967a5626240ab63a5c24179a7e6..3574713c5e693d2ff9fccf90cfe7ff8ed8c05ffa 100644
+--- a/chrome/browser/ui/browser_command_controller_browsertest.cc
++++ b/chrome/browser/ui/browser_command_controller_browsertest.cc
+@@ -8,13 +8,17 @@
+ #include <array>
+ #include <string_view>
+ #include <utility>
++#include <vector>
+ 
+ #include "base/command_line.h"
++#include "base/functional/callback_helpers.h"
+ #include "base/run_loop.h"
++#include "base/strings/utf_string_conversions.h"
+ #include "base/test/metrics/user_action_tester.h"
+ #include "base/test/run_until.h"
+ #include "base/test/scoped_feature_list.h"
+ #include "base/test/task_environment.h"
++#include "base/test/test_future.h"
+ #include "build/branding_buildflags.h"
+ #include "build/build_config.h"
+ #include "chrome/app/chrome_command_ids.h"
+@@ -37,6 +41,7 @@
+ #include "chrome/browser/sessions/tab_restore_service_load_waiter.h"
+ #include "chrome/browser/signin/identity_manager_factory.h"
+ #include "chrome/browser/tab_group_sync/tab_group_sync_service_factory.h"
++#include "chrome/browser/tab_list/tab_list_interface.h"
+ #include "chrome/browser/translate/chrome_translate_client.h"
+ #include "chrome/browser/translate/translate_test_utils.h"
+ #include "chrome/browser/ui/actions/chrome_action_id.h"
+@@ -47,6 +52,10 @@
+ #include "chrome/browser/ui/browser_window/public/create_browser_window.h"
+ #include "chrome/browser/ui/browser_window/public/global_browser_collection.h"
+ #include "chrome/browser/ui/fullscreen/browser_window_fullscreen_controller.h"
++#include "chrome/browser/ui/location_bar/location_bar.h"
++#include "chrome/browser/ui/navigator/browser_navigator.h"
++#include "chrome/browser/ui/navigator/browser_navigator_params.h"
++#include "chrome/browser/ui/omnibox/chrome_omnibox_client.h"
+ #include "chrome/browser/ui/profiles/profile_picker.h"
+ #include "chrome/browser/ui/profiles/profile_ui_test_utils.h"
+ #include "chrome/browser/ui/side_panel/side_panel_action_callback.h"
+@@ -55,13 +64,24 @@
+ #include "chrome/browser/ui/side_panel/side_panel_enums.h"
+ #include "chrome/browser/ui/side_panel/side_panel_ui.h"
+ #include "chrome/browser/ui/startup/startup_browser_creator.h"
++#include "chrome/browser/ui/tab_contents/core_tab_helper.h"
+ #include "chrome/browser/ui/tab_modal_confirm_dialog_browsertest.h"
+ #include "chrome/browser/ui/tabs/saved_tab_groups/tab_group_sync_service_initialized_observer.h"
++#include "chrome/browser/ui/tabs/split_tab_metrics.h"
+ #include "chrome/browser/ui/tabs/tab_enums.h"
++#include "chrome/browser/ui/tabs/tab_strip_api/tab_strip_model_impl/tab_strip_model_adapter_impl.h"
+ #include "chrome/browser/ui/tabs/tab_strip_model.h"
+ #include "chrome/browser/ui/ui_features.h"
++#include "chrome/browser/ui/views/frame/browser_view.h"
++#include "chrome/browser/ui/views/frame/toolbar_button_provider.h"
++#include "chrome/browser/ui/views/location_bar/location_bar_view.h"
++#include "chrome/browser/ui/views/location_bar/location_icon_view.h"
++#include "chrome/browser/ui/views/omnibox/omnibox_view_views.h"
++#include "chrome/browser/ui/views/toolbar/reload_button.h"
++#include "chrome/browser/ui/views/toolbar/toolbar_view.h"
+ #include "chrome/common/chrome_features.h"
+ #include "chrome/common/chrome_switches.h"
++#include "chrome/common/content_restriction.h"
+ #include "chrome/common/pref_names.h"
+ #include "chrome/test/base/in_process_browser_test.h"
+ #include "chrome/test/base/testing_profile_manager.h"
+@@ -71,8 +91,10 @@
+ #include "components/bookmarks/common/bookmark_bar_visibility_state.h"
+ #include "components/bookmarks/common/bookmark_pref_names.h"
+ #include "components/bookmarks/test/bookmark_test_helpers.h"
++#include "components/browser_apis/tab_strip/types/position.h"
+ #include "components/enterprise/isolated_mode/isolated_mode_features.h"
+ #include "components/input/native_web_keyboard_event.h"
++#include "components/omnibox/browser/autocomplete_match.h"
+ #include "components/optimization_guide/core/feature_registry/feature_registration.h"
+ #include "components/policy/core/common/policy_pref_names.h"
+ #include "components/prefs/pref_service.h"
+@@ -91,6 +113,16 @@
+ #include "content/public/test/test_navigation_observer.h"
+ #include "content/public/test/test_utils.h"
+ #include "google_apis/gaia/gaia_urls.h"
++#include "myarc/browser_workspace_adapter.h"
++#include "ui/views/controls/textfield/textfield.h"
++#include "ui/views/focus/focus_manager.h"
++
++#if BUILDFLAG(ENABLE_EXTENSIONS) && (BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC))
++#include "chrome/browser/ui/search_engines/default_search_extension_controlled_controller.h"
++#include "extensions/browser/unpacked_installer.h"
++#include "extensions/common/extension_features.h"
++#include "extensions/test/test_extension_dir.h"
++#endif
+ #include "net/base/network_change_notifier.h"
+ #include "ui/actions/actions.h"
+ #include "ui/base/base_window.h"
+@@ -1978,4 +2010,838 @@ IN_PROC_BROWSER_TEST_F(BrowserCommandControllerBrowserTestIsolatedTest,
+       isolated_browser->GetProfile()->IsEnterpriseIsolatedModeProfile());
+ }
+ 
++IN_PROC_BROWSER_TEST_F(BrowserCommandControllerBrowserTest,
++                       MyarcFlagOffKeepsNativeBulkCommands) {
++  ASSERT_FALSE(base::CommandLine::ForCurrentProcess()->HasSwitch(
++      "myarc-workspace-sidebar"));
++  ASSERT_TRUE(ui_test_utils::NavigateToURLWithDisposition(
++      browser(), GURL("about:blank"), WindowOpenDisposition::kNewForegroundTab,
++      ui_test_utils::BROWSER_TEST_WAIT_FOR_LOAD_STOP));
++  auto* tabs = browser()->GetTabStripModel();
++  ASSERT_EQ(2, tabs->count());
++  auto* window = BrowserWindow::FromBrowser(browser());
++  ASSERT_TRUE(window);
++  EXPECT_FALSE(window->IsMyarcWorkspaceActive());
++  EXPECT_FALSE(window->IsMyarcWorkspaceBlank());
++  EXPECT_TRUE(CanCloseOtherTabs(browser()));
++  tabs->ActivateTabAt(0);
++  auto* page = tabs->GetActiveWebContents();
++  MoveTabNext(browser());
++  EXPECT_EQ(page, tabs->GetWebContentsAt(1));
++  CloseOtherTabs(browser());
++  EXPECT_EQ(1, tabs->count());
++  EXPECT_EQ(page, tabs->GetActiveWebContents());
++}
++
++// These use real Rust projection and native tabs, not a mock workspace model.
++// Runtime execution belongs to the disposable-profile native test runner.
++class MyarcWorkspaceCommandSafetyTest
++    : public InProcessBrowserTest,
++      public testing::WithParamInterface<bool> {
++ public:
++  MyarcWorkspaceCommandSafetyTest() {
++    features_.InitWithFeatureStates(
++        {{features::kUseActionsForBrowserCommands, GetParam()},
++         {features::kTabGroupsFocusing, true}});
++#if BUILDFLAG(ENABLE_EXTENSIONS) && (BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC))
++    consent_features_.InitAndEnableFeature(
++        extensions_features::kSearchEngineExplicitChoiceDialog);
++#endif
++  }
++
++  void SetUpCommandLine(base::CommandLine* command_line) override {
++    command_line->AppendSwitch("myarc-visual-parity");
++    command_line->AppendSwitch("myarc-workspace-sidebar");
++  }
++
++  void SetUpOnMainThread() override {
++    InProcessBrowserTest::SetUpOnMainThread();
++    browser()->GetProfile()->GetPrefs()->SetBoolean(prefs::kVerticalTabsEnabled,
++                                                    true);
++    workspace_browser_ = CreateBrowser(browser()->GetProfile());
++    view_ = BrowserView::GetBrowserViewForBrowser(workspace_browser_);
++    ASSERT_TRUE(view_);
++    adapter_ = view_->GetMyarcWorkspaceAdapter();
++    ASSERT_TRUE(adapter_);
++    ASSERT_TRUE(base::test::RunUntil(
++        [&] { return adapter_->service().ExportSnapshot().has_value(); }));
++    // This is a fresh test Profile after native window creation, with no
++    // restore in flight. Production restoration remains owned by the lifecycle
++    // hooks.
++    ASSERT_TRUE(myarc::BrowserWorkspaceAdapter::FinishSessionRestore(
++                    *workspace_browser_->GetProfile())
++                    .ok);
++    ASSERT_TRUE(base::test::RunUntil([&] { return adapter_->ready(); }));
++    ASSERT_TRUE(adapter_->DisplayedContents());
++  }
++
++  void TearDownOnMainThread() override {
++    adapter_ = nullptr;
++    view_ = nullptr;
++    workspace_browser_ = nullptr;
++    InProcessBrowserTest::TearDownOnMainThread();
++  }
++
++ protected:
++  void EnterEmptySpace() {
++    const auto space = adapter_->CreateSpace("Empty command test");
++    ASSERT_TRUE(space.ok);
++    ASSERT_TRUE(adapter_->SelectSpace(space.id).ok);
++    view_->RefreshMyarcWorkspaceSidebar();
++    ASSERT_TRUE(view_->IsMyarcWorkspaceBlank());
++  }
++
++  base::test::ScopedFeatureList features_;
++#if BUILDFLAG(ENABLE_EXTENSIONS) && (BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC))
++  base::test::ScopedFeatureList consent_features_;
++#endif
++  raw_ptr<BrowserWindowInterface> workspace_browser_ = nullptr;
++  raw_ptr<BrowserView> view_ = nullptr;
++  raw_ptr<myarc::BrowserWorkspaceAdapter> adapter_ = nullptr;
++};
++
++IN_PROC_BROWSER_TEST_P(MyarcWorkspaceCommandSafetyTest,
++                       HiddenTabCommandsAndUpdates) {
++  auto* tabs = workspace_browser_->GetTabStripModel();
++  ASSERT_TRUE(ui_test_utils::NavigateToURL(
++      workspace_browser_, GURL("data:text/html,<title>Command test</title>")));
++  auto* hidden = tabs->GetActiveWebContents();
++  auto* root = BrowserActions::From(workspace_browser_)->root_action_item();
++  auto* source =
++      actions::ActionManager::Get().FindAction(kActionViewSource, root);
++  auto* zoom =
++      actions::ActionManager::Get().FindAction(kActionShowZoomBubble, root);
++  ASSERT_TRUE(source);
++  ASSERT_TRUE(zoom);
++  ASSERT_TRUE(CanViewSource(workspace_browser_));
++  const bool source_enabled = source->GetEnabled();
++  const bool zoom_enabled = zoom->GetEnabled();
++  ASSERT_TRUE(source_enabled);
++  auto* helper = CoreTabHelper::FromWebContents(hidden);
++  ASSERT_TRUE(helper);
++  helper->UpdateContentRestrictions(CONTENT_RESTRICTION_COPY |
++                                    CONTENT_RESTRICTION_CUT |
++                                    CONTENT_RESTRICTION_PASTE);
++  EXPECT_FALSE(IsCommandEnabled(workspace_browser_, IDC_COPY));
++  const int index = tabs->active_index();
++  const int count = tabs->count();
++  const GURL old_url = hidden->GetVisibleURL();
++  const auto old_space = adapter_->Sidebar().current_space.id;
++  ASSERT_NO_FATAL_FAILURE(EnterEmptySpace());
++  // Inspect Actions before any command updates can mask missing transition
++  // work.
++  EXPECT_FALSE(source->GetEnabled());
++  EXPECT_FALSE(zoom->GetEnabled());
++  ASSERT_EQ(hidden, tabs->GetActiveWebContents());
++  ASSERT_EQ(index, tabs->active_index());
++
++  constexpr int page_commands[] = {
++      IDC_BACK,
++      IDC_FORWARD,
++      IDC_RELOAD,
++      IDC_STOP,
++      IDC_HOME,
++      IDC_CLOSE_TAB,
++      IDC_DUPLICATE_TAB,
++      IDC_NEW_SPLIT_TAB,
++      IDC_PRINT,
++      IDC_SAVE_PAGE,
++      IDC_VIEW_SOURCE,
++      IDC_FIND,
++      IDC_ZOOM_PLUS,
++      IDC_DEV_TOOLS,
++      IDC_COPY_URL,
++      IDC_BOOKMARK_THIS_TAB,
++      IDC_WINDOW_PIN_TAB,
++#if BUILDFLAG(IS_MAC)
++      IDC_TOGGLE_JAVASCRIPT_APPLE_EVENTS,
++#endif
++  };
++  auto* controller = BrowserCommandController::From(workspace_browser_);
++  for (int id : page_commands) {
++    SCOPED_TRACE(id);
++    // Check the genuine native baseline, without force-enabling test commands.
++    EXPECT_FALSE(IsCommandEnabled(workspace_browser_, id));
++    EXPECT_FALSE(ExecuteCommand(workspace_browser_, id));
++  }
++  // Real updater entry points must retain the blank gate and field editing.
++  controller->TabStateChanged();
++  controller->ContentRestrictionsChanged();
++  controller->FullscreenStateChanged();
++  controller->LoadingStateChanged(true, true);
++  EXPECT_FALSE(source->GetEnabled());
++  EXPECT_FALSE(zoom->GetEnabled());
++  EXPECT_FALSE(IsCommandEnabled(workspace_browser_, IDC_STOP));
++  EXPECT_TRUE(IsCommandEnabled(workspace_browser_, IDC_NEW_TAB));
++  EXPECT_TRUE(IsCommandEnabled(workspace_browser_, IDC_NEW_WINDOW));
++  EXPECT_TRUE(IsCommandEnabled(workspace_browser_, IDC_FOCUS_LOCATION));
++  EXPECT_TRUE(IsCommandEnabled(workspace_browser_, IDC_CUT));
++  EXPECT_TRUE(IsCommandEnabled(workspace_browser_, IDC_COPY));
++  EXPECT_TRUE(IsCommandEnabled(workspace_browser_, IDC_PASTE));
++
++  // Direct helpers bypass ExecuteCommand; they must share the same gate.
++  CloseTab(workspace_browser_);
++  DuplicateTab(workspace_browser_);
++  Home(workspace_browser_, WindowOpenDisposition::kCurrentTab);
++  PinTab(workspace_browser_);
++  NewSplitTab(workspace_browser_, split_tabs::SplitTabLayout::kSideBySide,
++              split_tabs::SplitTabCreatedSource::kKeyboardShortcut);
++  EXPECT_EQ(count, tabs->count());
++  EXPECT_EQ(old_url, hidden->GetVisibleURL());
++  EXPECT_FALSE(tabs->IsTabPinned(index));
++  EXPECT_FALSE(
++      tabs->IsContextMenuCommandEnabled(index, TabStripModel::CommandCloseTab));
++  tabs->ExecuteContextMenuCommand(index, TabStripModel::CommandCloseTab);
++  EXPECT_EQ(count, tabs->count());
++
++  source->InvokeAction();
++#if BUILDFLAG(IS_MAC)
++  EXPECT_TRUE(IsMyarcPageCommand(IDC_TOGGLE_JAVASCRIPT_APPLE_EVENTS));
++  auto* apple_events = actions::ActionManager::Get().FindAction(
++      kActionToggleJavascriptAppleEvents, root);
++  ASSERT_TRUE(apple_events);
++  EXPECT_FALSE(apple_events->GetEnabled());
++  const bool apple_events_allowed =
++      workspace_browser_->GetProfile()->GetPrefs()->GetBoolean(
++          prefs::kAllowJavascriptAppleEvents);
++  apple_events->InvokeAction();
++  EXPECT_EQ(apple_events_allowed,
++            workspace_browser_->GetProfile()->GetPrefs()->GetBoolean(
++                prefs::kAllowJavascriptAppleEvents));
++#endif
++  EXPECT_EQ(old_url, hidden->GetVisibleURL());
++  EXPECT_EQ(count, tabs->count());
++
++  ASSERT_TRUE(adapter_->SelectSpace(old_space).ok);
++  view_->RefreshMyarcWorkspaceSidebar();
++  EXPECT_FALSE(view_->IsMyarcWorkspaceBlank());
++  EXPECT_TRUE(IsCommandEnabled(workspace_browser_, IDC_CLOSE_TAB));
++  EXPECT_TRUE(IsCommandEnabled(workspace_browser_, IDC_RELOAD));
++  EXPECT_EQ(source_enabled, source->GetEnabled());
++  EXPECT_EQ(zoom_enabled, zoom->GetEnabled());
++  EXPECT_FALSE(IsCommandEnabled(workspace_browser_, IDC_COPY));
++  EXPECT_FALSE(IsCommandEnabled(workspace_browser_, IDC_CUT));
++  EXPECT_FALSE(IsCommandEnabled(workspace_browser_, IDC_PASTE));
++  EXPECT_EQ(hidden, adapter_->DisplayedContents());
++}
++
++IN_PROC_BROWSER_TEST_P(MyarcWorkspaceCommandSafetyTest,
++                       DifferentNativeTabRestoresActionState) {
++  ASSERT_TRUE(embedded_test_server()->Start());
++  ASSERT_TRUE(ui_test_utils::NavigateToURL(
++      workspace_browser_, embedded_test_server()->GetURL("/title1.html")));
++  auto* tabs = workspace_browser_->GetTabStripModel();
++  auto* first_page = tabs->GetActiveWebContents();
++  const auto first_space = adapter_->Sidebar().current_space.id;
++  const auto second_space = adapter_->CreateSpace("Second populated Space");
++  ASSERT_TRUE(second_space.ok);
++  ASSERT_TRUE(adapter_->SelectSpace(second_space.id).ok);
++  ASSERT_TRUE(
++      adapter_
++          ->OpenInCurrentSpace(embedded_test_server()->GetURL("/title2.html"))
++          .ok);
++  auto* second_page = tabs->GetActiveWebContents();
++  ASSERT_NE(first_page, second_page);
++  ASSERT_TRUE(content::WaitForLoadStop(second_page));
++  ASSERT_TRUE(base::test::RunUntil([&] {
++    return adapter_->DisplayedContents() == second_page &&
++           !view_->IsMyarcWorkspaceBlank();
++  }));
++  auto* root = BrowserActions::From(workspace_browser_)->root_action_item();
++  auto* zoom =
++      actions::ActionManager::Get().FindAction(kActionShowZoomBubble, root);
++  auto* lens = actions::ActionManager::Get().FindAction(
++      kActionContentContextLensRegionSearch, root);
++  ASSERT_TRUE(zoom);
++  ASSERT_TRUE(lens);
++  const bool zoom_enabled = zoom->GetEnabled();
++  const bool lens_enabled = lens->GetEnabled();
++  ASSERT_TRUE(zoom_enabled);
++
++  ASSERT_TRUE(adapter_->SelectSpace(first_space).ok);
++  ASSERT_TRUE(base::test::RunUntil([&] {
++    return adapter_->DisplayedContents() == first_page &&
++           tabs->GetActiveWebContents() == first_page;
++  }));
++  auto* toolbar = view_->toolbar();
++  ASSERT_TRUE(toolbar);
++  auto* location = toolbar->location_bar_view();
++  ASSERT_TRUE(location);
++  auto* omnibox = location->omnibox_view();
++  ASSERT_TRUE(omnibox);
++  auto* reload = toolbar->reload_button();
++  ASSERT_TRUE(reload);
++  view_->GetWidget()->LayoutRootViewIfNecessary();
++  ASSERT_TRUE(location->IsDrawn());
++  ASSERT_TRUE(location->location_icon_view()->IsDrawn());
++  ASSERT_TRUE(reload->IsDrawn());
++  EXPECT_NE(std::u16string::npos, omnibox->GetText().find(u"/title1.html"));
++
++  const auto empty_space = adapter_->CreateSpace("Empty between native tabs");
++  ASSERT_TRUE(empty_space.ok);
++  ASSERT_TRUE(adapter_->SelectSpace(empty_space.id).ok);
++  ASSERT_TRUE(base::test::RunUntil([&] {
++    return view_->IsMyarcWorkspaceBlank() && !zoom->GetEnabled() &&
++           !lens->GetEnabled();
++  }));
++  ASSERT_EQ(first_page, tabs->GetActiveWebContents());
++  // Real toolbar/loading updates and layout must not re-expose retained P1.
++  view_->UpdateToolbar(first_page);
++  view_->UpdateReloadStopState(true, true);
++  view_->GetWidget()->LayoutRootViewIfNecessary();
++  EXPECT_TRUE(location->IsDrawn());
++  EXPECT_TRUE(omnibox->IsDrawn());
++  EXPECT_TRUE(omnibox->GetText().empty());
++  EXPECT_EQ(nullptr, location->GetWebContents());
++  EXPECT_FALSE(location->ShowPageInfoDialog());
++  EXPECT_FALSE(location->location_icon_view()->IsDrawn());
++  EXPECT_FALSE(view_->toolbar_button_provider()->GetBackButton()->IsDrawn());
++  EXPECT_FALSE(toolbar->forward_button()->IsDrawn());
++  EXPECT_FALSE(reload->IsDrawn());
++  EXPECT_FALSE(reload->GetEnabled());
++  EXPECT_EQ(ReloadControl::Mode::kReload, reload->GetVisibleMode());
++  EXPECT_TRUE(IsCommandEnabled(workspace_browser_, IDC_FOCUS_LOCATION));
++  EXPECT_TRUE(IsCommandEnabled(workspace_browser_, IDC_NEW_TAB));
++
++  // No manual sidebar or command refresh: P1 -> empty -> P2 must notify
++  // Actions.
++  ASSERT_TRUE(adapter_->SelectSpace(second_space.id).ok);
++  ASSERT_TRUE(base::test::RunUntil([&] {
++    return adapter_->DisplayedContents() == second_page &&
++           tabs->GetActiveWebContents() == second_page &&
++           !view_->IsMyarcWorkspaceBlank() &&
++           zoom->GetEnabled() == zoom_enabled &&
++           lens->GetEnabled() == lens_enabled;
++  }));
++  EXPECT_EQ(second_space.id, adapter_->Sidebar().current_space.id);
++  EXPECT_EQ(zoom_enabled, zoom->GetEnabled());
++  EXPECT_EQ(lens_enabled, lens->GetEnabled());
++  view_->GetWidget()->LayoutRootViewIfNecessary();
++  EXPECT_TRUE(location->IsDrawn());
++  EXPECT_EQ(second_page, location->GetWebContents());
++  EXPECT_NE(std::u16string::npos, omnibox->GetText().find(u"/title2.html"));
++  EXPECT_TRUE(location->location_icon_view()->IsDrawn());
++  EXPECT_TRUE(view_->toolbar_button_provider()->GetBackButton()->IsDrawn());
++  EXPECT_TRUE(toolbar->forward_button()->IsDrawn());
++  EXPECT_TRUE(reload->IsDrawn());
++  EXPECT_TRUE(reload->GetEnabled());
++}
++
++IN_PROC_BROWSER_TEST_P(MyarcWorkspaceCommandSafetyTest,
++                       ReselectHiddenActiveTabRevealsOwningSpace) {
++  auto* tabs = workspace_browser_->GetTabStripModel();
++  auto* hidden = tabs->GetActiveWebContents();
++  const auto space = adapter_->Sidebar().current_space.id;
++  ASSERT_NO_FATAL_FAILURE(EnterEmptySpace());
++  tabs->ActivateTabAt(tabs->active_index());
++  EXPECT_EQ(space, adapter_->Sidebar().current_space.id);
++  EXPECT_EQ(hidden, adapter_->DisplayedContents());
++  EXPECT_FALSE(view_->IsMyarcWorkspaceBlank());
++}
++
++IN_PROC_BROWSER_TEST_P(MyarcWorkspaceCommandSafetyTest,
++                       CommitRechecksSpaceAndKeepsHiddenPage) {
++  ASSERT_TRUE(embedded_test_server()->Start());
++  const auto palette_url = embedded_test_server()->GetURL("/title1.html");
++  auto* tabs = workspace_browser_->GetTabStripModel();
++  auto* hidden = tabs->GetActiveWebContents();
++  const auto old_url = hidden->GetVisibleURL();
++  const int count = tabs->count();
++  ASSERT_NO_FATAL_FAILURE(EnterEmptySpace());
++  const auto empty_space = adapter_->Sidebar().current_space.id;
++  // false is the current-tab intent captured before a Space switch.
++  ASSERT_TRUE(NavigateFromMyarcPalette(
++      workspace_browser_, base::UTF8ToUTF16(palette_url.spec()), false));
++  EXPECT_EQ(count + 1, tabs->count());
++  EXPECT_NE(hidden, tabs->GetActiveWebContents());
++  EXPECT_EQ(old_url, hidden->GetVisibleURL());
++  ASSERT_TRUE(base::test::RunUntil([&] {
++    return adapter_->DisplayedContents() == tabs->GetActiveWebContents();
++  }));
++  EXPECT_EQ(empty_space, adapter_->Sidebar().current_space.id);
++  auto* first_commit_page = tabs->GetActiveWebContents();
++  ASSERT_TRUE(content::WaitForLoadStop(first_commit_page));
++  const auto first_commit_url = first_commit_page->GetVisibleURL();
++  ASSERT_EQ(palette_url, first_commit_url);
++
++  ASSERT_NO_FATAL_FAILURE(EnterEmptySpace());
++  const auto omnibox_space = adapter_->Sidebar().current_space.id;
++  auto* location_bar =
++      BrowserWindow::FromBrowser(workspace_browser_)->GetLocationBar();
++  ASSERT_TRUE(location_bar);
++  ChromeOmniboxClient client(location_bar, workspace_browser_,
++                             workspace_browser_->GetProfile());
++  EXPECT_FALSE(client.CurrentPageExists());
++  EXPECT_TRUE(client.GetURL().is_empty());
++  EXPECT_TRUE(client.GetTitle().empty());
++  EXPECT_TRUE(client.GetFormattedFullURL().empty());
++  EXPECT_TRUE(client.GetNavigationEntryURL().is_empty());
++  AutocompleteMatch match;
++  match.destination_url = GURL("about:blank");
++  client.OnAutocompleteAccept(
++      match.destination_url, nullptr, WindowOpenDisposition::kCurrentTab,
++      ui::PAGE_TRANSITION_TYPED, match.type, base::TimeTicks::Now(), false,
++      false, u"about:blank", match, AutocompleteMatch());
++  EXPECT_EQ(count + 2, tabs->count());
++  EXPECT_NE(first_commit_page, tabs->GetActiveWebContents());
++  EXPECT_EQ(first_commit_url, first_commit_page->GetVisibleURL());
++  EXPECT_EQ(old_url, hidden->GetVisibleURL());
++  ASSERT_TRUE(base::test::RunUntil([&] {
++    return adapter_->DisplayedContents() == tabs->GetActiveWebContents();
++  }));
++  EXPECT_EQ(omnibox_space, adapter_->Sidebar().current_space.id);
++}
++
++IN_PROC_BROWSER_TEST_P(MyarcWorkspaceCommandSafetyTest,
++                       ExplicitSaveAndNativeBitAreDifferent) {
++  auto* tabs = workspace_browser_->GetTabStripModel();
++  auto* page = tabs->GetActiveWebContents();
++  ASSERT_TRUE(
++      ui_test_utils::NavigateToURL(workspace_browser_, GURL("about:blank")));
++  const auto id = myarc::BrowserWorkspaceAdapter::ItemIdForContents(*page);
++  ASSERT_NE(0u, id);
++  ASSERT_TRUE(adapter_->Pin(id).ok);
++  view_->RefreshMyarcWorkspaceSidebar();
++  EXPECT_FALSE(tabs->IsTabPinned(tabs->GetIndexOfWebContents(page)));
++  auto state = view_->GetMyarcTabSaveState({tabs->GetIndexOfWebContents(page)});
++  ASSERT_TRUE(state);
++  EXPECT_EQ(u"Remove Space Pins", state->label);
++
++  // Toggle direction comes from Rust membership, not the native pin bit.
++  PinTab(workspace_browser_);
++  EXPECT_TRUE(adapter_->Sidebar().pins.empty());
++  EXPECT_TRUE(adapter_->Sidebar().favorites.empty());
++  EXPECT_EQ(id, myarc::BrowserWorkspaceAdapter::ItemIdForContents(*page));
++  PinTab(workspace_browser_);
++  ASSERT_TRUE(base::test::RunUntil([&] {
++    const auto model = adapter_->Sidebar();
++    const int index = tabs->GetIndexOfWebContents(page);
++    return model.ok && model.favorites.size() == 1u &&
++           model.favorites[0].id == id && tabs->ContainsIndex(index) &&
++           tabs->IsTabPinned(index);
++  }));
++  const auto canonical =
++      std::string(adapter_->Sidebar().favorites[0].canonical_url);
++  auto* tab_list = TabListInterface::From(workspace_browser_);
++  ASSERT_TRUE(tab_list);
++  tab_list->UnpinTab(
++      tabs->GetTabAtIndex(tabs->GetIndexOfWebContents(page))->GetHandle());
++  // Extension API unpin is consumed without deleting managed saved data.
++  auto model = adapter_->Sidebar();
++  ASSERT_EQ(1u, model.favorites.size());
++  EXPECT_EQ(id, model.favorites[0].id);
++  EXPECT_EQ(canonical, std::string(model.favorites[0].canonical_url));
++  EXPECT_TRUE(tabs->IsTabPinned(tabs->GetIndexOfWebContents(page)));
++
++  tabs->SetTabPinned(tabs->GetIndexOfWebContents(page), false);
++  ASSERT_FALSE(tabs->IsTabPinned(tabs->GetIndexOfWebContents(page)));
++  // Generic native bit changes are repaired by the posted projection refresh.
++  ASSERT_TRUE(base::test::RunUntil([&] {
++    const int index = tabs->GetIndexOfWebContents(page);
++    return tabs->ContainsIndex(index) && tabs->IsTabPinned(index);
++  }));
++  model = adapter_->Sidebar();
++  ASSERT_EQ(1u, model.favorites.size());
++  EXPECT_EQ(id, model.favorites[0].id);
++  EXPECT_EQ(canonical, std::string(model.favorites[0].canonical_url));
++  EXPECT_EQ(id, myarc::BrowserWorkspaceAdapter::ItemIdForContents(*page));
++
++  // Explicit UI removal uses Unsave, never just the generic pin bit.
++  tabs->ExecuteContextMenuCommand(tabs->GetIndexOfWebContents(page),
++                                  TabStripModel::CommandTogglePinned);
++  ASSERT_TRUE(base::test::RunUntil([&] {
++    const auto model = adapter_->Sidebar();
++    return model.ok && model.favorites.empty() && model.pins.empty() &&
++           model.temporary.size() == 1u && model.temporary[0].id == id &&
++           adapter_->DisplayedContents() == page &&
++           myarc::BrowserWorkspaceAdapter::ItemIdForContents(*page) == id &&
++           !tabs->IsTabPinned(tabs->GetIndexOfWebContents(page));
++  }));
++  EXPECT_FALSE(view_->IsMyarcWorkspaceBlank());
++  EXPECT_EQ(id, myarc::BrowserWorkspaceAdapter::ItemIdForContents(*page));
++}
++
++IN_PROC_BROWSER_TEST_P(MyarcWorkspaceCommandSafetyTest,
++                       MixedSaveKeepsPinsAndSkipsTemporaryUnsave) {
++  auto* tabs = workspace_browser_->GetTabStripModel();
++  auto* pin_page = tabs->GetActiveWebContents();
++  const auto pin_id =
++      myarc::BrowserWorkspaceAdapter::ItemIdForContents(*pin_page);
++  ASSERT_TRUE(adapter_->Pin(pin_id).ok);
++  ASSERT_TRUE(
++      NavigateFromMyarcPalette(workspace_browser_, u"about:blank", true));
++  auto* temporary_page = tabs->GetActiveWebContents();
++  ASSERT_TRUE(base::test::RunUntil([&] { return adapter_->ready(); }));
++  const auto temporary_id =
++      myarc::BrowserWorkspaceAdapter::ItemIdForContents(*temporary_page);
++  ASSERT_NE(0u, temporary_id);
++  ASSERT_NE(pin_id, temporary_id);
++  EXPECT_TRUE(view_->SetMyarcTabsSaved(
++      {tabs->GetIndexOfWebContents(temporary_page)}, false));
++  EXPECT_TRUE(adapter_->error().empty());
++  EXPECT_EQ(temporary_id,
++            myarc::BrowserWorkspaceAdapter::ItemIdForContents(*temporary_page));
++  EXPECT_TRUE(adapter_->Sidebar().favorites.empty());
++
++  const auto indices = [&] {
++    return std::vector<int>{tabs->GetIndexOfWebContents(pin_page),
++                            tabs->GetIndexOfWebContents(temporary_page),
++                            tabs->GetIndexOfWebContents(temporary_page)};
++  };
++  auto state = view_->GetMyarcTabSaveState(indices());
++  ASSERT_TRUE(state && state->enabled && state->save);
++  // Validate the entire selection before changing even its valid prefix.
++  auto invalid = indices();
++  invalid.push_back(tabs->count());
++  EXPECT_TRUE(view_->SetMyarcTabsSaved(invalid, true));
++  EXPECT_TRUE(adapter_->Sidebar().favorites.empty());
++  EXPECT_TRUE(view_->SetMyarcTabsSaved(indices(), true));
++  ASSERT_TRUE(base::test::RunUntil([&] {
++    const int index = tabs->GetIndexOfWebContents(temporary_page);
++    return tabs->ContainsIndex(index) && tabs->IsTabPinned(index);
++  }));
++  auto model = adapter_->Sidebar();
++  ASSERT_EQ(1u, model.pins.size());
++  EXPECT_EQ(pin_id, model.pins[0].id);
++  ASSERT_EQ(1u, model.favorites.size());
++  EXPECT_EQ(temporary_id, model.favorites[0].id);
++  EXPECT_FALSE(tabs->IsTabPinned(tabs->GetIndexOfWebContents(pin_page)));
++  EXPECT_TRUE(tabs->IsTabPinned(tabs->GetIndexOfWebContents(temporary_page)));
++  EXPECT_TRUE(view_->SetMyarcTabsSaved(indices(), true));
++  EXPECT_EQ(1u, adapter_->Sidebar().pins.size());
++
++  // Unsave a mixed Pin + Temporary selection, without promoting/moving the
++  // already-temporary row. Duplicate indices must dispatch each stable ID once.
++  EXPECT_TRUE(view_->SetMyarcTabsSaved(
++      {tabs->GetIndexOfWebContents(temporary_page)}, false));
++  EXPECT_TRUE(view_->SetMyarcTabsSaved(indices(), false));
++  model = adapter_->Sidebar();
++  EXPECT_TRUE(model.pins.empty());
++  EXPECT_TRUE(model.favorites.empty());
++  EXPECT_EQ(temporary_id,
++            myarc::BrowserWorkspaceAdapter::ItemIdForContents(*temporary_page));
++}
++
++IN_PROC_BROWSER_TEST_P(MyarcWorkspaceCommandSafetyTest,
++                       BlankNavigationHasNoImplicitOpenerOrGroup) {
++  auto* tabs = workspace_browser_->GetTabStripModel();
++  auto* hidden = tabs->GetActiveWebContents();
++  const auto old_url = hidden->GetVisibleURL();
++  const auto group = tabs->AddToNewGroup({tabs->active_index()});
++  tabs->EnterFocusMode(group);
++  ASSERT_EQ(group, tabs->GetFocusedGroup());
++  ASSERT_NO_FATAL_FAILURE(EnterEmptySpace());
++  const auto space = adapter_->Sidebar().current_space.id;
++  NavigateParams params(workspace_browser_, GURL("about:blank"),
++                        ui::PAGE_TRANSITION_TYPED);
++  params.referrer.url = GURL("https://source.example/");
++  params.tabstrip_add_types |= AddTabTypes::ADD_INHERIT_OPENER;
++  Navigate(&params);
++  EXPECT_EQ(WindowOpenDisposition::kNewForegroundTab, params.disposition);
++  EXPECT_TRUE(params.user_gesture);
++  EXPECT_EQ(GURL("https://source.example/"), params.referrer.url);
++  EXPECT_EQ(nullptr, params.source_contents);
++  EXPECT_FALSE(params.source_site_instance);
++  EXPECT_EQ(nullptr, params.opener);
++  EXPECT_FALSE(tabs->GetOpenerOfTabAt(tabs->active_index()));
++  EXPECT_FALSE(tabs->GetTabGroupForTab(tabs->active_index()));
++  EXPECT_NE(hidden, tabs->GetActiveWebContents());
++  EXPECT_EQ(old_url, hidden->GetVisibleURL());
++  ASSERT_TRUE(base::test::RunUntil([&] { return adapter_->ready(); }));
++  EXPECT_EQ(space, adapter_->Sidebar().current_space.id);
++
++  ASSERT_NO_FATAL_FAILURE(EnterEmptySpace());
++  auto* active = tabs->GetActiveWebContents();
++  NavigateParams background(workspace_browser_, GURL("about:blank"),
++                            ui::PAGE_TRANSITION_LINK);
++  background.disposition = WindowOpenDisposition::kNewBackgroundTab;
++  Navigate(&background);
++  EXPECT_EQ(WindowOpenDisposition::kNewBackgroundTab, background.disposition);
++  EXPECT_EQ(active, tabs->GetActiveWebContents());
++  ASSERT_TRUE(background.navigated_or_inserted_contents);
++  const int index =
++      tabs->GetIndexOfWebContents(background.navigated_or_inserted_contents);
++  EXPECT_FALSE(tabs->GetOpenerOfTabAt(index));
++  EXPECT_FALSE(tabs->GetTabGroupForTab(index));
++}
++
++IN_PROC_BROWSER_TEST_P(MyarcWorkspaceCommandSafetyTest,
++                       BlankFocusKeepsChromeFieldAndRejectsTabContext) {
++  ASSERT_NO_FATAL_FAILURE(EnterEmptySpace());
++  auto* field = view_->AddChildView(std::make_unique<views::Textfield>());
++  field->SetBounds(0, 0, 160, 30);
++  field->RequestFocus();
++  ASSERT_EQ(field, view_->GetFocusManager()->GetFocusedView());
++  view_->RestoreFocus();
++  EXPECT_EQ(field, view_->GetFocusManager()->GetFocusedView());
++  auto* tabs = workspace_browser_->GetTabStripModel();
++  const int count = tabs->count();
++  EXPECT_FALSE(tabs->IsContextMenuCommandEnabled(
++      tabs->active_index(), TabStripModel::CommandNewTabToRight));
++  tabs->ExecuteContextMenuCommand(tabs->active_index(),
++                                  TabStripModel::CommandNewTabToRight);
++  EXPECT_EQ(count, tabs->count());
++  tabs_api::TabStripModelAdapterImpl tree(tabs, "workspace-test");
++  auto result =
++      tree.MoveTab(tabs->GetActiveTab()->GetHandle(), tabs_api::Position(0));
++  ASSERT_FALSE(result.has_value());
++  EXPECT_EQ(mojo_base::mojom::Code::kInvalidArgument, result.error()->code);
++  view_->RemoveChildViewT(field);
++  view_->GetFocusManager()->ClearFocus();
++  view_->RestoreFocus();
++  EXPECT_EQ(view_->GetInitiallyFocusedView(),
++            view_->GetFocusManager()->GetFocusedView());
++}
++
++#if BUILDFLAG(ENABLE_EXTENSIONS) && (BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC))
++IN_PROC_BROWSER_TEST_P(MyarcWorkspaceCommandSafetyTest,
++                       BlankSearchKeepsRequiredConsent) {
++  extensions::TestExtensionDir dir;
++  dir.WriteManifest(R"({
++    "name": "Workspace consent test", "version": "1", "manifest_version": 3,
++    "permissions": ["storage"],
++    "chrome_settings_overrides": { "search_provider": {
++      "name": "Consent search", "keyword": "consent",
++      "search_url": "https://search.example/?q={searchTerms}",
++      "encoding": "UTF-8", "is_default": true
++    }}
++  })");
++  auto installer =
++      extensions::UnpackedInstaller::Create(workspace_browser_->GetProfile());
++  base::test::TestFuture<const extensions::Extension*, const base::FilePath&,
++                         const std::u16string&>
++      installed;
++  installer->set_completion_callback(installed.GetCallback());
++  installer->Load(dir.UnpackedPath());
++  ASSERT_TRUE(installed.Get<0>());
++  auto* controller =
++      DefaultSearchExtensionControlledController::From(workspace_browser_);
++  ASSERT_TRUE(controller);
++  const GURL url("https://search.example/?q=test");
++  ASSERT_TRUE(base::test::RunUntil([&] {
++    return controller->ShouldRequestConfirmationForExtensionDse(url);
++  }));
++  ASSERT_NO_FATAL_FAILURE(EnterEmptySpace());
++  EXPECT_FALSE(NavigateFromMyarcPalette(workspace_browser_,
++                                        base::UTF8ToUTF16(url.spec()), false));
++  auto* location_bar =
++      BrowserWindow::FromBrowser(workspace_browser_)->GetLocationBar();
++  ChromeOmniboxClient client(location_bar, workspace_browser_,
++                             workspace_browser_->GetProfile());
++  base::test::TestFuture<OmniboxClient::ExtensionControlledDialogResult> result;
++  EXPECT_TRUE(client.ShowConfirmationDialogIfDefaultSearchExtensionControlled(
++      url, result.GetCallback()));
++  // No decision is synthesized. The test runner closes the native dialog at
++  // teardown; actual accept/reject journeys require an unlocked native run.
++  EXPECT_FALSE(result.IsReady());
++}
++#endif
++
++IN_PROC_BROWSER_TEST_P(MyarcWorkspaceCommandSafetyTest,
++                       BulkCommandsKeepOtherSpaces) {
++  auto* tabs = workspace_browser_->GetTabStripModel();
++  ASSERT_TRUE(adapter_->OpenInCurrentSpace(GURL("about:blank")).ok);
++  ASSERT_NO_FATAL_FAILURE(EnterEmptySpace());
++  ASSERT_TRUE(adapter_->OpenInCurrentSpace(GURL("about:blank")).ok);
++  ASSERT_TRUE(base::test::RunUntil([&] {
++    return adapter_->DisplayedContents() == tabs->GetActiveWebContents();
++  }));
++  view_->RefreshMyarcWorkspaceSidebar();
++  ASSERT_FALSE(view_->IsMyarcWorkspaceBlank());
++  ASSERT_TRUE(view_->IsMyarcWorkspaceActive());
++  ASSERT_EQ(1u, adapter_->Sidebar().temporary.size());
++  ASSERT_GE(tabs->count(), 3);
++  std::vector<content::WebContents*> pages;
++  for (int i = 0; i < tabs->count(); ++i) {
++    pages.push_back(tabs->GetWebContentsAt(i));
++  }
++  const int index = tabs->active_index();
++  constexpr std::pair<int, actions::ActionId> commands[] = {
++      {IDC_WINDOW_CLOSE_OTHER_TABS, kActionWindowCloseOtherTabs},
++      {IDC_WINDOW_CLOSE_TABS_TO_RIGHT, kActionWindowCloseTabsToRight},
++      {IDC_BOOKMARK_ALL_TABS, kActionBookmarkAllTabs},
++      {IDC_GROUP_UNGROUPED_TABS, kActionGroupUngroupedTabs},
++      {IDC_MOVE_TAB_NEXT, kActionMoveTabNext},
++      {IDC_MOVE_TAB_PREVIOUS, kActionMoveTabPrevious},
++      {IDC_MOVE_TAB_TO_NEW_WINDOW, kActionMoveTabToNewWindow},
++      {IDC_WINDOW_GROUP_TAB, kActionWindowGroupTab},
++      {IDC_ADD_NEW_TAB_TO_GROUP, kActionAddNewTabToGroup},
++      {IDC_CREATE_NEW_TAB_GROUP, kActionCreateNewTabGroup}};
++  auto* root = BrowserActions::From(workspace_browser_)->root_action_item();
++  for (const auto& [command, action_id] : commands) {
++    SCOPED_TRACE(command);
++    EXPECT_FALSE(IsCommandEnabled(workspace_browser_, command));
++    EXPECT_FALSE(ExecuteCommand(workspace_browser_, command));
++    auto* action = actions::ActionManager::Get().FindAction(action_id, root);
++    ASSERT_TRUE(action);
++    EXPECT_FALSE(action->GetEnabled());
++    // Even stale ActionItems must recheck execution eligibility.
++    action->SetEnabled(true);
++    action->InvokeAction();
++  }
++  EXPECT_FALSE(CanCloseOtherTabs(workspace_browser_));
++  EXPECT_FALSE(CanCloseTabsToRight(workspace_browser_));
++  EXPECT_FALSE(CanBookmarkAllTabs(workspace_browser_));
++  EXPECT_FALSE(CanGroupAllUngroupedTabs(workspace_browser_));
++  EXPECT_FALSE(CanMoveActiveTabToNewWindow(workspace_browser_));
++  EXPECT_FALSE(CanMoveTabsToNewWindow(workspace_browser_, {index}));
++  CloseOtherTabs(workspace_browser_);
++  CloseTabsToRight(workspace_browser_);
++  BookmarkAllTabs(workspace_browser_);
++  EXPECT_FALSE(GroupAllUngroupedTabs(workspace_browser_));
++  GroupTab(workspace_browser_);
++  MoveTabNext(workspace_browser_);
++  MoveTabPrevious(workspace_browser_);
++  MoveActiveTabToNewWindow(workspace_browser_);
++  MoveTabsToNewWindow(workspace_browser_, {index});
++  MoveTabsToExistingWindow(workspace_browser_, browser(), {index});
++  constexpr TabStripModel::ContextMenuCommand context_commands[] = {
++      TabStripModel::CommandCloseOtherTabs,
++      TabStripModel::CommandCloseTabsToRight,
++      TabStripModel::CommandToggleGrouped,
++      TabStripModel::CommandAddToNewGroup,
++      TabStripModel::CommandAddToExistingGroup,
++      TabStripModel::CommandMoveTabsToNewWindow,
++      TabStripModel::CommandMoveToExistingWindow};
++  for (auto command : context_commands) {
++    SCOPED_TRACE(command);
++    EXPECT_FALSE(tabs->IsContextMenuCommandEnabled(index, command));
++    tabs->ExecuteContextMenuCommand(index, command);
++  }
++  ASSERT_EQ(static_cast<int>(pages.size()), tabs->count());
++  EXPECT_EQ(index, tabs->active_index());
++  for (int i = 0; i < tabs->count(); ++i) {
++    EXPECT_EQ(pages[i], tabs->GetWebContentsAt(i));
++    EXPECT_FALSE(tabs->GetTabGroupForTab(i));
++  }
++}
++
++IN_PROC_BROWSER_TEST_P(MyarcWorkspaceCommandSafetyTest,
++                       ActionReplayPreservesSupportAndPolicy) {
++  ASSERT_TRUE(embedded_test_server()->Start());
++  ASSERT_TRUE(ui_test_utils::NavigateToURL(
++      workspace_browser_, embedded_test_server()->GetURL("/title1.html")));
++  auto* controller = BrowserCommandController::From(workspace_browser_);
++  auto* root = BrowserActions::From(workspace_browser_)->root_action_item();
++  auto* lens = actions::ActionManager::Get().FindAction(
++      kActionContentContextLensRegionSearch, root);
++  auto* qr =
++      actions::ActionManager::Get().FindAction(kActionQrCodeGenerator, root);
++  ASSERT_TRUE(lens);
++  ASSERT_TRUE(qr);
++  const bool supported = SupportsCommand(
++      workspace_browser_, IDC_CONTENT_CONTEXT_LENS_REGION_SEARCH);
++  EXPECT_EQ(GetParam(), supported);
++  const bool lens_enabled = lens->GetEnabled();
++  const auto old_space = adapter_->Sidebar().current_space.id;
++  const bool qr_policy = g_browser_process->local_state()->GetBoolean(
++      prefs::kQRCodeGeneratorEnabled);
++  base::ScopedClosureRunner restore_qr_policy(base::BindOnce(
++      [](bool enabled) {
++        g_browser_process->local_state()->SetBoolean(
++            prefs::kQRCodeGeneratorEnabled, enabled);
++      },
++      qr_policy));
++  for (int pass = 0; pass < 2; ++pass) {
++    g_browser_process->local_state()->SetBoolean(prefs::kQRCodeGeneratorEnabled,
++                                                 true);
++    controller->TabStateChanged();
++    ASSERT_TRUE(qr->GetEnabled());
++    ASSERT_NO_FATAL_FAILURE(EnterEmptySpace());
++    EXPECT_FALSE(lens->GetEnabled());
++    EXPECT_FALSE(qr->GetEnabled());
++    // A policy change while masked must survive native-state replay.
++    g_browser_process->local_state()->SetBoolean(prefs::kQRCodeGeneratorEnabled,
++                                                 false);
++    controller->MyarcWorkspaceStateChanged();
++    EXPECT_FALSE(lens->GetEnabled());
++    EXPECT_EQ(supported,
++              SupportsCommand(workspace_browser_,
++                              IDC_CONTENT_CONTEXT_LENS_REGION_SEARCH));
++    ASSERT_TRUE(adapter_->SelectSpace(old_space).ok);
++    view_->RefreshMyarcWorkspaceSidebar();
++    EXPECT_EQ(lens_enabled, lens->GetEnabled());
++    EXPECT_FALSE(qr->GetEnabled());
++    EXPECT_EQ(supported,
++              SupportsCommand(workspace_browser_,
++                              IDC_CONTENT_CONTEXT_LENS_REGION_SEARCH));
++  }
++  g_browser_process->local_state()->SetBoolean(prefs::kQRCodeGeneratorEnabled,
++                                               qr_policy);
++  EXPECT_FALSE(IsMyarcPageCommand(IDC_TAKE_SCREENSHOT));
++}
++
++IN_PROC_BROWSER_TEST_P(MyarcWorkspaceCommandSafetyTest,
++                       NativeFallbackBeforeProjectionReady) {
++  auto* tabs = workspace_browser_->GetTabStripModel();
++  ASSERT_TRUE(adapter_->OpenInCurrentSpace(GURL("about:blank")).ok);
++  ASSERT_TRUE(base::test::RunUntil([&] {
++    return adapter_->DisplayedContents() == tabs->GetActiveWebContents();
++  }));
++  view_->RefreshMyarcWorkspaceSidebar();
++  EXPECT_FALSE(CanCloseOtherTabs(workspace_browser_));
++  myarc::BrowserWorkspaceAdapter::BeginSessionRestore(
++      *workspace_browser_->GetProfile());
++  view_->RefreshMyarcWorkspaceSidebar();
++  ASSERT_FALSE(adapter_->ready());
++  EXPECT_FALSE(view_->IsMyarcWorkspaceActive());
++  EXPECT_FALSE(view_->IsMyarcWorkspaceBlank());
++  EXPECT_TRUE(CanCloseOtherTabs(workspace_browser_));
++  EXPECT_TRUE(
++      IsCommandEnabled(workspace_browser_, IDC_WINDOW_CLOSE_OTHER_TABS));
++  EXPECT_TRUE(IsCommandEnabled(workspace_browser_, IDC_CLOSE_TAB));
++  ASSERT_TRUE(myarc::BrowserWorkspaceAdapter::FinishSessionRestore(
++                  *workspace_browser_->GetProfile())
++                  .ok);
++  ASSERT_TRUE(base::test::RunUntil([&] { return adapter_->ready(); }));
++  view_->RefreshMyarcWorkspaceSidebar();
++  EXPECT_TRUE(view_->IsMyarcWorkspaceActive());
++  EXPECT_FALSE(
++      IsCommandEnabled(workspace_browser_, IDC_WINDOW_CLOSE_OTHER_TABS));
++}
++
++IN_PROC_BROWSER_TEST_P(MyarcWorkspaceCommandSafetyTest,
++                       LastTemporaryCloseBlanksSpace) {
++  auto* tabs = workspace_browser_->GetTabStripModel();
++  ASSERT_TRUE(ui_test_utils::NavigateToURL(
++      workspace_browser_, GURL("data:text/html,<title>Retained page</title>")));
++  auto* retained = tabs->GetActiveWebContents();
++  const auto retained_item =
++      myarc::BrowserWorkspaceAdapter::ItemIdForContents(*retained);
++  ASSERT_NO_FATAL_FAILURE(EnterEmptySpace());
++  const auto empty_space = adapter_->Sidebar().current_space.id;
++  ASSERT_TRUE(adapter_->OpenInCurrentSpace(GURL("about:blank")).ok);
++  ASSERT_TRUE(base::test::RunUntil([&] {
++    return !view_->IsMyarcWorkspaceBlank() &&
++           adapter_->DisplayedContents() == tabs->GetActiveWebContents();
++  }));
++  const auto item = myarc::BrowserWorkspaceAdapter::ItemIdForContents(
++      *tabs->GetActiveWebContents());
++  auto* source = actions::ActionManager::Get().FindAction(
++      kActionViewSource,
++      BrowserActions::From(workspace_browser_)->root_action_item());
++  ASSERT_TRUE(source);
++  ASSERT_TRUE(adapter_->CloseItem(item).ok);
++  // No SelectSpace or manual command refresh: native close must notify Views.
++  ASSERT_TRUE(base::test::RunUntil([&] {
++    return adapter_->Sidebar().temporary.empty() &&
++           view_->IsMyarcWorkspaceBlank() && !source->GetEnabled();
++  }));
++  EXPECT_EQ(empty_space, adapter_->Sidebar().current_space.id);
++  EXPECT_EQ(retained, tabs->GetActiveWebContents());
++  EXPECT_FALSE(IsCommandEnabled(workspace_browser_, IDC_CLOSE_TAB));
++  EXPECT_FALSE(source->GetEnabled());
++  const int index = tabs->active_index();
++  ASSERT_TRUE(adapter_->ActivateItem(retained_item).ok);
++  ASSERT_TRUE(base::test::RunUntil(
++      [&] { return !view_->IsMyarcWorkspaceBlank() && source->GetEnabled(); }));
++  EXPECT_EQ(index, tabs->active_index());
++  EXPECT_TRUE(IsCommandEnabled(workspace_browser_, IDC_CLOSE_TAB));
++  EXPECT_TRUE(source->GetEnabled());
++}
++
++INSTANTIATE_TEST_SUITE_P(LegacyAndActions,
++                         MyarcWorkspaceCommandSafetyTest,
++                         testing::Bool());
++
+ }  // namespace chrome

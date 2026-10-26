@@ -1,0 +1,23 @@
+diff --git a/chrome/browser/ui/browser_tabrestore.cc b/chrome/browser/ui/browser_tabrestore.cc
+index f2a9542aea8d31977a7918886c41d5d9a49617af..f2ff909446aa5aaae70a49010d71db4e41931673 100644
+--- a/chrome/browser/ui/browser_tabrestore.cc
++++ b/chrome/browser/ui/browser_tabrestore.cc
+@@ -37,6 +37,7 @@
+ #include "content/public/browser/restore_type.h"
+ #include "content/public/browser/session_storage_namespace_handle.h"
+ #include "content/public/browser/web_contents.h"
++#include "myarc/workspace_lifecycle.h"
+ #include "third_party/blink/public/common/user_agent/user_agent_metadata.h"
+ #include "ui/gfx/geometry/size.h"
+ #include "ui/gfx/range/range.h"
+@@ -83,6 +84,10 @@ std::unique_ptr<WebContents> CreateRestoredTab(
+   apps::SetAppIdForWebContents(browser->GetProfile(), web_contents.get(),
+                                extension_app_id);
+ 
++  if (auto* lifecycle = myarc::WorkspaceLifecycle::Get(browser->GetProfile())) {
++    lifecycle->RestoreTab(*browser, *web_contents, extra_data);
++  }
++
+   glic::RestoreGlicStateFromExtraData(web_contents.get(), extra_data);
+   contextual_tasks::ContextualTasksTabRestoreData::RestoreFromExtraData(
+       web_contents.get(), extra_data);

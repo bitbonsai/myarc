@@ -1,0 +1,81 @@
+diff --git a/chrome/browser/ui/views/frame/vertical_tab_strip_region_view.h b/chrome/browser/ui/views/frame/vertical_tab_strip_region_view.h
+index 5c8d5a6d2038b452b94656096a0057209ea34d32..abd63cee3d9b2dc4c046680215e66fef9d36c7ab 100644
+--- a/chrome/browser/ui/views/frame/vertical_tab_strip_region_view.h
++++ b/chrome/browser/ui/views/frame/vertical_tab_strip_region_view.h
+@@ -28,6 +28,7 @@
+ #include "ui/base/interaction/element_tracker.h"
+ #include "ui/base/metadata/metadata_header_macros.h"
+ #include "ui/events/event_handler.h"
++#include "ui/events/event_observer.h"
+ #include "ui/gfx/geometry/point.h"
+ #include "ui/views/accessible_pane_view.h"
+ #include "ui/views/controls/resize_area_delegate.h"
+@@ -45,6 +46,7 @@ class VerticalTabStripStateController;
+ }  // namespace tabs
+ 
+ namespace views {
++class EventMonitor;
+ class ResizeArea;
+ class Separator;
+ class View;
+@@ -58,7 +60,8 @@ class VerticalTabStripRegionView final
+       public OmniboxTabHelper::Observer,
+       public tabs::VerticalTabStripStateController::Delegate,
+       public OrganizerPanelHost,
+-      public views::LayoutDelegate {
++      public views::LayoutDelegate,
++      public ui::EventObserver {
+   METADATA_HEADER(VerticalTabStripRegionView, BaseTabStripRegionView)
+ 
+  public:
+@@ -81,6 +84,11 @@ class VerticalTabStripRegionView final
+     return bottom_button_container_;
+   }
+ 
++  // Separate body only. Native header and width/collapse state remain upstream.
++  void SetMyarcWorkspaceSidebar(std::unique_ptr<views::View> sidebar);
++  void SetMyarcWorkspaceReady(bool ready);
++  void RemoveMyarcWorkspaceSidebar();
++
+   bool IsPositionInWindowCaption(const gfx::Point& point) override;
+ 
+   // These methods provide the toolbar height and exclusion width, before the
+@@ -111,6 +119,11 @@ class VerticalTabStripRegionView final
+   void OnMouseMoved(const ui::MouseEvent& event) override;
+   void OnMouseExited(const ui::MouseEvent& event) override;
+ 
++  using BaseTabStripRegionView::OnEvent;
++
++  // ui::EventObserver:
++  void OnEvent(const ui::Event& event) override;
++
+   std::unique_ptr<ExpandOnHoverLock> GetExpandOnHoverLock(
+       ExpandOnHoverLockType lock_type) override;
+ 
+@@ -201,6 +214,7 @@ class VerticalTabStripRegionView final
+   // strip.
+   gfx::Rect GetTabStripDraggableBounds() const override;
+ 
++  bool IsMyarcHoverEdge(const gfx::Point& screen_point) const;
+   void OnExpandOnHoverEnabledChanged(bool enabled);
+   void UpdateExpandOnHoverState(std::optional<bool> hovered = std::nullopt);
+   void OnMouseVelocityHeuristicInterval();
+@@ -224,6 +238,8 @@ class VerticalTabStripRegionView final
+   raw_ptr<views::View> organizer_panel_view_ = nullptr;
+   double organizer_panel_show_percent_ = 0.0;
+ 
++  raw_ptr<views::View> myarc_workspace_sidebar_ = nullptr;
++  bool myarc_workspace_ready_ = false;
+   raw_ptr<views::View> content_area_view_ = nullptr;
+   raw_ptr<VerticalTabStripTopContainer> top_button_container_ = nullptr;
+   raw_ptr<views::Separator> top_button_separator_ = nullptr;
+@@ -260,6 +276,9 @@ class VerticalTabStripRegionView final
+ 
+   base::OneShotTimer expand_on_hover_timer_;
+   bool is_expanded_on_hover_ = false;
++  // Observes this window without adding a hit target over page content.
++  std::unique_ptr<views::EventMonitor> myarc_edge_monitor_;
++  bool myarc_edge_hovered_ = false;
+   bool suppress_expand_on_hover_ = false;
+   std::optional<base::TimeTicks> expand_on_hover_start_time_;
+   base::RetainingOneShotTimer expand_on_hover_heuristic_timer_;

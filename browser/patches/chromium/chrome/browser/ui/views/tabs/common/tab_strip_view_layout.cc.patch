@@ -1,0 +1,28 @@
+diff --git a/chrome/browser/ui/views/tabs/common/tab_strip_view_layout.cc b/chrome/browser/ui/views/tabs/common/tab_strip_view_layout.cc
+index f016525adc1c543d223e2854369a57c8157857f4..a33319899a13969e1bb2759a6b810f1a0a366f94 100644
+--- a/chrome/browser/ui/views/tabs/common/tab_strip_view_layout.cc
++++ b/chrome/browser/ui/views/tabs/common/tab_strip_view_layout.cc
+@@ -6,6 +6,7 @@
+ 
+ #include <algorithm>
+ 
++#include "base/command_line.h"
+ #include "base/logging.h"
+ #include "chrome/browser/ui/layout_constants.h"
+ #include "chrome/browser/ui/tabs/tab_style.h"
+@@ -277,8 +278,13 @@ views::ProposedLayout TabStripViewLayout::CalculateVerticalLayout(
+   int y = 0;
+ 
+   // Determine container preferred heights.
+-  views::SizeBounds pinned_tab_container_size_bounds =
+-      size_bounds.Inset(gfx::Insets::TLBR(0, region_horizontal_padding, 0, 0));
++  // Tiles fill the container; reserve both gutters here, including for splits.
++  const int trailing_padding =
++      base::CommandLine::ForCurrentProcess()->HasSwitch("myarc-visual-parity")
++          ? region_horizontal_padding
++          : 0;
++  views::SizeBounds pinned_tab_container_size_bounds = size_bounds.Inset(
++      gfx::Insets::TLBR(0, region_horizontal_padding, 0, trailing_padding));
+   const int pinned_preferred_height =
+       pinned_tabs_scroll_view
+           ->GetPreferredSize(pinned_tab_container_size_bounds)

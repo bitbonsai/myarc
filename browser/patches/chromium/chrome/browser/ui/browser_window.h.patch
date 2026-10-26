@@ -1,0 +1,55 @@
+diff --git a/chrome/browser/ui/browser_window.h b/chrome/browser/ui/browser_window.h
+index 3b0e66f8a95dc0518c74122eec1baab5717c3028..fb7f347d30c64a4304c5229dcaac75de4becba2d 100644
+--- a/chrome/browser/ui/browser_window.h
++++ b/chrome/browser/ui/browser_window.h
+@@ -112,6 +112,25 @@ class BrowserWindow : public ui::BaseWindow {
+  public:
+   virtual ~BrowserWindow() = default;
+ 
++  // Presentation query only. Rust remains authoritative; metadata loading uses
++  // ordinary native browsing. Defaults preserve windows without the experiment.
++  virtual bool IsMyarcWorkspaceBlank() const;
++  // Reselecting the same hidden native tab emits no active-tab change.
++  virtual void RevealMyarcActiveTab();
++  // Native tabs include other Spaces while the Rust projection is ready.
++  virtual bool IsMyarcWorkspaceActive() const;
++
++  struct MyarcTabSaveState {
++    bool enabled = false;
++    bool save = true;
++    std::u16string label;
++  };
++  virtual std::optional<MyarcTabSaveState> GetMyarcTabSaveState(
++      const std::vector<int>& indices) const;
++  // True consumes the explicit user operation, including an actionable failure.
++  // Generic native pin-bit changes (restore/detach) must not unsave metadata.
++  virtual bool SetMyarcTabsSaved(const std::vector<int>& indices, bool saved);
++
+   //////////////////////////////////////////////////////////////////////////////
+   // ui::BaseWindow interface notes:
+ 
+@@ -508,4 +527,24 @@ class BrowserWindow : public ui::BaseWindow {
+   virtual void DeleteBrowserWindow() = 0;
+ };
+ 
++inline bool BrowserWindow::IsMyarcWorkspaceBlank() const {
++  return false;
++}
++
++inline void BrowserWindow::RevealMyarcActiveTab() {}
++
++inline bool BrowserWindow::IsMyarcWorkspaceActive() const {
++  return false;
++}
++
++inline std::optional<BrowserWindow::MyarcTabSaveState>
++BrowserWindow::GetMyarcTabSaveState(const std::vector<int>& indices) const {
++  return std::nullopt;
++}
++
++inline bool BrowserWindow::SetMyarcTabsSaved(const std::vector<int>& indices,
++                                             bool saved) {
++  return false;
++}
++
+ #endif  // CHROME_BROWSER_UI_BROWSER_WINDOW_H_

@@ -1,0 +1,26 @@
+diff --git a/chrome/browser/ui/cocoa/accelerators_cocoa.mm b/chrome/browser/ui/cocoa/accelerators_cocoa.mm
+index 7182077016dc6e932a039a6f0fd75f939dca50a9..490f5325270e7143762e70b36f381bc413b08def 100644
+--- a/chrome/browser/ui/cocoa/accelerators_cocoa.mm
++++ b/chrome/browser/ui/cocoa/accelerators_cocoa.mm
+@@ -10,6 +10,7 @@
+ #include <algorithm>
+ #include <utility>
+ 
++#include "base/command_line.h"
+ #include "base/i18n/rtl.h"
+ #include "base/mac/mac_util.h"
+ #include "base/memory/singleton.h"
+@@ -145,6 +146,13 @@ AcceleratorsCocoa::AcceleratorsCocoa() {
+     CHECK(result.second, base::NotFatalUntil::M162);
+   }
+ 
++  if (base::CommandLine::ForCurrentProcess()->HasSwitch(
++          "myarc-visual-parity")) {
++    accelerators_[IDC_TOGGLE_VERTICAL_TABS_COLLAPSE] =
++        ui::Accelerator(ui::VKEY_S, ui::EF_COMMAND_DOWN);
++    accelerators_.erase(IDC_SAVE_PAGE);
++  }
++
+   accelerators_[IDC_CLOSE_WINDOW] = AcceleratorForCloseWindow();
+ 
+   auto result = accelerators_.insert(

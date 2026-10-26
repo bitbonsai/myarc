@@ -1,6 +1,6 @@
 # Optional native saved-page fade
 
-MA-007.c-fade, 2026-10-25. [Patch 0014](../patches/0014-native-pinned-site-fade.patch) builds in native Chromium. The parent recorded visible fade intermediates between live native pins and a direct cut under app-only reduced motion. Automated browser regressions and the Rust-sidebar route remain unrun.
+MA-007.c-fade, 2026-10-25. [Patch 0014](../patches/legacy/0014-native-pinned-site-fade.patch) builds in native Chromium. The parent recorded visible fade intermediates between live native pins and a direct cut under app-only reduced motion. Automated browser regressions and the Rust-sidebar route remain unrun.
 
 This is new myArc polish requested conditionally on a small native change. The 120 ms incoming fade is a prototype choice, not observed or measured Arc behavior. It fades the incoming page through the existing compositor. DOM morphing and old/new crossfading remain outside this slice.
 

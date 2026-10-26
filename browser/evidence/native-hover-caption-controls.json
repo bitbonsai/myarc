@@ -25,7 +25,7 @@
     "chrome/browser/ui/views/frame/browser_view_browsertest.cc",
     "chrome/browser/ui/views/frame/contents_web_view.cc"
   ],
-  "patch": "browser/patches/0015-native-hover-caption-controls.patch",
+  "patch": "browser/patches/legacy/0015-native-hover-caption-controls.patch",
   "patch_sha256": "bd9b1b7b1e69630843fd2303dace7bc90bc51daf8a0b1c2f3adfc0f401ad9eac",
   "source_checked_patch_sha256": "da932b333abb17b7f71729eb9d750cae8ad2e800c1d30a2d7fc4512c0528fe05",
   "files": {

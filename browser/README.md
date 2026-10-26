@@ -1,6 +1,6 @@
 # M0 foundation experiment
 
-Status: unmodified Chromium built and launched; a Rust-owned rename command works through a native toolbar test control. The integration builds and passes its core/bridge checks on two upstream revisions. Foundation acceptance remains open. [upstream.json](upstream.json) pins the feasibility candidate and patch; [initial build evidence](evidence/foundation.json) and [later runtime evidence](evidence/runtime.json) record their separate scope and outstanding checks. This development build is not a myarc release.
+Status: unmodified Chromium built and launched; a Rust-owned rename command works through a native toolbar test control. The integration builds and passes its core/bridge checks on two upstream revisions. Foundation acceptance remains open. [upstream.json](upstream.json) pins the base revision and branch for the [patch exports](#chromium-branch-and-patch-exports); [initial build evidence](evidence/foundation.json) and [later runtime evidence](evidence/runtime.json) record their separate scope and outstanding checks. This development build is not a myarc release.
 
 ## Bounded outcomes
 
@@ -14,7 +14,7 @@ Current work prioritizes [MA-007.a, the native shell experiment](experiments/nat
 
 ## Candidate workspace lifecycle hooks
 
-[Patch 0011](patches/0011-native-workspace-lifecycle.patch) connects native startup/restore and shutdown to the Profile-owned adapter. Its base-only [dispatch boundary](foundation/workspace_lifecycle.h) avoids a reverse dependency from sessions/lifetime to the adapter. With optional 0020 applied, each opted-in normal window registers its adapter during BrowserView initialization, before native restore hints, even while horizontal. Sidebar presentation still waits for vertical mode. Keep `--myarc-workspace-sidebar` disabled until command safety and native restoration checks pass.
+[Patch 0011](patches/legacy/0011-native-workspace-lifecycle.patch) connects native startup/restore and shutdown to the Profile-owned adapter. Its base-only [dispatch boundary](foundation/workspace_lifecycle.h) avoids a reverse dependency from sessions/lifetime to the adapter. With optional 0020 applied, each opted-in normal window registers its adapter during BrowserView initialization, before native restore hints, even while horizontal. Sidebar presentation still waits for vertical mode. Keep `--myarc-workspace-sidebar` disabled until command safety and native restoration checks pass.
 
 The canonical foundation payload now includes 16 owned files. Patch 0011 contains upstream hooks only; its owned helper and adapter changes live in that payload. After applying the optional native stack through 0011, run from Chromium's source root:
 
@@ -54,7 +54,7 @@ Run from the myarc repository root. Choose a new external checkout path with no 
 set -eu
 REPO="$PWD"
 WORK="$HOME/.cache/myarc-m0"
-REV=7ae71de816ba32868ff9f974c2716f04ebd9b860
+REV=8d208f20744ac6d4ce00cc3f9de6a14a9b8b926d  # "revision" in browser/upstream.json
 
 mkdir -p "$WORK"
 git clone https://chromium.googlesource.com/chromium/tools/depot_tools.git "$WORK/depot_tools"
@@ -103,19 +103,25 @@ cargo fmt --all -- --check
 rustfmt --check --edition 2024 browser/foundation/bridge.rs
 cargo clippy --workspace --all-targets --locked -- -D warnings
 cargo test --workspace --locked
-python3 tools/check_foundation_patch.py
 ```
 
-Cargo uses pinned Rust 1.96.1. Chromium GN uses its fetched toolchain. The same dependency-free [core source](../crates/workspace/src/lib.rs) is packaged in the patch; the freshness check rejects drift between that payload and the canonical repository files. The GitHub workflow covers standalone checks, not the external Chromium build.
+Cargo uses pinned Rust 1.96.1. Chromium GN uses its fetched toolchain. The GitHub workflow covers standalone checks, not the external Chromium build.
 
-After the unmodified build, use a clean external checkout at the pinned base. Preserve unrelated changes and existing branches. The patch includes the native integration, owned source files and MIT notice:
+### Chromium branch and patch exports
+
+The `myarc` branch in the external checkout is the source of truth for upstream-file changes. It starts at the `revision` in [upstream.json](upstream.json). myarc-owned code is linked, not copied: `src/myarc` is an untracked symlink to [browser/foundation](foundation/BUILD.gn), whose `workspace` and `LICENSE` entries link to [crates/workspace](../crates/workspace/src/lib.rs) and the repository license. Edits in this repository take effect on the next build with no copy step. The checkout's `.git/info/exclude` hides the link from Chromium diffs.
+
+`browser/patches/chromium/` holds one generated patch per changed upstream file, at the file's Chromium path plus `.patch`. The numbered stack in [patches/legacy](patches/legacy/README.md) is historical and no longer applied.
+
+After the unmodified build, set up a checkout at the pinned base:
 
 ```sh
 SRC="$WORK/chromium/src"
 git -C "$SRC" config --local user.name bitbonsai
 git -C "$SRC" config --local user.email 44185+bitbonsai@users.noreply.github.com
-git -C "$SRC" switch -c myarc/m0-foundation "$REV"
-git -C "$SRC" am "$REPO/browser/patches/0001-workspace-foundation.patch"
+python3 tools/export_patches.py --apply "$SRC"
+git -C "$SRC" switch -c myarc
+git -C "$SRC" commit -m "Apply myarc patch exports"
 cd "$SRC"
 gn gen out/MyarcM0
 autoninja -C out/MyarcM0 -j 8 chrome myarc:bridge_check myarc:workspace_unittests
@@ -128,7 +134,18 @@ out/MyarcM0/Chromium.app/Contents/MacOS/Chromium \
 
 The flag adds `Test Space: Everyday`. Activating it runs `rename_space` in Rust and changes the label to Research, then back on the next activation. Each toolbar owns one transient workspace; closing it discards that state. Browser Spaces, import and persistence remain unimplemented. The control is omitted without the flag.
 
-For reapplication, select a new branch at `8d208f20744ac6d4ce00cc3f9de6a14a9b8b926d`, apply the same patch, then run dependency sync/hooks, GN generation and the build/check commands again. Keep the root checkout unmanaged during sync, as in the generated `.gclient`, so sync preserves the applied patch. Verify the checked-out commit and identity before compiling. The recorded run reused the output directory; it was an incremental rebuild, not a second fresh-output timing measurement. This immediate-child revision rolls a PHP test dependency and is a weak measure of future browser/security-update porting cost.
+`--apply` refuses a checkout whose HEAD is not the base revision. It applies every export with `git apply --index`, then creates the symlink and its exclude entry.
+
+Commit upstream-file changes on the `myarc` branch, then regenerate and check the exports from this repository:
+
+```sh
+python3 tools/export_patches.py
+python3 tools/export_patches.py --check
+```
+
+The first command rewrites `browser/patches/chromium/` and deletes stale patches. `--check` fails when an export differs from the branch or fails `git apply --cached --check` against a clean base tree in a temporary index. Both read committed branch state, so uncommitted checkout edits are not exported. They use `~/.cache/myarc-m0/chromium/src` unless `--src` names another checkout, so CI cannot run them.
+
+MA-002.c reapplied the legacy 0001 patch on a new branch at `8d208f20744ac6d4ce00cc3f9de6a14a9b8b926d`, then ran dependency sync/hooks, GN generation and the build/check commands again. Keep the root checkout unmanaged during sync, as in the generated `.gclient`, so sync preserves applied changes. Verify the checked-out commit and identity before compiling. The recorded run reused the output directory; it was an incremental rebuild, not a second fresh-output timing measurement. This immediate-child revision rolls a PHP test dependency and is a weak measure of future browser/security-update porting cost.
 
 ## Runtime regression checks
 

@@ -1,0 +1,146 @@
+diff --git a/chrome/browser/ui/tabs/tab_strip_model.cc b/chrome/browser/ui/tabs/tab_strip_model.cc
+index 8f53ac45605d10c921fee6fba53a758b22afa687..471e3163c9116440519c1bf8dcc4152f4adf0860 100644
+--- a/chrome/browser/ui/tabs/tab_strip_model.cc
++++ b/chrome/browser/ui/tabs/tab_strip_model.cc
+@@ -1027,6 +1027,13 @@ void TabStripModel::ActivateTabAt(int index,
+ 
+ void TabStripModel::ActivateTab(tabs::TabInterface* tab,
+                                 TabStripUserGestureDetails user_gesture) {
++  if (tab && tab == GetActiveTab()) {
++    auto* browser = delegate_->GetBrowserWindowInterface();
++    if (auto* window = browser ? BrowserWindow::FromBrowser(browser) : nullptr;
++        window && window->IsMyarcWorkspaceBlank()) {
++      window->RevealMyarcActiveTab();
++    }
++  }
+   ReentrancyCheck reentrancy_check(&reentrancy_guard_);
+ 
+   CHECK(tab);
+@@ -1731,9 +1738,16 @@ void TabStripModel::AddTab(std::unique_ptr<tabs::TabModel> tab,
+   // If the newly-opened tab is part of the same task as the parent tab, we want
+   // to inherit the parent's opener attribute, so that if this tab is then
+   // closed we'll jump back to the parent tab.
++  auto* browser = delegate_->GetBrowserWindowInterface();
++  auto* window = browser ? BrowserWindow::FromBrowser(browser) : nullptr;
++  const bool blank = window && window->IsMyarcWorkspaceBlank();
++  if (blank) {
++    add_types &= ~ADD_INHERIT_OPENER;
++  }
+   bool inherit_opener = (add_types & ADD_INHERIT_OPENER) == ADD_INHERIT_OPENER;
+ 
+-  if (ui::PageTransitionTypeIncludingQualifiersIs(transition,
++  if (!blank &&
++      ui::PageTransitionTypeIncludingQualifiersIs(transition,
+                                                   ui::PAGE_TRANSITION_LINK) &&
+       (add_types & ADD_FORCE_INDEX) == 0) {
+     // We assume tabs opened via link clicks are part of the same task as their
+@@ -1788,7 +1802,8 @@ void TabStripModel::AddTab(std::unique_ptr<tabs::TabModel> tab,
+     index = GetIndexRangeOfSplit(split_id.value()).GetMax();
+   }
+ 
+-  if (ui::PageTransitionTypeIncludingQualifiersIs(transition,
++  if (!blank &&
++      ui::PageTransitionTypeIncludingQualifiersIs(transition,
+                                                   ui::PAGE_TRANSITION_TYPED) &&
+       index == count()) {
+     // Also, any tab opened at the end of the TabStrip with a "TYPED"
+@@ -2690,6 +2705,30 @@ bool TabStripModel::IsContextMenuCommandEnabled(
+   if (!ContainsIndex(context_index)) {
+     return false;
+   }
++  auto* browser = delegate_->GetBrowserWindowInterface();
++  auto* window = browser ? BrowserWindow::FromBrowser(browser) : nullptr;
++  if (window && window->IsMyarcWorkspaceBlank() &&
++      command_id != CommandToggleVertical) {
++    return false;
++  }
++  if (window && window->IsMyarcWorkspaceActive()) {
++    // Native bulk/group operations do not understand the visible Rust Space.
++    switch (command_id) {
++      case CommandCloseOtherTabs:
++      case CommandCloseTabsToRight:
++      case CommandToggleGrouped:
++      case CommandAddToNewGroup:
++      case CommandAddToNewGroupFromMenuItem:
++      case CommandAddToExistingGroup:
++      case CommandRemoveFromGroup:
++      case CommandToggleFocusGroup:
++      case CommandMoveToExistingWindow:
++      case CommandMoveTabsToNewWindow:
++        return false;
++      default:
++        break;
++    }
++  }
+   tabs::TabHandle context_tab = GetTabAtIndex(context_index)->GetHandle();
+ 
+   switch (command_id) {
+@@ -2725,6 +2764,12 @@ bool TabStripModel::IsContextMenuCommandEnabled(
+     }
+ 
+     case CommandTogglePinned:
++      if (window) {
++        if (const auto state = window->GetMyarcTabSaveState(
++                GetIndicesForCommand(context_index))) {
++          return state->enabled;
++        }
++      }
+       return true;
+ 
+     case CommandToggleGrouped:
+@@ -2836,6 +2881,14 @@ void TabStripModel::ExecuteContextMenuCommand(int context_index,
+   if (!ContainsIndex(context_index)) {
+     return;
+   }
++  auto* workspace_browser = delegate_->GetBrowserWindowInterface();
++  auto* window = workspace_browser
++                     ? BrowserWindow::FromBrowser(workspace_browser)
++                     : nullptr;
++  if (window && window->IsMyarcWorkspaceActive() &&
++      !IsContextMenuCommandEnabled(context_index, command_id)) {
++    return;
++  }
+   tabs::TabHandle context_tab = GetTabAtIndex(context_index)->GetHandle();
+   switch (command_id) {
+     case CommandNewTabToRight: {
+@@ -2950,11 +3003,14 @@ void TabStripModel::ExecuteContextMenuCommand(int context_index,
+       base::RecordAction(UserMetricsAction("TabContextMenu_TogglePinned"));
+ 
+       std::vector<int> indices = GetIndicesForCommand(context_index);
++      const bool pin = WillContextMenuPin(context_index);
++      if (window && window->SetMyarcTabsSaved(indices, pin)) {
++        break;
++      }
+       std::vector<tab_groups::TabGroupId> groups_to_delete =
+           GetGroupsDestroyedFromRemovingIndices(indices);
+       MarkTabGroupsForClosing(groups_to_delete);
+ 
+-      bool pin = WillContextMenuPin(context_index);
+ 
+       // If there are groups that will be deleted by closing tabs from the
+       // context menu, confirm the group deletion first, and then perform the
+@@ -3525,6 +3581,12 @@ bool TabStripModel::WillContextMenuMuteSites(int index) {
+ 
+ bool TabStripModel::WillContextMenuPin(int index) {
+   std::vector<int> indices = GetIndicesForCommand(index);
++  auto* browser = delegate_->GetBrowserWindowInterface();
++  if (auto* window = browser ? BrowserWindow::FromBrowser(browser) : nullptr) {
++    if (const auto state = window->GetMyarcTabSaveState(indices)) {
++      return state->save;
++    }
++  }
+   // If all tabs are pinned, then we unpin, otherwise we pin.
+   bool all_pinned = true;
+   for (size_t i = 0; i < indices.size() && all_pinned; ++i) {
+@@ -3956,7 +4018,10 @@ int TabStripModel::InsertTabAtImpl(
+   // otherwise we run into problems when we try to change the active contents
+   // since the old contents and the new contents will be the same...
+   CHECK_EQ(this, tab->owning_model());
+-  if ((add_types & ADD_INHERIT_OPENER) && active_tab_model) {
++  auto* browser = delegate_->GetBrowserWindowInterface();
++  auto* window = browser ? BrowserWindow::FromBrowser(browser) : nullptr;
++  if ((add_types & ADD_INHERIT_OPENER) && active_tab_model &&
++      !(window && window->IsMyarcWorkspaceBlank())) {
+     if (active) {
+       // Forget any existing relationships, we don't want to make things too
+       // confusing by having multiple openers active at the same time.

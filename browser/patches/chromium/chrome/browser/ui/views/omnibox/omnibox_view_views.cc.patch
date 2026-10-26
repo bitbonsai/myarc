@@ -1,0 +1,56 @@
+diff --git a/chrome/browser/ui/views/omnibox/omnibox_view_views.cc b/chrome/browser/ui/views/omnibox/omnibox_view_views.cc
+index 1bc7b41ec34f53f27df734c4e17967e09c36f37f..841768e85b2b050eb5f4e19416f42f8d771482b9 100644
+--- a/chrome/browser/ui/views/omnibox/omnibox_view_views.cc
++++ b/chrome/browser/ui/views/omnibox/omnibox_view_views.cc
+@@ -57,6 +57,7 @@
+ #include "chrome/browser/ui/ui_features.h"
+ #include "chrome/browser/ui/view_ids.h"
+ #include "chrome/browser/ui/views/chrome_layout_provider.h"
++#include "chrome/browser/ui/views/frame/browser_view.h"
+ #include "chrome/browser/ui/views/frame/contents_web_view.h"
+ #include "chrome/browser/ui/views/location_bar/icon_label_bubble_view.h"
+ #include "chrome/browser/ui/views/location_bar/location_bar_view.h"
+@@ -400,8 +401,7 @@ void OmniboxViewViews::InstallPlaceholderText() {
+   SetPlaceholderText(placeholder_text);
+   const std::u16string a11y_text =
+       maybe_a11y_placeholder_text.value_or(placeholder_text);
+-  const bool is_focused =
+-      controller()->edit_model()->has_focus() || HasFocus();
++  const bool is_focused = controller()->edit_model()->has_focus() || HasFocus();
+ 
+   if (is_focused) {
+     if (!a11y_text.empty()) {
+@@ -1424,6 +1424,14 @@ bool OmniboxViewViews::SupportsDrag() const {
+ }
+ 
+ bool OmniboxViewViews::OnMousePressed(const ui::MouseEvent& event) {
++  if (base::CommandLine::ForCurrentProcess()->HasSwitch(
++          "myarc-visual-parity") &&
++      location_bar_view_ && location_bar_view_->browser() &&
++      location_bar_view_->browser()->GetType() ==
++          BrowserWindowInterface::Type::TYPE_NORMAL &&
++      event.IsOnlyLeftMouseButton()) {
++    return true;
++  }
+   PermitExternalProtocolHandler();
+ 
+   // Clear focus of buttons, but do not clear keyword mode.
+@@ -1591,6 +1599,18 @@ bool OmniboxViewViews::OnMouseDragged(const ui::MouseEvent& event) {
+ }
+ 
+ void OmniboxViewViews::OnMouseReleased(const ui::MouseEvent& event) {
++  if (base::CommandLine::ForCurrentProcess()->HasSwitch(
++          "myarc-visual-parity") &&
++      location_bar_view_ && location_bar_view_->browser() &&
++      location_bar_view_->browser()->GetType() ==
++          BrowserWindowInterface::Type::TYPE_NORMAL &&
++      event.IsOnlyLeftMouseButton()) {
++    if (auto* view = BrowserView::GetBrowserViewForBrowser(
++            location_bar_view_->browser())) {
++      view->SetFocusToLocationBar(true);
++    }
++    return;
++  }
+   PermitExternalProtocolHandler();
+ 
+   views::Textfield::OnMouseReleased(event);

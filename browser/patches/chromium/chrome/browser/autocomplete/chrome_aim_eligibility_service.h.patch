@@ -1,0 +1,12 @@
+diff --git a/chrome/browser/autocomplete/chrome_aim_eligibility_service.h b/chrome/browser/autocomplete/chrome_aim_eligibility_service.h
+index 88015f171a2dd0fd54bfa8090858b0b158ea358d..86adf67b2965ad860ff12db34ea15ca73b997b4b 100644
+--- a/chrome/browser/autocomplete/chrome_aim_eligibility_service.h
++++ b/chrome/browser/autocomplete/chrome_aim_eligibility_service.h
+@@ -30,6 +30,7 @@ class ChromeAimEligibilityService : public AimEligibilityService {
+   ~ChromeAimEligibilityService() override;
+ 
+   // AimEligibilityService:
++  bool IsAimAllowedByFeatureAndPolicy() const override;
+   std::string GetLocaleImpl() const override;
+   variations::VariationsService* GetVariationsService() const override;
+ };

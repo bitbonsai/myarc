@@ -72,6 +72,6 @@ Continue the [native shell experiment](browser/experiments/native-shell.md) towa
 
 Read [AGENTS.md](AGENTS.md) and [CONTRIBUTING.md](CONTRIBUTING.md). Current documents and original tooling are MIT licensed; future upstream code retains its own notices and license obligations. A chosen browser foundation must receive a separate license review before integration or distribution.
 
-Run `python3 tools/check_docs.py` for relative links. Standalone Rust checks are `cargo fmt --all -- --check`, `cargo clippy --workspace --all-targets --locked -- -D warnings` and `cargo test --workspace --locked`. Run `python3 tools/check_foundation_patch.py` to check the packaged source payload. The [foundation recipe](browser/README.md) covers GN/Cxx checks and their limits.
+Run `python3 tools/check_docs.py` for relative links. Standalone Rust checks are `cargo fmt --all -- --check`, `cargo clippy --workspace --all-targets --locked -- -D warnings` and `cargo test --workspace --locked`. With the external Chromium checkout present, run `python3 tools/export_patches.py --check` to confirm the per-file patch exports match the `myarc` branch. The [foundation recipe](browser/README.md) covers GN/Cxx checks and their limits.
 
 Run `node --test design/onboarding/state.test.mjs` for study state tests; [study instructions](design/onboarding/README.md) cover browser-driven checks and recordings. These checks establish experimental behavior, not production-browser readiness.

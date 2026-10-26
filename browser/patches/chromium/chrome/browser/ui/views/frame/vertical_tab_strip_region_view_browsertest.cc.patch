@@ -1,0 +1,82 @@
+diff --git a/chrome/browser/ui/views/frame/vertical_tab_strip_region_view_browsertest.cc b/chrome/browser/ui/views/frame/vertical_tab_strip_region_view_browsertest.cc
+index 9fa7b0b20c67f3c0ee57ec897f43465926888191..8161e520d8605d395806358c6410ec1052d9a43f 100644
+--- a/chrome/browser/ui/views/frame/vertical_tab_strip_region_view_browsertest.cc
++++ b/chrome/browser/ui/views/frame/vertical_tab_strip_region_view_browsertest.cc
+@@ -4,6 +4,7 @@
+ 
+ #include "chrome/browser/ui/views/frame/vertical_tab_strip_region_view.h"
+ 
++#include "base/command_line.h"
+ #include "base/i18n/language_tag.h"
+ #include "base/i18n/test/scoped_icu_locale.h"
+ #include "base/test/metrics/histogram_tester.h"
+@@ -36,6 +37,7 @@
+ #include "chrome/browser/ui/views/tabs/common/pinned_tab_container_view.h"
+ #include "chrome/browser/ui/views/tabs/common/root_tab_collection_node.h"
+ #include "chrome/browser/ui/views/tabs/common/split_tab_view.h"
++#include "chrome/browser/ui/views/tabs/common/tab_strip_view_layout.h"
+ #include "chrome/browser/ui/views/tabs/common/unpinned_tab_container_view.h"
+ #include "chrome/browser/ui/views/tabs/shared/tab_strip_combo_button.h"
+ #include "chrome/browser/ui/views/tabs/tab_strip.h"
+@@ -180,6 +182,61 @@ class VerticalTabStripRegionViewTest
+   }
+ };
+ 
++class MyarcSlidingSidebarTest : public VerticalTabStripRegionViewTest {
++ public:
++  void SetUpCommandLine(base::CommandLine* command_line) override {
++    VerticalTabStripRegionViewTest::SetUpCommandLine(command_line);
++    command_line->AppendSwitch("myarc-visual-parity");
++  }
++};
++
++IN_PROC_BROWSER_TEST_F(MyarcSlidingSidebarTest,
++                       FixedInnerBoundsAndBothGutters) {
++  SetupExpandedVerticalTabStrip();
++  for (int body = 0; body < 3; ++body) {
++    if (body == 1) {
++      region_view()->SetMyarcWorkspaceSidebar(std::make_unique<views::View>());
++    }
++    if (body == 2) {
++      region_view()->SetMyarcWorkspaceReady(true);
++    }
++    for (int width : {180, 230, 278, 400}) {
++      region_view()->SetBounds(0, 0, width, 600);
++      region_view()->OnResize(0, true);
++      ASSERT_EQ(width, region_view()->uncollapsed_width());
++      const auto expanded =
++          region_view()->CalculateProposedLayout({width, 600});
++      // Both directions must use identical inner geometry at each outer width.
++      for (int direction : {-1, 1}) {
++        for (int step = 0; step <= 100; ++step) {
++          const int outer = width * (direction < 0 ? 100 - step : step) / 100;
++          const auto sliding =
++              region_view()->CalculateProposedLayout({outer, 600});
++          EXPECT_EQ(outer, sliding.host_size.width());
++          ASSERT_EQ(expanded.child_layouts.size(),
++                    sliding.child_layouts.size());
++          for (size_t i = 0; i < expanded.child_layouts.size(); ++i) {
++            auto expected = expanded.child_layouts[i].bounds;
++            expected.Offset(outer - width, 0);
++            EXPECT_EQ(expected, sliding.child_layouts[i].bounds);
++          }
++        }
++      }
++    }
++  }
++  region_view()->RemoveMyarcWorkspaceSidebar();
++  auto* manager =
++      static_cast<TabStripViewLayout*>(tab_strip_view()->GetLayoutManager());
++  for (int width : {0, 12, 24, 64, 230}) {
++    const auto layout = manager->CalculateProposedLayout({width, 600});
++    const auto* pins =
++        layout.GetLayoutFor(tab_strip_view()->pinned_tabs_scroll_view());
++    ASSERT_TRUE(pins);
++    EXPECT_EQ(12, pins->bounds.x());
++    EXPECT_EQ(std::max(0, width - 24), pins->bounds.width());
++  }
++}
++
+ class VerticalTabStripRegionViewGlassFrameTest
+     : public VerticalTabStripRegionViewTest {
+  public:

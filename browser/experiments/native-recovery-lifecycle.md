@@ -8,7 +8,7 @@ The [actual process-kill/Restore failure](../evidence/workspace-process-crash.js
 
 The canonical lifecycle boundary now counts pending recovery choices alongside startup launches and native restorers. The adapter handles choice-start as a restore barrier and choice-finish through its existing weak, non-nestable completion path. Existing binding, pruning and persistence gates consume that shared readiness state. No IDs are reconstructed and Temporary lifetime policy is unchanged.
 
-[0018-native-recovery-lifecycle.patch](../patches/0018-native-recovery-lifecycle.patch) retains the existing browser-removal observer across these paths:
+[0018-native-recovery-lifecycle.patch](../patches/legacy/0018-native-recovery-lifecycle.patch) retains the existing browser-removal observer across these paths:
 
 - `ShowIfNotOffTheRecordProfile` creates it before branded consent lookup. The same owner moves through the async reply and successful Show into the dialog delegate, without releasing the count. Failed posting/canceled callbacks, missing browser/tab and unsupported BrowserView release through destruction.
 - Restore moves both the stock `CrashedLock` and recovery observer into local ownership before dialog Close deletes the delegate. `RestoreSessionAfterCrash` constructs the native restorer before the local choice owner releases. Its independent restorer count then gates reconciliation through native completion observers.
@@ -20,7 +20,7 @@ Inspected startup infobar creation/first-active-tab callbacks, the ChromeOS Sess
 
 ## Files and packaging
 
-Four canonical files change: `workspace_lifecycle.h`, `.cc`, `workspace_lifecycle_check.cc` and `browser_workspace_adapter.cc`. Their refreshed payload remains in [0001](../patches/0001-workspace-foundation.patch), with exactly 16 canonical owned files and no core/schema/dependency changes.
+Four canonical files change: `workspace_lifecycle.h`, `.cc`, `workspace_lifecycle_check.cc` and `browser_workspace_adapter.cc`. Their refreshed payload remains in [0001](../patches/legacy/0001-workspace-foundation.patch), with exactly 16 canonical owned files and no core/schema/dependency changes.
 
 0018 contains four upstream deltas under `chrome/browser/ui/views/`: recovery implementation/header, the existing interactive fixture, and its BUILD dependencies. Apply once after the frozen optional stack, using refreshed 0001 for a fresh checkout. The handed-off external checkout already contains both owned and upstream changes; do not apply them twice.
 

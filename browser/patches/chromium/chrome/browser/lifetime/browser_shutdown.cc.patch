@@ -1,0 +1,46 @@
+diff --git a/chrome/browser/lifetime/browser_shutdown.cc b/chrome/browser/lifetime/browser_shutdown.cc
+index e972784ab75c7f354c2af6d72354ff4bdf7ee974..2ca6ff8208a9a661f14e4edb8a4b5e937080e0ee 100644
+--- a/chrome/browser/lifetime/browser_shutdown.cc
++++ b/chrome/browser/lifetime/browser_shutdown.cc
+@@ -39,6 +39,7 @@
+ #include "content/public/browser/render_process_host.h"
+ #include "content/public/browser/tracing_controller.h"
+ #include "content/public/common/content_switches.h"
++#include "myarc/workspace_lifecycle.h"
+ #include "printing/buildflags/buildflags.h"
+ #include "rlz/buildflags/buildflags.h"
+ 
+@@ -199,6 +200,13 @@ void OnShutdownStarting(ShutdownType type) {
+     return;
+   }
+ 
++  // Silent exit/system session end can bypass SetTryingToQuit(true).
++  // Ordinary window closure retains its normal last-projection semantics.
++  if (type != ShutdownType::kWindowClose && type != ShutdownType::kNotValid) {
++    myarc::WorkspaceLifecycle::NotifyAll(
++        myarc::WorkspaceLifecycle::Event::kShutdownStarted);
++  }
++
+   static crash_reporter::CrashKeyString<11> shutdown_type_key("shutdown-type");
+   shutdown_type_key.Set(ToShutdownTypeString(type));
+ 
+@@ -488,6 +496,9 @@ void SetTryingToQuit(bool quitting) {
+   g_trying_to_quit = quitting;
+ 
+   if (quitting) {
++    // Application quit precedes ShutdownSessionServices and native tab closure.
++    myarc::WorkspaceLifecycle::NotifyAll(
++        myarc::WorkspaceLifecycle::Event::kShutdownStarted);
+     return;
+   }
+ 
+@@ -505,6 +516,9 @@ void SetTryingToQuit(bool quitting) {
+ #if BUILDFLAG(ENABLE_BACKGROUND_MODE)
+   BackgroundModeManager::set_should_restart_in_background(false);
+ #endif  // BUILDFLAG(ENABLE_BACKGROUND_MODE)
++  // Delegates post cancellable work, after caller-side unload cleanup too.
++  myarc::WorkspaceLifecycle::NotifyAll(
++      myarc::WorkspaceLifecycle::Event::kShutdownCancelled);
+ }
+ 
+ bool IsTryingToQuit() {

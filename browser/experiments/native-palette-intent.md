@@ -1,6 +1,6 @@
 # Native palette shortcut intent
 
-MA-007.c bounded repair from parent `9426f9e`. Optional [0022-native-palette-intent.patch](../patches/0022-native-palette-intent.patch) follows the frozen stack through 0021. It addresses the [observed Cmd+T/draft/Cmd+L dismissal](../evidence/native-palette-interruption.json). Source and fixture syntax checks and the full Chrome build pass. Parent bounded desktop acceptance passed below. Browser fixtures remain **UNRUN**. Workspace renderer stays default OFF.
+MA-007.c bounded repair from parent `9426f9e`. Optional [0022-native-palette-intent.patch](../patches/legacy/0022-native-palette-intent.patch) follows the frozen stack through 0021. It addresses the [observed Cmd+T/draft/Cmd+L dismissal](../evidence/native-palette-interruption.json). Source and fixture syntax checks and the full Chrome build pass. Parent bounded desktop acceptance passed below. Browser fixtures remain **UNRUN**. Workspace renderer stays default OFF.
 
 ## Behavior and boundary
 
@@ -80,7 +80,7 @@ The same0023 build separately passed a clean persisted seed and audited SIGKILL/
 
 ## Candidate 0024: current-address literal submission
 
-From parent `5f2b76a`, optional [0024-native-current-address-submit.patch](../patches/0024-native-current-address-submit.patch) follows frozen 0023. Two existing automatic-selection sites now require new-tab intent: synchronous open-tab rebuilding and asynchronous history arrival. Current intent retains `selected_ = -1` until deliberate arrow selection; row mouse callbacks still activate directly. Every text edit resets selection through the existing rebuild path.
+From parent `5f2b76a`, optional [0024-native-current-address-submit.patch](../patches/legacy/0024-native-current-address-submit.patch) follows frozen 0023. Two existing automatic-selection sites now require new-tab intent: synchronous open-tab rebuilding and asynchronous history arrival. Current intent retains `selected_ = -1` until deliberate arrow selection; row mouse callbacks still activate directly. Every text edit resets selection through the existing rebuild path.
 
 Plain changed current-address Enter therefore calls the existing `Submit()` path even when rows match. Unchanged current input still reloads. Explicit result activation retains global cross-Space selection/reveal within the native window. New-intent matching, ranking and default selection remain unchanged provisionally. No classifier, controller or Rust policy was added. Empty-Space guarding before reuse, same-widget drafts/focus, history bounds/cancellation, weak ownership, saved destination policy and flags-off/default-OFF behavior are unchanged.
 

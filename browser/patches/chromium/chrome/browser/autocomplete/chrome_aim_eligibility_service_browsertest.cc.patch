@@ -1,0 +1,131 @@
+diff --git a/chrome/browser/autocomplete/chrome_aim_eligibility_service_browsertest.cc b/chrome/browser/autocomplete/chrome_aim_eligibility_service_browsertest.cc
+index 68c13595adfa8cb253dad42a0de6b7efc67985ed..ab9f8c6055ab8b2c1d73b3368918cb565e91133e 100644
+--- a/chrome/browser/autocomplete/chrome_aim_eligibility_service_browsertest.cc
++++ b/chrome/browser/autocomplete/chrome_aim_eligibility_service_browsertest.cc
+@@ -13,6 +13,7 @@
+ 
+ #include "base/callback_list.h"
+ #include "base/check.h"
++#include "base/command_line.h"
+ #include "base/functional/bind.h"
+ #include "base/strings/string_number_conversions.h"
+ #include "base/task/sequenced_task_runner.h"
+@@ -25,10 +26,12 @@
+ #include "chrome/browser/autocomplete/aim_eligibility_service_factory.h"
+ #include "chrome/browser/browser_process.h"
+ #include "chrome/browser/profiles/profile.h"
++#include "chrome/browser/search_engines/ai_mode_button_service_factory.h"
+ #include "chrome/browser/search_engines/template_url_service_factory.h"
+ #include "chrome/browser/signin/chrome_signin_client_test_util.h"
+ #include "chrome/browser/signin/identity_manager_factory.h"
+ #include "chrome/browser/signin/identity_test_environment_profile_adaptor.h"
++#include "chrome/browser/ui/omnibox/omnibox_next_features.h"
+ #include "chrome/test/base/in_process_browser_test.h"
+ #include "chrome/test/base/scoped_browser_locale.h"
+ #include "chrome/test/base/search_test_utils.h"
+@@ -36,10 +39,13 @@
+ #include "components/embedder_support/user_agent_utils.h"
+ #include "components/omnibox/browser/aim_eligibility_service.h"
+ #include "components/omnibox/browser/aim_eligibility_service_features.h"
++#include "components/omnibox/browser/omnibox_field_trial.h"
++#include "components/omnibox/browser/omnibox_pref_names.h"
+ #include "components/omnibox/browser/omnibox_prefs.h"
+ #include "components/omnibox/common/omnibox_features.h"
+ #include "components/prefs/pref_service.h"
+ #include "components/search/search.h"
++#include "components/search_engines/ai_mode_button_service.h"
+ #include "components/search_engines/template_url.h"
+ #include "components/search_engines/template_url_data.h"
+ #include "components/search_engines/template_url_service.h"
+@@ -266,6 +272,91 @@ class AimEligibilityTestBase : public InProcessBrowserTest {
+   const bool use_null_factory_;
+ };
+ 
++class ChromeAimEligibilityServiceMyarcBrowserTest
++    : public AimEligibilityTestBase,
++      public testing::WithParamInterface<int> {
++ public:
++  ChromeAimEligibilityServiceMyarcBrowserTest() {
++    features_.InitWithFeaturesAndParameters(
++        {{omnibox::kAimEnabled, {}},
++         {omnibox::kAim3pEntrypoint,
++          {{omnibox::kAim3pEntrypointDebug.name, "true"}}},
++         {omnibox::internal::kWebUIOmniboxAimPopup, {}}},
++        {omnibox::kAimServerEligibilityEnabled});
++  }
++
++  void SetUpCommandLine(base::CommandLine* command_line) override {
++    AimEligibilityTestBase::SetUpCommandLine(command_line);
++    if (GetParam() & 1) {
++      command_line->AppendSwitch("myarc-visual-parity");
++    }
++    if (GetParam() & 2) {
++      command_line->AppendSwitch("myarc-workspace-sidebar");
++    }
++  }
++
++ private:
++  base::test::ScopedFeatureList features_;
++};
++
++IN_PROC_BROWSER_TEST_P(ChromeAimEligibilityServiceMyarcBrowserTest,
++                       PrototypeOmitsUnsupportedEntrypoints) {
++  const bool prototype = GetParam() == 3;
++  Profile* const regular = GetProfile();
++  Profile* const otr = regular->GetPrimaryOTRProfile(/*create_if_needed=*/true);
++  auto* const regular_service = GetAimEligibilityService(regular);
++  auto* const otr_service = GetAimEligibilityService(otr);
++  ASSERT_TRUE(regular_service);
++  ASSERT_TRUE(otr_service);
++  EXPECT_NE(regular_service, otr_service);
++
++  for (Profile* profile : {regular, otr}) {
++    SCOPED_TRACE(profile->IsOffTheRecord());
++    SetUpDefaultSearchEngine(profile, /*is_google_dse=*/true);
++    auto* const service = GetAimEligibilityService(profile);
++    auto* const prefs = profile->GetPrefs();
++    auto* const button = AiModeButtonServiceFactory::GetForProfile(profile);
++    ASSERT_TRUE(button);
++    ASSERT_TRUE(button->GetCurrentConfig());
++    auto* const search = TemplateURLServiceFactory::GetForProfile(profile);
++    prefs->SetInteger(omnibox::kAIModeSettings, 0);
++    prefs->SetBoolean(omnibox::kShowAiModeOmniboxButton, true);
++
++    EXPECT_EQ(!prototype, service->IsAimAllowedByFeatureAndPolicy());
++    EXPECT_EQ(!prototype, service->IsAimLocallyEligible());
++    EXPECT_EQ(!prototype, service->IsAimEligible());
++    EXPECT_EQ(!prototype, OmniboxFieldTrial::IsAimOmniboxEntrypointEnabled(
++                              service, button, search));
++    EXPECT_EQ(!prototype, omnibox::ShouldShowAimContextMenuOption(profile));
++    EXPECT_FALSE(prefs->IsManagedPreference(omnibox::kAIModeSettings));
++    EXPECT_EQ(0, prefs->GetInteger(omnibox::kAIModeSettings));
++    EXPECT_TRUE(prefs->GetBoolean(omnibox::kShowAiModeOmniboxButton));
++
++    // Native policy still applies, and resetting it cannot enable prototype AI.
++    prefs->SetInteger(omnibox::kAIModeSettings, 1);
++    EXPECT_FALSE(service->IsAimAllowedByFeatureAndPolicy());
++    prefs->SetInteger(omnibox::kAIModeSettings, 0);
++    EXPECT_EQ(!prototype, service->IsAimAllowedByFeatureAndPolicy());
++
++    // The non-Google entrypoint uses feature/policy eligibility directly.
++    SetUpDefaultSearchEngine(profile, /*is_google_dse=*/false);
++    EXPECT_FALSE(service->IsAimEligible());
++    EXPECT_EQ(!prototype, service->IsAimAllowedByFeatureAndPolicy());
++    ASSERT_TRUE(button->GetCurrentConfig());
++    EXPECT_EQ(!prototype, OmniboxFieldTrial::IsAimOmniboxEntrypointEnabled(
++                              service, button, search));
++    EXPECT_FALSE(omnibox::IsAimPopupEnabled(profile));
++    EXPECT_EQ(!prototype, omnibox::ShouldShowAimContextMenuOption(profile));
++    ASSERT_TRUE(search->GetDefaultSearchProvider());
++    EXPECT_EQ("https://www.bing.com/search?q={searchTerms}",
++              search->GetDefaultSearchProvider()->url());
++  }
++}
++
++INSTANTIATE_TEST_SUITE_P(AllSwitchCombinations,
++                         ChromeAimEligibilityServiceMyarcBrowserTest,
++                         testing::Values(0, 1, 2, 3));
++
+ class ChromeAimEligibilityServiceBrowserTest
+     : public AimEligibilityTestBase,
+       public ::testing::WithParamInterface<

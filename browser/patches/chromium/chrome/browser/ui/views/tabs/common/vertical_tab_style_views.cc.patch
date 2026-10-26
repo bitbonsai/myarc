@@ -1,0 +1,61 @@
+diff --git a/chrome/browser/ui/views/tabs/common/vertical_tab_style_views.cc b/chrome/browser/ui/views/tabs/common/vertical_tab_style_views.cc
+index dd7a0a899fae671287402c2672ffd7931b773636..1531b8fa06fb7145ca239c4c31e602d3247f61e9 100644
+--- a/chrome/browser/ui/views/tabs/common/vertical_tab_style_views.cc
++++ b/chrome/browser/ui/views/tabs/common/vertical_tab_style_views.cc
+@@ -7,6 +7,7 @@
+ #include <optional>
+ #include <string>
+ 
++#include "base/command_line.h"
+ #include "chrome/browser/themes/theme_properties.h"
+ #include "chrome/browser/ui/layout_constants.h"
+ #include "chrome/browser/ui/views/frame/browser_frame_view.h"
+@@ -187,7 +188,9 @@ bool VerticalTabStyleViews::ShouldPaintTabBackgroundColor(
+     return false;
+   }
+ 
+-  if (hovered) {
++  if (hovered || (delegate_->IsPinned() &&
++                  base::CommandLine::ForCurrentProcess()->HasSwitch(
++                      "myarc-visual-parity"))) {
+     return true;
+   }
+ 
+@@ -197,9 +200,16 @@ bool VerticalTabStyleViews::ShouldPaintTabBackgroundColor(
+ SkColor VerticalTabStyleViews::GetCurrentTabBackgroundColor(
+     TabStyle::TabSelectionState selection_state) const {
+   const bool frame_glass = delegate_->IsGlassFrame();
++  const bool inactive_tile =
++      delegate_->IsPinned() &&
++      selection_state == TabStyle::TabSelectionState::kInactive &&
++      base::CommandLine::ForCurrentProcess()->HasSwitch("myarc-visual-parity");
++  // Reuse the theme's hover fill, including its glass alpha and animation.
+   return tab_style()->GetCurrentTabBackgroundColor(
+-      selection_state, delegate_->IsHoverAnimationActive(),
+-      delegate_->GetHoverAnimationValue(),
++      selection_state, inactive_tile || delegate_->IsHoverAnimationActive(),
++      inactive_tile
++          ? std::lerp(0.35f, 1.0f, delegate_->GetHoverAnimationValue())
++          : delegate_->GetHoverAnimationValue(),
+       delegate_->GetView()->GetWidget()
+           ? delegate_->GetView()->GetWidget()->ShouldPaintAsActive()
+           : true,
+@@ -250,10 +260,17 @@ bool VerticalTabStyleViews::IsApparentlyActive() const {
+ }
+ 
+ TabStyle::TabColors VerticalTabStyleViews::CalculateTargetColors() const {
+-  return tab_style()->CalculateTargetColors(
++  auto colors = tab_style()->CalculateTargetColors(
+       GetSelectionState(), IsApparentlyActive(), delegate_->IsHovering(),
+       delegate_->GetView()->GetWidget()
+           ? delegate_->GetView()->GetWidget()->ShouldPaintAsActive()
+           : true,
+       delegate_->GetView()->GetColorProvider());
++  if (delegate_->IsPinned() && delegate_->IsSplit() &&
++      base::CommandLine::ForCurrentProcess()->HasSwitch(
++          "myarc-visual-parity")) {
++    // Match single tiles in SplitTabView's merged background.
++    colors.background_color = GetCurrentTabBackgroundColor(GetSelectionState());
++  }
++  return colors;
+ }

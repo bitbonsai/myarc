@@ -1,0 +1,56 @@
+diff --git a/chrome/browser/ui/browser_live_tab_context.cc b/chrome/browser/ui/browser_live_tab_context.cc
+index cc8786f0d1c94f3034e237b8be5a37b22ab9518d..87d75f14c0a65c08f90a951a9e7b42e1756bafe7 100644
+--- a/chrome/browser/ui/browser_live_tab_context.cc
++++ b/chrome/browser/ui/browser_live_tab_context.cc
+@@ -61,6 +61,7 @@
+ #include "content/public/browser/navigation_controller.h"
+ #include "content/public/browser/session_storage_namespace_handle.h"
+ #include "content/public/browser/web_contents.h"
++#include "myarc/workspace_lifecycle.h"
+ #include "ui/base/mojom/window_show_state.mojom.h"
+ #include "ui/base/window_open_disposition.h"
+ 
+@@ -158,6 +159,9 @@ BrowserLiveTabContext::~BrowserLiveTabContext() {
+ }
+ 
+ void BrowserLiveTabContext::ShowBrowserWindow() {
++  // TabRestoreService calls this after inserting all tabs in the context.
++  myarc::WorkspaceLifecycle::Notify(
++      &profile_.get(), myarc::WorkspaceLifecycle::Event::kNativeReady);
+   base_window_->Show();
+ }
+ 
+@@ -208,6 +212,9 @@ std::map<std::string, std::string> BrowserLiveTabContext::GetExtraDataForTab(
+     extra_data.merge(contextual_tasks_controller->GetTabRestoreData(tab));
+   }
+ 
++  if (auto* lifecycle = myarc::WorkspaceLifecycle::Get(&profile_.get())) {
++    extra_data.merge(lifecycle->TabData(browser_.get(), *tab->GetContents()));
++  }
+   return extra_data;
+ }
+ 
+@@ -233,6 +240,9 @@ BrowserLiveTabContext::GetExtraDataForWindow() const {
+     }
+   }
+ 
++  if (auto* lifecycle = myarc::WorkspaceLifecycle::Get(&profile_.get())) {
++    data.merge(lifecycle->WindowData(browser_.get()));
++  }
+   return data;
+ }
+ 
+@@ -579,8 +589,13 @@ sessions::LiveTabContext* BrowserLiveTabContext::Create(
+     }
+   }
+ 
++  myarc::WorkspaceLifecycle::Notify(
++      profile, myarc::WorkspaceLifecycle::Event::kRestoreStarted);
+   BrowserWindowInterface* browser =
+       CreateBrowserWindow(std::move(*create_params));
++  if (auto* lifecycle = myarc::WorkspaceLifecycle::Get(profile)) {
++    lifecycle->RestoreWindow(*browser, extra_data);
++  }
+ 
+   return BrowserLiveTabContext::From(browser);
+ }

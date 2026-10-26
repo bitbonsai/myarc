@@ -1,0 +1,12 @@
+diff --git a/chrome/browser/autocomplete/BUILD.gn b/chrome/browser/autocomplete/BUILD.gn
+index c01ba2c923dd18f792786ffb1742121e61ff96c5..265570892c0b2b17c3b14267ca2d93a8218eed3b 100644
+--- a/chrome/browser/autocomplete/BUILD.gn
++++ b/chrome/browser/autocomplete/BUILD.gn
+@@ -234,6 +234,7 @@ if (!is_android) {
+       "//chrome/browser/ui/browser_window",
+       "//chrome/browser/ui/lens:test_support",
+       "//chrome/browser/ui/location_bar",
++      "//chrome/browser/ui/omnibox",
+       "//chrome/browser/ui/tabs:tab_strip",
+       "//chrome/browser/ui/tabs:tabs_public",
+       "//chrome/browser/ui/views/frame:browser_view_header",

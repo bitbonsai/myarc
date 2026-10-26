@@ -1,0 +1,20 @@
+diff --git a/chrome/browser/ui/views/frame/contents_web_view.h b/chrome/browser/ui/views/frame/contents_web_view.h
+index af18353b9d2c61c1b7e229ed277ddaff52d30fcc..51c43861008f26e89a70cbe8a5fd20483e6975ed 100644
+--- a/chrome/browser/ui/views/frame/contents_web_view.h
++++ b/chrome/browser/ui/views/frame/contents_web_view.h
+@@ -59,6 +59,7 @@ class ContentsWebView : public views::WebView,
+   void SetWebContents(content::WebContents* web_contents) override;
+ 
+   // content::WebContentsObserver overrides:
++  void PrimaryPageChanged(content::Page& page) override;
+   // Overridden to track physical interactions (mouse/touch) on the WebContents.
+   // This allows the browser to force focus synchronization in split view even
+   // when native OS focus gets stuck on a different window (like a permission
+@@ -76,6 +77,7 @@ class ContentsWebView : public views::WebView,
+ 
+  private:
+   void UpdateBackgroundColor();
++  void UpdateMyarcPageBackground();
+   std::unique_ptr<StatusBubbleViews> status_bubble_;
+   std::unique_ptr<WebContentsCloseHandler> web_contents_close_handler_;
+ 

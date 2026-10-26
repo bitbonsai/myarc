@@ -1,0 +1,144 @@
+diff --git a/chrome/browser/ui/views/toolbar/toolbar_view.cc b/chrome/browser/ui/views/toolbar/toolbar_view.cc
+index 80b0e24263170de768a6684c8aabf106018710e7..e4cbca7c75cdffdf75f5f29e23c13914920cd19f 100644
+--- a/chrome/browser/ui/views/toolbar/toolbar_view.cc
++++ b/chrome/browser/ui/views/toolbar/toolbar_view.cc
+@@ -5,6 +5,7 @@
+ #include "chrome/browser/ui/views/toolbar/toolbar_view.h"
+ 
+ #include <algorithm>
++#include <array>
+ #include <memory>
+ #include <utility>
+ 
+@@ -140,6 +141,7 @@
+ #include "components/strings/grit/components_strings.h"
+ #include "content/public/browser/render_view_host.h"
+ #include "content/public/browser/web_contents.h"
++#include "myarc/native_button.h"
+ #include "third_party/skia/include/core/SkPath.h"
+ #include "third_party/skia/include/core/SkPathBuilder.h"
+ #include "ui/accessibility/ax_node_data.h"
+@@ -162,6 +164,7 @@
+ #include "ui/views/accessibility/view_accessibility.h"
+ #include "ui/views/actions/action_view_controller.h"
+ #include "ui/views/background.h"
++#include "ui/views/border.h"
+ #include "ui/views/cascading_property.h"
+ #include "ui/views/controls/button/label_button.h"
+ #include "ui/views/controls/separator.h"
+@@ -188,6 +191,13 @@ using content::WebContents;
+ 
+ DEFINE_UI_CLASS_PROPERTY_KEY(bool, kActionItemUnderlineIndicatorKey, false)
+ 
++// Apply sidebar geometry through Views so temporary layout visibility does not
++// overwrite the upstream controls' externally requested visibility.
++class ToolbarView::ToolbarLayout : public views::FlexLayout {
++ public:
++  using views::FlexLayout::ApplyLayout;
++};
++
+ namespace {
+ 
+ // Gets the display mode for a given browser.
+@@ -479,6 +489,10 @@ void ToolbarView::Init() {
+     location_bar_ = toolbar_webview_->GetLocationBar();
+   }
+ 
++  if (base::CommandLine::ForCurrentProcess()->HasSwitch("myarc-foundation")) {
++    AddChildView(myarc::CreateFoundationButton());
++  }
++
+   bool is_glic_left_of_profile =
+       features::kGlicToolbarButtonLocationParam.Get() ==
+           features::GlicToolbarButtonLocation::kLeftOfProfileChip ||
+@@ -1463,12 +1477,81 @@ gfx::Size ToolbarView::GetMinimumSize() const {
+   return size;
+ }
+ 
++void ToolbarView::SetMyarcSidebarToggle(std::unique_ptr<views::View> toggle) {
++  CHECK(back_ && forward_ && reload_ && location_bar_view_)
++      << "myarc-visual-parity requires --disable-features=InitialWebUI";
++  CHECK(!myarc_sidebar_toggle_);
++  myarc_sidebar_toggle_ = AddChildView(std::move(toggle));
++  for (ToolbarButton* button : std::array<ToolbarButton*, 3>{
++           back_.get(), forward_.get(), reload_.get()}) {
++    button->SetLayoutInsets(gfx::Insets());
++  }
++}
++
++std::unique_ptr<views::View> ToolbarView::TakeMyarcSidebarToggle() {
++  auto* toggle = myarc_sidebar_toggle_.get();
++  myarc_sidebar_toggle_ = nullptr;
++  auto owned = RemoveChildViewT(toggle);
++  for (ToolbarButton* button : std::array<ToolbarButton*, 3>{
++           back_.get(), forward_.get(), reload_.get()}) {
++    button->SetLayoutInsets(std::nullopt);
++  }
++  if (background()) {
++    if (auto* corners = background()->AsA<CustomCornersBackground>()) {
++      corners->SetVisible(true);
++    }
++  }
++  InvalidateLayout();
++  return owned;
++}
++
+ void ToolbarView::Layout(PassKey) {
+   // If we have not been initialized yet just do nothing.
+   if (!initialized_) {
+     return;
+   }
+ 
++  if (myarc_sidebar_toggle_ && location_bar_view_) {
++    // shortcut: first-state geometry; review narrow/fullscreen before wider
++    // use.
++    const bool expanded = width() >= 180;
++    const bool has_page = !chrome::IsMyarcWorkspaceBlank(browser_);
++    views::ProposedLayout layout;
++    layout.host_size = size();
++    for (views::View* child : children()) {
++      const bool visible =
++          child == myarc_sidebar_toggle_ ||
++          (expanded && (child == location_bar_view_ ||
++                        (has_page && (child == back_ || child == forward_ ||
++                                      child == reload_))));
++      gfx::Rect bounds;
++      if (child == myarc_sidebar_toggle_) {
++        bounds = gfx::Rect(expanded ? 84 : 8, expanded ? 8 : 42, 28, 28);
++      } else if (child == back_) {
++        bounds = gfx::Rect(width() - 104, 8, 24, 28);
++      } else if (child == forward_) {
++        bounds = gfx::Rect(width() - 70, 8, 24, 28);
++      } else if (child == reload_) {
++        bounds = gfx::Rect(width() - 36, 8, 24, 28);
++      } else if (child == location_bar_view_) {
++        bounds = gfx::Rect(8, 46, width() - 16, 38);
++      }
++      // Constrain the pill so unchanged bounds still lay out hover/focus
++      // actions.
++      layout.child_layouts.emplace_back(child, visible, bounds,
++                                        child == location_bar_view_
++                                            ? views::SizeBounds(bounds.size())
++                                            : views::SizeBounds());
++    }
++    layout_manager_->ApplyLayout(layout);
++    if (background()) {
++      if (auto* corners = background()->AsA<CustomCornersBackground>()) {
++        corners->SetVisible(false);
++      }
++    }
++    return;
++  }
++
+   if (display_mode_ == DisplayMode::kCustomTab) {
+     custom_tab_bar_->SetBounds(0, 0, width(),
+                                custom_tab_bar_->GetPreferredSize().height());
+@@ -1580,7 +1663,7 @@ void ToolbarView::InitLayout() {
+                                views::MaximumFlexSizeRule::kUnbounded)
+           .WithOrder(location_bar_flex_order);
+ 
+-  layout_manager_ = SetLayoutManager(std::make_unique<views::FlexLayout>());
++  layout_manager_ = SetLayoutManager(std::make_unique<ToolbarLayout>());
+ 
+   layout_manager_->SetOrientation(views::LayoutOrientation::kHorizontal)
+       .SetCrossAxisAlignment(views::LayoutAlignment::kCenter)

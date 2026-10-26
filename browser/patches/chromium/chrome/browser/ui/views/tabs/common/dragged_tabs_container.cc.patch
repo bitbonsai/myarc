@@ -1,0 +1,23 @@
+diff --git a/chrome/browser/ui/views/tabs/common/dragged_tabs_container.cc b/chrome/browser/ui/views/tabs/common/dragged_tabs_container.cc
+index 1fcbfddf16dde3175572eb3c77f72347d53fcab3..40fc90da75129719f628eefe99b44651d63a42ff 100644
+--- a/chrome/browser/ui/views/tabs/common/dragged_tabs_container.cc
++++ b/chrome/browser/ui/views/tabs/common/dragged_tabs_container.cc
+@@ -8,6 +8,7 @@
+ 
+ #include "base/auto_reset.h"
+ #include "base/callback_list.h"
++#include "base/command_line.h"
+ #include "base/i18n/rtl.h"
+ #include "base/notreached.h"
+ #include "base/time/time.h"
+@@ -670,7 +671,9 @@ tabs::VerticalTabStripCollapseState
+ DraggedTabsContainer::GetTabStripCollapseState() const {
+   const auto* controller =
+       collection_node_ ? collection_node_->GetController() : nullptr;
+-  if (!controller) {
++  // Sliding the full-width sidebar preserves grid, group and drop geometry.
++  if (!controller || base::CommandLine::ForCurrentProcess()->HasSwitch(
++                         "myarc-visual-parity")) {
+     return tabs::VerticalTabStripCollapseState::kExpanded;
+   }
+   return controller->GetStateController()->GetCollapseState();

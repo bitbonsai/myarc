@@ -1,0 +1,181 @@
+diff --git a/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl.cc b/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl.cc
+index b1ea4a69f42333b238abbf67b0278467ea41bb28..12b377f8d6798cf724596e2b29993335ce8cea18 100644
+--- a/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl.cc
++++ b/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl.cc
+@@ -9,6 +9,7 @@
+ #include <optional>
+ #include <utility>
+ 
++#include "base/command_line.h"
+ #include "base/functional/bind.h"
+ #include "base/i18n/rtl.h"
+ #include "base/numerics/safe_conversions.h"
+@@ -680,10 +681,13 @@ BrowserViewTabbedLayoutImpl::CalculateVerticalTabStripAnimation() {
+   VerticalTabStripAnimation animation;
+   animation.current_motion =
+       controller->GetCurrentMotion(TabStripAnimations::kVerticalTabStrip);
+-  animation.top_offset = base::ClampRound(
+-      leading_exclusion_height *
+-      *controller->GetCurrentValue(TabStripAnimations::kVerticalTabStrip,
+-                                   TabStripAnimations::kTabStripTop));
++  animation.top_offset =
++      base::CommandLine::ForCurrentProcess()->HasSwitch("myarc-visual-parity")
++          ? 0
++          : base::ClampRound(leading_exclusion_height *
++                             *controller->GetCurrentValue(
++                                 TabStripAnimations::kVerticalTabStrip,
++                                 TabStripAnimations::kTabStripTop));
+   animation.expand_on_hover_width =
+       *controller->GetCurrentValue(TabStripAnimations::kVerticalTabStrip,
+                                    TabStripAnimations::kTabStripHoverWidth);
+@@ -727,7 +731,7 @@ gfx::Size BrowserViewTabbedLayoutImpl::GetMinimumMainAreaSize(
+ 
+   int width = std::max({toolbar_size.width(), bookmark_bar_size.width(),
+                         infobar_container_size.width(),
+-                            kContentsContainerMinimumWidth});
++                        kContentsContainerMinimumWidth});
+   const int height = toolbar_size.height() + bookmark_bar_size.height() +
+                      infobar_container_size.height() + contents_size.height();
+ 
+@@ -897,6 +901,8 @@ BrowserViewTabbedLayoutImpl::CalculateProposedLayout(
+   gfx::Rect unclipped_contents_region = params.visual_client_area;
+ 
+   // Lay out vertical tab strip if visible.
++  const bool visual_parity =
++      base::CommandLine::ForCurrentProcess()->HasSwitch("myarc-visual-parity");
+   int collapsed_vertical_tab_strip_adjustment = 0;
+   const VerticalTabStripAnimation& vertical_tab_strip_animation =
+       layout_data_->vertical_tab_strip_animation;
+@@ -909,8 +915,14 @@ BrowserViewTabbedLayoutImpl::CalculateProposedLayout(
+             horizontal_layout.vertical_tab_strip_width;
+       }
+ 
++      const int hover_target_width =
++          visual_parity
++              ? views().vertical_tab_strip_region_view->uncollapsed_width()
++              : tabs::kVerticalTabStripDefaultUncollapsedWidth;
++      // Hover changes only the overlay host. The horizontal layout continues
++      // to reserve zero width until the user permanently expands the sidebar.
+       const int vertical_tab_strip_hover_width =
+-          std::max(0, tabs::kVerticalTabStripDefaultUncollapsedWidth -
++          std::max(0, hover_target_width -
+                           horizontal_layout.vertical_tab_strip_width) *
+           vertical_tab_strip_animation.expand_on_hover_width;
+ 
+@@ -977,16 +989,18 @@ BrowserViewTabbedLayoutImpl::CalculateProposedLayout(
+       if (vertical_tab_strip_animation.current_motion) {
+         clip_content_for_animation =
+             vertical_tab_strip_animation.is_expanding_or_collapsing();
+-        unclipped_contents_region.Inset(
+-            gfx::Insets::TLBR(0, tabs::kVerticalTabStripCollapsedWidth, 0, 0));
++        unclipped_contents_region.Inset(gfx::Insets::TLBR(
++            0, visual_parity ? 0 : tabs::kVerticalTabStripCollapsedWidth, 0,
++            0));
+       } else {
+         unclipped_contents_region.Inset(gfx::Insets::TLBR(
+             0, horizontal_layout.vertical_tab_strip_width, 0, 0));
+       }
+     }
+-    layout.AddChild(views().vertical_tab_strip_region_view,
+-                    vertical_tab_strip_bounds,
+-                    layout_data_->tab_strip_type == TabStripType::kVertical);
++    layout.AddChild(
++        views().vertical_tab_strip_region_view, vertical_tab_strip_bounds,
++        layout_data_->tab_strip_type == TabStripType::kVertical &&
++            (!visual_parity || vertical_tab_strip_bounds.width() > 0));
+   }
+ 
+   if (IsParentedTo(views().vertical_tab_strip_background_blur_backdrop,
+@@ -994,7 +1008,8 @@ BrowserViewTabbedLayoutImpl::CalculateProposedLayout(
+     layout.AddChild(
+         views().vertical_tab_strip_background_blur_backdrop,
+         vertical_tab_strip_bounds,
+-        in_glass_mode() && features::kGlassExpandOnHoverEnabled.Get() &&
++        (!visual_parity || vertical_tab_strip_bounds.width() > 0) &&
++            in_glass_mode() && features::kGlassExpandOnHoverEnabled.Get() &&
+             layout_data_->vertical_tab_strip_animation.expand_on_hover_width >
+                 0.0f);
+   }
+@@ -1006,7 +1021,7 @@ BrowserViewTabbedLayoutImpl::CalculateProposedLayout(
+     const double top_corner = layout_data_->vertical_tabs_top_corner();
+     const bool top_corner_visible =
+         layout_data_->tab_strip_type == TabStripType::kVertical &&
+-        top_corner > 0.0;
++        !visual_parity && top_corner > 0.0;
+ 
+     // The top corner is drawn when the tabstrip goes all the way to the top.
+     if (top_corner_visible) {
+@@ -1029,7 +1044,7 @@ BrowserViewTabbedLayoutImpl::CalculateProposedLayout(
+     const double bottom_corner = layout_data_->vertical_tabs_bottom_corner();
+     const bool bottom_corner_visible =
+         layout_data_->tab_strip_type == TabStripType::kVertical &&
+-        bottom_corner > 0.0;
++        !visual_parity && bottom_corner > 0.0;
+     if (bottom_corner_visible) {
+       auto preferred =
+           views().vertical_tab_strip_bottom_corner->GetPreferredSize();
+@@ -1195,6 +1210,13 @@ BrowserViewTabbedLayoutImpl::CalculateProposedLayout(
+     params.SetTop(top_container_layout.bounds.bottom());
+   }
+ 
++  if (visual_parity &&
++      layout_data_->tab_strip_type == TabStripType::kVertical) {
++    const int leading_inset = base::ClampRound(
++        10 * (1.0 - vertical_tab_strip_animation.tab_strip_width));
++    params.Inset(gfx::Insets::TLBR(10, leading_inset, 10, 10));
++  }
++
+   // Lay out infobar container.
+   const bool infobar_visible = delegate().IsInfobarVisible();
+   if (IsParentedTo(views().infobar_container, views().browser_view)) {
+@@ -1227,6 +1249,8 @@ BrowserViewTabbedLayoutImpl::CalculateProposedLayout(
+   // the required top padding.
+   const auto& separator_info = layout_data_->separator_info;
+   views().multi_contents_view->SetShouldShowTopSeparator(
++      !base::CommandLine::ForCurrentProcess()->HasSwitch(
++          "myarc-visual-parity") &&
+       separator_info.multi_contents_separator);
+ 
+   // Updating the top, left and right insets for contents container view when
+@@ -1602,6 +1626,12 @@ void BrowserViewTabbedLayoutImpl::DoPostLayoutVisualAdjustments(
+         content_corners.set_lower_left(radius);
+       }
+     }
++    if (base::CommandLine::ForCurrentProcess()->HasSwitch(
++            "myarc-visual-parity") &&
++        layout_data_->tab_strip_type == TabStripType::kVertical &&
++        !is_fullscreen(layout_data_->window_state)) {
++      content_corners = gfx::RoundedCornersF(10);
++    }
+     views().multi_contents_view->SetBackgroundRadii(content_corners);
+   }
+ 
+@@ -1726,19 +1756,26 @@ void BrowserViewTabbedLayoutImpl::DoPostLayoutVisualAdjustments(
+     if (animation.expand_on_hover_width > 0.0) {
+       vertical_tabs_outline.bottom = true;
+     }
++    // The prototype clips the page once, without the stock sidebar edge stroke.
++    if (base::CommandLine::ForCurrentProcess()->HasSwitch(
++            "myarc-visual-parity")) {
++      vertical_tabs_outline = {};
++    }
+     vertical_tabs_background->SetOutline(vertical_tabs_outline);
+ 
+     // Cut the vertical tab strip out of the top container.
+     if (!frame_color.is_opaque()) {
+       top_container_cutout_views.push_back(
+           views().vertical_tab_strip_region_view);
+-      if (top_corner > 0) {
++      if (top_corner > 0 &&
++          views().vertical_tab_strip_top_corner->GetVisible()) {
+         top_container_cutout_views.push_back(
+             views().vertical_tab_strip_top_corner);
+         tab_strip_cutout_views.push_back(views().vertical_tab_strip_top_corner);
+       }
+       main_background_cutout_views = top_container_cutout_views;
+-      if (bottom_corner > 0) {
++      if (bottom_corner > 0 &&
++          views().vertical_tab_strip_bottom_corner->GetVisible()) {
+         main_background_cutout_views.push_back(
+             views().vertical_tab_strip_bottom_corner);
+         tab_strip_cutout_views.push_back(

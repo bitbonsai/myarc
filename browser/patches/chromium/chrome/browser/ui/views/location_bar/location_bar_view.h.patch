@@ -1,0 +1,31 @@
+diff --git a/chrome/browser/ui/views/location_bar/location_bar_view.h b/chrome/browser/ui/views/location_bar/location_bar_view.h
+index 856d9d7c66a7314d7046571bb3dfefda898970cc..afb91f955baa7b4b3e6b1d7482cf20b3d494adb3 100644
+--- a/chrome/browser/ui/views/location_bar/location_bar_view.h
++++ b/chrome/browser/ui/views/location_bar/location_bar_view.h
+@@ -449,6 +449,7 @@ class LocationBarView
+   bool OnMousePressed(const ui::MouseEvent& event) override;
+   bool OnMouseDragged(const ui::MouseEvent& event) override;
+   void OnMouseReleased(const ui::MouseEvent& event) override;
++  void OnMouseEntered(const ui::MouseEvent& event) override;
+   void OnMouseMoved(const ui::MouseEvent& event) override;
+   void OnMouseExited(const ui::MouseEvent& event) override;
+   void ShowContextMenu(const gfx::Point& p,
+@@ -463,6 +464,9 @@ class LocationBarView
+                            const gfx::Point& press_pt,
+                            const gfx::Point& p) override;
+ 
++  bool IsMyarcUrlPill() const;
++  void CopyMyarcCurrentUrl();
++
+   bool ShouldUsePopupOpenAppearance() const;
+ 
+   bool ShouldHidePageActionIcons() const;
+@@ -575,6 +579,8 @@ class LocationBarView
+   // An icon to the left of the edit field: the HTTPS lock, blank page icon,
+   // search icon, EV HTTPS bubble, etc.
+   raw_ptr<LocationIconView> location_icon_view_ = nullptr;
++  raw_ptr<views::ImageButton> myarc_copy_url_button_ = nullptr;
++  bool myarc_url_hovered_ = false;
+ 
+   // Views to show inline autocompletion when an IME is active.  In this case,
+   // we shouldn't change the text or selection inside the OmniboxView itself,

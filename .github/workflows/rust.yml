@@ -1,4 +1,4 @@
-name: Rust core and foundation patch
+name: Rust core
 
 on:
   push:
@@ -36,5 +36,3 @@ jobs:
           core = next(p for p in metadata['packages'] if p['name'] == 'myarc-workspace')
           assert not core['dependencies'], 'M0 workspace core must remain dependency-free'
           PY
-      - name: Check Chromium patch source freshness
-        run: python3 tools/check_foundation_patch.py

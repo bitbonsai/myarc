@@ -1,0 +1,161 @@
+diff --git a/chrome/browser/ui/views/frame/vertical_tab_strip_region_view_interactive_uitest.cc b/chrome/browser/ui/views/frame/vertical_tab_strip_region_view_interactive_uitest.cc
+index 8d4a5b9362f1b449417dbb07379f097b5818b7df..9d8087737244a3dddf600ccaf957a933667fa9b4 100644
+--- a/chrome/browser/ui/views/frame/vertical_tab_strip_region_view_interactive_uitest.cc
++++ b/chrome/browser/ui/views/frame/vertical_tab_strip_region_view_interactive_uitest.cc
+@@ -4,18 +4,32 @@
+ 
+ #include "chrome/browser/ui/views/frame/vertical_tab_strip_region_view.h"
+ 
++#include "base/command_line.h"
++#include "base/i18n/rtl.h"
++#include "base/test/bind.h"
+ #include "base/test/metrics/histogram_tester.h"
++#include "base/test/run_until.h"
+ #include "build/build_config.h"
+ #include "chrome/app/chrome_command_ids.h"
++#include "chrome/browser/ui/animation/browser_animation_controller.h"
++#include "chrome/browser/ui/browser_commands.h"
+ #include "chrome/browser/ui/browser_element_identifiers.h"
+ #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
++#include "chrome/browser/ui/tabs/tab_strip_model.h"
++#include "chrome/browser/ui/views/animations/tab_strip_animations.h"
+ #include "chrome/browser/ui/views/frame/browser_view.h"
++#include "chrome/browser/ui/views/frame/multi_contents_view.h"
+ #include "chrome/browser/ui/views/tabs/common/tab_strip_view.h"
++#include "chrome/browser/ui/views/tabs/common/tab_view.h"
++#include "chrome/browser/ui/views/tabs/tab/tab_icon.h"
++#include "chrome/browser/ui/views/tabs/tab/tab_title.h"
+ #include "chrome/browser/ui/views/test/vertical_tabs_interactive_test_mixin.h"
+ #include "chrome/test/base/ui_test_utils.h"
+ #include "chrome/test/interaction/interactive_browser_test.h"
+ #include "content/public/test/browser_test.h"
+ #include "ui/views/test/widget_activation_waiter.h"
++#include "ui/views/view_utils.h"
++#include "ui/views/widget/widget.h"
+ 
+ class VerticalTabStripRegionViewInteractiveUiTest
+     : public VerticalTabsInteractiveTestMixin<InteractiveBrowserTest> {
+@@ -28,6 +42,123 @@ class VerticalTabStripRegionViewInteractiveUiTest
+   base::HistogramTester histogram_tester_;
+ };
+ 
++class MyarcHoverSidebarInteractiveUiTest
++    : public VerticalTabStripRegionViewInteractiveUiTest {
++ public:
++  void SetUpCommandLine(base::CommandLine* command_line) override {
++    VerticalTabStripRegionViewInteractiveUiTest::SetUpCommandLine(command_line);
++    command_line->AppendSwitch("myarc-visual-parity");
++    command_line->AppendSwitchASCII("disable-features", "InitialWebUI");
++  }
++};
++
++IN_PROC_BROWSER_TEST_F(MyarcHoverSidebarInteractiveUiTest,
++                       HiddenEdgeOverlaysThenToggleReservesWidth) {
++  auto* const view = BrowserView::GetBrowserViewForBrowser(browser());
++  auto* const region = view->vertical_tab_strip_region_view_for_testing();
++  auto* const state = tabs::VerticalTabStripStateController::From(browser());
++  auto* const animation = BrowserAnimationController::From(browser());
++  gfx::Rect moved_bounds = view->GetWidget()->GetWindowBoundsInScreen();
++  moved_bounds.set_origin(gfx::Point(64, 64));
++  view->GetWidget()->SetBounds(moved_bounds);
++  ASSERT_TRUE(base::test::RunUntil([&] {
++    return view->GetBoundsInScreen().x() != 0 &&
++           view->GetBoundsInScreen().y() != 0;
++  }));
++  const auto settled = [&] {
++    return !animation->IsAnimating(TabStripAnimations::kVerticalTabStrip);
++  };
++  browser()->GetTabStripModel()->SetTabPinned(0, true);
++  state->SetExpandOnHoverEnabled(true);
++  state->RequestCollapse(false);
++  ASSERT_TRUE(base::test::RunUntil(settled));
++  RunScheduledLayouts();
++  region->OnResize(278 - region->width(), /*done_resizing=*/true);
++  RunScheduledLayouts();
++  const int expanded_width = region->width();
++  ASSERT_EQ(278, expanded_width);
++  const auto expanded_inner =
++      region->CalculateProposedLayout({expanded_width, region->height()});
++  const gfx::Rect pinned_contents = view->multi_contents_view()->bounds();
++  auto* const pinned_view =
++      views::AsViewClass<TabView>(region->GetTabAnchorView(
++          browser()->GetTabStripModel()->GetTabAtIndex(0)->GetHandle()));
++  ASSERT_TRUE(pinned_view);
++  EXPECT_FALSE(pinned_view->title_for_testing()->GetVisible());
++  const gfx::Rect pinned_icon = pinned_view->GetTabIconForTesting()->bounds();
++  gfx::Rect hidden_contents;
++
++  RunTestSequence(
++      MoveMouseTo(kMultiContentsViewElementId), Do([&] {
++        chrome::ToggleCollapseVerticalTabs(browser());
++        ASSERT_TRUE(base::test::RunUntil(
++            [&] { return state->IsCollapsed() && settled(); }));
++        RunScheduledLayouts();
++        EXPECT_EQ(0, region->width());
++        EXPECT_FALSE(region->GetVisible());
++        hidden_contents = view->multi_contents_view()->bounds();
++        EXPECT_GT(hidden_contents.width(), pinned_contents.width());
++        EXPECT_FALSE(
++            region->Contains(view->GetFocusManager()->GetFocusedView()));
++      }),
++      // This real window-local move must reach the sensor despite the region
++      // being zero-width and hidden. No test calls its observer directly.
++      MoveMouseTo(base::BindLambdaForTesting([&] {
++        const auto client = view->GetBoundsInScreen();
++        return gfx::Point(base::i18n::IsRTL() ? client.right() - 1 : client.x(),
++                          client.CenterPoint().y());
++      })),
++      Do([&] {
++        ASSERT_TRUE(base::test::RunUntil(
++            [&] { return region->is_expanded_on_hover() && settled(); }));
++        RunScheduledLayouts();
++        EXPECT_TRUE(state->IsCollapsed());
++        EXPECT_EQ(expanded_width, region->width());
++        EXPECT_EQ(hidden_contents, view->multi_contents_view()->bounds());
++        const auto peek_inner = region->CalculateProposedLayout(
++            {region->width(), region->height()});
++        ASSERT_EQ(expanded_inner.child_layouts.size(),
++                  peek_inner.child_layouts.size());
++        for (size_t i = 0; i < expanded_inner.child_layouts.size(); ++i) {
++          EXPECT_EQ(expanded_inner.child_layouts[i].bounds,
++                    peek_inner.child_layouts[i].bounds);
++        }
++      }),
++      MoveMouseTo(base::BindLambdaForTesting(
++          [&] { return region->GetBoundsInScreen().CenterPoint(); })),
++      Check([&] {
++        return region->is_expanded_on_hover() &&
++               !pinned_view->title_for_testing()->GetVisible() &&
++               pinned_view->GetTabIconForTesting()->bounds() == pinned_icon;
++      }),
++      MoveMouseTo(kMultiContentsViewElementId), Do([&] {
++        ASSERT_TRUE(base::test::RunUntil(
++            [&] { return !region->is_expanded_on_hover() && settled(); }));
++        RunScheduledLayouts();
++        EXPECT_EQ(0, region->width());
++        EXPECT_EQ(hidden_contents, view->multi_contents_view()->bounds());
++      }),
++      MoveMouseTo(base::BindLambdaForTesting([&] {
++        const auto client = view->GetBoundsInScreen();
++        return gfx::Point(base::i18n::IsRTL() ? client.right() - 1 : client.x(),
++                          client.CenterPoint().y());
++      })),
++      Do([&] {
++        ASSERT_TRUE(base::test::RunUntil(
++            [&] { return region->is_expanded_on_hover() && settled(); }));
++        chrome::ToggleCollapseVerticalTabs(browser());
++        ASSERT_TRUE(base::test::RunUntil(
++            [&] { return !state->IsCollapsed() && settled(); }));
++        RunScheduledLayouts();
++        EXPECT_FALSE(region->is_expanded_on_hover());
++        EXPECT_EQ(expanded_width, region->width());
++        EXPECT_EQ(pinned_contents, view->multi_contents_view()->bounds());
++      }),
++      MoveMouseTo(kMultiContentsViewElementId), Check([&] {
++        return !state->IsCollapsed() && !region->is_expanded_on_hover();
++      }));
++}
++
+ // Deactivate() function is flaky on Mac. Test is flaky on Linux Wayland because
+ // activation events are asynchronous.
+ #if BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX)

@@ -1,6 +1,6 @@
 # Native restore bindings before sidebar presentation
 
-MA-007.c bounded follow-up to [0019](native-workspace-mode-bootstrap.md), based on parent `0dfa2f6`. Optional [0020](../patches/0020-native-late-workspace-bindings.patch) changes consumer lifetime. Full build and source checks pass. Parent bounded native clean/crash and two-window restoration checks passed; workspace renderer stays default OFF.
+MA-007.c bounded follow-up to [0019](native-workspace-mode-bootstrap.md), based on parent `0dfa2f6`. Optional [0020](../patches/legacy/0020-native-late-workspace-bindings.patch) changes consumer lifetime. Full build and source checks pass. Parent bounded native clean/crash and two-window restoration checks passed; workspace renderer stays default OFF.
 
 ## Failure and boundary
 

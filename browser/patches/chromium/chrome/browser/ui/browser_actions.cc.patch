@@ -1,0 +1,905 @@
+diff --git a/chrome/browser/ui/browser_actions.cc b/chrome/browser/ui/browser_actions.cc
+index 97a909f99fdde9015e022e7685e2a8f2477e1282..f65ad2122671d6a09fc7574bfa509e9682b72f8d 100644
+--- a/chrome/browser/ui/browser_actions.cc
++++ b/chrome/browser/ui/browser_actions.cc
+@@ -12,6 +12,7 @@
+ 
+ #include "base/check_deref.h"
+ #include "base/check_op.h"
++#include "base/command_line.h"
+ #include "base/feature_list.h"
+ #include "base/functional/bind.h"
+ #include "base/functional/callback_helpers.h"
+@@ -357,8 +358,22 @@ actions::ActionItem::ActionItemBuilder SidePanelAction(
+                         actions::ActionPinnableState::kPinnable)
+                   : std::underlying_type_t<actions::ActionPinnableState>(
+                         actions::ActionPinnableState::kNotPinnable);
+-  return actions::ActionItem::Builder(
+-             CreateToggleSidePanelActionCallback(SidePanelEntryKey(id), bwi))
++  auto callback =
++      CreateToggleSidePanelActionCallback(SidePanelEntryKey(id), bwi);
++  if (action_id == kActionSidePanelShowComments) {
++    callback = base::BindRepeating(
++        [](BrowserWindowInterface* browser,
++           actions::ActionItem::InvokeActionCallback invoke,
++           actions::ActionItem* item,
++           actions::ActionInvocationContext context) {
++          if (chrome::IsMyarcWorkspaceCommandAllowed(
++                  browser, IDC_SHOW_COMMENTS_SIDE_PANEL)) {
++            invoke.Run(item, std::move(context));
++          }
++        },
++        bwi, std::move(callback));
++  }
++  return actions::ActionItem::Builder(std::move(callback))
+       .SetActionId(action_id)
+       .SetText(l10n_util::GetStringUTF16(title_id))
+       .SetTooltipText(l10n_util::GetStringUTF16(tooltip_id))
+@@ -569,6 +584,10 @@ void BrowserActions::InitializeSidePanelActions() {
+           base::BindRepeating(
+               [](BrowserWindowInterface* bwi, actions::ActionItem* item,
+                  actions::ActionInvocationContext context) {
++                if (!chrome::IsMyarcWorkspaceCommandAllowed(
++                        bwi, IDC_SHOW_READING_MODE_KEYBOARD)) {
++                  return;
++                }
+                 read_anything::ReadAnythingEntryPointController::ToggleUI(
+                     bwi, read_anything::mojom::ReadAnythingOpenTrigger::
+                              kKeyboardShortcut);
+@@ -589,6 +608,10 @@ void BrowserActions::InitializeSidePanelActions() {
+           base::BindRepeating(
+               [](BrowserWindowInterface* bwi, actions::ActionItem* item,
+                  actions::ActionInvocationContext context) {
++                if (!chrome::IsMyarcWorkspaceCommandAllowed(
++                        bwi, IDC_SHOW_READING_MODE)) {
++                  return;
++                }
+                 const SidePanelOpenTrigger side_panel_trigger =
+                     static_cast<SidePanelOpenTrigger>(
+                         context.GetProperty(kSidePanelOpenTriggerKey));
+@@ -808,6 +831,10 @@ void BrowserActions::InitializePageActionIconActions() {
+           base::BindRepeating(
+               [](BrowserWindowInterface* bwi, actions::ActionItem* item,
+                  actions::ActionInvocationContext context) {
++                if (!chrome::IsMyarcWorkspaceCommandAllowed(
++                        bwi, IDC_OFFERS_AND_REWARDS_FOR_PAGE)) {
++                  return;
++                }
+                 chrome::ShowOffersAndRewardsForPage(bwi);
+               },
+               bwi))
+@@ -920,6 +947,10 @@ void BrowserActions::InitializePageActionIconActions() {
+           base::BindRepeating(
+               [](BrowserWindowInterface* bwi, actions::ActionItem* item,
+                  actions::ActionInvocationContext context) {
++                if (!chrome::IsMyarcWorkspaceCommandAllowed(bwi,
++                                                            IDC_ZOOM_MENU)) {
++                  return;
++                }
+                 bwi->GetActiveTabInterface()
+                     ->GetTabFeatures()
+                     ->zoom_view_controller()
+@@ -941,6 +972,9 @@ void BrowserActions::InitializePageActionIconActions() {
+           base::BindRepeating(
+               [](BrowserWindowInterface* bwi, actions::ActionItem* item,
+                  actions::ActionInvocationContext context) {
++                if (!chrome::IsMyarcWorkspaceCommandAllowed(bwi, IDC_FIND)) {
++                  return;
++                }
+                 chrome::Find(bwi);
+               },
+               bwi))
+@@ -959,6 +993,10 @@ void BrowserActions::InitializePageActionIconActions() {
+           base::BindRepeating(
+               [](BrowserWindowInterface* bwi, actions::ActionItem* item,
+                  actions::ActionInvocationContext context) {
++                if (!chrome::IsMyarcWorkspaceCommandAllowed(
++                        bwi, IDC_VIRTUAL_CARD_ENROLL)) {
++                  return;
++                }
+                 tabs::TabInterface* tab_interface =
+                     bwi->GetActiveTabInterface();
+                 CHECK(tab_interface);
+@@ -992,6 +1030,10 @@ void BrowserActions::InitializePageActionIconActions() {
+           base::BindRepeating(
+               [](BrowserWindowInterface* bwi, actions::ActionItem* item,
+                  actions::ActionInvocationContext context) {
++                if (!chrome::IsMyarcWorkspaceCommandAllowed(
++                        bwi, IDC_FILLED_CARD_INFORMATION)) {
++                  return;
++                }
+                 tabs::TabInterface* tab_interface =
+                     bwi->GetActiveTabInterface();
+                 CHECK(tab_interface);
+@@ -1086,6 +1128,10 @@ void BrowserActions::InitializePageActionIconActions() {
+           base::BindRepeating(
+               [](BrowserWindowInterface* bwi, actions::ActionItem* item,
+                  actions::ActionInvocationContext context) {
++                if (!chrome::IsMyarcWorkspaceCommandAllowed(
++                        bwi, IDC_AUTOFILL_MANDATORY_REAUTH)) {
++                  return;
++                }
+                 auto* tab_interface = bwi->GetActiveTabInterface();
+                 CHECK(tab_interface);
+ 
+@@ -1243,8 +1289,13 @@ void BrowserActions::InitializeChromeMenuActions() {
+               },
+               bwi))
+           .SetActionId(kActionToggleCollapseVertical)
+-          .SetAccelerator(ui::Accelerator(
+-              ui::VKEY_L, ui::EF_SHIFT_DOWN | ui::EF_PLATFORM_ACCELERATOR))
++          .SetAccelerator(
++              base::CommandLine::ForCurrentProcess()->HasSwitch(
++                  "myarc-visual-parity")
++                  ? ui::Accelerator(ui::VKEY_S, ui::EF_PLATFORM_ACCELERATOR)
++                  : ui::Accelerator(
++                        ui::VKEY_L,
++                        ui::EF_SHIFT_DOWN | ui::EF_PLATFORM_ACCELERATOR))
+           .SetEnabled(false)
+           .Build());
+ 
+@@ -1315,7 +1366,7 @@ void BrowserActions::InitializeChromeMenuActions() {
+           base::BindRepeating(
+               [](BrowserWindowInterface* bwi, actions::ActionItem* item,
+                  actions::ActionInvocationContext context) {
+-                chrome::NewTab(bwi, NewTabTypes::kNewTabCommand);
++                chrome::NewTabFromUI(bwi, NewTabTypes::kNewTabCommand);
+               },
+               bwi))
+           .SetActionId(kActionNewTab)
+@@ -1357,6 +1408,9 @@ void BrowserActions::InitializeChromeMenuActions() {
+           base::BindRepeating(
+               [](BrowserWindowInterface* bwi, actions::ActionItem* item,
+                  actions::ActionInvocationContext context) {
++                if (!chrome::IsMyarcWorkspaceCommandAllowed(bwi, IDC_PRINT)) {
++                  return;
++                }
+                 chrome::Print(bwi);
+               },
+               bwi),
+@@ -1479,6 +1533,10 @@ void BrowserActions::InitializeChromeMenuActions() {
+           base::BindRepeating(
+               [](BrowserWindowInterface* bwi, actions::ActionItem* item,
+                  actions::ActionInvocationContext context) {
++                if (!chrome::IsMyarcWorkspaceCommandAllowed(bwi,
++                                                            IDC_DEV_TOOLS)) {
++                  return;
++                }
+                 const auto trigger = static_cast<SidePanelOpenTrigger>(
+                     context.GetProperty(kSidePanelOpenTriggerKey));
+                 const auto source =
+@@ -1510,6 +1568,10 @@ void BrowserActions::InitializeChromeMenuActions() {
+                 [](BrowserWindowInterface* bwi, TabStripModel* tab_strip_model,
+                    actions::ActionItem* item,
+                    actions::ActionInvocationContext context) {
++                  if (!chrome::IsMyarcWorkspaceCommandAllowed(
++                          bwi, IDC_SEND_TAB_TO_SELF)) {
++                    return;
++                  }
+                   if (context.GetProperty(chrome::kActionInvocationSourceKey) ==
+                       chrome::ActionInvocationSource::kAppMenu) {
+                     chrome::SendTabToSelf(bwi);
+@@ -1533,6 +1595,10 @@ void BrowserActions::InitializeChromeMenuActions() {
+           base::BindRepeating(
+               [](BrowserWindowInterface* bwi, actions::ActionItem* item,
+                  actions::ActionInvocationContext context) {
++                if (!chrome::IsMyarcWorkspaceCommandAllowed(
++                        bwi, IDC_SHOW_TRANSLATE)) {
++                  return;
++                }
+                 chrome::ShowTranslateBubble(bwi);
+               },
+               bwi),
+@@ -1563,6 +1629,10 @@ void BrowserActions::InitializeChromeMenuActions() {
+           base::BindRepeating(
+               [](BrowserWindowInterface* bwi, actions::ActionItem* item,
+                  actions::ActionInvocationContext context) {
++                if (!chrome::IsMyarcWorkspaceCommandAllowed(
++                        bwi, IDC_BOOKMARK_THIS_TAB)) {
++                  return;
++                }
+                 std::underlying_type_t<page_actions::PageActionTrigger>
+                     page_action_trigger = context.GetProperty(
+                         page_actions::kPageActionTriggerKey);
+@@ -1591,6 +1661,10 @@ void BrowserActions::InitializeChromeMenuActions() {
+           base::BindRepeating(
+               [](BrowserWindowInterface* bwi, actions::ActionItem* item,
+                  actions::ActionInvocationContext context) {
++                if (!chrome::IsMyarcWorkspaceCommandAllowed(
++                        bwi, IDC_QRCODE_GENERATOR)) {
++                  return;
++                }
+                 chrome::GenerateQRCode(bwi);
+               },
+               bwi),
+@@ -1764,6 +1838,10 @@ void BrowserActions::InitializeChromeMenuActions() {
+           base::BindRepeating(
+               [](BrowserWindowInterface* bwi, actions::ActionItem* item,
+                  actions::ActionInvocationContext context) {
++                if (!chrome::IsMyarcWorkspaceCommandAllowed(
++                        bwi, IDC_DEV_TOOLS_INSPECT)) {
++                  return;
++                }
+                 chrome::ToggleDevToolsWindow(
+                     bwi, DevToolsToggleAction::Inspect(),
+                     DevToolsOpenedByAction::kInspectorModeShortcut);
+@@ -1924,6 +2002,10 @@ void BrowserActions::InitializeChromeMenuActions() {
+             base::BindRepeating(
+                 [](BrowserWindowInterface* bwi, actions::ActionItem* item,
+                    actions::ActionInvocationContext context) {
++                  if (!chrome::IsMyarcWorkspaceCommandAllowed(
++                          bwi, IDC_SHOW_TTC_MENU)) {
++                    return;
++                  }
+                   chrome::ShowTtcMenuItem(bwi);
+                 },
+                 bwi),
+@@ -2002,6 +2084,10 @@ void BrowserActions::InitializeToolbarAndMiscActions() {
+               [](BrowserWindowInterface* bwi, TabStripModel* tab_strip_model,
+                  actions::ActionItem* item,
+                  actions::ActionInvocationContext context) {
++                if (!chrome::IsMyarcWorkspaceCommandAllowed(bwi,
++                                                            IDC_COPY_URL)) {
++                  return;
++                }
+                 chrome::CopyURL(bwi, tab_strip_model->GetActiveWebContents());
+               },
+               bwi, tab_strip_model),
+@@ -2020,6 +2106,10 @@ void BrowserActions::InitializeToolbarAndMiscActions() {
+           base::BindRepeating(
+               [](BrowserWindowInterface* bwi, actions::ActionItem* item,
+                  actions::ActionInvocationContext context) {
++                if (!chrome::IsMyarcWorkspaceCommandAllowed(bwi,
++                                                            IDC_ROUTE_MEDIA)) {
++                  return;
++                }
+                 // TODO(crbug.com/356468503): Figure out how to capture
+                 // action invocation location.
+                 auto* cast_browser_controller =
+@@ -2285,6 +2375,10 @@ void BrowserActions::InitializeToolbarAndMiscActions() {
+           base::BindRepeating(
+               [](BrowserWindowInterface* bwi, actions::ActionItem* item,
+                  actions::ActionInvocationContext context) {
++                if (!chrome::IsMyarcWorkspaceCommandAllowed(bwi,
++                                                            IDC_INSTALL_PWA)) {
++                  return;
++                }
+                 base::RecordAction(
+                     base::UserMetricsAction("InstallWebAppFromMenu"));
+                 web_app::CreateWebAppFromCurrentWebContents(
+@@ -2648,6 +2742,10 @@ void BrowserActions::InitializeToolbarAndMiscActions() {
+           base::BindRepeating(
+               [](BrowserWindowInterface* bwi, actions::ActionItem* item,
+                  actions::ActionInvocationContext context) {
++                if (!chrome::IsMyarcWorkspaceCommandAllowed(
++                        bwi, IDC_NEW_SPLIT_TAB)) {
++                  return;
++                }
+                 if (!bwi->GetTabStripModel()->GetActiveTab()->IsSplit()) {
+                   chrome::NewSplitTab(
+                       bwi, split_tabs::SplitTabLayout::kSideBySide,
+@@ -2663,6 +2761,10 @@ void BrowserActions::InitializeToolbarAndMiscActions() {
+           base::BindRepeating(
+               [](BrowserWindowInterface* bwi, actions::ActionItem* item,
+                  actions::ActionInvocationContext context) {
++                if (!chrome::IsMyarcWorkspaceCommandAllowed(
++                        bwi, IDC_MANAGE_PASSWORDS_FOR_PAGE)) {
++                  return;
++                }
+                 chrome::ManagePasswordsForPage(bwi);
+               },
+               bwi))
+@@ -2674,6 +2776,10 @@ void BrowserActions::InitializeToolbarAndMiscActions() {
+           base::BindRepeating(
+               [](BrowserWindowInterface* bwi, actions::ActionItem* item,
+                  actions::ActionInvocationContext context) {
++                if (!chrome::IsMyarcWorkspaceCommandAllowed(
++                        bwi, IDC_SAVE_CREDIT_CARD_FOR_PAGE)) {
++                  return;
++                }
+                 chrome::SaveCreditCard(bwi);
+               },
+               bwi))
+@@ -2685,6 +2791,10 @@ void BrowserActions::InitializeToolbarAndMiscActions() {
+           base::BindRepeating(
+               [](BrowserWindowInterface* bwi, actions::ActionItem* item,
+                  actions::ActionInvocationContext context) {
++                if (!chrome::IsMyarcWorkspaceCommandAllowed(
++                        bwi, IDC_SAVE_IBAN_FOR_PAGE)) {
++                  return;
++                }
+                 chrome::SaveIban(bwi);
+               },
+               bwi))
+@@ -3025,6 +3135,10 @@ void BrowserActions::InitializeToolbarAndMiscActions() {
+           base::BindRepeating(
+               [](BrowserWindowInterface* bwi, actions::ActionItem* item,
+                  actions::ActionInvocationContext context) {
++                if (!chrome::IsMyarcWorkspaceCommandAllowed(
++                        bwi, IDC_OPEN_IN_PWA_WINDOW)) {
++                  return;
++                }
+                 base::RecordAction(
+                     base::UserMetricsAction("OpenActiveTabInPwaWindow"));
+                 web_app::ReparentWebAppForActiveTab(bwi);
+@@ -3051,6 +3165,10 @@ void BrowserActions::InitializeToolbarAndMiscActions() {
+           base::BindRepeating(
+               [](BrowserWindowInterface* bwi, actions::ActionItem* item,
+                  actions::ActionInvocationContext context) {
++                if (!chrome::IsMyarcWorkspaceCommandAllowed(
++                        bwi, IDC_WINDOW_MUTE_SITE)) {
++                  return;
++                }
+                 chrome::MuteSite(bwi);
+               },
+               bwi))
+@@ -3062,6 +3180,10 @@ void BrowserActions::InitializeToolbarAndMiscActions() {
+           base::BindRepeating(
+               [](BrowserWindowInterface* bwi, actions::ActionItem* item,
+                  actions::ActionInvocationContext context) {
++                if (!chrome::IsMyarcWorkspaceCommandAllowed(bwi,
++                                                            IDC_CLOSE_TAB)) {
++                  return;
++                }
+                 base::RecordAction(base::UserMetricsAction("CloseTabByKey"));
+                 chrome::CloseTab(bwi);
+               },
+@@ -3255,6 +3377,10 @@ void BrowserActions::InitializeToolbarAndMiscActions() {
+           base::BindRepeating(
+               [](BrowserWindowInterface* bwi, actions::ActionItem* item,
+                  actions::ActionInvocationContext context) {
++                if (!chrome::IsMyarcWorkspaceCommandAllowed(
++                        bwi, IDC_DUPLICATE_TAB)) {
++                  return;
++                }
+                 chrome::DuplicateTab(bwi);
+               },
+               bwi))
+@@ -3277,6 +3403,10 @@ void BrowserActions::InitializeToolbarAndMiscActions() {
+           base::BindRepeating(
+               [](BrowserWindowInterface* bwi, actions::ActionItem* item,
+                  actions::ActionInvocationContext context) {
++                if (!chrome::IsMyarcWorkspaceCommandAllowed(bwi,
++                                                            IDC_SHOW_AS_TAB)) {
++                  return;
++                }
+                 chrome::ConvertPopupToTabbedBrowser(bwi);
+               },
+               bwi))
+@@ -3288,6 +3418,10 @@ void BrowserActions::InitializeToolbarAndMiscActions() {
+           base::BindRepeating(
+               [](BrowserWindowInterface* bwi, actions::ActionItem* item,
+                  actions::ActionInvocationContext context) {
++                if (!chrome::IsMyarcWorkspaceCommandAllowed(
++                        bwi, IDC_MOVE_TAB_NEXT)) {
++                  return;
++                }
+                 chrome::MoveTabNext(bwi);
+               },
+               bwi))
+@@ -3299,6 +3433,10 @@ void BrowserActions::InitializeToolbarAndMiscActions() {
+           base::BindRepeating(
+               [](BrowserWindowInterface* bwi, actions::ActionItem* item,
+                  actions::ActionInvocationContext context) {
++                if (!chrome::IsMyarcWorkspaceCommandAllowed(
++                        bwi, IDC_MOVE_TAB_PREVIOUS)) {
++                  return;
++                }
+                 chrome::MoveTabPrevious(bwi);
+               },
+               bwi))
+@@ -3310,6 +3448,10 @@ void BrowserActions::InitializeToolbarAndMiscActions() {
+           base::BindRepeating(
+               [](BrowserWindowInterface* bwi, actions::ActionItem* item,
+                  actions::ActionInvocationContext context) {
++                if (!chrome::IsMyarcWorkspaceCommandAllowed(
++                        bwi, IDC_MOVE_TAB_TO_NEW_WINDOW)) {
++                  return;
++                }
+                 chrome::MoveActiveTabToNewWindow(bwi);
+               },
+               bwi))
+@@ -3321,6 +3463,10 @@ void BrowserActions::InitializeToolbarAndMiscActions() {
+           base::BindRepeating(
+               [](BrowserWindowInterface* bwi, actions::ActionItem* item,
+                  actions::ActionInvocationContext context) {
++                if (!chrome::IsMyarcWorkspaceCommandAllowed(
++                        bwi, IDC_BOOKMARK_ALL_TABS)) {
++                  return;
++                }
+                 chrome::BookmarkAllTabs(bwi);
+               },
+               bwi))
+@@ -3339,6 +3485,10 @@ void BrowserActions::InitializeToolbarAndMiscActions() {
+           base::BindRepeating(
+               [](BrowserWindowInterface* bwi, actions::ActionItem* item,
+                  actions::ActionInvocationContext context) {
++                if (!chrome::IsMyarcWorkspaceCommandAllowed(
++                        bwi, IDC_WINDOW_PIN_TAB)) {
++                  return;
++                }
+                 chrome::PinTab(bwi);
+               },
+               bwi))
+@@ -3350,6 +3500,10 @@ void BrowserActions::InitializeToolbarAndMiscActions() {
+           base::BindRepeating(
+               [](BrowserWindowInterface* bwi, actions::ActionItem* item,
+                  actions::ActionInvocationContext context) {
++                if (!chrome::IsMyarcWorkspaceCommandAllowed(
++                        bwi, IDC_WINDOW_GROUP_TAB)) {
++                  return;
++                }
+                 chrome::GroupTab(bwi);
+               },
+               bwi))
+@@ -3361,6 +3515,10 @@ void BrowserActions::InitializeToolbarAndMiscActions() {
+           base::BindRepeating(
+               [](BrowserWindowInterface* bwi, actions::ActionItem* item,
+                  actions::ActionInvocationContext context) {
++                if (!chrome::IsMyarcWorkspaceCommandAllowed(
++                        bwi, IDC_WINDOW_CLOSE_TABS_TO_RIGHT)) {
++                  return;
++                }
+                 chrome::CloseTabsToRight(bwi);
+               },
+               bwi))
+@@ -3372,6 +3530,10 @@ void BrowserActions::InitializeToolbarAndMiscActions() {
+           base::BindRepeating(
+               [](BrowserWindowInterface* bwi, actions::ActionItem* item,
+                  actions::ActionInvocationContext context) {
++                if (!chrome::IsMyarcWorkspaceCommandAllowed(
++                        bwi, IDC_WINDOW_CLOSE_OTHER_TABS)) {
++                  return;
++                }
+                 chrome::CloseOtherTabs(bwi);
+               },
+               bwi))
+@@ -3383,6 +3545,10 @@ void BrowserActions::InitializeToolbarAndMiscActions() {
+           base::BindRepeating(
+               [](BrowserWindowInterface* bwi, actions::ActionItem* item,
+                  actions::ActionInvocationContext context) {
++                if (!chrome::IsMyarcWorkspaceCommandAllowed(
++                        bwi, IDC_NEW_TAB_TO_RIGHT)) {
++                  return;
++                }
+                 chrome::NewTabToRight(bwi);
+               },
+               bwi))
+@@ -3394,6 +3560,10 @@ void BrowserActions::InitializeToolbarAndMiscActions() {
+           base::BindRepeating(
+               [](BrowserWindowInterface* bwi, actions::ActionItem* item,
+                  actions::ActionInvocationContext context) {
++                if (!chrome::IsMyarcWorkspaceCommandAllowed(
++                        bwi, IDC_ADD_NEW_TAB_TO_GROUP)) {
++                  return;
++                }
+                 chrome::AddNewTabToGroup(bwi);
+                 base::UmaHistogramEnumeration(
+                     "TabGroups.Shortcuts",
+@@ -3408,6 +3578,10 @@ void BrowserActions::InitializeToolbarAndMiscActions() {
+           base::BindRepeating(
+               [](BrowserWindowInterface* bwi, actions::ActionItem* item,
+                  actions::ActionInvocationContext context) {
++                if (!chrome::IsMyarcWorkspaceCommandAllowed(
++                        bwi, IDC_CREATE_NEW_TAB_GROUP)) {
++                  return;
++                }
+                 chrome::CreateNewTabGroup(bwi);
+                 base::UmaHistogramEnumeration(
+                     "TabGroups.Shortcuts",
+@@ -3463,6 +3637,10 @@ void BrowserActions::InitializeToolbarAndMiscActions() {
+           base::BindRepeating(
+               [](BrowserWindowInterface* bwi, actions::ActionItem* item,
+                  actions::ActionInvocationContext context) {
++                if (!chrome::IsMyarcWorkspaceCommandAllowed(
++                        bwi, IDC_CLOSE_TAB_GROUP)) {
++                  return;
++                }
+                 chrome::CloseTabGroup(bwi);
+                 base::UmaHistogramEnumeration(
+                     "TabGroups.Shortcuts",
+@@ -3477,6 +3655,10 @@ void BrowserActions::InitializeToolbarAndMiscActions() {
+           base::BindRepeating(
+               [](BrowserWindowInterface* bwi, actions::ActionItem* item,
+                  actions::ActionInvocationContext context) {
++                if (!chrome::IsMyarcWorkspaceCommandAllowed(
++                        bwi, IDC_GROUP_UNGROUPED_TABS)) {
++                  return;
++                }
+                 chrome::GroupAllUngroupedTabs(bwi);
+                 base::RecordAction(
+                     base::UserMetricsAction("TabGroups_GroupAllUngroupedTabs"));
+@@ -3490,6 +3672,10 @@ void BrowserActions::InitializeToolbarAndMiscActions() {
+           base::BindRepeating(
+               [](BrowserWindowInterface* bwi, actions::ActionItem* item,
+                  actions::ActionInvocationContext context) {
++                if (!chrome::IsMyarcWorkspaceCommandAllowed(
++                        bwi, IDC_ADD_NEW_TAB_RECENT_GROUP)) {
++                  return;
++                }
+                 chrome::AddNewTabToRecentGroup(bwi);
+               },
+               bwi))
+@@ -3501,6 +3687,10 @@ void BrowserActions::InitializeToolbarAndMiscActions() {
+           base::BindRepeating(
+               [](BrowserWindowInterface* bwi, actions::ActionItem* item,
+                  actions::ActionInvocationContext context) {
++                if (!chrome::IsMyarcWorkspaceCommandAllowed(
++                        bwi, IDC_PIN_TARGET_TAB)) {
++                  return;
++                }
+                 chrome::PinKeyboardFocusedTab(bwi);
+               },
+               bwi))
+@@ -3512,6 +3702,10 @@ void BrowserActions::InitializeToolbarAndMiscActions() {
+           base::BindRepeating(
+               [](BrowserWindowInterface* bwi, actions::ActionItem* item,
+                  actions::ActionInvocationContext context) {
++                if (!chrome::IsMyarcWorkspaceCommandAllowed(
++                        bwi, IDC_GROUP_TARGET_TAB)) {
++                  return;
++                }
+                 chrome::GroupKeyboardFocusedTab(bwi);
+               },
+               bwi))
+@@ -3523,6 +3717,10 @@ void BrowserActions::InitializeToolbarAndMiscActions() {
+           base::BindRepeating(
+               [](BrowserWindowInterface* bwi, actions::ActionItem* item,
+                  actions::ActionInvocationContext context) {
++                if (!chrome::IsMyarcWorkspaceCommandAllowed(
++                        bwi, IDC_DUPLICATE_TARGET_TAB)) {
++                  return;
++                }
+                 chrome::DuplicateKeyboardFocusedTab(bwi);
+               },
+               bwi))
+@@ -3534,6 +3732,10 @@ void BrowserActions::InitializeToolbarAndMiscActions() {
+           base::BindRepeating(
+               [](BrowserWindowInterface* bwi, actions::ActionItem* item,
+                  actions::ActionInvocationContext context) {
++                if (!chrome::IsMyarcWorkspaceCommandAllowed(
++                        bwi, IDC_TOGGLE_REQUEST_TABLET_SITE)) {
++                  return;
++                }
+                 chrome::ToggleRequestTabletSite(bwi);
+               },
+               bwi))
+@@ -3545,6 +3747,10 @@ void BrowserActions::InitializeToolbarAndMiscActions() {
+           base::BindRepeating(
+               [](BrowserWindowInterface* bwi, actions::ActionItem* item,
+                  actions::ActionInvocationContext context) {
++                if (!chrome::IsMyarcWorkspaceCommandAllowed(
++                        bwi, IDC_READING_LIST_MENU_ADD_TAB)) {
++                  return;
++                }
+                 chrome::MoveCurrentTabToReadLater(bwi);
+               },
+               bwi))
+@@ -3681,6 +3887,10 @@ void BrowserActions::InitializeToolbarAndMiscActions() {
+           base::BindRepeating(
+               [](BrowserWindowInterface* bwi, actions::ActionItem* item,
+                  actions::ActionInvocationContext context) {
++                if (!chrome::IsMyarcWorkspaceCommandAllowed(
++                        bwi, IDC_FOCUS_WEB_CONTENTS_PANE)) {
++                  return;
++                }
+                 chrome::FocusWebContentsPane(bwi);
+               },
+               bwi))
+@@ -3692,6 +3902,10 @@ void BrowserActions::InitializeToolbarAndMiscActions() {
+           base::BindRepeating(
+               [](BrowserWindowInterface* bwi, actions::ActionItem* item,
+                  actions::ActionInvocationContext context) {
++                if (!chrome::IsMyarcWorkspaceCommandAllowed(bwi,
++                                                            IDC_ZOOM_PLUS)) {
++                  return;
++                }
+                 chrome::Zoom(bwi, content::PAGE_ZOOM_IN);
+               },
+               bwi))
+@@ -3707,6 +3921,10 @@ void BrowserActions::InitializeToolbarAndMiscActions() {
+           base::BindRepeating(
+               [](BrowserWindowInterface* bwi, actions::ActionItem* item,
+                  actions::ActionInvocationContext context) {
++                if (!chrome::IsMyarcWorkspaceCommandAllowed(bwi,
++                                                            IDC_ZOOM_MINUS)) {
++                  return;
++                }
+                 chrome::Zoom(bwi, content::PAGE_ZOOM_OUT);
+               },
+               bwi))
+@@ -3722,6 +3940,10 @@ void BrowserActions::InitializeToolbarAndMiscActions() {
+           base::BindRepeating(
+               [](BrowserWindowInterface* bwi, actions::ActionItem* item,
+                  actions::ActionInvocationContext context) {
++                if (!chrome::IsMyarcWorkspaceCommandAllowed(bwi,
++                                                            IDC_ZOOM_NORMAL)) {
++                  return;
++                }
+                 chrome::Zoom(bwi, content::PAGE_ZOOM_RESET);
+               },
+               bwi))
+@@ -3737,6 +3959,10 @@ void BrowserActions::InitializeToolbarAndMiscActions() {
+           base::BindRepeating(
+               [](BrowserWindowInterface* bwi, actions::ActionItem* item,
+                  actions::ActionInvocationContext context) {
++                if (!chrome::IsMyarcWorkspaceCommandAllowed(
++                        bwi, IDC_CONTENT_CONTEXT_LENS_REGION_SEARCH)) {
++                  return;
++                }
+                 tabs::TabInterface* const active_tab =
+                     bwi->GetActiveTabInterface();
+                 if (!active_tab) {
+@@ -3787,6 +4013,10 @@ void BrowserActions::InitializeToolbarAndMiscActions() {
+           base::BindRepeating(
+               [](BrowserWindowInterface* bwi, actions::ActionItem* item,
+                  actions::ActionInvocationContext context) {
++                if (!chrome::IsMyarcWorkspaceCommandAllowed(bwi,
++                                                            IDC_VIEW_SOURCE)) {
++                  return;
++                }
+                 tabs::TabInterface* const active_tab =
+                     bwi->GetActiveTabInterface();
+                 if (!active_tab) {
+@@ -3815,6 +4045,10 @@ void BrowserActions::InitializeToolbarAndMiscActions() {
+           base::BindRepeating(
+               [](BrowserWindowInterface* bwi, actions::ActionItem* item,
+                  actions::ActionInvocationContext context) {
++                if (!chrome::IsMyarcWorkspaceCommandAllowed(bwi,
++                                                            IDC_SAVE_PAGE)) {
++                  return;
++                }
+                 chrome::SavePage(bwi);
+               },
+               bwi))
+@@ -3835,6 +4069,10 @@ void BrowserActions::InitializeToolbarAndMiscActions() {
+           base::BindRepeating(
+               [](BrowserWindowInterface* bwi, actions::ActionItem* item,
+                  actions::ActionInvocationContext context) {
++                if (!chrome::IsMyarcWorkspaceCommandAllowed(bwi,
++                                                            IDC_BASIC_PRINT)) {
++                  return;
++                }
+                 base::RecordAction(
+                     base::UserMetricsAction("Accel_Advanced_Print"));
+                 chrome::BasicPrint(bwi);
+@@ -3849,6 +4087,10 @@ void BrowserActions::InitializeToolbarAndMiscActions() {
+           base::BindRepeating(
+               [](BrowserWindowInterface* bwi, actions::ActionItem* item,
+                  actions::ActionInvocationContext context) {
++                if (!chrome::IsMyarcWorkspaceCommandAllowed(
++                        bwi, IDC_MUTE_TARGET_SITE)) {
++                  return;
++                }
+                 chrome::MuteSiteForKeyboardFocusedTab(bwi);
+               },
+               bwi))
+@@ -3860,6 +4102,10 @@ void BrowserActions::InitializeToolbarAndMiscActions() {
+           base::BindRepeating(
+               [](BrowserWindowInterface* bwi, actions::ActionItem* item,
+                  actions::ActionInvocationContext context) {
++                if (!chrome::IsMyarcWorkspaceCommandAllowed(bwi,
++                                                            IDC_FIND_NEXT)) {
++                  return;
++                }
+                 chrome::FindNext(bwi);
+               },
+               bwi))
+@@ -3871,6 +4117,10 @@ void BrowserActions::InitializeToolbarAndMiscActions() {
+           base::BindRepeating(
+               [](BrowserWindowInterface* bwi, actions::ActionItem* item,
+                  actions::ActionInvocationContext context) {
++                if (!chrome::IsMyarcWorkspaceCommandAllowed(
++                        bwi, IDC_FIND_PREVIOUS)) {
++                  return;
++                }
+                 chrome::FindPrevious(bwi);
+               },
+               bwi))
+@@ -3882,6 +4132,10 @@ void BrowserActions::InitializeToolbarAndMiscActions() {
+           base::BindRepeating(
+               [](BrowserWindowInterface* bwi, actions::ActionItem* item,
+                  actions::ActionInvocationContext context) {
++                if (!chrome::IsMyarcWorkspaceCommandAllowed(
++                        bwi, IDC_CLOSE_FIND_OR_STOP)) {
++                  return;
++                }
+                 if (chrome::CanCloseFind(bwi)) {
+                   chrome::CloseFind(bwi);
+                 } else {
+@@ -3897,6 +4151,10 @@ void BrowserActions::InitializeToolbarAndMiscActions() {
+           base::BindRepeating(
+               [](BrowserWindowInterface* bwi, actions::ActionItem* item,
+                  actions::ActionInvocationContext context) {
++                if (!chrome::IsMyarcWorkspaceCommandAllowed(
++                        bwi, IDC_CREATE_SHORTCUT)) {
++                  return;
++                }
+                 base::RecordAction(base::UserMetricsAction("CreateShortcut"));
+ #if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_MAC) || BUILDFLAG(IS_LINUX)
+                 chrome::CreateDesktopShortcutForActiveWebContents(bwi);
+@@ -3922,6 +4180,10 @@ void BrowserActions::InitializeToolbarAndMiscActions() {
+           base::BindRepeating(
+               [](BrowserWindowInterface* bwi, actions::ActionItem* item,
+                  actions::ActionInvocationContext context) {
++                if (!chrome::IsMyarcWorkspaceCommandAllowed(
++                        bwi, IDC_DEV_TOOLS_CONSOLE)) {
++                  return;
++                }
+                 chrome::ToggleDevToolsWindow(
+                     bwi, DevToolsToggleAction::ShowConsolePanel(),
+                     DevToolsOpenedByAction::kConsoleShortcut);
+@@ -3935,6 +4197,10 @@ void BrowserActions::InitializeToolbarAndMiscActions() {
+           base::BindRepeating(
+               [](BrowserWindowInterface* bwi, actions::ActionItem* item,
+                  actions::ActionInvocationContext context) {
++                if (!chrome::IsMyarcWorkspaceCommandAllowed(
++                        bwi, IDC_DEV_TOOLS_TOGGLE)) {
++                  return;
++                }
+                 chrome::ToggleDevToolsWindow(
+                     bwi, DevToolsToggleAction::Toggle(),
+                     DevToolsOpenedByAction::kToggleShortcut);
+@@ -4035,6 +4301,10 @@ void BrowserActions::InitializeToolbarAndMiscActions() {
+           base::BindRepeating(
+               [](BrowserWindowInterface* bwi, actions::ActionItem* item,
+                  actions::ActionInvocationContext context) {
++                if (!chrome::IsMyarcWorkspaceCommandAllowed(
++                        bwi, IDC_CARET_BROWSING_TOGGLE)) {
++                  return;
++                }
+                 chrome::ToggleCaretBrowsing(bwi);
+               },
+               bwi))
+@@ -4306,6 +4576,10 @@ void BrowserActions::InitializeToolbarAndMiscActions() {
+           base::BindRepeating(
+               [](BrowserWindowInterface* bwi, actions::ActionItem* item,
+                  actions::ActionInvocationContext context) {
++                if (!chrome::IsMyarcWorkspaceCommandAllowed(
++                        bwi, IDC_CONTENT_CONTEXT_LENS_OVERLAY)) {
++                  return;
++                }
+                 if (!bwi) {
+                   return;
+                 }
+@@ -4502,6 +4776,10 @@ void BrowserActions::InitializeToolbarAndMiscActions() {
+           base::BindRepeating(
+               [](BrowserWindowInterface* bwi, actions::ActionItem* item,
+                  actions::ActionInvocationContext context) {
++                if (!chrome::IsMyarcWorkspaceCommandAllowed(
++                        bwi, IDC_OPEN_IN_CHROME)) {
++                  return;
++                }
+                 chrome::OpenInChrome(bwi);
+               },
+               bwi),
+@@ -4600,6 +4878,10 @@ void BrowserActions::InitializeToolbarAndMiscActions() {
+           base::BindRepeating(
+               [](BrowserWindowInterface* bwi, actions::ActionItem* item,
+                  actions::ActionInvocationContext context) {
++                if (!chrome::IsMyarcWorkspaceCommandAllowed(
++                        bwi, IDC_SAVE_AUTOFILL_ADDRESS)) {
++                  return;
++                }
+                 chrome::SaveAutofillAddress(bwi);
+               },
+               bwi))
+@@ -4611,6 +4893,10 @@ void BrowserActions::InitializeToolbarAndMiscActions() {
+           base::BindRepeating(
+               [](BrowserWindowInterface* bwi, actions::ActionItem* item,
+                  actions::ActionInvocationContext context) {
++                if (!chrome::IsMyarcWorkspaceCommandAllowed(bwi,
++                                                            IDC_SHARING_HUB)) {
++                  return;
++                }
+                 chrome::SharingHub(bwi);
+               },
+               bwi))
+@@ -4622,6 +4908,10 @@ void BrowserActions::InitializeToolbarAndMiscActions() {
+           base::BindRepeating(
+               [](BrowserWindowInterface* bwi, actions::ActionItem* item,
+                  actions::ActionInvocationContext context) {
++                if (!chrome::IsMyarcWorkspaceCommandAllowed(
++                        bwi, IDC_SHARING_HUB_SCREENSHOT)) {
++                  return;
++                }
+                 chrome::ScreenshotCapture(bwi);
+               },
+               bwi))
+@@ -4964,6 +5254,10 @@ void BrowserActions::InitializeToolbarAndMiscActions() {
+           base::BindRepeating(
+               [](BrowserWindowInterface* bwi, actions::ActionItem* item,
+                  actions::ActionInvocationContext context) {
++                if (!chrome::IsMyarcWorkspaceCommandAllowed(
++                        bwi, IDC_TOGGLE_JAVASCRIPT_APPLE_EVENTS)) {
++                  return;
++                }
+                 tabs::TabInterface* const active_tab =
+                     bwi->GetActiveTabInterface();
+                 if (!active_tab) {
+@@ -5208,6 +5502,9 @@ void BrowserActions::InitializeNavigationActions() {
+           base::BindRepeating(
+               [](BrowserWindowInterface* bwi, actions::ActionItem* item,
+                  actions::ActionInvocationContext context) {
++                if (!chrome::IsMyarcWorkspaceCommandAllowed(bwi, IDC_BACK)) {
++                  return;
++                }
+                 WindowOpenDisposition disposition =
+                     context.GetProperty(chrome::kDispositionKey);
+                 chrome::GoBack(bwi, disposition);
+@@ -5221,6 +5518,9 @@ void BrowserActions::InitializeNavigationActions() {
+           base::BindRepeating(
+               [](BrowserWindowInterface* bwi, actions::ActionItem* item,
+                  actions::ActionInvocationContext context) {
++                if (!chrome::IsMyarcWorkspaceCommandAllowed(bwi, IDC_RELOAD)) {
++                  return;
++                }
+                 WindowOpenDisposition disposition =
+                     context.GetProperty(chrome::kDispositionKey);
+                 chrome::Reload(bwi, disposition);
+@@ -5234,6 +5534,9 @@ void BrowserActions::InitializeNavigationActions() {
+           base::BindRepeating(
+               [](BrowserWindowInterface* bwi, actions::ActionItem* item,
+                  actions::ActionInvocationContext context) {
++                if (!chrome::IsMyarcWorkspaceCommandAllowed(bwi, IDC_STOP)) {
++                  return;
++                }
+                 chrome::Stop(bwi);
+               },
+               bwi))
+@@ -5245,6 +5548,10 @@ void BrowserActions::InitializeNavigationActions() {
+           base::BindRepeating(
+               [](BrowserWindowInterface* bwi, actions::ActionItem* item,
+                  actions::ActionInvocationContext context) {
++                if (!chrome::IsMyarcWorkspaceCommandAllowed(
++                        bwi, IDC_RELOAD_CLEARING_CACHE)) {
++                  return;
++                }
+                 WindowOpenDisposition disposition =
+                     context.GetProperty(chrome::kDispositionKey);
+                 chrome::ClearCache(bwi);
+@@ -5259,6 +5566,10 @@ void BrowserActions::InitializeNavigationActions() {
+           base::BindRepeating(
+               [](BrowserWindowInterface* bwi, actions::ActionItem* item,
+                  actions::ActionInvocationContext context) {
++                if (!chrome::IsMyarcWorkspaceCommandAllowed(
++                        bwi, IDC_RELOAD_BYPASSING_CACHE)) {
++                  return;
++                }
+                 WindowOpenDisposition disposition =
+                     context.GetProperty(chrome::kDispositionKey);
+                 chrome::ReloadBypassingCache(bwi, disposition);
+@@ -5283,6 +5594,9 @@ void BrowserActions::InitializeNavigationActions() {
+           base::BindRepeating(
+               [](BrowserWindowInterface* bwi, actions::ActionItem* item,
+                  actions::ActionInvocationContext context) {
++                if (!chrome::IsMyarcWorkspaceCommandAllowed(bwi, IDC_HOME)) {
++                  return;
++                }
+                 WindowOpenDisposition disposition =
+                     context.GetProperty(chrome::kDispositionKey);
+                 chrome::Home(bwi, disposition);
+@@ -5296,6 +5610,9 @@ void BrowserActions::InitializeNavigationActions() {
+           base::BindRepeating(
+               [](BrowserWindowInterface* bwi, actions::ActionItem* item,
+                  actions::ActionInvocationContext context) {
++                if (!chrome::IsMyarcWorkspaceCommandAllowed(bwi, IDC_FORWARD)) {
++                  return;
++                }
+                 WindowOpenDisposition disposition =
+                     context.GetProperty(chrome::kDispositionKey);
+                 chrome::GoForward(bwi, disposition);
+@@ -5368,7 +5685,12 @@ void BrowserActions::InitializeSubmenuActions() {
+       ChromeMenuAction(
+           base::BindRepeating(
+               [](BrowserWindowInterface* bwi, actions::ActionItem* item,
+-                 actions::ActionInvocationContext context) {},
++                 actions::ActionInvocationContext context) {
++                if (!chrome::IsMyarcWorkspaceCommandAllowed(bwi,
++                                                            IDC_ZOOM_MENU)) {
++                  return;
++                }
++              },
+               bwi),
+           kActionZoomSubmenu, IDS_ZOOM_MENU, IDS_ZOOM_MENU,
+           features::IsRoundedIconsEnabled() ? kZoomInIcon : kZoomInOldIcon,

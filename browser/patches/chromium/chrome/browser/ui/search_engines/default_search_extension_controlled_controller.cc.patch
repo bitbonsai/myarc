@@ -1,0 +1,27 @@
+diff --git a/chrome/browser/ui/search_engines/default_search_extension_controlled_controller.cc b/chrome/browser/ui/search_engines/default_search_extension_controlled_controller.cc
+index cd760a84e42af6f706704eda5a0ff366d6c7744d..5c8562ca81791399538880c039334229470075e5 100644
+--- a/chrome/browser/ui/search_engines/default_search_extension_controlled_controller.cc
++++ b/chrome/browser/ui/search_engines/default_search_extension_controlled_controller.cc
+@@ -11,6 +11,7 @@
+ #include "base/no_destructor.h"
+ #include "chrome/browser/profiles/profile.h"
+ #include "chrome/browser/search_engines/template_url_service_factory.h"
++#include "chrome/browser/ui/browser_window.h"
+ #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
+ #include "chrome/browser/ui/extensions/controlled_home_dialog_controller.h"
+ #include "chrome/browser/ui/extensions/extension_settings_overridden_dialog.h"
+@@ -205,7 +206,13 @@ void DefaultSearchExtensionControlledController::OnParamsLoaded(
+       browser_window_interface_->GetActiveTabInterface()->GetContents();
+   CHECK(web_contents);
+ 
+-  gfx::NativeWindow parent_window = web_contents->GetTopLevelNativeWindow();
++  auto* window = BrowserWindow::FromBrowser(&*browser_window_interface_);
++  // Hidden contents need not have a native parent. Consent belongs to the
++  // browser window even when its selected Space has no page.
++  gfx::NativeWindow parent_window =
++      window && window->IsMyarcWorkspaceBlank()
++          ? window->GetNativeWindow()
++          : web_contents->GetTopLevelNativeWindow();
+   extensions::ShowSettingsOverriddenDialog(std::move(dialog), parent_window);
+ }
+ 

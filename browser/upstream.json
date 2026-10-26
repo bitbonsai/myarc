@@ -1,10 +1,11 @@
 {
   "repository": "https://chromium.googlesource.com/chromium/src.git",
-  "revision": "7ae71de816ba32868ff9f974c2716f04ebd9b860",
+  "revision": "8d208f20744ac6d4ce00cc3f9de6a14a9b8b926d",
   "version": "158.0.8122.0",
   "channel": "main feasibility candidate, not a release baseline",
   "depotToolsRepository": "https://chromium.googlesource.com/chromium/tools/depot_tools.git",
   "depotToolsRevision": "dbc99f8b5b88e43a2b907d8ddd93c269d24c287e",
   "target": "mac-arm64",
-  "patches": ["patches/0001-workspace-foundation.patch"]
+  "branch": "myarc",
+  "patches": "patches/chromium"
 }

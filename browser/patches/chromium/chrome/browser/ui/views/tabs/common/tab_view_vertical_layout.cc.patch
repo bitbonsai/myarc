@@ -1,0 +1,55 @@
+diff --git a/chrome/browser/ui/views/tabs/common/tab_view_vertical_layout.cc b/chrome/browser/ui/views/tabs/common/tab_view_vertical_layout.cc
+index d2b935e0c80a1a82d08b4da25496f5b0b5360773..31a87ea70a318707a3c2c0c6937087431e64ad61 100644
+--- a/chrome/browser/ui/views/tabs/common/tab_view_vertical_layout.cc
++++ b/chrome/browser/ui/views/tabs/common/tab_view_vertical_layout.cc
+@@ -4,6 +4,7 @@
+ 
+ #include "chrome/browser/ui/views/tabs/common/tab_view_vertical_layout.h"
+ 
++#include "base/command_line.h"
+ #include "chrome/browser/glic/browser_ui/tab_underline_view.h"
+ #include "chrome/browser/ui/layout_constants.h"
+ #include "chrome/browser/ui/tabs/vertical_tab_strip_state.h"
+@@ -49,9 +50,15 @@ views::ProposedLayout TabViewVerticalLayout::CalculateProposedLayout(
+     const views::SizeBounds& size_bounds) const {
+   const int width =
+       size_bounds.width().value_or(tabs::kVerticalTabStripUncollapsedMaxWidth);
+-  const int height = GetLayoutConstant(
+-      TabView().pinned_ ? LayoutConstant::kVerticalTabPinnedHeight
+-                        : LayoutConstant::kVerticalTabHeight);
++  const bool visual_pinned =
++      TabView().pinned_ &&
++      base::CommandLine::ForCurrentProcess()->HasSwitch("myarc-visual-parity");
++  const int height =
++      visual_pinned
++          ? 48
++          : GetLayoutConstant(TabView().pinned_
++                                  ? LayoutConstant::kVerticalTabPinnedHeight
++                                  : LayoutConstant::kVerticalTabHeight);
+   views::ProposedLayout layouts;
+   layouts.host_size = gfx::Size(width, height);
+ 
+@@ -60,8 +67,9 @@ views::ProposedLayout TabViewVerticalLayout::CalculateProposedLayout(
+ 
+   // If the tab is collapsed but animating with a wider width then we shouldn't
+   // center the contents.
+-  const bool is_centered = (TabView().pinned_ || TabView().collapsed_) &&
+-                           !TabView().IsInExpandOnHover(width);
++  const bool is_centered =
++      visual_pinned || ((TabView().pinned_ || TabView().collapsed_) &&
++                        !TabView().IsInExpandOnHover(width));
+ 
+   int placed_children = 0;
+   for (const auto& child : tab_children_configs_) {
+@@ -147,7 +155,10 @@ bool TabViewVerticalLayout::IsChildVisible(const views::View* child_view,
+   if (child_view == TabView().title_) {
+     // Pinned titles should be visible in the expand on hover state when the
+     // width is sufficient to show the title.
+-    return !TabView().pinned_ || TabView().IsInExpandOnHover(width);
++    return !TabView().pinned_ ||
++           (!base::CommandLine::ForCurrentProcess()->HasSwitch(
++                "myarc-visual-parity") &&
++            TabView().IsInExpandOnHover(width));
+   }
+ 
+   if (child_view == TabView().alert_indicator_) {

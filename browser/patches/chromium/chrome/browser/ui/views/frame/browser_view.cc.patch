@@ -1,0 +1,1484 @@
+diff --git a/chrome/browser/ui/views/frame/browser_view.cc b/chrome/browser/ui/views/frame/browser_view.cc
+index 7b568f6de760af21d6e9d2aa44415a7cef617c51..dd50027bad1b699bec17aaba7dccc961dc25aade 100644
+--- a/chrome/browser/ui/views/frame/browser_view.cc
++++ b/chrome/browser/ui/views/frame/browser_view.cc
+@@ -22,6 +22,7 @@
+ #include "base/feature_list.h"
+ #include "base/functional/bind.h"
+ #include "base/functional/callback_helpers.h"
++#include "base/i18n/case_conversion.h"
+ #include "base/i18n/rtl.h"
+ #include "base/location.h"
+ #include "base/memory/raw_ptr.h"
+@@ -34,6 +35,8 @@
+ #include "base/scoped_observation.h"
+ #include "base/strings/string_number_conversions.h"
+ #include "base/strings/stringprintf.h"
++#include "base/strings/utf_string_conversions.h"
++#include "base/task/cancelable_task_tracker.h"
+ #include "base/task/sequenced_task_runner.h"
+ #include "base/task/single_thread_task_runner.h"
+ #include "base/trace_event/trace_event.h"
+@@ -55,6 +58,7 @@
+ #include "chrome/browser/feature_engagement/tracker_factory.h"
+ #include "chrome/browser/glic/public/features.h"
+ #include "chrome/browser/headless/headless_mode_util.h"
++#include "chrome/browser/history/history_service_factory.h"
+ #include "chrome/browser/platform_util.h"
+ #include "chrome/browser/profiles/profile.h"
+ #include "chrome/browser/profiles/profile_attributes_entry.h"
+@@ -152,6 +156,7 @@
+ #include "chrome/browser/ui/views/bookmarks/bookmark_page_action_controller.h"
+ #include "chrome/browser/ui/views/bubble_anchor_util_views.h"
+ #include "chrome/browser/ui/views/color_provider_browser_helper.h"
++#include "chrome/browser/ui/views/controls/hover_button.h"
+ #include "chrome/browser/ui/views/download/download_in_progress_dialog_view.h"
+ #include "chrome/browser/ui/views/exclusive_access/exclusive_access_bubble_views.h"
+ #include "chrome/browser/ui/views/exclusive_access/exclusive_access_bubble_views_context.h"
+@@ -233,7 +238,9 @@
+ #include "chrome/browser/ui/views/toolbar/browser_app_menu_button.h"
+ #include "chrome/browser/ui/views/toolbar/chrome_labs/chrome_labs_coordinator.h"
+ #include "chrome/browser/ui/views/toolbar/pinned_toolbar_actions_container.h"
++#include "chrome/browser/ui/views/toolbar/reload_button.h"
+ #include "chrome/browser/ui/views/toolbar/reload_control.h"
++#include "chrome/browser/ui/views/toolbar/toolbar_button.h"
+ #include "chrome/browser/ui/views/toolbar/toolbar_view.h"
+ #include "chrome/browser/ui/views/translate/translate_bubble_controller.h"
+ #include "chrome/browser/ui/views/translate/translate_bubble_view.h"
+@@ -263,10 +270,13 @@
+ #include "components/feature_engagement/public/event_constants.h"
+ #include "components/feature_engagement/public/feature_constants.h"
+ #include "components/feature_engagement/public/tracker.h"
++#include "components/history/core/browser/history_service.h"
++#include "components/history/core/browser/history_types.h"
+ #include "components/infobars/content/content_infobar_manager.h"
+ #include "components/javascript_dialogs/app_modal_dialog_controller.h"
+ #include "components/javascript_dialogs/app_modal_dialog_queue.h"
+ #include "components/javascript_dialogs/app_modal_dialog_view.h"
++#include "components/omnibox/browser/location_bar_model.h"
+ #include "components/performance_manager/public/features.h"
+ #include "components/permissions/permission_request_manager.h"
+ #include "components/prefs/pref_service.h"
+@@ -291,6 +301,7 @@
+ #include "components/user_education/common/new_badge/new_badge_controller.h"
+ #include "components/user_education/common/user_education_features.h"
+ #include "components/user_education/views/help_bubble_view.h"
++#include "components/vector_icons/vector_icons.h"
+ #include "components/version_info/channel.h"
+ #include "components/web_modal/web_contents_modal_dialog_manager.h"
+ #include "content/public/browser/browser_accessibility_state.h"
+@@ -311,6 +322,8 @@
+ #include "content/public/common/drop_data.h"
+ #include "extensions/common/command.h"
+ #include "media/capture/capture_switches.h"
++#include "myarc/browser_workspace_adapter.h"
++#include "myarc/workspace_lifecycle.h"
+ #include "third_party/blink/public/common/features.h"
+ #include "third_party/blink/public/common/permissions/permission_utils.h"
+ #include "ui/accessibility/ax_enums.mojom-shared.h"
+@@ -335,11 +348,14 @@
+ #include "ui/color/color_id.h"
+ #include "ui/compositor/debug_utils.h"
+ #include "ui/compositor/layer.h"
++#include "ui/compositor/layer_animator.h"
+ #include "ui/compositor/paint_recorder.h"
++#include "ui/compositor/scoped_layer_animation_settings.h"
+ #include "ui/content_accelerators/accelerator_util.h"
+ #include "ui/display/screen.h"
+ #include "ui/display/types/display_constants.h"
+ #include "ui/events/event_utils.h"
++#include "ui/gfx/animation/animation.h"
+ #include "ui/gfx/animation/animation_runner.h"
+ #include "ui/gfx/canvas.h"
+ #include "ui/gfx/color_utils.h"
+@@ -353,12 +369,20 @@
+ #include "ui/views/accessibility/view_accessibility.h"
+ #include "ui/views/accessibility/view_accessibility_utils.h"
+ #include "ui/views/animation/compositor_animation_runner.h"
++#include "ui/views/background.h"
++#include "ui/views/border.h"
+ #include "ui/views/bubble/bubble_dialog_delegate_view.h"
++#include "ui/views/controls/button/label_button.h"
+ #include "ui/views/controls/button/menu_button.h"
++#include "ui/views/controls/image_view.h"
++#include "ui/views/controls/label.h"
++#include "ui/views/controls/native/native_view_host.h"
+ #include "ui/views/controls/textfield/textfield.h"
++#include "ui/views/controls/textfield/textfield_controller.h"
+ #include "ui/views/controls/webview/webview.h"
+ #include "ui/views/interaction/element_tracker_views.h"
+ #include "ui/views/interaction/view_subregion_anchor.h"
++#include "ui/views/layout/box_layout_view.h"
+ #include "ui/views/layout/fill_layout.h"
+ #include "ui/views/view.h"
+ #include "ui/views/view_class_properties.h"
+@@ -659,6 +683,378 @@ bool ConvertedHitTest(views::View* src, views::View* dst, gfx::Point* point) {
+   return dst->HitTestPoint(*point);
+ }
+ 
++class MyarcPaletteResultButton : public HoverButton {
++  METADATA_HEADER(MyarcPaletteResultButton, HoverButton)
++
++ public:
++  using HoverButton::HoverButton;
++
++ protected:
++  void StateChanged(ButtonState old_state) override {
++    // Address results keep explicit focus; menu-style hover must not move it.
++    views::LabelButton::StateChanged(old_state);
++  }
++};
++
++BEGIN_METADATA(MyarcPaletteResultButton)
++END_METADATA
++
++class MyarcPaletteView : public views::BoxLayoutView,
++                         public views::TextfieldController {
++  METADATA_HEADER(MyarcPaletteView, views::BoxLayoutView)
++
++ public:
++  MyarcPaletteView(base::WeakPtr<BrowserWindowInterface> browser,
++                   int width,
++                   bool new_tab,
++                   std::u16string initial_text)
++      : browser_(browser),
++        width_(width),
++        new_tab_(new_tab),
++        initial_text_(std::move(initial_text)) {
++    SetOrientation(views::BoxLayout::Orientation::kVertical);
++    SetBetweenChildSpacing(8);
++    auto* header = AddChildView(std::make_unique<views::BoxLayoutView>());
++    header->SetOrientation(views::BoxLayout::Orientation::kHorizontal);
++    header->SetCrossAxisAlignment(
++        views::BoxLayout::CrossAxisAlignment::kCenter);
++    auto* icon = header->AddChildView(std::make_unique<views::ImageView>());
++    icon->SetImage(ui::ImageModel::FromVectorIcon(vector_icons::kSearchIcon,
++                                                  ui::kColorSysOnSurface, 18));
++    input_ = header->AddChildView(std::make_unique<views::Textfield>());
++    input_->SetController(this);
++    input_->SetPlaceholderText(u"Search or Enter URL...");
++    input_->GetViewAccessibility().SetName(u"Search or Enter URL");
++    input_->SetTextInputType(ui::TEXT_INPUT_TYPE_URL);
++    input_->SetFontList(gfx::FontList().DeriveWithSizeDelta(5));
++    input_->SetBackgroundColor(ui::kColorBubbleBackground);
++    input_->SetTextColorId(ui::kColorSysOnSurface);
++    input_->SetPlaceholderTextColorId(ui::kColorSysOnSurfaceVariant);
++    input_->SetBorder(views::CreateEmptyBorder(gfx::Insets::VH(8, 12)));
++    header->SetFlexForView(input_, 1);
++    header->SetPreferredSize(gfx::Size(width_, 52));
++    rows_ = AddChildView(std::make_unique<views::BoxLayoutView>());
++    rows_->SetOrientation(views::BoxLayout::Orientation::kVertical);
++    rows_->SetBetweenChildSpacing(4);
++    error_ = AddChildView(std::make_unique<views::Label>());
++    error_->SetEnabledColor(ui::kColorSysError);
++    error_->SetVisible(false);
++    input_->SetText(initial_text_);
++    input_->SelectAll(false);
++    Rebuild();
++  }
++
++  views::Textfield* input() { return input_; }
++
++  void SetIntent(bool new_tab, std::u16string initial_text) {
++    if (new_tab_ != new_tab) {
++      new_tab_ = new_tab;
++      initial_text_ = std::move(initial_text);
++      input_->SetText(initial_text_);
++      Rebuild();
++    }
++  }
++
++  void FocusInput() {
++    if (!GetWidget() || GetWidget()->IsClosed()) {
++      return;
++    }
++    auto weak_this = weak_factory_.GetWeakPtr();
++    GetWidget()->Activate();
++    if (weak_this && GetWidget() && !GetWidget()->IsClosed()) {
++      input_->SelectAll(false);
++      input_->RequestFocus();
++    }
++  }
++
++  void PrepareToClose() {
++    history_tasks_.TryCancelAll();
++    weak_factory_.InvalidateWeakPtrs();
++  }
++
++  base::WeakPtr<MyarcPaletteView> GetWeakPtr() {
++    return weak_factory_.GetWeakPtr();
++  }
++
++  void ContentsChanged(views::Textfield* sender,
++                       const std::u16string& text) override {
++    Rebuild();
++  }
++
++  bool HandleKeyEvent(views::Textfield* sender,
++                      const ui::KeyEvent& event) override {
++    if (event.type() != ui::EventType::kKeyPressed ||
++        sender->IsIMEComposing()) {
++      return false;
++    }
++    if (event.key_code() == ui::VKEY_ESCAPE) {
++      GetWidget()->Close();
++      return true;
++    }
++    if (event.key_code() == ui::VKEY_RETURN) {
++      if (selected_ >= 0 && (new_tab_ || input_->GetText() != initial_text_)) {
++        ActivateResult(selected_);
++      } else {
++        Submit();
++      }
++      return true;
++    }
++    if (!buttons_.empty() && (event.key_code() == ui::VKEY_DOWN ||
++                              event.key_code() == ui::VKEY_UP)) {
++      const int count = static_cast<int>(buttons_.size());
++      selected_ =
++          event.key_code() == ui::VKEY_DOWN
++              ? (selected_ + 1) % count
++              : (selected_ < 0 ? count - 1 : (selected_ + count - 1) % count);
++      UpdateSelection();
++      return true;
++    }
++    return false;
++  }
++
++ private:
++  void Resize() {
++    const int row_count = std::max(1, static_cast<int>(buttons_.size()));
++    SetPreferredSize(gfx::Size(
++        width_, 60 + row_count * 48 + (error_->GetVisible() ? 32 : 0)));
++    if (GetWidget()) {
++      GetWidget()
++          ->widget_delegate()
++          ->AsBubbleDialogDelegate()
++          ->SizeToContents();
++    }
++  }
++
++  void UpdateSelection() {
++    for (size_t i = 0; i < buttons_.size(); ++i) {
++      const bool selected = static_cast<int>(i) == selected_;
++      buttons_[i]->SetBackground(views::CreateRoundedRectBackground(
++          selected ? SkColorSetRGB(66, 66, 210) : SK_ColorTRANSPARENT, 8));
++      const ui::ColorVariant foreground =
++          selected ? ui::ColorVariant(SK_ColorWHITE)
++                   : ui::ColorVariant(ui::kColorSysOnSurface);
++      buttons_[i]->title()->SetEnabledColor(foreground);
++      actions_[i]->SetEnabledColor(
++          selected ? ui::ColorVariant(SK_ColorWHITE)
++                   : ui::ColorVariant(ui::kColorSysOnSurfaceVariant));
++      icons_[i]->SetImage(ui::ImageModel::FromVectorIcon(
++          i < matches_.size() ? vector_icons::kGlobeIcon
++                              : vector_icons::kHistoryIcon,
++          foreground, 16));
++    }
++  }
++
++  void AddResultRow(const std::u16string& title,
++                    const std::u16string& address,
++                    bool is_tab) {
++    HoverButton::Params params;
++    auto icon =
++        std::make_unique<views::ImageView>(ui::ImageModel::FromVectorIcon(
++            is_tab ? vector_icons::kGlobeIcon : vector_icons::kHistoryIcon,
++            ui::kColorSysOnSurface, 16));
++    icons_.push_back(icon.get());
++    params.icon_view = std::move(icon);
++    params.title = title;
++    params.add_vertical_label_spacing = false;
++    auto action = std::make_unique<views::Label>(
++        is_tab ? u"Switch to Tab  \u2192" : u"Open from History  \u2192");
++    action->SetSubpixelRenderingEnabled(false);
++    action->SetAutoColorReadabilityEnabled(false);
++    actions_.push_back(action.get());
++    params.secondary_view = std::move(action);
++    auto* button =
++        rows_->AddChildView(std::make_unique<MyarcPaletteResultButton>(
++            base::BindRepeating(&MyarcPaletteView::ActivateResult,
++                                base::Unretained(this),
++                                static_cast<int>(buttons_.size())),
++            std::move(params)));
++    button->title()->SetSubpixelRenderingEnabled(false);
++    button->title()->SetAutoColorReadabilityEnabled(false);
++    button->title()->SetEnabledColor(ui::kColorSysOnSurface);
++    button->SetBorder(views::CreateEmptyBorder(gfx::Insets::VH(10, 12)));
++    button->SetPreferredSize(gfx::Size(width_, 44));
++    button->SetTooltipText(address);
++    button->AddExtraAccessibleText(is_tab ? u"Switch to Tab"
++                                          : u"Open from History");
++    button->SetFocusBehavior(views::View::FocusBehavior::ALWAYS);
++    buttons_.push_back(button);
++  }
++
++  void AddHistoryResults(history::QueryResults results) {
++    if (!browser_ || (GetWidget() && GetWidget()->IsClosed())) {
++      return;
++    }
++    for (const auto& result : results) {
++      if (buttons_.size() >= 8) {
++        break;
++      }
++      const GURL& url = result.url();
++      if (!url.SchemeIsHTTPOrHTTPS() || url.spec().size() > 4096 ||
++          std::ranges::any_of(matches_, [&url](const auto& tab) {
++            return tab && tab->GetLastCommittedURL() == url;
++          })) {
++        continue;
++      }
++      if (buttons_.empty()) {
++        rows_->RemoveAllChildViews();
++      }
++      history_urls_.push_back(url);
++      const std::u16string address = base::UTF8ToUTF16(url.spec());
++      AddResultRow(result.title().empty() ? address.substr(0, 160)
++                                          : result.title().substr(0, 160),
++                   address, false);
++    }
++    if (new_tab_ && !buttons_.empty() && selected_ < 0) {
++      selected_ = 0;
++    }
++    UpdateSelection();
++    Resize();
++  }
++
++  void Rebuild() {
++    history_tasks_.TryCancelAll();
++    buttons_.clear();
++    actions_.clear();
++    icons_.clear();
++    matches_.clear();
++    history_urls_.clear();
++    rows_->RemoveAllChildViews();
++    selected_ = -1;
++    error_->SetVisible(false);
++    if (input_->GetText().size() > 4096) {
++      error_->SetText(u"Use at most 4096 characters.");
++      error_->SetVisible(true);
++      Resize();
++      return;
++    }
++    const std::u16string query = base::i18n::ToLower(input_->GetText());
++    if (browser_) {
++      auto* model = browser_->GetTabStripModel();
++      // shortcut: scan 512 tabs and show eight; expand for large-workspace
++      // search.
++      for (int i = 0; i < std::min(model->count(), 512) && matches_.size() < 8;
++           ++i) {
++        auto* contents = model->GetWebContentsAt(i);
++        const GURL& url = contents->GetLastCommittedURL();
++        if (url.is_empty() || url.IsAboutBlank()) {
++          continue;
++        }
++        std::u16string title = contents->GetTitle().substr(0, 160);
++        const std::u16string address =
++            base::UTF8ToUTF16(url.spec().substr(0, 512));
++        if (!query.empty() &&
++            base::i18n::ToLower(title + u" " + address).find(query) ==
++                std::u16string::npos) {
++          continue;
++        }
++        if (title.empty()) {
++          title = address;
++        }
++        matches_.push_back(contents->GetWeakPtr());
++        AddResultRow(title, address, true);
++      }
++    }
++    if (matches_.empty()) {
++      auto* hint = rows_->AddChildView(std::make_unique<views::Label>(
++          new_tab_ ? u"Enter opens a new tab. Esc cancels."
++                   : u"Enter updates the current tab. Esc cancels."));
++      hint->SetEnabledColor(ui::kColorSysOnSurfaceVariant);
++      hint->SetPreferredSize(gfx::Size(width_, 44));
++    } else if (new_tab_) {
++      selected_ = 0;
++      UpdateSelection();
++    }
++    Resize();
++    if (browser_ && !browser_->GetProfile()->IsOffTheRecord() &&
++        buttons_.size() < 8) {
++      auto* history_service = HistoryServiceFactory::GetForProfile(
++          browser_->GetProfile(), ServiceAccessType::IMPLICIT_ACCESS);
++      if (history_service) {
++        history::QueryOptions options;
++        options.max_count = 16;
++        options.policy_for_404_visits =
++            history::VisitQuery404sPolicy::kInclude404s;
++        history_service->QueryHistory(
++            std::u16string(input_->GetText()), options,
++            base::BindOnce(&MyarcPaletteView::AddHistoryResults,
++                           weak_factory_.GetWeakPtr()),
++            &history_tasks_);
++      }
++    }
++  }
++
++  void ActivateResult(int index) {
++    if (index >= static_cast<int>(matches_.size())) {
++      const int history_index = index - static_cast<int>(matches_.size());
++      if (browser_ && history_index >= 0 &&
++          history_index < static_cast<int>(history_urls_.size()) &&
++          chrome::NavigateFromMyarcPalette(
++              browser_.get(),
++              base::UTF8ToUTF16(history_urls_[history_index].spec()),
++              new_tab_)) {
++        if (GetWidget() && !GetWidget()->IsClosed()) {
++          GetWidget()->Close();
++        }
++      }
++      return;
++    }
++    if (!browser_ || index < 0 || !matches_[index]) {
++      Rebuild();
++      return;
++    }
++    const int current = browser_->GetTabStripModel()->GetIndexOfWebContents(
++        matches_[index].get());
++    if (current < 0) {
++      Rebuild();
++      return;
++    }
++    GetWidget()->Close();
++    if (browser_) {
++      browser_->GetTabStripModel()->ActivateTabAt(current);
++    }
++  }
++
++  void Submit() {
++    if (!browser_) {
++      return;
++    }
++    if (!new_tab_ && !chrome::IsMyarcWorkspaceBlank(browser_.get()) &&
++        input_->GetText() == initial_text_) {
++      chrome::Reload(browser_.get(), WindowOpenDisposition::kCurrentTab);
++    } else if (!chrome::NavigateFromMyarcPalette(browser_.get(),
++                                                 input_->GetText(), new_tab_)) {
++      error_->SetText(
++          u"Address unsupported. For search confirmation, open a page and "
++          u"use the address bar.");
++      error_->SetVisible(true);
++      Resize();
++      return;
++    }
++    if (GetWidget() && !GetWidget()->IsClosed()) {
++      GetWidget()->Close();
++    }
++  }
++
++  base::WeakPtr<BrowserWindowInterface> browser_;
++  const int width_;
++  bool new_tab_;
++  std::u16string initial_text_;
++  raw_ptr<views::Textfield> input_ = nullptr;
++  raw_ptr<views::BoxLayoutView> rows_ = nullptr;
++  raw_ptr<views::Label> error_ = nullptr;
++  std::vector<base::WeakPtr<content::WebContents>> matches_;
++  std::vector<raw_ptr<HoverButton>> buttons_;
++  std::vector<raw_ptr<views::Label>> actions_;
++  std::vector<raw_ptr<views::ImageView>> icons_;
++  std::vector<GURL> history_urls_;
++  base::CancelableTaskTracker history_tasks_;
++  int selected_ = -1;
++  base::WeakPtrFactory<MyarcPaletteView> weak_factory_{this};
++};
++
++BEGIN_METADATA(MyarcPaletteView)
++END_METADATA
++
+ }  // namespace
+ 
+ // Implements the exclusive access context and bubble context.
+@@ -1124,6 +1520,20 @@ BrowserView::~BrowserView() {
+   // other cleanups that destroy views referenced in the layout manager.
+   SetLayoutManager(nullptr);
+ 
++  myarc_workspace_weak_factory_.InvalidateWeakPtrs();
++  myarc_workspace_subscription_ = {};
++  CloseMyarcSpaceDialog();
++  // Sidebar owns menu runner and callbacks into this delegate/adapter.
++  myarc_workspace_sidebar_ = nullptr;
++  if (vertical_tab_strip_region_view_) {
++    vertical_tab_strip_region_view_->RemoveMyarcWorkspaceSidebar();
++  }
++  myarc_workspace_adapter_.reset();
++
++  if (myarc_command_palette_widget_) {
++    myarc_command_palette_widget_->Close();
++  }
++  OnMyarcCommandPaletteClosed(myarc_command_palette_delegate_.get());
+   tab_search_bubble_host_.reset();
+ 
+   global_error_observation_.Reset();
+@@ -1624,6 +2034,7 @@ void BrowserView::OnVerticalTabStripModeChanged(
+     horizontal_tab_strip_region_view_->InitializeTabStrip();
+   }
+ 
++  UpdateMyarcTabStripMode();
+   GetFrameView()->OnTabStripStateChanged();
+ 
+   UpdateTabSearchBubbleHost();
+@@ -1992,6 +2403,15 @@ void BrowserView::OnActiveTabChanged(content::WebContents* old_contents,
+                                      int index,
+                                      int reason) {
+   CHECK(new_contents, base::NotFatalUntil::M162);
++  if (IsMyarcWorkspaceBlank()) {
++    WebContentsObserver::Observe(new_contents);
++    UpdateMyarcWorkspaceCanvas();
++    return;
++  }
++  if (myarc_workspace_blank_) {
++    myarc_workspace_blank_ = false;
++    multi_contents_view_->GetActiveContentsContainerView()->SetVisible(true);
++  }
+   TRACE_EVENT0("ui", "BrowserView::OnActiveTabChanged");
+   views::WebView* active_contents_view = GetActiveContentsWebView();
+   bool tab_change_in_split_view =
+@@ -2014,6 +2434,47 @@ void BrowserView::OnActiveTabChanged(content::WebContents* old_contents,
+       active_contents_view->web_contents() != new_contents &&
+       !tab_change_in_split_view;
+ 
++#if BUILDFLAG(IS_MAC)
++  const auto is_live_page = [this](content::WebContents* contents) {
++    const auto* tab = tabs::TabInterface::MaybeGetFromContents(contents);
++    return tab && tab->GetBrowserWindowInterface() == browser_.get() &&
++           !tab->IsSplit() && !tab->IsBlocked() &&
++           contents->GetBrowserContext() == browser_->GetProfile() &&
++           !contents->IsBeingDestroyed() && !contents->IsCrashed() &&
++           !contents->IsLoading() &&
++           !contents->GetController().GetPendingEntry() &&
++           contents->GetLastCommittedURL().SchemeIsHTTPOrHTTPS() &&
++           contents->GetPrimaryMainFrame()->IsRenderFrameLive();
++  };
++  bool fade_saved_page =
++      base::CommandLine::ForCurrentProcess()->HasSwitch(
++          "myarc-visual-parity") &&
++      change_tab_contents && old_contents && old_contents != new_contents &&
++      active_contents_view->web_contents() == old_contents &&
++      !multi_contents_view_->IsInSplitView() && !IsFullscreen() &&
++      !browser_->GetTabStripModel()->closing_all() && GetWidget()->IsActive() &&
++      !WidgetHasChildModalDialog(GetWidget()) &&
++      gfx::Animation::ShouldRenderRichAnimation() &&
++      !gfx::Animation::PrefersReducedMotion() && is_live_page(old_contents) &&
++      is_live_page(new_contents);
++  if (fade_saved_page && myarc_workspace_adapter_) {
++    const auto sidebar = myarc_workspace_adapter_->Sidebar();
++    const auto is_saved = [&sidebar](content::WebContents* contents) {
++      const uint64_t id =
++          myarc::BrowserWorkspaceAdapter::ItemIdForContents(*contents);
++      const auto matches = [id](const auto& row) { return row.id == id; };
++      return std::ranges::any_of(sidebar.favorites, matches) ||
++             std::ranges::any_of(sidebar.pins, matches);
++    };
++    fade_saved_page = myarc_workspace_adapter_->ready() && sidebar.ok &&
++                      is_saved(old_contents) && is_saved(new_contents);
++  } else if (fade_saved_page) {
++    fade_saved_page =
++        tabs::TabInterface::GetFromContents(old_contents)->IsPinned() &&
++        tabs::TabInterface::GetFromContents(new_contents)->IsPinned();
++  }
++#endif
++
+   bool will_restore_focus = !browser_->GetTabStripModel()->closing_all() &&
+                             GetWidget()->IsVisible() &&
+                             !tab_change_in_split_view;
+@@ -2139,6 +2600,23 @@ void BrowserView::OnActiveTabChanged(content::WebContents* old_contents,
+   UpdateTitleBar();
+ 
+   CHECK_DEREF(TranslateBubbleController::From(browser_.get())).CloseBubble();
++  UpdateMyarcWorkspaceCanvas();
++#if BUILDFLAG(IS_MAC)
++  auto* incoming_view = multi_contents_view_->GetActiveContentsView();
++  ui::Layer* page_layer = incoming_view->holder()->layer();
++  if (fade_saved_page && incoming_view->web_contents() == new_contents &&
++      incoming_view->IsDrawn() && page_layer && page_layer->GetCompositor() &&
++      !page_layer->children().empty()) {
++    // The Mac page compositor is a child of this NativeViewHost layer.
++    // myArc polish: 120 ms is a prototype choice, not measured Arc behavior.
++    page_layer->GetAnimator()->StopAnimatingProperty(
++        ui::LayerAnimationElement::OPACITY);
++    page_layer->SetOpacity(0.f);
++    ui::ScopedLayerAnimationSettings settings(page_layer->GetAnimator());
++    settings.SetTransitionDuration(base::Milliseconds(120));
++    page_layer->SetOpacity(1.f);
++  }
++#endif
+ }
+ 
+ void BrowserView::OnTabDetached(content::WebContents* contents,
+@@ -2258,6 +2736,20 @@ bool BrowserView::IsFullscreen() const {
+ }
+ 
+ void BrowserView::RestoreFocus() {
++  if (IsMyarcWorkspaceBlank()) {
++    auto* focused = GetFocusManager()->GetFocusedView();
++    auto* active = multi_contents_view_->GetActiveContentsView();
++    auto* inactive = multi_contents_view_->GetInactiveContentsView();
++    if (focused && focused->IsDrawn() &&
++        !(active && active->Contains(focused)) &&
++        !(inactive && inactive->Contains(focused))) {
++      return;
++    }
++    if (auto* view = GetInitiallyFocusedView()) {
++      view->RequestFocus();
++    }
++    return;
++  }
+   WebContents* selected_web_contents = GetActiveWebContents();
+   if (selected_web_contents) {
+     selected_web_contents->RestoreFocus();
+@@ -2363,6 +2855,13 @@ PinnedToolbarActions* BrowserView::GetPinnedToolbarActions() {
+ }
+ 
+ void BrowserView::SetFocusToLocationBar(bool is_user_initiated) {
++  if (is_user_initiated &&
++      base::CommandLine::ForCurrentProcess()->HasSwitch(
++          "myarc-visual-parity") &&
++      browser_->GetType() == BrowserWindowInterface::Type::TYPE_NORMAL &&
++      ShowMyarcCommandPalette(false)) {
++    return;
++  }
+   // On Windows, changing focus to the location bar causes the browser window to
+   // become active. This can steal focus if the user has another window open
+   // already. On Chrome OS, changing focus makes a view believe it has a focus
+@@ -2383,16 +2882,25 @@ void BrowserView::SetFocusToLocationBar(bool is_user_initiated) {
+ }
+ 
+ void BrowserView::UpdateReloadStopState(bool is_loading, bool force) {
++  is_loading &= !IsMyarcWorkspaceBlank();
+   ReloadControl::Mode mode =
+       is_loading ? ReloadControl::Mode::kStop : ReloadControl::Mode::kReload;
+   ReloadControl* reload_button =
+       ToolbarButtonProvider::From(browser_)->GetReloadButton();
+   if (reload_button) {
+     reload_button->ChangeMode(mode, force);
++    // ChangeMode can enable Reload even though the retained tab is hidden.
++    if (IsMyarcWorkspaceBlank() && toolbar_ && toolbar_->reload_button()) {
++      toolbar_->reload_button()->SetEnabled(false);
++    }
+   }
+ }
+ 
+ void BrowserView::UpdateToolbar(content::WebContents* contents) {
++  if (IsMyarcWorkspaceBlank()) {
++    UpdateMyarcWorkspaceCanvas();
++    return;
++  }
+   // We may end up here during destruction.
+   if (toolbar_) {
+     toolbar_->Update(contents);
+@@ -2404,6 +2912,9 @@ void BrowserView::UpdateToolbar(content::WebContents* contents) {
+ }
+ 
+ bool BrowserView::UpdateToolbarSecurityState() {
++  if (IsMyarcWorkspaceBlank()) {
++    return false;
++  }
+   // We may end up here during destruction.
+   if (toolbar_) {
+     return toolbar_->UpdateSecurityState();
+@@ -3414,7 +3925,7 @@ void BrowserView::CutCopyPaste(int command_id) {
+   // key events (and not accelerators) to the WebContents so it can give the web
+   // page a chance to override them.
+   WebContents* contents = browser_->GetTabStripModel()->GetActiveWebContents();
+-  if (contents) {
++  if (contents && !IsMyarcWorkspaceBlank()) {
+     void (WebContents::*method)();
+     if (command_id == IDC_CUT) {
+       method = &content::WebContents::Cut;
+@@ -3483,6 +3994,10 @@ LocationBarView* BrowserView::GetLocationBarView() const {
+ // BrowserView, TabStripModelObserver implementation:
+ 
+ void BrowserView::OnSplitTabChanged(const SplitTabChange& change) {
++  if (IsMyarcWorkspaceBlank()) {
++    UpdateMyarcWorkspaceCanvas();
++    return;
++  }
+   switch (change.type) {
+     case SplitTabChange::Type::kAdded: {
+       const tabs::TabInterface* active_tab =
+@@ -3690,6 +4205,9 @@ bool BrowserView::CanActivate() const {
+ }
+ 
+ std::u16string BrowserView::GetWindowTitle() const {
++  if (IsMyarcWorkspaceBlank()) {
++    return u"Empty Space - myarc";
++  }
+   std::u16string title =
+       WindowMetadataController::From(browser_.get())
+           ->GetWindowTitleForCurrentTab(true /* include_app_name */);
+@@ -3710,6 +4228,9 @@ std::u16string BrowserView::GetWindowTitle() const {
+ }
+ 
+ std::u16string BrowserView::GetAccessibleWindowTitle() const {
++  if (IsMyarcWorkspaceBlank()) {
++    return GetWindowTitle();
++  }
+   // If there is a focused and visible tab-modal dialog, report the dialog's
+   // title instead of the page title.
+   views::Widget* tab_modal =
+@@ -3947,7 +4468,10 @@ bool BrowserView::CanChangeWindowIcon() const {
+ }
+ 
+ views::View* BrowserView::GetInitiallyFocusedView() {
+-  return nullptr;
++  return IsMyarcWorkspaceBlank() && myarc_workspace_sidebar_ &&
++                 myarc_workspace_sidebar_->IsDrawn()
++             ? myarc_workspace_sidebar_.get()
++             : nullptr;
+ }
+ 
+ bool BrowserView::ShouldShowWindowTitle() const {
+@@ -3971,6 +4495,9 @@ ui::ImageModel BrowserView::GetWindowAppIcon() {
+ }
+ 
+ ui::ImageModel BrowserView::GetWindowIcon() {
++  if (IsMyarcWorkspaceBlank()) {
++    return ui::ImageModel();
++  }
+   // Use the default icon for devtools.
+   if (browser_->GetType() == BrowserWindowInterface::Type::TYPE_DEVTOOLS) {
+     return ui::ImageModel();
+@@ -4336,6 +4863,10 @@ void BrowserView::UpdateTabSearchBubbleHost() {
+ }
+ 
+ void BrowserView::ShowSplitView(bool focus_active_view) {
++  if (IsMyarcWorkspaceBlank()) {
++    UpdateMyarcWorkspaceCanvas();
++    return;
++  }
+   const int active_index = browser_->GetTabStripModel()->active_index();
+ 
+   std::optional<split_tabs::SplitTabId> split_tab_id =
+@@ -4954,6 +5485,9 @@ void BrowserView::Layout(PassKey) {
+     if (fallback_popup_anchor_) {
+       fallback_popup_anchor_->MaybeUpdateAnchor(rect);
+     }
++    if (myarc_popup_anchor_) {
++      myarc_popup_anchor_->SetBoundsRect(rect);
++    }
+ 
+     if (dialog_anchor_) {
+       rect.Offset(0, -kAdditionalDialogToolbarOverlap);
+@@ -5197,6 +5731,103 @@ void BrowserView::AddedToWidget() {
+       kFallbackPopupAnchorElementId, *this);
+ 
+   initialized_ = true;
++  UpdateMyarcTabStripMode();
++}
++
++void BrowserView::UpdateMyarcTabStripMode() {
++  // Mode notifications can precede toolbar/widget initialization. Startup
++  // calls this again once layout and native dialog anchors are ready.
++  if (!initialized_ || !GetWidget() || GetWidget()->IsClosed() ||
++      !base::CommandLine::ForCurrentProcess()->HasSwitch(
++          "myarc-visual-parity") ||
++      !vertical_tab_strip_region_view_) {
++    return;
++  }
++  if (!myarc_popup_anchor_) {
++    // Keep the 0016 anchor alive across both modes, including recovery UI.
++    myarc_popup_anchor_ = AddChildView(std::make_unique<views::View>());
++    myarc_popup_anchor_->SetCanProcessEventsWithinSubtree(false);
++    myarc_popup_anchor_->GetViewAccessibility().SetIsIgnored(true);
++  }
++
++  auto* const header = vertical_tab_strip_region_view_->GetTopContainer();
++  const bool vertical = ShouldDrawVerticalTabStrip();
++  const bool reparent = vertical ? toolbar_->parent() == top_container_
++                                 : toolbar_->parent() == header;
++  if (reparent) {
++    auto* const focus = GetFocusManager()->GetFocusedView();
++    const bool restore_focus =
++        toolbar_->Contains(focus) ||
++        (!vertical && vertical_tab_strip_region_view_->Contains(focus));
++    if (restore_focus) {
++      GetFocusManager()->ClearFocus();
++      GetFocusManager()->SetStoredFocusView(nullptr);
++    }
++    if (vertical) {
++      toolbar_->SetMyarcSidebarToggle(
++          header->RemoveChildViewT(header->GetCollapseButton()));
++      header->SetMyarcSidebarToolbar(
++          top_container_->RemoveChildViewT(toolbar_.get()));
++    } else {
++      // Clear each borrowed reference before ownership leaves its parent.
++      header->AddChildView(toolbar_->TakeMyarcSidebarToggle());
++      top_container_->AddChildView(header->TakeMyarcSidebarToolbar());
++      toolbar_->SetVisible(true);
++    }
++    EnsureFocusOrder();
++    if (restore_focus) {
++      // Reparenting can hide the old focus target until the new mode lays out.
++      // Never restore into a stale mode, nested UI loop or closing window.
++      base::SingleThreadTaskRunner::GetCurrentDefault()->PostNonNestableTask(
++          FROM_HERE, base::BindOnce(
++                         [](base::WeakPtr<BrowserView> view, bool vertical) {
++                           if (!view || !view->GetWidget() ||
++                               view->GetWidget()->IsClosed() ||
++                               !view->GetWidget()->IsActive() ||
++                               view->ShouldDrawVerticalTabStrip() != vertical ||
++                               view->GetFocusManager()->GetFocusedView()) {
++                             return;
++                           }
++                           view->GetWidget()->LayoutRootViewIfNecessary();
++                           if (!view) {
++                             return;
++                           }
++                           if (view->toolbar_->IsDrawn()) {
++                             view->SetFocusToLocationBar(false);
++                           } else {
++                             view->RestoreFocus();
++                           }
++                         },
++                         myarc_workspace_weak_factory_.GetWeakPtr(), vertical));
++    }
++  }
++
++  // Native restore delivers identity hints before returning the new window.
++  // Consume them even when this window starts with horizontal presentation.
++  if (!myarc_workspace_adapter_ &&
++      base::CommandLine::ForCurrentProcess()->HasSwitch(
++          "myarc-workspace-sidebar") &&
++      browser_->GetType() == BrowserWindowInterface::Type::TYPE_NORMAL) {
++    myarc_workspace_adapter_ =
++        std::make_unique<myarc::BrowserWorkspaceAdapter>(*browser_);
++    myarc_workspace_subscription_ = myarc_workspace_adapter_->Subscribe(
++        base::BindRepeating(&BrowserView::RefreshMyarcWorkspaceSidebar,
++                            myarc_workspace_weak_factory_.GetWeakPtr()));
++    // Metadata readiness is NOT the native async session-restore barrier.
++    // Parent calls FinishSessionRestore only after all restore hooks complete.
++    // New windows may follow startup; counted restore holds still apply.
++    myarc::WorkspaceLifecycle::Notify(
++        browser_->GetProfile(), myarc::WorkspaceLifecycle::Event::kNativeReady);
++  }
++  if (vertical && myarc_workspace_adapter_ && !myarc_workspace_sidebar_) {
++    auto sidebar = std::make_unique<myarc::SidebarView>(
++        static_cast<myarc::SidebarView::Delegate&>(*this));
++    sidebar->SetFocusBehavior(views::View::FocusBehavior::ALWAYS);
++    myarc_workspace_sidebar_ = sidebar.get();
++    vertical_tab_strip_region_view_->SetMyarcWorkspaceSidebar(
++        std::move(sidebar));
++    RefreshMyarcWorkspaceSidebar();
++  }
+ }
+ 
+ void BrowserView::RemovedFromWidget() {
+@@ -5267,6 +5898,570 @@ const views::View* BrowserView::GetViewByElementId(
+ ///////////////////////////////////////////////////////////////////////////////
+ // BrowserView, ui::AcceleratorTarget overrides:
+ 
++myarc::BrowserWorkspaceAdapter* BrowserView::GetMyarcWorkspaceAdapter() {
++  return myarc_workspace_adapter_.get();
++}
++
++bool BrowserView::IsMyarcWorkspaceBlank() const {
++  return myarc_workspace_adapter_ && myarc_workspace_adapter_->ready() &&
++         !myarc_workspace_adapter_->DisplayedContents();
++}
++
++void BrowserView::RevealMyarcActiveTab() {
++  if (!IsMyarcWorkspaceBlank()) {
++    return;
++  }
++  auto* contents = browser_->GetTabStripModel()->GetActiveWebContents();
++  if (contents) {
++    MyarcWorkspaceResult(myarc_workspace_adapter_->service().RevealItem(
++        myarc_workspace_adapter_->window_id(),
++        myarc::BrowserWorkspaceAdapter::ItemIdForContents(*contents)));
++  }
++}
++
++bool BrowserView::IsMyarcWorkspaceActive() const {
++  return myarc_workspace_adapter_ && myarc_workspace_adapter_->ready();
++}
++
++std::optional<BrowserWindow::MyarcTabSaveState>
++BrowserView::GetMyarcTabSaveState(const std::vector<int>& indices) const {
++  if (!myarc_workspace_adapter_) {
++    return std::nullopt;
++  }
++  MyarcTabSaveState result;
++  result.label = u"Workspace save unavailable";
++  if (!myarc_workspace_adapter_->ready() || IsMyarcWorkspaceBlank() ||
++      indices.empty()) {
++    return result;
++  }
++  const auto model = myarc_workspace_adapter_->Sidebar();
++  if (!model.ok) {
++    return result;
++  }
++  bool all_saved = true;
++  bool all_favorites = true;
++  bool all_pins = true;
++  auto* tabs = browser_->GetTabStripModel();
++  for (int index : indices) {
++    if (!tabs->ContainsIndex(index)) {
++      return result;
++    }
++    const auto id = myarc::BrowserWorkspaceAdapter::ItemIdForContents(
++        *tabs->GetWebContentsAt(index));
++    const auto contains = [id](const auto& rows) {
++      return std::ranges::any_of(
++          rows, [id](const auto& row) { return row.id == id; });
++    };
++    const bool favorite = contains(model.favorites);
++    const bool pin = contains(model.pins);
++    if (!favorite && !pin && !contains(model.temporary)) {
++      return result;
++    }
++    all_saved &= favorite || pin;
++    all_favorites &= favorite;
++    all_pins &= pin;
++  }
++  result.enabled = true;
++  result.save = !all_saved;
++  result.label = result.save     ? u"Add to Profile Favorites"
++                 : all_favorites ? u"Remove from Profile Favorites"
++                 : all_pins      ? u"Remove Space Pins"
++                                 : u"Remove saved items";
++  return result;
++}
++
++bool BrowserView::SetMyarcTabsSaved(const std::vector<int>& indices,
++                                    bool saved) {
++  const auto state = GetMyarcTabSaveState(indices);
++  if (!state) {
++    return false;
++  }
++  if (!state->enabled) {
++    myarc_workspace_action_error_ =
++        u"Workspace save unavailable. Select a live page in this Space.";
++    RefreshMyarcWorkspaceSidebar();
++    return true;
++  }
++  // Resolve before mutations: Favorite can reorder native pinned tabs, and a
++  // stable item may have multiple native projections in the selection.
++  const auto model = myarc_workspace_adapter_->Sidebar();
++  if (!model.ok) {
++    myarc_workspace_action_error_ = u"Workspace save unavailable. Try again.";
++    RefreshMyarcWorkspaceSidebar();
++    return true;
++  }
++  std::set<uint64_t> ids;
++  for (int index : indices) {
++    const auto id = myarc::BrowserWorkspaceAdapter::ItemIdForContents(
++        *browser_->GetTabStripModel()->GetWebContentsAt(index));
++    const auto contains = [id](const auto& rows) {
++      return std::ranges::any_of(
++          rows, [id](const auto& row) { return row.id == id; });
++    };
++    if (saved ? contains(model.temporary)
++              : contains(model.favorites) || contains(model.pins)) {
++      ids.insert(id);
++    }
++  }
++  for (uint64_t id : ids) {
++    auto result = saved ? myarc_workspace_adapter_->Favorite(id)
++                        : myarc_workspace_adapter_->Unsave(id);
++    if (!result.ok) {
++      MyarcWorkspaceResult(std::move(result));
++      return true;
++    }
++  }
++  myarc_workspace_action_error_.clear();
++  RefreshMyarcWorkspaceSidebar();
++  return true;
++}
++
++void BrowserView::RefreshMyarcWorkspaceSidebar() {
++  if (!myarc_workspace_adapter_) {
++    return;
++  }
++  if (!myarc_workspace_sidebar_ || !vertical_tab_strip_region_view_) {
++    UpdateMyarcWorkspaceCanvas();
++    return;
++  }
++  auto model = myarc_workspace_adapter_->Sidebar();
++  const bool ready = myarc_workspace_adapter_->ready() && model.ok;
++  // Snapshot local native bindings once per render. Metadata is Profile-wide.
++  myarc_workspace_live_items_.clear();
++  if (ready) {
++    auto* tabs = browser_->GetTabStripModel();
++    for (int i = 0; i < tabs->count(); ++i) {
++      const auto data = myarc::BrowserWorkspaceAdapter::TabExtraData(
++          *tabs->GetWebContentsAt(i));
++      auto binding = data.find(myarc::BrowserWorkspaceAdapter::kItemKey);
++      if (binding != data.end()) {
++        myarc_workspace_live_items_.insert(binding->second);
++      }
++    }
++  }
++  using Storage = myarc::WorkspaceService::StorageState;
++  using Retry = myarc::SidebarView::StorageRetry;
++  auto& service = myarc_workspace_adapter_->service();
++  vertical_tab_strip_region_view_->SetMyarcWorkspaceReady(ready);
++  if (!ready) {
++    const std::u16string reason =
++        u"Workspace unavailable. Native tabs remain available. " +
++        base::UTF8ToUTF16(service.storage_state() == Storage::kLoadError
++                              ? service.storage_error()
++                              : myarc_workspace_adapter_->error());
++    myarc_workspace_sidebar_->SetUnavailable(
++        reason, service.storage_state() == Storage::kLoadError ? Retry::kLoad
++                                                               : Retry::kNone);
++  } else {
++    std::u16string status = myarc_workspace_action_error_;
++    const auto append = [&status](const std::u16string& message) {
++      if (!message.empty()) {
++        if (!status.empty()) {
++          status += u"\n";
++        }
++        status += message;
++      }
++    };
++    append(base::UTF8ToUTF16(myarc_workspace_adapter_->error()));
++    append(base::UTF8ToUTF16(myarc_workspace_adapter_->binding_warning()));
++    switch (service.storage_state()) {
++      case Storage::kLoading:
++        append(u"Loading workspace metadata.");
++        break;
++      case Storage::kLoadError:
++      case Storage::kWriteError:
++        append(u"Workspace storage error: " +
++               base::UTF8ToUTF16(service.storage_error()));
++        break;
++      case Storage::kWritePending:
++        append(u"Workspace changes pending storage write.");
++        break;
++      case Storage::kEphemeral:
++        append(u"Private workspace. Changes stay in memory.");
++        break;
++      case Storage::kReady:
++      case Storage::kWritten:
++        // A completed atomic write is not an OS-crash durability guarantee.
++        break;
++    }
++    myarc_workspace_sidebar_->SetModel(
++        model, status,
++        service.storage_state() == Storage::kWriteError ? Retry::kSave
++                                                        : Retry::kNone);
++  }
++  UpdateMyarcWorkspaceCanvas();
++}
++
++myarc::SidebarView::ItemPresentation BrowserView::GetItemPresentation(
++    const myarc::foundation::ItemRecord& item) const {
++  myarc::SidebarView::ItemPresentation result;
++  if (auto metadata = myarc_workspace_adapter_->Metadata(item.id)) {
++    result.title = metadata->title;
++    result.icon = ui::ImageModel::FromImage(metadata->icon);
++    if (metadata->loading) {
++      if (result.title.empty() && item.has_url) {
++        result.title = base::UTF8ToUTF16(std::string(item.canonical_url));
++      }
++      result.title += u" (loading)";
++    }
++  }
++  // Close applies to this window, not another window's live projection.
++  result.is_live =
++      myarc_workspace_live_items_.contains(base::NumberToString(item.id));
++  return result;
++}
++
++void BrowserView::MyarcWorkspaceResult(
++    myarc::foundation::MutationResult result) {
++  myarc_workspace_action_error_ =
++      result.ok ? std::u16string()
++                : base::UTF8ToUTF16(std::string(result.error));
++  // Adapter posts native-selection refresh. Avoid rebuilding row controls or
++  // cancelling menus synchronously inside their own callbacks.
++  base::SingleThreadTaskRunner::GetCurrentDefault()->PostTask(
++      FROM_HERE, base::BindOnce(&BrowserView::RefreshMyarcWorkspaceSidebar,
++                                myarc_workspace_weak_factory_.GetWeakPtr()));
++}
++
++void BrowserView::RetryWorkspaceStorage(
++    myarc::SidebarView::StorageRetry retry) {
++  // Let the pressed button unwind before service notifications rebuild rows.
++  base::SingleThreadTaskRunner::GetCurrentDefault()->PostTask(
++      FROM_HERE,
++      base::BindOnce(
++          [](base::WeakPtr<BrowserView> view,
++             myarc::SidebarView::StorageRetry retry) {
++            if (!view || !view->myarc_workspace_adapter_ ||
++                !view->myarc_workspace_sidebar_) {
++              return;
++            }
++            auto& adapter = *view->myarc_workspace_adapter_;
++            auto& service = adapter.service();
++            using Storage = myarc::WorkspaceService::StorageState;
++            using Retry = myarc::SidebarView::StorageRetry;
++            if (retry == Retry::kLoad &&
++                service.storage_state() == Storage::kLoadError) {
++              service.RetryLoad();
++            } else if (retry == Retry::kSave && adapter.ready() &&
++                       service.storage_state() == Storage::kWriteError) {
++              service.RetrySave();
++            }
++          },
++          myarc_workspace_weak_factory_.GetWeakPtr(), retry));
++}
++
++void BrowserView::ActivateItem(uint64_t item) {
++  MyarcWorkspaceResult(myarc_workspace_adapter_->ActivateItem(item));
++}
++
++void BrowserView::CloseLiveItem(uint64_t item) {
++  auto weak = myarc_workspace_weak_factory_.GetWeakPtr();
++  auto result = myarc_workspace_adapter_->CloseItem(item);
++  // Closing the final native tab can synchronously destroy this window.
++  if (weak) {
++    weak->MyarcWorkspaceResult(std::move(result));
++  }
++}
++
++void BrowserView::PinItem(uint64_t item) {
++  MyarcWorkspaceResult(myarc_workspace_adapter_->Pin(item));
++}
++
++void BrowserView::FavoriteItem(uint64_t item) {
++  MyarcWorkspaceResult(myarc_workspace_adapter_->Favorite(item));
++}
++
++bool BrowserView::DropFavorite(uint64_t item, uint64_t before) {
++  auto weak = myarc_workspace_weak_factory_.GetWeakPtr();
++  auto& adapter = *myarc_workspace_adapter_;
++  const auto sidebar = adapter.Sidebar();
++  const bool favorite = std::ranges::any_of(
++      sidebar.favorites, [item](const auto& row) { return row.id == item; });
++  auto result = favorite ? adapter.MoveItemBefore(item, before)
++                         : adapter.Favorite(item);
++  if (!weak) {
++    return false;
++  }
++  if (!favorite && result.ok) {
++    result = weak->myarc_workspace_adapter_->MoveItemBefore(item, before);
++    if (!weak) {
++      return false;
++    }
++  }
++  const bool ok = result.ok;
++  // A reorder failure keeps any successful promotion and reports the error.
++  // Never roll back by unsaving, which would remove the canonical URL.
++  weak->MyarcWorkspaceResult(std::move(result));
++  return ok;
++}
++
++void BrowserView::UnsaveItem(uint64_t item) {
++  MyarcWorkspaceResult(myarc_workspace_adapter_->Unsave(item));
++}
++
++void BrowserView::SelectSpace(uint64_t space) {
++  MyarcWorkspaceResult(myarc_workspace_adapter_->SelectSpace(space));
++}
++
++void BrowserView::CreateSpace() {
++  ShowMyarcSpaceDialog(0);
++}
++
++void BrowserView::RenameSpace(uint64_t space) {
++  ShowMyarcSpaceDialog(space);
++}
++
++void BrowserView::NewTab() {
++  ShowMyarcCommandPalette(true);
++}
++
++void BrowserView::OpenDownloads() {
++  // Menu dispatch unwinds before tab selection can rebuild sidebar children.
++  base::SingleThreadTaskRunner::GetCurrentDefault()->PostTask(
++      FROM_HERE, base::BindOnce(
++                     [](base::WeakPtr<BrowserView> view) {
++                       if (view) {
++                         chrome::ExecuteCommand(view->browser_.get(),
++                                                IDC_SHOW_DOWNLOADS);
++                       }
++                     },
++                     myarc_workspace_weak_factory_.GetWeakPtr()));
++}
++
++void BrowserView::ShowMyarcSpaceDialog(uint64_t space) {
++  if (!myarc_workspace_adapter_ || !myarc_workspace_adapter_->ready() ||
++      !GetWidget()) {
++    return;
++  }
++  CloseMyarcSpaceDialog();
++  myarc_space_dialog_delegate_ = std::make_unique<views::DialogDelegate>();
++  auto* dialog = myarc_space_dialog_delegate_.get();
++  dialog->SetOwnershipOfNewWidget(
++      views::Widget::InitParams::CLIENT_OWNS_WIDGET);
++  dialog->SetTitle(space ? u"Rename Space" : u"Create Space");
++  dialog->SetModalType(ui::mojom::ModalType::kWindow);
++  dialog->SetButtonLabel(ui::mojom::DialogButton::kOk,
++                         space ? u"Rename" : u"Create");
++  auto body = std::make_unique<views::BoxLayoutView>();
++  body->SetOrientation(views::BoxLayout::Orientation::kVertical);
++  body->SetInsideBorderInsets(gfx::Insets(16));
++  body->SetBetweenChildSpacing(12);
++  body->SetPreferredSize(gfx::Size(360, 180));
++  myarc_space_name_ = body->AddChildView(std::make_unique<views::Textfield>());
++  myarc_space_name_->GetViewAccessibility().SetName(u"Space name");
++  if (space) {
++    auto model = myarc_workspace_adapter_->Sidebar();
++    if (!model.ok) {
++      myarc_space_name_ = nullptr;
++      myarc_space_dialog_delegate_.reset();
++      return;
++    }
++    for (const auto& record : model.spaces) {
++      if (record.id == space) {
++        myarc_space_name_->SetText(base::UTF8ToUTF16(std::string(record.name)));
++        myarc_space_name_->SelectAll(false);
++        break;
++      }
++    }
++  }
++  myarc_space_error_ = body->AddChildView(std::make_unique<views::Label>(
++      u"Space names allow up to 128 UTF-8 bytes."));
++  myarc_space_error_->SetMultiLine(true);
++  myarc_space_error_->SetHorizontalAlignment(gfx::ALIGN_LEFT);
++  dialog->SetContentsView(std::move(body));
++  dialog->SetInitiallyFocusedView(myarc_space_name_);
++  dialog->SetAcceptCallbackWithClose(base::BindRepeating(
++      [](base::WeakPtr<BrowserView> view, uint64_t space) {
++        return view && view->AcceptMyarcSpaceDialog(space);
++      },
++      myarc_workspace_weak_factory_.GetWeakPtr(), space));
++  myarc_space_dialog_widget_.reset(views::DialogDelegate::CreateDialogWidget(
++      dialog, GetNativeWindow(), GetWidget()->GetNativeView()));
++  myarc_space_dialog_widget_->MakeCloseSynchronous(
++      base::IgnoreArgs<views::Widget::ClosedReason>(
++          base::BindOnce(&BrowserView::CloseMyarcSpaceDialog,
++                         myarc_workspace_weak_factory_.GetWeakPtr())));
++  myarc_space_dialog_widget_->Show();
++}
++
++bool BrowserView::AcceptMyarcSpaceDialog(uint64_t space) {
++  if (!myarc_workspace_adapter_ || !myarc_space_name_ || !myarc_space_error_) {
++    return false;
++  }
++  // Bound UTF-16 before converting. Rust owns the UTF-8 length/name rules.
++  if (myarc_space_name_->GetText().size() > 128) {
++    myarc_space_error_->SetText(u"Space name exceeds 128 UTF-8 bytes.");
++    myarc_space_name_->SetInvalid(true);
++    return false;
++  }
++  const auto name = base::UTF16ToUTF8(myarc_space_name_->GetText());
++  auto result = space ? myarc_workspace_adapter_->RenameSpace(space, name)
++                      : myarc_workspace_adapter_->CreateSpace(name);
++  const bool ok = result.ok;
++  if (!ok) {
++    myarc_space_name_->SetInvalid(true);
++    myarc_space_error_->SetText(base::UTF8ToUTF16(std::string(result.error)));
++    myarc_space_error_->GetViewAccessibility().AnnounceText(
++        myarc_space_error_->GetText());
++  }
++  MyarcWorkspaceResult(std::move(result));
++  return ok;
++}
++
++void BrowserView::CloseMyarcSpaceDialog() {
++  myarc_space_name_ = nullptr;
++  myarc_space_error_ = nullptr;
++  myarc_space_dialog_widget_.reset();
++  myarc_space_dialog_delegate_.reset();
++}
++
++void BrowserView::UpdateMyarcWorkspaceCanvas() {
++  if (!myarc_workspace_adapter_ || !multi_contents_view_) {
++    return;
++  }
++  const bool blank = IsMyarcWorkspaceBlank();
++  const bool was_blank = std::exchange(myarc_workspace_blank_, blank);
++  const bool active = IsMyarcWorkspaceActive();
++  const bool was_active = std::exchange(myarc_workspace_active_, active);
++  // Native tab changes can clear the visual blank flag before this callback.
++  const bool commands_were_blank =
++      std::exchange(myarc_workspace_commands_blank_, blank);
++  if (blank != commands_were_blank || active != was_active) {
++    if (auto* controller = chrome::BrowserCommandController::From(browser_)) {
++      controller->MyarcWorkspaceStateChanged();
++    }
++  }
++  if (blank) {
++    if (!was_blank && GetFocusManager()) {
++      GetFocusManager()->ClearFocus();
++      GetFocusManager()->SetStoredFocusView(nullptr);
++      restore_focus_on_activation_ = false;
++      if (myarc_workspace_sidebar_ && myarc_workspace_sidebar_->IsDrawn()) {
++        myarc_workspace_sidebar_->RequestFocus();
++      }
++    }
++    // MultiContentsView is required by frame layout and stays visible. Hide its
++    // native hosts instead; keep original tabs/services alive in TabStripModel.
++    multi_contents_view_->CloseSplitView();
++    for (ContentsContainerView* container :
++         multi_contents_view_->contents_container_views()) {
++      container->contents_view()->SetWebContents(nullptr);
++      container->SetVisible(false);
++    }
++    infobar_container_->ChangeInfoBarManager(nullptr);
++    if (bookmark_bar_view_) {
++      bookmark_bar_view_->SetVisible(false);
++    }
++  } else if (was_blank) {
++    multi_contents_view_->GetActiveContentsContainerView()->SetVisible(true);
++    auto* displayed =
++        myarc_workspace_adapter_->ready()
++            ? myarc_workspace_adapter_->DisplayedContents()
++            : browser_->GetTabStripModel()->GetActiveWebContents();
++    if (displayed) {
++      OnActiveTabChanged(nullptr, displayed,
++                         browser_->GetTabStripModel()->active_index(), 0);
++    }
++  }
++  if (toolbar_) {
++    auto* displayed =
++        blank ? nullptr
++        : myarc_workspace_adapter_->ready()
++            ? myarc_workspace_adapter_->DisplayedContents()
++            : browser_->GetTabStripModel()->GetActiveWebContents();
++    // A null update refreshes the neutral omnibox through its blank guards;
++    // hiding the location bar is undone by sidebar layout.
++    toolbar_->Update(displayed);
++    UpdateReloadStopState(displayed && displayed->IsLoading(), true);
++    if (auto* back = ToolbarButtonProvider::From(browser_)->GetBackButton()) {
++      back->SetEnabled(!blank && chrome::IsCommandEnabled(browser_, IDC_BACK));
++    }
++    if (auto* forward = toolbar_->forward_button()) {
++      forward->SetEnabled(!blank &&
++                          chrome::IsCommandEnabled(browser_, IDC_FORWARD));
++    }
++    if (auto* reload = toolbar_->reload_button()) {
++      reload->SetEnabled(!blank &&
++                         chrome::IsCommandEnabled(browser_, IDC_RELOAD));
++    }
++  }
++  if (blank) {
++    if (auto* frame = GetFrameView()) {
++      frame->UpdateThrobber(false);
++    }
++  }
++  if (browser_widget_) {
++    UpdateTitleBar();
++  }
++  InvalidateLayout();
++}
++
++bool BrowserView::ShowMyarcCommandPalette(bool new_tab) {
++  if (!initialized_ || !GetWidget()) {
++    return false;
++  }
++  // Current-page intent in an empty Space must not target hidden native tab.
++  new_tab |= IsMyarcWorkspaceBlank();
++  const auto* location_model = LocationBarModel::From(browser_.get());
++  const std::u16string initial_text =
++      !new_tab && location_model ? location_model->GetFormattedFullURL() : u"";
++  if (myarc_command_palette_widget_ &&
++      myarc_command_palette_widget_->IsClosed()) {
++    OnMyarcCommandPaletteClosed(myarc_command_palette_delegate_.get());
++  }
++  if (myarc_command_palette_widget_) {
++    auto* content = static_cast<MyarcPaletteView*>(
++        myarc_command_palette_delegate_->GetContentsView());
++    auto weak_content = content->GetWeakPtr();
++    content->SetIntent(new_tab, initial_text);
++    if (weak_content) {
++      weak_content->FocusInput();
++    }
++    return true;
++  }
++  const int width = std::clamp(GetBoundsInScreen().width() - 48, 240, 752);
++  myarc_command_palette_delegate_ =
++      std::make_unique<views::BubbleDialogDelegate>(this,
++                                                    views::BubbleBorder::FLOAT);
++  auto* delegate = myarc_command_palette_delegate_.get();
++  delegate->SetButtons(static_cast<int>(ui::mojom::DialogButton::kNone));
++  delegate->SetShowCloseButton(false);
++  delegate->SetShowTitle(false);
++  delegate->SetTitle(u"Command palette");
++  delegate->set_corner_radius(12);
++  delegate->set_margins(gfx::Insets(12));
++  auto* content = delegate->SetContentsView(std::make_unique<MyarcPaletteView>(
++      browser_->GetWeakPtr(), width, new_tab, initial_text));
++  delegate->SetInitiallyFocusedView(content->input());
++  myarc_command_palette_widget_ = views::BubbleDialogDelegate::CreateBubble(
++      delegate, base::IgnoreArgs<views::Widget::ClosedReason>(base::BindOnce(
++                    &BrowserView::OnMyarcCommandPaletteClosed, GetAsWeakPtr(),
++                    base::Unretained(delegate))));
++  auto weak_content = content->GetWeakPtr();
++  myarc_command_palette_widget_->Show();
++  if (weak_content) {
++    weak_content->FocusInput();
++  }
++  return true;
++}
++
++void BrowserView::OnMyarcCommandPaletteClosed(
++    views::BubbleDialogDelegate* delegate) {
++  if (!delegate || delegate != myarc_command_palette_delegate_.get()) {
++    return;
++  }
++  static_cast<MyarcPaletteView*>(delegate->GetContentsView())->PrepareToClose();
++  delegate->SetAnchorView(nullptr);
++  if (myarc_command_palette_widget_) {
++    base::SingleThreadTaskRunner::GetCurrentDefault()->DeleteSoon(
++        FROM_HERE, std::move(myarc_command_palette_widget_));
++  }
++  if (myarc_command_palette_delegate_) {
++    base::SingleThreadTaskRunner::GetCurrentDefault()->DeleteSoon(
++        FROM_HERE, std::move(myarc_command_palette_delegate_));
++  }
++}
++
+ bool BrowserView::AcceleratorPressed(const ui::Accelerator& accelerator) {
+ #if BUILDFLAG(IS_MAC)
+   // Forward accelerators to ExclusiveAccessManager to handle Esc press-and-hold
+@@ -5342,7 +6537,8 @@ void BrowserView::LoadingAnimationCallback(base::TimeTicks timestamp) {
+     // GetActiveWebContents can return null for example under Purify when
+     // the animations are running slowly and this function is called on a timer
+     // through LoadingAnimationCallback.
+-    GetFrameView()->UpdateThrobber(web_contents && web_contents->IsLoading());
++    GetFrameView()->UpdateThrobber(!IsMyarcWorkspaceBlank() && web_contents &&
++                                   web_contents->IsLoading());
+   }
+ }
+ 
+@@ -5471,6 +6667,10 @@ bool BrowserView::MaybeUpdateDevtools(content::WebContents* contents) {
+ 
+ void BrowserView::UpdateUIForContents(WebContents* contents,
+                                       bool should_layout_immediately) {
++  if (IsMyarcWorkspaceBlank()) {
++    UpdateMyarcWorkspaceCanvas();
++    return;
++  }
+   TRACE_EVENT0("ui", "BrowserView::UpdateUIForContents");
+   bool needs_layout = MaybeShowBookmarkBar(contents);
+ 
+@@ -5706,6 +6906,23 @@ void BrowserView::LoadAccelerators() {
+   }
+ 
+ #if BUILDFLAG(IS_MAC)
++  if (base::CommandLine::ForCurrentProcess()->HasSwitch(
++          "myarc-visual-parity")) {
++    for (const auto& [accelerator, command] :
++         {std::pair{ui::Accelerator(ui::VKEY_T, ui::EF_CONTROL_DOWN),
++                    IDC_NEW_TAB},
++          std::pair{ui::Accelerator(ui::VKEY_L, ui::EF_CONTROL_DOWN),
++                    IDC_FOCUS_LOCATION},
++          std::pair{ui::Accelerator(ui::VKEY_S, ui::EF_COMMAND_DOWN),
++                    IDC_TOGGLE_VERTICAL_TABS_COLLAPSE},
++          std::pair{ui::Accelerator(ui::VKEY_S, ui::EF_CONTROL_DOWN),
++                    IDC_TOGGLE_VERTICAL_TABS_COLLAPSE}}) {
++      accelerator_table_[accelerator] = command;
++      focus_manager->RegisterAccelerator(
++          accelerator, ui::AcceleratorManager::kHighPriority, this);
++    }
++  }
++
+   // Register the Esc accelerators (both press and release) to ensure they are
+   // sent to the ExclusiveAccessManager for press-and-hold fullscreen exit.
+   // This is only needed on macOS due to AppKit fullscreen transitions leaving

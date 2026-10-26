@@ -1,0 +1,29 @@
+diff --git a/chrome/browser/autocomplete/chrome_aim_eligibility_service.cc b/chrome/browser/autocomplete/chrome_aim_eligibility_service.cc
+index 1ebfcb9f17332f0c4bfec3aa01ef0ce2d9eaa190..721fd3f6686e1ddffb6ed26122faf0736293e533 100644
+--- a/chrome/browser/autocomplete/chrome_aim_eligibility_service.cc
++++ b/chrome/browser/autocomplete/chrome_aim_eligibility_service.cc
+@@ -6,6 +6,7 @@
+ 
+ #include <string>
+ 
++#include "base/command_line.h"
+ #include "base/memory/scoped_refptr.h"
+ #include "base/strings/strcat.h"
+ #include "base/strings/string_util.h"
+@@ -36,6 +37,16 @@ ChromeAimEligibilityService::ChromeAimEligibilityService(
+ 
+ ChromeAimEligibilityService::~ChromeAimEligibilityService() = default;
+ 
++bool ChromeAimEligibilityService::IsAimAllowedByFeatureAndPolicy() const {
++  // The opted-in myarc prototype has no built-in AI enablement or provider.
++  const auto* command_line = base::CommandLine::ForCurrentProcess();
++  if (command_line->HasSwitch("myarc-visual-parity") &&
++      command_line->HasSwitch("myarc-workspace-sidebar")) {
++    return false;
++  }
++  return AimEligibilityService::IsAimAllowedByFeatureAndPolicy();
++}
++
+ std::string ChromeAimEligibilityService::GetLocaleImpl() const {
+   return g_browser_process ? std::string(g_browser_process->GetFeatures()
+                                              ->application_locale_storage()

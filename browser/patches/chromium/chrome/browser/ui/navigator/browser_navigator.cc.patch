@@ -1,0 +1,36 @@
+diff --git a/chrome/browser/ui/navigator/browser_navigator.cc b/chrome/browser/ui/navigator/browser_navigator.cc
+index d5d5691f0b7dfdb1a8cc5671537826262c96addd..62ab5d02e84ed1ebf89419e2c0a9360493361621 100644
+--- a/chrome/browser/ui/navigator/browser_navigator.cc
++++ b/chrome/browser/ui/navigator/browser_navigator.cc
+@@ -806,8 +806,19 @@ base::WeakPtr<content::NavigationHandle> NavigateImpl(
+   // has a chance to replace |params->browser| with another one, but after the
+   // above check that relies on the original source_contents value.
+   if (!params->source_contents && params->browser) {
+-    params->source_contents =
+-        params->browser->GetTabStripModel()->GetActiveWebContents();
++    auto* window = BrowserWindow::FromBrowser(params->browser);
++    if (window && window->IsMyarcWorkspaceBlank()) {
++      // A blank Space has no implicit page context. Keep explicit sources and
++      // security parameters intact, including user gestures and referrers.
++      if (params->disposition == WindowOpenDisposition::kCurrentTab) {
++        params->disposition = WindowOpenDisposition::kNewForegroundTab;
++      }
++      params->tabstrip_add_types &= ~AddTabTypes::ADD_INHERIT_OPENER;
++      params->tabstrip_add_types |= AddTabTypes::ADD_FORCE_INDEX;
++    } else {
++      params->source_contents =
++          params->browser->GetTabStripModel()->GetActiveWebContents();
++    }
+   }
+ 
+   WebContents* contents_to_navigate_or_insert =
+@@ -1087,7 +1098,8 @@ base::WeakPtr<content::NavigationHandle> NavigateImpl(
+     DCHECK(tab_to_insert);
+     std::optional<tab_groups::TabGroupId> group = params->group;
+     if (!(params->tabstrip_add_types & AddTabTypes::ADD_PINNED)) {
+-      if (!group.has_value()) {
++      auto* window = BrowserWindow::FromBrowser(params->browser);
++      if (!group.has_value() && !(window && window->IsMyarcWorkspaceBlank())) {
+         group = params->browser->GetTabStripModel()->GetFocusedGroup();
+       }
+     }

@@ -4,7 +4,7 @@
 
 Bounded task: install corrected optional 0012 on the existing native stack and compile/link `chrome`. Desktop/runtime acceptance belongs to the parent task.
 
-Imported [0012](../patches/0012-native-workspace-command-safety.patch) unchanged from commit `020a8dc59c7c5e2b063d7a41dd5d7c50fbd2ecb8`.
+Imported [0012](../patches/legacy/0012-native-workspace-command-safety.patch) unchanged from commit `020a8dc59c7c5e2b063d7a41dd5d7c50fbd2ecb8`.
 SHA-256: `028b623228355bdcf6d02bc97fa397972c3080361950fccc51229c5ed834409a`.
 Install this complete replacement patch once after its baseline passes verification. Keep old R1/UI/core addon patches out of that application.
 
@@ -66,7 +66,7 @@ Cross-Space shortcut/Tab Search policy, extension `activeTab`, cross-window dest
 
 The smoke observations and [workspace-native.json](../evidence/workspace-native.json) above describe the pre-fix run. They remain historical evidence. The agent handoff verified compilation only; the parent's later native acceptance is recorded below.
 
-Updated complete replacement [0012](../patches/0012-native-workspace-command-safety.patch), SHA-256 `8f8023789fdb66841128879766afdb89866c7e393453185336eba69745f66e53`. Apply it once to the pre-0012 baseline, rather than over the prior version. The external checkout already contains this update.
+Updated complete replacement [0012](../patches/legacy/0012-native-workspace-command-safety.patch), SHA-256 `8f8023789fdb66841128879766afdb89866c7e393453185336eba69745f66e53`. Apply it once to the pre-0012 baseline, rather than over the prior version. The external checkout already contains this update.
 
 Four upstream files changed relative to the integrated candidate:
 

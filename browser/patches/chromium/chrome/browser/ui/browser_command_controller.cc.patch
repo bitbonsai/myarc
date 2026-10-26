@@ -1,0 +1,175 @@
+diff --git a/chrome/browser/ui/browser_command_controller.cc b/chrome/browser/ui/browser_command_controller.cc
+index afc3f64a97c6a8676a656fca1a3ede18eb23b1fb..e875df02da6d93984d2d6edbda0d887efbf94593 100644
+--- a/chrome/browser/ui/browser_command_controller.cc
++++ b/chrome/browser/ui/browser_command_controller.cc
+@@ -60,6 +60,7 @@
+ #include "chrome/browser/ui/actions/chrome_action_id.h"
+ #include "chrome/browser/ui/actions/chrome_action_properties.h"
+ #include "chrome/browser/ui/actions/command_action_updater.h"
++#include "chrome/browser/ui/actions/command_id_to_action_id.h"
+ #include "chrome/browser/ui/browser_actions.h"
+ #include "chrome/browser/ui/browser_commands.h"
+ #include "chrome/browser/ui/browser_element_identifiers.h"
+@@ -284,6 +285,43 @@ actions::ActionItem* FindAction(actions::ActionId action_id,
+   return actions::ActionManager::Get().FindAction(action_id, root_action_item);
+ }
+ 
++// All native update sites, including asynchronous loading/policy updates, pass
++// through this existing updater interface. Keep native eligibility for replay
++// when Space selection changes without a native active-index notification.
++template <typename NativeUpdater>
++class MyarcCommandUpdater final : public NativeUpdater {
++ public:
++  template <typename Delegate>
++  MyarcCommandUpdater(BrowserWindowInterface* browser,
++                      base::flat_map<int, bool>* states,
++                      Delegate* delegate)
++      : NativeUpdater(delegate), browser_(browser), states_(states) {}
++
++  bool UpdateCommandEnabled(int id, bool state) override {
++    if (IsMyarcPageCommand(id)) {
++      (*states_)[id] = state;
++      const bool allowed = IsMyarcWorkspaceCommandAllowed(browser_, id);
++      gated_ |= !allowed;
++      state &= allowed;
++      // Legacy updater does not update Actions. Synchronize only after this
++      // opt-in window has gated a command; stock windows stay unchanged.
++      if (gated_) {
++        if (auto action_id = GetActionIdForCommandId(id)) {
++          if (auto* action = FindAction(*action_id, browser_)) {
++            action->SetEnabled(state);
++          }
++        }
++      }
++    }
++    return NativeUpdater::UpdateCommandEnabled(id, state);
++  }
++
++ private:
++  raw_ptr<BrowserWindowInterface> browser_;
++  raw_ptr<base::flat_map<int, bool>> states_;
++  bool gated_ = false;
++};
++
+ #if BUILDFLAG(IS_CHROMEOS)
+ bool IsLockedForOnTask(BrowserWindowInterface* browser) {
+   if (features::IsUseUnifiedLockedStateControllerEnabled()) {
+@@ -651,7 +689,8 @@ bool BrowserCommandController::SupportsCommand(int id) const {
+ }
+ 
+ bool BrowserCommandController::IsCommandEnabled(int id) const {
+-  return command_updater_->IsCommandEnabled(id);
++  return IsMyarcWorkspaceCommandAllowed(browser_, id) &&
++         command_updater_->IsCommandEnabled(id);
+ }
+ 
+ bool BrowserCommandController::ExecuteCommandWithDispositionAndContext(
+@@ -684,6 +723,9 @@ void BrowserCommandController::HandleCommandWithDisposition(
+     int id,
+     WindowOpenDisposition disposition,
+     base::TimeTicks time_stamp) {
++  if (!IsMyarcWorkspaceCommandAllowed(browser_, id)) {
++    return;
++  }
+   DCHECK(IsCommandEnabled(id)) << "Invalid/disabled command " << id;
+ 
+   // LINT.IfChange
+@@ -783,7 +825,7 @@ void BrowserCommandController::HandleCommandWithDisposition(
+       CloseWindow(browser_);
+       break;
+     case IDC_NEW_TAB: {
+-      NewTab(browser_, NewTabTypes::kNewTabCommand);
++      NewTabFromUI(browser_, NewTabTypes::kNewTabCommand);
+       break;
+     }
+     case IDC_NEW_TAB_TO_RIGHT: {
+@@ -2234,6 +2276,51 @@ void BrowserCommandController::UpdateCommandsForExtensionsMenu() {
+                                          /*state=*/true);
+ }
+ 
++void BrowserCommandController::MyarcWorkspaceStateChanged() {
++  // Replay native eligibility for commands initialized once (e.g. Close), then
++  // refresh dynamic tab/policy state. Copy because updates write this map.
++  for (const auto& [id, action_id] : GetCommandIdToActionIdMap()) {
++    if (IsMyarcPageCommand(id) && SupportsCommand(id) &&
++        !myarc_page_command_states_.contains(id)) {
++      myarc_page_command_states_[id] = command_updater_->IsCommandEnabled(id);
++    }
++  }
++  const auto states = myarc_page_command_states_;
++  for (const auto& [id, enabled] : states) {
++    UpdateCommandEnabled(id, enabled);
++  }
++  UpdateCommandsForTabState();
++  UpdateCommandsForFullscreenMode();
++  UpdateCommandsForTabStripStateChanged();
++  if (auto* contents = browser_->GetTabStripModel()->GetActiveWebContents()) {
++    LoadingStateChanged(contents->IsLoading(), true);
++  }
++
++  const auto gate_action = [this](actions::ActionId action_id, int command) {
++    auto* action = FindAction(action_id, browser_);
++    if (!action) {
++      return;
++    }
++    if (!IsMyarcWorkspaceCommandAllowed(browser_, command)) {
++      myarc_page_action_states_.try_emplace(action_id, action->GetEnabled());
++      action->SetEnabled(false);
++    } else if (auto it = myarc_page_action_states_.find(action_id);
++               it != myarc_page_action_states_.end()) {
++      action->SetEnabled(it->second);
++      myarc_page_action_states_.erase(it);
++    }
++  };
++  for (const auto& [id, action_id] : GetCommandIdToActionIdMap()) {
++    if (IsMyarcPageCommand(id) && !SupportsCommand(id)) {
++      gate_action(action_id, id);
++    }
++  }
++  // Zoom's page-action button has no IDC mapping (unlike its menu).
++  gate_action(kActionShowZoomBubble, IDC_ZOOM_MENU);
++  // QR has action-only policy state, independent of legacy command state.
++  UpdateQRCodeGeneratorActionEnabledState();
++}
++
+ void BrowserCommandController::UpdateCommandsForTabState() {
+   // Keep commands disabled when in locked fullscreen so users cannot exit this
+   // mode. Only update navigation ones when the webapp is locked for OnTask
+@@ -2974,8 +3061,10 @@ void BrowserCommandController::UpdateActionsForSharingHubPolicy() {
+ }
+ 
+ void BrowserCommandController::UpdateQRCodeGeneratorActionEnabledState() {
+-  bool qr_code_generator_enabled = g_browser_process->local_state()->GetBoolean(
+-      prefs::kQRCodeGeneratorEnabled);
++  bool qr_code_generator_enabled =
++      g_browser_process->local_state()->GetBoolean(
++          prefs::kQRCodeGeneratorEnabled) &&
++      IsMyarcWorkspaceCommandAllowed(browser_, IDC_QRCODE_GENERATOR);
+   if (auto* qr_code_action_item =
+           FindAction(kActionQrCodeGenerator, browser_)) {
+     qr_code_action_item->SetEnabled(qr_code_generator_enabled);
+@@ -2989,7 +3078,8 @@ void BrowserCommandController::UpdateCommandAndActionEnabled(
+   command_updater_->UpdateCommandEnabled(command_id, enabled);
+   if (!features::ShouldUseActionsForBrowserCommands()) {
+     if (auto* const action = FindAction(action_id, browser_)) {
+-      action->SetEnabled(enabled);
++      action->SetEnabled(enabled &&
++                         IsMyarcWorkspaceCommandAllowed(browser_, command_id));
+     }
+   }
+ }
+@@ -3010,10 +3100,12 @@ bool BrowserCommandController::IsInLockedFullscreenMode(
+ std::unique_ptr<CommandUpdater>
+ BrowserCommandController::CreateCommandUpdater() {
+   if (features::ShouldUseActionsForBrowserCommands()) {
+-    return std::make_unique<CommandActionUpdater>(
++    return std::make_unique<MyarcCommandUpdater<CommandActionUpdater>>(
++        browser_, &myarc_page_command_states_,
+         BrowserActions::From(browser_)->root_action_item());
+   }
+-  return std::make_unique<CommandUpdaterImpl>(this);
++  return std::make_unique<MyarcCommandUpdater<CommandUpdaterImpl>>(
++      browser_, &myarc_page_command_states_, this);
+ }
+ 
+ BrowserWindow* BrowserCommandController::window() {

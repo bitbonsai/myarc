@@ -1,0 +1,69 @@
+diff --git a/chrome/browser/sessions/session_restore.cc b/chrome/browser/sessions/session_restore.cc
+index ea1990e8cd42875e6d651edbe429c76de7e8ab9f..a1c748c288da576d3947d192090f06fc902c3035 100644
+--- a/chrome/browser/sessions/session_restore.cc
++++ b/chrome/browser/sessions/session_restore.cc
+@@ -115,6 +115,7 @@
+ #include "content/public/browser/web_contents.h"
+ #include "extensions/browser/extension_registry.h"
+ #include "extensions/common/extension_set.h"
++#include "myarc/workspace_lifecycle.h"
+ #include "ui/base/mojom/window_show_state.mojom.h"
+ #include "ui/base/page_transition_types.h"
+ #include "ui/base/window_open_disposition.h"
+@@ -364,6 +365,8 @@ class SessionRestoreImpl : public BrowserCollectionObserver {
+         KeepAliveOrigin::SESSION_RESTORE, KeepAliveRestartOption::DISABLED);
+     profile_keep_alive_ = std::make_unique<ScopedProfileKeepAlive>(
+         profile, ProfileKeepAliveOrigin::kBrowserWindow);
++    myarc::WorkspaceLifecycle::Notify(
++        profile_, myarc::WorkspaceLifecycle::Event::kSessionRestoreStarted);
+   }
+ 
+   bool synchronous() const { return synchronous_; }
+@@ -532,17 +535,20 @@ class SessionRestoreImpl : public BrowserCollectionObserver {
+     // IsAnySessionCurrentlyRestoring() from OnProfileSessionRestored() to
+     // decide whether the last in-flight restore has completed.
+     GetActiveSessionRestorers().erase(this);
++    weak_factory_.InvalidateWeakPtrs();
+ 
+     // Restores of a session from another device are not restores of this
+     // profile's own session, and are not reported to observers.
+-    if (is_foreign_session_restore_) {
+-      return;
+-    }
+-
+-    for (auto& observer : *SessionRestore::observers()) {
+-      observer.OnProfileSessionRestored(profile_, counts_.normal_windows,
+-                                        counts_.app_windows);
++    if (!is_foreign_session_restore_) {
++      for (auto& observer : *SessionRestore::observers()) {
++        observer.OnProfileSessionRestored(profile_, counts_.normal_windows,
++                                          counts_.app_windows);
++      }
+     }
++    // Includes cancellation: pending callbacks are invalidated, so only the
++    // windows/tabs actually inserted can remain. Notify after native observers.
++    myarc::WorkspaceLifecycle::Notify(
++        profile_, myarc::WorkspaceLifecycle::Event::kSessionRestoreFinished);
+   }
+ 
+   bool is_foreign_session_restore() const {
+@@ -879,6 +885,9 @@ class SessionRestoreImpl : public BrowserCollectionObserver {
+           ShouldRestoreToExistingBrowser()) {
+         // The first set of tabs is added to the existing browser.
+         browser = browser_;
++        if (auto* lifecycle = myarc::WorkspaceLifecycle::Get(profile_)) {
++          lifecycle->RestoreWindow(*browser, window->extra_data);
++        }
+       } else {
+ #if BUILDFLAG(IS_CHROMEOS)
+         ash::BootTimesRecorder::Get()->AddLoginTimeMarker(
+@@ -1404,6 +1413,9 @@ class SessionRestoreImpl : public BrowserCollectionObserver {
+       manager->SetWindowCreationInfo(
+           waap::NewWindowCreationSource::kSessionRestore, now);
+     }
++    if (auto* lifecycle = myarc::WorkspaceLifecycle::Get(profile_)) {
++      lifecycle->RestoreWindow(*browser_window, extra_data);
++    }
+     g_is_any_session_restored = true;
+     return browser_window;
+   }

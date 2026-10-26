@@ -5,7 +5,7 @@
   "status": "bounded_native_ui_and_clean_review_restart_passed",
   "source_commits": ["2b8ab75", "42711dde71b88c45042c25b9db19d87e2b7d5932"],
   "launcher_commits": ["137acc8", "72a609d"],
-  "patch": "browser/patches/0026-native-sidebar-row-footer.patch",
+  "patch": "browser/patches/legacy/0026-native-sidebar-row-footer.patch",
   "patch_sha256": "83c305404d61f14ea36b50e7cbea0ee72f0a18b78bf501fb69ea33f3b36f6db6",
   "native_component_sha256": "6601f15e8ed7b8f9666a6d5c90fb29361fa1902e3a1ef5654190238f0090c724",
   "installed_source_inventory": 83,

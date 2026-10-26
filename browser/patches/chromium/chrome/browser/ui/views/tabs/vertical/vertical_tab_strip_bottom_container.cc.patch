@@ -1,0 +1,47 @@
+diff --git a/chrome/browser/ui/views/tabs/vertical/vertical_tab_strip_bottom_container.cc b/chrome/browser/ui/views/tabs/vertical/vertical_tab_strip_bottom_container.cc
+index 64150f80cfea3a21442eea1138e77e538dad21a9..0182ea7b675c2e1ea379ee8986eafffbd2054410 100644
+--- a/chrome/browser/ui/views/tabs/vertical/vertical_tab_strip_bottom_container.cc
++++ b/chrome/browser/ui/views/tabs/vertical/vertical_tab_strip_bottom_container.cc
+@@ -4,6 +4,7 @@
+ 
+ #include "chrome/browser/ui/views/tabs/vertical/vertical_tab_strip_bottom_container.h"
+ 
++#include "base/command_line.h"
+ #include "base/functional/bind.h"
+ #include "chrome/browser/ui/browser_element_identifiers.h"
+ #include "chrome/browser/ui/layout_constants.h"
+@@ -50,7 +51,6 @@ VerticalTabStripBottomContainer::VerticalTabStripBottomContainer(
+ 
+ VerticalTabStripBottomContainer::~VerticalTabStripBottomContainer() = default;
+ 
+-
+ bool VerticalTabStripBottomContainer::IsPositionInWindowCaption(
+     const gfx::Point& point) {
+   for (views::View* child : children()) {
+@@ -70,7 +70,9 @@ void VerticalTabStripBottomContainer::OnCollapseStateChanged(
+     tabs::VerticalTabStripCollapseState state) {
+   // Updating the styles immediately at start of the animation by including
+   // collapsing state.
+-  UpdateButtonStyles(state != tabs::VerticalTabStripCollapseState::kExpanded);
++  UpdateButtonStyles(!base::CommandLine::ForCurrentProcess()->HasSwitch(
++                         "myarc-visual-parity") &&
++                     state != tabs::VerticalTabStripCollapseState::kExpanded);
+ }
+ 
+ void VerticalTabStripBottomContainer::OnNewTabButtonContextMenuWillShow() {
+@@ -105,6 +107,15 @@ void VerticalTabStripBottomContainer::UpdateButtonStyles(bool collapsed) {
+   new_tab_button_->SetInsets(GetLayoutInsets(
+       collapsed ? LayoutInset::VERTICAL_TAB_STRIP_BOTTOM_BUTTON_COLLAPSED
+                 : LayoutInset::VERTICAL_TAB_STRIP_BOTTOM_BUTTON_UNCOLLAPSED));
++  if (base::CommandLine::ForCurrentProcess()->HasSwitch(
++          "myarc-visual-parity")) {
++    new_tab_button_->SetShouldShowLabel(!collapsed);
++    if (collapsed) {
++      new_tab_button_->SetText(u"");
++    }
++    new_tab_button_->SetPaintTransparent(true);
++    new_tab_button_->SetImageLabelSpacing(8);
++  }
+ }
+ 
+ BEGIN_METADATA(VerticalTabStripBottomContainer)

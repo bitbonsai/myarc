@@ -1,6 +1,6 @@
 # Native hover caption controls
 
-MA-007.c-caption supplies [patch 0015](../patches/0015-native-hover-caption-controls.patch), incremental after corrected 0013. The parent built the native app and observed real traffic lights during the hover overlay, including app-only reduced motion. Automated browser regressions and full caption-motion acceptance remain open.
+MA-007.c-caption supplies [patch 0015](../patches/legacy/0015-native-hover-caption-controls.patch), incremental after corrected 0013. The parent built the native app and observed real traffic lights during the hover overlay, including app-only reduced motion. Automated browser regressions and full caption-motion acceptance remain open.
 
 ## Defect and change
 
@@ -26,8 +26,8 @@ Apply after 0002, 0004, 0005, corrected 0006, 0007, 0008, 0009, 0010, normalized
 [Evidence manifest](../evidence/native-hover-caption-controls.json) records every input/output SHA-256 and Git blob ID, the exact prerequisite 0013 patch hash and 0015 patch hash. Its four input hashes are authoritative for this incremental delta, rather than a claim that all external work matches a clean upstream commit. Preserve unrelated parent edits. Check those four inputs before applying:
 
 ```sh
-git apply --check --index --whitespace=error-all "$MYARC/browser/patches/0015-native-hover-caption-controls.patch"
-git apply --index --whitespace=error-all "$MYARC/browser/patches/0015-native-hover-caption-controls.patch"
+git apply --check --index --whitespace=error-all "$MYARC/browser/patches/legacy/0015-native-hover-caption-controls.patch"
+git apply --index --whitespace=error-all "$MYARC/browser/patches/legacy/0015-native-hover-caption-controls.patch"
 ```
 
 The index commands require matching staged inputs. The parent owns actual integration and any merge with subsequent frame/GN changes.
