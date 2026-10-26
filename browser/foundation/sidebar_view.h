@@ -61,6 +61,9 @@ class SidebarView final : public views::View,
     // removal of saved data, distinct from closing a live page.
     virtual void PinItem(uint64_t item_id) = 0;
     virtual void FavoriteItem(uint64_t item_id) = 0;
+    // Promotes if needed, then places `item_id` before `before_id` (0 = end).
+    // Returns false when the workspace rejected the change.
+    virtual bool DropFavorite(uint64_t item_id, uint64_t before_id) = 0;
     virtual void UnsaveItem(uint64_t item_id) = 0;
     virtual void SelectSpace(uint64_t space_id) = 0;
     virtual void CreateSpace() = 0;
