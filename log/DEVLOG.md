@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-10-26: Palette intent reuse build candidate
+
+- Starting revision `9426f9e`. [0022](../browser/experiments/native-palette-intent.md) updates the live native palette when shortcut intent changes, preserves same-intent drafts and applies the Empty-Space guard before reuse. Existing reload/navigation and Rust policy remain intact. Close cleanup cancels history callbacks, checks delegate identity and retains anchor clearing/widget-before-delegate deferred deletion. Weak view checks protect focus across native activation.
+- Four browser fixtures cover drafts, current reload/edit versus new-tab submission, an adapter-selected empty Space and cancel/reopen/owner-close ownership. All remain UNRUN. Actual nonzero production/fixture GN checks, final real-context clang syntax and full `chrome -j8` terminal build pass, exit `0` at 01:49:45Z after a forced recompile/relink from frozen final source. Initial syntax API errors were corrected. Strict indexed 82-file replay changes four files and preserves 78 unrelated files, canonical16 and all earlier patches through 0021. Document/payload/format/whitespace checks pass.
+- No app/helper/server launched. Parent retains actual desktop interruption/focus/reduced-motion/history-overlap acceptance. Lifecycle helper and Rust suites were not rerun because their sources are unchanged. Recovery holds, adapter readiness, AI gate and renderer default OFF remain unchanged. External source/build ownership returns explicitly at handoff.
+
 ## 2026-10-26: Existing palette drops current-tab shortcut intent
 
 Real Cmd+T/draft/Cmd+L dismissed the palette on `fdc20a3`; page URL/count/time origin stayed exact. Source closes any existing palette before considering new intent. [Failure](../browser/evidence/native-palette-interruption.json) retained. Routine repair assumption: switch intent in the same live widget, preserve same-intent drafts, keep empty-Space hidden-URL guards. Native owner close closed its palette; outstanding-history race was not directly observed. Apps/helpers/server closed before source transfer.

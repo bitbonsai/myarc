@@ -52,6 +52,8 @@ Later [empty-header](../evidence/workspace-empty-header.json), [saved identity](
 
 Fresh [interruption evidence](../evidence/native-palette-interruption.json) found a distinct shortcut defect on `fdc20a3`: native Cmd+T, typed draft, then Cmd+L dismissed the palette instead of keeping a current-URL editor. The real page count/URL/time origin stayed unchanged. Source closes and returns whenever a palette already exists. Repair should update different intent in place and preserve same-intent drafts. Empty-Space URL protection still applies. Actual owner-window close also closed its open palette; this bounded smoke does not establish an outstanding-history callback race. Private run `/tmp/myarc-m0-runtime/palette-interrupt-20261026T013508Z/`; apps/helpers/server closed.
 
+[0022 intent repair](native-palette-intent.md) implements live-widget intent changes and draft-preserving focus, with empty-Space protection before reuse and bounded close/history cleanup. Source checks and full build pass; its four browser fixtures and fresh native interruption acceptance remain UNRUN. The original failure above remains the observed baseline.
+
 ## Remaining
 
 Current-tab editing, sidebar URL activation and full sidebar hide/show still need native acceptance. Complete autocomplete and the broader command catalog remain pending. Motion timing, interruption, reduced motion, full accessibility and Windows behavior are unverified.

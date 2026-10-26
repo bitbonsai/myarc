@@ -1,0 +1,382 @@
+diff --git a/chrome/browser/ui/views/frame/BUILD.gn b/chrome/browser/ui/views/frame/BUILD.gn
+index af09a3f..00662ea 100644
+--- a/chrome/browser/ui/views/frame/BUILD.gn
++++ b/chrome/browser/ui/views/frame/BUILD.gn
+@@ -2289,7 +2289,9 @@ source_set("browser_tests") {
+     "//chrome/browser/ui/views/web_apps/frame_toolbar:web_app_frame_toolbar_view",
+     "//chrome/browser/ui/window_metadata",
+     "//components/enterprise/data_controls/core/browser:test_support",
++    "//components/omnibox/browser",
+     "//components/safe_browsing/core/browser/realtime:test_support",
++    "//myarc:browser_workspace_adapter",
+     "//ui/accessibility:test_support",
+     "//ui/base:data_exchange",
+     "//ui/base:ozone_buildflags",
+diff --git a/chrome/browser/ui/views/frame/browser_view.cc b/chrome/browser/ui/views/frame/browser_view.cc
+index b8b8d9d..74ea531 100644
+--- a/chrome/browser/ui/views/frame/browser_view.cc
++++ b/chrome/browser/ui/views/frame/browser_view.cc
+@@ -730,6 +730,36 @@ class MyarcPaletteView : public views::BoxLayoutView,
+ 
+   views::Textfield* input() { return input_; }
+ 
++  void SetIntent(bool new_tab, std::u16string initial_text) {
++    if (new_tab_ != new_tab) {
++      new_tab_ = new_tab;
++      initial_text_ = std::move(initial_text);
++      input_->SetText(initial_text_);
++      Rebuild();
++    }
++  }
++
++  void FocusInput() {
++    if (!GetWidget() || GetWidget()->IsClosed()) {
++      return;
++    }
++    auto weak_this = weak_factory_.GetWeakPtr();
++    GetWidget()->Activate();
++    if (weak_this && GetWidget() && !GetWidget()->IsClosed()) {
++      input_->SelectAll(false);
++      input_->RequestFocus();
++    }
++  }
++
++  void PrepareToClose() {
++    history_tasks_.TryCancelAll();
++    weak_factory_.InvalidateWeakPtrs();
++  }
++
++  base::WeakPtr<MyarcPaletteView> GetWeakPtr() {
++    return weak_factory_.GetWeakPtr();
++  }
++
+   void ContentsChanged(views::Textfield* sender,
+                        const std::u16string& text) override {
+     Rebuild();
+@@ -990,8 +1020,8 @@ class MyarcPaletteView : public views::BoxLayoutView,
+ 
+   base::WeakPtr<BrowserWindowInterface> browser_;
+   const int width_;
+-  const bool new_tab_;
+-  const std::u16string initial_text_;
++  bool new_tab_;
++  std::u16string initial_text_;
+   raw_ptr<views::Textfield> input_ = nullptr;
+   raw_ptr<views::BoxLayoutView> rows_ = nullptr;
+   raw_ptr<views::Label> error_ = nullptr;
+@@ -1486,7 +1516,7 @@ BrowserView::~BrowserView() {
+   if (myarc_command_palette_widget_) {
+     myarc_command_palette_widget_->Close();
+   }
+-  OnMyarcCommandPaletteClosed();
++  OnMyarcCommandPaletteClosed(myarc_command_palette_delegate_.get());
+   tab_search_bubble_host_.reset();
+ 
+   global_error_observation_.Reset();
+@@ -6280,12 +6310,25 @@ bool BrowserView::ShowMyarcCommandPalette(bool new_tab) {
+   if (!initialized_ || !GetWidget()) {
+     return false;
+   }
++  // Current-page intent in an empty Space must not target hidden native tab.
++  new_tab |= IsMyarcWorkspaceBlank();
++  const auto* location_model = LocationBarModel::From(browser_.get());
++  const std::u16string initial_text =
++      !new_tab && location_model ? location_model->GetFormattedFullURL() : u"";
++  if (myarc_command_palette_widget_ &&
++      myarc_command_palette_widget_->IsClosed()) {
++    OnMyarcCommandPaletteClosed(myarc_command_palette_delegate_.get());
++  }
+   if (myarc_command_palette_widget_) {
+-    myarc_command_palette_widget_->Close();
++    auto* content = static_cast<MyarcPaletteView*>(
++        myarc_command_palette_delegate_->GetContentsView());
++    auto weak_content = content->GetWeakPtr();
++    content->SetIntent(new_tab, initial_text);
++    if (weak_content) {
++      weak_content->FocusInput();
++    }
+     return true;
+   }
+-  // Current-page intent in an empty Space must not target hidden native tab.
+-  new_tab |= IsMyarcWorkspaceBlank();
+   const int width = std::clamp(GetBoundsInScreen().width() - 48, 240, 752);
+   myarc_command_palette_delegate_ =
+       std::make_unique<views::BubbleDialogDelegate>(this,
+@@ -6297,25 +6340,28 @@ bool BrowserView::ShowMyarcCommandPalette(bool new_tab) {
+   delegate->SetTitle(u"Command palette");
+   delegate->set_corner_radius(12);
+   delegate->set_margins(gfx::Insets(12));
+-  const auto* location_model = LocationBarModel::From(browser_.get());
+-  const std::u16string initial_text =
+-      !new_tab && location_model ? location_model->GetFormattedFullURL() : u"";
+   auto* content = delegate->SetContentsView(std::make_unique<MyarcPaletteView>(
+       browser_->GetWeakPtr(), width, new_tab, initial_text));
+   delegate->SetInitiallyFocusedView(content->input());
+   myarc_command_palette_widget_ = views::BubbleDialogDelegate::CreateBubble(
+-      delegate,
+-      base::IgnoreArgs<views::Widget::ClosedReason>(base::BindOnce(
+-          &BrowserView::OnMyarcCommandPaletteClosed, GetAsWeakPtr())));
++      delegate, base::IgnoreArgs<views::Widget::ClosedReason>(base::BindOnce(
++                    &BrowserView::OnMyarcCommandPaletteClosed, GetAsWeakPtr(),
++                    base::Unretained(delegate))));
++  auto weak_content = content->GetWeakPtr();
+   myarc_command_palette_widget_->Show();
+-  content->input()->RequestFocus();
++  if (weak_content) {
++    weak_content->FocusInput();
++  }
+   return true;
+ }
+ 
+-void BrowserView::OnMyarcCommandPaletteClosed() {
+-  if (myarc_command_palette_delegate_) {
+-    myarc_command_palette_delegate_->SetAnchorView(nullptr);
++void BrowserView::OnMyarcCommandPaletteClosed(
++    views::BubbleDialogDelegate* delegate) {
++  if (!delegate || delegate != myarc_command_palette_delegate_.get()) {
++    return;
+   }
++  static_cast<MyarcPaletteView*>(delegate->GetContentsView())->PrepareToClose();
++  delegate->SetAnchorView(nullptr);
+   if (myarc_command_palette_widget_) {
+     base::SingleThreadTaskRunner::GetCurrentDefault()->DeleteSoon(
+         FROM_HERE, std::move(myarc_command_palette_widget_));
+diff --git a/chrome/browser/ui/views/frame/browser_view.h b/chrome/browser/ui/views/frame/browser_view.h
+index f35c829..24366bd 100644
+--- a/chrome/browser/ui/views/frame/browser_view.h
++++ b/chrome/browser/ui/views/frame/browser_view.h
+@@ -1316,7 +1316,7 @@ class BrowserView : public BrowserWindow,
+   raw_ptr<views::Textfield> myarc_space_name_ = nullptr;
+   raw_ptr<views::Label> myarc_space_error_ = nullptr;
+ 
+-  void OnMyarcCommandPaletteClosed();
++  void OnMyarcCommandPaletteClosed(views::BubbleDialogDelegate* delegate);
+   std::unique_ptr<views::BubbleDialogDelegate> myarc_command_palette_delegate_;
+   std::unique_ptr<views::Widget> myarc_command_palette_widget_;
+ 
+diff --git a/chrome/browser/ui/views/frame/browser_view_browsertest.cc b/chrome/browser/ui/views/frame/browser_view_browsertest.cc
+index 928092e..784cba2 100644
+--- a/chrome/browser/ui/views/frame/browser_view_browsertest.cc
++++ b/chrome/browser/ui/views/frame/browser_view_browsertest.cc
+@@ -15,6 +15,7 @@
+ #include "base/memory/raw_ptr.h"
+ #include "base/memory/scoped_refptr.h"
+ #include "base/numerics/safe_conversions.h"
++#include "base/run_loop.h"
+ #include "base/strings/strcat.h"
+ #include "base/strings/utf_string_conversions.h"
+ #include "base/test/metrics/histogram_tester.h"
+@@ -102,6 +103,7 @@
+ #include "components/enterprise/data_controls/core/browser/test_utils.h"
+ #include "components/enterprise/isolated_mode/isolated_mode_features.h"
+ #include "components/keyed_service/content/browser_context_dependency_manager.h"
++#include "components/omnibox/browser/location_bar_model.h"
+ #include "components/policy/core/common/policy_pref_names.h"
+ #include "components/policy/core/common/policy_types.h"
+ #include "components/prefs/pref_service.h"
+@@ -125,6 +127,7 @@
+ #include "content/public/test/test_navigation_observer.h"
+ #include "media/base/media_switches.h"
+ #include "media/capture/capture_switches.h"
++#include "myarc/browser_workspace_adapter.h"
+ #include "net/test/embedded_test_server/http_response.h"
+ #include "net/traffic_annotation/network_traffic_annotation_test_helper.h"
+ #include "testing/gmock/include/gmock/gmock.h"
+@@ -160,6 +163,7 @@
+ #include "ui/views/controls/button/label_button.h"
+ #include "ui/views/controls/button/md_text_button.h"
+ #include "ui/views/controls/native/native_view_host.h"
++#include "ui/views/controls/textfield/textfield.h"
+ #include "ui/views/controls/webview/webview.h"
+ #include "ui/views/focus/focus_manager.h"
+ #include "ui/views/test/views_test_utils.h"
+@@ -392,6 +396,189 @@ class BrowserViewTest : public InProcessBrowserTest {
+   raw_ptr<DevToolsWindow> devtools_;
+ };
+ 
++class BrowserViewPaletteIntentTest : public BrowserViewTest {
++ protected:
++  void SetUpCommandLine(base::CommandLine* command_line) override {
++    BrowserViewTest::SetUpCommandLine(command_line);
++    command_line->AppendSwitch("myarc-visual-parity");
++    command_line->AppendSwitch("myarc-workspace-sidebar");
++  }
++
++  views::BubbleDialogDelegate* palette() {
++    return views::BubbleDialogDelegate::GetAnchoredDialog(
++        views::BubbleAnchor(browser_view()));
++  }
++
++  views::Textfield* input() {
++    return views::AsViewClass<views::Textfield>(
++        palette()->GetInitiallyFocusedView());
++  }
++
++  void Type(const std::u16string& text) {
++    input()->SelectAll(false);
++    input()->InsertText(
++        text,
++        ui::TextInputClient::InsertTextCursorBehavior::kMoveCursorAfterText);
++  }
++
++  void Press(ui::KeyboardCode key) {
++    ui::KeyEvent event(ui::EventType::kKeyPressed, key, ui::EF_NONE);
++    EXPECT_TRUE(static_cast<views::View*>(input())->OnKeyPressed(event));
++  }
++};
++
++IN_PROC_BROWSER_TEST_F(BrowserViewPaletteIntentTest,
++                       ReuseIntentDraftsAndCancelThenReopen) {
++  ASSERT_TRUE(embedded_test_server()->Start());
++  const GURL url = embedded_test_server()->GetURL("/title1.html");
++  ASSERT_TRUE(ui_test_utils::NavigateToURL(browser(), url));
++  auto* contents = active_web_contents();
++  const int count = browser()->GetTabStripModel()->count();
++  ASSERT_TRUE(browser_view()->ShowMyarcCommandPalette(true));
++  ASSERT_TRUE(palette());
++  auto* widget = palette()->GetWidget();
++  EXPECT_TRUE(input()->GetText().empty());
++  Type(u"synthetic pending draft");
++  ASSERT_TRUE(browser_view()->ShowMyarcCommandPalette(true));
++  EXPECT_EQ(widget, palette()->GetWidget());
++  EXPECT_EQ(u"synthetic pending draft", input()->GetText());
++  EXPECT_EQ(input()->GetText(), input()->GetSelectedText());
++  EXPECT_EQ(input(), widget->GetFocusManager()->GetFocusedView());
++
++  ASSERT_TRUE(browser_view()->ShowMyarcCommandPalette(false));
++  EXPECT_EQ(widget, palette()->GetWidget());
++  EXPECT_EQ(LocationBarModel::From(browser())->GetFormattedFullURL(),
++            input()->GetText());
++  EXPECT_EQ(input()->GetText(), input()->GetSelectedText());
++  Type(u"synthetic current draft");
++  ASSERT_TRUE(browser_view()->ShowMyarcCommandPalette(false));
++  EXPECT_EQ(u"synthetic current draft", input()->GetText());
++  EXPECT_EQ(input()->GetText(), input()->GetSelectedText());
++  ASSERT_TRUE(browser_view()->ShowMyarcCommandPalette(true));
++  EXPECT_EQ(widget, palette()->GetWidget());
++  EXPECT_TRUE(input()->GetText().empty());
++  EXPECT_EQ(count, browser()->GetTabStripModel()->count());
++  EXPECT_EQ(contents, active_web_contents());
++  EXPECT_EQ(url, contents->GetLastCommittedURL());
++
++  Type(u"pending history before cancel");
++  auto old_widget = widget->GetWeakPtr();
++  Press(ui::VKEY_ESCAPE);
++  EXPECT_FALSE(palette());
++  // Reopen before deferred old-widget/delegate deletion drains.
++  ASSERT_TRUE(browser_view()->ShowMyarcCommandPalette(false));
++  ASSERT_TRUE(palette());
++  auto replacement = palette()->GetWidget()->GetWeakPtr();
++  EXPECT_NE(old_widget.get(), replacement.get());
++  base::RunLoop().RunUntilIdle();
++  EXPECT_FALSE(old_widget);
++  ASSERT_TRUE(replacement);
++  ASSERT_TRUE(palette());
++  EXPECT_EQ(replacement.get(), palette()->GetWidget());
++  EXPECT_EQ(LocationBarModel::From(browser())->GetFormattedFullURL(),
++            input()->GetText());
++  EXPECT_EQ(count, browser()->GetTabStripModel()->count());
++  Press(ui::VKEY_ESCAPE);
++}
++
++IN_PROC_BROWSER_TEST_F(BrowserViewPaletteIntentTest,
++                       CurrentReloadEditAndNewTabSubmission) {
++  ASSERT_TRUE(embedded_test_server()->Start());
++  ASSERT_TRUE(ui_test_utils::NavigateToURL(
++      browser(), embedded_test_server()->GetURL("/title1.html")));
++  auto* contents = active_web_contents();
++  const int count = browser()->GetTabStripModel()->count();
++  ASSERT_TRUE(browser_view()->ShowMyarcCommandPalette(true));
++  Type(u"discard on intent change");
++  ASSERT_TRUE(browser_view()->ShowMyarcCommandPalette(false));
++  content::TestNavigationObserver reload(contents);
++  Press(ui::VKEY_RETURN);
++  reload.Wait();
++  EXPECT_EQ(contents, active_web_contents());
++  EXPECT_EQ(count, browser()->GetTabStripModel()->count());
++
++  ASSERT_TRUE(browser_view()->ShowMyarcCommandPalette(false));
++  const GURL edited = embedded_test_server()->GetURL("/title2.html");
++  Type(base::UTF8ToUTF16(edited.spec()));
++  content::TestNavigationObserver edit(contents);
++  Press(ui::VKEY_RETURN);
++  edit.Wait();
++  EXPECT_EQ(contents, active_web_contents());
++  EXPECT_EQ(edited, contents->GetLastCommittedURL());
++  EXPECT_EQ(count, browser()->GetTabStripModel()->count());
++
++  ASSERT_TRUE(browser_view()->ShowMyarcCommandPalette(false));
++  ASSERT_TRUE(browser_view()->ShowMyarcCommandPalette(true));
++  EXPECT_TRUE(input()->GetText().empty());
++  const GURL added = embedded_test_server()->GetURL("/title3.html");
++  Type(base::UTF8ToUTF16(added.spec()));
++  EXPECT_EQ(count, browser()->GetTabStripModel()->count());
++  Press(ui::VKEY_RETURN);
++  ASSERT_NE(contents, active_web_contents());
++  ASSERT_TRUE(content::WaitForLoadStop(active_web_contents()));
++  EXPECT_EQ(count + 1, browser()->GetTabStripModel()->count());
++  EXPECT_EQ(added, active_web_contents()->GetLastCommittedURL());
++}
++
++IN_PROC_BROWSER_TEST_F(BrowserViewPaletteIntentTest,
++                       EmptySpaceGuardsExistingCurrentIntent) {
++  ASSERT_TRUE(embedded_test_server()->Start());
++  const GURL hidden = embedded_test_server()->GetURL("/title1.html");
++  ASSERT_TRUE(ui_test_utils::NavigateToURL(browser(), hidden));
++  auto* contents = active_web_contents();
++  auto* adapter = browser_view()->GetMyarcWorkspaceAdapter();
++  ASSERT_TRUE(adapter);
++  ASSERT_TRUE(base::test::RunUntil([&] { return adapter->ready(); }));
++  const uint64_t original_space = adapter->Sidebar().current_space.id;
++  const auto empty = adapter->CreateSpace("Palette empty fixture");
++  ASSERT_TRUE(empty.ok);
++  ASSERT_TRUE(browser_view()->ShowMyarcCommandPalette(false));
++  auto* widget = palette()->GetWidget();
++  palette()->set_close_on_deactivate(false);
++  ASSERT_TRUE(adapter->SelectSpace(empty.id).ok);
++  ASSERT_TRUE(browser_view()->IsMyarcWorkspaceBlank());
++  ASSERT_TRUE(browser_view()->ShowMyarcCommandPalette(false));
++  EXPECT_EQ(widget, palette()->GetWidget());
++  EXPECT_TRUE(input()->GetText().empty());
++  Type(u"synthetic empty draft");
++  ASSERT_TRUE(browser_view()->ShowMyarcCommandPalette(false));
++  EXPECT_EQ(u"synthetic empty draft", input()->GetText());
++  EXPECT_EQ(input()->GetText(), input()->GetSelectedText());
++  const int count = browser()->GetTabStripModel()->count();
++  const GURL added = embedded_test_server()->GetURL("/title2.html");
++  Type(base::UTF8ToUTF16(added.spec()));
++  EXPECT_EQ(count, browser()->GetTabStripModel()->count());
++  Press(ui::VKEY_RETURN);
++  ASSERT_TRUE(content::WaitForLoadStop(active_web_contents()));
++  EXPECT_EQ(count + 1, browser()->GetTabStripModel()->count());
++  EXPECT_EQ(hidden, contents->GetLastCommittedURL());
++  EXPECT_EQ(added, active_web_contents()->GetLastCommittedURL());
++  EXPECT_FALSE(browser_view()->IsMyarcWorkspaceBlank());
++  ASSERT_TRUE(adapter->SelectSpace(original_space).ok);
++  EXPECT_EQ(contents, adapter->DisplayedContents());
++}
++
++IN_PROC_BROWSER_TEST_F(BrowserViewPaletteIntentTest,
++                       OwnerCloseWithHistoryWorkQueued) {
++  auto* owner = CreateBrowser(browser()->GetProfile());
++  auto* view = BrowserView::GetBrowserViewForBrowser(owner);
++  ASSERT_TRUE(view->ShowMyarcCommandPalette(true));
++  auto* bubble =
++      views::BubbleDialogDelegate::GetAnchoredDialog(views::BubbleAnchor(view));
++  ASSERT_TRUE(bubble);
++  auto widget = bubble->GetWidget()->GetWeakPtr();
++  auto* field =
++      views::AsViewClass<views::Textfield>(bubble->GetInitiallyFocusedView());
++  ASSERT_TRUE(field);
++  field->InsertText(
++      u"queued synthetic history",
++      ui::TextInputClient::InsertTextCursorBehavior::kMoveCursorAfterText);
++  CloseBrowserSynchronously(owner);
++  base::RunLoop().RunUntilIdle();
++  EXPECT_FALSE(widget);
++  EXPECT_TRUE(browser_view()->GetWidget());
++}
++
+ #if BUILDFLAG(IS_MAC)
+ class BrowserViewPinnedFadeTest : public BrowserViewTest {
+  protected:

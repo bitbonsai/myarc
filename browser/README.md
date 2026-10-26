@@ -32,6 +32,8 @@ The executable checks exact-Profile registration, retained metadata and startup/
 
 [AI Mode entrypoint candidate 0021](experiments/native-ai-entrypoints-off.md) suppresses unsupported native AI Mode controls only when both prototype switches are present. Its shared eligibility gate also omits the associated context-menu toggle. Full build and source checks pass; native acceptance remains pending. This does not implement provider modes or prove AI network/privacy enforcement.
 
+[Palette intent candidate 0022](experiments/native-palette-intent.md) reuses the live palette for shortcut intent changes, preserves same-intent drafts and applies the empty-Space guard before reuse. Source checks and the full build pass; native fixtures and desktop acceptance remain UNRUN.
+
 On every Chromium rebase, compare `PreserveUnknownData` against the producers in `BrowserLiveTabContext` and consumers in `browser_tabrestore`, including private glic/send-tab keys. Cleared known fields must stay absent; unrelated historical keys must survive.
 
 ## Local build recipe
