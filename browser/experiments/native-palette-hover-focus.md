@@ -16,4 +16,14 @@ Changed-line Chromium clang-format, production/fixture real-context syntax, nonz
 
 Parent owns fresh final-build native acceptance in normal and reduced motion: real pointer enter/exit, opening/rebuilding with pointer under a result, continued typing/current literal submission, deliberate global keyboard/mouse selection and unchanged new-intent defaults, followed by exact preview. This implementation task launched no app, supplied no native input and started no server. Native suites remain UNRUN. Source/build ownership returns explicitly at handoff with no build running; do not reapply already installed 0025.
 
+## Parent native acceptance through0025
+
+Integrated as `8b52f25`; installed83, compiled artifacts, unchanged global HoverButton and canonical16 hashes checked. Fresh normal and app-only reduced runs used actual owned pointer entry/exit. Input focus, selected draft and continued typing survived. Opening/rebuilding under a stationary result pointer also kept focus. Fresh captures were inspected.
+
+Actual Tab/Enter and real mouse down/up selected the other Space's existing target; the actual palette closed and both page target IDs/URLs/time origins stayed exact. Deliberate keyboard row focus survived pointer exit. Full normal address/history/default checks and reduced address/global/unchanged-reload sequence passed, without Cmd+L refocus workarounds. The first long outer command timed out mid-run; its stale palette sidecar stopped input before action. Exact owned AX/CG identity was reacquired to cancel, then the fresh complete reduced run passed. The partial run is retained without a complete-pass claim.
+
+After every URL/selection exercise, a final clean quit/reopen proved the session. Without further navigation/selection, audited SIGKILL/plain relaunch/genuine Restore passed five strict samples. This is persisted-state recovery, separate from the retained recent-navigation failure. [Exact no-debug preview](../evidence/native-preview.json) then passed native navigation, pointer focus, empty header and Cmd+S return on the same build. All owned apps/helpers/fixture servers closed. Private `/tmp/myarc-m0-runtime/focus25-acceptance-20261026T041021Z/` and `/tmp/myarc-m0-runtime/preview25-20261026T042044Z/` retain fresh evidence.
+
+Native fixture suites remain **UNRUN**. Full assistive-technology/IME/RTL/fullscreen and arbitrary history/close overlap remain open; exact motion timing was not measured.
+
 Session storage, core/schema, restore, readiness, AI gating and default-OFF behavior are untouched. The [recent-navigation crash failure](native-session-navigation-crash.md) and separate clean-persisted control remain distinct evidence. This UI candidate makes no acknowledgement, crash-flush or power-loss durability claim.

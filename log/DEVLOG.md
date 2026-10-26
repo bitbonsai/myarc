@@ -1,5 +1,13 @@
 # Development log
 
+## 2026-10-26: Final native hover/input and preview verification
+
+0025 integrated as `8b52f25` after source/artifact/global-HoverButton/canonical hashes matched. Normal and actual app-only reduced motion passed real pointer enter/exit, opening/rebuilding under pointer, continued input and semantic address sequences. Actual Tab/Enter and mouse down/up revealed the other Space target, closed palette and preserved both targets/URLs/time origins. Explicit row focus survived pointer exit. [Evidence](../browser/evidence/native-palette-hover-focus.json).
+
+Final clean quit/reopen after all navigation/selection exercises, then audited SIGKILL/plain relaunch/genuine Restore passed five strict persisted-state samples. Recent acknowledgement/navigation failure remains distinct and open. An outer partial-run timeout left a stale native palette sidecar; strict input guard stopped, exact AX/CG identity was reacquired before cancel and complete rerun. No verifier/model repairs.
+
+Exact `python3 tools/launch_native_preview.py` on0025 then passed native Example Domain/current-item editing, pointer focus, neutral Empty and Cmd+S, with no debugging/automation/extension. Latest no-debug run did not repeat saved close/reopen or measure native target IDs/viewport. [Evidence](../browser/evidence/native-preview.json). Apps/helpers/fixture servers closed; native C++ suites, full accessibility/overlap and durability remain open.
+
 ## 2026-10-26: Palette-local hover-focus build candidate
 
 From `4d23a67`, optional [0025](../browser/experiments/native-palette-hover-focus.md#candidate-0025-palette-local-hover-focus) specializes only palette result state changes, calling LabelButton directly instead of HoverButton's menu-specific focus behavior. Shared control bytes and result focusability stay unchanged. Two added browser fixtures cover hover enter/exit, draft/focus, hovered rebuild plus same-target literal submission, and explicit Tab/Enter/mouse activation; all native browser/interactive fixtures remain UNRUN.

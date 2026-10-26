@@ -2,7 +2,7 @@
   "slice": "MA-007.c-native-current-address-submission",
   "date": "2026-10-26",
   "baseline_stack_through": "0023",
-  "status": "baseline retained; bounded normal literal/default correction accepted, hover focus gap open",
+  "status": "baseline retained; bounded native current/default and normal/reduced hover focus corrections accepted",
   "journey": {
     "two_existing_real_page_targets_in_one_marked_profile": true,
     "active_temporary_page_in_reading": true,
@@ -46,6 +46,18 @@
     "separate_clean_persisted_session_crash_control_passed": true,
     "native_fixture_suites": "UNRUN",
     "owned_apps_helpers_servers_closed": true
+  },
+  "through0025": {
+    "implementation_commit": "8b52f25",
+    "normal_and_reduced_complete_guarded_address_sequences_passed": true,
+    "matched_literal_keeps_current_target_and_saved_destination": true,
+    "real_keyboard_tab_enter_and_mouse_click_global_reveal_passed": true,
+    "real_pointer_hover_open_and_rebuild_no_longer_steal_input_focus": true,
+    "new_intent_default_and_actual_normal_history_cases_retained": true,
+    "unchanged_current_reload_same_target_verified_in_reduced_run": true,
+    "clean_persisted_session_crash_control_passed_after_all_url_exercises": true,
+    "acknowledged_recent_navigation_crash_failure_is_still_open": true,
+    "native_cpp_suites": "UNRUN"
   },
   "workspace_renderer_default_enabled": false
 }

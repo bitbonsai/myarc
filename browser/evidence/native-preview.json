@@ -1,6 +1,6 @@
 {
   "date": "2026-10-26",
-  "build_stack_through": "0022",
+  "build_stack_through": "0025",
   "command": "python3 tools/launch_native_preview.py",
   "status": "fresh native no-debug manual smoke passed within named scope",
   "launch": {
@@ -11,7 +11,7 @@
     "no_fixture_server_started": true,
     "no_account_or_ai_setup_used": true
   },
-  "observed": {
+  "through0022_observed": {
     "real_example_com_page_then_example_org_same_logical_item": true,
     "favorite_saved_and_native_pinned": true,
     "live_saved_page_closed_then_reopened_under_same_id_and_counter": true,
@@ -32,6 +32,19 @@
     "synthetic_profile_retained_not_deleted": true,
     "no_server_or_debug_endpoint_started": true,
     "protected_qa_and_arc_untouched": true
+  },
+  "through0025_observed": {
+    "exact_same_launcher_command_real_fresh_window": true,
+    "debug_automation_test_extension_flags_and_devtools_file_absent": true,
+    "actual_example_com_then_example_org_native_page_and_header": true,
+    "current_edit_keeps_logical_items_selection_and_counter": true,
+    "real_pointer_hover_preserves_current_field_focus_and_selection": true,
+    "empty_current_url_input_blank_neutral_header": true,
+    "actual_cmd_s_hide_and_expand_projection_observed": true,
+    "owned_app_helpers_closed_profile_retained": true,
+    "no_fixture_server_created": true,
+    "native_target_ids_viewport_and_site_storage_not_observed_without_debug": true,
+    "saved_close_reopen_matrix_not_repeated_in_latest_no_debug_smoke": true
   },
   "workspace_renderer_default_enabled": false,
   "raw_profiles_logs_screenshots_recording": "private outside Git"

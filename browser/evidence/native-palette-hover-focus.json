@@ -2,7 +2,7 @@
   "slice": "MA-007.c-native-palette-hover-focus",
   "date": "2026-10-26",
   "baseline_stack_through": "0024",
-  "status": "native hover focus defect reproduced; scoped repair pending",
+  "status": "baseline retained; bounded normal/reduced native hover focus repair accepted",
   "observed": {
     "fresh_marked_profile_normal_motion": true,
     "native_mouse_move_only_within_exact_foreground_owned_palette": true,
@@ -25,5 +25,24 @@
   },
   "raw_proof": "private outside Git",
   "owned_apps_helpers_server_closed": true,
+  "through0025": {
+    "implementation_commit": "8b52f25",
+    "installed83_compiled_hashes_global_hover_and_canonical16_verified": true,
+    "normal_and_app_only_reduced_motion_observed": true,
+    "actual_pointer_enter_exit_preserves_input_draft_and_selection": true,
+    "opening_and_rebuilding_under_pointer_preserves_typing_focus": true,
+    "actual_tab_enter_and_mouse_down_up_reveal_other_space_target": true,
+    "actual_palette_closure_and_unchanged_other_page_targets_urls_time_origins_verified": true,
+    "explicit_keyboard_row_focus_survives_pointer_exit": true,
+    "normal_current_history_literals_and_new_defaults_pass": true,
+    "reduced_full_address_reopen_global_and_unchanged_reload_sequence_pass": true,
+    "native_fixtures_and_browser_suites": "UNRUN",
+    "limits": [
+      "Outer command timeout interrupted one reduced run; stale palette sidecar stopped input, actual owned AX/CG identity was reacquired before cancel and fresh complete run",
+      "Complete assistive technology, IME/RTL/fullscreen, arbitrary close/history overlap and exact motion timing remain unmeasured",
+      "Session acknowledgement and power-loss durability unchanged"
+    ],
+    "owned_apps_helpers_server_closed": true
+  },
   "workspace_renderer_default_enabled": false
 }

@@ -11,7 +11,7 @@ python3 tools/launch_native_preview.py
 ```
 
 Requires Python 3 and the already-built optional native stack, currently through
-0022, at `$HOME/.cache/myarc-m0/chromium/src/out/MyarcM0/Chromium.app/Contents/MacOS/Chromium`.
+0025, at `$HOME/.cache/myarc-m0/chromium/src/out/MyarcM0/Chromium.app/Contents/MacOS/Chromium`.
 The launcher does no build, patching or installation. Missing/nonexecutable builds
 fail with that exact path. Ask the build owner to finish verification before use.
 
@@ -34,7 +34,9 @@ Check these in the preview window, recording failures rather than assuming parit
 
 1. Press Cmd+T, type `https://example.com`, then Enter. Expect one new real page.
    Press Cmd+L, change its URL to `https://example.org`, then Enter. Expect the same
-   tab to navigate, with no duplicate. Escape should dismiss an unused palette.
+   tab to navigate, with no duplicate. Hover a result without clicking; input should
+   keep focus. Arrow/click selection deliberately activates that result. Escape
+   should dismiss an unused palette.
 2. Use the footer `+` (Create Space), then switch with its Space dots. A fresh
    Space should show empty material and a neutral header, without the prior URL
    or page. Returning to the populated Space should show its actual page.
@@ -43,7 +45,7 @@ Check these in the preview window, recording failures rather than assuming parit
    should keep the live page as Temporary. Save again, open another Temporary page,
    then choose Close live page (keep Favorite) on the saved item. Its tile should
    remain; clicking it should reopen its URL. Favorites belong to the Profile and
-   can appear across Spaces. Last-live-page and multiwindow behavior remain open.
+   can appear across Spaces. Broader last-live-page and multiwindow behavior remain open.
 4. Press Cmd+S to hide/show the full sidebar. While hidden, hover at the left
    edge and pause: expect a usable overlay without shifting the page. Move back onto the
    page to dismiss it. Cmd+S should restore persistent visibility. This shortcut
@@ -57,10 +59,10 @@ Check these in the preview window, recording failures rather than assuming parit
    Persistence testing requires explicitly reusing a marked test profile and the
    parent's verified restore procedure, separately from this launcher.
 
-[Fresh native smoke through0022](../../../browser/evidence/native-preview.json) used this exact command without an endpoint/test extension. It covered the named URL, Favorite/Unsave and empty-Space steps plus a held hover sequence. Numeric viewport geometry and complete accessibility were not remeasured. Existing global open-tab/history matching remains provisional; the fresh URL destinations above do not accept every matching case.
+[Fresh native smoke through0025](../../../browser/evidence/native-preview.json) used this exact command without an endpoint/test extension. Latest run covered actual URL/current-item editing, pointer focus, neutral Empty and Cmd+S. Favorite/Unsave/close-reopen and held sidebar-hover evidence is retained from0022, rather than counted as repeated. Numeric viewport geometry and complete accessibility were not measured in the no-debug run. Provisional global result scope remains separate from current-address literal submission.
 
 Recovery/durability remain unaccepted: recent acknowledged localStorage writes
-have failed the process-crash probe. This smoke establishes neither recovery nor
+and recent navigation have failed process-crash probes. This smoke establishes neither recovery nor
 release readiness. See [the recovery candidate](../../../browser/experiments/native-recovery-lifecycle.md)
 and the parent's [current run report](../../../browser/experiments/overnight-2026-10-25.md).
 
@@ -170,7 +172,7 @@ The four existing MV3/CLI tests cover manifest identity/permissions, fixture arg
 
 ## Two-process workspace crash probe
 
-`workspace-crash-checkpoint` and `workspace-crash-verify` reuse the same real CDP transport. [The recovery helper](../../../tools/browser_workspace_recovery.mjs) observes existing pages and the actual native metadata schema from `WorkspaceService`; it supplies no browser backend. These phases are implemented and locally tested only. Actual process-crash recovery remains unproven until the parent records and runs the native journey.
+`workspace-crash-checkpoint` and `workspace-crash-verify` reuse the same real CDP transport. [The recovery helper](../../../tools/browser_workspace_recovery.mjs) observes existing pages and the actual native metadata schema from `WorkspaceService`; it supplies no browser backend. API doubles test these phases independently. [Bounded parent native evidence](../../../browser/evidence/workspace-process-crash.json) records actual persisted-session Restore/discard runs and retained recent-write/navigation failures; broader recovery and acknowledgement durability remain unaccepted.
 
 ### Exact setup
 
@@ -193,7 +195,7 @@ Through native controls, prepare exactly:
 - One other live Temporary page on [recovery.html](recovery.html), exact URL `http://127.0.0.1:8766/recovery.html`, owned by either existing Space. Open it through normal native navigation, never default-context `Target.createTarget`.
 - Select the original Favorite in the desired Space. Its document must be visible and the second page hidden. Close all other page targets, including startup, NTP, version and extension-detail pages. Both fixture pages must remain live in that same native window.
 
-The client also checks persisted `vertical_tabs.enabled` is true; set it before startup, because changing it in a running window does not construct the adapter. The real `Default/myarc-workspace-v1.json` must already contain that setup: two Spaces, two items and one window selecting the Favorite. The tool reads it and rejects a different setup; it never creates, overwrites or repairs workspace metadata. It does not require or start the MV3 worker. Existing `workspace-pin` behavior is unchanged.
+The client also checks persisted `vertical_tabs.enabled` is true; seed it before startup for a reproducible fixture. Runtime enablement now works in the named0020 cases, but this recipe avoids a mode change during the probe. The real `Default/myarc-workspace-v1.json` must already contain that setup: two Spaces, two items and one window selecting the Favorite. The tool reads it and rejects a different setup; it never creates, overwrites or repairs workspace metadata. It does not require or start the MV3 worker. Existing `workspace-pin` behavior is unchanged.
 
 ### Checkpoint, parent-owned crash, verify
 
