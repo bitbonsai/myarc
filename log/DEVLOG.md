@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-10-26: Native AI Mode omission accepted narrowly
+
+Integrated `5627bb3`, then personally checked fresh NTP, native address menu, regular/private/new-Profile contexts and horizontal/vertical changes. AI Mode button/toggle omitted with both prototype switches; default flag-off positively retained them without a workspace file/UI. [Evidence](../browser/evidence/native-ai-entrypoints-off.json).
+
+Actual same-tab URL/query navigation worked; Google challenged the query, so results remain unaccepted. Native pin/generic Unpin and another clean-seeded actual SIGKILL/plain relaunch/genuine Restore passed strict persisted state/identity/canary checks. Wrong initial checkpoint selection was rejected and corrected through native UI. A native menu delayed graceful cleanup; a harness Cmd+Escape mistake was corrected to plain Escape with release, then Normal exit/app-helper/server cleanup verified. No source/storage guard relaxed. Native suites remain unrun; background AI requests, provider modes, broader focus/durability and product CLI/MCP remain open.
+
 ## 2026-10-26: Unsupported AI Mode entrypoint build candidate
 
 - Starting revision `fbdf96e`. Parent native AX found an enabled AI Mode button despite absent built-in enablement/providers. [0021 and run record](../browser/experiments/native-ai-entrypoints-off.md) override Chrome's existing feature/policy eligibility gate only with both prototype switches. Existing Google/non-Google entrypoint and popup/menu callers suppress unsupported controls. Prefs, factory Profile/OTR routing, navigation/search, Rust policy and command guards are untouched.

@@ -1,0 +1,53 @@
+{
+  "slice": "MA-007.c-ai-entrypoints",
+  "date": "2026-10-26",
+  "implementation_commit": "5627bb3",
+  "status": "bounded native entrypoint omission passed",
+  "opted_in": {
+    "both_prototype_switches_present": true,
+    "native_ntp_ai_mode_button_absent": true,
+    "actual_address_context_menu_opened": true,
+    "associated_always_show_ai_mode_item_absent": true,
+    "horizontal_vertical_and_private_mode_cycles_keep_omission": true,
+    "private_ntp_memory_notice_inspected": true,
+    "new_regular_profile_horizontal_and_same_window_vertical_keep_omission": true,
+    "new_profile_native_create_space_works": true,
+    "native_cmd_t_and_cmd_l_work": true,
+    "same_tab_local_navigation_and_single_native_page_preserved": true,
+    "ordinary_query_submitted_to_normal_google_search": true,
+    "search_destination_redirected_to_bot_challenge": true,
+    "challenge_not_interacted_with_and_search_results_not_accepted": true,
+    "real_extension_pin_and_generic_unpin_probe_passed": true
+  },
+  "recovery_regression": {
+    "initial_wrong_checkpoint_selection_rejected": true,
+    "native_favorite_selection_corrected_without_verifier_change": true,
+    "clean_changed_process_persisted_seed_strict_verify_passed": true,
+    "actual_sigkill_after_native_crash_marker_persisted": true,
+    "plain_relaunch_without_urls_or_restore_flag": true,
+    "genuine_pending_restore_prompt_no_ai_mode_button": true,
+    "pending_workspace_metadata_exact": true,
+    "genuine_restore_strict_ids_owners_selection_canary_verify_passed": true,
+    "stable_samples": 5
+  },
+  "positive_flag_off_control": {
+    "native_ai_mode_button_present": true,
+    "associated_always_show_ai_mode_menu_item_present": true,
+    "no_workspace_sidebar_or_file": true,
+    "no_forced_eligibility_feature_override": true
+  },
+  "cleanup": {
+    "all_owned_apps_helpers_servers_closed": true,
+    "native_context_menu_dismissed_before_normal_exit": true,
+    "harness_cmd_escape_mistake_corrected_to_plain_escape": true
+  },
+  "limits": [
+    "Entry-point omission only. Base service eligibility-request setup remains, and network/privacy enforcement was not measured",
+    "Off/local/BYOK/hosted modes and P0 product CLI/MCP remain unimplemented",
+    "Native C++ browser fixtures are source/syntax checked and UNRUN",
+    "Other Chrome AI features, OS Services and forced eligibility overrides are outside this slice",
+    "Full search-result behavior, arbitrary focus races and durability remain unaccepted"
+  ],
+  "workspace_renderer_default_enabled": false,
+  "raw_profiles_network_urls_recordings_and_ui_logs": "private outside Git"
+}

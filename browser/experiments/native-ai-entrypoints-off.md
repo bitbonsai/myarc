@@ -1,6 +1,6 @@
 # Unsupported native AI Mode entrypoints
 
-MA-007.c visible-control slice from parent `fbdf96e`. Optional [0021](../patches/0021-native-ai-entrypoints-off.patch) suppresses unsupported browser-owned AI Mode entrypoints when both `--myarc-visual-parity` and `--myarc-workspace-sidebar` are present. Full Chrome build passes. Desktop/native acceptance belongs to the parent and remains pending. Workspace renderer stays default OFF.
+MA-007.c visible-control slice from parent `fbdf96e`. Optional [0021](../patches/0021-native-ai-entrypoints-off.patch) suppresses unsupported browser-owned AI Mode entrypoints when both `--myarc-visual-parity` and `--myarc-workspace-sidebar` are present. Full Chrome build passes. Parent bounded desktop/native checks passed; [structured evidence](../evidence/native-ai-entrypoints-off.json) records their limits. Workspace renderer stays default OFF.
 
 ## Observed gap and repair
 
@@ -54,6 +54,16 @@ Private proof: `/tmp/myarc-m0-runtime/mode21/`. Packaging and syntax scripts wer
 
 0021 SHA-256: `f935d68db5a5d69d35e8947471abdfed0e82938ba9cd1205ab9640596414ec1e`.
 
-Parent acceptance: use fresh marked disposable Profiles. Inspect native AX after startup, pending recovery/Restore and new regular-Profile/private creation. AI Mode button/context toggle must be absent; ordinary query submission and same-tab URL navigation must work. Check horizontal/vertical transitions and a flag-off control. Preserve existing command guards and Profile isolation checks. Full native suites and AI network/privacy enforcement remain unmeasured.
+## Parent native acceptance
+
+Integrated as `5627bb3`; installed 82-file hashes match. Fresh marked native NTP, horizontal/vertical transitions, private NTP/mode transitions and new regular-Profile horizontal/vertical presentation omitted the AI Mode button. The actual address context menu omitted its associated toggle. Private memory-only notice and recovery NTP captures were inspected. Same other window created a Space without reopening.
+
+Native Cmd+L navigated the same tab to the fixture, submitted an ordinary text query and returned to the fixture. Google redirected the query to a bot challenge; no challenge was interacted with and search results are unaccepted. The single-page native Pin/generic Unpin probe passed. An initial crash-checkpoint attempt rejected the wrong selected page; actual Favorite selection corrected setup without changing the verifier.
+
+A clean changed-process roundtrip seeded and strictly verified the canary. Audited SIGKILL after the real native crash marker persisted, plain relaunch without URLs/restore flag and genuine Restore then retained IDs/owners/selection/canary for five stable samples. Pending metadata stayed exact and its NTP/header showed no AI Mode button.
+
+A separate default flag-off NTP positively showed the native AI Mode button and `Always show AI Mode` menu item, with no workspace file/UI. No eligibility override or preference manipulation was needed. Its active context menu delayed graceful termination; the harness initially sent Cmd+Escape, then corrected that to plain Escape with key release. Native exit was Normal and all owned apps/helpers/servers closed. This was harness cleanup, not a product repair.
+
+Private runs: `/tmp/myarc-m0-runtime/mode21-acceptance-20261026T012158Z/` and `/tmp/myarc-m0-runtime/mode21-control-20261026T012755Z/`. Raw network URLs and OS Services names stay private. Full native suites, other AI features, AI network/privacy enforcement and durability remain unmeasured. Provider modes and product CLI/MCP remain unimplemented; renderer stays off.
 
 External source/build ownership is relinquished at handoff, with no build left running. Parent owns integration, launches and native captures.
