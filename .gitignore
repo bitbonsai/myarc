@@ -24,6 +24,7 @@ upstream/
 node_modules/
 __pycache__/
 .venv/
+.wrangler/
 site/blog/
 site/.publish-receipt.json
 site/index.md
