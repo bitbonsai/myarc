@@ -1,5 +1,5 @@
 diff --git a/chrome/browser/ui/views/toolbar/toolbar_view.cc b/chrome/browser/ui/views/toolbar/toolbar_view.cc
-index 80b0e24263170de768a6684c8aabf106018710e7..14846385d3edfc54f146f326c519b20ef33762be 100644
+index 80b0e24263170de768a6684c8aabf106018710e7..a5569ba6c8fe8ea0470d28845000aff72b9ce09d 100644
 --- a/chrome/browser/ui/views/toolbar/toolbar_view.cc
 +++ b/chrome/browser/ui/views/toolbar/toolbar_view.cc
 @@ -5,6 +5,7 @@
@@ -59,7 +59,7 @@ index 80b0e24263170de768a6684c8aabf106018710e7..14846385d3edfc54f146f326c519b20e
    bool is_glic_left_of_profile =
        features::kGlicToolbarButtonLocationParam.Get() ==
            features::GlicToolbarButtonLocation::kLeftOfProfileChip ||
-@@ -1463,12 +1478,81 @@ gfx::Size ToolbarView::GetMinimumSize() const {
+@@ -1463,12 +1478,82 @@ gfx::Size ToolbarView::GetMinimumSize() const {
    return size;
  }
  
@@ -112,7 +112,8 @@ index 80b0e24263170de768a6684c8aabf106018710e7..14846385d3edfc54f146f326c519b20e
 +                           child == forward_ || child == reload_;
 +      gfx::Rect bounds;
 +      if (child == myarc_sidebar_toggle_) {
-+        bounds = gfx::Rect(84, 8, 28, 28);
++        // Arc's toggle chip sits 5 DIP right of the traffic lights.
++        bounds = gfx::Rect(78, 8, 28, 28);
 +      } else if (child == back_) {
 +        bounds = gfx::Rect(w - 104, 8, 24, 28);
 +      } else if (child == forward_) {
@@ -141,7 +142,7 @@ index 80b0e24263170de768a6684c8aabf106018710e7..14846385d3edfc54f146f326c519b20e
    if (display_mode_ == DisplayMode::kCustomTab) {
      custom_tab_bar_->SetBounds(0, 0, width(),
                                 custom_tab_bar_->GetPreferredSize().height());
-@@ -1580,7 +1664,7 @@ void ToolbarView::InitLayout() {
+@@ -1580,7 +1665,7 @@ void ToolbarView::InitLayout() {
                                 views::MaximumFlexSizeRule::kUnbounded)
            .WithOrder(location_bar_flex_order);
  

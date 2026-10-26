@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-10-26: Lucide footer and sidebar toggle, like Arc
+
+- The sidebar footer now shows Lucide `archive` for Library and `plus` for Create, with one dot per Space centered between them; the current Space's dot is brighter and the filled chip is gone, so one Space shows one dot. The header toggle is Lucide `panel-left` at 18 DIP in a subtle 28 DIP chip 5 DIP right of the traffic lights. Back and forward already match Arc. Reload differs, but Lucide `rotate-cw` has the same corner arrow as Chromium's, so it stays.
+- Blog scene at 5% fuzz: footer crop 400×80 px fell from 2.75% to 2.29% differing pixels (RMSE 0.103 to 0.087), header crop 400×64 px from 4.34% to 4.19% (RMSE 0.121 to 0.120). The whole window rose from 6.52% to 7.52% because of the live page; the sidebar strip alone went from 3.63% to 3.59%.
+- Still differs: the footer sits about 8 pt higher than Arc's, icons are brighter than Arc's #A9A2AF, Arc's archive is filled and its Spaces can carry icons, the chip assumes dark mode, and the reload glyph remains Chromium's. Committed Chromium `99789023df41966cc34f213ad7c6e64fa0c295d8`.
+
 ## 2026-10-26: Sidebar tiles and URL field read lighter, like Arc
 
 - Favorite tiles, the URL field and the New Tab row now use translucent white over the window material instead of dark container colors. In dark mode they measure #3A3745 (Arc #3B3A4D), the selected tile #83828B instead of blue #1D4973 (Arc #83848F) and the New Tab row #514F5C (Arc #505060). New Tab fills only while the New Tab palette is open, as in the blog reference; Arc's idle references show it unfilled. Tiles are 46 pt tall with 8 pt gaps, and the Space title sits 41 pt above New Tab. Sidebar icons keep their own colors, so an inactive Mac window no longer greys them.

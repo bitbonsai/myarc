@@ -19,6 +19,7 @@
 #include "ui/gfx/color_utils.h"
 #include "ui/gfx/geometry/insets.h"
 #include "ui/gfx/geometry/size.h"
+#include "ui/gfx/vector_icon_types.h"
 #include "ui/views/accessibility/view_accessibility.h"
 #include "ui/views/animation/ink_drop.h"
 #include "ui/views/animation/ink_drop_host.h"
@@ -40,6 +41,32 @@ namespace {
 using Orientation = views::BoxLayout::Orientation;
 
 constexpr int kTileHeight = 46;
+
+// Footer icons from Lucide (ISC, lucide-static 1.61.0): 24 DIP canvas,
+// stroke 2. "archive" stands in for Arc's Library box, "plus" for Create.
+constexpr gfx::PathElement kArchivePath[] = {
+    gfx::CANVAS_DIMENSIONS, 24, gfx::STROKE, 2, gfx::ROUND_RECT, 2, 3, 20, 5, 1,
+    gfx::NEW_PATH, gfx::STROKE, 2, gfx::MOVE_TO, 4, 8, gfx::V_LINE_TO, 19,
+    gfx::R_ARC_TO, 2, 2, 0, 0, 0, 2, 2, gfx::H_LINE_TO, 18,
+    gfx::R_ARC_TO, 2, 2, 0, 0, 0, 2, -2, gfx::V_LINE_TO, 8,
+    gfx::NEW_PATH, gfx::STROKE, 2, gfx::MOVE_TO, 10, 12, gfx::R_H_LINE_TO, 4};
+constexpr gfx::VectorIconRep kArchiveRep[] = {{kArchivePath}};
+constexpr gfx::VectorIcon kArchiveIcon(kArchiveRep,
+                                       std::size(kArchiveRep),
+                                       "myarc_archive");
+
+constexpr gfx::PathElement kPlusPath[] = {
+    gfx::CANVAS_DIMENSIONS, 24, gfx::STROKE, 2, gfx::MOVE_TO, 5, 12,
+    gfx::H_LINE_TO, 19, gfx::NEW_PATH, gfx::STROKE, 2, gfx::MOVE_TO, 12, 5,
+    gfx::V_LINE_TO, 19};
+constexpr gfx::VectorIconRep kPlusRep[] = {{kPlusPath}};
+constexpr gfx::VectorIcon kPlusIcon(kPlusRep, std::size(kPlusRep), "myarc_plus");
+
+// Lucide "circle" filled: Arc marks every Space with a dot.
+constexpr gfx::PathElement kDotPath[] = {gfx::CANVAS_DIMENSIONS, 24,
+                                         gfx::CIRCLE, 12, 12, 10};
+constexpr gfx::VectorIconRep kDotRep[] = {{kDotPath}};
+constexpr gfx::VectorIcon kDotIcon(kDotRep, std::size(kDotRep), "myarc_dot");
 
 struct Fills {
   SkColor tile;
@@ -183,7 +210,9 @@ std::unique_ptr<views::MdTextButton> Button(
 
 std::unique_ptr<views::MdTextButton> IconButton(
     views::Button::PressedCallback callback,
-    const gfx::VectorIcon& icon) {
+    const gfx::VectorIcon& icon,
+    int icon_size = 20,
+    ui::ColorId color = ui::kColorSysOnSurface) {
   auto button = Button(std::move(callback), u"");
   button->SetMinSize(gfx::Size(32, 32));
   button->SetMaxSize(gfx::Size(32, 32));
@@ -194,7 +223,7 @@ std::unique_ptr<views::MdTextButton> IconButton(
   button->SetCornerRadius(8);
   button->SetImageModel(
       views::Button::STATE_NORMAL,
-      ui::ImageModel::FromVectorIcon(icon, ui::kColorSysOnSurface, 20));
+      ui::ImageModel::FromVectorIcon(icon, color, icon_size));
   return button;
 }
 
@@ -327,8 +356,8 @@ void SidebarView::SetCreateMenuOpen(bool open) {
   button->SetImageModel(
       views::Button::STATE_NORMAL,
       ui::ImageModel::FromVectorIcon(
-          open ? vector_icons::kCloseIcon : vector_icons::kAdd2Icon,
-          ui::kColorSysOnSurface, 20));
+          open ? vector_icons::kCloseIcon : kPlusIcon, ui::kColorSysOnSurface,
+          20));
   button->SetTooltipText(open ? u"Close creation menu" : u"Create Space");
   if (open) {
     button->GetViewAccessibility().SetIsExpanded();
@@ -667,7 +696,7 @@ void SidebarView::SetModel(const foundation::SidebarResult& model,
       ->set_cross_axis_alignment(views::BoxLayout::CrossAxisAlignment::kCenter);
   auto library = IconButton(
       base::BindRepeating(&SidebarView::ShowLibrary, base::Unretained(this)),
-      vector_icons::kFolderOpenIcon);
+      kArchiveIcon, 18);
   library->SetTooltipText(u"Library");
   library->GetViewAccessibility().SetName(u"Library");
   library->GetViewAccessibility().SetHasPopup(ax::mojom::HasPopup::kMenu);
@@ -684,9 +713,14 @@ void SidebarView::SetModel(const foundation::SidebarResult& model,
   // Keep all footer controls on one 32-DIP line while retaining wheel/focus
   // scrolling and the current-Space reveal callback.
   spaces_scroll_->SetPreferredSize(gfx::Size(0, 32));
-  auto* spaces = spaces_scroll_->SetContents(Box(Orientation::kHorizontal, 2));
-  static_cast<views::BoxLayout*>(spaces->GetLayoutManager())
-      ->set_cross_axis_alignment(views::BoxLayout::CrossAxisAlignment::kCenter);
+  // Like Arc, Space dots sit centered between Library and Create.
+  auto* spaces = spaces_scroll_->SetContents(Box(Orientation::kHorizontal, 0));
+  auto* spaces_layout =
+      static_cast<views::BoxLayout*>(spaces->GetLayoutManager());
+  spaces_layout->set_cross_axis_alignment(
+      views::BoxLayout::CrossAxisAlignment::kCenter);
+  spaces_layout->set_main_axis_alignment(
+      views::BoxLayout::MainAxisAlignment::kCenter);
   spaces->GetViewAccessibility().SetRole(ax::mojom::Role::kGroup);
   spaces->GetViewAccessibility().SetName(u"Spaces");
   views::View* current_space = nullptr;
@@ -695,18 +729,16 @@ void SidebarView::SetModel(const foundation::SidebarResult& model,
   for (const auto& space : model.spaces) {
     const bool current = space.id == model.current_space.id;
     // Button presses request a switch; only a Rust snapshot changes selection.
+    // The current Space's dot is brighter; no chip, as in Arc.
     auto choice = IconButton(
         base::BindRepeating(&Delegate::SelectSpace,
                             base::Unretained(&delegate_.get()), space.id),
-        vector_icons::kGlobeIcon);
-    if (!current) {
-      choice->SetImageModel(views::Button::STATE_NORMAL, ui::ImageModel());
-      choice->SetText(u"\u2022");
-    }
-    choice->SetEnabledTextColors(ui::kColorSysOnSurfaceVariant);
+        kDotIcon, 8,
+        current ? ui::kColorSysOutline : ui::kColorSysStateDisabled);
+    choice->SetMinSize(gfx::Size(30, 32));
+    choice->SetMaxSize(gfx::Size(30, 32));
+    choice->SetPreferredSize(gfx::Size(30, 32));
     if (current) {
-      choice->SetBgColorOverrideDeprecated(std::nullopt);
-      choice->SetBgColorIdOverride(ui::kColorSysSurfaceContainerHighest);
       current_space = choice.get();
       current_space_index = spaces->children().size();
     }
@@ -730,6 +762,13 @@ void SidebarView::SetModel(const foundation::SidebarResult& model,
   spaces_scroll_->RegisterPostLayoutCallback(base::BindRepeating(
       [](std::optional<gfx::PointF>& offset, bool reveal_current,
          std::optional<size_t> current, views::ScrollView* scroll) {
+        // Fill the viewport so the centered dots stay centered when they fit.
+        views::View* contents = scroll->contents();
+        const int fill = std::max(contents->GetPreferredSize().width(),
+                                  scroll->GetVisibleRect().width());
+        if (contents->width() != fill) {
+          contents->SetSize(gfx::Size(fill, contents->height()));
+        }
         if (auto saved = std::exchange(offset, std::nullopt)) {
           scroll->ScrollToOffset(*saved);
           if (reveal_current && current) {
@@ -743,7 +782,7 @@ void SidebarView::SetModel(const foundation::SidebarResult& model,
   auto create = IconButton(
       base::BindRepeating(&SidebarView::ShowCreateMenu,
                           weak_factory_.GetWeakPtr()),
-      create_menu_open_ ? vector_icons::kCloseIcon : vector_icons::kAdd2Icon);
+      create_menu_open_ ? vector_icons::kCloseIcon : kPlusIcon);
   create->SetTooltipText(u"Create Space");
   create->GetViewAccessibility().SetName(u"Create Space");
   create->GetViewAccessibility().SetHasPopup(ax::mojom::HasPopup::kMenu);

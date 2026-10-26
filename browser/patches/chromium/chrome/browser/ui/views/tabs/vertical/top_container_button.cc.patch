@@ -1,8 +1,8 @@
 diff --git a/chrome/browser/ui/views/tabs/vertical/top_container_button.cc b/chrome/browser/ui/views/tabs/vertical/top_container_button.cc
-index 1029f4c7295e812797ee0a3c6c84d69f13707b14..0268170b6269b36d5012fd7fb00157889901620f 100644
+index 1029f4c7295e812797ee0a3c6c84d69f13707b14..cb7b7ac8ac9d9a4b0e10d45b01c7ae5f6da7c57e 100644
 --- a/chrome/browser/ui/views/tabs/vertical/top_container_button.cc
 +++ b/chrome/browser/ui/views/tabs/vertical/top_container_button.cc
-@@ -4,12 +4,15 @@
+@@ -4,15 +4,30 @@
  
  #include "chrome/browser/ui/views/tabs/vertical/top_container_button.h"
  
@@ -13,12 +13,27 @@ index 1029f4c7295e812797ee0a3c6c84d69f13707b14..0268170b6269b36d5012fd7fb0015788
  #include "chrome/browser/ui/views/toolbar/toolbar_ink_drop_util.h"
  #include "ui/base/metadata/metadata_impl_macros.h"
  #include "ui/compositor/layer.h"
++#include "ui/gfx/vector_icon_types.h"
  #include "ui/views/actions/action_view_interface.h"
++#include "ui/views/background.h"
 +#include "ui/views/border.h"
  #include "ui/views/widget/widget.h"
  
  namespace {
-@@ -41,6 +44,11 @@ class TopContainerButtonActionViewInterface
++
++// Lucide "panel-left" (ISC, lucide-static 1.61.0): 24 DIP canvas, stroke 2.
++constexpr gfx::PathElement kMyarcPanelLeftPath[] = {
++    gfx::CANVAS_DIMENSIONS, 24, gfx::STROKE, 2, gfx::ROUND_RECT, 3, 3, 18, 18,
++    2, gfx::NEW_PATH, gfx::STROKE, 2, gfx::MOVE_TO, 9, 3, gfx::V_LINE_TO, 21};
++constexpr gfx::VectorIconRep kMyarcPanelLeftRep[] = {{kMyarcPanelLeftPath}};
++constexpr gfx::VectorIcon kMyarcPanelLeftIcon(kMyarcPanelLeftRep,
++                                              std::size(kMyarcPanelLeftRep),
++                                              "myarc_panel_left");
++
+ class TopContainerButtonActionViewInterface
+     : public views::LabelButtonActionViewInterface {
+  public:
+@@ -41,6 +56,14 @@ class TopContainerButtonActionViewInterface
  }  // namespace
  
  TopContainerButton::TopContainerButton() {
@@ -26,11 +41,14 @@ index 1029f4c7295e812797ee0a3c6c84d69f13707b14..0268170b6269b36d5012fd7fb0015788
 +          "myarc-visual-parity")) {
 +    SetBorder(views::CreateEmptyBorder(0));
 +    SetHorizontalAlignment(gfx::ALIGN_CENTER);
++    // Arc keeps the toggle in its own subtle chip, lighter than the sidebar.
++    SetBackground(views::CreateRoundedRectBackground(
++        SkColorSetA(SK_ColorWHITE, 0x13), 6));
 +  }
    views::FocusRing::Get(this)->SetColorId(kColorNewTabButtonFocusRing);
    ConfigureInkDrop(this);
    SetPaintToLayer();
-@@ -57,9 +65,15 @@ void TopContainerButton::UpdateIcon(const ui::ImageModel& icon_image) {
+@@ -57,9 +80,15 @@ void TopContainerButton::UpdateIcon(const ui::ImageModel& icon_image) {
      return;
    }
  
@@ -39,11 +57,11 @@ index 1029f4c7295e812797ee0a3c6c84d69f13707b14..0268170b6269b36d5012fd7fb0015788
    const ui::ImageModel image_model = ui::ImageModel::FromVectorIcon(
 -      *icon_image.GetVectorIcon().vector_icon(), GetForegroundColor(),
 -      GetLayoutConstant(LayoutConstant::kVerticalTabStripButtonIconSize));
-+      visual_parity ? kDockToLeftIcon
++      visual_parity ? kMyarcPanelLeftIcon
 +                    : *icon_image.GetVectorIcon().vector_icon(),
 +      GetForegroundColor(),
 +      visual_parity
-+          ? 16
++          ? 18
 +          : GetLayoutConstant(LayoutConstant::kVerticalTabStripButtonIconSize));
  
    SetImageModel(views::Button::STATE_NORMAL, image_model);
