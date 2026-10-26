@@ -111,13 +111,19 @@ def check(src, base):
     return 0
 
 
-def link(src):
+def needs_link(src):
     target = src / 'myarc'
     if target.is_symlink() and target.resolve() == FOUNDATION.resolve():
-        return
+        return False
     if target.exists() or target.is_symlink():
         raise SystemExit(f'{target} exists; move it aside first')
-    target.symlink_to(FOUNDATION)
+    return True
+
+
+def link(src):
+    if not needs_link(src):
+        return
+    (src / 'myarc').symlink_to(FOUNDATION)
     exclude = Path(git(src, 'rev-parse', '--git-path', 'info/exclude').decode().strip())
     exclude = exclude if exclude.is_absolute() else src / exclude
     lines = exclude.read_text().splitlines() if exclude.exists() else []
@@ -130,6 +136,8 @@ def apply(src, base):
     head = git(src, 'rev-parse', 'HEAD').decode().strip()
     if head != base:
         raise SystemExit(f'{src} is at {head}, expected base {base}')
+    # Validate the link first; git apply is atomic, so a failure leaves src untouched.
+    needs_link(src)
     patches = [str(path) for _, path in sorted(on_disk().items())]
     subprocess.run(['git', '-C', str(src), 'apply', '--index', *patches], check=True)
     link(src)

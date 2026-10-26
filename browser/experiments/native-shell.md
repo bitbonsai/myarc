@@ -4,15 +4,7 @@ MA-007.a targets 1:1 Arc visual parity. The current native iteration is incomple
 
 ## Reproduce the current iteration
 
-Use the [foundation toolchain and build](../README.md). Start from its clean second integration, `3e117efa80cec1c4e1e6fbfdf44edeb087a279a5`, over upstream `8d208f20744ac6d4ce00cc3f9de6a14a9b8b926d`. This experiment was exercised on macOS 26.7, Apple Silicon. Its existing glass-frame integration requires macOS 26 or later.
-
-The [optional prototype patch](../patches/legacy/0002-native-shell-prototype.patch) is separate from `upstream.json` and the accepted foundation patch payload. Apply it once in the external Chromium checkout, with `MYARC_REPO` set to this repository:
-
-```sh
-git apply "$MYARC_REPO/browser/patches/legacy/0002-native-shell-prototype.patch"
-git apply "$MYARC_REPO/browser/patches/legacy/0003-rounded-content.patch"
-autoninja -C out/MyarcM0 -j 8 chrome
-```
+Use the [foundation toolchain and build](../README.md). The shell prototype is part of the `myarc` Chromium branch and its per-file exports in `browser/patches/chromium/`; `python3 tools/export_patches.py --apply <src>` sets up a fresh checkout at the recorded base. This experiment was exercised on macOS 26.7, Apple Silicon. Its existing glass-frame integration requires macOS 26 or later. The original [prototype patch](../patches/legacy/0002-native-shell-prototype.patch) is kept for history only; do not reapply it.
 
 Create a disposable profile, never an existing browser profile:
 
