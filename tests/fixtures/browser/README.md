@@ -11,7 +11,7 @@ python3 tools/launch_native_preview.py
 ```
 
 Requires Python 3 and the already-built optional native stack, currently through
-0018, at `$HOME/.cache/myarc-m0/chromium/src/out/MyarcM0/Chromium.app/Contents/MacOS/Chromium`.
+0022, at `$HOME/.cache/myarc-m0/chromium/src/out/MyarcM0/Chromium.app/Contents/MacOS/Chromium`.
 The launcher does no build, patching or installation. Missing/nonexecutable builds
 fail with that exact path. Ask the build owner to finish verification before use.
 
@@ -45,7 +45,7 @@ Check these in the preview window, recording failures rather than assuming parit
    remain; clicking it should reopen its URL. Favorites belong to the Profile and
    can appear across Spaces. Last-live-page and multiwindow behavior remain open.
 4. Press Cmd+S to hide/show the full sidebar. While hidden, hover at the left
-   edge: expect a usable overlay without shifting the page. Move back onto the
+   edge and pause: expect a usable overlay without shifting the page. Move back onto the
    page to dismiss it. Cmd+S should restore persistent visibility. This shortcut
    toggles the sidebar rather than Save Page.
 5. Ordinary white pages should remain opaque white; authored dark pages should
@@ -56,6 +56,8 @@ Check these in the preview window, recording failures rather than assuming parit
    running. Running the launcher again intentionally creates another fresh profile.
    Persistence testing requires explicitly reusing a marked test profile and the
    parent's verified restore procedure, separately from this launcher.
+
+[Fresh native smoke through0022](../../../browser/evidence/native-preview.json) used this exact command without an endpoint/test extension. It covered the named URL, Favorite/Unsave and empty-Space steps plus a held hover sequence. Numeric viewport geometry and complete accessibility were not remeasured. Existing global open-tab/history matching remains provisional; the fresh URL destinations above do not accept every matching case.
 
 Recovery/durability remain unaccepted: recent acknowledged localStorage writes
 have failed the process-crash probe. This smoke establishes neither recovery nor

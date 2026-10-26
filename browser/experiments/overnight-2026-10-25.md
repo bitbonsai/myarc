@@ -36,6 +36,8 @@ A fresh palette interruption check found Cmd+L dismissing an existing Cmd+T draf
 python3 tools/launch_native_preview.py
 ```
 
+[Rechecked on the actual stack through0022](../evidence/native-preview.json) with no endpoint, automation flag or test extension. Real Example Domain navigation, same-item editing, Favorite close/reopen/Unsave, empty header and held hover sequence passed. App/helpers exited and synthetic profile retained. Numeric viewport and complete accessibility were not remeasured.
+
 Existing build host only. Each run creates a fresh disposable profile and prints its PID/log paths. Experimental sidebar flags are explicit; ordinary app launches remain unchanged. Keep important data in the normal browser. Follow the [short manual checklist and cleanup instructions](../../tests/fixtures/browser/README.md#native-preview-five-minute-manual-smoke). This developer launcher and acceptance CDP probes do not implement the P0 product CLI/MCP controls.
 
 ## Results and handoff

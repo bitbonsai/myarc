@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-10-26: Exact preview command rechecked through0022
+
+Ran `python3 tools/launch_native_preview.py` unchanged. Fresh marked profile had neither debugging/automation/test-extension flags nor DevToolsActivePort. Native Cmd+T and same-item Cmd+L reached actual Example Domain sites; save/pin, last saved-live close/reopen under the same logical ID/counter, explicit Unsave and new empty Space/header passed. Cmd+S and a held edge/inside/exit sequence were recorded/inspected. [Evidence](../browser/evidence/native-preview.json).
+
+An immediate hover snapshot was premature; the held sequence showed overlay/reversal. AX exposed no web-area rectangle, so no numeric viewport remeasurement was counted. OS appearance/preferences unchanged. App/helpers exited; no server/debug endpoint started; synthetic profile retained privately. Broader matcher/accessibility, durability and distribution remain open. Guide now references0022 and an edge pause.
+
 ## 2026-10-26: Palette intent native followup
 
 Integrated `2c1f49d`. Same native widget retained both shortcut intents, selected/focused drafts and unchanged-current reload; changed unmatched URL kept the target and new intent added one only on submit. Empty Space selection closed the prior palette; fresh current shortcut exposed no hidden URL. [Evidence](../browser/evidence/native-palette-interruption.json). Normal/app-only reduced sequences inspected, OS prefs unchanged. Capture guards stopped on an owned 66x20 non-key indicator; exact AX focus verification and release-before-postcondition checks fixed the private harness, not product code.

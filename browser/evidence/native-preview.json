@@ -1,0 +1,38 @@
+{
+  "date": "2026-10-26",
+  "build_stack_through": "0022",
+  "command": "python3 tools/launch_native_preview.py",
+  "status": "fresh native no-debug manual smoke passed within named scope",
+  "launch": {
+    "fresh_marked_private_profile": true,
+    "explicit_prototype_flags": true,
+    "automation_debugging_test_extension_flags_absent": true,
+    "devtools_port_file_absent": true,
+    "no_fixture_server_started": true,
+    "no_account_or_ai_setup_used": true
+  },
+  "observed": {
+    "real_example_com_page_then_example_org_same_logical_item": true,
+    "favorite_saved_and_native_pinned": true,
+    "live_saved_page_closed_then_reopened_under_same_id_and_counter": true,
+    "explicit_unsave_preserved_live_temporary": true,
+    "cmd_s_hidden_zero_rail_and_persistent_return_observed": true,
+    "held_edge_hover_overlay_and_exit_recorded_and_inspected": true,
+    "new_space_neutral_header_and_empty_cmd_l": true
+  },
+  "limits": [
+    "Native AX web-area geometry unavailable in this read, so no numeric viewport remeasurement",
+    "First immediate hover snapshot missed reveal; held sequence used instead",
+    "Exact motion timing, complete accessibility and broader URI/history matching remain unaccepted",
+    "Preview launcher and developer probes do not implement P0 product CLI/MCP",
+    "Named smoke is not distribution/security or durability acceptance"
+  ],
+  "cleanup": {
+    "owned_app_helpers_exited": true,
+    "synthetic_profile_retained_not_deleted": true,
+    "no_server_or_debug_endpoint_started": true,
+    "protected_qa_and_arc_untouched": true
+  },
+  "workspace_renderer_default_enabled": false,
+  "raw_profiles_logs_screenshots_recording": "private outside Git"
+}
