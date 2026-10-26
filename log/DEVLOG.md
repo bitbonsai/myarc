@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-10-26: Header fits at 198 pt, footer sits lower
+
+- Arc on this Mac (macOS 26 reference, 228 pt sidebar) places the traffic lights exactly where native does and spaces back/forward/reload 34 pt apart, so the lights stay put. The older blog reference uses a 30 pt pitch at 200 pt, so navigation now tightens from 34 to 30 pt below 228 pt and the toggle chip moves to x 77. The minimum sidebar width drops from 220 to 198 pt, and the blog scene renders at 200 pt with back/forward/reload centers at 121/150.5/181 (Arc 121/151/181). The footer lost Chromium's 12 pt bottom padding: Library sits 23.2 pt above the window bottom (Arc 22.7 in the blog reference, 25.5 on macOS 26). Its icons are white at 60% (#ABA8AE, Arc #A9A2AF), black at 60% in light mode. The toggle chip and URL pill now pick light/dark from `kColorSysSurface` like the tiles, and Increase Contrast gives the selected Favorite a 1 px outline.
+- Blog scene at 5% fuzz: header crop 400×64 px fell from 5.51% to 3.93% differing pixels (RMSE 0.137 to 0.117), footer 400×80 px from 2.94% to 1.37% (RMSE 0.098 to 0.066), sidebar strip 280×1170 px from 2.79% to 2.60% (RMSE 0.098 to 0.094), whole window 6.51% to 5.83%. A 1440-wide capture keeps the 34 pt pitch at the 270 pt default.
+- Still differs: the blog reference's traffic lights are smaller (older macOS), so the header can't match it pixel for pixel. Light mode and the contrast outline were not captured, since that means changing system settings. Committed Chromium `f1965c797cef046bb38093d0fcdeae19176b0b04`.
+
 ## 2026-10-26: Pure Peek routing rule
 
 - Added `crates/workspace/src/peek.rs`: `route_navigation` returns Peek, current tab or new tab from source kind, scheme and site keys, Cmd-click and the Peek setting; `resolve_peek_action` maps Cmd+O to a new Temporary item in the current Space and close to the source item. Contract BC-005.

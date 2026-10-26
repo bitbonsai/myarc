@@ -1,8 +1,8 @@
 diff --git a/chrome/browser/ui/views/tabs/vertical/top_container_button.cc b/chrome/browser/ui/views/tabs/vertical/top_container_button.cc
-index 1029f4c7295e812797ee0a3c6c84d69f13707b14..cb7b7ac8ac9d9a4b0e10d45b01c7ae5f6da7c57e 100644
+index 1029f4c7295e812797ee0a3c6c84d69f13707b14..1d0973f5c6b0c574105deff89015c57969d25dad 100644
 --- a/chrome/browser/ui/views/tabs/vertical/top_container_button.cc
 +++ b/chrome/browser/ui/views/tabs/vertical/top_container_button.cc
-@@ -4,15 +4,30 @@
+@@ -4,15 +4,33 @@
  
  #include "chrome/browser/ui/views/tabs/vertical/top_container_button.h"
  
@@ -12,7 +12,10 @@ index 1029f4c7295e812797ee0a3c6c84d69f13707b14..cb7b7ac8ac9d9a4b0e10d45b01c7ae5f
  #include "chrome/browser/ui/layout_constants.h"
  #include "chrome/browser/ui/views/toolbar/toolbar_ink_drop_util.h"
  #include "ui/base/metadata/metadata_impl_macros.h"
++#include "ui/color/color_id.h"
++#include "ui/color/color_provider.h"
  #include "ui/compositor/layer.h"
++#include "ui/gfx/color_utils.h"
 +#include "ui/gfx/vector_icon_types.h"
  #include "ui/views/actions/action_view_interface.h"
 +#include "ui/views/background.h"
@@ -33,7 +36,7 @@ index 1029f4c7295e812797ee0a3c6c84d69f13707b14..cb7b7ac8ac9d9a4b0e10d45b01c7ae5f
  class TopContainerButtonActionViewInterface
      : public views::LabelButtonActionViewInterface {
   public:
-@@ -41,6 +56,14 @@ class TopContainerButtonActionViewInterface
+@@ -41,6 +59,11 @@ class TopContainerButtonActionViewInterface
  }  // namespace
  
  TopContainerButton::TopContainerButton() {
@@ -41,9 +44,6 @@ index 1029f4c7295e812797ee0a3c6c84d69f13707b14..cb7b7ac8ac9d9a4b0e10d45b01c7ae5f
 +          "myarc-visual-parity")) {
 +    SetBorder(views::CreateEmptyBorder(0));
 +    SetHorizontalAlignment(gfx::ALIGN_CENTER);
-+    // Arc keeps the toggle in its own subtle chip, lighter than the sidebar.
-+    SetBackground(views::CreateRoundedRectBackground(
-+        SkColorSetA(SK_ColorWHITE, 0x13), 6));
 +  }
    views::FocusRing::Get(this)->SetColorId(kColorNewTabButtonFocusRing);
    ConfigureInkDrop(this);
@@ -66,3 +66,24 @@ index 1029f4c7295e812797ee0a3c6c84d69f13707b14..cb7b7ac8ac9d9a4b0e10d45b01c7ae5f
  
    SetImageModel(views::Button::STATE_NORMAL, image_model);
    SetImageModel(views::Button::STATE_HOVERED, image_model);
+@@ -91,6 +120,20 @@ void TopContainerButton::RemovedFromWidget() {
+   paint_as_active_subscription_ = {};
+ }
+ 
++void TopContainerButton::OnThemeChanged() {
++  views::LabelButton::OnThemeChanged();
++  if (!base::CommandLine::ForCurrentProcess()->HasSwitch(
++          "myarc-visual-parity")) {
++    return;
++  }
++  // Arc keeps the toggle in its own subtle chip, lighter than the sidebar.
++  // Light/dark follows the same source as the sidebar tiles and URL pill.
++  const bool dark =
++      color_utils::IsDark(GetColorProvider()->GetColor(ui::kColorSysSurface));
++  SetBackground(views::CreateRoundedRectBackground(
++      SkColorSetA(SK_ColorWHITE, dark ? 0x13 : 0x66), 6));
++}
++
+ ui::ColorId TopContainerButton::GetForegroundColor() const {
+   return GetWidget() && GetWidget()->ShouldPaintAsActive()
+              ? kColorTabForegroundInactiveFrameActive

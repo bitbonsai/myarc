@@ -1,0 +1,12 @@
+diff --git a/chrome/browser/ui/views/tabs/vertical/top_container_button.h b/chrome/browser/ui/views/tabs/vertical/top_container_button.h
+index 87dd1fbb6bcc18831738d5d300f2ac3347041d25..739787d7923c933d9d0076becca89173bf345b74 100644
+--- a/chrome/browser/ui/views/tabs/vertical/top_container_button.h
++++ b/chrome/browser/ui/views/tabs/vertical/top_container_button.h
+@@ -30,6 +30,7 @@ class TopContainerButton : public views::LabelButton {
+   // views::View:
+   void AddedToWidget() override;
+   void RemovedFromWidget() override;
++  void OnThemeChanged() override;
+ 
+   ui::ColorId GetForegroundColor() const;
+ 

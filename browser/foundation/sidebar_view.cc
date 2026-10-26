@@ -20,6 +20,7 @@
 #include "ui/gfx/geometry/insets.h"
 #include "ui/gfx/geometry/size.h"
 #include "ui/gfx/vector_icon_types.h"
+#include "ui/native_theme/native_theme.h"
 #include "ui/views/accessibility/view_accessibility.h"
 #include "ui/views/animation/ink_drop.h"
 #include "ui/views/animation/ink_drop_host.h"
@@ -72,18 +73,23 @@ struct Fills {
   SkColor tile;
   SkColor selected_tile;
   SkColor new_tab;
+  SkColor footer_icon;
 };
 
 // Arc lifts sidebar controls with white over the window material, so they read
-// lighter than the sidebar. Dark values are sampled from Arc's dark sidebar.
+// lighter than the sidebar. Dark values are sampled from Arc's dark sidebar;
+// footer icons are Arc's muted #A9A2AF over it. The URL pill and header toggle
+// chip pick light/dark from the same kColorSysSurface.
 Fills GetFills(const ui::ColorProvider* provider) {
   const bool dark = !provider || color_utils::IsDark(
                                      provider->GetColor(ui::kColorSysSurface));
   return dark ? Fills{SkColorSetA(SK_ColorWHITE, 0x18),
                       SkColorSetA(SK_ColorWHITE, 0x6F),
-                      SkColorSetA(SK_ColorWHITE, 0x33)}
+                      SkColorSetA(SK_ColorWHITE, 0x33),
+                      SkColorSetA(SK_ColorWHITE, 0x99)}
               : Fills{SkColorSetA(SK_ColorWHITE, 0x80), SK_ColorWHITE,
-                      SkColorSetA(SK_ColorWHITE, 0xB3)};
+                      SkColorSetA(SK_ColorWHITE, 0xB3),
+                      SkColorSetA(SK_ColorBLACK, 0x99)};
 }
 
 enum ItemCommand {
@@ -212,7 +218,7 @@ std::unique_ptr<views::MdTextButton> IconButton(
     views::Button::PressedCallback callback,
     const gfx::VectorIcon& icon,
     int icon_size = 20,
-    ui::ColorId color = ui::kColorSysOnSurface) {
+    ui::ColorVariant color = ui::kColorSysOnSurface) {
   auto button = Button(std::move(callback), u"");
   button->SetMinSize(gfx::Size(32, 32));
   button->SetMaxSize(gfx::Size(32, 32));
@@ -239,8 +245,8 @@ void AddStatus(views::View& parent, const std::u16string& text) {
 
 SidebarView::SidebarView(Delegate& delegate) : delegate_(delegate) {
   SetPreferredSize(gfx::Size(230, 400));
-  SetLayoutManager(std::make_unique<views::BoxLayout>(Orientation::kVertical,
-                                                      gfx::Insets(8), 8));
+  SetLayoutManager(std::make_unique<views::BoxLayout>(
+      Orientation::kVertical, gfx::Insets::TLBR(8, 8, 7, 8), 8));
   GetViewAccessibility().SetRole(ax::mojom::Role::kGroup);
   GetViewAccessibility().SetName(u"Workspace sidebar");
   SetUnavailable(u"Loading workspace\u2026");
@@ -353,11 +359,10 @@ void SidebarView::SetCreateMenuOpen(bool open) {
     return;
   }
   auto* button = static_cast<views::MdTextButton*>(target->view.get());
-  button->SetImageModel(
-      views::Button::STATE_NORMAL,
-      ui::ImageModel::FromVectorIcon(
-          open ? vector_icons::kCloseIcon : kPlusIcon, ui::kColorSysOnSurface,
-          20));
+  button->SetImageModel(views::Button::STATE_NORMAL,
+                        ui::ImageModel::FromVectorIcon(
+                            open ? vector_icons::kCloseIcon : kPlusIcon,
+                            GetFills(GetColorProvider()).footer_icon, 20));
   button->SetTooltipText(open ? u"Close creation menu" : u"Create Space");
   if (open) {
     button->GetViewAccessibility().SetIsExpanded();
@@ -674,7 +679,6 @@ void SidebarView::SetModel(const foundation::SidebarResult& model,
   // Arc keeps 41 DIP between the Space title and New Tab row centers.
   new_tab->SetProperty(views::kMarginsKey, gfx::Insets::TLBR(5, 0, 0, 0));
   new_tab_ = body->AddChildView(std::move(new_tab));
-  UpdateFills();
   for (const auto& item : model.temporary) {
     body->AddChildView(
         MakeItem(item, false, item.id == model.selected_item_id));
@@ -788,7 +792,7 @@ void SidebarView::SetModel(const foundation::SidebarResult& model,
   create->GetViewAccessibility().SetHasPopup(ax::mojom::HasPopup::kMenu);
   TrackFocus(create.get(), FocusAction::kCreate);
   footer->AddChildView(std::move(create));
-  SetCreateMenuOpen(create_menu_open_);
+  UpdateFills();
 
   scroll->RegisterPostLayoutCallback(base::BindRepeating(
       [](std::optional<gfx::PointF>& offset, views::ScrollView* scroll) {
@@ -822,14 +826,29 @@ void SidebarView::OnThemeChanged() {
 
 void SidebarView::UpdateFills() {
   const Fills fills = GetFills(GetColorProvider());
+  // With Increase Contrast on, the selected tile also gets a 1px outline.
+  const bool more_contrast = GetNativeTheme()->preferred_contrast() ==
+                             ui::NativeTheme::PreferredContrast::kMore;
   for (const auto& [tile, selected] : tiles_) {
     tile->SetBgColorOverrideDeprecated(selected ? fills.selected_tile
                                                 : fills.tile);
+    tile->SetStrokeColorIdOverride(selected && more_contrast
+                                       ? std::optional(ui::kColorSysOutline)
+                                       : std::nullopt);
   }
   if (new_tab_) {
     new_tab_->SetBgColorOverrideDeprecated(
         new_tab_intent_ ? fills.new_tab : SK_ColorTRANSPARENT);
   }
+  const auto library = std::ranges::find(focus_targets_, FocusAction::kLibrary,
+                                         &FocusTarget::action);
+  if (library != focus_targets_.end()) {
+    static_cast<views::MdTextButton*>(library->view.get())
+        ->SetImageModel(views::Button::STATE_NORMAL,
+                        ui::ImageModel::FromVectorIcon(kArchiveIcon,
+                                                       fills.footer_icon, 18));
+  }
+  SetCreateMenuOpen(create_menu_open_);
 }
 
 BEGIN_METADATA(SidebarView)

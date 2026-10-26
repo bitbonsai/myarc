@@ -1,5 +1,5 @@
 diff --git a/chrome/browser/ui/views/toolbar/toolbar_view.cc b/chrome/browser/ui/views/toolbar/toolbar_view.cc
-index 80b0e24263170de768a6684c8aabf106018710e7..a5569ba6c8fe8ea0470d28845000aff72b9ce09d 100644
+index 80b0e24263170de768a6684c8aabf106018710e7..f492bc146f1d4cf8cbf4c6a77b605f8d9e6e5d2e 100644
 --- a/chrome/browser/ui/views/toolbar/toolbar_view.cc
 +++ b/chrome/browser/ui/views/toolbar/toolbar_view.cc
 @@ -5,6 +5,7 @@
@@ -59,7 +59,7 @@ index 80b0e24263170de768a6684c8aabf106018710e7..a5569ba6c8fe8ea0470d28845000aff7
    bool is_glic_left_of_profile =
        features::kGlicToolbarButtonLocationParam.Get() ==
            features::GlicToolbarButtonLocation::kLeftOfProfileChip ||
-@@ -1463,12 +1478,82 @@ gfx::Size ToolbarView::GetMinimumSize() const {
+@@ -1463,12 +1478,88 @@ gfx::Size ToolbarView::GetMinimumSize() const {
    return size;
  }
  
@@ -104,6 +104,12 @@ index 80b0e24263170de768a6684c8aabf106018710e7..a5569ba6c8fe8ea0470d28845000aff7
 +    // Peek/collapse animations pass through narrower widths; lay out at the
 +    // minimum and let the sidebar clip, so nothing gets negative bounds.
 +    const int w = std::max(width(), tabs::kMyarcSidebarMinWidth);
++    // Arc on macOS 26 spaces navigation 34 DIP apart at its 228 DIP default
++    // width; older Arc headers use 30 DIP at 200 DIP. Tighten between the two
++    // so the full header still fits at the minimum width.
++    const int squeeze = std::clamp(228 - w, 0, 28);
++    const int pitch = 34 - squeeze / 7;
++    const int reload_x = w - 36 + squeeze * 3 / 28;
 +    views::ProposedLayout layout;
 +    layout.host_size = size();
 +    for (views::View* child : children()) {
@@ -112,14 +118,14 @@ index 80b0e24263170de768a6684c8aabf106018710e7..a5569ba6c8fe8ea0470d28845000aff7
 +                           child == forward_ || child == reload_;
 +      gfx::Rect bounds;
 +      if (child == myarc_sidebar_toggle_) {
-+        // Arc's toggle chip sits 5 DIP right of the traffic lights.
-+        bounds = gfx::Rect(78, 8, 28, 28);
++        // Arc's toggle chip sits 4.5 DIP right of the traffic lights.
++        bounds = gfx::Rect(77, 8, 28, 28);
 +      } else if (child == back_) {
-+        bounds = gfx::Rect(w - 104, 8, 24, 28);
++        bounds = gfx::Rect(reload_x - 2 * pitch, 8, 24, 28);
 +      } else if (child == forward_) {
-+        bounds = gfx::Rect(w - 70, 8, 24, 28);
++        bounds = gfx::Rect(reload_x - pitch, 8, 24, 28);
 +      } else if (child == reload_) {
-+        bounds = gfx::Rect(w - 36, 8, 24, 28);
++        bounds = gfx::Rect(reload_x, 8, 24, 28);
 +      } else if (child == location_bar_view_) {
 +        bounds = gfx::Rect(8, 46, w - 16, 38);
 +      }
@@ -142,7 +148,7 @@ index 80b0e24263170de768a6684c8aabf106018710e7..a5569ba6c8fe8ea0470d28845000aff7
    if (display_mode_ == DisplayMode::kCustomTab) {
      custom_tab_bar_->SetBounds(0, 0, width(),
                                 custom_tab_bar_->GetPreferredSize().height());
-@@ -1580,7 +1665,7 @@ void ToolbarView::InitLayout() {
+@@ -1580,7 +1671,7 @@ void ToolbarView::InitLayout() {
                                 views::MaximumFlexSizeRule::kUnbounded)
            .WithOrder(location_bar_flex_order);
  
