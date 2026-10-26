@@ -1,0 +1,12 @@
+diff --git a/chrome/app/BUILD.gn b/chrome/app/BUILD.gn
+index fec2772c4eef8ff197bfe930910593278a3e6883..80ce321039b7ebac4f1d42c0d4cc1617d5efd6ce 100644
+--- a/chrome/app/BUILD.gn
++++ b/chrome/app/BUILD.gn
+@@ -221,6 +221,7 @@ static_library("test_support") {
+       "//components/metrics:client_info",
+       "//components/policy:generated",
+       "//components/version_info",
++      "//myarc:nightly_switches",
+     ]
+ 
+     data_deps = [ "//chrome:chrome_framework" ]

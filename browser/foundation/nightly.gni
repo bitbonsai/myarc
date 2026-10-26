@@ -1,0 +1,6 @@
+declare_args() {
+  # Builds the myArc nightly: myArc branding with its own bundle id, profile
+  # directory and app icon, and myArc mode switched on by default. Pair it
+  # with branding_file_path = "//myarc/nightly/BRANDING".
+  myarc_nightly = false
+}

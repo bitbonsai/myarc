@@ -1,4 +1,10 @@
+import("//build/buildflag_header.gni")
+import("//build/config/chrome_build.gni")
 import("//build/rust/rust_static_library.gni")
+import("//myarc/nightly.gni")
+
+assert(!myarc_nightly || branding_file_path == "//myarc/nightly/BRANDING",
+       "myarc_nightly needs branding_file_path = \"//myarc/nightly/BRANDING\"")
 
 rust_static_library("workspace") {
   crate_root = "workspace/src/lib.rs"
@@ -116,4 +122,20 @@ executable("bridge_check") {
   testonly = true
   sources = [ "bridge_check.cc" ]
   deps = [ ":workspace_service" ]
+}
+
+buildflag_header("nightly_buildflags") {
+  header = "nightly_buildflags.h"
+  flags = [ "MYARC_NIGHTLY=$myarc_nightly" ]
+}
+
+source_set("nightly_switches") {
+  sources = [
+    "nightly_switches.cc",
+    "nightly_switches.h",
+  ]
+  deps = [
+    ":nightly_buildflags",
+    "//base",
+  ]
 }

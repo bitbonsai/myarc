@@ -1,0 +1,12 @@
+# myArc pre-alpha nightly: static release build with myArc branding and
+# myArc mode on by default. Ad-hoc signed by tools/package_nightly.sh.
+is_debug = false
+is_official_build = false
+is_component_build = false
+symbol_level = 0
+target_cpu = "arm64"
+use_remoteexec = false
+proprietary_codecs = true
+ffmpeg_branding = "Chrome"
+myarc_nightly = true
+branding_file_path = "//myarc/nightly/BRANDING"

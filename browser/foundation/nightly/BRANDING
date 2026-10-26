@@ -1,0 +1,10 @@
+COMPANY_FULLNAME=myArc contributors
+COMPANY_SHORTNAME=myArc contributors
+PRODUCT_FULLNAME=myArc
+PRODUCT_SHORTNAME=myArc
+PRODUCT_INSTALLER_FULLNAME=myArc Installer
+PRODUCT_INSTALLER_SHORTNAME=myArc Installer
+COPYRIGHT=Copyright @LASTCHANGE_YEAR@ The Chromium Authors and myArc contributors. All rights reserved.
+MAC_BUNDLE_ID=dev.myarc.nightly
+MAC_CREATOR_CODE=Cr24
+MAC_TEAM_ID=
