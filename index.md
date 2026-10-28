@@ -5,7 +5,6 @@ HTML: https://myarc.dev/
 An open-source browser project bringing back Arc's browsing experience, with a local workspace and optional AI.
 
 [Download pre-alpha](https://myarc.dev/download/)
-[Follow development](https://github.com/bitbonsai/myarc)
 [Read the plan](https://github.com/bitbonsai/myarc#readme)
 
 ## Your Spaces and pinned tabs are part of how you work. They should outlast the company behind your browser.
