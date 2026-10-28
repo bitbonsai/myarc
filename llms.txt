@@ -1,6 +1,6 @@
 # myArc
 
-> An unreleased open-source browser project inspired by Arc, built on Chromium with a Rust-owned workspace core.
+> A pre-release open-source browser project inspired by Arc, built on Chromium with a Rust-owned workspace core.
 
 A complete myArc browser and importer remain unimplemented. Native integration is experimental. Arc reference screenshots illustrate the target appearance. Local ownership and optional AI are product requirements, not evidence of a finished release.
 
@@ -8,6 +8,7 @@ A complete myArc browser and importer remain unimplemented. Native integration i
 
 - [Overview](https://myarc.dev/index.md): Markdown equivalent of the homepage.
 - [Progress journal](https://myarc.dev/blog/index.md): Published development updates.
+- [Download](https://myarc.dev/download/index.md): Pre-alpha nightly status, requirements and known limitations.
 - [Repository](https://github.com/bitbonsai/myarc): Public source and plans.
 
 ## Posts
