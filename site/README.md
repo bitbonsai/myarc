@@ -52,7 +52,7 @@ Adjacent article figures form a two-column image grid, including on phones. Capt
 
 Blog index and article content use a centered 68ch reading column. Article title, metadata and body share its left edge; text stays left-aligned. Header/footer retain the wider site layout, and phone gutters stay 1.5rem.
 
-Header/footer ribbon marks are 1rem square beside outlined Outfit wordmarks. Header links are ink without underlines at rest; document links remain underlined. Both development CTAs include the user-supplied GitHub SVG mark, with fill inherited from the button text color.
+Header/footer ribbon marks are 1rem square beside outlined Outfit wordmarks. Header links are ink without underlines at rest; document links remain underlined. The header shows Follow development as an outlined secondary button, so the hero holds the only filled button: Download pre-alpha once a nightly is published, Follow development before that. Every Follow development button carries the user-supplied GitHub SVG mark, with fill inherited from the button text color.
 
 The page follows `prefers-color-scheme` automatically. Dark-mode body text uses softer `#D2D9E1`, while headings retain ivory `#F5F2EC`. CSS variables switch surfaces/text and native picture sources select ivory wordmarks in dark mode. Blue primary buttons and colorful artwork remain unchanged. Original grain covers page and panel in both themes. Reduced motion disables animation, transitions and smooth scrolling.
 

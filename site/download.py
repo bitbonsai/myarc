@@ -172,7 +172,7 @@ def apply_release(template, release):
     link = '<a class="download-link" href="/download/">Download</a>' if release else ''
     template = template.replace('<!--download-nav-->', link)
     if release:
-        cta = f'<a class="button" href="/download/">Download pre-alpha</a>\n            <a href="{REPO}">Follow development</a>'
+        cta = '<a class="button" href="/download/">Download pre-alpha</a>'
         template = re.sub(r'<!--cta-->.*?<!--/cta-->', lambda _: cta, template, count=1, flags=re.S)
     return re.sub(r'<!--/?cta-->', '', template)
 
