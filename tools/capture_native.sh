@@ -1,6 +1,7 @@
 #!/bin/bash
 # Capture the native myArc build window (disposable profile, by-PID cleanup).
 # Usage: tools/capture_native.sh [out.png]   env: W=1440 H=900 URL=about:blank SETTLE=3
+#   APP=<path to Chromium.app> captures another build, e.g. a checkout copy.
 #   URL may list several space-separated URLs; URL=none passes none, so the
 #   window opens the way a new window does. KEYS=cmd+t (or PALETTE=1) opens the
 #   command palette via --myarc-capture-open-palette and waits KEY_SETTLE (default 2).
@@ -14,7 +15,7 @@
 set -euo pipefail
 
 BASE="$(cd "$(dirname "$0")/.." && pwd)/research-private/captures"
-APP="$HOME/.cache/myarc-m0/chromium/src/out/MyarcM0/Chromium.app"
+APP="${APP:-$HOME/.cache/myarc-m0/chromium/src/out/MyarcM0/Chromium.app}"
 BIN="$APP/Contents/MacOS/Chromium"
 W=${W:-1440}; H=${H:-900}; URL=${URL:-about:blank}; SETTLE=${SETTLE:-5}
 KEYS=${KEYS:-}; KEY_SETTLE=${KEY_SETTLE:-2}
