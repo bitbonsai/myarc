@@ -1,0 +1,43 @@
+diff --git a/chrome/browser/app_controller_mac.mm b/chrome/browser/app_controller_mac.mm
+index f251259f8293dfda0bae845202d0f4776020a618..eeaaefdd9cd2a4d324c1e4e97dc3a9b4bbca0221 100644
+--- a/chrome/browser/app_controller_mac.mm
++++ b/chrome/browser/app_controller_mac.mm
+@@ -78,6 +78,7 @@
+ #include "chrome/browser/ui/browser_commands.h"
+ #include "chrome/browser/ui/browser_live_tab_context.h"
+ #include "chrome/browser/ui/browser_mac.h"
++#include "chrome/browser/ui/browser_window.h"
+ #include "chrome/browser/ui/browser_window/public/browser_window_features.h"
+ #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
+ #include "chrome/browser/ui/browser_window/public/browser_window_interface_iterator.h"
+@@ -193,6 +194,20 @@ void BeginHandlingWebAuthenticationSessionRequestWithProfile(
+ // possible and returns a pointer to the activated browser or NULL if this was
+ // not possible. If the last active browser is minimized (in particular, if
+ // there are only minimized windows), it will unminimize it.
++// myArc mode answers Cmd+, with its native Settings window, owned by the last
++// active browser window. Leaves window activation to the Settings window.
++bool ShowMyarcSettings(Profile* profile) {
++  ProfileBrowserCollection* collection =
++      ProfileBrowserCollection::GetForProfile(
++          profile->IsGuestSession()
++              ? profile->GetPrimaryOTRProfile(/*create_if_needed=*/true)
++              : profile);
++  BrowserWindowInterface* browser =
++      collection ? collection->GetLastActiveBrowser() : nullptr;
++  BrowserWindow* window = browser ? BrowserWindow::FromBrowser(browser) : nullptr;
++  return window && window->ShowMyarcSettings();
++}
++
+ BrowserWindowInterface* ActivateBrowser(Profile* profile) {
+   ProfileBrowserCollection* collection =
+       ProfileBrowserCollection::GetForProfile(
+@@ -2099,6 +2114,9 @@ class AppControllerProfileObserver : public ProfileAttributesStorage::Observer,
+     // Failed to load profile, show Profile Picker instead.
+     return;
+   }
++  if (ShowMyarcSettings(profile)) {
++    return;
++  }
+   // Re-use an existing browser, or create a new one.
+   if (BrowserWindowInterface* browser = ActivateBrowser(profile)) {
+     chrome::ShowSettings(browser);

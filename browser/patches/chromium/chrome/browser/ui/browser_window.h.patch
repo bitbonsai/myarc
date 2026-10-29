@@ -1,8 +1,8 @@
 diff --git a/chrome/browser/ui/browser_window.h b/chrome/browser/ui/browser_window.h
-index 3b0e66f8a95dc0518c74122eec1baab5717c3028..602a43f05eb7ae3b1a510b091b745e1783a0a872 100644
+index 3b0e66f8a95dc0518c74122eec1baab5717c3028..486ddd6f8a7e154cbc7fe6b8f9e9a6279dec9959 100644
 --- a/chrome/browser/ui/browser_window.h
 +++ b/chrome/browser/ui/browser_window.h
-@@ -112,6 +112,27 @@ class BrowserWindow : public ui::BaseWindow {
+@@ -112,6 +112,29 @@ class BrowserWindow : public ui::BaseWindow {
   public:
    virtual ~BrowserWindow() = default;
  
@@ -26,11 +26,13 @@ index 3b0e66f8a95dc0518c74122eec1baab5717c3028..602a43f05eb7ae3b1a510b091b745e17
 +  virtual bool SetMyarcTabsSaved(const std::vector<int>& indices, bool saved);
 +  // True when myArc showed its own copied-URL toast instead of Chromium's.
 +  virtual bool ShowMyarcCopiedUrlToast();
++  // True when myArc opened its native Settings window instead of Chromium's.
++  virtual bool ShowMyarcSettings();
 +
    //////////////////////////////////////////////////////////////////////////////
    // ui::BaseWindow interface notes:
  
-@@ -508,4 +529,28 @@ class BrowserWindow : public ui::BaseWindow {
+@@ -508,4 +531,32 @@ class BrowserWindow : public ui::BaseWindow {
    virtual void DeleteBrowserWindow() = 0;
  };
  
@@ -55,6 +57,10 @@ index 3b0e66f8a95dc0518c74122eec1baab5717c3028..602a43f05eb7ae3b1a510b091b745e17
 +}
 +
 +inline bool BrowserWindow::ShowMyarcCopiedUrlToast() {
++  return false;
++}
++
++inline bool BrowserWindow::ShowMyarcSettings() {
 +  return false;
 +}
 +

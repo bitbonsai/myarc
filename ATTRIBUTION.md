@@ -20,7 +20,7 @@ Public Artcraft repository conventions informed the development methodology. Pri
 
 The native command palette's magnifier (`kMyarcSearchIcon` in `browser/patches/chromium/`) converts Lucide's search icon from [`lucide-static` 1.61.0 `icons/search.svg`](https://unpkg.com/lucide-static@1.61.0/icons/search.svg), by Lucide Icons and Contributors, into Chromium vector-icon path commands at its 24-unit canvas and stroke 2. It is under ISC; the full notice is in `design/brand/assets/Lucide-LICENSE.txt`.
 
-The native sidebar converts more `lucide-static` 1.61.0 icons the same way: `archive`, `plus` and `circle` (drawn filled) for the footer's Library, Create and Space dots (`browser/foundation/sidebar_view.cc`), `panel-left` for the sidebar toggle (`kMyarcPanelLeftIcon` in `browser/patches/chromium/`), and `share` for the copied-URL toast (`browser/foundation/copied_url_toast.cc`). Same ISC notice.
+The native sidebar converts more `lucide-static` 1.61.0 icons the same way: `archive`, `plus` and `circle` (drawn filled) for the footer's Library, Create and Space dots (`browser/foundation/sidebar_view.cc`), `panel-left` for the sidebar toggle (`kMyarcPanelLeftIcon` in `browser/patches/chromium/`), `share` for the copied-URL toast (`browser/foundation/copied_url_toast.cc`), and `settings`, `user`, `app-window`, `keyboard`, `sliders-horizontal` and `heart` (drawn filled) for the Settings window (`browser/foundation/settings_window.cc`). Same ISC notice.
 
 The one-second page transition and 2rem blur treatment were observed on [karinwolff.com](https://karinwolff.com/). myArc independently implements blur/fade on native transition snapshots with CSS and a separate header capture. Reference scripts, overlays and artwork are not bundled.
 

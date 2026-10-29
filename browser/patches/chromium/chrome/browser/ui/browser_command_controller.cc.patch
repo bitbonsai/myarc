@@ -1,5 +1,5 @@
 diff --git a/chrome/browser/ui/browser_command_controller.cc b/chrome/browser/ui/browser_command_controller.cc
-index afc3f64a97c6a8676a656fca1a3ede18eb23b1fb..05616c8b99b7d7218dea1ba05b7cf455df8d8713 100644
+index afc3f64a97c6a8676a656fca1a3ede18eb23b1fb..f218b137de6640096dd5877c6abf15a3c3783d1d 100644
 --- a/chrome/browser/ui/browser_command_controller.cc
 +++ b/chrome/browser/ui/browser_command_controller.cc
 @@ -60,6 +60,7 @@
@@ -162,7 +162,18 @@ index afc3f64a97c6a8676a656fca1a3ede18eb23b1fb..05616c8b99b7d7218dea1ba05b7cf455
        break;
      }
      case IDC_NEW_TAB_TO_RIGHT: {
-@@ -2234,6 +2341,51 @@ void BrowserCommandController::UpdateCommandsForExtensionsMenu() {
+@@ -1347,6 +1454,10 @@ void BrowserCommandController::HandleCommandWithDisposition(
+                           chrome::kPerformanceSubPage);
+       break;
+     case IDC_OPTIONS:
++      // myArc mode opens its native Settings window; chrome://settings stays.
++      if (window() && window()->ShowMyarcSettings()) {
++        break;
++      }
+       ShowSettings(webui::GetBrowserForOpeningWebUi(browser_));
+       break;
+     case IDC_EDIT_SEARCH_ENGINES:
+@@ -2234,6 +2345,51 @@ void BrowserCommandController::UpdateCommandsForExtensionsMenu() {
                                           /*state=*/true);
  }
  
@@ -214,7 +225,7 @@ index afc3f64a97c6a8676a656fca1a3ede18eb23b1fb..05616c8b99b7d7218dea1ba05b7cf455
  void BrowserCommandController::UpdateCommandsForTabState() {
    // Keep commands disabled when in locked fullscreen so users cannot exit this
    // mode. Only update navigation ones when the webapp is locked for OnTask
-@@ -2974,8 +3126,10 @@ void BrowserCommandController::UpdateActionsForSharingHubPolicy() {
+@@ -2974,8 +3130,10 @@ void BrowserCommandController::UpdateActionsForSharingHubPolicy() {
  }
  
  void BrowserCommandController::UpdateQRCodeGeneratorActionEnabledState() {
@@ -227,7 +238,7 @@ index afc3f64a97c6a8676a656fca1a3ede18eb23b1fb..05616c8b99b7d7218dea1ba05b7cf455
    if (auto* qr_code_action_item =
            FindAction(kActionQrCodeGenerator, browser_)) {
      qr_code_action_item->SetEnabled(qr_code_generator_enabled);
-@@ -2989,7 +3143,8 @@ void BrowserCommandController::UpdateCommandAndActionEnabled(
+@@ -2989,7 +3147,8 @@ void BrowserCommandController::UpdateCommandAndActionEnabled(
    command_updater_->UpdateCommandEnabled(command_id, enabled);
    if (!features::ShouldUseActionsForBrowserCommands()) {
      if (auto* const action = FindAction(action_id, browser_)) {
@@ -237,7 +248,7 @@ index afc3f64a97c6a8676a656fca1a3ede18eb23b1fb..05616c8b99b7d7218dea1ba05b7cf455
      }
    }
  }
-@@ -3010,10 +3165,12 @@ bool BrowserCommandController::IsInLockedFullscreenMode(
+@@ -3010,10 +3169,12 @@ bool BrowserCommandController::IsInLockedFullscreenMode(
  std::unique_ptr<CommandUpdater>
  BrowserCommandController::CreateCommandUpdater() {
    if (features::ShouldUseActionsForBrowserCommands()) {

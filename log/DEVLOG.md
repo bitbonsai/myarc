@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-10-29: Native Settings window, first slice
+
+- In myArc mode Cmd+, (the app menu's `showPreferences:` and `IDC_OPTIONS`) opens one Arc-style dark Settings window (`browser/foundation/settings_window.cc`) through the new `BrowserWindow::ShowMyarcSettings` hook. chrome://settings is unchanged. General shows the default-browser banner (Chromium's `DefaultBrowserWorker`). Advanced has More Settings…, which opens chrome://settings in the owning window and closes Settings. Profiles, Links and Shortcuts are shown disabled. `--myarc-capture-open-settings[=advanced|more]` is `SETTINGS=1|advanced|more` in `tools/capture_native.sh`, and `bgcapture.swift shot` takes an optional window title.
+- Verification: build and `bridge_check` pass. A Cmd+, posted to the background PID opened one 684x650 "General" window, and a second press reused it. `SETTINGS=more` left chrome://settings in the browser tab. A side-by-side with Arc's Settings matches window size, traffic lights, tab row and banner geometry and the grays to within 1 to 2 DIP.
+- Open: Esc and Cmd+W are wired but untested, because the window only takes keys when the app is active. Set as default was not pressed, to avoid the system prompt. The blue captures as (52,120,246) against Arc's P3 (0,122,255). There's no light palette, and the stock path without the switch was not run.
+
 ## 2026-10-29: Copied-URL toast
 
 - In myArc mode `IDC_COPY_URL` (Cmd+Shift+C) shows Arc's "Copied Current URL" pill with Lucide `share` at the window's top-right (`browser/foundation/copied_url_toast.cc`) instead of Chromium's link-copied toast, and fades out after 2 s. `CopyURL` asks the new `BrowserWindow::ShowMyarcCopiedUrlToast` hook, which returns false without `--myarc-visual-parity`. `--myarc-capture-copy-url` (`COPY_URL=1` in `tools/capture_native.sh`) copies once and holds the toast.

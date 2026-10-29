@@ -5,6 +5,9 @@
 #   command palette via --myarc-capture-open-palette and waits KEY_SETTLE (default 2).
 #   PALETTE_TEXT="claude plans" pre-fills the palette input to show its results.
 #   COPY_URL=1 copies the page URL via --myarc-capture-copy-url and holds the toast.
+#   SETTINGS=1 (or general/advanced/more) opens the native Settings window via
+#   --myarc-capture-open-settings and captures only that window; "more" presses
+#   More Settings… and captures the browser window instead.
 #   The browser launches in the background (open -g) and is captured with
 #   ScreenCaptureKit (tools/bgcapture.swift), so it never takes focus.
 set -euo pipefail
@@ -38,6 +41,13 @@ if [ "${1:-}" = "--inner" ]; then
   { [ -n "$KEYS" ] || [ -n "${PALETTE:-}" ]; } && EXTRA+=(--myarc-capture-open-palette)
   [ -n "${PALETTE_TEXT:-}" ] && EXTRA+=(--myarc-capture-palette-text="$PALETTE_TEXT")
   [ -n "${COPY_URL:-}" ] && EXTRA+=(--myarc-capture-copy-url)
+  SHOT_TITLE=()
+  case "${SETTINGS:-}" in
+    "") ;;
+    more) EXTRA+=(--myarc-capture-open-settings=more); KEY_SETTLE=$((KEY_SETTLE + 2)) ;;
+    advanced) EXTRA+=(--myarc-capture-open-settings=advanced); SHOT_TITLE=(Advanced) ;;
+    *) EXTRA+=(--myarc-capture-open-settings); SHOT_TITLE=(General) ;;
+  esac
   # -g: launch without activating, so the user's frontmost app keeps focus.
   open -g -n -a "$APP" --args --user-data-dir="$PROFILE" --no-first-run --no-default-browser-check \
     --enable-features=GlassFrame --disable-features=InitialWebUI \
@@ -54,7 +64,7 @@ if [ "${1:-}" = "--inner" ]; then
   sleep "$SETTLE"
   [ -n "${EXTRA[*]-}" ] && sleep "$KEY_SETTLE"
   kill -0 "$PID" 2>/dev/null || { echo "native process exited early" >&2; exit 1; }
-  swift "$(dirname "$0")/bgcapture.swift" shot "$PID" "$OUT"
+  swift "$(dirname "$0")/bgcapture.swift" shot "$PID" "$OUT" ${SHOT_TITLE[@]+"${SHOT_TITLE[@]}"}
   WID=bg; RECT=window
   echo "pid=$PID window=$WID rect=$RECT"
   exit 0

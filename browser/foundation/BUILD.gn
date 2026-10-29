@@ -136,6 +136,30 @@ source_set("copied_url_toast") {
   ]
 }
 
+source_set("settings_window") {
+  sources = [
+    "settings_window.cc",
+    "settings_window.h",
+  ]
+  public_deps = [ "//base" ]
+  deps = [
+    "//cc/paint",
+    "//chrome/browser:shell_integration",
+    "//skia",
+    "//ui/accessibility",
+    "//ui/base",
+    "//ui/events",
+    "//ui/gfx",
+    "//ui/gfx/geometry",
+    "//ui/views",
+  ]
+  if (is_mac) {
+    sources += [ "settings_window_mac.mm" ]
+    deps += [ "//components/remote_cocoa/common:mojo" ]
+    frameworks = [ "Cocoa.framework" ]
+  }
+}
+
 executable("bridge_check") {
   testonly = true
   sources = [ "bridge_check.cc" ]
