@@ -1,5 +1,5 @@
 diff --git a/chrome/browser/ui/browser_command_controller_browsertest.cc b/chrome/browser/ui/browser_command_controller_browsertest.cc
-index 54deb1aa44b9e967a5626240ab63a5c24179a7e6..677c72835b8827397fc1cbd702528f6a8f8bffa1 100644
+index 54deb1aa44b9e967a5626240ab63a5c24179a7e6..819385d458d20a5b6eae7ec99de4ff1ed2b79fae 100644
 --- a/chrome/browser/ui/browser_command_controller_browsertest.cc
 +++ b/chrome/browser/ui/browser_command_controller_browsertest.cc
 @@ -8,13 +8,17 @@
@@ -228,7 +228,6 @@ index 54deb1aa44b9e967a5626240ab63a5c24179a7e6..677c72835b8827397fc1cbd702528f6a
 +      IDC_RELOAD,
 +      IDC_STOP,
 +      IDC_HOME,
-+      IDC_CLOSE_TAB,
 +      IDC_DUPLICATE_TAB,
 +      IDC_NEW_SPLIT_TAB,
 +      IDC_PRINT,
@@ -261,13 +260,14 @@ index 54deb1aa44b9e967a5626240ab63a5c24179a7e6..677c72835b8827397fc1cbd702528f6a
 +  EXPECT_FALSE(IsCommandEnabled(workspace_browser_, IDC_STOP));
 +  EXPECT_TRUE(IsCommandEnabled(workspace_browser_, IDC_NEW_TAB));
 +  EXPECT_TRUE(IsCommandEnabled(workspace_browser_, IDC_NEW_WINDOW));
++  // Cmd+W closes an empty Space's window, as in Arc.
++  EXPECT_TRUE(IsCommandEnabled(workspace_browser_, IDC_CLOSE_TAB));
 +  EXPECT_TRUE(IsCommandEnabled(workspace_browser_, IDC_FOCUS_LOCATION));
 +  EXPECT_TRUE(IsCommandEnabled(workspace_browser_, IDC_CUT));
 +  EXPECT_TRUE(IsCommandEnabled(workspace_browser_, IDC_COPY));
 +  EXPECT_TRUE(IsCommandEnabled(workspace_browser_, IDC_PASTE));
 +
 +  // Direct helpers bypass ExecuteCommand; they must share the same gate.
-+  CloseTab(workspace_browser_);
 +  DuplicateTab(workspace_browser_);
 +  Home(workspace_browser_, WindowOpenDisposition::kCurrentTab);
 +  PinTab(workspace_browser_);
@@ -916,7 +916,7 @@ index 54deb1aa44b9e967a5626240ab63a5c24179a7e6..677c72835b8827397fc1cbd702528f6a
 +  }));
 +  EXPECT_EQ(empty_space, adapter_->Sidebar().current_space.id);
 +  EXPECT_EQ(retained, tabs->GetActiveWebContents());
-+  EXPECT_FALSE(IsCommandEnabled(workspace_browser_, IDC_CLOSE_TAB));
++  EXPECT_TRUE(IsCommandEnabled(workspace_browser_, IDC_CLOSE_TAB));
 +  EXPECT_FALSE(source->GetEnabled());
 +  const int index = tabs->active_index();
 +  ASSERT_TRUE(adapter_->ActivateItem(retained_item).ok);

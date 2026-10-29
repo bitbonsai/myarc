@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-10-30: Empty Space in every window
+
+- Cmd+N and incognito windows opened `about:blank` in myArc mode and showed it as a row; they now open the New Tab Page, so they land in the same empty Space as the first window. Cmd+W in an empty Space closes the window, as in Arc, instead of being disabled, so a window left with only its hidden NTP after the last page closes can still be closed. `Sidebar()` now checks a Temporary row's page in any window of the Profile, so a second window no longer shows the first window's hidden NTP as a row it can't close.
+- Verification: `chrome` and `bridge_check` build, `bridge_check` passes, and a background `URL=none` capture still shows the empty Space. Cmd+N, incognito and Cmd+W need key input, so they were not captured; the `MyarcWorkspaceCommandSafetyTest` expectations for Cmd+W were updated but browser tests were not built or run.
+- Chromium `myarc` commit `522ebee901`; `export_patches.py --check` and `check_docs.py` pass. Cmd+W in an empty Space also closes the window's pages from other Spaces, as closing any window does.
+
 ## 2026-10-30: Empty Space shows Arc's page card
 
 - The empty-Space canvas hid the active contents container, leaving only the window background. It now detaches the page hosts but keeps that container visible, so the same translucent rounded card as with an `about:blank` page shows, as in Arc's empty Space.

@@ -197,6 +197,15 @@ content::WebContents* LocalPage(TabStripModel& tabs, uint64_t item) {
   return nullptr;
 }
 
+// Temporary rows are per Space, so their page may live in another window.
+content::WebContents* AnyPage(Profile& profile, uint64_t item) {
+  for (const auto& [contents, id] : ForProfile(profile).pages) {
+    if (id == item)
+      return contents;
+  }
+  return nullptr;
+}
+
 // Like Arc, a window's untouched New Tab Page is an empty Space, not a row.
 // Matches the virtual chrome://newtab URL and its committed WebUI host.
 bool IsUntouchedNewTabPage(content::WebContents& page) {
@@ -779,6 +788,8 @@ foundation::SidebarResult BrowserWorkspaceAdapter::Sidebar() const {
     rust::Vec<foundation::ItemRecord> temporary;
     for (const auto& row : sidebar.temporary) {
       auto* page = LocalPage(*tabs_, row.id);
+      if (!page)
+        page = AnyPage(*profile_, row.id);
       if (!page || !IsUntouchedNewTabPage(*page)) {
         temporary.push_back(row);
       } else if (row.id == sidebar.selected_item_id) {
@@ -804,16 +815,9 @@ BrowserWorkspaceAdapter::Metadata(uint64_t item) const {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
   if (!item)
     return std::nullopt;
-  const auto& pages = ForProfile(*profile_).pages;
   content::WebContents* page = tabs_ ? LocalPage(*tabs_, item) : nullptr;
-  if (!page) {
-    for (const auto& [contents, id] : pages) {
-      if (id == item) {
-        page = contents;
-        break;
-      }
-    }
-  }
+  if (!page)
+    page = AnyPage(*profile_, item);
   if (!page)
     return std::nullopt;
   LiveMetadata metadata;
