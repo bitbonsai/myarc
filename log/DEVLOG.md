@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-10-30: Pinned row fills match Arc
+
+- Compared a 1440x900 capture (three Favorites and three Space Pins) with Arc's `03-pin-context-menu.png` and blog reference. Favorite tiles already match: resting #393745 over #242232 (+21 per channel) against Arc #3B3A4B over #262538 (+21), selected #83828B against #83848F. Pinned rows did not: the selected row was #2C2E34 on #272333 (a grey container color, almost invisible) and hover used the same container colors. Both now use the tile white tints: selected #524F5C, matching Arc's row highlight #505060, and hover the resting tile fill.
+- Arc has no capture of a pinned row, so the row fills come from Arc's New Tab row and tiles, not a pinned row. Arc's tile corners measure about 8-9 pt against our 10 pt, from rough edge profiles; left unchanged. Text and icon colors were not compared, since no Arc pinned row exists to sample.
+- Captures in `research-private/captures/20261030-fav-pin-colors/` (before/after, Favorite and pin selected). `bridge_check` passes, `export_patches.py --check` and `check_docs.py` pass. No Chromium commit: `myarc/` is symlinked from `browser/foundation`, so this change lives only in this repo.
+
 ## 2026-10-30: Empty Space in every window
 
 - Cmd+N and incognito windows opened `about:blank` in myArc mode and showed it as a row; they now open the New Tab Page, so they land in the same empty Space as the first window. Cmd+W in an empty Space closes the window, as in Arc, instead of being disabled, so a window left with only its hidden NTP after the last page closes can still be closed. `Sidebar()` now checks a Temporary row's page in any window of the Profile, so a second window no longer shows the first window's hidden NTP as a row it can't close.

@@ -155,16 +155,23 @@ class ItemRow final : public views::View, public views::FocusChangeListener {
 
   void OnDidChangeFocus(views::View*, views::View*) override { UpdateClose(); }
 
+  void OnThemeChanged() override {
+    views::View::OnThemeChanged();
+    UpdateClose();
+  }
+
  private:
   void UpdateClose() {
     auto* manager = GetFocusManager();
     const bool reveal =
         hovered_ || (manager && Contains(manager->GetFocusedView()));
+    // Same translucent white as the Favorite tiles: Arc's row highlight
+    // (#505060 on the New Tab row) for the selected row, the resting tile
+    // fill for hover.
+    const Fills fills = GetFills(GetColorProvider());
     SetBackground(selected_ || reveal
                       ? views::CreateRoundedRectBackground(
-                            selected_ ? ui::kColorSysSurfaceContainerHighest
-                                      : ui::kColorSysSurfaceContainer,
-                            10)
+                            selected_ ? fills.new_tab : fills.tile, 10)
                       : nullptr);
     if (close_) {
       close_->SetImageModel(
