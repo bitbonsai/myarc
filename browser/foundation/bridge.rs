@@ -137,7 +137,7 @@ pub fn rename_space(workspace: &mut Workspace, id: u64, name: &str) -> ffi::Rena
     let result = workspace.0.rename_space(id, name);
     ffi::RenameResult {
         ok: result.is_ok(),
-        name: current_name(workspace),
+        name: workspace.0.space_name_of(id).unwrap_or_default().to_owned(),
         error: result
             .err()
             .map(|error| error.to_string())

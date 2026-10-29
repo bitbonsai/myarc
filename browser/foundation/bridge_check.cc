@@ -299,6 +299,37 @@ bool CheckMetadataRecords() {
          sidebar_snapshot(*model, 1).selected_item_id == item_id;
 }
 
+// Space 1 is not special: after it is deleted the sidebar, selection and
+// rename follow the remaining Space, and the last Space cannot be deleted.
+bool CheckDeleteFirstSpace() {
+  using namespace myarc::foundation;
+  auto model = new_workspace();
+  auto space = create_space(*model, "Second");
+  auto item = add_temporary_item(*model, space.id);
+  if (!space.ok || !item.ok || !select_space(*model, 1, space.id).ok ||
+      !select_item(*model, 1, item.id).ok) {
+    return false;
+  }
+  auto deleted = delete_space(*model, 1);
+  auto sidebar = sidebar_snapshot(*model, 1);
+  if (!deleted.ok || deleted.id != space.id || !sidebar.ok ||
+      sidebar.current_space.id != space.id || sidebar.spaces.size() != 1 ||
+      sidebar.temporary.size() != 1 || sidebar.selected_item_id != item.id ||
+      std::string(current_name(*model)) != "Second") {
+    return false;
+  }
+  auto renamed = rename_space(*model, space.id, "Renamed");
+  if (!renamed.ok || std::string(renamed.name) != "Renamed" ||
+      std::string(sidebar_snapshot(*model, 1).current_space.name) !=
+          "Renamed" ||
+      rename_space(*model, 1, "Gone").ok) {
+    return false;
+  }
+  auto last = delete_space(*model, space.id);
+  return !last.ok && !last.error.empty() &&
+         sidebar_snapshot(*model, 1).current_space.id == space.id;
+}
+
 }  // namespace
 
 int main() {
@@ -318,7 +349,7 @@ int main() {
     return 3;
   }
   const auto unknown = myarc::foundation::rename_space(*workspace, 2, "Other");
-  if (unknown.ok || std::string(unknown.name) != "Research") {
+  if (unknown.ok || !unknown.name.empty()) {
     return 4;
   }
   const auto oversize =
@@ -347,12 +378,16 @@ int main() {
     std::cerr << "Native snapshot count/URL-presence checks failed\n";
     return 11;
   }
+  if (!CheckDeleteFirstSpace()) {
+    std::cerr << "Delete-Space-1 checks failed\n";
+    return 12;
+  }
   if (!CheckMetadataRecords()) {
     std::cerr << "Metadata codec/bounds checks failed\n";
     return 9;
   }
   std::cout << "7 legacy C++/Rust checks passed, including 1000 ownership "
-               "round trips; workspace transitions and metadata codec checks "
-               "passed\n";
+               "round trips; workspace transitions, Space 1 deletion and "
+               "metadata codec checks passed\n";
   return 0;
 }

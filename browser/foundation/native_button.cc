@@ -41,7 +41,13 @@ class FoundationButton : public views::MdTextButton {
     const auto current = foundation::current_name(*workspace_);
     const std::string next =
         std::string(current) == "Everyday" ? "Research" : "Everyday";
-    auto result = foundation::rename_space(*workspace_, 1, next);
+    const auto state = foundation::export_snapshot(*workspace_);
+    if (state.spaces.empty()) {
+      SetText(u"Test Space: rename failed");
+      return;
+    }
+    auto result =
+        foundation::rename_space(*workspace_, state.spaces[0].id, next);
     if (!result.ok) {
       SetText(u"Test Space: rename failed");
       SetTooltipText(base::UTF8ToUTF16(std::string(result.error)));

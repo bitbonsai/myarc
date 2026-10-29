@@ -244,6 +244,15 @@ impl Workspace {
             .unwrap_or_default()
     }
 
+    /// Name of the Space with `id`, if it exists.
+    pub fn space_name_of(&self, id: SpaceId) -> Option<&str> {
+        self.state
+            .spaces
+            .iter()
+            .find(|space| space.id == id)
+            .map(|space| space.name.as_str())
+    }
+
     pub fn rename_space(&mut self, id: u64, name: &str) -> Result<(), RenameError> {
         let space = self
             .state
@@ -851,6 +860,19 @@ mod tests {
         assert_eq!(workspace.space_name(), "Research");
         assert_eq!(workspace.rename_space(TEST_SPACE_ID, "Everyday"), Ok(()));
         assert_eq!(workspace.space_name(), "Everyday");
+    }
+
+    #[test]
+    fn space_name_of_reports_the_renamed_space() {
+        let mut workspace = Workspace::default();
+        let second = workspace.create_space(DEFAULT_PROFILE_ID, "Two").unwrap();
+        workspace.rename_space(second, "Study").unwrap();
+        assert_eq!(workspace.space_name_of(second), Some("Study"));
+        assert_eq!(workspace.space_name(), "Everyday");
+        workspace.delete_space(TEST_SPACE_ID).unwrap();
+        workspace.rename_space(second, "Work").unwrap();
+        assert_eq!(workspace.space_name_of(second), Some("Work"));
+        assert_eq!(workspace.space_name_of(TEST_SPACE_ID), None);
     }
 
     #[test]

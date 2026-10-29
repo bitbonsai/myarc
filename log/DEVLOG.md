@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-10-29: C++ no longer assumes Space 1
+
+- The M0 test button (`native_button.cc`) renames the first Space from `export_snapshot` instead of id 1. `rename_space`'s `name` now reports the renamed Space through the new `Workspace::space_name_of`, and is empty for an unknown id. The adapter already allocates windows in `spaces[0]`; no other literal Space 1 turned up in `browser/foundation` or the Chromium patches.
+- Verification: `cargo test` passes with a new `space_name_of` test (rename after deleting Space 1). `chrome` and `bridge_check` build in 11 s. The new `bridge_check` case passes: create Space 2, delete Space 1, then the sidebar, selection, `current_name` and rename follow Space 2, and deleting the last Space is rejected.
+- Open: there's still no menu or dialog to delete a Space, and the test button was not clicked in a live build.
+
 ## 2026-10-29: Native Settings window, first slice
 
 - In myArc mode Cmd+, (the app menu's `showPreferences:` and `IDC_OPTIONS`) opens one Arc-style dark Settings window (`browser/foundation/settings_window.cc`) through the new `BrowserWindow::ShowMyarcSettings` hook. chrome://settings is unchanged. General shows the default-browser banner (Chromium's `DefaultBrowserWorker`). Advanced has More Settings…, which opens chrome://settings in the owning window and closes Settings. Profiles, Links and Shortcuts are shown disabled. `--myarc-capture-open-settings[=advanced|more]` is `SETTINGS=1|advanced|more` in `tools/capture_native.sh`, and `bgcapture.swift shot` takes an optional window title.
