@@ -244,13 +244,14 @@
     }
 
     /* Phone menu. A popover gives Esc, backdrop-tap dismissal and focus return without script.
-       Its ::backdrop blurs the page; the sheet sits at the bottom, within thumb reach.
+       The header stays pinned. Its ::backdrop blurs the page; the sheet sits at the bottom, within thumb reach.
        Browsers without popover support keep the wrapped inline nav from the 48rem rules. */
     .quick, .menu-close { display: none }
     @supports selector(:popover-open) {
       @media (max-width: 48rem) {
         html:has(#site-menu:popover-open) { overflow: hidden }
-        .top { flex-wrap: nowrap; justify-content: flex-start; gap: .25rem }
+        html { scroll-padding-top: 5rem }
+        .top { position: sticky; top: 0; z-index: 10; flex-wrap: nowrap; justify-content: flex-start; gap: .25rem; margin-inline: -1.5rem; padding: .75rem 1.5rem; background: var(--page) var(--grain) repeat; background-size: 16rem 16rem }
         .top .home-mark { display: none }
         .menu-toggle, .quick-icon, .menu-close { align-items: center; justify-content: center; flex: none; margin: 0; padding: 0; border: 0; background: transparent; color: var(--text); cursor: pointer; transition: color .2s ease-in-out, background-color .2s ease-in-out }
         .menu-toggle { display: inline-flex; width: 2.75rem; height: 2.75rem; margin-left: -.625rem; border-radius: .75rem }
@@ -271,8 +272,8 @@
         .top nav > a:not(.button):hover, .top nav > a:not(.button):focus-visible { background: rgb(var(--link-rgb) / .08) }
         .top nav a[aria-current] { color: var(--link-solid) }
         .top nav a:not(.button):focus-visible { outline-offset: -.1875rem }
-        .top nav .button { justify-content: center; min-height: 3.5rem; margin-top: .5rem; padding-inline: 1rem; font-size: 1rem; white-space: nowrap }
-        .menu-close { display: inline-flex; width: 3.5rem; height: 3.5rem; margin-top: .5rem; border-radius: 50%; background: rgb(var(--link-rgb) / .1) }
+        .top nav .button { display: none }
+        .menu-close { display: inline-flex; grid-column: -2; width: 3.5rem; height: 3.5rem; margin-top: .5rem; border-radius: 50%; background: rgb(var(--link-rgb) / .1) }
         .menu-close:hover, .menu-close:focus-visible { background: rgb(var(--link-rgb) / .16); color: var(--link-solid) }
         .menu-close svg { width: 1.5rem; height: 1.5rem }
       }
