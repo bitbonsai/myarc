@@ -6,4 +6,4 @@ Choose a task with clear dependencies and a definition of done. Keep changes nar
 
 Behavioral research needs source/date/confidence and an original summary. Do not attach raw user exports, private URLs, personal screenshots, or vendor assets to public issues or pull requests. Use synthetic examples. Report suspected vulnerabilities privately once an actively monitored reporting channel is established; do not disclose exploit details in public issues.
 
-Original contributions use the repository's MIT license. Third-party components retain their own licenses; document them before inclusion. No contributor agreement or external account is required to read or build the standalone core.
+Original contributions use the repository's GPL-3.0 license. Releases and commits before the switch on 29 October 2026 remain available under MIT. Third-party components retain their own licenses; document them before inclusion. No contributor agreement or external account is required to read or build the standalone core.

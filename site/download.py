@@ -151,7 +151,7 @@ def content(release):
              f'<li><a href="{REPO}">Source on GitHub</a>, with instructions to <a href="{REPO}/blob/main/browser/README.md">build it from source</a>.</li>'
              f'<li><a href="{REPO}/issues">GitHub issues</a> take bug reports. Include the version, your macOS version and the steps that trigger the problem, and leave out private pages.</li></ul>')
     html += ('<h2>License and notices</h2>'
-             f'<p>myArc is MIT licensed, see <a href="{REPO}/blob/main/LICENSE">LICENSE</a>. Chromium and other bundled components keep their own licenses. <a href="{REPO}/blob/main/ATTRIBUTION.md">ATTRIBUTION.md</a> records what is known, and the <a href="{REPO}/blob/main/browser/evidence/dependency-licenses.json">dependency license inventory</a> is not yet complete.</p>')
+             f'<p>myArc is licensed under GPL-3.0, see <a href="{REPO}/blob/main/LICENSE">LICENSE</a>. Chromium and other bundled components keep their own licenses. <a href="{REPO}/blob/main/ATTRIBUTION.md">ATTRIBUTION.md</a> records what is known, and the <a href="{REPO}/blob/main/browser/evidence/dependency-licenses.json">dependency license inventory</a> is not yet complete.</p>')
     return f'<header class="post-header"><h1>{TITLE}</h1><p class="download-status">{STATUS}</p></header><div class="post-body download">{html}</div>'
 
 

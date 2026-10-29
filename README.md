@@ -70,7 +70,7 @@ Continue the [native shell experiment](browser/experiments/native-shell.md) towa
 
 ## Contributing
 
-Read [AGENTS.md](AGENTS.md) and [CONTRIBUTING.md](CONTRIBUTING.md). Current documents and original tooling are MIT licensed; future upstream code retains its own notices and license obligations. A chosen browser foundation must receive a separate license review before integration or distribution.
+Read [AGENTS.md](AGENTS.md) and [CONTRIBUTING.md](CONTRIBUTING.md). myArc is licensed under GPL-3.0; upstream code retains its own notices and license obligations. A chosen browser foundation must receive a separate license review before integration or distribution.
 
 Run `python3 tools/check_docs.py` for relative links. Standalone Rust checks are `cargo fmt --all -- --check`, `cargo clippy --workspace --all-targets --locked -- -D warnings` and `cargo test --workspace --locked`. With the external Chromium checkout present, run `python3 tools/export_patches.py --check` to confirm the per-file patch exports match the `myarc` branch. The [foundation recipe](browser/README.md) covers GN/Cxx checks and their limits.
 

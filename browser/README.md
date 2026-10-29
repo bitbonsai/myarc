@@ -149,7 +149,7 @@ MA-002.c reapplied the legacy 0001 patch on a new branch at `8d208f20744ac6d4ce0
 
 ## Nightly build
 
-The pre-alpha nightly is a static release build from [args-nightly.gn](args-nightly.gn): arm64, no symbols, H.264/AAC (`proprietary_codecs`, `ffmpeg_branding = "Chrome"`), no Widevine. Its GN arg `myarc_nightly` does three things, and dev builds without it are unchanged:
+The pre-alpha nightly is a static release build from [args-nightly.gn](args-nightly.gn): arm64, no symbols, H.264/AAC (`proprietary_codecs`, `ffmpeg_branding = "Chrome"`), no Widevine, no UnRAR (its license conflicts with GPL-3.0). Its GN arg `myarc_nightly` does three things, and dev builds without it are unchanged:
 
 - Branding: `branding_file_path` selects [nightly/BRANDING](foundation/nightly/BRANDING), so the build produces `myArc.app` with bundle id `dev.myarc.nightly`. A merged plist key sets the profile directory to `~/Library/Application Support/myArc Nightly`, apart from Chromium and dev builds. The icon comes from `design/brand/assets/myarc-matte.png`; regenerate it with `tools/make_nightly_icons.sh`. Menus and settings still say Chromium, since those strings come from Chromium's resources.
 - myArc mode: at startup, before features load, [nightly_switches.cc](foundation/nightly_switches.cc) adds `--myarc-visual-parity`, `--myarc-workspace-sidebar`, `GlassFrame`, disabled `InitialWebUI` and `--no-first-run` to the browser command line unless already given. Skipping first run hides Chromium's branded welcome page. With both myArc switches, a new profile starts with vertical tabs, so the sidebar shows on first launch.

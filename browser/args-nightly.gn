@@ -10,3 +10,5 @@ proprietary_codecs = true
 ffmpeg_branding = "Chrome"
 myarc_nightly = true
 branding_file_path = "//myarc/nightly/BRANDING"
+# UnRAR's license conflicts with GPL-3.0, so RAR downloads are not scanned.
+safe_browsing_use_unrar = false
