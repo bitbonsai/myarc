@@ -1,7 +1,8 @@
 #!/bin/bash
 # Capture the native myArc build window (disposable profile, by-PID cleanup).
 # Usage: tools/capture_native.sh [out.png]   env: W=1440 H=900 URL=about:blank SETTLE=3
-#   URL may list several space-separated URLs. KEYS=cmd+t (or PALETTE=1) opens the
+#   URL may list several space-separated URLs; URL=none passes none, so the
+#   window opens the way a new window does. KEYS=cmd+t (or PALETTE=1) opens the
 #   command palette via --myarc-capture-open-palette and waits KEY_SETTLE (default 2).
 #   PALETTE_TEXT="claude plans" pre-fills the palette input to show its results.
 #   COPY_URL=1 copies the page URL via --myarc-capture-copy-url and holds the toast.
@@ -36,7 +37,8 @@ if [ "${1:-}" = "--inner" ]; then
   mkdir -p "$PROFILE/Default"
   touch "$PROFILE/.myarc-m0-test-profile"
   printf '%s\n' '{"vertical_tabs":{"enabled":true,"collapsed_state":false,"enabled_first_time":true}}' > "$PROFILE/Default/Preferences"
-  read -r -a URLS <<< "$URL"
+  URLS=()
+  [ "$URL" = none ] || read -r -a URLS <<< "$URL"
   EXTRA=()
   { [ -n "$KEYS" ] || [ -n "${PALETTE:-}" ]; } && EXTRA+=(--myarc-capture-open-palette)
   [ -n "${PALETTE_TEXT:-}" ] && EXTRA+=(--myarc-capture-palette-text="$PALETTE_TEXT")
@@ -52,7 +54,7 @@ if [ "${1:-}" = "--inner" ]; then
   open -g -n -a "$APP" --args --user-data-dir="$PROFILE" --no-first-run --no-default-browser-check \
     --enable-features=GlassFrame --disable-features=InitialWebUI \
     --disable-backgrounding-occluded-windows ${EXTRA[@]+"${EXTRA[@]}"} \
-    --myarc-visual-parity --myarc-workspace-sidebar --window-size="$W,$H" --window-position=40,60 "${URLS[@]}"
+    --myarc-visual-parity --myarc-workspace-sidebar --window-size="$W,$H" --window-position=40,60 ${URLS[@]+"${URLS[@]}"}
   for _ in $(seq 1 60); do
     for p in $(pgrep -f -- "--user-data-dir=$PROFILE" || true); do
       ps -o command= -p "$p" | grep -q -- '--type=' || { PID=$p; break; }

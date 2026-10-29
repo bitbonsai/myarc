@@ -1,5 +1,5 @@
 diff --git a/chrome/browser/ui/views/location_bar/location_bar_view.cc b/chrome/browser/ui/views/location_bar/location_bar_view.cc
-index 972bd7bc04d240f23d4c527bdb6faa81272421e5..1cc5fb2c7af20579bfa9dc4e14f8fdb8a22dd47b 100644
+index 972bd7bc04d240f23d4c527bdb6faa81272421e5..df0663d7ca1010248c893d1dfc433fcf87476a5e 100644
 --- a/chrome/browser/ui/views/location_bar/location_bar_view.cc
 +++ b/chrome/browser/ui/views/location_bar/location_bar_view.cc
 @@ -11,6 +11,7 @@
@@ -106,18 +106,19 @@ index 972bd7bc04d240f23d4c527bdb6faa81272421e5..1cc5fb2c7af20579bfa9dc4e14f8fdb8
    // The padding between the left edges of the location bar and the LHS icon,
    // e.g. the page info icon, the google G icon, the selected suggestion icon.
    int icon_left = GetLayoutConstant(
-@@ -858,6 +913,10 @@ void LocationBarView::Layout(PassKey) {
+@@ -858,6 +913,11 @@ void LocationBarView::Layout(PassKey) {
          vertical_padding, location_height, false, kLeadingDecorationMaxFraction,
          /*intra_item_padding=*/0, icon_left, selected_keyword_view_);
      selected_keyword_view_->SetKeyword(keyword);
-+  } else if (chrome::IsMyarcWorkspaceBlank(browser_)) {
++  } else if (chrome::IsMyarcWorkspaceBlank(browser_) && !IsEditingOrEmpty()) {
++    // An empty field keeps the search icon below, as in Arc's empty Space.
 +    location_icon_view_->SetVisible(false);
 +  } else if (myarc_quiet_site_info) {
 +    location_icon_view_->SetVisible(reveal_myarc_actions);
    } else if (location_icon_view_->GetShowText() &&
               !ShouldChipOverrideLocationIcon()) {
      location_icon_view_->SetVisible(true);
-@@ -882,6 +941,15 @@ void LocationBarView::Layout(PassKey) {
+@@ -882,6 +942,15 @@ void LocationBarView::Layout(PassKey) {
      }
    };
  
@@ -133,7 +134,7 @@ index 972bd7bc04d240f23d4c527bdb6faa81272421e5..1cc5fb2c7af20579bfa9dc4e14f8fdb8
    if (features::IsPageActionsElevatedToolbarEnabled()) {
      if (page_action_container_ && page_action_container_->GetVisible()) {
        const bool is_capsule_active = page_action_container_->IsCapsuleActive();
-@@ -1125,7 +1193,8 @@ LocationBarModel* LocationBarView::GetLocationBarModel() {
+@@ -1125,7 +1194,8 @@ LocationBarModel* LocationBarView::GetLocationBarModel() {
  }
  
  WebContents* LocationBarView::GetWebContents() {
@@ -143,7 +144,7 @@ index 972bd7bc04d240f23d4c527bdb6faa81272421e5..1cc5fb2c7af20579bfa9dc4e14f8fdb8
  }
  
  std::optional<bubble_anchor_util::AnchorConfiguration>
-@@ -1292,6 +1361,9 @@ bool LocationBarView::ShouldUsePopupOpenAppearance() const {
+@@ -1292,6 +1362,9 @@ bool LocationBarView::ShouldUsePopupOpenAppearance() const {
  }
  
  bool LocationBarView::ShouldHidePageActionIcons() const {
@@ -153,7 +154,7 @@ index 972bd7bc04d240f23d4c527bdb6faa81272421e5..1cc5fb2c7af20579bfa9dc4e14f8fdb8
    if (!omnibox_view_) {
      return false;
    }
-@@ -1400,6 +1472,15 @@ void LocationBarView::RefreshBackground() {
+@@ -1400,6 +1473,15 @@ void LocationBarView::RefreshBackground() {
    SkColor normal = color_provider->GetColor(kColorLocationBarBackground);
    SkColor hovered =
        color_provider->GetColor(kColorLocationBarBackgroundHovered);
@@ -169,7 +170,7 @@ index 972bd7bc04d240f23d4c527bdb6faa81272421e5..1cc5fb2c7af20579bfa9dc4e14f8fdb8
  
    background_color_ = gfx::Tween::ColorValueBetween(opacity, normal, hovered);
    if (is_caret_visible) {
-@@ -1440,8 +1521,12 @@ void LocationBarView::RefreshBackground() {
+@@ -1440,8 +1522,12 @@ void LocationBarView::RefreshBackground() {
    }
  
    // Keep the views::Textfield in sync. It needs an opaque background to
@@ -184,7 +185,7 @@ index 972bd7bc04d240f23d4c527bdb6faa81272421e5..1cc5fb2c7af20579bfa9dc4e14f8fdb8
  
    // The divider between indicators and request chips should have the same color
    // as the omnibox.
-@@ -1792,11 +1877,42 @@ void LocationBarView::OnMouseReleased(const ui::MouseEvent& event) {
+@@ -1792,11 +1878,42 @@ void LocationBarView::OnMouseReleased(const ui::MouseEvent& event) {
    omnibox_view_->OnMouseReleased(AdjustMouseEventLocationForOmniboxView(event));
  }
  
@@ -227,7 +228,7 @@ index 972bd7bc04d240f23d4c527bdb6faa81272421e5..1cc5fb2c7af20579bfa9dc4e14f8fdb8
    OnOmniboxHovered(false);
  }
  
-@@ -1812,6 +1928,9 @@ void LocationBarView::WriteDragDataForView(views::View* sender,
+@@ -1812,6 +1929,9 @@ void LocationBarView::WriteDragDataForView(views::View* sender,
              ui::DragDropTypes::DRAG_NONE);
  
    WebContents* web_contents = GetWebContents();
@@ -237,7 +238,7 @@ index 972bd7bc04d240f23d4c527bdb6faa81272421e5..1cc5fb2c7af20579bfa9dc4e14f8fdb8
    favicon::FaviconDriver* favicon_driver =
        favicon::ContentFaviconDriver::FromWebContents(web_contents);
    gfx::ImageSkia favicon = favicon_driver->GetFavicon().AsImageSkia();
-@@ -1823,7 +1942,7 @@ void LocationBarView::WriteDragDataForView(views::View* sender,
+@@ -1823,7 +1943,7 @@ void LocationBarView::WriteDragDataForView(views::View* sender,
  int LocationBarView::GetDragOperationsForView(views::View* sender,
                                                const gfx::Point& p) {
    DCHECK_EQ(location_icon_view_, sender);
@@ -246,7 +247,7 @@ index 972bd7bc04d240f23d4c527bdb6faa81272421e5..1cc5fb2c7af20579bfa9dc4e14f8fdb8
    return (web_contents && web_contents->GetVisibleURL().is_valid() &&
            (!GetOmniboxView()->IsEditingOrEmpty()))
               ? (ui::DragDropTypes::DRAG_COPY | ui::DragDropTypes::DRAG_LINK)
-@@ -2173,6 +2292,9 @@ bool LocationBarView::IsFullWebUiOmniboxReady() const {
+@@ -2173,6 +2293,9 @@ bool LocationBarView::IsFullWebUiOmniboxReady() const {
  }
  
  void LocationBarView::OnOmniboxHovered(bool is_hovering) {
@@ -256,7 +257,7 @@ index 972bd7bc04d240f23d4c527bdb6faa81272421e5..1cc5fb2c7af20579bfa9dc4e14f8fdb8
    if (is_hovering) {
      // Only show the hover animation when omnibox is in unfocused steady state.
      if (!omnibox_view_->HasFocus()) {
-@@ -2502,7 +2624,6 @@ void LocationBarView::OnAppShimChanged(const webapps::AppId& app_id) {
+@@ -2502,7 +2625,6 @@ void LocationBarView::OnAppShimChanged(const webapps::AppId& app_id) {
  }
  #endif
  

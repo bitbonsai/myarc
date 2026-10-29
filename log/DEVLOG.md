@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-10-30: Empty Space looks like Arc's
+
+- A new window opens Chromium's New Tab Page, which showed up as a "New tab" row with the Google NTP in the content area. The adapter's `Sidebar()` now leaves out a Temporary row whose page is an untouched NTP (`chrome://newtab`, one history entry), so the window lands in the existing empty-Space state with no row. In myArc mode the address field reads "Search or Enter URL…" for every search engine, and an empty Space keeps the search icon instead of hiding it. `URL=none tools/capture_native.sh` captures a real new window.
+- Verification: Chromium `e3321093c2` builds; `bridge_check` passes; patch export `--check` passes. A side-by-side of `URL=none` against Arc's `05-sidebar-expanded-empty-active.png` matches the row list (New Tab only), the magnifier and the placeholder. Browser tests were not built or run.
+- Open: the empty-Space state hides the content card, while Arc keeps an empty rounded card. The NTP tab stays alive, hidden, in the native strip until the window closes.
+
 ## 2026-10-29: Pre-alpha nightly 2026.10.29
 
 - Rebuilt `out/MyarcNightly` from Chromium `e3e9eb8173` with `safe_browsing_use_unrar = false` (confirmed by `gn args`), so this nightly carries GPL-3.0, the copied-URL toast and the native Settings window. Incremental build 3m 15s, then `tools/package_nightly.sh`.

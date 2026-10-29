@@ -28,6 +28,7 @@
 #include "content/public/browser/navigation_entry.h"
 #include "content/public/browser/web_contents.h"
 #include "content/public/browser/web_contents_observer.h"
+#include "content/public/common/url_constants.h"
 #include "myarc/workspace_lifecycle.h"
 
 namespace myarc {
@@ -194,6 +195,15 @@ content::WebContents* LocalPage(TabStripModel& tabs, uint64_t item) {
       return contents;
   }
   return nullptr;
+}
+
+// Like Arc, a window's untouched New Tab Page is an empty Space, not a row.
+// Matches the virtual chrome://newtab URL and its committed WebUI host.
+bool IsUntouchedNewTabPage(content::WebContents& page) {
+  const GURL& url = page.GetVisibleURL();
+  return page.GetController().GetEntryCount() <= 1 &&
+         url.SchemeIs(content::kChromeUIScheme) &&
+         (url.host() == "newtab" || url.host() == "new-tab-page");
 }
 
 const foundation::ItemRecord* FindItem(const foundation::StateSnapshot& state,
@@ -762,8 +772,22 @@ std::string BrowserWorkspaceAdapter::error() const {
 
 foundation::SidebarResult BrowserWorkspaceAdapter::Sidebar() const {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
-  if (ready())
-    return service_->Sidebar(window_id_);
+  if (ready()) {
+    auto sidebar = service_->Sidebar(window_id_);
+    if (!sidebar.ok)
+      return sidebar;
+    rust::Vec<foundation::ItemRecord> temporary;
+    for (const auto& row : sidebar.temporary) {
+      auto* page = LocalPage(*tabs_, row.id);
+      if (!page || !IsUntouchedNewTabPage(*page)) {
+        temporary.push_back(row);
+      } else if (row.id == sidebar.selected_item_id) {
+        sidebar.selected_item_id = 0;
+      }
+    }
+    sidebar.temporary = std::move(temporary);
+    return sidebar;
+  }
   foundation::SidebarResult result;
   result.ok = false;
   result.error = error();
