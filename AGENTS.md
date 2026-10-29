@@ -28,7 +28,7 @@ The loop: the lead picks the next Arc screenshot from `research-private/arc/` (o
 - Chromium: one task at a time in the shared checkout `~/.cache/myarc-m0/chromium/src` on branch `myarc`, no worktrees. myarc code is symlinked from `browser/foundation`; export upstream edits per file with `python3 tools/export_patches.py`.
 - Off-Chromium: Rust core, CLI/MCP, site, docs, each in its own worktree (`wt`), so they run alongside the Chromium task.
 
-Wrap builds and browser launches in `/usr/bin/lockf -k /tmp/myarc-build.lock`. Launch the native build only in the background (`open -g`, as in `tools/capture_native.sh`) and capture with `tools/bgcapture.swift`; never run the binary directly or activate it, because windows pop over the user's work. Never `git fetch` in the Chromium checkout. Run builds and captures in the foreground and never end a turn while one is running or waiting on the lock; `lockf` blocks until it's free. Each task logs 3 lines in [log/DEVLOG.md](log/DEVLOG.md). Update `.plans/INDEX.md` at most daily.
+Wrap builds and browser launches in `/usr/bin/lockf -k /tmp/myarc-build.lock`. Launch the native build only in the background (`open -g`, as in `tools/capture_native.sh`) and capture with `tools/bgcapture.swift`; never run the binary directly or activate it, because windows pop over the user's work. The same goes for `browser_tests`, `interactive_ui_tests` and other test binaries that open browser windows: don't run them unless the user asks. Never `git fetch` in the Chromium checkout. Run builds and captures in the foreground and never end a turn while one is running or waiting on the lock; `lockf` blocks until it's free. Each task logs 3 lines in [log/DEVLOG.md](log/DEVLOG.md). Update `.plans/INDEX.md` at most daily.
 
 ## Commands
 
