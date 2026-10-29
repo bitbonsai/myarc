@@ -4,12 +4,12 @@ HTML: https://myarc.dev/download/
 
 Pre-alpha nightly, for trying the Arc-like shell. Not for daily or sensitive browsing.
 
-[Download for macOS (Apple silicon)](https://github.com/bitbonsai/myarc/releases/download/nightly-2026.10.27/myArc-Nightly-2026.10.27-arm64.dmg)
+[Download for macOS (Apple silicon)](https://github.com/bitbonsai/myarc/releases/download/nightly-2026.10.29/myArc-Nightly-2026.10.29-arm64.dmg)
 
-- **Version:** 2026.10.27
-- **Date:** October 27, 2026
-- **Size:** 233.9 MB
-- **SHA-256:** `59d76fe747d0f4d25ded36afe65413cd3fdaa8471cb3f2afbcf5183f70a880ea`
+- **Version:** 2026.10.29
+- **Date:** October 29, 2026
+- **Size:** 232.7 MB
+- **SHA-256:** `efc1a3bc00b74cdd937c658887b03160f11635d74fa2a0b2562fa3f4c2135b1e`
 
 ## System requirements
 
@@ -21,7 +21,7 @@ Pre-alpha nightly, for trying the Arc-like shell. Not for daily or sensitive bro
 1. Check the download against the SHA-256 listed with it. The two values must match.
 
    ```
-   shasum -a 256 ~/Downloads/myArc-Nightly-2026.10.27-arm64.dmg
+   shasum -a 256 ~/Downloads/myArc-Nightly-2026.10.29-arm64.dmg
    ```
 2. Open the DMG and drag myArc Nightly to Applications.
 3. macOS blocks the first launch because the app is not notarized. Right-click myArc Nightly, choose Open, then Open again. If macOS only offers Done or Move to Trash, which macOS 15 and later usually does, open System Settings \> Privacy \& Security, scroll to the myArc Nightly message and choose Open Anyway.
@@ -40,7 +40,8 @@ Each item was seen working in a native run or experiment note. None of it has ha
 - Creating, switching and renaming Spaces from the sidebar footer. Favorites are shared across the Spaces of one Profile.
 - Closing a pinned tab keeps the pin.
 - A command bar: Cmd\+L opens it on the current address, arrows, Enter and Escape work, and new windows open it centered.
-- Shortcuts: Cmd\+S hides the sidebar, Cmd\+Shift\+T reopens a closed tab, Cmd\+Shift\+C copies the address, Cmd\+Shift\+N opens a private window and Ctrl\+Cmd\+N a blank one.
+- Shortcuts: Cmd\+S hides the sidebar, Cmd\+Shift\+T reopens a closed tab, Cmd\+Shift\+C copies the address and shows a Copied Current URL toast, Cmd\+Shift\+N opens a private window and Ctrl\+Cmd\+N a blank one.
+- Cmd\+, opens a native Settings window. General shows the default-browser banner and Advanced links to the full Chromium settings. Profiles, Links and Shortcuts are not available yet.
 - Quitting with Cmd\+Q needs no confirmation by default, with a setting to turn the warning on.
 
 ## What does not work yet
@@ -60,13 +61,14 @@ Each item was seen working in a native run or experiment note. None of it has ha
 - The app is ad-hoc signed and not notarized by Apple.
 - Recent tabs and navigation can be lost after a crash or force quit.
 - Private window, Profile, cookie and credential guarantees are not verified.
+- RAR downloads are not scanned by Safe Browsing, because the UnRAR license conflicts with GPL-3.0.
 - No Widevine, so Netflix, Spotify and Disney\+ will not play.
 - H.264 and AAC are included, so most other web video plays.
 - myArc is an independent project, not affiliated with Arc or The Browser Company.
 
 ## Other ways to get it
 
-- [GitHub releases](https://github.com/bitbonsai/myarc/releases/tag/nightly-2026.10.27) lists every nightly.
+- [GitHub releases](https://github.com/bitbonsai/myarc/releases/tag/nightly-2026.10.29) lists every nightly.
 - [Source on GitHub](https://github.com/bitbonsai/myarc), with instructions to [build it from source](https://github.com/bitbonsai/myarc/blob/main/browser/README.md).
 - [GitHub issues](https://github.com/bitbonsai/myarc/issues) take bug reports. Include the version, your macOS version and the steps that trigger the problem, and leave out private pages.
 
