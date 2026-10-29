@@ -13,6 +13,7 @@ A complete myArc browser and importer remain unimplemented. Native integration i
 
 ## Posts
 
+- [Why myArc is now GPL-3.0](https://myarc.dev/blog/2026-10-29-gpl/index.md): myArc moved from the MIT license to GPL-3.0 so it stays open for good. I don't plan to make money from it, and any modified version has to publish its code.
 - [Building myArc in public](https://myarc.dev/blog/2026-10-25-building-in-public/index.md): Why I'm building myArc after Arc's sunset announcement, with account-free browsing, no behavioral tracking and an Artcraft-inspired workflow.
 
 ## Optional
