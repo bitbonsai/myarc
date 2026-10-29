@@ -115,7 +115,9 @@
 
     /* Header */
     .top { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 1.25rem 1.5rem; padding: 1.75rem 0 }
-    .top nav { display: flex; align-items: center; gap: 2rem }
+    /* The nav is also the phone menu popover. Undo popover defaults so desktop renders it inline. */
+    .top nav { display: flex; align-items: center; gap: 2rem; position: static; inset: auto; width: auto; height: auto; margin: 0; border: 0; padding: 0; overflow: visible; background: none; color: inherit }
+    .menu-toggle { display: none }
     .top nav a:not(.button) { color: var(--text); text-decoration: none; font-weight: 500 }
     .top nav a:not(.button):hover, .top nav a:not(.button):focus-visible { color: var(--link-solid) }
 
@@ -212,10 +214,7 @@
       .wrap { padding: 0 1.5rem }
       h1 { font-size: 3.75rem }
       h2 { font-size: 2.25rem }
-      .top nav { gap: .75rem }
-      .top nav a:not(.button) { display: none }
-      .top nav a.blog-link { display: inline }
-      .top nav .button { font-size: 1rem }
+      .top nav { flex-wrap: wrap; gap: .75rem 1.25rem }
       .hero { grid-template-columns: minmax(0, 1fr); gap: 2.5rem; padding: 2.5rem 0 4.5rem }
       .hero-art { --shift: 0%; grid-row: 1; justify-self: center; max-width: 20rem }
       .hero-art img { animation: none }
@@ -240,12 +239,37 @@
       .hero-copy p { font-size: 1.125rem }
       .hero-art { max-width: 15rem }
       .button { padding: .75rem 1.125rem }
-      .top { flex-wrap: nowrap; gap: 1rem }
-      /* The header button keeps its GitHub mark and accessible name; the label hides visually. */
-      .top nav .button { padding: .75rem }
-      .top .button-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap }
       .top .mark .wordmark { height: 1.375rem }
       .mark { gap: .375rem }
+    }
+
+    /* Phone menu. A popover gives Esc, outside-tap dismissal and focus return without script.
+       Browsers without popover support keep the wrapped inline nav from the 48rem rules. */
+    @supports selector(:popover-open) {
+      @media (max-width: 48rem) {
+        .top { flex-wrap: nowrap; justify-content: flex-start; gap: .75rem }
+        .top .home-mark { display: none }
+        .menu-toggle { display: inline-flex; align-items: center; justify-content: center; width: 2.75rem; height: 2.75rem; flex: none; margin: 0; padding: 0; border: 0; border-radius: 6rem; background: transparent; color: var(--text); box-shadow: inset 0 0 0 .09375rem rgb(var(--link-rgb) / .35); cursor: pointer; transition: background-color .2s ease-in-out, color .2s ease-in-out, box-shadow .2s ease-in-out }
+        .menu-toggle:hover, .menu-toggle:focus-visible { background: rgb(var(--link-rgb) / .08); color: var(--link-solid); box-shadow: inset 0 0 0 .09375rem var(--link-solid) }
+        .menu-toggle svg { width: 1.25rem; height: 1.25rem }
+        .menu-toggle .icon-close, .top:has(> nav:popover-open) .icon-open { display: none }
+        .top:has(> nav:popover-open) .icon-close { display: block }
+        .top nav { position: fixed; inset: var(--menu-top, 6rem) 1.5rem auto; flex-direction: column; align-items: stretch; gap: .125rem; padding: .75rem; border-radius: 1.25rem; background: var(--page) var(--grain) repeat; background-size: 16rem 16rem; color: var(--text); box-shadow: 0 0 0 .0625rem rgb(var(--link-rgb) / .18), 0 1.5rem 3rem rgb(16 28 43 / .22) }
+        .top nav:not(:popover-open) { display: none }
+        .top nav a:not(.button) { padding: .625rem 1rem; border-radius: .75rem; font-size: 1.5rem; font-weight: 600; letter-spacing: -.02em; line-height: 1.3 }
+        .top nav a:not(.button):hover, .top nav a:not(.button):focus-visible { background: rgb(var(--link-rgb) / .08) }
+        .top nav a[aria-current] { color: var(--link-solid) }
+        .top nav a:not(.button):focus-visible { outline-offset: -.1875rem }
+        .top nav .button { justify-content: center; margin-top: .625rem; font-size: 1rem }
+      }
+      @media (max-width: 48rem) and (prefers-reduced-motion: no-preference) {
+        .top nav { transition: opacity .2s ease-out, transform .25s var(--ease), overlay .25s allow-discrete, display .25s allow-discrete }
+        .top nav:not(:popover-open) { opacity: 0; transform: translateY(-.5rem) }
+        @starting-style { .top nav:popover-open { opacity: 0; transform: translateY(-.5rem) } }
+      }
+      @media (max-width: 48rem) and (prefers-color-scheme: dark) {
+        .top nav { box-shadow: 0 0 0 .0625rem rgb(var(--link-rgb) / .22), 0 1.5rem 3rem rgb(0 0 0 / .45) }
+      }
     }
   
     .journal { max-width: 68ch; margin-inline: auto; padding: 4rem 0 6rem }
@@ -327,14 +351,34 @@
 <script type="application/json" id="asset-notices">{"Outfit": "Copyright 2021 The Outfit Project Authors (https://github.com/Outfitio/Outfit-Fonts)\n\nThis Font Software is licensed under the SIL Open Font License, Version 1.1.\nThis license is copied below, and is also available with a FAQ at:\nhttps://scripts.sil.org/OFL\n\n\n-----------------------------------------------------------\nSIL OPEN FONT LICENSE Version 1.1 - 26 February 2007\n-----------------------------------------------------------\n\nPREAMBLE\nThe goals of the Open Font License (OFL) are to stimulate worldwide\ndevelopment of collaborative font projects, to support the font creation\nefforts of academic and linguistic communities, and to provide a free and\nopen framework in which fonts may be shared and improved in partnership\nwith others.\n\nThe OFL allows the licensed fonts to be used, studied, modified and\nredistributed freely as long as they are not sold by themselves. The\nfonts, including any derivative works, can be bundled, embedded,\nredistributed and/or sold with any software provided that any reserved\nnames are not used by derivative works. The fonts and derivatives,\nhowever, cannot be released under any other type of license. The\nrequirement for fonts to remain under this license does not apply\nto any document created using the fonts or their derivatives.\n\nDEFINITIONS\n\"Font Software\" refers to the set of files released by the Copyright\nHolder(s) under this license and clearly marked as such. This may\ninclude source files, build scripts and documentation.\n\n\"Reserved Font Name\" refers to any names specified as such after the\ncopyright statement(s).\n\n\"Original Version\" refers to the collection of Font Software components as\ndistributed by the Copyright Holder(s).\n\n\"Modified Version\" refers to any derivative made by adding to, deleting,\nor substituting -- in part or in whole -- any of the components of the\nOriginal Version, by changing formats or by porting the Font Software to a\nnew environment.\n\n\"Author\" refers to any designer, engineer, programmer, technical\nwriter or other person who contributed to the Font Software.\n\nPERMISSION & CONDITIONS\nPermission is hereby granted, free of charge, to any person obtaining\na copy of the Font Software, to use, study, copy, merge, embed, modify,\nredistribute, and sell modified and unmodified copies of the Font\nSoftware, subject to the following conditions:\n\n1) Neither the Font Software nor any of its individual components,\nin Original or Modified Versions, may be sold by itself.\n\n2) Original or Modified Versions of the Font Software may be bundled,\nredistributed and/or sold with any software, provided that each copy\ncontains the above copyright notice and this license. These can be\nincluded either as stand-alone text files, human-readable headers or\nin the appropriate machine-readable metadata fields within text or\nbinary files as long as those fields can be easily viewed by the user.\n\n3) No Modified Version of the Font Software may use the Reserved Font\nName(s) unless explicit written permission is granted by the corresponding\nCopyright Holder. This restriction only applies to the primary font name as\npresented to the users.\n\n4) The name(s) of the Copyright Holder(s) or the Author(s) of the Font\nSoftware shall not be used to promote, endorse or advertise any\nModified Version, except to acknowledge the contribution(s) of the\nCopyright Holder(s) and the Author(s) or with their explicit written\npermission.\n\n5) The Font Software, modified or unmodified, in part or in whole,\nmust be distributed entirely under this license, and must not be\ndistributed under any other license. The requirement for fonts to\nremain under this license does not apply to any document created\nusing the Font Software.\n\nTERMINATION\nThis license becomes null and void if any of the above conditions are\nnot met.\n\nDISCLAIMER\nTHE FONT SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND,\nEXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO ANY WARRANTIES OF\nMERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT\nOF COPYRIGHT, PATENT, TRADEMARK, OR OTHER RIGHT. IN NO EVENT SHALL THE\nCOPYRIGHT HOLDER BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,\nINCLUDING ANY GENERAL, SPECIAL, INDIRECT, INCIDENTAL, OR CONSEQUENTIAL\nDAMAGES, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING\nFROM, OUT OF THE USE OR INABILITY TO USE THE FONT SOFTWARE OR FROM\nOTHER DEALINGS IN THE FONT SOFTWARE.\n", "Lucide": "ISC License\n\nCopyright (c) 2026 Lucide Icons and Contributors\n\nPermission to use, copy, modify, and/or distribute this software for any\npurpose with or without fee is hereby granted, provided that the above\ncopyright notice and this permission notice appear in all copies.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\" AND THE AUTHOR DISCLAIMS ALL WARRANTIES\nWITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF\nMERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR\nANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES\nWHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN\nACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF\nOR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.\n\n---\n\nThe following Lucide icons are derived from the Feather project:\n\nairplay, alert-circle, alert-octagon, alert-triangle, aperture, arrow-down-circle, arrow-down-left, arrow-down-right, arrow-down, arrow-left-circle, arrow-left, arrow-right-circle, arrow-right, arrow-up-circle, arrow-up-left, arrow-up-right, arrow-up, at-sign, calendar, cast, check, chevron-down, chevron-left, chevron-right, chevron-up, chevrons-down, chevrons-left, chevrons-right, chevrons-up, circle, clipboard, clock, code, columns, command, compass, corner-down-left, corner-down-right, corner-left-down, corner-left-up, corner-right-down, corner-right-up, corner-up-left, corner-up-right, crosshair, database, divide-circle, divide-square, dollar-sign, download, external-link, feather, frown, hash, headphones, help-circle, info, italic, key, layout, life-buoy, link-2, link, loader, lock, log-in, log-out, maximize, meh, minimize, minimize-2, minus-circle, minus-square, minus, monitor, moon, more-horizontal, more-vertical, move, music, navigation-2, navigation, octagon, pause-circle, percent, plus-circle, plus-square, plus, power, radio, rss, search, server, share, shopping-bag, sidebar, smartphone, smile, square, table-2, tablet, target, terminal, trash-2, trash, triangle, tv, type, upload, x-circle, x-octagon, x-square, x, zoom-in, zoom-out\n\nThe MIT License (MIT) (for the icons listed above)\n\nCopyright (c) 2013-present Cole Bemis\n\nPermission is hereby granted, free of charge, to any person obtaining a copy\nof this software and associated documentation files (the \"Software\"), to deal\nin the Software without restriction, including without limitation the rights\nto use, copy, modify, merge, publish, distribute, sublicense, and/or sell\ncopies of the Software, and to permit persons to whom the Software is\nfurnished to do so, subject to the following conditions:\n\nThe above copyright notice and this permission notice shall be included in all\ncopies or substantial portions of the Software.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR\nIMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,\nFITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE\nAUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER\nLIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,\nOUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE\nSOFTWARE.\n", "artwork": "User-supplied ribbon logos. Original grain and custom wordmark generated for myArc. See repository ATTRIBUTION.md for provenance and rights limitations."}</script>
 </head>
 <body><a class="skip" href="#main">Skip to content</a><div class="wrap"><header class="top">
+      <button class="menu-toggle" type="button" popovertarget="site-menu" aria-controls="site-menu" aria-label="Menu"><svg class="icon-open" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M4 5h16"/><path d="M4 12h16"/><path d="M4 19h16"/></svg><svg class="icon-close" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
       <a class="mark plain" href="/" aria-label="myArc home"><img class="ribbon" src="_assets/logo-matte.300972748816.webp" alt="" width="1254" height="1254"><picture><source media="(prefers-color-scheme: dark)" srcset="_assets/wordmark-ivory.3a99cf025832.svg"><img class="wordmark" src="_assets/wordmark-ink.18b9e7ae3785.svg" alt="myArc" width="3056" height="1049"></picture></a>
-      <nav aria-label="Page">
+      <nav id="site-menu" aria-label="Page" popover>
         <a href="/#principles">Principles</a>
         <a href="/#building">Progress</a>
         <a class="blog-link" aria-current="page" href="/blog/">Blog</a>
         <a class="download-link" href="/download/">Download</a>
         <a class="button ghost" href="https://github.com/bitbonsai/myarc"><svg class="github-icon" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false"><path fill-rule="evenodd" clip-rule="evenodd" d="M8 0C3.58 0 0 3.58 0 8C0 11.54 2.29 14.53 5.47 15.59C5.87 15.66 6.02 15.42 6.02 15.21C6.02 15.02 6.01 14.39 6.01 13.72C4 14.09 3.48 13.23 3.32 12.78C3.23 12.55 2.84 11.84 2.5 11.65C2.22 11.5 1.82 11.13 2.49 11.12C3.12 11.11 3.57 11.7 3.72 11.94C4.44 13.15 5.59 12.81 6.05 12.6C6.12 12.08 6.33 11.73 6.56 11.53C4.78 11.33 2.92 10.64 2.92 7.58C2.92 6.71 3.23 5.99 3.74 5.43C3.66 5.23 3.38 4.41 3.82 3.31C3.82 3.31 4.49 3.1 6.02 4.13C6.66 3.95 7.34 3.86 8.02 3.86C8.7 3.86 9.38 3.95 10.02 4.13C11.55 3.09 12.22 3.31 12.22 3.31C12.66 4.41 12.38 5.23 12.3 5.43C12.81 5.99 13.12 6.7 13.12 7.58C13.12 10.65 11.25 11.33 9.47 11.53C9.76 11.78 10.01 12.26 10.01 13.01C10.01 14.08 10 14.94 10 15.21C10 15.42 10.15 15.67 10.55 15.59C13.71 14.53 16 11.53 16 8C16 3.58 12.42 0 8 0Z" transform="scale(64)" fill="currentColor"/></svg><span class="button-label">Follow development</span></a>
       </nav>
+      <script>
+        (() => {
+          const menu = document.querySelector('#site-menu')
+          const toggle = document.querySelector('.menu-toggle')
+          if (!menu || !toggle || typeof menu.showPopover !== 'function') return
+          const open = () => menu.matches(':popover-open')
+          toggle.setAttribute('aria-expanded', 'false')
+          menu.addEventListener('beforetoggle', event => {
+            if (event.newState === 'open') menu.style.setProperty('--menu-top', toggle.getBoundingClientRect().bottom + 12 + 'px')
+          })
+          menu.addEventListener('toggle', () => toggle.setAttribute('aria-expanded', String(open())))
+          menu.addEventListener('click', event => {
+            if (event.target.closest('a') && open()) menu.hidePopover()
+          })
+          matchMedia('(min-width: 48.0625rem)').addEventListener('change', event => {
+            if (event.matches && open()) menu.hidePopover()
+          })
+        })()
+      </script>
     </header><main id="main" class="journal"><h1 class="visually-hidden">Blog</h1><div class="post-list"><p class="post-month">October 2026</p><article class="post-preview"><a class="post-thumb" href="2026-10-25-building-in-public/" aria-hidden="true" tabindex="-1"><img src="_thumbnails/2026-10-25-building-in-public.04ddfd989a3f.webp" alt="" width="384" height="240" loading="lazy"></a><div class="post-preview-copy"><h2><a href="2026-10-25-building-in-public/">Building myArc in public</a></h2><time class="post-date" datetime="2026-10-25">October 25, 2026</time><p class="post-summary">Why I&#x27;m building myArc after Arc&#x27;s sunset announcement, with account-free browsing, no behavioral tracking and an Artcraft-inspired workflow.</p></div></article></div></main><footer class="end">
       <a class="mark plain" href="#main" aria-label="Back to top"><img class="ribbon" src="_assets/logo-matte.300972748816.webp" alt="" width="1254" height="1254"><picture><source media="(prefers-color-scheme: dark)" srcset="_assets/wordmark-ivory.3a99cf025832.svg"><img class="wordmark" src="_assets/wordmark-ink.18b9e7ae3785.svg" alt="myArc" width="3056" height="1049"></picture></a>
       <div class="end-copy">
