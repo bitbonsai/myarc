@@ -210,4 +210,4 @@ The [dependency/license inventory](evidence/dependency-licenses.json) contains 3
 
 The current component app has an ad-hoc linker signature, no team identifier or sealed resources, and fails strict bundle verification with `code has no resources but signature indicates they must be present`. It is a local development build, unsuitable for distribution. Signing/notarization and authenticated update rehearsal remain open; signing identities were not inspected.
 
-Before accepting the foundation, identify security triage and signing/update owners, primary/backup build capacity, recurring costs and absence coverage. An available workstation establishes neither funding nor ownership. Upstream licenses remain separate from this repository's MIT license. Helium, native messaging, DRM and codecs remain unevaluated.
+Before accepting the foundation, identify security triage and signing/update owners, primary/backup build capacity, recurring costs and absence coverage. An available workstation establishes neither funding nor ownership. Upstream licenses remain separate from this repository's GPL-3.0 license. Helium, native messaging, DRM and codecs remain unevaluated.
