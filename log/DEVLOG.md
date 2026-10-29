@@ -12,6 +12,11 @@
 - Verification: `chrome` and `bridge_check` build, `bridge_check` passes, and a background `URL=none` capture still shows the empty Space. Cmd+N, incognito and Cmd+W need key input, so they were not captured; the `MyarcWorkspaceCommandSafetyTest` expectations for Cmd+W were updated but browser tests were not built or run.
 - Chromium `myarc` commit `522ebee901`; `export_patches.py --check` and `check_docs.py` pass. Cmd+W in an empty Space also closes the window's pages from other Spaces, as closing any window does.
 
+## 2026-10-30: Arc default sidebar width
+
+- Default sidebar width 270pt -> 228pt (`kMyarcSidebarDefaultWidth`); min stays 198. Arc measures 228pt: the sidebar edge sits at x=456px in both 2x reference screenshots.
+- Verification: `chrome` and `bridge_check` build, `bridge_check` passes, and a background `URL=none W=1440 H=900` capture puts the edge at x=456px (228pt). A width saved in the profile pref `vertical_tab_strip_uncollapsed_width` still overrides the default; no migration. Chromium `myarc` commit `817f2783a1`; `export_patches.py --check` and `check_docs.py` pass.
+
 ## 2026-10-30: Empty Space shows Arc's page card
 
 - The empty-Space canvas hid the active contents container, leaving only the window background. It now detaches the page hosts but keeps that container visible, so the same translucent rounded card as with an `about:blank` page shows, as in Arc's empty Space.
