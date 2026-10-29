@@ -1,8 +1,8 @@
 diff --git a/chrome/browser/ui/browser_window.h b/chrome/browser/ui/browser_window.h
-index 3b0e66f8a95dc0518c74122eec1baab5717c3028..fb7f347d30c64a4304c5229dcaac75de4becba2d 100644
+index 3b0e66f8a95dc0518c74122eec1baab5717c3028..602a43f05eb7ae3b1a510b091b745e1783a0a872 100644
 --- a/chrome/browser/ui/browser_window.h
 +++ b/chrome/browser/ui/browser_window.h
-@@ -112,6 +112,25 @@ class BrowserWindow : public ui::BaseWindow {
+@@ -112,6 +112,27 @@ class BrowserWindow : public ui::BaseWindow {
   public:
    virtual ~BrowserWindow() = default;
  
@@ -24,11 +24,13 @@ index 3b0e66f8a95dc0518c74122eec1baab5717c3028..fb7f347d30c64a4304c5229dcaac75de
 +  // True consumes the explicit user operation, including an actionable failure.
 +  // Generic native pin-bit changes (restore/detach) must not unsave metadata.
 +  virtual bool SetMyarcTabsSaved(const std::vector<int>& indices, bool saved);
++  // True when myArc showed its own copied-URL toast instead of Chromium's.
++  virtual bool ShowMyarcCopiedUrlToast();
 +
    //////////////////////////////////////////////////////////////////////////////
    // ui::BaseWindow interface notes:
  
-@@ -508,4 +527,24 @@ class BrowserWindow : public ui::BaseWindow {
+@@ -508,4 +529,28 @@ class BrowserWindow : public ui::BaseWindow {
    virtual void DeleteBrowserWindow() = 0;
  };
  
@@ -49,6 +51,10 @@ index 3b0e66f8a95dc0518c74122eec1baab5717c3028..fb7f347d30c64a4304c5229dcaac75de
 +
 +inline bool BrowserWindow::SetMyarcTabsSaved(const std::vector<int>& indices,
 +                                             bool saved) {
++  return false;
++}
++
++inline bool BrowserWindow::ShowMyarcCopiedUrlToast() {
 +  return false;
 +}
 +

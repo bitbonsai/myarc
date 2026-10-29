@@ -118,6 +118,24 @@ source_set("sidebar_view") {
   ]
 }
 
+source_set("copied_url_toast") {
+  sources = [
+    "copied_url_toast.cc",
+    "copied_url_toast.h",
+  ]
+  public_deps = [ "//base" ]
+  deps = [
+    "//cc/paint",
+    "//skia",
+    "//ui/accessibility",
+    "//ui/base",
+    "//ui/compositor",
+    "//ui/gfx",
+    "//ui/gfx/geometry",
+    "//ui/views",
+  ]
+}
+
 executable("bridge_check") {
   testonly = true
   sources = [ "bridge_check.cc" ]

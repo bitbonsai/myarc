@@ -1,5 +1,5 @@
 diff --git a/chrome/browser/ui/views/frame/BUILD.gn b/chrome/browser/ui/views/frame/BUILD.gn
-index 41231752d903fec4f355a7b20037f5058904661c..acc3379f88d34390adae6fb85d0e6b1a50a26ca5 100644
+index 41231752d903fec4f355a7b20037f5058904661c..7c9b20e967e86cb0b7cfff38df1bafbc15e62c6b 100644
 --- a/chrome/browser/ui/views/frame/BUILD.gn
 +++ b/chrome/browser/ui/views/frame/BUILD.gn
 @@ -591,6 +591,7 @@ source_set("app_menu_button_impl") {
@@ -10,15 +10,16 @@ index 41231752d903fec4f355a7b20037f5058904661c..acc3379f88d34390adae6fb85d0e6b1a
      "//chrome/browser/ui:browser_actions",
      "//chrome/browser/ui:browser_element_identifiers",
      "//chrome/browser/ui:browser_window_header",
-@@ -737,6 +738,7 @@ source_set("browser_view_header") {
+@@ -737,6 +738,8 @@ source_set("browser_view_header") {
      "//components/user_education/common",
      "//components/viz/common",
      "//content/public/browser",
++    "//myarc:copied_url_toast",
 +    "//myarc:sidebar_view",
      "//third_party/blink/public/common:headers",
      "//ui/base",
      "//ui/base/identifier",
-@@ -800,6 +802,7 @@ source_set("browser_view") {
+@@ -800,6 +803,7 @@ source_set("browser_view") {
      "//chrome/browser/feature_engagement",
      "//chrome/browser/glic/public:features",
      "//chrome/browser/headless",
@@ -26,7 +27,7 @@ index 41231752d903fec4f355a7b20037f5058904661c..acc3379f88d34390adae6fb85d0e6b1a
      "//chrome/browser/profiles",
      "//chrome/browser/profiles:profile",
      "//chrome/browser/profiles:profile_manager",
-@@ -879,6 +882,7 @@ source_set("browser_view") {
+@@ -879,6 +883,7 @@ source_set("browser_view") {
      "//chrome/browser/ui/views/accessibility",
      "//chrome/browser/ui/views/autofill:autofill_bubble_handler_impl",
      "//chrome/browser/ui/views/bookmarks",
@@ -34,7 +35,7 @@ index 41231752d903fec4f355a7b20037f5058904661c..acc3379f88d34390adae6fb85d0e6b1a
      "//chrome/browser/ui/views/download",
      "//chrome/browser/ui/views/exclusive_access",
      "//chrome/browser/ui/views/extensions:extensions_toolbar_desktop",
-@@ -935,6 +939,7 @@ source_set("browser_view") {
+@@ -935,6 +940,7 @@ source_set("browser_view") {
      "//components/enterprise/buildflags",
      "//components/feature_engagement/public",
      "//components/feature_engagement/public:feature_constants",
@@ -42,7 +43,7 @@ index 41231752d903fec4f355a7b20037f5058904661c..acc3379f88d34390adae6fb85d0e6b1a
      "//components/infobars/content",
      "//components/javascript_dialogs",
      "//components/performance_manager",
-@@ -960,6 +965,8 @@ source_set("browser_view") {
+@@ -960,6 +966,8 @@ source_set("browser_view") {
      "//content/public/common",
      "//extensions/common",
      "//media/capture:capture_switches",
@@ -51,7 +52,7 @@ index 41231752d903fec4f355a7b20037f5058904661c..acc3379f88d34390adae6fb85d0e6b1a
      "//third_party/blink/public/common:headers",
      "//ui/accessibility",
      "//ui/accessibility:ax_base",
-@@ -1392,6 +1399,7 @@ source_set("contents_web_view") {
+@@ -1392,6 +1400,7 @@ source_set("contents_web_view") {
    deps = [
      ":safe_invoke",
      ":web_contents_close_handler",
@@ -59,7 +60,7 @@ index 41231752d903fec4f355a7b20037f5058904661c..acc3379f88d34390adae6fb85d0e6b1a
      "//chrome/browser/ui/color:color_headers",
      "//chrome/browser/ui/views:status_bubble",
      "//chrome/browser/ui/views/animations",
-@@ -1943,6 +1951,7 @@ if (is_mac) {
+@@ -1943,6 +1952,7 @@ if (is_mac) {
        "//chrome/browser/ui:fullscreen_util_mac",
        "//chrome/browser/ui:layout_constants",
        "//chrome/browser/ui:view_ids",
@@ -67,7 +68,7 @@ index 41231752d903fec4f355a7b20037f5058904661c..acc3379f88d34390adae6fb85d0e6b1a
        "//chrome/browser/ui/browser_window",
        "//chrome/browser/ui/cocoa",
        "//chrome/browser/ui/color:color_headers",
-@@ -1950,6 +1959,7 @@ if (is_mac) {
+@@ -1950,6 +1960,7 @@ if (is_mac) {
        "//chrome/browser/ui/exclusive_access",
        "//chrome/browser/ui/immersive:immersive_mode_controller",
        "//chrome/browser/ui/tabs",
@@ -75,7 +76,7 @@ index 41231752d903fec4f355a7b20037f5058904661c..acc3379f88d34390adae6fb85d0e6b1a
        "//chrome/browser/ui/views/bookmarks",
        "//chrome/browser/ui/views/tabs:tab_strip",
        "//chrome/browser/ui/views/toolbar",
-@@ -2262,6 +2272,7 @@ source_set("browser_tests") {
+@@ -2262,6 +2273,7 @@ source_set("browser_tests") {
      "//chrome/browser/devtools",
      "//chrome/browser/devtools:test_support",
      "//chrome/browser/glic/test_support",
@@ -83,7 +84,7 @@ index 41231752d903fec4f355a7b20037f5058904661c..acc3379f88d34390adae6fb85d0e6b1a
      "//chrome/browser/ui:browser_actions",
      "//chrome/browser/ui:browser_tabstrip",
      "//chrome/browser/ui:recently_audible_helper",
-@@ -2269,20 +2280,30 @@ source_set("browser_tests") {
+@@ -2269,20 +2281,30 @@ source_set("browser_tests") {
      "//chrome/browser/ui/actions:actions_util",
      "//chrome/browser/ui/browser_web_contents_delegate",
      "//chrome/browser/ui/find_bar",

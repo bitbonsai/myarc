@@ -1,5 +1,5 @@
 diff --git a/chrome/browser/ui/views/frame/browser_view.h b/chrome/browser/ui/views/frame/browser_view.h
-index 750e46c97b64dccccf4268e912df5dbdb6516b3c..a0423aa303876e1f7042977b5dc343bfb0ddc098 100644
+index 750e46c97b64dccccf4268e912df5dbdb6516b3c..45b7a400763b63e3e12edc45ff594d08c62d0e78 100644
 --- a/chrome/browser/ui/views/frame/browser_view.h
 +++ b/chrome/browser/ui/views/frame/browser_view.h
 @@ -8,6 +8,7 @@
@@ -18,12 +18,13 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..a0423aa303876e1f7042977b5dc343bf
  #include "third_party/blink/public/common/permissions/permission_utils.h"
  #include "ui/base/accelerators/accelerator.h"
  #include "ui/base/identifier/typed_identifier.h"
-@@ -104,6 +106,13 @@ class TopControlsSlideControllerTest;
+@@ -104,6 +106,14 @@ class TopControlsSlideControllerTest;
  class VerticalTabStripRegionView;
  class WebAppFrameToolbarView;
  
 +namespace myarc {
 +class BrowserWorkspaceAdapter;
++class CopiedUrlToast;
 +namespace foundation {
 +struct MutationResult;
 +}
@@ -32,7 +33,7 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..a0423aa303876e1f7042977b5dc343bf
  namespace gfx {
  class AnimationRunner;
  }  // namespace gfx
-@@ -121,7 +130,11 @@ enum class Channel;
+@@ -121,7 +131,11 @@ enum class Channel;
  }
  
  namespace views {
@@ -44,7 +45,7 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..a0423aa303876e1f7042977b5dc343bf
  class NativeViewHost;
  class WebView;
  }  // namespace views
-@@ -143,7 +156,8 @@ class BrowserView : public BrowserWindow,
+@@ -143,7 +157,8 @@ class BrowserView : public BrowserWindow,
                      public ImmersiveModeController::Observer,
                      public GlobalErrorObserver,
                      public views::FocusChangeListener,
@@ -54,7 +55,7 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..a0423aa303876e1f7042977b5dc343bf
    METADATA_HEADER(BrowserView, views::ClientView)
  
   public:
-@@ -234,6 +248,8 @@ class BrowserView : public BrowserWindow,
+@@ -234,6 +249,8 @@ class BrowserView : public BrowserWindow,
    // Container for the tabstrip, toolbar, etc.
    TopContainerView* top_container() { return top_container_; }
  
@@ -63,7 +64,7 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..a0423aa303876e1f7042977b5dc343bf
    std::optional<int> theme_background_y_offset() const {
      return theme_background_y_offset_;
    }
-@@ -311,6 +327,19 @@ class BrowserView : public BrowserWindow,
+@@ -311,6 +328,20 @@ class BrowserView : public BrowserWindow,
  
    ScrimView* window_scrim_view() { return window_scrim_view_; }
  
@@ -79,11 +80,12 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..a0423aa303876e1f7042977b5dc343bf
 +  std::optional<MyarcTabSaveState> GetMyarcTabSaveState(
 +      const std::vector<int>& indices) const override;
 +  bool SetMyarcTabsSaved(const std::vector<int>& indices, bool saved) override;
++  bool ShowMyarcCopiedUrlToast() override;
 +
    base::WeakPtr<BrowserView> GetAsWeakPtr() {
      return weak_ptr_factory_.GetWeakPtr();
    }
-@@ -1253,12 +1282,56 @@ class BrowserView : public BrowserWindow,
+@@ -1253,12 +1284,59 @@ class BrowserView : public BrowserWindow,
  
    // Anchor point for help bubbles and other dialogs that want to reliably
    // anchor outside the content area of the window.
@@ -129,6 +131,9 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..a0423aa303876e1f7042977b5dc343bf
 +  std::unique_ptr<views::Widget> myarc_command_palette_widget_;
 +  // --myarc-capture-open-palette opens the palette once per window.
 +  bool myarc_capture_palette_scheduled_ = false;
++  std::unique_ptr<myarc::CopiedUrlToast> myarc_copied_url_toast_;
++  // --myarc-capture-copy-url copies the URL once per window.
++  bool myarc_capture_copy_url_scheduled_ = false;
 +
    std::unique_ptr<views::ViewSubregionAnchor> dialog_anchor_;
  
@@ -140,7 +145,7 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..a0423aa303876e1f7042977b5dc343bf
  
    // A mapping between accelerators and command IDs.
    std::map<ui::Accelerator, int> accelerator_table_;
-@@ -1411,6 +1484,7 @@ class BrowserView : public BrowserWindow,
+@@ -1411,6 +1489,7 @@ class BrowserView : public BrowserWindow,
    base::EnumSet<TabStripAndWebAppViewsReparentedState>
        tab_strip_web_apps_reparented_state_;
  

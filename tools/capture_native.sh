@@ -4,6 +4,7 @@
 #   URL may list several space-separated URLs. KEYS=cmd+t (or PALETTE=1) opens the
 #   command palette via --myarc-capture-open-palette and waits KEY_SETTLE (default 2).
 #   PALETTE_TEXT="claude plans" pre-fills the palette input to show its results.
+#   COPY_URL=1 copies the page URL via --myarc-capture-copy-url and holds the toast.
 #   The browser launches in the background (open -g) and is captured with
 #   ScreenCaptureKit (tools/bgcapture.swift), so it never takes focus.
 set -euo pipefail
@@ -36,6 +37,7 @@ if [ "${1:-}" = "--inner" ]; then
   EXTRA=()
   { [ -n "$KEYS" ] || [ -n "${PALETTE:-}" ]; } && EXTRA+=(--myarc-capture-open-palette)
   [ -n "${PALETTE_TEXT:-}" ] && EXTRA+=(--myarc-capture-palette-text="$PALETTE_TEXT")
+  [ -n "${COPY_URL:-}" ] && EXTRA+=(--myarc-capture-copy-url)
   # -g: launch without activating, so the user's frontmost app keeps focus.
   open -g -n -a "$APP" --args --user-data-dir="$PROFILE" --no-first-run --no-default-browser-check \
     --enable-features=GlassFrame --disable-features=InitialWebUI \

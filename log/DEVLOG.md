@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-10-29: Copied-URL toast
+
+- In myArc mode `IDC_COPY_URL` (Cmd+Shift+C) shows Arc's "Copied Current URL" pill with Lucide `share` at the window's top-right (`browser/foundation/copied_url_toast.cc`) instead of Chromium's link-copied toast, and fades out after 2 s. `CopyURL` asks the new `BrowserWindow::ShowMyarcCopiedUrlToast` hook, which returns false without `--myarc-visual-parity`. `--myarc-capture-copy-url` (`COPY_URL=1` in `tools/capture_native.sh`) copies once and holds the toast.
+- Verification: build and `bridge_check` pass. A Cmd+Shift+C posted to the background PID put `https://example.com/` on the clipboard; the toast was visible at 0.4 s and gone at 3.4 s. A side-by-side with the Arc reference matches size, radius, insets, fill and icon well within a few pixels at 2x.
+- Open: the label renders about 3% wider than Arc's, and Arc's well has a faint top highlight that isn't drawn. The stock path without the switch was not run.
+
 ## 2026-10-27: Nightly pages stuck loading
 
 - Cause: the nightly read Chromium's `Chromium Safe Storage` Keychain item, which the dev build's signature owns. macOS queued a login-password prompt that background launches never showed, the persistent cookie store waited on the key, and every request stopped after `URL_REQUEST_START_JOB` (net-log: no `COOKIE_PERSISTENT_STORE_LOAD` end, no HTTP cache events). The nightly now uses its own `myArc Nightly Safe Storage` item. Committed Chromium `38c468b970`.
