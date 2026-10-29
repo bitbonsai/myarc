@@ -22,7 +22,8 @@ WORKS = [
     'Creating, switching and renaming Spaces from the sidebar footer. Favorites are shared across the Spaces of one Profile.',
     'Closing a pinned tab keeps the pin.',
     'A command bar: Cmd+L opens it on the current address, arrows, Enter and Escape work, and new windows open it centered.',
-    'Shortcuts: Cmd+S hides the sidebar, Cmd+Shift+T reopens a closed tab, Cmd+Shift+C copies the address, Cmd+Shift+N opens a private window and Ctrl+Cmd+N a blank one.',
+    'Shortcuts: Cmd+S hides the sidebar, Cmd+Shift+T reopens a closed tab, Cmd+Shift+C copies the address and shows a Copied Current URL toast, Cmd+Shift+N opens a private window and Ctrl+Cmd+N a blank one.',
+    'Cmd+, opens a native Settings window. General shows the default-browser banner and Advanced links to the full Chromium settings. Profiles, Links and Shortcuts are not available yet.',
     'Quitting with Cmd+Q needs no confirmation by default, with a setting to turn the warning on.',
 ]
 MISSING = [
@@ -95,6 +96,7 @@ def limitations(release):
             'The app is ad-hoc signed and not notarized by Apple.',
             'Recent tabs and navigation can be lost after a crash or force quit.',
             'Private window, Profile, cookie and credential guarantees are not verified.',
+            'RAR downloads are not scanned by Safe Browsing, because the UnRAR license conflicts with GPL-3.0.',
             'No Widevine, so Netflix, Spotify and Disney+ will not play.',
             'H.264 and AAC are included, so most other web video plays.' if codecs else 'H.264 and AAC are not included, so some web video will not play.',
             'myArc is an independent project, not affiliated with Arc or The Browser Company.']

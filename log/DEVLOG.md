@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-10-29: Pre-alpha nightly 2026.10.29
+
+- Rebuilt `out/MyarcNightly` from Chromium `e3e9eb8173` with `safe_browsing_use_unrar = false` (confirmed by `gn args`), so this nightly carries GPL-3.0, the copied-URL toast and the native Settings window. Incremental build 3m 15s, then `tools/package_nightly.sh`.
+- Published prerelease `nightly-2026.10.29`: `myArc-Nightly-2026.10.29-arm64.dmg`, 232,719,126 bytes, SHA-256 `efc1a3bc00b74cdd937c658887b03160f11635d74fa2a0b2562fa3f4c2135b1e`, matched on re-download. The download page lists Cmd+, and the RAR limitation.
+- Verification: a background launch of the staged app with a temp profile started 10 processes and quit cleanly; site build, unit tests and checks pass. Settings and toast were not exercised in this build.
+
 ## 2026-10-29: C++ no longer assumes Space 1
 
 - The M0 test button (`native_button.cc`) renames the first Space from `export_snapshot` instead of id 1. `rename_space`'s `name` now reports the renamed Space through the new `Workspace::space_name_of`, and is empty for an unknown id. The adapter already allocates windows in `spaces[0]`; no other literal Space 1 turned up in `browser/foundation` or the Chromium patches.
