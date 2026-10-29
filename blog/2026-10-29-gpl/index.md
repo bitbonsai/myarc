@@ -27,7 +27,7 @@ MIT's main advantage for an author is that it keeps commercial doors open: you c
 
 ## What changes in practice
 
-- Releases and commits before the switch stay available under MIT. GPL-3.0 applies from [this commit](https://github.com/bitbonsai/myarc/commit/28f4b51) onward.
+- Releases and commits before the switch stay available under MIT. GPL-3.0 applies from [this commit](https://github.com/bitbonsai/myarc/commit/3bb4d23) onward.
 - New contributions are licensed under GPL-3.0. No contributor agreement is needed.
 - Chromium and the other bundled components keep their own licenses, listed in [ATTRIBUTION.md](https://github.com/bitbonsai/myarc/blob/main/ATTRIBUTION.md).
 - One Chromium component, the RAR decompressor used to scan downloaded archives, has a license that conflicts with the GPL. From the next nightly, it's turned off, so RAR files you download won't be scanned.
