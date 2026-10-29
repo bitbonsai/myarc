@@ -37,7 +37,7 @@
     }
 
     :root {
-      --grain: url('_assets/grain.abf704de0076.webp');
+      --grain: url('_assets/grain.4656a6e225c0.webp');
       --ivory: #f5f2ec;
       --ink: #182432;
       --quiet: #54616d;
@@ -66,7 +66,7 @@
     }
 
     * { box-sizing: border-box }
-    html { font-size: 100%; scroll-behavior: smooth }
+    html { font-size: 100%; scroll-behavior: smooth; overflow-x: clip }
     body {
       margin: 0;
       overflow-x: clip;
@@ -126,8 +126,9 @@
     .hero-copy p { max-width: 34rem; margin-top: 1.75rem; font-size: 1.375rem; line-height: 1.45; color: var(--quiet) }
     .cta { display: flex; align-items: center; flex-wrap: wrap; gap: 1.25rem 1.75rem; margin-top: 2.5rem }
     .cta a:not(.button) { font-weight: 500 }
-    .hero-art { --shift: 6%; position: relative; justify-self: end; width: 100%; max-width: 34rem; transform: translateX(var(--shift)) }
-    .hero-art img { width: 100%; filter: drop-shadow(0 2.5rem 3rem rgb(24 36 50 / .18)) }
+    .hero-art { --shift: 6%; position: relative; justify-self: end; width: 100%; max-width: 34rem; aspect-ratio: 1; transform: translateX(var(--shift)); pointer-events: none }
+    /* Transparent image padding holds baked shadows outside the original artwork box. */
+    .hero-art img { position: absolute; top: -25%; left: -25%; width: 150%; max-width: none }
 
     /* Sections breathe instead of drawing rules. One column of headings, content grids below them. */
     .block { padding: 6rem 0 }
@@ -151,8 +152,8 @@
     }
     .panel-head { grid-area: head; max-width: 40rem }
     .panel .lead { margin-top: 1.5rem; font-size: 1.25rem; line-height: 1.5; color: rgb(245 242 236 / .82) }
-    .panel-art { grid-area: art; width: 13rem; justify-self: end; transform: translate(10%, -12%); pointer-events: none }
-    .panel-art img { width: 100%; filter: drop-shadow(0 0 3rem rgb(16 174 255 / .28)) }
+    .panel-art { grid-area: art; position: relative; width: 13rem; aspect-ratio: 1; justify-self: end; transform: translate(10%, -12%); pointer-events: none }
+    .panel-art img { position: absolute; top: -50%; left: -50%; width: 200%; max-width: none }
     .status { grid-area: status; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 2.5rem 3rem; margin-top: 3.5rem }
     .status dt { font-size: 1.5rem; font-weight: 600; letter-spacing: -.02em; line-height: 1.2 }
     .status dd { margin-top: .75rem; color: rgb(245 242 236 / .86) }
@@ -298,6 +299,9 @@
         .top nav::backdrop { background: rgb(0 0 0 / .4) }
       }
     }
+    @media (prefers-reduced-motion: reduce) {
+      .menu-toggle, .quick-icon, .menu-close { transition: none }
+    }
   
     .journal { max-width: 68ch; margin-inline: auto; padding: 4rem 0 6rem }
     .journal > header { margin-bottom: 3rem }
@@ -379,7 +383,7 @@
 </head>
 <body><a class="skip" href="#main">Skip to content</a><div class="wrap"><header class="top">
       <button class="menu-toggle" type="button" popovertarget="site-menu" aria-controls="site-menu" aria-label="Menu"><svg class="icon-open" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M4 5h16"/><path d="M4 12h16"/><path d="M4 19h16"/></svg><svg class="icon-close" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
-      <a class="mark plain" href="/" aria-label="myArc home"><img class="ribbon" src="_assets/logo-matte.300972748816.webp" alt="" width="1254" height="1254"><picture><source media="(prefers-color-scheme: dark)" srcset="_assets/wordmark-ivory.3a99cf025832.svg"><img class="wordmark" src="_assets/wordmark-ink.18b9e7ae3785.svg" alt="myArc" width="3056" height="1049"></picture></a>
+      <a class="mark plain" href="/" aria-label="myArc home"><img class="ribbon" src="_assets/logo-matte.adbb3c7ddc14.webp" alt="" width="1254" height="1254"><picture><source media="(prefers-color-scheme: dark)" srcset="_assets/wordmark-ivory.3a99cf025832.svg"><img class="wordmark" src="_assets/wordmark-ink.18b9e7ae3785.svg" alt="myArc" width="3056" height="1049"></picture></a>
       <div class="quick">
         <a class="quick-blog" aria-current="page" href="/blog/">Blog</a>
         <a class="quick-icon" href="https://github.com/bitbonsai/myarc" aria-label="Follow development"><svg class="github-icon" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false"><path fill-rule="evenodd" clip-rule="evenodd" d="M8 0C3.58 0 0 3.58 0 8C0 11.54 2.29 14.53 5.47 15.59C5.87 15.66 6.02 15.42 6.02 15.21C6.02 15.02 6.01 14.39 6.01 13.72C4 14.09 3.48 13.23 3.32 12.78C3.23 12.55 2.84 11.84 2.5 11.65C2.22 11.5 1.82 11.13 2.49 11.12C3.12 11.11 3.57 11.7 3.72 11.94C4.44 13.15 5.59 12.81 6.05 12.6C6.12 12.08 6.33 11.73 6.56 11.53C4.78 11.33 2.92 10.64 2.92 7.58C2.92 6.71 3.23 5.99 3.74 5.43C3.66 5.23 3.38 4.41 3.82 3.31C3.82 3.31 4.49 3.1 6.02 4.13C6.66 3.95 7.34 3.86 8.02 3.86C8.7 3.86 9.38 3.95 10.02 4.13C11.55 3.09 12.22 3.31 12.22 3.31C12.66 4.41 12.38 5.23 12.3 5.43C12.81 5.99 13.12 6.7 13.12 7.58C13.12 10.65 11.25 11.33 9.47 11.53C9.76 11.78 10.01 12.26 10.01 13.01C10.01 14.08 10 14.94 10 15.21C10 15.42 10.15 15.67 10.55 15.59C13.71 14.53 16 11.53 16 8C16 3.58 12.42 0 8 0Z" transform="scale(64)" fill="currentColor"/></svg></a>
@@ -409,7 +413,7 @@
         })()
       </script>
     </header><main id="main" class="journal"><h1 class="visually-hidden">Blog</h1><div class="post-list"><p class="post-month">October 2026</p><article class="post-preview"><div class="post-preview-copy"><h2><a href="2026-10-29-gpl/">Why myArc is now GPL-3.0</a></h2><time class="post-date" datetime="2026-10-29">October 29, 2026</time><p class="post-summary">myArc moved from the MIT license to GPL-3.0 so it stays open for good. I don&#x27;t plan to make money from it, and any modified version has to publish its code.</p></div></article><article class="post-preview"><a class="post-thumb" href="2026-10-25-building-in-public/" aria-hidden="true" tabindex="-1"><img src="_thumbnails/2026-10-25-building-in-public.04ddfd989a3f.webp" alt="" width="384" height="240" loading="lazy"></a><div class="post-preview-copy"><h2><a href="2026-10-25-building-in-public/">Building myArc in public</a></h2><time class="post-date" datetime="2026-10-25">October 25, 2026</time><p class="post-summary">Why I&#x27;m building myArc after Arc&#x27;s sunset announcement, with account-free browsing, no behavioral tracking and an Artcraft-inspired workflow.</p></div></article></div></main><footer class="end">
-      <a class="mark plain" href="#main" aria-label="Back to top"><img class="ribbon" src="_assets/logo-matte.300972748816.webp" alt="" width="1254" height="1254"><picture><source media="(prefers-color-scheme: dark)" srcset="_assets/wordmark-ivory.3a99cf025832.svg"><img class="wordmark" src="_assets/wordmark-ink.18b9e7ae3785.svg" alt="myArc" width="3056" height="1049"></picture></a>
+      <a class="mark plain" href="#main" aria-label="Back to top"><img class="ribbon" src="_assets/logo-matte.adbb3c7ddc14.webp" alt="" width="1254" height="1254"><picture><source media="(prefers-color-scheme: dark)" srcset="_assets/wordmark-ivory.3a99cf025832.svg"><img class="wordmark" src="_assets/wordmark-ink.18b9e7ae3785.svg" alt="myArc" width="3056" height="1049"></picture></a>
       <div class="end-copy">
         <p>Made with <svg class="heart" role="img" aria-label="love" focusable="false"
   xmlns="http://www.w3.org/2000/svg"
