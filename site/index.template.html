@@ -243,32 +243,58 @@
       .mark { gap: .375rem }
     }
 
-    /* Phone menu. A popover gives Esc, outside-tap dismissal and focus return without script.
+    /* Phone menu. A popover gives Esc, backdrop-tap dismissal and focus return without script.
+       Its ::backdrop blurs the page; the sheet sits at the bottom, within thumb reach.
        Browsers without popover support keep the wrapped inline nav from the 48rem rules. */
+    .quick, .menu-close { display: none }
     @supports selector(:popover-open) {
       @media (max-width: 48rem) {
-        .top { flex-wrap: nowrap; justify-content: flex-start; gap: .75rem }
+        html:has(#site-menu:popover-open) { overflow: hidden }
+        .top { flex-wrap: nowrap; justify-content: flex-start; gap: .25rem }
         .top .home-mark { display: none }
-        .menu-toggle { display: inline-flex; align-items: center; justify-content: center; width: 2.75rem; height: 2.75rem; flex: none; margin: 0; padding: 0; border: 0; border-radius: 6rem; background: transparent; color: var(--text); box-shadow: inset 0 0 0 .09375rem rgb(var(--link-rgb) / .35); cursor: pointer; transition: background-color .2s ease-in-out, color .2s ease-in-out, box-shadow .2s ease-in-out }
-        .menu-toggle:hover, .menu-toggle:focus-visible { background: rgb(var(--link-rgb) / .08); color: var(--link-solid); box-shadow: inset 0 0 0 .09375rem var(--link-solid) }
-        .menu-toggle svg { width: 1.25rem; height: 1.25rem }
+        .menu-toggle, .quick-icon, .menu-close { align-items: center; justify-content: center; flex: none; margin: 0; padding: 0; border: 0; background: transparent; color: var(--text); cursor: pointer; transition: color .2s ease-in-out, background-color .2s ease-in-out }
+        .menu-toggle { display: inline-flex; width: 2.75rem; height: 2.75rem; margin-left: -.625rem; border-radius: .75rem }
+        .menu-toggle:hover, .menu-toggle:focus-visible, .quick-icon:hover, .quick-icon:focus-visible { color: var(--link-solid) }
+        .menu-toggle:focus-visible, .quick-icon:focus-visible, .quick-blog:focus-visible { outline-offset: 0 }
+        .menu-toggle svg { width: 1.5rem; height: 1.5rem }
         .menu-toggle .icon-close, .top:has(> nav:popover-open) .icon-open { display: none }
         .top:has(> nav:popover-open) .icon-close { display: block }
-        .top nav { position: fixed; inset: var(--menu-top, 6rem) 1.5rem auto; flex-direction: column; align-items: stretch; gap: .125rem; padding: .75rem; border-radius: 1.25rem; background: var(--page) var(--grain) repeat; background-size: 16rem 16rem; color: var(--text); box-shadow: 0 0 0 .0625rem rgb(var(--link-rgb) / .18), 0 1.5rem 3rem rgb(16 28 43 / .22) }
+        .quick { display: flex; align-items: center; gap: .25rem; margin-left: auto; margin-right: -.625rem }
+        .quick-blog { display: inline-flex; align-items: center; min-height: 2.75rem; padding: 0 .625rem; border-radius: .75rem; color: var(--text); font-weight: 500; text-decoration: none }
+        .quick-blog:hover, .quick-blog:focus-visible, .quick-blog[aria-current] { color: var(--link-solid) }
+        .quick-icon { display: inline-flex; width: 2.75rem; height: 2.75rem; border-radius: .75rem }
+        .quick-icon .github-icon { width: 1.375rem; height: 1.375rem }
+        .top nav { position: fixed; inset: auto .75rem calc(.75rem + env(safe-area-inset-bottom)); display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 0 .5rem; max-height: calc(100dvh - 1.5rem); padding: .5rem; overflow: auto; overscroll-behavior: contain; border-radius: 1.75rem; background: var(--page) var(--grain) repeat; background-size: 16rem 16rem; color: var(--text); box-shadow: 0 0 0 .0625rem rgb(var(--link-rgb) / .16), 0 -.5rem 3rem rgb(16 28 43 / .18) }
         .top nav:not(:popover-open) { display: none }
-        .top nav a:not(.button) { padding: .625rem 1rem; border-radius: .75rem; font-size: 1.5rem; font-weight: 600; letter-spacing: -.02em; line-height: 1.3 }
-        .top nav a:not(.button):hover, .top nav a:not(.button):focus-visible { background: rgb(var(--link-rgb) / .08) }
+        .top nav::backdrop { background: rgb(16 28 43 / .22); -webkit-backdrop-filter: blur(.875rem) saturate(1.1); backdrop-filter: blur(.875rem) saturate(1.1) }
+        .top nav > a:not(.button) { grid-column: 1 / -1; display: flex; align-items: center; min-height: 3.5rem; padding: 0 1.25rem; border-radius: 1.25rem; font-size: 1.75rem; font-weight: 600; letter-spacing: -.025em; line-height: 1.1 }
+        .top nav > a:not(.button):hover, .top nav > a:not(.button):focus-visible { background: rgb(var(--link-rgb) / .08) }
         .top nav a[aria-current] { color: var(--link-solid) }
         .top nav a:not(.button):focus-visible { outline-offset: -.1875rem }
-        .top nav .button { justify-content: center; margin-top: .625rem; font-size: 1rem }
+        .top nav .button { justify-content: center; min-height: 3.5rem; margin-top: .5rem; padding-inline: 1rem; font-size: 1rem; white-space: nowrap }
+        .menu-close { display: inline-flex; width: 3.5rem; height: 3.5rem; margin-top: .5rem; border-radius: 50%; background: rgb(var(--link-rgb) / .1) }
+        .menu-close:hover, .menu-close:focus-visible { background: rgb(var(--link-rgb) / .16); color: var(--link-solid) }
+        .menu-close svg { width: 1.5rem; height: 1.5rem }
       }
       @media (max-width: 48rem) and (prefers-reduced-motion: no-preference) {
-        .top nav { transition: opacity .2s ease-out, transform .25s var(--ease), overlay .25s allow-discrete, display .25s allow-discrete }
-        .top nav:not(:popover-open) { opacity: 0; transform: translateY(-.5rem) }
-        @starting-style { .top nav:popover-open { opacity: 0; transform: translateY(-.5rem) } }
+        .top nav { transition: opacity .2s ease-out, transform .35s var(--ease), overlay .35s allow-discrete, display .35s allow-discrete }
+        .top nav:not(:popover-open) { opacity: 0; transform: translateY(1.5rem) }
+        .top nav::backdrop { transition: opacity .3s ease-out, overlay .3s allow-discrete, display .3s allow-discrete }
+        .top nav:not(:popover-open)::backdrop { opacity: 0 }
+        .top nav > * { transition: opacity .3s ease-out, transform .45s var(--ease) }
+        .top nav > :nth-child(2) { transition-delay: .03s }
+        .top nav > :nth-child(3) { transition-delay: .06s }
+        .top nav > :nth-child(4) { transition-delay: .09s }
+        .top nav > :nth-child(n+5) { transition-delay: .12s }
+        @starting-style {
+          .top nav:popover-open { opacity: 0; transform: translateY(1.5rem) }
+          .top nav:popover-open::backdrop { opacity: 0 }
+          .top nav:popover-open > * { opacity: 0; transform: translateY(.75rem) }
+        }
       }
       @media (max-width: 48rem) and (prefers-color-scheme: dark) {
-        .top nav { box-shadow: 0 0 0 .0625rem rgb(var(--link-rgb) / .22), 0 1.5rem 3rem rgb(0 0 0 / .45) }
+        .top nav { box-shadow: 0 0 0 .0625rem rgb(var(--link-rgb) / .2), 0 -.5rem 3rem rgb(0 0 0 / .5) }
+        .top nav::backdrop { background: rgb(0 0 0 / .4) }
       }
     }
   </style>
@@ -279,12 +305,17 @@
     <header class="top">
       <button class="menu-toggle" type="button" popovertarget="site-menu" aria-controls="site-menu" aria-label="Menu"><svg class="icon-open" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M4 5h16"/><path d="M4 12h16"/><path d="M4 19h16"/></svg><svg class="icon-close" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
       <a class="mark plain home-mark" href="#main" aria-label="myArc home"><img class="ribbon" src="@@LOGO_MATTE@@" alt="" width="1254" height="1254"><picture><source media="(prefers-color-scheme: dark)" srcset="@@WORDMARK_IVORY@@"><img class="wordmark" src="@@WORDMARK_INK@@" alt="myArc" width="3056" height="1049"></picture></a>
+      <div class="quick">
+        <a class="quick-blog" href="/blog/">Blog</a>
+        <a class="quick-icon" href="https://github.com/bitbonsai/myarc" aria-label="Follow development"><svg class="github-icon" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false"><path fill-rule="evenodd" clip-rule="evenodd" d="M8 0C3.58 0 0 3.58 0 8C0 11.54 2.29 14.53 5.47 15.59C5.87 15.66 6.02 15.42 6.02 15.21C6.02 15.02 6.01 14.39 6.01 13.72C4 14.09 3.48 13.23 3.32 12.78C3.23 12.55 2.84 11.84 2.5 11.65C2.22 11.5 1.82 11.13 2.49 11.12C3.12 11.11 3.57 11.7 3.72 11.94C4.44 13.15 5.59 12.81 6.05 12.6C6.12 12.08 6.33 11.73 6.56 11.53C4.78 11.33 2.92 10.64 2.92 7.58C2.92 6.71 3.23 5.99 3.74 5.43C3.66 5.23 3.38 4.41 3.82 3.31C3.82 3.31 4.49 3.1 6.02 4.13C6.66 3.95 7.34 3.86 8.02 3.86C8.7 3.86 9.38 3.95 10.02 4.13C11.55 3.09 12.22 3.31 12.22 3.31C12.66 4.41 12.38 5.23 12.3 5.43C12.81 5.99 13.12 6.7 13.12 7.58C13.12 10.65 11.25 11.33 9.47 11.53C9.76 11.78 10.01 12.26 10.01 13.01C10.01 14.08 10 14.94 10 15.21C10 15.42 10.15 15.67 10.55 15.59C13.71 14.53 16 11.53 16 8C16 3.58 12.42 0 8 0Z" transform="scale(64)" fill="currentColor"/></svg></a>
+      </div>
       <nav id="site-menu" aria-label="Page" popover>
         <a href="#principles">Principles</a>
         <a href="#building">Progress</a>
         <a class="blog-link" href="/blog/">Blog</a>
         <!--download-nav-->
         <a class="button ghost" href="https://github.com/bitbonsai/myarc"><svg class="github-icon" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false"><path fill-rule="evenodd" clip-rule="evenodd" d="M8 0C3.58 0 0 3.58 0 8C0 11.54 2.29 14.53 5.47 15.59C5.87 15.66 6.02 15.42 6.02 15.21C6.02 15.02 6.01 14.39 6.01 13.72C4 14.09 3.48 13.23 3.32 12.78C3.23 12.55 2.84 11.84 2.5 11.65C2.22 11.5 1.82 11.13 2.49 11.12C3.12 11.11 3.57 11.7 3.72 11.94C4.44 13.15 5.59 12.81 6.05 12.6C6.12 12.08 6.33 11.73 6.56 11.53C4.78 11.33 2.92 10.64 2.92 7.58C2.92 6.71 3.23 5.99 3.74 5.43C3.66 5.23 3.38 4.41 3.82 3.31C3.82 3.31 4.49 3.1 6.02 4.13C6.66 3.95 7.34 3.86 8.02 3.86C8.7 3.86 9.38 3.95 10.02 4.13C11.55 3.09 12.22 3.31 12.22 3.31C12.66 4.41 12.38 5.23 12.3 5.43C12.81 5.99 13.12 6.7 13.12 7.58C13.12 10.65 11.25 11.33 9.47 11.53C9.76 11.78 10.01 12.26 10.01 13.01C10.01 14.08 10 14.94 10 15.21C10 15.42 10.15 15.67 10.55 15.59C13.71 14.53 16 11.53 16 8C16 3.58 12.42 0 8 0Z" transform="scale(64)" fill="currentColor"/></svg><span class="button-label">Follow development</span></a>
+        <button class="menu-close" type="button" popovertarget="site-menu" popovertargetaction="hide" aria-label="Close menu"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
       </nav>
       <script>
         (() => {
@@ -293,9 +324,6 @@
           if (!menu || !toggle || typeof menu.showPopover !== 'function') return
           const open = () => menu.matches(':popover-open')
           toggle.setAttribute('aria-expanded', 'false')
-          menu.addEventListener('beforetoggle', event => {
-            if (event.newState === 'open') menu.style.setProperty('--menu-top', toggle.getBoundingClientRect().bottom + 12 + 'px')
-          })
           menu.addEventListener('toggle', () => toggle.setAttribute('aria-expanded', String(open())))
           menu.addEventListener('click', event => {
             if (event.target.closest('a') && open()) menu.hidePopover()

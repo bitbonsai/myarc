@@ -343,7 +343,7 @@ def page_shell(template, title, summary, url, content, published=None, cover=Non
     # Off the homepage the header logo stays on phones as the way home.
     header = header.replace(' home-mark', '').replace('href="#main"', 'href="/"').replace('href="#principles"', 'href="/#principles"').replace('href="#building"', 'href="/#building"')
     if published is None:
-        header = header.replace('class="blog-link"', 'class="blog-link" aria-current="page"')
+        header = header.replace('class="blog-link"', 'class="blog-link" aria-current="page"').replace('class="quick-blog"', 'class="quick-blog" aria-current="page"')
     return head + '<body><a class="skip" href="#main">Skip to content</a><div class="wrap">' + header + '<main id="main" class="journal">' + content + '</main>' + footer + '</div></body></html>\n'
 
 
