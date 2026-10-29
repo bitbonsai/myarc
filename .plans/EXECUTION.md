@@ -2,7 +2,7 @@
 
 Workstreams below remain open. MA-001.a has a synthetic motion study; MA-002.a–c establish an unmodified build, a native Rust command and two-revision build/bridge checks. These slices do not complete native onboarding or foundation acceptance. Each task becomes reviewable changes with evidence. Dates and priorities are in [ROADMAP.md](../ROADMAP.md).
 
-These IDs identify workstreams. Break the selected workstream into bounded slices (for example `MA-004.a`) with a concrete outcome, affected boundary and evidence. Follow [behavior contracts](BEHAVIOR-CONTRACTS.md) and [the adapted workflow](../docs/ARTCRAFT-WORKFLOW.md). Standalone core/preservation work does not require a successful Chromium build; browser integration does.
+These IDs identify workstreams. Break the selected workstream into bounded slices (for example `MA-004.a`) with a concrete outcome, affected boundary and evidence. Follow [behavior contracts](BEHAVIOR-CONTRACTS.md) and [the adapted workflow](../docs/WORKFLOW.md). Standalone core/preservation work does not require a successful Chromium build; browser integration does.
 
 ## MA-001 — Design the animated first minute
 

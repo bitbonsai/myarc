@@ -23,13 +23,15 @@ I do want to know whether people try it. GitHub's aggregate download totals per 
 
 ## Trying Artcraft's way of working
 
-I'm borrowing [Artcraft's public engineering practices](https://github.com/bitbonsai/myarc/blob/main/docs/ARTCRAFT-WORKFLOW.md) as a starting point. PhotoCraft's development guide separates those checks: model tests run on their own, and visual checks happen in the native app.
+I'm borrowing [Artcraft's public engineering practices](https://github.com/storytold/photocraft/blob/main/AGENTS.md) as a starting point. PhotoCraft's development guide separates those checks: model tests run on their own, and visual checks happen in the native app.
 
 Moving the navigation controls into the sidebar broke startup and layout. Going back to Chromium's native controls fixed both.
 
 The address field also lost keyboard focus when layout hid it and showed it again. Keeping it visible brought navigation back. The lesson for me is that any time those controls move, I recheck startup and keyboard navigation in the native app.
 
 Chromium provides the browser services, and Rust handles the workspace logic that's ours. Agent tasks follow that line.
+
+**Update, 30 October 2026:** the Artcraft method didn't pay off for a browser. myArc now uses a simpler [screenshot loop](https://github.com/bitbonsai/myarc/blob/main/docs/WORKFLOW.md): one Arc screenshot, one agent, a side-by-side check, then the next task.
 
 Each coding agent gets a narrow job with a result I can check myself. Right now that's the Rust Spaces model and a workspace service owned by a Chromium Profile, while another agent wires that state into the native sidebar. A separate agent reviews the change, and its findings go back for another implementation pass. The lead agent then merges the Rust and Chromium pieces, builds the browser and looks at the native window.
 

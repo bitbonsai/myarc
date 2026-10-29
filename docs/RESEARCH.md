@@ -43,7 +43,7 @@ Use documented session orientation, clear subsystem boundaries, a common command
 
 Adapt rather than transplant: a browser must preserve upstream security and extension infrastructure. Our Rust core therefore sits beside Chromium's existing platform. Our public `.plans/` contains publishable tasks and decisions; private samples and machine/session data stay out of it. Shared rules stay inside this repository until multiple projects justify extraction. We do not reproduce a private `craftrules` repository or copy a sibling app's constraints blindly.
 
-The follow-up audit and concrete application decisions are in [ARTCRAFT-WORKFLOW.md](ARTCRAFT-WORKFLOW.md). It adds behavior-contract seeds, reproducible work records and a dependency correction; it does not claim that application checks exist before implementation.
+This adaptation was later dropped for a simpler screenshot loop, described in [WORKFLOW.md](WORKFLOW.md).
 
 ## How much the help center can teach us
 
