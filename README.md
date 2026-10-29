@@ -4,74 +4,56 @@
 
 <h1 align="center">myArc, forever yours.</h1>
 
-Arc was an awesome browser. Now it's being [sunsetted](https://arc.net/). We're building myArc to bring back the browsing experience people loved, as an open-source browser that keeps your workspace local and works without an account.
+<p align="center">
+  <a href="https://myarc.dev/download/"><b>Download pre-alpha</b></a> · <a href="https://myarc.dev">Website</a> · <a href="https://myarc.dev/blog/">Blog</a>
+</p>
 
-The goal is familiar everyday browsing, including the sidebar, Spaces, keyboard commands, Peek, Split View and Boosts. Your setup stays exportable, and browsing won't depend on a subscription.
+Arc is being [sunsetted](https://arc.net/). myArc is an open-source browser that brings back the way Arc works: the sidebar, Spaces, pinned tabs and the command bar. It runs on Chromium, needs no account and keeps your workspace on your Mac.
 
-AI is an optional layer, off by default. The plan supports models running on your machine, your own API keys (BYOK), or an optional paid hosted service. You choose what a provider can access. Pages won't be uploaded in the background, and hosted features won't be required for local browsing.
+![myArc showing the sidebar with the Everyday Space, three tabs and the myarc.dev homepage](docs/images/myarc-nightly.jpg)
 
-**Foundation experiment in progress.** A compiled Chromium candidate runs a [Rust-backed native test control](browser/README.md), with build/bridge checks passing on two upstream revisions. An original [onboarding motion study](design/onboarding/README.md) runs with synthetic data. The complete browser, importer and native onboarding remain unimplemented.
+## Try it
 
-`myArc` is a working name. This project is independent of The Browser Company and Atlassian.
+The [pre-alpha nightly](https://myarc.dev/download/) runs on Apple silicon Macs with macOS 26 or later. It's for trying the shell, not for daily or sensitive browsing: it has no automatic or security updates, it isn't notarized, and recent tabs can be lost after a crash. The download page lists every known limitation.
 
-## How we're building it
+What works today:
 
-This is an independent reimplementation based on public documentation and permitted observations of Arc's behavior. We're writing myArc's own code, with Chromium providing the existing browser foundation. Our [development workflow](docs/ARTCRAFT-WORKFLOW.md) takes cues from Artcraft's public projects.
+- Browsing with Chromium extensions
+- A glass sidebar with Favorites, pinned tabs and temporary tabs next to a rounded page card
+- Creating, switching and renaming Spaces
+- The command bar (Cmd+L) and Arc's shortcuts, such as Cmd+S to hide the sidebar and Cmd+Shift+C to copy the address
+- A native Settings window (Cmd+,)
 
-The planned architecture uses Rust for workspace state, import, storage and commands. Chromium's browser engine and services remain C++, including its extension support. Foundation and compatibility still need proof.
+## Where it's going
 
-CLI and MCP browser control are launch requirements. With your permission, external tools and AI agents should be able to inspect real pages, interact with them and manage tabs through the same commands as the UI. Both interfaces will work with built-in AI turned off.
+- Arc's layouts, shortcuts and habits, with an animated onboarding that shows what's different.
+- Import from Arc, and export of your workspace at any time.
+- No account, subscription or analytics about how you browse.
+- Ads and trackers blocked by default, with per-site controls.
+- Peek, Split View and Boosts.
+- Control from the command line and MCP, so scripts and AI agents can use the same commands as the UI, with your permission.
+- Optional AI, off by default, using models on your machine or your own API key.
 
-## Product commitments
+Plans and their status are in the [roadmap](ROADMAP.md) and [ranked gaps](docs/GAPS.md).
 
-These are design commitments, not claims that the planned features work today.
+## Build and contribute
 
-- Develop in public with build instructions and clear license information. Keep myarc-owned code and documentation permissively licensed; upstream components retain their own licenses.
-- Build a native desktop browser on Chromium's complete browser layer, with a Rust-owned workspace core. Do not use Electron as the production shell or claim the whole browser is pure Rust.
-- Preserve Arc's useful layouts, shortcuts, Spaces, and workspace habits. Onboarding should teach the differences instead of forcing people to relearn browsing.
-- Keep workspace data local and exportable, with no required account or background uploads to AI services. Websites still use the network; ownership of the workspace is the promise.
-- Make CLI and MCP supported launch interfaces over the same commands as the UI, with scoped access and an obvious Stop control.
-- Keep AI optional: off by default, with local models, user API keys, and an optional paid hosted service. The browser must remain useful without that service.
-- Block ads and trackers by default, with clear per-site controls. Verify the blocking implementation against the selected Chromium version before release.
-- Support Chrome extensions through a proven browser implementation, with published compatibility results.
-- Include Boosts, beginning with appearance, CSS, and element hiding. No Easels.
-- Launch with an animated onboarding experience that teaches by doing.
+myArc is a small patch set over Chromium, with a Rust core for workspace state and commands. The [foundation recipe](browser/README.md) covers the Chromium checkout, the build and the nightly packaging. Read [AGENTS.md](AGENTS.md) and [CONTRIBUTING.md](CONTRIBUTING.md) before sending changes.
 
-## Start here
+Checks:
 
-| Document | Purpose |
-| --- | --- |
-| [Product plan](docs/PRODUCT.md) | Audience, advantage, scope, and commercial direction |
-| [Roadmap](ROADMAP.md) | Milestones, dates, dependencies, and release gates |
-| [Animated onboarding](docs/ONBOARDING.md) | Storyboard, interaction design, motion, and acceptance criteria |
-| [Architecture](docs/ARCHITECTURE.md) | Chromium recommendation, alternatives, and foundation experiment |
-| [Arc migration](docs/MIGRATION.md) | Import contract, data boundaries, recovery, and portable export |
-| [AI and services](docs/AI.md) | Provider choices, privacy, and sustainable hosted billing |
-| [CLI and MCP browser control](docs/CONTROL-PROTOCOL.md) | Shared tools, page interaction, user grants, and external AI agents |
-| [Boosts](docs/BOOSTS.md) | Phased scope and safe execution |
-| [Parity register](docs/PARITY.md) | What is wanted, what is known, and what is actually implemented |
-| [Ranked gaps](docs/GAPS.md) | Work order and launch blockers |
-| [Scorecard](docs/SCORECARD.md) | Proposed budgets and evidence needed to ship |
-| [Agent workflow](AGENTS.md) | How to contribute without drifting from the product |
-| [Working method](docs/ARTCRAFT-WORKFLOW.md) | The habits kept from Artcraft and the screenshot loop |
-| [Behavior contracts](.plans/BEHAVIOR-CONTRACTS.md) | Precise interactions and unresolved questions before coding |
-| [Execution plan](.plans/EXECUTION.md) | Implementation workstreams and definitions of done |
-| [Research](docs/RESEARCH.md) | Primary sources, limitations, and Artcraft lessons |
+```sh
+python3 tools/check_docs.py
+cargo fmt --all -- --check
+cargo clippy --workspace --all-targets --locked -- -D warnings
+cargo test --workspace --locked
+python3 tools/export_patches.py --check   # needs the Chromium checkout
+```
 
-## What makes this plan different
+More detail: [architecture](docs/ARCHITECTURE.md), [Arc migration](docs/MIGRATION.md), [CLI and MCP control](docs/CONTROL-PROTOCOL.md), [AI](docs/AI.md) and the [development log](log/DEVLOG.md).
 
-An Arc-like native browser shell leads current work, with 1:1 visual parity as the target, including translucent materials and sidebar navigation. Migration follows this visible slice; animated onboarding remains a release requirement. Browser security, extension support, and data durability decide whether it can ship. AI monetization follows a useful browser rather than determining the browser experience. Feature breadth is tracked separately from demonstrated daily-use reliability.
+## License
 
-The current recommendation is a **Rust core for myarc's workspace, importer, persistence, and commands**, integrated through a small patch set over Chromium's complete browser layer, subject to a one-week feasibility gate. Chromium's engine and existing browser services remain C++. This is not a commitment to write a browser engine, use Electron, or rebuild Chrome's extension platform.
+myArc is licensed under [GPL-3.0](LICENSE). Releases and commits before 29 October 2026 remain available under MIT; the [blog post](https://myarc.dev/blog/2026-10-29-gpl/) explains the switch. Chromium and other bundled components keep their own licenses, listed in [ATTRIBUTION.md](ATTRIBUTION.md).
 
-## Immediate next step
-
-Continue the [native shell experiment](browser/experiments/native-shell.md) toward Arc visual parity, beginning with the empty/new-tab window. Follow [.plans/EXECUTION.md](.plans/EXECUTION.md) for the remaining desktop-alpha work and release gates. The December 2026 milestones are conditional targets, not release promises.
-
-## Contributing
-
-Read [AGENTS.md](AGENTS.md) and [CONTRIBUTING.md](CONTRIBUTING.md). myArc is licensed under GPL-3.0; upstream code retains its own notices and license obligations. A chosen browser foundation must receive a separate license review before integration or distribution.
-
-Run `python3 tools/check_docs.py` for relative links. Standalone Rust checks are `cargo fmt --all -- --check`, `cargo clippy --workspace --all-targets --locked -- -D warnings` and `cargo test --workspace --locked`. With the external Chromium checkout present, run `python3 tools/export_patches.py --check` to confirm the per-file patch exports match the `myarc` branch. The [foundation recipe](browser/README.md) covers GN/Cxx checks and their limits.
-
-Run `node --test design/onboarding/state.test.mjs` for study state tests; [study instructions](design/onboarding/README.md) cover browser-driven checks and recordings. These checks establish experimental behavior, not production-browser readiness.
+myArc is independent of The Browser Company and Atlassian.
