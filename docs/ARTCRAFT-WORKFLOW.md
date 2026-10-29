@@ -1,12 +1,10 @@
 # Working method
 
-This is an original adaptation of public practices from the [photocraft repository](https://github.com/storytold/photocraft/blob/main/AGENTS.md). It does not reproduce private standards or assume another project's delivery speed transfers to a browser.
+This started as an adaptation of public practices from the [photocraft repository](https://github.com/storytold/photocraft/blob/main/AGENTS.md). Most of the ceremony didn't pay off for a browser. Four habits stayed:
 
-## Rules
+- One task per agent, with one acceptance check named before it starts. For visual work the check is a side-by-side with an Arc screenshot in `research-private/arc/`.
+- Fresh evidence for every claim: a screenshot from this run, and tests that actually ran. A run that selects no tests is not a success. See [VERIFY.md](VERIFY.md).
+- Once a behavior passes, its check stays. Don't weaken a baseline to clear a failing change.
+- [Behavior contracts](../.plans/BEHAVIOR-CONTRACTS.md) only for logic rules such as archiving, Peek and Space deletion. For visual work the screenshot is the spec.
 
-- Keep tasks small and bounded. Name the files, one acceptance check and a stopping condition before starting. MA-001 through MA-011 are workstreams; pick a slice such as `MA-004.a`.
-- Attach fresh evidence to every claim. Say which tests ran and which artifacts this run produced. See [VERIFY.md](VERIFY.md).
-- Harnesses fail honestly. A run that selects no tests is not a success, and a check must say what it covered.
-- Once a behavior passes, keep a regression check for it. Don't weaken a baseline to clear a failing change.
-
-Interactions are specified first in [behavior contracts](../.plans/BEHAVIOR-CONTRACTS.md). Significant outcomes and failed attempts go in [the development log](../log/DEVLOG.md).
+The day-to-day loop is in [AGENTS.md](../AGENTS.md#workflow). Significant outcomes and failed attempts go in [the development log](../log/DEVLOG.md).

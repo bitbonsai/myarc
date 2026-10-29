@@ -53,7 +53,7 @@ These are design commitments, not claims that the planned features work today.
 | [Ranked gaps](docs/GAPS.md) | Work order and launch blockers |
 | [Scorecard](docs/SCORECARD.md) | Proposed budgets and evidence needed to ship |
 | [Agent workflow](AGENTS.md) | How to contribute without drifting from the product |
-| [Artcraft methods applied](docs/ARTCRAFT-WORKFLOW.md) | Practical lessons, current enforcement and implementation triggers |
+| [Working method](docs/ARTCRAFT-WORKFLOW.md) | The habits kept from Artcraft and the screenshot loop |
 | [Behavior contracts](.plans/BEHAVIOR-CONTRACTS.md) | Precise interactions and unresolved questions before coding |
 | [Execution plan](.plans/EXECUTION.md) | Implementation workstreams and definitions of done |
 | [Research](docs/RESEARCH.md) | Primary sources, limitations, and Artcraft lessons |
