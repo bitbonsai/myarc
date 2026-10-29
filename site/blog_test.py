@@ -233,6 +233,21 @@ class BlogTests(unittest.TestCase):
         self.assertTrue(all(entry['author'] == author for entry in schema['blogPost']))
         self.assertFalse(index.select('.post-thumb'))
 
+    def test_header_menu_links_home_from_blog_pages(self):
+        self.post()
+        self.build()
+        for page in (self.root / 'blog/index.html', self.root / 'blog' / self.folder.name / 'index.html'):
+            header = BeautifulSoup(page.read_text(), 'html.parser').select_one('header.top')
+            toggle = header.select_one('button.menu-toggle')
+            self.assertEqual(('Menu', 'site-menu', 'site-menu'), (toggle['aria-label'], toggle['aria-controls'], toggle['popovertarget']))
+            self.assertEqual(2, len(toggle.select('svg[aria-hidden="true"]')))
+            menu = header.select_one('nav#site-menu[popover]')
+            self.assertEqual(['/#principles', '/#building', '/blog/', 'https://github.com/bitbonsai/myarc'], [link['href'] for link in menu.select('a')])
+            self.assertEqual('/', header.select_one('a.mark')['href'])
+            self.assertNotIn('home-mark', str(header))
+        home = BeautifulSoup(TEMPLATE, 'html.parser').select_one('header.top')
+        self.assertEqual(['mark', 'plain', 'home-mark'], home.select_one('a.mark')['class'])
+
     def test_posts_group_by_month_without_repeated_labels(self):
         self.post()
         for slug in ('2026-10-24-earlier', '2026-09-30-older'):

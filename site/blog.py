@@ -340,7 +340,8 @@ def page_shell(template, title, summary, url, content, published=None, cover=Non
     if published:
         alternates += f'<meta name="author" content="Mauricio Wolff">\n<meta property="article:published_time" content="{published.isoformat()}">\n'
     head = head.replace('</head>', alternates + '</head>', 1)
-    header = header.replace('href="#main"', 'href="/"').replace('href="#principles"', 'href="/#principles"').replace('href="#building"', 'href="/#building"')
+    # Off the homepage the header logo stays on phones as the way home.
+    header = header.replace(' home-mark', '').replace('href="#main"', 'href="/"').replace('href="#principles"', 'href="/#principles"').replace('href="#building"', 'href="/#building"')
     if published is None:
         header = header.replace('class="blog-link"', 'class="blog-link" aria-current="page"')
     return head + '<body><a class="skip" href="#main">Skip to content</a><div class="wrap">' + header + '<main id="main" class="journal">' + content + '</main>' + footer + '</div></body></html>\n'
