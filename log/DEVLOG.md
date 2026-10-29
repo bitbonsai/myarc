@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-10-30: Empty Space shows Arc's page card
+
+- The empty-Space canvas hid the active contents container, leaving only the window background. It now detaches the page hosts but keeps that container visible, so the same translucent rounded card as with an `about:blank` page shows, as in Arc's empty Space.
+- Verification: `chrome` and `bridge_check` build, `bridge_check` passes, and a background `URL=none` capture shows the card at the page position with the same radius and fill. Browser tests did not run: they open windows, and the `MyarcWorkspaceCommandSafetyTest` fixture crashes in `TabStrip::Reset` during setup, before any Space logic.
+- Chromium `myarc` commit `a1022e562c`; `export_patches.py --check` and `check_docs.py` pass. Card fill is within a few levels of Arc's but not pixel-matched.
+
 ## 2026-10-30: Empty Space looks like Arc's
 
 - A new window opens Chromium's New Tab Page, which showed up as a "New tab" row with the Google NTP in the content area. The adapter's `Sidebar()` now leaves out a Temporary row whose page is an untouched NTP (`chrome://newtab`, one history entry), so the window lands in the existing empty-Space state with no row. In myArc mode the address field reads "Search or Enter URL…" for every search engine, and an empty Space keeps the search icon instead of hiding it. `URL=none tools/capture_native.sh` captures a real new window.

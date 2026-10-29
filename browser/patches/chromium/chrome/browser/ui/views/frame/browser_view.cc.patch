@@ -1,5 +1,5 @@
 diff --git a/chrome/browser/ui/views/frame/browser_view.cc b/chrome/browser/ui/views/frame/browser_view.cc
-index 7b568f6de760af21d6e9d2aa44415a7cef617c51..3644027702424c6cb1d9b00540e225b87652256e 100644
+index 7b568f6de760af21d6e9d2aa44415a7cef617c51..d218a457c4df0a10c4ea5fb2073a1e6a61783d68 100644
 --- a/chrome/browser/ui/views/frame/browser_view.cc
 +++ b/chrome/browser/ui/views/frame/browser_view.cc
 @@ -22,6 +22,7 @@
@@ -1341,7 +1341,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..3644027702424c6cb1d9b00540e225b8
  }
  
  void BrowserView::RemovedFromWidget() {
-@@ -5267,6 +6342,632 @@ const views::View* BrowserView::GetViewByElementId(
+@@ -5267,6 +6342,634 @@ const views::View* BrowserView::GetViewByElementId(
  ///////////////////////////////////////////////////////////////////////////////
  // BrowserView, ui::AcceleratorTarget overrides:
  
@@ -1827,14 +1827,16 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..3644027702424c6cb1d9b00540e225b8
 +        myarc_workspace_sidebar_->RequestFocus();
 +      }
 +    }
-+    // MultiContentsView is required by frame layout and stays visible. Hide its
-+    // native hosts instead; keep original tabs/services alive in TabStripModel.
++    // MultiContentsView is required by frame layout and stays visible. Detach
++    // its native hosts instead; keep original tabs/services alive in
++    // TabStripModel. The active container stays visible so the empty rounded
++    // page card still shows, as in Arc.
 +    multi_contents_view_->CloseSplitView();
 +    for (ContentsContainerView* container :
 +         multi_contents_view_->contents_container_views()) {
 +      container->contents_view()->SetWebContents(nullptr);
-+      container->SetVisible(false);
 +    }
++    multi_contents_view_->GetActiveContentsContainerView()->SetVisible(true);
 +    infobar_container_->ChangeInfoBarManager(nullptr);
 +    if (bookmark_bar_view_) {
 +      bookmark_bar_view_->SetVisible(false);
@@ -1974,7 +1976,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..3644027702424c6cb1d9b00540e225b8
  bool BrowserView::AcceleratorPressed(const ui::Accelerator& accelerator) {
  #if BUILDFLAG(IS_MAC)
    // Forward accelerators to ExclusiveAccessManager to handle Esc press-and-hold
-@@ -5342,7 +7043,8 @@ void BrowserView::LoadingAnimationCallback(base::TimeTicks timestamp) {
+@@ -5342,7 +7045,8 @@ void BrowserView::LoadingAnimationCallback(base::TimeTicks timestamp) {
      // GetActiveWebContents can return null for example under Purify when
      // the animations are running slowly and this function is called on a timer
      // through LoadingAnimationCallback.
@@ -1984,7 +1986,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..3644027702424c6cb1d9b00540e225b8
    }
  }
  
-@@ -5471,6 +7173,10 @@ bool BrowserView::MaybeUpdateDevtools(content::WebContents* contents) {
+@@ -5471,6 +7175,10 @@ bool BrowserView::MaybeUpdateDevtools(content::WebContents* contents) {
  
  void BrowserView::UpdateUIForContents(WebContents* contents,
                                        bool should_layout_immediately) {
@@ -1995,7 +1997,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..3644027702424c6cb1d9b00540e225b8
    TRACE_EVENT0("ui", "BrowserView::UpdateUIForContents");
    bool needs_layout = MaybeShowBookmarkBar(contents);
  
-@@ -5706,6 +7412,26 @@ void BrowserView::LoadAccelerators() {
+@@ -5706,6 +7414,26 @@ void BrowserView::LoadAccelerators() {
    }
  
  #if BUILDFLAG(IS_MAC)
