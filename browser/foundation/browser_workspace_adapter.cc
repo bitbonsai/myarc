@@ -10,8 +10,10 @@
 #include "base/functional/bind.h"
 #include "base/functional/callback_helpers.h"
 #include "base/location.h"
+#include "base/strings/utf_string_conversions.h"
 #include "base/strings/string_number_conversions.h"
 #include "base/task/single_thread_task_runner.h"
+#include "chrome/browser/favicon/favicon_service_factory.h"
 #include "chrome/browser/lifetime/browser_shutdown.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/sessions/session_restore.h"
@@ -21,6 +23,9 @@
 #include "chrome/browser/ui/navigator/browser_navigator.h"
 #include "chrome/browser/ui/navigator/browser_navigator_params.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
+#include "components/favicon/core/favicon_service.h"
+#include "components/favicon_base/favicon_types.h"
+#include "components/keyed_service/core/service_access_type.h"
 #include "components/sessions/content/session_tab_helper.h"
 #include "content/public/browser/browser_thread.h"
 #include "content/public/browser/favicon_status.h"
@@ -1088,7 +1093,85 @@ void BrowserWorkspaceAdapter::Refresh() {
   }
   SyncNativePins();
   ShowSelected();
+  if (ready()) {
+    const auto sidebar = Sidebar();
+    if (sidebar.ok) {
+      PersistTitles(sidebar);
+      RequestSavedIcons(sidebar);
+    }
+  }
   changed_.Notify();
+}
+
+void BrowserWorkspaceAdapter::PersistTitles(
+    const foundation::SidebarResult& sidebar) {
+  for (const auto* rows : {&sidebar.favorites, &sidebar.pins}) {
+    for (const auto& row : *rows) {
+      auto* page = AnyPage(*profile_, row.id);
+      if (!page || page->IsLoading() || !row.has_url)
+        continue;
+      // Only the saved URL's own title describes the dormant row. Redirects
+      // keep the saved URL as the entry's original request.
+      const std::string saved(row.canonical_url);
+      const auto* entry = page->GetController().GetLastCommittedEntry();
+      if (page->GetLastCommittedURL().spec() != saved &&
+          (!entry || entry->GetOriginalRequestURL().spec() != saved)) {
+        continue;
+      }
+      const std::string title = base::UTF16ToUTF8(page->GetTitle());
+      if (!title.empty() && title != std::string(row.title))
+        service_->SetTitle(row.id, title);
+    }
+  }
+}
+
+void BrowserWorkspaceAdapter::RequestSavedIcons(
+    const foundation::SidebarResult& sidebar) {
+  auto* favicons = FaviconServiceFactory::GetForProfile(
+      profile_, ServiceAccessType::IMPLICIT_ACCESS);
+  if (!favicons)
+    return;  // Off-the-record Profiles keep no favicon history.
+  for (const auto* rows : {&sidebar.favorites, &sidebar.pins}) {
+    for (const auto& row : *rows) {
+      if (!row.has_url)
+        continue;
+      const GURL url(std::string(row.canonical_url));
+      auto cached = saved_icons_.find(url);
+      if (AnyPage(*profile_, row.id)) {
+        // The live page may store a new favicon; look again once it closes.
+        if (cached != saved_icons_.end() && cached->second.IsEmpty())
+          saved_icons_.erase(cached);
+        continue;
+      }
+      if (cached != saved_icons_.end())
+        continue;
+      saved_icons_.emplace(url, gfx::Image());
+      favicons->GetFaviconImageForPageURL(
+          url,
+          base::BindOnce(&BrowserWorkspaceAdapter::OnSavedIcon,
+                         weak_factory_.GetWeakPtr(), url),
+          &icon_tracker_);
+    }
+  }
+}
+
+void BrowserWorkspaceAdapter::OnSavedIcon(
+    const GURL& url,
+    const favicon_base::FaviconImageResult& result) {
+  if (result.image.IsEmpty())
+    return;
+  saved_icons_[url] = result.image;
+  // Refresh notifies the sidebar, which asks SavedIcon again.
+  OnServiceChanged();
+}
+
+gfx::Image BrowserWorkspaceAdapter::SavedIcon(
+    const foundation::ItemRecord& item) const {
+  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
+  if (!item.has_url)
+    return gfx::Image();
+  auto cached = saved_icons_.find(GURL(std::string(item.canonical_url)));
+  return cached == saved_icons_.end() ? gfx::Image() : cached->second;
 }
 
 foundation::MutationResult BrowserWorkspaceAdapter::ActivateItem(

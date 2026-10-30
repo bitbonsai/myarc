@@ -330,6 +330,54 @@ bool CheckDeleteFirstSpace() {
          sidebar_snapshot(*model, 1).current_space.id == space.id;
 }
 
+// Saved titles survive the JSON codec, files without them still load, and
+// an unchanged title reports no change.
+bool CheckSavedTitles() {
+  using namespace myarc::foundation;
+  using myarc::internal::DecodeWorkspaceMetadata;
+  using myarc::internal::EncodeWorkspaceMetadata;
+  auto model = new_workspace();
+  auto item = add_temporary_item(*model, 1);
+  if (!item.ok || set_title(*model, item.id, "Temporary").ok ||
+      !set_placement(*model, item.id, PlacementKind::Favorite, 1, true,
+                     "https://example.test/")
+           .ok) {
+    return false;
+  }
+  auto changed = set_title(*model, item.id, "Example");
+  auto same = set_title(*model, item.id, "Example");
+  if (!changed.ok || changed.id != 1 || !same.ok || same.id != 0)
+    return false;
+  const auto encoded = EncodeWorkspaceMetadata(export_snapshot(*model));
+  auto decoded = encoded ? DecodeWorkspaceMetadata(*encoded)
+                         : myarc::internal::MetadataResult{};
+  if (!decoded.snapshot ||
+      std::string(decoded.snapshot->items[0].title) != "Example") {
+    return false;
+  }
+  auto root = base::JSONReader::ReadDict(*encoded, base::JSON_PARSE_RFC);
+  auto* items = root ? root->FindList("items") : nullptr;
+  if (!items)
+    return false;
+  const auto decode = [&root] {
+    const auto json = base::WriteJson(*root);
+    return json ? DecodeWorkspaceMetadata(*json)
+                : myarc::internal::MetadataResult{};
+  };
+  (*items)[0].GetDict().Remove("title");
+  auto legacy = decode();
+  if (!legacy.snapshot || !legacy.snapshot->items[0].title.empty() ||
+      !restore_snapshot(*model, std::move(*legacy.snapshot)).ok) {
+    return false;
+  }
+  (*items)[0].GetDict().Set("title", 7);
+  if (decode().snapshot)
+    return false;
+  (*items)[0].GetDict().Set("title",
+                            std::string(bridge_limits().title_bytes + 1, 'x'));
+  return !decode().snapshot;
+}
+
 }  // namespace
 
 int main() {
@@ -386,8 +434,12 @@ int main() {
     std::cerr << "Metadata codec/bounds checks failed\n";
     return 9;
   }
+  if (!CheckSavedTitles()) {
+    std::cerr << "Saved title checks failed\n";
+    return 13;
+  }
   std::cout << "7 legacy C++/Rust checks passed, including 1000 ownership "
                "round trips; workspace transitions, Space 1 deletion and "
-               "metadata codec checks passed\n";
+               "metadata codec and saved title checks passed\n";
   return 0;
 }

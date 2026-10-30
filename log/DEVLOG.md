@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-10-30: Dormant saved rows show favicon and title
+
+- Saved items now keep the last title their page had while it showed the saved URL (Rust `Item.title`, bridge `set_title`, optional `title` key in `myarc-workspace-v1.json`, so files without the key still load). Dormant rows ask the Profile's favicon history for the saved URL and rebuild when the answer comes in. The globe now appears only when nothing is cached.
+- Verification: core round-trip test, `cargo fmt`/`clippy`/`test`, the `chrome` and `bridge_check` builds and `bridge_check` (title codec and legacy load) all pass. In a throwaway profile, run 1 loaded the three sites, and a throwaway extension pinned them so they became Favorites and their titles were persisted. A dormant relaunch then showed the real favicon and title on the seeded Favorites and Pins. Three extra live tiles came back from run 1's native pins, which is a capture artifact.
+- Chromium `myarc` commit `b527f0cdd6`; `export_patches.py --check` and `check_docs.py` pass.
+
 ## 2026-10-30: Space title weight, color and gap
 
 - Arc's title (`05-sidebar-expanded-empty-active.png`, 2x) is 13pt semibold, white at 45% (#888892 over #262537), text origin 16pt, baseline 31pt under the Favorites tiles. myArc was 13pt medium, full on-surface (#DADBE4), baseline 25pt under the tiles. Now semibold, `Fills::title` white 0x73 (black 0x99 in light), plus 6pt top margin when Favorites exist.

@@ -34,6 +34,7 @@ pub mod archive;
 
 pub const MAX_SPACE_NAME_BYTES: usize = 128;
 pub const MAX_URL_BYTES: usize = 8192;
+pub const MAX_TITLE_BYTES: usize = 1024;
 pub const MAX_SPACES: usize = 64;
 pub const MAX_ITEMS: usize = 1024;
 pub const MAX_WINDOWS: usize = 64;
@@ -147,6 +148,9 @@ pub struct Item {
     pub placement: Placement,
     /// Saved URL only. Navigating a live page must not update this value implicitly.
     pub canonical_url: Option<String>,
+    /// Last known page title of a saved item, shown while it is dormant. Empty
+    /// when unknown and always empty for temporary items.
+    pub title: String,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -422,6 +426,7 @@ impl Workspace {
             id,
             placement: Placement::Temporary { space_id },
             canonical_url: None,
+            title: String::new(),
         });
         self.state.next_item_id = next;
         Ok(id)
@@ -487,6 +492,36 @@ impl Workspace {
         Ok(())
     }
 
+    /// Remember a saved item's page title for dormant rows. The caller passes the
+    /// live page's title only while it shows the canonical URL. Control characters
+    /// become spaces and the text is cut to `MAX_TITLE_BYTES` on a character
+    /// boundary. Returns whether the stored title changed, so adapters can skip
+    /// writes. Temporary items reject with `NoCanonicalUrl`.
+    pub fn set_title(&mut self, item_id: ItemId, title: &str) -> Result<bool, WorkspaceError> {
+        if matches!(self.item(item_id)?.placement, Placement::Temporary { .. }) {
+            return Err(WorkspaceError::NoCanonicalUrl(item_id));
+        }
+        let mut clean = String::with_capacity(title.len().min(MAX_TITLE_BYTES));
+        for ch in title.chars() {
+            let ch = if ch.is_control() { ' ' } else { ch };
+            if clean.len() + ch.len_utf8() > MAX_TITLE_BYTES {
+                break;
+            }
+            clean.push(ch);
+        }
+        let item = self
+            .state
+            .items
+            .iter_mut()
+            .find(|item| item.id == item_id)
+            .ok_or(WorkspaceError::UnknownItem(item_id))?;
+        if item.title == clean {
+            return Ok(false);
+        }
+        item.title = clean;
+        Ok(true)
+    }
+
     /// True when a live saved item shows a page other than its canonical URL, which
     /// drives Arc's slash next to the pinned name (BC-003). Comparison is exact string
     /// equality, so the caller must normalize `current_url` the same way as the saved
@@ -540,6 +575,7 @@ impl Workspace {
                 if item.id == item_id {
                     item.placement = Placement::Temporary { space_id };
                     item.canonical_url = None;
+                    item.title.clear();
                     break;
                 }
             }
@@ -761,6 +797,14 @@ impl Workspace {
                 (Placement::Temporary { .. }, None) => {}
                 (_, Some(url)) => validate_url(url)?,
                 (_, None) => return Err(WorkspaceError::CanonicalUrlRequired),
+            }
+            if item.title.len() > MAX_TITLE_BYTES
+                || item.title.chars().any(char::is_control)
+                || (matches!(item.placement, Placement::Temporary { .. }) && !item.title.is_empty())
+            {
+                return Err(WorkspaceError::InvalidSnapshot(
+                    "item title is oversized, has control characters or belongs to a temporary item",
+                ));
             }
         }
         for window in &state.windows {
@@ -991,6 +1035,35 @@ mod tests {
             );
         }
         assert_eq!(workspace.snapshot(), before);
+    }
+
+    #[test]
+    fn set_title_round_trips_through_snapshot() {
+        let mut workspace = Workspace::default();
+        let id = pin(&mut workspace, DEFAULT_SPACE_ID);
+        assert_eq!(workspace.set_title(id, "Mauricio\nWolff"), Ok(true));
+        assert_eq!(workspace.set_title(id, "Mauricio Wolff"), Ok(false));
+        let restored = Workspace::from_snapshot(workspace.snapshot()).unwrap();
+        assert_eq!(restored.item(id).unwrap().title, "Mauricio Wolff");
+
+        let long = "é".repeat(MAX_TITLE_BYTES);
+        assert_eq!(workspace.set_title(id, &long), Ok(true));
+        let title = &workspace.item(id).unwrap().title;
+        assert!(title.len() <= MAX_TITLE_BYTES && title.chars().all(|ch| ch == 'é'));
+
+        workspace.unsave_item(id, Some(DEFAULT_SPACE_ID)).unwrap();
+        assert!(workspace.item(id).unwrap().title.is_empty());
+        assert_eq!(
+            workspace.set_title(id, "Page"),
+            Err(WorkspaceError::NoCanonicalUrl(id))
+        );
+
+        let mut snapshot = workspace.snapshot();
+        snapshot.items[0].title = String::from("Leaked temporary title");
+        assert!(matches!(
+            Workspace::from_snapshot(snapshot),
+            Err(WorkspaceError::InvalidSnapshot(_))
+        ));
     }
 
     #[test]

@@ -38,6 +38,8 @@ mod ffi {
         owner_id: u64,
         has_url: bool,
         canonical_url: String,
+        // Last known page title of a saved item; empty when unknown.
+        title: String,
     }
 
     struct WindowRecord {
@@ -77,6 +79,7 @@ mod ffi {
         windows: usize,
         name_bytes: usize,
         url_bytes: usize,
+        title_bytes: usize,
     }
 
     extern "Rust" {
@@ -104,6 +107,8 @@ mod ffi {
         fn remove_saved_item(workspace: &mut Workspace, item_id: u64) -> MutationResult;
         // Saved items only. Navigation never calls this implicitly.
         fn set_canonical_url(workspace: &mut Workspace, item_id: u64, url: &str) -> MutationResult;
+        // Saved items only. `id` is 1 when the stored title changed, else 0.
+        fn set_title(workspace: &mut Workspace, item_id: u64, title: &str) -> MutationResult;
         // Saved items only. `id` is 1 when current_url differs from the saved URL, else 0.
         fn differs_from_canonical(
             workspace: &Workspace,
@@ -153,6 +158,7 @@ pub fn bridge_limits() -> ffi::BridgeLimits {
         windows: workspace::MAX_WINDOWS,
         name_bytes: workspace::MAX_SPACE_NAME_BYTES,
         url_bytes: workspace::MAX_URL_BYTES,
+        title_bytes: workspace::MAX_TITLE_BYTES,
     }
 }
 
@@ -260,6 +266,10 @@ pub fn set_canonical_url(
     outcome(workspace.0.set_canonical_url(item_id, url).map(|()| 0))
 }
 
+pub fn set_title(workspace: &mut Workspace, item_id: u64, title: &str) -> ffi::MutationResult {
+    outcome(workspace.0.set_title(item_id, title).map(u64::from))
+}
+
 pub fn differs_from_canonical(
     workspace: &Workspace,
     item_id: u64,
@@ -336,6 +346,7 @@ fn item_record(item: workspace::Item) -> ffi::ItemRecord {
         owner_id,
         has_url: item.canonical_url.is_some(),
         canonical_url: item.canonical_url.unwrap_or_default(),
+        title: item.title,
     }
 }
 
@@ -405,6 +416,7 @@ pub fn restore_snapshot(
             .any(|space| space.name.len() > workspace::MAX_SPACE_NAME_BYTES)
         || snapshot.items.iter().any(|item| {
             item.canonical_url.len() > workspace::MAX_URL_BYTES
+                || item.title.len() > workspace::MAX_TITLE_BYTES
                 || (!item.has_url && !item.canonical_url.is_empty())
         })
     {
@@ -420,6 +432,7 @@ pub fn restore_snapshot(
             id: item.id,
             placement,
             canonical_url: item.has_url.then_some(item.canonical_url),
+            title: item.title,
         });
     }
     outcome(

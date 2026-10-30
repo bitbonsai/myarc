@@ -170,6 +170,7 @@ std::optional<std::string> EncodeWorkspaceMetadata(
     record.Set("owner_id", base::NumberToString(item.owner_id));
     record.Set("has_url", item.has_url);
     record.Set("canonical_url", std::string(item.canonical_url));
+    record.Set("title", std::string(item.title));
     items.Append(std::move(record));
   }
   root.Set("items", std::move(items));
@@ -232,14 +233,17 @@ MetadataResult DecodeWorkspaceMetadata(std::string_view json) {
   }
   for (const auto& value : *items) {
     const auto* record = value.GetIfDict();
-    if (!record || record->size() != 5) {
+    // Files written before saved titles existed have no "title" key.
+    if (!record || record->size() < 5 || record->size() > 6) {
       return InvalidMetadata();
     }
     const auto kind = record->FindInt("placement");
     const auto has_url = record->FindBool("has_url");
     const auto* url = record->FindString("canonical_url");
+    const auto* title = record->FindString("title");
     foundation::ItemRecord item;
-    if (!kind ||
+    if ((record->size() == 6) != (title != nullptr) ||
+        (title && !BoundedText(*title, limits.title_bytes)) || !kind ||
         *kind < static_cast<int>(foundation::PlacementKind::Temporary) ||
         *kind > static_cast<int>(foundation::PlacementKind::Favorite) ||
         !has_url || !url || !BoundedText(*url, limits.url_bytes) ||
@@ -250,6 +254,8 @@ MetadataResult DecodeWorkspaceMetadata(std::string_view json) {
     item.placement = static_cast<foundation::PlacementKind>(*kind);
     item.has_url = *has_url;
     item.canonical_url = *url;
+    if (title)
+      item.title = *title;
     snapshot.items.push_back(std::move(item));
   }
   for (const auto& value : *windows) {
@@ -519,6 +525,18 @@ foundation::MutationResult WorkspaceService::SetPlacement(
   return Changed(
       foundation::set_placement(*workspace_, item, placement, owner, has_url,
                                 rust::Str(url->data(), url->size())));
+}
+
+foundation::MutationResult WorkspaceService::SetTitle(uint64_t item,
+                                                      std::string_view title) {
+  if (!CanMutate())
+    return Failure("Workspace is not loaded. Check storage state.");
+  if (!base::IsStringUTF8(title))
+    return Failure("Invalid UTF-8 page title.");
+  auto result = foundation::set_title(*workspace_, item,
+                                      rust::Str(title.data(), title.size()));
+  // An unchanged title needs no write or sidebar rebuild.
+  return result.ok && !result.id ? result : Changed(std::move(result));
 }
 
 foundation::MutationResult WorkspaceService::RemoveSavedItem(uint64_t item) {

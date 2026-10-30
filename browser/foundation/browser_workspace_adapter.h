@@ -10,6 +10,7 @@
 #include "base/callback_list.h"
 #include "base/memory/raw_ptr.h"
 #include "base/sequence_checker.h"
+#include "base/task/cancelable_task_tracker.h"
 #include "chrome/browser/ui/tabs/tab_strip_model_observer.h"
 #include "myarc/workspace_service.h"
 #include "ui/gfx/image/image.h"
@@ -17,6 +18,10 @@
 
 class BrowserWindowInterface;
 class Profile;
+
+namespace favicon_base {
+struct FaviconImageResult;
+}
 
 namespace myarc {
 
@@ -86,6 +91,10 @@ class BrowserWorkspaceAdapter final : public TabStripModelObserver {
     size_t projections = 0;  // Exact Profile, including detached live pages.
   };
   std::optional<LiveMetadata> Metadata(uint64_t item) const;
+  // Favicon the Profile's history cached for a saved row's URL, for rows with
+  // no live page. Empty until the lookup Refresh starts has answered, or when
+  // nothing is cached. Never fetches from the network.
+  gfx::Image SavedIcon(const foundation::ItemRecord& item) const;
   content::WebContents* DisplayedContents() const;
   bool HasDisplayedContents() const { return DisplayedContents() != nullptr; }
   // Use for an explicit URL commit when no page is displayed. Native navigation
@@ -129,6 +138,12 @@ class BrowserWorkspaceAdapter final : public TabStripModelObserver {
   void ShowSelected();
   void OnServiceChanged();
   void Refresh();
+  // Remembers the title of live saved pages showing their saved URL.
+  void PersistTitles(const foundation::SidebarResult& sidebar);
+  // Starts favicon lookups for dormant saved rows not looked up yet.
+  void RequestSavedIcons(const foundation::SidebarResult& sidebar);
+  void OnSavedIcon(const GURL& url,
+                   const favicon_base::FaviconImageResult& result);
   foundation::MutationResult Remember(foundation::MutationResult result);
   foundation::MutationResult StepOrSelectItem(int index, int delta);
   void OnTabStripModelChanged(
@@ -161,6 +176,9 @@ class BrowserWorkspaceAdapter final : public TabStripModelObserver {
   std::string binding_warning_;
   base::RepeatingClosureList changed_;
   base::CallbackListSubscription service_subscription_;
+  // By saved URL. An empty image marks a pending lookup or a cache miss.
+  std::map<GURL, gfx::Image> saved_icons_;
+  base::CancelableTaskTracker icon_tracker_;
   SEQUENCE_CHECKER(sequence_checker_);
   base::WeakPtrFactory<BrowserWorkspaceAdapter> weak_factory_{this};
 };

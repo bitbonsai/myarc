@@ -479,8 +479,11 @@ std::unique_ptr<views::View> SidebarView::MakeItem(
     bool tile,
     bool selected) {
   ItemPresentation presentation = delegate_->GetItemPresentation(item);
-  // The bridge has no saved-title field yet. Preserve the actual saved record
-  // while dormant instead of substituting a made-up site name.
+  // Dormant saved rows show the last title their page had, as Arc does, and
+  // fall back to the saved URL until a page has loaded once.
+  if (presentation.title.empty() && !item.title.empty()) {
+    presentation.title = base::UTF8ToUTF16(std::string(item.title));
+  }
   if (presentation.title.empty()) {
     presentation.title =
         item.has_url ? base::UTF8ToUTF16(std::string(item.canonical_url))
