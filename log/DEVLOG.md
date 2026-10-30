@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-10-30: Sidebar footer matches Arc
+
+- Arc's footer centers Space dots between Library and Create at a 34pt pitch, 8pt across, current dot white 50% vs 18%. myArc used 30pt pitch, 7pt dots and other colors. Now 34pt/8pt with those colors; dots recolor on theme change. Footer sits 2pt higher (button center 25.25pt from bottom, as in Arc). Library icon 18 -> 16, Create 20 -> 21, and the multi-stroke icons draw as one path so alpha no longer doubles at overlaps. Arc's Library glyph and per-Space icons (planet) are unchanged and not reproduced.
+- Verification: `chrome` and `bridge_check` build, `bridge_check` passes; backgrounded 1440x900 captures: a 4-Space seeded profile puts the dots at x=62.75/96.75/130.75/164.75pt and the icons at 23.75/203.25pt, matching Arc's 62.75/…/164.75, 23.5 and 203.75 to within 0.5pt. `export_patches.py --check` and `check_docs.py` pass; no Chromium file changed.
+- Light-mode dot alphas are a guess (no Arc light reference).
+
 ## 2026-10-30: Dormant saved rows show favicon and title
 
 - Saved items now keep the last title their page had while it showed the saved URL (Rust `Item.title`, bridge `set_title`, optional `title` key in `myarc-workspace-v1.json`, so files without the key still load). Dormant rows ask the Profile's favicon history for the saved URL and rebuild when the answer comes in. The globe now appears only when nothing is cached.

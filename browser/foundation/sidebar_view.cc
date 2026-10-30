@@ -49,10 +49,10 @@ constexpr int kTileHeight = 46;
 // stroke 2. "archive" stands in for Arc's Library box, "plus" for Create.
 constexpr gfx::PathElement kArchivePath[] = {
     gfx::CANVAS_DIMENSIONS, 24, gfx::STROKE, 2, gfx::ROUND_RECT, 2, 3, 20, 5, 1,
-    gfx::NEW_PATH, gfx::STROKE, 2, gfx::MOVE_TO, 4, 8, gfx::V_LINE_TO, 19,
+    gfx::MOVE_TO, 4, 8, gfx::V_LINE_TO, 19,
     gfx::R_ARC_TO, 2, 2, 0, 0, 0, 2, 2, gfx::H_LINE_TO, 18,
     gfx::R_ARC_TO, 2, 2, 0, 0, 0, 2, -2, gfx::V_LINE_TO, 8,
-    gfx::NEW_PATH, gfx::STROKE, 2, gfx::MOVE_TO, 10, 12, gfx::R_H_LINE_TO, 4};
+    gfx::MOVE_TO, 10, 12, gfx::R_H_LINE_TO, 4};
 constexpr gfx::VectorIconRep kArchiveRep[] = {{kArchivePath}};
 constexpr gfx::VectorIcon kArchiveIcon(kArchiveRep,
                                        std::size(kArchiveRep),
@@ -60,14 +60,13 @@ constexpr gfx::VectorIcon kArchiveIcon(kArchiveRep,
 
 constexpr gfx::PathElement kPlusPath[] = {
     gfx::CANVAS_DIMENSIONS, 24, gfx::STROKE, 2, gfx::MOVE_TO, 5, 12,
-    gfx::H_LINE_TO, 19, gfx::NEW_PATH, gfx::STROKE, 2, gfx::MOVE_TO, 12, 5,
-    gfx::V_LINE_TO, 19};
+    gfx::H_LINE_TO, 19, gfx::MOVE_TO, 12, 5, gfx::V_LINE_TO, 19};
 constexpr gfx::VectorIconRep kPlusRep[] = {{kPlusPath}};
 constexpr gfx::VectorIcon kPlusIcon(kPlusRep, std::size(kPlusRep), "myarc_plus");
 
-// Lucide "circle" filled: Arc marks every Space with a dot.
+// Lucide "circle" filled to the canvas edge: Arc's Space dot is 8 DIP across.
 constexpr gfx::PathElement kDotPath[] = {gfx::CANVAS_DIMENSIONS, 24,
-                                         gfx::CIRCLE, 12, 12, 10};
+                                         gfx::CIRCLE, 12, 12, 12};
 constexpr gfx::VectorIconRep kDotRep[] = {{kDotPath}};
 constexpr gfx::VectorIcon kDotIcon(kDotRep, std::size(kDotRep), "myarc_dot");
 
@@ -76,12 +75,15 @@ struct Fills {
   SkColor selected_tile;
   SkColor new_tab;
   SkColor footer_icon;
+  SkColor space_dot;
+  SkColor current_space_dot;
   SkColor title;
 };
 
 // Arc lifts sidebar controls with white over the window material, so they read
 // lighter than the sidebar. Dark values are sampled from Arc's dark sidebar;
-// footer icons are Arc's muted #A9A2AF over it. The URL pill and header toggle
+// footer icons are Arc's muted #A9A2AF over it; Space dots are the same white
+// at 50% (current) and 18% (others). The URL pill and header toggle
 // chip pick light/dark from the same kColorSysSurface.
 Fills GetFills(const ui::ColorProvider* provider) {
   const bool dark = !provider || color_utils::IsDark(
@@ -90,10 +92,14 @@ Fills GetFills(const ui::ColorProvider* provider) {
                       SkColorSetA(SK_ColorWHITE, 0x6F),
                       SkColorSetA(SK_ColorWHITE, 0x33),
                       SkColorSetA(SK_ColorWHITE, 0x99),
+                      SkColorSetA(SK_ColorWHITE, 0x2D),
+                      SkColorSetA(SK_ColorWHITE, 0x80),
                       SkColorSetA(SK_ColorWHITE, 0x73)}
               : Fills{SkColorSetA(SK_ColorWHITE, 0x80), SK_ColorWHITE,
                       SkColorSetA(SK_ColorWHITE, 0xB3),
                       SkColorSetA(SK_ColorBLACK, 0x99),
+                      SkColorSetA(SK_ColorBLACK, 0x33),
+                      SkColorSetA(SK_ColorBLACK, 0x80),
                       SkColorSetA(SK_ColorBLACK, 0x99)};
 }
 
@@ -374,7 +380,7 @@ void SidebarView::SetCreateMenuOpen(bool open) {
   button->SetImageModel(views::Button::STATE_NORMAL,
                         ui::ImageModel::FromVectorIcon(
                             open ? vector_icons::kCloseIcon : kPlusIcon,
-                            GetFills(GetColorProvider()).footer_icon, 20));
+                            GetFills(GetColorProvider()).footer_icon, 21));
   button->SetTooltipText(open ? u"Close creation menu" : u"Create Space");
   if (open) {
     button->GetViewAccessibility().SetIsExpanded();
@@ -725,11 +731,13 @@ void SidebarView::SetModel(const foundation::SidebarResult& model,
   }
 
   auto* footer = AddChildView(Box(Orientation::kHorizontal, 4));
+  // Arc's footer controls sit 2 DIP higher than the sidebar's bottom inset.
+  footer->SetProperty(views::kMarginsKey, gfx::Insets::TLBR(0, 0, 2, 0));
   static_cast<views::BoxLayout*>(footer->GetLayoutManager())
       ->set_cross_axis_alignment(views::BoxLayout::CrossAxisAlignment::kCenter);
   auto library = IconButton(
       base::BindRepeating(&SidebarView::ShowLibrary, base::Unretained(this)),
-      kArchiveIcon, 18);
+      kArchiveIcon, 16);
   library->SetTooltipText(u"Library");
   library->GetViewAccessibility().SetName(u"Library");
   library->GetViewAccessibility().SetHasPopup(ax::mojom::HasPopup::kMenu);
@@ -766,11 +774,11 @@ void SidebarView::SetModel(const foundation::SidebarResult& model,
     auto choice = IconButton(
         base::BindRepeating(&Delegate::SelectSpace,
                             base::Unretained(&delegate_.get()), space.id),
-        kDotIcon, 8,
-        current ? ui::kColorSysOutline : ui::kColorSysStateDisabled);
-    choice->SetMinSize(gfx::Size(30, 32));
-    choice->SetMaxSize(gfx::Size(30, 32));
-    choice->SetPreferredSize(gfx::Size(30, 32));
+        kDotIcon, 8);
+    // Arc spaces its Space dots 34 DIP apart.
+    choice->SetMinSize(gfx::Size(34, 32));
+    choice->SetMaxSize(gfx::Size(34, 32));
+    choice->SetPreferredSize(gfx::Size(34, 32));
     if (current) {
       current_space = choice.get();
       current_space_index = spaces->children().size();
@@ -815,7 +823,7 @@ void SidebarView::SetModel(const foundation::SidebarResult& model,
   auto create = IconButton(
       base::BindRepeating(&SidebarView::ShowCreateMenu,
                           weak_factory_.GetWeakPtr()),
-      create_menu_open_ ? vector_icons::kCloseIcon : kPlusIcon);
+      create_menu_open_ ? vector_icons::kCloseIcon : kPlusIcon, 21);
   create->SetTooltipText(u"Create Space");
   create->GetViewAccessibility().SetName(u"Create Space");
   create->GetViewAccessibility().SetHasPopup(ax::mojom::HasPopup::kMenu);
@@ -881,7 +889,19 @@ void SidebarView::UpdateFills() {
     static_cast<views::MdTextButton*>(library->view.get())
         ->SetImageModel(views::Button::STATE_NORMAL,
                         ui::ImageModel::FromVectorIcon(kArchiveIcon,
-                                                       fills.footer_icon, 18));
+                                                       fills.footer_icon, 16));
+  }
+  for (const auto& target : focus_targets_) {
+    if (target.action == FocusAction::kSpaces) {
+      static_cast<views::MdTextButton*>(target.view.get())
+          ->SetImageModel(
+              views::Button::STATE_NORMAL,
+              ui::ImageModel::FromVectorIcon(
+                  kDotIcon,
+                  target.id == current_space_id_ ? fills.current_space_dot
+                                                 : fills.space_dot,
+                  8));
+    }
   }
   SetCreateMenuOpen(create_menu_open_);
 }
