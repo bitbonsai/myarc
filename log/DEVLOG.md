@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-10-30: Space title weight, color and gap
+
+- Arc's title (`05-sidebar-expanded-empty-active.png`, 2x) is 13pt semibold, white at 45% (#888892 over #262537), text origin 16pt, baseline 31pt under the Favorites tiles. myArc was 13pt medium, full on-surface (#DADBE4), baseline 25pt under the tiles. Now semibold, `Fills::title` white 0x73 (black 0x99 in light), plus 6pt top margin when Favorites exist.
+- Verification: `chrome` and `bridge_check` build, `bridge_check` passes, the native build launches without a startup crash. No new capture: the display was asleep, so ScreenCaptureKit returned no displays. The side-by-side is still to do.
+- Repo only; Chromium has no new commit. `export_patches.py --check` and `check_docs.py` pass.
+
 ## 2026-10-30: Pinned row fills match Arc
 
 - Compared a 1440x900 capture (three Favorites and three Space Pins) with Arc's `03-pin-context-menu.png` and blog reference. Favorite tiles already match: resting #393745 over #242232 (+21 per channel) against Arc #3B3A4B over #262538 (+21), selected #83828B against #83848F. Pinned rows did not: the selected row was #2C2E34 on #272333 (a grey container color, almost invisible) and hover used the same container colors. Both now use the tile white tints: selected #524F5C, matching Arc's row highlight #505060, and hover the resting tile fill.

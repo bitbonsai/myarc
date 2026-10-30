@@ -17,6 +17,7 @@
 #include "ui/color/color_id.h"
 #include "ui/color/color_provider.h"
 #include "ui/gfx/color_utils.h"
+#include "ui/gfx/font_list.h"
 #include "ui/gfx/geometry/insets.h"
 #include "ui/gfx/geometry/size.h"
 #include "ui/gfx/vector_icon_types.h"
@@ -35,6 +36,7 @@
 #include "ui/views/layout/box_layout.h"
 #include "ui/views/style/typography.h"
 #include "ui/views/view_class_properties.h"
+#include "ui/views/view_utils.h"
 
 namespace myarc {
 namespace {
@@ -74,6 +76,7 @@ struct Fills {
   SkColor selected_tile;
   SkColor new_tab;
   SkColor footer_icon;
+  SkColor title;
 };
 
 // Arc lifts sidebar controls with white over the window material, so they read
@@ -86,9 +89,11 @@ Fills GetFills(const ui::ColorProvider* provider) {
   return dark ? Fills{SkColorSetA(SK_ColorWHITE, 0x18),
                       SkColorSetA(SK_ColorWHITE, 0x6F),
                       SkColorSetA(SK_ColorWHITE, 0x33),
-                      SkColorSetA(SK_ColorWHITE, 0x99)}
+                      SkColorSetA(SK_ColorWHITE, 0x99),
+                      SkColorSetA(SK_ColorWHITE, 0x73)}
               : Fills{SkColorSetA(SK_ColorWHITE, 0x80), SK_ColorWHITE,
                       SkColorSetA(SK_ColorWHITE, 0xB3),
+                      SkColorSetA(SK_ColorBLACK, 0x99),
                       SkColorSetA(SK_ColorBLACK, 0x99)};
 }
 
@@ -662,6 +667,20 @@ void SidebarView::SetModel(const foundation::SidebarResult& model,
                                             base::Unretained(&delegate_.get()),
                                             model.current_space.id),
                         name);
+  // Arc's Space title is 13pt semibold in white at 45% (#888892 over its dark
+  // sidebar), its baseline 31pt below the Favorites tiles.
+  // STYLE_EMPHASIZED is not allowed for CONTEXT_BUTTON_MD and LabelButton hides
+  // its label, so reweight the button's Label child directly.
+  for (views::View* child : heading->children()) {
+    if (auto* label = views::AsViewClass<views::Label>(child)) {
+      label->SetFontList(
+          label->font_list().DeriveWithWeight(gfx::Font::Weight::SEMIBOLD));
+    }
+  }
+  heading->SetEnabledTextColors(GetFills(GetColorProvider()).title);
+  if (!model.favorites.empty()) {
+    heading->SetProperty(views::kMarginsKey, gfx::Insets::TLBR(6, 0, 0, 0));
+  }
   heading->SetTooltipText(u"Rename Space: " + name);
   heading->GetViewAccessibility().SetName(u"Rename Space: " + name);
   TrackFocus(heading.get(), FocusAction::kRename, model.current_space.id);
@@ -846,6 +865,12 @@ void SidebarView::UpdateFills() {
   if (new_tab_) {
     new_tab_->SetBgColorOverrideDeprecated(
         new_tab_intent_ ? fills.new_tab : SK_ColorTRANSPARENT);
+  }
+  const auto rename = std::ranges::find(focus_targets_, FocusAction::kRename,
+                                        &FocusTarget::action);
+  if (rename != focus_targets_.end()) {
+    static_cast<views::MdTextButton*>(rename->view.get())
+        ->SetEnabledTextColors(fills.title);
   }
   const auto library = std::ranges::find(focus_targets_, FocusAction::kLibrary,
                                          &FocusTarget::action);
