@@ -33,8 +33,10 @@
 #include "content/public/browser/navigation_entry.h"
 #include "content/public/browser/web_contents.h"
 #include "content/public/browser/web_contents_observer.h"
+#include "content/public/common/page_type.h"
 #include "content/public/common/url_constants.h"
 #include "myarc/workspace_lifecycle.h"
+#include "url/origin.h"
 
 namespace myarc {
 
@@ -158,6 +160,7 @@ class Binding final : public base::SupportsUserData::Data,
     ForProfile(*profile_).pages[web_contents()] = item;
   }
   void Adopted() { legacy_ = false; }
+  void DidStopLoading() override;
   void WebContentsDestroyed() override {
     auto& runtime = ForProfile(*profile_);
     runtime.pages.erase(web_contents());
@@ -233,6 +236,40 @@ bool IsReady(WorkspaceService& service) {
   using State = WorkspaceService::StorageState;
   return service.storage_state() != State::kLoading &&
          service.storage_state() != State::kLoadError;
+}
+
+// Remembers a saved item's title once its page has loaded the saved URL, for
+// the dormant row. Error pages, non-2xx responses and redirects to another
+// origin, such as a login page, keep the last good title.
+void SaveTitle(Profile& profile, content::WebContents& page, uint64_t item) {
+  if (page.IsLoading())
+    return;
+  auto& service = WorkspaceService::ForProfile(profile);
+  auto state = service.ExportSnapshot();
+  const auto* row = state ? FindItem(*state, item) : nullptr;
+  const auto* entry = page.GetController().GetLastCommittedEntry();
+  if (!row || !row->has_url || !entry ||
+      entry->GetPageType() == content::PAGE_TYPE_ERROR) {
+    return;
+  }
+  const GURL& url = entry->GetURL();
+  if (url.SchemeIsHTTPOrHTTPS() && entry->GetHttpStatusCode() / 100 != 2)
+    return;
+  const GURL saved(std::string(row->canonical_url));
+  if (url != saved && (entry->GetOriginalRequestURL() != saved ||
+                       !url::IsSameOriginWith(url, saved))) {
+    return;
+  }
+  // GetTitle() is empty when the page set none; WebContents would substitute
+  // the URL.
+  const std::string title = base::UTF16ToUTF8(entry->GetTitle());
+  if (!title.empty() && title != std::string(row->title))
+    service.SetTitle(item, title);
+}
+
+void Binding::DidStopLoading() {
+  if (item_)
+    SaveTitle(*profile_, *web_contents(), item_);
 }
 
 }  // namespace
@@ -631,6 +668,7 @@ foundation::MutationResult BrowserWorkspaceAdapter::BindTabs() {
             std::string(result.error);
         continue;
       }
+      SaveTitle(*profile_, *contents, binding->item());
       Remember(Ok(binding->item()));
     }
     binding->Adopted();
@@ -1095,42 +1133,21 @@ void BrowserWorkspaceAdapter::Refresh() {
   ShowSelected();
   if (ready()) {
     const auto sidebar = Sidebar();
-    if (sidebar.ok) {
-      PersistTitles(sidebar);
+    if (sidebar.ok)
       RequestSavedIcons(sidebar);
-    }
   }
   changed_.Notify();
 }
 
-void BrowserWorkspaceAdapter::PersistTitles(
-    const foundation::SidebarResult& sidebar) {
-  for (const auto* rows : {&sidebar.favorites, &sidebar.pins}) {
-    for (const auto& row : *rows) {
-      auto* page = AnyPage(*profile_, row.id);
-      if (!page || page->IsLoading() || !row.has_url)
-        continue;
-      // Only the saved URL's own title describes the dormant row. Redirects
-      // keep the saved URL as the entry's original request.
-      const std::string saved(row.canonical_url);
-      const auto* entry = page->GetController().GetLastCommittedEntry();
-      if (page->GetLastCommittedURL().spec() != saved &&
-          (!entry || entry->GetOriginalRequestURL().spec() != saved)) {
-        continue;
-      }
-      const std::string title = base::UTF16ToUTF8(page->GetTitle());
-      if (!title.empty() && title != std::string(row.title))
-        service_->SetTitle(row.id, title);
-    }
-  }
-}
-
 void BrowserWorkspaceAdapter::RequestSavedIcons(
     const foundation::SidebarResult& sidebar) {
+  // Implicit access to an off-the-record Profile's favicons is fatal.
+  if (profile_->IsOffTheRecord())
+    return;
   auto* favicons = FaviconServiceFactory::GetForProfile(
       profile_, ServiceAccessType::IMPLICIT_ACCESS);
   if (!favicons)
-    return;  // Off-the-record Profiles keep no favicon history.
+    return;
   for (const auto* rows : {&sidebar.favorites, &sidebar.pins}) {
     for (const auto& row : *rows) {
       if (!row.has_url)
@@ -1146,6 +1163,7 @@ void BrowserWorkspaceAdapter::RequestSavedIcons(
       if (cached != saved_icons_.end())
         continue;
       saved_icons_.emplace(url, gfx::Image());
+      ++pending_icons_;
       favicons->GetFaviconImageForPageURL(
           url,
           base::BindOnce(&BrowserWorkspaceAdapter::OnSavedIcon,
@@ -1158,11 +1176,18 @@ void BrowserWorkspaceAdapter::RequestSavedIcons(
 void BrowserWorkspaceAdapter::OnSavedIcon(
     const GURL& url,
     const favicon_base::FaviconImageResult& result) {
-  if (result.image.IsEmpty())
-    return;
-  saved_icons_[url] = result.image;
-  // Refresh notifies the sidebar, which asks SavedIcon again.
-  OnServiceChanged();
+  DCHECK_GT(pending_icons_, 0u);
+  --pending_icons_;
+  if (!result.image.IsEmpty()) {
+    saved_icons_[url] = result.image;
+    icons_found_ = true;
+  }
+  // One sidebar rebuild per batch. Refresh notifies the sidebar, which asks
+  // SavedIcon again.
+  if (!pending_icons_ && icons_found_) {
+    icons_found_ = false;
+    OnServiceChanged();
+  }
 }
 
 gfx::Image BrowserWorkspaceAdapter::SavedIcon(
@@ -1313,8 +1338,12 @@ foundation::MutationResult BrowserWorkspaceAdapter::Save(
   auto* page = LocalPage(*tabs_, item);
   if (!page)
     return Fail("Save requires an actual live page in this window.");
-  return Remember(service_->SetPlacement(item, kind, owner, true,
-                                         page->GetLastCommittedURL().spec()));
+  auto result = service_->SetPlacement(item, kind, owner, true,
+                                       page->GetLastCommittedURL().spec());
+  // A page saved after it loaded has no later DidStopLoading.
+  if (result.ok)
+    SaveTitle(*profile_, *page, item);
+  return Remember(std::move(result));
 }
 foundation::MutationResult BrowserWorkspaceAdapter::Pin(uint64_t item) {
   return Save(item, foundation::PlacementKind::Pin);

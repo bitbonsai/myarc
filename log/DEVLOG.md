@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-10-30: Saved titles and favicons, review fixes
+
+- Review of `de57afd`: opening an off-the-record (incognito or Guest) window hit a fatal `NOTREACHED` in the favicon lookup, so off-the-record Profiles now skip it. Titles are saved when a bound page stops loading, or when a loaded page is saved. Saving only marks the file for the next write and doesn't rebuild the sidebar, so a blinking `(3) WhatsApp` title no longer causes writes. Error pages, non-2xx responses and redirects to another origin don't save. The raw entry title is used, so the URL is never saved as a title. Favicon replies rebuild the sidebar once per batch, and the `title` key is only written when set, so older builds still load the file.
+- Verification: `chrome` and `bridge_check` build, `bridge_check` passes (new check: an untitled record keeps 5 keys), and `cargo fmt`/`clippy`/`test` pass. In a background throwaway-profile capture, the dormant Favorites show their favicons, the dormant Pin shows its saved title and favicon, and the title-less item was written with 5 keys. Native pinned-tab restore again brought back extra live tiles. The load-stop path wasn't exercised on its own; titles in the capture came through the save-after-load path. The off-the-record guard was checked by reading the code, not by running it.
+- `export_patches.py --check` and `check_docs.py` pass; no Chromium file changed.
+
 ## 2026-10-30: Sidebar footer matches Arc
 
 - Arc's footer centers Space dots between Library and Create at a 34pt pitch, 8pt across, current dot white 50% vs 18%. myArc used 30pt pitch, 7pt dots and other colors. Now 34pt/8pt with those colors; dots recolor on theme change. Footer sits 2pt higher (button center 25.25pt from bottom, as in Arc). Library icon 18 -> 16, Create 20 -> 21, and the multi-stroke icons draw as one path so alpha no longer doubles at overlaps. Arc's Library glyph and per-Space icons (planet) are unchanged and not reproduced.

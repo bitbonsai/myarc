@@ -170,7 +170,9 @@ std::optional<std::string> EncodeWorkspaceMetadata(
     record.Set("owner_id", base::NumberToString(item.owner_id));
     record.Set("has_url", item.has_url);
     record.Set("canonical_url", std::string(item.canonical_url));
-    record.Set("title", std::string(item.title));
+    // Builds without saved titles reject the key, so write it only when set.
+    if (!item.title.empty())
+      record.Set("title", std::string(item.title));
     items.Append(std::move(record));
   }
   root.Set("items", std::move(items));
@@ -535,8 +537,11 @@ foundation::MutationResult WorkspaceService::SetTitle(uint64_t item,
     return Failure("Invalid UTF-8 page title.");
   auto result = foundation::set_title(*workspace_, item,
                                       rust::Str(title.data(), title.size()));
-  // An unchanged title needs no write or sidebar rebuild.
-  return result.ok && !result.id ? result : Changed(std::move(result));
+  // Titles touch no bindings, and live rows show the page's own title, so
+  // skip the notify and its rebuilds. The next write or shutdown flush saves it.
+  if (result.ok && result.id && !ephemeral_)
+    dirty_ = true;
+  return result;
 }
 
 foundation::MutationResult WorkspaceService::RemoveSavedItem(uint64_t item) {

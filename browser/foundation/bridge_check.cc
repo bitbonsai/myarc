@@ -330,8 +330,8 @@ bool CheckDeleteFirstSpace() {
          sidebar_snapshot(*model, 1).current_space.id == space.id;
 }
 
-// Saved titles survive the JSON codec, files without them still load, and
-// an unchanged title reports no change.
+// Saved titles survive the JSON codec, untitled records omit the key, files
+// without it still load, and an unchanged title reports no change.
 bool CheckSavedTitles() {
   using namespace myarc::foundation;
   using myarc::internal::DecodeWorkspaceMetadata;
@@ -342,6 +342,18 @@ bool CheckSavedTitles() {
       !set_placement(*model, item.id, PlacementKind::Favorite, 1, true,
                      "https://example.test/")
            .ok) {
+    return false;
+  }
+  // Without a title the record keeps the 5 keys older builds require.
+  const auto untitled = EncodeWorkspaceMetadata(export_snapshot(*model));
+  auto untitled_root =
+      untitled ? base::JSONReader::ReadDict(*untitled, base::JSON_PARSE_RFC)
+               : std::nullopt;
+  auto* untitled_items =
+      untitled_root ? untitled_root->FindList("items") : nullptr;
+  if (!untitled_items || untitled_items->size() != 1 ||
+      (*untitled_items)[0].GetDict().size() != 5 ||
+      (*untitled_items)[0].GetDict().contains("title")) {
     return false;
   }
   auto changed = set_title(*model, item.id, "Example");

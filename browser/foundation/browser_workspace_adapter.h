@@ -138,8 +138,6 @@ class BrowserWorkspaceAdapter final : public TabStripModelObserver {
   void ShowSelected();
   void OnServiceChanged();
   void Refresh();
-  // Remembers the title of live saved pages showing their saved URL.
-  void PersistTitles(const foundation::SidebarResult& sidebar);
   // Starts favicon lookups for dormant saved rows not looked up yet.
   void RequestSavedIcons(const foundation::SidebarResult& sidebar);
   void OnSavedIcon(const GURL& url,
@@ -178,6 +176,9 @@ class BrowserWorkspaceAdapter final : public TabStripModelObserver {
   base::CallbackListSubscription service_subscription_;
   // By saved URL. An empty image marks a pending lookup or a cache miss.
   std::map<GURL, gfx::Image> saved_icons_;
+  // Lookups not answered yet, and whether this batch found any icon.
+  size_t pending_icons_ = 0;
+  bool icons_found_ = false;
   base::CancelableTaskTracker icon_tracker_;
   SEQUENCE_CHECKER(sequence_checker_);
   base::WeakPtrFactory<BrowserWorkspaceAdapter> weak_factory_{this};

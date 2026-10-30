@@ -84,7 +84,8 @@ class WorkspaceService final : public base::SupportsUserData::Data {
                                           bool has_url,
                                           std::string_view canonical_url);
   // Saved items only. Pass the live page title while it shows the saved URL;
-  // Rust bounds it. An unchanged title neither writes nor notifies.
+  // Rust bounds it. Never notifies or writes by itself: a changed title is
+  // saved with the next metadata write or the shutdown flush.
   foundation::MutationResult SetTitle(uint64_t item, std::string_view title);
   foundation::MutationResult RemoveSavedItem(uint64_t item);
   foundation::MutationResult RevealItem(uint64_t window, uint64_t item);
