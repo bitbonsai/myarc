@@ -83,11 +83,14 @@ class WorkspaceService final : public base::SupportsUserData::Data {
   foundation::MutationResult ArchiveClosedTab(uint64_t item,
                                               std::string_view url,
                                               std::string_view title);
-  // One Auto Archive pass at the current wall-clock time: records views of
-  // selected and new temporary items, then returns the idle items among
-  // `closable` that are due. The caller closes their pages, which archives
-  // them. `media` lists audible items. Off-the-record Profiles get nothing.
-  rust::Vec<uint64_t> AutoArchive(base::span<const uint64_t> closable,
+  // One Auto Archive pass on the browser-open clock, which advances by the
+  // monotonic time since the previous pass: records views of `viewed`
+  // (visible tabs), selected and new temporary items, then returns the idle
+  // items among `closable` that are due. The caller closes their pages, which
+  // archives them. `media` lists items playing or capturing media. Pass empty
+  // `closable` to only record views. Off-the-record Profiles get nothing.
+  rust::Vec<uint64_t> AutoArchive(base::span<const uint64_t> viewed,
+                                  base::span<const uint64_t> closable,
                                   base::span<const uint64_t> media);
   // Unexpired Archived Tabs, newest first. Empty while not loaded.
   rust::Vec<foundation::ArchivedTabRecord> ArchivedTabs() const;
@@ -139,6 +142,8 @@ class WorkspaceService final : public base::SupportsUserData::Data {
   std::string storage_error_;
   bool dirty_ = false;
   bool write_in_flight_ = false;
+  // When the last Auto Archive pass advanced the clock; null before the first.
+  base::TimeTicks last_pass_;
   base::RepeatingClosureList changed_;
   SEQUENCE_CHECKER(sequence_checker_);
   // Invalidates replies on destruction. Queued writes own their path/records

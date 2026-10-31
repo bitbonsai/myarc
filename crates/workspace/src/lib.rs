@@ -157,8 +157,9 @@ pub struct Item {
     /// Last known page title of a saved item, shown while it is dormant. Empty
     /// when unknown and always empty for temporary items.
     pub title: String,
-    /// Wall-clock seconds a temporary item was last seen selected, for Auto
-    /// Archive. Zero means not recorded yet; saving or unsaving resets it.
+    /// Reading of the browser-open clock (`WorkspaceSnapshot::open_secs`) when a
+    /// temporary item was last seen, for Auto Archive. Zero means not recorded
+    /// yet; saving or unsaving resets it.
     pub last_viewed_secs: u64,
 }
 
@@ -204,6 +205,10 @@ pub struct WorkspaceSnapshot {
     /// Archived Tabs, oldest first. Never holds private-browsing pages: the
     /// adapter records nothing for off-the-record Profiles.
     pub archived: Vec<ArchivedTab>,
+    /// Browser-open clock for Auto Archive: seconds the browser has run, summed
+    /// across launches. It stands still while the browser is closed or the
+    /// computer sleeps. Zero until the first Auto Archive pass.
+    pub open_secs: u64,
     pub next_space_id: SpaceId,
     pub next_item_id: ItemId,
     pub next_window_id: WindowId,
@@ -256,6 +261,7 @@ impl Default for Workspace {
                     selected_item_id: None,
                 }],
                 archived: Vec::new(),
+                open_secs: 0,
                 next_space_id: 2,
                 next_item_id: 1,
                 next_window_id: 2,

@@ -15,9 +15,13 @@
 //!
 //! One call covers one Profile policy. Callers filter items by Profile first.
 //!
-//! `Workspace::auto_archive` is the pass the browser runs on a timer: it records
-//! views in each temporary item's `last_viewed_secs`, which persists with the
-//! snapshot, then applies the rule with the default policy.
+//! `Workspace::auto_archive` is the pass the browser runs on a timer and on tab
+//! activation. Its clock is the snapshot's `open_secs`, which counts only time
+//! the browser is open: each pass adds the monotonic time since the previous one,
+//! capped at `MAX_PASS_GAP_SECS`, so a sleeping computer or a closed browser adds
+//! nothing. It records views in each temporary item's `last_viewed_secs` against
+//! that clock, both persist with the snapshot, then it applies the rule with the
+//! default policy.
 
 use std::cmp::Reverse;
 use std::collections::BTreeSet;
@@ -133,46 +137,66 @@ pub fn decide_archive(
     decision
 }
 
+/// Longest gap one pass may add to the browser-open clock. The browser passes
+/// every 5 minutes while it runs; a longer gap means the computer slept or the
+/// clock jumped, and that time does not count.
+pub const MAX_PASS_GAP_SECS: u64 = 10 * 60;
+
 /// What one `Workspace::auto_archive` pass found.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct AutoArchive {
     /// Temporary items to close now, in item order.
     pub due: Vec<ItemId>,
-    /// Whether any `last_viewed_secs` changed, so the snapshot needs saving.
-    pub stamped: bool,
+    /// Whether the clock or any `last_viewed_secs` changed, so the snapshot
+    /// needs saving.
+    pub changed: bool,
 }
 
 impl Workspace {
-    /// One Auto Archive pass at `now_secs` with the default 12-hour policy.
+    /// One Auto Archive pass with the default 12-hour policy, `elapsed_secs`
+    /// after the previous pass by a monotonic clock (zero for the first pass of
+    /// a launch).
     ///
-    /// First it records views: a temporary item selected in any window, or one
-    /// with no recorded view yet (a new item, or a file from an older build),
-    /// gets `now_secs`, so nothing expires just because its time was unknown.
-    /// Then `decide_archive` picks the due items among `closable`: the items
-    /// whose live pages the adapter can close and archive. `media` lists items
-    /// playing media. Unknown IDs are ignored. Nothing is removed here: the
+    /// The browser-open clock (`open_secs`) advances by `elapsed_secs`, capped
+    /// at `MAX_PASS_GAP_SECS`. It starts at 1, since zero marks an unrecorded
+    /// view. Then views are recorded at the new reading: a temporary item
+    /// selected in any window, listed in `viewed` (every visible tab, split
+    /// views included), with no recorded view yet (a new item, or a file from an
+    /// older build) or with a view ahead of the clock (a damaged or older file)
+    /// gets the current reading, so nothing expires early. Then
+    /// `decide_archive` picks the due items among `closable`: the items whose
+    /// live pages the adapter can close and archive. `media` lists items playing
+    /// or capturing media. Unknown IDs are ignored. Nothing is removed here: the
     /// adapter closes each due page, and closing archives it through
     /// `archive_closed_tab`.
     pub fn auto_archive(
         &mut self,
+        viewed: &[ItemId],
         closable: &[ItemId],
         media: &[ItemId],
-        now_secs: u64,
+        elapsed_secs: u64,
     ) -> AutoArchive {
-        let selected: BTreeSet<ItemId> = self
-            .state
-            .windows
-            .iter()
-            .filter_map(|window| window.selected_item_id)
-            .collect();
-        let mut stamped = false;
+        let before = self.state.open_secs;
+        let now = before
+            .saturating_add(elapsed_secs.min(MAX_PASS_GAP_SECS))
+            .max(1);
+        self.state.open_secs = now;
+        let mut changed = now != before;
+        let mut seen: BTreeSet<ItemId> = viewed.iter().copied().collect();
+        seen.extend(
+            self.state
+                .windows
+                .iter()
+                .filter_map(|window| window.selected_item_id),
+        );
         for item in &mut self.state.items {
+            let last = item.last_viewed_secs;
             if matches!(item.placement, Placement::Temporary { .. })
-                && (item.last_viewed_secs == 0 || selected.contains(&item.id))
-                && item.last_viewed_secs != now_secs
+                && (last == 0 || last > now || seen.contains(&item.id))
+                && last != now
             {
-                item.last_viewed_secs = now_secs;
-                stamped = true;
+                item.last_viewed_secs = now;
+                changed = true;
             }
         }
         let closable: BTreeSet<ItemId> = closable.iter().copied().collect();
@@ -189,10 +213,10 @@ impl Workspace {
                 media_playing: media.contains(&item.id),
             })
             .collect();
-        let selected: Vec<ItemId> = selected.into_iter().collect();
+        let seen: Vec<ItemId> = seen.into_iter().collect();
         AutoArchive {
-            due: decide_archive(&candidates, &selected, ArchivePolicy::default(), now_secs).archive,
-            stamped,
+            due: decide_archive(&candidates, &seen, ArchivePolicy::default(), now).archive,
+            changed,
         }
     }
 
@@ -538,17 +562,20 @@ mod auto_archive_tests {
     use crate::{DEFAULT_SPACE_ID, DEFAULT_WINDOW_ID};
 
     const H: u64 = HOUR_SECS;
+    /// The browser's pass interval.
+    const PASS: u64 = 5 * 60;
 
-    /// Fake clock: the test owns `now` and moves it by hand.
-    struct Clock {
-        now: u64,
-    }
-
-    impl Clock {
-        fn advance(&mut self, secs: u64) -> u64 {
-            self.now += secs;
-            self.now
+    /// Runs passes every 5 minutes for `secs` of open browser time, as the
+    /// browser's timer does, and returns the last one.
+    fn run(workspace: &mut Workspace, closable: &[ItemId], secs: u64) -> AutoArchive {
+        let mut last = AutoArchive::default();
+        let mut left = secs;
+        while left > 0 {
+            let step = left.min(PASS);
+            last = workspace.auto_archive(&[], closable, &[], step);
+            left -= step;
         }
+        last
     }
 
     fn viewed(workspace: &Workspace, id: ItemId) -> u64 {
@@ -562,57 +589,62 @@ mod auto_archive_tests {
     }
 
     #[test]
-    fn idle_temporary_items_are_due_after_twelve_hours() {
-        let mut clock = Clock { now: 1_000 };
+    fn idle_temporary_items_are_due_after_twelve_open_hours() {
         let mut workspace = Workspace::default();
         let a = workspace.add_temporary_item(DEFAULT_SPACE_ID).unwrap();
         let b = workspace.add_temporary_item(DEFAULT_SPACE_ID).unwrap();
-        // First pass records the unknown views and archives nothing.
-        let first = workspace.auto_archive(&[a, b], &[], clock.now);
+        // The first pass starts the clock, records the unknown views and
+        // archives nothing.
+        let first = workspace.auto_archive(&[], &[a, b], &[], 0);
         assert_eq!(
             first,
             AutoArchive {
                 due: vec![],
-                stamped: true
+                changed: true
             }
         );
-        assert_eq!(viewed(&workspace, a), 1_000);
-        // Nothing new to record until something is selected.
-        let quiet = workspace.auto_archive(&[a, b], &[], clock.advance(12 * H - 1));
-        assert_eq!(quiet, AutoArchive::default());
-        let due = workspace.auto_archive(&[a, b], &[], clock.advance(1));
-        assert_eq!(due.due, vec![a, b]);
+        assert_eq!(workspace.snapshot().open_secs, 1);
+        assert_eq!(viewed(&workspace, a), 1);
+        assert!(run(&mut workspace, &[a, b], 12 * H - 1).due.is_empty());
+        assert_eq!(run(&mut workspace, &[a, b], 1).due, vec![a, b]);
         // The pass only decides; the adapter's close removes the items.
         assert_eq!(workspace.snapshot().items.len(), 2);
     }
 
     #[test]
-    fn the_selected_item_is_kept_and_its_view_recorded() {
-        let mut clock = Clock { now: 10 };
+    fn selected_and_visible_items_are_kept_and_their_views_recorded() {
         let mut workspace = Workspace::default();
         let a = workspace.add_temporary_item(DEFAULT_SPACE_ID).unwrap();
         let b = workspace.add_temporary_item(DEFAULT_SPACE_ID).unwrap();
-        workspace.auto_archive(&[a, b], &[], clock.now);
+        let split = workspace.add_temporary_item(DEFAULT_SPACE_ID).unwrap();
+        workspace.auto_archive(&[], &[], &[], 0);
         workspace.select_item(DEFAULT_WINDOW_ID, a).unwrap();
-        let pass = workspace.auto_archive(&[a, b], &[], clock.advance(20 * H));
+        run(&mut workspace, &[], 20 * H);
+        // `split` shares the window with `a` in a split view.
+        let pass = workspace.auto_archive(&[split], &[a, b, split], &[], PASS);
         assert_eq!(pass.due, vec![b]);
-        assert!(pass.stamped);
-        assert_eq!(viewed(&workspace, a), clock.now);
+        let now = workspace.snapshot().open_secs;
+        assert_eq!(viewed(&workspace, a), now);
+        assert_eq!(viewed(&workspace, split), now);
         // Leaving it starts its 12 hours from the last recorded view.
         let other = workspace.add_temporary_item(DEFAULT_SPACE_ID).unwrap();
         workspace.select_item(DEFAULT_WINDOW_ID, other).unwrap();
-        let left_at = clock.now;
-        assert!(
-            workspace
-                .auto_archive(&[a], &[], clock.advance(12 * H - 1))
-                .due
-                .is_empty()
-        );
-        assert_eq!(viewed(&workspace, a), left_at);
-        assert_eq!(
-            workspace.auto_archive(&[a], &[], clock.advance(1)).due,
-            vec![a]
-        );
+        assert!(run(&mut workspace, &[a], 12 * H - 1).due.is_empty());
+        assert_eq!(viewed(&workspace, a), now);
+        assert_eq!(run(&mut workspace, &[a], 1).due, vec![a]);
+    }
+
+    #[test]
+    fn an_activation_records_a_view_between_passes() {
+        let mut workspace = Workspace::default();
+        let id = workspace.add_temporary_item(DEFAULT_SPACE_ID).unwrap();
+        workspace.auto_archive(&[], &[], &[], 0);
+        run(&mut workspace, &[], 11 * H);
+        // Viewed 2 minutes after a pass, with nothing closable.
+        let view = workspace.auto_archive(&[id], &[], &[], 120);
+        assert!(view.changed && view.due.is_empty());
+        assert!(run(&mut workspace, &[id], 12 * H - 1).due.is_empty());
+        assert_eq!(run(&mut workspace, &[id], 1).due, vec![id]);
     }
 
     #[test]
@@ -621,7 +653,7 @@ mod auto_archive_tests {
         let pin = workspace.add_temporary_item(DEFAULT_SPACE_ID).unwrap();
         let chrome_page = workspace.add_temporary_item(DEFAULT_SPACE_ID).unwrap();
         let playing = workspace.add_temporary_item(DEFAULT_SPACE_ID).unwrap();
-        workspace.auto_archive(&[], &[], 1);
+        workspace.auto_archive(&[], &[], &[], 0);
         workspace
             .set_placement(
                 pin,
@@ -632,7 +664,8 @@ mod auto_archive_tests {
             )
             .unwrap();
         assert_eq!(viewed(&workspace, pin), 0);
-        let pass = workspace.auto_archive(&[pin, playing, 99], &[playing], 30 * 24 * H);
+        run(&mut workspace, &[], 30 * H);
+        let pass = workspace.auto_archive(&[], &[pin, playing, 99], &[playing], PASS);
         assert!(pass.due.is_empty());
         // Saved items record no views.
         assert_eq!(viewed(&workspace, pin), 0);
@@ -641,10 +674,9 @@ mod auto_archive_tests {
 
     #[test]
     fn an_unsaved_item_starts_a_fresh_timer() {
-        let mut clock = Clock { now: 5 };
         let mut workspace = Workspace::default();
         let id = workspace.add_temporary_item(DEFAULT_SPACE_ID).unwrap();
-        workspace.auto_archive(&[id], &[], clock.now);
+        workspace.auto_archive(&[], &[id], &[], 0);
         workspace
             .set_placement(
                 id,
@@ -654,39 +686,62 @@ mod auto_archive_tests {
                 Some("https://example.test/"),
             )
             .unwrap();
-        clock.advance(48 * H);
+        run(&mut workspace, &[], 48 * H);
         workspace.unsave_item(id, Some(DEFAULT_SPACE_ID)).unwrap();
-        assert!(workspace.auto_archive(&[id], &[], clock.now).due.is_empty());
-        assert_eq!(viewed(&workspace, id), clock.now);
+        assert!(workspace.auto_archive(&[], &[id], &[], 0).due.is_empty());
+        assert_eq!(viewed(&workspace, id), workspace.snapshot().open_secs);
     }
 
     #[test]
-    fn recorded_views_survive_a_restart() {
+    fn time_with_the_browser_closed_does_not_count() {
         let mut workspace = Workspace::default();
         let id = workspace.add_temporary_item(DEFAULT_SPACE_ID).unwrap();
-        workspace.auto_archive(&[id], &[], 100);
+        workspace.auto_archive(&[], &[id], &[], 0);
+        run(&mut workspace, &[id], 8 * H);
+        // Quit on Friday, relaunch on Monday: the clock and the view persist,
+        // and the first pass of a launch reports no elapsed time.
         let mut restored = Workspace::from_snapshot(workspace.snapshot()).unwrap();
-        assert_eq!(viewed(&restored, id), 100);
-        // The restored time counts: no reset, no early expiry.
+        assert_eq!(restored.snapshot().open_secs, 1 + 8 * H);
+        assert_eq!(viewed(&restored, id), 1);
+        assert!(restored.auto_archive(&[], &[id], &[], 0).due.is_empty());
+        assert!(run(&mut restored, &[id], 4 * H - 1).due.is_empty());
+        assert_eq!(run(&mut restored, &[id], 1).due, vec![id]);
+    }
+
+    #[test]
+    fn a_sleeping_computer_adds_at_most_one_pass_gap() {
+        let mut workspace = Workspace::default();
+        let id = workspace.add_temporary_item(DEFAULT_SPACE_ID).unwrap();
+        workspace.auto_archive(&[], &[id], &[], 0);
+        run(&mut workspace, &[id], 6 * H);
+        // A weekend asleep, or a clock jump, arrives as one huge gap.
+        let woke = workspace.auto_archive(&[], &[id], &[], 60 * H);
+        assert!(woke.due.is_empty());
+        assert_eq!(
+            workspace.snapshot().open_secs,
+            1 + 6 * H + MAX_PASS_GAP_SECS
+        );
         assert!(
-            restored
-                .auto_archive(&[id], &[], 100 + 12 * H - 1)
+            run(&mut workspace, &[id], 6 * H - MAX_PASS_GAP_SECS - 1)
                 .due
                 .is_empty()
         );
-        assert_eq!(
-            restored.auto_archive(&[id], &[], 100 + 12 * H).due,
-            vec![id]
-        );
+        assert_eq!(run(&mut workspace, &[id], 1).due, vec![id]);
     }
 
     #[test]
-    fn a_clock_that_moved_backwards_archives_nothing() {
+    fn a_view_ahead_of_the_clock_is_clamped_to_now() {
         let mut workspace = Workspace::default();
         let id = workspace.add_temporary_item(DEFAULT_SPACE_ID).unwrap();
-        workspace.auto_archive(&[id], &[], 50 * H);
-        assert!(workspace.auto_archive(&[id], &[], H).due.is_empty());
-        assert_eq!(viewed(&workspace, id), 50 * H);
+        let mut snapshot = workspace.snapshot();
+        snapshot.open_secs = 100;
+        // A wall-clock stamp from an older build, far ahead of this clock.
+        snapshot.items[0].last_viewed_secs = 1_800_000_000;
+        let mut restored = Workspace::from_snapshot(snapshot).unwrap();
+        assert!(restored.auto_archive(&[], &[id], &[], 0).changed);
+        assert_eq!(viewed(&restored, id), 100);
+        assert!(run(&mut restored, &[id], 12 * H - 1).due.is_empty());
+        assert_eq!(run(&mut restored, &[id], 1).due, vec![id]);
     }
 }
 

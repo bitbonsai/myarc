@@ -990,6 +990,7 @@ fn old_snapshot_with_space_one_loads_unchanged() {
         next_space_id: 3,
         next_item_id: 2,
         archived: Vec::new(),
+        open_secs: 0,
         next_window_id: 2,
     };
     let workspace = Workspace::from_snapshot(snapshot.clone()).unwrap();

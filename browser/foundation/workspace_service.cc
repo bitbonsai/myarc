@@ -1,5 +1,6 @@
 #include "myarc/workspace_service.h"
 
+#include <algorithm>
 #include <array>
 #include <limits>
 #include <memory>
@@ -234,6 +235,9 @@ std::optional<std::string> EncodeWorkspaceMetadata(
     }
     root.Set("archived", std::move(archived));
   }
+  // Builds without Auto Archive reject the key, so write it only when set.
+  if (snapshot.open_secs)
+    root.Set("open_secs", base::NumberToString(snapshot.open_secs));
   auto json = base::WriteJson(root);
   if (json && json->size() <= kMaxMetadataBytes) {
     return json;
@@ -248,7 +252,7 @@ MetadataResult DecodeWorkspaceMetadata(std::string_view json) {
   auto root =
       base::JSONReader::ReadDict(json, base::JSON_PARSE_RFC, kMaxJsonDepth);
   const auto limits = foundation::bridge_limits();
-  if (!root || root->size() < 8 || root->size() > 9 ||
+  if (!root || root->size() < 8 || root->size() > 10 ||
       root->FindInt("version") != static_cast<int>(limits.version)) {
     return InvalidMetadata();
   }
@@ -259,10 +263,15 @@ MetadataResult DecodeWorkspaceMetadata(std::string_view json) {
   // archive never fails the file: it is a convenience, the rest is not.
   const auto* archived_value = root->Find("archived");
   const auto* archived = archived_value ? archived_value->GetIfList() : nullptr;
+  // Nor does a bad Auto Archive clock (or one from before Auto Archive): it
+  // reads as zero, and the next pass restamps every view, so nothing archives
+  // early.
+  const bool has_open_secs = root->contains("open_secs");
   if (!spaces || spaces->size() > limits.spaces || !items ||
       items->size() > limits.items || !windows ||
       windows->size() > limits.windows ||
-      (root->size() == 9) != (archived_value != nullptr)) {
+      root->size() != 8 + (archived_value ? 1u : 0u) +
+                          (has_open_secs ? 1u : 0u)) {
     return InvalidMetadata();
   }
   foundation::StateSnapshot snapshot;
@@ -273,6 +282,8 @@ MetadataResult DecodeWorkspaceMetadata(std::string_view json) {
       !ReadId(*root, "next_window_id", snapshot.next_window_id)) {
     return InvalidMetadata();
   }
+  if (has_open_secs && !ReadId(*root, "open_secs", snapshot.open_secs))
+    snapshot.open_secs = 0;
   for (const auto& value : *spaces) {
     const auto* record = value.GetIfDict();
     foundation::SpaceRecord space;
@@ -300,7 +311,6 @@ MetadataResult DecodeWorkspaceMetadata(std::string_view json) {
     const bool viewed = record->contains("viewed_secs");
     foundation::ItemRecord item;
     if (record->size() != 5 + (title ? 1u : 0u) + (viewed ? 1u : 0u) ||
-        (viewed && !ReadId(*record, "viewed_secs", item.last_viewed_secs)) ||
         (title && !BoundedText(*title, limits.title_bytes)) || !kind ||
         *kind < static_cast<int>(foundation::PlacementKind::Temporary) ||
         *kind > static_cast<int>(foundation::PlacementKind::Favorite) ||
@@ -309,6 +319,9 @@ MetadataResult DecodeWorkspaceMetadata(std::string_view json) {
         !ReadId(*record, "owner_id", item.owner_id)) {
       return InvalidMetadata();
     }
+    // A bad view time reads as unrecorded: the next pass restamps it.
+    if (viewed && !ReadId(*record, "viewed_secs", item.last_viewed_secs))
+      item.last_viewed_secs = 0;
     item.placement = static_cast<foundation::PlacementKind>(*kind);
     item.has_url = *has_url;
     item.canonical_url = *url;
@@ -611,18 +624,27 @@ foundation::MutationResult WorkspaceService::ArchiveClosedTab(
 }
 
 rust::Vec<uint64_t> WorkspaceService::AutoArchive(
+    base::span<const uint64_t> viewed,
     base::span<const uint64_t> closable,
     base::span<const uint64_t> media) {
   // Private browsing keeps no history, so it archives nothing.
   if (ephemeral_ || !CanMutate())
     return {};
+  // Whole monotonic seconds since the previous pass; the remainder carries
+  // over. Rust caps the gap, so time asleep does not count either way.
+  const base::TimeTicks now = base::TimeTicks::Now();
+  if (last_pass_.is_null())
+    last_pass_ = now;
+  const int64_t elapsed = std::max<int64_t>(0, (now - last_pass_).InSeconds());
+  last_pass_ += base::Seconds(elapsed);
   auto pass = foundation::auto_archive(
-      *workspace_,
+      *workspace_, rust::Slice<const uint64_t>(viewed.data(), viewed.size()),
       rust::Slice<const uint64_t>(closable.data(), closable.size()),
-      rust::Slice<const uint64_t>(media.data(), media.size()), NowSecs());
-  // Like titles, view times touch no bindings: save them with the next
-  // metadata write or the shutdown flush, without a notify.
-  if (pass.stamped)
+      rust::Slice<const uint64_t>(media.data(), media.size()),
+      static_cast<uint64_t>(elapsed));
+  // Like titles, the clock and view times touch no bindings: save them with
+  // the next metadata write or the shutdown flush, without a notify.
+  if (pass.changed)
     dirty_ = true;
   return std::move(pass.due);
 }

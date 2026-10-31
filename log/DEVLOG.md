@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-10-31: Auto Archive review fixes
+
+- The 12 hours now count only browser-open time: the snapshot keeps a clock (`open_secs`, JSON key written only when set) that each pass advances by monotonic time since the previous one, capped at 10 minutes, and the first pass of a launch adds nothing, so a closed browser or a sleeping Mac stops it. View times are clock readings; one ahead of the clock, or a malformed `viewed_secs` or `open_secs`, reads as unrecorded and gets restamped instead of failing the load. Tab activation records the new and the previous tab as viewed. Split-view foreground tabs are viewed and kept. Gated passes still record views. Captured and Picture-in-Picture tabs stay. Auto-archived tabs skip the recently closed list, and each close re-checks its page through a weak pointer.
+- Verification: `chrome` and `bridge_check` build; `bridge_check` (clock and view survive the codec, due after 12 hours of passes, bad values decode as 0), 8 Rust Auto Archive tests including a simulated sleep gap and a closed-browser restart, cargo fmt/clippy/test, `export_patches.py --check` and `check_docs.py` pass. Activation, split view and closing were checked by reading the code, not run.
+- No Chromium commit: only symlinked `browser/foundation` files changed. Camera and microphone capture still don't hold a tab (needs a `//chrome/browser` dependency).
+
 ## 2026-10-31: Auto Archive
 
 - Temporary tabs not viewed for 12 hours now close through the ordinary close path, so they land in Archived Tabs. Each temporary item records when it was last seen selected (`last_viewed_secs`, a `viewed_secs` JSON key written only when set; saving or unsaving clears it). `Workspace::auto_archive` records the views, gives an item with no recorded time the current time, and picks the due items with the existing rule. The browser runs a pass at startup or restore and every 5 minutes. It keeps selected, active and audible tabs, pages that would prompt before unloading, and anything the archive wouldn't keep: off-the-record and no-history Profiles, Chrome and blank pages.

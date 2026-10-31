@@ -40,8 +40,8 @@ mod ffi {
         canonical_url: String,
         // Last known page title of a saved item; empty when unknown.
         title: String,
-        // Wall-clock seconds a temporary item was last seen selected; zero
-        // when not recorded yet.
+        // Browser-open clock reading when a temporary item was last seen;
+        // zero when not recorded yet.
         last_viewed_secs: u64,
     }
 
@@ -63,8 +63,9 @@ mod ffi {
     struct AutoArchiveResult {
         // Temporary items to close now; closing archives them.
         due: Vec<u64>,
-        // A last-viewed time changed, so the snapshot needs saving.
-        stamped: bool,
+        // The clock or a last-viewed time changed, so the snapshot needs
+        // saving.
+        changed: bool,
     }
 
     struct StateSnapshot {
@@ -78,6 +79,9 @@ mod ffi {
         windows: Vec<WindowRecord>,
         // Oldest first, as stored.
         archived: Vec<ArchivedTabRecord>,
+        // Auto Archive's browser-open clock in seconds; zero before its first
+        // pass.
+        open_secs: u64,
     }
 
     struct SidebarResult {
@@ -130,14 +134,18 @@ mod ffi {
         // Unexpired entries, newest first.
         fn archived_tabs(workspace: &Workspace, now_secs: u64) -> Vec<ArchivedTabRecord>;
         fn remove_archived_tab(workspace: &mut Workspace, id: u64) -> MutationResult;
-        // One Auto Archive pass: records views of selected and new temporary
-        // items, then names the idle ones among `closable` (items whose pages
-        // can close and archive) that are due. `media` lists audible items.
+        // One Auto Archive pass, `elapsed_secs` of monotonic time after the
+        // previous one (zero for the first of a launch): advances the
+        // browser-open clock, records views of `viewed` (visible tabs),
+        // selected and new temporary items, then names the idle ones among
+        // `closable` (items whose pages can close and archive) that are due.
+        // `media` lists items playing or capturing media.
         fn auto_archive(
             workspace: &mut Workspace,
+            viewed: &[u64],
             closable: &[u64],
             media: &[u64],
-            now_secs: u64,
+            elapsed_secs: u64,
         ) -> AutoArchiveResult;
         // Drops expired entries; `id` is how many went.
         fn prune_archived_tabs(workspace: &mut Workspace, now_secs: u64) -> MutationResult;
@@ -313,14 +321,17 @@ pub fn remove_archived_tab(workspace: &mut Workspace, id: u64) -> ffi::MutationR
 
 pub fn auto_archive(
     workspace: &mut Workspace,
+    viewed: &[u64],
     closable: &[u64],
     media: &[u64],
-    now_secs: u64,
+    elapsed_secs: u64,
 ) -> ffi::AutoArchiveResult {
-    let pass = workspace.0.auto_archive(closable, media, now_secs);
+    let pass = workspace
+        .0
+        .auto_archive(viewed, closable, media, elapsed_secs);
     ffi::AutoArchiveResult {
         due: pass.due,
-        stamped: pass.stamped,
+        changed: pass.changed,
     }
 }
 
@@ -535,6 +546,7 @@ pub fn export_snapshot(workspace: &Workspace) -> ffi::StateSnapshot {
             })
             .collect(),
         archived: state.archived.into_iter().map(archived_record).collect(),
+        open_secs: state.open_secs,
     }
 }
 
@@ -617,6 +629,7 @@ pub fn restore_snapshot(
                         archived_secs: tab.archived_secs,
                     })
                     .collect(),
+                open_secs: snapshot.open_secs,
             })
             .map(|()| 0),
     )

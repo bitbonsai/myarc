@@ -837,64 +837,86 @@ foundation::MutationResult BrowserWorkspaceAdapter::FinishSessionRestore(
 
 void BrowserWorkspaceAdapter::AutoArchive(Profile& profile) {
   auto& runtime = ForProfile(profile);
-  if (profile.IsOffTheRecord() || !runtime.complete || runtime.shutting_down ||
-      browser_shutdown::IsTryingToQuit() ||
-      SessionRestore::IsRestoring(&profile) ||
-      profile.GetPrefs()->GetBoolean(prefs::kSavingBrowserHistoryDisabled)) {
+  if (profile.IsOffTheRecord() || runtime.shutting_down ||
+      browser_shutdown::IsTryingToQuit()) {
     return;
   }
-  // A window that is not bound yet may hold stale bindings: wait for it.
+  // Every pass records views and keeps the idle clock running. It closes
+  // pages only once restore is over, every window is bound (an unbound one may
+  // hold stale bindings) and the Profile saves history.
+  bool can_close =
+      runtime.complete && !SessionRestore::IsRestoring(&profile) &&
+      !profile.GetPrefs()->GetBoolean(prefs::kSavingBrowserHistoryDisabled);
+  // Foreground pages count as viewed: the active tab and, in a split view,
+  // the tabs beside it.
   std::map<content::WebContents*, TabStripModel*> strips;
+  std::set<content::WebContents*> foreground;
   for (const auto& adapter : runtime.adapters) {
     if (!adapter->tabs_)
       continue;
-    if (!adapter->ready())
-      return;
-    for (int i = 0; i < adapter->tabs_->count(); ++i)
-      strips[adapter->tabs_->GetWebContentsAt(i)] = adapter->tabs_;
+    can_close = can_close && adapter->ready();
+    for (int i = 0; i < adapter->tabs_->count(); ++i) {
+      auto* page = adapter->tabs_->GetWebContentsAt(i);
+      strips[page] = adapter->tabs_;
+      if (adapter->tabs_->IsTabInForeground(i))
+        foreground.insert(page);
+    }
   }
   // An item may close only when every page of it can: it sits in a myArc
-  // window, is not that window's active tab, shows a URL the archive keeps
-  // (no Chrome or blank pages) and would not prompt before unloading.
+  // window, is not in that window's foreground, shows a URL the archive keeps
+  // (no Chrome or blank pages) and would not prompt before unloading. Pages
+  // playing media, being captured or in Picture-in-Picture hold their item.
   const size_t url_bytes = foundation::bridge_limits().url_bytes;
   std::map<uint64_t, bool> closable;
+  std::set<uint64_t> viewed;
   std::set<uint64_t> media;
   for (const auto& [page, item] : runtime.pages) {
     if (!item)
       continue;
-    const auto strip = strips.find(page);
+    const bool shown = foreground.contains(page);
+    if (shown)
+      viewed.insert(item);
     const GURL& url = page->GetLastCommittedURL();
-    const bool ok = strip != strips.end() &&
-                    strip->second->GetActiveWebContents() != page &&
+    const bool ok = strips.contains(page) && !shown &&
                     url.SchemeIsHTTPOrHTTPS() && !url.has_username() &&
                     !url.has_password() && url.spec().size() <= url_bytes &&
                     !page->NeedToFireBeforeUnload();
     auto [it, inserted] = closable.emplace(item, ok);
     if (!inserted)
       it->second = it->second && ok;
-    if (page->IsCurrentlyAudible())
+    if (page->IsCurrentlyAudible() || page->IsBeingCaptured() ||
+        page->HasPictureInPictureVideo() ||
+        page->HasPictureInPictureDocument()) {
       media.insert(item);
+    }
   }
   std::vector<uint64_t> ids;
   for (const auto& [item, ok] : closable) {
-    if (ok)
+    if (ok && can_close)
       ids.push_back(item);
   }
   const auto due = WorkspaceService::ForProfile(profile).AutoArchive(
-      ids, std::vector<uint64_t>(media.begin(), media.end()));
+      std::vector<uint64_t>(viewed.begin(), viewed.end()), ids,
+      std::vector<uint64_t>(media.begin(), media.end()));
   if (due.empty())
     return;
   const std::set<uint64_t> doomed(due.begin(), due.end());
-  std::vector<content::WebContents*> pages;
+  std::vector<base::WeakPtr<content::WebContents>> pages;
   for (const auto& [page, item] : runtime.pages) {
     if (doomed.contains(item))
-      pages.push_back(page);
+      pages.push_back(page->GetWeakPtr());
   }
   // The ordinary close path archives each item once its last page goes.
-  for (auto* page : pages) {
+  // Auto-archived tabs stay out of the recently closed list, so reopening a
+  // closed tab does not bring them back. One close can run observers that
+  // destroy other pages, so each is checked again first.
+  for (const auto& page : pages) {
+    if (!page)
+      continue;
     for (const auto& adapter : runtime.adapters) {
-      if (adapter->tabs_ && adapter->tabs_->GetIndexOfWebContents(page) >= 0) {
-        adapter->tabs_->CloseWebContents(page, CLOSE_CREATE_HISTORICAL_TAB);
+      if (adapter->tabs_ &&
+          adapter->tabs_->GetIndexOfWebContents(page.get()) >= 0) {
+        adapter->tabs_->CloseWebContents(page.get(), CLOSE_NONE);
         break;
       }
     }
@@ -1768,8 +1790,20 @@ void BrowserWorkspaceAdapter::OnTabStripModelChanged(
        change.type() == TabStripModelChange::kSelectionOnly)) {
     if (ready()) {
       if (auto* binding = Binding::Get(*selection.new_contents);
-          binding && binding->item())
-        Remember(service_->RevealItem(window_id_, binding->item()));
+          binding && binding->item()) {
+        auto revealed = service_->RevealItem(window_id_, binding->item());
+        // Activation is a view of the new tab and the end of one of the tab
+        // just left: record both now rather than at the next pass.
+        if (revealed.ok) {
+          std::vector<uint64_t> viewed = {binding->item()};
+          if (selection.old_contents) {
+            if (const uint64_t left = ItemIdForContents(*selection.old_contents))
+              viewed.push_back(left);
+          }
+          service_->AutoArchive(viewed, {}, {});
+        }
+        Remember(std::move(revealed));
+      }
     } else if (ForProfile(*profile_).complete &&
                !SessionRestore::IsRestoring(profile_)) {
       reveal_active_ = true;
