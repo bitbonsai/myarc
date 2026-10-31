@@ -1,5 +1,5 @@
 diff --git a/chrome/browser/ui/views/frame/browser_view.h b/chrome/browser/ui/views/frame/browser_view.h
-index 750e46c97b64dccccf4268e912df5dbdb6516b3c..5ba2e298cfd3fe7c8cd030068d66f3f1fb22f50a 100644
+index 750e46c97b64dccccf4268e912df5dbdb6516b3c..66fa7cbac824c67788df8ffc704627b09b136a38 100644
 --- a/chrome/browser/ui/views/frame/browser_view.h
 +++ b/chrome/browser/ui/views/frame/browser_view.h
 @@ -8,6 +8,7 @@
@@ -65,7 +65,7 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..5ba2e298cfd3fe7c8cd030068d66f3f1
    std::optional<int> theme_background_y_offset() const {
      return theme_background_y_offset_;
    }
-@@ -311,6 +329,23 @@ class BrowserView : public BrowserWindow,
+@@ -311,6 +329,25 @@ class BrowserView : public BrowserWindow,
  
    ScrimView* window_scrim_view() { return window_scrim_view_; }
  
@@ -75,6 +75,8 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..5ba2e298cfd3fe7c8cd030068d66f3f1
 +  // Parent owns session binding/restore barriers and shutdown/resume hooks.
 +  myarc::BrowserWorkspaceAdapter* GetMyarcWorkspaceAdapter();
 +  void RefreshMyarcWorkspaceSidebar();
++  // Returns to the sidebar rows, so collapsing the region hides the Library.
++  void CloseMyarcLibrary();
 +  bool IsMyarcWorkspaceBlank() const override;
 +  void RevealMyarcActiveTab() override;
 +  bool IsMyarcWorkspaceActive() const override;
@@ -89,7 +91,7 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..5ba2e298cfd3fe7c8cd030068d66f3f1
    base::WeakPtr<BrowserView> GetAsWeakPtr() {
      return weak_ptr_factory_.GetWeakPtr();
    }
-@@ -1253,12 +1288,68 @@ class BrowserView : public BrowserWindow,
+@@ -1253,12 +1290,71 @@ class BrowserView : public BrowserWindow,
  
    // Anchor point for help bubbles and other dialogs that want to reliably
    // anchor outside the content area of the window.
@@ -147,6 +149,9 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..5ba2e298cfd3fe7c8cd030068d66f3f1
 +  bool myarc_capture_settings_scheduled_ = false;
 +  // --myarc-capture-open-library opens the Library once per window.
 +  bool myarc_capture_library_scheduled_ = false;
++  // Refreshes the Library's Downloads list while the Library is open.
++  class MyarcDownloadWatcher;
++  std::unique_ptr<MyarcDownloadWatcher> myarc_download_watcher_;
 +
    std::unique_ptr<views::ViewSubregionAnchor> dialog_anchor_;
  
@@ -158,7 +163,7 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..5ba2e298cfd3fe7c8cd030068d66f3f1
  
    // A mapping between accelerators and command IDs.
    std::map<ui::Accelerator, int> accelerator_table_;
-@@ -1411,6 +1502,7 @@ class BrowserView : public BrowserWindow,
+@@ -1411,6 +1507,7 @@ class BrowserView : public BrowserWindow,
    base::EnumSet<TabStripAndWebAppViewsReparentedState>
        tab_strip_web_apps_reparented_state_;
  

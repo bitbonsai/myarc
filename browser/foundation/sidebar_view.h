@@ -64,6 +64,7 @@ class SidebarView final : public views::View,
     uint32_t id = 0;
     std::u16string name;
     std::u16string detail;  // Source host, or why it can't be opened.
+    bool operator==(const DownloadPresentation&) const = default;
   };
 
   class Delegate {
@@ -92,8 +93,9 @@ class SidebarView final : public views::View,
     // Newest first, bounded by the parent. Lookup only.
     virtual std::vector<DownloadPresentation> GetRecentDownloads() const = 0;
     virtual void OpenDownload(uint32_t download_id) = 0;
-    // The parent resizes the sidebar region for the Library. After closing it
-    // supplies a fresh model with SetModel.
+    // The parent resizes the sidebar region for the Library, and calls
+    // RefreshLibraryDownloads while it is open. After closing it supplies a
+    // fresh model with SetModel.
     virtual void SetLibraryOpen(bool open) = 0;
     virtual void RetryWorkspaceStorage(StorageRetry retry) = 0;
   };
@@ -116,6 +118,10 @@ class SidebarView final : public views::View,
   // Replaces the sidebar contents with the Library until back or Esc. Needs a
   // usable model.
   void OpenLibrary(LibrarySection section = LibrarySection::kSpaces);
+  // Returns to the sidebar rows. Never call from the Library's own handlers.
+  void CloseLibrary();
+  // Reloads an open Library's Downloads list if it changed.
+  void RefreshLibraryDownloads();
   bool library_open() const { return !!library_; }
 
  private:
@@ -159,7 +165,6 @@ class SidebarView final : public views::View,
       views::View* source,
       const gfx::Point& point,
       ui::mojom::MenuSourceType source_type) override;
-  void CloseLibrary();
   // Drops the Library view without notifying the parent.
   void ResetLibrary();
   void BuildCreateMenu();

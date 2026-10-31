@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-10-31: Library panel review fixes
+
+- Esc closes the Library only when focus is in the sidebar or nowhere, so the omnibox and pages keep their Esc. Collapsing the sidebar closes the Library. While the Library is open, the Downloads list refreshes on new, finished and removed downloads (500 ms coalescing, rebuilt only when the list changes). The Spaces columns scroll sideways when they don't fit. Rebuilds keep focus on the same Space or download, theme updates rebuild only when colors change, and closing focuses the Library button only for keyboard users. A double-click no longer resets the section.
+- Verification: `chrome` and `bridge_check` build, `bridge_check`, `export_patches.py --check`, `check_docs.py` and cargo fmt/clippy/test pass. A background `LIBRARY=1 URL=none W=900 H=700` capture shows the scrolled Spaces row with its column and Create; with one Space it fits, so overflow wasn't seen. Esc, collapse, focus and live downloads were checked by reading the code, not run.
+- Chromium `myarc` commit `23e5243849`.
+
 ## 2026-10-31: Library panel replaces the Library menu
 
 - The footer Library button swaps the sidebar for a panel with Arc's rail (Media, Downloads, Easels, Spaces, Boosts, Archived Tabs) and a back arrow; Esc also returns. Spaces lists Spaces (click switches) plus Create Space, Downloads lists recent downloads and opens them, Archived Tabs shows an empty state; Media, Easels and Boosts are placeholders. New `library.svg` and `saturn.svg` icons from `design/icons/` draw the Library button and every Space icon.

@@ -1,5 +1,5 @@
 diff --git a/chrome/browser/ui/views/frame/vertical_tab_strip_region_view.cc b/chrome/browser/ui/views/frame/vertical_tab_strip_region_view.cc
-index 252172ef9e07498c1ade0fbe972afc7c6472116c..ad4f896b4802d7b858bc652ce971067e5c09fca2 100644
+index 252172ef9e07498c1ade0fbe972afc7c6472116c..c5e47b2110546aa28cedd50448a5125c6a4c982b 100644
 --- a/chrome/browser/ui/views/frame/vertical_tab_strip_region_view.cc
 +++ b/chrome/browser/ui/views/frame/vertical_tab_strip_region_view.cc
 @@ -9,6 +9,7 @@
@@ -395,9 +395,15 @@ index 252172ef9e07498c1ade0fbe972afc7c6472116c..ad4f896b4802d7b858bc652ce971067e
      }
      if (done_resizing) {
        // We only want to save the uncollapsed width to the state controller if
-@@ -813,6 +983,21 @@ bool VerticalTabStripRegionView::IsCollapsing() {
+@@ -812,7 +982,27 @@ bool VerticalTabStripRegionView::IsCollapsing() {
+ 
  void VerticalTabStripRegionView::RequestCollapse(bool collapse) {
    target_collapse_state_.collapsed = collapse;
++  if (collapse && myarc_library_open_) {
++    // The Library hides the header's toggle, but the shortcut and menu still
++    // collapse. Return to the rows so the sidebar collapses as usual.
++    browser_view()->CloseMyarcLibrary();
++  }
    if (collapse) {
 +    if (base::CommandLine::ForCurrentProcess()->HasSwitch(
 +            "myarc-visual-parity") &&
@@ -417,7 +423,7 @@ index 252172ef9e07498c1ade0fbe972afc7c6472116c..ad4f896b4802d7b858bc652ce971067e
      suppress_expand_on_hover_ = IsCollapseButtonHovered();
      ResetExpandOnHoverTimers();
    } else {
-@@ -880,7 +1065,16 @@ void VerticalTabStripRegionView::AddTabStripView(
+@@ -880,7 +1070,16 @@ void VerticalTabStripRegionView::AddTabStripView(
    std::optional<size_t> separator_index =
        content_parent->GetIndexOf(top_button_separator_);
    CHECK(separator_index.has_value());
@@ -435,7 +441,7 @@ index 252172ef9e07498c1ade0fbe972afc7c6472116c..ad4f896b4802d7b858bc652ce971067e
  
    // Pre-set the animation values to the appropriate state.
    auto* const animation_controller =
-@@ -927,7 +1121,9 @@ void VerticalTabStripRegionView::OnCollapseStateChanged(
+@@ -927,7 +1126,9 @@ void VerticalTabStripRegionView::OnCollapseStateChanged(
    resize_area_width_ = collapsed ? kCollapsedResizeAreaWidth : kResizeAreaWidth;
  
    if (tab_strip_view()) {
@@ -446,7 +452,7 @@ index 252172ef9e07498c1ade0fbe972afc7c6472116c..ad4f896b4802d7b858bc652ce971067e
    }
  
    if ((state == tabs::VerticalTabStripCollapseState::kCollapsing) ||
-@@ -988,6 +1184,18 @@ void VerticalTabStripRegionView::UpdateExpandOnHoverState(
+@@ -988,6 +1189,18 @@ void VerticalTabStripRegionView::UpdateExpandOnHoverState(
        !state_controller_->IsCollapsed()) {
      ResetExpandOnHoverTimers();
      is_expanded_on_hover_ = false;
@@ -465,7 +471,7 @@ index 252172ef9e07498c1ade0fbe972afc7c6472116c..ad4f896b4802d7b858bc652ce971067e
      return;
    }
  
-@@ -1022,6 +1230,10 @@ void VerticalTabStripRegionView::UpdateExpandOnHoverState(
+@@ -1022,6 +1235,10 @@ void VerticalTabStripRegionView::UpdateExpandOnHoverState(
    // locks because IsFrameActive can also return false when a WebUI bubble is
    // open.
    if (GetWidget() && !GetWidget()->ShouldPaintAsActive()) {
@@ -476,7 +482,7 @@ index 252172ef9e07498c1ade0fbe972afc7c6472116c..ad4f896b4802d7b858bc652ce971067e
      if (is_expanded_on_hover_) {
        AnimateExpandOnHover(/*expand=*/false);
      }
-@@ -1031,7 +1243,7 @@ void VerticalTabStripRegionView::UpdateExpandOnHoverState(
+@@ -1031,7 +1248,7 @@ void VerticalTabStripRegionView::UpdateExpandOnHoverState(
    const bool should_expand =
        !suppress_expand_on_hover_ &&
        state_controller_->IsExpandOnHoverEnabled() &&
@@ -485,7 +491,7 @@ index 252172ef9e07498c1ade0fbe972afc7c6472116c..ad4f896b4802d7b858bc652ce971067e
         (GetFocusManager() && Contains(GetFocusManager()->GetFocusedView())));
  
    if (!should_expand) {
-@@ -1057,6 +1269,15 @@ void VerticalTabStripRegionView::UpdateExpandOnHoverState(
+@@ -1057,6 +1274,15 @@ void VerticalTabStripRegionView::UpdateExpandOnHoverState(
  }
  
  void VerticalTabStripRegionView::OnMouseVelocityHeuristicInterval() {
@@ -501,7 +507,7 @@ index 252172ef9e07498c1ade0fbe972afc7c6472116c..ad4f896b4802d7b858bc652ce971067e
    const bool should_expand =
        state_controller_->IsExpandOnHoverEnabled() &&
        (IsMouseHovered() ||
-@@ -1214,8 +1435,10 @@ void VerticalTabStripRegionView::UnregisterExpandOnHoverLock(
+@@ -1214,8 +1440,10 @@ void VerticalTabStripRegionView::UnregisterExpandOnHoverLock(
  void VerticalTabStripRegionView::OnOmniboxPopupVisibilityChanged(bool is_open) {
    if (is_open) {
      if (!omnibox_open_lock_) {

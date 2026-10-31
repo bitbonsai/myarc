@@ -1,5 +1,6 @@
 #include "myarc/library_view.h"
 
+#include <algorithm>
 #include <array>
 #include <limits>
 #include <memory>
@@ -34,6 +35,7 @@
 #include "ui/views/controls/label.h"
 #include "ui/views/controls/scroll_view.h"
 #include "ui/views/controls/textfield/textfield.h"
+#include "ui/views/focus/focus_manager.h"
 #include "ui/views/layout/box_layout.h"
 #include "ui/views/style/typography.h"
 #include "ui/views/view_class_properties.h"
@@ -264,7 +266,8 @@ LibraryView::LibraryView(SidebarView::Delegate& delegate,
   auto* footer =
       rail->AddChildView(Box(Orientation::kHorizontal, gfx::Insets(), 0));
   auto back = std::make_unique<views::ImageButton>(base::BindRepeating(
-      [](LibraryView* view) { view->close_.Run(); }, base::Unretained(this)));
+      [](LibraryView* view) { view->PostAction(view->close_); },
+      base::Unretained(this)));
   back->SetImageModel(views::Button::STATE_NORMAL,
                       ui::ImageModel::FromVectorIcon(
                           kArrowLeftIcon, GetColors(nullptr).muted, 18));
@@ -305,7 +308,22 @@ void LibraryView::SelectSection(Section section) {
   }
   section_ = section;
   query_.clear();
+  // Keys from the old section mean nothing in the new one.
+  keyed_views_.clear();
   Rebuild();
+}
+
+void LibraryView::RefreshDownloads() {
+  if (section_ != Section::kDownloads || !list_) {
+    return;
+  }
+  auto downloads = delegate_->GetRecentDownloads();
+  // Progress ticks rarely change what the list shows.
+  if (downloads == downloads_) {
+    return;
+  }
+  downloads_ = std::move(downloads);
+  UpdateDownloads();
 }
 
 void LibraryView::FocusSection() {
@@ -326,14 +344,53 @@ gfx::Size LibraryView::CalculatePreferredSize(
 }
 
 bool LibraryView::AcceleratorPressed(const ui::Accelerator& accelerator) {
-  close_.Run();
+  // The window offers accelerators before the focused view sees the key, so
+  // leave Esc to the omnibox and pages unless focus is in the sidebar.
+  const views::FocusManager* manager = GetFocusManager();
+  const views::View* focused = manager ? manager->GetFocusedView() : nullptr;
+  if (focused && !parent()->Contains(focused)) {
+    return false;
+  }
+  PostAction(close_);
   return true;
 }
 
 void LibraryView::OnThemeChanged() {
   views::View::OnThemeChanged();
-  // Pane fills are plain colors picked for the current scheme.
+  // Pane fills are plain colors picked for the current scheme. Rebuild only
+  // when they change: inactive-window updates land here too.
+  const ui::ColorProvider* provider = GetColorProvider();
+  const std::pair colors(provider->GetColor(ui::kColorSysSurface),
+                         provider->GetColor(ui::kColorSysOnSurface));
+  if (colors == theme_colors_) {
+    return;
+  }
+  theme_colors_ = colors;
   Rebuild();
+}
+
+std::optional<uint64_t> LibraryView::FocusedKey() const {
+  const views::FocusManager* manager = GetFocusManager();
+  const views::View* focused = manager ? manager->GetFocusedView() : nullptr;
+  for (const auto& [key, view] : keyed_views_) {
+    if (focused && view.get() == focused) {
+      return key;
+    }
+  }
+  return std::nullopt;
+}
+
+bool LibraryView::RestoreFocus(std::optional<uint64_t> key) {
+  if (!key) {
+    return false;
+  }
+  const auto target = std::ranges::find(
+      keyed_views_, *key, &decltype(keyed_views_)::value_type::first);
+  if (target == keyed_views_.end()) {
+    return false;
+  }
+  target->second->RequestFocus();
+  return true;
 }
 
 void LibraryView::PostAction(base::OnceClosure action) {
@@ -355,15 +412,18 @@ void LibraryView::Rebuild() {
   }
   const bool had_focus = pane_->Contains(
       GetFocusManager() ? GetFocusManager()->GetFocusedView() : nullptr);
+  const std::optional<uint64_t> key = FocusedKey();
   search_ = nullptr;
   list_ = nullptr;
+  keyed_views_.clear();
   pane_->RemoveAllChildViews();
   if (section_ == Section::kSpaces) {
     BuildSpaces();
   } else {
     BuildList();
   }
-  if (had_focus) {
+  // Keep focus on the same Space or download, else on the section's tab.
+  if (had_focus && !RestoreFocus(key)) {
     FocusSection();
   }
   PreferredSizeChanged();
@@ -372,13 +432,33 @@ void LibraryView::Rebuild() {
 void LibraryView::BuildSpaces() {
   const Colors colors = GetColors(GetColorProvider());
   auto* layout = static_cast<views::BoxLayout*>(pane_->GetLayoutManager());
+  // Columns keep their width: many Spaces or a narrow window scroll sideways,
+  // so Create stays reachable.
+  auto* scroll = pane_->AddChildView(std::make_unique<views::ScrollView>());
+  scroll->SetBackgroundColor(std::nullopt);
+  scroll->SetDrawOverflowIndicator(false);
+  scroll->SetVerticalScrollBarMode(views::ScrollView::ScrollBarMode::kDisabled);
+  scroll->SetTreatAllScrollEventsAsHorizontal(true);
+  scroll->SetUseContentsPreferredSize(true);
+  layout->SetFlexForView(scroll, 1);
   // Arc's columns start 28 DIP right of the rail and 48 DIP from the top.
   auto* row =
-      pane_->AddChildView(Box(Orientation::kHorizontal,
+      scroll->SetContents(Box(Orientation::kHorizontal,
                               gfx::Insets::TLBR(48, library::kColumnsLeading,
                                                 49, library::kCreateTrailing),
                               library::kColumnGap));
-  layout->SetFlexForView(row, 1);
+  scroll->RegisterPostLayoutCallback(
+      base::BindRepeating([](views::ScrollView* scroll) {
+        // Columns take the viewport's height, and its width when they fit.
+        views::View* contents = scroll->contents();
+        const gfx::Rect visible = scroll->GetVisibleRect();
+        const gfx::Size fill(
+            std::max(contents->GetPreferredSize().width(), visible.width()),
+            visible.height());
+        if (contents->size() != fill) {
+          contents->SetSize(fill);
+        }
+      }));
   auto* row_layout = static_cast<views::BoxLayout*>(row->GetLayoutManager());
   row->GetViewAccessibility().SetRole(ax::mojom::Role::kGroup);
   row->GetViewAccessibility().SetName(u"Spaces");
@@ -392,23 +472,23 @@ void LibraryView::BuildSpaces() {
         views::CreateRoundedRectBackground(colors.column, 10));
     column->SetPreferredSize(gfx::Size(library::kColumnWidth, 0));
     row_layout->SetFlexForView(column, 1);
-    auto header = TextButton(
-        base::BindRepeating(
-            [](LibraryView* view, uint64_t space) {
-              // Switching rebuilds this column, and a failure can drop the
-              // Library entirely; hold nothing of `view` across the call.
-              SidebarView::Delegate* delegate = &view->delegate_.get();
-              base::RepeatingClosure close = view->close_;
-              view->PostAction(base::BindOnce(
-                  [](SidebarView::Delegate* delegate, uint64_t space,
-                     base::RepeatingClosure close) {
-                    delegate->SelectSpace(space);
-                    close.Run();
-                  },
-                  base::Unretained(delegate), space, std::move(close)));
-            },
-            base::Unretained(this), id),
-        name);
+    auto header =
+        TextButton(base::BindRepeating(
+                       [](LibraryView* view, uint64_t space) {
+                         // Switching rebuilds this column, and a failure can
+                         // drop the Library entirely; the action holds nothing
+                         // of `view`.
+                         view->PostAction(base::BindOnce(
+                             [](SidebarView::Delegate* delegate, uint64_t space,
+                                const base::RepeatingClosure& close) {
+                               delegate->SelectSpace(space);
+                               close.Run();
+                             },
+                             base::Unretained(&view->delegate_.get()), space,
+                             view->close_));
+                       },
+                       base::Unretained(this), id),
+                   name);
     for (views::View* child : header->children()) {
       if (auto* label = views::AsViewClass<views::Label>(child)) {
         label->SetFontList(title_font);
@@ -427,6 +507,7 @@ void LibraryView::BuildSpaces() {
     header->GetViewAccessibility().SetCheckedState(
         current ? ax::mojom::CheckedState::kTrue
                 : ax::mojom::CheckedState::kFalse);
+    keyed_views_.emplace_back(id, header.get());
     column->AddChildView(std::move(header));
   }
 
@@ -459,6 +540,7 @@ void LibraryView::BuildSpaces() {
   create->SetTooltipText(u"Create Space");
   create->GetViewAccessibility().SetName(u"Create Space");
   views::InstallCircleHighlightPathGenerator(create.get());
+  keyed_views_.emplace_back(0, create.get());
   create_cell->AddChildView(std::move(create));
 }
 
@@ -496,6 +578,10 @@ void LibraryView::BuildList() {
 
   list_ = content->AddChildView(Box(Orientation::kVertical, gfx::Insets(), 0));
   content_layout->SetFlexForView(list_, 1);
+  downloads_.clear();
+  if (section_ == Section::kDownloads) {
+    downloads_ = delegate_->GetRecentDownloads();
+  }
   UpdateDownloads();
 }
 
@@ -503,16 +589,19 @@ void LibraryView::UpdateDownloads() {
   if (!list_) {
     return;
   }
+  const views::FocusManager* manager = GetFocusManager();
+  const bool had_focus =
+      list_->Contains(manager ? manager->GetFocusedView() : nullptr);
+  const std::optional<uint64_t> key = FocusedKey();
+  keyed_views_.clear();
   list_->RemoveAllChildViews();
   const Colors colors = GetColors(GetColorProvider());
   auto* list_layout = static_cast<views::BoxLayout*>(list_->GetLayoutManager());
 
   std::vector<SidebarView::DownloadPresentation> downloads;
-  if (section_ == Section::kDownloads) {
-    for (auto& download : delegate_->GetRecentDownloads()) {
-      if (library::MatchesSearch(download.name, query_)) {
-        downloads.push_back(std::move(download));
-      }
+  for (const auto& download : downloads_) {
+    if (library::MatchesSearch(download.name, query_)) {
+      downloads.push_back(download);
     }
   }
 
@@ -601,6 +690,7 @@ void LibraryView::UpdateDownloads() {
                               : download.name + u"\n" + download.detail);
       row->GetViewAccessibility().SetName(u"Open " + download.name);
       row->GetViewAccessibility().SetDescription(download.detail);
+      keyed_views_.emplace_back(download.id, row.get());
       rows->AddChildView(std::move(row));
     }
   }
@@ -616,7 +706,12 @@ void LibraryView::UpdateDownloads() {
                               base::Unretained(this)),
                           u"Show All Downloads");
     all->SetEnabledTextColors(colors.muted);
+    keyed_views_.emplace_back(0, all.get());
     list_->AddChildView(std::move(all));
+  }
+  // A refresh keeps focus on the same row, else on the search field.
+  if (had_focus && !RestoreFocus(key)) {
+    search_->RequestFocus();
   }
 }
 

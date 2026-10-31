@@ -48,6 +48,9 @@ namespace {
 using Orientation = views::BoxLayout::Orientation;
 
 constexpr int kTileHeight = 46;
+// The rows' size and edges; the Library replaces both while it is open.
+constexpr gfx::Size kSidebarSize(230, 400);
+constexpr gfx::Insets kSidebarInsets = gfx::Insets::TLBR(8, 8, 7, 8);
 
 // Lucide "circle" filled to the canvas edge: Arc's Space dot is 8 DIP across.
 constexpr gfx::PathElement kDotPath[] = {gfx::CANVAS_DIMENSIONS, 24,
@@ -242,9 +245,9 @@ void AddStatus(views::View& parent, const std::u16string& text) {
 }  // namespace
 
 SidebarView::SidebarView(Delegate& delegate) : delegate_(delegate) {
-  SetPreferredSize(gfx::Size(230, 400));
-  SetLayoutManager(std::make_unique<views::BoxLayout>(
-      Orientation::kVertical, gfx::Insets::TLBR(8, 8, 7, 8), 8));
+  SetPreferredSize(kSidebarSize);
+  SetLayoutManager(std::make_unique<views::BoxLayout>(Orientation::kVertical,
+                                                      kSidebarInsets, 8));
   GetViewAccessibility().SetRole(ax::mojom::Role::kGroup);
   GetViewAccessibility().SetName(u"Workspace sidebar");
   SetUnavailable(u"Loading workspace\u2026");
@@ -329,15 +332,11 @@ void SidebarView::OpenLibrary(LibrarySection section) {
   auto* layout = static_cast<views::BoxLayout*>(GetLayoutManager());
   layout->set_inside_border_insets(gfx::Insets());
   SetPreferredSize(std::nullopt);
+  // The Library posts every close, so its handlers have unwound.
   library_ = AddChildView(std::make_unique<LibraryView>(
       *delegate_,
-      base::BindRepeating(
-          [](base::WeakPtr<SidebarView> sidebar) {
-            // Back and Esc run inside the Library's own handlers.
-            base::SequencedTaskRunner::GetCurrentDefault()->PostTask(
-                FROM_HERE, base::BindOnce(&SidebarView::CloseLibrary, sidebar));
-          },
-          weak_factory_.GetWeakPtr()),
+      base::BindRepeating(&SidebarView::CloseLibrary,
+                          weak_factory_.GetWeakPtr()),
       section));
   layout->SetFlexForView(library_, 1);
   library_->SetSpaces(spaces_, current_space_id_);
@@ -354,8 +353,8 @@ void SidebarView::ResetLibrary() {
   views::View* library = std::exchange(library_, nullptr);
   RemoveChildViewT(library);
   static_cast<views::BoxLayout*>(GetLayoutManager())
-      ->set_inside_border_insets(gfx::Insets::TLBR(8, 8, 7, 8));
-  SetPreferredSize(gfx::Size(230, 400));
+      ->set_inside_border_insets(kSidebarInsets);
+  SetPreferredSize(kSidebarSize);
   // SetModel rebuilds the rows from scratch.
   current_space_id_ = 0;
 }
@@ -365,16 +364,26 @@ void SidebarView::CloseLibrary() {
   if (!library_) {
     return;
   }
+  // Keyboard users land on the Library button; a click leaves no focus ring.
+  const bool had_focus = library_->Contains(
+      GetFocusManager() ? GetFocusManager()->GetFocusedView() : nullptr);
   ResetLibrary();
   auto weak = weak_factory_.GetWeakPtr();
   delegate_->SetLibraryOpen(false);
-  if (!weak) {
+  if (!weak || !had_focus) {
     return;
   }
   const auto button = std::ranges::find(focus_targets_, FocusAction::kLibrary,
                                         &FocusTarget::action);
   if (button != focus_targets_.end()) {
     button->view->RequestFocus();
+  }
+}
+
+void SidebarView::RefreshLibraryDownloads() {
+  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
+  if (library_) {
+    library_->RefreshDownloads();
   }
 }
 
@@ -754,10 +763,16 @@ void SidebarView::SetModel(const foundation::SidebarResult& model,
   auto library = IconButton(
       base::BindRepeating(
           [](base::WeakPtr<SidebarView> sidebar) {
-            // Opening removes this button; let its press handler unwind.
+            // Opening removes this button; let its press handler unwind. A
+            // second click queued meanwhile must not reset the section.
             base::SequencedTaskRunner::GetCurrentDefault()->PostTask(
-                FROM_HERE, base::BindOnce(&SidebarView::OpenLibrary, sidebar,
-                                          LibrarySection::kSpaces));
+                FROM_HERE, base::BindOnce(
+                               [](base::WeakPtr<SidebarView> sidebar) {
+                                 if (sidebar && !sidebar->library_) {
+                                   sidebar->OpenLibrary();
+                                 }
+                               },
+                               sidebar));
           },
           weak_factory_.GetWeakPtr()),
       kLibraryIcon, 16);
