@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-10-31: Archive timer and Clear Archive
+
+- Settings' Profiles tab now works and offers Arc's "Archive tabs after" (12 hours default, 24 hours, 7 days, 30 days) for the opening window's Profile. The choice is stored in that Profile's workspace (`archive_interval_secs`, a JSON key written only when it isn't 12 hours; a bad value reads as 12 hours), and the next Auto Archive pass uses it. The `never` interval is gone because Arc's article says Auto Archive can't be disabled. Right-clicking the Library's Archived Tabs item offers Clear Archive, which confirms first (Cancel is the default button) and then empties the archive and saves. The 30-day / 500-entry keep cap stays: retention counts from the close, so a 30-day timer doesn't shorten it.
+- Verification: `chrome` and `bridge_check` build; `bridge_check` (new check: the interval survives the codec, 12 hours stays unwritten, bad values fall back, a 7-day pass keeps a day-old tab, the cleared archive persists), 2 new Rust tests, cargo fmt/clippy/test, `export_patches.py --check` and `check_docs.py` pass. A background `LIBRARY=archive` capture still renders the list. The Settings picker, the menu and the dialog were checked by reading the code, not run.
+- Chromium `myarc` commit `7208260f9d`. Not done: the Default Profile inheritance, the Command Bar's "clear archive" and a Profile list in Settings. With several Profiles, the single Settings window shows the timer of whichever window opened it.
+
 ## 2026-10-31: Auto Archive review fixes
 
 - The 12 hours now count only browser-open time: the snapshot keeps a clock (`open_secs`, JSON key written only when set) that each pass advances by monotonic time since the previous one, capped at 10 minutes, and the first pass of a launch adds nothing, so a closed browser or a sleeping Mac stops it. View times are clock readings; one ahead of the clock, or a malformed `viewed_secs` or `open_secs`, reads as unrecorded and gets restamped instead of failing the load. Tab activation records the new and the previous tab as viewed. Split-view foreground tabs are viewed and kept. Gated passes still record views. Captured and Picture-in-Picture tabs stay. Auto-archived tabs skip the recently closed list, and each close re-checks its page through a weak pointer.

@@ -516,6 +516,73 @@ bool CheckAutoArchive() {
          lenient.snapshot->items[0].last_viewed_secs == 0;
 }
 
+// The "Archive tabs after" choice survives the JSON codec, the 12-hour default
+// stays unwritten, a bad value reads as the default, and the pass uses the
+// choice. Clear Archive empties the archive and the empty archive persists.
+bool CheckArchiveTimerAndClear() {
+  using namespace myarc::foundation;
+  using myarc::internal::DecodeWorkspaceMetadata;
+  using myarc::internal::EncodeWorkspaceMetadata;
+  constexpr uint64_t kHour = 60 * 60;
+  constexpr uint64_t kWeek = 7 * 24 * kHour;
+  auto model = new_workspace();
+  const auto plain = EncodeWorkspaceMetadata(export_snapshot(*model));
+  auto plain_root =
+      plain ? base::JSONReader::ReadDict(*plain, base::JSON_PARSE_RFC)
+            : std::nullopt;
+  if (archive_interval_secs(*model) != 12 * kHour || !plain_root ||
+      plain_root->contains("archive_interval_secs") ||
+      set_archive_interval(*model, 6 * kHour).ok ||
+      !set_archive_interval(*model, kWeek).ok ||
+      archive_interval_secs(*model) != kWeek) {
+    return false;
+  }
+  auto item = add_temporary_item(*model, 1);
+  auto gone = add_temporary_item(*model, 1);
+  archive_closed_tab(*model, gone.id, "https://example.test/", "", 100);
+  const uint64_t ids[] = {item.id};
+  const rust::Slice<const uint64_t> closable(ids, 1);
+  auto_archive(*model, {}, closable, {}, 0);
+  const auto encoded = EncodeWorkspaceMetadata(export_snapshot(*model));
+  auto decoded = encoded ? DecodeWorkspaceMetadata(*encoded)
+                         : myarc::internal::MetadataResult{};
+  auto restored = new_workspace();
+  if (!decoded.snapshot || decoded.snapshot->archive_interval_secs != kWeek ||
+      !restore_snapshot(*restored, std::move(*decoded.snapshot)).ok ||
+      archive_interval_secs(*restored) != kWeek) {
+    return false;
+  }
+  // A day of passes archives nothing on the 7-day timer.
+  for (uint64_t open = 0; open < 24 * kHour; open += 5 * 60) {
+    if (!auto_archive(*restored, {}, closable, {}, 5 * 60).due.empty())
+      return false;
+  }
+  auto root = base::JSONReader::ReadDict(*encoded, base::JSON_PARSE_RFC);
+  if (!root || !root->contains("archive_interval_secs"))
+    return false;
+  for (const char* bad_value : {"x", "21600"}) {
+    root->Set("archive_interval_secs", bad_value);
+    const auto bad = base::WriteJson(*root);
+    auto lenient = bad ? DecodeWorkspaceMetadata(*bad)
+                       : myarc::internal::MetadataResult{};
+    auto fallback = new_workspace();
+    if (!lenient.snapshot ||
+        !restore_snapshot(*fallback, std::move(*lenient.snapshot)).ok ||
+        archive_interval_secs(*fallback) != 12 * kHour) {
+      return false;
+    }
+  }
+  auto cleared = clear_archived_tabs(*restored);
+  if (!cleared.ok || cleared.id != 1 || !archived_tabs(*restored, 100).empty())
+    return false;
+  const auto empty = EncodeWorkspaceMetadata(export_snapshot(*restored));
+  auto again = empty ? DecodeWorkspaceMetadata(*empty)
+                     : myarc::internal::MetadataResult{};
+  return again.snapshot && again.snapshot->archived.empty() &&
+         again.snapshot->items.size() == 1 &&
+         clear_archived_tabs(*restored).id == 0;
+}
+
 }  // namespace
 
 int main() {
@@ -584,9 +651,13 @@ int main() {
     std::cerr << "Auto Archive checks failed\n";
     return 15;
   }
+  if (!CheckArchiveTimerAndClear()) {
+    std::cerr << "Archive timer and Clear Archive checks failed\n";
+    return 16;
+  }
   std::cout << "7 legacy C++/Rust checks passed, including 1000 ownership "
                "round trips; workspace transitions, Space 1 deletion and "
-               "metadata codec, saved title, Archived Tabs and Auto Archive "
-               "checks passed\n";
+               "metadata codec, saved title, Archived Tabs, Auto Archive, "
+               "archive timer and Clear Archive checks passed\n";
   return 0;
 }

@@ -21,7 +21,7 @@
 //! capped at `MAX_PASS_GAP_SECS`, so a sleeping computer or a closed browser adds
 //! nothing. It records views in each temporary item's `last_viewed_secs` against
 //! that clock, both persist with the snapshot, then it applies the rule with the
-//! default policy.
+//! snapshot's Profile interval (`archive_interval`, 12 hours by default).
 
 use std::cmp::Reverse;
 use std::collections::BTreeSet;
@@ -38,7 +38,8 @@ const DAY_SECS: u64 = 24 * HOUR_SECS;
 /// Little Arc windows archive after six hours whatever the Profile interval says.
 pub const LITTLE_ARC_INTERVAL_SECS: u64 = 6 * HOUR_SECS;
 
-/// Per-Profile archive interval. Default is 12 hours.
+/// Per-Profile archive interval, Arc's "Archive tabs after" choices. Default
+/// is 12 hours. Arc offers no way to turn Auto Archive off.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum ArchiveInterval {
     #[default]
@@ -46,19 +47,27 @@ pub enum ArchiveInterval {
     Hours24,
     Days7,
     Days30,
-    Never,
 }
 
 impl ArchiveInterval {
-    /// Idle seconds before an item is due, or `None` when the Profile never archives.
-    pub const fn seconds(self) -> Option<u64> {
+    /// Every choice, shortest first.
+    pub const ALL: [Self; 4] = [Self::Hours12, Self::Hours24, Self::Days7, Self::Days30];
+
+    /// Idle seconds before an item is due.
+    pub const fn seconds(self) -> u64 {
         match self {
-            Self::Hours12 => Some(12 * HOUR_SECS),
-            Self::Hours24 => Some(DAY_SECS),
-            Self::Days7 => Some(7 * DAY_SECS),
-            Self::Days30 => Some(30 * DAY_SECS),
-            Self::Never => None,
+            Self::Hours12 => 12 * HOUR_SECS,
+            Self::Hours24 => DAY_SECS,
+            Self::Days7 => 7 * DAY_SECS,
+            Self::Days30 => 30 * DAY_SECS,
         }
+    }
+
+    /// The choice that lasts exactly `secs`, if any.
+    pub fn from_seconds(secs: u64) -> Option<Self> {
+        Self::ALL
+            .into_iter()
+            .find(|interval| interval.seconds() == secs)
     }
 }
 
@@ -70,10 +79,10 @@ pub struct ArchivePolicy {
 }
 
 impl ArchivePolicy {
-    /// Effective idle seconds, or `None` when nothing archives.
-    pub const fn interval_secs(self) -> Option<u64> {
+    /// Effective idle seconds.
+    pub const fn interval_secs(self) -> u64 {
         if self.little_arc {
-            Some(LITTLE_ARC_INTERVAL_SECS)
+            LITTLE_ARC_INTERVAL_SECS
         } else {
             self.interval.seconds()
         }
@@ -113,9 +122,7 @@ pub fn decide_archive(
     now_secs: u64,
 ) -> ArchiveDecision {
     let mut decision = ArchiveDecision::default();
-    let Some(interval) = policy.interval_secs() else {
-        return decision;
-    };
+    let interval = policy.interval_secs();
     let selected: BTreeSet<ItemId> = selected.iter().copied().collect();
     for item in items {
         if !matches!(item.placement, Placement::Temporary { .. })
@@ -153,9 +160,9 @@ pub struct AutoArchive {
 }
 
 impl Workspace {
-    /// One Auto Archive pass with the default 12-hour policy, `elapsed_secs`
-    /// after the previous pass by a monotonic clock (zero for the first pass of
-    /// a launch).
+    /// One Auto Archive pass with the Profile's `archive_interval`,
+    /// `elapsed_secs` after the previous pass by a monotonic clock (zero for the
+    /// first pass of a launch).
     ///
     /// The browser-open clock (`open_secs`) advances by `elapsed_secs`, capped
     /// at `MAX_PASS_GAP_SECS`. It starts at 1, since zero marks an unrecorded
@@ -214,10 +221,25 @@ impl Workspace {
             })
             .collect();
         let seen: Vec<ItemId> = seen.into_iter().collect();
+        let policy = ArchivePolicy {
+            interval: self.state.archive_interval,
+            little_arc: false,
+        };
         AutoArchive {
-            due: decide_archive(&candidates, &seen, ArchivePolicy::default(), now).archive,
+            due: decide_archive(&candidates, &seen, policy, now).archive,
             changed,
         }
+    }
+
+    /// This Profile's "Archive tabs after" choice.
+    pub fn archive_interval(&self) -> ArchiveInterval {
+        self.state.archive_interval
+    }
+
+    /// Changes this Profile's interval. Views already recorded keep their
+    /// times, so a shorter interval can make items due at the next pass.
+    pub fn set_archive_interval(&mut self, interval: ArchiveInterval) {
+        self.state.archive_interval = interval;
     }
 
     /// The last live page of `item_id` closed. A temporary item ends, like
@@ -279,6 +301,11 @@ impl Workspace {
             .position(|tab| tab.id == id)
             .ok_or(WorkspaceError::UnknownArchivedTab(id))?;
         Ok(self.state.archived.remove(index))
+    }
+
+    /// Clear Archive: drops every entry, returning how many went.
+    pub fn clear_archived_tabs(&mut self) -> usize {
+        std::mem::take(&mut self.state.archived).len()
     }
 
     /// Drops entries expired at `now_secs`, returning how many went. The adapter
@@ -457,6 +484,21 @@ mod store_tests {
     }
 
     #[test]
+    fn clear_archive_drops_every_entry_and_persists() {
+        let mut workspace = Workspace::default();
+        close(&mut workspace, DEFAULT_SPACE_ID, 5);
+        close(&mut workspace, DEFAULT_SPACE_ID, 6);
+        let live = workspace.add_temporary_item(DEFAULT_SPACE_ID).unwrap();
+        assert_eq!(workspace.clear_archived_tabs(), 2);
+        assert!(workspace.archived_tabs(6).is_empty());
+        assert_eq!(workspace.clear_archived_tabs(), 0);
+        // Open tabs stay, and a reload brings nothing back.
+        let restored = Workspace::from_snapshot(workspace.snapshot()).unwrap();
+        assert!(restored.snapshot().archived.is_empty());
+        assert_eq!(restored.snapshot().items[0].id, live);
+    }
+
+    #[test]
     fn prune_drops_expired_entries_only() {
         let mut workspace = Workspace::default();
         close(&mut workspace, DEFAULT_SPACE_ID, 0);
@@ -609,6 +651,30 @@ mod auto_archive_tests {
         assert_eq!(run(&mut workspace, &[a, b], 1).due, vec![a, b]);
         // The pass only decides; the adapter's close removes the items.
         assert_eq!(workspace.snapshot().items.len(), 2);
+    }
+
+    #[test]
+    fn the_profile_interval_sets_when_items_are_due_and_persists() {
+        let mut workspace = Workspace::default();
+        assert_eq!(workspace.archive_interval(), ArchiveInterval::Hours12);
+        workspace.set_archive_interval(ArchiveInterval::Days7);
+        let id = workspace.add_temporary_item(DEFAULT_SPACE_ID).unwrap();
+        workspace.auto_archive(&[], &[id], &[], 0);
+        assert!(run(&mut workspace, &[id], 24 * H).due.is_empty());
+        let mut restored = Workspace::from_snapshot(workspace.snapshot()).unwrap();
+        assert_eq!(restored.archive_interval(), ArchiveInterval::Days7);
+        assert!(run(&mut restored, &[id], 6 * 24 * H - 1).due.is_empty());
+        assert_eq!(run(&mut restored, &[id], 1).due, vec![id]);
+        // Going back to 12 hours makes a long-idle item due at the next pass.
+        let other = restored.add_temporary_item(DEFAULT_SPACE_ID).unwrap();
+        restored.set_archive_interval(ArchiveInterval::Days30);
+        restored.auto_archive(&[], &[], &[], PASS);
+        run(&mut restored, &[], 20 * H);
+        restored.set_archive_interval(ArchiveInterval::Hours12);
+        assert_eq!(
+            restored.auto_archive(&[], &[other], &[], 0).due,
+            vec![other]
+        );
     }
 
     #[test]
@@ -766,16 +832,23 @@ mod tests {
 
     #[test]
     fn default_interval_is_twelve_hours() {
-        assert_eq!(ArchivePolicy::default().interval_secs(), Some(12 * H));
+        assert_eq!(ArchivePolicy::default().interval_secs(), 12 * H);
     }
 
     #[test]
     fn interval_options_map_to_seconds() {
-        assert_eq!(ArchiveInterval::Hours12.seconds(), Some(12 * H));
-        assert_eq!(ArchiveInterval::Hours24.seconds(), Some(24 * H));
-        assert_eq!(ArchiveInterval::Days7.seconds(), Some(7 * 24 * H));
-        assert_eq!(ArchiveInterval::Days30.seconds(), Some(30 * 24 * H));
-        assert_eq!(ArchiveInterval::Never.seconds(), None);
+        assert_eq!(ArchiveInterval::Hours12.seconds(), 12 * H);
+        assert_eq!(ArchiveInterval::Hours24.seconds(), 24 * H);
+        assert_eq!(ArchiveInterval::Days7.seconds(), 7 * 24 * H);
+        assert_eq!(ArchiveInterval::Days30.seconds(), 30 * 24 * H);
+        for interval in ArchiveInterval::ALL {
+            assert_eq!(
+                ArchiveInterval::from_seconds(interval.seconds()),
+                Some(interval)
+            );
+        }
+        assert_eq!(ArchiveInterval::from_seconds(0), None);
+        assert_eq!(ArchiveInterval::from_seconds(6 * H), None);
     }
 
     #[test]
@@ -844,16 +917,6 @@ mod tests {
     }
 
     #[test]
-    fn never_interval_archives_nothing() {
-        let policy = ArchivePolicy {
-            interval: ArchiveInterval::Never,
-            little_arc: false,
-        };
-        let decision = decide_archive(&[temp(1, 0)], &[], policy, u64::MAX);
-        assert_eq!(decision, ArchiveDecision::default());
-    }
-
-    #[test]
     fn longer_intervals_delay_archiving() {
         let items = [temp(1, 0)];
         for (interval, secs) in [
@@ -874,11 +937,7 @@ mod tests {
 
     #[test]
     fn little_arc_uses_six_hours_over_profile_interval() {
-        for interval in [
-            ArchiveInterval::Hours12,
-            ArchiveInterval::Days30,
-            ArchiveInterval::Never,
-        ] {
+        for interval in [ArchiveInterval::Hours12, ArchiveInterval::Days30] {
             let policy = ArchivePolicy {
                 interval,
                 little_arc: true,

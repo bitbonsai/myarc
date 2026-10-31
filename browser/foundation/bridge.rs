@@ -82,6 +82,9 @@ mod ffi {
         // Auto Archive's browser-open clock in seconds; zero before its first
         // pass.
         open_secs: u64,
+        // "Archive tabs after" in seconds. Restore reads anything but the
+        // four choices as the 12-hour default.
+        archive_interval_secs: u64,
     }
 
     struct SidebarResult {
@@ -147,6 +150,13 @@ mod ffi {
             media: &[u64],
             elapsed_secs: u64,
         ) -> AutoArchiveResult;
+        // "Archive tabs after" in seconds: 12 hours, 24 hours, 7 days or 30
+        // days.
+        fn archive_interval_secs(workspace: &Workspace) -> u64;
+        // Rejects any other value.
+        fn set_archive_interval(workspace: &mut Workspace, secs: u64) -> MutationResult;
+        // Clear Archive: drops every entry; `id` is how many went.
+        fn clear_archived_tabs(workspace: &mut Workspace) -> MutationResult;
         // Drops expired entries; `id` is how many went.
         fn prune_archived_tabs(workspace: &mut Workspace, now_secs: u64) -> MutationResult;
         // History deletion: drops entries whose URL is in `urls`, and with
@@ -333,6 +343,28 @@ pub fn auto_archive(
         due: pass.due,
         changed: pass.changed,
     }
+}
+
+pub fn archive_interval_secs(workspace: &Workspace) -> u64 {
+    workspace.0.archive_interval().seconds()
+}
+
+pub fn set_archive_interval(workspace: &mut Workspace, secs: u64) -> ffi::MutationResult {
+    match workspace::archive::ArchiveInterval::from_seconds(secs) {
+        Some(interval) => {
+            workspace.0.set_archive_interval(interval);
+            ffi::MutationResult {
+                ok: true,
+                id: secs,
+                error: String::new(),
+            }
+        }
+        None => reject("Choose 12 hours, 24 hours, 7 days or 30 days"),
+    }
+}
+
+pub fn clear_archived_tabs(workspace: &mut Workspace) -> ffi::MutationResult {
+    count(workspace.0.clear_archived_tabs())
 }
 
 fn count(removed: usize) -> ffi::MutationResult {
@@ -547,6 +579,7 @@ pub fn export_snapshot(workspace: &Workspace) -> ffi::StateSnapshot {
             .collect(),
         archived: state.archived.into_iter().map(archived_record).collect(),
         open_secs: state.open_secs,
+        archive_interval_secs: state.archive_interval.seconds(),
     }
 }
 
@@ -630,6 +663,10 @@ pub fn restore_snapshot(
                     })
                     .collect(),
                 open_secs: snapshot.open_secs,
+                archive_interval: workspace::archive::ArchiveInterval::from_seconds(
+                    snapshot.archive_interval_secs,
+                )
+                .unwrap_or_default(),
             })
             .map(|()| 0),
     )

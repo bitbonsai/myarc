@@ -18,6 +18,7 @@
 #include "third_party/skia/include/core/SkColor.h"
 #include "ui/base/accelerators/accelerator.h"
 #include "ui/base/metadata/metadata_impl_macros.h"
+#include "ui/base/mojom/menu_source_type.mojom.h"
 #include "ui/color/color_id.h"
 #include "ui/color/color_provider.h"
 #include "ui/events/keycodes/keyboard_codes.h"
@@ -25,6 +26,7 @@
 #include "ui/gfx/font_list.h"
 #include "ui/gfx/geometry/insets.h"
 #include "ui/gfx/geometry/point_f.h"
+#include "ui/gfx/geometry/rect.h"
 #include "ui/gfx/geometry/size.h"
 #include "ui/views/accessibility/view_accessibility.h"
 #include "ui/views/animation/ink_drop.h"
@@ -36,6 +38,7 @@
 #include "ui/views/controls/highlight_path_generator.h"
 #include "ui/views/controls/image_view.h"
 #include "ui/views/controls/label.h"
+#include "ui/views/controls/menu/menu_runner.h"
 #include "ui/views/controls/scroll_view.h"
 #include "ui/views/controls/textfield/textfield.h"
 #include "ui/views/focus/focus_manager.h"
@@ -52,6 +55,8 @@ using Orientation = views::BoxLayout::Orientation;
 using MainAxis = views::BoxLayout::MainAxisAlignment;
 using CrossAxis = views::BoxLayout::CrossAxisAlignment;
 using Section = LibraryView::Section;
+
+constexpr int kClearArchive = 1;
 
 // Same translucent lifts as the sidebar: the rail's selected tile matches the
 // Favorites tile, muted text matches the footer icons.
@@ -325,6 +330,10 @@ LibraryView::LibraryView(SidebarView::Delegate& delegate,
         base::BindRepeating(&LibraryView::SelectSection, base::Unretained(this),
                             info.section),
         info)));
+    // Arc clears the archive from the Archived Tabs item's context menu.
+    if (info.section == Section::kArchive) {
+      rail_items_.back()->set_context_menu_controller(this);
+    }
   }
   auto* footer =
       rail->AddChildView(Box(Orientation::kHorizontal, gfx::Insets(), 0));
@@ -867,6 +876,30 @@ void LibraryView::UpdateList(bool keep_scroll) {
   // A refresh keeps focus on the same row, else on the search field.
   if (had_focus && !RestoreFocus(key)) {
     search_->RequestFocus();
+  }
+}
+
+void LibraryView::ShowContextMenuForViewImpl(
+    views::View* source,
+    const gfx::Point& point,
+    ui::mojom::MenuSourceType source_type) {
+  if (!GetWidget() || (menu_runner_ && menu_runner_->IsRunning())) {
+    return;
+  }
+  menu_runner_.reset();
+  menu_model_ = std::make_unique<ui::SimpleMenuModel>(this);
+  menu_model_->AddItem(kClearArchive, u"Clear Archive");
+  menu_runner_ = std::make_unique<views::MenuRunner>(
+      menu_model_.get(), views::MenuRunner::CONTEXT_MENU);
+  menu_runner_->RunMenuAt(GetWidget(), nullptr, gfx::Rect(point, gfx::Size()),
+                          views::MenuAnchorPosition::kTopLeft, source_type);
+}
+
+void LibraryView::ExecuteCommand(int command_id, int event_flags) {
+  if (command_id == kClearArchive) {
+    // The confirmation and the refresh it triggers run after the menu closes.
+    PostAction(base::BindOnce(&SidebarView::Delegate::ClearArchive,
+                              base::Unretained(&delegate_.get())));
   }
 }
 

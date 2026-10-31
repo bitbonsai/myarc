@@ -165,6 +165,7 @@ source_set("settings_window") {
     "//ui/events",
     "//ui/gfx",
     "//ui/gfx/geometry",
+    "//ui/menus",
     "//ui/views",
   ]
   if (is_mac) {

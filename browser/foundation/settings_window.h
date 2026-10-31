@@ -1,6 +1,7 @@
 #ifndef MYARC_SETTINGS_WINDOW_H_
 #define MYARC_SETTINGS_WINDOW_H_
 
+#include <cstdint>
 #include <memory>
 
 #include "base/functional/callback.h"
@@ -19,10 +20,19 @@ namespace myarc {
 // and closes the window when it goes away. UI sequence only.
 class SettingsWindow {
  public:
-  enum class Section { kGeneral, kAdvanced };
+  enum class Section { kGeneral, kProfiles, kAdvanced };
+
+  // The owning browser window's Profile timer, Arc's "Archive tabs after".
+  // `get` returns its seconds, or 0 while the workspace is not loaded; `set`
+  // applies one of the four choices.
+  struct ArchiveTimer {
+    base::RepeatingCallback<uint64_t()> get;
+    base::RepeatingCallback<void(uint64_t)> set;
+  };
 
   // `open_more_settings` opens chrome://settings in the owning browser window.
-  explicit SettingsWindow(base::RepeatingClosure open_more_settings);
+  SettingsWindow(base::RepeatingClosure open_more_settings,
+                 ArchiveTimer archive_timer);
   SettingsWindow(const SettingsWindow&) = delete;
   SettingsWindow& operator=(const SettingsWindow&) = delete;
   ~SettingsWindow();
@@ -45,6 +55,7 @@ class SettingsWindow {
   void OpenMoreSettings();
 
   base::RepeatingClosure open_more_settings_;
+  ArchiveTimer archive_timer_;
   std::unique_ptr<views::WidgetDelegate> delegate_;
   std::unique_ptr<views::Widget> widget_;
   base::WeakPtrFactory<SettingsWindow> weak_factory_{this};

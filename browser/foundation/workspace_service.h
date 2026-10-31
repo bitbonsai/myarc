@@ -96,6 +96,13 @@ class WorkspaceService final : public base::SupportsUserData::Data {
   rust::Vec<foundation::ArchivedTabRecord> ArchivedTabs() const;
   // Call after the entry has been reopened.
   foundation::MutationResult RemoveArchivedTab(uint64_t id);
+  // Clear Archive: drops every Archived Tab and saves.
+  foundation::MutationResult ClearArchivedTabs();
+  // This Profile's "Archive tabs after" in seconds (12 hours, 24 hours, 7 days
+  // or 30 days); 0 while not loaded. Set rejects any other value. The next
+  // Auto Archive pass uses the new interval.
+  uint64_t ArchiveIntervalSecs() const;
+  foundation::MutationResult SetArchiveInterval(uint64_t secs);
   // History deletion: drops Archived Tabs whose URL is in `urls`, and with
   // `range` those closed between its begin and end, inclusive. A null end
   // means no end. Writes only when an entry went.

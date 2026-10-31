@@ -35,6 +35,8 @@ const char kWorkspaceServiceKey = 0;
 // owned bridge records.
 constexpr size_t kMaxMetadataBytes = 20 * 1024 * 1024;
 constexpr size_t kMaxJsonDepth = 8;
+// Auto Archive's default "Archive tabs after", which files leave unwritten.
+constexpr uint64_t kDefaultArchiveIntervalSecs = 12 * 60 * 60;
 
 scoped_refptr<base::SequencedTaskRunner> WorkspaceIoRunner() {
   DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
@@ -238,6 +240,12 @@ std::optional<std::string> EncodeWorkspaceMetadata(
   // Builds without Auto Archive reject the key, so write it only when set.
   if (snapshot.open_secs)
     root.Set("open_secs", base::NumberToString(snapshot.open_secs));
+  // Builds without the archive timer reject the key, so write it only when it
+  // is not the 12-hour default.
+  if (snapshot.archive_interval_secs != kDefaultArchiveIntervalSecs) {
+    root.Set("archive_interval_secs",
+             base::NumberToString(snapshot.archive_interval_secs));
+  }
   auto json = base::WriteJson(root);
   if (json && json->size() <= kMaxMetadataBytes) {
     return json;
@@ -252,7 +260,7 @@ MetadataResult DecodeWorkspaceMetadata(std::string_view json) {
   auto root =
       base::JSONReader::ReadDict(json, base::JSON_PARSE_RFC, kMaxJsonDepth);
   const auto limits = foundation::bridge_limits();
-  if (!root || root->size() < 8 || root->size() > 10 ||
+  if (!root || root->size() < 8 || root->size() > 11 ||
       root->FindInt("version") != static_cast<int>(limits.version)) {
     return InvalidMetadata();
   }
@@ -267,11 +275,15 @@ MetadataResult DecodeWorkspaceMetadata(std::string_view json) {
   // reads as zero, and the next pass restamps every view, so nothing archives
   // early.
   const bool has_open_secs = root->contains("open_secs");
+  // A bad archive timer reads as the default; Rust restore does the same for
+  // any value that is not one of the four choices.
+  const bool has_interval = root->contains("archive_interval_secs");
   if (!spaces || spaces->size() > limits.spaces || !items ||
       items->size() > limits.items || !windows ||
       windows->size() > limits.windows ||
       root->size() != 8 + (archived_value ? 1u : 0u) +
-                          (has_open_secs ? 1u : 0u)) {
+                          (has_open_secs ? 1u : 0u) +
+                          (has_interval ? 1u : 0u)) {
     return InvalidMetadata();
   }
   foundation::StateSnapshot snapshot;
@@ -284,6 +296,10 @@ MetadataResult DecodeWorkspaceMetadata(std::string_view json) {
   }
   if (has_open_secs && !ReadId(*root, "open_secs", snapshot.open_secs))
     snapshot.open_secs = 0;
+  if (has_interval && !ReadId(*root, "archive_interval_secs",
+                              snapshot.archive_interval_secs)) {
+    snapshot.archive_interval_secs = 0;
+  }
   for (const auto& value : *spaces) {
     const auto* record = value.GetIfDict();
     foundation::SpaceRecord space;
@@ -654,6 +670,25 @@ rust::Vec<foundation::ArchivedTabRecord> WorkspaceService::ArchivedTabs()
   if (!CanMutate())
     return {};
   return foundation::archived_tabs(*workspace_, NowSecs());
+}
+
+uint64_t WorkspaceService::ArchiveIntervalSecs() const {
+  if (!CanMutate())
+    return 0;
+  return foundation::archive_interval_secs(*workspace_);
+}
+
+foundation::MutationResult WorkspaceService::SetArchiveInterval(
+    uint64_t secs) {
+  if (!CanMutate())
+    return Failure("Workspace is not loaded. Check storage state.");
+  return Changed(foundation::set_archive_interval(*workspace_, secs));
+}
+
+foundation::MutationResult WorkspaceService::ClearArchivedTabs() {
+  if (!CanMutate())
+    return Failure("Workspace is not loaded. Check storage state.");
+  return Changed(foundation::clear_archived_tabs(*workspace_));
 }
 
 foundation::MutationResult WorkspaceService::RemoveArchivedTab(uint64_t id) {

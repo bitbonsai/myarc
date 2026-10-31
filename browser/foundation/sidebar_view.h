@@ -109,6 +109,9 @@ class SidebarView final : public views::View,
     // Reopens the tab in its Space and drops it from the archive. The parent
     // reports errors.
     virtual void RestoreArchivedTab(uint64_t archive_id) = 0;
+    // Clear Archive: the parent asks for confirmation, then drops every
+    // archived tab and reports errors.
+    virtual void ClearArchive() = 0;
     // The parent resizes the sidebar region for the Library, and calls
     // RefreshLibraryDownloads while it is open. After closing it supplies a
     // fresh model with SetModel.

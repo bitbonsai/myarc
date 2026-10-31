@@ -40,7 +40,8 @@ pub const MAX_ITEMS: usize = 1024;
 pub const MAX_WINDOWS: usize = 64;
 /// Archived Tabs keep at most this many entries; the oldest go first.
 pub const MAX_ARCHIVED_TABS: usize = 500;
-/// Archived Tabs older than 30 days are dropped.
+/// Archived Tabs older than 30 days are dropped. Retention counts from the
+/// close, so it is independent of the Auto Archive interval.
 pub const ARCHIVE_RETENTION_SECS: u64 = 30 * 24 * 60 * 60;
 pub const SNAPSHOT_VERSION: u32 = 1;
 pub const DEFAULT_SPACE_ID: u64 = 1;
@@ -209,6 +210,8 @@ pub struct WorkspaceSnapshot {
     /// across launches. It stands still while the browser is closed or the
     /// computer sleeps. Zero until the first Auto Archive pass.
     pub open_secs: u64,
+    /// This Profile's Auto Archive interval ("Archive tabs after").
+    pub archive_interval: archive::ArchiveInterval,
     pub next_space_id: SpaceId,
     pub next_item_id: ItemId,
     pub next_window_id: WindowId,
@@ -262,6 +265,7 @@ impl Default for Workspace {
                 }],
                 archived: Vec::new(),
                 open_secs: 0,
+                archive_interval: archive::ArchiveInterval::Hours12,
                 next_space_id: 2,
                 next_item_id: 1,
                 next_window_id: 2,

@@ -11,7 +11,7 @@
 #   --myarc-capture-open-library, on Spaces unless a section is named.
 #   WORKSPACE=<file> seeds the profile's myarc-workspace-v1.json, for example
 #   with Archived Tabs.
-#   SETTINGS=1 (or general/advanced/more) opens the native Settings window via
+#   SETTINGS=1 (or general/profiles/advanced/more) opens the native Settings window via
 #   --myarc-capture-open-settings and captures only that window; "more" presses
 #   More Settings… and captures the browser window instead.
 #   The browser launches in the background (open -g) and is captured with
@@ -58,6 +58,7 @@ if [ "${1:-}" = "--inner" ]; then
   case "${SETTINGS:-}" in
     "") ;;
     more) EXTRA+=(--myarc-capture-open-settings=more); KEY_SETTLE=$((KEY_SETTLE + 2)) ;;
+    profiles) EXTRA+=(--myarc-capture-open-settings=profiles); SHOT_TITLE=(Profiles) ;;
     advanced) EXTRA+=(--myarc-capture-open-settings=advanced); SHOT_TITLE=(Advanced) ;;
     *) EXTRA+=(--myarc-capture-open-settings); SHOT_TITLE=(General) ;;
   esac

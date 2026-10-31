@@ -25,6 +25,7 @@
 #include "ui/base/metadata/metadata_header_macros.h"
 #include "ui/base/metadata/metadata_impl_macros.h"
 #include "ui/base/models/image_model.h"
+#include "ui/base/mojom/menu_source_type.mojom.h"
 #include "ui/events/event_constants.h"
 #include "ui/events/keycodes/keyboard_codes.h"
 #include "ui/gfx/canvas.h"
@@ -36,10 +37,12 @@
 #include "ui/gfx/geometry/size.h"
 #include "ui/gfx/scoped_canvas.h"
 #include "ui/gfx/vector_icon_types.h"
+#include "ui/menus/simple_menu_model.h"
 #include "ui/views/accessibility/view_accessibility.h"
 #include "ui/views/controls/button/button.h"
 #include "ui/views/controls/image_view.h"
 #include "ui/views/controls/label.h"
+#include "ui/views/controls/menu/menu_runner.h"
 #include "ui/views/layout/box_layout.h"
 #include "ui/views/view.h"
 #include "ui/views/widget/widget.h"
@@ -112,6 +115,12 @@ constexpr gfx::PathElement kSlidersPath[] = {
     gfx::NEW_PATH, gfx::STROKE, 1.5f, gfx::MOVE_TO, 21, 5, gfx::R_H_LINE_TO, -7,
     gfx::NEW_PATH, gfx::STROKE, 1.5f, gfx::MOVE_TO, 8, 10, gfx::R_V_LINE_TO, 4,
     gfx::NEW_PATH, gfx::STROKE, 1.5f, gfx::MOVE_TO, 8, 12, gfx::H_LINE_TO, 3};
+// Lucide "chevrons-up-down", the arrows of Arc's pop-up buttons.
+constexpr gfx::PathElement kChevronsUpDownPath[] = {
+    gfx::CANVAS_DIMENSIONS, 24, gfx::STROKE, 2,
+    gfx::MOVE_TO, 7, 15, gfx::R_LINE_TO, 5, 5, gfx::R_LINE_TO, 5, -5,
+    gfx::NEW_PATH, gfx::STROKE, 2,
+    gfx::MOVE_TO, 7, 9, gfx::R_LINE_TO, 5, -5, gfx::R_LINE_TO, 5, 5};
 // Lucide "heart", filled like Arc's banner button.
 constexpr gfx::PathElement kHeartPath[] = {
     gfx::CANVAS_DIMENSIONS, 24,
@@ -136,6 +145,7 @@ MYARC_ICON(kAppWindowIcon, kAppWindowPath);
 MYARC_ICON(kKeyboardIcon, kKeyboardPath);
 MYARC_ICON(kSlidersIcon, kSlidersPath);
 MYARC_ICON(kHeartIcon, kHeartPath);
+MYARC_ICON(kChevronsUpDownIcon, kChevronsUpDownPath);
 #undef MYARC_ICON
 
 // Measured from Arc's dark Settings window at 2x (DIP).
@@ -242,8 +252,14 @@ class PillButton : public views::Button {
       AddChildView(std::make_unique<views::ImageView>(
           ui::ImageModel::FromVectorIcon(*icon, text_color, 16)));
     }
-    AddLabel(this, text, 13, weight, text_color);
+    label_ = AddLabel(this, text, 13, weight, text_color);
     SetAccessibleName(text);
+  }
+
+  void SetText(const std::u16string& text) {
+    label_->SetText(text);
+    SetAccessibleName(text);
+    PreferredSizeChanged();
   }
 
   gfx::Size CalculatePreferredSize(
@@ -263,6 +279,7 @@ class PillButton : public views::Button {
 
  private:
   const SkColor fill_;
+  raw_ptr<views::Label> label_ = nullptr;
 };
 
 BEGIN_METADATA(PillButton)
@@ -454,6 +471,109 @@ class AdvancedPage : public views::View {
 BEGIN_METADATA(AdvancedPage)
 END_METADATA
 
+// Arc's "Archive tabs after" choices; Auto Archive can't be turned off.
+struct ArchiveChoice {
+  uint64_t secs;
+  const char16_t* label;
+};
+
+constexpr uint64_t kHourSecs = 60 * 60;
+constexpr std::array<ArchiveChoice, 4> kArchiveChoices = {{
+    {12 * kHourSecs, u"12 hours (default)"},
+    {24 * kHourSecs, u"24 hours"},
+    {7 * 24 * kHourSecs, u"7 days"},
+    {30 * 24 * kHourSecs, u"30 days"},
+}};
+
+// Profiles: Arc's "Archive tabs after" row for the owning window's Profile.
+class ProfilesPage : public views::View, public ui::SimpleMenuModel::Delegate {
+  METADATA_HEADER(ProfilesPage, views::View)
+
+ public:
+  explicit ProfilesPage(SettingsWindow::ArchiveTimer timer)
+      : timer_(std::move(timer)) {
+    card_ = AddChildView(
+        std::make_unique<Panel>(kCardFill, kCardStroke, kCardRadius));
+    auto* layout = card_->SetLayoutManager(std::make_unique<views::BoxLayout>(
+        views::BoxLayout::Orientation::kHorizontal,
+        gfx::Insets::VH(0, kBannerPad)));
+    layout->set_cross_axis_alignment(
+        views::BoxLayout::CrossAxisAlignment::kCenter);
+    auto* label = AddLabel(card_, u"Archive tabs after", 13,
+                           gfx::Font::Weight::NORMAL, kCardText);
+    label->SetHorizontalAlignment(gfx::ALIGN_LEFT);
+    label->SetTooltipText(
+        u"Unpinned tabs you haven\u2019t viewed for this long move to "
+        u"Archived Tabs. Applies to this window\u2019s Profile.");
+    layout->SetFlexForView(label, 1);
+    picker_ = card_->AddChildView(std::make_unique<PillButton>(
+        base::BindRepeating(&ProfilesPage::OpenMenu, base::Unretained(this)),
+        u"", kGrayButton, kButtonText, gfx::Font::Weight::NORMAL, nullptr));
+    picker_->AddChildView(std::make_unique<views::ImageView>(
+        ui::ImageModel::FromVectorIcon(kChevronsUpDownIcon, kButtonText, 12)));
+    picker_->GetViewAccessibility().SetRole(ax::mojom::Role::kPopUpButton);
+    picker_->GetViewAccessibility().SetHasPopup(ax::mojom::HasPopup::kMenu);
+    Refresh();
+  }
+
+  void Refresh() {
+    secs_ = timer_.get.Run();
+    std::u16string text = u"Unavailable";
+    for (const ArchiveChoice& choice : kArchiveChoices) {
+      if (choice.secs == secs_) {
+        text = choice.label;
+      }
+    }
+    picker_->SetText(text);
+    picker_->SetAccessibleName(u"Archive tabs after: " + text);
+    picker_->SetEnabled(secs_ != 0);
+    InvalidateLayout();
+  }
+
+  void Layout(PassKey) override {
+    card_->SetBounds(kSideMargin, kContentTop, width() - 2 * kSideMargin,
+                     kRowHeight);
+  }
+
+  // ui::SimpleMenuModel::Delegate:
+  bool IsCommandIdChecked(int command_id) const override {
+    return kArchiveChoices[command_id].secs == secs_;
+  }
+
+  void ExecuteCommand(int command_id, int event_flags) override {
+    timer_.set.Run(kArchiveChoices[command_id].secs);
+    Refresh();
+  }
+
+ private:
+  void OpenMenu() {
+    if (!GetWidget() || (runner_ && runner_->IsRunning())) {
+      return;
+    }
+    runner_.reset();
+    model_ = std::make_unique<ui::SimpleMenuModel>(this);
+    for (size_t i = 0; i < kArchiveChoices.size(); ++i) {
+      model_->AddRadioItem(static_cast<int>(i), kArchiveChoices[i].label,
+                           /*group_id=*/0);
+    }
+    runner_ = std::make_unique<views::MenuRunner>(model_.get(),
+                                                  views::MenuRunner::NO_FLAGS);
+    runner_->RunMenuAt(GetWidget(), nullptr, picker_->GetBoundsInScreen(),
+                       views::MenuAnchorPosition::kTopLeft,
+                       ui::mojom::MenuSourceType::kNone);
+  }
+
+  SettingsWindow::ArchiveTimer timer_;
+  uint64_t secs_ = 0;
+  raw_ptr<Panel> card_ = nullptr;
+  raw_ptr<PillButton> picker_ = nullptr;
+  std::unique_ptr<ui::SimpleMenuModel> model_;
+  std::unique_ptr<views::MenuRunner> runner_;
+};
+
+BEGIN_METADATA(ProfilesPage)
+END_METADATA
+
 struct SectionSpec {
   const char16_t* title;
   // Static icons in a constexpr table.
@@ -462,11 +582,11 @@ struct SectionSpec {
 };
 
 // Arc's tab row minus Account (myArc has no account), Max (AI is off) and
-// Icon (no app icon picker). Profiles, Links and Shortcuts stay visible but
-// disabled so the row keeps Arc's rhythm.
+// Icon (no app icon picker). Links and Shortcuts stay visible but disabled so
+// the row keeps Arc's rhythm.
 constexpr std::array<SectionSpec, 5> kSections = {{
     {u"General", &kSettingsIcon, SettingsWindow::Section::kGeneral},
-    {u"Profiles", &kUserIcon, std::nullopt},
+    {u"Profiles", &kUserIcon, SettingsWindow::Section::kProfiles},
     {u"Links", &kAppWindowIcon, std::nullopt},
     {u"Shortcuts", &kKeyboardIcon, std::nullopt},
     {u"Advanced", &kSlidersIcon, SettingsWindow::Section::kAdvanced},
@@ -477,6 +597,7 @@ class SettingsView : public views::View {
 
  public:
   SettingsView(base::RepeatingClosure more_settings,
+               SettingsWindow::ArchiveTimer archive_timer,
                base::RepeatingClosure close)
       : close_(std::move(close)) {
     title_ = AddLabel(this, u"", 13, gfx::Font::Weight::BOLD, kTitleText);
@@ -495,6 +616,8 @@ class SettingsView : public views::View {
       tabs_.push_back(tab);
     }
     general_ = AddChildView(std::make_unique<GeneralPage>());
+    profiles_ =
+        AddChildView(std::make_unique<ProfilesPage>(std::move(archive_timer)));
     advanced_ = AddChildView(std::make_unique<AdvancedPage>(more_settings));
     AddAccelerator(ui::Accelerator(ui::VKEY_ESCAPE, ui::EF_NONE));
     AddAccelerator(ui::Accelerator(ui::VKEY_W, ui::EF_PLATFORM_ACCELERATOR));
@@ -502,15 +625,20 @@ class SettingsView : public views::View {
   }
 
   void Select(SettingsWindow::Section section) {
-    const bool general = section == SettingsWindow::Section::kGeneral;
-    general_->SetVisible(general);
-    advanced_->SetVisible(!general);
-    if (general) {
+    general_->SetVisible(section == SettingsWindow::Section::kGeneral);
+    profiles_->SetVisible(section == SettingsWindow::Section::kProfiles);
+    advanced_->SetVisible(section == SettingsWindow::Section::kAdvanced);
+    if (section == SettingsWindow::Section::kGeneral) {
       general_->Refresh();
+    } else if (section == SettingsWindow::Section::kProfiles) {
+      profiles_->Refresh();
     }
-    const std::u16string title = general ? u"General" : u"Advanced";
+    std::u16string title;
     for (size_t i = 0; i < kSections.size(); ++i) {
       tabs_[i]->SetSelected(kSections[i].section == section);
+      if (kSections[i].section == section) {
+        title = kSections[i].title;
+      }
     }
     title_->SetText(title);
     if (GetWidget() && GetWidget()->widget_delegate()) {
@@ -544,6 +672,7 @@ class SettingsView : public views::View {
       x += w;
     }
     general_->SetBoundsRect(GetLocalBounds());
+    profiles_->SetBoundsRect(GetLocalBounds());
     advanced_->SetBoundsRect(GetLocalBounds());
   }
 
@@ -552,6 +681,7 @@ class SettingsView : public views::View {
   raw_ptr<views::Label> title_ = nullptr;
   std::vector<raw_ptr<SectionTab>> tabs_;
   raw_ptr<GeneralPage> general_ = nullptr;
+  raw_ptr<ProfilesPage> profiles_ = nullptr;
   raw_ptr<AdvancedPage> advanced_ = nullptr;
 };
 
@@ -581,8 +711,10 @@ SettingsWindow* g_open = nullptr;
 
 }  // namespace
 
-SettingsWindow::SettingsWindow(base::RepeatingClosure open_more_settings)
-    : open_more_settings_(std::move(open_more_settings)) {}
+SettingsWindow::SettingsWindow(base::RepeatingClosure open_more_settings,
+                               ArchiveTimer archive_timer)
+    : open_more_settings_(std::move(open_more_settings)),
+      archive_timer_(std::move(archive_timer)) {}
 
 SettingsWindow::~SettingsWindow() {
   widget_.reset();
@@ -616,6 +748,7 @@ void SettingsWindow::Show(Section section, bool inactive) {
     view = delegate_->SetContentsView(std::make_unique<SettingsView>(
         base::BindRepeating(&SettingsWindow::OpenMoreSettings,
                             weak_factory_.GetWeakPtr()),
+        archive_timer_,
         base::BindRepeating(&SettingsWindow::Close,
                             weak_factory_.GetWeakPtr())));
     delegate_->SetClientViewFactory(

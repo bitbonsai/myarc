@@ -2,6 +2,7 @@
 #define MYARC_LIBRARY_VIEW_H_
 
 #include <cstdint>
+#include <memory>
 #include <optional>
 #include <set>
 #include <string>
@@ -15,11 +16,14 @@
 #include "myarc/sidebar_view.h"
 #include "third_party/skia/include/core/SkColor.h"
 #include "ui/base/metadata/metadata_header_macros.h"
+#include "ui/menus/simple_menu_model.h"
+#include "ui/views/context_menu_controller.h"
 #include "ui/views/controls/textfield/textfield_controller.h"
 #include "ui/views/view.h"
 
 namespace views {
 class Button;
+class MenuRunner;
 class Textfield;
 }  // namespace views
 
@@ -29,7 +33,9 @@ namespace myarc {
 // Space and download actions go through the sidebar's Delegate. `close`
 // destroys this view, so the view runs it only from a posted task.
 class LibraryView final : public views::View,
-                          public views::TextfieldController {
+                          public views::TextfieldController,
+                          public views::ContextMenuController,
+                          public ui::SimpleMenuModel::Delegate {
   METADATA_HEADER(LibraryView, views::View)
 
  public:
@@ -77,6 +83,16 @@ class LibraryView final : public views::View,
   void ContentsChanged(views::Textfield* sender,
                        const std::u16string& new_contents) override;
 
+  // views::ContextMenuController, for Arc's right-click on the Archived Tabs
+  // rail item:
+  void ShowContextMenuForViewImpl(
+      views::View* source,
+      const gfx::Point& point,
+      ui::mojom::MenuSourceType source_type) override;
+
+  // ui::SimpleMenuModel::Delegate:
+  void ExecuteCommand(int command_id, int event_flags) override;
+
   const raw_ref<SidebarView::Delegate> delegate_;
   const base::RepeatingClosure close_;
   Section section_;
@@ -98,6 +114,8 @@ class LibraryView final : public views::View,
   std::u16string query_;
   // Surface and text colors the pane was last built with.
   std::optional<std::pair<SkColor, SkColor>> theme_colors_;
+  std::unique_ptr<ui::SimpleMenuModel> menu_model_;
+  std::unique_ptr<views::MenuRunner> menu_runner_;
   base::WeakPtrFactory<LibraryView> weak_factory_{this};
 };
 
