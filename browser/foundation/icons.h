@@ -7,41 +7,9 @@
 
 namespace myarc {
 
-// Filled single-path icons from design/icons/, 24 DIP canvas, even-odd fill:
-// library.svg for the footer Library button, saturn.svg as the default Space
-// icon.
-inline constexpr gfx::PathElement kLibraryPath[] = {
-    gfx::CANVAS_DIMENSIONS, 24, gfx::MOVE_TO, 15.6f, 3.3f,
-    gfx::CUBIC_TO, 16.208f, 3.3f, 16.7f, 3.792f, 16.7f, 4.4f,
-    gfx::CUBIC_TO, 16.7f, 5.008f, 16.208f, 5.5f, 15.6f, 5.5f,
-    gfx::CUBIC_TO, 14.992f, 5.5f, 14.5f, 5.008f, 14.5f, 4.4f,
-    gfx::CUBIC_TO, 14.5f, 3.792f, 14.992f, 3.3f, 15.6f, 3.3f, gfx::CLOSE,
-    gfx::MOVE_TO, 7.49f, 6.45f, gfx::LINE_TO, 8.13f, 4.23f,
-    gfx::LINE_TO, 9.35f, 6.19f, gfx::LINE_TO, 11.66f, 6.11f,
-    gfx::LINE_TO, 10.18f, 7.88f, gfx::LINE_TO, 10.96f, 10.05f,
-    gfx::LINE_TO, 8.82f, 9.18f, gfx::LINE_TO, 7, 10.6f,
-    gfx::LINE_TO, 7.16f, 8.3f, gfx::LINE_TO, 5.25f, 7.01f,
-    gfx::LINE_TO, 7.49f, 6.45f, gfx::CLOSE, gfx::MOVE_TO, 15.3f, 10.6f,
-    gfx::LINE_TO, 15.3f, 7.2f, gfx::LINE_TO, 18.8f, 8.9f,
-    gfx::LINE_TO, 15.3f, 10.6f, gfx::CLOSE, gfx::MOVE_TO, 5, 13.5f,
-    gfx::CUBIC_TO, 5, 12.395f, 5.895f, 11.5f, 7, 11.5f,
-    gfx::LINE_TO, 17, 11.5f,
-    gfx::CUBIC_TO, 18.105f, 11.5f, 19, 12.395f, 19, 13.5f,
-    gfx::LINE_TO, 19, 19,
-    gfx::CUBIC_TO, 19, 20.381f, 17.881f, 21.5f, 16.5f, 21.5f,
-    gfx::LINE_TO, 7.5f, 21.5f, gfx::CUBIC_TO, 6.119f, 21.5f, 5, 20.381f, 5, 19,
-    gfx::LINE_TO, 5, 13.5f, gfx::CLOSE, gfx::MOVE_TO, 10.6f, 13.9f,
-    gfx::CUBIC_TO, 10.158f, 13.9f, 9.8f, 14.258f, 9.8f, 14.7f,
-    gfx::CUBIC_TO, 9.8f, 15.142f, 10.158f, 15.5f, 10.6f, 15.5f,
-    gfx::LINE_TO, 13.4f, 15.5f,
-    gfx::CUBIC_TO, 13.842f, 15.5f, 14.2f, 15.142f, 14.2f, 14.7f,
-    gfx::CUBIC_TO, 14.2f, 14.258f, 13.842f, 13.9f, 13.4f, 13.9f,
-    gfx::LINE_TO, 10.6f, 13.9f, gfx::CLOSE};
-inline constexpr gfx::VectorIconRep kLibraryRep[] = {{kLibraryPath}};
-inline constexpr gfx::VectorIcon kLibraryIcon(kLibraryRep,
-                                              std::size(kLibraryRep),
-                                              "myarc_library");
-
+// Filled single-path icon from design/icons/saturn.svg, 24 DIP canvas, even-odd
+// fill: the default Space icon. The Library button draws its own art
+// (footer_button.cc).
 inline constexpr gfx::PathElement kSaturnPath[] = {
     gfx::CANVAS_DIMENSIONS, 24, gfx::MOVE_TO, 5.6f, 12,
     gfx::CUBIC_TO, 5.6f, 8.465f, 8.465f, 5.6f, 12, 5.6f,
@@ -75,7 +43,7 @@ inline constexpr gfx::VectorIcon kSaturnIcon(kSaturnRep,
 // Icons from Lucide (ISC, lucide-static 1.61.0): 24 DIP canvas, stroke 2.
 // "archive" for Archived Tabs, "plus" for Create, "search" for the Library's
 // search fields, and the Library rail's "image", "circle-arrow-down",
-// "presentation", "copy", "wand" and "arrow-left".
+// "presentation", "copy" and "wand".
 inline constexpr gfx::PathElement kArchivePath[] = {
     gfx::CANVAS_DIMENSIONS, 24, gfx::STROKE, 2,
     gfx::ROUND_RECT, 2, 3, 20, 5, 1, gfx::MOVE_TO, 4, 8, gfx::V_LINE_TO, 19,
@@ -160,15 +128,6 @@ inline constexpr gfx::VectorIconRep kWandRep[] = {{kWandPath}};
 inline constexpr gfx::VectorIcon kWandIcon(kWandRep,
                                            std::size(kWandRep),
                                            "myarc_wand");
-
-inline constexpr gfx::PathElement kArrowLeftPath[] = {
-    gfx::CANVAS_DIMENSIONS, 24, gfx::STROKE, 2, gfx::MOVE_TO, 12, 19,
-    gfx::R_LINE_TO, -7, -7, gfx::R_LINE_TO, 7, -7, gfx::MOVE_TO, 19, 12,
-    gfx::H_LINE_TO, 5};
-inline constexpr gfx::VectorIconRep kArrowLeftRep[] = {{kArrowLeftPath}};
-inline constexpr gfx::VectorIcon kArrowLeftIcon(kArrowLeftRep,
-                                                std::size(kArrowLeftRep),
-                                                "myarc_arrow_left");
 
 }  // namespace myarc
 

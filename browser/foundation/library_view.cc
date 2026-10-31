@@ -13,6 +13,7 @@
 #include "base/notreached.h"
 #include "base/task/sequenced_task_runner.h"
 #include "base/time/time.h"
+#include "myarc/footer_button.h"
 #include "myarc/icons.h"
 #include "myarc/library_logic.h"
 #include "third_party/skia/include/core/SkColor.h"
@@ -130,10 +131,10 @@ std::unique_ptr<views::Label> MakeLabel(const std::u16string& text,
 }
 
 // Transparent text button like the sidebar's rows.
-std::unique_ptr<views::MdTextButton> TextButton(
-    views::Button::PressedCallback callback,
-    const std::u16string& text) {
-  auto button = std::make_unique<views::MdTextButton>(
+template <typename T = views::MdTextButton>
+std::unique_ptr<T> TextButton(views::Button::PressedCallback callback,
+                              const std::u16string& text) {
+  auto button = std::make_unique<T>(
       std::move(callback), text, views::style::CONTEXT_BUTTON_MD,
       /*use_text_color_for_icon=*/false);
   button->SetStyle(ui::ButtonStyle::kText);
@@ -337,19 +338,19 @@ LibraryView::LibraryView(SidebarView::Delegate& delegate,
   }
   auto* footer =
       rail->AddChildView(Box(Orientation::kHorizontal, gfx::Insets(), 0));
-  auto back = std::make_unique<views::ImageButton>(base::BindRepeating(
-      [](LibraryView* view) { view->PostAction(view->close_); },
-      base::Unretained(this)));
-  back->SetImageModel(views::Button::STATE_NORMAL,
-                      ui::ImageModel::FromVectorIcon(
-                          kArrowLeftIcon, GetColors(nullptr).muted, 18));
-  back->SetImageHorizontalAlignment(views::ImageButton::ALIGN_CENTER);
-  back->SetImageVerticalAlignment(views::ImageButton::ALIGN_MIDDLE);
+  // As in Arc, the glowing Library button stays in the footer and closes it.
+  auto back = TextButton<LibraryButton>(
+      base::BindRepeating(
+          [](LibraryView* view) { view->PostAction(view->close_); },
+          base::Unretained(this)),
+      u"");
+  back->SetCustomPadding(gfx::Insets());
+  back->SetMinSize(gfx::Size(32, 32));
+  back->SetMaxSize(gfx::Size(32, 32));
   back->SetPreferredSize(gfx::Size(32, 32));
-  back->SetFocusBehavior(FocusBehavior::ALWAYS);
-  back->SetTooltipText(u"Back");
-  back->GetViewAccessibility().SetName(u"Back to sidebar");
-  views::InstallRoundRectHighlightPathGenerator(back.get(), gfx::Insets(), 8);
+  back->SetOpen(true, /*animate=*/false);
+  back->SetTooltipText(u"Close Library");
+  back->GetViewAccessibility().SetName(u"Close Library");
   footer->AddChildView(std::move(back));
 
   pane_ = AddChildView(std::make_unique<views::View>());

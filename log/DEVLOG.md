@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-10-31: Animated Library icon
+
+- The footer Library button now draws the user-designed `design/icons/library-idle.svg` and `library-glow.svg` with Skia (new `footer_button.cc`) and morphs between them as `library-morph.html` does: on hover the star, dot and triangle rise out of the box under a blurred light beam, with an overshoot and a small stagger. The Library panel's footer shows the same button glowing in place of its back arrow (it still closes the Library, now named "Close Library"), and on close the new sidebar button settles back to idle. All parts use the theme's foreground color at 55% idle and 95% glowing, so light mode draws in black. Reduced motion jumps to the end state; a footer rebuilt under the pointer stays lit. The old `library.svg` glyph and Lucide `arrow-left` are no longer used.
+- Verification: `chrome` and `bridge_check` build; `bridge_check`, cargo fmt/clippy/test, `export_patches.py --check` and `check_docs.py` pass. Background captures `research-private/captures/footer-library/sidebar-idle.png` and `LIBRARY=1` `library-open.png` show both states; the hover morph, light mode and reduced motion were checked by reading the code, not run.
+- No Chromium commit: only symlinked `browser/foundation` files changed.
+
 ## 2026-10-31: Archive timer review fixes
 
 - Settings now edit the invoking window's original Profile: an Incognito window sets its regular Profile's timer instead of a throwaway workspace, and Guest shows "Unavailable". Opening Settings from a window of another Profile closes the open window and shows the invoker's; the row names the Profile ("Profile: Person 1") and the tooltip says which one it applies to. The picker rereads the timer when its menu opens and when Settings come back to the front. The workspace loader now ignores unknown keys at the root and in records (known keys still need their type), so later optional fields no longer break older builds; the Rust side gets a typed snapshot and had no such check.

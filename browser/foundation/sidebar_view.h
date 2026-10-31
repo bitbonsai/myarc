@@ -212,6 +212,8 @@ class SidebarView final : public views::View,
   std::unique_ptr<ui::SimpleMenuModel> menu_model_;
   std::unique_ptr<views::MenuRunner> menu_runner_;
   bool create_menu_open_ = false;
+  // The next footer's Library button starts glowing and settles.
+  bool library_closed_ = false;
   SEQUENCE_CHECKER(sequence_checker_);
   base::WeakPtrFactory<SidebarView> weak_factory_{this};
 };

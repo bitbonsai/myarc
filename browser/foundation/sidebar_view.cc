@@ -13,6 +13,7 @@
 #include "base/task/sequenced_task_runner.h"
 #include "components/vector_icons/vector_icons.h"
 #include "myarc/bridge.rs.h"
+#include "myarc/footer_button.h"
 #include "myarc/icons.h"
 #include "myarc/library_view.h"
 #include "third_party/skia/include/core/SkColor.h"
@@ -193,12 +194,12 @@ std::unique_ptr<views::View> Box(Orientation orientation, int spacing) {
   return view;
 }
 
-std::unique_ptr<views::MdTextButton> Button(
-    views::Button::PressedCallback callback,
-    const std::u16string& text) {
+template <typename T = views::MdTextButton>
+std::unique_ptr<T> Button(views::Button::PressedCallback callback,
+                          const std::u16string& text) {
   // Icons keep their explicit colors. Retinting them with the text color bakes
   // in the disabled color whenever colors update in an inactive Mac window.
-  auto button = std::make_unique<views::MdTextButton>(
+  auto button = std::make_unique<T>(
       std::move(callback), text, views::style::CONTEXT_BUTTON_MD,
       /*use_text_color_for_icon=*/false);
   button->SetStyle(ui::ButtonStyle::kText);
@@ -215,12 +216,13 @@ std::unique_ptr<views::MdTextButton> Button(
   return button;
 }
 
-std::unique_ptr<views::MdTextButton> IconButton(
-    views::Button::PressedCallback callback,
-    const gfx::VectorIcon& icon,
-    int icon_size = 20,
-    ui::ColorVariant color = ui::kColorSysOnSurface) {
-  auto button = Button(std::move(callback), u"");
+// A 32 DIP square footer button. Without `icon` the button draws its own art.
+template <typename T = views::MdTextButton>
+std::unique_ptr<T> IconButton(views::Button::PressedCallback callback,
+                              const gfx::VectorIcon* icon,
+                              int icon_size = 20,
+                              ui::ColorVariant color = ui::kColorSysOnSurface) {
+  auto button = Button<T>(std::move(callback), u"");
   button->SetMinSize(gfx::Size(32, 32));
   button->SetMaxSize(gfx::Size(32, 32));
   button->SetPreferredSize(gfx::Size(32, 32));
@@ -228,9 +230,11 @@ std::unique_ptr<views::MdTextButton> IconButton(
   button->SetHorizontalAlignment(gfx::ALIGN_CENTER);
   button->SetImageCentered(true);
   button->SetCornerRadius(8);
-  button->SetImageModel(
-      views::Button::STATE_NORMAL,
-      ui::ImageModel::FromVectorIcon(icon, color, icon_size));
+  if (icon) {
+    button->SetImageModel(
+        views::Button::STATE_NORMAL,
+        ui::ImageModel::FromVectorIcon(*icon, color, icon_size));
+  }
   return button;
 }
 
@@ -368,6 +372,7 @@ void SidebarView::CloseLibrary() {
   const bool had_focus = library_->Contains(
       GetFocusManager() ? GetFocusManager()->GetFocusedView() : nullptr);
   ResetLibrary();
+  library_closed_ = true;
   auto weak = weak_factory_.GetWeakPtr();
   delegate_->SetLibraryOpen(false);
   if (!weak || !had_focus) {
@@ -548,7 +553,7 @@ std::unique_ptr<views::View> SidebarView::MakeItem(
     close = IconButton(
         base::BindRepeating(&Delegate::CloseLiveItem,
                             base::Unretained(&delegate_.get()), item.id),
-        vector_icons::kCloseIcon);
+        &vector_icons::kCloseIcon);
     views::InstallRoundRectHighlightPathGenerator(close.get(), gfx::Insets(4),
                                                   6);
     const std::u16string close_name =
@@ -762,7 +767,7 @@ void SidebarView::SetModel(const foundation::SidebarResult& model,
   footer->SetProperty(views::kMarginsKey, gfx::Insets::TLBR(0, 0, 2, 0));
   static_cast<views::BoxLayout*>(footer->GetLayoutManager())
       ->set_cross_axis_alignment(views::BoxLayout::CrossAxisAlignment::kCenter);
-  auto library = IconButton(
+  auto library = IconButton<LibraryButton>(
       base::BindRepeating(
           [](base::WeakPtr<SidebarView> sidebar) {
             // Opening removes this button; let its press handler unwind. A
@@ -777,10 +782,15 @@ void SidebarView::SetModel(const foundation::SidebarResult& model,
                                sidebar));
           },
           weak_factory_.GetWeakPtr()),
-      kLibraryIcon, 16);
+      nullptr);
   library->SetTooltipText(u"Library");
   library->GetViewAccessibility().SetName(u"Library");
   TrackFocus(library.get(), FocusAction::kLibrary);
+  // Right after the Library closes, its glow settles back into the box.
+  if (std::exchange(library_closed_, false)) {
+    library->SetOpen(true, /*animate=*/false);
+    library->SetOpen(false);
+  }
   footer->AddChildView(std::move(library));
   spaces_scroll_ = footer->AddChildView(std::make_unique<views::ScrollView>());
   spaces_scroll_->SetBackgroundColor(std::nullopt);
@@ -812,7 +822,7 @@ void SidebarView::SetModel(const foundation::SidebarResult& model,
     auto choice = IconButton(
         base::BindRepeating(&Delegate::SelectSpace,
                             base::Unretained(&delegate_.get()), space_id),
-        current ? kSaturnIcon : kDotIcon, current ? 16 : 8);
+        current ? &kSaturnIcon : &kDotIcon, current ? 16 : 8);
     // Arc spaces its Space dots 34 DIP apart.
     choice->SetMinSize(gfx::Size(34, 32));
     choice->SetMaxSize(gfx::Size(34, 32));
@@ -858,7 +868,7 @@ void SidebarView::SetModel(const foundation::SidebarResult& model,
   auto create = IconButton(
       base::BindRepeating(&SidebarView::ShowCreateMenu,
                           weak_factory_.GetWeakPtr()),
-      create_menu_open_ ? vector_icons::kCloseIcon : kPlusIcon, 21);
+      create_menu_open_ ? &vector_icons::kCloseIcon : &kPlusIcon, 21);
   create->SetTooltipText(u"Create Space");
   create->GetViewAccessibility().SetName(u"Create Space");
   create->GetViewAccessibility().SetHasPopup(ax::mojom::HasPopup::kMenu);
@@ -917,14 +927,6 @@ void SidebarView::UpdateFills() {
   if (rename != focus_targets_.end()) {
     static_cast<views::MdTextButton*>(rename->view.get())
         ->SetEnabledTextColors(fills.title);
-  }
-  const auto library = std::ranges::find(focus_targets_, FocusAction::kLibrary,
-                                         &FocusTarget::action);
-  if (library != focus_targets_.end()) {
-    static_cast<views::MdTextButton*>(library->view.get())
-        ->SetImageModel(views::Button::STATE_NORMAL,
-                        ui::ImageModel::FromVectorIcon(kLibraryIcon,
-                                                       fills.footer_icon, 16));
   }
   for (const auto& target : focus_targets_) {
     if (target.action == FocusAction::kSpaces) {

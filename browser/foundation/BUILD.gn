@@ -108,6 +108,8 @@ source_set("browser_workspace_adapter") {
 
 source_set("sidebar_view") {
   sources = [
+    "footer_button.cc",
+    "footer_button.h",
     "icons.h",
     "library_logic.cc",
     "library_logic.h",
@@ -125,9 +127,12 @@ source_set("sidebar_view") {
   deps = [
     ":bridge",
     "//base:i18n",
+    "//cc/paint",
     "//components/vector_icons",
+    "//skia",
     "//ui/color",
     "//ui/gfx",
+    "//ui/gfx/animation",
     "//ui/gfx/geometry",
   ]
 }

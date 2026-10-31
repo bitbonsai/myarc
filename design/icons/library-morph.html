@@ -1,0 +1,44 @@
+<!doctype html><html><head><style>
+.row{display:flex;gap:16px;flex-wrap:wrap;align-items:stretch}
+.c{display:flex;flex-direction:column;align-items:center;gap:8px;font:12px var(--font-sans);color:var(--muted-foreground)}
+.box{border-radius:var(--radius);padding:16px;display:flex;gap:18px;align-items:flex-end;justify-content:center;min-width:150px;height:120px;cursor:pointer}
+.dark{background:#232032}.light{background:#ece9f2}
+.dark .lib{color:rgba(255,255,255,.55)} .dark .lib.on{color:rgba(255,255,255,.95)}
+.light .lib{color:rgba(0,0,0,.5)} .light .lib.on{color:rgba(0,0,0,.9)}
+.lib{transition:color .35s ease;overflow:visible}
+.lib .sp{transition:transform .45s cubic-bezier(.34,1.56,.64,1),filter .45s ease;transform-box:view-box;transform-origin:0 0}
+.lib .beam{opacity:0;transform:scaleY(.4);transform-origin:30px 36px;transform-box:view-box;transition:opacity .35s ease,transform .45s cubic-bezier(.22,1,.36,1)}
+.lib .star{transform:translate(26.27px,30.84px) rotate(-7.5deg) scale(.857)}
+.lib .dot{transform:translate(35px,22px)}
+.lib .tri{transform:translate(40.81px,29.74px) rotate(-27.3deg)}
+.lib.on .beam{opacity:1;transform:scaleY(1)}
+.lib.on .star{transform:translate(26.13px,27.18px) rotate(-30.4deg) scale(1);transition-delay:.03s}
+.lib.on .dot{transform:translate(37px,17px);transition-delay:.08s}
+.lib.on .tri{transform:translate(42.69px,26.5px) rotate(-27.3deg);transition-delay:.12s}
+.lib.on .sp{filter:blur(.5px)}
+</style></head><body>
+<template id="t"><svg class="lib" viewBox="0 0 60 53"><defs>
+<filter id="FB" filterUnits="userSpaceOnUse" x="-12" y="-12" width="84" height="80"><feGaussianBlur stdDeviation="3"/></filter>
+<linearGradient id="G" x1="0" y1="9" x2="0" y2="36" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="currentColor" stop-opacity="0"/><stop offset="1" stop-color="currentColor" stop-opacity=".5"/></linearGradient>
+<mask id="M" maskUnits="userSpaceOnUse" x="0" y="0" width="60" height="53"><rect x="0" y="0" width="60" height="32" fill="#fff"/></mask></defs>
+<g class="beam"><path filter="url(#FB)" transform="translate(9 9)" fill="url(#G)" d="M11 27C11 27 0.052 2.287 0 2C-0.051 1.713 13.442 4.312 13.442 4.312C13.442 4.312 17.552 9.006 17.256 9.45C16.96 9.894 24.54 2.604 24.884 2.256C25.056 2.083 27.174 -0.001 29 0C30.826 0.001 32.361 2.088 32.512 2.256C32.814 2.593 35.372 6.715 35.372 6.715L42 3C42 3 39.828 6.777 39 10C38.172 13.223 39.69 18.233 39.612 18.053C39.457 17.692 31.89 26.741 32.243 26.92C32.595 27.1 11 27 11 27Z"/></g>
+<g mask="url(#M)" fill="currentColor">
+<g class="sp star"><path transform="translate(-10.39 -10.2)" d="M9.006 0.916C9.522 -0.305 11.253 -0.305 11.769 0.916L13.56 5.157C13.777 5.67 14.259 6.021 14.814 6.068L19.401 6.461C20.722 6.574 21.257 8.221 20.255 9.089L16.775 12.103C16.354 12.468 16.17 13.035 16.296 13.577L17.34 18.061C17.64 19.353 16.24 20.37 15.104 19.685L11.162 17.307C10.686 17.019 10.089 17.019 9.613 17.307L5.671 19.685C4.535 20.37 3.134 19.353 3.435 18.061L4.479 13.577C4.605 13.035 4.421 12.468 4 12.103L0.52 9.089C-0.482 8.221 0.053 6.574 1.374 6.461L5.961 6.068C6.515 6.021 6.998 5.67 7.215 5.157Z"/></g>
+<g class="sp dot"><circle r="2"/></g>
+<g class="sp tri"><path transform="translate(-3.02 -3)" d="M2.16 0.485C2.548 -0.162 3.485 -0.162 3.874 0.485L5.889 3.835C6.29 4.501 5.81 5.35 5.032 5.35L1.002 5.35C0.224 5.35 -0.256 4.501 0.145 3.835Z"/></g>
+</g>
+<path fill="currentColor" fill-rule="evenodd" transform="translate(19 35)" d="M0 4C0 0.375 0 0 4 0L6 0L20 0C24 0 24 0 24 4L24 6L24 12C24 15.314 21.314 18 18 18L6 18C2.686 18 0 15.314 0 12L0 4ZM9.25 2C8.56 2 8 2.56 8 3.25L8 4.75C8 5.44 8.56 6 9.25 6L14.75 6C15.44 6 16 5.44 16 4.75L16 3.25C16 2.56 15.44 2 14.75 2L9.25 2Z"/>
+</svg></template>
+<div class="row">
+<div class="c"><div class="box dark" data-h><span data-s="96"></span><span data-s="36"></span></div>dark · hover me</div>
+<div class="c"><div class="box dark" data-loop><span data-s="96"></span><span data-s="36"></span></div>dark · auto loop</div>
+<div class="c"><div class="box light" data-loop><span data-s="96"></span><span data-s="36"></span></div>light · auto loop</div>
+</div>
+<script>
+let n=0;const t=document.getElementById('t');
+document.querySelectorAll('[data-s]').forEach(s=>{const sv=t.content.firstElementChild.cloneNode(true);n++;
+ sv.innerHTML=sv.innerHTML.replaceAll('"FB"','"FB'+n+'"').replaceAll('#FB)','#FB'+n+')').replaceAll('"G"','"G'+n+'"').replaceAll('#G)','#G'+n+')').replaceAll('"M"','"M'+n+'"').replaceAll('#M)','#M'+n+')');
+ const w=+s.dataset.s;sv.setAttribute('width',w);sv.setAttribute('height',w*53/60);s.replaceWith(sv);});
+document.querySelectorAll('[data-h]').forEach(b=>{b.onmouseenter=()=>b.querySelectorAll('.lib').forEach(x=>x.classList.add('on'));b.onmouseleave=()=>b.querySelectorAll('.lib').forEach(x=>x.classList.remove('on'));});
+let on=false;setInterval(()=>{on=!on;document.querySelectorAll('[data-loop] .lib').forEach(x=>x.classList.toggle('on',on));},1400);
+</script></body></html>
