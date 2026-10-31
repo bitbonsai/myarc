@@ -15,6 +15,7 @@
 #include "base/strings/utf_string_conversions.h"
 #include "base/strings/string_number_conversions.h"
 #include "base/task/single_thread_task_runner.h"
+#include "base/timer/timer.h"
 #include "chrome/browser/favicon/favicon_service_factory.h"
 #include "chrome/browser/history/history_service_factory.h"
 #include "chrome/browser/lifetime/browser_shutdown.h"
@@ -68,9 +69,13 @@ class WorkspaceLifecycleBridge final : public WorkspaceLifecycle {
   BrowserWorkspaceAdapter* Find(BrowserWindowInterface& browser);
   void Resume();
   void NativeReady();
+  // Runs an Auto Archive pass now and then every few minutes.
+  void StartAutoArchive();
+  void AutoArchive();
   const raw_ptr<Profile> profile_;
   bool native_ready_ = false;
   bool finishing_ = false;
+  base::RepeatingTimer auto_archive_;
   base::WeakPtrFactory<WorkspaceLifecycleBridge> weak_factory_{this};
 };
 
@@ -405,6 +410,8 @@ void WorkspaceLifecycleBridge::Retry() {
   }
   base::AutoReset<bool> finishing(&finishing_, true);
   auto result = BrowserWorkspaceAdapter::FinishSessionRestore(*profile_);
+  if (runtime.complete)
+    StartAutoArchive();
   // Global reconciliation errors keep every window on native fallback. Later
   // per-window allocation errors are already reported by FinishSessionRestore.
   if (!result.ok && !runtime.complete) {
@@ -416,6 +423,24 @@ void WorkspaceLifecycleBridge::Retry() {
       }
     }
   }
+}
+
+void WorkspaceLifecycleBridge::StartAutoArchive() {
+  // Off-the-record Profiles archive nothing.
+  if (profile_->IsOffTheRecord())
+    return;
+  if (!auto_archive_.IsRunning()) {
+    auto_archive_.Start(FROM_HERE, base::Minutes(5), this,
+                        &WorkspaceLifecycleBridge::AutoArchive);
+  }
+  // Startup and restore get a pass too, once bindings settle.
+  base::SingleThreadTaskRunner::GetCurrentDefault()->PostNonNestableTask(
+      FROM_HERE, base::BindOnce(&WorkspaceLifecycleBridge::AutoArchive,
+                                weak_factory_.GetWeakPtr()));
+}
+
+void WorkspaceLifecycleBridge::AutoArchive() {
+  BrowserWorkspaceAdapter::AutoArchive(*profile_);
 }
 
 void WorkspaceLifecycleBridge::NativeReady() {
@@ -808,6 +833,72 @@ foundation::MutationResult BrowserWorkspaceAdapter::FinishSessionRestore(
     }
   }
   return failure;
+}
+
+void BrowserWorkspaceAdapter::AutoArchive(Profile& profile) {
+  auto& runtime = ForProfile(profile);
+  if (profile.IsOffTheRecord() || !runtime.complete || runtime.shutting_down ||
+      browser_shutdown::IsTryingToQuit() ||
+      SessionRestore::IsRestoring(&profile) ||
+      profile.GetPrefs()->GetBoolean(prefs::kSavingBrowserHistoryDisabled)) {
+    return;
+  }
+  // A window that is not bound yet may hold stale bindings: wait for it.
+  std::map<content::WebContents*, TabStripModel*> strips;
+  for (const auto& adapter : runtime.adapters) {
+    if (!adapter->tabs_)
+      continue;
+    if (!adapter->ready())
+      return;
+    for (int i = 0; i < adapter->tabs_->count(); ++i)
+      strips[adapter->tabs_->GetWebContentsAt(i)] = adapter->tabs_;
+  }
+  // An item may close only when every page of it can: it sits in a myArc
+  // window, is not that window's active tab, shows a URL the archive keeps
+  // (no Chrome or blank pages) and would not prompt before unloading.
+  const size_t url_bytes = foundation::bridge_limits().url_bytes;
+  std::map<uint64_t, bool> closable;
+  std::set<uint64_t> media;
+  for (const auto& [page, item] : runtime.pages) {
+    if (!item)
+      continue;
+    const auto strip = strips.find(page);
+    const GURL& url = page->GetLastCommittedURL();
+    const bool ok = strip != strips.end() &&
+                    strip->second->GetActiveWebContents() != page &&
+                    url.SchemeIsHTTPOrHTTPS() && !url.has_username() &&
+                    !url.has_password() && url.spec().size() <= url_bytes &&
+                    !page->NeedToFireBeforeUnload();
+    auto [it, inserted] = closable.emplace(item, ok);
+    if (!inserted)
+      it->second = it->second && ok;
+    if (page->IsCurrentlyAudible())
+      media.insert(item);
+  }
+  std::vector<uint64_t> ids;
+  for (const auto& [item, ok] : closable) {
+    if (ok)
+      ids.push_back(item);
+  }
+  const auto due = WorkspaceService::ForProfile(profile).AutoArchive(
+      ids, std::vector<uint64_t>(media.begin(), media.end()));
+  if (due.empty())
+    return;
+  const std::set<uint64_t> doomed(due.begin(), due.end());
+  std::vector<content::WebContents*> pages;
+  for (const auto& [page, item] : runtime.pages) {
+    if (doomed.contains(item))
+      pages.push_back(page);
+  }
+  // The ordinary close path archives each item once its last page goes.
+  for (auto* page : pages) {
+    for (const auto& adapter : runtime.adapters) {
+      if (adapter->tabs_ && adapter->tabs_->GetIndexOfWebContents(page) >= 0) {
+        adapter->tabs_->CloseWebContents(page, CLOSE_CREATE_HISTORICAL_TAB);
+        break;
+      }
+    }
+  }
 }
 
 void BrowserWorkspaceAdapter::BeginShutdown(Profile& profile) {

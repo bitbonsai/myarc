@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-10-31: Auto Archive
+
+- Temporary tabs not viewed for 12 hours now close through the ordinary close path, so they land in Archived Tabs. Each temporary item records when it was last seen selected (`last_viewed_secs`, a `viewed_secs` JSON key written only when set; saving or unsaving clears it). `Workspace::auto_archive` records the views, gives an item with no recorded time the current time, and picks the due items with the existing rule. The browser runs a pass at startup or restore and every 5 minutes. It keeps selected, active and audible tabs, pages that would prompt before unloading, and anything the archive wouldn't keep: off-the-record and no-history Profiles, Chrome and blank pages.
+- Verification: `chrome` and `bridge_check` build; `bridge_check` (new Auto Archive check: the time survives the codec, an item is due at 12 hours, a bad value fails the file), 6 new Rust tests on a fake clock, cargo fmt/clippy/test, `export_patches.py --check` and `check_docs.py` pass. The timer and tab closing were checked by reading the code, not run.
+- No Chromium commit: only symlinked `browser/foundation` files changed. Older builds reject files with `viewed_secs`.
+
 ## 2026-10-31: Archived Tabs review fixes
 
 - Blank pages, tabs of a closing window (only tabs closed one by one archive, as in Arc) and Profiles with history saving off archive nothing. Deleting history drops the matching entries: all of them, those in the deleted time range, or those with a deleted URL; expiry is ignored. Expired entries go at load too, and a bad, duplicate or clashing entry is dropped instead of failing the workspace load. Entries sort by close time before the day headers. Archive favicons load only while Archived Tabs shows, and a refresh keeps the list's scroll offset. A reopen opens the page first and switches Space after; the entry goes once the page is open even if selecting it fails, a second click is ignored, and a failed removal is logged.

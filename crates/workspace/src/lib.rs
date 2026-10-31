@@ -157,6 +157,9 @@ pub struct Item {
     /// Last known page title of a saved item, shown while it is dormant. Empty
     /// when unknown and always empty for temporary items.
     pub title: String,
+    /// Wall-clock seconds a temporary item was last seen selected, for Auto
+    /// Archive. Zero means not recorded yet; saving or unsaving resets it.
+    pub last_viewed_secs: u64,
 }
 
 /// A closed temporary page, kept so the Library can reopen it (Archived Tabs).
@@ -451,6 +454,7 @@ impl Workspace {
             placement: Placement::Temporary { space_id },
             canonical_url: None,
             title: String::new(),
+            last_viewed_secs: 0,
         });
         self.state.next_item_id = next;
         Ok(id)
@@ -489,6 +493,9 @@ impl Workspace {
         };
         for item in &mut self.state.items {
             if item.id == item_id {
+                if url.is_some() {
+                    item.last_viewed_secs = 0;
+                }
                 item.placement = placement;
                 item.canonical_url = url;
                 break;
@@ -593,6 +600,7 @@ impl Workspace {
                     item.placement = Placement::Temporary { space_id };
                     item.canonical_url = None;
                     item.title.clear();
+                    item.last_viewed_secs = 0;
                     break;
                 }
             }

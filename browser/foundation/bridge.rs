@@ -40,6 +40,9 @@ mod ffi {
         canonical_url: String,
         // Last known page title of a saved item; empty when unknown.
         title: String,
+        // Wall-clock seconds a temporary item was last seen selected; zero
+        // when not recorded yet.
+        last_viewed_secs: u64,
     }
 
     struct WindowRecord {
@@ -55,6 +58,13 @@ mod ffi {
         url: String,
         title: String,
         archived_secs: u64,
+    }
+
+    struct AutoArchiveResult {
+        // Temporary items to close now; closing archives them.
+        due: Vec<u64>,
+        // A last-viewed time changed, so the snapshot needs saving.
+        stamped: bool,
     }
 
     struct StateSnapshot {
@@ -120,6 +130,15 @@ mod ffi {
         // Unexpired entries, newest first.
         fn archived_tabs(workspace: &Workspace, now_secs: u64) -> Vec<ArchivedTabRecord>;
         fn remove_archived_tab(workspace: &mut Workspace, id: u64) -> MutationResult;
+        // One Auto Archive pass: records views of selected and new temporary
+        // items, then names the idle ones among `closable` (items whose pages
+        // can close and archive) that are due. `media` lists audible items.
+        fn auto_archive(
+            workspace: &mut Workspace,
+            closable: &[u64],
+            media: &[u64],
+            now_secs: u64,
+        ) -> AutoArchiveResult;
         // Drops expired entries; `id` is how many went.
         fn prune_archived_tabs(workspace: &mut Workspace, now_secs: u64) -> MutationResult;
         // History deletion: drops entries whose URL is in `urls`, and with
@@ -292,6 +311,19 @@ pub fn remove_archived_tab(workspace: &mut Workspace, id: u64) -> ffi::MutationR
     outcome(workspace.0.remove_archived_tab(id).map(|tab| tab.id))
 }
 
+pub fn auto_archive(
+    workspace: &mut Workspace,
+    closable: &[u64],
+    media: &[u64],
+    now_secs: u64,
+) -> ffi::AutoArchiveResult {
+    let pass = workspace.0.auto_archive(closable, media, now_secs);
+    ffi::AutoArchiveResult {
+        due: pass.due,
+        stamped: pass.stamped,
+    }
+}
+
 fn count(removed: usize) -> ffi::MutationResult {
     ffi::MutationResult {
         ok: true,
@@ -448,6 +480,7 @@ fn item_record(item: workspace::Item) -> ffi::ItemRecord {
         has_url: item.canonical_url.is_some(),
         canonical_url: item.canonical_url.unwrap_or_default(),
         title: item.title,
+        last_viewed_secs: item.last_viewed_secs,
     }
 }
 
@@ -535,6 +568,7 @@ pub fn restore_snapshot(
             placement,
             canonical_url: item.has_url.then_some(item.canonical_url),
             title: item.title,
+            last_viewed_secs: item.last_viewed_secs,
         });
     }
     outcome(

@@ -204,6 +204,9 @@ std::optional<std::string> EncodeWorkspaceMetadata(
     // Builds without saved titles reject the key, so write it only when set.
     if (!item.title.empty())
       record.Set("title", std::string(item.title));
+    // Builds without Auto Archive reject the key; saved items never carry it.
+    if (item.last_viewed_secs)
+      record.Set("viewed_secs", base::NumberToString(item.last_viewed_secs));
     items.Append(std::move(record));
   }
   root.Set("items", std::move(items));
@@ -285,16 +288,19 @@ MetadataResult DecodeWorkspaceMetadata(std::string_view json) {
   }
   for (const auto& value : *items) {
     const auto* record = value.GetIfDict();
-    // Files written before saved titles existed have no "title" key.
-    if (!record || record->size() < 5 || record->size() > 6) {
+    // Files written before saved titles or Auto Archive existed have no
+    // "title" or "viewed_secs" key.
+    if (!record || record->size() < 5 || record->size() > 7) {
       return InvalidMetadata();
     }
     const auto kind = record->FindInt("placement");
     const auto has_url = record->FindBool("has_url");
     const auto* url = record->FindString("canonical_url");
     const auto* title = record->FindString("title");
+    const bool viewed = record->contains("viewed_secs");
     foundation::ItemRecord item;
-    if ((record->size() == 6) != (title != nullptr) ||
+    if (record->size() != 5 + (title ? 1u : 0u) + (viewed ? 1u : 0u) ||
+        (viewed && !ReadId(*record, "viewed_secs", item.last_viewed_secs)) ||
         (title && !BoundedText(*title, limits.title_bytes)) || !kind ||
         *kind < static_cast<int>(foundation::PlacementKind::Temporary) ||
         *kind > static_cast<int>(foundation::PlacementKind::Favorite) ||
@@ -602,6 +608,23 @@ foundation::MutationResult WorkspaceService::ArchiveClosedTab(
   return Changed(foundation::archive_closed_tab(
       *workspace_, item, rust::Str(canonical.data(), canonical.size()),
       rust::Str(text.data(), text.size()), NowSecs()));
+}
+
+rust::Vec<uint64_t> WorkspaceService::AutoArchive(
+    base::span<const uint64_t> closable,
+    base::span<const uint64_t> media) {
+  // Private browsing keeps no history, so it archives nothing.
+  if (ephemeral_ || !CanMutate())
+    return {};
+  auto pass = foundation::auto_archive(
+      *workspace_,
+      rust::Slice<const uint64_t>(closable.data(), closable.size()),
+      rust::Slice<const uint64_t>(media.data(), media.size()), NowSecs());
+  // Like titles, view times touch no bindings: save them with the next
+  // metadata write or the shutdown flush, without a notify.
+  if (pass.stamped)
+    dirty_ = true;
+  return std::move(pass.due);
 }
 
 rust::Vec<foundation::ArchivedTabRecord> WorkspaceService::ArchivedTabs()

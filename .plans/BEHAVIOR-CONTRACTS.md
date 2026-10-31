@@ -77,8 +77,8 @@ Parent: TAB-02, backlog "Tabs lifecycle". Evidence: documented in Arc's [Auto Ar
 - Expected: archive the item ids that are `Placement::Temporary`, not playing media, not selected in any window, and idle for at least the interval (`now >= last_viewed + interval`). Favorites, Pins and any other placement never archive. The result also names the earliest future deadline so the browser keeps one timer. Items excluded by selection or media add no deadline, which is why those events force a new call.
 - Interval: 12 hours by default, per Profile; Little Arc windows use 6 hours whatever the Profile says.
 - Cancellation/error: a clock that moved backwards (`now < last_viewed`) means not yet due. Time arithmetic saturates. Empty input and `never` return nothing and no wake-up. The rule never reads a clock, so the caller owns the time source; mixing monotonic and wall values across calls is the caller's bug.
-- Persistence/restart: last-viewed times are not persisted by this crate yet. On relaunch the adapter must restore or reset them before the first call; resetting is the safe choice (nothing archives early).
-- Proof: unit tests in `crates/workspace/src/archive.rs` cover each rule. Browser timer, archive store, restore and UI are still unproven.
+- Persistence/restart: `Workspace::auto_archive` records last-viewed times on temporary items and they persist with the snapshot. An item with no recorded time (new, or from an older file) gets the current time, so nothing archives early; wall-clock time with the browser closed counts.
+- Proof: unit tests in `crates/workspace/src/archive.rs` cover each rule and the pass with a fake clock; `bridge_check` covers the persisted time. The browser runs the pass at startup and every 5 minutes; that native timer is unproven at runtime.
 - Unresolved: whether Little Arc overrides a `never` Profile; exact timing source (Arc may count foreground time, not wall time); form-input and Split View exclusions; folder items (the model has no folder placement yet, so no folder case exists to test); the downloads schedule.
 
 ## BC-007: Clear unpinned closes temporary tabs that are not playing media

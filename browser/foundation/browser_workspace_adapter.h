@@ -144,6 +144,10 @@ class BrowserWorkspaceAdapter final : public TabStripModelObserver {
  private:
   friend class WorkspaceLifecycleBridge;
   static foundation::MutationResult ReconcileBindings(Profile& profile);
+  // Auto Archive (BC-006): closes temporary pages left unviewed for 12 hours
+  // through the ordinary close path, which archives them. Pages the archive
+  // could not keep stay open.
+  static void AutoArchive(Profile& profile);
   foundation::MutationResult BindWindow();
   foundation::MutationResult BindTabs();
   foundation::MutationResult Save(uint64_t item,

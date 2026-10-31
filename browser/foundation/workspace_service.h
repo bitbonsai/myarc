@@ -83,6 +83,12 @@ class WorkspaceService final : public base::SupportsUserData::Data {
   foundation::MutationResult ArchiveClosedTab(uint64_t item,
                                               std::string_view url,
                                               std::string_view title);
+  // One Auto Archive pass at the current wall-clock time: records views of
+  // selected and new temporary items, then returns the idle items among
+  // `closable` that are due. The caller closes their pages, which archives
+  // them. `media` lists audible items. Off-the-record Profiles get nothing.
+  rust::Vec<uint64_t> AutoArchive(base::span<const uint64_t> closable,
+                                  base::span<const uint64_t> media);
   // Unexpired Archived Tabs, newest first. Empty while not loaded.
   rust::Vec<foundation::ArchivedTabRecord> ArchivedTabs() const;
   // Call after the entry has been reopened.

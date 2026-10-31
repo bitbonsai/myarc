@@ -460,6 +460,50 @@ bool CheckArchivedTabs() {
   return prune_archived_tabs(*model, 100 + 31 * 24 * 60 * 60).id == 2;
 }
 
+// Auto Archive records a view time that survives the JSON codec, so a restart
+// neither resets nor expires it, and names an idle item due after 12 hours.
+bool CheckAutoArchive() {
+  using namespace myarc::foundation;
+  using myarc::internal::DecodeWorkspaceMetadata;
+  using myarc::internal::EncodeWorkspaceMetadata;
+  constexpr uint64_t kHalfDay = 12 * 60 * 60;
+  auto model = new_workspace();
+  auto item = add_temporary_item(*model, 1);
+  const uint64_t ids[] = {item.id};
+  auto first =
+      auto_archive(*model, rust::Slice<const uint64_t>(ids, 1), {}, 100);
+  if (!item.ok || !first.stamped || !first.due.empty())
+    return false;
+  const auto encoded = EncodeWorkspaceMetadata(export_snapshot(*model));
+  auto decoded = encoded ? DecodeWorkspaceMetadata(*encoded)
+                         : myarc::internal::MetadataResult{};
+  auto restored = new_workspace();
+  if (!decoded.snapshot || decoded.snapshot->items.size() != 1 ||
+      decoded.snapshot->items[0].last_viewed_secs != 100 ||
+      !restore_snapshot(*restored, std::move(*decoded.snapshot)).ok) {
+    return false;
+  }
+  if (!auto_archive(*restored, rust::Slice<const uint64_t>(ids, 1), {},
+                    100 + kHalfDay - 1)
+           .due.empty()) {
+    return false;
+  }
+  auto due = auto_archive(*restored, rust::Slice<const uint64_t>(ids, 1), {},
+                          100 + kHalfDay);
+  if (due.due.size() != 1 || due.due[0] != item.id)
+    return false;
+  // A malformed view time fails the file like any other bad item field.
+  auto root = base::JSONReader::ReadDict(*encoded, base::JSON_PARSE_RFC);
+  auto* items = root ? root->FindList("items") : nullptr;
+  if (!items || items->size() != 1 ||
+      !(*items)[0].GetDict().contains("viewed_secs")) {
+    return false;
+  }
+  (*items)[0].GetDict().Set("viewed_secs", "-1");
+  const auto bad = base::WriteJson(*root);
+  return bad && !DecodeWorkspaceMetadata(*bad).snapshot;
+}
+
 }  // namespace
 
 int main() {
@@ -524,8 +568,13 @@ int main() {
     std::cerr << "Archived Tabs checks failed\n";
     return 14;
   }
+  if (!CheckAutoArchive()) {
+    std::cerr << "Auto Archive checks failed\n";
+    return 15;
+  }
   std::cout << "7 legacy C++/Rust checks passed, including 1000 ownership "
                "round trips; workspace transitions, Space 1 deletion and "
-               "metadata codec, saved title and Archived Tabs checks passed\n";
+               "metadata codec, saved title, Archived Tabs and Auto Archive "
+               "checks passed\n";
   return 0;
 }
