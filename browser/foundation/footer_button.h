@@ -3,28 +3,48 @@
 
 #include <array>
 #include <memory>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
 
 #include "base/memory/raw_ptr.h"
 #include "base/memory/weak_ptr.h"
+#include "base/scoped_observation.h"
 #include "base/timer/timer.h"
+#include "third_party/skia/include/core/SkColor.h"
 #include "ui/base/metadata/metadata_header_macros.h"
+#include "ui/events/event_observer.h"
 #include "ui/gfx/animation/linear_animation.h"
+#include "ui/gfx/geometry/point.h"
+#include "ui/views/animation/animation_delegate_views.h"
 #include "ui/views/controls/button/md_text_button.h"
+#include "ui/views/view_observer.h"
+#include "ui/views/widget/widget_observer.h"
+
+namespace ui {
+class ColorProvider;
+}  // namespace ui
 
 namespace views {
+class EventMonitor;
 class View;
 class Widget;
 }  // namespace views
 
 namespace myarc {
 
+// The footer icons' color, Arc's muted #A9A2AF over its dark sidebar.
+// `active` is the brighter color of a lit icon, such as the glowing Library.
+SkColor GetFooterIconColor(const ui::ColorProvider* provider, bool active);
+
 // Arc's footer tooltip: after a hover delay, a navy pill above the hovered
 // button with its label and the keycaps of its shortcut. A separate widget, so
-// the footer's bounds don't clip it. One per sidebar, on the UI sequence.
-class FooterTooltip {
+// the footer's bounds don't clip it. One per sidebar, shared with its Library,
+// on the UI sequence.
+class FooterTooltip : public views::ViewObserver,
+                      public views::WidgetObserver,
+                      public ui::EventObserver {
  public:
   struct Content {
     std::u16string label;
@@ -36,19 +56,16 @@ class FooterTooltip {
   FooterTooltip();
   FooterTooltip(const FooterTooltip&) = delete;
   FooterTooltip& operator=(const FooterTooltip&) = delete;
-  ~FooterTooltip();
+  ~FooterTooltip() override;
 
-  // The pointer entered `anchor`. A replacement anchor for the content already
-  // showing or pending takes it over without restarting the delay.
+  // The pointer entered `anchor`.
   void Hover(views::View& anchor, const Content& content);
   // The pointer left `anchor`.
   void Unhover(const views::View& anchor);
-  // `anchor` is being destroyed. The tooltip waits briefly for a rebuilt
-  // button to take it over, then hides.
-  void Detach(const views::View& anchor);
-  // A press hides the tooltip; `content` stays hidden until the pointer
-  // leaves, even across a rebuilt button.
-  void Press(const Content& content);
+  // A press at `screen_point` hides the tooltip. A button under that point,
+  // the pressed one or one the press put there, stays quiet until the pointer
+  // leaves it.
+  void Press(const gfx::Point& screen_point);
   // Shows `content` above `anchor` at once and keeps it up, for captures.
   void ShowNow(views::View& anchor, const Content& content);
   void Hide();
@@ -58,16 +75,33 @@ class FooterTooltip {
   }
 
  private:
-  bool IsActive() const;
   void Show();
+  void HideUnlessHeld();
+
+  // views::ViewObserver, for the anchor:
+  void OnViewVisibilityChanged(views::View* observed_view,
+                               views::View* starting_view,
+                               bool visible) override;
+  void OnViewBoundsChanged(views::View* observed_view) override;
+  void OnViewRemovedFromWidget(views::View* observed_view) override;
+  void OnViewIsDeleting(views::View* observed_view) override;
+  // views::WidgetObserver, for the anchor's window:
+  void OnWidgetActivationChanged(views::Widget* widget, bool active) override;
+  void OnWidgetDestroying(views::Widget* widget) override;
+  // ui::EventObserver, for key presses in the anchor's window:
+  void OnEvent(const ui::Event& event) override;
 
   raw_ptr<views::View> anchor_ = nullptr;
   Content content_;
   bool hold_ = false;
-  bool pressed_ = false;
+  std::optional<gfx::Point> pressed_at_;
   base::OneShotTimer delay_;
-  base::OneShotTimer orphan_;
   std::unique_ptr<views::Widget> widget_;
+  base::ScopedObservation<views::View, views::ViewObserver> anchor_observation_{
+      this};
+  base::ScopedObservation<views::Widget, views::WidgetObserver>
+      window_observation_{this};
+  std::unique_ptr<views::EventMonitor> key_monitor_;
   base::WeakPtrFactory<FooterTooltip> weak_factory_{this};
 };
 
@@ -82,23 +116,23 @@ class FooterButton : public views::MdTextButton {
                bool use_text_color_for_icon);
   ~FooterButton() override;
 
+  // Call again to change the content.
   void SetFooterTooltip(base::WeakPtr<FooterTooltip> tooltip,
                         FooterTooltip::Content content);
+  const FooterTooltip::Content& footer_tooltip() const { return content_; }
   void ShowFooterTooltipNow();
 
  protected:
   bool hovered() const { return hovered_; }
-  // `animate` is false when a rebuilt button finds the pointer already on it.
-  virtual void OnHoverChanged(bool animate) {}
+  virtual void OnHoverChanged() {}
 
   // views::View:
   void OnMouseEntered(const ui::MouseEvent& event) override;
   void OnMouseExited(const ui::MouseEvent& event) override;
   bool OnMousePressed(const ui::MouseEvent& event) override;
-  void OnBoundsChanged(const gfx::Rect& previous_bounds) override;
 
  private:
-  void SetHovered(bool hovered, bool animate);
+  void SetHovered(bool hovered);
 
   bool hovered_ = false;
   base::WeakPtr<FooterTooltip> tooltip_;
@@ -106,10 +140,10 @@ class FooterButton : public views::MdTextButton {
 };
 
 // The Library button. It draws the user-designed design/icons/library-idle.svg
-// and library-glow.svg with Skia, in the theme's foreground color, and morphs
-// to the glow (sparkles rise out of the box under a light beam) while hovered
-// or while the Library is open, as design/icons/library-morph.html does.
-// Reduced motion jumps straight to the end state.
+// and library-glow.svg with Skia, in the footer icons' color, and morphs to
+// the glow (sparkles rise out of the box under a light beam) while hovered or
+// while the Library is open, as design/icons/library-morph.html does. Reduced
+// motion jumps straight to the end state.
 class LibraryButton : public FooterButton {
   METADATA_HEADER(LibraryButton, FooterButton)
 
@@ -122,6 +156,9 @@ class LibraryButton : public FooterButton {
 
   // Glows while `open`. `animate` false jumps to the new state.
   void SetOpen(bool open, bool animate = true);
+  // Starts at the glow and animates to the current state, for the sidebar's
+  // button right after the Library closes.
+  void SettleFromGlow();
 
  private:
   enum Channel {
@@ -135,21 +172,32 @@ class LibraryButton : public FooterButton {
     kChannelCount
   };
 
+  // The morph's own delegate, so its animation container doesn't replace the
+  // one Button's hover animation registered with Button's delegate.
+  class MorphDelegate : public views::AnimationDelegateViews {
+   public:
+    explicit MorphDelegate(LibraryButton* button);
+    void AnimationProgressed(const gfx::Animation* animation) override;
+
+   private:
+    const raw_ptr<LibraryButton> button_;
+  };
+
   void UpdateGlow(bool animate);
+  void MorphProgressed();
 
   // FooterButton:
-  void OnHoverChanged(bool animate) override;
+  void OnHoverChanged() override;
   // views::Button:
   void PaintButtonContents(gfx::Canvas* canvas) override;
-  // views::AnimationDelegateViews:
-  void AnimationProgressed(const gfx::Animation* animation) override;
 
   bool open_ = false;
   bool glowing_ = false;
   // Per channel progress from idle (0) to glow (1); overshoot leaves [0, 1].
   std::array<float, kChannelCount> from_ = {};
   std::array<float, kChannelCount> now_ = {};
-  gfx::LinearAnimation animation_{this};
+  MorphDelegate morph_delegate_{this};
+  gfx::LinearAnimation animation_{&morph_delegate_};
 };
 
 }  // namespace myarc

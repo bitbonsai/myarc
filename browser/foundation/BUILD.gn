@@ -131,6 +131,7 @@ source_set("sidebar_view") {
     "//components/vector_icons",
     "//skia",
     "//ui/color",
+    "//ui/events",
     "//ui/gfx",
     "//ui/gfx/animation",
     "//ui/gfx/geometry",

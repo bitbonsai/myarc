@@ -1,5 +1,5 @@
 diff --git a/chrome/browser/ui/views/frame/browser_view_browsertest.cc b/chrome/browser/ui/views/frame/browser_view_browsertest.cc
-index 33bcd23f7807e7634e7bb251dcc19b63025fa54a..150eb2e4496874122255907d2ba0b742e772d957 100644
+index 33bcd23f7807e7634e7bb251dcc19b63025fa54a..1caf06dabfcd887e8022aaf235006c8034c92351 100644
 --- a/chrome/browser/ui/views/frame/browser_view_browsertest.cc
 +++ b/chrome/browser/ui/views/frame/browser_view_browsertest.cc
 @@ -6,19 +6,28 @@
@@ -147,7 +147,7 @@ index 33bcd23f7807e7634e7bb251dcc19b63025fa54a..150eb2e4496874122255907d2ba0b742
  #include "ui/views/window/dialog_client_view.h"
  #include "url/url_constants.h"
  
-@@ -382,6 +424,1372 @@ class BrowserViewTest : public InProcessBrowserTest {
+@@ -382,6 +424,1375 @@ class BrowserViewTest : public InProcessBrowserTest {
    raw_ptr<DevToolsWindow> devtools_;
  };
  
@@ -161,6 +161,9 @@ index 33bcd23f7807e7634e7bb251dcc19b63025fa54a..150eb2e4496874122255907d2ba0b742
 +  }
 +  static void SetCreateMenuOpen(SidebarView* sidebar, bool open) {
 +    sidebar->SetCreateMenuOpen(open);
++  }
++  static std::u16string CreateTooltip(SidebarView* sidebar) {
++    return sidebar->GetCreateTooltipForTesting();
 +  }
 +};
 +
@@ -483,8 +486,8 @@ index 33bcd23f7807e7634e7bb251dcc19b63025fa54a..150eb2e4496874122255907d2ba0b742
 +  ASSERT_TRUE(close);
 +  EXPECT_TRUE(close->HasFocus());
 +  EXPECT_FALSE(close->GetImage(views::Button::STATE_NORMAL).isNull());
-+  ASSERT_TRUE(Button(u"Library"));
-+  Button(u"Library")->RequestFocus();
++  ASSERT_TRUE(Button(u"View Library"));
++  Button(u"View Library")->RequestFocus();
 +  close->parent()->OnMouseExited(exit);
 +  EXPECT_TRUE(close->GetImage(views::Button::STATE_NORMAL).isNull());
 +}
@@ -529,9 +532,10 @@ index 33bcd23f7807e7634e7bb251dcc19b63025fa54a..150eb2e4496874122255907d2ba0b742
 +  browser_view()->RefreshMyarcWorkspaceSidebar();
 +  auto* create = Button(u"Create Space");
 +  ASSERT_TRUE(create);
-+  EXPECT_EQ(u"Close creation menu", create->GetTooltipText());
++  EXPECT_EQ(u"Close creation menu",
++            myarc::SidebarViewTestApi::CreateTooltip(view));
 +  myarc::SidebarViewTestApi::SetCreateMenuOpen(view, false);
-+  EXPECT_EQ(u"Create Space", create->GetTooltipText());
++  EXPECT_EQ(u"Create Space", myarc::SidebarViewTestApi::CreateTooltip(view));
 +  const auto spaces_before =
 +      browser_view()->GetMyarcWorkspaceAdapter()->Sidebar().spaces.size();
 +  menu->ActivatedAt(0, 0);
@@ -562,7 +566,7 @@ index 33bcd23f7807e7634e7bb251dcc19b63025fa54a..150eb2e4496874122255907d2ba0b742
 +  ASSERT_TRUE(adapter->SelectSpace(last).ok);
 +  browser_view()->RefreshMyarcWorkspaceSidebar();
 +  RunScheduledLayouts();
-+  auto* library = Button(u"Library");
++  auto* library = Button(u"View Library");
 +  auto* create = Button(u"Create Space");
 +  auto* current = Button(u"Space: Footer 17");
 +  ASSERT_TRUE(library);
@@ -571,7 +575,6 @@ index 33bcd23f7807e7634e7bb251dcc19b63025fa54a..150eb2e4496874122255907d2ba0b742
 +  EXPECT_EQ(gfx::Size(32, 32), library->size());
 +  EXPECT_EQ(gfx::Size(32, 32), create->size());
 +  EXPECT_EQ(gfx::Size(32, 32), current->size());
-+  EXPECT_FALSE(library->GetImage(views::Button::STATE_NORMAL).isNull());
 +  EXPECT_FALSE(current->GetImage(views::Button::STATE_NORMAL).isNull());
 +  EXPECT_EQ(ui::kColorSysSurfaceContainerHighest,
 +            current->GetBgColorIdOverride());
@@ -626,7 +629,7 @@ index 33bcd23f7807e7634e7bb251dcc19b63025fa54a..150eb2e4496874122255907d2ba0b742
 +                                              ->GetMyarcWorkspaceAdapter()
 +                                              ->Sidebar()
 +                                              .current_space.name));
-+  EXPECT_TRUE(FindAnyButton(browser_view(), u"Library"));
++  EXPECT_TRUE(FindAnyButton(browser_view(), u"View Library"));
 +  view->OpenLibrary(Section::kSpaces);
 +  PressLibraryButton(u"Create Space");
 +  views::DialogDelegate* dialog = nullptr;

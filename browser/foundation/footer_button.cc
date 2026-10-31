@@ -9,6 +9,7 @@
 #include "base/functional/bind.h"
 #include "base/location.h"
 #include "base/no_destructor.h"
+#include "base/strings/utf_string_conversions.h"
 #include "base/time/time.h"
 #include "cc/paint/paint_canvas.h"
 #include "cc/paint/paint_filter.h"
@@ -22,6 +23,7 @@
 #include "ui/base/metadata/metadata_impl_macros.h"
 #include "ui/color/color_id.h"
 #include "ui/color/color_provider.h"
+#include "ui/events/event.h"
 #include "ui/gfx/animation/animation.h"
 #include "ui/gfx/canvas.h"
 #include "ui/gfx/color_utils.h"
@@ -35,6 +37,7 @@
 #include "ui/gfx/scoped_canvas.h"
 #include "ui/gfx/text_utils.h"
 #include "ui/views/accessibility/view_accessibility.h"
+#include "ui/views/event_monitor.h"
 #include "ui/views/view.h"
 #include "ui/views/widget/widget.h"
 
@@ -109,12 +112,13 @@ constexpr Sparkle kDotMotion = {{35, 22, 0, 1}, {37, 17, 0, 1}};
 constexpr Sparkle kTriangleMotion = {{40.81f, 29.74f, -27.3f, 1},
                                {42.69f, 26.5f, -27.3f, 1}};
 
-// Box size matches the old 16 DIP Library glyph: 24 units wide at 0.4 DIP.
-constexpr float kArtScale = 0.4f;
+// Arc's box is 12 DIP wide, so its 24 units draw at 0.5 DIP. In the 32 DIP
+// tile its edges land on whole DIPs: 10 and 22 across, 15 and 24 down.
+constexpr float kArtScale = 0.5f;
 constexpr float kBoxCenterX = 31;
 constexpr float kBoxBottom = 53;
-// Box bottom below the button's center, as the old glyph's.
-constexpr float kBoxBottomOffset = 6.33f;
+// Box bottom below the button's center.
+constexpr float kBoxBottomOffset = 8;
 // Sparkles show only above the box's top edge.
 constexpr SkRect kSparkleClip = SkRect::MakeLTRB(0, 0, 60, 32);
 constexpr float kBeamOriginX = 30;
@@ -124,8 +128,6 @@ constexpr float kBeamBottom = 36;
 constexpr float kBeamBlur = 3;
 constexpr float kBeamIdleScale = 0.4f;
 constexpr float kSparkleBlur = 0.5f;
-constexpr float kIdleAlpha = 0.55f;
-constexpr float kGlowAlpha = 0.95f;
 
 constexpr base::TimeDelta kSparkleDuration = base::Milliseconds(450);
 constexpr base::TimeDelta kFadeDuration = base::Milliseconds(350);
@@ -147,7 +149,6 @@ Pose Lerp(const Sparkle& sparkle, float t) {
 // 10 before the label, then 18 DIP keycaps 4 apart with a 2 DIP lip, 5 from
 // the pill's edge.
 constexpr base::TimeDelta kTooltipDelay = base::Seconds(1);
-constexpr base::TimeDelta kOrphanGrace = base::Milliseconds(250);
 constexpr int kTooltipHeight = 28;
 constexpr int kTooltipGap = 4;
 constexpr int kTooltipMargin = 6;
@@ -266,70 +267,66 @@ END_METADATA
 
 }  // namespace
 
+SkColor GetFooterIconColor(const ui::ColorProvider* provider, bool active) {
+  const bool dark = !provider || color_utils::IsDark(
+                                     provider->GetColor(ui::kColorSysSurface));
+  return SkColorSetA(dark ? SK_ColorWHITE : SK_ColorBLACK,
+                     active ? 0xF2 : 0x99);
+}
+
 FooterTooltip::FooterTooltip() = default;
 
 FooterTooltip::~FooterTooltip() = default;
 
-bool FooterTooltip::IsActive() const {
-  return delay_.IsRunning() || (widget_ && widget_->IsVisible());
-}
-
 void FooterTooltip::Hover(views::View& anchor, const Content& content) {
-  if (hold_ || (pressed_ && content == content_)) {
+  if (hold_) {
     return;
   }
-  pressed_ = false;
-  orphan_.Stop();
-  if (content == content_ && IsActive()) {
-    anchor_ = &anchor;
-    if (widget_ && widget_->IsVisible()) {
-      Show();
-    }
+  if (pressed_at_ && anchor.GetBoundsInScreen().Contains(*pressed_at_)) {
     return;
   }
+  pressed_at_.reset();
   Hide();
+  views::Widget* window = anchor.GetWidget();
+  if (!window) {
+    return;
+  }
   anchor_ = &anchor;
   content_ = content;
+  anchor_observation_.Observe(&anchor);
+  window_observation_.Observe(window);
+  key_monitor_ = views::EventMonitor::CreateWindowMonitor(
+      this, window->GetNativeWindow(), {ui::EventType::kKeyPressed});
   delay_.Start(FROM_HERE, kTooltipDelay,
                base::BindOnce(&FooterTooltip::Show, base::Unretained(this)));
 }
 
 void FooterTooltip::Unhover(const views::View& anchor) {
-  // A rebuilt button can leave without having been the anchor.
-  pressed_ = false;
-  if (anchor_ == &anchor && !hold_) {
-    Hide();
+  pressed_at_.reset();
+  if (anchor_ == &anchor) {
+    HideUnlessHeld();
   }
 }
 
-void FooterTooltip::Press(const Content& content) {
+void FooterTooltip::Press(const gfx::Point& screen_point) {
   Hide();
-  content_ = content;
-  pressed_ = true;
-}
-
-void FooterTooltip::Detach(const views::View& anchor) {
-  if (anchor_ != &anchor) {
-    return;
-  }
-  anchor_ = nullptr;
-  if (!hold_ && IsActive()) {
-    orphan_.Start(FROM_HERE, kOrphanGrace,
-                  base::BindOnce(&FooterTooltip::Hide, base::Unretained(this)));
-  }
+  pressed_at_ = screen_point;
 }
 
 void FooterTooltip::ShowNow(views::View& anchor, const Content& content) {
   Hide();
   anchor_ = &anchor;
   content_ = content;
-  Show();
+  anchor_observation_.Observe(&anchor);
   hold_ = true;
+  Show();
 }
 
 void FooterTooltip::Hide() {
   delay_.Stop();
-  orphan_.Stop();
+  key_monitor_.reset();
+  window_observation_.Reset();
+  anchor_observation_.Reset();
   anchor_ = nullptr;
   hold_ = false;
   if (widget_) {
@@ -337,11 +334,57 @@ void FooterTooltip::Hide() {
   }
 }
 
+void FooterTooltip::HideUnlessHeld() {
+  if (!hold_) {
+    Hide();
+  }
+}
+
+void FooterTooltip::OnViewVisibilityChanged(views::View* observed_view,
+                                            views::View* starting_view,
+                                            bool visible) {
+  if (!visible) {
+    HideUnlessHeld();
+  }
+}
+
+void FooterTooltip::OnViewBoundsChanged(views::View* observed_view) {
+  HideUnlessHeld();
+}
+
+void FooterTooltip::OnViewRemovedFromWidget(views::View* observed_view) {
+  Hide();
+}
+
+void FooterTooltip::OnViewIsDeleting(views::View* observed_view) {
+  Hide();
+}
+
+void FooterTooltip::OnWidgetActivationChanged(views::Widget* widget,
+                                              bool active) {
+  if (!active) {
+    HideUnlessHeld();
+  }
+}
+
+void FooterTooltip::OnWidgetDestroying(views::Widget* widget) {
+  Hide();
+}
+
+void FooterTooltip::OnEvent(const ui::Event& event) {
+  HideUnlessHeld();
+}
+
 void FooterTooltip::Show() {
   if (!anchor_ || !anchor_->GetWidget() || content_.label.empty()) {
     return;
   }
   views::Widget* parent = anchor_->GetWidget();
+  // Captures run in a background window.
+  if (!hold_ && !parent->IsActive()) {
+    Hide();
+    return;
+  }
   if (!widget_) {
     views::Widget::InitParams params(
         views::Widget::InitParams::CLIENT_OWNS_WIDGET,
@@ -383,16 +426,25 @@ FooterButton::FooterButton(PressedCallback callback,
                           button_context,
                           use_text_color_for_icon) {}
 
-FooterButton::~FooterButton() {
-  if (tooltip_) {
-    tooltip_->Detach(*this);
-  }
-}
+FooterButton::~FooterButton() = default;
 
 void FooterButton::SetFooterTooltip(base::WeakPtr<FooterTooltip> tooltip,
                                     FooterTooltip::Content content) {
   tooltip_ = std::move(tooltip);
   content_ = std::move(content);
+  // The keycaps as ARIA key shortcuts, for example "Control+1".
+  std::string shortcuts;
+  for (const auto& key : content_.keys) {
+    if (!shortcuts.empty()) {
+      shortcuts += '+';
+    }
+    shortcuts += key == u"\u2303" ? "Control" : base::UTF16ToUTF8(key);
+  }
+  if (shortcuts.empty()) {
+    GetViewAccessibility().RemoveKeyShortcuts();
+  } else {
+    GetViewAccessibility().SetKeyShortcuts(shortcuts);
+  }
 }
 
 void FooterButton::ShowFooterTooltipNow() {
@@ -401,7 +453,7 @@ void FooterButton::ShowFooterTooltipNow() {
   }
 }
 
-void FooterButton::SetHovered(bool hovered, bool animate) {
+void FooterButton::SetHovered(bool hovered) {
   if (hovered == hovered_) {
     return;
   }
@@ -413,34 +465,26 @@ void FooterButton::SetHovered(bool hovered, bool animate) {
       tooltip_->Unhover(*this);
     }
   }
-  OnHoverChanged(animate);
+  OnHoverChanged();
 }
 
 void FooterButton::OnMouseEntered(const ui::MouseEvent& event) {
   views::MdTextButton::OnMouseEntered(event);
-  SetHovered(true, true);
+  SetHovered(true);
 }
 
 void FooterButton::OnMouseExited(const ui::MouseEvent& event) {
   views::MdTextButton::OnMouseExited(event);
-  SetHovered(false, true);
+  SetHovered(false);
 }
 
 bool FooterButton::OnMousePressed(const ui::MouseEvent& event) {
   if (tooltip_) {
-    tooltip_->Press(content_);
+    gfx::Point point = event.location();
+    views::View::ConvertPointToScreen(this, &point);
+    tooltip_->Press(point);
   }
   return views::MdTextButton::OnMousePressed(event);
-}
-
-void FooterButton::OnBoundsChanged(const gfx::Rect& previous_bounds) {
-  views::MdTextButton::OnBoundsChanged(previous_bounds);
-  // The sidebar rebuilds its footer on every workspace change. A replacement
-  // under the pointer keeps its hover state and tooltip instead of replaying
-  // them.
-  if (!hovered_ && IsMouseHovered()) {
-    SetHovered(true, false);
-  }
 }
 
 BEGIN_METADATA(FooterButton)
@@ -457,13 +501,29 @@ LibraryButton::LibraryButton(PressedCallback callback,
 
 LibraryButton::~LibraryButton() = default;
 
+LibraryButton::MorphDelegate::MorphDelegate(LibraryButton* button)
+    : views::AnimationDelegateViews(button), button_(button) {}
+
+void LibraryButton::MorphDelegate::AnimationProgressed(
+    const gfx::Animation* animation) {
+  button_->MorphProgressed();
+}
+
 void LibraryButton::SetOpen(bool open, bool animate) {
   open_ = open;
   UpdateGlow(animate);
 }
 
-void LibraryButton::OnHoverChanged(bool animate) {
-  UpdateGlow(animate);
+void LibraryButton::SettleFromGlow() {
+  animation_.Stop();
+  glowing_ = true;
+  now_.fill(1);
+  SchedulePaint();
+  UpdateGlow(/*animate=*/true);
+}
+
+void LibraryButton::OnHoverChanged() {
+  UpdateGlow(/*animate=*/true);
 }
 
 void LibraryButton::UpdateGlow(bool animate) {
@@ -483,11 +543,7 @@ void LibraryButton::UpdateGlow(bool animate) {
   animation_.Start();
 }
 
-void LibraryButton::AnimationProgressed(const gfx::Animation* animation) {
-  if (animation != &animation_) {
-    FooterButton::AnimationProgressed(animation);
-    return;
-  }
+void LibraryButton::MorphProgressed() {
   // CSS easings from the prototype: ease, an overshoot for the sparkles and an
   // ease-out for the beam's growth.
   static const gfx::CubicBezier ease(0.25, 0.1, 0.25, 1);
@@ -517,10 +573,15 @@ void LibraryButton::AnimationProgressed(const gfx::Animation* animation) {
 
 void LibraryButton::PaintButtonContents(gfx::Canvas* canvas) {
   const Paths& paths = GetPaths();
-  const SkColor foreground =
-      GetColorProvider()->GetColor(ui::kColorSysOnSurface);
-  SkColor4f color = SkColor4f::FromColor(foreground);
-  color.fA = Lerp(kIdleAlpha, kGlowAlpha, now_[kColor]);
+  // The same color as the other footer icons, brighter while lit.
+  const SkColor4f idle =
+      SkColor4f::FromColor(GetFooterIconColor(GetColorProvider(), false));
+  const SkColor4f glow =
+      SkColor4f::FromColor(GetFooterIconColor(GetColorProvider(), true));
+  const float t = now_[kColor];
+  const SkColor4f color = {Lerp(idle.fR, glow.fR, t), Lerp(idle.fG, glow.fG, t),
+                           Lerp(idle.fB, glow.fB, t),
+                           Lerp(idle.fA, glow.fA, t)};
 
   gfx::ScopedCanvas scoped(canvas);
   cc::PaintCanvas* paint = canvas->sk_canvas();

@@ -16,6 +16,7 @@
 #include "base/time/time.h"
 #include "ui/base/metadata/metadata_header_macros.h"
 #include "ui/base/models/image_model.h"
+#include "ui/gfx/geometry/point_f.h"
 #include "ui/menus/simple_menu_model.h"
 #include "ui/views/context_menu_controller.h"
 #include "ui/views/view.h"
@@ -195,12 +196,23 @@ class SidebarView final : public views::View,
   void ShowCreateMenu(const ui::Event& event);
   void SetCreateMenuOpen(bool open);
   void ExecuteCommand(int command_id, int event_flags) override;
+  // Builds the footer for spaces_ and current_space_id_, tracking its
+  // controls' focus.
+  void BuildFooter(const gfx::PointF& spaces_offset, bool space_changed);
+  // The Create button's footer tooltip label.
+  std::u16string GetCreateTooltipForTesting() const;
   std::unique_ptr<views::View> MakeItem(const foundation::ItemRecord& item,
                                         bool tile,
                                         bool selected);
 
   const raw_ref<Delegate> delegate_;
+  // Every control's target, the footer's included.
   std::vector<FocusTarget> focus_targets_;
+  // The footer kept across row rebuilds, and the Spaces it shows.
+  raw_ptr<views::View> footer_ = nullptr;
+  std::vector<FocusTarget> footer_targets_;
+  std::vector<std::pair<uint64_t, std::u16string>> footer_spaces_;
+  uint64_t footer_space_id_ = 0;
   raw_ptr<views::ScrollView> spaces_scroll_ = nullptr;
   raw_ptr<views::MdTextButton> new_tab_ = nullptr;
   // Favorite tiles and whether each is selected.
@@ -217,6 +229,7 @@ class SidebarView final : public views::View,
   std::unique_ptr<ui::SimpleMenuModel> menu_model_;
   std::unique_ptr<views::MenuRunner> menu_runner_;
   bool create_menu_open_ = false;
+  // Shared with the Library, so a press there keeps the tooltip quiet here.
   std::unique_ptr<FooterTooltip> footer_tooltip_;
   // The next footer's Library button starts glowing and settles.
   bool library_closed_ = false;

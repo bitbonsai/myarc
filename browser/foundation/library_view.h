@@ -46,7 +46,8 @@ class LibraryView final : public views::View,
 
   LibraryView(SidebarView::Delegate& delegate,
               base::RepeatingClosure close,
-              Section section);
+              Section section,
+              base::WeakPtr<FooterTooltip> tooltip);
   ~LibraryView() override;
 
   // Rebuilds the Spaces section only when its Spaces or the current one
@@ -118,7 +119,6 @@ class LibraryView final : public views::View,
   std::optional<std::pair<SkColor, SkColor>> theme_colors_;
   std::unique_ptr<ui::SimpleMenuModel> menu_model_;
   std::unique_ptr<views::MenuRunner> menu_runner_;
-  std::unique_ptr<FooterTooltip> tooltip_;
   base::WeakPtrFactory<LibraryView> weak_factory_{this};
 };
 

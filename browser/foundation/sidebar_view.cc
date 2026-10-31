@@ -80,12 +80,12 @@ Fills GetFills(const ui::ColorProvider* provider) {
   return dark ? Fills{SkColorSetA(SK_ColorWHITE, 0x18),
                       SkColorSetA(SK_ColorWHITE, 0x6F),
                       SkColorSetA(SK_ColorWHITE, 0x33),
-                      SkColorSetA(SK_ColorWHITE, 0x99),
+                      GetFooterIconColor(provider, false),
                       SkColorSetA(SK_ColorWHITE, 0x2D),
                       SkColorSetA(SK_ColorWHITE, 0x73)}
               : Fills{SkColorSetA(SK_ColorWHITE, 0x80), SK_ColorWHITE,
                       SkColorSetA(SK_ColorWHITE, 0xB3),
-                      SkColorSetA(SK_ColorBLACK, 0x99),
+                      GetFooterIconColor(provider, false),
                       SkColorSetA(SK_ColorBLACK, 0x33),
                       SkColorSetA(SK_ColorBLACK, 0x99)};
 }
@@ -331,6 +331,8 @@ void SidebarView::OpenLibrary(LibrarySection section) {
     menu_runner_->Cancel();
   }
   focus_targets_.clear();
+  footer_targets_.clear();
+  footer_ = nullptr;
   spaces_scroll_ = nullptr;
   new_tab_ = nullptr;
   tiles_.clear();
@@ -344,7 +346,7 @@ void SidebarView::OpenLibrary(LibrarySection section) {
       *delegate_,
       base::BindRepeating(&SidebarView::CloseLibrary,
                           weak_factory_.GetWeakPtr()),
-      section));
+      section, footer_tooltip_->GetWeakPtr()));
   layout->SetFlexForView(library_, 1);
   library_->SetSpaces(spaces_, current_space_id_);
   delegate_->SetLibraryOpen(true);
@@ -410,7 +412,10 @@ void SidebarView::SetCreateMenuOpen(bool open) {
   if (target == focus_targets_.end()) {
     return;
   }
-  auto* button = static_cast<views::MdTextButton*>(target->view.get());
+  auto* button = static_cast<FooterButton*>(target->view.get());
+  button->SetFooterTooltip(
+      footer_tooltip_->GetWeakPtr(),
+      {open ? u"Close creation menu" : u"Create Space", {}});
   button->SetImageModel(views::Button::STATE_NORMAL,
                         ui::ImageModel::FromVectorIcon(
                             open ? vector_icons::kCloseIcon : kPlusIcon,
@@ -594,7 +599,10 @@ void SidebarView::SetUnavailable(const std::u16string& reason,
     menu_runner_->Cancel();
   }
   ResetLibrary();
+  library_closed_ = false;
   focus_targets_.clear();
+  footer_targets_.clear();
+  footer_ = nullptr;
   spaces_scroll_ = nullptr;
   new_tab_ = nullptr;
   tiles_.clear();
@@ -663,12 +671,25 @@ void SidebarView::SetModel(const foundation::SidebarResult& model,
   const bool space_changed = current_space_id_ != model.current_space.id;
   current_space_id_ = model.current_space.id;
   focus_targets_.clear();
-  spaces_scroll_ = nullptr;
   new_tab_ = nullptr;
   tiles_.clear();
-  RemoveAllChildViews();
+  // Loading and title ticks rebuild only the rows. The footer stays, with its
+  // hover, tooltip and Spaces scroll, until the Spaces or the current one
+  // change.
+  const bool keep_footer = footer_ && footer_spaces_ == spaces_ &&
+                           footer_space_id_ == current_space_id_;
+  if (keep_footer) {
+    while (children().front() != footer_) {
+      RemoveChildViewT(children().front());
+    }
+  } else {
+    footer_targets_.clear();
+    footer_ = nullptr;
+    spaces_scroll_ = nullptr;
+    RemoveAllChildViews();
+  }
 
-  auto* scroll = AddChildView(std::make_unique<views::ScrollView>());
+  auto* scroll = AddChildViewAt(std::make_unique<views::ScrollView>(), 0);
   // Bounded mode sizes contents to viewport width and full preferred height.
   scroll->ClipHeightTo(0, std::numeric_limits<int>::max());
   scroll->SetHorizontalScrollBarMode(
@@ -764,6 +785,46 @@ void SidebarView::SetModel(const foundation::SidebarResult& model,
     menu_runner_->Cancel();
   }
 
+  if (keep_footer) {
+    focus_targets_.insert(focus_targets_.end(), footer_targets_.begin(),
+                          footer_targets_.end());
+  } else {
+    const size_t first_footer_target = focus_targets_.size();
+    BuildFooter(spaces_offset, space_changed);
+    footer_targets_.assign(focus_targets_.begin() + first_footer_target,
+                           focus_targets_.end());
+  }
+  UpdateFills();
+
+  scroll->RegisterPostLayoutCallback(base::BindRepeating(
+      [](std::optional<gfx::PointF>& offset, views::ScrollView* scroll) {
+        if (auto saved = std::exchange(offset, std::nullopt)) {
+          scroll->ScrollToOffset(*saved);
+        }
+      },
+      base::OwnedRef(std::optional(offset))));
+  if (focus) {
+    const auto target = std::ranges::find_if(
+        focus_targets_, [&focus](const FocusTarget& target) {
+          return target.action == focus->first && target.id == focus->second;
+        });
+    const auto current_space =
+        std::ranges::find_if(focus_targets_, [this](const FocusTarget& target) {
+          return target.action == FocusAction::kSpaces &&
+                 target.id == current_space_id_;
+        });
+    views::View* restore = target != focus_targets_.end() ? target->view.get()
+                           : current_space != focus_targets_.end()
+                               ? current_space->view.get()
+                               : spaces_scroll_->contents();
+    restore->RequestFocus();
+  }
+}
+
+void SidebarView::BuildFooter(const gfx::PointF& spaces_offset,
+                              bool space_changed) {
+  footer_spaces_ = spaces_;
+  footer_space_id_ = current_space_id_;
   auto* footer = AddChildView(Box(Orientation::kHorizontal, 4));
   // Arc's footer controls sit 2 DIP higher than the sidebar's bottom inset.
   footer->SetProperty(views::kMarginsKey, gfx::Insets::TLBR(0, 0, 2, 0));
@@ -789,12 +850,11 @@ void SidebarView::SetModel(const foundation::SidebarResult& model,
   // tooltip shows no shortcut.
   library->SetFooterTooltip(footer_tooltip_->GetWeakPtr(),
                             {u"View Library", {}});
-  library->GetViewAccessibility().SetName(u"Library");
+  library->GetViewAccessibility().SetName(u"View Library");
   TrackFocus(library.get(), FocusAction::kLibrary);
   // Right after the Library closes, its glow settles back into the box.
   if (std::exchange(library_closed_, false)) {
-    library->SetOpen(true, /*animate=*/false);
-    library->SetOpen(false);
+    library->SettleFromGlow();
   }
   footer->AddChildView(std::move(library));
   spaces_scroll_ = footer->AddChildView(std::make_unique<views::ScrollView>());
@@ -818,11 +878,10 @@ void SidebarView::SetModel(const foundation::SidebarResult& model,
       views::BoxLayout::MainAxisAlignment::kCenter);
   spaces->GetViewAccessibility().SetRole(ax::mojom::Role::kGroup);
   spaces->GetViewAccessibility().SetName(u"Spaces");
-  views::View* current_space = nullptr;
   std::optional<size_t> current_space_index;
   for (size_t index = 0; index < spaces_.size(); ++index) {
     const auto& [space_id, space_name] = spaces_[index];
-    const bool current = space_id == model.current_space.id;
+    const bool current = space_id == current_space_id_;
     // Button presses request a switch; only a Rust snapshot changes selection.
     // As in Arc, the current Space shows its icon and the others a dot.
     auto choice = IconButton<FooterButton>(
@@ -834,7 +893,6 @@ void SidebarView::SetModel(const foundation::SidebarResult& model,
     choice->SetMaxSize(gfx::Size(34, 32));
     choice->SetPreferredSize(gfx::Size(34, 32));
     if (current) {
-      current_space = choice.get();
       current_space_index = spaces->children().size();
     }
     // Ctrl-1 to Ctrl-8 select those Spaces and Ctrl-9 the last one.
@@ -881,32 +939,22 @@ void SidebarView::SetModel(const foundation::SidebarResult& model,
       base::BindRepeating(&SidebarView::ShowCreateMenu,
                           weak_factory_.GetWeakPtr()),
       create_menu_open_ ? &vector_icons::kCloseIcon : &kPlusIcon, 21);
-  // No shortcut opens the creation menu.
-  create->SetFooterTooltip(footer_tooltip_->GetWeakPtr(),
-                           {u"Create Space", {}});
+  // No shortcut opens the creation menu. SetCreateMenuOpen sets the tooltip.
   create->GetViewAccessibility().SetName(u"Create Space");
   create->GetViewAccessibility().SetHasPopup(ax::mojom::HasPopup::kMenu);
   TrackFocus(create.get(), FocusAction::kCreate);
   footer->AddChildView(std::move(create));
-  UpdateFills();
+  footer_ = footer;
+}
 
-  scroll->RegisterPostLayoutCallback(base::BindRepeating(
-      [](std::optional<gfx::PointF>& offset, views::ScrollView* scroll) {
-        if (auto saved = std::exchange(offset, std::nullopt)) {
-          scroll->ScrollToOffset(*saved);
-        }
-      },
-      base::OwnedRef(std::optional(offset))));
-  if (focus) {
-    views::View* restore = current_space ? current_space : spaces;
-    for (const auto& target : focus_targets_) {
-      if (target.action == focus->first && target.id == focus->second) {
-        restore = target.view;
-        break;
-      }
-    }
-    restore->RequestFocus();
-  }
+std::u16string SidebarView::GetCreateTooltipForTesting() const {
+  const auto target = std::ranges::find(focus_targets_, FocusAction::kCreate,
+                                        &FocusTarget::action);
+  return target == focus_targets_.end()
+             ? std::u16string()
+             : static_cast<FooterButton*>(target->view.get())
+                   ->footer_tooltip()
+                   .label;
 }
 
 void SidebarView::ShowFooterTooltipForCapture(std::string_view target) {

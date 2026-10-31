@@ -305,7 +305,8 @@ END_METADATA
 
 LibraryView::LibraryView(SidebarView::Delegate& delegate,
                          base::RepeatingClosure close,
-                         Section section)
+                         Section section,
+                         base::WeakPtr<FooterTooltip> tooltip)
     : delegate_(delegate), close_(std::move(close)), section_(section) {
   SetLayoutManager(std::make_unique<views::BoxLayout>(Orientation::kHorizontal,
                                                       gfx::Insets(), 0));
@@ -349,8 +350,7 @@ LibraryView::LibraryView(SidebarView::Delegate& delegate,
   back->SetMaxSize(gfx::Size(32, 32));
   back->SetPreferredSize(gfx::Size(32, 32));
   back->SetOpen(true, /*animate=*/false);
-  tooltip_ = std::make_unique<FooterTooltip>();
-  back->SetFooterTooltip(tooltip_->GetWeakPtr(), {u"Close Library", {}});
+  back->SetFooterTooltip(std::move(tooltip), {u"Close Library", {}});
   back->GetViewAccessibility().SetName(u"Close Library");
   footer->AddChildView(std::move(back));
 
