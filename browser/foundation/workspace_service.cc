@@ -260,8 +260,10 @@ MetadataResult DecodeWorkspaceMetadata(std::string_view json) {
   auto root =
       base::JSONReader::ReadDict(json, base::JSON_PARSE_RFC, kMaxJsonDepth);
   const auto limits = foundation::bridge_limits();
-  if (!root || root->size() < 8 || root->size() > 11 ||
-      root->FindInt("version") != static_cast<int>(limits.version)) {
+  // Unknown keys are ignored at every level, so a newer build can add
+  // optional fields without breaking older ones. A change an older build must
+  // not ignore needs a new version.
+  if (!root || root->FindInt("version") != static_cast<int>(limits.version)) {
     return InvalidMetadata();
   }
   const auto* spaces = root->FindList("spaces");
@@ -280,10 +282,7 @@ MetadataResult DecodeWorkspaceMetadata(std::string_view json) {
   const bool has_interval = root->contains("archive_interval_secs");
   if (!spaces || spaces->size() > limits.spaces || !items ||
       items->size() > limits.items || !windows ||
-      windows->size() > limits.windows ||
-      root->size() != 8 + (archived_value ? 1u : 0u) +
-                          (has_open_secs ? 1u : 0u) +
-                          (has_interval ? 1u : 0u)) {
+      windows->size() > limits.windows) {
     return InvalidMetadata();
   }
   foundation::StateSnapshot snapshot;
@@ -304,8 +303,7 @@ MetadataResult DecodeWorkspaceMetadata(std::string_view json) {
     const auto* record = value.GetIfDict();
     foundation::SpaceRecord space;
     const auto* name = record ? record->FindString("name") : nullptr;
-    if (!record || record->size() != 3 || !name ||
-        !BoundedText(*name, limits.name_bytes) ||
+    if (!record || !name || !BoundedText(*name, limits.name_bytes) ||
         !ReadId(*record, "id", space.id) ||
         !ReadId(*record, "profile_id", space.profile_id)) {
       return InvalidMetadata();
@@ -317,7 +315,7 @@ MetadataResult DecodeWorkspaceMetadata(std::string_view json) {
     const auto* record = value.GetIfDict();
     // Files written before saved titles or Auto Archive existed have no
     // "title" or "viewed_secs" key.
-    if (!record || record->size() < 5 || record->size() > 7) {
+    if (!record) {
       return InvalidMetadata();
     }
     const auto kind = record->FindInt("placement");
@@ -326,7 +324,7 @@ MetadataResult DecodeWorkspaceMetadata(std::string_view json) {
     const auto* title = record->FindString("title");
     const bool viewed = record->contains("viewed_secs");
     foundation::ItemRecord item;
-    if (record->size() != 5 + (title ? 1u : 0u) + (viewed ? 1u : 0u) ||
+    if ((record->contains("title") && !title) ||
         (title && !BoundedText(*title, limits.title_bytes)) || !kind ||
         *kind < static_cast<int>(foundation::PlacementKind::Temporary) ||
         *kind > static_cast<int>(foundation::PlacementKind::Favorite) ||
@@ -348,7 +346,7 @@ MetadataResult DecodeWorkspaceMetadata(std::string_view json) {
   for (const auto& value : *windows) {
     const auto* record = value.GetIfDict();
     foundation::WindowRecord window;
-    if (!record || record->size() != 3 || !ReadId(*record, "id", window.id) ||
+    if (!record || !ReadId(*record, "id", window.id) ||
         !ReadId(*record, "space_id", window.space_id) ||
         !ReadId(*record, "selected_item_id", window.selected_item_id)) {
       return InvalidMetadata();
@@ -365,7 +363,7 @@ MetadataResult DecodeWorkspaceMetadata(std::string_view json) {
       const auto* url = record ? record->FindString("url") : nullptr;
       const auto* title = record ? record->FindString("title") : nullptr;
       foundation::ArchivedTabRecord tab;
-      if (!record || record->size() != 5 || !url ||
+      if (!record || !url ||
           !BoundedText(*url, limits.url_bytes) || !title ||
           !BoundedText(*title, limits.title_bytes) ||
           !ReadId(*record, "id", tab.id) ||

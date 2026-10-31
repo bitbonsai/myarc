@@ -39,7 +39,8 @@ bool CanonicalizeUrls(foundation::StateSnapshot& snapshot);
 }  // namespace internal
 
 // UI-sequence only. Exact Profile owns this service and its Rust workspace.
-// Never redirect OTR to GetOriginalProfile(). Controls retain subscriptions,
+// Never redirect OTR windows to GetOriginalProfile(); only Settings edits the
+// original Profile's service on purpose. Controls retain subscriptions,
 // not independent workspaces; callers must stop using the service before
 // Profile dies. Native window/tab pointers and session IDs stay in the browser
 // projection layer.

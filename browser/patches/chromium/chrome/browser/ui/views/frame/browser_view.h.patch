@@ -1,5 +1,5 @@
 diff --git a/chrome/browser/ui/views/frame/browser_view.h b/chrome/browser/ui/views/frame/browser_view.h
-index 750e46c97b64dccccf4268e912df5dbdb6516b3c..96be5f8af38add28bb31c9dc02b637c32e089414 100644
+index 750e46c97b64dccccf4268e912df5dbdb6516b3c..d952e46667ee6317d04f64beb8a318cfaa45b836 100644
 --- a/chrome/browser/ui/views/frame/browser_view.h
 +++ b/chrome/browser/ui/views/frame/browser_view.h
 @@ -8,6 +8,7 @@
@@ -87,8 +87,8 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..96be5f8af38add28bb31c9dc02b637c3
 +  bool ShowMyarcSettings() override;
 +  // Opens chrome://settings in this window, for myArc Settings.
 +  void OpenChromiumSettings();
-+  // myArc Settings bound to this window: More Settings… and the Profile's
-+  // archive timer.
++  // myArc Settings owned by this window: More Settings… opens here, and the
++  // archive timer is the original Profile's.
 +  std::unique_ptr<myarc::SettingsWindow> CreateMyarcSettingsWindow();
 +
    base::WeakPtr<BrowserView> GetAsWeakPtr() {

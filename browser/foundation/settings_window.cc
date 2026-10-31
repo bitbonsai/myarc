@@ -485,7 +485,7 @@ constexpr std::array<ArchiveChoice, 4> kArchiveChoices = {{
     {30 * 24 * kHourSecs, u"30 days"},
 }};
 
-// Profiles: Arc's "Archive tabs after" row for the owning window's Profile.
+// Profiles: Arc's "Archive tabs after" row for the bound Profile.
 class ProfilesPage : public views::View, public ui::SimpleMenuModel::Delegate {
   METADATA_HEADER(ProfilesPage, views::View)
 
@@ -499,13 +499,24 @@ class ProfilesPage : public views::View, public ui::SimpleMenuModel::Delegate {
         gfx::Insets::VH(0, kBannerPad)));
     layout->set_cross_axis_alignment(
         views::BoxLayout::CrossAxisAlignment::kCenter);
-    auto* label = AddLabel(card_, u"Archive tabs after", 13,
+    // The title over the Profile it applies to, which may not be the Profile
+    // of the window in front (Incognito edits its regular Profile).
+    auto* text = card_->AddChildView(std::make_unique<views::View>());
+    text->SetLayoutManager(std::make_unique<views::BoxLayout>(
+        views::BoxLayout::Orientation::kVertical));
+    auto* label = AddLabel(text, u"Archive tabs after", 13,
                            gfx::Font::Weight::NORMAL, kCardText);
     label->SetHorizontalAlignment(gfx::ALIGN_LEFT);
-    label->SetTooltipText(
+    auto* profile = AddLabel(text, u"Profile: " + timer_.profile_name, 11,
+                             gfx::Font::Weight::NORMAL, kTabText);
+    profile->SetHorizontalAlignment(gfx::ALIGN_LEFT);
+    const std::u16string tooltip =
         u"Unpinned tabs you haven\u2019t viewed for this long move to "
-        u"Archived Tabs. Applies to this window\u2019s Profile.");
-    layout->SetFlexForView(label, 1);
+        u"Archived Tabs. Applies to the " +
+        timer_.profile_name + u" Profile.";
+    label->SetTooltipText(tooltip);
+    profile->SetTooltipText(tooltip);
+    layout->SetFlexForView(text, 1);
     picker_ = card_->AddChildView(std::make_unique<PillButton>(
         base::BindRepeating(&ProfilesPage::OpenMenu, base::Unretained(this)),
         u"", kGrayButton, kButtonText, gfx::Font::Weight::NORMAL, nullptr));
@@ -548,6 +559,12 @@ class ProfilesPage : public views::View, public ui::SimpleMenuModel::Delegate {
  private:
   void OpenMenu() {
     if (!GetWidget() || (runner_ && runner_->IsRunning())) {
+      return;
+    }
+    // Another window may have changed the timer, or the workspace finished
+    // loading, since the page last looked.
+    Refresh();
+    if (!secs_) {
       return;
     }
     runner_.reset();
@@ -647,6 +664,8 @@ class SettingsView : public views::View {
     InvalidateLayout();
   }
 
+  void RefreshProfiles() { profiles_->Refresh(); }
+
   bool AcceleratorPressed(const ui::Accelerator& accelerator) override {
     close_.Run();
     return true;
@@ -711,9 +730,11 @@ SettingsWindow* g_open = nullptr;
 
 }  // namespace
 
-SettingsWindow::SettingsWindow(base::RepeatingClosure open_more_settings,
+SettingsWindow::SettingsWindow(const Profile* profile,
+                               base::RepeatingClosure open_more_settings,
                                ArchiveTimer archive_timer)
-    : open_more_settings_(std::move(open_more_settings)),
+    : profile_(profile),
+      open_more_settings_(std::move(open_more_settings)),
       archive_timer_(std::move(archive_timer)) {}
 
 SettingsWindow::~SettingsWindow() {
@@ -725,10 +746,19 @@ SettingsWindow::~SettingsWindow() {
 }
 
 // static
-bool SettingsWindow::ActivateOpen(bool inactive) {
+bool SettingsWindow::ActivateOpen(const Profile* profile, bool inactive) {
   if (!g_open || !g_open->widget_) {
     return false;
   }
+  if (g_open->profile_ != profile) {
+    // Settings of another Profile: the caller opens its own in its place.
+    g_open->widget_->Hide();
+    g_open->Close();
+    g_open = nullptr;
+    return false;
+  }
+  static_cast<SettingsView*>(g_open->delegate_->GetContentsView())
+      ->RefreshProfiles();
   // Widget::Show() activates the app; a background app stays behind.
   if (!inactive && IsSettingsAppActive() && !g_open->widget_->IsActive()) {
     g_open->widget_->Show();

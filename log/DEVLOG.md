@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-10-31: Archive timer review fixes
+
+- Settings now edit the invoking window's original Profile: an Incognito window sets its regular Profile's timer instead of a throwaway workspace, and Guest shows "Unavailable". Opening Settings from a window of another Profile closes the open window and shows the invoker's; the row names the Profile ("Profile: Person 1") and the tooltip says which one it applies to. The picker rereads the timer when its menu opens and when Settings come back to the front. The workspace loader now ignores unknown keys at the root and in records (known keys still need their type), so later optional fields no longer break older builds; the Rust side gets a typed snapshot and had no such check.
+- Verification: `chrome` and `bridge_check` build; `bridge_check` (new: unknown root, space, item and window keys load; a non-string `title` still fails), cargo fmt/clippy/test, `export_patches.py --check` and `check_docs.py` pass. A background `SETTINGS=profiles` capture shows the two-line row; it predates the switch from Chromium's avatar label ("You") to the local Profile name, which wasn't recaptured. Incognito, Guest and the Profile switch were checked by reading the code, not run.
+- Chromium `myarc` commit `ee536a96e1`.
+
 ## 2026-10-31: Archive timer and Clear Archive
 
 - Settings' Profiles tab now works and offers Arc's "Archive tabs after" (12 hours default, 24 hours, 7 days, 30 days) for the opening window's Profile. The choice is stored in that Profile's workspace (`archive_interval_secs`, a JSON key written only when it isn't 12 hours; a bad value reads as 12 hours), and the next Auto Archive pass uses it. The `never` interval is gone because Arc's article says Auto Archive can't be disabled. Right-clicking the Library's Archived Tabs item offers Clear Archive, which confirms first (Cancel is the default button) and then empties the archive and saves. The 30-day / 500-entry keep cap stays: retention counts from the close, so a 30-day timer doesn't shorten it.

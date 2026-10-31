@@ -228,10 +228,28 @@ bool CheckMetadataRecords() {
   if (!rejects(*root))
     return false;
   root->Set("version", static_cast<int>(bridge_limits().version));
-  root->Set("future_field", true);
+  // A newer build's optional keys, at the root or in a record, are ignored.
+  {
+    auto future = root->Clone();
+    future.Set("future_field", true);
+    (*future.FindList("spaces"))[0].GetDict().Set("future_field", 1);
+    (*future.FindList("items"))[0].GetDict().Set("future_field", "x");
+    (*future.FindList("windows"))[0].GetDict().Set("future_field", false);
+    const auto json = base::WriteJson(future);
+    auto loaded = json ? DecodeWorkspaceMetadata(*json)
+                       : myarc::internal::MetadataResult{};
+    if (!loaded.snapshot || !loaded.error.empty() ||
+        loaded.snapshot->items[0].id != item_id ||
+        !restore_snapshot(*new_workspace(), std::move(*loaded.snapshot)).ok) {
+      std::cerr << "Unknown metadata keys rejected: " << loaded.error << '\n';
+      return false;
+    }
+  }
+  // Known optional keys still need their type.
+  (*root->FindList("items"))[0].GetDict().Set("title", 7);
   if (!rejects(*root))
     return false;
-  root->Remove("future_field");
+  (*root->FindList("items"))[0].GetDict().Remove("title");
   root->Set("next_item_id", 12);  // Numeric IDs must be rejected.
   if (!rejects(*root))
     return false;
