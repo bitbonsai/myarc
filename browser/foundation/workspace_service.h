@@ -5,6 +5,7 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#include <utility>
 
 #include "base/callback_list.h"
 #include "base/containers/span.h"
@@ -13,6 +14,7 @@
 #include "base/memory/weak_ptr.h"
 #include "base/sequence_checker.h"
 #include "base/supports_user_data.h"
+#include "base/time/time.h"
 #include "myarc/bridge.rs.h"
 
 class Profile;
@@ -85,6 +87,12 @@ class WorkspaceService final : public base::SupportsUserData::Data {
   rust::Vec<foundation::ArchivedTabRecord> ArchivedTabs() const;
   // Call after the entry has been reopened.
   foundation::MutationResult RemoveArchivedTab(uint64_t id);
+  // History deletion: drops Archived Tabs whose URL is in `urls`, and with
+  // `range` those closed between its begin and end, inclusive. A null end
+  // means no end. Writes only when an entry went.
+  void ForgetArchivedTabs(
+      base::span<const std::string> urls,
+      std::optional<std::pair<base::Time, base::Time>> range);
   // has_url=false preserves existing saved URL; first save requires explicit
   // URL.
   foundation::MutationResult SetPlacement(uint64_t item,

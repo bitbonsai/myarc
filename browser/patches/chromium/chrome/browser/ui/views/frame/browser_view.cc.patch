@@ -1,5 +1,5 @@
 diff --git a/chrome/browser/ui/views/frame/browser_view.cc b/chrome/browser/ui/views/frame/browser_view.cc
-index 7b568f6de760af21d6e9d2aa44415a7cef617c51..c0e9091da5c3323f13c0834ce156efee37561b57 100644
+index 7b568f6de760af21d6e9d2aa44415a7cef617c51..6989fa3b5045ecdb7c86cdeaafb1162b6f356279 100644
 --- a/chrome/browser/ui/views/frame/browser_view.cc
 +++ b/chrome/browser/ui/views/frame/browser_view.cc
 @@ -22,6 +22,7 @@
@@ -1436,7 +1436,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..c0e9091da5c3323f13c0834ce156efee
  }
  
  void BrowserView::RemovedFromWidget() {
-@@ -5267,6 +6420,773 @@ const views::View* BrowserView::GetViewByElementId(
+@@ -5267,6 +6420,777 @@ const views::View* BrowserView::GetViewByElementId(
  ///////////////////////////////////////////////////////////////////////////////
  // BrowserView, ui::AcceleratorTarget overrides:
  
@@ -1883,7 +1883,10 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..c0e9091da5c3323f13c0834ce156efee
 +    return result;
 +  }
 +  const auto sidebar = myarc_workspace_adapter_->Sidebar();
-+  for (const auto& tab : myarc_workspace_adapter_->service().ArchivedTabs()) {
++  const auto tabs = myarc_workspace_adapter_->service().ArchivedTabs();
++  // Only the showing Library asks, so archive favicons load on demand.
++  myarc_workspace_adapter_->RequestArchivedIcons(tabs);
++  for (const auto& tab : tabs) {
 +    const GURL url(std::string(tab.url));
 +    myarc::SidebarView::ArchivedTabPresentation row;
 +    row.id = tab.id;
@@ -1901,7 +1904,8 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..c0e9091da5c3323f13c0834ce156efee
 +        row.space = base::UTF8ToUTF16(std::string(space.name));
 +      }
 +    }
-+    if (gfx::Image icon = myarc_workspace_adapter_->CachedIcon(url);
++    if (gfx::Image icon = myarc_workspace_adapter_->CachedIcon(
++            std::string_view(tab.url.data(), tab.url.size()));
 +        !icon.IsEmpty()) {
 +      row.icon = ui::ImageModel::FromImage(icon);
 +    }
@@ -2210,7 +2214,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..c0e9091da5c3323f13c0834ce156efee
  bool BrowserView::AcceleratorPressed(const ui::Accelerator& accelerator) {
  #if BUILDFLAG(IS_MAC)
    // Forward accelerators to ExclusiveAccessManager to handle Esc press-and-hold
-@@ -5342,7 +7262,8 @@ void BrowserView::LoadingAnimationCallback(base::TimeTicks timestamp) {
+@@ -5342,7 +7266,8 @@ void BrowserView::LoadingAnimationCallback(base::TimeTicks timestamp) {
      // GetActiveWebContents can return null for example under Purify when
      // the animations are running slowly and this function is called on a timer
      // through LoadingAnimationCallback.
@@ -2220,7 +2224,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..c0e9091da5c3323f13c0834ce156efee
    }
  }
  
-@@ -5471,6 +7392,10 @@ bool BrowserView::MaybeUpdateDevtools(content::WebContents* contents) {
+@@ -5471,6 +7396,10 @@ bool BrowserView::MaybeUpdateDevtools(content::WebContents* contents) {
  
  void BrowserView::UpdateUIForContents(WebContents* contents,
                                        bool should_layout_immediately) {
@@ -2231,7 +2235,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..c0e9091da5c3323f13c0834ce156efee
    TRACE_EVENT0("ui", "BrowserView::UpdateUIForContents");
    bool needs_layout = MaybeShowBookmarkBar(contents);
  
-@@ -5706,6 +7631,26 @@ void BrowserView::LoadAccelerators() {
+@@ -5706,6 +7635,26 @@ void BrowserView::LoadAccelerators() {
    }
  
  #if BUILDFLAG(IS_MAC)

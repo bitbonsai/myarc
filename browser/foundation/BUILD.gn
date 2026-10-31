@@ -86,6 +86,7 @@ source_set("browser_workspace_adapter") {
   deps = [
     ":workspace_lifecycle",
     "//chrome/browser/favicon",
+    "//chrome/browser/history",
     "//chrome/browser/lifetime",
     "//chrome/browser/profiles:profile",
     "//chrome/browser/sessions",
@@ -94,7 +95,10 @@ source_set("browser_workspace_adapter") {
     "//chrome/browser/ui/tabs:tab_strip",
     "//components/favicon/core",
     "//components/favicon_base",
+    "//components/history/core/browser",
+    "//components/history/core/common",
     "//components/keyed_service/core",
+    "//components/prefs",
     "//components/sessions",
     "//components/tabs:public",
     "//content/public/browser",

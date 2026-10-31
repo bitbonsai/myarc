@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-10-31: Archived Tabs review fixes
+
+- Blank pages, tabs of a closing window (only tabs closed one by one archive, as in Arc) and Profiles with history saving off archive nothing. Deleting history drops the matching entries: all of them, those in the deleted time range, or those with a deleted URL; expiry is ignored. Expired entries go at load too, and a bad, duplicate or clashing entry is dropped instead of failing the workspace load. Entries sort by close time before the day headers. Archive favicons load only while Archived Tabs shows, and a refresh keeps the list's scroll offset. A reopen opens the page first and switches Space after; the entry goes once the page is open even if selecting it fails, a second click is ignored, and a failed removal is logged.
+- Verification: `chrome` and `bridge_check` build; `bridge_check` (lenient decode, prune and history-forget checks), 4 new or rewritten Rust tests, cargo fmt/clippy/test, `export_patches.py --check` and `check_docs.py` pass. A background `WORKSPACE=… LIBRARY=archive` capture of the same seed now drops its `about:blank` row. History deletion, window close, scroll keep and reopen were checked by reading the code, not run.
+- Chromium `myarc` commit `2f2533ad76`.
+
 ## 2026-10-31: Archived Tabs
 
 - Closing the last live page of a temporary item now archives its URL, title, Space and close time in Rust (`archived` in the workspace snapshot, saved to JSON only when non-empty), capped at 500 entries and 30 days. Saved items, Chrome pages and off-the-record Profiles archive nothing. The Library's Archived Tabs lists them newest first under Arc's day headers with cached favicon, title and address, and search matches title or address. Clicking a row reopens it as a temporary tab in its Space (the current one if that Space is gone), then drops the entry. The auto-archive timing rule has no caller yet, so only closing archives.

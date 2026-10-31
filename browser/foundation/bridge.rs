@@ -108,7 +108,8 @@ mod ffi {
         fn select_item(workspace: &mut Workspace, window_id: u64, item_id: u64) -> MutationResult;
         fn live_tab_closed(workspace: &mut Workspace, item_id: u64) -> MutationResult;
         // Like live_tab_closed, and archives a temporary item. `id` is 1 when
-        // archived, else 0. Never call it for off-the-record Profiles.
+        // archived, else 0. Never call it for off-the-record Profiles or when
+        // the Profile saves no history.
         fn archive_closed_tab(
             workspace: &mut Workspace,
             item_id: u64,
@@ -119,6 +120,18 @@ mod ffi {
         // Unexpired entries, newest first.
         fn archived_tabs(workspace: &Workspace, now_secs: u64) -> Vec<ArchivedTabRecord>;
         fn remove_archived_tab(workspace: &mut Workspace, id: u64) -> MutationResult;
+        // Drops expired entries; `id` is how many went.
+        fn prune_archived_tabs(workspace: &mut Workspace, now_secs: u64) -> MutationResult;
+        // History deletion: drops entries whose URL is in `urls`, and with
+        // `has_range` those archived in begin..=end seconds. `id` is how many
+        // went.
+        fn forget_archived_tabs(
+            workspace: &mut Workspace,
+            urls: Vec<String>,
+            has_range: bool,
+            begin_secs: u64,
+            end_secs: u64,
+        ) -> MutationResult;
         fn set_placement(
             workspace: &mut Workspace,
             item_id: u64,
@@ -277,6 +290,32 @@ pub fn archived_tabs(workspace: &Workspace, now_secs: u64) -> Vec<ffi::ArchivedT
 
 pub fn remove_archived_tab(workspace: &mut Workspace, id: u64) -> ffi::MutationResult {
     outcome(workspace.0.remove_archived_tab(id).map(|tab| tab.id))
+}
+
+fn count(removed: usize) -> ffi::MutationResult {
+    ffi::MutationResult {
+        ok: true,
+        id: u64::try_from(removed).unwrap_or(u64::MAX),
+        error: String::new(),
+    }
+}
+
+pub fn prune_archived_tabs(workspace: &mut Workspace, now_secs: u64) -> ffi::MutationResult {
+    count(workspace.0.prune_archived_tabs(now_secs))
+}
+
+pub fn forget_archived_tabs(
+    workspace: &mut Workspace,
+    urls: Vec<String>,
+    has_range: bool,
+    begin_secs: u64,
+    end_secs: u64,
+) -> ffi::MutationResult {
+    count(
+        workspace
+            .0
+            .forget_archived_tabs(&urls, has_range.then_some(begin_secs..=end_secs)),
+    )
 }
 
 fn placement(
@@ -482,10 +521,6 @@ pub fn restore_snapshot(
                 || item.title.len() > workspace::MAX_TITLE_BYTES
                 || (!item.has_url && !item.canonical_url.is_empty())
         })
-        || snapshot.archived.len() > workspace::MAX_ARCHIVED_TABS
-        || snapshot.archived.iter().any(|tab| {
-            tab.url.len() > workspace::MAX_URL_BYTES || tab.title.len() > workspace::MAX_TITLE_BYTES
-        })
     {
         return reject("Snapshot exceeds bridge bounds or has inconsistent URL presence");
     }
@@ -531,9 +566,15 @@ pub fn restore_snapshot(
                             .then_some(window.selected_item_id),
                     })
                     .collect(),
+                // An oversized entry is dropped like any other bad one; the
+                // workspace keeps the newest entries within its limit.
                 archived: snapshot
                     .archived
                     .into_iter()
+                    .filter(|tab| {
+                        tab.url.len() <= workspace::MAX_URL_BYTES
+                            && tab.title.len() <= workspace::MAX_TITLE_BYTES
+                    })
                     .map(|tab| workspace::ArchivedTab {
                         id: tab.id,
                         space_id: tab.space_id,

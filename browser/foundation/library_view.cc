@@ -4,6 +4,7 @@
 #include <array>
 #include <limits>
 #include <memory>
+#include <optional>
 #include <utility>
 
 #include "base/functional/bind.h"
@@ -23,6 +24,7 @@
 #include "ui/gfx/color_utils.h"
 #include "ui/gfx/font_list.h"
 #include "ui/gfx/geometry/insets.h"
+#include "ui/gfx/geometry/point_f.h"
 #include "ui/gfx/geometry/size.h"
 #include "ui/views/accessibility/view_accessibility.h"
 #include "ui/views/animation/ink_drop.h"
@@ -384,7 +386,7 @@ void LibraryView::RefreshDownloads() {
     return;
   }
   downloads_ = std::move(downloads);
-  UpdateList();
+  UpdateList(/*keep_scroll=*/true);
 }
 
 void LibraryView::RefreshArchive() {
@@ -396,7 +398,7 @@ void LibraryView::RefreshArchive() {
     return;
   }
   archived_ = std::move(archived);
-  UpdateList();
+  UpdateList(/*keep_scroll=*/true);
 }
 
 void LibraryView::FocusSection() {
@@ -659,7 +661,7 @@ void LibraryView::BuildList() {
   } else if (section_ == Section::kArchive) {
     archived_ = delegate_->GetArchivedTabs();
   }
-  UpdateList();
+  UpdateList(/*keep_scroll=*/false);
 }
 
 void LibraryView::AddArchiveRows(views::View& rows) {
@@ -688,6 +690,10 @@ void LibraryView::AddArchiveRows(views::View& rows) {
     auto row = std::make_unique<ArchiveRow>(
         base::BindRepeating(
             [](LibraryView* view, uint64_t id) {
+              // A second click before the first reopen runs is ignored.
+              if (!view->reopening_.insert(id).second) {
+                return;
+              }
               // Reopening switches Space and rebuilds the sidebar, so the
               // action holds nothing of `view`.
               view->PostAction(base::BindOnce(
@@ -705,9 +711,18 @@ void LibraryView::AddArchiveRows(views::View& rows) {
   }
 }
 
-void LibraryView::UpdateList() {
+void LibraryView::UpdateList(bool keep_scroll) {
   if (!list_) {
     return;
+  }
+  // A refresh (a closed tab, a favicon) keeps the reader's place; a new query
+  // or section starts at the top.
+  std::optional<gfx::PointF> offset;
+  if (keep_scroll && !list_->children().empty()) {
+    if (const auto* scroll =
+            views::AsViewClass<views::ScrollView>(list_->children().front())) {
+      offset = scroll->CurrentOffset();
+    }
   }
   const views::FocusManager* manager = GetFocusManager();
   const bool had_focus =
@@ -796,6 +811,15 @@ void LibraryView::UpdateList() {
     scroll->SetBackgroundColor(std::nullopt);
     scroll->SetDrawOverflowIndicator(false);
     list_layout->SetFlexForView(scroll, 1);
+    if (offset) {
+      scroll->RegisterPostLayoutCallback(base::BindRepeating(
+          [](std::optional<gfx::PointF>& saved, views::ScrollView* scroll) {
+            if (auto restore = std::exchange(saved, std::nullopt)) {
+              scroll->ScrollToOffset(*restore);
+            }
+          },
+          base::OwnedRef(std::move(offset))));
+    }
     auto* rows =
         scroll->SetContents(Box(Orientation::kVertical, gfx::Insets(), 2));
     rows->GetViewAccessibility().SetRole(ax::mojom::Role::kList);
@@ -849,7 +873,7 @@ void LibraryView::UpdateList() {
 void LibraryView::ContentsChanged(views::Textfield* sender,
                                   const std::u16string& new_contents) {
   query_ = new_contents;
-  UpdateList();
+  UpdateList(/*keep_scroll=*/false);
 }
 
 BEGIN_METADATA(LibraryView)

@@ -15,11 +15,13 @@
 //!
 //! One call covers one Profile policy. Callers filter items by Profile first.
 
+use std::cmp::Reverse;
 use std::collections::BTreeSet;
+use std::ops::RangeInclusive;
 
 use crate::{
     ARCHIVE_RETENTION_SECS, ArchivedTab, ItemId, MAX_ARCHIVED_TABS, MAX_TITLE_BYTES, Placement,
-    Workspace, WorkspaceError, clean_title, validate_url,
+    Workspace, WorkspaceError, WorkspaceSnapshot, clean_title, validate_url,
 };
 
 const HOUR_SECS: u64 = 60 * 60;
@@ -131,8 +133,9 @@ impl Workspace {
     /// The last live page of `item_id` closed. A temporary item ends, like
     /// `live_tab_closed`, and is archived with `url`, `title` and `now_secs`.
     /// Returns whether it was archived: saved items stay and archive nothing, and
-    /// a URL the saved-URL gate rejects (such as `chrome://newtab`) is not kept.
-    /// Off-the-record adapters call `live_tab_closed` instead.
+    /// a blank page or a URL the saved-URL gate rejects (such as
+    /// `chrome://newtab`) is not kept. Off-the-record adapters, and adapters
+    /// whose Profile saves no history, call `live_tab_closed` instead.
     pub fn archive_closed_tab(
         &mut self,
         item_id: ItemId,
@@ -144,12 +147,10 @@ impl Workspace {
             return Ok(false);
         };
         self.remove_item(item_id);
-        if validate_url(url).is_err() {
+        if !archivable(url) {
             return Ok(false);
         }
-        self.state
-            .archived
-            .retain(|tab| !expired(tab.archived_secs, now_secs));
+        self.prune_archived_tabs(now_secs);
         if self.state.archived.len() >= MAX_ARCHIVED_TABS {
             let excess = self.state.archived.len() + 1 - MAX_ARCHIVED_TABS;
             self.state.archived.drain(..excess);
@@ -164,15 +165,19 @@ impl Workspace {
         Ok(true)
     }
 
-    /// Unexpired Archived Tabs at `now_secs`, newest first.
+    /// Unexpired Archived Tabs at `now_secs`, newest first by close time. Ties,
+    /// and entries from a clock that moved backwards, keep the newest-added first.
     pub fn archived_tabs(&self, now_secs: u64) -> Vec<ArchivedTab> {
-        self.state
+        let mut tabs: Vec<ArchivedTab> = self
+            .state
             .archived
             .iter()
             .rev()
             .filter(|tab| !expired(tab.archived_secs, now_secs))
             .cloned()
-            .collect()
+            .collect();
+        tabs.sort_by_key(|tab| Reverse(tab.archived_secs));
+        tabs
     }
 
     /// Remove an entry once the adapter has reopened it, returning it.
@@ -186,26 +191,67 @@ impl Workspace {
         Ok(self.state.archived.remove(index))
     }
 
-    pub(crate) fn validate_archive(&self) -> Result<(), WorkspaceError> {
-        let state = &self.state;
-        let mut seen = BTreeSet::new();
-        for tab in &state.archived {
-            if tab.id == 0
-                || tab.id >= state.next_item_id
-                || tab.space_id == 0
-                || !seen.insert(tab.id)
-                || state.items.iter().any(|item| item.id == tab.id)
-                || tab.title.len() > MAX_TITLE_BYTES
-                || tab.title.chars().any(char::is_control)
-            {
-                return Err(WorkspaceError::InvalidSnapshot(
-                    "archived tab has a reused or invalid ID, Space or title",
-                ));
-            }
-            validate_url(&tab.url)?;
-        }
-        Ok(())
+    /// Drops entries expired at `now_secs`, returning how many went. The adapter
+    /// calls it after a load, since entries otherwise expire only on the next
+    /// archive.
+    pub fn prune_archived_tabs(&mut self, now_secs: u64) -> usize {
+        let before = self.state.archived.len();
+        self.state
+            .archived
+            .retain(|tab| !expired(tab.archived_secs, now_secs));
+        before - self.state.archived.len()
     }
+
+    /// History deletion: drops entries whose URL is in `urls`, and with `range`
+    /// those archived within it (inclusive seconds). Returns how many went.
+    pub fn forget_archived_tabs(
+        &mut self,
+        urls: &[String],
+        range: Option<RangeInclusive<u64>>,
+    ) -> usize {
+        let urls: BTreeSet<&str> = urls.iter().map(String::as_str).collect();
+        let before = self.state.archived.len();
+        self.state.archived.retain(|tab| {
+            !urls.contains(tab.url.as_str())
+                && !range
+                    .as_ref()
+                    .is_some_and(|range| range.contains(&tab.archived_secs))
+        });
+        before - self.state.archived.len()
+    }
+
+    /// Archived Tabs are a convenience, so a bad entry in a loaded snapshot is
+    /// dropped rather than failing the whole workspace: reused, duplicate or zero
+    /// IDs, a zero Space and URLs that could not have been archived. Titles are
+    /// cleaned like new ones, and only the newest `MAX_ARCHIVED_TABS` stay.
+    pub(crate) fn sanitize_archive(&mut self) {
+        let WorkspaceSnapshot {
+            archived,
+            items,
+            next_item_id,
+            ..
+        } = &mut self.state;
+        let excess = archived.len().saturating_sub(MAX_ARCHIVED_TABS);
+        archived.drain(..excess);
+        let live: BTreeSet<ItemId> = items.iter().map(|item| item.id).collect();
+        let mut seen = BTreeSet::new();
+        archived.retain_mut(|tab| {
+            if tab.title.len() > MAX_TITLE_BYTES || tab.title.chars().any(char::is_control) {
+                tab.title = clean_title(&tab.title);
+            }
+            tab.id != 0
+                && tab.id < *next_item_id
+                && tab.space_id != 0
+                && !live.contains(&tab.id)
+                && archivable(&tab.url)
+                && seen.insert(tab.id)
+        });
+    }
+}
+
+/// Blank pages carry nothing to reopen, so only HTTP(S) URLs are archived.
+fn archivable(url: &str) -> bool {
+    url != "about:blank" && validate_url(url).is_ok()
 }
 
 /// A clock that moved backwards keeps the entry.
@@ -270,6 +316,11 @@ mod store_tests {
             Ok(false)
         );
         assert_eq!(workspace.snapshot().items.len(), 1);
+        for blank in ["about:blank", ""] {
+            let page = workspace.add_temporary_item(DEFAULT_SPACE_ID).unwrap();
+            assert_eq!(workspace.archive_closed_tab(page, blank, "", 1), Ok(false));
+        }
+        assert_eq!(workspace.snapshot().items.len(), 1);
         assert!(workspace.archived_tabs(1).is_empty());
         assert_eq!(
             workspace.archive_closed_tab(99, URL, "", 1),
@@ -316,36 +367,102 @@ mod store_tests {
     }
 
     #[test]
-    fn snapshot_rejects_bad_archive_entries() {
+    fn prune_drops_expired_entries_only() {
         let mut workspace = Workspace::default();
-        close(&mut workspace, DEFAULT_SPACE_ID, 5);
+        close(&mut workspace, DEFAULT_SPACE_ID, 0);
+        let kept = close(&mut workspace, DEFAULT_SPACE_ID, DAY);
+        assert_eq!(workspace.prune_archived_tabs(30 * DAY), 0);
+        assert_eq!(workspace.prune_archived_tabs(30 * DAY + 1), 1);
+        let archived = workspace.snapshot().archived;
+        assert_eq!(
+            archived.iter().map(|tab| tab.id).collect::<Vec<_>>(),
+            [kept]
+        );
+    }
+
+    #[test]
+    fn history_deletion_forgets_matching_entries() {
+        let mut workspace = Workspace::default();
+        let ids: Vec<_> = (1..=4)
+            .map(|secs| close(&mut workspace, DEFAULT_SPACE_ID, secs * 10))
+            .collect();
+        let other = workspace.add_temporary_item(DEFAULT_SPACE_ID).unwrap();
+        workspace
+            .archive_closed_tab(other, "https://other.test/", "", 50)
+            .unwrap();
+        let urls = [String::from("https://other.test/")];
+        assert_eq!(workspace.forget_archived_tabs(&urls, None), 1);
+        assert_eq!(workspace.forget_archived_tabs(&[], Some(20..=30)), 2);
+        let left: Vec<_> = workspace
+            .archived_tabs(50)
+            .iter()
+            .map(|tab| tab.id)
+            .collect();
+        assert_eq!(left, [ids[3], ids[0]]);
+        assert_eq!(workspace.forget_archived_tabs(&[], Some(0..=u64::MAX)), 2);
+        assert!(workspace.archived_tabs(50).is_empty());
+    }
+
+    #[test]
+    fn entries_list_by_close_time_even_after_a_clock_change() {
+        let mut workspace = Workspace::default();
+        let late = close(&mut workspace, DEFAULT_SPACE_ID, 100);
+        let early = close(&mut workspace, DEFAULT_SPACE_ID, 50);
+        let tie = close(&mut workspace, DEFAULT_SPACE_ID, 100);
+        let order: Vec<_> = workspace
+            .archived_tabs(100)
+            .iter()
+            .map(|tab| tab.id)
+            .collect();
+        assert_eq!(order, [tie, late, early]);
+    }
+
+    #[test]
+    fn snapshot_drops_bad_archive_entries_and_keeps_the_rest() {
+        let mut workspace = Workspace::default();
+        let good_id = close(&mut workspace, DEFAULT_SPACE_ID, 5);
+        close(&mut workspace, DEFAULT_SPACE_ID, 6);
         let live = workspace.add_temporary_item(DEFAULT_SPACE_ID).unwrap();
         let good = workspace.snapshot();
-        let mut cases = Vec::new();
         for edit in [
             |tab: &mut ArchivedTab| tab.id = 0,
             |tab: &mut ArchivedTab| tab.id = 99,
             |tab: &mut ArchivedTab| tab.space_id = 0,
-            |tab: &mut ArchivedTab| tab.title = String::from("a\nb"),
             |tab: &mut ArchivedTab| tab.url = String::from("ftp://example.test"),
+            |tab: &mut ArchivedTab| tab.url = String::from("about:blank"),
         ] {
             let mut snapshot = good.clone();
-            edit(&mut snapshot.archived[0]);
-            cases.push(snapshot);
+            edit(&mut snapshot.archived[1]);
+            let restored = Workspace::from_snapshot(snapshot).unwrap();
+            let ids: Vec<_> = restored.archived_tabs(6).iter().map(|tab| tab.id).collect();
+            assert_eq!(ids, [good_id]);
+            assert_eq!(restored.snapshot().items.len(), 1);
         }
         let mut reused = good.clone();
-        reused.archived[0].id = live;
-        cases.push(reused);
+        reused.archived[1].id = live;
         let mut duplicate = good.clone();
-        duplicate.archived.push(duplicate.archived[0].clone());
-        cases.push(duplicate);
-        for snapshot in cases {
-            assert!(Workspace::from_snapshot(snapshot).is_err());
+        duplicate.archived[1].id = good_id;
+        for snapshot in [reused, duplicate] {
+            let restored = Workspace::from_snapshot(snapshot).unwrap();
+            assert_eq!(restored.snapshot().archived.len(), 1);
+            assert_eq!(restored.snapshot().archived[0].id, good_id);
         }
+        // Titles are cleaned like new ones rather than dropped.
+        let mut titled = good.clone();
+        titled.archived[0].title = String::from("a\nb");
+        let restored = Workspace::from_snapshot(titled).unwrap();
+        assert_eq!(restored.snapshot().archived[0].title, "a b");
         // A deleted Space is fine: the adapter reopens in the current Space.
         let mut gone = good;
         gone.archived[0].space_id = 7;
-        assert!(Workspace::from_snapshot(gone).is_ok());
+        assert_eq!(
+            Workspace::from_snapshot(gone)
+                .unwrap()
+                .snapshot()
+                .archived
+                .len(),
+            2
+        );
     }
 }
 

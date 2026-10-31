@@ -391,7 +391,8 @@ bool CheckSavedTitles() {
 }
 
 // Archived Tabs survive the JSON codec; an empty archive omits the key so older
-// builds still load the file, and a malformed entry is rejected.
+// builds still load the file, and a malformed entry is dropped while the rest
+// of the file loads. Expired and history-deleted entries go.
 bool CheckArchivedTabs() {
   using namespace myarc::foundation;
   using myarc::internal::DecodeWorkspaceMetadata;
@@ -430,9 +431,33 @@ bool CheckArchivedTabs() {
   auto* list = root ? root->FindList("archived") : nullptr;
   if (!list || list->size() != 1)
     return false;
+  base::DictValue good = (*list)[0].GetDict().Clone();
   (*list)[0].GetDict().Set("url", "javascript:alert(1)");
+  base::DictValue malformed;
+  malformed.Set("id", "x");
+  list->Append(std::move(malformed));
+  list->Append(std::move(good));
   const auto bad = base::WriteJson(*root);
-  return bad && !DecodeWorkspaceMetadata(*bad).snapshot;
+  auto lenient = bad ? DecodeWorkspaceMetadata(*bad)
+                     : myarc::internal::MetadataResult{};
+  if (!lenient.snapshot || lenient.snapshot->archived.size() != 1 ||
+      lenient.snapshot->archived[0].id != item.id) {
+    return false;
+  }
+  if (!restore_snapshot(*restored, std::move(*lenient.snapshot)).ok ||
+      prune_archived_tabs(*restored, 100).id != 0 ||
+      forget_archived_tabs(*restored, {}, true, 0, 99).id != 0) {
+    return false;
+  }
+  rust::Vec<rust::String> urls;
+  urls.push_back("https://example.test/");
+  if (forget_archived_tabs(*restored, std::move(urls), false, 0, 0).id != 1 ||
+      !archived_tabs(*restored, 100).empty()) {
+    return false;
+  }
+  auto expiring = add_temporary_item(*model, 1);
+  archive_closed_tab(*model, expiring.id, "https://example.test/b", "", 0);
+  return prune_archived_tabs(*model, 100 + 31 * 24 * 60 * 60).id == 2;
 }
 
 }  // namespace

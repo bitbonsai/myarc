@@ -2,6 +2,7 @@
 #define MYARC_BROWSER_WORKSPACE_ADAPTER_H_
 
 #include <cstdint>
+#include <functional>
 #include <map>
 #include <optional>
 #include <string>
@@ -19,6 +20,9 @@
 class BrowserWindowInterface;
 class Profile;
 
+namespace favicon {
+class FaviconService;
+}
 namespace favicon_base {
 struct FaviconImageResult;
 }
@@ -95,8 +99,12 @@ class BrowserWorkspaceAdapter final : public TabStripModelObserver {
   // no live page. Empty until the lookup Refresh starts has answered, or when
   // nothing is cached. Never fetches from the network.
   gfx::Image SavedIcon(const foundation::ItemRecord& item) const;
-  // The same cache by URL, which also covers Archived Tabs.
-  gfx::Image CachedIcon(const GURL& url) const;
+  // The same cache by canonical URL spec, which also covers Archived Tabs.
+  gfx::Image CachedIcon(std::string_view url) const;
+  // Starts favicon lookups for Archived Tabs not looked up yet. Call only
+  // while the Library shows them; Refresh then reports found icons.
+  void RequestArchivedIcons(
+      const rust::Vec<foundation::ArchivedTabRecord>& tabs);
   // Reopens an Archived Tab as a temporary item in its Space (or the current
   // one if that Space is gone), selects it, then drops the archive entry.
   foundation::MutationResult RestoreArchivedTab(uint64_t id);
@@ -105,6 +113,12 @@ class BrowserWorkspaceAdapter final : public TabStripModelObserver {
   // Use for an explicit URL commit when no page is displayed. Native navigation
   // keeps upstream policy; hidden active pages are never navigated.
   foundation::MutationResult OpenInCurrentSpace(const GURL& url);
+  // Opens `url` as a temporary item of `space`, switching this window to that
+  // Space once the page is open. Sets `opened` (if given) once the page is
+  // open and bound, even when selecting it fails.
+  foundation::MutationResult OpenInSpace(const GURL& url,
+                                         uint64_t space,
+                                         bool* opened);
   foundation::MutationResult ActivateItem(uint64_t item);
   // Close this window's projection only. Dormant saved rows remain unchanged.
   foundation::MutationResult CloseItem(uint64_t item);
@@ -143,10 +157,13 @@ class BrowserWorkspaceAdapter final : public TabStripModelObserver {
   void ShowSelected();
   void OnServiceChanged();
   void Refresh();
-  // Starts favicon lookups for dormant saved rows and Archived Tabs not looked
-  // up yet.
+  // Null for off-the-record Profiles.
+  favicon::FaviconService* Favicons() const;
+  // Looks `url` up once; later calls answer from the cache.
+  void RequestIcon(favicon::FaviconService& favicons, std::string_view url);
+  // Starts favicon lookups for dormant saved rows not looked up yet.
   void RequestSavedIcons(const foundation::SidebarResult& sidebar);
-  void OnSavedIcon(const GURL& url,
+  void OnSavedIcon(const std::string& url,
                    const favicon_base::FaviconImageResult& result);
   foundation::MutationResult Remember(foundation::MutationResult result);
   foundation::MutationResult StepOrSelectItem(int index, int delta);
@@ -180,9 +197,9 @@ class BrowserWorkspaceAdapter final : public TabStripModelObserver {
   std::string binding_warning_;
   base::RepeatingClosureList changed_;
   base::CallbackListSubscription service_subscription_;
-  // By saved or archived URL. An empty image marks a pending lookup or a
-  // cache miss.
-  std::map<GURL, gfx::Image> saved_icons_;
+  // By saved or archived canonical URL spec. An empty image marks a pending
+  // lookup or a cache miss.
+  std::map<std::string, gfx::Image, std::less<>> saved_icons_;
   // Lookups not answered yet, and whether this batch found any icon.
   size_t pending_icons_ = 0;
   bool icons_found_ = false;

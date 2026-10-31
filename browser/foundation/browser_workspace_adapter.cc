@@ -10,10 +10,13 @@
 #include "base/functional/bind.h"
 #include "base/functional/callback_helpers.h"
 #include "base/location.h"
+#include "base/logging.h"
+#include "base/scoped_observation.h"
 #include "base/strings/utf_string_conversions.h"
 #include "base/strings/string_number_conversions.h"
 #include "base/task/single_thread_task_runner.h"
 #include "chrome/browser/favicon/favicon_service_factory.h"
+#include "chrome/browser/history/history_service_factory.h"
 #include "chrome/browser/lifetime/browser_shutdown.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/sessions/session_restore.h"
@@ -25,7 +28,12 @@
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
 #include "components/favicon/core/favicon_service.h"
 #include "components/favicon_base/favicon_types.h"
+#include "components/history/core/browser/history_service.h"
+#include "components/history/core/browser/history_service_observer.h"
+#include "components/history/core/browser/history_types.h"
+#include "components/history/core/common/pref_names.h"
 #include "components/keyed_service/core/service_access_type.h"
+#include "components/prefs/pref_service.h"
 #include "components/sessions/content/session_tab_helper.h"
 #include "content/public/browser/browser_thread.h"
 #include "content/public/browser/favicon_status.h"
@@ -87,9 +95,49 @@ foundation::MutationResult Fail(std::string_view error) {
   return {false, 0, rust::String(error.data(), error.size())};
 }
 
+// Drops Archived Tabs the user deletes from history: all of them when all
+// history goes, entries in a deleted time range, and entries for deleted URLs.
+class HistoryWatcher final : public history::HistoryServiceObserver {
+ public:
+  explicit HistoryWatcher(Profile& profile) : profile_(&profile) {
+    if (auto* history = HistoryServiceFactory::GetForProfile(
+            &profile, ServiceAccessType::EXPLICIT_ACCESS)) {
+      observation_.Observe(history);
+    }
+  }
+  void OnHistoryDeletions(history::HistoryService*,
+                          const history::DeletionInfo& info) override {
+    // History keeps visits longer than the archive's 30 days.
+    if (info.is_from_expiration())
+      return;
+    std::optional<std::pair<base::Time, base::Time>> range;
+    if (info.time_range().IsValid()) {
+      // A range restricted to some URLs still drops every entry in it.
+      range.emplace(info.time_range().begin(), info.time_range().end());
+    }
+    std::vector<std::string> urls;
+    if (!info.IsAllHistory()) {
+      urls.reserve(info.deleted_rows().size());
+      for (const auto& row : info.deleted_rows())
+        urls.push_back(row.url().spec());
+    }
+    WorkspaceService::ForProfile(*profile_).ForgetArchivedTabs(urls, range);
+  }
+  void HistoryServiceBeingDeleted(history::HistoryService*) override {
+    observation_.Reset();
+  }
+
+ private:
+  const raw_ptr<Profile> profile_;
+  base::ScopedObservation<history::HistoryService,
+                          history::HistoryServiceObserver>
+      observation_{this};
+};
+
 // Runtime pointers locate live projections only, never persisted identities.
 struct Runtime : base::SupportsUserData::Data {
   std::unique_ptr<WorkspaceLifecycleBridge> lifecycle;
+  std::unique_ptr<HistoryWatcher> history;
   std::vector<raw_ptr<BrowserWorkspaceAdapter>> adapters;
   std::map<content::WebContents*, uint64_t> pages;
   bool complete = false;
@@ -160,6 +208,8 @@ class Binding final : public base::SupportsUserData::Data,
     ForProfile(*profile_).pages[web_contents()] = item;
   }
   void Adopted() { legacy_ = false; }
+  // Arc archives tabs closed one by one, not the tabs of a closing window.
+  void SkipArchive() { archive_ = false; }
   void DidStopLoading() override;
   void WebContentsDestroyed() override {
     auto& runtime = ForProfile(*profile_);
@@ -169,11 +219,17 @@ class Binding final : public base::SupportsUserData::Data,
         !SessionRestore::IsRestoring(profile_) &&
         Count(*profile_, item_) == 0) {
       // Unknown IDs can occur only before rejected restore binding finishes.
-      // Rust archives the item only when it is temporary.
+      // Rust archives the item only when it is temporary. A Profile that
+      // saves no history archives nothing either.
+      auto& service = WorkspaceService::ForProfile(*profile_);
       auto& contents = *web_contents();
-      WorkspaceService::ForProfile(*profile_).ArchiveClosedTab(
-          item_, contents.GetLastCommittedURL().spec(),
-          base::UTF16ToUTF8(contents.GetTitle()));
+      if (archive_ && !profile_->GetPrefs()->GetBoolean(
+                          prefs::kSavingBrowserHistoryDisabled)) {
+        service.ArchiveClosedTab(item_, contents.GetLastCommittedURL().spec(),
+                                 base::UTF16ToUTF8(contents.GetTitle()));
+      } else {
+        service.LiveTabClosed(item_);
+      }
     }
   }
 
@@ -182,6 +238,7 @@ class Binding final : public base::SupportsUserData::Data,
   uint64_t item_;
   uint64_t space_;
   bool legacy_;
+  bool archive_ = true;
 };
 
 std::optional<uint64_t> ReadBinding(
@@ -425,6 +482,9 @@ BrowserWorkspaceAdapter::BrowserWorkspaceAdapter(
   if (!runtime.lifecycle) {
     runtime.lifecycle = std::make_unique<WorkspaceLifecycleBridge>(*profile_);
   }
+  // Off-the-record Profiles archive nothing, so they watch no history.
+  if (!runtime.history && !profile_->IsOffTheRecord())
+    runtime.history = std::make_unique<HistoryWatcher>(*profile_);
   if (browser_shutdown::IsTryingToQuit()) {
     BeginShutdown(*profile_);
   }
@@ -1143,31 +1203,38 @@ void BrowserWorkspaceAdapter::Refresh() {
   changed_.Notify();
 }
 
-void BrowserWorkspaceAdapter::RequestSavedIcons(
-    const foundation::SidebarResult& sidebar) {
+favicon::FaviconService* BrowserWorkspaceAdapter::Favicons() const {
   // Implicit access to an off-the-record Profile's favicons is fatal.
   if (profile_->IsOffTheRecord())
-    return;
-  auto* favicons = FaviconServiceFactory::GetForProfile(
+    return nullptr;
+  return FaviconServiceFactory::GetForProfile(
       profile_, ServiceAccessType::IMPLICIT_ACCESS);
+}
+
+void BrowserWorkspaceAdapter::RequestIcon(favicon::FaviconService& favicons,
+                                          std::string_view url) {
+  if (saved_icons_.contains(url))
+    return;
+  saved_icons_.emplace(url, gfx::Image());
+  ++pending_icons_;
+  favicons.GetFaviconImageForPageURL(
+      GURL(url),
+      base::BindOnce(&BrowserWorkspaceAdapter::OnSavedIcon,
+                     weak_factory_.GetWeakPtr(), std::string(url)),
+      &icon_tracker_);
+}
+
+void BrowserWorkspaceAdapter::RequestSavedIcons(
+    const foundation::SidebarResult& sidebar) {
+  auto* favicons = Favicons();
   if (!favicons)
     return;
-  const auto request = [&](const GURL& url) {
-    if (saved_icons_.contains(url))
-      return;
-    saved_icons_.emplace(url, gfx::Image());
-    ++pending_icons_;
-    favicons->GetFaviconImageForPageURL(
-        url,
-        base::BindOnce(&BrowserWorkspaceAdapter::OnSavedIcon,
-                       weak_factory_.GetWeakPtr(), url),
-        &icon_tracker_);
-  };
   for (const auto* rows : {&sidebar.favorites, &sidebar.pins}) {
     for (const auto& row : *rows) {
       if (!row.has_url)
         continue;
-      const GURL url(std::string(row.canonical_url));
+      const std::string_view url(row.canonical_url.data(),
+                                 row.canonical_url.size());
       if (AnyPage(*profile_, row.id)) {
         // The live page may store a new favicon; look again once it closes.
         auto cached = saved_icons_.find(url);
@@ -1175,16 +1242,22 @@ void BrowserWorkspaceAdapter::RequestSavedIcons(
           saved_icons_.erase(cached);
         continue;
       }
-      request(url);
+      RequestIcon(*favicons, url);
     }
   }
-  // Archived Tabs share the cache; each URL is looked up once per window.
-  for (const auto& tab : service_->ArchivedTabs())
-    request(GURL(std::string(tab.url)));
+}
+
+void BrowserWorkspaceAdapter::RequestArchivedIcons(
+    const rust::Vec<foundation::ArchivedTabRecord>& tabs) {
+  auto* favicons = Favicons();
+  if (!favicons)
+    return;
+  for (const auto& tab : tabs)
+    RequestIcon(*favicons, std::string_view(tab.url.data(), tab.url.size()));
 }
 
 void BrowserWorkspaceAdapter::OnSavedIcon(
-    const GURL& url,
+    const std::string& url,
     const favicon_base::FaviconImageResult& result) {
   DCHECK_GT(pending_icons_, 0u);
   --pending_icons_;
@@ -1204,10 +1277,11 @@ gfx::Image BrowserWorkspaceAdapter::SavedIcon(
     const foundation::ItemRecord& item) const {
   if (!item.has_url)
     return gfx::Image();
-  return CachedIcon(GURL(std::string(item.canonical_url)));
+  return CachedIcon(
+      std::string_view(item.canonical_url.data(), item.canonical_url.size()));
 }
 
-gfx::Image BrowserWorkspaceAdapter::CachedIcon(const GURL& url) const {
+gfx::Image BrowserWorkspaceAdapter::CachedIcon(std::string_view url) const {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
   auto cached = saved_icons_.find(url);
   return cached == saved_icons_.end() ? gfx::Image() : cached->second;
@@ -1222,7 +1296,6 @@ foundation::MutationResult BrowserWorkspaceAdapter::RestoreArchivedTab(
       std::ranges::find(tabs, id, &foundation::ArchivedTabRecord::id);
   if (tab == tabs.end())
     return Fail("This archived tab no longer exists.");
-  const GURL url(std::string(tab->url));
   const auto sidebar = Sidebar();
   if (!sidebar.ok)
     return Fail("Workspace window is not ready.");
@@ -1231,15 +1304,18 @@ foundation::MutationResult BrowserWorkspaceAdapter::RestoreArchivedTab(
       sidebar.spaces, [&](const foundation::SpaceRecord& space) {
         return space.id == tab->space_id;
       });
-  if (space_exists && tab->space_id != sidebar.current_space.id) {
-    auto selected = SelectSpace(tab->space_id);
-    if (!selected.ok)
-      return selected;
+  bool opened = false;
+  auto result =
+      OpenInSpace(GURL(std::string(tab->url)),
+                  space_exists ? tab->space_id : sidebar.current_space.id,
+                  &opened);
+  // The page is open again, so drop the entry even if selecting it failed.
+  if (opened) {
+    if (auto removed = service_->RemoveArchivedTab(id); !removed.ok) {
+      LOG(WARNING) << "Reopened archived tab " << id
+                   << " stays archived: " << std::string(removed.error);
+    }
   }
-  auto result = OpenInCurrentSpace(url);
-  // Drop the entry only once its page is open again.
-  if (result.ok)
-    service_->RemoveArchivedTab(id);
   return result;
 }
 
@@ -1293,6 +1369,18 @@ foundation::MutationResult BrowserWorkspaceAdapter::OpenInCurrentSpace(
     const GURL& url) {
   if (!ready())
     return Fail(error());
+  const auto sidebar = Sidebar();
+  if (!sidebar.ok)
+    return Fail("Workspace window is not ready.");
+  return OpenInSpace(url, sidebar.current_space.id, nullptr);
+}
+
+foundation::MutationResult BrowserWorkspaceAdapter::OpenInSpace(
+    const GURL& url,
+    uint64_t space,
+    bool* opened) {
+  if (!ready())
+    return Fail(error());
   if (!url.is_valid())
     return Fail("Enter a valid URL.");
   auto sidebar = Sidebar();
@@ -1301,7 +1389,7 @@ foundation::MutationResult BrowserWorkspaceAdapter::OpenInCurrentSpace(
   base::AutoReset<bool> changing(&changing_, true);
   base::ScopedClosureRunner refresh_on_exit(base::BindOnce(
       &BrowserWorkspaceAdapter::OnServiceChanged, base::Unretained(this)));
-  auto result = service_->AddTemporaryItem(sidebar.current_space.id);
+  auto result = service_->AddTemporaryItem(space);
   if (!result.ok)
     return result;
   const uint64_t item = result.id;
@@ -1317,10 +1405,16 @@ foundation::MutationResult BrowserWorkspaceAdapter::OpenInCurrentSpace(
       Remember(service_->LiveTabClosed(item));
     return Fail("Native navigation did not open in the owning window/Profile.");
   }
-  result = Binding::Set(*page, item, sidebar.current_space.id);
+  result = Binding::Set(*page, item, space);
   if (result.ok) {
     DCHECK_EQ(ItemIdForContents(*page), item);
-    result = service_->SelectItem(window_id_, item);
+    if (opened)
+      *opened = true;
+    // Switch Space only once the page is open in it.
+    if (space != sidebar.current_space.id)
+      result = service_->SelectSpace(window_id_, space);
+    if (result.ok)
+      result = service_->SelectItem(window_id_, item);
   }
   if (!result.ok)
     return result;
@@ -1559,6 +1653,18 @@ void BrowserWorkspaceAdapter::OnTabStripModelChanged(
                             binding->space(), binding->legacy()));
       if (bound_)
         PersistBindings();
+    }
+  }
+  // Observers hear of a removal before its contents is destroyed.
+  if (change.type() == TabStripModelChange::kRemoved && tabs_ &&
+      (tabs_->closing_all() || browser_->IsDeleteScheduled())) {
+    for (const auto& removed : change.GetRemove()->contents) {
+      auto* binding = removed.contents ? Binding::Get(*removed.contents)
+                                       : nullptr;
+      if (binding && removed.tab_detach_reason ==
+                         tabs::TabInterface::DetachReason::kDelete) {
+        binding->SkipArchive();
+      }
     }
   }
   // Navigate binds only navigated_or_inserted_contents after it returns.

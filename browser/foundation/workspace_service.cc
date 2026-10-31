@@ -1,6 +1,7 @@
 #include "myarc/workspace_service.h"
 
 #include <array>
+#include <limits>
 #include <memory>
 #include <utility>
 
@@ -121,10 +122,17 @@ bool BoundedText(std::string_view text, size_t limit) {
   return text.size() <= limit && base::IsStringUTF8(text);
 }
 
-// Wall-clock seconds for Archived Tabs; a clock before 1970 reads as 0.
+// Wall-clock seconds for Archived Tabs; a time before 1970 reads as 0 and
+// base::Time::Max() as the largest value.
+uint64_t Secs(base::Time time) {
+  if (time.is_max())
+    return std::numeric_limits<uint64_t>::max();
+  const time_t secs = time.is_null() ? 0 : time.ToTimeT();
+  return secs > 0 ? static_cast<uint64_t>(secs) : 0;
+}
+
 uint64_t NowSecs() {
-  const time_t now = base::Time::Now().ToTimeT();
-  return now > 0 ? static_cast<uint64_t>(now) : 0;
+  return Secs(base::Time::Now());
 }
 
 }  // namespace
@@ -150,14 +158,21 @@ bool CanonicalizeUrls(foundation::StateSnapshot& snapshot) {
       return false;
     item.canonical_url = *url;
   }
-  if (snapshot.archived.size() > limits.archived_tabs)
-    return false;
-  for (auto& tab : snapshot.archived) {
+  // A bad Archived Tab is dropped rather than failing the snapshot; only the
+  // newest entries within the limit stay.
+  rust::Vec<foundation::ArchivedTabRecord> archived;
+  const size_t skip = snapshot.archived.size() > limits.archived_tabs
+                          ? snapshot.archived.size() - limits.archived_tabs
+                          : 0;
+  for (size_t i = skip; i < snapshot.archived.size(); ++i) {
+    auto& tab = snapshot.archived[i];
     auto url = CanonicalUrl(std::string_view(tab.url.data(), tab.url.size()));
     if (!url)
-      return false;
+      continue;
     tab.url = *url;
+    archived.push_back(std::move(tab));
   }
+  snapshot.archived = std::move(archived);
   return true;
 }
 
@@ -237,13 +252,14 @@ MetadataResult DecodeWorkspaceMetadata(std::string_view json) {
   const auto* spaces = root->FindList("spaces");
   const auto* items = root->FindList("items");
   const auto* windows = root->FindList("windows");
-  // Files written before Archived Tabs existed have no "archived" key.
-  const auto* archived = root->FindList("archived");
+  // Files written before Archived Tabs existed have no "archived" key. A bad
+  // archive never fails the file: it is a convenience, the rest is not.
+  const auto* archived_value = root->Find("archived");
+  const auto* archived = archived_value ? archived_value->GetIfList() : nullptr;
   if (!spaces || spaces->size() > limits.spaces || !items ||
       items->size() > limits.items || !windows ||
       windows->size() > limits.windows ||
-      (root->size() == 9) != (archived != nullptr) ||
-      (archived && archived->size() > limits.archived_tabs)) {
+      (root->size() == 9) != (archived_value != nullptr)) {
     return InvalidMetadata();
   }
   foundation::StateSnapshot snapshot;
@@ -305,8 +321,12 @@ MetadataResult DecodeWorkspaceMetadata(std::string_view json) {
     snapshot.windows.push_back(std::move(window));
   }
   if (archived) {
-    for (const auto& value : *archived) {
-      const auto* record = value.GetIfDict();
+    // Oldest first, so the newest entries within the limit stay.
+    const size_t skip = archived->size() > limits.archived_tabs
+                            ? archived->size() - limits.archived_tabs
+                            : 0;
+    for (size_t i = skip; i < archived->size(); ++i) {
+      const auto* record = (*archived)[i].GetIfDict();
       const auto* url = record ? record->FindString("url") : nullptr;
       const auto* title = record ? record->FindString("title") : nullptr;
       foundation::ArchivedTabRecord tab;
@@ -316,7 +336,7 @@ MetadataResult DecodeWorkspaceMetadata(std::string_view json) {
           !ReadId(*record, "id", tab.id) ||
           !ReadId(*record, "space_id", tab.space_id) ||
           !ReadId(*record, "archived_secs", tab.archived_secs)) {
-        return InvalidMetadata();
+        continue;
       }
       tab.url = *url;
       tab.title = *title;
@@ -432,11 +452,16 @@ void WorkspaceService::OnLoaded(internal::MetadataResult result) {
     if (!restored.ok) {
       result.error = std::string(restored.error) +
                      ". Metadata preserved. Recover file and retry loading.";
+    } else if (foundation::prune_archived_tabs(*workspace_, NowSecs()).id) {
+      // Entries that expired while the browser was closed leave the file too.
+      dirty_ = true;
     }
   }
   storage_error_ = std::move(result.error);
   storage_state_ =
       storage_error_.empty() ? StorageState::kReady : StorageState::kLoadError;
+  if (storage_state_ == StorageState::kReady)
+    ScheduleWrite();
   changed_.Notify();
 }
 
@@ -592,6 +617,26 @@ foundation::MutationResult WorkspaceService::RemoveArchivedTab(uint64_t id) {
   return Changed(foundation::remove_archived_tab(*workspace_, id));
 }
 
+void WorkspaceService::ForgetArchivedTabs(
+    base::span<const std::string> urls,
+    std::optional<std::pair<base::Time, base::Time>> range) {
+  if (!CanMutate())
+    return;
+  rust::Vec<rust::String> owned;
+  owned.reserve(urls.size());
+  for (const auto& url : urls)
+    owned.emplace_back(url.data(), url.size());
+  // A null end means "until now", the same as no end.
+  const uint64_t end =
+      range && !range->second.is_null() ? Secs(range->second)
+                                        : std::numeric_limits<uint64_t>::max();
+  auto result = foundation::forget_archived_tabs(
+      *workspace_, std::move(owned), range.has_value(),
+      range ? Secs(range->first) : 0, end);
+  if (result.id)
+    Changed(std::move(result));
+}
+
 foundation::MutationResult WorkspaceService::SetPlacement(
     uint64_t item,
     foundation::PlacementKind placement,
@@ -685,8 +730,10 @@ foundation::MutationResult WorkspaceService::RestoreSnapshot(
     return Failure("Workspace is not loaded. Check storage state.");
   if (!internal::CanonicalizeUrls(snapshot))
     return Failure("Workspace snapshot exceeds limits or has an invalid URL.");
-  return Changed(
-      foundation::restore_snapshot(*workspace_, std::move(snapshot)));
+  auto result = foundation::restore_snapshot(*workspace_, std::move(snapshot));
+  if (result.ok)
+    foundation::prune_archived_tabs(*workspace_, NowSecs());
+  return Changed(std::move(result));
 }
 
 }  // namespace myarc

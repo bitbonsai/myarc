@@ -3,6 +3,7 @@
 
 #include <cstdint>
 #include <optional>
+#include <set>
 #include <string>
 #include <utility>
 #include <vector>
@@ -61,7 +62,8 @@ class LibraryView final : public views::View,
   void BuildSpaces();
   void BuildList();
   // Fills the Downloads or Archived Tabs list from the cached entries.
-  void UpdateList();
+  // `keep_scroll` keeps the list's scroll offset across the rebuild.
+  void UpdateList(bool keep_scroll);
   void AddArchiveRows(views::View& rows);
   // The keyed control that has focus, and putting focus back on it after a
   // rebuild. Returns false when no control has `key` any more.
@@ -91,6 +93,8 @@ class LibraryView final : public views::View,
   std::vector<SidebarView::DownloadPresentation> downloads_;
   // Archived Tabs, newest first and unfiltered, while that section shows.
   std::vector<SidebarView::ArchivedTabPresentation> archived_;
+  // Archived Tabs whose reopen is queued, so a second click does nothing.
+  std::set<uint64_t> reopening_;
   std::u16string query_;
   // Surface and text colors the pane was last built with.
   std::optional<std::pair<SkColor, SkColor>> theme_colors_;

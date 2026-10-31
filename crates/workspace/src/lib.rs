@@ -708,7 +708,8 @@ impl Workspace {
     }
 
     pub fn from_snapshot(snapshot: WorkspaceSnapshot) -> Result<Self, WorkspaceError> {
-        let workspace = Self { state: snapshot };
+        let mut workspace = Self { state: snapshot };
+        workspace.sanitize_archive();
         workspace.validate()?;
         Ok(workspace)
     }
@@ -782,7 +783,6 @@ impl Workspace {
         if state.spaces.len() > MAX_SPACES
             || state.items.len() > MAX_ITEMS
             || state.windows.len() > MAX_WINDOWS
-            || state.archived.len() > MAX_ARCHIVED_TABS
         {
             return Err(WorkspaceError::InvalidSnapshot(
                 "collection count exceeds workspace limits",
@@ -833,7 +833,7 @@ impl Workspace {
                 }
             }
         }
-        self.validate_archive()
+        Ok(())
     }
 }
 
