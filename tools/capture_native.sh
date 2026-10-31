@@ -7,6 +7,8 @@
 #   command palette via --myarc-capture-open-palette and waits KEY_SETTLE (default 2).
 #   PALETTE_TEXT="claude plans" pre-fills the palette input to show its results.
 #   COPY_URL=1 copies the page URL via --myarc-capture-copy-url and holds the toast.
+#   LIBRARY=1 (or media/downloads/easels/boosts/archive) opens the Library via
+#   --myarc-capture-open-library, on Spaces unless a section is named.
 #   SETTINGS=1 (or general/advanced/more) opens the native Settings window via
 #   --myarc-capture-open-settings and captures only that window; "more" presses
 #   More Settings… and captures the browser window instead.
@@ -44,6 +46,11 @@ if [ "${1:-}" = "--inner" ]; then
   { [ -n "$KEYS" ] || [ -n "${PALETTE:-}" ]; } && EXTRA+=(--myarc-capture-open-palette)
   [ -n "${PALETTE_TEXT:-}" ] && EXTRA+=(--myarc-capture-palette-text="$PALETTE_TEXT")
   [ -n "${COPY_URL:-}" ] && EXTRA+=(--myarc-capture-copy-url)
+  case "${LIBRARY:-}" in
+    "") ;;
+    1) EXTRA+=(--myarc-capture-open-library) ;;
+    *) EXTRA+=(--myarc-capture-open-library="$LIBRARY") ;;
+  esac
   SHOT_TITLE=()
   case "${SETTINGS:-}" in
     "") ;;

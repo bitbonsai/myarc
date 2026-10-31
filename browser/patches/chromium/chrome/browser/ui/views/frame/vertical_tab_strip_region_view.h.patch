@@ -1,5 +1,5 @@
 diff --git a/chrome/browser/ui/views/frame/vertical_tab_strip_region_view.h b/chrome/browser/ui/views/frame/vertical_tab_strip_region_view.h
-index 5c8d5a6d2038b452b94656096a0057209ea34d32..abd63cee3d9b2dc4c046680215e66fef9d36c7ab 100644
+index 5c8d5a6d2038b452b94656096a0057209ea34d32..36028f9ec09d137ebf3518038e756426e4a7c9dc 100644
 --- a/chrome/browser/ui/views/frame/vertical_tab_strip_region_view.h
 +++ b/chrome/browser/ui/views/frame/vertical_tab_strip_region_view.h
 @@ -28,6 +28,7 @@
@@ -28,7 +28,7 @@ index 5c8d5a6d2038b452b94656096a0057209ea34d32..abd63cee3d9b2dc4c046680215e66fef
    METADATA_HEADER(VerticalTabStripRegionView, BaseTabStripRegionView)
  
   public:
-@@ -81,6 +84,11 @@ class VerticalTabStripRegionView final
+@@ -81,6 +84,14 @@ class VerticalTabStripRegionView final
      return bottom_button_container_;
    }
  
@@ -36,11 +36,14 @@ index 5c8d5a6d2038b452b94656096a0057209ea34d32..abd63cee3d9b2dc4c046680215e66fef
 +  void SetMyarcWorkspaceSidebar(std::unique_ptr<views::View> sidebar);
 +  void SetMyarcWorkspaceReady(bool ready);
 +  void RemoveMyarcWorkspaceSidebar();
++  // The Library takes the whole region at the sidebar's preferred width and
++  // hides the header, as Arc replaces its sidebar.
++  void SetMyarcLibraryOpen(bool open);
 +
    bool IsPositionInWindowCaption(const gfx::Point& point) override;
  
    // These methods provide the toolbar height and exclusion width, before the
-@@ -111,6 +119,11 @@ class VerticalTabStripRegionView final
+@@ -111,6 +122,11 @@ class VerticalTabStripRegionView final
    void OnMouseMoved(const ui::MouseEvent& event) override;
    void OnMouseExited(const ui::MouseEvent& event) override;
  
@@ -52,7 +55,7 @@ index 5c8d5a6d2038b452b94656096a0057209ea34d32..abd63cee3d9b2dc4c046680215e66fef
    std::unique_ptr<ExpandOnHoverLock> GetExpandOnHoverLock(
        ExpandOnHoverLockType lock_type) override;
  
-@@ -201,6 +214,7 @@ class VerticalTabStripRegionView final
+@@ -201,6 +217,7 @@ class VerticalTabStripRegionView final
    // strip.
    gfx::Rect GetTabStripDraggableBounds() const override;
  
@@ -60,16 +63,17 @@ index 5c8d5a6d2038b452b94656096a0057209ea34d32..abd63cee3d9b2dc4c046680215e66fef
    void OnExpandOnHoverEnabledChanged(bool enabled);
    void UpdateExpandOnHoverState(std::optional<bool> hovered = std::nullopt);
    void OnMouseVelocityHeuristicInterval();
-@@ -224,6 +238,8 @@ class VerticalTabStripRegionView final
+@@ -224,6 +241,9 @@ class VerticalTabStripRegionView final
    raw_ptr<views::View> organizer_panel_view_ = nullptr;
    double organizer_panel_show_percent_ = 0.0;
  
 +  raw_ptr<views::View> myarc_workspace_sidebar_ = nullptr;
 +  bool myarc_workspace_ready_ = false;
++  bool myarc_library_open_ = false;
    raw_ptr<views::View> content_area_view_ = nullptr;
    raw_ptr<VerticalTabStripTopContainer> top_button_container_ = nullptr;
    raw_ptr<views::Separator> top_button_separator_ = nullptr;
-@@ -260,6 +276,9 @@ class VerticalTabStripRegionView final
+@@ -260,6 +280,9 @@ class VerticalTabStripRegionView final
  
    base::OneShotTimer expand_on_hover_timer_;
    bool is_expanded_on_hover_ = false;

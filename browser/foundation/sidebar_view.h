@@ -31,6 +31,8 @@ struct SidebarResult;
 
 namespace myarc {
 
+class LibraryView;
+
 // Presentation only, on the UI sequence. Delegate outlives this view. The
 // parent owns Profile/window scope, Rust mutations, browser tabs, dialogs and
 // failures.
@@ -46,6 +48,22 @@ class SidebarView final : public views::View,
     std::u16string title;
     ui::ImageModel icon;  // Parent supplies a favicon, preferably 16 or 20 DIP.
     bool is_live = false;
+  };
+
+  // Arc's Library rail, top to bottom.
+  enum class LibrarySection {
+    kMedia,
+    kDownloads,
+    kEasels,
+    kSpaces,
+    kBoosts,
+    kArchive
+  };
+
+  struct DownloadPresentation {
+    uint32_t id = 0;
+    std::u16string name;
+    std::u16string detail;  // Source host, or why it can't be opened.
   };
 
   class Delegate {
@@ -71,6 +89,12 @@ class SidebarView final : public views::View,
     virtual void RenameSpace(uint64_t space_id) = 0;
     virtual void NewTab() = 0;  // Parent opens its real New Tab/palette flow.
     virtual void OpenDownloads() = 0;  // Exact owning browser's Chrome command.
+    // Newest first, bounded by the parent. Lookup only.
+    virtual std::vector<DownloadPresentation> GetRecentDownloads() const = 0;
+    virtual void OpenDownload(uint32_t download_id) = 0;
+    // The parent resizes the sidebar region for the Library. After closing it
+    // supplies a fresh model with SetModel.
+    virtual void SetLibraryOpen(bool open) = 0;
     virtual void RetryWorkspaceStorage(StorageRetry retry) = 0;
   };
 
@@ -89,6 +113,10 @@ class SidebarView final : public views::View,
                       StorageRetry retry = StorageRetry::kNone);
   // Fills the New Tab row while the parent's New Tab palette is open.
   void SetNewTabIntent(bool intent);
+  // Replaces the sidebar contents with the Library until back or Esc. Needs a
+  // usable model.
+  void OpenLibrary(LibrarySection section = LibrarySection::kSpaces);
+  bool library_open() const { return !!library_; }
 
  private:
   friend class SidebarViewTestApi;
@@ -131,8 +159,9 @@ class SidebarView final : public views::View,
       views::View* source,
       const gfx::Point& point,
       ui::mojom::MenuSourceType source_type) override;
-  void BuildLibraryMenu();
-  void ShowLibrary(const ui::Event& event);
+  void CloseLibrary();
+  // Drops the Library view without notifying the parent.
+  void ResetLibrary();
   void BuildCreateMenu();
   void ShowCreateMenu(const ui::Event& event);
   void SetCreateMenuOpen(bool open);
@@ -152,7 +181,7 @@ class SidebarView final : public views::View,
   uint64_t menu_space_id_ = 0;
   uint64_t menu_item_id_ = 0;
   std::vector<std::pair<uint64_t, std::u16string>> spaces_;
-  std::vector<uint64_t> library_space_ids_;
+  raw_ptr<LibraryView> library_ = nullptr;
   ItemMenuState menu_state_ = {};
   // Stable sidebar owns both; no menu callback or anchor retains a child row.
   // Runner must be destroyed before its model and before children.

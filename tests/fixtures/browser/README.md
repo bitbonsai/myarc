@@ -57,8 +57,10 @@ Check these in the preview window, recording failures rather than assuming parit
    may remain listed through the current shared Profile projection. Hover a result
    without clicking; input should keep focus. Arrow/click selection deliberately
    activates that result. Escape should dismiss an unused palette.
-2. Library opens a native menu for Downloads and existing Space actions. The
-   footer Library/current Space/`+` controls stay square. Use `+` (Create Space),
+2. Library replaces the sidebar with its rail; check Spaces (switch, Create
+   Space), Downloads (open one, Show All Downloads) and the Archived Tabs empty
+   state, then leave with the back arrow or Esc. The footer Library/current
+   Space/`+` controls stay square. Use `+` (Create Space),
    then switch with its Space dots. A fresh
    Space should show empty material and a neutral header, without the prior URL
    or page. Return to the populated Space and select its row to show the actual page.

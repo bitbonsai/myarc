@@ -150,7 +150,7 @@ Feature lines: 159 total, 25 done, 38 partial, 96 missing. Shortcut table: 44 ro
 
 ## Library, downloads, media
 
-- [ ] Library opens from the footer icon with Media, Downloads, Easels & Notes, Spaces and Archived Tabs sections. | status: partial | evidence: browser/experiments/native-sidebar-row-footer.md (small menu: Downloads, Spaces, Create Space; Easels excluded) | source: https://resources.arc.net/hc/en-us/articles/19230634389911-Library-A-home-for-your-downloads-archived-tabs-easels-and-more
+- [ ] Library opens from the footer icon with Media, Downloads, Easels & Notes, Spaces and Archived Tabs sections. | status: partial | evidence: browser/foundation/library_view.cc (rail with all six sections; Spaces, Downloads and an empty Archived Tabs work; Media and Boosts are placeholders; Easels excluded) | source: https://resources.arc.net/hc/en-us/articles/19230634389911-Library-A-home-for-your-downloads-archived-tabs-easels-and-more
 - [ ] Library remembers its last-used section and opens on Downloads right after a download. | status: missing | evidence: none | source: https://resources.arc.net/hc/en-us/articles/20498293324823-Arc-for-macOS-2024-2026-Release-Notes
 - [ ] Hovering the Library icon lists recent files that can be dragged out. | status: missing | evidence: none | source: https://resources.arc.net/hc/en-us/articles/19230634389911-Library-A-home-for-your-downloads-archived-tabs-easels-and-more
 - [ ] A Spaces overview in Library shows every tab in every Space and lets you drag tabs between them. | status: missing | evidence: none | source: https://resources.arc.net/hc/en-us/articles/20498293324823-Arc-for-macOS-2024-2026-Release-Notes

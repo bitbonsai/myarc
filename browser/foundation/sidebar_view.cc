@@ -7,10 +7,14 @@
 #include <utility>
 
 #include "base/functional/bind.h"
+#include "base/location.h"
 #include "base/scoped_observation.h"
 #include "base/strings/utf_string_conversions.h"
+#include "base/task/sequenced_task_runner.h"
 #include "components/vector_icons/vector_icons.h"
 #include "myarc/bridge.rs.h"
+#include "myarc/icons.h"
+#include "myarc/library_view.h"
 #include "third_party/skia/include/core/SkColor.h"
 #include "ui/base/metadata/metadata_impl_macros.h"
 #include "ui/base/mojom/menu_source_type.mojom.h"
@@ -45,25 +49,6 @@ using Orientation = views::BoxLayout::Orientation;
 
 constexpr int kTileHeight = 46;
 
-// Footer icons from Lucide (ISC, lucide-static 1.61.0): 24 DIP canvas,
-// stroke 2. "archive" stands in for Arc's Library box, "plus" for Create.
-constexpr gfx::PathElement kArchivePath[] = {
-    gfx::CANVAS_DIMENSIONS, 24, gfx::STROKE, 2, gfx::ROUND_RECT, 2, 3, 20, 5, 1,
-    gfx::MOVE_TO, 4, 8, gfx::V_LINE_TO, 19,
-    gfx::R_ARC_TO, 2, 2, 0, 0, 0, 2, 2, gfx::H_LINE_TO, 18,
-    gfx::R_ARC_TO, 2, 2, 0, 0, 0, 2, -2, gfx::V_LINE_TO, 8,
-    gfx::MOVE_TO, 10, 12, gfx::R_H_LINE_TO, 4};
-constexpr gfx::VectorIconRep kArchiveRep[] = {{kArchivePath}};
-constexpr gfx::VectorIcon kArchiveIcon(kArchiveRep,
-                                       std::size(kArchiveRep),
-                                       "myarc_archive");
-
-constexpr gfx::PathElement kPlusPath[] = {
-    gfx::CANVAS_DIMENSIONS, 24, gfx::STROKE, 2, gfx::MOVE_TO, 5, 12,
-    gfx::H_LINE_TO, 19, gfx::MOVE_TO, 12, 5, gfx::V_LINE_TO, 19};
-constexpr gfx::VectorIconRep kPlusRep[] = {{kPlusPath}};
-constexpr gfx::VectorIcon kPlusIcon(kPlusRep, std::size(kPlusRep), "myarc_plus");
-
 // Lucide "circle" filled to the canvas edge: Arc's Space dot is 8 DIP across.
 constexpr gfx::PathElement kDotPath[] = {gfx::CANVAS_DIMENSIONS, 24,
                                          gfx::CIRCLE, 12, 12, 12};
@@ -76,14 +61,13 @@ struct Fills {
   SkColor new_tab;
   SkColor footer_icon;
   SkColor space_dot;
-  SkColor current_space_dot;
   SkColor title;
 };
 
 // Arc lifts sidebar controls with white over the window material, so they read
 // lighter than the sidebar. Dark values are sampled from Arc's dark sidebar;
-// footer icons are Arc's muted #A9A2AF over it; Space dots are the same white
-// at 50% (current) and 18% (others). The URL pill and header toggle
+// footer icons, the current Space's included, are Arc's muted #A9A2AF over it;
+// other Spaces' dots are the same white at 18%. The URL pill and header toggle
 // chip pick light/dark from the same kColorSysSurface.
 Fills GetFills(const ui::ColorProvider* provider) {
   const bool dark = !provider || color_utils::IsDark(
@@ -93,13 +77,11 @@ Fills GetFills(const ui::ColorProvider* provider) {
                       SkColorSetA(SK_ColorWHITE, 0x33),
                       SkColorSetA(SK_ColorWHITE, 0x99),
                       SkColorSetA(SK_ColorWHITE, 0x2D),
-                      SkColorSetA(SK_ColorWHITE, 0x80),
                       SkColorSetA(SK_ColorWHITE, 0x73)}
               : Fills{SkColorSetA(SK_ColorWHITE, 0x80), SK_ColorWHITE,
                       SkColorSetA(SK_ColorWHITE, 0xB3),
                       SkColorSetA(SK_ColorBLACK, 0x99),
                       SkColorSetA(SK_ColorBLACK, 0x33),
-                      SkColorSetA(SK_ColorBLACK, 0x80),
                       SkColorSetA(SK_ColorBLACK, 0x99)};
 }
 
@@ -108,10 +90,8 @@ enum ItemCommand {
   kFavorite,
   kUnsave,
   kClose,
-  kDownloads,
   kCreateSpace,
-  kNewTab,
-  kFirstSpace = 100
+  kNewTab
 };
 
 // The row owns its highlight and reserves the close target even when its glyph
@@ -323,42 +303,79 @@ void SidebarView::ShowContextMenuForViewImpl(
                           views::MenuAnchorPosition::kTopLeft, source_type);
 }
 
-void SidebarView::BuildLibraryMenu() {
-  menu_item_id_ = 0;
-  menu_runner_.reset();
-  menu_model_ = std::make_unique<ui::SimpleMenuModel>(this);
-  menu_model_->AddItem(kDownloads, u"Downloads");
-  menu_model_->AddSeparator(ui::NORMAL_SEPARATOR);
-  library_space_ids_.clear();
-  for (const auto& [id, name] : spaces_) {
-    menu_model_->AddItem(
-        kFirstSpace + library_space_ids_.size(),
-        (id == current_space_id_ ? u"Current Space: " : u"Switch to Space: ") +
-            name);
-    library_space_ids_.push_back(id);
+void SidebarView::OpenLibrary(LibrarySection section) {
+  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
+  if (library_) {
+    library_->SelectSection(section);
+    return;
   }
-  menu_model_->AddSeparator(ui::NORMAL_SEPARATOR);
-  menu_model_->AddItem(kCreateSpace, u"Create Space");
+  if (!current_space_id_) {
+    return;
+  }
+  // Keyboard users keep focus; a click leaves no focus ring, as in Arc.
+  const bool had_focus = std::ranges::any_of(
+      focus_targets_,
+      [](const FocusTarget& target) { return target.view->HasFocus(); });
+  menu_item_id_ = 0;
+  if (menu_runner_) {
+    menu_runner_->Cancel();
+  }
+  focus_targets_.clear();
+  spaces_scroll_ = nullptr;
+  new_tab_ = nullptr;
+  tiles_.clear();
+  RemoveAllChildViews();
+  // The Library sets its own width and edges, as Arc swaps out its sidebar.
+  auto* layout = static_cast<views::BoxLayout*>(GetLayoutManager());
+  layout->set_inside_border_insets(gfx::Insets());
+  SetPreferredSize(std::nullopt);
+  library_ = AddChildView(std::make_unique<LibraryView>(
+      *delegate_,
+      base::BindRepeating(
+          [](base::WeakPtr<SidebarView> sidebar) {
+            // Back and Esc run inside the Library's own handlers.
+            base::SequencedTaskRunner::GetCurrentDefault()->PostTask(
+                FROM_HERE, base::BindOnce(&SidebarView::CloseLibrary, sidebar));
+          },
+          weak_factory_.GetWeakPtr()),
+      section));
+  layout->SetFlexForView(library_, 1);
+  library_->SetSpaces(spaces_, current_space_id_);
+  delegate_->SetLibraryOpen(true);
+  if (had_focus) {
+    library_->FocusSection();
+  }
 }
 
-void SidebarView::ShowLibrary(const ui::Event& event) {
+void SidebarView::ResetLibrary() {
+  if (!library_) {
+    return;
+  }
+  views::View* library = std::exchange(library_, nullptr);
+  RemoveChildViewT(library);
+  static_cast<views::BoxLayout*>(GetLayoutManager())
+      ->set_inside_border_insets(gfx::Insets::TLBR(8, 8, 7, 8));
+  SetPreferredSize(gfx::Size(230, 400));
+  // SetModel rebuilds the rows from scratch.
+  current_space_id_ = 0;
+}
+
+void SidebarView::CloseLibrary() {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
-  if (!GetWidget() || (menu_runner_ && menu_runner_->IsRunning())) {
+  if (!library_) {
     return;
   }
-  const auto target = std::ranges::find(focus_targets_, FocusAction::kLibrary,
+  ResetLibrary();
+  auto weak = weak_factory_.GetWeakPtr();
+  delegate_->SetLibraryOpen(false);
+  if (!weak) {
+    return;
+  }
+  const auto button = std::ranges::find(focus_targets_, FocusAction::kLibrary,
                                         &FocusTarget::action);
-  if (target == focus_targets_.end()) {
-    return;
+  if (button != focus_targets_.end()) {
+    button->view->RequestFocus();
   }
-  const gfx::Rect anchor = target->view->GetBoundsInScreen();
-  BuildLibraryMenu();
-  menu_runner_ = std::make_unique<views::MenuRunner>(
-      menu_model_.get(), views::MenuRunner::CONTEXT_MENU);
-  menu_runner_->RunMenuAt(
-      GetWidget(), nullptr, anchor, views::MenuAnchorPosition::kTopLeft,
-      event.IsKeyEvent() ? ui::mojom::MenuSourceType::kKeyboard
-                         : ui::mojom::MenuSourceType::kMouse);
 }
 
 void SidebarView::BuildCreateMenu() {
@@ -426,10 +443,6 @@ void SidebarView::ShowCreateMenu(const ui::Event& event) {
 
 void SidebarView::ExecuteCommand(int command_id, int event_flags) {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
-  if (command_id == kDownloads) {
-    delegate_->OpenDownloads();
-    return;
-  }
   if (command_id == kCreateSpace) {
     SetCreateMenuOpen(false);
     delegate_->CreateSpace();
@@ -438,13 +451,6 @@ void SidebarView::ExecuteCommand(int command_id, int event_flags) {
   if (command_id == kNewTab) {
     SetCreateMenuOpen(false);
     delegate_->NewTab();
-    return;
-  }
-  if (command_id >= kFirstSpace) {
-    const size_t index = command_id - kFirstSpace;
-    if (index < library_space_ids_.size()) {
-      delegate_->SelectSpace(library_space_ids_[index]);
-    }
     return;
   }
   const uint64_t id = std::exchange(menu_item_id_, 0);
@@ -571,13 +577,13 @@ void SidebarView::SetUnavailable(const std::u16string& reason,
   if (menu_runner_) {
     menu_runner_->Cancel();
   }
+  ResetLibrary();
   focus_targets_.clear();
   spaces_scroll_ = nullptr;
   new_tab_ = nullptr;
   tiles_.clear();
   current_space_id_ = 0;
   spaces_.clear();
-  library_space_ids_.clear();
   RemoveAllChildViews();
   auto* scroll = AddChildView(std::make_unique<views::ScrollView>());
   scroll->ClipHeightTo(0, std::numeric_limits<int>::max());
@@ -606,6 +612,16 @@ void SidebarView::SetModel(const foundation::SidebarResult& model,
   if (!model.ok) {
     SetUnavailable(u"Workspace unavailable: " +
                    base::UTF8ToUTF16(std::string(model.error)));
+    return;
+  }
+  spaces_.clear();
+  for (const auto& space : model.spaces) {
+    spaces_.emplace_back(space.id, base::UTF8ToUTF16(std::string(space.name)));
+  }
+  if (library_) {
+    // The Library shows Spaces only; rows rebuild when it closes.
+    current_space_id_ = model.current_space.id;
+    library_->SetSpaces(spaces_, current_space_id_);
     return;
   }
 
@@ -736,11 +752,17 @@ void SidebarView::SetModel(const foundation::SidebarResult& model,
   static_cast<views::BoxLayout*>(footer->GetLayoutManager())
       ->set_cross_axis_alignment(views::BoxLayout::CrossAxisAlignment::kCenter);
   auto library = IconButton(
-      base::BindRepeating(&SidebarView::ShowLibrary, base::Unretained(this)),
-      kArchiveIcon, 16);
+      base::BindRepeating(
+          [](base::WeakPtr<SidebarView> sidebar) {
+            // Opening removes this button; let its press handler unwind.
+            base::SequencedTaskRunner::GetCurrentDefault()->PostTask(
+                FROM_HERE, base::BindOnce(&SidebarView::OpenLibrary, sidebar,
+                                          LibrarySection::kSpaces));
+          },
+          weak_factory_.GetWeakPtr()),
+      kLibraryIcon, 16);
   library->SetTooltipText(u"Library");
   library->GetViewAccessibility().SetName(u"Library");
-  library->GetViewAccessibility().SetHasPopup(ax::mojom::HasPopup::kMenu);
   TrackFocus(library.get(), FocusAction::kLibrary);
   footer->AddChildView(std::move(library));
   spaces_scroll_ = footer->AddChildView(std::make_unique<views::ScrollView>());
@@ -766,15 +788,14 @@ void SidebarView::SetModel(const foundation::SidebarResult& model,
   spaces->GetViewAccessibility().SetName(u"Spaces");
   views::View* current_space = nullptr;
   std::optional<size_t> current_space_index;
-  spaces_.clear();
-  for (const auto& space : model.spaces) {
-    const bool current = space.id == model.current_space.id;
+  for (const auto& [space_id, space_name] : spaces_) {
+    const bool current = space_id == model.current_space.id;
     // Button presses request a switch; only a Rust snapshot changes selection.
-    // The current Space's dot is brighter; no chip, as in Arc.
+    // As in Arc, the current Space shows its icon and the others a dot.
     auto choice = IconButton(
         base::BindRepeating(&Delegate::SelectSpace,
-                            base::Unretained(&delegate_.get()), space.id),
-        kDotIcon, 8);
+                            base::Unretained(&delegate_.get()), space_id),
+        current ? kSaturnIcon : kDotIcon, current ? 16 : 8);
     // Arc spaces its Space dots 34 DIP apart.
     choice->SetMinSize(gfx::Size(34, 32));
     choice->SetMaxSize(gfx::Size(34, 32));
@@ -783,9 +804,6 @@ void SidebarView::SetModel(const foundation::SidebarResult& model,
       current_space = choice.get();
       current_space_index = spaces->children().size();
     }
-    const std::u16string space_name =
-        base::UTF8ToUTF16(std::string(space.name));
-    spaces_.emplace_back(space.id, space_name);
     choice->SetTooltipText(
         (current ? u"Current Space: " : u"Switch to Space: ") + space_name);
     choice->GetViewAccessibility().SetName(u"Space: " + space_name);
@@ -793,7 +811,7 @@ void SidebarView::SetModel(const foundation::SidebarResult& model,
     choice->GetViewAccessibility().SetCheckedState(
         current ? ax::mojom::CheckedState::kTrue
                 : ax::mojom::CheckedState::kFalse);
-    TrackFocus(choice.get(), FocusAction::kSpaces, space.id);
+    TrackFocus(choice.get(), FocusAction::kSpaces, space_id);
     spaces->AddChildView(std::move(choice));
   }
   // Non-layer ScrollViews need an explicit contents size too.
@@ -888,19 +906,18 @@ void SidebarView::UpdateFills() {
   if (library != focus_targets_.end()) {
     static_cast<views::MdTextButton*>(library->view.get())
         ->SetImageModel(views::Button::STATE_NORMAL,
-                        ui::ImageModel::FromVectorIcon(kArchiveIcon,
+                        ui::ImageModel::FromVectorIcon(kLibraryIcon,
                                                        fills.footer_icon, 16));
   }
   for (const auto& target : focus_targets_) {
     if (target.action == FocusAction::kSpaces) {
+      const bool current = target.id == current_space_id_;
       static_cast<views::MdTextButton*>(target.view.get())
-          ->SetImageModel(
-              views::Button::STATE_NORMAL,
-              ui::ImageModel::FromVectorIcon(
-                  kDotIcon,
-                  target.id == current_space_id_ ? fills.current_space_dot
-                                                 : fills.space_dot,
-                  8));
+          ->SetImageModel(views::Button::STATE_NORMAL,
+                          current ? ui::ImageModel::FromVectorIcon(
+                                        kSaturnIcon, fills.footer_icon, 16)
+                                  : ui::ImageModel::FromVectorIcon(
+                                        kDotIcon, fills.space_dot, 8));
     }
   }
   SetCreateMenuOpen(create_menu_open_);

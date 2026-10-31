@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-10-31: Library panel replaces the Library menu
+
+- The footer Library button swaps the sidebar for a panel with Arc's rail (Media, Downloads, Easels, Spaces, Boosts, Archived Tabs) and a back arrow; Esc also returns. Spaces lists Spaces (click switches) plus Create Space, Downloads lists recent downloads and opens them, Archived Tabs shows an empty state; Media, Easels and Boosts are placeholders. New `library.svg` and `saturn.svg` icons from `design/icons/` draw the Library button and every Space icon.
+- Verification: `chrome`, `bridge_check` and `browser_view_browsertest.cc` build; `bridge_check`, `export_patches.py --check`, `check_docs.py` and cargo fmt/clippy/test pass. Browser tests not run (they open windows). `LIBRARY=1` in `tools/capture_native.sh` passes `--myarc-capture-open-library`.
+- Chromium `myarc` commit `e8234fd36c`.
+
 ## 2026-10-30: Saved titles and favicons, review fixes
 
 - Review of `de57afd`: opening an off-the-record (incognito or Guest) window hit a fatal `NOTREACHED` in the favicon lookup, so off-the-record Profiles now skip it. Titles are saved when a bound page stops loading, or when a loaded page is saved. Saving only marks the file for the next write and doesn't rebuild the sidebar, so a blinking `(3) WhatsApp` title no longer causes writes. Error pages, non-2xx responses and redirects to another origin don't save. The raw entry title is used, so the URL is never saved as a title. Favicon replies rebuild the sidebar once per batch, and the `title` key is only written when set, so older builds still load the file.

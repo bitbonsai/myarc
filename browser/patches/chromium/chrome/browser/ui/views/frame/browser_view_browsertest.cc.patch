@@ -1,5 +1,5 @@
 diff --git a/chrome/browser/ui/views/frame/browser_view_browsertest.cc b/chrome/browser/ui/views/frame/browser_view_browsertest.cc
-index 33bcd23f7807e7634e7bb251dcc19b63025fa54a..c335e8dd89e3dd2aeb792953f19c960efde6a224 100644
+index 33bcd23f7807e7634e7bb251dcc19b63025fa54a..150eb2e4496874122255907d2ba0b742e772d957 100644
 --- a/chrome/browser/ui/views/frame/browser_view_browsertest.cc
 +++ b/chrome/browser/ui/views/frame/browser_view_browsertest.cc
 @@ -6,19 +6,28 @@
@@ -147,7 +147,7 @@ index 33bcd23f7807e7634e7bb251dcc19b63025fa54a..c335e8dd89e3dd2aeb792953f19c960e
  #include "ui/views/window/dialog_client_view.h"
  #include "url/url_constants.h"
  
-@@ -382,6 +424,1361 @@ class BrowserViewTest : public InProcessBrowserTest {
+@@ -382,6 +424,1372 @@ class BrowserViewTest : public InProcessBrowserTest {
    raw_ptr<DevToolsWindow> devtools_;
  };
  
@@ -155,10 +155,6 @@ index 33bcd23f7807e7634e7bb251dcc19b63025fa54a..c335e8dd89e3dd2aeb792953f19c960e
 +
 +class SidebarViewTestApi {
 + public:
-+  static ui::SimpleMenuModel* LibraryMenu(SidebarView* sidebar) {
-+    sidebar->BuildLibraryMenu();
-+    return sidebar->menu_model_.get();
-+  }
 +  static ui::SimpleMenuModel* CreateMenu(SidebarView* sidebar) {
 +    sidebar->BuildCreateMenu();
 +    return sidebar->menu_model_.get();
@@ -407,6 +403,27 @@ index 33bcd23f7807e7634e7bb251dcc19b63025fa54a..c335e8dd89e3dd2aeb792953f19c960e
 +    return nullptr;
 +  }
 +
++  // Any button kind, by accessible name.
++  views::Button* FindAnyButton(views::View* root, const std::u16string& name) {
++    if (auto* button = views::AsViewClass<views::Button>(root);
++        button && button->GetViewAccessibility().GetCachedName() == name) {
++      return button;
++    }
++    for (const auto& child : root->children()) {
++      if (auto* button = FindAnyButton(child, name)) {
++        return button;
++      }
++    }
++    return nullptr;
++  }
++
++  void PressLibraryButton(const std::u16string& name) {
++    auto* button = FindAnyButton(browser_view(), name);
++    ASSERT_TRUE(button) << name;
++    views::test::ButtonTestApi(button).NotifyClick(
++        ui::KeyEvent(ui::EventType::kKeyPressed, ui::VKEY_SPACE, ui::EF_NONE));
++  }
++
 +  std::vector<gfx::Rect> ChildBounds(views::View* button) {
 +    std::vector<gfx::Rect> result;
 +    for (const auto& child : button->children()) {
@@ -582,17 +599,18 @@ index 33bcd23f7807e7634e7bb251dcc19b63025fa54a..c335e8dd89e3dd2aeb792953f19c960e
 +
 +IN_PROC_BROWSER_TEST_F(BrowserViewSidebarPresentationTest,
 +                       LibraryDispatchesDownloadsAndExistingSpaceActions) {
++  using Section = myarc::SidebarView::LibrarySection;
 +  ASSERT_TRUE(service().CreateSpace("Library target").ok);
 +  browser_view()->RefreshMyarcWorkspaceSidebar();
 +  auto* view = sidebar();
 +  ASSERT_TRUE(view);
-+  auto* menu = myarc::SidebarViewTestApi::LibraryMenu(view);
-+  ASSERT_EQ(u"Downloads", menu->GetLabelAt(0));
++  view->OpenLibrary(Section::kDownloads);
++  ASSERT_TRUE(view->library_open());
 +  auto* other = CreateBrowser(profile());
 +  const GURL other_url =
 +      other->GetTabStripModel()->GetActiveWebContents()->GetLastCommittedURL();
 +  const int other_count = other->GetTabStripModel()->count();
-+  menu->ActivatedAt(0, 0);
++  PressLibraryButton(u"Show All Downloads");
 +  ASSERT_TRUE(base::test::RunUntil([&] {
 +    return active_web_contents()->GetLastCommittedURL() ==
 +           GURL(chrome::kChromeUIDownloadsURL);
@@ -601,34 +619,27 @@ index 33bcd23f7807e7634e7bb251dcc19b63025fa54a..c335e8dd89e3dd2aeb792953f19c960e
 +  EXPECT_EQ(
 +      other_url,
 +      other->GetTabStripModel()->GetActiveWebContents()->GetLastCommittedURL());
-+  browser_view()->RefreshMyarcWorkspaceSidebar();
-+  menu = myarc::SidebarViewTestApi::LibraryMenu(sidebar());
-+  bool selected = false;
-+  for (size_t i = 0; i < menu->GetItemCount(); ++i) {
-+    if (menu->GetLabelAt(i) == u"Switch to Space: Library target") {
-+      menu->ActivatedAt(i, 0);
-+      selected = true;
-+      break;
-+    }
-+  }
-+  ASSERT_TRUE(selected);
++  view->OpenLibrary(Section::kSpaces);
++  PressLibraryButton(u"Space: Library target");
++  ASSERT_TRUE(base::test::RunUntil([&] { return !view->library_open(); }));
 +  EXPECT_EQ("Library target", std::string(browser_view()
 +                                              ->GetMyarcWorkspaceAdapter()
 +                                              ->Sidebar()
 +                                              .current_space.name));
-+  browser_view()->RefreshMyarcWorkspaceSidebar();
-+  menu = myarc::SidebarViewTestApi::LibraryMenu(sidebar());
-+  ASSERT_EQ(u"Create Space", menu->GetLabelAt(menu->GetItemCount() - 1));
-+  menu->ActivatedAt(menu->GetItemCount() - 1, 0);
++  EXPECT_TRUE(FindAnyButton(browser_view(), u"Library"));
++  view->OpenLibrary(Section::kSpaces);
++  PressLibraryButton(u"Create Space");
 +  views::DialogDelegate* dialog = nullptr;
-+  for (const auto& widget : views::Widget::GetAllOwnedWidgets(
-+           browser_view()->GetWidget()->GetNativeView())) {
-+    if (widget->widget_delegate()->GetWindowTitle() == u"Create Space") {
-+      dialog = widget->widget_delegate()->AsDialogDelegate();
-+      break;
++  ASSERT_TRUE(base::test::RunUntil([&] {
++    for (const auto& widget : views::Widget::GetAllOwnedWidgets(
++             browser_view()->GetWidget()->GetNativeView())) {
++      if (widget->widget_delegate()->GetWindowTitle() == u"Create Space") {
++        dialog = widget->widget_delegate()->AsDialogDelegate();
++        return true;
++      }
 +    }
-+  }
-+  ASSERT_TRUE(dialog);
++    return false;
++  }));
 +  auto* name =
 +      views::AsViewClass<views::Textfield>(dialog->GetInitiallyFocusedView());
 +  ASSERT_TRUE(name);

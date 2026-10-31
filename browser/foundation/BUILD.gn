@@ -104,6 +104,11 @@ source_set("browser_workspace_adapter") {
 
 source_set("sidebar_view") {
   sources = [
+    "icons.h",
+    "library_logic.cc",
+    "library_logic.h",
+    "library_view.cc",
+    "library_view.h",
     "sidebar_view.cc",
     "sidebar_view.h",
   ]
@@ -115,6 +120,7 @@ source_set("sidebar_view") {
   ]
   deps = [
     ":bridge",
+    "//base:i18n",
     "//components/vector_icons",
     "//ui/color",
     "//ui/gfx",
