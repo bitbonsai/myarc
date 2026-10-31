@@ -3,6 +3,7 @@
 #include <string>
 
 #include "base/i18n/case_conversion.h"
+#include "base/strings/string_number_conversions.h"
 
 namespace myarc::library {
 
@@ -21,6 +22,19 @@ bool MatchesSearch(std::u16string_view text, std::u16string_view query) {
   }
   return base::i18n::FoldCase(text).find(base::i18n::FoldCase(query)) !=
          std::u16string::npos;
+}
+
+std::u16string DayLabel(base::Time time, base::Time now) {
+  // Round, since a day with a daylight saving change is 23 or 25 hours.
+  const int days =
+      ((now.LocalMidnight() - time.LocalMidnight()) + base::Hours(12)).InDays();
+  if (days <= 0) {
+    return u"Today";
+  }
+  if (days == 1) {
+    return u"Yesterday";
+  }
+  return base::NumberToString16(days) + u" days ago";
 }
 
 }  // namespace myarc::library

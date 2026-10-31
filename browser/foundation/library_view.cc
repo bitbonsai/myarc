@@ -11,6 +11,7 @@
 #include "base/memory/raw_ptr_exclusion.h"
 #include "base/notreached.h"
 #include "base/task/sequenced_task_runner.h"
+#include "base/time/time.h"
 #include "myarc/icons.h"
 #include "myarc/library_logic.h"
 #include "third_party/skia/include/core/SkColor.h"
@@ -232,6 +233,66 @@ class LibraryRailItem final : public TileButton {
 BEGIN_METADATA(LibraryRailItem)
 END_METADATA
 
+// Arc's Archived Tabs row: favicon, then the title over the page's address.
+class ArchiveRow final : public TileButton {
+  METADATA_HEADER(ArchiveRow, TileButton)
+
+ public:
+  ArchiveRow(PressedCallback callback,
+             const SidebarView::ArchivedTabPresentation& tab)
+      : TileButton(std::move(callback)) {
+    auto* layout = SetLayoutManager(std::make_unique<views::BoxLayout>(
+        Orientation::kHorizontal, gfx::Insets::VH(9, 12), 12));
+    layout->set_cross_axis_alignment(CrossAxis::kCenter);
+    // Pages without a cached favicon get Arc's blank rounded square.
+    icon_ = AddChildView(std::make_unique<views::ImageView>(tab.icon));
+    icon_->SetImageSize(gfx::Size(16, 16));
+    icon_->SetPreferredSize(gfx::Size(20, 20));
+    blank_icon_ = tab.icon.IsEmpty();
+    auto* text = AddChildView(Box(Orientation::kVertical, gfx::Insets(), 2));
+    layout->SetFlexForView(text, 1);
+    title_ = text->AddChildView(MakeLabel(
+        tab.title,
+        gfx::FontList().Derive(1, gfx::Font::NORMAL, gfx::Font::Weight::NORMAL),
+        SK_ColorWHITE));
+    url_ = text->AddChildView(
+        MakeLabel(tab.url, gfx::FontList(), GetColors(nullptr).muted));
+    for (views::Label* label : {title_.get(), url_.get()}) {
+      label->SetHorizontalAlignment(gfx::ALIGN_LEFT);
+      label->SetElideBehavior(gfx::ELIDE_TAIL);
+    }
+    std::u16string detail = tab.url;
+    if (!tab.space.empty()) {
+      detail += u"\nSpace: " + tab.space;
+    }
+    SetTooltipText(tab.title + u"\n" + detail);
+    GetViewAccessibility().SetName(u"Reopen " + tab.title);
+    GetViewAccessibility().SetDescription(detail);
+  }
+
+ private:
+  void Update() override {
+    TileButton::Update();
+    const Colors colors = GetColors(GetColorProvider());
+    if (blank_icon_) {
+      icon_->SetBackground(views::CreateRoundedRectBackground(colors.tile, 5));
+    }
+    if (GetColorProvider()) {
+      title_->SetEnabledColor(
+          GetColorProvider()->GetColor(ui::kColorSysOnSurface));
+    }
+    url_->SetEnabledColor(colors.muted);
+  }
+
+  raw_ptr<views::ImageView> icon_ = nullptr;
+  raw_ptr<views::Label> title_ = nullptr;
+  raw_ptr<views::Label> url_ = nullptr;
+  bool blank_icon_ = false;
+};
+
+BEGIN_METADATA(ArchiveRow)
+END_METADATA
+
 }  // namespace
 
 LibraryView::LibraryView(SidebarView::Delegate& delegate,
@@ -323,7 +384,19 @@ void LibraryView::RefreshDownloads() {
     return;
   }
   downloads_ = std::move(downloads);
-  UpdateDownloads();
+  UpdateList();
+}
+
+void LibraryView::RefreshArchive() {
+  if (section_ != Section::kArchive || !list_) {
+    return;
+  }
+  auto archived = delegate_->GetArchivedTabs();
+  if (archived == archived_) {
+    return;
+  }
+  archived_ = std::move(archived);
+  UpdateList();
 }
 
 void LibraryView::FocusSection() {
@@ -568,8 +641,9 @@ void LibraryView::BuildList() {
   search->GetViewAccessibility().SetName(info.search);
   search->SetText(query_);
   search->set_controller(this);
-  // Only Downloads has anything to search yet.
-  search->SetEnabled(section_ == Section::kDownloads);
+  // Only Downloads and Archived Tabs have anything to search yet.
+  search->SetEnabled(section_ == Section::kDownloads ||
+                     section_ == Section::kArchive);
   search_ = field->AddChildView(std::move(search));
   static_cast<views::BoxLayout*>(field->GetLayoutManager())
       ->SetFlexForView(search_, 1);
@@ -579,13 +653,59 @@ void LibraryView::BuildList() {
   list_ = content->AddChildView(Box(Orientation::kVertical, gfx::Insets(), 0));
   content_layout->SetFlexForView(list_, 1);
   downloads_.clear();
+  archived_.clear();
   if (section_ == Section::kDownloads) {
     downloads_ = delegate_->GetRecentDownloads();
+  } else if (section_ == Section::kArchive) {
+    archived_ = delegate_->GetArchivedTabs();
   }
-  UpdateDownloads();
+  UpdateList();
 }
 
-void LibraryView::UpdateDownloads() {
+void LibraryView::AddArchiveRows(views::View& rows) {
+  const Colors colors = GetColors(GetColorProvider());
+  const base::Time now = base::Time::Now();
+  std::u16string day;
+  for (const auto& tab : archived_) {
+    if (!library::MatchesSearch(tab.title, query_) &&
+        !library::MatchesSearch(tab.url, query_)) {
+      continue;
+    }
+    // Entries come newest first, so each day's header appears once.
+    if (std::u16string label = library::DayLabel(tab.archived, now);
+        label != day) {
+      day = std::move(label);
+      auto* header = rows.AddChildView(
+          MakeLabel(day,
+                    gfx::FontList().Derive(0, gfx::Font::NORMAL,
+                                           gfx::Font::Weight::SEMIBOLD),
+                    colors.muted));
+      header->SetHorizontalAlignment(gfx::ALIGN_LEFT);
+      header->SetBorder(
+          views::CreateEmptyBorder(gfx::Insets::TLBR(10, 6, 6, 6)));
+      header->GetViewAccessibility().SetRole(ax::mojom::Role::kHeading);
+    }
+    auto row = std::make_unique<ArchiveRow>(
+        base::BindRepeating(
+            [](LibraryView* view, uint64_t id) {
+              // Reopening switches Space and rebuilds the sidebar, so the
+              // action holds nothing of `view`.
+              view->PostAction(base::BindOnce(
+                  [](SidebarView::Delegate* delegate, uint64_t id,
+                     const base::RepeatingClosure& close) {
+                    delegate->RestoreArchivedTab(id);
+                    close.Run();
+                  },
+                  base::Unretained(&view->delegate_.get()), id, view->close_));
+            },
+            base::Unretained(this), tab.id),
+        tab);
+    keyed_views_.emplace_back(tab.id, row.get());
+    rows.AddChildView(std::move(row));
+  }
+}
+
+void LibraryView::UpdateList() {
   if (!list_) {
     return;
   }
@@ -604,8 +724,13 @@ void LibraryView::UpdateDownloads() {
       downloads.push_back(download);
     }
   }
+  const bool any_archived =
+      std::ranges::any_of(archived_, [this](const auto& tab) {
+        return library::MatchesSearch(tab.title, query_) ||
+               library::MatchesSearch(tab.url, query_);
+      });
 
-  if (downloads.empty()) {
+  if (downloads.empty() && !any_archived) {
     const gfx::VectorIcon* icon = Info(section_).icon;
     std::u16string title = u"Nothing here yet!";
     std::u16string body =
@@ -619,6 +744,10 @@ void LibraryView::UpdateDownloads() {
         break;
       case Section::kArchive:
         body = u"Tabs you archive will show up here.";
+        if (!query_.empty()) {
+          title = u"No matches";
+          body = u"No archived tabs match your search.";
+        }
         break;
       case Section::kMedia:
         title = u"Not available yet";
@@ -670,7 +799,9 @@ void LibraryView::UpdateDownloads() {
     auto* rows =
         scroll->SetContents(Box(Orientation::kVertical, gfx::Insets(), 2));
     rows->GetViewAccessibility().SetRole(ax::mojom::Role::kList);
-    rows->GetViewAccessibility().SetName(u"Recent downloads");
+    rows->GetViewAccessibility().SetName(
+        section_ == Section::kArchive ? u"Archived tabs" : u"Recent downloads");
+    AddArchiveRows(*rows);
     for (const auto& download : downloads) {
       auto row =
           TextButton(base::BindRepeating(
@@ -718,7 +849,7 @@ void LibraryView::UpdateDownloads() {
 void LibraryView::ContentsChanged(views::Textfield* sender,
                                   const std::u16string& new_contents) {
   query_ = new_contents;
-  UpdateDownloads();
+  UpdateList();
 }
 
 BEGIN_METADATA(LibraryView)

@@ -1,5 +1,5 @@
 diff --git a/chrome/browser/ui/views/frame/browser_view.h b/chrome/browser/ui/views/frame/browser_view.h
-index 750e46c97b64dccccf4268e912df5dbdb6516b3c..66fa7cbac824c67788df8ffc704627b09b136a38 100644
+index 750e46c97b64dccccf4268e912df5dbdb6516b3c..ef2857fc67f8be018a418589f5a4ede08a90c4e5 100644
 --- a/chrome/browser/ui/views/frame/browser_view.h
 +++ b/chrome/browser/ui/views/frame/browser_view.h
 @@ -8,6 +8,7 @@
@@ -91,7 +91,7 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..66fa7cbac824c67788df8ffc704627b0
    base::WeakPtr<BrowserView> GetAsWeakPtr() {
      return weak_ptr_factory_.GetWeakPtr();
    }
-@@ -1253,12 +1290,71 @@ class BrowserView : public BrowserWindow,
+@@ -1253,12 +1290,74 @@ class BrowserView : public BrowserWindow,
  
    // Anchor point for help bubbles and other dialogs that want to reliably
    // anchor outside the content area of the window.
@@ -112,6 +112,9 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..66fa7cbac824c67788df8ffc704627b0
 +  std::vector<myarc::SidebarView::DownloadPresentation> GetRecentDownloads()
 +      const override;
 +  void OpenDownload(uint32_t download_id) override;
++  std::vector<myarc::SidebarView::ArchivedTabPresentation> GetArchivedTabs()
++      const override;
++  void RestoreArchivedTab(uint64_t archive_id) override;
 +  void SetLibraryOpen(bool open) override;
 +  void MyarcWorkspaceResult(myarc::foundation::MutationResult result);
 +  void UpdateMyarcWorkspaceCanvas();
@@ -163,7 +166,7 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..66fa7cbac824c67788df8ffc704627b0
  
    // A mapping between accelerators and command IDs.
    std::map<ui::Accelerator, int> accelerator_table_;
-@@ -1411,6 +1507,7 @@ class BrowserView : public BrowserWindow,
+@@ -1411,6 +1510,7 @@ class BrowserView : public BrowserWindow,
    base::EnumSet<TabStripAndWebAppViewsReparentedState>
        tab_strip_web_apps_reparented_state_;
  

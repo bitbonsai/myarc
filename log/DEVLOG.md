@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-10-31: Archived Tabs
+
+- Closing the last live page of a temporary item now archives its URL, title, Space and close time in Rust (`archived` in the workspace snapshot, saved to JSON only when non-empty), capped at 500 entries and 30 days. Saved items, Chrome pages and off-the-record Profiles archive nothing. The Library's Archived Tabs lists them newest first under Arc's day headers with cached favicon, title and address, and search matches title or address. Clicking a row reopens it as a temporary tab in its Space (the current one if that Space is gone), then drops the entry. The auto-archive timing rule has no caller yet, so only closing archives.
+- Verification: `chrome` and `bridge_check` build; `bridge_check` (now with an Archived Tabs codec check), 5 new Rust unit tests, cargo fmt/clippy/test, `export_patches.py --check` and `check_docs.py` pass. A background `WORKSPACE=… LIBRARY=archive URL=none W=1440 H=900` capture of 8 seeded entries matches Arc's layout; rows sit about 10% further apart than Arc's. Closing a tab and clicking a row to reopen it were checked by reading the code, not run.
+- Chromium `myarc` commit `9c47743f80`. `tools/capture_native.sh` gains `WORKSPACE=<file>` to seed the profile's workspace file.
+
 ## 2026-10-31: Library panel review fixes
 
 - Esc closes the Library only when focus is in the sidebar or nowhere, so the omnibox and pages keep their Esc. Collapsing the sidebar closes the Library. While the Library is open, the Downloads list refreshes on new, finished and removed downloads (500 ms coalescing, rebuilt only when the list changes). The Spaces columns scroll sideways when they don't fit. Rebuilds keep focus on the same Space or download, theme updates rebuild only when colors change, and closing focuses the Library button only for keyboard users. A double-click no longer resets the section.

@@ -95,6 +95,11 @@ class BrowserWorkspaceAdapter final : public TabStripModelObserver {
   // no live page. Empty until the lookup Refresh starts has answered, or when
   // nothing is cached. Never fetches from the network.
   gfx::Image SavedIcon(const foundation::ItemRecord& item) const;
+  // The same cache by URL, which also covers Archived Tabs.
+  gfx::Image CachedIcon(const GURL& url) const;
+  // Reopens an Archived Tab as a temporary item in its Space (or the current
+  // one if that Space is gone), selects it, then drops the archive entry.
+  foundation::MutationResult RestoreArchivedTab(uint64_t id);
   content::WebContents* DisplayedContents() const;
   bool HasDisplayedContents() const { return DisplayedContents() != nullptr; }
   // Use for an explicit URL commit when no page is displayed. Native navigation
@@ -138,7 +143,8 @@ class BrowserWorkspaceAdapter final : public TabStripModelObserver {
   void ShowSelected();
   void OnServiceChanged();
   void Refresh();
-  // Starts favicon lookups for dormant saved rows not looked up yet.
+  // Starts favicon lookups for dormant saved rows and Archived Tabs not looked
+  // up yet.
   void RequestSavedIcons(const foundation::SidebarResult& sidebar);
   void OnSavedIcon(const GURL& url,
                    const favicon_base::FaviconImageResult& result);
@@ -174,7 +180,8 @@ class BrowserWorkspaceAdapter final : public TabStripModelObserver {
   std::string binding_warning_;
   base::RepeatingClosureList changed_;
   base::CallbackListSubscription service_subscription_;
-  // By saved URL. An empty image marks a pending lookup or a cache miss.
+  // By saved or archived URL. An empty image marks a pending lookup or a
+  // cache miss.
   std::map<GURL, gfx::Image> saved_icons_;
   // Lookups not answered yet, and whether this batch found any icon.
   size_t pending_icons_ = 0;

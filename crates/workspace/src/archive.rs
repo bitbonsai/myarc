@@ -1,4 +1,10 @@
-//! Pure Auto Archive decision rule (BC-006). No clock reads, no live tabs, no I/O.
+//! Archived Tabs: the store of closed temporary pages, and the pure Auto Archive
+//! decision rule (BC-006). No clock reads, no live tabs, no I/O.
+//!
+//! The store records a temporary item when its last live page closes, with the
+//! URL and title the adapter read from that page. Saved items keep their identity
+//! and are never archived. Entries expire after `ARCHIVE_RETENTION_SECS` and the
+//! oldest go first past `MAX_ARCHIVED_TABS`. The store persists with the snapshot.
 //!
 //! The caller supplies `now_secs` and each item's `last_viewed_secs` from one
 //! monotonic or wall clock, in whole seconds. The rule answers two questions: which
@@ -11,7 +17,10 @@
 
 use std::collections::BTreeSet;
 
-use crate::{ItemId, Placement};
+use crate::{
+    ARCHIVE_RETENTION_SECS, ArchivedTab, ItemId, MAX_ARCHIVED_TABS, MAX_TITLE_BYTES, Placement,
+    Workspace, WorkspaceError, clean_title, validate_url,
+};
 
 const HOUR_SECS: u64 = 60 * 60;
 const DAY_SECS: u64 = 24 * HOUR_SECS;
@@ -116,6 +125,228 @@ pub fn decide_archive(
         }
     }
     decision
+}
+
+impl Workspace {
+    /// The last live page of `item_id` closed. A temporary item ends, like
+    /// `live_tab_closed`, and is archived with `url`, `title` and `now_secs`.
+    /// Returns whether it was archived: saved items stay and archive nothing, and
+    /// a URL the saved-URL gate rejects (such as `chrome://newtab`) is not kept.
+    /// Off-the-record adapters call `live_tab_closed` instead.
+    pub fn archive_closed_tab(
+        &mut self,
+        item_id: ItemId,
+        url: &str,
+        title: &str,
+        now_secs: u64,
+    ) -> Result<bool, WorkspaceError> {
+        let Placement::Temporary { space_id } = self.item(item_id)?.placement else {
+            return Ok(false);
+        };
+        self.remove_item(item_id);
+        if validate_url(url).is_err() {
+            return Ok(false);
+        }
+        self.state
+            .archived
+            .retain(|tab| !expired(tab.archived_secs, now_secs));
+        if self.state.archived.len() >= MAX_ARCHIVED_TABS {
+            let excess = self.state.archived.len() + 1 - MAX_ARCHIVED_TABS;
+            self.state.archived.drain(..excess);
+        }
+        self.state.archived.push(ArchivedTab {
+            id: item_id,
+            space_id,
+            url: url.to_owned(),
+            title: clean_title(title),
+            archived_secs: now_secs,
+        });
+        Ok(true)
+    }
+
+    /// Unexpired Archived Tabs at `now_secs`, newest first.
+    pub fn archived_tabs(&self, now_secs: u64) -> Vec<ArchivedTab> {
+        self.state
+            .archived
+            .iter()
+            .rev()
+            .filter(|tab| !expired(tab.archived_secs, now_secs))
+            .cloned()
+            .collect()
+    }
+
+    /// Remove an entry once the adapter has reopened it, returning it.
+    pub fn remove_archived_tab(&mut self, id: ItemId) -> Result<ArchivedTab, WorkspaceError> {
+        let index = self
+            .state
+            .archived
+            .iter()
+            .position(|tab| tab.id == id)
+            .ok_or(WorkspaceError::UnknownArchivedTab(id))?;
+        Ok(self.state.archived.remove(index))
+    }
+
+    pub(crate) fn validate_archive(&self) -> Result<(), WorkspaceError> {
+        let state = &self.state;
+        let mut seen = BTreeSet::new();
+        for tab in &state.archived {
+            if tab.id == 0
+                || tab.id >= state.next_item_id
+                || tab.space_id == 0
+                || !seen.insert(tab.id)
+                || state.items.iter().any(|item| item.id == tab.id)
+                || tab.title.len() > MAX_TITLE_BYTES
+                || tab.title.chars().any(char::is_control)
+            {
+                return Err(WorkspaceError::InvalidSnapshot(
+                    "archived tab has a reused or invalid ID, Space or title",
+                ));
+            }
+            validate_url(&tab.url)?;
+        }
+        Ok(())
+    }
+}
+
+/// A clock that moved backwards keeps the entry.
+fn expired(archived_secs: u64, now_secs: u64) -> bool {
+    now_secs > archived_secs.saturating_add(ARCHIVE_RETENTION_SECS)
+}
+
+#[cfg(test)]
+mod store_tests {
+    use super::*;
+    use crate::{DEFAULT_PROFILE_ID, DEFAULT_SPACE_ID};
+
+    const URL: &str = "https://example.test/a";
+    const DAY: u64 = 24 * 60 * 60;
+
+    fn close(workspace: &mut Workspace, space: u64, now: u64) -> ItemId {
+        let id = workspace.add_temporary_item(space).unwrap();
+        assert_eq!(
+            workspace.archive_closed_tab(id, URL, "Page\nTitle", now),
+            Ok(true)
+        );
+        id
+    }
+
+    #[test]
+    fn closing_a_temporary_item_archives_it_newest_first() {
+        let mut workspace = Workspace::default();
+        let other = workspace.create_space(DEFAULT_PROFILE_ID, "Two").unwrap();
+        let first = close(&mut workspace, DEFAULT_SPACE_ID, 10);
+        let second = close(&mut workspace, other, 20);
+        assert!(workspace.snapshot().items.is_empty());
+        let tabs = workspace.archived_tabs(30);
+        assert_eq!(
+            tabs.iter().map(|tab| tab.id).collect::<Vec<_>>(),
+            vec![second, first]
+        );
+        assert_eq!(tabs[0].space_id, other);
+        assert_eq!(tabs[0].title, "Page Title");
+        assert_eq!(tabs[0].archived_secs, 20);
+        let restored = Workspace::from_snapshot(workspace.snapshot()).unwrap();
+        assert_eq!(restored.archived_tabs(30), tabs);
+    }
+
+    #[test]
+    fn saved_items_and_unarchivable_urls_are_not_kept() {
+        let mut workspace = Workspace::default();
+        let pin = workspace.add_temporary_item(DEFAULT_SPACE_ID).unwrap();
+        workspace
+            .set_placement(
+                pin,
+                Placement::Pin {
+                    space_id: DEFAULT_SPACE_ID,
+                },
+                Some(URL),
+            )
+            .unwrap();
+        assert_eq!(workspace.archive_closed_tab(pin, URL, "Pin", 1), Ok(false));
+        assert_eq!(workspace.snapshot().items.len(), 1);
+        let ntp = workspace.add_temporary_item(DEFAULT_SPACE_ID).unwrap();
+        assert_eq!(
+            workspace.archive_closed_tab(ntp, "chrome://newtab/", "New Tab", 1),
+            Ok(false)
+        );
+        assert_eq!(workspace.snapshot().items.len(), 1);
+        assert!(workspace.archived_tabs(1).is_empty());
+        assert_eq!(
+            workspace.archive_closed_tab(99, URL, "", 1),
+            Err(WorkspaceError::UnknownItem(99))
+        );
+    }
+
+    #[test]
+    fn archive_expires_after_thirty_days_and_caps_its_size() {
+        let mut workspace = Workspace::default();
+        let old = close(&mut workspace, DEFAULT_SPACE_ID, 0);
+        assert_eq!(workspace.archived_tabs(30 * DAY).len(), 1);
+        assert!(workspace.archived_tabs(30 * DAY + 1).is_empty());
+        close(&mut workspace, DEFAULT_SPACE_ID, 31 * DAY);
+        assert!(
+            workspace
+                .snapshot()
+                .archived
+                .iter()
+                .all(|tab| tab.id != old)
+        );
+
+        for _ in 0..MAX_ARCHIVED_TABS + 5 {
+            close(&mut workspace, DEFAULT_SPACE_ID, 31 * DAY);
+        }
+        let archived = workspace.snapshot().archived;
+        assert_eq!(archived.len(), MAX_ARCHIVED_TABS);
+        assert_eq!(
+            archived.last().map(|tab| tab.id),
+            workspace.archived_tabs(31 * DAY).first().map(|tab| tab.id)
+        );
+    }
+
+    #[test]
+    fn removing_an_entry_returns_it_once() {
+        let mut workspace = Workspace::default();
+        let id = close(&mut workspace, DEFAULT_SPACE_ID, 5);
+        let tab = workspace.remove_archived_tab(id).unwrap();
+        assert_eq!((tab.id, tab.url.as_str()), (id, URL));
+        assert_eq!(
+            workspace.remove_archived_tab(id),
+            Err(WorkspaceError::UnknownArchivedTab(id))
+        );
+    }
+
+    #[test]
+    fn snapshot_rejects_bad_archive_entries() {
+        let mut workspace = Workspace::default();
+        close(&mut workspace, DEFAULT_SPACE_ID, 5);
+        let live = workspace.add_temporary_item(DEFAULT_SPACE_ID).unwrap();
+        let good = workspace.snapshot();
+        let mut cases = Vec::new();
+        for edit in [
+            |tab: &mut ArchivedTab| tab.id = 0,
+            |tab: &mut ArchivedTab| tab.id = 99,
+            |tab: &mut ArchivedTab| tab.space_id = 0,
+            |tab: &mut ArchivedTab| tab.title = String::from("a\nb"),
+            |tab: &mut ArchivedTab| tab.url = String::from("ftp://example.test"),
+        ] {
+            let mut snapshot = good.clone();
+            edit(&mut snapshot.archived[0]);
+            cases.push(snapshot);
+        }
+        let mut reused = good.clone();
+        reused.archived[0].id = live;
+        cases.push(reused);
+        let mut duplicate = good.clone();
+        duplicate.archived.push(duplicate.archived[0].clone());
+        cases.push(duplicate);
+        for snapshot in cases {
+            assert!(Workspace::from_snapshot(snapshot).is_err());
+        }
+        // A deleted Space is fine: the adapter reopens in the current Space.
+        let mut gone = good;
+        gone.archived[0].space_id = 7;
+        assert!(Workspace::from_snapshot(gone).is_ok());
+    }
 }
 
 #[cfg(test)]

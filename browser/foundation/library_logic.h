@@ -2,7 +2,10 @@
 #define MYARC_LIBRARY_LOGIC_H_
 
 #include <cstddef>
+#include <string>
 #include <string_view>
+
+#include "base/time/time.h"
 
 namespace myarc::library {
 
@@ -25,6 +28,10 @@ int SpacesWidth(size_t spaces);
 
 // Case-insensitive substring match; an empty query matches everything.
 bool MatchesSearch(std::u16string_view text, std::u16string_view query);
+
+// Arc's day headers in Archived Tabs: "Today", "Yesterday" or "N days ago",
+// counted in local calendar days before `now`.
+std::u16string DayLabel(base::Time time, base::Time now);
 
 }  // namespace myarc::library
 

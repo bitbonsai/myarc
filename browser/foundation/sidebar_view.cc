@@ -628,9 +628,11 @@ void SidebarView::SetModel(const foundation::SidebarResult& model,
     spaces_.emplace_back(space.id, base::UTF8ToUTF16(std::string(space.name)));
   }
   if (library_) {
-    // The Library shows Spaces only; rows rebuild when it closes.
+    // The Library shows Spaces and the archive; rows rebuild when it closes.
     current_space_id_ = model.current_space.id;
     library_->SetSpaces(spaces_, current_space_id_);
+    // Closing a tab or a favicon lookup changes the archive.
+    library_->RefreshArchive();
     return;
   }
 

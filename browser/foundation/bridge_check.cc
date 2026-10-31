@@ -390,6 +390,51 @@ bool CheckSavedTitles() {
   return !decode().snapshot;
 }
 
+// Archived Tabs survive the JSON codec; an empty archive omits the key so older
+// builds still load the file, and a malformed entry is rejected.
+bool CheckArchivedTabs() {
+  using namespace myarc::foundation;
+  using myarc::internal::DecodeWorkspaceMetadata;
+  using myarc::internal::EncodeWorkspaceMetadata;
+  auto model = new_workspace();
+  const auto empty = EncodeWorkspaceMetadata(export_snapshot(*model));
+  auto empty_root =
+      empty ? base::JSONReader::ReadDict(*empty, base::JSON_PARSE_RFC)
+            : std::nullopt;
+  if (!empty_root || empty_root->contains("archived"))
+    return false;
+  auto item = add_temporary_item(*model, 1);
+  auto archived = archive_closed_tab(*model, item.id, "https://example.test/",
+                                     "Example", 100);
+  if (!archived.ok || archived.id != 1)
+    return false;
+  const auto encoded = EncodeWorkspaceMetadata(export_snapshot(*model));
+  auto decoded = encoded ? DecodeWorkspaceMetadata(*encoded)
+                         : myarc::internal::MetadataResult{};
+  auto restored = new_workspace();
+  if (!decoded.snapshot ||
+      !restore_snapshot(*restored, std::move(*decoded.snapshot)).ok) {
+    return false;
+  }
+  auto tabs = archived_tabs(*restored, 100);
+  if (tabs.size() != 1 || tabs[0].id != item.id || tabs[0].space_id != 1 ||
+      std::string(tabs[0].title) != "Example" || tabs[0].archived_secs != 100) {
+    return false;
+  }
+  if (!remove_archived_tab(*restored, item.id).ok ||
+      !archived_tabs(*restored, 100).empty() ||
+      remove_archived_tab(*restored, item.id).ok) {
+    return false;
+  }
+  auto root = base::JSONReader::ReadDict(*encoded, base::JSON_PARSE_RFC);
+  auto* list = root ? root->FindList("archived") : nullptr;
+  if (!list || list->size() != 1)
+    return false;
+  (*list)[0].GetDict().Set("url", "javascript:alert(1)");
+  const auto bad = base::WriteJson(*root);
+  return bad && !DecodeWorkspaceMetadata(*bad).snapshot;
+}
+
 }  // namespace
 
 int main() {
@@ -450,8 +495,12 @@ int main() {
     std::cerr << "Saved title checks failed\n";
     return 13;
   }
+  if (!CheckArchivedTabs()) {
+    std::cerr << "Archived Tabs checks failed\n";
+    return 14;
+  }
   std::cout << "7 legacy C++/Rust checks passed, including 1000 ownership "
                "round trips; workspace transitions, Space 1 deletion and "
-               "metadata codec and saved title checks passed\n";
+               "metadata codec, saved title and Archived Tabs checks passed\n";
   return 0;
 }

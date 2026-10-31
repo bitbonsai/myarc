@@ -9,6 +9,8 @@
 #   COPY_URL=1 copies the page URL via --myarc-capture-copy-url and holds the toast.
 #   LIBRARY=1 (or media/downloads/easels/boosts/archive) opens the Library via
 #   --myarc-capture-open-library, on Spaces unless a section is named.
+#   WORKSPACE=<file> seeds the profile's myarc-workspace-v1.json, for example
+#   with Archived Tabs.
 #   SETTINGS=1 (or general/advanced/more) opens the native Settings window via
 #   --myarc-capture-open-settings and captures only that window; "more" presses
 #   More Settings… and captures the browser window instead.
@@ -40,6 +42,7 @@ if [ "${1:-}" = "--inner" ]; then
   mkdir -p "$PROFILE/Default"
   touch "$PROFILE/.myarc-m0-test-profile"
   printf '%s\n' '{"vertical_tabs":{"enabled":true,"collapsed_state":false,"enabled_first_time":true}}' > "$PROFILE/Default/Preferences"
+  [ -n "${WORKSPACE:-}" ] && cp "$WORKSPACE" "$PROFILE/Default/myarc-workspace-v1.json"
   URLS=()
   [ "$URL" = none ] || read -r -a URLS <<< "$URL"
   EXTRA=()

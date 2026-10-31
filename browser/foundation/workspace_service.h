@@ -76,6 +76,15 @@ class WorkspaceService final : public base::SupportsUserData::Data {
   foundation::MutationResult SelectItem(uint64_t window, uint64_t item);
   // Call only when the LAST live projection closes. Saved identity survives.
   foundation::MutationResult LiveTabClosed(uint64_t item);
+  // LiveTabClosed that also archives a temporary item with the page's URL and
+  // title for the Library. Off-the-record Profiles archive nothing.
+  foundation::MutationResult ArchiveClosedTab(uint64_t item,
+                                              std::string_view url,
+                                              std::string_view title);
+  // Unexpired Archived Tabs, newest first. Empty while not loaded.
+  rust::Vec<foundation::ArchivedTabRecord> ArchivedTabs() const;
+  // Call after the entry has been reopened.
+  foundation::MutationResult RemoveArchivedTab(uint64_t id);
   // has_url=false preserves existing saved URL; first save requires explicit
   // URL.
   foundation::MutationResult SetPlacement(uint64_t item,

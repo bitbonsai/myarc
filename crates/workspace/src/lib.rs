@@ -38,6 +38,10 @@ pub const MAX_TITLE_BYTES: usize = 1024;
 pub const MAX_SPACES: usize = 64;
 pub const MAX_ITEMS: usize = 1024;
 pub const MAX_WINDOWS: usize = 64;
+/// Archived Tabs keep at most this many entries; the oldest go first.
+pub const MAX_ARCHIVED_TABS: usize = 500;
+/// Archived Tabs older than 30 days are dropped.
+pub const ARCHIVE_RETENTION_SECS: u64 = 30 * 24 * 60 * 60;
 pub const SNAPSHOT_VERSION: u32 = 1;
 pub const DEFAULT_SPACE_ID: u64 = 1;
 pub const TEST_SPACE_ID: u64 = DEFAULT_SPACE_ID;
@@ -79,6 +83,7 @@ pub enum WorkspaceError {
     UnknownProfile(ProfileId),
     UnknownItem(ItemId),
     UnknownWindow(WindowId),
+    UnknownArchivedTab(ItemId),
     InvalidName(RenameError),
     InvalidUrl,
     CanonicalUrlRequired,
@@ -105,6 +110,7 @@ impl fmt::Display for WorkspaceError {
             Self::UnknownProfile(id) => write!(formatter, "Profile {id} is unsupported; use Profile 1"),
             Self::UnknownItem(id) => write!(formatter, "Item {id} does not exist"),
             Self::UnknownWindow(id) => write!(formatter, "Window {id} does not exist; create it first"),
+            Self::UnknownArchivedTab(id) => write!(formatter, "Archived tab {id} does not exist"),
             Self::InvalidName(error) => error.fmt(formatter),
             Self::InvalidUrl => formatter.write_str(
                 "Use either a browser-validated canonical HTTP(S) URL without credentials, or about:blank; at most 8192 bytes and without whitespace/control characters",
@@ -153,6 +159,20 @@ pub struct Item {
     pub title: String,
 }
 
+/// A closed temporary page, kept so the Library can reopen it (Archived Tabs).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ArchivedTab {
+    /// ID of the closed item. Item IDs are never reused, so this stays unique.
+    pub id: ItemId,
+    /// Space the page belonged to. That Space may since have been deleted.
+    pub space_id: SpaceId,
+    /// Browser-validated URL the page showed when it closed.
+    pub url: String,
+    pub title: String,
+    /// Caller-supplied wall-clock seconds when it closed.
+    pub archived_secs: u64,
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct WindowState {
     pub id: WindowId,
@@ -178,6 +198,9 @@ pub struct WorkspaceSnapshot {
     pub spaces: Vec<Space>,
     pub items: Vec<Item>,
     pub windows: Vec<WindowState>,
+    /// Archived Tabs, oldest first. Never holds private-browsing pages: the
+    /// adapter records nothing for off-the-record Profiles.
+    pub archived: Vec<ArchivedTab>,
     pub next_space_id: SpaceId,
     pub next_item_id: ItemId,
     pub next_window_id: WindowId,
@@ -229,6 +252,7 @@ impl Default for Workspace {
                     space_id: DEFAULT_SPACE_ID,
                     selected_item_id: None,
                 }],
+                archived: Vec::new(),
                 next_space_id: 2,
                 next_item_id: 1,
                 next_window_id: 2,
@@ -501,14 +525,7 @@ impl Workspace {
         if matches!(self.item(item_id)?.placement, Placement::Temporary { .. }) {
             return Err(WorkspaceError::NoCanonicalUrl(item_id));
         }
-        let mut clean = String::with_capacity(title.len().min(MAX_TITLE_BYTES));
-        for ch in title.chars() {
-            let ch = if ch.is_control() { ' ' } else { ch };
-            if clean.len() + ch.len_utf8() > MAX_TITLE_BYTES {
-                break;
-            }
-            clean.push(ch);
-        }
+        let clean = clean_title(title);
         let item = self
             .state
             .items
@@ -765,6 +782,7 @@ impl Workspace {
         if state.spaces.len() > MAX_SPACES
             || state.items.len() > MAX_ITEMS
             || state.windows.len() > MAX_WINDOWS
+            || state.archived.len() > MAX_ARCHIVED_TABS
         {
             return Err(WorkspaceError::InvalidSnapshot(
                 "collection count exceeds workspace limits",
@@ -815,7 +833,7 @@ impl Workspace {
                 }
             }
         }
-        Ok(())
+        self.validate_archive()
     }
 }
 
@@ -830,6 +848,20 @@ fn validate_name(name: &str) -> Result<(), RenameError> {
         return Err(RenameError::ControlCharacter);
     }
     Ok(())
+}
+
+/// Control characters become spaces; the text is cut to `MAX_TITLE_BYTES` on a
+/// character boundary.
+fn clean_title(title: &str) -> String {
+    let mut clean = String::with_capacity(title.len().min(MAX_TITLE_BYTES));
+    for ch in title.chars() {
+        let ch = if ch.is_control() { ' ' } else { ch };
+        if clean.len() + ch.len_utf8() > MAX_TITLE_BYTES {
+            break;
+        }
+        clean.push(ch);
+    }
+    clean
 }
 
 fn validate_profile(id: ProfileId) -> Result<(), WorkspaceError> {

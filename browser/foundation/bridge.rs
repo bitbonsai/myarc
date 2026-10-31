@@ -49,6 +49,14 @@ mod ffi {
         selected_item_id: u64,
     }
 
+    struct ArchivedTabRecord {
+        id: u64,
+        space_id: u64,
+        url: String,
+        title: String,
+        archived_secs: u64,
+    }
+
     struct StateSnapshot {
         version: u32,
         profile_id: u64,
@@ -58,6 +66,8 @@ mod ffi {
         spaces: Vec<SpaceRecord>,
         items: Vec<ItemRecord>,
         windows: Vec<WindowRecord>,
+        // Oldest first, as stored.
+        archived: Vec<ArchivedTabRecord>,
     }
 
     struct SidebarResult {
@@ -77,6 +87,7 @@ mod ffi {
         spaces: usize,
         items: usize,
         windows: usize,
+        archived_tabs: usize,
         name_bytes: usize,
         url_bytes: usize,
         title_bytes: usize,
@@ -96,6 +107,18 @@ mod ffi {
         fn add_temporary_item(workspace: &mut Workspace, space_id: u64) -> MutationResult;
         fn select_item(workspace: &mut Workspace, window_id: u64, item_id: u64) -> MutationResult;
         fn live_tab_closed(workspace: &mut Workspace, item_id: u64) -> MutationResult;
+        // Like live_tab_closed, and archives a temporary item. `id` is 1 when
+        // archived, else 0. Never call it for off-the-record Profiles.
+        fn archive_closed_tab(
+            workspace: &mut Workspace,
+            item_id: u64,
+            url: &str,
+            title: &str,
+            now_secs: u64,
+        ) -> MutationResult;
+        // Unexpired entries, newest first.
+        fn archived_tabs(workspace: &Workspace, now_secs: u64) -> Vec<ArchivedTabRecord>;
+        fn remove_archived_tab(workspace: &mut Workspace, id: u64) -> MutationResult;
         fn set_placement(
             workspace: &mut Workspace,
             item_id: u64,
@@ -156,6 +179,7 @@ pub fn bridge_limits() -> ffi::BridgeLimits {
         spaces: workspace::MAX_SPACES,
         items: workspace::MAX_ITEMS,
         windows: workspace::MAX_WINDOWS,
+        archived_tabs: workspace::MAX_ARCHIVED_TABS,
         name_bytes: workspace::MAX_SPACE_NAME_BYTES,
         url_bytes: workspace::MAX_URL_BYTES,
         title_bytes: workspace::MAX_TITLE_BYTES,
@@ -215,6 +239,44 @@ pub fn select_item(workspace: &mut Workspace, window_id: u64, item_id: u64) -> f
 
 pub fn live_tab_closed(workspace: &mut Workspace, item_id: u64) -> ffi::MutationResult {
     outcome(workspace.0.live_tab_closed(item_id).map(|()| 0))
+}
+
+pub fn archive_closed_tab(
+    workspace: &mut Workspace,
+    item_id: u64,
+    url: &str,
+    title: &str,
+    now_secs: u64,
+) -> ffi::MutationResult {
+    outcome(
+        workspace
+            .0
+            .archive_closed_tab(item_id, url, title, now_secs)
+            .map(u64::from),
+    )
+}
+
+fn archived_record(tab: workspace::ArchivedTab) -> ffi::ArchivedTabRecord {
+    ffi::ArchivedTabRecord {
+        id: tab.id,
+        space_id: tab.space_id,
+        url: tab.url,
+        title: tab.title,
+        archived_secs: tab.archived_secs,
+    }
+}
+
+pub fn archived_tabs(workspace: &Workspace, now_secs: u64) -> Vec<ffi::ArchivedTabRecord> {
+    workspace
+        .0
+        .archived_tabs(now_secs)
+        .into_iter()
+        .map(archived_record)
+        .collect()
+}
+
+pub fn remove_archived_tab(workspace: &mut Workspace, id: u64) -> ffi::MutationResult {
+    outcome(workspace.0.remove_archived_tab(id).map(|tab| tab.id))
 }
 
 fn placement(
@@ -400,6 +462,7 @@ pub fn export_snapshot(workspace: &Workspace) -> ffi::StateSnapshot {
                 selected_item_id: window.selected_item_id.unwrap_or(0),
             })
             .collect(),
+        archived: state.archived.into_iter().map(archived_record).collect(),
     }
 }
 
@@ -418,6 +481,10 @@ pub fn restore_snapshot(
             item.canonical_url.len() > workspace::MAX_URL_BYTES
                 || item.title.len() > workspace::MAX_TITLE_BYTES
                 || (!item.has_url && !item.canonical_url.is_empty())
+        })
+        || snapshot.archived.len() > workspace::MAX_ARCHIVED_TABS
+        || snapshot.archived.iter().any(|tab| {
+            tab.url.len() > workspace::MAX_URL_BYTES || tab.title.len() > workspace::MAX_TITLE_BYTES
         })
     {
         return reject("Snapshot exceeds bridge bounds or has inconsistent URL presence");
@@ -462,6 +529,17 @@ pub fn restore_snapshot(
                         space_id: window.space_id,
                         selected_item_id: (window.selected_item_id != 0)
                             .then_some(window.selected_item_id),
+                    })
+                    .collect(),
+                archived: snapshot
+                    .archived
+                    .into_iter()
+                    .map(|tab| workspace::ArchivedTab {
+                        id: tab.id,
+                        space_id: tab.space_id,
+                        url: tab.url,
+                        title: tab.title,
+                        archived_secs: tab.archived_secs,
                     })
                     .collect(),
             })

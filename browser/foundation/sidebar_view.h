@@ -12,6 +12,7 @@
 #include "base/memory/raw_ref.h"
 #include "base/memory/weak_ptr.h"
 #include "base/sequence_checker.h"
+#include "base/time/time.h"
 #include "ui/base/metadata/metadata_header_macros.h"
 #include "ui/base/models/image_model.h"
 #include "ui/menus/simple_menu_model.h"
@@ -67,6 +68,16 @@ class SidebarView final : public views::View,
     bool operator==(const DownloadPresentation&) const = default;
   };
 
+  struct ArchivedTabPresentation {
+    uint64_t id = 0;  // Rust archive ID.
+    std::u16string title;
+    std::u16string url;    // Display form, without the scheme.
+    std::u16string space;  // Owning Space's name; empty once it is deleted.
+    ui::ImageModel icon;   // Cached favicon, or empty.
+    base::Time archived;
+    bool operator==(const ArchivedTabPresentation&) const = default;
+  };
+
   class Delegate {
    public:
     virtual ~Delegate() = default;
@@ -93,6 +104,11 @@ class SidebarView final : public views::View,
     // Newest first, bounded by the parent. Lookup only.
     virtual std::vector<DownloadPresentation> GetRecentDownloads() const = 0;
     virtual void OpenDownload(uint32_t download_id) = 0;
+    // Newest first. Lookup only.
+    virtual std::vector<ArchivedTabPresentation> GetArchivedTabs() const = 0;
+    // Reopens the tab in its Space and drops it from the archive. The parent
+    // reports errors.
+    virtual void RestoreArchivedTab(uint64_t archive_id) = 0;
     // The parent resizes the sidebar region for the Library, and calls
     // RefreshLibraryDownloads while it is open. After closing it supplies a
     // fresh model with SetModel.

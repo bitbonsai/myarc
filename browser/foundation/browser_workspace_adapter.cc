@@ -169,7 +169,11 @@ class Binding final : public base::SupportsUserData::Data,
         !SessionRestore::IsRestoring(profile_) &&
         Count(*profile_, item_) == 0) {
       // Unknown IDs can occur only before rejected restore binding finishes.
-      WorkspaceService::ForProfile(*profile_).LiveTabClosed(item_);
+      // Rust archives the item only when it is temporary.
+      auto& contents = *web_contents();
+      WorkspaceService::ForProfile(*profile_).ArchiveClosedTab(
+          item_, contents.GetLastCommittedURL().spec(),
+          base::UTF16ToUTF8(contents.GetTitle()));
     }
   }
 
@@ -1148,29 +1152,35 @@ void BrowserWorkspaceAdapter::RequestSavedIcons(
       profile_, ServiceAccessType::IMPLICIT_ACCESS);
   if (!favicons)
     return;
+  const auto request = [&](const GURL& url) {
+    if (saved_icons_.contains(url))
+      return;
+    saved_icons_.emplace(url, gfx::Image());
+    ++pending_icons_;
+    favicons->GetFaviconImageForPageURL(
+        url,
+        base::BindOnce(&BrowserWorkspaceAdapter::OnSavedIcon,
+                       weak_factory_.GetWeakPtr(), url),
+        &icon_tracker_);
+  };
   for (const auto* rows : {&sidebar.favorites, &sidebar.pins}) {
     for (const auto& row : *rows) {
       if (!row.has_url)
         continue;
       const GURL url(std::string(row.canonical_url));
-      auto cached = saved_icons_.find(url);
       if (AnyPage(*profile_, row.id)) {
         // The live page may store a new favicon; look again once it closes.
+        auto cached = saved_icons_.find(url);
         if (cached != saved_icons_.end() && cached->second.IsEmpty())
           saved_icons_.erase(cached);
         continue;
       }
-      if (cached != saved_icons_.end())
-        continue;
-      saved_icons_.emplace(url, gfx::Image());
-      ++pending_icons_;
-      favicons->GetFaviconImageForPageURL(
-          url,
-          base::BindOnce(&BrowserWorkspaceAdapter::OnSavedIcon,
-                         weak_factory_.GetWeakPtr(), url),
-          &icon_tracker_);
+      request(url);
     }
   }
+  // Archived Tabs share the cache; each URL is looked up once per window.
+  for (const auto& tab : service_->ArchivedTabs())
+    request(GURL(std::string(tab.url)));
 }
 
 void BrowserWorkspaceAdapter::OnSavedIcon(
@@ -1192,11 +1202,45 @@ void BrowserWorkspaceAdapter::OnSavedIcon(
 
 gfx::Image BrowserWorkspaceAdapter::SavedIcon(
     const foundation::ItemRecord& item) const {
-  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
   if (!item.has_url)
     return gfx::Image();
-  auto cached = saved_icons_.find(GURL(std::string(item.canonical_url)));
+  return CachedIcon(GURL(std::string(item.canonical_url)));
+}
+
+gfx::Image BrowserWorkspaceAdapter::CachedIcon(const GURL& url) const {
+  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
+  auto cached = saved_icons_.find(url);
   return cached == saved_icons_.end() ? gfx::Image() : cached->second;
+}
+
+foundation::MutationResult BrowserWorkspaceAdapter::RestoreArchivedTab(
+    uint64_t id) {
+  if (!ready())
+    return Fail(error());
+  const auto tabs = service_->ArchivedTabs();
+  const auto tab =
+      std::ranges::find(tabs, id, &foundation::ArchivedTabRecord::id);
+  if (tab == tabs.end())
+    return Fail("This archived tab no longer exists.");
+  const GURL url(std::string(tab->url));
+  const auto sidebar = Sidebar();
+  if (!sidebar.ok)
+    return Fail("Workspace window is not ready.");
+  // A deleted Space's tabs reopen in the current one.
+  const bool space_exists = std::ranges::any_of(
+      sidebar.spaces, [&](const foundation::SpaceRecord& space) {
+        return space.id == tab->space_id;
+      });
+  if (space_exists && tab->space_id != sidebar.current_space.id) {
+    auto selected = SelectSpace(tab->space_id);
+    if (!selected.ok)
+      return selected;
+  }
+  auto result = OpenInCurrentSpace(url);
+  // Drop the entry only once its page is open again.
+  if (result.ok)
+    service_->RemoveArchivedTab(id);
+  return result;
 }
 
 foundation::MutationResult BrowserWorkspaceAdapter::ActivateItem(

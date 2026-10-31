@@ -17,6 +17,7 @@
 #include "base/task/sequenced_task_runner.h"
 #include "base/task/thread_pool.h"
 #include "base/threading/sequence_local_storage_slot.h"
+#include "base/time/time.h"
 #include "base/values.h"
 #include "chrome/browser/profiles/profile.h"
 #include "content/public/browser/browser_thread.h"
@@ -26,9 +27,10 @@ namespace myarc {
 namespace {
 
 const char kWorkspaceServiceKey = 0;
-// Covers the core maximum (1024 saved URLs of 8192 bytes), including JSON
-// escaping. JSONReader's input and depth limits bound its intermediate tree;
-// per-field/count checks below precede allocation of owned bridge records.
+// Covers the core maximum (1024 saved URLs and 500 archived URLs of 8192
+// bytes), including JSON escaping. JSONReader's input and depth limits bound
+// its intermediate tree; per-field/count checks below precede allocation of
+// owned bridge records.
 constexpr size_t kMaxMetadataBytes = 20 * 1024 * 1024;
 constexpr size_t kMaxJsonDepth = 8;
 
@@ -119,6 +121,12 @@ bool BoundedText(std::string_view text, size_t limit) {
   return text.size() <= limit && base::IsStringUTF8(text);
 }
 
+// Wall-clock seconds for Archived Tabs; a clock before 1970 reads as 0.
+uint64_t NowSecs() {
+  const time_t now = base::Time::Now().ToTimeT();
+  return now > 0 ? static_cast<uint64_t>(now) : 0;
+}
+
 }  // namespace
 
 namespace internal {
@@ -141,6 +149,14 @@ bool CanonicalizeUrls(foundation::StateSnapshot& snapshot) {
     if (!url)
       return false;
     item.canonical_url = *url;
+  }
+  if (snapshot.archived.size() > limits.archived_tabs)
+    return false;
+  for (auto& tab : snapshot.archived) {
+    auto url = CanonicalUrl(std::string_view(tab.url.data(), tab.url.size()));
+    if (!url)
+      return false;
+    tab.url = *url;
   }
   return true;
 }
@@ -186,6 +202,20 @@ std::optional<std::string> EncodeWorkspaceMetadata(
     windows.Append(std::move(record));
   }
   root.Set("windows", std::move(windows));
+  // Builds without Archived Tabs reject the key, so write it only when set.
+  if (!snapshot.archived.empty()) {
+    base::ListValue archived;
+    for (const auto& tab : snapshot.archived) {
+      base::DictValue record;
+      record.Set("id", base::NumberToString(tab.id));
+      record.Set("space_id", base::NumberToString(tab.space_id));
+      record.Set("url", std::string(tab.url));
+      record.Set("title", std::string(tab.title));
+      record.Set("archived_secs", base::NumberToString(tab.archived_secs));
+      archived.Append(std::move(record));
+    }
+    root.Set("archived", std::move(archived));
+  }
   auto json = base::WriteJson(root);
   if (json && json->size() <= kMaxMetadataBytes) {
     return json;
@@ -200,16 +230,20 @@ MetadataResult DecodeWorkspaceMetadata(std::string_view json) {
   auto root =
       base::JSONReader::ReadDict(json, base::JSON_PARSE_RFC, kMaxJsonDepth);
   const auto limits = foundation::bridge_limits();
-  if (!root || root->size() != 8 ||
+  if (!root || root->size() < 8 || root->size() > 9 ||
       root->FindInt("version") != static_cast<int>(limits.version)) {
     return InvalidMetadata();
   }
   const auto* spaces = root->FindList("spaces");
   const auto* items = root->FindList("items");
   const auto* windows = root->FindList("windows");
+  // Files written before Archived Tabs existed have no "archived" key.
+  const auto* archived = root->FindList("archived");
   if (!spaces || spaces->size() > limits.spaces || !items ||
       items->size() > limits.items || !windows ||
-      windows->size() > limits.windows) {
+      windows->size() > limits.windows ||
+      (root->size() == 9) != (archived != nullptr) ||
+      (archived && archived->size() > limits.archived_tabs)) {
     return InvalidMetadata();
   }
   foundation::StateSnapshot snapshot;
@@ -269,6 +303,25 @@ MetadataResult DecodeWorkspaceMetadata(std::string_view json) {
       return InvalidMetadata();
     }
     snapshot.windows.push_back(std::move(window));
+  }
+  if (archived) {
+    for (const auto& value : *archived) {
+      const auto* record = value.GetIfDict();
+      const auto* url = record ? record->FindString("url") : nullptr;
+      const auto* title = record ? record->FindString("title") : nullptr;
+      foundation::ArchivedTabRecord tab;
+      if (!record || record->size() != 5 || !url ||
+          !BoundedText(*url, limits.url_bytes) || !title ||
+          !BoundedText(*title, limits.title_bytes) ||
+          !ReadId(*record, "id", tab.id) ||
+          !ReadId(*record, "space_id", tab.space_id) ||
+          !ReadId(*record, "archived_secs", tab.archived_secs)) {
+        return InvalidMetadata();
+      }
+      tab.url = *url;
+      tab.title = *title;
+      snapshot.archived.push_back(std::move(tab));
+    }
   }
   if (!CanonicalizeUrls(snapshot))
     return InvalidMetadata();
@@ -507,6 +560,36 @@ foundation::MutationResult WorkspaceService::LiveTabClosed(uint64_t item) {
   if (!CanMutate())
     return Failure("Workspace is not loaded. Check storage state.");
   return Changed(foundation::live_tab_closed(*workspace_, item));
+}
+
+foundation::MutationResult WorkspaceService::ArchiveClosedTab(
+    uint64_t item,
+    std::string_view url,
+    std::string_view title) {
+  // Private browsing keeps no history, so it archives nothing.
+  if (ephemeral_)
+    return LiveTabClosed(item);
+  if (!CanMutate())
+    return Failure("Workspace is not loaded. Check storage state.");
+  // An unarchivable URL (a Chrome page, say) still ends the item in Rust.
+  const std::string canonical = CanonicalUrl(url).value_or(std::string());
+  const std::string text = base::IsStringUTF8(title) ? std::string(title) : "";
+  return Changed(foundation::archive_closed_tab(
+      *workspace_, item, rust::Str(canonical.data(), canonical.size()),
+      rust::Str(text.data(), text.size()), NowSecs()));
+}
+
+rust::Vec<foundation::ArchivedTabRecord> WorkspaceService::ArchivedTabs()
+    const {
+  if (!CanMutate())
+    return {};
+  return foundation::archived_tabs(*workspace_, NowSecs());
+}
+
+foundation::MutationResult WorkspaceService::RemoveArchivedTab(uint64_t id) {
+  if (!CanMutate())
+    return Failure("Workspace is not loaded. Check storage state.");
+  return Changed(foundation::remove_archived_tab(*workspace_, id));
 }
 
 foundation::MutationResult WorkspaceService::SetPlacement(

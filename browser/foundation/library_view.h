@@ -47,6 +47,8 @@ class LibraryView final : public views::View,
   void FocusSection();
   // Reloads the Downloads list when it is showing and its entries changed.
   void RefreshDownloads();
+  // Reloads the Archived Tabs list when it is showing and its entries changed.
+  void RefreshArchive();
 
   // views::View:
   gfx::Size CalculatePreferredSize(
@@ -58,7 +60,9 @@ class LibraryView final : public views::View,
   void Rebuild();
   void BuildSpaces();
   void BuildList();
-  void UpdateDownloads();
+  // Fills the Downloads or Archived Tabs list from the cached entries.
+  void UpdateList();
+  void AddArchiveRows(views::View& rows);
   // The keyed control that has focus, and putting focus back on it after a
   // rebuild. Returns false when no control has `key` any more.
   std::optional<uint64_t> FocusedKey() const;
@@ -80,11 +84,13 @@ class LibraryView final : public views::View,
   raw_ptr<views::View> pane_ = nullptr;
   raw_ptr<views::Textfield> search_ = nullptr;
   raw_ptr<views::View> list_ = nullptr;
-  // Pane controls keyed by the Space or download they act on (0 for Create
-  // and Show All Downloads), so a rebuild can put focus back.
+  // Pane controls keyed by the Space, download or archived tab they act on (0
+  // for Create and Show All Downloads), so a rebuild can put focus back.
   std::vector<std::pair<uint64_t, raw_ptr<views::View>>> keyed_views_;
   // Recent downloads, unfiltered, while the Downloads section shows.
   std::vector<SidebarView::DownloadPresentation> downloads_;
+  // Archived Tabs, newest first and unfiltered, while that section shows.
+  std::vector<SidebarView::ArchivedTabPresentation> archived_;
   std::u16string query_;
   // Surface and text colors the pane was last built with.
   std::optional<std::pair<SkColor, SkColor>> theme_colors_;
