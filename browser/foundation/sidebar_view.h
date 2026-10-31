@@ -5,6 +5,7 @@
 #include <memory>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -32,6 +33,7 @@ struct SidebarResult;
 
 namespace myarc {
 
+class FooterTooltip;
 class LibraryView;
 
 // Presentation only, on the UI sequence. Delegate outlives this view. The
@@ -142,6 +144,9 @@ class SidebarView final : public views::View,
   // Reloads an open Library's Downloads list if it changed.
   void RefreshLibraryDownloads();
   bool library_open() const { return !!library_; }
+  // Shows the footer tooltip of "library", "space" (the current one) or
+  // "create" without hover and keeps it up, for background captures.
+  void ShowFooterTooltipForCapture(std::string_view target);
 
  private:
   friend class SidebarViewTestApi;
@@ -212,6 +217,7 @@ class SidebarView final : public views::View,
   std::unique_ptr<ui::SimpleMenuModel> menu_model_;
   std::unique_ptr<views::MenuRunner> menu_runner_;
   bool create_menu_open_ = false;
+  std::unique_ptr<FooterTooltip> footer_tooltip_;
   // The next footer's Library button starts glowing and settles.
   bool library_closed_ = false;
   SEQUENCE_CHECKER(sequence_checker_);

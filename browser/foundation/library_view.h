@@ -29,6 +29,8 @@ class Textfield;
 
 namespace myarc {
 
+class FooterTooltip;
+
 // Arc's Library: a section rail and one section pane. Presentation only; the
 // Space and download actions go through the sidebar's Delegate. `close`
 // destroys this view, so the view runs it only from a posted task.
@@ -116,6 +118,7 @@ class LibraryView final : public views::View,
   std::optional<std::pair<SkColor, SkColor>> theme_colors_;
   std::unique_ptr<ui::SimpleMenuModel> menu_model_;
   std::unique_ptr<views::MenuRunner> menu_runner_;
+  std::unique_ptr<FooterTooltip> tooltip_;
   base::WeakPtrFactory<LibraryView> weak_factory_{this};
 };
 

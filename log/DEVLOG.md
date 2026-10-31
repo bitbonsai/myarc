@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-10-31: Footer tooltips like Arc
+
+- After a 1 second hover, the Library button, each Space and `+` show Arc's tooltip instead of the native one: a navy pill above the button (white with dark text in light mode) with the label and keycaps for a working shortcut. Spaces show their name with ⌃1 to ⌃8, and ⌃9 on the last Space when it is ninth or later (that key selects the last Space). The Library says "View Library" without keys: Arc's ⇧⌘L is Chromium's View > Collapse Tabs shortcut. `+` says "Create Space" without keys; no shortcut opens its menu. The Library panel's glowing button says "Close Library". A press hides the tooltip until the pointer leaves, and a footer rebuilt under the pointer keeps it. `TOOLTIP=library|space|create` in `tools/capture_native.sh` shows one via the new `--myarc-capture-footer-tooltip`.
+- Verification: `chrome` and `bridge_check` build; `bridge_check`, cargo fmt/clippy/test, `export_patches.py --check` and `check_docs.py` pass. Background captures `research-private/captures/footer-tooltips/library.png` and `space.png` match Arc's references; hover timing, press, light mode and the Library panel's tooltip were checked by reading the code, not run.
+- Chromium `myarc` commit `5a3b4c3337`.
+
 ## 2026-10-31: Animated Library icon
 
 - The footer Library button now draws the user-designed `design/icons/library-idle.svg` and `library-glow.svg` with Skia (new `footer_button.cc`) and morphs between them as `library-morph.html` does: on hover the star, dot and triangle rise out of the box under a blurred light beam, with an overshoot and a small stagger. The Library panel's footer shows the same button glowing in place of its back arrow (it still closes the Library, now named "Close Library"), and on close the new sidebar button settles back to idle. All parts use the theme's foreground color at 55% idle and 95% glowing, so light mode draws in black. Reduced motion jumps to the end state; a footer rebuilt under the pointer stays lit. The old `library.svg` glyph and Lucide `arrow-left` are no longer used.

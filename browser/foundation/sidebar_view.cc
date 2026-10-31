@@ -9,6 +9,7 @@
 #include "base/functional/bind.h"
 #include "base/location.h"
 #include "base/scoped_observation.h"
+#include "base/strings/string_number_conversions.h"
 #include "base/strings/utf_string_conversions.h"
 #include "base/task/sequenced_task_runner.h"
 #include "components/vector_icons/vector_icons.h"
@@ -248,7 +249,9 @@ void AddStatus(views::View& parent, const std::u16string& text) {
 
 }  // namespace
 
-SidebarView::SidebarView(Delegate& delegate) : delegate_(delegate) {
+SidebarView::SidebarView(Delegate& delegate)
+    : delegate_(delegate),
+      footer_tooltip_(std::make_unique<FooterTooltip>()) {
   SetPreferredSize(kSidebarSize);
   SetLayoutManager(std::make_unique<views::BoxLayout>(Orientation::kVertical,
                                                       kSidebarInsets, 8));
@@ -412,7 +415,6 @@ void SidebarView::SetCreateMenuOpen(bool open) {
                         ui::ImageModel::FromVectorIcon(
                             open ? vector_icons::kCloseIcon : kPlusIcon,
                             GetFills(GetColorProvider()).footer_icon, 21));
-  button->SetTooltipText(open ? u"Close creation menu" : u"Create Space");
   if (open) {
     button->GetViewAccessibility().SetIsExpanded();
   } else {
@@ -783,7 +785,10 @@ void SidebarView::SetModel(const foundation::SidebarResult& model,
           },
           weak_factory_.GetWeakPtr()),
       nullptr);
-  library->SetTooltipText(u"Library");
+  // Arc's Shift-Cmd-L would clash with Chromium's View > Collapse Tabs, so the
+  // tooltip shows no shortcut.
+  library->SetFooterTooltip(footer_tooltip_->GetWeakPtr(),
+                            {u"View Library", {}});
   library->GetViewAccessibility().SetName(u"Library");
   TrackFocus(library.get(), FocusAction::kLibrary);
   // Right after the Library closes, its glow settles back into the box.
@@ -815,11 +820,12 @@ void SidebarView::SetModel(const foundation::SidebarResult& model,
   spaces->GetViewAccessibility().SetName(u"Spaces");
   views::View* current_space = nullptr;
   std::optional<size_t> current_space_index;
-  for (const auto& [space_id, space_name] : spaces_) {
+  for (size_t index = 0; index < spaces_.size(); ++index) {
+    const auto& [space_id, space_name] = spaces_[index];
     const bool current = space_id == model.current_space.id;
     // Button presses request a switch; only a Rust snapshot changes selection.
     // As in Arc, the current Space shows its icon and the others a dot.
-    auto choice = IconButton(
+    auto choice = IconButton<FooterButton>(
         base::BindRepeating(&Delegate::SelectSpace,
                             base::Unretained(&delegate_.get()), space_id),
         current ? &kSaturnIcon : &kDotIcon, current ? 16 : 8);
@@ -831,8 +837,14 @@ void SidebarView::SetModel(const foundation::SidebarResult& model,
       current_space = choice.get();
       current_space_index = spaces->children().size();
     }
-    choice->SetTooltipText(
-        (current ? u"Current Space: " : u"Switch to Space: ") + space_name);
+    // Ctrl-1 to Ctrl-8 select those Spaces and Ctrl-9 the last one.
+    FooterTooltip::Content tooltip = {space_name, {}};
+    if (index < 8) {
+      tooltip.keys = {u"\u2303", base::NumberToString16(index + 1)};
+    } else if (index + 1 == spaces_.size()) {
+      tooltip.keys = {u"\u2303", u"9"};
+    }
+    choice->SetFooterTooltip(footer_tooltip_->GetWeakPtr(), std::move(tooltip));
     choice->GetViewAccessibility().SetName(u"Space: " + space_name);
     choice->GetViewAccessibility().SetRole(ax::mojom::Role::kToggleButton);
     choice->GetViewAccessibility().SetCheckedState(
@@ -865,11 +877,13 @@ void SidebarView::SetModel(const foundation::SidebarResult& model,
       base::OwnedRef(std::optional(spaces_offset)), space_changed,
       current_space_index));
 
-  auto create = IconButton(
+  auto create = IconButton<FooterButton>(
       base::BindRepeating(&SidebarView::ShowCreateMenu,
                           weak_factory_.GetWeakPtr()),
       create_menu_open_ ? &vector_icons::kCloseIcon : &kPlusIcon, 21);
-  create->SetTooltipText(u"Create Space");
+  // No shortcut opens the creation menu.
+  create->SetFooterTooltip(footer_tooltip_->GetWeakPtr(),
+                           {u"Create Space", {}});
   create->GetViewAccessibility().SetName(u"Create Space");
   create->GetViewAccessibility().SetHasPopup(ax::mojom::HasPopup::kMenu);
   TrackFocus(create.get(), FocusAction::kCreate);
@@ -892,6 +906,22 @@ void SidebarView::SetModel(const foundation::SidebarResult& model,
       }
     }
     restore->RequestFocus();
+  }
+}
+
+void SidebarView::ShowFooterTooltipForCapture(std::string_view target) {
+  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
+  const FocusAction action = target == "space"    ? FocusAction::kSpaces
+                             : target == "create" ? FocusAction::kCreate
+                                                  : FocusAction::kLibrary;
+  for (const auto& focus : focus_targets_) {
+    if (focus.action == action &&
+        (action != FocusAction::kSpaces || focus.id == current_space_id_)) {
+      if (auto* button = views::AsViewClass<FooterButton>(focus.view.get())) {
+        button->ShowFooterTooltipNow();
+      }
+      return;
+    }
   }
 }
 

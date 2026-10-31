@@ -349,7 +349,8 @@ LibraryView::LibraryView(SidebarView::Delegate& delegate,
   back->SetMaxSize(gfx::Size(32, 32));
   back->SetPreferredSize(gfx::Size(32, 32));
   back->SetOpen(true, /*animate=*/false);
-  back->SetTooltipText(u"Close Library");
+  tooltip_ = std::make_unique<FooterTooltip>();
+  back->SetFooterTooltip(tooltip_->GetWeakPtr(), {u"Close Library", {}});
   back->GetViewAccessibility().SetName(u"Close Library");
   footer->AddChildView(std::move(back));
 

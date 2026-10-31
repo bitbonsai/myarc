@@ -2,8 +2,12 @@
 
 #include <algorithm>
 #include <array>
+#include <memory>
+#include <utility>
 
 #include "base/check.h"
+#include "base/functional/bind.h"
+#include "base/location.h"
 #include "base/no_destructor.h"
 #include "base/time/time.h"
 #include "cc/paint/paint_canvas.h"
@@ -14,13 +18,25 @@
 #include "third_party/skia/include/core/SkPath.h"
 #include "third_party/skia/include/core/SkRect.h"
 #include "third_party/skia/include/utils/SkParsePath.h"
+#include "ui/accessibility/ax_enums.mojom.h"
 #include "ui/base/metadata/metadata_impl_macros.h"
 #include "ui/color/color_id.h"
 #include "ui/color/color_provider.h"
 #include "ui/gfx/animation/animation.h"
 #include "ui/gfx/canvas.h"
+#include "ui/gfx/color_utils.h"
+#include "ui/gfx/font.h"
+#include "ui/gfx/font_list.h"
 #include "ui/gfx/geometry/cubic_bezier.h"
+#include "ui/gfx/geometry/rect.h"
+#include "ui/gfx/geometry/rect_conversions.h"
+#include "ui/gfx/geometry/rect_f.h"
+#include "ui/gfx/geometry/size.h"
 #include "ui/gfx/scoped_canvas.h"
+#include "ui/gfx/text_utils.h"
+#include "ui/views/accessibility/view_accessibility.h"
+#include "ui/views/view.h"
+#include "ui/views/widget/widget.h"
 
 namespace myarc {
 namespace {
@@ -127,7 +143,317 @@ Pose Lerp(const Sparkle& sparkle, float t) {
           Lerp(sparkle.idle.scale, sparkle.glow.scale, t)};
 }
 
+// Footer tooltip, measured from Arc's (DIP): a 28 tall pill 4 above the button,
+// 10 before the label, then 18 DIP keycaps 4 apart with a 2 DIP lip, 5 from
+// the pill's edge.
+constexpr base::TimeDelta kTooltipDelay = base::Seconds(1);
+constexpr base::TimeDelta kOrphanGrace = base::Milliseconds(250);
+constexpr int kTooltipHeight = 28;
+constexpr int kTooltipGap = 4;
+constexpr int kTooltipMargin = 6;
+constexpr int kTooltipInset = 10;
+constexpr int kKeysGap = 10;
+constexpr int kKeySize = 18;
+constexpr int kKeyGap = 4;
+constexpr int kKeyLip = 2;
+constexpr float kKeyRadius = 5;
+constexpr int kKeysInset = (kTooltipHeight - kKeySize) / 2;
+constexpr int kLabelSize = 13;
+constexpr int kKeyLabelSize = 11;
+
+struct TooltipColors {
+  SkColor fill;
+  SkColor border;
+  SkColor label;
+  SkColor key;
+  SkColor key_lip;
+  SkColor key_label;
+};
+
+// Sampled from Arc's dark tooltip. Light mode keeps the keycaps on a white
+// pill with dark text.
+constexpr TooltipColors kDarkTooltip = {
+    SkColorSetRGB(0x0A, 0x0C, 0x4B), SkColorSetA(SK_ColorWHITE, 0x1A),
+    SkColorSetRGB(0xDE, 0xDF, 0xFE), SkColorSetRGB(0xD3, 0xD5, 0xFD),
+    SkColorSetRGB(0x83, 0x87, 0xE4), SkColorSetRGB(0x21, 0x2A, 0xFC)};
+constexpr TooltipColors kLightTooltip = {
+    SK_ColorWHITE,                   SkColorSetA(SK_ColorBLACK, 0x1F),
+    SkColorSetRGB(0x1D, 0x1B, 0x26), SkColorSetRGB(0xE4, 0xE5, 0xFE),
+    SkColorSetRGB(0xB0, 0xB4, 0xF4), SkColorSetRGB(0x21, 0x2A, 0xFC)};
+
+gfx::FontList FontOfSize(int size, gfx::Font::Weight weight) {
+  const gfx::FontList base;
+  return base.Derive(size - base.GetFontSize(), gfx::Font::NORMAL, weight);
+}
+
+class TooltipView : public views::View {
+  METADATA_HEADER(TooltipView, views::View)
+
+ public:
+  TooltipView(const FooterTooltip::Content& content,
+              const TooltipColors& colors)
+      : content_(content),
+        colors_(colors),
+        label_font_(FontOfSize(kLabelSize, gfx::Font::Weight::MEDIUM)),
+        key_font_(FontOfSize(kKeyLabelSize, gfx::Font::Weight::BOLD)) {
+    GetViewAccessibility().SetRole(ax::mojom::Role::kTooltip);
+    GetViewAccessibility().SetName(content_.label);
+  }
+
+  gfx::Size CalculatePreferredSize(
+      const views::SizeBounds& available_size) const override {
+    int width = kTooltipInset + LabelWidth();
+    if (content_.keys.empty()) {
+      width += kTooltipInset;
+    } else {
+      width += kKeysGap + KeysWidth() + kKeysInset;
+    }
+    return gfx::Size(width, kTooltipHeight);
+  }
+
+  void OnPaint(gfx::Canvas* canvas) override {
+    const gfx::RectF bounds(GetLocalBounds());
+    cc::PaintFlags flags;
+    flags.setAntiAlias(true);
+    flags.setColor(colors_.fill);
+    canvas->DrawRoundRect(bounds, bounds.height() / 2, flags);
+    gfx::RectF edge = bounds;
+    edge.Inset(0.5f);
+    flags.setStyle(cc::PaintFlags::kStroke_Style);
+    flags.setStrokeWidth(1);
+    flags.setColor(colors_.border);
+    canvas->DrawRoundRect(edge, edge.height() / 2, flags);
+
+    constexpr int kTextFlags = gfx::Canvas::NO_SUBPIXEL_RENDERING;
+    canvas->DrawStringRectWithFlags(
+        content_.label, label_font_, colors_.label,
+        gfx::Rect(kTooltipInset, 0, LabelWidth(), height()), kTextFlags);
+    flags.setStyle(cc::PaintFlags::kFill_Style);
+    int x = kTooltipInset + LabelWidth() + kKeysGap;
+    for (const auto& key : content_.keys) {
+      const gfx::RectF cap(x, kKeysInset, kKeySize, kKeySize);
+      flags.setColor(colors_.key_lip);
+      canvas->DrawRoundRect(cap, kKeyRadius, flags);
+      gfx::RectF face = cap;
+      face.set_height(kKeySize - kKeyLip);
+      flags.setColor(colors_.key);
+      canvas->DrawRoundRect(face, kKeyRadius, flags);
+      canvas->DrawStringRectWithFlags(
+          key, key_font_, colors_.key_label, gfx::ToEnclosingRect(face),
+          kTextFlags | gfx::Canvas::TEXT_ALIGN_CENTER);
+      x += kKeySize + kKeyGap;
+    }
+  }
+
+ private:
+  int LabelWidth() const {
+    return gfx::GetStringWidth(content_.label, label_font_);
+  }
+
+  int KeysWidth() const {
+    const int count = static_cast<int>(content_.keys.size());
+    return count * kKeySize + (count - 1) * kKeyGap;
+  }
+
+  const FooterTooltip::Content content_;
+  const TooltipColors colors_;
+  const gfx::FontList label_font_;
+  const gfx::FontList key_font_;
+};
+
+BEGIN_METADATA(TooltipView)
+END_METADATA
+
 }  // namespace
+
+FooterTooltip::FooterTooltip() = default;
+
+FooterTooltip::~FooterTooltip() = default;
+
+bool FooterTooltip::IsActive() const {
+  return delay_.IsRunning() || (widget_ && widget_->IsVisible());
+}
+
+void FooterTooltip::Hover(views::View& anchor, const Content& content) {
+  if (hold_ || (pressed_ && content == content_)) {
+    return;
+  }
+  pressed_ = false;
+  orphan_.Stop();
+  if (content == content_ && IsActive()) {
+    anchor_ = &anchor;
+    if (widget_ && widget_->IsVisible()) {
+      Show();
+    }
+    return;
+  }
+  Hide();
+  anchor_ = &anchor;
+  content_ = content;
+  delay_.Start(FROM_HERE, kTooltipDelay,
+               base::BindOnce(&FooterTooltip::Show, base::Unretained(this)));
+}
+
+void FooterTooltip::Unhover(const views::View& anchor) {
+  // A rebuilt button can leave without having been the anchor.
+  pressed_ = false;
+  if (anchor_ == &anchor && !hold_) {
+    Hide();
+  }
+}
+
+void FooterTooltip::Press(const Content& content) {
+  Hide();
+  content_ = content;
+  pressed_ = true;
+}
+
+void FooterTooltip::Detach(const views::View& anchor) {
+  if (anchor_ != &anchor) {
+    return;
+  }
+  anchor_ = nullptr;
+  if (!hold_ && IsActive()) {
+    orphan_.Start(FROM_HERE, kOrphanGrace,
+                  base::BindOnce(&FooterTooltip::Hide, base::Unretained(this)));
+  }
+}
+
+void FooterTooltip::ShowNow(views::View& anchor, const Content& content) {
+  Hide();
+  anchor_ = &anchor;
+  content_ = content;
+  Show();
+  hold_ = true;
+}
+
+void FooterTooltip::Hide() {
+  delay_.Stop();
+  orphan_.Stop();
+  anchor_ = nullptr;
+  hold_ = false;
+  if (widget_) {
+    widget_->Hide();
+  }
+}
+
+void FooterTooltip::Show() {
+  if (!anchor_ || !anchor_->GetWidget() || content_.label.empty()) {
+    return;
+  }
+  views::Widget* parent = anchor_->GetWidget();
+  if (!widget_) {
+    views::Widget::InitParams params(
+        views::Widget::InitParams::CLIENT_OWNS_WIDGET,
+        views::Widget::InitParams::TYPE_POPUP);
+    params.SetParent(parent);
+    params.opacity = views::Widget::InitParams::WindowOpacity::kTranslucent;
+    params.activatable = views::Widget::InitParams::Activatable::kNo;
+    params.accept_events = false;
+    params.shadow_type = views::Widget::InitParams::ShadowType::kNone;
+    params.name = "MyarcFooterTooltip";
+    widget_ = std::make_unique<views::Widget>(std::move(params));
+  }
+  const ui::ColorProvider* provider = anchor_->GetColorProvider();
+  const bool dark = !provider || color_utils::IsDark(
+                                     provider->GetColor(ui::kColorSysSurface));
+  auto* contents = widget_->SetContentsView(
+      std::make_unique<TooltipView>(content_, dark ? kDarkTooltip
+                                                   : kLightTooltip));
+  const gfx::Size size = contents->GetPreferredSize();
+  const gfx::Rect anchor = anchor_->GetBoundsInScreen();
+  const gfx::Rect window = parent->GetClientAreaBoundsInScreen();
+  const int x = std::clamp(anchor.CenterPoint().x() - size.width() / 2,
+                           window.x() + kTooltipMargin,
+                           std::max(window.x() + kTooltipMargin,
+                                    window.right() - kTooltipMargin -
+                                        size.width()));
+  widget_->SetBounds(gfx::Rect(gfx::Point(x, anchor.y() - kTooltipGap -
+                                                 size.height()),
+                               size));
+  widget_->ShowInactive();
+}
+
+FooterButton::FooterButton(PressedCallback callback,
+                           std::u16string_view text,
+                           int button_context,
+                           bool use_text_color_for_icon)
+    : views::MdTextButton(std::move(callback),
+                          text,
+                          button_context,
+                          use_text_color_for_icon) {}
+
+FooterButton::~FooterButton() {
+  if (tooltip_) {
+    tooltip_->Detach(*this);
+  }
+}
+
+void FooterButton::SetFooterTooltip(base::WeakPtr<FooterTooltip> tooltip,
+                                    FooterTooltip::Content content) {
+  tooltip_ = std::move(tooltip);
+  content_ = std::move(content);
+}
+
+void FooterButton::ShowFooterTooltipNow() {
+  if (tooltip_) {
+    tooltip_->ShowNow(*this, content_);
+  }
+}
+
+void FooterButton::SetHovered(bool hovered, bool animate) {
+  if (hovered == hovered_) {
+    return;
+  }
+  hovered_ = hovered;
+  if (tooltip_) {
+    if (hovered_) {
+      tooltip_->Hover(*this, content_);
+    } else {
+      tooltip_->Unhover(*this);
+    }
+  }
+  OnHoverChanged(animate);
+}
+
+void FooterButton::OnMouseEntered(const ui::MouseEvent& event) {
+  views::MdTextButton::OnMouseEntered(event);
+  SetHovered(true, true);
+}
+
+void FooterButton::OnMouseExited(const ui::MouseEvent& event) {
+  views::MdTextButton::OnMouseExited(event);
+  SetHovered(false, true);
+}
+
+bool FooterButton::OnMousePressed(const ui::MouseEvent& event) {
+  if (tooltip_) {
+    tooltip_->Press(content_);
+  }
+  return views::MdTextButton::OnMousePressed(event);
+}
+
+void FooterButton::OnBoundsChanged(const gfx::Rect& previous_bounds) {
+  views::MdTextButton::OnBoundsChanged(previous_bounds);
+  // The sidebar rebuilds its footer on every workspace change. A replacement
+  // under the pointer keeps its hover state and tooltip instead of replaying
+  // them.
+  if (!hovered_ && IsMouseHovered()) {
+    SetHovered(true, false);
+  }
+}
+
+BEGIN_METADATA(FooterButton)
+END_METADATA
+
+LibraryButton::LibraryButton(PressedCallback callback,
+                             std::u16string_view text,
+                             int button_context,
+                             bool use_text_color_for_icon)
+    : FooterButton(std::move(callback),
+                   text,
+                   button_context,
+                   use_text_color_for_icon) {}
 
 LibraryButton::~LibraryButton() = default;
 
@@ -136,13 +462,12 @@ void LibraryButton::SetOpen(bool open, bool animate) {
   UpdateGlow(animate);
 }
 
-void LibraryButton::SetHovered(bool hovered, bool animate) {
-  hovered_ = hovered;
+void LibraryButton::OnHoverChanged(bool animate) {
   UpdateGlow(animate);
 }
 
 void LibraryButton::UpdateGlow(bool animate) {
-  const bool glowing = open_ || hovered_;
+  const bool glowing = open_ || hovered();
   if (glowing == glowing_) {
     return;
   }
@@ -160,7 +485,7 @@ void LibraryButton::UpdateGlow(bool animate) {
 
 void LibraryButton::AnimationProgressed(const gfx::Animation* animation) {
   if (animation != &animation_) {
-    views::MdTextButton::AnimationProgressed(animation);
+    FooterButton::AnimationProgressed(animation);
     return;
   }
   // CSS easings from the prototype: ease, an overshoot for the sparkles and an
@@ -188,25 +513,6 @@ void LibraryButton::AnimationProgressed(const gfx::Animation* animation) {
     now_[i] = Lerp(from_[i], target, curves[i]->Solve(t));
   }
   SchedulePaint();
-}
-
-void LibraryButton::OnMouseEntered(const ui::MouseEvent& event) {
-  views::MdTextButton::OnMouseEntered(event);
-  SetHovered(true, true);
-}
-
-void LibraryButton::OnMouseExited(const ui::MouseEvent& event) {
-  views::MdTextButton::OnMouseExited(event);
-  SetHovered(false, true);
-}
-
-void LibraryButton::OnBoundsChanged(const gfx::Rect& previous_bounds) {
-  views::MdTextButton::OnBoundsChanged(previous_bounds);
-  // The sidebar rebuilds its footer on every workspace change. A replacement
-  // under the pointer keeps the glow instead of replaying the morph.
-  if (!hovered_ && IsMouseHovered()) {
-    SetHovered(true, false);
-  }
 }
 
 void LibraryButton::PaintButtonContents(gfx::Canvas* canvas) {

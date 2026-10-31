@@ -9,6 +9,8 @@
 #   COPY_URL=1 copies the page URL via --myarc-capture-copy-url and holds the toast.
 #   LIBRARY=1 (or media/downloads/easels/boosts/archive) opens the Library via
 #   --myarc-capture-open-library, on Spaces unless a section is named.
+#   TOOLTIP=library (or space/create) shows that sidebar footer tooltip via
+#   --myarc-capture-footer-tooltip and keeps it up.
 #   WORKSPACE=<file> seeds the profile's myarc-workspace-v1.json, for example
 #   with Archived Tabs.
 #   SETTINGS=1 (or general/profiles/advanced/more) opens the native Settings window via
@@ -54,6 +56,7 @@ if [ "${1:-}" = "--inner" ]; then
     1) EXTRA+=(--myarc-capture-open-library) ;;
     *) EXTRA+=(--myarc-capture-open-library="$LIBRARY") ;;
   esac
+  [ -n "${TOOLTIP:-}" ] && EXTRA+=(--myarc-capture-footer-tooltip="$TOOLTIP")
   SHOT_TITLE=()
   case "${SETTINGS:-}" in
     "") ;;
