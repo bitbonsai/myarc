@@ -59,45 +59,61 @@ using Section = LibraryView::Section;
 
 constexpr int kClearArchive = 1;
 
-// Same translucent lifts as the sidebar: the rail's selected tile matches the
-// Favorites tile, muted text matches the footer icons.
+// Translucent lifts: `tile` matches the sidebar's Favorites tile and `muted`
+// its footer icons. The rail and empty-state values are sampled from Arc's dark
+// Library; light mode mirrors them in black.
 struct Colors {
   SkColor tile;
   SkColor column;
   SkColor muted;
+  SkColor rail_selected;
+  SkColor rail_hover;
+  SkColor rail_icon;
+  SkColor rail_label_hover;
+  SkColor rail_label_selected;
+  SkColor empty_icon;
+  SkColor empty_body;
 };
 
-// Arc's accent, sampled from its Library: the selected rail icon and the
-// create button.
+// Arc's accent, sampled from its Library: the create button.
 constexpr SkColor kAccent = SkColorSetRGB(0x21, 0x2A, 0xFB);
+// The selected rail glyph's outline; icons.h bakes it into the duotone icons.
+constexpr SkColor kRailLine = SkColorSetRGB(0xED, 0xED, 0xFD);
 
 Colors GetColors(const ui::ColorProvider* provider) {
   const bool dark = !provider || color_utils::IsDark(
                                      provider->GetColor(ui::kColorSysSurface));
-  return dark ? Colors{SkColorSetA(SK_ColorWHITE, 0x18),
-                       SkColorSetA(SK_ColorWHITE, 0x0D),
-                       SkColorSetA(SK_ColorWHITE, 0x99)}
-              : Colors{SkColorSetA(SK_ColorWHITE, 0x80),
-                       SkColorSetA(SK_ColorWHITE, 0x59),
-                       SkColorSetA(SK_ColorBLACK, 0x99)};
+  const SkColor ink = dark ? SK_ColorWHITE : SK_ColorBLACK;
+  return {.tile = SkColorSetA(SK_ColorWHITE, dark ? 0x18 : 0x80),
+          .column = SkColorSetA(SK_ColorWHITE, dark ? 0x0D : 0x59),
+          .muted = SkColorSetA(ink, 0x99),
+          .rail_selected = SkColorSetA(SK_ColorWHITE, dark ? 0x16 : 0x80),
+          .rail_hover = SkColorSetA(SK_ColorWHITE, dark ? 0x0B : 0x59),
+          .rail_icon = SkColorSetA(ink, 0xA6),
+          .rail_label_hover = SkColorSetA(ink, 0xBF),
+          .rail_label_selected = SkColorSetA(ink, 0xE6),
+          .empty_icon = SkColorSetA(ink, 0x47),
+          .empty_body = SkColorSetA(ink, 0x8C)};
 }
 
 struct SectionInfo {
   Section section;
   // Constant table of static icons.
   RAW_PTR_EXCLUSION const gfx::VectorIcon* icon;
+  // Duotone icon for the selected rail item; null draws `icon` in kRailLine.
+  RAW_PTR_EXCLUSION const gfx::VectorIcon* active_icon;
   const char16_t* name;
   const char16_t* search;
 };
 
 constexpr auto kSections = std::to_array<SectionInfo>({
-    {Section::kMedia, &kImageIcon, u"Media", u"Search Media\u2026"},
-    {Section::kDownloads, &kCircleArrowDownIcon, u"Downloads",
-     u"Search Downloads\u2026"},
-    {Section::kEasels, &kPresentationIcon, u"Easels", u"Search Easels\u2026"},
-    {Section::kSpaces, &kCopyIcon, u"Spaces", nullptr},
-    {Section::kBoosts, &kWandIcon, u"Boosts", u"Search Boosts\u2026"},
-    {Section::kArchive, &kArchiveIcon, u"Archived Tabs",
+    {Section::kMedia, &kImageIcon, &kImageActiveIcon, u"Media",
+     u"Search Media\u2026"},
+    {Section::kDownloads, &kCircleArrowDownIcon, &kCircleArrowDownActiveIcon,
+     u"Downloads", u"Search Downloads\u2026"},
+    {Section::kSpaces, &kCopyIcon, &kCopyActiveIcon, u"Spaces", nullptr},
+    {Section::kBoosts, &kWandIcon, nullptr, u"Boosts", u"Search Boosts\u2026"},
+    {Section::kArchive, &kArchiveIcon, &kArchiveActiveIcon, u"Archived Tabs",
      u"Search Archive\u2026"},
 });
 
@@ -197,13 +213,18 @@ class TileButton : public views::Button {
 BEGIN_METADATA(TileButton)
 END_METADATA
 
-// Arc's rail entry: icon over a short label, the selected icon in the accent.
+// Arc's rail entry: icon over a short label. Hover lifts the tile half as much
+// as selection and brightens only the label; selection swaps in the duotone
+// icon. Arc flips these instantly, without a fade.
 class LibraryRailItem final : public TileButton {
   METADATA_HEADER(LibraryRailItem, TileButton)
 
  public:
   LibraryRailItem(PressedCallback callback, const SectionInfo& info)
-      : TileButton(std::move(callback)), icon_(*info.icon) {
+      : TileButton(std::move(callback)),
+        icon_(*info.icon),
+        active_icon_(info.active_icon) {
+    views::InstallRoundRectHighlightPathGenerator(this, gfx::Insets(), 12);
     auto* layout = SetLayoutManager(std::make_unique<views::BoxLayout>(
         Orientation::kVertical, gfx::Insets::VH(12, 4), 6));
     layout->set_main_axis_alignment(MainAxis::kCenter);
@@ -223,17 +244,26 @@ class LibraryRailItem final : public TileButton {
 
  private:
   void Update() override {
-    TileButton::Update();
     const Colors colors = GetColors(GetColorProvider());
-    image_->SetImage(ui::ImageModel::FromVectorIcon(
-        *icon_, selected() ? kAccent : colors.muted, 22));
-    label_->SetEnabledColor(
-        selected() && GetColorProvider()
-            ? GetColorProvider()->GetColor(ui::kColorSysOnSurface)
-            : colors.muted);
+    const bool hovered =
+        GetState() == STATE_HOVERED || GetState() == STATE_PRESSED;
+    SetBackground(
+        selected() || hovered
+            ? views::CreateRoundedRectBackground(
+                  selected() ? colors.rail_selected : colors.rail_hover, 12)
+            : nullptr);
+    image_->SetImage(
+        selected()
+            ? ui::ImageModel::FromVectorIcon(
+                  active_icon_ ? *active_icon_ : *icon_, kRailLine, 22)
+            : ui::ImageModel::FromVectorIcon(*icon_, colors.rail_icon, 22));
+    label_->SetEnabledColor(selected() ? colors.rail_label_selected
+                            : hovered  ? colors.rail_label_hover
+                                       : colors.muted);
   }
 
   const raw_ref<const gfx::VectorIcon> icon_;
+  RAW_PTR_EXCLUSION const gfx::VectorIcon* const active_icon_;
   raw_ptr<views::ImageView> image_ = nullptr;
   raw_ptr<views::Label> label_ = nullptr;
 };
@@ -769,7 +799,9 @@ void LibraryView::UpdateList(bool keep_scroll) {
         }
         break;
       case Section::kArchive:
-        body = u"Tabs you archive will show up here.";
+        body =
+            u"Hover your mouse over a tab and press the \u00D7 to archive "
+            u"it.";
         if (!query_.empty()) {
           title = u"No matches";
           body = u"No archived tabs match your search.";
@@ -779,10 +811,6 @@ void LibraryView::UpdateList(bool keep_scroll) {
         title = u"Not available yet";
         body = u"Media from your pages will show up here in a later version.";
         break;
-      case Section::kEasels:
-        title = u"Not part of myArc";
-        body = u"myArc doesn\u2019t include Easels.";
-        break;
       case Section::kBoosts:
         title = u"Not available yet";
         body = u"Boosts are coming in a later version.";
@@ -791,29 +819,30 @@ void LibraryView::UpdateList(bool keep_scroll) {
         NOTREACHED();
     }
     auto* empty = list_->AddChildView(
-        Box(Orientation::kVertical, gfx::Insets::VH(0, 16), 8));
+        Box(Orientation::kVertical, gfx::Insets::VH(0, 16), 6));
     list_layout->SetFlexForView(empty, 1);
     auto* empty_layout =
         static_cast<views::BoxLayout*>(empty->GetLayoutManager());
     empty_layout->set_main_axis_alignment(MainAxis::kCenter);
     empty_layout->set_cross_axis_alignment(CrossAxis::kCenter);
     auto* image = empty->AddChildView(std::make_unique<views::ImageView>(
-        ui::ImageModel::FromVectorIcon(*icon, colors.muted, 48)));
-    image->SetProperty(views::kMarginsKey, gfx::Insets::TLBR(0, 0, 8, 0));
+        ui::ImageModel::FromVectorIcon(*icon, colors.empty_icon, 48)));
+    image->SetProperty(views::kMarginsKey, gfx::Insets::TLBR(0, 0, 12, 0));
     const SkColor on_surface =
         GetColorProvider()
             ? GetColorProvider()->GetColor(ui::kColorSysOnSurface)
             : SK_ColorWHITE;
-    empty->AddChildView(MakeLabel(
-        title,
-        gfx::FontList().Derive(3, gfx::Font::NORMAL, gfx::Font::Weight::BOLD),
-        on_surface));
-    auto* body_label =
-        empty->AddChildView(MakeLabel(body, gfx::FontList(), colors.muted));
+    empty->AddChildView(
+        MakeLabel(title,
+                  gfx::FontList().Derive(3, gfx::Font::NORMAL,
+                                         gfx::Font::Weight::SEMIBOLD),
+                  on_surface));
+    auto* body_label = empty->AddChildView(
+        MakeLabel(body, gfx::FontList(), colors.empty_body));
     body_label->SetMultiLine(true);
     body_label->SetHorizontalAlignment(gfx::ALIGN_CENTER);
-    // Arc wraps its empty-state text at about 240 DIP.
-    body_label->SizeToFit(240);
+    // Arc wraps its empty-state text at about 248 DIP.
+    body_label->SizeToFit(248);
   } else {
     auto* scroll = list_->AddChildView(std::make_unique<views::ScrollView>());
     scroll->ClipHeightTo(0, std::numeric_limits<int>::max());

@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-11-01: Library rail like Arc, no Easels
+
+- The Library rail drops Easels (rail item, `LibrarySection::kEasels`, its empty state and the `LIBRARY=easels` capture section). Selected Media, Downloads, Spaces and Archived Tabs show Arc's duotone glyph: blue `#2523F6` fill under light lavender `#EDEDFD` strokes, baked into new `*ActiveIcon`s in `icons.h`; Boosts stays a single-color wand, lavender when selected. Tiles use radius 12, white 8.5% selected and 4.5% hovered; hover brightens only the label (60% idle, 75% hover, 90% selected), the icon stays at 65%. Empty states: icon at 28%, semibold title, body at 55% wrapped at 248 DIP, and Archived Tabs uses Arc's copy "Hover your mouse over a tab and press the × to archive it." No "Learn more" button.
+- Verification: `chrome` and `bridge_check` build; `bridge_check`, `export_patches.py --check` and `check_docs.py` pass. Background captures `research-private/captures/library-rail/myarc-archive.png` and `myarc-spaces.png` match Arc's 29.5 s and 39.9 s frames; hover and light mode were checked by reading the code, not run.
+- Chromium `myarc` commit `1d9f56b38e`.
+
 ## 2026-10-31: Footer button review fixes
 
 - Title and load ticks now rebuild only the rows: the footer stays until the Spaces or the current one change, so hover, glow, tooltip and the Spaces scroll survive, and the hover-adoption and tooltip-handover code is gone, so a window covering the footer leaves no glow or tooltip. The tooltip hides when its button hides, moves or goes away, when the window deactivates and on any key, and shows only in the active window. The sidebar and the Library share one tooltip, so a press keeps it quiet for the button that ends up under the pointer. The Library art is 12 DIP wide, as Arc's (edges at 10, 22, 15 and 24 in the 32 DIP tile), in the footer icons' color, brightening to 95% while lit; the morph has its own animation delegate. `+` says "Close creation menu" while its menu is open, the sidebar's Library is named "View Library", Space dots expose their ⌃ shortcut to accessibility, and unused `design/icons/library.svg` is deleted.

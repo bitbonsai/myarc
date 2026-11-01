@@ -42,8 +42,8 @@ inline constexpr gfx::VectorIcon kSaturnIcon(kSaturnRep,
 
 // Icons from Lucide (ISC, lucide-static 1.61.0): 24 DIP canvas, stroke 2.
 // "archive" for Archived Tabs, "plus" for Create, "search" for the Library's
-// search fields, and the Library rail's "image", "circle-arrow-down",
-// "presentation", "copy" and "wand".
+// search fields, and the Library rail's "image", "circle-arrow-down", "copy"
+// and "wand".
 inline constexpr gfx::PathElement kArchivePath[] = {
     gfx::CANVAS_DIMENSIONS, 24, gfx::STROKE, 2,
     gfx::ROUND_RECT, 2, 3, 20, 5, 1, gfx::MOVE_TO, 4, 8, gfx::V_LINE_TO, 19,
@@ -94,17 +94,6 @@ inline constexpr gfx::VectorIcon kCircleArrowDownIcon(
     std::size(kCircleArrowDownRep),
     "myarc_circle_arrow_down");
 
-inline constexpr gfx::PathElement kPresentationPath[] = {
-    gfx::CANVAS_DIMENSIONS, 24, gfx::STROKE, 2, gfx::MOVE_TO, 2, 3,
-    gfx::R_H_LINE_TO, 20, gfx::MOVE_TO, 21, 3, gfx::R_V_LINE_TO, 11,
-    gfx::R_ARC_TO, 2, 2, 0, 0, 1, -2, 2, gfx::H_LINE_TO, 5,
-    gfx::R_ARC_TO, 2, 2, 0, 0, 1, -2, -2, gfx::V_LINE_TO, 3,
-    gfx::MOVE_TO, 7, 21, gfx::R_LINE_TO, 5, -5, gfx::R_LINE_TO, 5, 5};
-inline constexpr gfx::VectorIconRep kPresentationRep[] = {{kPresentationPath}};
-inline constexpr gfx::VectorIcon kPresentationIcon(kPresentationRep,
-                                                   std::size(kPresentationRep),
-                                                   "myarc_presentation");
-
 inline constexpr gfx::PathElement kCopyPath[] = {
     gfx::CANVAS_DIMENSIONS, 24, gfx::STROKE, 2,
     gfx::ROUND_RECT, 8, 8, 14, 14, 2, gfx::NEW_PATH, gfx::STROKE, 2,
@@ -128,6 +117,71 @@ inline constexpr gfx::VectorIconRep kWandRep[] = {{kWandPath}};
 inline constexpr gfx::VectorIcon kWandIcon(kWandRep,
                                            std::size(kWandRep),
                                            "myarc_wand");
+
+// Arc's selected Library rail glyphs are duotone: the enclosed shapes filled
+// blue (#2523F6) under the Lucide strokes in light lavender (#EDEDFD). The
+// colors are baked in, so ImageModel's color argument doesn't change them.
+#define MYARC_RAIL_FILL gfx::PATH_COLOR_ARGB, 0xFF, 0x25, 0x23, 0xF6
+#define MYARC_RAIL_LINE                                          \
+  gfx::NEW_PATH, gfx::PATH_COLOR_ARGB, 0xFF, 0xED, 0xED, 0xFD, \
+      gfx::STROKE, 2
+
+inline constexpr gfx::PathElement kArchiveActivePath[] = {
+    gfx::CANVAS_DIMENSIONS, 24, MYARC_RAIL_FILL,
+    gfx::ROUND_RECT, 2, 3, 20, 5, 1, gfx::MOVE_TO, 4, 8, gfx::V_LINE_TO, 19,
+    gfx::R_ARC_TO, 2, 2, 0, 0, 0, 2, 2, gfx::H_LINE_TO, 18,
+    gfx::R_ARC_TO, 2, 2, 0, 0, 0, 2, -2, gfx::V_LINE_TO, 8, gfx::CLOSE,
+    MYARC_RAIL_LINE,
+    gfx::ROUND_RECT, 2, 3, 20, 5, 1, gfx::MOVE_TO, 4, 8, gfx::V_LINE_TO, 19,
+    gfx::R_ARC_TO, 2, 2, 0, 0, 0, 2, 2, gfx::H_LINE_TO, 18,
+    gfx::R_ARC_TO, 2, 2, 0, 0, 0, 2, -2, gfx::V_LINE_TO, 8,
+    gfx::MOVE_TO, 10, 12, gfx::R_H_LINE_TO, 4};
+inline constexpr gfx::VectorIconRep kArchiveActiveRep[] = {
+    {kArchiveActivePath}};
+inline constexpr gfx::VectorIcon kArchiveActiveIcon(kArchiveActiveRep,
+                                                    std::size(kArchiveActiveRep),
+                                                    "myarc_archive_active");
+
+inline constexpr gfx::PathElement kImageActivePath[] = {
+    gfx::CANVAS_DIMENSIONS, 24, MYARC_RAIL_FILL,
+    gfx::ROUND_RECT, 3, 3, 18, 18, 2, MYARC_RAIL_LINE,
+    gfx::ROUND_RECT, 3, 3, 18, 18, 2, MYARC_RAIL_LINE,
+    gfx::CIRCLE, 9, 9, 2, MYARC_RAIL_LINE, gfx::MOVE_TO, 21, 15,
+    gfx::R_LINE_TO, -3.086f, -3.086f, gfx::R_ARC_TO, 2, 2, 0, 0, 0, -2.828f, 0,
+    gfx::LINE_TO, 6, 21};
+inline constexpr gfx::VectorIconRep kImageActiveRep[] = {{kImageActivePath}};
+inline constexpr gfx::VectorIcon kImageActiveIcon(kImageActiveRep,
+                                                  std::size(kImageActiveRep),
+                                                  "myarc_image_active");
+
+inline constexpr gfx::PathElement kCircleArrowDownActivePath[] = {
+    gfx::CANVAS_DIMENSIONS, 24, MYARC_RAIL_FILL, gfx::CIRCLE, 12, 12, 10,
+    MYARC_RAIL_LINE, gfx::CIRCLE, 12, 12, 10,
+    MYARC_RAIL_LINE, gfx::MOVE_TO, 12, 8, gfx::R_V_LINE_TO, 8,
+    gfx::MOVE_TO, 8, 12, gfx::R_LINE_TO, 4, 4, gfx::R_LINE_TO, 4, -4};
+inline constexpr gfx::VectorIconRep kCircleArrowDownActiveRep[] = {
+    {kCircleArrowDownActivePath}};
+inline constexpr gfx::VectorIcon kCircleArrowDownActiveIcon(
+    kCircleArrowDownActiveRep,
+    std::size(kCircleArrowDownActiveRep),
+    "myarc_circle_arrow_down_active");
+
+// The back card is filled whole; the front card's fill covers the overlap.
+inline constexpr gfx::PathElement kCopyActivePath[] = {
+    gfx::CANVAS_DIMENSIONS, 24, MYARC_RAIL_FILL,
+    gfx::ROUND_RECT, 2, 2, 14, 14, 2, gfx::NEW_PATH, MYARC_RAIL_FILL,
+    gfx::ROUND_RECT, 8, 8, 14, 14, 2, MYARC_RAIL_LINE,
+    gfx::ROUND_RECT, 8, 8, 14, 14, 2, MYARC_RAIL_LINE,
+    gfx::MOVE_TO, 4, 16, gfx::R_CUBIC_TO, -1.1f, 0, -2, -0.9f, -2, -2,
+    gfx::V_LINE_TO, 4, gfx::R_CUBIC_TO, 0, -1.1f, 0.9f, -2, 2, -2,
+    gfx::R_H_LINE_TO, 10, gfx::R_CUBIC_TO, 1.1f, 0, 2, 0.9f, 2, 2};
+inline constexpr gfx::VectorIconRep kCopyActiveRep[] = {{kCopyActivePath}};
+inline constexpr gfx::VectorIcon kCopyActiveIcon(kCopyActiveRep,
+                                                 std::size(kCopyActiveRep),
+                                                 "myarc_copy_active");
+
+#undef MYARC_RAIL_LINE
+#undef MYARC_RAIL_FILL
 
 }  // namespace myarc
 

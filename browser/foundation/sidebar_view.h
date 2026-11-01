@@ -55,14 +55,7 @@ class SidebarView final : public views::View,
   };
 
   // Arc's Library rail, top to bottom.
-  enum class LibrarySection {
-    kMedia,
-    kDownloads,
-    kEasels,
-    kSpaces,
-    kBoosts,
-    kArchive
-  };
+  enum class LibrarySection { kMedia, kDownloads, kSpaces, kBoosts, kArchive };
 
   struct DownloadPresentation {
     uint32_t id = 0;
