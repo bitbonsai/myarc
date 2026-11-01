@@ -25,10 +25,12 @@
 #include "ui/color/color_id.h"
 #include "ui/color/color_provider.h"
 #include "ui/compositor/layer.h"
+#include "ui/gfx/animation/tween.h"
 #include "ui/gfx/color_utils.h"
 #include "ui/gfx/font_list.h"
 #include "ui/gfx/geometry/insets.h"
 #include "ui/gfx/geometry/size.h"
+#include "ui/gfx/geometry/transform.h"
 #include "ui/gfx/vector_icon_types.h"
 #include "ui/native_theme/native_theme.h"
 #include "ui/views/accessibility/view_accessibility.h"
@@ -64,6 +66,8 @@ constexpr base::TimeDelta kLibraryExit = base::Milliseconds(270);
 constexpr base::TimeDelta kRowsSwap = base::Milliseconds(55);
 constexpr base::TimeDelta kRowsFadeIn = base::Milliseconds(65);
 constexpr double kLibraryExitSpeed = 2.2;
+// Arc's Space switch slides the rows for ~6 frames at 30 fps, easing out.
+constexpr base::TimeDelta kSpaceSlide = base::Milliseconds(200);
 
 // Lucide "circle" filled to the canvas edge: Arc's Space dot is 8 DIP across.
 constexpr gfx::PathElement kDotPath[] = {gfx::CANVAS_DIMENSIONS, 24,
@@ -262,11 +266,62 @@ void AddStatus(views::View& parent, const std::u16string& text) {
 
 }  // namespace
 
+// The current Space's title and rows. During a Space switch the old Space's
+// rows ride one width beside them, outside their bounds, on their own layer.
+class SpaceRows final : public views::View {
+  METADATA_HEADER(SpaceRows, views::View)
+
+ public:
+  SpaceRows() {
+    SetLayoutManager(std::make_unique<views::BoxLayout>(Orientation::kVertical,
+                                                        gfx::Insets(), 4));
+  }
+
+  // `shift` is +1 to place `rows` on the right, -1 on the left.
+  void SetOutgoing(std::unique_ptr<SpaceRows> rows, int shift) {
+    TakeOutgoing();
+    rows->SetProperty(views::kViewIgnoredByLayoutKey, true);
+    rows->SetCanProcessEventsWithinSubtree(false);
+    rows->GetViewAccessibility().SetIsIgnored(true);
+    if (!rows->layer()) {
+      rows->SetPaintToLayer();
+      rows->layer()->SetFillsBoundsOpaquely(false);
+    }
+    rows->layer()->SetTransform(gfx::Transform());
+    outgoing_shift_ = shift;
+    outgoing_ = AddChildView(std::move(rows));
+    InvalidateLayout();
+  }
+
+  std::unique_ptr<SpaceRows> TakeOutgoing() {
+    if (!outgoing_) {
+      return nullptr;
+    }
+    return RemoveChildViewT(std::exchange(outgoing_, nullptr).get());
+  }
+
+  void Layout(PassKey) override {
+    LayoutSuperclass<views::View>(this);
+    if (outgoing_) {
+      outgoing_->SetBounds(outgoing_shift_ * width(), 0, width(),
+                           outgoing_->GetHeightForWidth(width()));
+    }
+  }
+
+ private:
+  raw_ptr<SpaceRows> outgoing_ = nullptr;
+  int outgoing_shift_ = 0;
+};
+
+BEGIN_METADATA(SpaceRows)
+END_METADATA
+
 SidebarView::SidebarView(Delegate& delegate)
     : views::AnimationDelegateViews(this),
       delegate_(delegate),
       footer_tooltip_(std::make_unique<FooterTooltip>()) {
   library_exit_.SetDuration(kLibraryExit);
+  space_slide_.SetDuration(kSpaceSlide);
   SetPreferredSize(kSidebarSize);
   SetLayoutManager(std::make_unique<views::BoxLayout>(Orientation::kVertical,
                                                       kSidebarInsets, 8));
@@ -356,12 +411,14 @@ void SidebarView::OpenLibrary(LibrarySection section) {
   if (menu_runner_) {
     menu_runner_->Cancel();
   }
+  space_slide_.Stop();
   focus_targets_.clear();
   footer_targets_.clear();
   footer_ = nullptr;
   downloads_stack_ = nullptr;
   spaces_scroll_ = nullptr;
   new_tab_ = nullptr;
+  space_rows_ = nullptr;
   tiles_.clear();
   RemoveAllChildViews();
   // The Library sets its own width and edges, as Arc swaps out its sidebar.
@@ -644,6 +701,7 @@ void SidebarView::SetUnavailable(const std::u16string& reason,
     menu_runner_->Cancel();
   }
   library_exit_.Stop();
+  space_slide_.Stop();
   ResetLibrary();
   library_closed_ = false;
   focus_targets_.clear();
@@ -652,6 +710,7 @@ void SidebarView::SetUnavailable(const std::u16string& reason,
   downloads_stack_ = nullptr;
   spaces_scroll_ = nullptr;
   new_tab_ = nullptr;
+  space_rows_ = nullptr;
   tiles_.clear();
   current_space_id_ = 0;
   spaces_.clear();
@@ -716,6 +775,30 @@ void SidebarView::SetModel(const foundation::SidebarResult& model,
   const gfx::PointF spaces_offset =
       spaces_scroll_ ? spaces_scroll_->CurrentOffset() : gfx::PointF();
   const bool space_changed = current_space_id_ != model.current_space.id;
+  // A Space switch slides the old title and rows out as the new ones come
+  // in. Row rebuilds mid-slide carry the old rows over.
+  std::unique_ptr<SpaceRows> outgoing;
+  bool slide = false;
+  if (space_rows_ && space_changed) {
+    const auto index_of = [this](uint64_t id) {
+      return std::ranges::find(spaces_, id,
+                               &std::pair<uint64_t, std::u16string>::first) -
+             spaces_.begin();
+    };
+    const auto from = index_of(current_space_id_);
+    const auto to = index_of(model.current_space.id);
+    space_slide_.Stop();
+    if (!gfx::Animation::PrefersReducedMotion() && IsDrawn() &&
+        from < std::ssize(spaces_) && to < std::ssize(spaces_)) {
+      // A Space to the left enters from the left, pushing the old one right.
+      space_slide_shift_ = to < from ? 1 : -1;
+      outgoing = space_rows_->parent()->RemoveChildViewT(space_rows_.get());
+      slide = true;
+    }
+  } else if (space_rows_ && space_slide_.is_animating()) {
+    outgoing = space_rows_->TakeOutgoing();
+  }
+  space_rows_ = nullptr;
   current_space_id_ = model.current_space.id;
   focus_targets_.clear();
   new_tab_ = nullptr;
@@ -773,6 +856,8 @@ void SidebarView::SetModel(const foundation::SidebarResult& model,
         ->SetFlexForView(cell, 1);
   }
 
+  auto* rows = body->AddChildView(std::make_unique<SpaceRows>());
+  space_rows_ = rows;
   const std::u16string name =
       base::UTF8ToUTF16(std::string(model.current_space.name));
   auto heading = Button(base::BindRepeating(&Delegate::RenameSpace,
@@ -796,14 +881,14 @@ void SidebarView::SetModel(const foundation::SidebarResult& model,
   heading->SetTooltipText(u"Rename Space: " + name);
   heading->GetViewAccessibility().SetName(u"Rename Space: " + name);
   TrackFocus(heading.get(), FocusAction::kRename, model.current_space.id);
-  body->AddChildView(std::move(heading));
+  rows->AddChildView(std::move(heading));
 
   for (const auto& item : model.pins) {
-    body->AddChildView(
+    rows->AddChildView(
         MakeItem(item, false, item.id == model.selected_item_id));
   }
   if (!model.pins.empty()) {
-    body->AddChildView(std::make_unique<views::Separator>());
+    rows->AddChildView(std::make_unique<views::Separator>());
   }
 
   auto new_tab = Button(base::BindRepeating(&Delegate::NewTab,
@@ -817,10 +902,18 @@ void SidebarView::SetModel(const foundation::SidebarResult& model,
   TrackFocus(new_tab.get(), FocusAction::kNewTab);
   // Arc keeps 41 DIP between the Space title and New Tab row centers.
   new_tab->SetProperty(views::kMarginsKey, gfx::Insets::TLBR(3, 0, 0, 0));
-  new_tab_ = body->AddChildView(std::move(new_tab));
+  new_tab_ = rows->AddChildView(std::move(new_tab));
   for (const auto& item : model.temporary) {
-    body->AddChildView(
+    rows->AddChildView(
         MakeItem(item, false, item.id == model.selected_item_id));
+  }
+  if (outgoing) {
+    outgoing->TakeOutgoing();
+    rows->SetOutgoing(std::move(outgoing), space_slide_shift_);
+    if (slide) {
+      space_slide_.Start();
+    }
+    UpdateSpaceSlide(false);
   }
 
   // Loading/title ticks rebuild rows, but leave a semantically unchanged menu
@@ -1071,6 +1164,10 @@ void SidebarView::Layout(PassKey) {
 }
 
 void SidebarView::AnimationProgressed(const gfx::Animation* animation) {
+  if (animation == &space_slide_) {
+    UpdateSpaceSlide(false);
+    return;
+  }
   const base::TimeDelta elapsed =
       kLibraryExit * library_exit_.GetCurrentValue();
   if (library_) {
@@ -1097,6 +1194,10 @@ void SidebarView::AnimationProgressed(const gfx::Animation* animation) {
 }
 
 void SidebarView::AnimationEnded(const gfx::Animation* animation) {
+  if (animation == &space_slide_) {
+    UpdateSpaceSlide(true);
+    return;
+  }
   if (library_) {
     auto weak = weak_factory_.GetWeakPtr();
     FinishCloseLibrary(LibraryHasFocus());
@@ -1108,10 +1209,39 @@ void SidebarView::AnimationEnded(const gfx::Animation* animation) {
 }
 
 void SidebarView::AnimationCanceled(const gfx::Animation* animation) {
+  if (animation == &space_slide_) {
+    UpdateSpaceSlide(true);
+    return;
+  }
   if (layer()) {
     DestroyLayer();
   }
   SetCanProcessEventsWithinSubtree(true);
+}
+
+void SidebarView::UpdateSpaceSlide(bool done) {
+  if (!space_rows_) {
+    return;
+  }
+  if (done) {
+    space_rows_->TakeOutgoing();
+    if (space_rows_->layer()) {
+      space_rows_->DestroyLayer();
+    }
+    return;
+  }
+  if (!space_rows_->layer()) {
+    space_rows_->SetPaintToLayer();
+    space_rows_->layer()->SetFillsBoundsOpaquely(false);
+  }
+  // The rows may not be laid out yet; the sidebar's inner width is theirs.
+  const double left = 1.0 - gfx::Tween::CalculateValue(
+                                gfx::Tween::EASE_OUT,
+                                space_slide_.GetCurrentValue());
+  gfx::Transform transform;
+  transform.Translate(
+      -space_slide_shift_ * (width() - kSidebarInsets.width()) * left, 0);
+  space_rows_->layer()->SetTransform(transform);
 }
 
 void SidebarView::SetNewTabIntent(bool intent) {

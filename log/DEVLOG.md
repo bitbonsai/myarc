@@ -1,5 +1,10 @@
 # Development log
 
+## 2026-11-01: Space switch slides the rows
+
+- Switching Spaces slides the Space title and rows sideways for 200 ms, easing out, with no fade: the old Space's rows ride one width beside the new ones on their own layer and leave as they enter. A Space to the left enters from the left. The URL pill, Favorites and footer stay still. Row rebuilds mid-slide carry the old rows over; reduced motion, a hidden sidebar and the Library snap.
+- Verification: `chrome` and `bridge_check` build; `bridge_check` and `check_docs.py` pass. A 60 fps ScreenCaptureKit recording of a background `/tmp` profile, switched with AXPress on the Space button (no focus, no keystrokes), shows the slide over about 10 frames with tiles and pill unchanged: `research-private/captures/finesse/sidebar-top/after-space-slide-frames.png`. The direction rule is a guess from one Arc clip.
+
 ## 2026-11-01: Sidebar top matches Arc's measurements
 
 - URL pill 38 -> 36 DIP and the top container 88 -> 82, so the Favorites sit 8 DIP below the pill as in Arc. The toggle chip is 32 DIP and the header row, traffic lights included, centres on y=24. The content area rounds by 7 DIP instead of 10. The empty pill's placeholder is semibold in disabled ink (`#76757f`, Arc `#757581`), its search glyph is dimmed (`#868592`, Arc `#898993`) and the darker plate behind it is gone. New Tab is dim (`#88868f`, like the Space title) until hovered, pressed or pending, and rows are 36 DIP tall with New Tab still 41 DIP below the title.

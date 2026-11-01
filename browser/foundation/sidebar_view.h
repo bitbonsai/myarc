@@ -39,6 +39,7 @@ namespace myarc {
 class DownloadsStack;
 class FooterTooltip;
 class LibraryView;
+class SpaceRows;
 
 // Presentation only, on the UI sequence. Delegate outlives this view. The
 // parent owns Profile/window scope, Rust mutations, browser tabs, dialogs and
@@ -204,6 +205,9 @@ class SidebarView final : public views::View,
   void OnThemeChanged() override;
   // Applies the scheme's tile and New Tab fills to the current rows.
   void UpdateFills();
+  // Places the sliding Space rows for the slide's progress, or settles them
+  // once it is `done`.
+  void UpdateSpaceSlide(bool done);
   void ShowContextMenuForViewImpl(
       views::View* source,
       const gfx::Point& point,
@@ -239,6 +243,8 @@ class SidebarView final : public views::View,
   uint64_t footer_space_id_ = 0;
   raw_ptr<views::ScrollView> spaces_scroll_ = nullptr;
   raw_ptr<views::MdTextButton> new_tab_ = nullptr;
+  // The current Space's title and rows, which slide on a Space switch.
+  raw_ptr<SpaceRows> space_rows_ = nullptr;
   // Favorite tiles and whether each is selected.
   std::vector<std::pair<raw_ptr<views::MdTextButton>, bool>> tiles_;
   bool new_tab_intent_ = false;
@@ -260,6 +266,10 @@ class SidebarView final : public views::View,
   // Arc's Library exit: it slides out ahead of the narrowing sidebar, then the
   // rows replace it and fade in.
   gfx::LinearAnimation library_exit_{this};
+  // Arc's Space switch: the old Space's title and rows leave sideways as the
+  // new ones enter beside them, with no fade. +1 slides them right.
+  gfx::LinearAnimation space_slide_{this};
+  int space_slide_shift_ = 0;
   SEQUENCE_CHECKER(sequence_checker_);
   base::WeakPtrFactory<SidebarView> weak_factory_{this};
 };
