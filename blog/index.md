@@ -8,7 +8,7 @@ November 2026
 
 November 01, 2026
 
-Side-by-side recordings showed what myArc's sidebar was missing, a quit bug emptied every Space, and I'm writing an alpha checklist next.
+Side-by-side recordings showed what myArc's sidebar was missing, and a quit bug was emptying every Space. Next up is an alpha checklist.
 
 October 2026
 
