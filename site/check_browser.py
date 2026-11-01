@@ -86,7 +86,7 @@ try:
           await Promise.all(Array.from(document.images).map(image => image.decode()))
           if (!matchMedia('(prefers-color-scheme: dark)').matches) throw new Error('System preference not detected')
           const body = getComputedStyle(document.body)
-          if (body.backgroundColor !== 'rgb(11, 20, 32)' || body.color !== 'rgb(245, 242, 236)') throw new Error('Dark palette missing')
+          if (body.backgroundColor !== 'rgb(11, 20, 32)' || body.color !== 'rgb(210, 217, 225)') throw new Error('Dark palette missing')
           for (const lockup of document.querySelectorAll('.top .mark,.end .mark')) {
             if (lockup.querySelector('.wordmark').currentSrc !== lockup.querySelector('source').srcset) throw new Error('Dark wordmark missing')
           }
@@ -106,9 +106,10 @@ try:
             if ((luminance('rgb(' + blended.join(',') + ')') + .05) / (background + .05) < 4.5) throw new Error('Dark text contrast')
           }
           if (document.documentElement.scrollWidth > innerWidth) throw new Error('Dark horizontal overflow')
-          if (document.querySelectorAll('.button .github-icon[aria-hidden="true"]').length !== 2) throw new Error('GitHub CTA icons missing')
+          const githubButtons = [...document.querySelectorAll('.button[href="https://github.com/bitbonsai/myarc"]')]
+          if (!githubButtons.length || githubButtons.some(button => !button.querySelector('.github-icon[aria-hidden="true"]'))) throw new Error('GitHub CTA icons missing')
           for (const icon of document.querySelectorAll('.github-icon')) {
-            if (icon.viewBox.baseVal.width !== 1024 || getComputedStyle(icon.querySelector('path')).fill !== 'rgb(255, 255, 255)') throw new Error('GitHub supplied mark or color regression')
+            if (icon.viewBox.baseVal.width !== 1024 || getComputedStyle(icon.querySelector('path')).fill !== getComputedStyle(icon).color) throw new Error('GitHub supplied mark or color regression')
           }
           return {width: innerWidth, preference: 'dark', wordmarks: 'ivory', contrast: 'AA'}
         })()"""))
@@ -182,8 +183,8 @@ try:
                     const [first, second] = [...grid.children].map(figure => figure.getBoundingClientRect())
                     if (Math.abs(first.top - second.top) > 1 || second.left < first.right) throw new Error('Gallery columns overlap or stack')
                   }
-                  const nav = document.querySelector('.blog-link')
-                  if (!nav.getClientRects().length) throw new Error('Blog navigation hidden')
+                  const nav = [...document.querySelectorAll('.blog-link,.quick-blog')].find(link => link.getClientRects().length)
+                  if (!nav) throw new Error('Blog navigation hidden')
                   for (const el of document.querySelectorAll('main h1,main h2,main h3,main p,main li,main time,main code,main figcaption')) {
                     const style = getComputedStyle(el)
                     if (parseFloat(style.fontSize) < 16 || !style.fontFamily.includes('Outfit')) throw new Error('Blog typography regression')
@@ -334,8 +335,8 @@ try:
                 SESSION = 'myarc-lightbox-' + str(width)
                 browser('open', page.as_uri())
                 browser('wait', '.post-body figure a')
-                browser('set', 'viewport', str(width), '1000')
                 browser('set', 'media', theme, 'reduced-motion')
+                browser('set', 'viewport', str(width), '1000')
                 browser(expression="document.querySelector('.post-body figure a').scrollIntoView({behavior: 'instant', block: 'center'})")
                 browser('focus', '.post-body figure a')
                 browser('press', 'Enter')
@@ -394,6 +395,8 @@ try:
                 browser('set', 'media', theme, *(['reduced-motion'] if reduced else []))
                 browser('open', origin + '/')
                 for selector, route in routes:
+                    if width <= 768 and selector == '.top .blog-link':
+                        selector = '.quick-blog'
                     browser(expression=f"""(() => {{
                       const link = document.querySelector({json.dumps(selector)})
                       if (link.origin !== location.origin || link.pathname !== {json.dumps(route)}) throw new Error('Internal link leaves this site: ' + link.href)

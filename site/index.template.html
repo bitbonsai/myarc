@@ -298,6 +298,9 @@
         .top nav::backdrop { background: rgb(0 0 0 / .4) }
       }
     }
+    @media (prefers-reduced-motion: reduce) {
+      .menu-toggle, .quick-icon, .menu-close { transition: none }
+    }
   </style>
 </head>
 <body>
