@@ -811,6 +811,14 @@ foundation::MutationResult WorkspaceService::MoveItemBefore(uint64_t item,
   return Changed(foundation::move_item_before(*workspace_, item, before));
 }
 
+foundation::MutationResult WorkspaceService::MoveSpaceBefore(uint64_t space,
+                                                             uint64_t before) {
+  if (!CanMutate()) {
+    return Failure("Workspace is not loaded. Check storage state.");
+  }
+  return Changed(foundation::move_space_before(*workspace_, space, before));
+}
+
 foundation::MutationResult WorkspaceService::ReconcileLiveItems(
     base::span<const uint64_t> live) {
   if (!CanMutate())

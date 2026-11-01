@@ -2,10 +2,12 @@
 
 #include <algorithm>
 #include <array>
+#include <iterator>
 #include <limits>
 #include <memory>
 #include <optional>
 #include <utility>
+#include <vector>
 
 #include "base/functional/bind.h"
 #include "base/location.h"
@@ -20,12 +22,20 @@
 #include "myarc/library_logic.h"
 #include "third_party/skia/include/core/SkColor.h"
 #include "ui/base/accelerators/accelerator.h"
+#include "ui/base/cursor/cursor.h"
+#include "ui/base/cursor/mojom/cursor_type.mojom-shared.h"
 #include "ui/base/menu_source_utils.h"
 #include "ui/base/metadata/metadata_impl_macros.h"
 #include "ui/base/mojom/menu_source_type.mojom.h"
 #include "ui/color/color_id.h"
 #include "ui/color/color_provider.h"
+#include "ui/compositor/layer.h"
+#include "ui/compositor/layer_animator.h"
+#include "ui/compositor/scoped_layer_animation_settings.h"
+#include "ui/events/event.h"
 #include "ui/events/keycodes/keyboard_codes.h"
+#include "ui/gfx/animation/animation.h"
+#include "ui/gfx/animation/tween.h"
 #include "ui/gfx/canvas.h"
 #include "ui/gfx/color_utils.h"
 #include "ui/gfx/font_list.h"
@@ -33,6 +43,7 @@
 #include "ui/gfx/geometry/point_f.h"
 #include "ui/gfx/geometry/rect.h"
 #include "ui/gfx/geometry/size.h"
+#include "ui/gfx/geometry/transform.h"
 #include "ui/gfx/skia_paint_util.h"
 #include "ui/views/accessibility/view_accessibility.h"
 #include "ui/views/animation/ink_drop.h"
@@ -62,7 +73,16 @@ using MainAxis = views::BoxLayout::MainAxisAlignment;
 using CrossAxis = views::BoxLayout::CrossAxisAlignment;
 using Section = LibraryView::Section;
 
-enum Command { kClearArchive = 1, kSwitchSpace, kRenameSpace };
+enum Command {
+  kClearArchive = 1,
+  kSwitchSpace,
+  kRenameSpace,
+  kMoveSpaceLeft,
+  kMoveSpaceRight,
+};
+
+// The other cards slide aside this fast while a card is dragged.
+constexpr base::TimeDelta kCardSlide = base::Milliseconds(150);
 
 // Translucent lifts: `tile` matches the sidebar's Favorites tile and `muted`
 // its footer icons. The rail and empty-state values are sampled from Arc's dark
@@ -455,6 +475,60 @@ class PinRow final : public TileButton {
 BEGIN_METADATA(PinRow)
 END_METADATA
 
+// Arc's move handle: dragging it reorders the Space cards. Mouse events go to
+// `on_event`, and nullptr when the drag loses capture.
+class MoveHandle final : public views::ImageView {
+  METADATA_HEADER(MoveHandle, views::ImageView)
+
+ public:
+  using OnEvent =
+      base::RepeatingCallback<void(views::View*, const ui::MouseEvent*)>;
+
+  MoveHandle(const ui::ImageModel& image, OnEvent on_event)
+      : views::ImageView(image), on_event_(std::move(on_event)) {}
+
+  // views::ImageView:
+  bool OnMousePressed(const ui::MouseEvent& event) override {
+    if (!event.IsOnlyLeftMouseButton()) {
+      return false;
+    }
+    on_event_.Run(this, &event);
+    return true;
+  }
+  bool OnMouseDragged(const ui::MouseEvent& event) override {
+    on_event_.Run(this, &event);
+    return true;
+  }
+  void OnMouseReleased(const ui::MouseEvent& event) override {
+    on_event_.Run(this, &event);
+  }
+  void OnMouseCaptureLost() override { on_event_.Run(this, nullptr); }
+  ui::Cursor GetCursor(const ui::MouseEvent& event) override {
+    return ui::mojom::CursorType::kGrab;
+  }
+
+ private:
+  const OnEvent on_event_;
+};
+
+BEGIN_METADATA(MoveHandle)
+END_METADATA
+
+// Moves a card sideways, sliding unless the user prefers reduced motion.
+void SlideCard(views::View& card, int x) {
+  ui::Layer* layer = card.layer();
+  if (!layer) {
+    return;
+  }
+  ui::ScopedLayerAnimationSettings slide(layer->GetAnimator());
+  slide.SetTransitionDuration(
+      gfx::Animation::PrefersReducedMotion() ? base::TimeDelta() : kCardSlide);
+  slide.SetTweenType(gfx::Tween::EASE_OUT);
+  slide.SetPreemptionStrategy(
+      ui::LayerAnimator::IMMEDIATELY_ANIMATE_TO_NEW_TARGET);
+  layer->SetTransform(gfx::Transform::MakeTranslation(x, 0));
+}
+
 }  // namespace
 
 LibraryView::LibraryView(SidebarView::Delegate& delegate,
@@ -528,6 +602,11 @@ void LibraryView::SetSpaces(Spaces spaces, uint64_t current) {
   }
   spaces_ = std::move(spaces);
   current_space_ = current;
+  // Rebuilding would drop the card under the pointer; the drag's end does it.
+  if (drag_) {
+    rebuild_after_drag_ = true;
+    return;
+  }
   if (section_ == Section::kSpaces) {
     Rebuild();
   }
@@ -602,6 +681,11 @@ bool LibraryView::AcceleratorPressed(const ui::Accelerator& accelerator) {
   const views::View* focused = manager ? manager->GetFocusedView() : nullptr;
   if (focused && !parent()->Contains(focused)) {
     return false;
+  }
+  // Esc drops a dragged card back in its place.
+  if (drag_) {
+    EndSpaceDrag(/*commit=*/false);
+    return true;
   }
   // The first Esc clears a search, the next exits.
   if (search_ && focused == search_ && !search_->GetText().empty()) {
@@ -695,6 +779,9 @@ void LibraryView::Rebuild() {
   search_ = nullptr;
   list_ = nullptr;
   keyed_views_.clear();
+  cards_.clear();
+  drag_.reset();
+  rebuild_after_drag_ = false;
   pane_->RemoveAllChildViews();
   if (section_ == Section::kSpaces) {
     BuildSpaces(offsets);
@@ -760,6 +847,8 @@ void LibraryView::BuildSpaces(const std::map<uint64_t, gfx::PointF>& offsets) {
     // Arc's footer glyphs sit 22 DIP above the card's bottom edge.
     auto* column = row->AddChildView(
         Box(Orientation::kVertical, gfx::Insets::TLBR(9, 8, 7, 8), 4));
+    const size_t index = cards_.size();
+    cards_.push_back(column);
     auto* column_layout =
         static_cast<views::BoxLayout*>(column->GetLayoutManager());
     // Arc's header: the name, and the edit brush at the card's right edge.
@@ -871,16 +960,17 @@ void LibraryView::BuildSpaces(const std::map<uint64_t, gfx::PointF>& offsets) {
       pins->AddChildView(std::move(pin_row));
     }
 
-    // Arc's footer: the move handle and the "..." menu. The workspace has no
-    // Space order to change yet, so the handle only shows.
+    // Arc's footer: the move handle and the "..." menu. Keyboard users move
+    // a Space from the menu instead of the handle.
     auto* footer =
         column->AddChildView(Box(Orientation::kHorizontal, gfx::Insets(), 0));
     auto* footer_layout =
         static_cast<views::BoxLayout*>(footer->GetLayoutManager());
     footer_layout->set_cross_axis_alignment(CrossAxis::kCenter);
-    auto* move = footer->AddChildView(
-        std::make_unique<views::ImageView>(ui::ImageModel::FromVectorIcon(
-            kSpaceMoveIcon, colors.card_control, 18)));
+    auto* move = footer->AddChildView(std::make_unique<MoveHandle>(
+        ui::ImageModel::FromVectorIcon(kSpaceMoveIcon, colors.card_control, 18),
+        base::BindRepeating(&LibraryView::OnMoveHandleEvent,
+                            base::Unretained(this), index)));
     move->SetPreferredSize(gfx::Size(28, 28));
     move->GetViewAccessibility().SetIsIgnored(true);
     footer_layout->SetFlexForView(
@@ -1200,6 +1290,15 @@ void LibraryView::ShowSpaceMenu(uint64_t space,
     menu_model_->AddItem(kSwitchSpace, u"Switch to Space");
   }
   menu_model_->AddItem(kRenameSpace, u"Rename Space\u2026");
+  // The handle's drag, for the keyboard.
+  const auto it =
+      std::ranges::find(spaces_, space, &SidebarView::LibrarySpace::id);
+  if (it != spaces_.begin() && it != spaces_.end()) {
+    menu_model_->AddItem(kMoveSpaceLeft, u"Move Left");
+  }
+  if (it != spaces_.end() && std::next(it) != spaces_.end()) {
+    menu_model_->AddItem(kMoveSpaceRight, u"Move Right");
+  }
   menu_runner_ =
       std::make_unique<views::MenuRunner>(menu_model_.get(), /*run_types=*/0);
   menu_runner_->RunMenuAt(GetWidget(), nullptr, anchor->GetBoundsInScreen(),
@@ -1246,7 +1345,149 @@ void LibraryView::ExecuteCommand(int command_id, int event_flags) {
                                 base::Unretained(&delegate_.get()),
                                 menu_space_));
       break;
+    case kMoveSpaceLeft:
+    case kMoveSpaceRight: {
+      const std::vector<uint64_t> ids = SpaceIds();
+      const auto it = std::ranges::find(ids, menu_space_);
+      if (it == ids.end()) {
+        break;
+      }
+      const size_t source = static_cast<size_t>(it - ids.begin());
+      const bool left = command_id == kMoveSpaceLeft;
+      if ((left && source == 0) || (!left && source + 1 == ids.size())) {
+        break;
+      }
+      MoveSpace(menu_space_, library::SpaceMoveBefore(
+                                 ids, source, left ? source - 1 : source + 1));
+      break;
+    }
   }
+}
+
+std::vector<uint64_t> LibraryView::SpaceIds() const {
+  std::vector<uint64_t> ids;
+  for (const auto& space : spaces_) {
+    ids.push_back(space.id);
+  }
+  return ids;
+}
+
+void LibraryView::OnMoveHandleEvent(size_t index,
+                                    views::View* handle,
+                                    const ui::MouseEvent* event) {
+  if (!event) {
+    EndSpaceDrag(/*commit=*/false);
+    return;
+  }
+  if (index >= cards_.size() || index >= spaces_.size()) {
+    return;
+  }
+  views::View* row = cards_[index]->parent();
+  // Row coordinates follow the pointer whatever the dragged card's offset.
+  gfx::Point point = event->location();
+  views::View::ConvertPointToTarget(handle, row, &point);
+  switch (event->type()) {
+    case ui::EventType::kMousePressed:
+      drag_ = SpaceDrag{
+          .ids = SpaceIds(), .source = index, .target = index, .press = point};
+      return;
+    case ui::EventType::kMouseDragged:
+      DragCard(point);
+      return;
+    case ui::EventType::kMouseReleased:
+      EndSpaceDrag(/*commit=*/true);
+      return;
+    default:
+      return;
+  }
+}
+
+void LibraryView::DragCard(const gfx::Point& point) {
+  if (!drag_) {
+    return;
+  }
+  views::View& card = *cards_[drag_->source];
+  if (!drag_->lifted) {
+    if (!views::View::ExceededDragThreshold(point - drag_->press)) {
+      return;
+    }
+    // Arc lifts the card over the others, which slide aside under it.
+    drag_->lifted = true;
+    for (auto& each : cards_) {
+      each->SetPaintToLayer();
+      each->layer()->SetFillsBoundsOpaquely(false);
+    }
+    if (ui::Layer* parent = card.layer()->parent()) {
+      parent->StackAtTop(card.layer());
+    }
+  }
+  // The card stays within the row of cards.
+  const int offset =
+      std::clamp(point.x() - drag_->press.x(), cards_.front()->x() - card.x(),
+                 cards_.back()->x() - card.x());
+  card.SetTransform(gfx::Transform::MakeTranslation(offset, 0));
+  const int step = cards_.size() > 1 ? cards_[1]->x() - cards_[0]->x() : 1;
+  const size_t target =
+      library::SpaceDropSlot(drag_->source, cards_.size(), offset, step);
+  if (target == drag_->target) {
+    return;
+  }
+  drag_->target = target;
+  const size_t source = drag_->source;
+  for (size_t i = 0; i < cards_.size(); ++i) {
+    if (i == source) {
+      continue;
+    }
+    int shift = 0;
+    if (source < target && i > source && i <= target) {
+      shift = -step;
+    } else if (target < source && i >= target && i < source) {
+      shift = step;
+    }
+    SlideCard(*cards_[i], shift);
+  }
+}
+
+void LibraryView::EndSpaceDrag(bool commit) {
+  if (!drag_) {
+    return;
+  }
+  const SpaceDrag drag = *std::exchange(drag_, std::nullopt);
+  const bool rebuild = std::exchange(rebuild_after_drag_, false);
+  if (commit && drag.lifted && drag.target != drag.source) {
+    MoveSpace(drag.ids[drag.source],
+              library::SpaceMoveBefore(drag.ids, drag.source, drag.target));
+    return;
+  }
+  for (auto& card : cards_) {
+    SlideCard(*card, 0);
+  }
+  if (rebuild) {
+    // The handle's own event is still running.
+    PostAction(base::BindOnce(&LibraryView::Rebuild, base::Unretained(this)));
+  }
+}
+
+void LibraryView::MoveSpace(uint64_t space, uint64_t before) {
+  // Shows the new order at once, after the caller's handler unwinds. The
+  // workspace's refresh keeps it, or puts the old order back if it refused.
+  PostAction(base::BindOnce(
+      [](LibraryView* view, uint64_t space, uint64_t before) {
+        auto& spaces = view->spaces_;
+        const auto moved =
+            std::ranges::find(spaces, space, &SidebarView::LibrarySpace::id);
+        if (moved != spaces.end() && space != before) {
+          SidebarView::LibrarySpace card = std::move(*moved);
+          spaces.erase(moved);
+          const auto at =
+              std::ranges::find(spaces, before, &SidebarView::LibrarySpace::id);
+          spaces.insert(at, std::move(card));
+        }
+        view->Rebuild();
+        // Last: the refresh it posts may replace this view.
+        view->delegate_->MoveSpace(space, before);
+      },
+      base::Unretained(this), space, before));
 }
 
 void LibraryView::ContentsChanged(views::Textfield* sender,

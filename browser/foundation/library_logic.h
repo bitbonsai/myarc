@@ -35,6 +35,17 @@ inline constexpr uint64_t kSpaceMoreKey = uint64_t{1} << 61;
 // browser layout still caps it to the window.
 int SpacesWidth(size_t spaces);
 
+// The slot a dragged Space card lands in: `offset` DIP from slot `source`,
+// with `count` cards `step` DIP apart. It snaps to the nearest slot.
+size_t SpaceDropSlot(size_t source, size_t count, int offset, int step);
+
+// The Space that the card at `source` goes before when it moves to slot
+// `target`, as move_space_before takes it: zero when it becomes last, its own
+// ID when it stays.
+uint64_t SpaceMoveBefore(const std::vector<uint64_t>& ids,
+                         size_t source,
+                         size_t target);
+
 // Case-insensitive substring match; an empty query matches everything.
 bool MatchesSearch(std::u16string_view text, std::u16string_view query);
 

@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-11-01: Reorder Spaces from the Library
+
+- Rust gains `move_space_before` (zero or `None` moves a Space to the end), bridged like `move_item_before` and saved through the same `WorkspaceService::Changed` write path. The sidebar's Space glyphs, Ctrl+1..9 and the Library all read that order from the Rust snapshot. Dragging a card by its move handle lifts it under the pointer while the other cards slide aside over 150 ms. They snap with Reduce Motion on, and Esc drops the card back. The "..." menu adds Move Left and Move Right for the keyboard. The handle doesn't auto-scroll a row of cards wider than the window.
+- Verification: `cargo test`/`fmt`/`clippy` (unknown IDs, a move before itself, both ends, restore), `chrome` and `bridge_check` builds, `bridge_check` (bridge order, restore, drop slot and before-ID helpers), `export_patches.py --check` and `check_docs.py` pass. In a live `/tmp` profile with 4 Spaces, a CGEvent drag sent while the window was frontmost moved Everyday two slots right. The saved file then listed Work, Research, Everyday, Travel, and Ctrl+1 selected Work. Captures 7-9 in `research-private/captures/finesse/library/space-cards/`.
+- Chromium `myarc` commit `c12a480fb0` adds `BrowserView::MoveSpace`.
+
 ## 2026-11-01: Library Space card controls
 
 - Each Space card gains Arc's controls, as traced 18 DIP glyphs in `icons.h` at white 55%. The header's paintbrush, Arc's edit glyph, opens the existing Rename Space dialog and brightens on hover. The footer's "..." opens a native menu with Switch to Space (other Spaces only) and Rename Space. Delete exists only in the Rust bridge, with no UI or confirmation, so the menu leaves it out. The four-way move glyph only shows, since the workspace has no Space order to change yet. Every card now has its footer, Pins or not.

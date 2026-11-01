@@ -137,6 +137,8 @@ class WorkspaceService final : public base::SupportsUserData::Data {
   foundation::MutationResult RevealItem(uint64_t window, uint64_t item);
   foundation::MutationResult UnsaveItem(uint64_t item, uint64_t live_space);
   foundation::MutationResult MoveItemBefore(uint64_t item, uint64_t before);
+  // Zero before moves the Space to the end.
+  foundation::MutationResult MoveSpaceBefore(uint64_t space, uint64_t before);
   foundation::MutationResult ReconcileLiveItems(
       base::span<const uint64_t> live);
   foundation::SidebarResult Sidebar(uint64_t window) const;

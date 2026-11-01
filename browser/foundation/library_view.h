@@ -17,11 +17,16 @@
 #include "myarc/sidebar_view.h"
 #include "third_party/skia/include/core/SkColor.h"
 #include "ui/base/metadata/metadata_header_macros.h"
+#include "ui/gfx/geometry/point.h"
 #include "ui/gfx/geometry/point_f.h"
 #include "ui/menus/simple_menu_model.h"
 #include "ui/views/context_menu_controller.h"
 #include "ui/views/controls/textfield/textfield_controller.h"
 #include "ui/views/view.h"
+
+namespace ui {
+class MouseEvent;
+}  // namespace ui
 
 namespace views {
 class Button;
@@ -99,6 +104,21 @@ class LibraryView final : public views::View,
   void ContentsChanged(views::Textfield* sender,
                        const std::u16string& new_contents) override;
 
+  std::vector<uint64_t> SpaceIds() const;
+  // A press, drag or release on the move handle of the card at `index`, or
+  // nullptr when the drag loses capture. `handle` is the handle itself.
+  void OnMoveHandleEvent(size_t index,
+                         views::View* handle,
+                         const ui::MouseEvent* event);
+  // Moves the dragged card to `point` in the row of cards and slides the
+  // others out of the slot it would land in.
+  void DragCard(const gfx::Point& point);
+  // Drops the dragged card in its slot when `commit`, else puts every card
+  // back.
+  void EndSpaceDrag(bool commit);
+  // Shows `space` before `before` (0 = last) and asks the workspace for it.
+  void MoveSpace(uint64_t space, uint64_t before);
+
   // A Space card's "..." menu, under `anchor`.
   void ShowSpaceMenu(uint64_t space,
                      views::View* anchor,
@@ -144,6 +164,21 @@ class LibraryView final : public views::View,
   std::unique_ptr<views::MenuRunner> menu_runner_;
   // The Space a card's "..." menu acts on.
   uint64_t menu_space_ = 0;
+  // The Space cards in order, while the Spaces section shows.
+  std::vector<raw_ptr<views::View>> cards_;
+  // A card dragged by its move handle. `ids` is the order when it started,
+  // `source` and `target` the slots it left and would land in, `press` the
+  // press point in the row of cards.
+  struct SpaceDrag {
+    std::vector<uint64_t> ids;
+    size_t source = 0;
+    size_t target = 0;
+    gfx::Point press;
+    bool lifted = false;
+  };
+  std::optional<SpaceDrag> drag_;
+  // The Spaces changed during a drag, so its end rebuilds the cards.
+  bool rebuild_after_drag_ = false;
   base::WeakPtrFactory<LibraryView> weak_factory_{this};
 };
 

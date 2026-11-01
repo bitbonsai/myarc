@@ -1,5 +1,7 @@
 #include "myarc/library_logic.h"
 
+#include <algorithm>
+#include <cmath>
 #include <cstdint>
 #include <string>
 #include <string_view>
@@ -16,6 +18,28 @@ int SpacesWidth(size_t spaces) {
       columns ? columns * kColumnWidth + (columns - 1) * kColumnGap : 0;
   return kRailWidth + kColumnsLeading + content + kCreateGap + kCreateSize +
          kCreateTrailing;
+}
+
+size_t SpaceDropSlot(size_t source, size_t count, int offset, int step) {
+  if (count == 0 || step <= 0) {
+    return source;
+  }
+  const long moved = std::lround(static_cast<double>(offset) / step);
+  const long slot = static_cast<long>(std::min(source, count - 1)) + moved;
+  return static_cast<size_t>(
+      std::clamp(slot, 0L, static_cast<long>(count - 1)));
+}
+
+uint64_t SpaceMoveBefore(const std::vector<uint64_t>& ids,
+                         size_t source,
+                         size_t target) {
+  if (source >= ids.size() || target >= ids.size()) {
+    return 0;
+  }
+  if (target <= source) {
+    return ids[target];
+  }
+  return target + 1 < ids.size() ? ids[target + 1] : 0;
 }
 
 bool MatchesSearch(std::u16string_view text, std::u16string_view query) {

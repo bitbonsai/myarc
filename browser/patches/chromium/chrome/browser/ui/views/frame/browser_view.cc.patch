@@ -1,5 +1,5 @@
 diff --git a/chrome/browser/ui/views/frame/browser_view.cc b/chrome/browser/ui/views/frame/browser_view.cc
-index 7b568f6de760af21d6e9d2aa44415a7cef617c51..e7197948a5f5924a0bbb89427b5e179838e73af4 100644
+index 7b568f6de760af21d6e9d2aa44415a7cef617c51..f7e841dda9d54a9515e1dd8ec45a6bafddc71a55 100644
 --- a/chrome/browser/ui/views/frame/browser_view.cc
 +++ b/chrome/browser/ui/views/frame/browser_view.cc
 @@ -22,6 +22,7 @@
@@ -1532,7 +1532,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..e7197948a5f5924a0bbb89427b5e1798
  }
  
  void BrowserView::RemovedFromWidget() {
-@@ -5267,6 +6499,936 @@ const views::View* BrowserView::GetViewByElementId(
+@@ -5267,6 +6499,941 @@ const views::View* BrowserView::GetViewByElementId(
  ///////////////////////////////////////////////////////////////////////////////
  // BrowserView, ui::AcceleratorTarget overrides:
  
@@ -1946,6 +1946,11 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..e7197948a5f5924a0bbb89427b5e1798
 +
 +void BrowserView::RenameSpace(uint64_t space) {
 +  ShowMyarcSpaceDialog(space);
++}
++
++void BrowserView::MoveSpace(uint64_t space, uint64_t before) {
++  MyarcWorkspaceResult(
++      myarc_workspace_adapter_->MoveSpaceBefore(space, before));
 +}
 +
 +void BrowserView::NewTab() {
@@ -2469,7 +2474,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..e7197948a5f5924a0bbb89427b5e1798
  bool BrowserView::AcceleratorPressed(const ui::Accelerator& accelerator) {
  #if BUILDFLAG(IS_MAC)
    // Forward accelerators to ExclusiveAccessManager to handle Esc press-and-hold
-@@ -5342,7 +7504,8 @@ void BrowserView::LoadingAnimationCallback(base::TimeTicks timestamp) {
+@@ -5342,7 +7509,8 @@ void BrowserView::LoadingAnimationCallback(base::TimeTicks timestamp) {
      // GetActiveWebContents can return null for example under Purify when
      // the animations are running slowly and this function is called on a timer
      // through LoadingAnimationCallback.
@@ -2479,7 +2484,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..e7197948a5f5924a0bbb89427b5e1798
    }
  }
  
-@@ -5471,6 +7634,10 @@ bool BrowserView::MaybeUpdateDevtools(content::WebContents* contents) {
+@@ -5471,6 +7639,10 @@ bool BrowserView::MaybeUpdateDevtools(content::WebContents* contents) {
  
  void BrowserView::UpdateUIForContents(WebContents* contents,
                                        bool should_layout_immediately) {
@@ -2490,7 +2495,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..e7197948a5f5924a0bbb89427b5e1798
    TRACE_EVENT0("ui", "BrowserView::UpdateUIForContents");
    bool needs_layout = MaybeShowBookmarkBar(contents);
  
-@@ -5706,6 +7873,26 @@ void BrowserView::LoadAccelerators() {
+@@ -5706,6 +7878,26 @@ void BrowserView::LoadAccelerators() {
    }
  
  #if BUILDFLAG(IS_MAC)

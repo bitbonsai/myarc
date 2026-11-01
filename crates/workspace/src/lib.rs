@@ -807,6 +807,38 @@ impl Workspace {
         Ok(())
     }
 
+    /// Reorder Spaces: the sidebar's Space glyphs, Ctrl+1..9 and the Library
+    /// follow this order. `None` moves to the end; moving before oneself is a
+    /// no-op. IDs, items, windows and selections are unchanged. Spaces are
+    /// all in Profile 1 until more Profiles exist.
+    pub fn move_space_before(
+        &mut self,
+        space_id: SpaceId,
+        before: Option<SpaceId>,
+    ) -> Result<(), WorkspaceError> {
+        self.space(space_id)?;
+        if let Some(id) = before {
+            self.space(id)?;
+            if id == space_id {
+                return Ok(());
+            }
+        }
+        let spaces = &mut self.state.spaces;
+        let source = spaces
+            .iter()
+            .position(|space| space.id == space_id)
+            .ok_or(WorkspaceError::UnknownSpace(space_id))?;
+        let space = spaces.remove(source);
+        let target = match before {
+            Some(id) => spaces.iter().position(|space| space.id == id),
+            None => Some(spaces.len()),
+        };
+        // Both IDs were checked above, so the target is always found.
+        let target = target.unwrap_or(source);
+        spaces.insert(target, space);
+        Ok(())
+    }
+
     /// Requires an allocated/rebound model window; restore may contain none.
     pub fn sidebar_snapshot(&self, window_id: WindowId) -> Result<SidebarSnapshot, WorkspaceError> {
         let window = self.window(window_id)?;

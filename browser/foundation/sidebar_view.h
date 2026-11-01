@@ -120,6 +120,9 @@ class SidebarView final : public views::View,
     virtual void SelectSpace(uint64_t space_id) = 0;
     virtual void CreateSpace() = 0;
     virtual void RenameSpace(uint64_t space_id) = 0;
+    // Places `space_id` before `before_id` (0 = last) in the Space order
+    // the footer, Ctrl+1..9 and the Library share. The parent reports errors.
+    virtual void MoveSpace(uint64_t space_id, uint64_t before_id) = 0;
     virtual void NewTab() = 0;  // Parent opens its real New Tab/palette flow.
     virtual void OpenDownloads() = 0;  // Exact owning browser's Chrome command.
     // Newest first, bounded by the parent. Lookup only, except that the

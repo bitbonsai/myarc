@@ -129,6 +129,7 @@ class BrowserWorkspaceAdapter final : public TabStripModelObserver {
   foundation::MutationResult Favorite(uint64_t item);
   foundation::MutationResult Unsave(uint64_t item);
   foundation::MutationResult MoveItemBefore(uint64_t item, uint64_t before);
+  foundation::MutationResult MoveSpaceBefore(uint64_t space, uint64_t before);
 
   // Keyboard commands over Rust's sidebar order: Favorites, Pins, then
   // temporary items, and Spaces in footer order. Index -1 means the last row;

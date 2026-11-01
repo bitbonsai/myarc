@@ -1,5 +1,5 @@
 diff --git a/chrome/browser/ui/views/frame/browser_view.h b/chrome/browser/ui/views/frame/browser_view.h
-index 750e46c97b64dccccf4268e912df5dbdb6516b3c..2034625c98c4d7f87f9dc5a70a4ac1c881ad43ac 100644
+index 750e46c97b64dccccf4268e912df5dbdb6516b3c..fac8f8ddf1715535bcb14033f1e1e95777ccd47c 100644
 --- a/chrome/browser/ui/views/frame/browser_view.h
 +++ b/chrome/browser/ui/views/frame/browser_view.h
 @@ -8,11 +8,13 @@
@@ -104,7 +104,7 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..2034625c98c4d7f87f9dc5a70a4ac1c8
    base::WeakPtr<BrowserView> GetAsWeakPtr() {
      return weak_ptr_factory_.GetWeakPtr();
    }
-@@ -1253,12 +1298,93 @@ class BrowserView : public BrowserWindow,
+@@ -1253,12 +1298,94 @@ class BrowserView : public BrowserWindow,
  
    // Anchor point for help bubbles and other dialogs that want to reliably
    // anchor outside the content area of the window.
@@ -119,6 +119,7 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..2034625c98c4d7f87f9dc5a70a4ac1c8
 +  void SelectSpace(uint64_t space) override;
 +  void CreateSpace() override;
 +  void RenameSpace(uint64_t space) override;
++  void MoveSpace(uint64_t space, uint64_t before) override;
 +  void NewTab() override;
 +  void RetryWorkspaceStorage(myarc::SidebarView::StorageRetry retry) override;
 +  void OpenDownloads() override;
@@ -198,7 +199,7 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..2034625c98c4d7f87f9dc5a70a4ac1c8
  
    // A mapping between accelerators and command IDs.
    std::map<ui::Accelerator, int> accelerator_table_;
-@@ -1411,6 +1537,7 @@ class BrowserView : public BrowserWindow,
+@@ -1411,6 +1538,7 @@ class BrowserView : public BrowserWindow,
    base::EnumSet<TabStripAndWebAppViewsReparentedState>
        tab_strip_web_apps_reparented_state_;
  

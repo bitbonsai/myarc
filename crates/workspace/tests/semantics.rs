@@ -1389,3 +1389,64 @@ fn delete_space_with_zero_windows_still_works() {
     assert!(deletion.moved_windows.is_empty());
     assert!(Workspace::from_snapshot(workspace.snapshot()).is_ok());
 }
+
+fn space_order(workspace: &Workspace) -> Vec<SpaceId> {
+    workspace.snapshot().spaces.iter().map(|s| s.id).collect()
+}
+
+#[test]
+fn move_space_before_reorders_ends_and_keeps_everything_else() {
+    let mut workspace = Workspace::default();
+    let s2 = workspace.create_space(P1, "Two").unwrap();
+    let s3 = workspace.create_space(P1, "Three").unwrap();
+    let saved = pin(&mut workspace, s2);
+    workspace.select_space(W1, s2).unwrap();
+    workspace.select_item(W1, saved).unwrap();
+    let before = workspace.snapshot();
+    for (space, target, expected) in [
+        (s3, Some(S1), [s3, S1, s2]),
+        (s3, None, [S1, s2, s3]),
+        (S1, Some(s3), [s2, S1, s3]),
+        (S1, Some(S1), [s2, S1, s3]),
+        (s3, None, [s2, S1, s3]),
+        (s2, None, [S1, s3, s2]),
+        (s2, Some(S1), [s2, S1, s3]),
+    ] {
+        workspace.move_space_before(space, target).unwrap();
+        assert_eq!(space_order(&workspace), expected);
+        let mut normalized = workspace.snapshot();
+        normalized.spaces.sort_by_key(|s| s.id);
+        assert_eq!(normalized, before);
+    }
+    let sidebar = workspace.sidebar_snapshot(W1).unwrap();
+    assert_eq!(
+        sidebar.spaces.iter().map(|s| s.id).collect::<Vec<_>>(),
+        [s2, S1, s3]
+    );
+    assert_eq!(sidebar.current_space.id, s2);
+    let restored = Workspace::from_snapshot(workspace.snapshot()).unwrap();
+    assert_eq!(space_order(&restored), [s2, S1, s3]);
+}
+
+#[test]
+fn move_space_before_rejects_unknown_ids_without_mutation() {
+    let mut workspace = Workspace::default();
+    let s2 = workspace.create_space(P1, "Two").unwrap();
+    unchanged(
+        &mut workspace,
+        |w| w.move_space_before(99, None),
+        WorkspaceError::UnknownSpace(99),
+    );
+    unchanged(
+        &mut workspace,
+        |w| w.move_space_before(s2, Some(99)),
+        WorkspaceError::UnknownSpace(99),
+    );
+    unchanged(
+        &mut workspace,
+        |w| w.move_space_before(99, Some(99)),
+        WorkspaceError::UnknownSpace(99),
+    );
+    workspace.move_space_before(S1, None).unwrap();
+    assert_eq!(space_order(&workspace), [s2, S1]);
+}

@@ -356,6 +356,53 @@ bool CheckDeleteFirstSpace() {
          sidebar_snapshot(*model, 1).current_space.id == space.id;
 }
 
+// Spaces reorder in the snapshot order the footer and Ctrl+1..9 read, and
+// unknown IDs fail without changing it.
+bool CheckMoveSpace() {
+  using namespace myarc::foundation;
+  auto model = new_workspace();
+  auto second = create_space(*model, "Second");
+  auto third = create_space(*model, "Third");
+  const auto order = [&model] {
+    std::vector<uint64_t> ids;
+    for (const auto& space : sidebar_snapshot(*model, 1).spaces) {
+      ids.push_back(space.id);
+    }
+    return ids;
+  };
+  using Ids = std::vector<uint64_t>;
+  if (!second.ok || !third.ok || !move_space_before(*model, third.id, 1).ok ||
+      order() != Ids{third.id, 1, second.id} ||
+      !move_space_before(*model, third.id, 0).ok ||
+      order() != Ids{1, second.id, third.id} ||
+      !move_space_before(*model, 1, 1).ok ||
+      move_space_before(*model, 99, 0).ok ||
+      move_space_before(*model, 1, 99).ok ||
+      order() != Ids{1, second.id, third.id}) {
+    return false;
+  }
+  // The Library's drag and Move Left/Right helpers.
+  using myarc::library::SpaceDropSlot;
+  using myarc::library::SpaceMoveBefore;
+  const Ids ids = {1, second.id, third.id};
+  if (SpaceDropSlot(1, 3, 0, 264) != 1 || SpaceDropSlot(1, 3, 131, 264) != 1 ||
+      SpaceDropSlot(1, 3, 133, 264) != 2 ||
+      SpaceDropSlot(1, 3, -140, 264) != 0 ||
+      SpaceDropSlot(0, 3, -900, 264) != 0 ||
+      SpaceDropSlot(0, 3, 9000, 264) != 2 ||
+      SpaceDropSlot(2, 0, 50, 264) != 2 || SpaceMoveBefore(ids, 2, 0) != 1 ||
+      SpaceMoveBefore(ids, 0, 1) != third.id ||
+      SpaceMoveBefore(ids, 0, 2) != 0 ||
+      SpaceMoveBefore(ids, 1, 1) != second.id ||
+      SpaceMoveBefore(ids, 3, 0) != 0) {
+    return false;
+  }
+  auto restored = new_workspace();
+  return move_space_before(*model, second.id, 1).ok &&
+         restore_snapshot(*restored, export_snapshot(*model)).ok &&
+         sidebar_snapshot(*restored, 1).spaces[0].id == second.id;
+}
+
 // Saved titles survive the JSON codec, untitled records omit the key, files
 // without it still load, and an unchanged title reports no change.
 bool CheckSavedTitles() {
@@ -773,11 +820,14 @@ int main() {
     std::cerr << "Dormant temporary item checks failed\n";
     return 18;
   }
-  std::cout
-      << "7 legacy C++/Rust checks passed, including 1000 ownership "
-         "round trips; workspace transitions, Space 1 deletion and "
-         "metadata codec, saved title, Archived Tabs, Auto Archive, "
-         "archive timer, Clear Archive, downloads stack and dormant "
-         "temporary item checks passed\n";
+  if (!CheckMoveSpace()) {
+    std::cerr << "Space reorder checks failed\n";
+    return 19;
+  }
+  std::cout << "7 legacy C++/Rust checks passed, including 1000 ownership "
+               "round trips; workspace transitions, Space 1 deletion and "
+               "metadata codec, saved title, Archived Tabs, Auto Archive, "
+               "archive timer, Clear Archive, downloads stack, dormant "
+               "temporary item and Space reorder checks passed\n";
   return 0;
 }

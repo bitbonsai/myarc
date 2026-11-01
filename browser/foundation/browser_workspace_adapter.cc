@@ -1719,6 +1719,12 @@ foundation::MutationResult BrowserWorkspaceAdapter::MoveItemBefore(
   return Remember(ready() ? service_->MoveItemBefore(item, before)
                           : Fail(error()));
 }
+foundation::MutationResult BrowserWorkspaceAdapter::MoveSpaceBefore(
+    uint64_t space,
+    uint64_t before) {
+  return Remember(ready() ? service_->MoveSpaceBefore(space, before)
+                          : Fail(error()));
+}
 
 BrowserWorkspaceAdapter* BrowserWorkspaceAdapter::ForBrowser(
     BrowserWindowInterface& browser) {
