@@ -454,6 +454,7 @@ void SidebarView::OpenLibrary(LibrarySection section) {
   layout->SetFlexForView(library_, 1);
   library_->SetSpaces(spaces_, current_space_id_);
   delegate_->SetLibraryOpen(true);
+  library_keyboard_ = had_focus;
   if (had_focus) {
     library_return_focus_.SetView(nullptr);
     library_->FocusSection();
@@ -496,15 +497,22 @@ void SidebarView::CloseLibrary() {
 }
 
 bool SidebarView::LibraryHasFocus() {
-  // Keyboard users land on the Library button; a click leaves no focus ring.
+  // Keyboard users land on the Library button; a click leaves no focus ring,
+  // even after clicking into the Library's search field.
+  const views::FocusManager* focus_manager = GetFocusManager();
   const views::View* focused =
-      GetFocusManager() ? GetFocusManager()->GetFocusedView() : nullptr;
-  return library_ && focused != library_ && library_->Contains(focused);
+      focus_manager ? focus_manager->GetFocusedView() : nullptr;
+  return library_ && focused != library_ && library_->Contains(focused) &&
+         (library_keyboard_ ||
+          focus_manager->focus_change_reason() ==
+              views::FocusManager::FocusChangeReason::kFocusTraversal);
 }
 
 void SidebarView::FinishCloseLibrary(bool had_focus) {
   // A click-opened Library holds focus only for Esc; hand it back.
-  const bool return_focus = library_ && library_->HasFocus();
+  const bool return_focus =
+      !had_focus && library_ && GetFocusManager() &&
+      library_->Contains(GetFocusManager()->GetFocusedView());
   ResetLibrary();
   library_closed_ = true;
   auto weak = weak_factory_.GetWeakPtr();

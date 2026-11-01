@@ -1,5 +1,10 @@
 # Development log
 
+## 2026-11-01: Closing the Library from its search field leaves no ring
+
+- Cause: closing with focus anywhere inside the Library except the Library view itself counted as keyboard use, so a click into search then Esc moved focus to the Library button and showed its ring. Now the button takes focus only when the Library was opened from the keyboard or focus last moved by Tab (`FocusManager::focus_change_reason()`); otherwise focus goes back to the page, as with a plain click-opened Library.
+- Verification: `chrome` and `bridge_check` build, `bridge_check`, `export_patches.py --check` and `check_docs.py` pass. Live `/tmp` profile driven with CGEvent while frontmost, checked through AX and window captures: click Library, Downloads, search, "x", Esc, Esc leaves the page focused with no ring; Tab out of search then Esc focuses the Library button with its ring; Esc on a click-opened Library still returns to the page. No Chromium patch changes.
+
 ## 2026-11-01: Sidebar peek in the Space colour
 
 - The peek panel painted the frame's opaque grey `#191B1F`. It now takes the sidebar's Space tint where the sidebar sits, composited opaque over the frame colour standing in for the window material: `#1E1A2B` in dark, the user's recorded pinned sidebar being `#1F192B`. The colour comes from the new `myarc/sidebar_tint.{h,cc}`, which also feeds the native gradient tint its stops, and reaches the panel through a new `ExplicitColor` choice in `CustomCorners` (frame-local header, ~25 files rebuild). Corners, rim and no-shadow unchanged.

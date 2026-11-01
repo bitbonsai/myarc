@@ -277,6 +277,8 @@ class SidebarView final : public views::View,
   // Where a click-opened Library hands focus back when it closes, usually the
   // page.
   views::ViewTracker library_return_focus_;
+  // The Library opened from the keyboard, so closing it lands on its button.
+  bool library_keyboard_ = false;
   // Arc's Space switch: the old Space's title and rows leave sideways as the
   // new ones enter beside them, with no fade. +1 slides them right.
   gfx::LinearAnimation space_slide_{this};
