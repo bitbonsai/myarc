@@ -106,20 +106,23 @@ struct SectionInfo {
   // Duotone icon for the selected rail item; null draws `icon` in the
   // selected label color.
   RAW_PTR_EXCLUSION const gfx::VectorIcon* active_icon;
+  // Arc's own glyphs draw at 28 DIP, the Lucide ones at 24.
+  int icon_size;
   const char16_t* name;
   const char16_t* search;
 };
 
 constexpr auto kSections = std::to_array<SectionInfo>({
-    {Section::kMedia, &kImageIcon, &kImageActiveIcon, u"Media",
+    {Section::kMedia, &kMediaIcon, &kMediaActiveIcon, 28, u"Media",
      u"Search Media..."},
     {Section::kDownloads, &kCircleArrowDownIcon, &kCircleArrowDownActiveIcon,
-     u"Downloads", u"Search Downloads..."},
-    {Section::kSpaces, &kCopyIcon, &kCopyActiveIcon, u"Spaces", nullptr},
-    {Section::kBoosts, &kWandIcon, &kWandActiveIcon, u"Boosts",
+     24, u"Downloads", u"Search Downloads..."},
+    {Section::kSpaces, &kSpacesIcon, &kSpacesActiveIcon, 28, u"Spaces",
+     nullptr},
+    {Section::kBoosts, &kBoostsIcon, &kBoostsActiveIcon, 28, u"Boosts",
      u"Search Boosts..."},
-    {Section::kArchive, &kArchiveIcon, &kArchiveActiveIcon, u"Archived Tabs",
-     u"Search Archive..."},
+    {Section::kArchive, &kArchiveIcon, &kArchiveActiveIcon, 24,
+     u"Archived Tabs", u"Search Archive..."},
 });
 
 const SectionInfo& Info(Section section) {
@@ -250,13 +253,16 @@ class LibraryRailItem final : public TileButton {
   LibraryRailItem(PressedCallback callback, const SectionInfo& info)
       : TileButton(std::move(callback)),
         icon_(*info.icon),
-        active_icon_(info.active_icon) {
+        active_icon_(info.active_icon),
+        icon_size_(info.icon_size) {
     views::InstallRoundRectHighlightPathGenerator(this, gfx::Insets(), 12);
     auto* layout = SetLayoutManager(std::make_unique<views::BoxLayout>(
         Orientation::kVertical, gfx::Insets::VH(12, 4), 6));
     layout->set_main_axis_alignment(MainAxis::kCenter);
     layout->set_cross_axis_alignment(CrossAxis::kCenter);
     image_ = AddChildView(std::make_unique<views::ImageView>());
+    // One box for every glyph size keeps the labels in line.
+    image_->SetPreferredSize(gfx::Size(28, 28));
     label_ = AddChildView(
         MakeLabel(info.name,
                   gfx::FontList().Derive(-2, gfx::Font::NORMAL,
@@ -280,14 +286,15 @@ class LibraryRailItem final : public TileButton {
                   selected() ? colors.rail_selected : colors.rail_hover, 12)
             : nullptr);
     image_->SetImage(
-        selected()
-            ? (active_icon_ ? ui::ImageModel::FromVectorIcon(*active_icon_,
-                                                             kRailLine, 22)
-                            // Single-color glyphs follow the label so they
-                            // stay visible on the light selected tile.
-                            : ui::ImageModel::FromVectorIcon(
-                                  *icon_, colors.rail_label_selected, 22))
-            : ui::ImageModel::FromVectorIcon(*icon_, colors.rail_icon, 22));
+        selected() ? (active_icon_
+                          ? ui::ImageModel::FromVectorIcon(
+                                *active_icon_, kRailLine, icon_size_)
+                          // Single-color glyphs follow the label so they
+                          // stay visible on the light selected tile.
+                          : ui::ImageModel::FromVectorIcon(
+                                *icon_, colors.rail_label_selected, icon_size_))
+                   : ui::ImageModel::FromVectorIcon(*icon_, colors.rail_icon,
+                                                    icon_size_));
     label_->SetEnabledColor(selected() ? colors.rail_label_selected
                             : hovered  ? colors.rail_label_hover
                                        : colors.muted);
@@ -295,6 +302,7 @@ class LibraryRailItem final : public TileButton {
 
   const raw_ref<const gfx::VectorIcon> icon_;
   RAW_PTR_EXCLUSION const gfx::VectorIcon* const active_icon_;
+  const int icon_size_;
   raw_ptr<views::ImageView> image_ = nullptr;
   raw_ptr<views::Label> label_ = nullptr;
 };

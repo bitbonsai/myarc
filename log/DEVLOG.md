@@ -1,5 +1,10 @@
 # Development log
 
+## 2026-11-01: Library panel finesse
+
+- Footer: Arc's thin back arrow (Lucide `arrow-left`, stroke 1.5, 24 DIP, muted ink) in a 32 DIP tile with an "Exit Library" tooltip beside it, replacing the glowing Library button and "Close Library". Search field is 36 DIP tall and 8 DIP from the rail, top and page, with a 14pt placeholder ending in "...". The rail ramps to ink@0x0A at its right edge and ends in a 1 DIP ink@0x12 hairline. Spaces columns drop to white@0x06. Media, Spaces and Boosts now use glyphs traced from Arc on a 28 DIP canvas at stroke 1.8, with duotone selected variants. The Boosts outline is cleared around the brush. Downloads and Archive draw at 24 DIP.
+- Verification: `chrome` and `bridge_check` build; `bridge_check`, `export_patches.py --check` and `check_docs.py` pass. Background captures `research-private/captures/finesse/library/after-archive.png`, `after-boosts-exit.png`, `after-media-exit.png` and `after-spaces.png`. Those runs pinned the tooltip mid-motion, off to the left. The fix that waits out the open motion is built but not captured. Light mode was checked by reading the code. Skipped: Filter, Media grid, Boosts list, "Learn more", the "+" menu.
+
 ## 2026-11-01: Space switch slides the rows
 
 - Switching Spaces slides the Space title and rows sideways for 200 ms, easing out, with no fade: the old Space's rows ride one width beside the new ones on their own layer and leave as they enter. A Space to the left enters from the left. The URL pill, Favorites and footer stay still. Row rebuilds mid-slide carry the old rows over; reduced motion, a hidden sidebar and the Library snap.

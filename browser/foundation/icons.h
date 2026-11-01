@@ -42,8 +42,7 @@ inline constexpr gfx::VectorIcon kSaturnIcon(kSaturnRep,
 
 // Icons from Lucide (ISC, lucide-static 1.61.0): 24 DIP canvas, stroke 2.
 // "archive" for Archived Tabs, "plus" for Create, "search" for the Library's
-// search fields, and the Library rail's "image", "circle-arrow-down", "copy"
-// and "wand".
+// search fields, and "circle-arrow-down" for the Library rail's Downloads.
 inline constexpr gfx::PathElement kArchivePath[] = {
     gfx::CANVAS_DIMENSIONS, 24, gfx::STROKE, 2,
     gfx::ROUND_RECT, 2, 3, 20, 5, 1, gfx::MOVE_TO, 4, 8, gfx::V_LINE_TO, 19,
@@ -83,17 +82,6 @@ inline constexpr gfx::VectorIcon kSearchIcon(kSearchRep,
                                              std::size(kSearchRep),
                                              "myarc_search");
 
-inline constexpr gfx::PathElement kImagePath[] = {
-    gfx::CANVAS_DIMENSIONS, 24, gfx::STROKE, 2,
-    gfx::ROUND_RECT, 3, 3, 18, 18, 2, gfx::NEW_PATH, gfx::STROKE, 2,
-    gfx::CIRCLE, 9, 9, 2, gfx::NEW_PATH, gfx::STROKE, 2, gfx::MOVE_TO, 21, 15,
-    gfx::R_LINE_TO, -3.086f, -3.086f, gfx::R_ARC_TO, 2, 2, 0, 0, 0, -2.828f, 0,
-    gfx::LINE_TO, 6, 21};
-inline constexpr gfx::VectorIconRep kImageRep[] = {{kImagePath}};
-inline constexpr gfx::VectorIcon kImageIcon(kImageRep,
-                                            std::size(kImageRep),
-                                            "myarc_image");
-
 inline constexpr gfx::PathElement kCircleArrowDownPath[] = {
     gfx::CANVAS_DIMENSIONS, 24, gfx::STROKE, 2, gfx::CIRCLE, 12, 12, 10,
     gfx::NEW_PATH, gfx::STROKE, 2, gfx::MOVE_TO, 12, 8, gfx::R_V_LINE_TO, 8,
@@ -105,37 +93,98 @@ inline constexpr gfx::VectorIcon kCircleArrowDownIcon(
     std::size(kCircleArrowDownRep),
     "myarc_circle_arrow_down");
 
-inline constexpr gfx::PathElement kCopyPath[] = {
-    gfx::CANVAS_DIMENSIONS, 24, gfx::STROKE, 2,
-    gfx::ROUND_RECT, 8, 8, 14, 14, 2, gfx::NEW_PATH, gfx::STROKE, 2,
-    gfx::MOVE_TO, 4, 16, gfx::R_CUBIC_TO, -1.1f, 0, -2, -0.9f, -2, -2,
-    gfx::V_LINE_TO, 4, gfx::R_CUBIC_TO, 0, -1.1f, 0.9f, -2, 2, -2,
-    gfx::R_H_LINE_TO, 10, gfx::R_CUBIC_TO, 1.1f, 0, 2, 0.9f, 2, 2};
-inline constexpr gfx::VectorIconRep kCopyRep[] = {{kCopyPath}};
-inline constexpr gfx::VectorIcon kCopyIcon(kCopyRep,
-                                           std::size(kCopyRep),
-                                           "myarc_copy");
+// Media, Spaces and Boosts are traced from Arc's rail glyphs on a 28 DIP canvas
+// at stroke 1.8, drawn at 28 DIP. Idle glyphs stroke only the edges a front
+// shape leaves visible; the duotone ones paint back to front instead.
 
-inline constexpr gfx::PathElement kWandPath[] = {
-    gfx::CANVAS_DIMENSIONS, 24, gfx::STROKE, 2, gfx::MOVE_TO, 15, 4,
-    gfx::V_LINE_TO, 2, gfx::MOVE_TO, 15, 16, gfx::R_V_LINE_TO, -2,
-    gfx::MOVE_TO, 8, 9, gfx::R_H_LINE_TO, 2, gfx::MOVE_TO, 20, 9,
-    gfx::R_H_LINE_TO, 2, gfx::MOVE_TO, 17.8f, 11.8f, gfx::LINE_TO, 19, 13,
-    gfx::MOVE_TO, 15, 9, gfx::R_H_LINE_TO, 0.01f, gfx::MOVE_TO, 17.8f, 6.2f,
-    gfx::LINE_TO, 19, 5, gfx::MOVE_TO, 3, 21, gfx::R_LINE_TO, 9, -9,
-    gfx::MOVE_TO, 12.2f, 6.2f, gfx::LINE_TO, 11, 5};
-inline constexpr gfx::VectorIconRep kWandRep[] = {{kWandPath}};
-inline constexpr gfx::VectorIcon kWandIcon(kWandRep,
-                                           std::size(kWandRep),
-                                           "myarc_wand");
+// Media: a photo stacked on a second card, its sun and hills filled.
+#define MYARC_MEDIA_BACK gfx::ROUND_RECT, 2.4f, 4.9f, 17.7f, 14.9f, 2.6f
+#define MYARC_MEDIA_FRONT gfx::ROUND_RECT, 8.2f, 10.4f, 18.7f, 13.5f, 2.6f
+#define MYARC_MEDIA_PHOTO                                                    \
+  gfx::CIRCLE, 14.2f, 14.4f, 1.8f, gfx::MOVE_TO, 8.9f, 23.1f, gfx::LINE_TO,  \
+      13, 18.6f, gfx::QUADRATIC_TO, 13.6f, 18, 14.2f, 18.6f, gfx::LINE_TO,   \
+      16, 20.4f, gfx::LINE_TO, 20, 16.4f, gfx::QUADRATIC_TO, 20.6f, 15.8f,   \
+      21.2f, 16.4f, gfx::LINE_TO, 26.6f, 21.8f, gfx::V_LINE_TO, 23.1f,       \
+      gfx::CLOSE
+
+inline constexpr gfx::PathElement kMediaPath[] = {
+    gfx::CANVAS_DIMENSIONS, 28, gfx::STROKE, 1.8f, gfx::MOVE_TO, 8.2f, 19.8f,
+    gfx::H_LINE_TO, 5, gfx::ARC_TO, 2.6f, 2.6f, 0, 0, 1, 2.4f, 17.2f,
+    gfx::V_LINE_TO, 7.5f, gfx::ARC_TO, 2.6f, 2.6f, 0, 0, 1, 5, 4.9f,
+    gfx::H_LINE_TO, 17.5f, gfx::ARC_TO, 2.6f, 2.6f, 0, 0, 1, 20.1f, 7.5f,
+    gfx::V_LINE_TO, 10.4f, MYARC_MEDIA_FRONT, gfx::NEW_PATH, MYARC_MEDIA_PHOTO};
+inline constexpr gfx::VectorIconRep kMediaRep[] = {{kMediaPath}};
+inline constexpr gfx::VectorIcon kMediaIcon(kMediaRep,
+                                            std::size(kMediaRep),
+                                            "myarc_media");
+
+// Spaces: an upright card over a second one tilted 16 degrees behind it.
+#define MYARC_SPACES_FRONT gfx::ROUND_RECT, 11.1f, 7.05f, 13, 18.4f, 2.6f
+#define MYARC_SPACES_BACK                                                      \
+  gfx::MOVE_TO, 5.44f, 5.76f, gfx::LINE_TO, 12.94f, 3.61f, gfx::ARC_TO, 2.6f, \
+      2.6f, 0, 0, 1, 16.15f, 5.4f, gfx::LINE_TO, 19.54f, 17.22f,              \
+      gfx::ARC_TO, 2.6f, 2.6f, 0, 0, 1, 17.76f, 20.44f, gfx::LINE_TO, 10.26f,  \
+      22.59f, gfx::ARC_TO, 2.6f, 2.6f, 0, 0, 1, 7.05f, 20.8f, gfx::LINE_TO,    \
+      3.66f, 8.98f, gfx::ARC_TO, 2.6f, 2.6f, 0, 0, 1, 5.44f, 5.76f, gfx::CLOSE
+
+inline constexpr gfx::PathElement kSpacesPath[] = {
+    gfx::CANVAS_DIMENSIONS, 28, gfx::STROKE, 1.8f, MYARC_SPACES_FRONT,
+    gfx::MOVE_TO, 11.1f, 22.35f, gfx::LINE_TO, 10.26f, 22.59f,
+    gfx::ARC_TO, 2.6f, 2.6f, 0, 0, 1, 7.05f, 20.8f, gfx::LINE_TO, 3.66f, 8.98f,
+    gfx::ARC_TO, 2.6f, 2.6f, 0, 0, 1, 5.44f, 5.76f, gfx::LINE_TO, 12.94f, 3.61f,
+    gfx::ARC_TO, 2.6f, 2.6f, 0, 0, 1, 16.15f, 5.4f, gfx::LINE_TO, 16.6f, 7.05f};
+inline constexpr gfx::VectorIconRep kSpacesRep[] = {{kSpacesPath}};
+inline constexpr gfx::VectorIcon kSpacesIcon(kSpacesRep,
+                                             std::size(kSpacesRep),
+                                             "myarc_spaces");
+
+// Boosts: a paintbrush across a tile tilted 13 degrees, with two sparkles. The
+// tile's outline is cleared around the brush, as Arc leaves a gap there.
+#define MYARC_BOOSTS_TILE                                                     \
+  gfx::MOVE_TO, 7.56f, 5.84f, gfx::LINE_TO, 16.33f, 3.81f, gfx::ARC_TO, 4.2f, \
+      4.2f, 0, 0, 1, 21.36f, 6.96f, gfx::LINE_TO, 23.39f, 15.73f,             \
+      gfx::ARC_TO, 4.2f, 4.2f, 0, 0, 1, 20.24f, 20.76f, gfx::LINE_TO, 11.47f,  \
+      22.79f, gfx::ARC_TO, 4.2f, 4.2f, 0, 0, 1, 6.44f, 19.64f, gfx::LINE_TO,   \
+      4.41f, 10.87f, gfx::ARC_TO, 4.2f, 4.2f, 0, 0, 1, 7.56f, 5.84f, gfx::CLOSE
+#define MYARC_BOOSTS_BRUSH                                                    \
+  gfx::MOVE_TO, 13.05f, 8.32f, gfx::LINE_TO, 16.36f, 10.55f, gfx::ARC_TO,     \
+      1.5f, 1.5f, 0, 0, 1, 16.77f, 12.64f, gfx::LINE_TO, 13.64f, 17.28f,      \
+      gfx::ARC_TO, 1.5f, 1.5f, 0, 0, 1, 11.55f, 17.68f, gfx::LINE_TO, 8.24f,  \
+      15.45f, gfx::ARC_TO, 1.5f, 1.5f, 0, 0, 1, 7.83f, 13.36f, gfx::LINE_TO,  \
+      10.96f, 8.72f, gfx::ARC_TO, 1.5f, 1.5f, 0, 0, 1, 13.05f, 8.32f,         \
+      gfx::CLOSE, gfx::MOVE_TO, 8.32f, 15.87f, gfx::LINE_TO, 11.14f, 17.77f,  \
+      gfx::ARC_TO, 0.8f, 0.8f, 0, 0, 1, 11.35f, 18.88f, gfx::LINE_TO, 10.79f, \
+      19.71f, gfx::ARC_TO, 0.8f, 0.8f, 0, 0, 1, 9.68f, 19.93f, gfx::LINE_TO,  \
+      6.86f, 18.03f, gfx::ARC_TO, 0.8f, 0.8f, 0, 0, 1, 6.65f, 16.92f,         \
+      gfx::LINE_TO, 7.21f, 16.09f, gfx::ARC_TO, 0.8f, 0.8f, 0, 0, 1, 8.32f,   \
+      15.87f, gfx::CLOSE, gfx::MOVE_TO, 8.11f, 19.21f, gfx::ARC_TO, 1.6f,     \
+      1.6f, 0, 0, 1, 8.54f, 21.44f, gfx::LINE_TO, 5.85f, 25.41f, gfx::ARC_TO, \
+      1.6f, 1.6f, 0, 0, 1, 3.2f, 23.62f, gfx::LINE_TO, 5.89f, 19.65f,         \
+      gfx::ARC_TO, 1.6f, 1.6f, 0, 0, 1, 8.11f, 19.21f, gfx::CLOSE
+// Clears the brush and a 1 DIP gap around its outline.
+#define MYARC_BOOSTS_GAP                                                  \
+  gfx::NEW_PATH, gfx::PATH_MODE_CLEAR, gfx::STROKE, 3.8f, MYARC_BOOSTS_BRUSH, \
+      gfx::NEW_PATH, gfx::PATH_MODE_CLEAR, MYARC_BOOSTS_BRUSH
+#define MYARC_BOOSTS_SPARKLES \
+  gfx::CIRCLE, 15.6f, 7.2f, 0.85f, gfx::CIRCLE, 19.3f, 10.6f, 0.85f
+
+inline constexpr gfx::PathElement kBoostsPath[] = {
+    gfx::CANVAS_DIMENSIONS, 28, gfx::STROKE, 1.8f, MYARC_BOOSTS_TILE,
+    MYARC_BOOSTS_GAP, gfx::NEW_PATH, gfx::STROKE, 1.8f, MYARC_BOOSTS_BRUSH,
+    gfx::NEW_PATH, MYARC_BOOSTS_SPARKLES};
+inline constexpr gfx::VectorIconRep kBoostsRep[] = {{kBoostsPath}};
+inline constexpr gfx::VectorIcon kBoostsIcon(kBoostsRep,
+                                             std::size(kBoostsRep),
+                                             "myarc_boosts");
 
 // Arc's selected Library rail glyphs are duotone: the enclosed shapes filled
-// blue (#2523F6) under the Lucide strokes in light lavender (#EDEDFD). The
-// colors are baked in, so ImageModel's color argument doesn't change them.
+// blue (#2523F6) under strokes in light lavender (#EDEDFD). The colors are
+// baked in, so ImageModel's color argument doesn't change them.
 #define MYARC_RAIL_FILL gfx::PATH_COLOR_ARGB, 0xFF, 0x25, 0x23, 0xF6
-#define MYARC_RAIL_LINE                                          \
-  gfx::NEW_PATH, gfx::PATH_COLOR_ARGB, 0xFF, 0xED, 0xED, 0xFD, \
-      gfx::STROKE, 2
+#define MYARC_RAIL_INK \
+  gfx::NEW_PATH, gfx::PATH_COLOR_ARGB, 0xFF, 0xED, 0xED, 0xFD
+#define MYARC_RAIL_LINE MYARC_RAIL_INK, gfx::STROKE, 2
+#define MYARC_RAIL_THIN MYARC_RAIL_INK, gfx::STROKE, 1.8f
 
 inline constexpr gfx::PathElement kArchiveActivePath[] = {
     gfx::CANVAS_DIMENSIONS, 24, MYARC_RAIL_FILL,
@@ -153,18 +202,6 @@ inline constexpr gfx::VectorIcon kArchiveActiveIcon(kArchiveActiveRep,
                                                     std::size(kArchiveActiveRep),
                                                     "myarc_archive_active");
 
-inline constexpr gfx::PathElement kImageActivePath[] = {
-    gfx::CANVAS_DIMENSIONS, 24, MYARC_RAIL_FILL,
-    gfx::ROUND_RECT, 3, 3, 18, 18, 2, MYARC_RAIL_LINE,
-    gfx::ROUND_RECT, 3, 3, 18, 18, 2, MYARC_RAIL_LINE,
-    gfx::CIRCLE, 9, 9, 2, MYARC_RAIL_LINE, gfx::MOVE_TO, 21, 15,
-    gfx::R_LINE_TO, -3.086f, -3.086f, gfx::R_ARC_TO, 2, 2, 0, 0, 0, -2.828f, 0,
-    gfx::LINE_TO, 6, 21};
-inline constexpr gfx::VectorIconRep kImageActiveRep[] = {{kImageActivePath}};
-inline constexpr gfx::VectorIcon kImageActiveIcon(kImageActiveRep,
-                                                  std::size(kImageActiveRep),
-                                                  "myarc_image_active");
-
 inline constexpr gfx::PathElement kCircleArrowDownActivePath[] = {
     gfx::CANVAS_DIMENSIONS, 24, MYARC_RAIL_FILL, gfx::CIRCLE, 12, 12, 10,
     MYARC_RAIL_LINE, gfx::CIRCLE, 12, 12, 10,
@@ -177,36 +214,48 @@ inline constexpr gfx::VectorIcon kCircleArrowDownActiveIcon(
     std::size(kCircleArrowDownActiveRep),
     "myarc_circle_arrow_down_active");
 
-// The back card is filled whole; the front card's fill covers the overlap.
-inline constexpr gfx::PathElement kCopyActivePath[] = {
-    gfx::CANVAS_DIMENSIONS, 24, MYARC_RAIL_FILL,
-    gfx::ROUND_RECT, 2, 2, 14, 14, 2, gfx::NEW_PATH, MYARC_RAIL_FILL,
-    gfx::ROUND_RECT, 8, 8, 14, 14, 2, MYARC_RAIL_LINE,
-    gfx::ROUND_RECT, 8, 8, 14, 14, 2, MYARC_RAIL_LINE,
-    gfx::MOVE_TO, 4, 16, gfx::R_CUBIC_TO, -1.1f, 0, -2, -0.9f, -2, -2,
-    gfx::V_LINE_TO, 4, gfx::R_CUBIC_TO, 0, -1.1f, 0.9f, -2, 2, -2,
-    gfx::R_H_LINE_TO, 10, gfx::R_CUBIC_TO, 1.1f, 0, 2, 0.9f, 2, 2};
-inline constexpr gfx::VectorIconRep kCopyActiveRep[] = {{kCopyActivePath}};
-inline constexpr gfx::VectorIcon kCopyActiveIcon(kCopyActiveRep,
-                                                 std::size(kCopyActiveRep),
-                                                 "myarc_copy_active");
+// The front photo's fill covers the back card's hidden corner.
+inline constexpr gfx::PathElement kMediaActivePath[] = {
+    gfx::CANVAS_DIMENSIONS, 28, MYARC_RAIL_FILL, MYARC_MEDIA_BACK,
+    MYARC_RAIL_THIN, MYARC_MEDIA_BACK, gfx::NEW_PATH, MYARC_RAIL_FILL,
+    MYARC_MEDIA_FRONT, MYARC_RAIL_THIN, MYARC_MEDIA_FRONT, MYARC_RAIL_INK,
+    MYARC_MEDIA_PHOTO};
+inline constexpr gfx::VectorIconRep kMediaActiveRep[] = {{kMediaActivePath}};
+inline constexpr gfx::VectorIcon kMediaActiveIcon(kMediaActiveRep,
+                                                  std::size(kMediaActiveRep),
+                                                  "myarc_media_active");
 
-// Arc's Boosts glyph sits on a filled tile; here the wand's sparkles do.
-inline constexpr gfx::PathElement kWandActivePath[] = {
-    gfx::CANVAS_DIMENSIONS, 24, MYARC_RAIL_FILL,
-    gfx::ROUND_RECT, 7, 1, 16, 16, 4, MYARC_RAIL_LINE,
-    gfx::MOVE_TO, 15, 4, gfx::V_LINE_TO, 2, gfx::MOVE_TO, 15, 16,
-    gfx::R_V_LINE_TO, -2, gfx::MOVE_TO, 8, 9, gfx::R_H_LINE_TO, 2,
-    gfx::MOVE_TO, 20, 9, gfx::R_H_LINE_TO, 2, gfx::MOVE_TO, 17.8f, 11.8f,
-    gfx::LINE_TO, 19, 13, gfx::MOVE_TO, 15, 9, gfx::R_H_LINE_TO, 0.01f,
-    gfx::MOVE_TO, 17.8f, 6.2f, gfx::LINE_TO, 19, 5, gfx::MOVE_TO, 3, 21,
-    gfx::R_LINE_TO, 9, -9, gfx::MOVE_TO, 12.2f, 6.2f, gfx::LINE_TO, 11, 5};
-inline constexpr gfx::VectorIconRep kWandActiveRep[] = {{kWandActivePath}};
-inline constexpr gfx::VectorIcon kWandActiveIcon(kWandActiveRep,
-                                                 std::size(kWandActiveRep),
-                                                 "myarc_wand_active");
+inline constexpr gfx::PathElement kSpacesActivePath[] = {
+    gfx::CANVAS_DIMENSIONS, 28, MYARC_RAIL_FILL, MYARC_SPACES_BACK,
+    MYARC_RAIL_THIN, MYARC_SPACES_BACK, gfx::NEW_PATH, MYARC_RAIL_FILL,
+    MYARC_SPACES_FRONT, MYARC_RAIL_THIN, MYARC_SPACES_FRONT};
+inline constexpr gfx::VectorIconRep kSpacesActiveRep[] = {{kSpacesActivePath}};
+inline constexpr gfx::VectorIcon kSpacesActiveIcon(kSpacesActiveRep,
+                                                   std::size(kSpacesActiveRep),
+                                                   "myarc_spaces_active");
 
+inline constexpr gfx::PathElement kBoostsActivePath[] = {
+    gfx::CANVAS_DIMENSIONS, 28, MYARC_RAIL_FILL, MYARC_BOOSTS_TILE,
+    MYARC_RAIL_THIN, MYARC_BOOSTS_TILE, MYARC_BOOSTS_GAP, gfx::NEW_PATH,
+    MYARC_RAIL_FILL, MYARC_BOOSTS_BRUSH, MYARC_RAIL_THIN, MYARC_BOOSTS_BRUSH,
+    MYARC_RAIL_INK, MYARC_BOOSTS_SPARKLES};
+inline constexpr gfx::VectorIconRep kBoostsActiveRep[] = {{kBoostsActivePath}};
+inline constexpr gfx::VectorIcon kBoostsActiveIcon(kBoostsActiveRep,
+                                                   std::size(kBoostsActiveRep),
+                                                   "myarc_boosts_active");
+
+#undef MYARC_BOOSTS_SPARKLES
+#undef MYARC_BOOSTS_GAP
+#undef MYARC_BOOSTS_BRUSH
+#undef MYARC_BOOSTS_TILE
+#undef MYARC_SPACES_BACK
+#undef MYARC_SPACES_FRONT
+#undef MYARC_MEDIA_PHOTO
+#undef MYARC_MEDIA_FRONT
+#undef MYARC_MEDIA_BACK
+#undef MYARC_RAIL_THIN
 #undef MYARC_RAIL_LINE
+#undef MYARC_RAIL_INK
 #undef MYARC_RAIL_FILL
 
 }  // namespace myarc
