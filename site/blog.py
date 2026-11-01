@@ -20,6 +20,7 @@ MD = MarkdownIt('commonmark', {'html': False, 'maxNesting': 20})
 MAX_POSTS = 200
 MAX_IMAGE_BYTES = 10 * 1024 * 1024
 MAX_TOTAL_IMAGE_BYTES = 256 * 1024 * 1024
+SLUG = re.compile(r'[a-z0-9]+(?:-[a-z0-9]+)*')
 IMAGE_FORMATS = {'.png': 'PNG', '.jpg': 'JPEG', '.jpeg': 'JPEG', '.webp': 'WEBP'}
 
 BLOG_CSS = '''
@@ -109,6 +110,7 @@ class Post:
     cover_alt: str = ''
     source_bytes: int = 0
     thumbnail: bytes = b''
+    redirect_from: tuple = ()
 
     @property
     def url(self):
@@ -198,16 +200,21 @@ def load_post(path):
         meta = yaml.safe_load(front)
     except yaml.YAMLError:
         raise ValueError(f'Invalid YAML front matter: {path}') from None
-    if not isinstance(meta, dict) or set(meta) - {'title', 'summary', 'draft', 'thumbnail'}:
-        raise ValueError(f'Use only title, summary, draft and thumbnail metadata: {path}')
+    if not isinstance(meta, dict) or set(meta) - {'title', 'summary', 'date', 'draft', 'thumbnail', 'redirect_from'}:
+        raise ValueError(f'Use only title, summary, date, draft, thumbnail and redirect_from metadata: {path}')
     if type(meta.get('draft', True)) is not bool:
         raise ValueError(f'draft must be true or false: {path}')
     if meta.get('draft', True):
         return None
     slug = path.parent.name
-    if not re.fullmatch(r'\d{4}-\d{2}-\d{2}-[a-z0-9]+(?:-[a-z0-9]+)*', slug):
-        raise ValueError(f'Use YYYY-MM-DD-slug folder names: {path}')
-    published = date.fromisoformat(slug[:10])
+    if not SLUG.fullmatch(slug):
+        raise ValueError(f'Use lowercase hyphenated folder names: {path}')
+    published = meta.get('date')
+    if type(published) is not date:
+        raise ValueError(f'date must be YYYY-MM-DD: {path}')
+    redirect_from = meta.get('redirect_from', [])
+    if not isinstance(redirect_from, list) or not all(isinstance(old, str) and SLUG.fullmatch(old) and old != slug for old in redirect_from):
+        raise ValueError(f'redirect_from lists earlier folder names: {path}')
     for field, maximum in (('title', 160), ('summary', 360)):
         value = meta.get(field)
         if not isinstance(value, str) or not value.strip() or len(value) > maximum:
@@ -292,7 +299,17 @@ def load_post(path):
             figure.img['sizes'] = '(max-width: 48rem) calc((100vw - 4rem) / 2), 24rem'
             grid.append(figure.extract())
             figure = following
-    return Post(slug, published, meta['title'].strip(), meta['summary'].strip(), str(rendered), images, cover_alt, source_bytes, thumbnail)
+    return Post(slug, published, meta['title'].strip(), meta['summary'].strip(), str(rendered), images, cover_alt, source_bytes, thumbnail, tuple(redirect_from))
+
+
+def redirect_page(post):
+    """Small page left at a renamed post's earlier URL, since GitHub Pages has no redirects."""
+    canonical = escape(post.url, quote=True)
+    target = f'/blog/{post.slug}/'
+    return ('<!doctype html>\n<html lang="en">\n<head>\n<meta charset="utf-8">\n<title>' + escape(post.title) + '</title>\n'
+            f'<link rel="canonical" href="{canonical}">\n<meta name="robots" content="noindex">\n'
+            f'<meta http-equiv="refresh" content="0; url={target}">\n</head>\n'
+            f'<body><p>This post moved to <a href="{target}">{escape(post.title)}</a>.</p></body>\n</html>\n')
 
 
 def page_shell(template, title, summary, url, content, published=None, cover=None, posts=None):
@@ -360,7 +377,7 @@ def build_blog(root, template, embed, extra_urls=()):
             if total > MAX_TOTAL_IMAGE_BYTES:
                 raise ValueError('Published screenshots exceed the 256 MiB site budget')
             posts.append(post)
-    posts.sort(key=lambda post: post.slug, reverse=True)
+    posts.sort(key=lambda post: (post.published, post.slug), reverse=True)
     output = root / 'blog'
     if output.is_symlink():
         raise ValueError('Generated blog output cannot be a symlink')
@@ -425,6 +442,14 @@ def build_blog(root, template, embed, extra_urls=()):
             target = folder / name
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_bytes(data)
+    slugs = {post.slug for post in posts}
+    for post in posts:
+        for old in post.redirect_from:
+            if old in slugs or old.startswith('_'):
+                raise ValueError(f'redirect_from {old} collides with another page: {post.slug}')
+            slugs.add(old)
+            (output / old).mkdir()
+            (output / old / 'index.html').write_text(redirect_page(post))
     urls = ['https://myarc.dev/', 'https://myarc.dev/blog/', *extra_urls] + [post.url for post in posts]
     covers = {post.url: post.cover for post in posts}
     rows = []

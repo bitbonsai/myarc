@@ -1,7 +1,9 @@
 ---
 title: "Building myArc in public"
 summary: "Why I'm building myArc after Arc's sunset announcement, with account-free browsing, no behavioral tracking and an Artcraft-inspired workflow."
+date: 2026-10-25
 draft: false
+redirect_from: [2026-10-25-building-in-public]
 thumbnail: myarc-logo-thumbnail.png
 ---
 

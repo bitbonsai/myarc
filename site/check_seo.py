@@ -25,9 +25,15 @@ def local_file(url):
     return path
 
 
+def is_redirect(path):
+    return 'http-equiv="refresh"' in path.read_text()
+
+
 def check():
     titles = set()
-    pages = [ROOT / 'index.html', ROOT / 'blog/index.html', ROOT / 'download/index.html', *sorted((ROOT / 'blog').glob('*/index.html'))]
+    articles = sorted((ROOT / 'blog').glob('*/index.html'))
+    redirects = [path for path in articles if is_redirect(path)]
+    pages = [ROOT / 'index.html', ROOT / 'blog/index.html', ROOT / 'download/index.html', *(path for path in articles if path not in redirects)]
     for path in pages:
         soup = BeautifulSoup(path.read_text(), 'html.parser')
         expected = 'https://myarc.dev/' + path.relative_to(ROOT).as_posix().removesuffix('index.html')
@@ -105,7 +111,12 @@ def check():
         assert (ROOT / name).read_text().startswith('# myArc')
     for page in (ROOT / 'blog').glob('*/index.html'):
         assert not list(page.parent.rglob('*.png')), 'Original PNG screenshots leaked into output'
-    print(f'PASS: {len(pages)} canonical pages, metadata, schemas, WebP images and Markdown/discovery routes')
+    for path in redirects:
+        soup = BeautifulSoup(path.read_text(), 'html.parser')
+        canonical = soup.select_one('link[rel="canonical"]')['href']
+        assert canonical in listed and soup.select_one('meta[name="robots"]')['content'] == 'noindex', f'Redirect stub must point at a listed page: {path}'
+        assert soup.select_one('meta[http-equiv="refresh"]')['content'] == '0; url=' + urlsplit(canonical).path, f'Redirect target mismatch: {path}'
+    print(f'PASS: {len(pages)} canonical pages, {len(redirects)} redirects, metadata, schemas, WebP images and Markdown/discovery routes')
 
 
 if __name__ == '__main__':

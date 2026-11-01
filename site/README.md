@@ -28,7 +28,7 @@ The browser check needs agent-browser and Chrome. It closes agent-browser and Ch
 
 ## Progress posts and publishing
 
-[Authoring instructions](posts/README.md) cover metadata, approval and screenshots. Put each Markdown post and its local images in `site/posts/YYYY-MM-DD-slug/`. Drafts are excluded by default. `site/blog/` is ignored generated output; the sitemap contains only published routes. Source and generated screenshots are separate so deleting a source reference removes the public artifact on the next deployment.
+[Authoring instructions](posts/README.md) cover metadata, approval and screenshots. Put each Markdown post and its local images in `site/posts/slug/`, with its date in front matter. Drafts are excluded by default. `site/blog/` is ignored generated output; the sitemap contains only published routes. Source and generated screenshots are separate so deleting a source reference removes the public artifact on the next deployment.
 
 With the environment above activated, publish with `python3 site/publish.py`. The publisher rebuilds and checks the homepage, uses the existing `bitbonsai` GitHub CLI login, and updates the artifact-only branch without force. It preserves the domain/HTTPS configuration and unrelated root files, while replacing the generated blog subtree so unpublishing removes article pages and screenshots. Credentials are never written to the website or receipt. Run the unit/browser checks before publishing.
 

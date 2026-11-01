@@ -23,12 +23,12 @@ class DiscoveryTests(unittest.TestCase):
     def test_exports_only_published_content_and_tracks_unpublishing(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            folder = root / 'posts/2026-10-25-public-post'
+            folder = root / 'posts/public-post'
             folder.mkdir(parents=True)
             source = folder / 'index.md'
-            source.write_text('---\ntitle: Published finding\nsummary: Verified result\ndraft: false\n---\nReal **evidence**.\n\n![Target](screen.png)')
+            source.write_text('---\ntitle: Published finding\nsummary: Verified result\ndate: 2026-10-25\ndraft: false\n---\nReal **evidence**.\n\n![Target](screen.png)')
             Image.new('RGB', (40, 20), 'purple').save(folder / 'screen.png')
-            draft = root / 'posts/2026-10-24-draft'
+            draft = root / 'posts/draft'
             draft.mkdir()
             (draft / 'index.md').write_text('---\ntitle: Unapproved private note\ndraft: true\n---\nUnapproved private body')
             posts = build_blog(root, TEMPLATE, lambda html, prefix: html)

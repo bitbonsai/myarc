@@ -1,7 +1,9 @@
 ---
 title: "Chasing Arc's details in the 2026.11.01 nightly"
 summary: "Side-by-side recordings showed what myArc's sidebar was missing, a quit bug emptied every Space, and I'm writing an alpha checklist next."
+date: 2026-11-01
 draft: false
+redirect_from: [2026-11-01-nightly]
 ---
 
 [![myArc's sidebar with the creation menu open above the "+" button, listing New Space, a greyed-out New Split and a highlighted New Tab](creation-menu.png)](creation-menu.png)

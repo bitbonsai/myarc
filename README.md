@@ -54,6 +54,6 @@ More detail: [alpha checklist](docs/ALPHA.md), [architecture](docs/ARCHITECTURE.
 
 ## License
 
-myArc is licensed under [GPL-3.0](LICENSE). Releases and commits before 29 October 2026 remain available under MIT; the [blog post](https://myarc.dev/blog/2026-10-29-gpl/) explains the switch. Chromium and other bundled components keep their own licenses, listed in [ATTRIBUTION.md](ATTRIBUTION.md).
+myArc is licensed under [GPL-3.0](LICENSE). Releases and commits before 29 October 2026 remain available under MIT; the [blog post](https://myarc.dev/blog/gpl/) explains the switch. Chromium and other bundled components keep their own licenses, listed in [ATTRIBUTION.md](ATTRIBUTION.md).
 
 myArc is independent of The Browser Company and Atlassian.

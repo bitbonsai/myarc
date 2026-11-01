@@ -1,5 +1,6 @@
 """Real Markdown rendering, draft removal and screenshot boundary checks."""
 from pathlib import Path
+import shutil
 import tempfile
 import json
 import unittest
@@ -15,7 +16,7 @@ class BlogTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.root = Path(self.temp.name)
-        self.folder = self.root / 'posts' / '2026-10-25-test-post'
+        self.folder = self.root / 'posts' / 'test-post'
         self.folder.mkdir(parents=True)
         self.source = self.folder / 'index.md'
 
@@ -23,7 +24,7 @@ class BlogTests(unittest.TestCase):
         self.temp.cleanup()
 
     def post(self, body='A real **Markdown** paragraph.', draft='false', title='Test post'):
-        self.source.write_text(f'---\ntitle: "{title}"\nsummary: "A synthetic test post."\ndraft: {draft}\n---\n\n{body}\n')
+        self.source.write_text(f'---\ntitle: "{title}"\nsummary: "A synthetic test post."\ndate: 2026-10-25\ndraft: {draft}\n---\n\n{body}\n')
 
     def build(self):
         return build_blog(self.root, TEMPLATE, lambda value, prefix: value)
@@ -197,7 +198,7 @@ class BlogTests(unittest.TestCase):
 
     def test_author_row_metadata_and_shared_portrait(self):
         self.post(' '.join(['word'] * 201))
-        other = self.root / 'posts/2026-10-24-other'
+        other = self.root / 'posts/other'
         other.mkdir()
         (other / 'index.md').write_text(self.source.read_text())
         posts = self.build()
@@ -255,16 +256,16 @@ class BlogTests(unittest.TestCase):
 
     def test_posts_group_by_month_without_repeated_labels(self):
         self.post()
-        for slug in ('2026-10-24-earlier', '2026-09-30-older'):
+        for slug, published in (('earlier', '2026-10-24'), ('older', '2026-09-30')):
             folder = self.root / 'posts' / slug
             folder.mkdir()
-            (folder / 'index.md').write_text(self.source.read_text())
+            (folder / 'index.md').write_text(self.source.read_text().replace('2026-10-25', published))
         posts = self.build()
         index = (self.root / 'blog/index.html').read_text()
         self.assertEqual(2, index.count('class="post-month"'))
         self.assertEqual(1, index.count('>October 2026</p>'))
         self.assertEqual(1, index.count('>September 2026</p>'))
-        self.assertEqual(['2026-10-25-test-post', '2026-10-24-earlier', '2026-09-30-older'], [post.slug for post in posts])
+        self.assertEqual(['test-post', 'earlier', 'older'], [post.slug for post in posts])
 
     def test_caption_is_explicit_and_belongs_to_its_figure(self):
         from bs4 import BeautifulSoup
@@ -346,6 +347,34 @@ class BlogTests(unittest.TestCase):
         self.source.write_text('---\ntitle: One\ntitle: Two\ndraft: false\n---\nBody')
         with self.assertRaises(ValueError):
             load_post(self.source)
+        for published in ('', 'date: "2026-10-25"\n', 'date: 2026-10-25T10:00:00\n', 'date: soon\n'):
+            self.source.write_text(f'---\ntitle: T\nsummary: S\n{published}draft: false\n---\nBody')
+            with self.assertRaises(ValueError):
+                load_post(self.source)
+
+    def test_folder_names_carry_no_date_requirement(self):
+        self.post()
+        dated = self.root / 'posts' / 'Not_A-Slug'
+        dated.mkdir()
+        (dated / 'index.md').write_text(self.source.read_text())
+        with self.assertRaises(ValueError):
+            self.build()
+        shutil.rmtree(dated)
+        self.assertEqual('https://myarc.dev/blog/test-post/', self.build()[0].url)
+
+    def test_redirect_from_leaves_noindex_stub_outside_sitemap(self):
+        self.post()
+        self.source.write_text(self.source.read_text().replace('draft: false', 'draft: false\nredirect_from: [2026-10-25-test-post]'))
+        self.build()
+        stub = (self.root / 'blog/2026-10-25-test-post/index.html').read_text()
+        self.assertIn('<meta http-equiv="refresh" content="0; url=/blog/test-post/">', stub)
+        self.assertIn('<link rel="canonical" href="https://myarc.dev/blog/test-post/">', stub)
+        self.assertIn('<meta name="robots" content="noindex">', stub)
+        self.assertNotIn('2026-10-25-test-post', (self.root / 'sitemap.xml').read_text())
+        for value in ('test-post', '_assets', 'Bad Name', '7'):
+            self.source.write_text(self.source.read_text().split('redirect_from')[0] + f'redirect_from: [{value}]\n---\nBody\n')
+            with self.assertRaises(ValueError):
+                self.build()
 
 
 class PublisherTests(unittest.TestCase):

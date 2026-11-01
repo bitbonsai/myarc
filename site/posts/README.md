@@ -3,7 +3,7 @@
 Each post has its own folder:
 
 ```text
-site/posts/2026-10-25-post-slug/
+site/posts/post-slug/
   index.md
   screenshot.png
 ```
@@ -14,6 +14,7 @@ Start `index.md` with YAML front matter:
 ---
 title: "Post title"
 summary: "A short description for the index and social previews."
+date: 2026-10-25
 draft: true
 ---
 
@@ -28,7 +29,9 @@ Write the post in Markdown.
 [screen]: screenshot.png
 ```
 
-The folder supplies the date and URL: `/blog/2026-10-25-post-slug/`. Use lowercase hyphenated slugs. The title comes from metadata, so body sections start at `##`.
+The folder name is the URL, `/blog/post-slug/`, so use a lowercase hyphenated slug without a date. Write `date` unquoted as YYYY-MM-DD; it orders the blog index and sets the published date. The title comes from metadata, so body sections start at `##`.
+
+Renaming a published post's folder breaks its old URL. Add the old folder name to `redirect_from: [old-slug]` and the build leaves a noindex page there that forwards to the new URL and stays out of the sitemap.
 
 ## Approval and privacy
 

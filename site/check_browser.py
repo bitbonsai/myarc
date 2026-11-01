@@ -4,6 +4,7 @@ from functools import partial
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from threading import Thread
 import json
+import re
 import subprocess
 
 ROOT = Path(__file__).resolve().parent
@@ -149,7 +150,8 @@ try:
       }
       return 'PASS'
     })()"""))
-    for page in [(ROOT / 'blog/index.html'), *sorted((ROOT / 'blog').glob('*/index.html'))]:
+    articles = [path for path in sorted((ROOT / 'blog').glob('*/index.html')) if 'http-equiv="refresh"' not in path.read_text()]
+    for page in [(ROOT / 'blog/index.html'), *articles]:
         browser('open', page.as_uri())
         for theme in ('light', 'dark'):
             browser('set', 'media', theme)
@@ -384,11 +386,12 @@ try:
             browser('set', 'offline', 'off')
             browser('record', 'start', '/tmp/myarc-view-transitions.webm')
             routes = [('.top .blog-link', '/blog/')]
-            posts = sorted((ROOT / 'blog').glob('*/index.html'))
-            if posts:
-                routes += [('.post-preview h2 a', '/blog/' + posts[-1].parent.name + '/'), ('.post-back', '/blog/')]
-                if 'id="image-lightbox"' in posts[-1].read_text():
-                    routes += [('.post-thumb', '/blog/' + posts[-1].parent.name + '/'), ('.post-back', '/blog/')]
+            latest = re.search(r'<h2><a href="([a-z0-9-]+)/">', (ROOT / 'blog/index.html').read_text())
+            if latest:
+                latest = latest.group(1)
+                routes += [('.post-preview h2 a', '/blog/' + latest + '/'), ('.post-back', '/blog/')]
+                if 'id="image-lightbox"' in (ROOT / 'blog' / latest / 'index.html').read_text():
+                    routes += [('.post-thumb', '/blog/' + latest + '/'), ('.post-back', '/blog/')]
             routes += [('.top .mark', '/')]
             for width, theme, reduced in ((1440, 'light', False), (390, 'dark', False), (390, 'dark', True)):
                 browser('set', 'viewport', str(width), '1000')
