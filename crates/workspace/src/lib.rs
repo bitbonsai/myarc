@@ -183,7 +183,8 @@ pub struct WindowState {
     pub id: WindowId,
     pub space_id: SpaceId,
     /// Last explicitly selected visible item, including a dormant saved item.
-    /// Switching Space clears it if hidden. No per-Space selection history yet.
+    /// Switching Space clears it if hidden, then restores the target Space's
+    /// last selection in this window from in-memory history, if still visible.
     pub selected_item_id: Option<ItemId>,
 }
 
@@ -241,10 +242,22 @@ pub struct SidebarSnapshot {
     pub temporary: Vec<Item>,
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug)]
 pub struct Workspace {
     state: WorkspaceSnapshot,
+    /// Last selected item per (window, Space), recorded when a window leaves a
+    /// Space. In memory only: not part of the snapshot, so it is not persisted
+    /// and does not take part in equality.
+    space_selections: Vec<(WindowId, SpaceId, ItemId)>,
 }
+
+impl PartialEq for Workspace {
+    fn eq(&self, other: &Self) -> bool {
+        self.state == other.state
+    }
+}
+
+impl Eq for Workspace {}
 
 impl Default for Workspace {
     fn default() -> Self {
@@ -270,6 +283,7 @@ impl Default for Workspace {
                 next_item_id: 1,
                 next_window_id: 2,
             },
+            space_selections: Vec::new(),
         }
     }
 }
@@ -374,6 +388,8 @@ impl Workspace {
         }
         self.state.items.retain(|item| !owned(item.placement));
         self.state.spaces.retain(|space| space.id != space_id);
+        self.space_selections
+            .retain(|&(_, space, _)| space != space_id);
         self.clear_hidden_selections();
         Ok(SpaceDeletion {
             fallback_space,
@@ -399,6 +415,8 @@ impl Workspace {
     pub fn close_window(&mut self, window_id: WindowId) -> Result<(), WorkspaceError> {
         self.window(window_id)?;
         self.state.windows.retain(|window| window.id != window_id);
+        self.space_selections
+            .retain(|&(window, _, _)| window != window_id);
         Ok(())
     }
 
@@ -408,13 +426,38 @@ impl Workspace {
         space_id: SpaceId,
     ) -> Result<(), WorkspaceError> {
         self.space(space_id)?;
-        self.window(window_id)?;
+        let window = self.window(window_id)?;
+        let (left, selected) = (window.space_id, window.selected_item_id);
+        if let Some(item) = selected {
+            self.space_selections
+                .retain(|&(window, space, _)| (window, space) != (window_id, left));
+            self.space_selections.push((window_id, left, item));
+        }
         for window in &mut self.state.windows {
             if window.id == window_id {
                 window.space_id = space_id;
             }
         }
         self.clear_hidden_selections();
+        // Arc returns each Space to its last tab in this window.
+        let remembered = self
+            .space_selections
+            .iter()
+            .find(|&&(window, space, _)| (window, space) == (window_id, space_id))
+            .map(|&(_, _, item)| item)
+            .filter(|&id| {
+                self.state
+                    .items
+                    .iter()
+                    .any(|item| item.id == id && visible(item.placement, space_id))
+            });
+        if let Some(item) = remembered {
+            for window in &mut self.state.windows {
+                if window.id == window_id {
+                    window.selected_item_id = Some(item);
+                }
+            }
+        }
         Ok(())
     }
 
@@ -726,7 +769,10 @@ impl Workspace {
     }
 
     pub fn from_snapshot(snapshot: WorkspaceSnapshot) -> Result<Self, WorkspaceError> {
-        let mut workspace = Self { state: snapshot };
+        let mut workspace = Self {
+            state: snapshot,
+            space_selections: Vec::new(),
+        };
         workspace.sanitize_archive();
         workspace.validate()?;
         Ok(workspace)

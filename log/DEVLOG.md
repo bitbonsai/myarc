@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-11-01: Spaces keep their last tab, and a new Space opens
+
+- Cause: `select_space` cleared a window's selection when it hid behind a Space switch and kept nothing to restore, so `ShowSelected` fell back to the first tab on return. `Workspace` now remembers each window's last selected item per Space in memory (not in the snapshot, so not across relaunch) and restores it on return if it's still visible there. Separately, the Create Space dialog only created the Space; on Create it now also selects it.
+- Verification: `cargo test` (`selections_are_per_window_and_hidden_selection_clears` now covers return and a closed remembered tab), clippy, `chrome` and `bridge_check` build, `bridge_check`, `export_patches.py --check` and `check_docs.py` pass. Live `/tmp` profile driven by CGEvent: "+" > New Space > "Work" opens Work; Everyday with Alpha, Bravo, Error, click Bravo, Ctrl+2, Ctrl+1 lands on Bravo. Evidence in `research-private/captures/fixes-2026-11-01/spaces/`.
+- Not verified: per-Space memory across relaunch (in memory only), and the Library's "+" (same dialog). Chromium `myarc` commit `91f9296595`.
+
 ## 2026-11-01: Tabs survive Cmd+Q
 
 - Cause: the workspace file kept its tab items through quit, but Chromium's default startup pref is New Tab, so relaunch restored no native tabs and `ReconcileBindings` retired every Temporary item without a live page. With `--myarc-workspace-sidebar`, `SessionStartupPref::GetDefaultStartupType` now returns `LAST`; an explicit user choice still wins.

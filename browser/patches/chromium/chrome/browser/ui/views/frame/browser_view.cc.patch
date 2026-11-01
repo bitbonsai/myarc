@@ -1,5 +1,5 @@
 diff --git a/chrome/browser/ui/views/frame/browser_view.cc b/chrome/browser/ui/views/frame/browser_view.cc
-index 7b568f6de760af21d6e9d2aa44415a7cef617c51..d699bbadea0d12cc8bf753b12ece6f015fa71b9f 100644
+index 7b568f6de760af21d6e9d2aa44415a7cef617c51..e7197948a5f5924a0bbb89427b5e179838e73af4 100644
 --- a/chrome/browser/ui/views/frame/browser_view.cc
 +++ b/chrome/browser/ui/views/frame/browser_view.cc
 @@ -22,6 +22,7 @@
@@ -1532,7 +1532,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..d699bbadea0d12cc8bf753b12ece6f01
  }
  
  void BrowserView::RemovedFromWidget() {
-@@ -5267,6 +6499,930 @@ const views::View* BrowserView::GetViewByElementId(
+@@ -5267,6 +6499,936 @@ const views::View* BrowserView::GetViewByElementId(
  ///////////////////////////////////////////////////////////////////////////////
  // BrowserView, ui::AcceleratorTarget overrides:
  
@@ -2278,7 +2278,13 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..d699bbadea0d12cc8bf753b12ece6f01
 +    myarc_space_error_->GetViewAccessibility().AnnounceText(
 +        myarc_space_error_->GetText());
 +  }
++  const uint64_t created = !space && ok ? result.id : 0;
 +  MyarcWorkspaceResult(std::move(result));
++  // Arc shows a new Space right away. The dialog closes either way, since
++  // the Space exists; a failed switch reports through the sidebar.
++  if (created) {
++    MyarcWorkspaceResult(myarc_workspace_adapter_->SelectSpace(created));
++  }
 +  return ok;
 +}
 +
@@ -2463,7 +2469,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..d699bbadea0d12cc8bf753b12ece6f01
  bool BrowserView::AcceleratorPressed(const ui::Accelerator& accelerator) {
  #if BUILDFLAG(IS_MAC)
    // Forward accelerators to ExclusiveAccessManager to handle Esc press-and-hold
-@@ -5342,7 +7498,8 @@ void BrowserView::LoadingAnimationCallback(base::TimeTicks timestamp) {
+@@ -5342,7 +7504,8 @@ void BrowserView::LoadingAnimationCallback(base::TimeTicks timestamp) {
      // GetActiveWebContents can return null for example under Purify when
      // the animations are running slowly and this function is called on a timer
      // through LoadingAnimationCallback.
@@ -2473,7 +2479,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..d699bbadea0d12cc8bf753b12ece6f01
    }
  }
  
-@@ -5471,6 +7628,10 @@ bool BrowserView::MaybeUpdateDevtools(content::WebContents* contents) {
+@@ -5471,6 +7634,10 @@ bool BrowserView::MaybeUpdateDevtools(content::WebContents* contents) {
  
  void BrowserView::UpdateUIForContents(WebContents* contents,
                                        bool should_layout_immediately) {
@@ -2484,7 +2490,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..d699bbadea0d12cc8bf753b12ece6f01
    TRACE_EVENT0("ui", "BrowserView::UpdateUIForContents");
    bool needs_layout = MaybeShowBookmarkBar(contents);
  
-@@ -5706,6 +7867,26 @@ void BrowserView::LoadAccelerators() {
+@@ -5706,6 +7873,26 @@ void BrowserView::LoadAccelerators() {
    }
  
  #if BUILDFLAG(IS_MAC)

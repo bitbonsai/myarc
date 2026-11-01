@@ -127,6 +127,16 @@ fn selections_are_per_window_and_hidden_selection_clears() {
         workspace.sidebar_snapshot(w2).unwrap().selected_item_id,
         Some(other)
     );
+    // Returning to a Space restores its last selection in that window only.
+    workspace.select_space(W1, S1).unwrap();
+    assert_eq!(
+        workspace.sidebar_snapshot(W1).unwrap().selected_item_id,
+        Some(item)
+    );
+    let second = workspace.add_temporary_item(S1).unwrap();
+    workspace.select_item(W1, second).unwrap();
+    workspace.select_space(W1, s2).unwrap();
+    workspace.live_tab_closed(second).unwrap();
     workspace.select_space(W1, S1).unwrap();
     assert_eq!(
         workspace.sidebar_snapshot(W1).unwrap().selected_item_id,
