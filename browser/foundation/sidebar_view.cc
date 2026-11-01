@@ -1041,8 +1041,11 @@ void SidebarView::Layout(PassKey) {
                         library_width, height());
   }
   if (downloads_stack_ && footer_) {
-    // Bottom on the footer's top, across the sidebar's inner width.
-    const int height = downloads_stack_->GetPreferredSize().height();
+    // Bottom on the footer's top, across the sidebar's inner width. A short
+    // window clips the oldest rows rather than placing the stack above it.
+    const int height =
+        std::clamp(downloads_stack_->GetPreferredSize().height(), 0,
+                   std::max(footer_->y(), 0));
     downloads_stack_->SetBounds(kSidebarInsets.left(), footer_->y() - height,
                                 width() - kSidebarInsets.width(), height);
   }

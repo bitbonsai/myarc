@@ -112,6 +112,10 @@ class SidebarView final : public views::View,
     // Starts a native file drag of a complete download, from a mouse drag.
     // Can delete the caller before it returns.
     virtual void DragDownload(uint32_t download_id) = 0;
+    // The downloads stack started or stopped showing. While it shows, the
+    // parent checks for files removed outside the browser and calls
+    // RefreshDownloadsStack when downloads change.
+    virtual void SetDownloadsStackShown(bool shown) = 0;
     // Newest first. Lookup only.
     virtual std::vector<ArchivedTabPresentation> GetArchivedTabs() const = 0;
     // Reopens the tab in its Space and drops it from the archive. The parent

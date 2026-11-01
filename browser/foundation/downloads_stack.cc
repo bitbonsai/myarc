@@ -3,7 +3,9 @@
 #include <algorithm>
 #include <memory>
 #include <utility>
+#include <vector>
 
+#include "base/check_op.h"
 #include "base/functional/bind.h"
 #include "base/location.h"
 #include "base/time/time.h"
@@ -15,6 +17,7 @@
 #include "ui/color/color_id.h"
 #include "ui/color/color_provider.h"
 #include "ui/compositor/layer.h"
+#include "ui/display/screen.h"
 #include "ui/events/event.h"
 #include "ui/gfx/animation/animation.h"
 #include "ui/gfx/animation/tween.h"
@@ -53,6 +56,7 @@ constexpr base::TimeDelta kShowDelay = base::Milliseconds(100);
 constexpr base::TimeDelta kHideDelay = base::Milliseconds(350);
 constexpr base::TimeDelta kShowDuration = base::Milliseconds(150);
 constexpr base::TimeDelta kHideDuration = base::Milliseconds(120);
+constexpr base::TimeDelta kHoverPoll = base::Milliseconds(100);
 // Each row up starts fading this much later, as a fraction of the show.
 constexpr float kRowStagger = 0.07f;
 
@@ -74,13 +78,23 @@ class DownloadsStack::Row : public views::Button {
                                           download.id)),
         stack_(stack),
         download_(download),
-        age_(library::AgeLabel(download.time, base::Time::Now())),
         name_font_(FontOfSize(kNameSize, gfx::Font::Weight::MEDIUM)),
         age_font_(FontOfSize(kAgeSize, gfx::Font::Weight::NORMAL)) {
     views::InkDrop::Get(this)->SetMode(views::InkDropHost::InkDropMode::OFF);
     // Shown only on hover; keyboard users have the Library's Downloads.
     SetFocusBehavior(FocusBehavior::NEVER);
+    Update(download);
+  }
+
+  uint32_t id() const { return download_.id; }
+
+  // Takes a newer presentation of the same download.
+  void Update(const SidebarView::DownloadPresentation& download) {
+    DCHECK_EQ(download.id, download_.id);
+    download_ = download;
+    age_ = library::AgeLabel(download_.time, base::Time::Now());
     GetViewAccessibility().SetName(download_.name + u", " + age_);
+    SchedulePaint();
   }
 
   void SetAlpha(float alpha) {
@@ -106,6 +120,13 @@ class DownloadsStack::Row : public views::Button {
       return true;
     }
     return views::Button::OnMouseDragged(event);
+  }
+
+  void OnMouseCaptureLost() override {
+    // A file drag takes the capture, and the pointer may leave without an
+    // exit event.
+    stack_->RecheckHover();
+    views::Button::OnMouseCaptureLost();
   }
 
   void PaintButtonContents(gfx::Canvas* canvas) override {
@@ -160,8 +181,8 @@ class DownloadsStack::Row : public views::Button {
 
  private:
   const raw_ref<DownloadsStack> stack_;
-  const SidebarView::DownloadPresentation download_;
-  const std::u16string age_;
+  SidebarView::DownloadPresentation download_;
+  std::u16string age_;
   const gfx::FontList name_font_;
   const gfx::FontList age_font_;
   SkAlpha alpha_ = 0;
@@ -195,12 +216,14 @@ void DownloadsStack::SetAnchorHovered(bool hovered) {
 void DownloadsStack::HideNow() {
   show_delay_.Stop();
   hide_delay_.Stop();
+  hover_poll_.Stop();
   hold_ = false;
   shown_ = false;
   hovered_ = false;
   animation_.Reset(0);
   SetVisible(false);
   RemoveAllChildViews();
+  SetWatching(false);
 }
 
 void DownloadsStack::ShowNow() {
@@ -212,13 +235,29 @@ void DownloadsStack::ShowNow() {
   shown_ = true;
   animation_.Reset(1);
   SetVisible(true);
+  SetWatching(true);
   LayoutRows();
 }
 
 void DownloadsStack::Refresh() {
-  if (shown_) {
-    LoadRows();
+  if (!shown_) {
+    return;
+  }
+  const auto rows = library::StackRows(delegate_->GetRecentDownloads());
+  if (rows.empty()) {
+    HideNow();
+    return;
+  }
+  const bool same_downloads = std::ranges::equal(
+      rows, children(), {}, &SidebarView::DownloadPresentation::id,
+      [](const views::View* row) { return static_cast<const Row*>(row)->id(); });
+  if (!same_downloads) {
+    SetRows(rows);
     LayoutRows();
+    return;
+  }
+  for (size_t i = 0; i < rows.size(); ++i) {
+    static_cast<Row*>(children()[i])->Update(rows[i]);
   }
 }
 
@@ -243,6 +282,20 @@ void DownloadsStack::UpdateHover() {
   }
 }
 
+void DownloadsStack::RecheckHover() {
+  hovered_ = GetVisible() &&
+             GetBoundsInScreen().Contains(
+                 display::Screen::Get()->GetCursorScreenPoint());
+  if (!hovered_) {
+    hover_poll_.Stop();
+  } else if (!hover_poll_.IsRunning()) {
+    hover_poll_.Start(FROM_HERE, kHoverPoll,
+                      base::BindRepeating(&DownloadsStack::RecheckHover,
+                                          base::Unretained(this)));
+  }
+  UpdateHover();
+}
+
 void DownloadsStack::Show() {
   // Already up while fading out: keep the rows and reverse.
   if (!GetVisible() && !LoadRows()) {
@@ -250,6 +303,7 @@ void DownloadsStack::Show() {
   }
   shown_ = true;
   SetVisible(true);
+  SetWatching(true);
   if (gfx::Animation::PrefersReducedMotion()) {
     animation_.Reset(1);
   } else {
@@ -270,13 +324,24 @@ void DownloadsStack::Hide() {
 }
 
 bool DownloadsStack::LoadRows() {
+  SetRows(library::StackRows(delegate_->GetRecentDownloads()));
+  return !children().empty();
+}
+
+void DownloadsStack::SetRows(
+    const std::vector<SidebarView::DownloadPresentation>& rows) {
   RemoveAllChildViews();
-  for (const auto& download :
-       library::StackRows(delegate_->GetRecentDownloads())) {
+  for (const auto& download : rows) {
     AddChildView(std::make_unique<Row>(*this, download));
   }
   PreferredSizeChanged();
-  return !children().empty();
+}
+
+void DownloadsStack::SetWatching(bool watching) {
+  if (watching_ != watching) {
+    watching_ = watching;
+    delegate_->SetDownloadsStackShown(watching);
+  }
 }
 
 void DownloadsStack::OpenRow(uint32_t id) {
@@ -284,7 +349,11 @@ void DownloadsStack::OpenRow(uint32_t id) {
 }
 
 void DownloadsStack::DragRow(uint32_t id) {
+  const base::WeakPtr<DownloadsStack> weak = weak_factory_.GetWeakPtr();
   delegate_->DragDownload(id);
+  if (weak) {
+    RecheckHover();
+  }
 }
 
 void DownloadsStack::LayoutRows() {
@@ -320,6 +389,7 @@ void DownloadsStack::OnMouseEntered(const ui::MouseEvent& event) {
 }
 
 void DownloadsStack::OnMouseExited(const ui::MouseEvent& event) {
+  hover_poll_.Stop();
   hovered_ = false;
   UpdateHover();
 }
@@ -331,9 +401,11 @@ void DownloadsStack::AnimationProgressed(const gfx::Animation* animation) {
 void DownloadsStack::AnimationEnded(const gfx::Animation* animation) {
   LayoutRows();
   if (!shown_) {
+    hover_poll_.Stop();
     SetVisible(false);
     RemoveAllChildViews();
     PreferredSizeChanged();
+    SetWatching(false);
   }
 }
 

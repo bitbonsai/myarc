@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-11-01: Downloads stack review fixes
+
+- File icons load only for the stack's 4 rows, once per path, so a failed load no longer loops. `Refresh` keeps the row views when the downloads are unchanged, so a press or drag survives an icon load, and hides when no rows are left. While the stack shows, the browser checks for files removed outside it and refreshes on download changes. History-restored downloads without an end time show their start time. After a file drag, hover is re-read from the pointer and polled until it leaves, since the Mac drag sends no exit. The beside tooltip is clamped to the screen and flips left when there's no room, and the stack's height is clamped to the space above the footer.
+- Verification: `chrome` and `bridge_check` build; `bridge_check`, `export_patches.py --check` and `check_docs.py` pass. `gn check` shows only the 4 include errors that predate this change. Background capture `research-private/captures/downloads-stack/native-stack.png` shows 4 rows with file icons and the tooltip. Drag, hover polling, the removed-file refresh and tooltip flipping were checked by reading the code, not run.
+- Chromium `myarc` commit `2ad99fa5c8`.
+
 ## 2026-11-01: Library enter and exit motion
 
 - The sidebar region now eases between the rows' width and the Library's (417 DIP, or the Spaces width) on Arc's measured curve, `1 - exp(-t/tau)`. Opening takes 230 ms with tau 40 ms, so the edge covers about 55% in the first frame. Closing takes 270 ms with tau 60 ms. On open the rows vanish at once and the Library, laid out at its final width, slides in behind the edge. On close it leads the narrowing edge at 2.2x and the rebuilt rows replace it at 55 ms, fading in over 65 ms on a temporary layer. Reduced motion snaps both ways. The width animation lives in the `vertical_tab_strip_region_view` patch; the slide and fade live in `SidebarView`.

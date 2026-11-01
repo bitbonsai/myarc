@@ -1,7 +1,10 @@
 #ifndef MYARC_DOWNLOADS_STACK_H_
 #define MYARC_DOWNLOADS_STACK_H_
 
+#include <vector>
+
 #include "base/memory/raw_ref.h"
+#include "base/memory/weak_ptr.h"
 #include "base/timer/timer.h"
 #include "myarc/sidebar_view.h"
 #include "ui/base/metadata/metadata_header_macros.h"
@@ -31,17 +34,26 @@ class DownloadsStack : public views::View,
   void HideNow();
   // Shows at once and stays up, for captures.
   void ShowNow();
-  // Reloads the rows while shown, for example once an icon loads.
+  // Reloads the rows while shown. Keeps the row views, and so a press or
+  // drag in progress, when the downloads are the same, for example once an
+  // icon loads. Hides when none are left.
   void Refresh();
 
  private:
   class Row;
 
   void UpdateHover();
+  // Sets hovered_ from the pointer's position, which a native file drag
+  // leaves without an exit event. Polls while the pointer stays over the
+  // stack, because the Mac drag runs after DragRow returns.
+  void RecheckHover();
   void Show();
   void Hide();
   // Fills the rows from the delegate. Returns false when there are none.
   bool LoadRows();
+  void SetRows(const std::vector<SidebarView::DownloadPresentation>& rows);
+  // Tells the delegate when the rows start or stop showing.
+  void SetWatching(bool watching);
   void OpenRow(uint32_t id);
   void DragRow(uint32_t id);
   void LayoutRows();
@@ -62,10 +74,13 @@ class DownloadsStack : public views::View,
   bool hold_ = false;
   // Showing or shown, as opposed to hiding or hidden.
   bool shown_ = false;
+  bool watching_ = false;
   base::OneShotTimer show_delay_;
   base::OneShotTimer hide_delay_;
+  base::RepeatingTimer hover_poll_;
   // 0 hidden, 1 shown; linear, eased per row in LayoutRows.
   gfx::SlideAnimation animation_{this};
+  base::WeakPtrFactory<DownloadsStack> weak_factory_{this};
 };
 
 }  // namespace myarc

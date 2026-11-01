@@ -12,13 +12,15 @@
 #   TOOLTIP=library (or space/create) shows that sidebar footer tooltip via
 #   --myarc-capture-footer-tooltip and keeps it up.
 #   STACK=1 shows the downloads stack above the Library button via
-#   --myarc-capture-downloads-stack and keeps it up. Downloads land in the
-#   profile, so file:// URLs of files Chromium can't show seed the stack.
+#   --myarc-capture-downloads-stack and keeps it up. file:// URLs of files
+#   Chromium can't show download and seed the stack.
 #   WORKSPACE=<file> seeds the profile's myarc-workspace-v1.json, for example
 #   with Archived Tabs.
 #   SETTINGS=1 (or general/profiles/advanced/more) opens the native Settings window via
 #   --myarc-capture-open-settings and captures only that window; "more" presses
 #   More Settings… and captures the browser window instead.
+#   Every capture downloads into the disposable profile's Downloads folder
+#   without asking.
 #   The browser launches in the background (open -g) and is captured with
 #   ScreenCaptureKit (tools/bgcapture.swift), so it never takes focus.
 set -euo pipefail

@@ -128,6 +128,7 @@ source_set("sidebar_view") {
     "sidebar_view.h",
   ]
   public_deps = [
+    ":library_logic",
     "//base",
     "//ui/base",
     "//ui/menus",
@@ -135,13 +136,13 @@ source_set("sidebar_view") {
   ]
   deps = [
     ":bridge",
-    ":library_logic",
     "//base:i18n",
     "//cc/paint",
     "//components/vector_icons",
     "//skia",
     "//ui/color",
     "//ui/compositor",
+    "//ui/display",
     "//ui/events",
     "//ui/gfx",
     "//ui/gfx/animation",

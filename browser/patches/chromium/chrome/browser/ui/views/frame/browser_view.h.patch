@@ -1,8 +1,8 @@
 diff --git a/chrome/browser/ui/views/frame/browser_view.h b/chrome/browser/ui/views/frame/browser_view.h
-index 750e46c97b64dccccf4268e912df5dbdb6516b3c..39e599d68e5aabffbe0a37fa224b5f064b4a3e0e 100644
+index 750e46c97b64dccccf4268e912df5dbdb6516b3c..36443df29ad60d0650ab350c5e673b7c7088a489 100644
 --- a/chrome/browser/ui/views/frame/browser_view.h
 +++ b/chrome/browser/ui/views/frame/browser_view.h
-@@ -8,6 +8,7 @@
+@@ -8,11 +8,13 @@
  #include <map>
  #include <memory>
  #include <optional>
@@ -10,7 +10,13 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..39e599d68e5aabffbe0a37fa224b5f06
  #include <string>
  #include <vector>
  
-@@ -52,6 +53,7 @@
+ #include "base/callback_list.h"
+ #include "base/containers/enum_set.h"
++#include "base/files/file_path.h"
+ #include "base/gtest_prod_util.h"
+ #include "base/memory/raw_ptr.h"
+ #include "base/scoped_observation.h"
+@@ -52,6 +54,7 @@
  #include "content/public/browser/permission_result.h"
  #include "content/public/browser/web_contents.h"
  #include "content/public/browser/web_contents_observer.h"
@@ -18,7 +24,7 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..39e599d68e5aabffbe0a37fa224b5f06
  #include "third_party/blink/public/common/permissions/permission_utils.h"
  #include "ui/base/accelerators/accelerator.h"
  #include "ui/base/identifier/typed_identifier.h"
-@@ -104,6 +106,15 @@ class TopControlsSlideControllerTest;
+@@ -104,6 +107,15 @@ class TopControlsSlideControllerTest;
  class VerticalTabStripRegionView;
  class WebAppFrameToolbarView;
  
@@ -34,7 +40,7 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..39e599d68e5aabffbe0a37fa224b5f06
  namespace gfx {
  class AnimationRunner;
  }  // namespace gfx
-@@ -121,7 +132,11 @@ enum class Channel;
+@@ -121,7 +133,11 @@ enum class Channel;
  }
  
  namespace views {
@@ -46,7 +52,7 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..39e599d68e5aabffbe0a37fa224b5f06
  class NativeViewHost;
  class WebView;
  }  // namespace views
-@@ -143,7 +158,8 @@ class BrowserView : public BrowserWindow,
+@@ -143,7 +159,8 @@ class BrowserView : public BrowserWindow,
                      public ImmersiveModeController::Observer,
                      public GlobalErrorObserver,
                      public views::FocusChangeListener,
@@ -56,7 +62,7 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..39e599d68e5aabffbe0a37fa224b5f06
    METADATA_HEADER(BrowserView, views::ClientView)
  
   public:
-@@ -234,6 +250,8 @@ class BrowserView : public BrowserWindow,
+@@ -234,6 +251,8 @@ class BrowserView : public BrowserWindow,
    // Container for the tabstrip, toolbar, etc.
    TopContainerView* top_container() { return top_container_; }
  
@@ -65,7 +71,7 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..39e599d68e5aabffbe0a37fa224b5f06
    std::optional<int> theme_background_y_offset() const {
      return theme_background_y_offset_;
    }
-@@ -311,6 +329,28 @@ class BrowserView : public BrowserWindow,
+@@ -311,6 +330,28 @@ class BrowserView : public BrowserWindow,
  
    ScrimView* window_scrim_view() { return window_scrim_view_; }
  
@@ -94,7 +100,7 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..39e599d68e5aabffbe0a37fa224b5f06
    base::WeakPtr<BrowserView> GetAsWeakPtr() {
      return weak_ptr_factory_.GetWeakPtr();
    }
-@@ -1253,12 +1293,84 @@ class BrowserView : public BrowserWindow,
+@@ -1253,12 +1294,89 @@ class BrowserView : public BrowserWindow,
  
    // Anchor point for help bubbles and other dialogs that want to reliably
    // anchor outside the content area of the window.
@@ -116,6 +122,7 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..39e599d68e5aabffbe0a37fa224b5f06
 +      const override;
 +  void OpenDownload(uint32_t download_id) override;
 +  void DragDownload(uint32_t download_id) override;
++  void SetDownloadsStackShown(bool shown) override;
 +  // The scale file icons are cached at for this window.
 +  float MyarcIconScale() const;
 +  std::vector<myarc::SidebarView::ArchivedTabPresentation> GetArchivedTabs()
@@ -165,9 +172,13 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..39e599d68e5aabffbe0a37fa224b5f06
 +  bool myarc_capture_stack_scheduled_ = false;
 +  // File icon loads for the downloads stack, started from a const lookup.
 +  mutable base::CancelableTaskTracker myarc_download_icon_tracker_;
++  // File icons already requested, so a failed load isn't retried.
++  mutable std::set<base::FilePath> myarc_requested_download_icons_;
 +  // Refreshes the Library's Downloads list while the Library is open.
 +  class MyarcDownloadWatcher;
 +  std::unique_ptr<MyarcDownloadWatcher> myarc_download_watcher_;
++  // Refreshes the downloads stack while it shows.
++  std::unique_ptr<MyarcDownloadWatcher> myarc_stack_download_watcher_;
 +
    std::unique_ptr<views::ViewSubregionAnchor> dialog_anchor_;
  
@@ -179,7 +190,7 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..39e599d68e5aabffbe0a37fa224b5f06
  
    // A mapping between accelerators and command IDs.
    std::map<ui::Accelerator, int> accelerator_table_;
-@@ -1411,6 +1523,7 @@ class BrowserView : public BrowserWindow,
+@@ -1411,6 +1529,7 @@ class BrowserView : public BrowserWindow,
    base::EnumSet<TabStripAndWebAppViewsReparentedState>
        tab_strip_web_apps_reparented_state_;
  

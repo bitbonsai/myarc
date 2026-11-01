@@ -23,6 +23,8 @@
 #include "ui/base/metadata/metadata_impl_macros.h"
 #include "ui/color/color_id.h"
 #include "ui/color/color_provider.h"
+#include "ui/display/display.h"
+#include "ui/display/screen.h"
 #include "ui/events/event.h"
 #include "ui/gfx/animation/animation.h"
 #include "ui/gfx/canvas.h"
@@ -408,10 +410,22 @@ void FooterTooltip::Show() {
   const gfx::Size size = contents->GetPreferredSize();
   const gfx::Rect anchor = anchor_->GetBoundsInScreen();
   if (content_.beside) {
-    widget_->SetBounds(
-        gfx::Rect(gfx::Point(anchor.right() + kTooltipGap,
-                             anchor.CenterPoint().y() - size.height() / 2),
-                  size));
+    // Right of the anchor, or left of it when the screen has no room.
+    const gfx::Rect screen =
+        display::Screen::Get()->GetDisplayMatching(anchor).work_area();
+    int x = anchor.right() + kTooltipGap;
+    if (x + size.width() > screen.right() - kTooltipMargin) {
+      x = anchor.x() - kTooltipGap - size.width();
+    }
+    x = std::clamp(x, screen.x() + kTooltipMargin,
+                   std::max(screen.x() + kTooltipMargin,
+                            screen.right() - kTooltipMargin - size.width()));
+    const int y = std::clamp(
+        anchor.CenterPoint().y() - size.height() / 2,
+        screen.y() + kTooltipMargin,
+        std::max(screen.y() + kTooltipMargin,
+                 screen.bottom() - kTooltipMargin - size.height()));
+    widget_->SetBounds(gfx::Rect(gfx::Point(x, y), size));
     widget_->ShowInactive();
     return;
   }
