@@ -14,6 +14,7 @@
 #include "base/task/sequenced_task_runner.h"
 #include "base/time/time.h"
 #include "cc/paint/paint_flags.h"
+#include "components/vector_icons/vector_icons.h"
 #include "myarc/footer_button.h"
 #include "myarc/icons.h"
 #include "myarc/library_logic.h"
@@ -370,6 +371,59 @@ class ArchiveRow final : public TileButton {
 BEGIN_METADATA(ArchiveRow)
 END_METADATA
 
+// A Pin on a Space's card: favicon and title, 36 DIP tall like the sidebar's
+// rows, with the same hover tile. Arc sets the title in 15pt semibold, 28 DIP
+// right of the card's icon column.
+class PinRow final : public TileButton {
+  METADATA_HEADER(PinRow, TileButton)
+
+ public:
+  PinRow(PressedCallback callback, const SidebarView::LibraryPin& pin)
+      : TileButton(std::move(callback)), icon_(pin.icon) {
+    auto* layout = SetLayoutManager(std::make_unique<views::BoxLayout>(
+        Orientation::kHorizontal, gfx::Insets::VH(0, 8), 8));
+    layout->set_cross_axis_alignment(CrossAxis::kCenter);
+    image_ = AddChildView(std::make_unique<views::ImageView>());
+    image_->SetImageSize(gfx::Size(16, 16));
+    image_->SetPreferredSize(gfx::Size(20, 20));
+    title_ = AddChildView(
+        MakeLabel(pin.title,
+                  gfx::FontList().Derive(2, gfx::Font::NORMAL,
+                                         gfx::Font::Weight::SEMIBOLD),
+                  SK_ColorWHITE));
+    title_->SetHorizontalAlignment(gfx::ALIGN_LEFT);
+    title_->SetElideBehavior(gfx::ELIDE_TAIL);
+    layout->SetFlexForView(title_, 1);
+    SetPreferredSize(gfx::Size(0, 36));
+    SetTooltipText(pin.title);
+    GetViewAccessibility().SetName(pin.title);
+    GetViewAccessibility().SetDescription(u"Space Pin");
+  }
+
+ private:
+  void Update() override {
+    TileButton::Update();
+    const ui::ColorProvider* provider = GetColorProvider();
+    if (!provider) {
+      return;
+    }
+    const SkColor on_surface = provider->GetColor(ui::kColorSysOnSurface);
+    // Pins without a cached favicon get the sidebar's globe.
+    image_->SetImage(icon_.IsEmpty()
+                         ? ui::ImageModel::FromVectorIcon(
+                               vector_icons::kGlobeIcon, on_surface, 16)
+                         : icon_);
+    title_->SetEnabledColor(on_surface);
+  }
+
+  const ui::ImageModel icon_;
+  raw_ptr<views::ImageView> image_ = nullptr;
+  raw_ptr<views::Label> title_ = nullptr;
+};
+
+BEGIN_METADATA(PinRow)
+END_METADATA
+
 }  // namespace
 
 LibraryView::LibraryView(SidebarView::Delegate& delegate,
@@ -651,7 +705,9 @@ void LibraryView::BuildSpaces() {
   row->GetViewAccessibility().SetName(u"Spaces");
   const gfx::FontList title_font =
       gfx::FontList().Derive(0, gfx::Font::NORMAL, gfx::Font::Weight::SEMIBOLD);
-  for (const auto& [id, name] : spaces_) {
+  for (const auto& space : spaces_) {
+    const uint64_t id = space.id;
+    const std::u16string& name = space.name;
     const bool current = id == current_space_;
     auto* column = row->AddChildView(
         Box(Orientation::kVertical, gfx::Insets::VH(9, 8), 4));
@@ -684,6 +740,8 @@ void LibraryView::BuildSpaces() {
     header->SetImageModel(
         views::Button::STATE_NORMAL,
         ui::ImageModel::FromVectorIcon(kSaturnIcon, colors.muted, 16));
+    // Arc lines the name up with the Pin titles below it.
+    header->SetImageLabelSpacing(12);
     if (!current) {
       header->SetEnabledTextColors(colors.muted);
     }
@@ -696,6 +754,45 @@ void LibraryView::BuildSpaces() {
                 : ax::mojom::CheckedState::kFalse);
     keyed_views_.emplace_back(id, header.get());
     column->AddChildView(std::move(header));
+    if (space.pins.empty()) {
+      continue;
+    }
+    // A long list scrolls inside its card, as in Arc, so every card keeps its
+    // header in place.
+    auto* pins_scroll =
+        column->AddChildView(std::make_unique<views::ScrollView>());
+    pins_scroll->ClipHeightTo(0, std::numeric_limits<int>::max());
+    pins_scroll->SetHorizontalScrollBarMode(
+        views::ScrollView::ScrollBarMode::kDisabled);
+    pins_scroll->SetBackgroundColor(std::nullopt);
+    pins_scroll->SetDrawOverflowIndicator(false);
+    static_cast<views::BoxLayout*>(column->GetLayoutManager())
+        ->SetFlexForView(pins_scroll, 1);
+    auto* pins = pins_scroll->SetContents(
+        Box(Orientation::kVertical, gfx::Insets::TLBR(1, 0, 0, 0), 2));
+    pins->GetViewAccessibility().SetRole(ax::mojom::Role::kList);
+    pins->GetViewAccessibility().SetName(u"Pinned tabs in " + name);
+    for (const auto& pin : space.pins) {
+      auto pin_row = std::make_unique<PinRow>(
+          base::BindRepeating(
+              [](LibraryView* view, uint64_t item) {
+                // Activating switches to the Pin's Space and reopens a dormant
+                // one, as its sidebar row does; the action holds nothing of
+                // `view`.
+                view->PostAction(base::BindOnce(
+                    [](SidebarView::Delegate* delegate, uint64_t item,
+                       const base::RepeatingClosure& close) {
+                      delegate->ActivateItem(item);
+                      close.Run();
+                    },
+                    base::Unretained(&view->delegate_.get()), item,
+                    view->close_));
+              },
+              base::Unretained(this), pin.id),
+          pin);
+      keyed_views_.emplace_back(pin.id | library::kPinKey, pin_row.get());
+      pins->AddChildView(std::move(pin_row));
+    }
   }
 
   auto* create_cell =

@@ -90,6 +90,16 @@ fn spaces_share_one_profile_but_keep_local_items_and_order() {
     );
     assert_eq!(sidebar.favorites[0].id, favorite);
     assert_eq!(sidebar.temporary[0].id, temporary);
+    // The Library's Space cards list every Space's Pins, never favorites or
+    // temporary items.
+    assert_eq!(
+        sidebar
+            .space_pins
+            .iter()
+            .map(|item| item.id)
+            .collect::<Vec<_>>(),
+        [first, third, local]
+    );
     workspace.select_space(W1, s2).unwrap();
     let sidebar = workspace.sidebar_snapshot(W1).unwrap();
     assert_eq!(sidebar.current_space.id, s2);

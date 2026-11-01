@@ -29,6 +29,10 @@ bool CheckWorkspaceRecords() {
            .ok ||
       !live_tab_closed(*model, item.id).ok ||
       sidebar_snapshot(*model, 1).pins.size() != 1 ||
+      // The Library's Space cards list Pins of Spaces a window isn't showing.
+      !sidebar_snapshot(*model, window.id).pins.empty() ||
+      sidebar_snapshot(*model, window.id).space_pins.size() != 1 ||
+      sidebar_snapshot(*model, window.id).space_pins[0].owner_id != 1 ||
       set_placement(*model, item.id, PlacementKind::Pin, 1, true,
                     "javascript:alert(1)")
           .ok ||
@@ -41,6 +45,7 @@ bool CheckWorkspaceRecords() {
   if (!sidebar.ok || sidebar.current_space.id != space.id ||
       sidebar.favorites.size() != 1 || sidebar.selected_item_id != item.id ||
       !sidebar.pins.empty() || !sidebar.temporary.empty() ||
+      !sidebar.space_pins.empty() ||
       std::string(sidebar.favorites[0].canonical_url) !=
           "https://example.test/saved") {
     return false;

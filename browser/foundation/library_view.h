@@ -43,7 +43,7 @@ class LibraryView final : public views::View,
 
  public:
   using Section = SidebarView::LibrarySection;
-  using Spaces = std::vector<std::pair<uint64_t, std::u16string>>;
+  using Spaces = std::vector<SidebarView::LibrarySpace>;
 
   LibraryView(SidebarView::Delegate& delegate,
               base::RepeatingClosure close,
@@ -51,8 +51,8 @@ class LibraryView final : public views::View,
               base::WeakPtr<FooterTooltip> tooltip);
   ~LibraryView() override;
 
-  // Rebuilds the Spaces section only when its Spaces or the current one
-  // changed.
+  // Rebuilds the Spaces section only when its Spaces, their Pins or the
+  // current one changed.
   void SetSpaces(Spaces spaces, uint64_t current);
   void SelectSection(Section section);
   void FocusSection();
@@ -114,8 +114,9 @@ class LibraryView final : public views::View,
   raw_ptr<views::View> pane_ = nullptr;
   raw_ptr<views::Textfield> search_ = nullptr;
   raw_ptr<views::View> list_ = nullptr;
-  // Pane controls keyed by the Space, download or archived tab they act on (0
-  // for Create and Show All Downloads), so a rebuild can put focus back.
+  // Pane controls keyed by the Space, Pin, download or archived tab they act
+  // on (0 for Create and Show All Downloads), so a rebuild can put focus back.
+  // Pin keys carry library::kPinKey to keep them apart from Space IDs.
   std::vector<std::pair<uint64_t, raw_ptr<views::View>>> keyed_views_;
   // Recent downloads, unfiltered, while the Downloads section shows.
   std::vector<SidebarView::DownloadPresentation> downloads_;

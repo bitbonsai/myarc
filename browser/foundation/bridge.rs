@@ -97,6 +97,8 @@ mod ffi {
         favorites: Vec<ItemRecord>,
         pins: Vec<ItemRecord>,
         temporary: Vec<ItemRecord>,
+        // Every Space's Pins in workspace order; `owner_id` is the Space.
+        space_pins: Vec<ItemRecord>,
     }
 
     struct BridgeLimits {
@@ -581,6 +583,7 @@ pub fn sidebar_snapshot(workspace: &Workspace, window_id: u64) -> ffi::SidebarRe
             favorites: sidebar.favorites.into_iter().map(item_record).collect(),
             pins: sidebar.pins.into_iter().map(item_record).collect(),
             temporary: sidebar.temporary.into_iter().map(item_record).collect(),
+            space_pins: sidebar.space_pins.into_iter().map(item_record).collect(),
         },
         Err(error) => ffi::SidebarResult {
             ok: false,
@@ -596,6 +599,7 @@ pub fn sidebar_snapshot(workspace: &Workspace, window_id: u64) -> ffi::SidebarRe
             favorites: Vec::new(),
             pins: Vec::new(),
             temporary: Vec::new(),
+            space_pins: Vec::new(),
         },
     }
 }

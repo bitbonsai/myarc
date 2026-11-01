@@ -242,6 +242,8 @@ pub struct SidebarSnapshot {
     pub favorites: Vec<Item>,
     pub pins: Vec<Item>,
     pub temporary: Vec<Item>,
+    /// Every Space's Pins in workspace order, for the Library's Space cards.
+    pub space_pins: Vec<Item>,
 }
 
 #[derive(Debug)]
@@ -816,8 +818,12 @@ impl Workspace {
             favorites: Vec::new(),
             pins: Vec::new(),
             temporary: Vec::new(),
+            space_pins: Vec::new(),
         };
         for item in &self.state.items {
+            if matches!(item.placement, Placement::Pin { .. }) {
+                sidebar.space_pins.push(item.clone());
+            }
             if !visible(item.placement, window.space_id) {
                 continue;
             }

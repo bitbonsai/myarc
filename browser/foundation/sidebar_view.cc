@@ -454,7 +454,7 @@ void SidebarView::OpenLibrary(LibrarySection section) {
                           weak_factory_.GetWeakPtr()),
       section, footer_tooltip_->GetWeakPtr()));
   layout->SetFlexForView(library_, 1);
-  library_->SetSpaces(spaces_, current_space_id_);
+  library_->SetSpaces(library_spaces_, current_space_id_);
   delegate_->SetLibraryOpen(true);
   library_keyboard_ = had_focus;
   if (had_focus) {
@@ -634,10 +634,8 @@ void SidebarView::TrackFocus(views::View* view,
   }
 }
 
-std::unique_ptr<views::View> SidebarView::MakeItem(
-    const foundation::ItemRecord& item,
-    bool tile,
-    bool selected) {
+SidebarView::ItemPresentation SidebarView::Present(
+    const foundation::ItemRecord& item) const {
   ItemPresentation presentation = delegate_->GetItemPresentation(item);
   // Dormant saved rows show the last title their page had, as Arc does, and
   // fall back to the saved URL until a page has loaded once.
@@ -649,6 +647,14 @@ std::unique_ptr<views::View> SidebarView::MakeItem(
         item.has_url ? base::UTF8ToUTF16(std::string(item.canonical_url))
                      : u"Untitled tab";
   }
+  return presentation;
+}
+
+std::unique_ptr<views::View> SidebarView::MakeItem(
+    const foundation::ItemRecord& item,
+    bool tile,
+    bool selected) {
+  ItemPresentation presentation = Present(item);
   const auto foreground = ui::kColorSysOnSurface;
   auto activate =
       Button(base::BindRepeating(&Delegate::ActivateItem,
@@ -746,6 +752,7 @@ void SidebarView::SetUnavailable(const std::u16string& reason,
   tiles_.clear();
   current_space_id_ = 0;
   spaces_.clear();
+  library_spaces_.clear();
   RemoveAllChildViews();
   auto* scroll = AddChildView(std::make_unique<views::ScrollView>());
   scroll->ClipHeightTo(0, std::numeric_limits<int>::max());
@@ -777,13 +784,25 @@ void SidebarView::SetModel(const foundation::SidebarResult& model,
     return;
   }
   spaces_.clear();
+  library_spaces_.clear();
   for (const auto& space : model.spaces) {
     spaces_.emplace_back(space.id, base::UTF8ToUTF16(std::string(space.name)));
+    library_spaces_.push_back({.id = space.id, .name = spaces_.back().second});
+  }
+  for (const auto& pin : model.space_pins) {
+    const auto space =
+        std::ranges::find(library_spaces_, pin.owner_id, &LibrarySpace::id);
+    if (space != library_spaces_.end()) {
+      ItemPresentation presentation = Present(pin);
+      space->pins.push_back({.id = pin.id,
+                             .title = std::move(presentation.title),
+                             .icon = std::move(presentation.icon)});
+    }
   }
   if (library_) {
     // The Library shows Spaces and the archive; rows rebuild when it closes.
     current_space_id_ = model.current_space.id;
-    library_->SetSpaces(spaces_, current_space_id_);
+    library_->SetSpaces(library_spaces_, current_space_id_);
     // Closing a tab or a favicon lookup changes the archive.
     library_->RefreshArchive();
     return;

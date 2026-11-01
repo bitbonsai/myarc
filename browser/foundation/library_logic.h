@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <cstddef>
+#include <cstdint>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -23,6 +24,9 @@ inline constexpr int kColumnsLeading = 28;
 inline constexpr int kCreateGap = 32;
 inline constexpr int kCreateSize = 30;
 inline constexpr int kCreateTrailing = 38;
+
+// Marks a Pin's focus key in the Spaces section, apart from Space IDs.
+inline constexpr uint64_t kPinKey = uint64_t{1} << 63;
 
 // Width of the Spaces section, rail included, for `spaces` columns. The
 // browser layout still caps it to the window.

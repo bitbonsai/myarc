@@ -85,6 +85,20 @@ class SidebarView final : public views::View,
     bool operator==(const ArchivedTabPresentation&) const = default;
   };
 
+  // A Space's card in the Library, with its Pins in sidebar order.
+  struct LibraryPin {
+    uint64_t id = 0;  // Rust item ID.
+    std::u16string title;
+    ui::ImageModel icon;  // Favicon, or empty.
+    bool operator==(const LibraryPin&) const = default;
+  };
+  struct LibrarySpace {
+    uint64_t id = 0;
+    std::u16string name;
+    std::vector<LibraryPin> pins;
+    bool operator==(const LibrarySpace&) const = default;
+  };
+
   class Delegate {
    public:
     virtual ~Delegate() = default;
@@ -231,6 +245,8 @@ class SidebarView final : public views::View,
   void BuildFooter(const gfx::PointF& spaces_offset, bool space_changed);
   // The Create button's footer tooltip label.
   std::u16string GetCreateTooltipForTesting() const;
+  // The row's title and favicon, with the saved title or URL for dormant rows.
+  ItemPresentation Present(const foundation::ItemRecord& item) const;
   std::unique_ptr<views::View> MakeItem(const foundation::ItemRecord& item,
                                         bool tile,
                                         bool selected);
@@ -258,6 +274,8 @@ class SidebarView final : public views::View,
   uint64_t menu_space_id_ = 0;
   uint64_t menu_item_id_ = 0;
   std::vector<std::pair<uint64_t, std::u16string>> spaces_;
+  // The same Spaces with their Pins, for the Library's cards.
+  std::vector<LibrarySpace> library_spaces_;
   raw_ptr<LibraryView> library_ = nullptr;
   ItemMenuState menu_state_ = {};
   // Stable sidebar owns both; no menu callback or anchor retains a child row.

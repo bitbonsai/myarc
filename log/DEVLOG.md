@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-11-01: Library Space cards list their Pins
+
+- Each Space card in the Library now lists that Space's Pins: favicon and title in 36 DIP rows with the sidebar's hover tile. A click switches to the Space and activates the Pin through `ActivateItem`, so dormant Pins reopen, then the Library closes. The workspace has no folders yet, so cards show Pins only, never temporary tabs. A long list scrolls inside its card and the header stays put. Rows sit in the Tab order after their card's header; the Library has no arrow-key navigation anywhere, so these rows don't add it. Data: `SidebarSnapshot.space_pins` (Rust and bridge) carries every Space's Pins, and cards refresh through `SetModel` while the Library is open.
+- Verification: `cargo test`/`fmt`/`clippy`, `chrome` and `bridge_check` builds, `bridge_check` (Pins of a Space the window isn't showing), `export_patches.py --check` and `check_docs.py` pass. Background capture with three seeded Spaces (3, 2 and 28 Pins) matches Arc's row position within 1 DIP. Live `/tmp` profile, CGEvent click on another Space's dormant Pin while frontmost: the window switched to that Space, reopened the Pin selected, and closed the Library. Captures in `research-private/captures/finesse/library/space-cards/`.
+- No Chromium patch changes. Card header pencil, footer controls and folders aren't built yet.
+
 ## 2026-11-01: Dormant rows keep their full URL
 
 - Dormant temporary rows store the page's full URL again, so a YouTube `watch?v=` row reopens the video. Full URLs are browsing state like Chromium's session files, gated by the history pref: nothing is stored when the Profile saves no history, and incognito and guest write nothing. A restored tab finds its dormant row by full URL, ignoring the fragment.
