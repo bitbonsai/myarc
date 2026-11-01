@@ -4,12 +4,12 @@ HTML: https://myarc.dev/download/
 
 Pre-alpha nightly, for trying the Arc-like shell. Not for daily or sensitive browsing.
 
-[Download for macOS (Apple silicon)](https://github.com/bitbonsai/myarc/releases/download/nightly-2026.10.29/myArc-Nightly-2026.10.29-arm64.dmg)
+[Download for macOS (Apple silicon)](https://github.com/bitbonsai/myarc/releases/download/nightly-2026.11.01/myArc-Nightly-2026.11.01-arm64.dmg)
 
-- **Version:** 2026.10.29
-- **Date:** October 29, 2026
-- **Size:** 232.7 MB
-- **SHA-256:** `efc1a3bc00b74cdd937c658887b03160f11635d74fa2a0b2562fa3f4c2135b1e`
+- **Version:** 2026.11.01
+- **Date:** November 1, 2026
+- **Size:** 234.2 MB
+- **SHA-256:** `b2beceb4e7dbbe1fe460ac068dd63ca9d39e6eba0a124cabc3091ce3d8fac556`
 
 ## System requirements
 
@@ -21,7 +21,7 @@ Pre-alpha nightly, for trying the Arc-like shell. Not for daily or sensitive bro
 1. Check the download against the SHA-256 listed with it. The two values must match.
 
    ```
-   shasum -a 256 ~/Downloads/myArc-Nightly-2026.10.29-arm64.dmg
+   shasum -a 256 ~/Downloads/myArc-Nightly-2026.11.01-arm64.dmg
    ```
 2. Open the DMG and drag myArc Nightly to Applications.
 3. macOS blocks the first launch because the app is not notarized. Right-click myArc Nightly, choose Open, then Open again. If macOS only offers Done or Move to Trash, which macOS 15 and later usually does, open System Settings \> Privacy \& Security, scroll to the myArc Nightly message and choose Open Anyway.
@@ -68,7 +68,7 @@ Each item was seen working in a native run or experiment note. None of it has ha
 
 ## Other ways to get it
 
-- [GitHub releases](https://github.com/bitbonsai/myarc/releases/tag/nightly-2026.10.29) lists every nightly.
+- [GitHub releases](https://github.com/bitbonsai/myarc/releases/tag/nightly-2026.11.01) lists every nightly.
 - [Source on GitHub](https://github.com/bitbonsai/myarc), with instructions to [build it from source](https://github.com/bitbonsai/myarc/blob/main/browser/README.md).
 - [GitHub issues](https://github.com/bitbonsai/myarc/issues) take bug reports. Include the version, your macOS version and the steps that trigger the problem, and leave out private pages.
 

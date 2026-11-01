@@ -2,6 +2,14 @@ HTML: https://myarc.dev/blog/
 
 # Blog
 
+November 2026
+
+## [Chasing Arc's details in the 2026.11.01 nightly](https://myarc.dev/blog/2026-11-01-nightly/)
+
+November 01, 2026
+
+Side-by-side recordings showed what myArc's sidebar was missing, a quit bug emptied every Space, and I'm writing an alpha checklist next.
+
 October 2026
 
 ## [Why myArc is now GPL-3.0](https://myarc.dev/blog/2026-10-29-gpl/)
