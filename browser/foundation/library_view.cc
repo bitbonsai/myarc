@@ -100,7 +100,8 @@ struct SectionInfo {
   Section section;
   // Constant table of static icons.
   RAW_PTR_EXCLUSION const gfx::VectorIcon* icon;
-  // Duotone icon for the selected rail item; null draws `icon` in kRailLine.
+  // Duotone icon for the selected rail item; null draws `icon` in the
+  // selected label color.
   RAW_PTR_EXCLUSION const gfx::VectorIcon* active_icon;
   const char16_t* name;
   const char16_t* search;
@@ -245,8 +246,8 @@ class LibraryRailItem final : public TileButton {
  private:
   void Update() override {
     const Colors colors = GetColors(GetColorProvider());
-    const bool hovered =
-        GetState() == STATE_HOVERED || GetState() == STATE_PRESSED;
+    // Arc has no pressed look: a click goes straight to selected.
+    const bool hovered = GetState() == STATE_HOVERED;
     SetBackground(
         selected() || hovered
             ? views::CreateRoundedRectBackground(
@@ -254,8 +255,12 @@ class LibraryRailItem final : public TileButton {
             : nullptr);
     image_->SetImage(
         selected()
-            ? ui::ImageModel::FromVectorIcon(
-                  active_icon_ ? *active_icon_ : *icon_, kRailLine, 22)
+            ? (active_icon_ ? ui::ImageModel::FromVectorIcon(*active_icon_,
+                                                             kRailLine, 22)
+                            // Single-color glyphs follow the label so they
+                            // stay visible on the light selected tile.
+                            : ui::ImageModel::FromVectorIcon(
+                                  *icon_, colors.rail_label_selected, 22))
             : ui::ImageModel::FromVectorIcon(*icon_, colors.rail_icon, 22));
     label_->SetEnabledColor(selected() ? colors.rail_label_selected
                             : hovered  ? colors.rail_label_hover
