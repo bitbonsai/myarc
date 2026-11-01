@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-11-01: Dormant rows keep no tokens and archive when idle
+
+- Review fixes for dormant temporary rows. A Profile that saves no history now remembers no page for them, and a remembered page drops its query and fragment, so magic-link and reset tokens stay out of the workspace file. Auto Archive now also archives idle dormant rows, using each row's last view, so they can't fill the 1024-item limit. A selected dormant row stays selected when its Space shows. A restored tab whose binding was lost takes over the dormant row of its page instead of appearing twice.
+- Verification: `cargo test`/`fmt`/`clippy` pass, with new tests for query stripping, dormant-row lookup and archiving an idle dormant row. `chrome` and `bridge_check` build; `bridge_check` (now covers stripping and the lookup), `export_patches.py --check` and `check_docs.py` pass. No live UI run.
+- No Chromium patch changes.
+
 ## 2026-11-01: Arc's nav glyphs, 47 DIP tiles, New Tab spacing
 
 - Back, forward and reload draw glyphs traced from Arc's header under `--myarc-visual-parity`: 14.5x12 DIP arrows and a 14x17 DIP open ring with a chevron, at stroke 1.7 (Chromium's was 13x13 and a closed ring). Favorite tiles are 47 DIP tall. The New Tab plus moves 2 DIP right and its label starts 13.5 DIP after it, as in Arc. The glyphs already sat at Arc's centres after the header fix, so no offset changed. Arc's stroke matches ours; it only looks lighter because its window wasn't key.

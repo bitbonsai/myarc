@@ -315,9 +315,10 @@ void SaveTitle(Profile& profile, content::WebContents& page, uint64_t item) {
   const auto* row = state ? FindItem(*state, item) : nullptr;
   const auto* entry = page.GetController().GetLastCommittedEntry();
   // A temporary row remembers its page, so it stays in the sidebar, dormant,
-  // when its tab is not restored.
+  // when its tab is not restored. A Profile that saves no history keeps none.
   if (row && row->placement == foundation::PlacementKind::Temporary) {
-    if (entry && entry->GetPageType() != content::PAGE_TYPE_ERROR) {
+    if (entry && entry->GetPageType() != content::PAGE_TYPE_ERROR &&
+        !profile.GetPrefs()->GetBoolean(prefs::kSavingBrowserHistoryDisabled)) {
       service.SetTemporaryPage(item, entry->GetURL().spec(),
                                base::UTF16ToUTF8(entry->GetTitle()));
     }
@@ -719,37 +720,50 @@ foundation::MutationResult BrowserWorkspaceAdapter::BindTabs() {
             return row.id == binding->space();
           }))
         space = binding->space();
-      // Native and workspace files can disagree after an interrupted write.
-      // Skip generated IDs still claimed by restored pages, including this
-      // stale binding, so unrelated histories cannot collapse into one item.
-      auto result = service_->AddTemporaryItem(space);
-      const size_t reservations = ForProfile(*profile_).pages.size();
-      for (size_t attempt = 0;
-           result.ok && Count(*profile_, result.id) && attempt < reservations;
-           ++attempt) {
-        auto closed = service_->LiveTabClosed(result.id);
-        if (!closed.ok)
-          return closed;
-        result = service_->AddTemporaryItem(space);
+      // A restored tab whose binding the workspace lost takes over the
+      // dormant row of its page rather than showing twice.
+      std::vector<uint64_t> live;
+      for (const auto& [page, item] : ForProfile(*profile_).pages) {
+        if (item)
+          live.push_back(item);
       }
-      if (!result.ok)
-        return Fail("Could not bind this window's native pages: " +
-                    std::string(result.error) +
-                    " Close unused native tabs or unsave unused items, then "
-                    "retry. Native pages remain intact.");
-      if (Count(*profile_, result.id)) {
-        auto closed = service_->LiveTabClosed(result.id);
-        if (!closed.ok)
-          return closed;
-        return Fail("Native item reservations exhausted. Retry binding.");
+      if (const uint64_t dormant = service_->DormantTemporaryItem(
+              space, contents->GetLastCommittedURL().spec(), live)) {
+        binding->Rebind(dormant, space);
+        SaveTitle(*profile_, *contents, dormant);
+      } else {
+        // Native and workspace files can disagree after an interrupted write.
+        // Skip generated IDs still claimed by restored pages, including this
+        // stale binding, so unrelated histories cannot collapse into one item.
+        auto result = service_->AddTemporaryItem(space);
+        const size_t reservations = ForProfile(*profile_).pages.size();
+        for (size_t attempt = 0;
+             result.ok && Count(*profile_, result.id) && attempt < reservations;
+             ++attempt) {
+          auto closed = service_->LiveTabClosed(result.id);
+          if (!closed.ok)
+            return closed;
+          result = service_->AddTemporaryItem(space);
+        }
+        if (!result.ok)
+          return Fail("Could not bind this window's native pages: " +
+                      std::string(result.error) +
+                      " Close unused native tabs or unsave unused items, then "
+                      "retry. Native pages remain intact.");
+        if (Count(*profile_, result.id)) {
+          auto closed = service_->LiveTabClosed(result.id);
+          if (!closed.ok)
+            return closed;
+          return Fail("Native item reservations exhausted. Retry binding.");
+        }
+        DCHECK_NE(result.id, 0u);
+        DCHECK_EQ(Count(*profile_, result.id), 0u);
+        binding->Rebind(result.id, space);
+        SaveTitle(*profile_, *contents, result.id);
+        state = service_->ExportSnapshot();
+        if (!state)
+          return Fail("Workspace metadata became unavailable during binding.");
       }
-      DCHECK_NE(result.id, 0u);
-      DCHECK_EQ(Count(*profile_, result.id), 0u);
-      binding->Rebind(result.id, space);
-      SaveTitle(*profile_, *contents, result.id);
-      state = service_->ExportSnapshot();
-      if (!state)
-        return Fail("Workspace metadata became unavailable during binding.");
     }
     if (binding->legacy() && tabs_->IsTabPinned(i)) {
       // Failed/lazy legacy saves retain their native pin and retry on page
@@ -905,11 +919,32 @@ void BrowserWorkspaceAdapter::AutoArchive(Profile& profile) {
     if (ok && can_close)
       ids.push_back(item);
   }
-  const auto due = WorkspaceService::ForProfile(profile).AutoArchive(
+  // A dormant temporary row has no page to close. It idles like any other
+  // and archives directly with the page it remembers.
+  auto& service = WorkspaceService::ForProfile(profile);
+  auto state = can_close ? service.ExportSnapshot() : std::nullopt;
+  std::set<uint64_t> dormant;
+  if (state) {
+    for (const auto& row : state->items) {
+      if (row.placement == foundation::PlacementKind::Temporary &&
+          row.has_url && !closable.contains(row.id)) {
+        dormant.insert(row.id);
+        ids.push_back(row.id);
+      }
+    }
+  }
+  const auto due = service.AutoArchive(
       std::vector<uint64_t>(viewed.begin(), viewed.end()), ids,
       std::vector<uint64_t>(media.begin(), media.end()));
   if (due.empty())
     return;
+  for (uint64_t item : due) {
+    const auto* row = dormant.contains(item) ? FindItem(*state, item) : nullptr;
+    if (row) {
+      service.ArchiveClosedTab(item, std::string(row->canonical_url),
+                               std::string(row->title));
+    }
+  }
   const std::set<uint64_t> doomed(due.begin(), due.end());
   std::vector<base::WeakPtr<content::WebContents>> pages;
   for (const auto& [page, item] : runtime.pages) {
@@ -1232,8 +1267,16 @@ void BrowserWorkspaceAdapter::ShowSelected() {
     return;
   content::WebContents* page = LocalPage(*tabs_, sidebar.selected_item_id);
   // Selection is UI policy over Rust's supplied rows, never native tab order
-  // or independently computed placement/Profile visibility.
-  if (!page) {
+  // or independently computed placement/Profile visibility. A dormant
+  // temporary row stays selected, showing nothing until it reopens; a saved
+  // row whose page closed hands selection on.
+  const bool dormant =
+      !page && sidebar.selected_item_id &&
+      !AnyPage(*profile_, sidebar.selected_item_id) &&
+      std::ranges::any_of(sidebar.temporary, [&sidebar](const auto& row) {
+        return row.id == sidebar.selected_item_id;
+      });
+  if (!page && !dormant) {
     for (const auto* section :
          {&sidebar.pins, &sidebar.temporary, &sidebar.favorites}) {
       for (const auto& row : *section) {

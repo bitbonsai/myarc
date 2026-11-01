@@ -122,11 +122,17 @@ class WorkspaceService final : public base::SupportsUserData::Data {
   // saved with the next metadata write or the shutdown flush.
   foundation::MutationResult SetTitle(uint64_t item, std::string_view title);
   // Temporary items only. Remembers the page a dormant row reopens when its tab
-  // is not restored; URLs outside the saved-URL gate are ignored. Writes when
-  // the URL changes, without a notify.
+  // is not restored, without query and fragment; URLs outside the saved-URL
+  // gate are ignored. Writes when the URL changes, without a notify. Callers
+  // skip it when the Profile saves no history.
   foundation::MutationResult SetTemporaryPage(uint64_t item,
                                               std::string_view url,
                                               std::string_view title);
+  // A dormant temporary row of `space` remembering the page at `url` and not
+  // in `live`, or zero.
+  uint64_t DormantTemporaryItem(uint64_t space,
+                                std::string_view url,
+                                base::span<const uint64_t> live) const;
   foundation::MutationResult RemoveSavedItem(uint64_t item);
   foundation::MutationResult RevealItem(uint64_t window, uint64_t item);
   foundation::MutationResult UnsaveItem(uint64_t item, uint64_t live_space);

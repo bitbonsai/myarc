@@ -429,19 +429,30 @@ bool CheckDormantTemporary() {
       set_temporary_page(*model, blank.id, "chrome://newtab/", "New Tab").ok) {
     return false;
   }
-  auto changed =
-      set_temporary_page(*model, kept.id, "https://example.test/a", "Alpha");
+  // Query and fragment, where tokens live, never reach the file.
+  auto changed = set_temporary_page(
+      *model, kept.id, "https://example.test/a?token=s3cret#x", "Alpha");
   auto same =
       set_temporary_page(*model, kept.id, "https://example.test/a", "Alpha");
   if (!changed.ok || changed.id != 1 || !same.ok || same.id != 0)
     return false;
   const auto encoded = EncodeWorkspaceMetadata(export_snapshot(*model));
+  if (!encoded || encoded->find("s3cret") != std::string::npos)
+    return false;
   auto decoded = encoded ? DecodeWorkspaceMetadata(*encoded)
                          : myarc::internal::MetadataResult{};
   auto relaunched = new_workspace();
   if (!decoded.snapshot ||
       !restore_snapshot(*relaunched, std::move(*decoded.snapshot)).ok ||
       !reconcile_live_items(*relaunched, rust::Slice<const uint64_t>()).ok) {
+    return false;
+  }
+  // A restored tab of that page with a lost binding finds the dormant row.
+  const uint64_t live[] = {kept.id};
+  if (dormant_temporary_item(*relaunched, 1, "https://example.test/a?b",
+                             rust::Slice<const uint64_t>()) != kept.id ||
+      dormant_temporary_item(*relaunched, 1, "https://example.test/a",
+                             rust::Slice<const uint64_t>(live, 1)) != 0) {
     return false;
   }
   const auto temporary = sidebar_snapshot(*relaunched, 1).temporary;

@@ -772,6 +772,18 @@ foundation::MutationResult WorkspaceService::SetTemporaryPage(
   return result;
 }
 
+uint64_t WorkspaceService::DormantTemporaryItem(
+    uint64_t space,
+    std::string_view url,
+    base::span<const uint64_t> live) const {
+  const auto canonical = CanonicalUrl(url);
+  if (!CanMutate() || !canonical)
+    return 0;
+  return foundation::dormant_temporary_item(
+      *workspace_, space, rust::Str(canonical->data(), canonical->size()),
+      rust::Slice<const uint64_t>(live.data(), live.size()));
+}
+
 foundation::MutationResult WorkspaceService::RemoveSavedItem(uint64_t item) {
   if (!CanMutate())
     return Failure("Workspace is not loaded. Check storage state.");

@@ -172,10 +172,12 @@ impl Workspace {
     /// older build) or with a view ahead of the clock (a damaged or older file)
     /// gets the current reading, so nothing expires early. Then
     /// `decide_archive` picks the due items among `closable`: the items whose
-    /// live pages the adapter can close and archive. `media` lists items playing
-    /// or capturing media. Unknown IDs are ignored. Nothing is removed here: the
+    /// live pages the adapter can close and archive, plus dormant temporary rows
+    /// (a remembered page, no live tab). `media` lists items playing or
+    /// capturing media. Unknown IDs are ignored. Nothing is removed here: the
     /// adapter closes each due page, and closing archives it through
-    /// `archive_closed_tab`.
+    /// `archive_closed_tab`; a due dormant row it archives directly with its
+    /// remembered page.
     pub fn auto_archive(
         &mut self,
         viewed: &[ItemId],
@@ -808,6 +810,30 @@ mod auto_archive_tests {
         assert_eq!(viewed(&restored, id), 100);
         assert!(run(&mut restored, &[id], 12 * H - 1).due.is_empty());
         assert_eq!(run(&mut restored, &[id], 1).due, vec![id]);
+    }
+
+    #[test]
+    fn an_idle_dormant_row_is_due_and_archives_its_remembered_page() {
+        let mut workspace = Workspace::default();
+        let id = workspace.add_temporary_item(DEFAULT_SPACE_ID).unwrap();
+        workspace
+            .set_temporary_page(id, "https://example.test/doc", "Doc")
+            .unwrap();
+        workspace.auto_archive(&[], &[], &[], 0);
+        // Relaunch without its tab: the row is dormant and keeps its last view.
+        let mut restored = Workspace::from_snapshot(workspace.snapshot()).unwrap();
+        restored.reconcile_live_items(&[]).unwrap();
+        assert!(run(&mut restored, &[id], 12 * H - 1).due.is_empty());
+        assert_eq!(run(&mut restored, &[id], 1).due, vec![id]);
+        // No page to close, so the adapter archives the row directly.
+        assert_eq!(
+            restored.archive_closed_tab(id, "https://example.test/doc", "Doc", 7),
+            Ok(true)
+        );
+        assert!(restored.snapshot().items.is_empty());
+        let archived = restored.archived_tabs(7);
+        assert_eq!(archived.len(), 1);
+        assert_eq!(archived[0].url, "https://example.test/doc");
     }
 }
 

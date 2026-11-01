@@ -190,6 +190,14 @@ mod ffi {
             url: &str,
             title: &str,
         ) -> MutationResult;
+        // A dormant temporary row of `space_id` remembering `url` (without
+        // query and fragment) and not in `live`; zero when none.
+        fn dormant_temporary_item(
+            workspace: &Workspace,
+            space_id: u64,
+            url: &str,
+            live: &[u64],
+        ) -> u64;
         // Saved items only. `id` is 1 when current_url differs from the saved URL, else 0.
         fn differs_from_canonical(
             workspace: &Workspace,
@@ -466,6 +474,18 @@ pub fn set_temporary_page(
             .set_temporary_page(item_id, url, title)
             .map(u64::from),
     )
+}
+
+pub fn dormant_temporary_item(
+    workspace: &Workspace,
+    space_id: u64,
+    url: &str,
+    live: &[u64],
+) -> u64 {
+    workspace
+        .0
+        .dormant_temporary_item(space_id, url, live)
+        .unwrap_or(0)
 }
 
 pub fn differs_from_canonical(

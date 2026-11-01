@@ -626,9 +626,12 @@ impl Workspace {
 
     /// Remember the page a live temporary item shows, so its row stays in the
     /// sidebar, dormant, if the browser does not restore its tab, and reopens
-    /// `url`. The caller passes a browser-canonicalized URL; the title is cleaned
-    /// like `set_title`. Returns whether anything changed. Saved items reject with
+    /// `url`. The caller passes a browser-canonicalized URL; its query and
+    /// fragment are dropped, so tokens such as magic links or password resets
+    /// never reach the workspace file. The title is cleaned like `set_title`.
+    /// Returns whether anything changed. Saved items reject with
     /// `ExplicitUnsaveRequired`: their URL changes only through `set_canonical_url`.
+    /// Callers whose Profile saves no history do not call this.
     pub fn set_temporary_page(
         &mut self,
         item_id: ItemId,
@@ -639,6 +642,7 @@ impl Workspace {
             return Err(WorkspaceError::ExplicitUnsaveRequired(item_id));
         }
         validate_url(url)?;
+        let url = page_url(url);
         let clean = clean_title(title);
         let item = self
             .state
@@ -652,6 +656,29 @@ impl Workspace {
         item.canonical_url = Some(url.to_owned());
         item.title = clean;
         Ok(true)
+    }
+
+    /// A dormant temporary row of `space_id` that remembers `url` (compared
+    /// without query and fragment, as `set_temporary_page` stores it) and is not
+    /// in `live`, the item IDs with a live page. A restored tab whose binding the
+    /// workspace lost takes this row over instead of duplicating it.
+    pub fn dormant_temporary_item(
+        &self,
+        space_id: SpaceId,
+        url: &str,
+        live: &[ItemId],
+    ) -> Option<ItemId> {
+        let url = page_url(url);
+        let live: BTreeSet<ItemId> = live.iter().copied().collect();
+        self.state
+            .items
+            .iter()
+            .find(|item| {
+                item.placement == Placement::Temporary { space_id }
+                    && item.canonical_url.as_deref() == Some(url)
+                    && !live.contains(&item.id)
+            })
+            .map(|item| item.id)
     }
 
     /// Temporary identity ends on close. Saved identity and selection survive;
@@ -1003,6 +1030,11 @@ fn validate_ids(ids: impl Iterator<Item = u64>, next: u64) -> Result<(), Workspa
         }
     }
     Ok(())
+}
+
+/// `url` up to its query or fragment: the page a dormant row reopens.
+fn page_url(url: &str) -> &str {
+    url.find(['?', '#']).map_or(url, |end| &url[..end])
 }
 
 fn validate_url(url: &str) -> Result<(), WorkspaceError> {
