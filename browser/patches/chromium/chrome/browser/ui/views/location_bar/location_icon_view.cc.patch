@@ -1,0 +1,29 @@
+diff --git a/chrome/browser/ui/views/location_bar/location_icon_view.cc b/chrome/browser/ui/views/location_bar/location_icon_view.cc
+index 035e8b5c14254c62a168f8d8309fa164d0b3e59f..174f9df37acf1f36863c6a55c81397a745a8c206 100644
+--- a/chrome/browser/ui/views/location_bar/location_icon_view.cc
++++ b/chrome/browser/ui/views/location_bar/location_icon_view.cc
+@@ -60,6 +60,10 @@ LocationIconView::Delegate::GetLocationIconBackgroundColorOverride() const {
+   return std::nullopt;
+ }
+ 
++bool LocationIconView::Delegate::ShouldHideLocationIconBackground() const {
++  return false;
++}
++
+ LocationIconView::LocationIconView(
+     const gfx::FontList& font_list,
+     IconLabelBubbleView::Delegate* parent_delegate,
+@@ -344,7 +348,12 @@ void LocationIconView::UpdateBackground() {
+           is_text_dangerous ? kColorOmniboxSecurityChipDangerousBackground
+                             : kColorOmniboxIconBackground);
+ 
+-  SetBackgroundColor(GetColorProvider()->GetColor(id));
++  // A hidden chip keeps its color's luminance for GetLocationIcon()'s
++  // dark-mode check.
++  const SkColor background = GetColorProvider()->GetColor(id);
++  SetBackgroundColor(delegate_->ShouldHideLocationIconBackground()
++                         ? SkColorSetA(background, SK_AlphaTRANSPARENT)
++                         : background);
+ 
+   if (is_text_dangerous) {
+     ConfigureInkDropForRefresh2023(this, kColorOmniboxSecurityChipInkDropHover,

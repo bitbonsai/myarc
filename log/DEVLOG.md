@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-11-01: Sidebar top matches Arc's measurements
+
+- URL pill 38 -> 36 DIP and the top container 88 -> 82, so the Favorites sit 8 DIP below the pill as in Arc. The toggle chip is 32 DIP and the header row, traffic lights included, centres on y=24. The content area rounds by 7 DIP instead of 10. The empty pill's placeholder is semibold in disabled ink (`#76757f`, Arc `#757581`), its search glyph is dimmed (`#868592`, Arc `#898993`) and the darker plate behind it is gone. New Tab is dim (`#88868f`, like the Space title) until hovered, pressed or pending, and rows are 36 DIP tall with New Tab still 41 DIP below the title.
+- Verification: `chrome` and `bridge_check` build; `bridge_check`, `export_patches.py --check` and `check_docs.py` pass. Background captures `research-private/captures/finesse/sidebar-top/after-full.png` and `after-empty.png`, measured by line scans. New Tab hover and light mode were checked by reading the code, not captured.
+- Chromium `myarc` commit `ee214c9e41`.
+
 ## 2026-11-01: Boosts duotone rail glyph
 
 - The selected Boosts rail item now draws the wand's sparkles on a filled `#2523F6` tile with `#EDEDFD` strokes, like the other duotone glyphs. Rail hover was already right: a capture of the live test measures hover at about 0.045 white and selected at about 0.085 (`0x0B` vs `0x16`).

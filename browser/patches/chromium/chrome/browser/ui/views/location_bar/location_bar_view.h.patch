@@ -1,8 +1,16 @@
 diff --git a/chrome/browser/ui/views/location_bar/location_bar_view.h b/chrome/browser/ui/views/location_bar/location_bar_view.h
-index 856d9d7c66a7314d7046571bb3dfefda898970cc..afb91f955baa7b4b3e6b1d7482cf20b3d494adb3 100644
+index 856d9d7c66a7314d7046571bb3dfefda898970cc..b1663d7c411b832043519152dfa2087e1cb9d8aa 100644
 --- a/chrome/browser/ui/views/location_bar/location_bar_view.h
 +++ b/chrome/browser/ui/views/location_bar/location_bar_view.h
-@@ -449,6 +449,7 @@ class LocationBarView
+@@ -303,6 +303,7 @@ class LocationBarView
+   // LocationIconView::Delegate:
+   const LocationBarModel* GetLocationBarModel() const override;
+   bool IsEditingOrEmpty() const override;
++  bool ShouldHideLocationIconBackground() const override;
+   void OnLocationIconGestureEvent(ui::GestureEvent* event) override;
+   void OnLocationIconPressed(const ui::MouseEvent& event) override;
+   void OnLocationIconDragged(const ui::MouseEvent& event) override;
+@@ -449,6 +450,7 @@ class LocationBarView
    bool OnMousePressed(const ui::MouseEvent& event) override;
    bool OnMouseDragged(const ui::MouseEvent& event) override;
    void OnMouseReleased(const ui::MouseEvent& event) override;
@@ -10,7 +18,7 @@ index 856d9d7c66a7314d7046571bb3dfefda898970cc..afb91f955baa7b4b3e6b1d7482cf20b3
    void OnMouseMoved(const ui::MouseEvent& event) override;
    void OnMouseExited(const ui::MouseEvent& event) override;
    void ShowContextMenu(const gfx::Point& p,
-@@ -463,6 +464,9 @@ class LocationBarView
+@@ -463,6 +465,9 @@ class LocationBarView
                             const gfx::Point& press_pt,
                             const gfx::Point& p) override;
  
@@ -20,7 +28,7 @@ index 856d9d7c66a7314d7046571bb3dfefda898970cc..afb91f955baa7b4b3e6b1d7482cf20b3
    bool ShouldUsePopupOpenAppearance() const;
  
    bool ShouldHidePageActionIcons() const;
-@@ -575,6 +579,8 @@ class LocationBarView
+@@ -575,6 +580,8 @@ class LocationBarView
    // An icon to the left of the edit field: the HTTPS lock, blank page icon,
    // search icon, EV HTTPS bubble, etc.
    raw_ptr<LocationIconView> location_icon_view_ = nullptr;

@@ -1,5 +1,5 @@
 diff --git a/chrome/browser/ui/views/frame/contents_web_view.cc b/chrome/browser/ui/views/frame/contents_web_view.cc
-index 184614e93db97174631601f8b34dd1f9ecec550b..307767d3c0d06f988752bc11778678ba0dfe6e67 100644
+index 184614e93db97174631601f8b34dd1f9ecec550b..eea0a3ca0d7e296c5b2600ce925be4ec44861eae 100644
 --- a/chrome/browser/ui/views/frame/contents_web_view.cc
 +++ b/chrome/browser/ui/views/frame/contents_web_view.cc
 @@ -4,8 +4,10 @@
@@ -146,7 +146,7 @@ index 184614e93db97174631601f8b34dd1f9ecec550b..307767d3c0d06f988752bc11778678ba
 +      : visual_parity     ? SkColorSetARGB(dark ? 18 : 220, 255, 255, 255)
 +                          : SK_ColorTRANSPARENT));
 +  if (visual_parity) {
-+    layer()->SetRoundedCornerRadius(gfx::RoundedCornersF(10));
++    layer()->SetRoundedCornerRadius(gfx::RoundedCornersF(7));
 +    layer()->SetIsFastRoundedCorner(true);
 +    layer()->SetMasksToBounds(true);
 +  }

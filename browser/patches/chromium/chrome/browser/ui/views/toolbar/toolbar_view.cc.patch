@@ -1,5 +1,5 @@
 diff --git a/chrome/browser/ui/views/toolbar/toolbar_view.cc b/chrome/browser/ui/views/toolbar/toolbar_view.cc
-index 80b0e24263170de768a6684c8aabf106018710e7..f492bc146f1d4cf8cbf4c6a77b605f8d9e6e5d2e 100644
+index 80b0e24263170de768a6684c8aabf106018710e7..34fc2ec5ffa3d7b389105de4f7a715889edb1424 100644
 --- a/chrome/browser/ui/views/toolbar/toolbar_view.cc
 +++ b/chrome/browser/ui/views/toolbar/toolbar_view.cc
 @@ -5,6 +5,7 @@
@@ -59,7 +59,7 @@ index 80b0e24263170de768a6684c8aabf106018710e7..f492bc146f1d4cf8cbf4c6a77b605f8d
    bool is_glic_left_of_profile =
        features::kGlicToolbarButtonLocationParam.Get() ==
            features::GlicToolbarButtonLocation::kLeftOfProfileChip ||
-@@ -1463,12 +1478,88 @@ gfx::Size ToolbarView::GetMinimumSize() const {
+@@ -1463,12 +1478,89 @@ gfx::Size ToolbarView::GetMinimumSize() const {
    return size;
  }
  
@@ -118,16 +118,17 @@ index 80b0e24263170de768a6684c8aabf106018710e7..f492bc146f1d4cf8cbf4c6a77b605f8d
 +                           child == forward_ || child == reload_;
 +      gfx::Rect bounds;
 +      if (child == myarc_sidebar_toggle_) {
-+        // Arc's toggle chip sits 4.5 DIP right of the traffic lights.
-+        bounds = gfx::Rect(77, 8, 28, 28);
++        // Arc's 32 DIP toggle chip sits 4.5 DIP right of the traffic lights.
++        // The header row centres on y=24, as Arc's does.
++        bounds = gfx::Rect(77, 8, 32, 32);
 +      } else if (child == back_) {
-+        bounds = gfx::Rect(reload_x - 2 * pitch, 8, 24, 28);
++        bounds = gfx::Rect(reload_x - 2 * pitch, 8, 24, 32);
 +      } else if (child == forward_) {
-+        bounds = gfx::Rect(reload_x - pitch, 8, 24, 28);
++        bounds = gfx::Rect(reload_x - pitch, 8, 24, 32);
 +      } else if (child == reload_) {
-+        bounds = gfx::Rect(reload_x, 8, 24, 28);
++        bounds = gfx::Rect(reload_x, 8, 24, 32);
 +      } else if (child == location_bar_view_) {
-+        bounds = gfx::Rect(8, 46, w - 16, 38);
++        bounds = gfx::Rect(8, 46, w - 16, 36);
 +      }
 +      // Constrain the pill so unchanged bounds still lay out hover/focus
 +      // actions.
@@ -148,7 +149,7 @@ index 80b0e24263170de768a6684c8aabf106018710e7..f492bc146f1d4cf8cbf4c6a77b605f8d
    if (display_mode_ == DisplayMode::kCustomTab) {
      custom_tab_bar_->SetBounds(0, 0, width(),
                                 custom_tab_bar_->GetPreferredSize().height());
-@@ -1580,7 +1671,7 @@ void ToolbarView::InitLayout() {
+@@ -1580,7 +1672,7 @@ void ToolbarView::InitLayout() {
                                 views::MaximumFlexSizeRule::kUnbounded)
            .WithOrder(location_bar_flex_order);
  

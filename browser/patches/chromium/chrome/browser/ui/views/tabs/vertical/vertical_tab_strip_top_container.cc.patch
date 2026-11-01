@@ -1,5 +1,5 @@
 diff --git a/chrome/browser/ui/views/tabs/vertical/vertical_tab_strip_top_container.cc b/chrome/browser/ui/views/tabs/vertical/vertical_tab_strip_top_container.cc
-index 485aa1faf322a7cab9f33c029986c373caccaf8a..dcce655c61fe0b1953ad3d1149963e5ba7d100e7 100644
+index 485aa1faf322a7cab9f33c029986c373caccaf8a..acdd373627aba386a9b428f9e9fbab2fe169ec45 100644
 --- a/chrome/browser/ui/views/tabs/vertical/vertical_tab_strip_top_container.cc
 +++ b/chrome/browser/ui/views/tabs/vertical/vertical_tab_strip_top_container.cc
 @@ -95,6 +95,20 @@ VerticalTabStripTopContainer::VerticalTabStripTopContainer(
@@ -23,7 +23,7 @@ index 485aa1faf322a7cab9f33c029986c373caccaf8a..dcce655c61fe0b1953ad3d1149963e5b
  void VerticalTabStripTopContainer::Layout(PassKey) {
    LayoutSuperclass<views::View>(this);
    combo_button_->SetOrientation(combo_button_orientation_);
-@@ -103,6 +117,18 @@ void VerticalTabStripTopContainer::Layout(PassKey) {
+@@ -103,6 +117,19 @@ void VerticalTabStripTopContainer::Layout(PassKey) {
  views::ProposedLayout VerticalTabStripTopContainer::CalculateProposedLayout(
      const views::SizeBounds& size_bounds) const {
    views::ProposedLayout layout;
@@ -31,7 +31,8 @@ index 485aa1faf322a7cab9f33c029986c373caccaf8a..dcce655c61fe0b1953ad3d1149963e5b
 +    const int width = size_bounds.width().is_bounded()
 +                          ? size_bounds.width().value()
 +                          : parent()->width();
-+    layout.host_size = gfx::Size(width, 88);
++    // The URL pill ends at 82, leaving Arc's 8 DIP gap to the Favorites.
++    layout.host_size = gfx::Size(width, 82);
 +    for (views::View* child : children()) {
 +      const bool toolbar = child == myarc_sidebar_toolbar_;
 +      layout.child_layouts.emplace_back(

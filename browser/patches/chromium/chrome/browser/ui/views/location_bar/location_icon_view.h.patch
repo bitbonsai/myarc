@@ -1,0 +1,14 @@
+diff --git a/chrome/browser/ui/views/location_bar/location_icon_view.h b/chrome/browser/ui/views/location_bar/location_icon_view.h
+index 0a3cb10759d553d40c1dc123af3a0d28d3d4159d..14bf395367bd3fb962f46bab22a320b785c912f1 100644
+--- a/chrome/browser/ui/views/location_bar/location_icon_view.h
++++ b/chrome/browser/ui/views/location_bar/location_icon_view.h
+@@ -69,6 +69,9 @@ class LocationIconView : public IconLabelBubbleView {
+     // chip.
+     virtual std::optional<ui::ColorId> GetLocationIconBackgroundColorOverride()
+         const;
++
++    // Whether the icon chip sits flat on the location bar, with no fill.
++    virtual bool ShouldHideLocationIconBackground() const;
+   };
+ 
+   LocationIconView(const gfx::FontList& font_list,

@@ -1,5 +1,5 @@
 diff --git a/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl.cc b/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl.cc
-index b1ea4a69f42333b238abbf67b0278467ea41bb28..cafabccf09d4c716f61532590912150d3d35e4f7 100644
+index b1ea4a69f42333b238abbf67b0278467ea41bb28..d9be1d912005eb7a0d0172eb0673d8188de7f24d 100644
 --- a/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl.cc
 +++ b/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl.cc
 @@ -9,6 +9,7 @@
@@ -166,7 +166,7 @@ index b1ea4a69f42333b238abbf67b0278467ea41bb28..cafabccf09d4c716f61532590912150d
        separator_info.multi_contents_separator);
  
    // Updating the top, left and right insets for contents container view when
-@@ -1602,6 +1635,12 @@ void BrowserViewTabbedLayoutImpl::DoPostLayoutVisualAdjustments(
+@@ -1602,6 +1635,13 @@ void BrowserViewTabbedLayoutImpl::DoPostLayoutVisualAdjustments(
          content_corners.set_lower_left(radius);
        }
      }
@@ -174,12 +174,13 @@ index b1ea4a69f42333b238abbf67b0278467ea41bb28..cafabccf09d4c716f61532590912150d
 +            "myarc-visual-parity") &&
 +        layout_data_->tab_strip_type == TabStripType::kVertical &&
 +        !is_fullscreen(layout_data_->window_state)) {
-+      content_corners = gfx::RoundedCornersF(10);
++      // Arc rounds its content area by ~7 DIP.
++      content_corners = gfx::RoundedCornersF(7);
 +    }
      views().multi_contents_view->SetBackgroundRadii(content_corners);
    }
  
-@@ -1726,19 +1765,26 @@ void BrowserViewTabbedLayoutImpl::DoPostLayoutVisualAdjustments(
+@@ -1726,19 +1766,26 @@ void BrowserViewTabbedLayoutImpl::DoPostLayoutVisualAdjustments(
      if (animation.expand_on_hover_width > 0.0) {
        vertical_tabs_outline.bottom = true;
      }

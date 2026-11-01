@@ -53,6 +53,8 @@ namespace {
 using Orientation = views::BoxLayout::Orientation;
 
 constexpr int kTileHeight = 46;
+// Arc's row highlight is 36 DIP tall, the URL pill's height.
+constexpr int kRowHeight = 36;
 // The rows' size and edges; the Library replaces both while it is open.
 constexpr gfx::Size kSidebarSize(230, 400);
 constexpr gfx::Insets kSidebarInsets = gfx::Insets::TLBR(8, 8, 7, 8);
@@ -124,6 +126,8 @@ class ItemRow final : public views::View, public views::FocusChangeListener {
         ->SetMode(views::InkDropHost::InkDropMode::OFF);
     auto* layout = SetLayoutManager(std::make_unique<views::BoxLayout>(
         Orientation::kHorizontal, gfx::Insets(), 0));
+    layout->set_cross_axis_alignment(
+        views::BoxLayout::CrossAxisAlignment::kCenter);
     layout->SetFlexForView(AddChildView(std::move(activate)), 1);
     if (close) {
       close_ = AddChildView(std::move(close));
@@ -594,6 +598,7 @@ std::unique_ptr<views::View> SidebarView::MakeItem(
     activate->SetPreferredSize(gfx::Size(0, kTileHeight));
     return activate;
   }
+  activate->SetMinSize(gfx::Size(0, kRowHeight));
 
   std::unique_ptr<views::MdTextButton> close;
   if (presentation.is_live) {
@@ -808,9 +813,10 @@ void SidebarView::SetModel(const foundation::SidebarResult& model,
       views::Button::STATE_NORMAL,
       ui::ImageModel::FromVectorIcon(vector_icons::kAdd2Icon,
                                      ui::kColorSysOnSurface, 16));
+  new_tab->SetMinSize(gfx::Size(0, kRowHeight));
   TrackFocus(new_tab.get(), FocusAction::kNewTab);
   // Arc keeps 41 DIP between the Space title and New Tab row centers.
-  new_tab->SetProperty(views::kMarginsKey, gfx::Insets::TLBR(5, 0, 0, 0));
+  new_tab->SetProperty(views::kMarginsKey, gfx::Insets::TLBR(3, 0, 0, 0));
   new_tab_ = body->AddChildView(std::move(new_tab));
   for (const auto& item : model.temporary) {
     body->AddChildView(
@@ -1134,6 +1140,22 @@ void SidebarView::UpdateFills() {
   if (new_tab_) {
     new_tab_->SetBgColorOverrideDeprecated(
         new_tab_intent_ ? fills.new_tab : SK_ColorTRANSPARENT);
+    // Arc dims the idle New Tab row like the Space title and brightens it
+    // under the pointer or while a new tab is pending.
+    const ui::ColorVariant idle =
+        new_tab_intent_ ? ui::ColorVariant(ui::kColorSysOnSurface)
+                        : ui::ColorVariant(fills.title);
+    for (const auto state : {views::Button::STATE_NORMAL,
+                             views::Button::STATE_HOVERED,
+                             views::Button::STATE_PRESSED}) {
+      const ui::ColorVariant color = state == views::Button::STATE_NORMAL
+                                         ? idle
+                                         : ui::kColorSysOnSurface;
+      new_tab_->SetTextColor(state, color);
+      new_tab_->SetImageModel(
+          state, ui::ImageModel::FromVectorIcon(vector_icons::kAdd2Icon, color,
+                                                16));
+    }
   }
   const auto rename = std::ranges::find(focus_targets_, FocusAction::kRename,
                                         &FocusTarget::action);

@@ -1,5 +1,5 @@
 diff --git a/chrome/browser/ui/views/location_bar/location_bar_view.cc b/chrome/browser/ui/views/location_bar/location_bar_view.cc
-index 972bd7bc04d240f23d4c527bdb6faa81272421e5..df0663d7ca1010248c893d1dfc433fcf87476a5e 100644
+index 972bd7bc04d240f23d4c527bdb6faa81272421e5..fd69234daffcd9070de4f5022b9d9507790c8861 100644
 --- a/chrome/browser/ui/views/location_bar/location_bar_view.cc
 +++ b/chrome/browser/ui/views/location_bar/location_bar_view.cc
 @@ -11,6 +11,7 @@
@@ -257,7 +257,44 @@ index 972bd7bc04d240f23d4c527bdb6faa81272421e5..df0663d7ca1010248c893d1dfc433fcf
    if (is_hovering) {
      // Only show the hover animation when omnibox is in unfocused steady state.
      if (!omnibox_view_->HasFocus()) {
-@@ -2502,7 +2625,6 @@ void LocationBarView::OnAppShimChanged(const webapps::AppId& app_id) {
+@@ -2345,11 +2468,19 @@ SkColor LocationBarView::GetSecurityChipColor(
+   ui::ColorId id = kColorOmniboxText;
+   if (security_level == security_state::DANGEROUS) {
+     id = kColorOmniboxSecurityChipDangerous;
++  } else if (IsMyarcUrlPill() && IsEditingOrEmpty()) {
++    // Arc's search glyph is the field's ink at ~47%, brighter than its
++    // placeholder.
++    return SkColorSetA(GetColorProvider()->GetColor(id), 0x78);
+   }
+ 
+   return GetColorProvider()->GetColor(id);
+ }
+ 
++bool LocationBarView::ShouldHideLocationIconBackground() const {
++  return IsMyarcUrlPill();
++}
++
+ bool LocationBarView::ShowPageInfoDialog() {
+   WebContents* contents = GetWebContents();
+   if (!contents) {
+@@ -2399,10 +2530,15 @@ ui::ImageModel LocationBarView::GetLocationIcon(
+     return GetOmniboxController()->edit_model()->GetAddContextIcon(dip_size);
+   }
+ 
++  // An empty pill shows the search glyph as a match icon; Arc dims it too.
++  const SkColor match_icon_color =
++      IsMyarcUrlPill() && IsEditingOrEmpty()
++          ? location_icon_view_->GetForegroundColor()
++          : View::GetColorProvider()->GetColor(kColorOmniboxResultsIcon);
+   return omnibox_view_
+              ? omnibox_view_->GetIcon(
+                    dip_size, location_icon_view_->GetForegroundColor(),
+-                   View::GetColorProvider()->GetColor(kColorOmniboxResultsIcon),
++                   match_icon_color,
+                    View::GetColorProvider()->GetColor(
+                        kColorOmniboxResultsStarterPackIcon),
+                    View::GetColorProvider()->GetColor(
+@@ -2502,7 +2638,6 @@ void LocationBarView::OnAppShimChanged(const webapps::AppId& app_id) {
  }
  #endif
  
