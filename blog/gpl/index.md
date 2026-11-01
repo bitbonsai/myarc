@@ -1,4 +1,4 @@
-HTML: https://myarc.dev/blog/2026-10-29-gpl/
+HTML: https://myarc.dev/blog/gpl/
 
 [All posts](https://myarc.dev/blog/)
 

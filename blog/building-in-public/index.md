@@ -1,4 +1,4 @@
-HTML: https://myarc.dev/blog/2026-10-25-building-in-public/
+HTML: https://myarc.dev/blog/building-in-public/
 
 [All posts](https://myarc.dev/blog/)
 
@@ -8,7 +8,7 @@ October 25, 2026
 
 [Mauricio Wolff](https://github.com/bitbonsai)4 min read
 
-[![Mauricio Wolff's Arc card, dated 25 March 2023, with three anniversary stamps](https://myarc.dev/blog/2026-10-25-building-in-public/mauricio-wolff-arc.c739650f7b1d.webp)](https://myarc.dev/blog/2026-10-25-building-in-public/mauricio-wolff-arc.c739650f7b1d.webp)
+[![Mauricio Wolff's Arc card, dated 25 March 2023, with three anniversary stamps](https://myarc.dev/blog/building-in-public/mauricio-wolff-arc.c739650f7b1d.webp)](https://myarc.dev/blog/building-in-public/mauricio-wolff-arc.c739650f7b1d.webp)
 
 My Arc card, 2023\.
 
@@ -52,6 +52,6 @@ Wrap saves the gotchas from a session and writes a handover for the next one. Th
 
 Page navigation works, and so does the centered native command palette. What I'm going for today is an Arc-like empty window and a native nightly build, so people can try it without compiling Chromium themselves.
 
-[![Arc on the left and the current myArc nightly on the right, both displaying mauriciowolff.com with their command bars open](https://myarc.dev/blog/2026-10-25-building-in-public/scene-sbs.9c2120fba7b4.webp)](https://myarc.dev/blog/2026-10-25-building-in-public/scene-sbs.9c2120fba7b4.webp)
+[![Arc on the left and the current myArc nightly on the right, both displaying mauriciowolff.com with their command bars open](https://myarc.dev/blog/building-in-public/scene-sbs.9c2120fba7b4.webp)](https://myarc.dev/blog/building-in-public/scene-sbs.9c2120fba7b4.webp)
 
 Arc on the left. The current myArc nightly on the right.

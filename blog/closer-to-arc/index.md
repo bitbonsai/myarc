@@ -1,4 +1,4 @@
-HTML: https://myarc.dev/blog/2026-11-01-nightly/
+HTML: https://myarc.dev/blog/closer-to-arc/
 
 [All posts](https://myarc.dev/blog/)
 
@@ -8,7 +8,7 @@ November 01, 2026
 
 [Mauricio Wolff](https://github.com/bitbonsai)6 min read
 
-[![myArc's sidebar with the creation menu open above the "+" button, listing New Space, a greyed-out New Split and a highlighted New Tab](https://myarc.dev/blog/2026-11-01-nightly/creation-menu.6b5d41985107.webp)](https://myarc.dev/blog/2026-11-01-nightly/creation-menu.6b5d41985107.webp)
+[![myArc's sidebar with the creation menu open above the "+" button, listing New Space, a greyed-out New Split and a highlighted New Tab](https://myarc.dev/blog/closer-to-arc/creation-menu.6b5d41985107.webp)](https://myarc.dev/blog/closer-to-arc/creation-menu.6b5d41985107.webp)
 
 The new creation menu. New Split stays greyed out until split view works.
 
@@ -44,7 +44,7 @@ The Library is Arc's panel for things that aren't tabs: Media, Downloads, Spaces
 
 The Spaces section has a card for each Space, listing its pinned tabs. Click a pinned tab on a card and myArc switches to that Space and opens it. The brush icon on a card renames the Space. As of today you can also reorder Spaces by dragging a card by its handle. The other cards slide aside, Esc drops the card back where it was, and the footer icons and Ctrl\+1 to Ctrl\+9 follow the new order. If you'd rather use the keyboard, the card's "..." menu has Move Left and Move Right.
 
-[![The Library's Spaces section with three Space cards, Everyday, Research and Reading, each listing synthetic pinned tabs, and the icon rail on the left](https://myarc.dev/blog/2026-11-01-nightly/library-space-cards.ce64221778f8.webp)](https://myarc.dev/blog/2026-11-01-nightly/library-space-cards.ce64221778f8.webp)
+[![The Library's Spaces section with three Space cards, Everyday, Research and Reading, each listing synthetic pinned tabs, and the icon rail on the left](https://myarc.dev/blog/closer-to-arc/library-space-cards.ce64221778f8.webp)](https://myarc.dev/blog/closer-to-arc/library-space-cards.ce64221778f8.webp)
 
 Space cards in the Library, filled with synthetic tabs.
 
@@ -52,7 +52,7 @@ Close a temporary tab and it lands in Archived Tabs, grouped by day and searchab
 
 Hover the Library button and your four most recent finished downloads fan out above it. Click one to open the file, or drag it into another app. Chromium's own download bubble no longer pops up in the corner, and past downloads still show after a relaunch.
 
-[![Two crops of the sidebar footer: at rest with no downloads showing, then with the downloads stack showing sample.zip above the Library button](https://myarc.dev/blog/2026-11-01-nightly/downloads-stack.cf200385ecfd.webp)](https://myarc.dev/blog/2026-11-01-nightly/downloads-stack.cf200385ecfd.webp)
+[![Two crops of the sidebar footer: at rest with no downloads showing, then with the downloads stack showing sample.zip above the Library button](https://myarc.dev/blog/closer-to-arc/downloads-stack.cf200385ecfd.webp)](https://myarc.dev/blog/closer-to-arc/downloads-stack.cf200385ecfd.webp)
 
 The footer at rest, then with the downloads stack open.
 
