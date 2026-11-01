@@ -1,5 +1,10 @@
 # Development log
 
+## 2026-11-01: Boosts duotone rail glyph
+
+- The selected Boosts rail item now draws the wand's sparkles on a filled `#2523F6` tile with `#EDEDFD` strokes, like the other duotone glyphs. Rail hover was already right: a capture of the live test measures hover at about 0.045 white and selected at about 0.085 (`0x0B` vs `0x16`).
+- Verification: `chrome` and `bridge_check` build; `bridge_check` and `check_docs.py` pass. Capture `research-private/captures/fixes-2026-11-01/d-library-boosts-4.png`.
+
 ## 2026-11-01: Library exit review fixes
 
 - Closing no longer clears the region's Library layout on the first frame: a leaving flag keeps the Library's width and hides the header until the sidebar swaps in its rows, and the header then fades in with them over 65 ms. Focus returns to the Library button only if the Library still holds focus at the swap. A hidden or zero-width sidebar closes at once. Reopening during the exit turns the Library back without a rebuild, keeping section and scroll. The fading rows take no clicks. Closing uses tau 70 ms.

@@ -113,7 +113,8 @@ constexpr auto kSections = std::to_array<SectionInfo>({
     {Section::kDownloads, &kCircleArrowDownIcon, &kCircleArrowDownActiveIcon,
      u"Downloads", u"Search Downloads\u2026"},
     {Section::kSpaces, &kCopyIcon, &kCopyActiveIcon, u"Spaces", nullptr},
-    {Section::kBoosts, &kWandIcon, nullptr, u"Boosts", u"Search Boosts\u2026"},
+    {Section::kBoosts, &kWandIcon, &kWandActiveIcon, u"Boosts",
+     u"Search Boosts\u2026"},
     {Section::kArchive, &kArchiveIcon, &kArchiveActiveIcon, u"Archived Tabs",
      u"Search Archive\u2026"},
 });

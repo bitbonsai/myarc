@@ -180,6 +180,21 @@ inline constexpr gfx::VectorIcon kCopyActiveIcon(kCopyActiveRep,
                                                  std::size(kCopyActiveRep),
                                                  "myarc_copy_active");
 
+// Arc's Boosts glyph sits on a filled tile; here the wand's sparkles do.
+inline constexpr gfx::PathElement kWandActivePath[] = {
+    gfx::CANVAS_DIMENSIONS, 24, MYARC_RAIL_FILL,
+    gfx::ROUND_RECT, 7, 1, 16, 16, 4, MYARC_RAIL_LINE,
+    gfx::MOVE_TO, 15, 4, gfx::V_LINE_TO, 2, gfx::MOVE_TO, 15, 16,
+    gfx::R_V_LINE_TO, -2, gfx::MOVE_TO, 8, 9, gfx::R_H_LINE_TO, 2,
+    gfx::MOVE_TO, 20, 9, gfx::R_H_LINE_TO, 2, gfx::MOVE_TO, 17.8f, 11.8f,
+    gfx::LINE_TO, 19, 13, gfx::MOVE_TO, 15, 9, gfx::R_H_LINE_TO, 0.01f,
+    gfx::MOVE_TO, 17.8f, 6.2f, gfx::LINE_TO, 19, 5, gfx::MOVE_TO, 3, 21,
+    gfx::R_LINE_TO, 9, -9, gfx::MOVE_TO, 12.2f, 6.2f, gfx::LINE_TO, 11, 5};
+inline constexpr gfx::VectorIconRep kWandActiveRep[] = {{kWandActivePath}};
+inline constexpr gfx::VectorIcon kWandActiveIcon(kWandActiveRep,
+                                                 std::size(kWandActiveRep),
+                                                 "myarc_wand_active");
+
 #undef MYARC_RAIL_LINE
 #undef MYARC_RAIL_FILL
 
