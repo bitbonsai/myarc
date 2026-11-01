@@ -314,6 +314,15 @@ void SaveTitle(Profile& profile, content::WebContents& page, uint64_t item) {
   auto state = service.ExportSnapshot();
   const auto* row = state ? FindItem(*state, item) : nullptr;
   const auto* entry = page.GetController().GetLastCommittedEntry();
+  // A temporary row remembers its page, so it stays in the sidebar, dormant,
+  // when its tab is not restored.
+  if (row && row->placement == foundation::PlacementKind::Temporary) {
+    if (entry && entry->GetPageType() != content::PAGE_TYPE_ERROR) {
+      service.SetTemporaryPage(item, entry->GetURL().spec(),
+                               base::UTF16ToUTF8(entry->GetTitle()));
+    }
+    return;
+  }
   if (!row || !row->has_url || !entry ||
       entry->GetPageType() == content::PAGE_TYPE_ERROR) {
     return;
@@ -674,7 +683,7 @@ foundation::MutationResult BrowserWorkspaceAdapter::ReconcileBindings(
   const bool stale =
       std::ranges::any_of(state->items, [&live](const auto& row) {
         return row.placement == foundation::PlacementKind::Temporary &&
-               !live.contains(row.id);
+               !row.has_url && !live.contains(row.id);
       });
   if (!stale)
     return Ok();
@@ -737,6 +746,7 @@ foundation::MutationResult BrowserWorkspaceAdapter::BindTabs() {
       DCHECK_NE(result.id, 0u);
       DCHECK_EQ(Count(*profile_, result.id), 0u);
       binding->Rebind(result.id, space);
+      SaveTitle(*profile_, *contents, result.id);
       state = service_->ExportSnapshot();
       if (!state)
         return Fail("Workspace metadata became unavailable during binding.");
@@ -1342,7 +1352,8 @@ void BrowserWorkspaceAdapter::RequestSavedIcons(
   auto* favicons = Favicons();
   if (!favicons)
     return;
-  for (const auto* rows : {&sidebar.favorites, &sidebar.pins}) {
+  for (const auto* rows :
+       {&sidebar.favorites, &sidebar.pins, &sidebar.temporary}) {
     for (const auto& row : *rows) {
       if (!row.has_url)
         continue;
@@ -1445,8 +1456,13 @@ foundation::MutationResult BrowserWorkspaceAdapter::ActivateItem(
     return Fail("Workspace item does not exist.");
   auto* page = LocalPage(*tabs_, item);
   if (!page) {
-    if (!row->has_url)
+    // A dormant temporary row reopens its remembered page, unless the page is
+    // still open in another window.
+    if (!row->has_url ||
+        (row->placement == foundation::PlacementKind::Temporary &&
+         AnyPage(*profile_, item))) {
       return Fail("Temporary page is detached or unavailable in this window.");
+    }
     const GURL url(std::string(row->canonical_url));
     if (!url.is_valid() || url.has_username() || url.has_password() ||
         !(url.SchemeIsHTTPOrHTTPS() || url.spec() == "about:blank"))
@@ -1542,8 +1558,21 @@ foundation::MutationResult BrowserWorkspaceAdapter::CloseItem(uint64_t item) {
   if (!ready())
     return Fail(error());
   auto* page = LocalPage(*tabs_, item);
-  if (!page)
-    return Fail("No live projection of this item in this window.");
+  if (!page) {
+    // A dormant temporary row closes like its page would have.
+    auto state = service_->ExportSnapshot();
+    const auto* row = state ? FindItem(*state, item) : nullptr;
+    if (!row || row->placement != foundation::PlacementKind::Temporary ||
+        AnyPage(*profile_, item)) {
+      return Fail("No live projection of this item in this window.");
+    }
+    if (!row->has_url || profile_->GetPrefs()->GetBoolean(
+                             prefs::kSavingBrowserHistoryDisabled)) {
+      return Remember(service_->LiveTabClosed(item));
+    }
+    return Remember(service_->ArchiveClosedTab(
+        item, std::string(row->canonical_url), std::string(row->title)));
+  }
   tabs_->CloseWebContents(page,
                           CLOSE_USER_GESTURE | CLOSE_CREATE_HISTORICAL_TAB);
   // Native beforeunload may cancel. Binding destruction acknowledges actual
@@ -1584,9 +1613,12 @@ foundation::MutationResult BrowserWorkspaceAdapter::Save(
   const uint64_t owner = kind == foundation::PlacementKind::Favorite
                              ? sidebar.current_space.profile_id
                              : sidebar.current_space.id;
-  if (row->has_url)
-    return Remember(service_->SetPlacement(item, kind, owner, false, ""));
   auto* page = LocalPage(*tabs_, item);
+  // A live temporary page saves where it is now, not the page it remembers.
+  if (row->has_url &&
+      (row->placement != foundation::PlacementKind::Temporary || !page)) {
+    return Remember(service_->SetPlacement(item, kind, owner, false, ""));
+  }
   if (!page)
     return Fail("Save requires an actual live page in this window.");
   auto result = service_->SetPlacement(item, kind, owner, true,

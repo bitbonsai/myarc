@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-11-01: Tabs Chromium doesn't restore stay as dormant rows
+
+- Cause: Temporary items stored no URL, so when Chromium didn't bring a tab back (New Tab startup choice, macOS restore off, a failed restore) `ReconcileBindings` deleted the row. Temporary items now remember their last http(s) page and title (`set_temporary_page`, written on load), reconcile keeps any that remember a page, and the row reopens it on click through the existing dormant path in `ActivateItem`. Dormant Temporary rows get a close button (archives the remembered page); a temporary row with no reopenable page (data:, chrome://) still goes at reconcile.
+- Verification: `cargo test` (`temporary_item_with_a_page_survives_reconciliation_without_a_tab`), fmt, clippy, `chrome` and `bridge_check` build, `bridge_check` (new `CheckDormantTemporary`: codec round trip, then reconcile with no live tabs), `export_patches.py --check` and `check_docs.py` pass. Live `/tmp` profile with 3 http pages from 127.0.0.1, startup pref 5 via chrome://settings, Cmd+Q to the PID, `Sessions` deleted, relaunch: only `chrome://newtab/` opens, the sidebar shows Alpha, Bravo, Charlie, and Cmd+2 reopens Bravo. Evidence in `research-private/captures/fixes-2026-11-01/restore-dormant/`.
+- Not verified: a real mouse click (background clicks don't reach the window; Cmd+2 calls the same `ActivateItem`), and why pref 5 alone still restored tabs (macOS window restoration, it seems). Dormant Temporary rows never Auto Archive, since that pass only sees open pages. No Chromium patch changes.
+
 ## 2026-11-01: Spaces keep their last tab, and a new Space opens
 
 - Cause: `select_space` cleared a window's selection when it hid behind a Space switch and kept nothing to restore, so `ShowSelected` fell back to the first tab on return. `Workspace` now remembers each window's last selected item per Space in memory (not in the snapshot, so not across relaunch) and restores it on return if it's still visible there. Separately, the Create Space dialog only created the Space; on Create it now also selects it.

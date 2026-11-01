@@ -658,7 +658,9 @@ std::unique_ptr<views::View> SidebarView::MakeItem(
   activate->SetMinSize(gfx::Size(0, kRowHeight));
 
   std::unique_ptr<views::MdTextButton> close;
-  if (presentation.is_live) {
+  // A dormant temporary row closes too; saved rows close only a live page.
+  if (presentation.is_live ||
+      item.placement == foundation::PlacementKind::Temporary) {
     close = IconButton(
         base::BindRepeating(&Delegate::CloseLiveItem,
                             base::Unretained(&delegate_.get()), item.id),
@@ -668,7 +670,8 @@ std::unique_ptr<views::View> SidebarView::MakeItem(
     const std::u16string close_name =
         (menu_state.is_pin        ? u"Close live page, keep Space Pin: "
          : menu_state.is_favorite ? u"Close live page, keep Favorite: "
-                                  : u"Close live page: ") +
+         : presentation.is_live   ? u"Close live page: "
+                                  : u"Close tab: ") +
         presentation.title;
     close->SetTooltipText(close_name);
     close->GetViewAccessibility().SetName(close_name);

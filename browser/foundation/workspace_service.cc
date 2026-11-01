@@ -750,6 +750,28 @@ foundation::MutationResult WorkspaceService::SetTitle(uint64_t item,
   return result;
 }
 
+foundation::MutationResult WorkspaceService::SetTemporaryPage(
+    uint64_t item,
+    std::string_view url,
+    std::string_view title) {
+  if (!CanMutate())
+    return Failure("Workspace is not loaded. Check storage state.");
+  const auto canonical = CanonicalUrl(url);
+  if (!canonical || !base::IsStringUTF8(title))
+    return {true, 0, rust::String()};
+  auto result = foundation::set_temporary_page(
+      *workspace_, item, rust::Str(canonical->data(), canonical->size()),
+      rust::Str(title.data(), title.size()));
+  // Like titles, a page touches no bindings, so skip the notify. It is written
+  // now so a crash keeps the row reopenable.
+  if (result.ok && result.id && !ephemeral_) {
+    dirty_ = true;
+    if (storage_state_ != StorageState::kWriteError)
+      ScheduleWrite();
+  }
+  return result;
+}
+
 foundation::MutationResult WorkspaceService::RemoveSavedItem(uint64_t item) {
   if (!CanMutate())
     return Failure("Workspace is not loaded. Check storage state.");

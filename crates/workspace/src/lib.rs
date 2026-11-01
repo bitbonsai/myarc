@@ -11,10 +11,11 @@
 //! Multiple windows can select the same item. Closing the last live page should
 //! trigger `live_tab_closed`; closing one of several projections must not remove
 //! a temporary item that still has a live page. This crate stores no live count.
-//! Temporary URLs/titles are browser-owned and absent from the typed snapshot;
-//! restoring their organization does not restore browser sessions. After native-session
-//! restoration and stable-ID binding finish, adapters must call `reconcile_live_items`
-//! with all bound live item IDs to prune unbound temporary rows. Saved rows survive.
+//! A temporary item may remember the last page it showed (`set_temporary_page`) so
+//! its row survives, dormant, when the browser does not restore its tab. After
+//! native-session restoration and stable-ID binding finish, adapters must call
+//! `reconcile_live_items` with all bound live item IDs to prune unbound temporary rows
+//! that remember no page. Saved rows and temporary rows with a page survive.
 //!
 //! Zero windows is valid during a Profile's lifetime. After restore or window close,
 //! adapters must allocate/rebind a model window before requesting `sidebar_snapshot`;
@@ -153,10 +154,11 @@ pub enum Placement {
 pub struct Item {
     pub id: ItemId,
     pub placement: Placement,
-    /// Saved URL only. Navigating a live page must not update this value implicitly.
+    /// Saved URL of a saved item. Navigating a live page must not update it
+    /// implicitly. A temporary item holds the last page it showed here, written
+    /// only by `set_temporary_page`, so its dormant row can reopen it.
     pub canonical_url: Option<String>,
-    /// Last known page title of a saved item, shown while it is dormant. Empty
-    /// when unknown and always empty for temporary items.
+    /// Last known page title, shown while the item is dormant. Empty when unknown.
     pub title: String,
     /// Reading of the browser-open clock (`WorkspaceSnapshot::open_secs`) when a
     /// temporary item was last seen, for Auto Archive. Zero means not recorded
@@ -514,7 +516,8 @@ impl Workspace {
     }
 
     /// `Some(url)` deliberately replaces the saved URL. `None` preserves a saved
-    /// URL when saving/moving. A first save requires `Some(url)`.
+    /// URL when saving/moving, and a temporary item's remembered page when saving
+    /// it or moving it between Spaces. A first save without one requires `Some(url)`.
     /// Saved-to-Temporary demotion is rejected: use `unsave_item` to report whether
     /// and where a live page exists. Temporary-to-Temporary moves remain allowed.
     /// Placement changes keep vector order. This method never observes navigation.
@@ -534,7 +537,7 @@ impl Workspace {
                 if !matches!(item.placement, Placement::Temporary { .. }) {
                     return Err(WorkspaceError::ExplicitUnsaveRequired(item_id));
                 }
-                None
+                item.canonical_url.clone()
             }
             Placement::Pin { .. } | Placement::Favorite { .. } => {
                 let url = canonical_url
@@ -544,9 +547,10 @@ impl Workspace {
                 Some(url.to_owned())
             }
         };
+        let saved = !matches!(placement, Placement::Temporary { .. });
         for item in &mut self.state.items {
             if item.id == item_id {
-                if url.is_some() {
+                if saved {
                     item.last_viewed_secs = 0;
                 }
                 item.placement = placement;
@@ -610,11 +614,44 @@ impl Workspace {
         item_id: ItemId,
         current_url: &str,
     ) -> Result<bool, WorkspaceError> {
-        self.item(item_id)?
-            .canonical_url
+        let item = self.item(item_id)?;
+        if matches!(item.placement, Placement::Temporary { .. }) {
+            return Err(WorkspaceError::NoCanonicalUrl(item_id));
+        }
+        item.canonical_url
             .as_deref()
             .map(|canonical| canonical != current_url)
             .ok_or(WorkspaceError::NoCanonicalUrl(item_id))
+    }
+
+    /// Remember the page a live temporary item shows, so its row stays in the
+    /// sidebar, dormant, if the browser does not restore its tab, and reopens
+    /// `url`. The caller passes a browser-canonicalized URL; the title is cleaned
+    /// like `set_title`. Returns whether anything changed. Saved items reject with
+    /// `ExplicitUnsaveRequired`: their URL changes only through `set_canonical_url`.
+    pub fn set_temporary_page(
+        &mut self,
+        item_id: ItemId,
+        url: &str,
+        title: &str,
+    ) -> Result<bool, WorkspaceError> {
+        if !matches!(self.item(item_id)?.placement, Placement::Temporary { .. }) {
+            return Err(WorkspaceError::ExplicitUnsaveRequired(item_id));
+        }
+        validate_url(url)?;
+        let clean = clean_title(title);
+        let item = self
+            .state
+            .items
+            .iter_mut()
+            .find(|item| item.id == item_id)
+            .ok_or(WorkspaceError::UnknownItem(item_id))?;
+        if item.canonical_url.as_deref() == Some(url) && item.title == clean {
+            return Ok(false);
+        }
+        item.canonical_url = Some(url.to_owned());
+        item.title = clean;
+        Ok(true)
     }
 
     /// Temporary identity ends on close. Saved identity and selection survive;
@@ -667,7 +704,9 @@ impl Workspace {
     /// Call only after native-session restoration and stable-ID binding complete.
     /// Supply all bound live item IDs (saved IDs are allowed). Counts, existence
     /// and uniqueness are checked before mutation. Prunes only unbound Temporary
-    /// items and their selections across all windows; dormant saved items remain.
+    /// items that remember no page, and their selections across all windows.
+    /// Dormant saved items and temporary items with a page remain: a tab the
+    /// browser did not restore is never grounds for dropping the user's row.
     pub fn reconcile_live_items(&mut self, live_item_ids: &[ItemId]) -> Result<(), WorkspaceError> {
         if live_item_ids.len() > MAX_ITEMS {
             return Err(WorkspaceError::LimitExceeded("live items"));
@@ -680,7 +719,9 @@ impl Workspace {
             }
         }
         self.state.items.retain(|item| {
-            !matches!(item.placement, Placement::Temporary { .. }) || live.contains(&item.id)
+            !matches!(item.placement, Placement::Temporary { .. })
+                || item.canonical_url.is_some()
+                || live.contains(&item.id)
         });
         self.clear_hidden_selections();
         Ok(())
@@ -873,19 +914,13 @@ impl Workspace {
         for item in &state.items {
             self.validate_placement(item.placement)?;
             match (item.placement, item.canonical_url.as_deref()) {
-                (Placement::Temporary { .. }, Some(_)) => {
-                    return Err(WorkspaceError::UnexpectedCanonicalUrl);
-                }
                 (Placement::Temporary { .. }, None) => {}
                 (_, Some(url)) => validate_url(url)?,
                 (_, None) => return Err(WorkspaceError::CanonicalUrlRequired),
             }
-            if item.title.len() > MAX_TITLE_BYTES
-                || item.title.chars().any(char::is_control)
-                || (matches!(item.placement, Placement::Temporary { .. }) && !item.title.is_empty())
-            {
+            if item.title.len() > MAX_TITLE_BYTES || item.title.chars().any(char::is_control) {
                 return Err(WorkspaceError::InvalidSnapshot(
-                    "item title is oversized, has control characters or belongs to a temporary item",
+                    "item title is oversized or has control characters",
                 ));
             }
         }
@@ -1155,7 +1190,7 @@ mod tests {
         );
 
         let mut snapshot = workspace.snapshot();
-        snapshot.items[0].title = String::from("Leaked temporary title");
+        snapshot.items[0].title = String::from("Bad\ttitle");
         assert!(matches!(
             Workspace::from_snapshot(snapshot),
             Err(WorkspaceError::InvalidSnapshot(_))

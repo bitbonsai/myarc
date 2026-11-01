@@ -13,6 +13,14 @@ fn pin(workspace: &mut Workspace, space: SpaceId) -> ItemId {
     id
 }
 
+fn find(workspace: &Workspace, id: ItemId) -> Option<Item> {
+    workspace
+        .snapshot()
+        .items
+        .into_iter()
+        .find(|item| item.id == id)
+}
+
 fn unchanged<T: std::fmt::Debug>(
     workspace: &mut Workspace,
     command: impl FnOnce(&mut Workspace) -> Result<T, WorkspaceError>,
@@ -515,7 +523,10 @@ fn snapshots_reject_dangling_owners_inconsistent_urls_and_selections() {
         |s| s.items[0].placement = Placement::Pin { space_id: 99 },
         |s| s.items[0].placement = Placement::Temporary { space_id: 99 },
         |s| s.items[0].placement = Placement::Favorite { profile_id: 2 },
-        |s| s.items[0].placement = Placement::Temporary { space_id: S1 },
+        |s| {
+            s.items[0].placement = Placement::Temporary { space_id: S1 };
+            s.items[0].canonical_url = Some("chrome://newtab".into());
+        },
         |s| s.items[0].canonical_url = None,
         |s| s.items[0].canonical_url = Some("javascript:alert(1)".into()),
         |s| s.items[0].canonical_url = Some("x".repeat(MAX_URL_BYTES + 1)),
@@ -702,6 +713,73 @@ fn reconciliation_validates_entire_bounded_live_set_before_pruning() {
         |w| w.reconcile_live_items(&vec![live; MAX_ITEMS + 1]),
         WorkspaceError::LimitExceeded("live items"),
     );
+}
+
+#[test]
+fn temporary_item_with_a_page_survives_reconciliation_without_a_tab() {
+    let mut workspace = Workspace::default();
+    let other = workspace.create_space(P1, "Other").unwrap();
+    let remembered = workspace.add_temporary_item(S1).unwrap();
+    let blank = workspace.add_temporary_item(S1).unwrap();
+    assert_eq!(
+        workspace.set_temporary_page(remembered, URL, "Alpha\n"),
+        Ok(true)
+    );
+    assert_eq!(
+        workspace.set_temporary_page(remembered, URL, "Alpha "),
+        Ok(false)
+    );
+    unchanged(
+        &mut workspace,
+        |w| w.set_temporary_page(blank, "chrome://newtab", "New Tab"),
+        WorkspaceError::InvalidUrl,
+    );
+    let saved = pin(&mut workspace, S1);
+    unchanged(
+        &mut workspace,
+        |w| w.set_temporary_page(saved, URL, "Saved"),
+        WorkspaceError::ExplicitUnsaveRequired(saved),
+    );
+    workspace.select_item(W1, remembered).unwrap();
+
+    // Relaunch with no restored tabs: the row stays dormant with its page and
+    // selection; only the row with nothing to reopen goes.
+    let mut restored = Workspace::from_snapshot(workspace.snapshot()).unwrap();
+    restored.reconcile_live_items(&[]).unwrap();
+    let item = find(&restored, remembered).unwrap();
+    assert_eq!(item.placement, Placement::Temporary { space_id: S1 });
+    assert_eq!(item.canonical_url.as_deref(), Some(URL));
+    assert_eq!(item.title, "Alpha ");
+    assert!(find(&restored, blank).is_none());
+    assert!(find(&restored, saved).is_some());
+    assert_eq!(
+        restored.sidebar_snapshot(W1).unwrap().selected_item_id,
+        Some(remembered)
+    );
+    assert_eq!(
+        restored.differs_from_canonical(remembered, URL),
+        Err(WorkspaceError::NoCanonicalUrl(remembered))
+    );
+
+    // Moving keeps the page; saving needs no URL; unsaving a live page drops it.
+    restored
+        .set_placement(remembered, Placement::Temporary { space_id: other }, None)
+        .unwrap();
+    assert_eq!(
+        find(&restored, remembered)
+            .unwrap()
+            .canonical_url
+            .as_deref(),
+        Some(URL)
+    );
+    restored
+        .set_placement(remembered, Placement::Pin { space_id: other }, None)
+        .unwrap();
+    assert_eq!(find(&restored, remembered).unwrap().title, "Alpha ");
+    restored.unsave_item(remembered, Some(other)).unwrap();
+    assert_eq!(find(&restored, remembered).unwrap().canonical_url, None);
+    restored.reconcile_live_items(&[]).unwrap();
+    assert!(find(&restored, remembered).is_none());
 }
 
 #[test]

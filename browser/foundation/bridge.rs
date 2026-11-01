@@ -182,6 +182,14 @@ mod ffi {
         fn set_canonical_url(workspace: &mut Workspace, item_id: u64, url: &str) -> MutationResult;
         // Saved items only. `id` is 1 when the stored title changed, else 0.
         fn set_title(workspace: &mut Workspace, item_id: u64, title: &str) -> MutationResult;
+        // Temporary items only: the page a dormant row reopens. `id` is 1 when
+        // the stored URL or title changed, else 0.
+        fn set_temporary_page(
+            workspace: &mut Workspace,
+            item_id: u64,
+            url: &str,
+            title: &str,
+        ) -> MutationResult;
         // Saved items only. `id` is 1 when current_url differs from the saved URL, else 0.
         fn differs_from_canonical(
             workspace: &Workspace,
@@ -444,6 +452,20 @@ pub fn set_canonical_url(
 
 pub fn set_title(workspace: &mut Workspace, item_id: u64, title: &str) -> ffi::MutationResult {
     outcome(workspace.0.set_title(item_id, title).map(u64::from))
+}
+
+pub fn set_temporary_page(
+    workspace: &mut Workspace,
+    item_id: u64,
+    url: &str,
+    title: &str,
+) -> ffi::MutationResult {
+    outcome(
+        workspace
+            .0
+            .set_temporary_page(item_id, url, title)
+            .map(u64::from),
+    )
 }
 
 pub fn differs_from_canonical(

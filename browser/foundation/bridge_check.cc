@@ -411,6 +411,47 @@ bool CheckSavedTitles() {
   return !decode().snapshot;
 }
 
+// A temporary item that remembers its page survives the JSON codec and a
+// relaunch where no tab matched it; one with nothing to reopen goes.
+bool CheckDormantTemporary() {
+  using namespace myarc::foundation;
+  using myarc::internal::DecodeWorkspaceMetadata;
+  using myarc::internal::EncodeWorkspaceMetadata;
+  auto model = new_workspace();
+  auto kept = add_temporary_item(*model, 1);
+  auto blank = add_temporary_item(*model, 1);
+  auto saved = add_temporary_item(*model, 1);
+  if (!kept.ok || !blank.ok || !saved.ok ||
+      !set_placement(*model, saved.id, PlacementKind::Pin, 1, true,
+                     "https://example.test/pin")
+           .ok ||
+      set_temporary_page(*model, saved.id, "https://example.test/", "Pin").ok ||
+      set_temporary_page(*model, blank.id, "chrome://newtab/", "New Tab").ok) {
+    return false;
+  }
+  auto changed =
+      set_temporary_page(*model, kept.id, "https://example.test/a", "Alpha");
+  auto same =
+      set_temporary_page(*model, kept.id, "https://example.test/a", "Alpha");
+  if (!changed.ok || changed.id != 1 || !same.ok || same.id != 0)
+    return false;
+  const auto encoded = EncodeWorkspaceMetadata(export_snapshot(*model));
+  auto decoded = encoded ? DecodeWorkspaceMetadata(*encoded)
+                         : myarc::internal::MetadataResult{};
+  auto relaunched = new_workspace();
+  if (!decoded.snapshot ||
+      !restore_snapshot(*relaunched, std::move(*decoded.snapshot)).ok ||
+      !reconcile_live_items(*relaunched, rust::Slice<const uint64_t>()).ok) {
+    return false;
+  }
+  const auto temporary = sidebar_snapshot(*relaunched, 1).temporary;
+  return temporary.size() == 1 && temporary[0].id == kept.id &&
+         temporary[0].has_url &&
+         std::string(temporary[0].canonical_url) == "https://example.test/a" &&
+         std::string(temporary[0].title) == "Alpha" &&
+         sidebar_snapshot(*relaunched, 1).pins.size() == 1;
+}
+
 // Archived Tabs survive the JSON codec; an empty archive omits the key so older
 // builds still load the file, and a malformed entry is dropped while the rest
 // of the file loads. Expired and history-deleted entries go.
@@ -712,10 +753,15 @@ int main() {
     std::cerr << "Downloads stack checks failed\n";
     return 17;
   }
+  if (!CheckDormantTemporary()) {
+    std::cerr << "Dormant temporary item checks failed\n";
+    return 18;
+  }
   std::cout
       << "7 legacy C++/Rust checks passed, including 1000 ownership "
          "round trips; workspace transitions, Space 1 deletion and "
          "metadata codec, saved title, Archived Tabs, Auto Archive, "
-         "archive timer, Clear Archive and downloads stack checks passed\n";
+         "archive timer, Clear Archive, downloads stack and dormant "
+         "temporary item checks passed\n";
   return 0;
 }

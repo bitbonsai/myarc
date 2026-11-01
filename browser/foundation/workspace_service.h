@@ -121,6 +121,12 @@ class WorkspaceService final : public base::SupportsUserData::Data {
   // Rust bounds it. Never notifies or writes by itself: a changed title is
   // saved with the next metadata write or the shutdown flush.
   foundation::MutationResult SetTitle(uint64_t item, std::string_view title);
+  // Temporary items only. Remembers the page a dormant row reopens when its tab
+  // is not restored; URLs outside the saved-URL gate are ignored. Writes when
+  // the URL changes, without a notify.
+  foundation::MutationResult SetTemporaryPage(uint64_t item,
+                                              std::string_view url,
+                                              std::string_view title);
   foundation::MutationResult RemoveSavedItem(uint64_t item);
   foundation::MutationResult RevealItem(uint64_t window, uint64_t item);
   foundation::MutationResult UnsaveItem(uint64_t item, uint64_t live_space);
