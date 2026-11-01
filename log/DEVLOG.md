@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-11-01: Library enter and exit motion
+
+- The sidebar region now eases between the rows' width and the Library's (417 DIP, or the Spaces width) on Arc's measured curve, `1 - exp(-t/tau)`. Opening takes 230 ms with tau 40 ms, so the edge covers about 55% in the first frame. Closing takes 270 ms with tau 60 ms. On open the rows vanish at once and the Library, laid out at its final width, slides in behind the edge. On close it leads the narrowing edge at 2.2x and the rebuilt rows replace it at 55 ms, fading in over 65 ms on a temporary layer. Reduced motion snaps both ways. The width animation lives in the `vertical_tab_strip_region_view` patch; the slide and fade live in `SidebarView`.
+- Verification: `chrome` and `bridge_check` build; `bridge_check`, `export_patches.py --check` and `check_docs.py` pass. Background captures `research-private/captures/library-motion/library-open.png` (end state) and `library-closed-after-esc.png` (Esc, then 1.5 s: rows back at full opacity, 230 DIP wide). No motion clip: each `bgcapture.swift` shot takes about a second, too slow for a 270 ms transition, so the curves were matched against the spec's frame tables, not against frames from this build. Reopening mid-exit and `SetUnavailable` mid-exit were checked by reading the code, not run.
+- Chromium `myarc` commit `5e9b391564`.
+
 ## 2026-11-01: Recent downloads stack above the Library button
 
 - Hovering the Library button for 100 ms fans up the 4 most recent complete downloads, oldest on top, with no panel: 56 DIP rows, system file icon in a 40 DIP box, 13 pt medium name at 80% and 11 pt age at 52% ("Just now", "N minutes/hours/days ago"). Rows rise on the footer's `rise` curve over 150 ms with the bottom row first, and sink over 120 ms after 350 ms off both the button and the stack; pressing the Library button drops it at once, and reduced motion jumps. Clicking a row opens the file and dragging it drags the file through Chromium's `DragDownloadItem`. The "View Library" tooltip now sits right of the button after 0.7 s. New `downloads_stack.{h,cc}`, `--myarc-capture-downloads-stack` (`STACK=1`), and capture profiles now download into the profile.

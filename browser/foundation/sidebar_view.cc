@@ -7,6 +7,7 @@
 #include <utility>
 
 #include "base/functional/bind.h"
+#include "base/numerics/safe_conversions.h"
 #include "base/location.h"
 #include "base/scoped_observation.h"
 #include "base/strings/string_number_conversions.h"
@@ -23,6 +24,7 @@
 #include "ui/base/mojom/menu_source_type.mojom.h"
 #include "ui/color/color_id.h"
 #include "ui/color/color_provider.h"
+#include "ui/compositor/layer.h"
 #include "ui/gfx/color_utils.h"
 #include "ui/gfx/font_list.h"
 #include "ui/gfx/geometry/insets.h"
@@ -54,6 +56,12 @@ constexpr int kTileHeight = 46;
 // The rows' size and edges; the Library replaces both while it is open.
 constexpr gfx::Size kSidebarSize(230, 400);
 constexpr gfx::Insets kSidebarInsets = gfx::Insets::TLBR(8, 8, 7, 8);
+// Measured from Arc: the edge narrows over ~270 ms while the Library leaves
+// 2.2x as fast. The rows replace it ~60% of the way and fade in over ~65 ms.
+constexpr base::TimeDelta kLibraryExit = base::Milliseconds(270);
+constexpr base::TimeDelta kRowsSwap = base::Milliseconds(55);
+constexpr base::TimeDelta kRowsFadeIn = base::Milliseconds(65);
+constexpr double kLibraryExitSpeed = 2.2;
 
 // Lucide "circle" filled to the canvas edge: Arc's Space dot is 8 DIP across.
 constexpr gfx::PathElement kDotPath[] = {gfx::CANVAS_DIMENSIONS, 24,
@@ -251,8 +259,10 @@ void AddStatus(views::View& parent, const std::u16string& text) {
 }  // namespace
 
 SidebarView::SidebarView(Delegate& delegate)
-    : delegate_(delegate),
+    : views::AnimationDelegateViews(this),
+      delegate_(delegate),
       footer_tooltip_(std::make_unique<FooterTooltip>()) {
+  library_exit_.SetDuration(kLibraryExit);
   SetPreferredSize(kSidebarSize);
   SetLayoutManager(std::make_unique<views::BoxLayout>(Orientation::kVertical,
                                                       kSidebarInsets, 8));
@@ -316,6 +326,8 @@ void SidebarView::ShowContextMenuForViewImpl(
 
 void SidebarView::OpenLibrary(LibrarySection section) {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
+  // Reopening while the Library leaves lands on the rows first.
+  library_exit_.End();
   if (library_) {
     library_->SelectSection(section);
     return;
@@ -372,15 +384,28 @@ void SidebarView::ResetLibrary() {
 
 void SidebarView::CloseLibrary() {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
-  if (!library_) {
+  if (!library_ || library_exit_.is_animating()) {
     return;
   }
   // Keyboard users land on the Library button; a click leaves no focus ring.
   const bool had_focus = library_->Contains(
       GetFocusManager() ? GetFocusManager()->GetFocusedView() : nullptr);
+  if (gfx::Animation::PrefersReducedMotion() || !parent()) {
+    FinishCloseLibrary(had_focus);
+    return;
+  }
+  // The parent eases back to the rows' width while Layout slides the Library
+  // out. SetModel keeps it until AnimationProgressed swaps in the rows.
+  library_exit_had_focus_ = had_focus;
+  library_exit_.Start();
+  delegate_->SetLibraryOpen(false);
+}
+
+void SidebarView::FinishCloseLibrary(bool had_focus) {
   ResetLibrary();
   library_closed_ = true;
   auto weak = weak_factory_.GetWeakPtr();
+  // After an animated close this repeats only to supply the rows' model.
   delegate_->SetLibraryOpen(false);
   if (!weak || !had_focus) {
     return;
@@ -600,6 +625,7 @@ void SidebarView::SetUnavailable(const std::u16string& reason,
   if (menu_runner_) {
     menu_runner_->Cancel();
   }
+  library_exit_.Stop();
   ResetLibrary();
   library_closed_ = false;
   focus_targets_.clear();
@@ -1007,11 +1033,59 @@ void SidebarView::ShowDownloadsStackForCapture() {
 
 void SidebarView::Layout(PassKey) {
   LayoutSuperclass<views::View>(this);
+  if (library_ && library_exit_.is_animating() && parent()) {
+    // The Library keeps its width and leads the parent's narrowing edge.
+    const int library_width = library_->GetPreferredSize().width();
+    const int closed = std::max(0, library_width - parent()->width());
+    library_->SetBounds(-base::ClampRound(kLibraryExitSpeed * closed), 0,
+                        library_width, height());
+  }
   if (downloads_stack_ && footer_) {
     // Bottom on the footer's top, across the sidebar's inner width.
     const int height = downloads_stack_->GetPreferredSize().height();
     downloads_stack_->SetBounds(kSidebarInsets.left(), footer_->y() - height,
                                 width() - kSidebarInsets.width(), height);
+  }
+}
+
+void SidebarView::AnimationProgressed(const gfx::Animation* animation) {
+  const base::TimeDelta elapsed =
+      kLibraryExit * library_exit_.GetCurrentValue();
+  if (library_) {
+    if (elapsed < kRowsSwap) {
+      InvalidateLayout();
+      return;
+    }
+    // The rows rebuild under a transparent layer and fade in.
+    SetPaintToLayer();
+    layer()->SetFillsBoundsOpaquely(false);
+    layer()->SetOpacity(0);
+    auto weak = weak_factory_.GetWeakPtr();
+    FinishCloseLibrary(library_exit_had_focus_);
+    if (!weak) {
+      return;
+    }
+  }
+  if (layer()) {
+    layer()->SetOpacity(
+        std::clamp((elapsed - kRowsSwap) / kRowsFadeIn, 0.0, 1.0));
+  }
+}
+
+void SidebarView::AnimationEnded(const gfx::Animation* animation) {
+  if (library_) {
+    auto weak = weak_factory_.GetWeakPtr();
+    FinishCloseLibrary(library_exit_had_focus_);
+    if (!weak) {
+      return;
+    }
+  }
+  AnimationCanceled(animation);
+}
+
+void SidebarView::AnimationCanceled(const gfx::Animation* animation) {
+  if (layer()) {
+    DestroyLayer();
   }
 }
 

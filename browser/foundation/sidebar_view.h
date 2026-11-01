@@ -16,8 +16,10 @@
 #include "base/time/time.h"
 #include "ui/base/metadata/metadata_header_macros.h"
 #include "ui/base/models/image_model.h"
+#include "ui/gfx/animation/linear_animation.h"
 #include "ui/gfx/geometry/point_f.h"
 #include "ui/menus/simple_menu_model.h"
+#include "ui/views/animation/animation_delegate_views.h"
 #include "ui/views/context_menu_controller.h"
 #include "ui/views/view.h"
 
@@ -42,6 +44,7 @@ class LibraryView;
 // parent owns Profile/window scope, Rust mutations, browser tabs, dialogs and
 // failures.
 class SidebarView final : public views::View,
+                          public views::AnimationDelegateViews,
                           public views::ContextMenuController,
                           public ui::SimpleMenuModel::Delegate {
   METADATA_HEADER(SidebarView, views::View)
@@ -190,6 +193,10 @@ class SidebarView final : public views::View,
                   std::optional<ItemMenuState> item_menu = std::nullopt);
   // views::View:
   void Layout(PassKey) override;
+  // views::AnimationDelegateViews:
+  void AnimationProgressed(const gfx::Animation* animation) override;
+  void AnimationEnded(const gfx::Animation* animation) override;
+  void AnimationCanceled(const gfx::Animation* animation) override;
   void OnThemeChanged() override;
   // Applies the scheme's tile and New Tab fills to the current rows.
   void UpdateFills();
@@ -199,6 +206,8 @@ class SidebarView final : public views::View,
       ui::mojom::MenuSourceType source_type) override;
   // Drops the Library view without notifying the parent.
   void ResetLibrary();
+  // Drops the Library and has the parent rebuild the rows.
+  void FinishCloseLibrary(bool had_focus);
   void BuildCreateMenu();
   void ShowCreateMenu(const ui::Event& event);
   void SetCreateMenuOpen(bool open);
@@ -242,6 +251,10 @@ class SidebarView final : public views::View,
   std::unique_ptr<FooterTooltip> footer_tooltip_;
   // The next footer's Library button starts glowing and settles.
   bool library_closed_ = false;
+  // Arc's Library exit: it slides out ahead of the narrowing sidebar, then the
+  // rows replace it and fade in.
+  gfx::LinearAnimation library_exit_{this};
+  bool library_exit_had_focus_ = false;
   SEQUENCE_CHECKER(sequence_checker_);
   base::WeakPtrFactory<SidebarView> weak_factory_{this};
 };
