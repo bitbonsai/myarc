@@ -263,9 +263,10 @@ inline constexpr gfx::VectorIcon kBoostsIcon(kBoostsRep,
                                              "myarc_boosts");
 
 // Arc's selected Library rail glyphs are duotone: the enclosed shapes filled
-// blue (#2523F6) under strokes in light lavender (#EDEDFD). The colors are
-// baked in, so ImageModel's color argument doesn't change them.
-#define MYARC_RAIL_FILL gfx::PATH_COLOR_ARGB, 0xFF, 0x25, 0x23, 0xF6
+// periwinkle (#6E7BFF, softer than Arc's #2523F6) under strokes in light
+// lavender (#EDEDFD). The colors are baked in, so ImageModel's color
+// argument doesn't change them.
+#define MYARC_RAIL_FILL gfx::PATH_COLOR_ARGB, 0xFF, 0x6E, 0x7B, 0xFF
 #define MYARC_RAIL_INK \
   gfx::NEW_PATH, gfx::PATH_COLOR_ARGB, 0xFF, 0xED, 0xED, 0xFD
 #define MYARC_RAIL_LINE MYARC_RAIL_INK, gfx::STROKE, 2

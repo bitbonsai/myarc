@@ -103,8 +103,8 @@ struct Colors {
   SkColor card_control_hover;
 };
 
-// Arc's accent, sampled from its Library: the create button.
-constexpr SkColor kAccent = SkColorSetRGB(0x21, 0x2A, 0xFB);
+// The Library accent on the create button: a softer periwinkle than Arc's #212AFB.
+constexpr SkColor kAccent = SkColorSetRGB(0x6E, 0x7B, 0xFF);
 // The selected rail glyph's outline; icons.h bakes it into the duotone icons.
 constexpr SkColor kRailLine = SkColorSetRGB(0xED, 0xED, 0xFD);
 
