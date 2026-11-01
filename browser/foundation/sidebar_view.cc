@@ -7,8 +7,8 @@
 #include <utility>
 
 #include "base/functional/bind.h"
-#include "base/numerics/safe_conversions.h"
 #include "base/location.h"
+#include "base/numerics/safe_conversions.h"
 #include "base/scoped_observation.h"
 #include "base/strings/string_number_conversions.h"
 #include "base/strings/utf_string_conversions.h"
@@ -326,8 +326,17 @@ void SidebarView::ShowContextMenuForViewImpl(
 
 void SidebarView::OpenLibrary(LibrarySection section) {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
-  // Reopening while the Library leaves lands on the rows first.
-  library_exit_.End();
+  if (library_exit_.is_animating()) {
+    // Reopening while the Library leaves turns it back, keeping its section
+    // state and scroll.
+    library_exit_.Stop();
+    if (library_) {
+      delegate_->SetLibraryOpen(true);
+      library_->SelectSection(section);
+      InvalidateLayout();
+      return;
+    }
+  }
   if (library_) {
     library_->SelectSection(section);
     return;
@@ -387,18 +396,22 @@ void SidebarView::CloseLibrary() {
   if (!library_ || library_exit_.is_animating()) {
     return;
   }
-  // Keyboard users land on the Library button; a click leaves no focus ring.
-  const bool had_focus = library_->Contains(
-      GetFocusManager() ? GetFocusManager()->GetFocusedView() : nullptr);
-  if (gfx::Animation::PrefersReducedMotion() || !parent()) {
-    FinishCloseLibrary(had_focus);
+  // A hidden or zero-width sidebar has nothing to animate.
+  if (gfx::Animation::PrefersReducedMotion() || !parent() || !IsDrawn() ||
+      parent()->width() <= 0) {
+    FinishCloseLibrary(LibraryHasFocus());
     return;
   }
   // The parent eases back to the rows' width while Layout slides the Library
   // out. SetModel keeps it until AnimationProgressed swaps in the rows.
-  library_exit_had_focus_ = had_focus;
   library_exit_.Start();
   delegate_->SetLibraryOpen(false);
+}
+
+bool SidebarView::LibraryHasFocus() {
+  // Keyboard users land on the Library button; a click leaves no focus ring.
+  return library_ && GetFocusManager() &&
+         library_->Contains(GetFocusManager()->GetFocusedView());
 }
 
 void SidebarView::FinishCloseLibrary(bool had_focus) {
@@ -1059,12 +1072,14 @@ void SidebarView::AnimationProgressed(const gfx::Animation* animation) {
       InvalidateLayout();
       return;
     }
-    // The rows rebuild under a transparent layer and fade in.
+    // The rows rebuild under a transparent layer and fade in; until the
+    // layer goes they take no clicks.
     SetPaintToLayer();
     layer()->SetFillsBoundsOpaquely(false);
     layer()->SetOpacity(0);
+    SetCanProcessEventsWithinSubtree(false);
     auto weak = weak_factory_.GetWeakPtr();
-    FinishCloseLibrary(library_exit_had_focus_);
+    FinishCloseLibrary(LibraryHasFocus());
     if (!weak) {
       return;
     }
@@ -1078,7 +1093,7 @@ void SidebarView::AnimationProgressed(const gfx::Animation* animation) {
 void SidebarView::AnimationEnded(const gfx::Animation* animation) {
   if (library_) {
     auto weak = weak_factory_.GetWeakPtr();
-    FinishCloseLibrary(library_exit_had_focus_);
+    FinishCloseLibrary(LibraryHasFocus());
     if (!weak) {
       return;
     }
@@ -1090,6 +1105,7 @@ void SidebarView::AnimationCanceled(const gfx::Animation* animation) {
   if (layer()) {
     DestroyLayer();
   }
+  SetCanProcessEventsWithinSubtree(true);
 }
 
 void SidebarView::SetNewTabIntent(bool intent) {

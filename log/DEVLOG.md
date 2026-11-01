@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-11-01: Library exit review fixes
+
+- Closing no longer clears the region's Library layout on the first frame: a leaving flag keeps the Library's width and hides the header until the sidebar swaps in its rows, and the header then fades in with them over 65 ms. Focus returns to the Library button only if the Library still holds focus at the swap. A hidden or zero-width sidebar closes at once. Reopening during the exit turns the Library back without a rebuild, keeping section and scroll. The fading rows take no clicks. Closing uses tau 70 ms.
+- Verification: `chrome` and `bridge_check` build; `bridge_check`, `export_patches.py --check` and `check_docs.py` pass. The motion itself was checked by reading the code, not recorded.
+- Chromium `myarc` commit `96efe37b60`.
+
 ## 2026-11-01: Downloads survive a relaunch, no bubble popup
 
 - Chromium defers loading download history until its bubble or `chrome://downloads` asks, and myArc has neither, so after a relaunch the downloads stack and Library > Downloads were empty. Creating the sidebar now calls `InitializeHistory` (with the bubble's trigger), and a one-shot watcher refreshes the stack and the Library list when the manager finishes loading. In sidebar mode the download bubble's partial view and started animation no longer show; they had anchored to the window's top-left corner.

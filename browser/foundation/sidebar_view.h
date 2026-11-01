@@ -210,6 +210,8 @@ class SidebarView final : public views::View,
       ui::mojom::MenuSourceType source_type) override;
   // Drops the Library view without notifying the parent.
   void ResetLibrary();
+  // Checked when the rows replace the Library, not when closing starts.
+  bool LibraryHasFocus();
   // Drops the Library and has the parent rebuild the rows.
   void FinishCloseLibrary(bool had_focus);
   void BuildCreateMenu();
@@ -258,7 +260,6 @@ class SidebarView final : public views::View,
   // Arc's Library exit: it slides out ahead of the narrowing sidebar, then the
   // rows replace it and fade in.
   gfx::LinearAnimation library_exit_{this};
-  bool library_exit_had_focus_ = false;
   SEQUENCE_CHECKER(sequence_checker_);
   base::WeakPtrFactory<SidebarView> weak_factory_{this};
 };
