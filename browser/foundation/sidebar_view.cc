@@ -455,8 +455,14 @@ void SidebarView::OpenLibrary(LibrarySection section) {
   library_->SetSpaces(spaces_, current_space_id_);
   delegate_->SetLibraryOpen(true);
   if (had_focus) {
+    library_return_focus_.SetView(nullptr);
     library_->FocusSection();
+    return;
   }
+  // Esc reaches the Library only while focus is in the sidebar.
+  library_return_focus_.SetView(
+      GetFocusManager() ? GetFocusManager()->GetFocusedView() : nullptr);
+  library_->RequestFocus();
 }
 
 void SidebarView::ResetLibrary() {
@@ -491,17 +497,27 @@ void SidebarView::CloseLibrary() {
 
 bool SidebarView::LibraryHasFocus() {
   // Keyboard users land on the Library button; a click leaves no focus ring.
-  return library_ && GetFocusManager() &&
-         library_->Contains(GetFocusManager()->GetFocusedView());
+  const views::View* focused =
+      GetFocusManager() ? GetFocusManager()->GetFocusedView() : nullptr;
+  return library_ && focused != library_ && library_->Contains(focused);
 }
 
 void SidebarView::FinishCloseLibrary(bool had_focus) {
+  // A click-opened Library holds focus only for Esc; hand it back.
+  const bool return_focus = library_ && library_->HasFocus();
   ResetLibrary();
   library_closed_ = true;
   auto weak = weak_factory_.GetWeakPtr();
   // After an animated close this repeats only to supply the rows' model.
   delegate_->SetLibraryOpen(false);
-  if (!weak || !had_focus) {
+  if (!weak) {
+    return;
+  }
+  if (return_focus && library_return_focus_.view()) {
+    library_return_focus_.view()->RequestFocus();
+  }
+  library_return_focus_.SetView(nullptr);
+  if (!had_focus) {
     return;
   }
   const auto button = std::ranges::find(focus_targets_, FocusAction::kLibrary,

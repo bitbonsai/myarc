@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-11-01: Esc exits the Library
+
+- Cause: the Library's Esc accelerator fired only with focus in the sidebar, and a click leaves focus on the page, so Esc never reached it. A click-opened Library now takes focus itself (no ring) and returns it to the page when it closes. Esc runs the same close as the Exit Library tile, so the sidebar stays and the close motion plays. With text in the focused search field, the first Esc clears it. Cmd+S is unchanged.
+- Verification: `chrome` and `bridge_check` build, `bridge_check`, `export_patches.py --check` and `check_docs.py` pass. Live `/tmp` profile driven with CGEvent while frontmost, checked through AX: Esc closes a click-opened Library; in Downloads search, "x" then Esc clears and keeps the Library open, and a second Esc exits; after clicking the page, Esc leaves the Library open; the Exit tile still closes it. No Chromium patch changes.
+- Left as is: closing while the search field has focus lands focus on the Library button with its ring (the existing keyboard rule).
+
 ## 2026-11-01: Tabs Chromium doesn't restore stay as dormant rows
 
 - Cause: Temporary items stored no URL, so when Chromium didn't bring a tab back (New Tab startup choice, macOS restore off, a failed restore) `ReconcileBindings` deleted the row. Temporary items now remember their last http(s) page and title (`set_temporary_page`, written on load), reconcile keeps any that remember a page, and the row reopens it on click through the existing dormant path in `ActivateItem`. Dormant Temporary rows get a close button (archives the remembered page); a temporary row with no reopenable page (data:, chrome://) still goes at reconcile.

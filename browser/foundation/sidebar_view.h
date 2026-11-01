@@ -22,6 +22,7 @@
 #include "ui/views/animation/animation_delegate_views.h"
 #include "ui/views/context_menu_controller.h"
 #include "ui/views/view.h"
+#include "ui/views/view_tracker.h"
 
 namespace views {
 class MdTextButton;
@@ -273,6 +274,9 @@ class SidebarView final : public views::View,
   // Arc's Library exit: it slides out ahead of the narrowing sidebar, then the
   // rows replace it and fade in.
   gfx::LinearAnimation library_exit_{this};
+  // Where a click-opened Library hands focus back when it closes, usually the
+  // page.
+  views::ViewTracker library_return_focus_;
   // Arc's Space switch: the old Space's title and rows leave sideways as the
   // new ones enter beside them, with no fade. +1 slides them right.
   gfx::LinearAnimation space_slide_{this};

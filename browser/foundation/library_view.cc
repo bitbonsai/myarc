@@ -381,6 +381,9 @@ LibraryView::LibraryView(SidebarView::Delegate& delegate,
                                                       gfx::Insets(), 0));
   GetViewAccessibility().SetRole(ax::mojom::Role::kGroup);
   GetViewAccessibility().SetName(u"Library");
+  // A click leaves no focus ring, so a click-opened Library holds focus itself
+  // and Esc reaches it rather than the page.
+  SetFocusBehavior(FocusBehavior::ALWAYS);
 
   auto* rail = AddChildView(
       Box(Orientation::kVertical, gfx::Insets::TLBR(0, 8, 10, 8), 0));
@@ -512,6 +515,12 @@ bool LibraryView::AcceleratorPressed(const ui::Accelerator& accelerator) {
   const views::View* focused = manager ? manager->GetFocusedView() : nullptr;
   if (focused && !parent()->Contains(focused)) {
     return false;
+  }
+  // The first Esc clears a search, the next exits.
+  if (search_ && focused == search_ && !search_->GetText().empty()) {
+    search_->SetText(std::u16string());
+    ContentsChanged(search_, std::u16string());
+    return true;
   }
   PostAction(close_);
   return true;
