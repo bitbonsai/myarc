@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-11-01: Downloads survive a relaunch, no bubble popup
+
+- Chromium defers loading download history until its bubble or `chrome://downloads` asks, and myArc has neither, so after a relaunch the downloads stack and Library > Downloads were empty. Creating the sidebar now calls `InitializeHistory` (with the bubble's trigger), and a one-shot watcher refreshes the stack and the Library list when the manager finishes loading. In sidebar mode the download bubble's partial view and started animation no longer show; they had anchored to the window's top-left corner.
+- Verification: `chrome` and `bridge_check` build; `bridge_check`, `export_patches.py --check` and `check_docs.py` pass. Live test on a `/tmp` profile in `research-private/captures/fixes-2026-11-01/`: 3 file downloads finish with no popup (`b-run1-download-*.png`), History holds them (`a-history-db-downloads.txt`), and after deleting the in-progress DB and relaunching, Library > Downloads and the stack list all 3 (`a-relaunch-*.png`).
+- Chromium `myarc` commit `408ce21220`.
+
 ## 2026-11-01: Downloads stack review fixes
 
 - File icons load only for the stack's 4 rows, once per path, so a failed load no longer loops. `Refresh` keeps the row views when the downloads are unchanged, so a press or drag survives an icon load, and hides when no rows are left. While the stack shows, the browser checks for files removed outside it and refreshes on download changes. History-restored downloads without an end time show their start time. After a file drag, hover is re-read from the pointer and polled until it leaves, since the Mac drag sends no exit. The beside tooltip is clamped to the screen and flips left when there's no room, and the stack's height is clamped to the space above the footer.

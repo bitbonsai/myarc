@@ -1,0 +1,26 @@
+diff --git a/chrome/browser/ui/views/download/bubble/download_toolbar_ui_controller.cc b/chrome/browser/ui/views/download/bubble/download_toolbar_ui_controller.cc
+index 10b7682418b0d6084a65a5fa40b7f96ad3191557..d61716cb81ec41f0c4f77d10d6adaeffebaa8fc6 100644
+--- a/chrome/browser/ui/views/download/bubble/download_toolbar_ui_controller.cc
++++ b/chrome/browser/ui/views/download/bubble/download_toolbar_ui_controller.cc
+@@ -286,7 +286,10 @@ void DownloadToolbarUIController::OpenSecuritySubpage(
+ // we do not show the partial view. If the partial view is already showing,
+ // there is nothing to do here, the controller should update the partial view.
+ void DownloadToolbarUIController::ShowDetails() {
+-  if (bubble_delegate_ || pending_bubble_) {
++  // myArc's sidebar has no downloads button; its downloads stack replaces the
++  // partial view, which would otherwise anchor to the window corner.
++  if (bubble_delegate_ || pending_bubble_ ||
++      browser_view_->HasMyarcWorkspaceSidebar()) {
+     return;
+   }
+   base::TimeDelta delay = GetAutoCloseDelay();
+@@ -503,7 +506,8 @@ void DownloadToolbarUIController::ShowPendingDownloadStartedAnimation() {
+   }
+   CHECK(show_download_started_animation_);
+   has_pending_download_started_animation_ = false;
+-  if (!gfx::Animation::ShouldRenderRichAnimation()) {
++  if (!gfx::Animation::ShouldRenderRichAnimation() ||
++      browser_view_->HasMyarcWorkspaceSidebar()) {
+     return;
+   }
+   tabs::TabInterface* const tab =
