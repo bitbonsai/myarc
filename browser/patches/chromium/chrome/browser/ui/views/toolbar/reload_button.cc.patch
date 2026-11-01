@@ -1,0 +1,64 @@
+diff --git a/chrome/browser/ui/views/toolbar/reload_button.cc b/chrome/browser/ui/views/toolbar/reload_button.cc
+index 18426283e58e5013f7537b36f613a0498960ce00..10b17279eef52521b36398518b344aa152f3d74c 100644
+--- a/chrome/browser/ui/views/toolbar/reload_button.cc
++++ b/chrome/browser/ui/views/toolbar/reload_button.cc
+@@ -6,6 +6,7 @@
+ 
+ #include <stddef.h>
+ 
++#include "base/command_line.h"
+ #include "base/strings/utf_string_conversions.h"
+ #include "build/build_config.h"
+ #include "chrome/app/chrome_command_ids.h"
+@@ -33,6 +34,7 @@
+ #include "ui/compositor/compositor.h"
+ #include "ui/gfx/color_palette.h"
+ #include "ui/gfx/paint_vector_icon.h"
++#include "ui/gfx/vector_icon_types.h"
+ #include "ui/menus/simple_menu_model.h"
+ #include "ui/views/accessibility/view_accessibility.h"
+ #include "ui/views/metrics.h"
+@@ -51,6 +53,24 @@ static constexpr views::SingleAnimatedImageContainer::AnimationBoundary
+ static constexpr base::TimeDelta kIconAnimationTime = base::Milliseconds(300);
+ static constexpr gfx::Tween::Type kIconAnimationTween =
+     gfx::Tween::Type::FAST_OUT_SLOW_IN_3;
++
++// Arc's reload, traced from its header: a ring open from twelve to three
++// o'clock with a chevron at its top end, 17 DIP tall at stroke 1.7.
++constexpr gfx::PathElement kMyarcReloadPath[] = {
++    gfx::CANVAS_DIMENSIONS, 20, gfx::STROKE, 1.7f, gfx::MOVE_TO, 16.1f, 11,
++    gfx::ARC_TO, 6.1f, 6.1f, 0, 1, 1, 12.67f, 5.52f, gfx::MOVE_TO, 10, 1.9f,
++    gfx::LINE_TO, 12.7f, 5.15f, gfx::LINE_TO, 10, 8.4f};
++constexpr gfx::VectorIconRep kMyarcReloadRep[] = {{kMyarcReloadPath}};
++constexpr gfx::VectorIcon kMyarcReloadIcon(kMyarcReloadRep,
++                                           std::size(kMyarcReloadRep),
++                                           "myarc_reload");
++
++const gfx::VectorIcon& ReloadIcon(const gfx::VectorIcon& chrome_icon) {
++  return base::CommandLine::ForCurrentProcess()->HasSwitch(
++             "myarc-visual-parity")
++             ? kMyarcReloadIcon
++             : chrome_icon;
++}
+ }  // namespace
+ 
+ // ReloadButton ---------------------------------------------------------------
+@@ -66,12 +86,12 @@ ReloadButton::ReloadButton(
+       metrics_recorder_(
+           profile ? std::make_unique<WaapUIMetricsRecorder>(profile) : nullptr),
+       command_updater_(command_updater),
+-      reload_icon_(features::IsRoundedIconsEnabled()
+-                       ? vector_icons::kRefreshIcon
+-                       : vector_icons::kReloadChromeRefreshOldIcon),
+-      reload_touch_icon_(features::IsRoundedIconsEnabled()
+-                             ? vector_icons::kRefreshIcon
+-                             : kReloadTouchOldIcon),
++      reload_icon_(ReloadIcon(features::IsRoundedIconsEnabled()
++                                  ? vector_icons::kRefreshIcon
++                                  : vector_icons::kReloadChromeRefreshOldIcon)),
++      reload_touch_icon_(ReloadIcon(features::IsRoundedIconsEnabled()
++                                        ? vector_icons::kRefreshIcon
++                                        : kReloadTouchOldIcon)),
+       stop_icon_(features::IsRoundedIconsEnabled()
+                      ? kCloseIcon
+                      : kNavigateStopChromeRefreshOldIcon),

@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-11-01: Arc's nav glyphs, 47 DIP tiles, New Tab spacing
+
+- Back, forward and reload draw glyphs traced from Arc's header under `--myarc-visual-parity`: 14.5x12 DIP arrows and a 14x17 DIP open ring with a chevron, at stroke 1.7 (Chromium's was 13x13 and a closed ring). Favorite tiles are 47 DIP tall. The New Tab plus moves 2 DIP right and its label starts 13.5 DIP after it, as in Arc. The glyphs already sat at Arc's centres after the header fix, so no offset changed. Arc's stroke matches ours; it only looks lighter because its window wasn't key.
+- Verification: `chrome` and `bridge_check` build; `bridge_check`, `export_patches.py --check` and `check_docs.py` pass. A seeded background capture (`after-glyphs.png`, crops `06b-nav-icons-after.png` and `04b-new-tab-row-after.png`) matches Arc's line scans: glyph boxes to the half pixel, tiles 94 px, label at x=45 DIP. The stop glyph and tab rows are unchanged.
+- Chromium `myarc` commit `a82fb3fb16`.
+
 ## 2026-11-01: Closing the Library from its search field leaves no ring
 
 - Cause: closing with focus anywhere inside the Library except the Library view itself counted as keyboard use, so a click into search then Esc moved focus to the Library button and showed its ring. Now the button takes focus only when the Library was opened from the keyboard or focus last moved by Tab (`FocusManager::focus_change_reason()`); otherwise focus goes back to the page, as with a plain click-opened Library.

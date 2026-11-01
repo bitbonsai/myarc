@@ -56,7 +56,9 @@ namespace {
 
 using Orientation = views::BoxLayout::Orientation;
 
-constexpr int kTileHeight = 46;
+// Arc's Favorite tiles are 47 DIP tall; three of them and two 8 DIP gaps fill
+// the 212 DIP row.
+constexpr int kTileHeight = 47;
 // Arc's row highlight is 36 DIP tall, the URL pill's height.
 constexpr int kRowHeight = 36;
 // The rows' size and edges; the Library replaces both while it is open.
@@ -932,6 +934,10 @@ void SidebarView::SetModel(const foundation::SidebarResult& model,
       ui::ImageModel::FromVectorIcon(vector_icons::kAdd2Icon,
                                      ui::kColorSysOnSurface, 16));
   new_tab->SetMinSize(gfx::Size(0, kRowHeight));
+  // Arc centres the plus 2 DIP further right and starts the label 13.5 DIP
+  // after it.
+  new_tab->SetCustomPadding(gfx::Insets::TLBR(6, 10, 6, 8));
+  new_tab->SetImageLabelSpacing(10);
   TrackFocus(new_tab.get(), FocusAction::kNewTab);
   // Arc keeps 41 DIP between the Space title and New Tab row centers.
   new_tab->SetProperty(views::kMarginsKey, gfx::Insets::TLBR(3, 0, 0, 0));

@@ -1,0 +1,60 @@
+diff --git a/chrome/browser/ui/views/toolbar/back_forward_button.cc b/chrome/browser/ui/views/toolbar/back_forward_button.cc
+index a1fe0c29476f000cda445470101749e0c9c71645..f5a0faa9fd85d415bcd2d2f5e7bb5cd5e1501073 100644
+--- a/chrome/browser/ui/views/toolbar/back_forward_button.cc
++++ b/chrome/browser/ui/views/toolbar/back_forward_button.cc
+@@ -4,6 +4,7 @@
+ 
+ #include "chrome/browser/ui/views/toolbar/back_forward_button.h"
+ 
++#include "base/command_line.h"
+ #include "base/metrics/user_metrics.h"
+ #include "base/time/time.h"
+ #include "chrome/app/vector_icons/vector_icons.h"
+@@ -27,9 +28,34 @@
+ #include "ui/base/window_open_disposition.h"
+ #include "ui/base/window_open_disposition_utils.h"
+ #include "ui/gfx/animation/tween.h"
++#include "ui/gfx/vector_icon_types.h"
+ #include "ui/views/accessibility/view_accessibility.h"
+ #include "ui/views/view_class_properties.h"
+ 
++namespace {
++
++// Arc's back and forward arrows, traced from its header: 12.8 DIP shafts with
++// heads 10.3 DIP tall at stroke 1.7, wider than they are tall.
++constexpr gfx::PathElement kMyarcBackPath[] = {
++    gfx::CANVAS_DIMENSIONS, 20, gfx::STROKE, 1.7f, gfx::MOVE_TO, 16.15f, 10,
++    gfx::H_LINE_TO, 3.35f, gfx::MOVE_TO, 8.5f, 4.85f, gfx::LINE_TO, 3.35f, 10,
++    gfx::LINE_TO, 8.5f, 15.15f};
++constexpr gfx::VectorIconRep kMyarcBackRep[] = {{kMyarcBackPath}};
++constexpr gfx::VectorIcon kMyarcBackIcon(kMyarcBackRep,
++                                         std::size(kMyarcBackRep),
++                                         "myarc_back");
++
++constexpr gfx::PathElement kMyarcForwardPath[] = {
++    gfx::CANVAS_DIMENSIONS, 20, gfx::STROKE, 1.7f, gfx::MOVE_TO, 3.35f, 10,
++    gfx::H_LINE_TO, 16.15f, gfx::MOVE_TO, 11, 4.85f, gfx::LINE_TO, 16.15f, 10,
++    gfx::LINE_TO, 11, 15.15f};
++constexpr gfx::VectorIconRep kMyarcForwardRep[] = {{kMyarcForwardPath}};
++constexpr gfx::VectorIcon kMyarcForwardIcon(kMyarcForwardRep,
++                                            std::size(kMyarcForwardRep),
++                                            "myarc_forward");
++
++}  // namespace
++
+ BackForwardButton::BackForwardButton(Direction direction,
+                                      PressedCallback callback,
+                                      BrowserWindowInterface* browser)
+@@ -75,6 +101,12 @@ BackForwardButton::BackForwardButton(Direction direction,
+     SetProperty(views::kElementIdentifierKey, kToolbarForwardButtonElementId);
+     set_menu_identifier(kToolbarForwardButtonMenuElementId);
+   }
++  if (base::CommandLine::ForCurrentProcess()->HasSwitch(
++          "myarc-visual-parity")) {
++    const gfx::VectorIcon& icon =
++        direction == Direction::kBack ? kMyarcBackIcon : kMyarcForwardIcon;
++    SetVectorIcons(icon, icon);
++  }
+ }
+ 
+ BackForwardButton::~BackForwardButton() = default;
