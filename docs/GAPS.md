@@ -2,7 +2,7 @@
 
 Updated: 2026-10-26. Browser release blockers remain open. Synthetic onboarding and the opt-in Rust/native browser experiment supply bounded evidence.
 
-Current implementation priority is [MA-007.a, native visual parity](../.plans/EXECUTION.md#ma-007a-native-visual-parity-first-state). Match the empty/new-tab window before expanding export investigation or the foundation test matrix. The ranking below retains release blockers; it does not override that current visible slice or permit unsafe browsing claims.
+Current implementation priority is [MA-007.a, native visual parity](../.plans/EXECUTION.md#ma-007a-native-visual-parity-first-state). Match the empty/new-tab window before expanding export investigation or the foundation test matrix. The ranking below retains release blockers; it does not override that current visible slice or permit unsafe browsing claims. The [alpha checklist](ALPHA.md) says which of this work alpha needs.
 
 [Native crash evidence](../browser/evidence/workspace-process-crash.json) now distinguishes successful clean-persisted session restoration from actual recent localStorage/navigation loss. [Navigation run details](../browser/experiments/native-session-navigation-crash.md) retain the failed strict duplicate-URL result. Acknowledgement and power-loss durability remain blockers despite stable-ID recovery controls. Renderer stays off by default; native browser/interactive suites remain unrun.
 

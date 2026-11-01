@@ -50,7 +50,7 @@ cargo test --workspace --locked
 python3 tools/export_patches.py --check   # needs the Chromium checkout
 ```
 
-More detail: [architecture](docs/ARCHITECTURE.md), [Arc migration](docs/MIGRATION.md), [CLI and MCP control](docs/CONTROL-PROTOCOL.md), [AI](docs/AI.md) and the [development log](log/DEVLOG.md).
+More detail: [alpha checklist](docs/ALPHA.md), [architecture](docs/ARCHITECTURE.md), [Arc migration](docs/MIGRATION.md), [CLI and MCP control](docs/CONTROL-PROTOCOL.md), [AI](docs/AI.md) and the [development log](log/DEVLOG.md).
 
 ## License
 

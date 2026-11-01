@@ -1,6 +1,6 @@
 # Working on myarc
 
-Read [README.md](README.md), [.plans/INDEX.md](.plans/INDEX.md) and [docs/GAPS.md](docs/GAPS.md) first. Current work is MA-007 native visual parity ([.plans/EXECUTION.md](.plans/EXECUTION.md)).
+Read [README.md](README.md), [.plans/INDEX.md](.plans/INDEX.md), [docs/GAPS.md](docs/GAPS.md) and [docs/ALPHA.md](docs/ALPHA.md) first. Current work is MA-007 native visual parity ([.plans/EXECUTION.md](.plans/EXECUTION.md)).
 
 ## Product guardrails
 

@@ -48,7 +48,9 @@ Dia already advertises optional AI and Arc migration. Those are baseline competi
 | P0 | Browser essentials | Extensions, permissions, downloads, history, find, private browsing, context menus, DevTools, recovery, updates |
 | P0 | Default-on ad and tracker blocking | Fresh Profiles start protected; per-site exceptions remain Profile-scoped; engine/filter updates and site recovery are tested on the selected Chromium version |
 | P0 | CLI and MCP browser control | An approved agent can inspect and act on real pages, manage tabs/Spaces, capture screenshots and stop/release control through a shared interface; works independently of built-in AI |
-| P1, beta target | Peek and two-pane Split View | Correct focus, navigation, dismissal, persistence; no cross-Profile split |
+| P1, alpha target | Two-pane Split View | Correct focus, navigation, dismissal, persistence; no cross-Profile split |
+| P1, alpha target | Little Arc | Small one-page window opened by shortcut or by links from other apps; promotes into a Space; can be turned off |
+| P1, beta target | Peek | Correct focus, navigation, dismissal |
 | P1, beta target | Boosts | Appearance controls, CSS, element hiding; inspectable and reversible |
 | P2 | Built-in AI providers | Explicit invocation and scope with local/BYOK/hosted providers; the P0 external-agent control interface does not wait for this |
 | Later | Convenience | Link routing, richer customization, sync, additional platforms, richer Boosts |
