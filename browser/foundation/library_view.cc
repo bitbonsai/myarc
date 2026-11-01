@@ -13,6 +13,7 @@
 #include "base/notreached.h"
 #include "base/task/sequenced_task_runner.h"
 #include "base/time/time.h"
+#include "cc/paint/paint_flags.h"
 #include "myarc/footer_button.h"
 #include "myarc/icons.h"
 #include "myarc/library_logic.h"
@@ -23,12 +24,14 @@
 #include "ui/color/color_id.h"
 #include "ui/color/color_provider.h"
 #include "ui/events/keycodes/keyboard_codes.h"
+#include "ui/gfx/canvas.h"
 #include "ui/gfx/color_utils.h"
 #include "ui/gfx/font_list.h"
 #include "ui/gfx/geometry/insets.h"
 #include "ui/gfx/geometry/point_f.h"
 #include "ui/gfx/geometry/rect.h"
 #include "ui/gfx/geometry/size.h"
+#include "ui/gfx/skia_paint_util.h"
 #include "ui/views/accessibility/view_accessibility.h"
 #include "ui/views/animation/ink_drop.h"
 #include "ui/views/background.h"
@@ -85,7 +88,7 @@ Colors GetColors(const ui::ColorProvider* provider) {
                                      provider->GetColor(ui::kColorSysSurface));
   const SkColor ink = dark ? SK_ColorWHITE : SK_ColorBLACK;
   return {.tile = SkColorSetA(SK_ColorWHITE, dark ? 0x18 : 0x80),
-          .column = SkColorSetA(SK_ColorWHITE, dark ? 0x0D : 0x59),
+          .column = SkColorSetA(SK_ColorWHITE, dark ? 0x06 : 0x59),
           .muted = SkColorSetA(ink, 0x99),
           .rail_selected = SkColorSetA(SK_ColorWHITE, dark ? 0x16 : 0x80),
           .rail_hover = SkColorSetA(SK_ColorWHITE, dark ? 0x0B : 0x59),
@@ -109,14 +112,14 @@ struct SectionInfo {
 
 constexpr auto kSections = std::to_array<SectionInfo>({
     {Section::kMedia, &kImageIcon, &kImageActiveIcon, u"Media",
-     u"Search Media\u2026"},
+     u"Search Media..."},
     {Section::kDownloads, &kCircleArrowDownIcon, &kCircleArrowDownActiveIcon,
-     u"Downloads", u"Search Downloads\u2026"},
+     u"Downloads", u"Search Downloads..."},
     {Section::kSpaces, &kCopyIcon, &kCopyActiveIcon, u"Spaces", nullptr},
     {Section::kBoosts, &kWandIcon, &kWandActiveIcon, u"Boosts",
-     u"Search Boosts\u2026"},
+     u"Search Boosts..."},
     {Section::kArchive, &kArchiveIcon, &kArchiveActiveIcon, u"Archived Tabs",
-     u"Search Archive\u2026"},
+     u"Search Archive..."},
 });
 
 const SectionInfo& Info(Section section) {
@@ -168,6 +171,27 @@ std::unique_ptr<T> TextButton(views::Button::PressedCallback callback,
   button->SetImageLabelSpacing(8);
   return button;
 }
+
+// Arc's rail brightens toward its right edge and ends in a hairline, so the
+// pane beside it reads a step darker. Light mode darkens the same way.
+class RailBackground final : public views::Background {
+ public:
+  void Paint(gfx::Canvas* canvas, views::View* view) const override {
+    const ui::ColorProvider* provider = view->GetColorProvider();
+    const bool dark = !provider || color_utils::IsDark(provider->GetColor(
+                                       ui::kColorSysSurface));
+    const SkColor ink = dark ? SK_ColorWHITE : SK_ColorBLACK;
+    const gfx::Rect bounds = view->GetLocalBounds();
+    cc::PaintFlags flags;
+    flags.setShader(gfx::CreateGradientShader(
+        bounds.origin(), bounds.top_right(), SkColorSetA(ink, 0),
+        SkColorSetA(ink, 0x0A)));
+    canvas->DrawRect(bounds, flags);
+    canvas->FillRect(
+        gfx::Rect(bounds.right() - 1, bounds.y(), 1, bounds.height()),
+        SkColorSetA(ink, 0x12));
+  }
+};
 
 // A button whose children are plain views; it paints its own hover tile.
 class TileButton : public views::Button {
@@ -352,6 +376,7 @@ LibraryView::LibraryView(SidebarView::Delegate& delegate,
   auto* rail = AddChildView(
       Box(Orientation::kVertical, gfx::Insets::TLBR(0, 8, 10, 8), 0));
   rail->SetPreferredSize(gfx::Size(library::kRailWidth, 0));
+  rail->SetBackground(std::make_unique<RailBackground>());
   auto* rail_layout = static_cast<views::BoxLayout*>(rail->GetLayoutManager());
   auto* items = rail->AddChildView(
       Box(Orientation::kVertical, gfx::Insets::TLBR(36, 0, 0, 0), 23));
@@ -375,20 +400,22 @@ LibraryView::LibraryView(SidebarView::Delegate& delegate,
   }
   auto* footer =
       rail->AddChildView(Box(Orientation::kHorizontal, gfx::Insets(), 0));
-  // As in Arc, the glowing Library button stays in the footer and closes it.
-  auto back = TextButton<LibraryButton>(
+  // Arc's footer is a thin back arrow with its tooltip beside it.
+  auto exit = TextButton<FooterButton>(
       base::BindRepeating(
           [](LibraryView* view) { view->PostAction(view->close_); },
           base::Unretained(this)),
       u"");
-  back->SetCustomPadding(gfx::Insets());
-  back->SetMinSize(gfx::Size(32, 32));
-  back->SetMaxSize(gfx::Size(32, 32));
-  back->SetPreferredSize(gfx::Size(32, 32));
-  back->SetOpen(true, /*animate=*/false);
-  back->SetFooterTooltip(std::move(tooltip), {u"Close Library", {}});
-  back->GetViewAccessibility().SetName(u"Close Library");
-  footer->AddChildView(std::move(back));
+  exit->SetCustomPadding(gfx::Insets());
+  exit->SetMinSize(gfx::Size(32, 32));
+  exit->SetMaxSize(gfx::Size(32, 32));
+  exit->SetPreferredSize(gfx::Size(32, 32));
+  exit->SetHorizontalAlignment(gfx::ALIGN_CENTER);
+  exit->SetImageCentered(true);
+  exit->SetFooterTooltip(std::move(tooltip),
+                         {u"Exit Library", {}, /*beside=*/true});
+  exit->GetViewAccessibility().SetName(u"Exit Library");
+  exit_ = footer->AddChildView(std::move(exit));
 
   pane_ = AddChildView(std::make_unique<views::View>());
   pane_->SetLayoutManager(std::make_unique<views::BoxLayout>(
@@ -448,6 +475,10 @@ void LibraryView::RefreshArchive() {
   UpdateList(/*keep_scroll=*/true);
 }
 
+void LibraryView::ShowExitTooltipNow() {
+  exit_->ShowFooterTooltipNow();
+}
+
 void LibraryView::FocusSection() {
   for (size_t i = 0; i < std::size(kSections); ++i) {
     if (kSections[i].section == section_) {
@@ -479,6 +510,10 @@ bool LibraryView::AcceleratorPressed(const ui::Accelerator& accelerator) {
 
 void LibraryView::OnThemeChanged() {
   views::View::OnThemeChanged();
+  exit_->SetImageModel(views::Button::STATE_NORMAL,
+                       ui::ImageModel::FromVectorIcon(
+                           kArrowLeftIcon, GetColors(GetColorProvider()).muted,
+                           24));
   // Pane fills are plain colors picked for the current scheme. Rebuild only
   // when they change: inactive-window updates land here too.
   const ui::ColorProvider* provider = GetColorProvider();
@@ -670,22 +705,26 @@ void LibraryView::BuildList() {
   const SectionInfo& info = Info(section_);
   const Colors colors = GetColors(GetColorProvider());
   auto* layout = static_cast<views::BoxLayout*>(pane_->GetLayoutManager());
+  // Arc insets the search field 8 DIP from the rail, the top and the page.
   auto* content = pane_->AddChildView(
-      Box(Orientation::kVertical, gfx::Insets::TLBR(10, 4, 10, 10), 8));
+      Box(Orientation::kVertical, gfx::Insets::TLBR(8, 8, 10, 8), 8));
   layout->SetFlexForView(content, 1);
   auto* content_layout =
       static_cast<views::BoxLayout*>(content->GetLayoutManager());
 
-  // Arc's search field: 35 DIP tall on the tile fill, 10 DIP from the top.
+  // Arc's search field: 36 DIP tall on the tile fill, a 14pt placeholder 13
+  // DIP right of the magnifier.
   auto* field = content->AddChildView(
-      Box(Orientation::kHorizontal, gfx::Insets::VH(0, 14), 10));
+      Box(Orientation::kHorizontal, gfx::Insets::VH(0, 14), 13));
   field->SetBackground(views::CreateRoundedRectBackground(colors.tile, 10));
-  field->SetPreferredSize(gfx::Size(0, 35));
+  field->SetPreferredSize(gfx::Size(0, 36));
   field->AddChildView(std::make_unique<views::ImageView>(
       ui::ImageModel::FromVectorIcon(kSearchIcon, colors.muted, 16)));
   auto search = std::make_unique<views::Textfield>();
   search->SetBackgroundEnabled(false);
   search->SetBorder(views::CreateEmptyBorder(gfx::Insets()));
+  search->SetFontList(gfx::FontList().Derive(1, gfx::Font::NORMAL,
+                                             gfx::Font::Weight::NORMAL));
   search->SetPlaceholderText(info.search);
   search->GetViewAccessibility().SetName(info.search);
   search->SetText(query_);

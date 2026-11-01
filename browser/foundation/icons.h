@@ -63,6 +63,17 @@ inline constexpr gfx::VectorIcon kPlusIcon(kPlusRep,
                                            std::size(kPlusRep),
                                            "myarc_plus");
 
+// Lucide "arrow-left" at stroke 1.5: the Library's Exit Library tile, as thin
+// as Arc's.
+inline constexpr gfx::PathElement kArrowLeftPath[] = {
+    gfx::CANVAS_DIMENSIONS, 24, gfx::STROKE, 1.5f, gfx::MOVE_TO, 12, 19,
+    gfx::R_LINE_TO, -7, -7, gfx::R_LINE_TO, 7, -7, gfx::MOVE_TO, 19, 12,
+    gfx::H_LINE_TO, 5};
+inline constexpr gfx::VectorIconRep kArrowLeftRep[] = {{kArrowLeftPath}};
+inline constexpr gfx::VectorIcon kArrowLeftIcon(kArrowLeftRep,
+                                                std::size(kArrowLeftRep),
+                                                "myarc_arrow_left");
+
 inline constexpr gfx::PathElement kSearchPath[] = {
     gfx::CANVAS_DIMENSIONS, 24, gfx::STROKE, 2, gfx::MOVE_TO, 21, 21,
     gfx::R_LINE_TO, -4.34f, -4.34f, gfx::NEW_PATH, gfx::STROKE, 2,

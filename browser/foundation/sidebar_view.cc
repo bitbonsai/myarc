@@ -1115,6 +1115,11 @@ std::u16string SidebarView::GetCreateTooltipForTesting() const {
 
 void SidebarView::ShowFooterTooltipForCapture(std::string_view target) {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
+  // An open Library replaces the footer; its Exit Library tile stands in.
+  if (library_) {
+    library_->ShowExitTooltipNow();
+    return;
+  }
   const FocusAction action = target == "space"    ? FocusAction::kSpaces
                              : target == "create" ? FocusAction::kCreate
                                                   : FocusAction::kLibrary;

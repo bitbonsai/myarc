@@ -29,6 +29,7 @@ class Textfield;
 
 namespace myarc {
 
+class FooterButton;
 class FooterTooltip;
 
 // Arc's Library: a section rail and one section pane. Presentation only; the
@@ -59,6 +60,8 @@ class LibraryView final : public views::View,
   void RefreshDownloads();
   // Reloads the Archived Tabs list when it is showing and its entries changed.
   void RefreshArchive();
+  // Shows the Exit Library tooltip at once and keeps it up, for captures.
+  void ShowExitTooltipNow();
 
   // views::View:
   gfx::Size CalculatePreferredSize(
@@ -102,6 +105,7 @@ class LibraryView final : public views::View,
   Spaces spaces_;
   uint64_t current_space_ = 0;
   std::vector<raw_ptr<views::Button>> rail_items_;
+  raw_ptr<FooterButton> exit_ = nullptr;
   raw_ptr<views::View> pane_ = nullptr;
   raw_ptr<views::Textfield> search_ = nullptr;
   raw_ptr<views::View> list_ = nullptr;
