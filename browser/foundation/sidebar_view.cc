@@ -1115,9 +1115,19 @@ std::u16string SidebarView::GetCreateTooltipForTesting() const {
 
 void SidebarView::ShowFooterTooltipForCapture(std::string_view target) {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
-  // An open Library replaces the footer; its Exit Library tile stands in.
+  // An open Library replaces the footer; its Exit Library tile stands in once
+  // the Library's opening motion has settled.
   if (library_) {
-    library_->ShowExitTooltipNow();
+    base::SequencedTaskRunner::GetCurrentDefault()->PostDelayedTask(
+        FROM_HERE,
+        base::BindOnce(
+            [](base::WeakPtr<SidebarView> sidebar) {
+              if (sidebar && sidebar->library_) {
+                sidebar->library_->ShowExitTooltipNow();
+              }
+            },
+            weak_factory_.GetWeakPtr()),
+        base::Milliseconds(500));
     return;
   }
   const FocusAction action = target == "space"    ? FocusAction::kSpaces

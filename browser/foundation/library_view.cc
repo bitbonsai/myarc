@@ -178,14 +178,15 @@ class RailBackground final : public views::Background {
  public:
   void Paint(gfx::Canvas* canvas, views::View* view) const override {
     const ui::ColorProvider* provider = view->GetColorProvider();
-    const bool dark = !provider || color_utils::IsDark(provider->GetColor(
-                                       ui::kColorSysSurface));
+    const bool dark =
+        !provider ||
+        color_utils::IsDark(provider->GetColor(ui::kColorSysSurface));
     const SkColor ink = dark ? SK_ColorWHITE : SK_ColorBLACK;
     const gfx::Rect bounds = view->GetLocalBounds();
     cc::PaintFlags flags;
-    flags.setShader(gfx::CreateGradientShader(
-        bounds.origin(), bounds.top_right(), SkColorSetA(ink, 0),
-        SkColorSetA(ink, 0x0A)));
+    flags.setShader(
+        gfx::CreateGradientShader(bounds.origin(), bounds.top_right(),
+                                  SkColorSetA(ink, 0), SkColorSetA(ink, 0x0A)));
     canvas->DrawRect(bounds, flags);
     canvas->FillRect(
         gfx::Rect(bounds.right() - 1, bounds.y(), 1, bounds.height()),
@@ -510,10 +511,10 @@ bool LibraryView::AcceleratorPressed(const ui::Accelerator& accelerator) {
 
 void LibraryView::OnThemeChanged() {
   views::View::OnThemeChanged();
-  exit_->SetImageModel(views::Button::STATE_NORMAL,
-                       ui::ImageModel::FromVectorIcon(
-                           kArrowLeftIcon, GetColors(GetColorProvider()).muted,
-                           24));
+  exit_->SetImageModel(
+      views::Button::STATE_NORMAL,
+      ui::ImageModel::FromVectorIcon(kArrowLeftIcon,
+                                     GetColors(GetColorProvider()).muted, 24));
   // Pane fills are plain colors picked for the current scheme. Rebuild only
   // when they change: inactive-window updates land here too.
   const ui::ColorProvider* provider = GetColorProvider();
@@ -723,8 +724,8 @@ void LibraryView::BuildList() {
   auto search = std::make_unique<views::Textfield>();
   search->SetBackgroundEnabled(false);
   search->SetBorder(views::CreateEmptyBorder(gfx::Insets()));
-  search->SetFontList(gfx::FontList().Derive(1, gfx::Font::NORMAL,
-                                             gfx::Font::Weight::NORMAL));
+  search->SetFontList(
+      gfx::FontList().Derive(1, gfx::Font::NORMAL, gfx::Font::Weight::NORMAL));
   search->SetPlaceholderText(info.search);
   search->GetViewAccessibility().SetName(info.search);
   search->SetText(query_);
