@@ -626,9 +626,8 @@ impl Workspace {
 
     /// Remember the page a live temporary item shows, so its row stays in the
     /// sidebar, dormant, if the browser does not restore its tab, and reopens
-    /// `url`. The caller passes a browser-canonicalized URL; its query and
-    /// fragment are dropped, so tokens such as magic links or password resets
-    /// never reach the workspace file. The title is cleaned like `set_title`.
+    /// `url`. The caller passes a browser-canonicalized URL, stored whole like
+    /// Chromium's session files. The title is cleaned like `set_title`.
     /// Returns whether anything changed. Saved items reject with
     /// `ExplicitUnsaveRequired`: their URL changes only through `set_canonical_url`.
     /// Callers whose Profile saves no history do not call this.
@@ -642,7 +641,6 @@ impl Workspace {
             return Err(WorkspaceError::ExplicitUnsaveRequired(item_id));
         }
         validate_url(url)?;
-        let url = page_url(url);
         let clean = clean_title(title);
         let item = self
             .state
@@ -659,7 +657,7 @@ impl Workspace {
     }
 
     /// A dormant temporary row of `space_id` that remembers `url` (compared
-    /// without query and fragment, as `set_temporary_page` stores it) and is not
+    /// without fragment, which in-page navigation changes) and is not
     /// in `live`, the item IDs with a live page. A restored tab whose binding the
     /// workspace lost takes this row over instead of duplicating it.
     pub fn dormant_temporary_item(
@@ -668,14 +666,14 @@ impl Workspace {
         url: &str,
         live: &[ItemId],
     ) -> Option<ItemId> {
-        let url = page_url(url);
+        let url = without_fragment(url);
         let live: BTreeSet<ItemId> = live.iter().copied().collect();
         self.state
             .items
             .iter()
             .find(|item| {
                 item.placement == Placement::Temporary { space_id }
-                    && item.canonical_url.as_deref() == Some(url)
+                    && item.canonical_url.as_deref().map(without_fragment) == Some(url)
                     && !live.contains(&item.id)
             })
             .map(|item| item.id)
@@ -1032,9 +1030,9 @@ fn validate_ids(ids: impl Iterator<Item = u64>, next: u64) -> Result<(), Workspa
     Ok(())
 }
 
-/// `url` up to its query or fragment: the page a dormant row reopens.
-fn page_url(url: &str) -> &str {
-    url.find(['?', '#']).map_or(url, |end| &url[..end])
+/// `url` up to its fragment.
+fn without_fragment(url: &str) -> &str {
+    url.find('#').map_or(url, |end| &url[..end])
 }
 
 fn validate_url(url: &str) -> Result<(), WorkspaceError> {

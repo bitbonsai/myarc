@@ -190,8 +190,8 @@ mod ffi {
             url: &str,
             title: &str,
         ) -> MutationResult;
-        // A dormant temporary row of `space_id` remembering `url` (without
-        // query and fragment) and not in `live`; zero when none.
+        // A dormant temporary row of `space_id` remembering `url` (ignoring
+        // the fragment) and not in `live`; zero when none.
         fn dormant_temporary_item(
             workspace: &Workspace,
             space_id: u64,

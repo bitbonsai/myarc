@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-11-01: Dormant rows keep their full URL
+
+- Dormant temporary rows store the page's full URL again, so a YouTube `watch?v=` row reopens the video. Full URLs are browsing state like Chromium's session files, gated by the history pref: nothing is stored when the Profile saves no history, and incognito and guest write nothing. A restored tab finds its dormant row by full URL, ignoring the fragment.
+- Verification: `cargo test`/`fmt`/`clippy` pass. `chrome` and `bridge_check` build; `bridge_check` (full URL through the codec, lookup by query), `export_patches.py --check` and `check_docs.py` pass. The history-pref gate sits in the Profile-bound adapter and has no bridge_check coverage. No live UI run.
+- No Chromium patch changes.
+
 ## 2026-11-01: Review fixes for tooltip key caps, "+" menu reopen and Library Tab order
 
 - A failed pathops difference in the footer tooltip's key caps no longer crashes paint (`CHECK`); the cap draws without its lip, like the "+" menu panel's `value_or`. Reopening the "+" menu during its close animation starts from the current opacity and scale instead of jumping to 0. The Library container is focusable only while it holds focus for a click-opened Library (`LibraryView::HoldFocus`), and drops that once focus moves to another view, so Tab no longer stops on it. A window deactivation keeps the hold, so focus comes back to it.

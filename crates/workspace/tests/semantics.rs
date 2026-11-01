@@ -783,23 +783,17 @@ fn temporary_item_with_a_page_survives_reconciliation_without_a_tab() {
 }
 
 #[test]
-fn a_remembered_page_keeps_no_query_or_fragment() {
+fn a_remembered_page_keeps_its_full_url() {
     let mut workspace = Workspace::default();
     let id = workspace.add_temporary_item(S1).unwrap();
-    assert_eq!(
-        workspace.set_temporary_page(id, "https://example.test/reset?token=s3cret#step", "Reset"),
-        Ok(true)
-    );
+    let page = "https://example.test/watch?v=abc#t=42";
+    assert_eq!(workspace.set_temporary_page(id, page, "Video"), Ok(true));
     let item = find(&workspace, id).unwrap();
+    assert_eq!(item.canonical_url.as_deref(), Some(page));
+    // Another query is another page.
     assert_eq!(
-        item.canonical_url.as_deref(),
-        Some("https://example.test/reset")
-    );
-    assert!(!format!("{:?}", workspace.snapshot()).contains("s3cret"));
-    // The same page with another token is no change.
-    assert_eq!(
-        workspace.set_temporary_page(id, "https://example.test/reset#other", "Reset"),
-        Ok(false)
+        workspace.set_temporary_page(id, "https://example.test/watch?v=def", "Video"),
+        Ok(true)
     );
 }
 
@@ -809,17 +803,22 @@ fn a_restored_tab_finds_the_dormant_row_of_its_page() {
     let other = workspace.create_space(P1, "Other").unwrap();
     let dormant = workspace.add_temporary_item(S1).unwrap();
     workspace
-        .set_temporary_page(dormant, "https://example.test/doc?a=1", "Doc")
+        .set_temporary_page(dormant, "https://example.test/doc?a=1#intro", "Doc")
         .unwrap();
     let live = workspace.add_temporary_item(S1).unwrap();
     workspace
         .set_temporary_page(live, "https://example.test/live", "Live")
         .unwrap();
     let saved = pin(&mut workspace, S1);
-    let page = "https://example.test/doc?b=2#top";
+    // Matched by full URL, ignoring the fragment.
+    let page = "https://example.test/doc?a=1#top";
     assert_eq!(
         workspace.dormant_temporary_item(S1, page, &[live]),
         Some(dormant)
+    );
+    assert_eq!(
+        workspace.dormant_temporary_item(S1, "https://example.test/doc?a=2", &[live]),
+        None
     );
     // Only dormant temporary rows of that Space, by page.
     assert_eq!(workspace.dormant_temporary_item(other, page, &[live]), None);

@@ -429,16 +429,14 @@ bool CheckDormantTemporary() {
       set_temporary_page(*model, blank.id, "chrome://newtab/", "New Tab").ok) {
     return false;
   }
-  // Query and fragment, where tokens live, never reach the file.
-  auto changed = set_temporary_page(
-      *model, kept.id, "https://example.test/a?token=s3cret#x", "Alpha");
-  auto same =
-      set_temporary_page(*model, kept.id, "https://example.test/a", "Alpha");
+  // The full URL is kept, like Chromium's session files. The adapter skips
+  // this call when the Profile saves no history.
+  constexpr char kPage[] = "https://example.test/a?v=1#t";
+  auto changed = set_temporary_page(*model, kept.id, kPage, "Alpha");
+  auto same = set_temporary_page(*model, kept.id, kPage, "Alpha");
   if (!changed.ok || changed.id != 1 || !same.ok || same.id != 0)
     return false;
   const auto encoded = EncodeWorkspaceMetadata(export_snapshot(*model));
-  if (!encoded || encoded->find("s3cret") != std::string::npos)
-    return false;
   auto decoded = encoded ? DecodeWorkspaceMetadata(*encoded)
                          : myarc::internal::MetadataResult{};
   auto relaunched = new_workspace();
@@ -449,16 +447,18 @@ bool CheckDormantTemporary() {
   }
   // A restored tab of that page with a lost binding finds the dormant row.
   const uint64_t live[] = {kept.id};
-  if (dormant_temporary_item(*relaunched, 1, "https://example.test/a?b",
+  if (dormant_temporary_item(*relaunched, 1, "https://example.test/a?v=1",
                              rust::Slice<const uint64_t>()) != kept.id ||
-      dormant_temporary_item(*relaunched, 1, "https://example.test/a",
+      dormant_temporary_item(*relaunched, 1, "https://example.test/a?v=2",
+                             rust::Slice<const uint64_t>()) != 0 ||
+      dormant_temporary_item(*relaunched, 1, kPage,
                              rust::Slice<const uint64_t>(live, 1)) != 0) {
     return false;
   }
   const auto temporary = sidebar_snapshot(*relaunched, 1).temporary;
   return temporary.size() == 1 && temporary[0].id == kept.id &&
          temporary[0].has_url &&
-         std::string(temporary[0].canonical_url) == "https://example.test/a" &&
+         std::string(temporary[0].canonical_url) == kPage &&
          std::string(temporary[0].title) == "Alpha" &&
          sidebar_snapshot(*relaunched, 1).pins.size() == 1;
 }
