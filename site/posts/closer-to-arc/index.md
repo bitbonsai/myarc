@@ -1,9 +1,10 @@
 ---
 title: "Chasing Arc's details in the 2026.11.01 nightly"
-summary: "Side-by-side recordings showed what myArc's sidebar was missing, a quit bug emptied every Space, and I'm writing an alpha checklist next."
+summary: "Side-by-side recordings showed what myArc's sidebar was missing, and a quit bug was emptying every Space. Next up is an alpha checklist."
 date: 2026-11-01
 draft: false
 redirect_from: [2026-11-01-nightly]
+thumbnail: creation-menu-thumbnail.png
 ---
 
 [![myArc's sidebar with the creation menu open above the "+" button, listing New Space, a greyed-out New Split and a highlighted New Tab](creation-menu.png)](creation-menu.png)
@@ -12,7 +13,7 @@ redirect_from: [2026-11-01-nightly]
 
 The 2026.11.01 nightly is on the [download page](https://myarc.dev/download/). A nightly is a pre-alpha build I make from the main branch, so people can try myArc without compiling Chromium. It has 58 commits since 2026.10.29, and most of them came out of the [screenshot loop](https://github.com/bitbonsai/myarc/blob/main/docs/WORKFLOW.md). I take one Arc screenshot, a coding agent matches it, and I compare the two before the next task.
 
-Screenshots only get you so far. After the last nightly I recorded Arc and myArc doing the same things next to each other, and the result felt off. Any single frame looked close enough, but the recording was missing details and finesse. The blue felt wrong. Arc's motion wasn't there. The footer didn't look like Arc's.
+Screenshots only get you so far. After the last nightly I recorded Arc and myArc doing the same things next to each other, and the result felt off. Any single frame looked close enough. In motion it didn't. Arc's sidebar and menus animate, and myArc's just snapped into place. The footer was laid out differently too, and even the blue looked wrong.
 
 ## Going frame by frame
 
@@ -20,7 +21,7 @@ Screenshots only get you so far. After the last nightly I recorded Arc and myArc
 
 Those numbers turned into tasks. Cmd+S now hides and shows the sidebar at Arc's pace, and the window buttons fade out and back with it. While the sidebar is hidden, moving the pointer to the window's left edge peeks it back in, filled with the Space's color where it used to be Chromium's grey.
 
-The "+" button used to open a plain macOS menu. Now it opens Arc's creation menu, with New Space, New Split and New Tab. The menu grows out of the button, follows the pointer and the arrow keys, and closes on Esc or a click outside it. While it's open, the "+" turns into a cross.
+The "+" button used to open a plain macOS menu. Now it opens Arc's creation menu, with New Space, New Split and New Tab. The menu grows out of the button and closes on Esc or a click outside it. The highlight follows the pointer or the arrow keys. While it's open, the "+" turns into a cross.
 
 The footer now packs the Space icons to the left with "+" on the right, as Arc's does. Rest the pointer on a footer button for a second and a glass tooltip shows its name and shortcut.
 
@@ -40,7 +41,7 @@ None of this is saved when your profile has history turned off, and private and 
 
 The Library is Arc's panel for things that aren't tabs: Media, Downloads, Spaces, Boosts and Archived Tabs. In the last nightly its button opened a short menu. Now the whole sidebar eases into the Library, with Arc's icon rail down the left. Esc or the arrow at the bottom takes you back.
 
-The Spaces section has a card for each Space, listing its pinned tabs. Click a pinned tab on a card and myArc switches to that Space and opens it. The brush icon on a card renames the Space. As of today you can also reorder Spaces by dragging a card by its handle. The other cards slide aside, Esc drops the card back where it was, and the footer icons and Ctrl+1 to Ctrl+9 follow the new order. If you'd rather use the keyboard, the card's "..." menu has Move Left and Move Right.
+The Spaces section has a card for each Space, listing its pinned tabs. Click a pinned tab on a card and myArc switches to that Space and opens it. The brush icon on a card renames the Space. As of today you can also reorder Spaces by dragging a card by its handle. The other cards slide aside while you drag, and Esc drops the card back where it was. The footer icons and Ctrl+1 to Ctrl+9 follow the new order. If you'd rather use the keyboard, the card's "..." menu has Move Left and Move Right.
 
 [![The Library's Spaces section with three Space cards, Everyday, Research and Reading, each listing synthetic pinned tabs, and the icon rail on the left](library-space-cards.png)](library-space-cards.png)
 
@@ -60,7 +61,7 @@ The blue is where I stepped away from Arc on purpose. The Library's accent, on i
 
 ## How far from an alpha
 
-Most of this build is visual parity. Behavior is tracked separately, in the [parity register](https://github.com/bitbonsai/myarc/blob/main/docs/PARITY.md). It lists 12 P0 behaviors, the ones a release can't ship without. Some now work in part. You can create, rename and switch Spaces, temporary tabs archive on Arc's schedule, and downloads have a home. None of them has the end-to-end evidence the register asks for yet, so it still counts zero demonstrated browser journeys.
+Most of this build is visual parity. Behavior is tracked separately, in the [parity register](https://github.com/bitbonsai/myarc/blob/main/docs/PARITY.md). It lists 12 P0 behaviors, the ones a release can't ship without. Some now work in part. Spaces can be created, renamed and switched, and temporary tabs archive on Arc's schedule. None of them has the end-to-end evidence the register asks for yet, so it still counts zero demonstrated browser journeys.
 
 Other P0 pieces don't exist. myArc can't import an Arc workspace. Ad and tracker blocking, which should be on by default, isn't there. Neither is browser control from the command line and over MCP, the protocol AI agents use to drive apps. Onboarding has to be animated to meet its [release requirement](https://github.com/bitbonsai/myarc/blob/main/docs/ONBOARDING.md), and so far there's a clickable web study with synthetic data and nothing in the native browser. Extension compatibility, crash durability and signed updates aren't verified either.
 

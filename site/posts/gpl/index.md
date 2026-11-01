@@ -4,6 +4,7 @@ summary: "myArc moved from the MIT license to GPL-3.0 so it stays open for good.
 date: 2026-10-29
 draft: false
 redirect_from: [2026-10-29-gpl]
+thumbnail: gpl-v3-thumbnail.png
 ---
 
 Today I switched myArc's license from MIT to GPL-3.0. Both are open-source licenses, and for anyone who just downloads and uses myArc nothing changes. They differ in what someone can do with the code after taking it.
