@@ -117,6 +117,8 @@ source_set("library_logic") {
 
 source_set("sidebar_view") {
   sources = [
+    "create_menu.cc",
+    "create_menu.h",
     "downloads_stack.cc",
     "downloads_stack.h",
     "footer_button.cc",
@@ -140,6 +142,7 @@ source_set("sidebar_view") {
     "//cc/paint",
     "//components/vector_icons",
     "//skia",
+    "//ui/accessibility",
     "//ui/color",
     "//ui/compositor",
     "//ui/display",

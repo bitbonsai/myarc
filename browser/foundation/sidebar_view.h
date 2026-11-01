@@ -36,6 +36,8 @@ struct SidebarResult;
 
 namespace myarc {
 
+class CreateButton;
+class CreateMenu;
 class DownloadsStack;
 class FooterTooltip;
 class LibraryView;
@@ -218,9 +220,10 @@ class SidebarView final : public views::View,
   bool LibraryHasFocus();
   // Drops the Library and has the parent rebuild the rows.
   void FinishCloseLibrary(bool had_focus);
-  void BuildCreateMenu();
   void ShowCreateMenu(const ui::Event& event);
   void SetCreateMenuOpen(bool open);
+  // Runs the creation menu's choice once its handlers have unwound.
+  void ChooseCreateItem(int item);
   void ExecuteCommand(int command_id, int event_flags) override;
   // Builds the footer for spaces_ and current_space_id_, tracking its
   // controls' focus.
@@ -236,8 +239,10 @@ class SidebarView final : public views::View,
   std::vector<FocusTarget> focus_targets_;
   // The footer kept across row rebuilds, and the Spaces it shows.
   raw_ptr<views::View> footer_ = nullptr;
-  // Floats above the footer, outside the layout, and goes with it.
+  // Float above the footer, outside the layout, and go with it.
   raw_ptr<DownloadsStack> downloads_stack_ = nullptr;
+  raw_ptr<CreateMenu> create_menu_ = nullptr;
+  raw_ptr<CreateButton> create_button_ = nullptr;
   std::vector<FocusTarget> footer_targets_;
   std::vector<std::pair<uint64_t, std::u16string>> footer_spaces_;
   uint64_t footer_space_id_ = 0;
@@ -259,6 +264,8 @@ class SidebarView final : public views::View,
   std::unique_ptr<ui::SimpleMenuModel> menu_model_;
   std::unique_ptr<views::MenuRunner> menu_runner_;
   bool create_menu_open_ = false;
+  // --myarc-capture-create-menu opens the menu once, for captures.
+  bool capture_menu_scheduled_ = false;
   // Shared with the Library, so a press there keeps the tooltip quiet here.
   std::unique_ptr<FooterTooltip> footer_tooltip_;
   // The next footer's Library button starts glowing and settles.

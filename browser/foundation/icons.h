@@ -62,6 +62,46 @@ inline constexpr gfx::VectorIcon kPlusIcon(kPlusRep,
                                            std::size(kPlusRep),
                                            "myarc_plus");
 
+// The creation menu's row icons, traced from Arc's. New Space is the Spaces
+// rail glyph's two cards with a plus on the front one, on its 28 DIP canvas.
+// New Split and New Tab use an 18 DIP canvas at stroke 1.6: a window split a
+// third of the way across with a plus replacing its top right corner, and a
+// rounded square with a plus.
+inline constexpr gfx::PathElement kNewSpacePath[] = {
+    gfx::CANVAS_DIMENSIONS, 28, gfx::STROKE, 1.8f, gfx::ROUND_RECT, 11.1f,
+    7.05f, 13, 18.4f, 2.6f, gfx::MOVE_TO, 11.1f, 22.35f, gfx::LINE_TO, 10.26f,
+    22.59f, gfx::ARC_TO, 2.6f, 2.6f, 0, 0, 1, 7.05f, 20.8f, gfx::LINE_TO, 3.66f,
+    8.98f, gfx::ARC_TO, 2.6f, 2.6f, 0, 0, 1, 5.44f, 5.76f, gfx::LINE_TO, 12.94f,
+    3.61f, gfx::ARC_TO, 2.6f, 2.6f, 0, 0, 1, 16.15f, 5.4f, gfx::LINE_TO, 16.6f,
+    7.05f, gfx::MOVE_TO, 14.1f, 16.25f, gfx::H_LINE_TO, 21.1f, gfx::MOVE_TO,
+    17.6f, 12.75f, gfx::V_LINE_TO, 19.75f};
+inline constexpr gfx::VectorIconRep kNewSpaceRep[] = {{kNewSpacePath}};
+inline constexpr gfx::VectorIcon kNewSpaceIcon(kNewSpaceRep,
+                                               std::size(kNewSpaceRep),
+                                               "myarc_new_space");
+
+inline constexpr gfx::PathElement kNewSplitPath[] = {
+    gfx::CANVAS_DIMENSIONS, 18, gfx::STROKE, 1.6f, gfx::MOVE_TO, 12.5f, 2.5f,
+    gfx::H_LINE_TO, 3.5f, gfx::ARC_TO, 2.5f, 2.5f, 0, 0, 0, 1, 5,
+    gfx::V_LINE_TO, 14, gfx::ARC_TO, 2.5f, 2.5f, 0, 0, 0, 3.5f, 16.5f,
+    gfx::H_LINE_TO, 13.5f, gfx::ARC_TO, 2.5f, 2.5f, 0, 0, 0, 16, 14,
+    gfx::V_LINE_TO, 6.5f, gfx::MOVE_TO, 6, 2.5f, gfx::V_LINE_TO, 16.5f,
+    gfx::MOVE_TO, 15, 1, gfx::V_LINE_TO, 6, gfx::MOVE_TO, 12.5f, 3.5f,
+    gfx::H_LINE_TO, 17.5f};
+inline constexpr gfx::VectorIconRep kNewSplitRep[] = {{kNewSplitPath}};
+inline constexpr gfx::VectorIcon kNewSplitIcon(kNewSplitRep,
+                                               std::size(kNewSplitRep),
+                                               "myarc_new_split");
+
+inline constexpr gfx::PathElement kNewTabPath[] = {
+    gfx::CANVAS_DIMENSIONS, 18, gfx::STROKE, 1.6f, gfx::ROUND_RECT, 1.5f, 1.5f,
+    15, 15, 3, gfx::MOVE_TO, 5.5f, 9, gfx::H_LINE_TO, 12.5f, gfx::MOVE_TO, 9,
+    5.5f, gfx::V_LINE_TO, 12.5f};
+inline constexpr gfx::VectorIconRep kNewTabRep[] = {{kNewTabPath}};
+inline constexpr gfx::VectorIcon kNewTabIcon(kNewTabRep,
+                                             std::size(kNewTabRep),
+                                             "myarc_new_tab");
+
 // Lucide "arrow-left" at stroke 1.5: the Library's Exit Library tile, as thin
 // as Arc's.
 inline constexpr gfx::PathElement kArrowLeftPath[] = {

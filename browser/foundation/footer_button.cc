@@ -15,6 +15,7 @@
 #include "cc/paint/paint_filter.h"
 #include "cc/paint/paint_flags.h"
 #include "cc/paint/paint_shader.h"
+#include "myarc/icons.h"
 #include "third_party/skia/include/core/SkColor.h"
 #include "third_party/skia/include/core/SkPath.h"
 #include "third_party/skia/include/core/SkRect.h"
@@ -27,6 +28,7 @@
 #include "ui/display/screen.h"
 #include "ui/events/event.h"
 #include "ui/gfx/animation/animation.h"
+#include "ui/gfx/animation/tween.h"
 #include "ui/gfx/canvas.h"
 #include "ui/gfx/color_utils.h"
 #include "ui/gfx/font.h"
@@ -36,9 +38,12 @@
 #include "ui/gfx/geometry/rect_conversions.h"
 #include "ui/gfx/geometry/rect_f.h"
 #include "ui/gfx/geometry/size.h"
+#include "ui/gfx/paint_vector_icon.h"
 #include "ui/gfx/scoped_canvas.h"
 #include "ui/gfx/text_utils.h"
 #include "ui/views/accessibility/view_accessibility.h"
+#include "ui/views/animation/ink_drop.h"
+#include "ui/views/animation/ink_drop_host.h"
 #include "ui/views/event_monitor.h"
 #include "ui/views/view.h"
 #include "ui/views/widget/widget.h"
@@ -135,6 +140,11 @@ constexpr base::TimeDelta kSparkleDuration = base::Milliseconds(450);
 constexpr base::TimeDelta kFadeDuration = base::Milliseconds(350);
 constexpr base::TimeDelta kLastDelay = base::Milliseconds(120);
 constexpr base::TimeDelta kTotal = kSparkleDuration + kLastDelay;
+
+// The Create button's plus, and its turn into a cross with the menu.
+constexpr int kPlusSize = 21;
+constexpr float kOpenAngle = 45;
+constexpr base::TimeDelta kTurnDuration = base::Milliseconds(130);
 
 float Lerp(float from, float to, float t) {
   return from + (to - from) * t;
@@ -667,6 +677,81 @@ void LibraryButton::PaintButtonContents(gfx::Canvas* canvas) {
 }
 
 BEGIN_METADATA(LibraryButton)
+END_METADATA
+
+CreateButton::CreateButton(PressedCallback callback,
+                           std::u16string_view text,
+                           int button_context,
+                           bool use_text_color_for_icon)
+    : FooterButton(std::move(callback),
+                   text,
+                   button_context,
+                   use_text_color_for_icon) {
+  turn_.SetDuration(kTurnDuration);
+}
+
+CreateButton::~CreateButton() = default;
+
+CreateButton::TurnDelegate::TurnDelegate(CreateButton* button)
+    : views::AnimationDelegateViews(button), button_(button) {}
+
+void CreateButton::TurnDelegate::AnimationProgressed(
+    const gfx::Animation* animation) {
+  const double t = gfx::Tween::CalculateValue(gfx::Tween::EASE_IN_OUT,
+                                              animation->GetCurrentValue());
+  button_->angle_ = gfx::Tween::FloatValueBetween(
+      t, button_->from_angle_, button_->open_ ? kOpenAngle : 0);
+  button_->SchedulePaint();
+}
+
+void CreateButton::SetOpen(bool open) {
+  if (open == open_) {
+    return;
+  }
+  open_ = open;
+  UpdateFill();
+  turn_.Stop();
+  if (gfx::Animation::PrefersReducedMotion() || !IsDrawn()) {
+    angle_ = open_ ? kOpenAngle : 0;
+    SchedulePaint();
+    return;
+  }
+  from_angle_ = angle_;
+  turn_.Start();
+}
+
+void CreateButton::UpdateFill() {
+  // Arc keeps the hover fill while the menu is open. The ink drop's hover
+  // would stack on it, so it pauses meanwhile.
+  if (open_ && GetColorProvider()) {
+    views::InkDrop::Get(this)->SetMode(views::InkDropHost::InkDropMode::OFF);
+    SetBgColorOverrideDeprecated(
+        GetColorProvider()->GetColor(ui::kColorSysStateHoverOnSubtle));
+    return;
+  }
+  SetBgColorOverrideDeprecated(SK_ColorTRANSPARENT);
+  views::InkDrop::Get(this)->SetMode(views::InkDropHost::InkDropMode::ON);
+}
+
+void CreateButton::OnThemeChanged() {
+  FooterButton::OnThemeChanged();
+  UpdateFill();
+}
+
+void CreateButton::PaintButtonContents(gfx::Canvas* canvas) {
+  gfx::ScopedCanvas scoped(canvas);
+  const int x = (width() - kPlusSize) / 2;
+  const int y = (height() - kPlusSize) / 2;
+  const float center = kPlusSize / 2.f;
+  cc::PaintCanvas* paint = canvas->sk_canvas();
+  paint->translate(x + center, y + center);
+  paint->rotate(angle_);
+  paint->translate(-center, -center);
+  gfx::PaintVectorIcon(canvas, kPlusIcon, kPlusSize,
+                       GetFooterIconColor(GetColorProvider(), false));
+}
+
+BEGIN_METADATA(CreateButton)
 END_METADATA
 
 }  // namespace myarc

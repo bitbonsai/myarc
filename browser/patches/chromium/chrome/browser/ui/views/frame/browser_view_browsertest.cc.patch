@@ -1,5 +1,5 @@
 diff --git a/chrome/browser/ui/views/frame/browser_view_browsertest.cc b/chrome/browser/ui/views/frame/browser_view_browsertest.cc
-index 33bcd23f7807e7634e7bb251dcc19b63025fa54a..1caf06dabfcd887e8022aaf235006c8034c92351 100644
+index 33bcd23f7807e7634e7bb251dcc19b63025fa54a..3517e86a568097c88eac23706833c46ab766d085 100644
 --- a/chrome/browser/ui/views/frame/browser_view_browsertest.cc
 +++ b/chrome/browser/ui/views/frame/browser_view_browsertest.cc
 @@ -6,19 +6,28 @@
@@ -90,18 +90,24 @@ index 33bcd23f7807e7634e7bb251dcc19b63025fa54a..1caf06dabfcd887e8022aaf235006c80
  #include "components/sessions/core/session_id.h"
  #include "components/split_tabs/split_tab_visual_data.h"
  #include "components/tabs/public/split_tab_collection.h"
-@@ -123,6 +143,10 @@
+@@ -123,9 +143,16 @@
  #include "content/public/test/test_navigation_observer.h"
  #include "media/base/media_switches.h"
  #include "media/capture/capture_switches.h"
 +#include "myarc/browser_workspace_adapter.h"
++#include "myarc/create_menu.h"
++#include "myarc/footer_button.h"
 +#include "net/dns/mock_host_resolver.h"
 +#include "net/test/embedded_test_server/embedded_test_server.h"
 +#include "net/test/embedded_test_server/http_response.h"
  #include "net/traffic_annotation/network_traffic_annotation_test_helper.h"
  #include "testing/gmock/include/gmock/gmock.h"
  #include "third_party/blink/public/mojom/frame/fullscreen.mojom.h"
-@@ -133,6 +157,8 @@
++#include "ui/accessibility/ax_action_data.h"
+ #include "ui/accessibility/platform/ax_platform_node.h"
+ #include "ui/accessibility/platform/ax_platform_node_test_helper.h"
+ #include "ui/actions/action_id.h"
+@@ -133,6 +160,8 @@
  #include "ui/base/accelerators/accelerator.h"
  #include "ui/base/base_window.h"
  #include "ui/base/buildflags.h"
@@ -110,7 +116,7 @@ index 33bcd23f7807e7634e7bb251dcc19b63025fa54a..1caf06dabfcd887e8022aaf235006c80
  #include "ui/base/interaction/element_identifier.h"
  #include "ui/base/interaction/element_tracker.h"
  #include "ui/base/l10n/l10n_util.h"
-@@ -142,20 +168,36 @@
+@@ -142,20 +171,36 @@
  #include "ui/base/ozone_buildflags.h"
  #include "ui/base/page_transition_types.h"
  #include "ui/base/ui_base_features.h"
@@ -147,7 +153,7 @@ index 33bcd23f7807e7634e7bb251dcc19b63025fa54a..1caf06dabfcd887e8022aaf235006c80
  #include "ui/views/window/dialog_client_view.h"
  #include "url/url_constants.h"
  
-@@ -382,6 +424,1375 @@ class BrowserViewTest : public InProcessBrowserTest {
+@@ -382,6 +427,1391 @@ class BrowserViewTest : public InProcessBrowserTest {
    raw_ptr<DevToolsWindow> devtools_;
  };
  
@@ -155,9 +161,11 @@ index 33bcd23f7807e7634e7bb251dcc19b63025fa54a..1caf06dabfcd887e8022aaf235006c80
 +
 +class SidebarViewTestApi {
 + public:
-+  static ui::SimpleMenuModel* CreateMenu(SidebarView* sidebar) {
-+    sidebar->BuildCreateMenu();
-+    return sidebar->menu_model_.get();
++  static myarc::CreateMenu* CreateMenu(SidebarView* sidebar) {
++    return sidebar->create_menu_;
++  }
++  static views::View* CreateButton(SidebarView* sidebar) {
++    return sidebar->create_button_;
 +  }
 +  static void SetCreateMenuOpen(SidebarView* sidebar, bool open) {
 +    sidebar->SetCreateMenuOpen(open);
@@ -525,9 +533,14 @@ index 33bcd23f7807e7634e7bb251dcc19b63025fa54a..1caf06dabfcd887e8022aaf235006c80
 +  auto* view = sidebar();
 +  ASSERT_TRUE(view);
 +  auto* menu = myarc::SidebarViewTestApi::CreateMenu(view);
-+  ASSERT_EQ(2u, menu->GetItemCount());
-+  EXPECT_EQ(u"New Space", menu->GetLabelAt(0));
-+  EXPECT_EQ(u"New Tab", menu->GetLabelAt(1));
++  ASSERT_TRUE(menu);
++  const auto rows = menu->children();
++  ASSERT_EQ(3u, rows.size());
++  EXPECT_EQ(u"New Space", rows[0]->GetViewAccessibility().GetCachedName());
++  EXPECT_EQ(u"New Split", rows[1]->GetViewAccessibility().GetCachedName());
++  EXPECT_EQ(u"New Tab", rows[2]->GetViewAccessibility().GetCachedName());
++  // Split view isn't modeled in the workspace yet.
++  EXPECT_FALSE(rows[1]->GetEnabled());
 +  myarc::SidebarViewTestApi::SetCreateMenuOpen(view, true);
 +  browser_view()->RefreshMyarcWorkspaceSidebar();
 +  auto* create = Button(u"Create Space");
@@ -538,7 +551,16 @@ index 33bcd23f7807e7634e7bb251dcc19b63025fa54a..1caf06dabfcd887e8022aaf235006c80
 +  EXPECT_EQ(u"Create Space", myarc::SidebarViewTestApi::CreateTooltip(view));
 +  const auto spaces_before =
 +      browser_view()->GetMyarcWorkspaceAdapter()->Sidebar().spaces.size();
-+  menu->ActivatedAt(0, 0);
++  menu = myarc::SidebarViewTestApi::CreateMenu(view);
++  ASSERT_TRUE(menu);
++  menu->Open(*myarc::SidebarViewTestApi::CreateButton(view));
++  ASSERT_TRUE(menu->is_open());
++  ui::AXActionData press;
++  press.action = ax::mojom::Action::kDoDefault;
++  menu->children()[0]->HandleAccessibleAction(press);
++  EXPECT_FALSE(menu->is_open());
++  // The choice runs once the menu's handlers unwind.
++  base::RunLoop().RunUntilIdle();
 +  views::DialogDelegate* dialog = nullptr;
 +  for (const auto& widget : views::Widget::GetAllOwnedWidgets(
 +           browser_view()->GetWidget()->GetNativeView())) {

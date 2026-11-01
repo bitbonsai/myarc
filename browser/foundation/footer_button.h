@@ -209,6 +209,47 @@ class LibraryButton : public FooterButton {
   gfx::LinearAnimation animation_{&morph_delegate_};
 };
 
+// The Create button. It draws the plus itself and turns it 45 degrees into a
+// cross while the creation menu is open, holding its hover fill. Reduced
+// motion turns it at once.
+class CreateButton : public FooterButton {
+  METADATA_HEADER(CreateButton, FooterButton)
+
+ public:
+  CreateButton(PressedCallback callback,
+               std::u16string_view text,
+               int button_context,
+               bool use_text_color_for_icon);
+  ~CreateButton() override;
+
+  void SetOpen(bool open);
+
+ private:
+  // The turn's own delegate, as LibraryButton's morph has.
+  class TurnDelegate : public views::AnimationDelegateViews {
+   public:
+    explicit TurnDelegate(CreateButton* button);
+    void AnimationProgressed(const gfx::Animation* animation) override;
+
+   private:
+    const raw_ptr<CreateButton> button_;
+  };
+
+  void UpdateFill();
+
+  // views::View:
+  void OnThemeChanged() override;
+  // views::Button:
+  void PaintButtonContents(gfx::Canvas* canvas) override;
+
+  bool open_ = false;
+  // Degrees.
+  float angle_ = 0;
+  float from_angle_ = 0;
+  TurnDelegate turn_delegate_{this};
+  gfx::LinearAnimation turn_{&turn_delegate_};
+};
+
 }  // namespace myarc
 
 #endif  // MYARC_FOOTER_BUTTON_H_

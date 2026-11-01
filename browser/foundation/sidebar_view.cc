@@ -6,6 +6,7 @@
 #include <optional>
 #include <utility>
 
+#include "base/command_line.h"
 #include "base/functional/bind.h"
 #include "base/location.h"
 #include "base/numerics/safe_conversions.h"
@@ -15,6 +16,7 @@
 #include "base/task/sequenced_task_runner.h"
 #include "components/vector_icons/vector_icons.h"
 #include "myarc/bridge.rs.h"
+#include "myarc/create_menu.h"
 #include "myarc/downloads_stack.h"
 #include "myarc/footer_button.h"
 #include "myarc/icons.h"
@@ -105,14 +107,17 @@ Fills GetFills(const ui::ColorProvider* provider) {
                       SkColorSetA(SK_ColorBLACK, 0x99)};
 }
 
-enum ItemCommand {
-  kPin = 1,
-  kFavorite,
-  kUnsave,
-  kClose,
-  kCreateSpace,
-  kNewTab
-};
+enum ItemCommand { kPin = 1, kFavorite, kUnsave, kClose };
+
+// Opens the creation menu once, held open, for background captures.
+constexpr char kCaptureCreateMenu[] = "myarc-capture-create-menu";
+
+// The creation menu floats 17 DIP above the Create button, its notch tip 12
+// DIP above it and 4 DIP left of its center, and its right edge 5 DIP inside
+// the button's.
+constexpr int kCreateMenuGap = 17;
+constexpr int kCreateMenuRightInset = 5;
+constexpr int kCreateMenuNotchShift = 4;
 
 // The row owns its highlight and reserves the close target even when its glyph
 // is hidden. Native child enter/exit and focus notifications cover both
@@ -416,6 +421,9 @@ void SidebarView::OpenLibrary(LibrarySection section) {
   footer_targets_.clear();
   footer_ = nullptr;
   downloads_stack_ = nullptr;
+  create_menu_ = nullptr;
+  create_button_ = nullptr;
+  create_menu_open_ = false;
   spaces_scroll_ = nullptr;
   new_tab_ = nullptr;
   space_rows_ = nullptr;
@@ -498,83 +506,63 @@ void SidebarView::RefreshLibraryDownloads() {
   }
 }
 
-void SidebarView::BuildCreateMenu() {
-  menu_item_id_ = 0;
-  menu_runner_.reset();
-  menu_model_ = std::make_unique<ui::SimpleMenuModel>(this);
-  menu_model_->AddItem(kCreateSpace, u"New Space");
-  menu_model_->AddItem(kNewTab, u"New Tab");
-}
-
 void SidebarView::SetCreateMenuOpen(bool open) {
   create_menu_open_ = open;
-  const auto target = std::ranges::find(focus_targets_, FocusAction::kCreate,
-                                        &FocusTarget::action);
-  if (target == focus_targets_.end()) {
+  if (!create_button_) {
     return;
   }
-  auto* button = static_cast<FooterButton*>(target->view.get());
-  button->SetFooterTooltip(
+  create_button_->SetFooterTooltip(
       footer_tooltip_->GetWeakPtr(),
       {open ? u"Close creation menu" : u"Create Space", {}});
-  button->SetImageModel(views::Button::STATE_NORMAL,
-                        ui::ImageModel::FromVectorIcon(
-                            open ? vector_icons::kCloseIcon : kPlusIcon,
-                            GetFills(GetColorProvider()).footer_icon, 21));
+  create_button_->SetOpen(open);
   if (open) {
-    button->GetViewAccessibility().SetIsExpanded();
+    create_button_->GetViewAccessibility().SetIsExpanded();
   } else {
-    button->GetViewAccessibility().SetIsCollapsed();
+    create_button_->GetViewAccessibility().SetIsCollapsed();
   }
 }
 
 void SidebarView::ShowCreateMenu(const ui::Event& event) {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
-  if (!GetWidget()) {
+  if (!create_menu_ || !create_button_) {
     return;
   }
-  if (menu_runner_ && menu_runner_->IsRunning()) {
-    if (create_menu_open_) {
-      menu_runner_->Cancel();
-    }
+  if (create_menu_->is_open()) {
+    create_menu_->Close();
     return;
   }
-  const auto target = std::ranges::find(focus_targets_, FocusAction::kCreate,
-                                        &FocusTarget::action);
-  if (target == focus_targets_.end()) {
-    return;
+  menu_item_id_ = 0;
+  if (menu_runner_) {
+    menu_runner_->Cancel();
   }
-  const gfx::Rect anchor = target->view->GetBoundsInScreen();
-  BuildCreateMenu();
-  // Views menus honor the above-footer anchor on macOS; context menus do not.
-  menu_runner_ = std::make_unique<views::MenuRunner>(
-      menu_model_.get(), views::MenuRunner::NO_FLAGS,
-      base::BindRepeating(&SidebarView::SetCreateMenuOpen,
-                          weak_factory_.GetWeakPtr(), false));
-  SetCreateMenuOpen(true);
-  auto weak = weak_factory_.GetWeakPtr();
-  menu_runner_->RunMenuAt(
-      GetWidget(), nullptr, anchor, views::MenuAnchorPosition::kBottomCenter,
-      event.IsKeyEvent() ? ui::mojom::MenuSourceType::kKeyboard
-                         : ui::mojom::MenuSourceType::kMouse);
-  // Dispatch can rebuild rows or destroy this view. Resolve the current button.
-  if (weak && (!weak->menu_runner_ || !weak->menu_runner_->IsRunning())) {
-    weak->SetCreateMenuOpen(false);
-  }
+  create_menu_->Open(*create_button_);
+}
+
+void SidebarView::ChooseCreateItem(int item) {
+  // A choice can open a dialog or the palette and rebuild the footer, so it
+  // runs after the menu's handlers return.
+  base::SequencedTaskRunner::GetCurrentDefault()->PostTask(
+      FROM_HERE, base::BindOnce(
+                     [](base::WeakPtr<SidebarView> sidebar, int item) {
+                       if (!sidebar) {
+                         return;
+                       }
+                       switch (static_cast<CreateMenu::Item>(item)) {
+                         case CreateMenu::Item::kNewSpace:
+                           sidebar->delegate_->CreateSpace();
+                           return;
+                         case CreateMenu::Item::kNewTab:
+                           sidebar->delegate_->NewTab();
+                           return;
+                         case CreateMenu::Item::kNewSplit:
+                           return;
+                       }
+                     },
+                     weak_factory_.GetWeakPtr(), item));
 }
 
 void SidebarView::ExecuteCommand(int command_id, int event_flags) {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
-  if (command_id == kCreateSpace) {
-    SetCreateMenuOpen(false);
-    delegate_->CreateSpace();
-    return;
-  }
-  if (command_id == kNewTab) {
-    SetCreateMenuOpen(false);
-    delegate_->NewTab();
-    return;
-  }
   const uint64_t id = std::exchange(menu_item_id_, 0);
   if (!id) {
     return;
@@ -708,6 +696,9 @@ void SidebarView::SetUnavailable(const std::u16string& reason,
   footer_targets_.clear();
   footer_ = nullptr;
   downloads_stack_ = nullptr;
+  create_menu_ = nullptr;
+  create_button_ = nullptr;
+  create_menu_open_ = false;
   spaces_scroll_ = nullptr;
   new_tab_ = nullptr;
   space_rows_ = nullptr;
@@ -816,6 +807,9 @@ void SidebarView::SetModel(const foundation::SidebarResult& model,
     footer_targets_.clear();
     footer_ = nullptr;
     downloads_stack_ = nullptr;
+    create_menu_ = nullptr;
+    create_button_ = nullptr;
+    create_menu_open_ = false;
     spaces_scroll_ = nullptr;
     RemoveAllChildViews();
   }
@@ -1088,19 +1082,47 @@ void SidebarView::BuildFooter(const gfx::PointF& spaces_offset,
       base::OwnedRef(std::optional(spaces_offset)), space_changed,
       current_space_index));
 
-  auto create = IconButton<FooterButton>(
+  // The button draws its plus and turns it into a cross with the menu.
+  auto create = IconButton<CreateButton>(
       base::BindRepeating(&SidebarView::ShowCreateMenu,
                           weak_factory_.GetWeakPtr()),
-      create_menu_open_ ? &vector_icons::kCloseIcon : &kPlusIcon, 21);
+      nullptr);
   // No shortcut opens the creation menu. SetCreateMenuOpen sets the tooltip.
   create->GetViewAccessibility().SetName(u"Create Space");
   create->GetViewAccessibility().SetHasPopup(ax::mojom::HasPopup::kMenu);
   TrackFocus(create.get(), FocusAction::kCreate);
-  footer->AddChildView(std::move(create));
+  create_button_ = footer->AddChildView(std::move(create));
   footer_ = footer;
-  // Last, so it paints over the rows.
+  // Last, so they paint over the rows.
   downloads_stack_ = AddChildView(std::make_unique<DownloadsStack>(*delegate_));
   downloads_stack_->SetProperty(views::kViewIgnoredByLayoutKey, true);
+  create_menu_ = AddChildView(std::make_unique<CreateMenu>(
+      base::BindRepeating(
+          [](base::WeakPtr<SidebarView> sidebar, CreateMenu::Item item) {
+            if (sidebar) {
+              sidebar->ChooseCreateItem(static_cast<int>(item));
+            }
+          },
+          weak_factory_.GetWeakPtr()),
+      base::BindRepeating(&SidebarView::SetCreateMenuOpen,
+                          weak_factory_.GetWeakPtr())));
+  create_menu_->SetProperty(views::kViewIgnoredByLayoutKey, true);
+  create_menu_open_ = false;
+  if (!capture_menu_scheduled_ &&
+      base::CommandLine::ForCurrentProcess()->HasSwitch(kCaptureCreateMenu)) {
+    capture_menu_scheduled_ = true;
+    base::SequencedTaskRunner::GetCurrentDefault()->PostDelayedTask(
+        FROM_HERE,
+        base::BindOnce(
+            [](base::WeakPtr<SidebarView> sidebar) {
+              if (sidebar && sidebar->create_menu_ && sidebar->create_button_) {
+                sidebar->create_menu_->Open(*sidebar->create_button_,
+                                            /*hold=*/true);
+              }
+            },
+            weak_factory_.GetWeakPtr()),
+        base::Milliseconds(2000));
+  }
 }
 
 std::u16string SidebarView::GetCreateTooltipForTesting() const {
@@ -1175,6 +1197,14 @@ void SidebarView::Layout(PassKey) {
                    std::max(footer_->y(), 0));
     downloads_stack_->SetBounds(kSidebarInsets.left(), footer_->y() - height,
                                 width() - kSidebarInsets.width(), height);
+  }
+  if (create_menu_ && footer_) {
+    // The Create button is the footer's last control, at its right end.
+    const int button_right = width() - kSidebarInsets.right();
+    const int button_center = button_right - 16;
+    create_menu_->Place(button_right - kCreateMenuRightInset,
+                        footer_->y() - kCreateMenuGap,
+                        button_center - kCreateMenuNotchShift);
   }
 }
 

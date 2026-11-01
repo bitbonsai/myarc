@@ -1,5 +1,10 @@
 # Development log
 
+## 2026-11-01: "+" creation menu
+
+- The footer's "+" opens a custom panel instead of the native menu: New Space, a separator, New Split and New Tab, with Arc's navy fill, indigo highlight, notch, traced icons and plain shortcut glyphs (`⌥⌘N`, `⌘T`). It opens in 65 ms (fade and scale from 0.97 at the notch), highlights New Tab after 100 ms, snaps the highlight on hover and closes in 100 ms (65 ms after an outside click) toward 0.94. The "+" turns 45 degrees into a cross over 130 ms and keeps its hover fill while open. Arrow keys, Return, Esc, outside clicks and focus loss work; reduced motion snaps. New Split is disabled: Chromium's split works, but the workspace has no split model (GAPS item 10), so a split wouldn't persist or show as one row. Light mode uses a white panel with ink alphas, checked by reading the code only.
+- Verification: `chrome`, `bridge_check` and the updated `browser_view_browsertest.o` build (the test wasn't run); `bridge_check`, `export_patches.py --check` and `check_docs.py` pass. Captures `research-private/captures/finesse/plus-menu/menu-open-dark.png` (`MENU=1`, new `--myarc-capture-create-menu`) and a 60 fps recording of a `/tmp` profile driven by mouse and keys, `motion.mov` with `motion-sheet.png`, `open-frames.png` and `close-frames.png`. Chromium `myarc` commit `02d12be4a7`.
+
 ## 2026-11-01: Library panel finesse
 
 - Footer: Arc's thin back arrow (Lucide `arrow-left`, stroke 1.5, 24 DIP, muted ink) in a 32 DIP tile with an "Exit Library" tooltip beside it, replacing the glowing Library button and "Close Library". Search field is 36 DIP tall and 8 DIP from the rail, top and page, with a 14pt placeholder ending in "...". The rail ramps to ink@0x0A at its right edge and ends in a 1 DIP ink@0x12 hairline. Spaces columns drop to white@0x06. Media, Spaces and Boosts now use glyphs traced from Arc on a 28 DIP canvas at stroke 1.8, with duotone selected variants. The Boosts outline is cleared around the brush. Downloads and Archive draw at 24 DIP.
