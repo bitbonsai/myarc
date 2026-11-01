@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <array>
 #include <memory>
+#include <optional>
 #include <utility>
 
 #include "base/check.h"
@@ -293,12 +294,14 @@ class TooltipView : public views::View {
       const SkPath face_path = SkPath::RRect(
           SkRRect::MakeRectXY(gfx::RectFToSkRect(face), kKeyRadius,
                               kKeyRadius));
-      SkPath lip;
-      CHECK(Op(SkPath::RRect(SkRRect::MakeRectXY(gfx::RectFToSkRect(cap),
-                                                 kKeyRadius, kKeyRadius)),
-               face_path, kDifference_SkPathOp, &lip));
-      flags.setColor(colors_.key_lip);
-      canvas->DrawPath(lip, flags);
+      // If pathops fails, the cap draws without its lip.
+      if (const std::optional<SkPath> lip =
+              Op(SkPath::RRect(SkRRect::MakeRectXY(gfx::RectFToSkRect(cap),
+                                                   kKeyRadius, kKeyRadius)),
+                 face_path, kDifference_SkPathOp)) {
+        flags.setColor(colors_.key_lip);
+        canvas->DrawPath(*lip, flags);
+      }
       flags.setColor(colors_.key);
       canvas->DrawPath(face_path, flags);
       canvas->DrawStringRectWithFlags(

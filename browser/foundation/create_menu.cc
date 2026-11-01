@@ -327,6 +327,8 @@ void CreateMenu::Open(views::View& anchor, bool hold) {
       this, widget->GetNativeWindow(), {ui::EventType::kMousePressed});
   widget_observation_.Observe(widget);
   open_changed_.Run(true);
+  // Reopening mid-close turns the menu back from where it is.
+  const bool closing = animation_.is_animating();
   animation_.Stop();
   if (hold) {
     SetHighlighted(rows_.size() - 1);
@@ -345,8 +347,8 @@ void CreateMenu::Open(views::View& anchor, bool hold) {
     Apply(1, 1);
     return;
   }
-  from_opacity_ = 0;
-  from_scale_ = kOpenScale;
+  from_opacity_ = closing ? opacity_ : 0;
+  from_scale_ = closing ? scale_ : kOpenScale;
   Apply(from_opacity_, from_scale_);
   animation_.SetDuration(kOpen);
   animation_.Start();

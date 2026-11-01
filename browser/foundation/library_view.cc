@@ -381,9 +381,6 @@ LibraryView::LibraryView(SidebarView::Delegate& delegate,
                                                       gfx::Insets(), 0));
   GetViewAccessibility().SetRole(ax::mojom::Role::kGroup);
   GetViewAccessibility().SetName(u"Library");
-  // A click leaves no focus ring, so a click-opened Library holds focus itself
-  // and Esc reaches it rather than the page.
-  SetFocusBehavior(FocusBehavior::ALWAYS);
 
   auto* rail = AddChildView(
       Box(Orientation::kVertical, gfx::Insets::TLBR(0, 8, 10, 8), 0));
@@ -491,6 +488,11 @@ void LibraryView::ShowExitTooltipNow() {
   exit_->ShowFooterTooltipNow();
 }
 
+void LibraryView::HoldFocus() {
+  SetFocusBehavior(FocusBehavior::ALWAYS);
+  RequestFocus();
+}
+
 void LibraryView::FocusSection() {
   for (size_t i = 0; i < std::size(kSections); ++i) {
     if (kSections[i].section == section_) {
@@ -524,6 +526,16 @@ bool LibraryView::AcceleratorPressed(const ui::Accelerator& accelerator) {
   }
   PostAction(close_);
   return true;
+}
+
+void LibraryView::OnBlur() {
+  views::View::OnBlur();
+  // Deactivating the window clears focus and restores it later, so only a
+  // move to another view ends the hold.
+  const views::FocusManager* manager = GetFocusManager();
+  if (manager && manager->GetFocusedView()) {
+    SetFocusBehavior(FocusBehavior::NEVER);
+  }
 }
 
 void LibraryView::OnThemeChanged() {

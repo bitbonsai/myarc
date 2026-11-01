@@ -56,6 +56,10 @@ class LibraryView final : public views::View,
   void SetSpaces(Spaces spaces, uint64_t current);
   void SelectSection(Section section);
   void FocusSection();
+  // A click leaves no focus ring, so a click-opened Library holds focus itself
+  // and Esc reaches it rather than the page. It stays focusable only until
+  // focus moves on, so Tab never stops on it.
+  void HoldFocus();
   // Reloads the Downloads list when it is showing and its entries changed.
   void RefreshDownloads();
   // Reloads the Archived Tabs list when it is showing and its entries changed.
@@ -67,6 +71,7 @@ class LibraryView final : public views::View,
   gfx::Size CalculatePreferredSize(
       const views::SizeBounds& available_size) const override;
   bool AcceleratorPressed(const ui::Accelerator& accelerator) override;
+  void OnBlur() override;
   void OnThemeChanged() override;
 
  private:

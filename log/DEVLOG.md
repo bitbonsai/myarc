@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-11-01: Review fixes for tooltip key caps, "+" menu reopen and Library Tab order
+
+- A failed pathops difference in the footer tooltip's key caps no longer crashes paint (`CHECK`); the cap draws without its lip, like the "+" menu panel's `value_or`. Reopening the "+" menu during its close animation starts from the current opacity and scale instead of jumping to 0. The Library container is focusable only while it holds focus for a click-opened Library (`LibraryView::HoldFocus`), and drops that once focus moves to another view, so Tab no longer stops on it. A window deactivation keeps the hold, so focus comes back to it.
+- Verification: `chrome` and `bridge_check` build; `bridge_check`, `export_patches.py --check` and `check_docs.py` pass. Live `/tmp` profile driven with CGEvent while frontmost, checked through AX: a click-opened Library holds focus and Esc returns focus to the page; Tab and Shift+Tab cycle the rail without landing on the Library group; search "as", Esc clears it, Esc exits with no ring; Tab use then Esc focuses the Library button. Open, close and reopen the "+" menu 40 ms into its close leaves it fully open. A still can't show the flicker itself, and the pathops fallback wasn't triggered live.
+- No Chromium patch changes.
+
 ## 2026-11-01: Dormant rows keep no tokens and archive when idle
 
 - Review fixes for dormant temporary rows. A Profile that saves no history now remembers no page for them, and a remembered page drops its query and fragment, so magic-link and reset tokens stay out of the workspace file. Auto Archive now also archives idle dormant rows, using each row's last view, so they can't fill the 1024-item limit. A selected dormant row stays selected when its Space shows. A restored tab whose binding was lost takes over the dormant row of its page instead of appearing twice.

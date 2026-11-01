@@ -465,7 +465,7 @@ void SidebarView::OpenLibrary(LibrarySection section) {
   // Esc reaches the Library only while focus is in the sidebar.
   library_return_focus_.SetView(
       GetFocusManager() ? GetFocusManager()->GetFocusedView() : nullptr);
-  library_->RequestFocus();
+  library_->HoldFocus();
 }
 
 void SidebarView::ResetLibrary() {
