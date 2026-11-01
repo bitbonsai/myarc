@@ -190,7 +190,10 @@ source_set("settings_window") {
     "//ui/views",
   ]
   if (is_mac) {
-    sources += [ "settings_window_mac.mm" ]
+    sources += [
+      "footer_tooltip_mac.mm",
+      "settings_window_mac.mm",
+    ]
     deps += [ "//components/remote_cocoa/common:mojo" ]
     frameworks = [ "Cocoa.framework" ]
   }

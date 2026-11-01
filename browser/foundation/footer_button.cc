@@ -11,6 +11,7 @@
 #include "base/no_destructor.h"
 #include "base/strings/utf_string_conversions.h"
 #include "base/time/time.h"
+#include "build/build_config.h"
 #include "cc/paint/paint_canvas.h"
 #include "cc/paint/paint_filter.h"
 #include "cc/paint/paint_flags.h"
@@ -18,7 +19,9 @@
 #include "myarc/icons.h"
 #include "third_party/skia/include/core/SkColor.h"
 #include "third_party/skia/include/core/SkPath.h"
+#include "third_party/skia/include/core/SkRRect.h"
 #include "third_party/skia/include/core/SkRect.h"
+#include "third_party/skia/include/pathops/SkPathOps.h"
 #include "third_party/skia/include/utils/SkParsePath.h"
 #include "ui/accessibility/ax_enums.mojom.h"
 #include "ui/base/metadata/metadata_impl_macros.h"
@@ -38,8 +41,9 @@
 #include "ui/gfx/geometry/rect_conversions.h"
 #include "ui/gfx/geometry/rect_f.h"
 #include "ui/gfx/geometry/size.h"
-#include "ui/gfx/paint_vector_icon.h"
+#include "ui/gfx/geometry/skia_conversions.h"
 #include "ui/gfx/scoped_canvas.h"
+#include "ui/gfx/skia_paint_util.h"
 #include "ui/gfx/text_utils.h"
 #include "ui/views/accessibility/view_accessibility.h"
 #include "ui/views/animation/ink_drop.h"
@@ -49,6 +53,12 @@
 #include "ui/views/widget/widget.h"
 
 namespace myarc {
+
+#if BUILDFLAG(IS_MAC)
+// footer_tooltip_mac.mm: the system's HUD blur behind the tooltip's pill.
+void ApplyFooterTooltipGlass(views::Widget& tooltip, bool dark);
+#endif
+
 namespace {
 
 // Paths from design/icons/library-morph.html, in its 60x53 viewBox. Each
@@ -141,8 +151,11 @@ constexpr base::TimeDelta kFadeDuration = base::Milliseconds(350);
 constexpr base::TimeDelta kLastDelay = base::Milliseconds(120);
 constexpr base::TimeDelta kTotal = kSparkleDuration + kLastDelay;
 
-// The Create button's plus, and its turn into a cross with the menu.
+// The Create button's plus in its 21 DIP box, and its turn into a cross with
+// the menu. Arc's arms span 14 DIP, round caps included, 2 DIP thick.
 constexpr int kPlusSize = 21;
+constexpr float kPlusArm = 14;
+constexpr float kPlusStroke = 2;
 constexpr float kOpenAngle = 45;
 constexpr base::TimeDelta kTurnDuration = base::Milliseconds(130);
 
@@ -157,15 +170,27 @@ Pose Lerp(const Sparkle& sparkle, float t) {
           Lerp(sparkle.idle.scale, sparkle.glow.scale, t)};
 }
 
-// Footer tooltip, measured from Arc's (DIP): a 28 tall pill 4 above the button,
-// 10 before the label, then 18 DIP keycaps 4 apart with a 2 DIP lip, 5 from
-// the pill's edge.
-constexpr base::TimeDelta kTooltipDelay = base::Seconds(1);
+// Arc's hover tile: 32 DIP, radius 8, white at 8% (black at 6% in light mode),
+// fading in over 120 ms and out over 150 ms.
+constexpr int kTileSize = 32;
+constexpr float kTileRadius = 8;
+constexpr base::TimeDelta kTileIn = base::Milliseconds(120);
+constexpr base::TimeDelta kTileOut = base::Milliseconds(150);
+
+// Footer tooltip, measured from Arc's (DIP): a 28 tall pill 3 above the button
+// and at least 7 from the window's edge, 10 before the label, then 18 DIP
+// keycaps 4 apart with a 2 DIP lip, 5 from the pill's edge.
+constexpr base::TimeDelta kTooltipDelay = base::Milliseconds(850);
 // Arc's Library tooltip shows 0.65-0.8 s after hover, right of the button.
 constexpr base::TimeDelta kBesideDelay = base::Milliseconds(700);
+constexpr base::TimeDelta kTooltipIn = base::Milliseconds(120);
+constexpr base::TimeDelta kTooltipOut = base::Milliseconds(150);
+// A tooltip that faded out this recently comes back at once on the next
+// button, as when the pointer crosses the gap between two.
+constexpr base::TimeDelta kWarmWindow = base::Milliseconds(300);
 constexpr int kTooltipHeight = 28;
-constexpr int kTooltipGap = 4;
-constexpr int kTooltipMargin = 6;
+constexpr int kTooltipGap = 3;
+constexpr int kTooltipMargin = 7;
 constexpr int kTooltipInset = 10;
 constexpr int kKeysGap = 10;
 constexpr int kKeySize = 18;
@@ -177,24 +202,32 @@ constexpr int kLabelSize = 13;
 constexpr int kKeyLabelSize = 11;
 
 struct TooltipColors {
+  // Over the system blur on Mac; elsewhere `fill` stands in for both.
+  SkColor tint;
   SkColor fill;
-  SkColor border;
+  // The rim, brighter at the top like a glass edge.
+  SkColor rim_top;
+  SkColor rim_bottom;
   SkColor label;
   SkColor key;
   SkColor key_lip;
   SkColor key_label;
 };
 
-// Sampled from Arc's dark tooltip. Light mode keeps the keycaps on a white
-// pill with dark text.
+// A dark glass pill with light keycaps. Arc's pill is navy with blue caps;
+// myArc keeps its size and caps but not its blue. The dark HUD blur is a mid
+// gray, so 80% black brings the pill to about #19191B, darker than the
+// sidebar.
 constexpr TooltipColors kDarkTooltip = {
-    SkColorSetRGB(0x0A, 0x0C, 0x4B), SkColorSetA(SK_ColorWHITE, 0x1A),
-    SkColorSetRGB(0xDE, 0xDF, 0xFE), SkColorSetRGB(0xD3, 0xD5, 0xFD),
-    SkColorSetRGB(0x83, 0x87, 0xE4), SkColorSetRGB(0x21, 0x2A, 0xFC)};
+    SkColorSetA(SK_ColorBLACK, 0xCC),  SkColorSetARGB(0xF2, 0x15, 0x15, 0x1C),
+    SkColorSetA(SK_ColorWHITE, 0x38),  SkColorSetA(SK_ColorWHITE, 0x14),
+    SkColorSetA(SK_ColorWHITE, 0xEB),  SkColorSetRGB(0xEC, 0xEC, 0xF1),
+    SkColorSetRGB(0xB6, 0xB6, 0xC2),   SkColorSetRGB(0x1C, 0x1C, 0x26)};
 constexpr TooltipColors kLightTooltip = {
-    SK_ColorWHITE,                   SkColorSetA(SK_ColorBLACK, 0x1F),
-    SkColorSetRGB(0x1D, 0x1B, 0x26), SkColorSetRGB(0xE4, 0xE5, 0xFE),
-    SkColorSetRGB(0xB0, 0xB4, 0xF4), SkColorSetRGB(0x21, 0x2A, 0xFC)};
+    SkColorSetA(SK_ColorWHITE, 0x8C),  SkColorSetA(SK_ColorWHITE, 0xF2),
+    SkColorSetA(SK_ColorBLACK, 0x24),  SkColorSetA(SK_ColorBLACK, 0x1A),
+    SkColorSetRGB(0x1D, 0x1B, 0x26),   SkColorSetA(SK_ColorBLACK, 0x14),
+    SkColorSetA(SK_ColorBLACK, 0x29),  SkColorSetA(SK_ColorBLACK, 0xD9)};
 
 gfx::FontList FontOfSize(int size, gfx::Font::Weight weight) {
   const gfx::FontList base;
@@ -230,29 +263,44 @@ class TooltipView : public views::View {
     const gfx::RectF bounds(GetLocalBounds());
     cc::PaintFlags flags;
     flags.setAntiAlias(true);
+#if BUILDFLAG(IS_MAC)
+    flags.setColor(colors_.tint);
+#else
     flags.setColor(colors_.fill);
+#endif
     canvas->DrawRoundRect(bounds, bounds.height() / 2, flags);
     gfx::RectF edge = bounds;
     edge.Inset(0.5f);
-    flags.setStyle(cc::PaintFlags::kStroke_Style);
-    flags.setStrokeWidth(1);
-    flags.setColor(colors_.border);
-    canvas->DrawRoundRect(edge, edge.height() / 2, flags);
+    cc::PaintFlags rim;
+    rim.setAntiAlias(true);
+    rim.setStyle(cc::PaintFlags::kStroke_Style);
+    rim.setStrokeWidth(1);
+    rim.setShader(gfx::CreateGradientShader(gfx::Point(), gfx::Point(0, height()),
+                                            colors_.rim_top,
+                                            colors_.rim_bottom));
+    canvas->DrawRoundRect(edge, edge.height() / 2, rim);
 
     constexpr int kTextFlags = gfx::Canvas::NO_SUBPIXEL_RENDERING;
     canvas->DrawStringRectWithFlags(
         content_.label, label_font_, colors_.label,
         gfx::Rect(kTooltipInset, 0, LabelWidth(), height()), kTextFlags);
-    flags.setStyle(cc::PaintFlags::kFill_Style);
     int x = kTooltipInset + LabelWidth() + kKeysGap;
     for (const auto& key : content_.keys) {
       const gfx::RectF cap(x, kKeysInset, kKeySize, kKeySize);
-      flags.setColor(colors_.key_lip);
-      canvas->DrawRoundRect(cap, kKeyRadius, flags);
       gfx::RectF face = cap;
       face.set_height(kKeySize - kKeyLip);
+      // The lip shows only below the face, so translucent caps don't stack.
+      const SkPath face_path = SkPath::RRect(
+          SkRRect::MakeRectXY(gfx::RectFToSkRect(face), kKeyRadius,
+                              kKeyRadius));
+      SkPath lip;
+      CHECK(Op(SkPath::RRect(SkRRect::MakeRectXY(gfx::RectFToSkRect(cap),
+                                                 kKeyRadius, kKeyRadius)),
+               face_path, kDifference_SkPathOp, &lip));
+      flags.setColor(colors_.key_lip);
+      canvas->DrawPath(lip, flags);
       flags.setColor(colors_.key);
-      canvas->DrawRoundRect(face, kKeyRadius, flags);
+      canvas->DrawPath(face_path, flags);
       canvas->DrawStringRectWithFlags(
           key, key_font_, colors_.key_label, gfx::ToEnclosingRect(face),
           kTextFlags | gfx::Canvas::TEXT_ALIGN_CENTER);
@@ -279,16 +327,26 @@ class TooltipView : public views::View {
 BEGIN_METADATA(TooltipView)
 END_METADATA
 
+bool IsDark(const ui::ColorProvider* provider) {
+  return !provider ||
+         color_utils::IsDark(provider->GetColor(ui::kColorSysSurface));
+}
+
 }  // namespace
 
 SkColor GetFooterIconColor(const ui::ColorProvider* provider, bool active) {
-  const bool dark = !provider || color_utils::IsDark(
-                                     provider->GetColor(ui::kColorSysSurface));
-  return SkColorSetA(dark ? SK_ColorWHITE : SK_ColorBLACK,
+  return SkColorSetA(IsDark(provider) ? SK_ColorWHITE : SK_ColorBLACK,
                      active ? 0xF2 : 0x99);
 }
 
-FooterTooltip::FooterTooltip() = default;
+SkColor GetCurrentSpaceColor(const ui::ColorProvider* provider) {
+  const SkColor idle = GetFooterIconColor(provider, false);
+  return SkColorSetA(idle, SkColorGetA(idle) * 85 / 100);
+}
+
+FooterTooltip::FooterTooltip() {
+  fade_.SetTweenType(gfx::Tween::EASE_OUT);
+}
 
 FooterTooltip::~FooterTooltip() = default;
 
@@ -300,9 +358,11 @@ void FooterTooltip::Hover(views::View& anchor, const Content& content) {
     return;
   }
   pressed_at_.reset();
-  Hide();
+  const bool warm = IsWarm();
+  Release();
   views::Widget* window = anchor.GetWidget();
   if (!window) {
+    Hide();
     return;
   }
   anchor_ = &anchor;
@@ -311,8 +371,14 @@ void FooterTooltip::Hover(views::View& anchor, const Content& content) {
   window_observation_.Observe(window);
   key_monitor_ = views::EventMonitor::CreateWindowMonitor(
       this, window->GetNativeWindow(), {ui::EventType::kKeyPressed});
+  if (warm) {
+    // Arc swaps the text in the frame the next tile lights.
+    Show(/*fade=*/false);
+    return;
+  }
   delay_.Start(FROM_HERE, content.beside ? kBesideDelay : kTooltipDelay,
-               base::BindOnce(&FooterTooltip::Show, base::Unretained(this)));
+               base::BindOnce(&FooterTooltip::Show, base::Unretained(this),
+                              /*fade=*/true));
 }
 
 void FooterTooltip::Unhover(const views::View& anchor) {
@@ -323,27 +389,73 @@ void FooterTooltip::Unhover(const views::View& anchor) {
 }
 
 void FooterTooltip::Press(const gfx::Point& screen_point) {
-  Hide();
+  // A click dismisses the tooltip for good, not just until the next button.
+  Release();
+  HideNow();
   pressed_at_ = screen_point;
 }
 
 void FooterTooltip::ShowNow(views::View& anchor, const Content& content) {
-  Hide();
+  Release();
   anchor_ = &anchor;
   content_ = content;
   anchor_observation_.Observe(&anchor);
   hold_ = true;
-  Show();
+  Show(/*fade=*/false);
 }
 
 void FooterTooltip::Hide() {
+  Release();
+  if (!widget_ || !widget_->IsVisible() || fade_.IsClosing()) {
+    return;
+  }
+  faded_at_ = base::TimeTicks::Now();
+  if (gfx::Animation::PrefersReducedMotion()) {
+    fade_.Reset(0);
+    widget_->Hide();
+    return;
+  }
+  fade_.SetSlideDuration(kTooltipOut);
+  fade_.Hide();
+}
+
+void FooterTooltip::Release() {
   delay_.Stop();
   key_monitor_.reset();
   window_observation_.Reset();
   anchor_observation_.Reset();
   anchor_ = nullptr;
   hold_ = false;
+}
+
+void FooterTooltip::HideNow() {
+  Release();
+  fade_.Reset(0);
+  faded_at_ = base::TimeTicks();
   if (widget_) {
+    widget_->Hide();
+  }
+}
+
+bool FooterTooltip::IsWarm() const {
+  if (!widget_) {
+    return false;
+  }
+  if (widget_->IsVisible()) {
+    return true;
+  }
+  return !faded_at_.is_null() &&
+         base::TimeTicks::Now() - faded_at_ < kWarmWindow;
+}
+
+void FooterTooltip::AnimationProgressed(const gfx::Animation* animation) {
+  if (widget_) {
+    widget_->SetOpacity(static_cast<float>(fade_.GetCurrentValue()));
+  }
+}
+
+void FooterTooltip::AnimationEnded(const gfx::Animation* animation) {
+  if (widget_ && fade_.GetCurrentValue() == 0) {
     widget_->Hide();
   }
 }
@@ -382,15 +494,16 @@ void FooterTooltip::OnWidgetActivationChanged(views::Widget* widget,
 }
 
 void FooterTooltip::OnWidgetDestroying(views::Widget* widget) {
-  Hide();
+  HideNow();
 }
 
 void FooterTooltip::OnEvent(const ui::Event& event) {
   HideUnlessHeld();
 }
 
-void FooterTooltip::Show() {
+void FooterTooltip::Show(bool fade) {
   if (!anchor_ || !anchor_->GetWidget() || content_.label.empty()) {
+    Hide();
     return;
   }
   views::Widget* parent = anchor_->GetWidget();
@@ -411,14 +524,13 @@ void FooterTooltip::Show() {
     params.name = "MyarcFooterTooltip";
     widget_ = std::make_unique<views::Widget>(std::move(params));
   }
-  const ui::ColorProvider* provider = anchor_->GetColorProvider();
-  const bool dark = !provider || color_utils::IsDark(
-                                     provider->GetColor(ui::kColorSysSurface));
+  const bool dark = IsDark(anchor_->GetColorProvider());
   auto* contents = widget_->SetContentsView(
       std::make_unique<TooltipView>(content_, dark ? kDarkTooltip
                                                    : kLightTooltip));
   const gfx::Size size = contents->GetPreferredSize();
   const gfx::Rect anchor = anchor_->GetBoundsInScreen();
+  gfx::Rect bounds;
   if (content_.beside) {
     // Right of the anchor, or left of it when the screen has no room.
     const gfx::Rect screen =
@@ -435,20 +547,33 @@ void FooterTooltip::Show() {
         screen.y() + kTooltipMargin,
         std::max(screen.y() + kTooltipMargin,
                  screen.bottom() - kTooltipMargin - size.height()));
-    widget_->SetBounds(gfx::Rect(gfx::Point(x, y), size));
-    widget_->ShowInactive();
-    return;
+    bounds = gfx::Rect(gfx::Point(x, y), size);
+  } else {
+    const gfx::Rect window = parent->GetClientAreaBoundsInScreen();
+    const int x = std::clamp(anchor.CenterPoint().x() - size.width() / 2,
+                             window.x() + kTooltipMargin,
+                             std::max(window.x() + kTooltipMargin,
+                                      window.right() - kTooltipMargin -
+                                          size.width()));
+    bounds = gfx::Rect(
+        gfx::Point(x, anchor.y() - kTooltipGap - size.height()), size);
   }
-  const gfx::Rect window = parent->GetClientAreaBoundsInScreen();
-  const int x = std::clamp(anchor.CenterPoint().x() - size.width() / 2,
-                           window.x() + kTooltipMargin,
-                           std::max(window.x() + kTooltipMargin,
-                                    window.right() - kTooltipMargin -
-                                        size.width()));
-  widget_->SetBounds(gfx::Rect(gfx::Point(x, anchor.y() - kTooltipGap -
-                                                 size.height()),
-                               size));
+  widget_->SetBounds(bounds);
+#if BUILDFLAG(IS_MAC)
+  ApplyFooterTooltipGlass(*widget_, dark);
+#endif
+  faded_at_ = base::TimeTicks();
+  if (!fade || gfx::Animation::PrefersReducedMotion()) {
+    fade_.Reset(1);
+  } else if (!widget_->IsVisible()) {
+    fade_.Reset(0);
+  }
+  widget_->SetOpacity(static_cast<float>(fade_.GetCurrentValue()));
   widget_->ShowInactive();
+  if (fade_.GetCurrentValue() < 1) {
+    fade_.SetSlideDuration(kTooltipIn);
+    fade_.Show();
+  }
 }
 
 FooterButton::FooterButton(PressedCallback callback,
@@ -458,9 +583,57 @@ FooterButton::FooterButton(PressedCallback callback,
     : views::MdTextButton(std::move(callback),
                           text,
                           button_context,
-                          use_text_color_for_icon) {}
+                          use_text_color_for_icon) {
+  // The tile replaces the ink drop's hover and press ripple.
+  views::InkDrop::Get(this)->SetMode(views::InkDropHost::InkDropMode::OFF);
+}
 
 FooterButton::~FooterButton() = default;
+
+FooterButton::TileDelegate::TileDelegate(FooterButton* button)
+    : views::AnimationDelegateViews(button), button_(button) {}
+
+void FooterButton::TileDelegate::AnimationProgressed(
+    const gfx::Animation* animation) {
+  button_->SchedulePaint();
+}
+
+bool FooterButton::HoldsTile() const {
+  return false;
+}
+
+void FooterButton::UpdateTile() {
+  const bool lit = hovered_ || HoldsTile();
+  if (gfx::Animation::PrefersReducedMotion() || !IsDrawn()) {
+    tile_.Reset(lit ? 1 : 0);
+    SchedulePaint();
+    return;
+  }
+  tile_.SetSlideDuration(lit ? kTileIn : kTileOut);
+  if (lit) {
+    tile_.Show();
+  } else {
+    tile_.Hide();
+  }
+}
+
+void FooterButton::OnPaintBackground(gfx::Canvas* canvas) {
+  views::MdTextButton::OnPaintBackground(canvas);
+  const double value = tile_.GetCurrentValue();
+  if (value <= 0) {
+    return;
+  }
+  const bool dark = IsDark(GetColorProvider());
+  const SkColor color = dark ? SkColorSetA(SK_ColorWHITE, 0x14)
+                             : SkColorSetA(SK_ColorBLACK, 0x0F);
+  cc::PaintFlags flags;
+  flags.setAntiAlias(true);
+  flags.setColor(color);
+  flags.setAlphaf(flags.getAlphaf() * static_cast<float>(value));
+  gfx::RectF tile(GetLocalBounds());
+  tile.ClampToCenteredSize(gfx::SizeF(kTileSize, kTileSize));
+  canvas->DrawRoundRect(tile, kTileRadius, flags);
+}
 
 void FooterButton::SetFooterTooltip(base::WeakPtr<FooterTooltip> tooltip,
                                     FooterTooltip::Content content) {
@@ -492,6 +665,7 @@ void FooterButton::SetHovered(bool hovered) {
     return;
   }
   hovered_ = hovered;
+  UpdateTile();
   if (tooltip_) {
     if (hovered_) {
       tooltip_->Hover(*this, content_);
@@ -709,7 +883,7 @@ void CreateButton::SetOpen(bool open) {
     return;
   }
   open_ = open;
-  UpdateFill();
+  UpdateTile();
   turn_.Stop();
   if (gfx::Animation::PrefersReducedMotion() || !IsDrawn()) {
     angle_ = open_ ? kOpenAngle : 0;
@@ -720,22 +894,9 @@ void CreateButton::SetOpen(bool open) {
   turn_.Start();
 }
 
-void CreateButton::UpdateFill() {
-  // Arc keeps the hover fill while the menu is open. The ink drop's hover
-  // would stack on it, so it pauses meanwhile.
-  if (open_ && GetColorProvider()) {
-    views::InkDrop::Get(this)->SetMode(views::InkDropHost::InkDropMode::OFF);
-    SetBgColorOverrideDeprecated(
-        GetColorProvider()->GetColor(ui::kColorSysStateHoverOnSubtle));
-    return;
-  }
-  SetBgColorOverrideDeprecated(SK_ColorTRANSPARENT);
-  views::InkDrop::Get(this)->SetMode(views::InkDropHost::InkDropMode::ON);
-}
-
-void CreateButton::OnThemeChanged() {
-  FooterButton::OnThemeChanged();
-  UpdateFill();
+// Arc keeps the hover tile lit while the menu is open.
+bool CreateButton::HoldsTile() const {
+  return open_;
 }
 
 void CreateButton::PaintButtonContents(gfx::Canvas* canvas) {
@@ -746,9 +907,15 @@ void CreateButton::PaintButtonContents(gfx::Canvas* canvas) {
   cc::PaintCanvas* paint = canvas->sk_canvas();
   paint->translate(x + center, y + center);
   paint->rotate(angle_);
-  paint->translate(-center, -center);
-  gfx::PaintVectorIcon(canvas, kPlusIcon, kPlusSize,
-                       GetFooterIconColor(GetColorProvider(), false));
+  cc::PaintFlags flags;
+  flags.setAntiAlias(true);
+  flags.setStyle(cc::PaintFlags::kStroke_Style);
+  flags.setStrokeWidth(kPlusStroke);
+  flags.setStrokeCap(cc::PaintFlags::kRound_Cap);
+  flags.setColor(GetFooterIconColor(GetColorProvider(), false));
+  constexpr float kHalf = (kPlusArm - kPlusStroke) / 2;
+  paint->drawLine(-kHalf, 0, kHalf, 0, flags);
+  paint->drawLine(0, -kHalf, 0, kHalf, flags);
 }
 
 BEGIN_METADATA(CreateButton)

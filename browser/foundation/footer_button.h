@@ -12,11 +12,14 @@
 #include "base/memory/raw_ptr.h"
 #include "base/memory/weak_ptr.h"
 #include "base/scoped_observation.h"
+#include "base/time/time.h"
 #include "base/timer/timer.h"
 #include "third_party/skia/include/core/SkColor.h"
 #include "ui/base/metadata/metadata_header_macros.h"
 #include "ui/events/event_observer.h"
+#include "ui/gfx/animation/animation_delegate.h"
 #include "ui/gfx/animation/linear_animation.h"
+#include "ui/gfx/animation/slide_animation.h"
 #include "ui/gfx/geometry/point.h"
 #include "ui/views/animation/animation_delegate_views.h"
 #include "ui/views/controls/button/md_text_button.h"
@@ -39,13 +42,18 @@ namespace myarc {
 // `active` is the brighter color of a lit icon, such as the glowing Library.
 SkColor GetFooterIconColor(const ui::ColorProvider* provider, bool active);
 
-// Arc's footer tooltip: after a hover delay, a navy pill above the hovered
-// button, or beside it, with its label and the keycaps of its shortcut. A
-// separate widget, so the footer's bounds don't clip it. One per sidebar,
-// shared with its Library, on the UI sequence.
+// The current Space's glyph: 0.85 of the footer icons' color.
+SkColor GetCurrentSpaceColor(const ui::ColorProvider* provider);
+
+// Arc's footer tooltip: after a hover delay, a glass pill above the hovered
+// button, or beside it, with its label and the keycaps of its shortcut. It
+// fades in and out; while one is up, or just after, the next button's shows
+// at once. A separate widget, so the footer's bounds don't clip it. One per
+// sidebar, shared with its Library, on the UI sequence.
 class FooterTooltip : public views::ViewObserver,
                       public views::WidgetObserver,
-                      public ui::EventObserver {
+                      public ui::EventObserver,
+                      public gfx::AnimationDelegate {
  public:
   struct Content {
     std::u16string label;
@@ -79,8 +87,19 @@ class FooterTooltip : public views::ViewObserver,
   }
 
  private:
-  void Show();
+  // Drops the anchor and its observers; the widget stays as it is.
+  void Release();
+  // Shows at full opacity unless `fade`.
+  void Show(bool fade);
   void HideUnlessHeld();
+  // Closes the widget at once, for the anchor or its window going away.
+  void HideNow();
+  // A tooltip is up or faded out a moment ago.
+  bool IsWarm() const;
+
+  // gfx::AnimationDelegate, for the fade:
+  void AnimationProgressed(const gfx::Animation* animation) override;
+  void AnimationEnded(const gfx::Animation* animation) override;
 
   // views::ViewObserver, for the anchor:
   void OnViewVisibilityChanged(views::View* observed_view,
@@ -101,6 +120,8 @@ class FooterTooltip : public views::ViewObserver,
   std::optional<gfx::Point> pressed_at_;
   base::OneShotTimer delay_;
   std::unique_ptr<views::Widget> widget_;
+  gfx::SlideAnimation fade_{this};
+  base::TimeTicks faded_at_;
   base::ScopedObservation<views::View, views::ViewObserver> anchor_observation_{
       this};
   base::ScopedObservation<views::Widget, views::WidgetObserver>
@@ -110,6 +131,7 @@ class FooterTooltip : public views::ViewObserver,
 };
 
 // A footer button that shows a FooterTooltip instead of the native tooltip.
+// It paints Arc's hover tile, which fades in and out, instead of an ink drop.
 class FooterButton : public views::MdTextButton {
   METADATA_HEADER(FooterButton, views::MdTextButton)
 
@@ -129,18 +151,35 @@ class FooterButton : public views::MdTextButton {
  protected:
   bool hovered() const { return hovered_; }
   virtual void OnHoverChanged() {}
+  // The tile stays lit while this is true, as the Create button's with its
+  // menu open. Call UpdateTile() when it changes.
+  virtual bool HoldsTile() const;
+  void UpdateTile();
 
   // views::View:
   void OnMouseEntered(const ui::MouseEvent& event) override;
   void OnMouseExited(const ui::MouseEvent& event) override;
   bool OnMousePressed(const ui::MouseEvent& event) override;
+  void OnPaintBackground(gfx::Canvas* canvas) override;
 
  private:
+  // The tile's own delegate, as LibraryButton's morph has.
+  class TileDelegate : public views::AnimationDelegateViews {
+   public:
+    explicit TileDelegate(FooterButton* button);
+    void AnimationProgressed(const gfx::Animation* animation) override;
+
+   private:
+    const raw_ptr<FooterButton> button_;
+  };
+
   void SetHovered(bool hovered);
 
   bool hovered_ = false;
   base::WeakPtr<FooterTooltip> tooltip_;
   FooterTooltip::Content content_;
+  TileDelegate tile_delegate_{this};
+  gfx::SlideAnimation tile_{&tile_delegate_};
 };
 
 // The Library button. It draws the user-designed design/icons/library-idle.svg
@@ -210,7 +249,7 @@ class LibraryButton : public FooterButton {
 };
 
 // The Create button. It draws the plus itself and turns it 45 degrees into a
-// cross while the creation menu is open, holding its hover fill. Reduced
+// cross while the creation menu is open, holding its hover tile. Reduced
 // motion turns it at once.
 class CreateButton : public FooterButton {
   METADATA_HEADER(CreateButton, FooterButton)
@@ -235,10 +274,8 @@ class CreateButton : public FooterButton {
     const raw_ptr<CreateButton> button_;
   };
 
-  void UpdateFill();
-
-  // views::View:
-  void OnThemeChanged() override;
+  // FooterButton:
+  bool HoldsTile() const override;
   // views::Button:
   void PaintButtonContents(gfx::Canvas* canvas) override;
 

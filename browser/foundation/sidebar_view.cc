@@ -81,31 +81,43 @@ struct Fills {
   SkColor tile;
   SkColor selected_tile;
   SkColor new_tab;
-  SkColor footer_icon;
+  SkColor current_space;
   SkColor space_dot;
   SkColor title;
 };
 
 // Arc lifts sidebar controls with white over the window material, so they read
 // lighter than the sidebar. Dark values are sampled from Arc's dark sidebar;
-// footer icons, the current Space's included, are Arc's muted #A9A2AF over it;
-// other Spaces' dots are the same white at 18%. The URL pill and header toggle
-// chip pick light/dark from the same kColorSysSurface.
+// the current Space's glyph is 0.85 of the footer icons' muted #A9A2AF, other
+// Spaces' glyphs the same white at 18%. The URL pill and header toggle chip
+// pick light/dark from the same kColorSysSurface.
 Fills GetFills(const ui::ColorProvider* provider) {
   const bool dark = !provider || color_utils::IsDark(
                                      provider->GetColor(ui::kColorSysSurface));
   return dark ? Fills{SkColorSetA(SK_ColorWHITE, 0x18),
                       SkColorSetA(SK_ColorWHITE, 0x6F),
                       SkColorSetA(SK_ColorWHITE, 0x33),
-                      GetFooterIconColor(provider, false),
+                      GetCurrentSpaceColor(provider),
                       SkColorSetA(SK_ColorWHITE, 0x2D),
                       SkColorSetA(SK_ColorWHITE, 0x73)}
               : Fills{SkColorSetA(SK_ColorWHITE, 0x80), SK_ColorWHITE,
                       SkColorSetA(SK_ColorWHITE, 0xB3),
-                      GetFooterIconColor(provider, false),
+                      GetCurrentSpaceColor(provider),
                       SkColorSetA(SK_ColorBLACK, 0x33),
                       SkColorSetA(SK_ColorBLACK, 0x99)};
 }
+
+// A Space's footer glyph: its icon, or a dot without one, brighter for the
+// current Space. Spaces store no icon yet; Arc's default planet is Space 1's.
+ui::ImageModel SpaceGlyph(size_t index, bool current, const Fills& fills) {
+  const SkColor color = current ? fills.current_space : fills.space_dot;
+  return index == 0 ? ui::ImageModel::FromVectorIcon(kSaturnIcon, color, 16)
+                    : ui::ImageModel::FromVectorIcon(kDotIcon, color, 8);
+}
+
+// Arc packs the Space glyphs left, 6 DIP after the Library button: the
+// footer's 4 DIP spacing and 2 more.
+constexpr int kSpacesLead = 2;
 
 enum ItemCommand { kPin = 1, kFavorite, kUnsave, kClose };
 
@@ -1015,14 +1027,14 @@ void SidebarView::BuildFooter(const gfx::PointF& spaces_offset,
   // Keep all footer controls on one 32-DIP line while retaining wheel/focus
   // scrolling and the current-Space reveal callback.
   spaces_scroll_->SetPreferredSize(gfx::Size(0, 32));
-  // Like Arc, Space dots sit centered between Library and Create.
+  // Like Arc, Space glyphs follow the Library and Create sits at the right.
   auto* spaces = spaces_scroll_->SetContents(Box(Orientation::kHorizontal, 0));
   auto* spaces_layout =
       static_cast<views::BoxLayout*>(spaces->GetLayoutManager());
   spaces_layout->set_cross_axis_alignment(
       views::BoxLayout::CrossAxisAlignment::kCenter);
-  spaces_layout->set_main_axis_alignment(
-      views::BoxLayout::MainAxisAlignment::kCenter);
+  spaces_layout->set_inside_border_insets(
+      gfx::Insets::TLBR(0, kSpacesLead, 0, 0));
   spaces->GetViewAccessibility().SetRole(ax::mojom::Role::kGroup);
   spaces->GetViewAccessibility().SetName(u"Spaces");
   std::optional<size_t> current_space_index;
@@ -1030,11 +1042,13 @@ void SidebarView::BuildFooter(const gfx::PointF& spaces_offset,
     const auto& [space_id, space_name] = spaces_[index];
     const bool current = space_id == current_space_id_;
     // Button presses request a switch; only a Rust snapshot changes selection.
-    // As in Arc, the current Space shows its icon and the others a dot.
     auto choice = IconButton<FooterButton>(
         base::BindRepeating(&Delegate::SelectSpace,
                             base::Unretained(&delegate_.get()), space_id),
-        current ? &kSaturnIcon : &kDotIcon, current ? 16 : 8);
+        nullptr);
+    choice->SetImageModel(
+        views::Button::STATE_NORMAL,
+        SpaceGlyph(index, current, GetFills(GetColorProvider())));
     // Arc spaces its Space dots 34 DIP apart.
     choice->SetMinSize(gfx::Size(34, 32));
     choice->SetMaxSize(gfx::Size(34, 32));
@@ -1065,13 +1079,6 @@ void SidebarView::BuildFooter(const gfx::PointF& spaces_offset,
   spaces_scroll_->RegisterPostLayoutCallback(base::BindRepeating(
       [](std::optional<gfx::PointF>& offset, bool reveal_current,
          std::optional<size_t> current, views::ScrollView* scroll) {
-        // Fill the viewport so the centered dots stay centered when they fit.
-        views::View* contents = scroll->contents();
-        const int fill = std::max(contents->GetPreferredSize().width(),
-                                  scroll->GetVisibleRect().width());
-        if (contents->width() != fill) {
-          contents->SetSize(gfx::Size(fill, contents->height()));
-        }
         if (auto saved = std::exchange(offset, std::nullopt)) {
           scroll->ScrollToOffset(*saved);
           if (reveal_current && current) {
@@ -1340,13 +1347,15 @@ void SidebarView::UpdateFills() {
   }
   for (const auto& target : focus_targets_) {
     if (target.action == FocusAction::kSpaces) {
-      const bool current = target.id == current_space_id_;
+      const auto space = std::ranges::find(spaces_, target.id,
+                                           [](const auto& entry) {
+                                             return entry.first;
+                                           });
       static_cast<views::MdTextButton*>(target.view.get())
-          ->SetImageModel(views::Button::STATE_NORMAL,
-                          current ? ui::ImageModel::FromVectorIcon(
-                                        kSaturnIcon, fills.footer_icon, 16)
-                                  : ui::ImageModel::FromVectorIcon(
-                                        kDotIcon, fills.space_dot, 8));
+          ->SetImageModel(
+              views::Button::STATE_NORMAL,
+              SpaceGlyph(static_cast<size_t>(space - spaces_.begin()),
+                         target.id == current_space_id_, fills));
     }
   }
   SetCreateMenuOpen(create_menu_open_);
