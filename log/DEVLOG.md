@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-11-01: Tabs survive Cmd+Q
+
+- Cause: the workspace file kept its tab items through quit, but Chromium's default startup pref is New Tab, so relaunch restored no native tabs and `ReconcileBindings` retired every Temporary item without a live page. With `--myarc-workspace-sidebar`, `SessionStartupPref::GetDefaultStartupType` now returns `LAST`; an explicit user choice still wins.
+- Verification: `chrome` and `bridge_check` build; `bridge_check`, `export_patches.py --check` and `check_docs.py` pass. A `/tmp` profile with 3 data: tabs, quit with Cmd+Q posted to the browser PID and relaunched without URLs, comes back with Alpha, Bravo and Charlie and items 1-3 in `myarc-workspace-v1.json`; before the fix only an empty item 4 remained. Evidence and script in `research-private/captures/fixes-2026-11-01/restore/`.
+- Not verified: a second Space during the quit, and `session_startup_pref_unittest` (not built; its desktop default case runs without the switch). Chromium `myarc` commit `adc8597ffd`.
+
 ## 2026-11-01: Sidebar hide, show and peek at Arc's pace
 
 - Hiding and showing the sidebar now takes 100/120 ms on `ACCEL_5_70_DECEL_90`, down from Chromium's 350/400 ms. The edge peek opens in 130 ms, closes in 80 ms and fades in 40 ms. The peek zone is 18 DIP from the window edge (was 2) and reveals after 30 ms without the velocity gate. The peek panel is opaque with no shadow and no glass blur, rounds its trailing corners by 10 DIP and draws a 1 DIP white@0.17 rim. Traffic lights fade with the visible sidebar fraction instead of snapping ahead of it. Reduced motion snaps through `BrowserAnimationController`.

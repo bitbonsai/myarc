@@ -1,0 +1,25 @@
+diff --git a/chrome/browser/prefs/session_startup_pref.cc b/chrome/browser/prefs/session_startup_pref.cc
+index 72fc94f5160a208d5507c22ad8fe5748cfcb39bb..10e35d10ef4a4bbea2fd78279b368d6a5e07d822 100644
+--- a/chrome/browser/prefs/session_startup_pref.cc
++++ b/chrome/browser/prefs/session_startup_pref.cc
+@@ -8,6 +8,7 @@
+ 
+ #include <string>
+ 
++#include "base/command_line.h"
+ #include "base/feature_list.h"
+ #include "base/values.h"
+ #include "build/build_config.h"
+@@ -69,6 +70,12 @@ SessionStartupPref::Type SessionStartupPref::GetDefaultStartupType() {
+ #if BUILDFLAG(IS_CHROMEOS)
+   return SessionStartupPref::LAST;
+ #else
++  // myArc's workspace keeps only identities for open tabs; their pages come
++  // back through session restore, so quitting must not drop them.
++  if (base::CommandLine::ForCurrentProcess()->HasSwitch(
++          "myarc-workspace-sidebar")) {
++    return SessionStartupPref::LAST;
++  }
+ #if BUILDFLAG(IS_WIN) || BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_MAC)
+   if (features::kSetDefaultToContinueSession.Get()) {
+     return SessionStartupPref::LAST;
