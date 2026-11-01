@@ -215,8 +215,11 @@ mod ffi {
         fn move_item_before(workspace: &mut Workspace, item_id: u64, before: u64)
         -> MutationResult;
         // Zero before means move to the end.
-        fn move_space_before(workspace: &mut Workspace, space_id: u64, before: u64)
-        -> MutationResult;
+        fn move_space_before(
+            workspace: &mut Workspace,
+            space_id: u64,
+            before: u64,
+        ) -> MutationResult;
         fn reconcile_live_items(workspace: &mut Workspace, live: &[u64]) -> MutationResult;
         fn sidebar_snapshot(workspace: &Workspace, window_id: u64) -> SidebarResult;
         fn export_snapshot(workspace: &Workspace) -> StateSnapshot;
