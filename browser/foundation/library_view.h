@@ -2,6 +2,7 @@
 #define MYARC_LIBRARY_VIEW_H_
 
 #include <cstdint>
+#include <map>
 #include <memory>
 #include <optional>
 #include <set>
@@ -16,6 +17,7 @@
 #include "myarc/sidebar_view.h"
 #include "third_party/skia/include/core/SkColor.h"
 #include "ui/base/metadata/metadata_header_macros.h"
+#include "ui/gfx/geometry/point_f.h"
 #include "ui/menus/simple_menu_model.h"
 #include "ui/views/context_menu_controller.h"
 #include "ui/views/controls/textfield/textfield_controller.h"
@@ -24,6 +26,7 @@
 namespace views {
 class Button;
 class MenuRunner;
+class ScrollView;
 class Textfield;
 }  // namespace views
 
@@ -76,7 +79,9 @@ class LibraryView final : public views::View,
 
  private:
   void Rebuild();
-  void BuildSpaces();
+  // `offsets` holds the scroll offsets to put back: key 0 for the row of
+  // cards, a Space's ID for its card's Pins.
+  void BuildSpaces(const std::map<uint64_t, gfx::PointF>& offsets);
   void BuildList();
   // Fills the Downloads or Archived Tabs list from the cached entries.
   // `keep_scroll` keeps the list's scroll offset across the rebuild.
@@ -93,6 +98,11 @@ class LibraryView final : public views::View,
   // views::TextfieldController:
   void ContentsChanged(views::Textfield* sender,
                        const std::u16string& new_contents) override;
+
+  // A Space card's "..." menu, under `anchor`.
+  void ShowSpaceMenu(uint64_t space,
+                     views::View* anchor,
+                     ui::mojom::MenuSourceType source_type);
 
   // views::ContextMenuController, for Arc's right-click on the Archived Tabs
   // rail item:
@@ -114,6 +124,9 @@ class LibraryView final : public views::View,
   raw_ptr<views::View> pane_ = nullptr;
   raw_ptr<views::Textfield> search_ = nullptr;
   raw_ptr<views::View> list_ = nullptr;
+  // The Spaces section's scrolling views, keyed like BuildSpaces' `offsets`,
+  // so a rebuild (a favicon, a rename) keeps every card where it was.
+  std::vector<std::pair<uint64_t, raw_ptr<views::ScrollView>>> scrolls_;
   // Pane controls keyed by the Space, Pin, download or archived tab they act
   // on (0 for Create and Show All Downloads), so a rebuild can put focus back.
   // Pin keys carry library::kPinKey to keep them apart from Space IDs.
@@ -129,6 +142,8 @@ class LibraryView final : public views::View,
   std::optional<std::pair<SkColor, SkColor>> theme_colors_;
   std::unique_ptr<ui::SimpleMenuModel> menu_model_;
   std::unique_ptr<views::MenuRunner> menu_runner_;
+  // The Space a card's "..." menu acts on.
+  uint64_t menu_space_ = 0;
   base::WeakPtrFactory<LibraryView> weak_factory_{this};
 };
 

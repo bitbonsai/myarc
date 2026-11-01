@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-11-01: Library Space card controls
+
+- Each Space card gains Arc's controls, as traced 18 DIP glyphs in `icons.h` at white 55%. The header's paintbrush, Arc's edit glyph, opens the existing Rename Space dialog and brightens on hover. The footer's "..." opens a native menu with Switch to Space (other Spaces only) and Rename Space. Delete exists only in the Rust bridge, with no UI or confirmation, so the menu leaves it out. The four-way move glyph only shows, since the workspace has no Space order to change yet. Every card now has its footer, Pins or not.
+- A rebuild while the Library is open (a favicon, a rename) keeps the row of cards and each card's Pin list at their scroll offsets. Verification: `chrome` and `bridge_check` builds, `bridge_check`, `export_patches.py --check` and `check_docs.py` pass. Background capture matches Arc's control positions within about 2 DIP. In a live `/tmp` profile, CGEvent input sent while the window was frontmost scrolled a card, clicked its brush, renamed the Space and clicked "...". The name updated, the card kept its offset, and the menu opened.
+- No Chromium patch changes. Card drag-to-reorder waits on a Space order in the workspace.
+
 ## 2026-11-01: Library Space cards list their Pins
 
 - Each Space card in the Library now lists that Space's Pins: favicon and title in 36 DIP rows with the sidebar's hover tile. A click switches to the Space and activates the Pin through `ActivateItem`, so dormant Pins reopen, then the Library closes. The workspace has no folders yet, so cards show Pins only, never temporary tabs. A long list scrolls inside its card and the header stays put. Rows sit in the Tab order after their card's header; the Library has no arrow-key navigation anywhere, so these rows don't add it. Data: `SidebarSnapshot.space_pins` (Rust and bridge) carries every Space's Pins, and cards refresh through `SetModel` while the Library is open.

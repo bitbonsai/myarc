@@ -102,6 +102,51 @@ inline constexpr gfx::VectorIcon kNewTabIcon(kNewTabRep,
                                              std::size(kNewTabRep),
                                              "myarc_new_tab");
 
+// A Library Space card's controls, traced from Arc's on an 18 DIP canvas: the
+// header's paintbrush (edit), and the footer's four-way move arrows and "...".
+inline constexpr gfx::PathElement kSpaceEditPath[] = {
+    gfx::CANVAS_DIMENSIONS, 18,
+    // Bristles.
+    gfx::MOVE_TO, 6.95f, 9.06f, gfx::LINE_TO, 9.14f, 11.53f,
+    gfx::LINE_TO, 8.7f, 12.91f,
+    gfx::ARC_TO, 2.8f, 2.8f, 0, 0, 1, 4.44f, 14.6f,
+    gfx::LINE_TO, 2.44f, 13.32f,
+    gfx::QUADRATIC_TO, 3.12f, 12.12f, 3.21f, 11.85f,
+    gfx::ARC_TO, 2.8f, 2.8f, 0, 0, 1, 5.41f, 9.52f, gfx::CLOSE,
+    // Ferrule band.
+    gfx::MOVE_TO, 7.26f, 8.58f, gfx::LINE_TO, 8.19f, 7.75f,
+    gfx::LINE_TO, 10.58f, 10.44f, gfx::LINE_TO, 9.65f, 11.27f, gfx::CLOSE,
+    // Handle.
+    gfx::MOVE_TO, 8.57f, 7.35f, gfx::LINE_TO, 13.31f, 3.88f,
+    gfx::ARC_TO, 1.3f, 1.3f, 0, 0, 1, 15.04f, 5.82f,
+    gfx::LINE_TO, 11.03f, 10.12f, gfx::CLOSE};
+inline constexpr gfx::VectorIconRep kSpaceEditRep[] = {{kSpaceEditPath}};
+inline constexpr gfx::VectorIcon kSpaceEditIcon(kSpaceEditRep,
+                                                std::size(kSpaceEditRep),
+                                                "myarc_space_edit");
+
+inline constexpr gfx::PathElement kSpaceMovePath[] = {
+    gfx::CANVAS_DIMENSIONS, 18,
+    gfx::MOVE_TO, 9, 1.6f, gfx::LINE_TO, 11.5f, 5.2f, gfx::H_LINE_TO, 6.5f,
+    gfx::CLOSE, gfx::MOVE_TO, 9, 16.4f, gfx::LINE_TO, 6.5f, 12.8f,
+    gfx::H_LINE_TO, 11.5f, gfx::CLOSE, gfx::MOVE_TO, 1.6f, 9,
+    gfx::LINE_TO, 5.2f, 6.5f, gfx::V_LINE_TO, 11.5f, gfx::CLOSE,
+    gfx::MOVE_TO, 16.4f, 9, gfx::LINE_TO, 12.8f, 11.5f, gfx::V_LINE_TO, 6.5f,
+    gfx::CLOSE, gfx::NEW_PATH, gfx::STROKE, 1.7f, gfx::MOVE_TO, 9, 4.5f,
+    gfx::V_LINE_TO, 13.5f, gfx::MOVE_TO, 4.5f, 9, gfx::H_LINE_TO, 13.5f};
+inline constexpr gfx::VectorIconRep kSpaceMoveRep[] = {{kSpaceMovePath}};
+inline constexpr gfx::VectorIcon kSpaceMoveIcon(kSpaceMoveRep,
+                                                std::size(kSpaceMoveRep),
+                                                "myarc_space_move");
+
+inline constexpr gfx::PathElement kSpaceMorePath[] = {
+    gfx::CANVAS_DIMENSIONS, 18, gfx::CIRCLE, 4.5f, 9, 1.35f,
+    gfx::CIRCLE, 9, 9, 1.35f, gfx::CIRCLE, 13.5f, 9, 1.35f};
+inline constexpr gfx::VectorIconRep kSpaceMoreRep[] = {{kSpaceMorePath}};
+inline constexpr gfx::VectorIcon kSpaceMoreIcon(kSpaceMoreRep,
+                                                std::size(kSpaceMoreRep),
+                                                "myarc_space_more");
+
 // Lucide "arrow-left" at stroke 1.5: the Library's Exit Library tile, as thin
 // as Arc's.
 inline constexpr gfx::PathElement kArrowLeftPath[] = {

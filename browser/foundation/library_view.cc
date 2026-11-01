@@ -20,6 +20,7 @@
 #include "myarc/library_logic.h"
 #include "third_party/skia/include/core/SkColor.h"
 #include "ui/base/accelerators/accelerator.h"
+#include "ui/base/menu_source_utils.h"
 #include "ui/base/metadata/metadata_impl_macros.h"
 #include "ui/base/mojom/menu_source_type.mojom.h"
 #include "ui/color/color_id.h"
@@ -61,7 +62,7 @@ using MainAxis = views::BoxLayout::MainAxisAlignment;
 using CrossAxis = views::BoxLayout::CrossAxisAlignment;
 using Section = LibraryView::Section;
 
-constexpr int kClearArchive = 1;
+enum Command { kClearArchive = 1, kSwitchSpace, kRenameSpace };
 
 // Translucent lifts: `tile` matches the sidebar's Favorites tile and `muted`
 // its footer icons. The rail and empty-state values are sampled from Arc's dark
@@ -77,6 +78,9 @@ struct Colors {
   SkColor rail_label_selected;
   SkColor empty_icon;
   SkColor empty_body;
+  // A Space card's edit, move and "..." glyphs, and the first two on hover.
+  SkColor card_control;
+  SkColor card_control_hover;
 };
 
 // Arc's accent, sampled from its Library: the create button.
@@ -97,7 +101,9 @@ Colors GetColors(const ui::ColorProvider* provider) {
           .rail_label_hover = SkColorSetA(ink, 0xBF),
           .rail_label_selected = SkColorSetA(ink, 0xE6),
           .empty_icon = SkColorSetA(ink, 0x47),
-          .empty_body = SkColorSetA(ink, 0x8C)};
+          .empty_body = SkColorSetA(ink, 0x8C),
+          .card_control = SkColorSetA(ink, 0x8C),
+          .card_control_hover = SkColorSetA(ink, 0xE6)};
 }
 
 struct SectionInfo {
@@ -173,6 +179,31 @@ std::unique_ptr<T> TextButton(views::Button::PressedCallback callback,
   button->SetHorizontalAlignment(gfx::ALIGN_LEFT);
   button->SetElideBehavior(gfx::ELIDE_TAIL);
   button->SetImageLabelSpacing(8);
+  return button;
+}
+
+// A Space card's edit or "..." button: Arc's dim glyph, brighter on hover.
+std::unique_ptr<views::ImageButton> CardButton(
+    views::Button::PressedCallback callback,
+    const gfx::VectorIcon& icon,
+    const Colors& colors,
+    const std::u16string& name) {
+  auto button = std::make_unique<views::ImageButton>(std::move(callback));
+  button->SetImageModel(
+      views::Button::STATE_NORMAL,
+      ui::ImageModel::FromVectorIcon(icon, colors.card_control, 18));
+  for (auto state :
+       {views::Button::STATE_HOVERED, views::Button::STATE_PRESSED}) {
+    button->SetImageModel(state, ui::ImageModel::FromVectorIcon(
+                                     icon, colors.card_control_hover, 18));
+  }
+  button->SetImageHorizontalAlignment(views::ImageButton::ALIGN_CENTER);
+  button->SetImageVerticalAlignment(views::ImageButton::ALIGN_MIDDLE);
+  button->SetPreferredSize(gfx::Size(28, 28));
+  button->SetFocusBehavior(views::View::FocusBehavior::ALWAYS);
+  button->SetTooltipText(name);
+  button->GetViewAccessibility().SetName(name);
+  views::InstallRoundRectHighlightPathGenerator(button.get(), gfx::Insets(), 8);
   return button;
 }
 
@@ -654,12 +685,19 @@ void LibraryView::Rebuild() {
   const bool had_focus = pane_->Contains(
       GetFocusManager() ? GetFocusManager()->GetFocusedView() : nullptr);
   const std::optional<uint64_t> key = FocusedKey();
+  // Only a rebuild of the Spaces section has `scrolls_`, so a section switch
+  // starts at the top.
+  std::map<uint64_t, gfx::PointF> offsets;
+  for (const auto& [scroll_key, scroll] : scrolls_) {
+    offsets.emplace(scroll_key, scroll->CurrentOffset());
+  }
+  scrolls_.clear();
   search_ = nullptr;
   list_ = nullptr;
   keyed_views_.clear();
   pane_->RemoveAllChildViews();
   if (section_ == Section::kSpaces) {
-    BuildSpaces();
+    BuildSpaces(offsets);
   } else {
     BuildList();
   }
@@ -670,7 +708,7 @@ void LibraryView::Rebuild() {
   PreferredSizeChanged();
 }
 
-void LibraryView::BuildSpaces() {
+void LibraryView::BuildSpaces(const std::map<uint64_t, gfx::PointF>& offsets) {
   const Colors colors = GetColors(GetColorProvider());
   auto* layout = static_cast<views::BoxLayout*>(pane_->GetLayoutManager());
   // Columns keep their width: many Spaces or a narrow window scroll sideways,
@@ -688,8 +726,13 @@ void LibraryView::BuildSpaces() {
                               gfx::Insets::TLBR(48, library::kColumnsLeading,
                                                 49, library::kCreateTrailing),
                               library::kColumnGap));
-  scroll->RegisterPostLayoutCallback(
-      base::BindRepeating([](views::ScrollView* scroll) {
+  // A rebuild puts each scroll back on its first real layout.
+  const auto saved = [&offsets](uint64_t key) -> std::optional<gfx::PointF> {
+    const auto it = offsets.find(key);
+    return it == offsets.end() ? std::nullopt : std::optional(it->second);
+  };
+  scroll->RegisterPostLayoutCallback(base::BindRepeating(
+      [](std::optional<gfx::PointF>& restore, views::ScrollView* scroll) {
         // Columns take the viewport's height, and its width when they fit.
         views::View* contents = scroll->contents();
         const gfx::Rect visible = scroll->GetVisibleRect();
@@ -699,7 +742,12 @@ void LibraryView::BuildSpaces() {
         if (contents->size() != fill) {
           contents->SetSize(fill);
         }
-      }));
+        if (restore && !visible.IsEmpty()) {
+          scroll->ScrollToOffset(*std::exchange(restore, std::nullopt));
+        }
+      },
+      base::OwnedRef(saved(0))));
+  scrolls_.emplace_back(0, scroll);
   auto* row_layout = static_cast<views::BoxLayout*>(row->GetLayoutManager());
   row->GetViewAccessibility().SetRole(ax::mojom::Role::kGroup);
   row->GetViewAccessibility().SetName(u"Spaces");
@@ -709,8 +757,16 @@ void LibraryView::BuildSpaces() {
     const uint64_t id = space.id;
     const std::u16string& name = space.name;
     const bool current = id == current_space_;
+    // Arc's footer glyphs sit 22 DIP above the card's bottom edge.
     auto* column = row->AddChildView(
-        Box(Orientation::kVertical, gfx::Insets::VH(9, 8), 4));
+        Box(Orientation::kVertical, gfx::Insets::TLBR(9, 8, 7, 8), 4));
+    auto* column_layout =
+        static_cast<views::BoxLayout*>(column->GetLayoutManager());
+    // Arc's header: the name, and the edit brush at the card's right edge.
+    auto* header_row =
+        column->AddChildView(Box(Orientation::kHorizontal, gfx::Insets(), 0));
+    static_cast<views::BoxLayout*>(header_row->GetLayoutManager())
+        ->set_cross_axis_alignment(CrossAxis::kCenter);
     column->SetBackground(
         views::CreateRoundedRectBackground(colors.column, 10));
     column->SetPreferredSize(gfx::Size(library::kColumnWidth, 0));
@@ -753,21 +809,42 @@ void LibraryView::BuildSpaces() {
         current ? ax::mojom::CheckedState::kTrue
                 : ax::mojom::CheckedState::kFalse);
     keyed_views_.emplace_back(id, header.get());
-    column->AddChildView(std::move(header));
-    if (space.pins.empty()) {
-      continue;
-    }
+    static_cast<views::BoxLayout*>(header_row->GetLayoutManager())
+        ->SetFlexForView(header_row->AddChildView(std::move(header)), 1);
+    // Renaming keeps the Library open; the rename rebuilds this card.
+    auto edit =
+        CardButton(base::BindRepeating(
+                       [](LibraryView* view, uint64_t space) {
+                         view->PostAction(base::BindOnce(
+                             &SidebarView::Delegate::RenameSpace,
+                             base::Unretained(&view->delegate_.get()), space));
+                       },
+                       base::Unretained(this), id),
+                   kSpaceEditIcon, colors, u"Rename Space: " + name);
+    edit->SetProperty(views::kMarginsKey, gfx::Insets::TLBR(0, 4, 0, 2));
+    keyed_views_.emplace_back(id | library::kSpaceEditKey, edit.get());
+    header_row->AddChildView(std::move(edit));
+
     // A long list scrolls inside its card, as in Arc, so every card keeps its
-    // header in place.
+    // header and footer in place.
     auto* pins_scroll =
         column->AddChildView(std::make_unique<views::ScrollView>());
+    column_layout->SetFlexForView(pins_scroll, 1);
     pins_scroll->ClipHeightTo(0, std::numeric_limits<int>::max());
     pins_scroll->SetHorizontalScrollBarMode(
         views::ScrollView::ScrollBarMode::kDisabled);
     pins_scroll->SetBackgroundColor(std::nullopt);
     pins_scroll->SetDrawOverflowIndicator(false);
-    static_cast<views::BoxLayout*>(column->GetLayoutManager())
-        ->SetFlexForView(pins_scroll, 1);
+    if (std::optional<gfx::PointF> offset = saved(id)) {
+      pins_scroll->RegisterPostLayoutCallback(base::BindRepeating(
+          [](std::optional<gfx::PointF>& restore, views::ScrollView* scroll) {
+            if (restore && !scroll->GetVisibleRect().IsEmpty()) {
+              scroll->ScrollToOffset(*std::exchange(restore, std::nullopt));
+            }
+          },
+          base::OwnedRef(std::move(offset))));
+    }
+    scrolls_.emplace_back(id, pins_scroll);
     auto* pins = pins_scroll->SetContents(
         Box(Orientation::kVertical, gfx::Insets::TLBR(1, 0, 0, 0), 2));
     pins->GetViewAccessibility().SetRole(ax::mojom::Role::kList);
@@ -793,6 +870,33 @@ void LibraryView::BuildSpaces() {
       keyed_views_.emplace_back(pin.id | library::kPinKey, pin_row.get());
       pins->AddChildView(std::move(pin_row));
     }
+
+    // Arc's footer: the move handle and the "..." menu. The workspace has no
+    // Space order to change yet, so the handle only shows.
+    auto* footer =
+        column->AddChildView(Box(Orientation::kHorizontal, gfx::Insets(), 0));
+    auto* footer_layout =
+        static_cast<views::BoxLayout*>(footer->GetLayoutManager());
+    footer_layout->set_cross_axis_alignment(CrossAxis::kCenter);
+    auto* move = footer->AddChildView(
+        std::make_unique<views::ImageView>(ui::ImageModel::FromVectorIcon(
+            kSpaceMoveIcon, colors.card_control, 18)));
+    move->SetPreferredSize(gfx::Size(28, 28));
+    move->GetViewAccessibility().SetIsIgnored(true);
+    footer_layout->SetFlexForView(
+        footer->AddChildView(std::make_unique<views::View>()), 1);
+    auto more = CardButton(views::Button::PressedCallback(), kSpaceMoreIcon,
+                           colors, u"Space options: " + name);
+    // The button owns its callback, so the pointer stays valid.
+    more->SetCallback(base::BindRepeating(
+        [](LibraryView* view, uint64_t space, views::Button* button,
+           const ui::Event& event) {
+          view->ShowSpaceMenu(space, button,
+                              ui::GetMenuSourceTypeForEvent(event));
+        },
+        base::Unretained(this), id, more.get()));
+    keyed_views_.emplace_back(id | library::kSpaceMoreKey, more.get());
+    footer->AddChildView(std::move(more));
   }
 
   auto* create_cell =
@@ -1082,6 +1186,26 @@ void LibraryView::UpdateList(bool keep_scroll) {
   }
 }
 
+void LibraryView::ShowSpaceMenu(uint64_t space,
+                                views::View* anchor,
+                                ui::mojom::MenuSourceType source_type) {
+  if (!anchor || !GetWidget() || (menu_runner_ && menu_runner_->IsRunning())) {
+    return;
+  }
+  // Rename and switching are the Space actions the sidebar has too.
+  menu_space_ = space;
+  menu_runner_.reset();
+  menu_model_ = std::make_unique<ui::SimpleMenuModel>(this);
+  if (space != current_space_) {
+    menu_model_->AddItem(kSwitchSpace, u"Switch to Space");
+  }
+  menu_model_->AddItem(kRenameSpace, u"Rename Space\u2026");
+  menu_runner_ =
+      std::make_unique<views::MenuRunner>(menu_model_.get(), /*run_types=*/0);
+  menu_runner_->RunMenuAt(GetWidget(), nullptr, anchor->GetBoundsInScreen(),
+                          views::MenuAnchorPosition::kTopRight, source_type);
+}
+
 void LibraryView::ShowContextMenuForViewImpl(
     views::View* source,
     const gfx::Point& point,
@@ -1099,10 +1223,29 @@ void LibraryView::ShowContextMenuForViewImpl(
 }
 
 void LibraryView::ExecuteCommand(int command_id, int event_flags) {
-  if (command_id == kClearArchive) {
-    // The confirmation and the refresh it triggers run after the menu closes.
-    PostAction(base::BindOnce(&SidebarView::Delegate::ClearArchive,
-                              base::Unretained(&delegate_.get())));
+  // Each action, its dialog and the refresh it triggers run after the menu
+  // closes.
+  switch (command_id) {
+    case kClearArchive:
+      PostAction(base::BindOnce(&SidebarView::Delegate::ClearArchive,
+                                base::Unretained(&delegate_.get())));
+      break;
+    case kSwitchSpace:
+      // As the header does: switching can drop the Library, so the action
+      // holds nothing of this view.
+      PostAction(base::BindOnce(
+          [](SidebarView::Delegate* delegate, uint64_t space,
+             const base::RepeatingClosure& close) {
+            delegate->SelectSpace(space);
+            close.Run();
+          },
+          base::Unretained(&delegate_.get()), menu_space_, close_));
+      break;
+    case kRenameSpace:
+      PostAction(base::BindOnce(&SidebarView::Delegate::RenameSpace,
+                                base::Unretained(&delegate_.get()),
+                                menu_space_));
+      break;
   }
 }
 
