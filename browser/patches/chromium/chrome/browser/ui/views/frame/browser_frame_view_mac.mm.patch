@@ -1,5 +1,5 @@
 diff --git a/chrome/browser/ui/views/frame/browser_frame_view_mac.mm b/chrome/browser/ui/views/frame/browser_frame_view_mac.mm
-index 8615eb60acaf1a7a9a23a08b505577c8eefb700b..f1bf9ba32bef93ba0d7c0107d72c36c59f8ba8ea 100644
+index 8615eb60acaf1a7a9a23a08b505577c8eefb700b..f614ed19df46bbf8eefcfdc9ddc508bd54fb23c2 100644
 --- a/chrome/browser/ui/views/frame/browser_frame_view_mac.mm
 +++ b/chrome/browser/ui/views/frame/browser_frame_view_mac.mm
 @@ -21,6 +21,7 @@
@@ -20,7 +20,7 @@ index 8615eb60acaf1a7a9a23a08b505577c8eefb700b..f1bf9ba32bef93ba0d7c0107d72c36c5
  #include "chrome/browser/ui/views/bookmarks/bookmark_bar_view.h"
  #include "chrome/browser/ui/views/frame/browser_native_widget.h"
  #include "chrome/browser/ui/views/frame/browser_view.h"
-@@ -69,6 +72,20 @@
+@@ -69,6 +72,50 @@
  
  namespace {
  
@@ -38,35 +38,52 @@ index 8615eb60acaf1a7a9a23a08b505577c8eefb700b..f1bf9ba32bef93ba0d7c0107d72c36c5
 +  return host && !host->application_host();
 +}
 +
++// How much of the myArc sidebar is on screen: the slide while it hides or
++// shows, the peek while it is hidden, 1 while it is pinned.
++double GetMyarcSidebarVisibleFraction(BrowserView* browser_view) {
++  auto* const controller =
++      tabs::VerticalTabStripStateController::From(browser_view->browser());
++  if (!controller || !controller->ShouldDisplayVerticalTabs()) {
++    return 1.0;
++  }
++  const auto* const animation =
++      BrowserAnimationController::From(browser_view->browser());
++  const bool expanded = controller->GetCollapseState() ==
++                        tabs::VerticalTabStripCollapseState::kExpanded;
++  if (!animation) {
++    return expanded ? 1.0 : 0.0;
++  }
++  const auto value = [animation](BrowserAnimationSequence sequence) {
++    return animation
++        ->GetCurrentValue(TabStripAnimations::kVerticalTabStrip, sequence)
++        .value_or(0.0);
++  };
++  if (expanded &&
++      animation->GetCurrentMotion(TabStripAnimations::kVerticalTabStrip) !=
++          TabStripAnimations::kExpand) {
++    return 1.0;
++  }
++  return std::clamp(std::max(value(TabStripAnimations::kTabStripWidth),
++                             value(TabStripAnimations::kTabStripHoverWidth)),
++                    0.0, 1.0);
++}
++
  FullscreenToolbarStyle GetUserPreferredToolbarStyle(bool always_show) {
    // In Kiosk mode, we don't show top Chrome UI.
    if (base::CommandLine::ForCurrentProcess()->HasSwitch(switches::kKioskMode)) {
-@@ -469,6 +486,24 @@ BrowserFrameViewMac::BoundsAndMargins
+@@ -469,6 +516,11 @@ BrowserFrameViewMac::BoundsAndMargins
  BrowserFrameViewMac::GetCaptionButtonBounds() const {
    BoundsAndMargins result;
  
-+  if (ShouldManageMyarcCaptionButtons(GetBrowserView())) {
-+    auto* controller = tabs::VerticalTabStripStateController::From(
-+        GetBrowserView()->browser());
-+    if (controller && controller->ShouldDisplayVerticalTabs() &&
-+        controller->GetCollapseState() !=
-+            tabs::VerticalTabStripCollapseState::kExpanded) {
-+      const auto* animation =
-+          BrowserAnimationController::From(GetBrowserView()->browser());
-+      if (!animation ||
-+          animation
-+                  ->GetCurrentValue(TabStripAnimations::kVerticalTabStrip,
-+                                    TabStripAnimations::kTabStripHoverWidth)
-+                  .value_or(0.0) <= 0.0) {
-+        return result;
-+      }
-+    }
++  if (ShouldManageMyarcCaptionButtons(GetBrowserView()) &&
++      GetMyarcSidebarVisibleFraction(GetBrowserView()) <= 0.0) {
++    return result;
 +  }
 +
    // In popups, the titlebar is system-drawn and the caption buttons aren't part
    // of the client area.
    if (GetBrowserView()->browser()->GetType() ==
-@@ -527,6 +562,17 @@ void BrowserFrameViewMac::OnPaint(gfx::Canvas* canvas) {
+@@ -527,6 +579,20 @@ void BrowserFrameViewMac::OnPaint(gfx::Canvas* canvas) {
  }
  
  void BrowserFrameViewMac::Layout(PassKey) {
@@ -75,10 +92,13 @@ index 8615eb60acaf1a7a9a23a08b505577c8eefb700b..f1bf9ba32bef93ba0d7c0107d72c36c5
 +  if (ShouldManageMyarcCaptionButtons(GetBrowserView())) {
 +    NSWindow* const window = GetWidget()->GetNativeWindow().GetNativeNSWindow();
 +    const bool hidden = GetCaptionButtonBounds().bounds.IsEmpty();
-+    // shortcut: visibility snaps, add sliding after native measurement.
++    // Arc's lights leave and return with the sidebar, so fade them with it.
++    const CGFloat alpha = GetMyarcSidebarVisibleFraction(GetBrowserView());
 +    for (NSWindowButton button :
 +         {NSWindowCloseButton, NSWindowMiniaturizeButton, NSWindowZoomButton}) {
-+      [[window standardWindowButton:button] setHidden:hidden];
++      NSButton* const view = [window standardWindowButton:button];
++      view.hidden = hidden;
++      view.alphaValue = alpha;
 +    }
 +  }
    if (GetBrowserView()->IsWindowControlsOverlayEnabled()) {
