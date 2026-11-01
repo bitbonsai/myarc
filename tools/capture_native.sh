@@ -11,6 +11,9 @@
 #   --myarc-capture-open-library, on Spaces unless a section is named.
 #   TOOLTIP=library (or space/create) shows that sidebar footer tooltip via
 #   --myarc-capture-footer-tooltip and keeps it up.
+#   STACK=1 shows the downloads stack above the Library button via
+#   --myarc-capture-downloads-stack and keeps it up. Downloads land in the
+#   profile, so file:// URLs of files Chromium can't show seed the stack.
 #   WORKSPACE=<file> seeds the profile's myarc-workspace-v1.json, for example
 #   with Archived Tabs.
 #   SETTINGS=1 (or general/profiles/advanced/more) opens the native Settings window via
@@ -43,7 +46,7 @@ if [ "${1:-}" = "--inner" ]; then
   trap cleanup EXIT
   mkdir -p "$PROFILE/Default"
   touch "$PROFILE/.myarc-m0-test-profile"
-  printf '%s\n' '{"vertical_tabs":{"enabled":true,"collapsed_state":false,"enabled_first_time":true}}' > "$PROFILE/Default/Preferences"
+  printf '{"vertical_tabs":{"enabled":true,"collapsed_state":false,"enabled_first_time":true},"download":{"default_directory":"%s","prompt_for_download":false}}\n' "$PROFILE/Downloads" > "$PROFILE/Default/Preferences"
   [ -n "${WORKSPACE:-}" ] && cp "$WORKSPACE" "$PROFILE/Default/myarc-workspace-v1.json"
   URLS=()
   [ "$URL" = none ] || read -r -a URLS <<< "$URL"
@@ -57,6 +60,7 @@ if [ "${1:-}" = "--inner" ]; then
     *) EXTRA+=(--myarc-capture-open-library="$LIBRARY") ;;
   esac
   [ -n "${TOOLTIP:-}" ] && EXTRA+=(--myarc-capture-footer-tooltip="$TOOLTIP")
+  [ -n "${STACK:-}" ] && EXTRA+=(--myarc-capture-downloads-stack)
   SHOT_TITLE=()
   case "${SETTINGS:-}" in
     "") ;;

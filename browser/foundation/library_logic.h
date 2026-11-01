@@ -1,9 +1,11 @@
 #ifndef MYARC_LIBRARY_LOGIC_H_
 #define MYARC_LIBRARY_LOGIC_H_
 
+#include <algorithm>
 #include <cstddef>
 #include <string>
 #include <string_view>
+#include <vector>
 
 #include "base/time/time.h"
 
@@ -32,6 +34,30 @@ bool MatchesSearch(std::u16string_view text, std::u16string_view query);
 // Arc's day headers in Archived Tabs: "Today", "Yesterday" or "N days ago",
 // counted in local calendar days before `now`.
 std::u16string DayLabel(base::Time time, base::Time now);
+
+// Rows in the downloads stack above the Library button.
+inline constexpr size_t kStackRows = 4;
+
+// The downloads stack's rows from a newest-first list: the most recent
+// complete downloads, oldest first, so the newest sits by the button.
+template <typename T>
+std::vector<T> StackRows(const std::vector<T>& newest_first) {
+  std::vector<T> rows;
+  for (const T& item : newest_first) {
+    if (rows.size() == kStackRows) {
+      break;
+    }
+    if (item.complete) {
+      rows.push_back(item);
+    }
+  }
+  std::ranges::reverse(rows);
+  return rows;
+}
+
+// A download's age in the stack: "Just now" under a minute, then
+// "N minutes ago", "N hours ago" or "N days ago".
+std::u16string AgeLabel(base::Time time, base::Time now);
 
 }  // namespace myarc::library
 

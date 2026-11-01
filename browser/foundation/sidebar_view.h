@@ -34,6 +34,7 @@ struct SidebarResult;
 
 namespace myarc {
 
+class DownloadsStack;
 class FooterTooltip;
 class LibraryView;
 
@@ -61,6 +62,9 @@ class SidebarView final : public views::View,
     uint32_t id = 0;
     std::u16string name;
     std::u16string detail;  // Source host, or why it can't be opened.
+    bool complete = false;  // Finished and still on disk.
+    base::Time time;        // When it finished, or started if it hasn't.
+    ui::ImageModel icon;    // The file type's icon once loaded, or empty.
     bool operator==(const DownloadPresentation&) const = default;
   };
 
@@ -97,9 +101,14 @@ class SidebarView final : public views::View,
     virtual void RenameSpace(uint64_t space_id) = 0;
     virtual void NewTab() = 0;  // Parent opens its real New Tab/palette flow.
     virtual void OpenDownloads() = 0;  // Exact owning browser's Chrome command.
-    // Newest first, bounded by the parent. Lookup only.
+    // Newest first, bounded by the parent. Lookup only, except that the
+    // parent may start loading missing file icons and then calls
+    // RefreshDownloadsStack.
     virtual std::vector<DownloadPresentation> GetRecentDownloads() const = 0;
     virtual void OpenDownload(uint32_t download_id) = 0;
+    // Starts a native file drag of a complete download, from a mouse drag.
+    // Can delete the caller before it returns.
+    virtual void DragDownload(uint32_t download_id) = 0;
     // Newest first. Lookup only.
     virtual std::vector<ArchivedTabPresentation> GetArchivedTabs() const = 0;
     // Reopens the tab in its Space and drops it from the archive. The parent
@@ -141,6 +150,10 @@ class SidebarView final : public views::View,
   // Shows the footer tooltip of "library", "space" (the current one) or
   // "create" without hover and keeps it up, for background captures.
   void ShowFooterTooltipForCapture(std::string_view target);
+  // Reloads the downloads stack above the Library button while it shows.
+  void RefreshDownloadsStack();
+  // Shows the downloads stack without hover and keeps it up, for captures.
+  void ShowDownloadsStackForCapture();
 
  private:
   friend class SidebarViewTestApi;
@@ -176,6 +189,7 @@ class SidebarView final : public views::View,
                   uint64_t id = 0,
                   std::optional<ItemMenuState> item_menu = std::nullopt);
   // views::View:
+  void Layout(PassKey) override;
   void OnThemeChanged() override;
   // Applies the scheme's tile and New Tab fills to the current rows.
   void UpdateFills();
@@ -203,6 +217,8 @@ class SidebarView final : public views::View,
   std::vector<FocusTarget> focus_targets_;
   // The footer kept across row rebuilds, and the Spaces it shows.
   raw_ptr<views::View> footer_ = nullptr;
+  // Floats above the footer, outside the layout, and goes with it.
+  raw_ptr<DownloadsStack> downloads_stack_ = nullptr;
   std::vector<FocusTarget> footer_targets_;
   std::vector<std::pair<uint64_t, std::u16string>> footer_spaces_;
   uint64_t footer_space_id_ = 0;

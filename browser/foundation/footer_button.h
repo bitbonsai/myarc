@@ -8,6 +8,7 @@
 #include <string_view>
 #include <vector>
 
+#include "base/functional/callback.h"
 #include "base/memory/raw_ptr.h"
 #include "base/memory/weak_ptr.h"
 #include "base/scoped_observation.h"
@@ -39,9 +40,9 @@ namespace myarc {
 SkColor GetFooterIconColor(const ui::ColorProvider* provider, bool active);
 
 // Arc's footer tooltip: after a hover delay, a navy pill above the hovered
-// button with its label and the keycaps of its shortcut. A separate widget, so
-// the footer's bounds don't clip it. One per sidebar, shared with its Library,
-// on the UI sequence.
+// button, or beside it, with its label and the keycaps of its shortcut. A
+// separate widget, so the footer's bounds don't clip it. One per sidebar,
+// shared with its Library, on the UI sequence.
 class FooterTooltip : public views::ViewObserver,
                       public views::WidgetObserver,
                       public ui::EventObserver {
@@ -50,6 +51,9 @@ class FooterTooltip : public views::ViewObserver,
     std::u16string label;
     // Keycap glyphs, for example u"⌃" and u"1". Only shortcuts that work.
     std::vector<std::u16string> keys;
+    // Right of the button after a shorter delay, as Arc's Library tooltip,
+    // clear of the downloads stack above it.
+    bool beside = false;
     bool operator==(const Content&) const = default;
   };
 
@@ -66,7 +70,7 @@ class FooterTooltip : public views::ViewObserver,
   // the pressed one or one the press put there, stays quiet until the pointer
   // leaves it.
   void Press(const gfx::Point& screen_point);
-  // Shows `content` above `anchor` at once and keeps it up, for captures.
+  // Shows `content` by `anchor` at once and keeps it up, for captures.
   void ShowNow(views::View& anchor, const Content& content);
   void Hide();
 
@@ -154,6 +158,10 @@ class LibraryButton : public FooterButton {
                 bool use_text_color_for_icon);
   ~LibraryButton() override;
 
+  // Runs with true when the pointer enters and false when it leaves.
+  void SetHoverChangedCallback(base::RepeatingCallback<void(bool)> callback) {
+    hover_changed_ = std::move(callback);
+  }
   // Glows while `open`. `animate` false jumps to the new state.
   void SetOpen(bool open, bool animate = true);
   // Starts at the glow and animates to the current state, for the sidebar's
@@ -191,6 +199,7 @@ class LibraryButton : public FooterButton {
   // views::Button:
   void PaintButtonContents(gfx::Canvas* canvas) override;
 
+  base::RepeatingCallback<void(bool)> hover_changed_;
   bool open_ = false;
   bool glowing_ = false;
   // Per channel progress from idle (0) to glow (1); overshoot leaves [0, 1].

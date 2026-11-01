@@ -106,13 +106,22 @@ source_set("browser_workspace_adapter") {
   ]
 }
 
+source_set("library_logic") {
+  sources = [
+    "library_logic.cc",
+    "library_logic.h",
+  ]
+  public_deps = [ "//base" ]
+  deps = [ "//base:i18n" ]
+}
+
 source_set("sidebar_view") {
   sources = [
+    "downloads_stack.cc",
+    "downloads_stack.h",
     "footer_button.cc",
     "footer_button.h",
     "icons.h",
-    "library_logic.cc",
-    "library_logic.h",
     "library_view.cc",
     "library_view.h",
     "sidebar_view.cc",
@@ -126,11 +135,13 @@ source_set("sidebar_view") {
   ]
   deps = [
     ":bridge",
+    ":library_logic",
     "//base:i18n",
     "//cc/paint",
     "//components/vector_icons",
     "//skia",
     "//ui/color",
+    "//ui/compositor",
     "//ui/events",
     "//ui/gfx",
     "//ui/gfx/animation",
@@ -184,7 +195,10 @@ source_set("settings_window") {
 executable("bridge_check") {
   testonly = true
   sources = [ "bridge_check.cc" ]
-  deps = [ ":workspace_service" ]
+  deps = [
+    ":library_logic",
+    ":workspace_service",
+  ]
 }
 
 buildflag_header("nightly_buildflags") {

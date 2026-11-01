@@ -1,5 +1,5 @@
 diff --git a/chrome/browser/ui/views/frame/browser_view.h b/chrome/browser/ui/views/frame/browser_view.h
-index 750e46c97b64dccccf4268e912df5dbdb6516b3c..882a80ad56fceffae3d6e537d2a6424c34759c19 100644
+index 750e46c97b64dccccf4268e912df5dbdb6516b3c..39e599d68e5aabffbe0a37fa224b5f064b4a3e0e 100644
 --- a/chrome/browser/ui/views/frame/browser_view.h
 +++ b/chrome/browser/ui/views/frame/browser_view.h
 @@ -8,6 +8,7 @@
@@ -94,7 +94,7 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..882a80ad56fceffae3d6e537d2a6424c
    base::WeakPtr<BrowserView> GetAsWeakPtr() {
      return weak_ptr_factory_.GetWeakPtr();
    }
-@@ -1253,12 +1293,77 @@ class BrowserView : public BrowserWindow,
+@@ -1253,12 +1293,84 @@ class BrowserView : public BrowserWindow,
  
    // Anchor point for help bubbles and other dialogs that want to reliably
    // anchor outside the content area of the window.
@@ -115,6 +115,9 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..882a80ad56fceffae3d6e537d2a6424c
 +  std::vector<myarc::SidebarView::DownloadPresentation> GetRecentDownloads()
 +      const override;
 +  void OpenDownload(uint32_t download_id) override;
++  void DragDownload(uint32_t download_id) override;
++  // The scale file icons are cached at for this window.
++  float MyarcIconScale() const;
 +  std::vector<myarc::SidebarView::ArchivedTabPresentation> GetArchivedTabs()
 +      const override;
 +  void RestoreArchivedTab(uint64_t archive_id) override;
@@ -158,6 +161,10 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..882a80ad56fceffae3d6e537d2a6424c
 +  bool myarc_capture_library_scheduled_ = false;
 +  // --myarc-capture-footer-tooltip shows a footer tooltip once per window.
 +  bool myarc_capture_tooltip_scheduled_ = false;
++  // --myarc-capture-downloads-stack shows the downloads stack once per window.
++  bool myarc_capture_stack_scheduled_ = false;
++  // File icon loads for the downloads stack, started from a const lookup.
++  mutable base::CancelableTaskTracker myarc_download_icon_tracker_;
 +  // Refreshes the Library's Downloads list while the Library is open.
 +  class MyarcDownloadWatcher;
 +  std::unique_ptr<MyarcDownloadWatcher> myarc_download_watcher_;
@@ -172,7 +179,7 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..882a80ad56fceffae3d6e537d2a6424c
  
    // A mapping between accelerators and command IDs.
    std::map<ui::Accelerator, int> accelerator_table_;
-@@ -1411,6 +1516,7 @@ class BrowserView : public BrowserWindow,
+@@ -1411,6 +1523,7 @@ class BrowserView : public BrowserWindow,
    base::EnumSet<TabStripAndWebAppViewsReparentedState>
        tab_strip_web_apps_reparented_state_;
  

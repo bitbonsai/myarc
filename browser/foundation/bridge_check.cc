@@ -2,10 +2,13 @@
 #include <limits>
 #include <string>
 #include <utility>
+#include <vector>
 
 #include "base/json/json_reader.h"
 #include "base/json/json_writer.h"
+#include "base/time/time.h"
 #include "myarc/bridge.rs.h"
+#include "myarc/library_logic.h"
 #include "myarc/workspace_service.h"
 
 namespace {
@@ -601,6 +604,38 @@ bool CheckArchiveTimerAndClear() {
          clear_archived_tabs(*restored).id == 0;
 }
 
+bool CheckDownloadsStack() {
+  using myarc::library::AgeLabel;
+  const base::Time now = base::Time::UnixEpoch() + base::Days(400);
+  for (const auto& [age, label] :
+       {std::pair(base::Seconds(-5), u"Just now"),
+        std::pair(base::Seconds(59), u"Just now"),
+        std::pair(base::Minutes(1), u"1 minute ago"),
+        std::pair(base::Minutes(59), u"59 minutes ago"),
+        std::pair(base::Hours(1), u"1 hour ago"),
+        std::pair(base::Hours(15), u"15 hours ago"),
+        std::pair(base::Hours(24), u"1 day ago"),
+        std::pair(base::Days(3), u"3 days ago")}) {
+    if (AgeLabel(now - age, now) != label) {
+      return false;
+    }
+  }
+  struct Download {
+    int id;
+    bool complete;
+    bool operator==(const Download&) const = default;
+  };
+  // Newest first; 2 is still downloading.
+  const std::vector<Download> newest_first = {{1, true}, {2, false}, {3, true},
+                                              {4, true}, {5, true},  {6, true}};
+  const std::vector<Download> rows = {
+      {5, true}, {4, true}, {3, true}, {1, true}};
+  return myarc::library::StackRows(newest_first) == rows &&
+         myarc::library::StackRows(std::vector<Download>{{1, false}}).empty() &&
+         myarc::library::StackRows(std::vector<Download>{{7, true}}) ==
+             std::vector<Download>{{7, true}};
+}
+
 }  // namespace
 
 int main() {
@@ -673,9 +708,14 @@ int main() {
     std::cerr << "Archive timer and Clear Archive checks failed\n";
     return 16;
   }
-  std::cout << "7 legacy C++/Rust checks passed, including 1000 ownership "
-               "round trips; workspace transitions, Space 1 deletion and "
-               "metadata codec, saved title, Archived Tabs, Auto Archive, "
-               "archive timer and Clear Archive checks passed\n";
+  if (!CheckDownloadsStack()) {
+    std::cerr << "Downloads stack checks failed\n";
+    return 17;
+  }
+  std::cout
+      << "7 legacy C++/Rust checks passed, including 1000 ownership "
+         "round trips; workspace transitions, Space 1 deletion and "
+         "metadata codec, saved title, Archived Tabs, Auto Archive, "
+         "archive timer, Clear Archive and downloads stack checks passed\n";
   return 0;
 }

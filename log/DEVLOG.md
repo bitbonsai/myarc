@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-11-01: Recent downloads stack above the Library button
+
+- Hovering the Library button for 100 ms fans up the 4 most recent complete downloads, oldest on top, with no panel: 56 DIP rows, system file icon in a 40 DIP box, 13 pt medium name at 80% and 11 pt age at 52% ("Just now", "N minutes/hours/days ago"). Rows rise on the footer's `rise` curve over 150 ms with the bottom row first, and sink over 120 ms after 350 ms off both the button and the stack; pressing the Library button drops it at once, and reduced motion jumps. Clicking a row opens the file and dragging it drags the file through Chromium's `DragDownloadItem`. The "View Library" tooltip now sits right of the button after 0.7 s. New `downloads_stack.{h,cc}`, `--myarc-capture-downloads-stack` (`STACK=1`), and capture profiles now download into the profile.
+- Verification: `chrome` and `bridge_check` build; `bridge_check` (new age label and row selection checks), `export_patches.py --check` and `check_docs.py` pass. No native capture: the screen was locked, so `bgcapture.swift` found no display, even for a plain `URL=none` capture. Arc reference crops are in `research-private/captures/downloads-stack/`; hover, click, drag and the tooltip placement are unrun.
+- Chromium `myarc` commit `09a2694161`.
+
 ## 2026-11-01: Library rail like Arc, no Easels
 
 - The Library rail drops Easels (rail item, `LibrarySection::kEasels`, its empty state and the `LIBRARY=easels` capture section). Selected Media, Downloads, Spaces and Archived Tabs show Arc's duotone glyph: blue `#2523F6` fill under light lavender `#EDEDFD` strokes, baked into new `*ActiveIcon`s in `icons.h`; Boosts stays a single-color wand, lavender when selected. Tiles use radius 12, white 8.5% selected and 4.5% hovered; hover brightens only the label (60% idle, 75% hover, 90% selected), the icon stays at 65%. Empty states: icon at 28%, semibold title, body at 55% wrapped at 248 DIP, and Archived Tabs uses Arc's copy "Hover your mouse over a tab and press the × to archive it." No "Learn more" button.

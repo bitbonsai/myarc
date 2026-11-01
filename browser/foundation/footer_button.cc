@@ -149,6 +149,8 @@ Pose Lerp(const Sparkle& sparkle, float t) {
 // 10 before the label, then 18 DIP keycaps 4 apart with a 2 DIP lip, 5 from
 // the pill's edge.
 constexpr base::TimeDelta kTooltipDelay = base::Seconds(1);
+// Arc's Library tooltip shows 0.65-0.8 s after hover, right of the button.
+constexpr base::TimeDelta kBesideDelay = base::Milliseconds(700);
 constexpr int kTooltipHeight = 28;
 constexpr int kTooltipGap = 4;
 constexpr int kTooltipMargin = 6;
@@ -297,7 +299,7 @@ void FooterTooltip::Hover(views::View& anchor, const Content& content) {
   window_observation_.Observe(window);
   key_monitor_ = views::EventMonitor::CreateWindowMonitor(
       this, window->GetNativeWindow(), {ui::EventType::kKeyPressed});
-  delay_.Start(FROM_HERE, kTooltipDelay,
+  delay_.Start(FROM_HERE, content.beside ? kBesideDelay : kTooltipDelay,
                base::BindOnce(&FooterTooltip::Show, base::Unretained(this)));
 }
 
@@ -405,6 +407,14 @@ void FooterTooltip::Show() {
                                                    : kLightTooltip));
   const gfx::Size size = contents->GetPreferredSize();
   const gfx::Rect anchor = anchor_->GetBoundsInScreen();
+  if (content_.beside) {
+    widget_->SetBounds(
+        gfx::Rect(gfx::Point(anchor.right() + kTooltipGap,
+                             anchor.CenterPoint().y() - size.height() / 2),
+                  size));
+    widget_->ShowInactive();
+    return;
+  }
   const gfx::Rect window = parent->GetClientAreaBoundsInScreen();
   const int x = std::clamp(anchor.CenterPoint().x() - size.width() / 2,
                            window.x() + kTooltipMargin,
@@ -524,6 +534,9 @@ void LibraryButton::SettleFromGlow() {
 
 void LibraryButton::OnHoverChanged() {
   UpdateGlow(/*animate=*/true);
+  if (hover_changed_) {
+    hover_changed_.Run(hovered());
+  }
 }
 
 void LibraryButton::UpdateGlow(bool animate) {

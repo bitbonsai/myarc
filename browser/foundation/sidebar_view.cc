@@ -14,6 +14,7 @@
 #include "base/task/sequenced_task_runner.h"
 #include "components/vector_icons/vector_icons.h"
 #include "myarc/bridge.rs.h"
+#include "myarc/downloads_stack.h"
 #include "myarc/footer_button.h"
 #include "myarc/icons.h"
 #include "myarc/library_view.h"
@@ -333,6 +334,7 @@ void SidebarView::OpenLibrary(LibrarySection section) {
   focus_targets_.clear();
   footer_targets_.clear();
   footer_ = nullptr;
+  downloads_stack_ = nullptr;
   spaces_scroll_ = nullptr;
   new_tab_ = nullptr;
   tiles_.clear();
@@ -603,6 +605,7 @@ void SidebarView::SetUnavailable(const std::u16string& reason,
   focus_targets_.clear();
   footer_targets_.clear();
   footer_ = nullptr;
+  downloads_stack_ = nullptr;
   spaces_scroll_ = nullptr;
   new_tab_ = nullptr;
   tiles_.clear();
@@ -685,6 +688,7 @@ void SidebarView::SetModel(const foundation::SidebarResult& model,
   } else {
     footer_targets_.clear();
     footer_ = nullptr;
+    downloads_stack_ = nullptr;
     spaces_scroll_ = nullptr;
     RemoveAllChildViews();
   }
@@ -833,6 +837,10 @@ void SidebarView::BuildFooter(const gfx::PointF& spaces_offset,
   auto library = IconButton<LibraryButton>(
       base::BindRepeating(
           [](base::WeakPtr<SidebarView> sidebar) {
+            // Arc drops the downloads stack with the view swap, unanimated.
+            if (sidebar && sidebar->downloads_stack_) {
+              sidebar->downloads_stack_->HideNow();
+            }
             // Opening removes this button; let its press handler unwind. A
             // second click queued meanwhile must not reset the section.
             base::SequencedTaskRunner::GetCurrentDefault()->PostTask(
@@ -849,7 +857,14 @@ void SidebarView::BuildFooter(const gfx::PointF& spaces_offset,
   // Arc's Shift-Cmd-L would clash with Chromium's View > Collapse Tabs, so the
   // tooltip shows no shortcut.
   library->SetFooterTooltip(footer_tooltip_->GetWeakPtr(),
-                            {u"View Library", {}});
+                            {u"View Library", {}, /*beside=*/true});
+  library->SetHoverChangedCallback(base::BindRepeating(
+      [](base::WeakPtr<SidebarView> sidebar, bool hovered) {
+        if (sidebar && sidebar->downloads_stack_) {
+          sidebar->downloads_stack_->SetAnchorHovered(hovered);
+        }
+      },
+      weak_factory_.GetWeakPtr()));
   library->GetViewAccessibility().SetName(u"View Library");
   TrackFocus(library.get(), FocusAction::kLibrary);
   // Right after the Library closes, its glow settles back into the box.
@@ -945,6 +960,9 @@ void SidebarView::BuildFooter(const gfx::PointF& spaces_offset,
   TrackFocus(create.get(), FocusAction::kCreate);
   footer->AddChildView(std::move(create));
   footer_ = footer;
+  // Last, so it paints over the rows.
+  downloads_stack_ = AddChildView(std::make_unique<DownloadsStack>(*delegate_));
+  downloads_stack_->SetProperty(views::kViewIgnoredByLayoutKey, true);
 }
 
 std::u16string SidebarView::GetCreateTooltipForTesting() const {
@@ -970,6 +988,30 @@ void SidebarView::ShowFooterTooltipForCapture(std::string_view target) {
       }
       return;
     }
+  }
+}
+
+void SidebarView::RefreshDownloadsStack() {
+  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
+  if (downloads_stack_) {
+    downloads_stack_->Refresh();
+  }
+}
+
+void SidebarView::ShowDownloadsStackForCapture() {
+  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
+  if (downloads_stack_) {
+    downloads_stack_->ShowNow();
+  }
+}
+
+void SidebarView::Layout(PassKey) {
+  LayoutSuperclass<views::View>(this);
+  if (downloads_stack_ && footer_) {
+    // Bottom on the footer's top, across the sidebar's inner width.
+    const int height = downloads_stack_->GetPreferredSize().height();
+    downloads_stack_->SetBounds(kSidebarInsets.left(), footer_->y() - height,
+                                width() - kSidebarInsets.width(), height);
   }
 }
 
