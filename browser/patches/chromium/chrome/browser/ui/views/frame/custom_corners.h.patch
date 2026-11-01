@@ -1,0 +1,27 @@
+diff --git a/chrome/browser/ui/views/frame/custom_corners.h b/chrome/browser/ui/views/frame/custom_corners.h
+index d86c6288e85bd35d8e41fd1dcc2ea2b871217273..06e7132b2207364b8da29ce8bc466fbab519f1dd 100644
+--- a/chrome/browser/ui/views/frame/custom_corners.h
++++ b/chrome/browser/ui/views/frame/custom_corners.h
+@@ -12,6 +12,7 @@
+ #include "base/memory/raw_ref.h"
+ #include "base/scoped_observation.h"
+ #include "base/types/strong_alias.h"
++#include "third_party/skia/include/core/SkColor.h"
+ #include "ui/color/color_id.h"
+ #include "ui/views/view.h"
+ #include "ui/views/view_observer.h"
+@@ -68,8 +69,13 @@ class CustomCorners : public views::ViewObserver {
+   // Designates that the toolbar theme background should be used.
+   using ToolbarTheme = base::StrongAlias<class ToolbarThemeTag, std::monostate>;
+ 
++  // Designates a fixed color, for surfaces whose color is computed outside the
++  // color pipeline.
++  using ExplicitColor = base::StrongAlias<class ExplicitColorTag, SkColor>;
++
+   // Specifies which color to be used for the background.
+-  using ColorChoice = std::variant<FrameTheme, ToolbarTheme, ui::ColorId>;
++  using ColorChoice =
++      std::variant<FrameTheme, ToolbarTheme, ui::ColorId, ExplicitColor>;
+ 
+   // Represents a color choice with optional alpha. Special-case logic will be
+   // used to optimize fully opaque and fully transparent surfaces.

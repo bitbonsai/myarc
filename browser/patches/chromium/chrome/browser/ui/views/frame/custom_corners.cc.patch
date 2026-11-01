@@ -1,0 +1,25 @@
+diff --git a/chrome/browser/ui/views/frame/custom_corners.cc b/chrome/browser/ui/views/frame/custom_corners.cc
+index afb36d5a414aa68cbe8736289f3db0708db62838..3d602d09ae3c02d96007a87d23def20398520c86 100644
+--- a/chrome/browser/ui/views/frame/custom_corners.cc
++++ b/chrome/browser/ui/views/frame/custom_corners.cc
+@@ -62,13 +62,18 @@ void CustomCorners::PaintPath(gfx::Canvas* canvas,
+             ? ThemedBackground::ThemeChoice::kToolbarTheme
+             : ThemedBackground::ThemeChoice::kFrameTheme);
+   } else {
+-    ui::ColorId color_id = std::get<ui::ColorId>(color_choice.color);
++    const auto* explicit_color =
++        std::get_if<ExplicitColor>(&color_choice.color);
++    const SkColor color = explicit_color
++                              ? explicit_color->value()
++                              : GetView().GetColorProvider()->GetColor(
++                                    std::get<ui::ColorId>(color_choice.color));
+ 
+     cc::PaintFlags flags;
+     flags.setAntiAlias(anti_alias);
+     flags.setStyle(cc::PaintFlags::kFill_Style);
+     flags.setColor(SkColorSetA(
+-        GetView().GetColorProvider()->GetColor(color_id),
++        color,
+         std::clamp(static_cast<int>(255 * color_choice.opacity), 0, 255)));
+     canvas->DrawPath(path, flags);
+   }

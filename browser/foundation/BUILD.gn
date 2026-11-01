@@ -153,6 +153,18 @@ source_set("sidebar_view") {
   ]
 }
 
+source_set("sidebar_tint") {
+  sources = [
+    "sidebar_tint.cc",
+    "sidebar_tint.h",
+  ]
+  public_deps = [ "//skia" ]
+  deps = [
+    "//ui/color",
+    "//ui/gfx",
+  ]
+}
+
 source_set("copied_url_toast") {
   sources = [
     "copied_url_toast.cc",

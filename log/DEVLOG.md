@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-11-01: Sidebar peek in the Space colour
+
+- The peek panel painted the frame's opaque grey `#191B1F`. It now takes the sidebar's Space tint where the sidebar sits, composited opaque over the frame colour standing in for the window material: `#1E1A2B` in dark, the user's recorded pinned sidebar being `#1F192B`. The colour comes from the new `myarc/sidebar_tint.{h,cc}`, which also feeds the native gradient tint its stops, and reaches the panel through a new `ExplicitColor` choice in `CustomCorners` (frame-local header, ~25 files rebuild). Corners, rim and no-shadow unchanged.
+- Verification: `chrome` and `bridge_check` build; `bridge_check`, `export_patches.py --check` and `check_docs.py` pass. One live `/tmp` profile driven by CGEvent while frontmost, two `screencapture -l` shots: peek fill uniform `#1E1A2B`, pinned on that desktop `#272332`-`#2C2534` (translucent, brighter backdrop). Evidence `research-private/captures/finesse/sidebar-peek/14_*`.
+- Not verified: light mode live (computed only), and the gap to Arc's `#111533` remains while Space themes don't exist. Chromium `myarc` commit `64804af463`.
+
 ## 2026-11-01: Esc exits the Library
 
 - Cause: the Library's Esc accelerator fired only with focus in the sidebar, and a click leaves focus on the page, so Esc never reached it. A click-opened Library now takes focus itself (no ring) and returns it to the page when it closes. Esc runs the same close as the Exit Library tile, so the sidebar stays and the close motion plays. With text in the focused search field, the first Esc clears it. Cmd+S is unchanged.
