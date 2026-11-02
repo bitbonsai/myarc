@@ -362,6 +362,7 @@
     .post-body blockquote { margin: 2rem 0; padding-left: 1.5rem; color: var(--quiet) }
     .post-body pre { font-family: inherit; padding: 1.25rem; overflow-x: auto; background: var(--panel); color: var(--ivory); border-radius: 1rem }
     .post-body code { font-family: inherit; font-size: 1rem; overflow-wrap: anywhere }
+    .post-body :not(pre) > code { padding: .05em .4em; border: 1px solid color-mix(in srgb, currentColor 18%, transparent); border-bottom-width: 2px; border-radius: .375rem; background: color-mix(in srgb, currentColor 6%, transparent); font-size: .875em; font-weight: 500; white-space: nowrap }
     .post-body a, .post-body p { overflow-wrap: anywhere }
     @media (prefers-color-scheme: dark) {
       .post-month { color: #8794a3 }
