@@ -81,7 +81,7 @@ gn gen out/MyarcM0 > "$WORK/generate.log" 2>&1
 autoninja -C out/MyarcM0 -j 8 chrome > "$WORK/build.log" 2>&1
 ```
 
-Execute each stage only after the preceding command succeeds. The checked-in [args.gn](args.gn) requests an arm64 release component build without debug symbols or remote execution. It is a development configuration, not signing/update configuration.
+Execute each stage only after the preceding command succeeds. The checked-in [args.gn](args.gn) requests an arm64 release component build without debug symbols or remote execution. It is a development configuration, not signing/update configuration. It sets `myarc_app_icon = true`, which takes the nightly's myArc icon (`foundation/nightly/app.icns` and `Assets.car`) and keeps the dev bundle as `Chromium.app` with Chromium's bundle id and profile directory.
 
 Monitor free disk during checkout, hooks and compilation. The first local attempt used a 40 GiB free-space stop reserve, checked every five seconds; this is a local safety policy, not an upstream capacity guarantee. Do not delete unrelated files or disable browser security to finish a build. The successful resumed baseline segment took 2h 22m 37s. A later snapshot measured 37.6 GiB for source plus build output and 0.7 GiB for depot_tools. Fresh-build total time, peak storage/RAM and recurring runner cost remain unmeasured.
 

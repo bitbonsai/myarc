@@ -3,4 +3,8 @@ declare_args() {
   # directory and app icon, and myArc mode switched on by default. Pair it
   # with branding_file_path = "//myarc/nightly/BRANDING".
   myarc_nightly = false
+
+  # Uses the nightly's myArc app icon without its branding, so a dev build
+  # stays Chromium.app with Chromium's bundle id and profile directory.
+  myarc_app_icon = false
 }

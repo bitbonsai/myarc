@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-11-02: Dev build shows the myArc icon
+
+- New GN arg `myarc_app_icon` (in `nightly.gni`) copies the nightly's `app.icns` and `Assets.car` into the bundle without the nightly branding, so `out/MyarcM0` stays `Chromium.app` with bundle id `org.chromium.Chromium` and its usual profile directory. `browser/args.gn` and `out/MyarcM0/args.gn` set it. Nightly builds are unchanged.
+- Verification: `chrome` and `bridge_check` builds (GN regen plus the 2 resource copies, 12 s), `bridge_check`, `export_patches.py --check` and `check_docs.py` pass. Both bundle files match the nightly's SHA-256. After `touch` and `lsregister -f`, Finder's icon for the bundle and the running icon of a fresh background launch show the myArc mark. The Dock itself wasn't screenshotted, and instances launched before this build weren't checked.
+- Chromium `myarc` commit `53a4d5a70d`.
+
 ## 2026-11-02: Page card corners follow the window corner
 
 - The page card sits 10 DIP inside the window on the top, right and bottom, and on the left too when the sidebar is hidden or peeking. Its radius is now the window's 20 DIP minus that inset, so 10 DIP, derived from `GetRestoredWindowCornerRadius()` and one shared inset constant. The left corners beside the pinned sidebar use the same 10 DIP and look right there. `ContentsWebView` no longer forces its own 7 DIP radius over the layout's. Fullscreen stays square, now for blank pages too.

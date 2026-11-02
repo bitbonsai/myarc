@@ -1,5 +1,5 @@
 diff --git a/chrome/BUILD.gn b/chrome/BUILD.gn
-index 06bfcf5a90d093b9ac8e255e93ef2ffd0a00421e..32c86935676fac71ca79c0e847a23056afd4eefe 100644
+index 06bfcf5a90d093b9ac8e255e93ef2ffd0a00421e..e0c486a003b57f16f366516a5e924931f48a6fd9 100644
 --- a/chrome/BUILD.gn
 +++ b/chrome/BUILD.gn
 @@ -54,6 +54,7 @@ if (is_android) {
@@ -31,7 +31,7 @@ index 06bfcf5a90d093b9ac8e255e93ef2ffd0a00421e..32c86935676fac71ca79c0e847a23056
  
    bundle_data("chrome_app_icon") {
 -    sources = [ "app/theme/$branding_path_component/mac/app.icns" ]
-+    if (myarc_nightly) {
++    if (myarc_nightly || myarc_app_icon) {
 +      sources = [ "//myarc/nightly/app.icns" ]
 +    } else {
 +      sources = [ "app/theme/$branding_path_component/mac/app.icns" ]
@@ -41,7 +41,7 @@ index 06bfcf5a90d093b9ac8e255e93ef2ffd0a00421e..32c86935676fac71ca79c0e847a23056
  
    bundle_data("chrome_asset_catalog") {
 -    sources = [ "app/theme/$branding_path_component/mac/Assets.car" ]
-+    if (myarc_nightly) {
++    if (myarc_nightly || myarc_app_icon) {
 +      sources = [ "//myarc/nightly/Assets.car" ]
 +    } else {
 +      sources = [ "app/theme/$branding_path_component/mac/Assets.car" ]
