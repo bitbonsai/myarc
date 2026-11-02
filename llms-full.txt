@@ -198,7 +198,7 @@ Most of this round came from recording Arc and myArc side by side. Any single fr
 
 ## Going frame by frame
 
-"Feels off" is hard to hand to a coding agent. A number is easy. So I split Arc's recordings into frames and started counting, like the nerd I am. Those timings became tasks.
+"Feels off" is hard to hand to a coding agent. A number is easy. So I gave the recordings to agents and had them measure how long each of Arc's animations takes. Those timings became tasks.
 
 Cmd\+S now hides and shows the sidebar at Arc's pace, and it peeks back in when you move the pointer to the window's edge. The "\+" button opens Arc's creation menu instead of a plain macOS one. The footer is laid out like Arc's, and its buttons show a tooltip with their name and shortcut.
 
