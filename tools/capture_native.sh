@@ -18,6 +18,8 @@
 #   Chromium can't show download and seed the stack.
 #   WORKSPACE=<file> seeds the profile's myarc-workspace-v1.json, for example
 #   with Archived Tabs.
+#   ACTIVATE=<item ID> opens that seeded row once the workspace loads, via
+#   --myarc-capture-activate; pair it with URL=none.
 #   SETTINGS=1 (or general/profiles/advanced/more) opens the native Settings window via
 #   --myarc-capture-open-settings and captures only that window; "more" presses
 #   More Settings… and captures the browser window instead.
@@ -66,6 +68,7 @@ if [ "${1:-}" = "--inner" ]; then
   [ -n "${TOOLTIP:-}" ] && EXTRA+=(--myarc-capture-footer-tooltip="$TOOLTIP")
   [ -n "${STACK:-}" ] && EXTRA+=(--myarc-capture-downloads-stack)
   [ -n "${MENU:-}" ] && EXTRA+=(--myarc-capture-create-menu)
+  [ -n "${ACTIVATE:-}" ] && EXTRA+=(--myarc-capture-activate="$ACTIVATE")
   SHOT_TITLE=()
   case "${SETTINGS:-}" in
     "") ;;

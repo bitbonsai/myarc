@@ -54,6 +54,16 @@ inline constexpr gfx::VectorIcon kArchiveIcon(kArchiveRep,
                                               std::size(kArchiveRep),
                                               "myarc_archive");
 
+// "arrow-down" for the Today divider's Clear.
+inline constexpr gfx::PathElement kArrowDownPath[] = {
+    gfx::CANVAS_DIMENSIONS, 24, gfx::STROKE, 2,
+    gfx::MOVE_TO, 12, 5, gfx::V_LINE_TO, 19,
+    gfx::MOVE_TO, 19, 12, gfx::LINE_TO, 12, 19, gfx::LINE_TO, 5, 12};
+inline constexpr gfx::VectorIconRep kArrowDownRep[] = {{kArrowDownPath}};
+inline constexpr gfx::VectorIcon kArrowDownIcon(kArrowDownRep,
+                                                std::size(kArrowDownRep),
+                                                "myarc_arrow_down");
+
 inline constexpr gfx::PathElement kPlusPath[] = {
     gfx::CANVAS_DIMENSIONS, 24, gfx::STROKE, 2, gfx::MOVE_TO, 5, 12,
     gfx::H_LINE_TO, 19, gfx::MOVE_TO, 12, 5, gfx::V_LINE_TO, 19};

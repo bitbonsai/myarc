@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-11-02: Sidebar Favorites, alignment, Clear and URL pill match Arc
+
+- With one Space the footer drops its Space glyph. Favorites share the row evenly (one tile spans it, two halve it, three or more go in thirds), and a selected tile with a colourful favicon gets a tinted fill and a 1.5 DIP ring in that colour. Every row icon centres on New Tab's plus and every title starts at New Tab's text. The Space planet is 18 DIP, and a resting title runs to the row edge because the close button only takes space on hover or focus. The divider shows only when Today has tabs, with a new Clear at its right end that closes them. Without it New Tab sits 41 DIP below the last Pin. The URL text starts 13 DIP into the pill, drawn in white at 60%.
+- Verification: `chrome` and `bridge_check` builds, `bridge_check`, `export_patches.py --check` and `check_docs.py` pass. Seven seeded captures and side-by-sides with Arc are in `research-private/captures/20261102-sidebar-parity/`. Measured against Arc in DIP: Space and Pin titles moved from 4 left of New Tab's text to level with it, the URL text from 5 right to 0.05, and the Clear text ends within 0.3. `capture_native.sh` gained `ACTIVATE=<id>` to open a seeded row.
+- Clear's click path and Arc's rule for four or more Favorites (kept at three per row) are unverified. Chromium `myarc` commit `ffef99e689`.
+
 ## 2026-11-02: Pin titles back to regular weight
 
 - Pin titles use the regular weight of Today tabs again. The bold and semibold weights from the last two pinned-section entries copied Arc Basics, which is a folder. The spacing, the 1 px divider, its inset and the Space title icon stay.

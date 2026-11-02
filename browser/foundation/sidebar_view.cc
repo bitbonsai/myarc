@@ -15,6 +15,7 @@
 #include "base/strings/string_number_conversions.h"
 #include "base/strings/utf_string_conversions.h"
 #include "base/task/sequenced_task_runner.h"
+#include "cc/paint/paint_flags.h"
 #include "components/vector_icons/vector_icons.h"
 #include "myarc/bridge.rs.h"
 #include "myarc/create_menu.h"
@@ -30,6 +31,7 @@
 #include "ui/compositor/layer.h"
 #include "ui/gfx/animation/tween.h"
 #include "ui/gfx/canvas.h"
+#include "ui/gfx/color_analysis.h"
 #include "ui/gfx/color_utils.h"
 #include "ui/gfx/font_list.h"
 #include "ui/gfx/geometry/insets.h"
@@ -114,10 +116,85 @@ Fills GetFills(const ui::ColorProvider* provider) {
                       SkColorSetA(SK_ColorBLACK, 0x99)};
 }
 
-// A Space's icon, as the Library shows it. Spaces store no icon yet, so every
-// Space gets Arc's default planet.
+// The Space title's icon. Spaces store no icon yet, so every Space gets Arc's
+// default planet, drawn 18 DIP as Arc's title glyph is a size up from the
+// rows' 16 DIP favicons.
+constexpr int kSpaceIconSize = 18;
 ui::ImageModel SpaceIcon(SkColor color) {
-  return ui::ImageModel::FromVectorIcon(kSaturnIcon, color, 16);
+  return ui::ImageModel::FromVectorIcon(kSaturnIcon, color, kSpaceIconSize);
+}
+
+// Arc centres every row icon 18 DIP into the row, on New Tab's plus, and starts
+// every title 36 DIP in.
+constexpr int kRowIconCenter = 18;
+constexpr int kRowTextStart = 36;
+
+// Leads a row's icon of `icon_size` so it centres on kRowIconCenter and its
+// title starts at kRowTextStart.
+void AlignRowContents(views::MdTextButton& button, int icon_size) {
+  const int lead = kRowIconCenter - icon_size / 2;
+  button.SetCustomPadding(gfx::Insets::TLBR(6, lead, 6, 8));
+  button.SetImageLabelSpacing(kRowTextStart - lead - icon_size);
+}
+
+// Arc fills one Favorites row edge to edge: one tile spans it, two halve it,
+// three or more share it in thirds.
+constexpr size_t kFavoriteColumns = 3;
+
+// A Favorite tile. Arc rings the selected tile in its favicon's colour.
+class FavoriteTile final : public views::MdTextButton {
+  METADATA_HEADER(FavoriteTile, views::MdTextButton)
+
+ public:
+  using views::MdTextButton::MdTextButton;
+
+  void SetRing(std::optional<SkColor> ring) {
+    if (ring_ != ring) {
+      ring_ = ring;
+      SchedulePaint();
+    }
+  }
+
+ private:
+  // Arc's ring is ~1.5 DIP inside the tile's 10 DIP corners.
+  static constexpr float kRingWidth = 1.5f;
+  static constexpr float kCornerRadius = 10;
+
+  void PaintButtonContents(gfx::Canvas* canvas) override {
+    if (!ring_) {
+      return;
+    }
+    cc::PaintFlags flags;
+    flags.setAntiAlias(true);
+    flags.setStyle(cc::PaintFlags::kStroke_Style);
+    flags.setStrokeWidth(kRingWidth);
+    flags.setColor(*ring_);
+    gfx::RectF bounds(GetLocalBounds());
+    bounds.Inset(kRingWidth / 2);
+    canvas->DrawRoundRect(bounds, kCornerRadius - kRingWidth / 2, flags);
+  }
+
+  std::optional<SkColor> ring_;
+};
+
+BEGIN_METADATA(FavoriteTile)
+END_METADATA
+
+// The favicon's dominant colour when it has one; grey, black or white icons
+// leave Arc's selected tile untinted.
+std::optional<SkColor> FaviconTint(const views::MdTextButton& tile) {
+  const gfx::ImageSkia image = tile.GetImage(views::Button::STATE_NORMAL);
+  const SkBitmap* bitmap = image.isNull() ? nullptr : image.bitmap();
+  if (!bitmap || bitmap->drawsNothing()) {
+    return std::nullopt;
+  }
+  const SkColor color = color_utils::CalculateKMeanColorOfBitmap(*bitmap);
+  color_utils::HSL hsl;
+  color_utils::SkColorToHSL(color, &hsl);
+  if (hsl.s < 0.3 || hsl.l < 0.2 || hsl.l > 0.85) {
+    return std::nullopt;
+  }
+  return color;
 }
 
 // STYLE_EMPHASIZED is not allowed for CONTEXT_BUTTON_MD and LabelButton hides
@@ -146,6 +223,8 @@ enum ItemCommand { kPin = 1, kFavorite, kUnsave, kClose };
 
 // Opens the creation menu once, held open, for background captures.
 constexpr char kCaptureCreateMenu[] = "myarc-capture-create-menu";
+// Opens one seeded row once the workspace loads, for background captures.
+constexpr char kCaptureActivate[] = "myarc-capture-activate";
 
 // The creation menu floats 17 DIP above the Create button, its notch tip 12
 // DIP above it and 4 DIP left of its center, and its right edge 5 DIP inside
@@ -154,9 +233,9 @@ constexpr int kCreateMenuGap = 17;
 constexpr int kCreateMenuRightInset = 5;
 constexpr int kCreateMenuNotchShift = 4;
 
-// The row owns its highlight and reserves the close target even when its glyph
-// is hidden. Native child enter/exit and focus notifications cover both
-// buttons.
+// The row owns its highlight. Its close target shows only with the pointer or
+// focus on the row, so a resting title runs to the row's edge as in Arc. Native
+// child enter/exit and focus notifications cover both buttons.
 class ItemRow final : public views::View, public views::FocusChangeListener {
   METADATA_HEADER(ItemRow, views::View)
 
@@ -175,7 +254,7 @@ class ItemRow final : public views::View, public views::FocusChangeListener {
     layout->SetFlexForView(AddChildView(std::move(activate)), 1);
     if (close) {
       close_ = AddChildView(std::move(close));
-      close_->SetImageModel(views::Button::STATE_NORMAL, ui::ImageModel());
+      close_->SetVisible(false);
     }
     SetNotifyEnterExitOnChild(true);
   }
@@ -227,11 +306,7 @@ class ItemRow final : public views::View, public views::FocusChangeListener {
                             selected_ ? fills.new_tab : fills.tile, 10)
                       : nullptr);
     if (close_) {
-      close_->SetImageModel(
-          views::Button::STATE_NORMAL,
-          reveal ? ui::ImageModel::FromVectorIcon(vector_icons::kCloseIcon,
-                                                  ui::kColorSysOnSurface, 20)
-                 : ui::ImageModel());
+      close_->SetVisible(reveal);
     }
   }
 
@@ -377,6 +452,42 @@ class Hairline final : public views::Separator {
 };
 
 BEGIN_METADATA(Hairline)
+END_METADATA
+
+// Arc's divider between the Pins and Today, ending short of Clear at its
+// right. It keeps the hairline's place: 6 DIP down a 14 DIP band.
+class TodayDivider final : public views::View {
+  METADATA_HEADER(TodayDivider, views::View)
+
+ public:
+  explicit TodayDivider(std::unique_ptr<views::View> clear) {
+    line_ = AddChildView(std::make_unique<Hairline>());
+    clear_ = AddChildView(std::move(clear));
+  }
+
+  gfx::Size CalculatePreferredSize(
+      const views::SizeBounds& available_size) const override {
+    return gfx::Size(0, kHeight);
+  }
+
+  void Layout(PassKey) override {
+    const gfx::Size clear = clear_->GetPreferredSize();
+    const int clear_height = std::min(clear.height(), height());
+    clear_->SetBounds(width() - clear.width(), (height() - clear_height) / 2,
+                      clear.width(), clear_height);
+    line_->SetBounds(0, kLineY, std::max(0, clear_->x() - kGap), 1);
+  }
+
+ private:
+  static constexpr int kHeight = 14;
+  static constexpr int kLineY = 6;
+  static constexpr int kGap = 6;
+
+  raw_ptr<Hairline> line_ = nullptr;
+  raw_ptr<views::View> clear_ = nullptr;
+};
+
+BEGIN_METADATA(TodayDivider)
 END_METADATA
 
 SidebarView::SidebarView(Delegate& delegate)
@@ -700,10 +811,11 @@ std::unique_ptr<views::View> SidebarView::MakeItem(
     bool selected) {
   ItemPresentation presentation = Present(item);
   const auto foreground = ui::kColorSysOnSurface;
-  auto activate =
-      Button(base::BindRepeating(&Delegate::ActivateItem,
-                                 base::Unretained(&delegate_.get()), item.id),
-             tile ? std::u16string() : presentation.title);
+  auto activate_callback = base::BindRepeating(
+      &Delegate::ActivateItem, base::Unretained(&delegate_.get()), item.id);
+  std::unique_ptr<views::MdTextButton> activate =
+      tile ? Button<FavoriteTile>(std::move(activate_callback), {})
+           : Button(std::move(activate_callback), presentation.title);
   if (presentation.icon.IsEmpty()) {
     presentation.icon = ui::ImageModel::FromVectorIcon(
         vector_icons::kGlobeIcon, foreground, tile ? 20 : 16);
@@ -732,6 +844,7 @@ std::unique_ptr<views::View> SidebarView::MakeItem(
     return activate;
   }
   activate->SetMinSize(gfx::Size(0, kRowHeight));
+  AlignRowContents(*activate, presentation.icon.Size().width());
 
   std::unique_ptr<views::MdTextButton> close;
   // A dormant temporary row closes too; saved rows close only a live page.
@@ -755,6 +868,53 @@ std::unique_ptr<views::View> SidebarView::MakeItem(
   }
   return std::make_unique<ItemRow>(std::move(activate), std::move(close),
                                    selected);
+}
+
+std::unique_ptr<views::View> SidebarView::MakeTodayDivider(
+    std::vector<uint64_t> today) {
+  auto clear =
+      Button(base::BindRepeating(
+                 [](base::WeakPtr<SidebarView> sidebar,
+                    const std::vector<uint64_t>& today) {
+                   // Every close rebuilds the rows, this button included, and
+                   // the last one can close the window. Close after the press
+                   // unwinds and stop once the sidebar is gone.
+                   base::SequencedTaskRunner::GetCurrentDefault()->PostTask(
+                       FROM_HERE, base::BindOnce(
+                                      [](base::WeakPtr<SidebarView> sidebar,
+                                         std::vector<uint64_t> today) {
+                                        for (const uint64_t id : today) {
+                                          if (!sidebar) {
+                                            return;
+                                          }
+                                          sidebar->delegate_->CloseLiveItem(id);
+                                        }
+                                      },
+                                      sidebar, today));
+                 },
+                 weak_factory_.GetWeakPtr(), std::move(today)),
+             u"Clear");
+  // Arc's Clear is 11pt semibold with a thin down arrow, dimmer than the
+  // Space title. UpdateFills sets its colours.
+  for (views::View* child : clear->children()) {
+    if (auto* label = views::AsViewClass<views::Label>(child)) {
+      label->SetFontList(
+          label->font_list().DeriveWithSizeDelta(-2).DeriveWithWeight(
+              gfx::Font::Weight::SEMIBOLD));
+    }
+  }
+  clear->SetMinSize(gfx::Size());
+  clear->SetCustomPadding(gfx::Insets::VH(0, 2));
+  clear->SetCornerRadius(4);
+  clear->SetImageLabelSpacing(0);
+  clear->SetTooltipText(u"Clear Today tabs");
+  clear->GetViewAccessibility().SetName(u"Clear Today tabs");
+  TrackFocus(clear.get(), FocusAction::kClearToday);
+  auto divider = std::make_unique<TodayDivider>(std::move(clear));
+  // The hairline starts 10 DIP inside the rows and Clear's text ends 8 DIP
+  // inside them.
+  divider->SetProperty(views::kMarginsKey, gfx::Insets::TLBR(0, 10, 0, 6));
+  return divider;
 }
 
 views::View* SidebarView::AddStorageRetry(views::View& parent,
@@ -936,8 +1096,9 @@ void SidebarView::SetModel(const foundation::SidebarResult& model,
   }
 
   views::View* favorites_row = nullptr;
+  const size_t columns = std::min(model.favorites.size(), kFavoriteColumns);
   for (size_t i = 0; i < model.favorites.size(); ++i) {
-    if (i % 3 == 0) {
+    if (i % columns == 0) {
       favorites_row = body->AddChildView(Box(Orientation::kHorizontal, 8));
     }
     auto* tile = favorites_row->AddChildView(
@@ -946,8 +1107,9 @@ void SidebarView::SetModel(const foundation::SidebarResult& model,
     static_cast<views::BoxLayout*>(favorites_row->GetLayoutManager())
         ->SetFlexForView(tile, 1);
   }
-  // Empty layout cells keep the final row at three columns; never controls.
-  for (size_t i = model.favorites.size(); favorites_row && i % 3 != 0; ++i) {
+  // Empty layout cells keep a short final row on the grid; never controls.
+  for (size_t i = model.favorites.size(); favorites_row && i % columns != 0;
+       ++i) {
     auto* cell = favorites_row->AddChildView(std::make_unique<views::View>());
     cell->SetPreferredSize(gfx::Size(0, kTileHeight));
     static_cast<views::BoxLayout*>(favorites_row->GetLayoutManager())
@@ -969,7 +1131,7 @@ void SidebarView::SetModel(const foundation::SidebarResult& model,
   // with the row icons so the name starts where the row titles do.
   const Fills fills = GetFills(GetColorProvider());
   heading->SetImageModel(views::Button::STATE_NORMAL, SpaceIcon(fills.title));
-  heading->SetImageLabelSpacing(8);
+  AlignRowContents(*heading, kSpaceIconSize);
   heading->SetEnabledTextColors(fills.title);
   if (!model.favorites.empty()) {
     heading->SetProperty(views::kMarginsKey, gfx::Insets::TLBR(6, 0, 0, 0));
@@ -987,12 +1149,15 @@ void SidebarView::SetModel(const foundation::SidebarResult& model,
       pin->SetProperty(views::kMarginsKey, gfx::Insets::TLBR(3, 0, 0, 0));
     }
   }
-  if (!model.pins.empty()) {
-    // Arc insets the divider 18 DIP from both sidebar edges, 10 inside the
-    // rows, and draws it 28.5 DIP below the last Pin's center and 29.5 DIP
-    // above New Tab's.
-    rows->AddChildView(std::make_unique<Hairline>())
-        ->SetProperty(views::kMarginsKey, gfx::Insets::TLBR(6, 10, 4, 10));
+  // Arc divides the Pins from Today only while Today has tabs, and puts Clear
+  // at the divider's right end.
+  const bool divider = !model.pins.empty() && !model.temporary.empty();
+  if (divider) {
+    std::vector<uint64_t> today;
+    for (const auto& item : model.temporary) {
+      today.push_back(item.id);
+    }
+    rows->AddChildView(MakeTodayDivider(std::move(today)));
   }
 
   auto new_tab = Button(base::BindRepeating(&Delegate::NewTab,
@@ -1003,14 +1168,15 @@ void SidebarView::SetModel(const foundation::SidebarResult& model,
       ui::ImageModel::FromVectorIcon(vector_icons::kAdd2Icon,
                                      ui::kColorSysOnSurface, 16));
   new_tab->SetMinSize(gfx::Size(0, kRowHeight));
-  // Arc centres the plus 2 DIP further right and starts the label 13.5 DIP
-  // after it.
-  new_tab->SetCustomPadding(gfx::Insets::TLBR(6, 10, 6, 8));
-  new_tab->SetImageLabelSpacing(10);
+  AlignRowContents(*new_tab, 16);
   TrackFocus(new_tab.get(), FocusAction::kNewTab);
-  // Arc keeps 41 DIP between the Space title and New Tab row centers, and
-  // between New Tab and the first Today tab.
-  new_tab->SetProperty(views::kMarginsKey, gfx::Insets::TLBR(3, 0, 1, 0));
+  // Arc keeps 41 DIP between New Tab's center and the Space title's, the last
+  // Pin's or the first Today tab's, and 58 DIP across the divider.
+  new_tab->SetProperty(views::kMarginsKey,
+                       gfx::Insets::TLBR(divider              ? 0
+                                         : model.pins.empty() ? 3
+                                                              : 1,
+                                         0, 1, 0));
   new_tab_ = rows->AddChildView(std::move(new_tab));
   for (const auto& item : model.temporary) {
     rows->AddChildView(
@@ -1046,6 +1212,26 @@ void SidebarView::SetModel(const foundation::SidebarResult& model,
                            focus_targets_.end());
   }
   UpdateFills();
+  if (!capture_activate_scheduled_ &&
+      base::CommandLine::ForCurrentProcess()->HasSwitch(kCaptureActivate)) {
+    capture_activate_scheduled_ = true;
+    uint64_t id = 0;
+    if (base::StringToUint64(
+            base::CommandLine::ForCurrentProcess()->GetSwitchValueASCII(
+                kCaptureActivate),
+            &id)) {
+      base::SequencedTaskRunner::GetCurrentDefault()->PostDelayedTask(
+          FROM_HERE,
+          base::BindOnce(
+              [](base::WeakPtr<SidebarView> sidebar, uint64_t id) {
+                if (sidebar) {
+                  sidebar->delegate_->ActivateItem(id);
+                }
+              },
+              weak_factory_.GetWeakPtr(), id),
+          base::Milliseconds(1500));
+    }
+  }
 
   scroll->RegisterPostLayoutCallback(base::BindRepeating(
       [](std::optional<gfx::PointF>& offset, views::ScrollView* scroll) {
@@ -1141,7 +1327,9 @@ void SidebarView::BuildFooter(const gfx::PointF& spaces_offset,
   spaces->GetViewAccessibility().SetRole(ax::mojom::Role::kGroup);
   spaces->GetViewAccessibility().SetName(u"Spaces");
   std::optional<size_t> current_space_index;
-  for (size_t index = 0; index < spaces_.size(); ++index) {
+  // With one Space, Arc's footer shows no Space glyph.
+  for (size_t index = 0; spaces_.size() > 1 && index < spaces_.size();
+       ++index) {
     const auto& [space_id, space_name] = spaces_[index];
     const bool current = space_id == current_space_id_;
     // Button presses request a switch; only a Rust snapshot changes selection.
@@ -1416,8 +1604,22 @@ void SidebarView::UpdateFills() {
   const bool more_contrast = GetNativeTheme()->preferred_contrast() ==
                              ui::NativeTheme::PreferredContrast::kMore;
   for (const auto& [tile, selected] : tiles_) {
-    tile->SetBgColorOverrideDeprecated(selected ? fills.selected_tile
-                                                : fills.tile);
+    // Arc tints a selected tile's fill and rings it in its favicon's colour.
+    const std::optional<SkColor> tint =
+        selected ? FaviconTint(*tile) : std::nullopt;
+    SkColor fill = selected ? fills.selected_tile : fills.tile;
+    if (tint) {
+      fill = SkColorSetA(color_utils::AlphaBlend(
+                             *tint, SkColorSetA(fill, SK_AlphaOPAQUE), 0.12f),
+                         std::max<SkAlpha>(SkColorGetA(fill), 0x80));
+    }
+    tile->SetBgColorOverrideDeprecated(fill);
+    if (auto* favorite = views::AsViewClass<FavoriteTile>(tile.get())) {
+      favorite->SetRing(
+          tint ? std::optional(SkColorSetA(
+                     color_utils::AlphaBlend(*tint, SK_ColorWHITE, 0.5f), 0xD9))
+               : std::nullopt);
+    }
     tile->SetStrokeColorIdOverride(selected && more_contrast
                                        ? std::optional(ui::kColorSysOutline)
                                        : std::nullopt);
@@ -1440,6 +1642,23 @@ void SidebarView::UpdateFills() {
       new_tab_->SetImageModel(
           state, ui::ImageModel::FromVectorIcon(vector_icons::kAdd2Icon, color,
                                                 16));
+    }
+  }
+  const auto clear = std::ranges::find(focus_targets_, FocusAction::kClearToday,
+                                       &FocusTarget::action);
+  if (clear != focus_targets_.end()) {
+    auto* button = static_cast<views::MdTextButton*>(clear->view.get());
+    const SkColor dim =
+        SkColorSetA(fills.title, SkColorGetA(fills.title) * 3 / 4);
+    for (const auto state : {views::Button::STATE_NORMAL,
+                             views::Button::STATE_HOVERED,
+                             views::Button::STATE_PRESSED}) {
+      const ui::ColorVariant color = state == views::Button::STATE_NORMAL
+                                         ? ui::ColorVariant(dim)
+                                         : ui::ColorVariant(fills.title);
+      button->SetTextColor(state, color);
+      button->SetImageModel(
+          state, ui::ImageModel::FromVectorIcon(kArrowDownIcon, color, 12));
     }
   }
   const auto rename = std::ranges::find(focus_targets_, FocusAction::kRename,

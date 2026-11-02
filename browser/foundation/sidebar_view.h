@@ -191,6 +191,7 @@ class SidebarView final : public views::View,
     kClose,
     kRename,
     kNewTab,
+    kClearToday,
     kSpaces,
     kCreate,
     kLibrary,
@@ -253,6 +254,8 @@ class SidebarView final : public views::View,
   std::unique_ptr<views::View> MakeItem(const foundation::ItemRecord& item,
                                         bool tile,
                                         bool selected);
+  // The divider between Pins and Today, with Clear closing `today`.
+  std::unique_ptr<views::View> MakeTodayDivider(std::vector<uint64_t> today);
 
   const raw_ref<Delegate> delegate_;
   // Every control's target, the footer's included.
@@ -288,6 +291,8 @@ class SidebarView final : public views::View,
   bool create_menu_open_ = false;
   // --myarc-capture-create-menu opens the menu once, for captures.
   bool capture_menu_scheduled_ = false;
+  // --myarc-capture-activate=<item ID> opens a seeded row once, for captures.
+  bool capture_activate_scheduled_ = false;
   // Shared with the Library, so a press there keeps the tooltip quiet here.
   std::unique_ptr<FooterTooltip> footer_tooltip_;
   // The next footer's Library button starts glowing and settles.
