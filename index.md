@@ -40,7 +40,7 @@ An open-source browser bringing back Arc, with no account required and optional 
 
   Control from the terminal and AI agents, and builds for Windows and Linux.
 
-[Download the 2026.11.02.2 nightly →](https://myarc.dev/download/) [Full alpha checklist →](https://github.com/bitbonsai/myarc/blob/main/docs/ALPHA.md)
+[Download the 2026.11.02.3 nightly →](https://myarc.dev/download/) [Full alpha checklist →](https://github.com/bitbonsai/myarc/blob/main/docs/ALPHA.md)
 
 ## Read along
 

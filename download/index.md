@@ -4,12 +4,12 @@ HTML: https://myarc.dev/download/
 
 Pre-alpha nightly, for trying the Arc-like shell. Not for daily or sensitive browsing.
 
-[Download for macOS (Apple silicon)](https://github.com/bitbonsai/myarc/releases/download/nightly-2026.11.02.2/myArc-Nightly-2026.11.02.2-arm64.dmg)
+[Download for macOS (Apple silicon)](https://github.com/bitbonsai/myarc/releases/download/nightly-2026.11.02.3/myArc-Nightly-2026.11.02.3-arm64.dmg)
 
-- **Version:** 2026.11.02.2
+- **Version:** 2026.11.02.3
 - **Date:** November 2, 2026
-- **Size:** 234.2 MB
-- **SHA-256:** `2b911c7abbf282505af45a62257a72b17f93eb6561dc27a060aae36ed61e39fa`
+- **Size:** 234.3 MB
+- **SHA-256:** `45ed98894b4629dafb6e6429a3541be46ee2b7bbf538c6099bc8ed04c47dde37`
 
 ## System requirements
 
@@ -21,7 +21,7 @@ Pre-alpha nightly, for trying the Arc-like shell. Not for daily or sensitive bro
 1. Check the download against the SHA-256 listed with it. The two values must match.
 
    ```
-   shasum -a 256 ~/Downloads/myArc-Nightly-2026.11.02.2-arm64.dmg
+   shasum -a 256 ~/Downloads/myArc-Nightly-2026.11.02.3-arm64.dmg
    ```
 2. Open the DMG and drag myArc Nightly to Applications.
 3. macOS blocks the first launch because the app is not notarized. Right-click myArc Nightly, choose Open, then Open again. If macOS only offers Done or Move to Trash, which macOS 15 and later usually does, open System Settings \> Privacy \& Security, scroll to the myArc Nightly message and choose Open Anyway.
@@ -57,8 +57,8 @@ Each item was seen working in a native run or experiment note. None of it has ha
 
 - Built from a Chromium 158 development revision, not a stable release.
 - No automatic updates and no security updates. Install each new nightly by hand.
-- After you install a newer nightly, macOS asks once for your login password so it can read the saved-data key. Choose Always Allow.
-- The app is ad-hoc signed and not notarized by Apple.
+- From 2026.11.02.3 on, nightlies are signed with a local certificate that later nightlies keep. macOS asks once more for your login password so it can read the saved-data key; choose Always Allow, and newer nightlies stop asking.
+- The app is self-signed and not notarized by Apple.
 - Recent tabs and navigation can be lost after a crash or force quit.
 - Private window, Profile, cookie and credential guarantees are not verified.
 - RAR downloads are not scanned by Safe Browsing, because the UnRAR license conflicts with GPL-3.0.
@@ -68,7 +68,7 @@ Each item was seen working in a native run or experiment note. None of it has ha
 
 ## Other ways to get it
 
-- [GitHub releases](https://github.com/bitbonsai/myarc/releases/tag/nightly-2026.11.02.2) lists every nightly.
+- [GitHub releases](https://github.com/bitbonsai/myarc/releases/tag/nightly-2026.11.02.3) lists every nightly.
 - [Source on GitHub](https://github.com/bitbonsai/myarc), with instructions to [build it from source](https://github.com/bitbonsai/myarc/blob/main/browser/README.md).
 - [GitHub issues](https://github.com/bitbonsai/myarc/issues) take bug reports. Include the version, your macOS version and the steps that trigger the problem, and leave out private pages.
 
