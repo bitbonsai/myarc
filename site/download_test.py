@@ -63,7 +63,7 @@ class DownloadTests(unittest.TestCase):
         self.assertNotIn('<!--', off.split('<body>')[1])
         self.assertEqual(on.count('href="/download/"'), 2)
         self.assertIn('Download pre-alpha', on)
-        self.assertIn('Read the plan', on)
+        self.assertIn('See what works', on)
 
     def test_page_uses_site_shell_and_marks_itself_current(self):
         with tempfile.TemporaryDirectory() as directory:

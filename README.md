@@ -34,7 +34,7 @@ What works today:
 - Control from the command line and MCP, so scripts and AI agents can use the same commands as the UI, with your permission.
 - Optional AI, off by default, using models on your machine or your own API key.
 
-Plans and their status are in the [roadmap](ROADMAP.md) and [ranked gaps](docs/GAPS.md).
+The [roadmap](ROADMAP.md) and [ranked gaps](docs/GAPS.md) track what comes next.
 
 ## Build and contribute
 
