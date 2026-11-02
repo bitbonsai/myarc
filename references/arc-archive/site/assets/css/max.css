@@ -1,0 +1,68 @@
+@font-face{font-family:Marlin;font-weight:800;font-display:fallback;src:url(../fonts/marlin.woff2) format("woff2")}
+@font-face{font-family:Inter;font-style:normal;font-weight:400;font-display:optional;src:url(../fonts/inter-var-latin.woff2) format("woff2");unicode-range:u+00??,u+0131,u+0152-0153,u+02bb-02bc,u+02c6,u+02da,u+02dc,u+2000-206f,u+2074,u+20ac,u+2122,u+2191,u+2193,u+2212,u+2215,u+feff,u+fffd}
+@font-face{font-family:Inter;font-style:normal;font-weight:500;font-display:optional;src:url(../fonts/inter-var-latin.woff2) format("woff2");unicode-range:u+00??,u+0131,u+0152-0153,u+02bb-02bc,u+02c6,u+02da,u+02dc,u+2000-206f,u+2074,u+20ac,u+2122,u+2191,u+2193,u+2212,u+2215,u+feff,u+fffd}
+@font-face{font-family:Inter;font-style:normal;font-weight:600;font-display:optional;src:url(../fonts/inter-var-latin.woff2) format("woff2");unicode-range:u+00??,u+0131,u+0152-0153,u+02bb-02bc,u+02c6,u+02da,u+02dc,u+2000-206f,u+2074,u+20ac,u+2122,u+2191,u+2193,u+2212,u+2215,u+feff,u+fffd}
+@font-face{font-family:Inter;font-style:normal;font-weight:700;font-display:optional;src:url(../fonts/inter-var-latin.woff2) format("woff2");unicode-range:u+00??,u+0131,u+0152-0153,u+02bb-02bc,u+02c6,u+02da,u+02dc,u+2000-206f,u+2074,u+20ac,u+2122,u+2191,u+2193,u+2212,u+2215,u+feff,u+fffd}
+@font-face{font-family:InterVariable;font-style:normal;font-weight:100 900;font-display:optional;src:url(../fonts/inter-var-latin.woff2) format("woff2-variations");unicode-range:u+00??,u+0131,u+0152-0153,u+02bb-02bc,u+02c6,u+02da,u+02dc,u+2000-206f,u+2074,u+20ac,u+2122,u+2191,u+2193,u+2212,u+2215,u+feff,u+fffd}
+@font-face{font-family:ABC Favorit Mono;src:url(../fonts/ABCFavoritMono-Bold.woff2) format("woff2");font-weight:700;font-style:normal;font-display:swap}
+@font-face{font-family:Marlin Soft SQ;src:url(../fonts/MarlinSoftSQ-Regular.woff2) format("woff2");font-weight:400;font-style:normal;font-display:swap}
+@font-face{font-family:Marlin Soft SQ;src:url(../fonts/MarlinSoftSQ-Medium.woff2) format("woff2");font-weight:500;font-style:normal;font-display:swap}
+@font-face{font-family:Marlin Soft SQ;src:url(../fonts/MarlinSoftSQ-Bold.woff2) format("woff2");font-weight:700;font-style:normal;font-display:swap}
+@font-face{font-family:Marlin Soft SQ;src:url(../fonts/MarlinSoftSQ-BoldItalic.woff2) format("woff2");font-weight:700;font-style:italic;font-display:swap}
+@font-face{font-family:Marlin Soft SQ;src:url(../fonts/MarlinSoftSQ-ExtraBold.woff2) format("woff2");font-weight:700;font-style:normal;font-display:swap}
+@font-face{font-family:Marlin Soft SQ;src:url(../fonts/MarlinSoftSQ-ExtraBoldItalic.woff2) format("woff2");font-weight:700;font-style:italic;font-display:swap}
+
+/* SVG masks need data URLs because file:// mask fetches are blocked by CORS. */
+:root {
+  --max-mobile-mask: url("data:image/svg+xml,%3Csvg%20width%3D%2260%22%20height%3D%2281%22%20viewBox%3D%220%200%2060%2081%22%20fill%3D%22none%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%0A%3Cmask%20id%3D%22mask0_mobile_small%22%20style%3D%22mask-type%3Aalpha%22%20maskUnits%3D%22userSpaceOnUse%22%20x%3D%220%22%20y%3D%220%22%20width%3D%2260%22%20height%3D%2281%22%3E%0A%3Cpath%20d%3D%22M0%200C2.917%200%204.284%201.098%205.974%202.298C7.516%203.775%208.844%204.428%2010.527%204.428C12.210%204.428%2013.028%203.775%2014.328%202.298C15.646%201.098%2017.288%200%2020.519%200C23.746%200%2025.386%201.098%2026.702%202.298C28.001%203.775%2028.820%204.428%2030.501%204.428C32.184%204.428%2033.001%203.775%2034.301%202.298C35.620%201.098%2037.259%200%2040.487%200C43.718%200%2045.360%201.098%2046.678%202.298C47.978%203.775%2048.796%204.428%2050.479%204.428C52.163%204.428%2052.982%203.775%2054.282%202.298C55.600%201.098%2057.241%200%2060%200V81C57.241%2081%2055.600%2079.339%2054.282%2078.170C52.982%2076.365%2052.163%2076.365%2050.479%2076.365C48.796%2076.365%2047.978%2076.365%2046.678%2078.170C45.360%2079.339%2043.718%2081%2040.487%2081C37.259%2081%2035.620%2079.339%2034.302%2078.170C33.001%2076.365%2032.184%2076.365%2030.501%2076.365C28.820%2076.365%2028.001%2076.365%2026.702%2078.170C25.386%2079.339%2023.746%2081%2020.519%2081C17.288%2081%2015.646%2079.339%2014.328%2078.170C13.028%2076.365%2012.210%2076.365%2010.527%2076.365C8.844%2076.365%207.516%2076.365%205.974%2078.170C4.284%2079.339%202.917%2081%200%2081V0Z%22%20fill%3D%22%232702C2%22%2F%3E%0A%3C%2Fmask%3E%0A%3Cg%20mask%3D%22url(%23mask0_mobile_small)%22%3E%0A%3Crect%20x%3D%220%22%20y%3D%22-55.207%22%20width%3D%2260%22%20height%3D%22136%22%20fill%3D%22%232702C2%22%2F%3E%0A%3C%2Fg%3E%0A%3C%2Fsvg%3E");
+  --max-desktop-mask: url("data:image/svg+xml,%3Csvg%20width%3D%22120%22%20height%3D%2288%22%20viewBox%3D%220%200%20120%2088%22%20fill%3D%22none%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%0A%3Cmask%20id%3D%22mask0_desktop_small%22%20style%3D%22mask-type%3Aalpha%22%20maskUnits%3D%22userSpaceOnUse%22%20x%3D%220%22%20y%3D%220%22%20width%3D%22120%22%20height%3D%2288%22%3E%0A%3Cpath%20d%3D%22M0%200C3.766%200%205.407%201.455%206.726%202.623C8.026%203.775%208.844%204.428%2010.527%204.428C12.210%204.428%2013.028%203.775%2014.328%202.623C15.646%201.455%2017.288%200%2020.519%200C23.746%200%2025.386%201.455%2026.702%202.623C28.001%203.775%2028.820%204.428%2030.501%204.428C32.184%204.428%2033.001%203.775%2034.301%202.623C35.620%201.455%2037.259%200%2040.487%200C43.718%200%2045.360%201.455%2046.678%202.623C47.978%203.775%2048.796%204.428%2050.479%204.428C52.163%204.428%2052.982%203.775%2054.282%202.623C55.600%201.455%2057.241%200%2060.471%200C63.701%200%2065.342%201.455%2066.660%202.623C67.960%203.775%2068.779%204.428%2070.462%204.428C72.148%204.428%2072.966%203.775%2074.266%202.623C75.587%201.455%2077.228%200%2080.456%200C83.685%200%2085.326%201.455%2086.645%202.623C87.944%203.775%2088.763%204.428%2090.445%204.428C92.130%204.428%2092.950%203.775%2094.250%202.623C95.570%201.455%2097.213%200%20100.443%200C103.676%200%20105.318%201.455%20106.638%202.623C107.941%203.775%20108.759%204.428%20110.446%204.428C112.134%204.428%20112.954%203.775%20114.257%202.623C115.576%201.455%20117.219%200%20120%200V88C117.219%2088%20115.576%2086.372%20114.257%2085.203C112.954%2084.051%20112.134%2083.398%20110.446%2083.398C108.759%2083.398%20107.941%2084.051%20106.638%2085.203C105.318%2086.372%20103.676%2087.826%20100.443%2087.826C97.213%2087.826%2095.570%2086.372%2094.250%2085.203C92.950%2084.051%2092.130%2083.398%2090.445%2083.398C88.763%2083.398%2087.944%2084.051%2086.645%2085.203C85.326%2086.372%2083.685%2087.826%2080.456%2087.826C77.228%2087.826%2075.587%2086.372%2074.266%2085.203C72.966%2084.051%2072.148%2083.398%2070.462%2083.398C68.779%2083.398%2067.960%2084.051%2066.660%2085.203C65.342%2086.372%2063.701%2087.826%2060.471%2087.826C57.241%2087.826%2055.600%2086.372%2054.282%2085.203C52.982%2084.051%2052.163%2083.398%2050.479%2083.398C48.796%2083.398%2047.978%2084.051%2046.678%2085.203C45.360%2086.372%2043.718%2087.826%2040.487%2087.826C37.259%2087.826%2035.620%2086.372%2034.302%2085.203C33.001%2084.051%2032.184%2083.398%2030.501%2083.398C28.820%2083.398%2028.001%2084.051%2026.702%2085.203C25.386%2086.372%2023.746%2087.826%2020.519%2087.826C17.288%2087.826%2015.646%2086.372%2014.328%2085.203C13.028%2084.051%2012.210%2083.398%2010.527%2083.398C8.844%2083.398%208.026%2084.051%206.726%2085.203C5.407%2086.372%203.766%2087.826%200%2087.826V0Z%22%20fill%3D%22%2326069C%22%2F%3E%0A%3C%2Fmask%3E%0A%3Cg%20mask%3D%22url(%23mask0_desktop_small)%22%3E%0A%3Crect%20x%3D%220%22%20y%3D%22-34.1738%22%20width%3D%22120%22%20height%3D%22157%22%20fill%3D%22%232702C2%22%2F%3E%0A%3C%2Fg%3E%0A%3C%2Fsvg%3E");
+}
+
+/* Captured entrance animations and hero sizing depended on archived app scripts. */
+[style*="opacity:0"][style*="translateY(100px)"] {
+  opacity: 1 !important;
+  transform: none !important;
+}
+.c-bIxIDe { position: relative; width: calc(100% - 16px); }
+.PJLV-illJumK-css { height: 0; }
+.c-jcPqOi { display: none; }
+
+/* Feature styles were generated only after hydration in the captured page. */
+.c-fPuIDf { max-width: 100%; border-radius: var(--radii-16); margin: 0 auto; }
+.c-kdzWOG { display: flex; flex-direction: column; justify-content: center; gap: var(--space-8); min-width: 0; }
+.c-eGptkf {
+  display: flex;
+  justify-content: space-between;
+  row-gap: var(--space-16);
+  column-gap: var(--space-64);
+  margin-top: var(--space-32);
+  margin-bottom: var(--space-64);
+}
+.c-eGptkf-ejCoEP-align-left { flex-direction: row; }
+.c-eGptkf-gtsvqC-align-right { flex-direction: row-reverse; }
+.c-eGptkf-iTKOFX-align-vertical { flex-direction: column; }
+.c-gsFcfx {
+  font-family: var(--fonts-softSans) !important;
+  font-size: var(--fontSizes-24);
+  font-weight: var(--fontWeights-700);
+  color: var(--colors-brandDarkBlue);
+  opacity: .6;
+}
+.c-bUUjO { line-height: var(--lineHeights-24); font-weight: 400; font-family: var(--fonts-body); }
+.c-foANHu { line-height: var(--lineHeights-16); font-weight: 400; font-family: var(--fonts-body); font-size: var(--fontSizes-10); margin-top: auto; }
+@media (max-width: 600px) {
+  .c-eGptkf { flex-direction: column !important; }
+}
+@media (max-width: 799px) {
+  [data-max-nav-open] #max-site-links {
+    display: flex;
+    position: absolute;
+    top: 80px;
+    left: 0;
+    right: 0;
+    padding: 16px;
+    flex-wrap: wrap;
+    background: var(--colors-brandBlue);
+    box-shadow: var(--shadows-small);
+  }
+}
