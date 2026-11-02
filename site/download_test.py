@@ -61,7 +61,8 @@ class DownloadTests(unittest.TestCase):
         self.assertNotIn('/download/', off)
         self.assertIn('Follow development', off)
         self.assertNotIn('<!--', off.split('<body>')[1])
-        self.assertEqual(on.count('href="/download/"'), 3)
+        self.assertEqual(on.count('href="/download/"'), 4)
+        self.assertIn(f"Download the {SAMPLE['version']} nightly", on)
         self.assertIn('Download pre-alpha', on)
         self.assertIn('See what works', on)
 

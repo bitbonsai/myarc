@@ -175,6 +175,8 @@ def apply_release(template, release):
     template = template.replace('<!--download-nav-->', link)
     works = '<a class="button" href="/download/">Download pre-alpha</a>' if release else ''
     template = template.replace('<!--works-download-->', works)
+    latest = f'<a href="/download/">Download the {release["version"]} nightly &rarr;</a> ' if release else ''
+    template = template.replace('<!--latest-nightly-->', latest)
     if release:
         cta = '<a class="button" href="/download/">Download pre-alpha</a>'
         template = re.sub(r'<!--cta-->.*?<!--/cta-->', lambda _: cta, template, count=1, flags=re.S)
