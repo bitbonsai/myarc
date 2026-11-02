@@ -302,6 +302,58 @@
     @media (prefers-reduced-motion: reduce) {
       .menu-toggle, .quick-icon, .menu-close { transition: none }
     }
+
+    /* What works dialog. Script upgrades the hero link; without it the link opens GitHub.
+       Like the blog lightbox, the backdrop blur applies at once and the panel starts hidden. */
+    html:has(.works[open]) { overflow: hidden }
+    .works {
+      --glass: rgb(245 242 236 / .62);
+      --rim: rgb(255 255 255 / .7);
+      width: min(34rem, calc(100% - 2rem));
+      max-height: calc(100dvh - 2rem);
+      padding: 2.25rem 2.25rem 2rem;
+      border: .0625rem solid var(--rim);
+      border-radius: 1.75rem;
+      background: var(--glass);
+      -webkit-backdrop-filter: blur(1.5rem) saturate(1.6);
+      backdrop-filter: blur(1.5rem) saturate(1.6);
+      box-shadow: inset 0 .0625rem 0 rgb(255 255 255 / .45), 0 1.5rem 4rem rgb(16 28 43 / .2), 0 .25rem 1rem rgb(16 28 43 / .08);
+      color: var(--text);
+      font: inherit;
+      opacity: 0;
+      transform: scale(.96);
+      transition: opacity .2s ease, transform .2s var(--ease);
+    }
+    .works.is-visible { opacity: 1; transform: none }
+    .works::backdrop { background: rgb(16 28 43 / 0); -webkit-backdrop-filter: blur(.875rem) saturate(1.1); backdrop-filter: blur(.875rem) saturate(1.1); transition: background-color .2s ease }
+    .works.is-visible::backdrop { background: rgb(16 28 43 / .22) }
+    .works form { float: right; margin: -1rem -1rem 0 1rem }
+    .works-close { display: grid; place-items: center; width: 2.75rem; height: 2.75rem; padding: 0; border: 0; border-radius: 50%; background: rgb(var(--link-rgb) / .1); color: inherit; cursor: pointer; transition: background-color .2s ease-in-out, color .2s ease-in-out }
+    .works-close:hover, .works-close:focus-visible { background: rgb(var(--link-rgb) / .16); color: var(--link-solid) }
+    /* No outline ring; keyboard focus shows as the same fill as hover. */
+    .works-close:focus-visible { outline: none }
+    .works-close:focus-visible { outline-offset: 0 }
+    .works-close svg { width: 1.25rem; height: 1.25rem }
+    .works h2 { font-size: 2rem; letter-spacing: -.035em }
+    .works ul { margin-top: 1.25rem; padding-left: 1.25rem; list-style: disc }
+    .works li + li { margin-top: .375rem }
+    .works li::marker { color: rgb(var(--link-rgb) / .7) }
+    .works kbd { padding: .05em .4em; border: 1px solid color-mix(in srgb, currentColor 18%, transparent); border-bottom-width: 2px; border-radius: .375rem; background: color-mix(in srgb, currentColor 6%, transparent); font-family: inherit; font-size: 1rem; font-weight: 500; white-space: nowrap }
+    .works-later { margin-top: 1.25rem; color: var(--quiet) }
+    .works-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 1rem 1.5rem; margin-top: 1.75rem }
+    .works-actions a:not(.button) { font-weight: 500 }
+    @media (prefers-color-scheme: dark) {
+      .works { --glass: rgb(16 28 43 / .58); --rim: rgb(255 255 255 / .14); box-shadow: inset 0 .0625rem 0 rgb(255 255 255 / .08), 0 1.5rem 4rem rgb(0 0 0 / .5), 0 .25rem 1rem rgb(0 0 0 / .25) }
+      .works.is-visible::backdrop { background: rgb(0 0 0 / .4) }
+    }
+    @media (max-width: 40rem) {
+      .works { padding: 1.75rem 1.5rem 1.5rem; border-radius: 1.25rem }
+      .works form { margin: -.75rem -.75rem 0 .75rem }
+      .works h2 { font-size: 1.75rem }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .works, .works::backdrop, .works-close { transition: none }
+    }
   
     .journal { max-width: 68ch; margin-inline: auto; padding: 4rem 0 6rem }
     .journal > header { margin-bottom: 3rem }
@@ -362,7 +414,7 @@
     .post-body blockquote { margin: 2rem 0; padding-left: 1.5rem; color: var(--quiet) }
     .post-body pre { font-family: inherit; padding: 1.25rem; overflow-x: auto; background: var(--panel); color: var(--ivory); border-radius: 1rem }
     .post-body code { font-family: inherit; font-size: 1rem; overflow-wrap: anywhere }
-    .post-body :not(pre) > code { padding: .05em .4em; border: 1px solid color-mix(in srgb, currentColor 18%, transparent); border-bottom-width: 2px; border-radius: .375rem; background: color-mix(in srgb, currentColor 6%, transparent); font-size: .875em; font-weight: 500; white-space: nowrap }
+    .post-body :not(pre) > code { padding: .05em .4em; border: 1px solid color-mix(in srgb, currentColor 18%, transparent); border-bottom-width: 2px; border-radius: .375rem; background: color-mix(in srgb, currentColor 6%, transparent); font-size: 1rem; font-weight: 500; white-space: nowrap }
     .post-body a, .post-body p { overflow-wrap: anywhere }
     @media (prefers-color-scheme: dark) {
       .post-month { color: #8794a3 }

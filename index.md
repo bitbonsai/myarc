@@ -2,29 +2,29 @@ HTML: https://myarc.dev/
 
 # myArc, forever yours.
 
-An open-source browser project bringing back Arc's browsing experience, with a local workspace and optional AI.
+An open-source browser bringing back Arc, with no account required and optional AI.
 
 [Download pre-alpha](https://myarc.dev/download/)
 [See what works](https://github.com/bitbonsai/myarc#try-it)
 
-## Your Spaces and pinned tabs are part of how you work. They should outlast the company behind your browser.
+## How you browse is part of how you work. It should outlast the company behind your browser.
 
-Arc is being sunsetted. We're building myArc so the sidebar, Spaces, keyboard commands, Peek, Split View and Boosts keep working, with a setup you can export and browsing that doesn't hinge on a subscription.
+[Arc is being sunsetted](https://arc.net/), and its code was never open, so nobody can keep it going. **myArc is open source**, so anyone can.
 
 ## What we hold to
 
 - ### Yours to keep
 
-  Keep workspace data local and exportable. Everyday browsing should work without an account.
+  Your workspace stays on your computer, in files you own. Export is on the way.
 - ### Keep what worked
 
-  Carry forward Arc's Spaces, pinned tabs and keyboard workflow. Teach the differences through onboarding.
+  If you used Arc, you already know myArc. Where they differ, onboarding shows you.
 - ### AI by choice
 
-  Keep AI off by default. Choose local models, your own API key or optional hosted access, with explicit control over what they can see.
+  AI is off until you turn it on. Then you pick: a local model, your own API key, or a hosted option, and you decide what it can see.
 - ### Built in the open
 
-  Code, plans and decisions are public, so the project can continue beyond any one team.
+  The plans and decisions are public too, not just the code. If I stop, anyone can pick it up where I left off.
 
 ## What we're building
 
