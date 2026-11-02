@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-11-02: Window corners lose the second curve
+
+- The page card was fine (7 DIP, inset 10 DIP, as in Arc). The second curve at each window corner came from the behind-window material: an active window's blur kept a tighter corner (about 12 DIP) than the window's 20 DIP, so its edge showed past the rim. The material now carries a stretchable mask with the window's 20 DIP radius, the value `BrowserNativeWidgetWindow` reports on macOS 26. Fullscreen drops the mask.
+- Verification: `chrome` and `bridge_check` builds, `bridge_check`, `export_patches.py --check` and `check_docs.py` pass. Background captures of an inactive window, with its system rim and shadow, show the same single 20 DIP corner and unchanged card corners before and after. The artifact only appears in an active window, which these launches never get, so it wasn't seen fixed live. Crops in `research-private/captures/finesse/page-card-corners/`.
+- Chromium `myarc` commit `0c0b6d8b1c`.
+
 ## 2026-11-01: Reorder Spaces from the Library
 
 - Rust gains `move_space_before` (zero or `None` moves a Space to the end), bridged like `move_item_before` and saved through the same `WorkspaceService::Changed` write path. The sidebar's Space glyphs, Ctrl+1..9 and the Library all read that order from the Rust snapshot. Dragging a card by its move handle lifts it under the pointer while the other cards slide aside over 150 ms. They snap with Reduce Motion on, and Esc drops the card back. The "..." menu adds Move Left and Move Right for the keyboard. The handle doesn't auto-scroll a row of cards wider than the window.
