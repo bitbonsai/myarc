@@ -49,16 +49,16 @@ An open-source browser bringing back Arc, with no account required and optional 
   Milestones, dependencies and the gates a release has to pass.
 - [Architecture](https://github.com/bitbonsai/myarc/blob/main/docs/ARCHITECTURE.md)
 
-  Why Chromium, what Rust owns, and the foundation experiment.
+  Why Chromium, and what Rust owns.
 - [Arc migration](https://github.com/bitbonsai/myarc/blob/main/docs/MIGRATION.md)
 
-  Import contract, data boundaries, recovery and portable export.
+  What an Arc import brings over, what it leaves out, and how export will work.
 - [AI and services](https://github.com/bitbonsai/myarc/blob/main/docs/AI.md)
 
   Provider choices, privacy rules and how a hosted option would be paid for.
 - [CLI and MCP control](https://github.com/bitbonsai/myarc/blob/main/docs/CONTROL-PROTOCOL.md)
 
-  Shared tools, page interaction, user grants and external agents.
+  How the terminal and AI agents will drive the browser, and what you let them do.
 - [Contributing](https://github.com/bitbonsai/myarc/blob/main/CONTRIBUTING.md)
 
   How to help without drifting from the product.
