@@ -24,7 +24,7 @@ Most of this round came from recording Arc and myArc side by side. Any single fr
 
 ## The bug that emptied Spaces
 
-A sidebar that jumps only looks bad, but this bug lost data. If you quit myArc and opened it again, every tab you hadn't pinned was gone and your Spaces came back empty. The 2026.10.29 nightly still does this, so please update. Sorry about that.
+The worst bug in the last nightly lost data. If you quit myArc and opened it again, every tab you hadn't pinned was gone and your Spaces came back empty. The 2026.10.29 nightly still does this, so please update. Sorry about that.
 
 myArc and Chromium disagreed about what to restore on launch, and myArc threw away the tabs it couldn't find. Now it restores your last session by default, and a tab that doesn't come back stays in the sidebar anyway. It loads when you click it.
 
