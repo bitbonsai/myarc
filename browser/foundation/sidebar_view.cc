@@ -1,6 +1,7 @@
 #include "myarc/sidebar_view.h"
 
 #include <algorithm>
+#include <cmath>
 #include <limits>
 #include <memory>
 #include <optional>
@@ -28,11 +29,14 @@
 #include "ui/color/color_provider.h"
 #include "ui/compositor/layer.h"
 #include "ui/gfx/animation/tween.h"
+#include "ui/gfx/canvas.h"
 #include "ui/gfx/color_utils.h"
 #include "ui/gfx/font_list.h"
 #include "ui/gfx/geometry/insets.h"
+#include "ui/gfx/geometry/rect.h"
 #include "ui/gfx/geometry/size.h"
 #include "ui/gfx/geometry/transform.h"
+#include "ui/gfx/scoped_canvas.h"
 #include "ui/gfx/vector_icon_types.h"
 #include "ui/native_theme/native_theme.h"
 #include "ui/views/accessibility/view_accessibility.h"
@@ -118,11 +122,10 @@ ui::ImageModel SpaceIcon(SkColor color) {
 
 // STYLE_EMPHASIZED is not allowed for CONTEXT_BUTTON_MD and LabelButton hides
 // its label, so reweight the button's Label child directly.
-void SetSemibold(views::LabelButton& button) {
+void SetWeight(views::LabelButton& button, gfx::Font::Weight weight) {
   for (views::View* child : button.children()) {
     if (auto* label = views::AsViewClass<views::Label>(child)) {
-      label->SetFontList(
-          label->font_list().DeriveWithWeight(gfx::Font::Weight::SEMIBOLD));
+      label->SetFontList(label->font_list().DeriveWithWeight(weight));
     }
   }
 }
@@ -351,6 +354,29 @@ class SpaceRows final : public views::View {
 };
 
 BEGIN_METADATA(SpaceRows)
+END_METADATA
+
+// Arc's divider under the Pins is one device pixel thick, so it paints only
+// the bottom pixel of its 1 DIP height.
+class Hairline final : public views::Separator {
+  METADATA_HEADER(Hairline, views::Separator)
+
+ public:
+  Hairline() { SetOrientation(Orientation::kHorizontal); }
+
+  void OnPaint(gfx::Canvas* canvas) override {
+    gfx::ScopedCanvas scoped_canvas(canvas);
+    const float dsf = canvas->UndoDeviceScaleFactor();
+    const gfx::Rect bounds = GetContentsBounds();
+    const int x = std::ceil(bounds.x() * dsf);
+    const int r = std::floor(bounds.right() * dsf);
+    const int b = std::ceil(bounds.bottom() * dsf);
+    canvas->FillRect(gfx::Rect(x, b - 1, std::max(1, r - x), 1),
+                     GetForegroundColor());
+  }
+};
+
+BEGIN_METADATA(Hairline)
 END_METADATA
 
 SidebarView::SidebarView(Delegate& delegate)
@@ -706,9 +732,9 @@ std::unique_ptr<views::View> SidebarView::MakeItem(
     return activate;
   }
   activate->SetMinSize(gfx::Size(0, kRowHeight));
-  // Arc sets Pin titles semibold, Today tabs regular.
+  // Arc sets Pin titles bold, Today tabs regular.
   if (item.placement == foundation::PlacementKind::Pin) {
-    SetSemibold(*activate);
+    SetWeight(*activate, gfx::Font::Weight::BOLD);
   }
 
   std::unique_ptr<views::MdTextButton> close;
@@ -942,7 +968,7 @@ void SidebarView::SetModel(const foundation::SidebarResult& model,
                         name);
   // Arc's Space title is 13pt semibold in white at 45% (#888892 over its dark
   // sidebar), its baseline 31pt below the Favorites tiles.
-  SetSemibold(*heading);
+  SetWeight(*heading, gfx::Font::Weight::SEMIBOLD);
   // Arc leads the title with the Space's icon in the title's color, lined up
   // with the row icons so the name starts where the row titles do.
   const Fills fills = GetFills(GetColorProvider());
@@ -958,14 +984,19 @@ void SidebarView::SetModel(const foundation::SidebarResult& model,
   rows->AddChildView(std::move(heading));
 
   for (const auto& item : model.pins) {
-    rows->AddChildView(
+    auto* pin = rows->AddChildView(
         MakeItem(item, false, item.id == model.selected_item_id));
+    // Arc keeps 40 DIP between the Space title and first Pin row centers.
+    if (&item == &model.pins.front()) {
+      pin->SetProperty(views::kMarginsKey, gfx::Insets::TLBR(3, 0, 0, 0));
+    }
   }
   if (!model.pins.empty()) {
     // Arc insets the divider 18 DIP from both sidebar edges, 10 inside the
-    // rows.
-    rows->AddChildView(std::make_unique<views::Separator>())
-        ->SetProperty(views::kMarginsKey, gfx::Insets::VH(0, 10));
+    // rows, and draws it 28.5 DIP below the last Pin's center and 29.5 DIP
+    // above New Tab's.
+    rows->AddChildView(std::make_unique<Hairline>())
+        ->SetProperty(views::kMarginsKey, gfx::Insets::TLBR(6, 10, 4, 10));
   }
 
   auto new_tab = Button(base::BindRepeating(&Delegate::NewTab,
@@ -981,8 +1012,9 @@ void SidebarView::SetModel(const foundation::SidebarResult& model,
   new_tab->SetCustomPadding(gfx::Insets::TLBR(6, 10, 6, 8));
   new_tab->SetImageLabelSpacing(10);
   TrackFocus(new_tab.get(), FocusAction::kNewTab);
-  // Arc keeps 41 DIP between the Space title and New Tab row centers.
-  new_tab->SetProperty(views::kMarginsKey, gfx::Insets::TLBR(3, 0, 0, 0));
+  // Arc keeps 41 DIP between the Space title and New Tab row centers, and
+  // between New Tab and the first Today tab.
+  new_tab->SetProperty(views::kMarginsKey, gfx::Insets::TLBR(3, 0, 1, 0));
   new_tab_ = rows->AddChildView(std::move(new_tab));
   for (const auto& item : model.temporary) {
     rows->AddChildView(

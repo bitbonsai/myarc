@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-11-02: Pinned section rhythm and weight match Arc
+
+- Pin titles are bold. The divider under the Pins is one device pixel thick. The first Pin, the divider, New Tab and the first Today tab sit where Arc puts them: 40 DIP from the Space title to the first Pin, 28.5 DIP from the last Pin to the divider, 29.5 DIP from the divider to New Tab, then 41 DIP to the first Today tab.
+- Verification: `chrome` and `bridge_check` builds, `bridge_check`, `export_patches.py --check` and `check_docs.py` pass. With the same seed, row centres at 2x moved from 6, 18.5, 26.5 and 28 px off Arc to 0.5 px or less. Ink per pixel of title width went from 1.15x the Today tabs' to 1.24x, against Arc's 1.28x. The new capture and `side-by-side-v2.png` are in `research-private/captures/20261102-pinned-section/`.
+- Row text keeps `kColorSysOnSurface`. It is Chromium's shared text colour, also used by the command palette and URL field, so moving it to Arc's (222,223,255) would restyle more than the rows.
+
 ## 2026-11-02: Pinned section matches Arc
 
 - The Space title now starts with the Space's icon, the same planet the Library cards use, drawn in the title's grey and level with the row icons, so the name lines up with the row titles as in Arc. Pin titles are semibold, and Today tabs stay regular. The divider under the Pins sits 18 DIP in from both sidebar edges instead of spanning the rows.
