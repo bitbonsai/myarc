@@ -254,7 +254,7 @@ class SidebarView final : public views::View,
   std::unique_ptr<views::View> MakeItem(const foundation::ItemRecord& item,
                                         bool tile,
                                         bool selected);
-  // The divider between Pins and Today, with Clear closing `today`.
+  // The divider above Today, with Clear closing `today`.
   std::unique_ptr<views::View> MakeTodayDivider(std::vector<uint64_t> today);
 
   const raw_ref<Delegate> delegate_;
@@ -273,7 +273,7 @@ class SidebarView final : public views::View,
   raw_ptr<views::MdTextButton> new_tab_ = nullptr;
   // The current Space's title and rows, which slide on a Space switch.
   raw_ptr<SpaceRows> space_rows_ = nullptr;
-  // Favorite tiles and whether each is selected.
+  // Favorite and Pin tiles and whether each is selected.
   std::vector<std::pair<raw_ptr<views::MdTextButton>, bool>> tiles_;
   bool new_tab_intent_ = false;
   uint64_t current_space_id_ = 0;

@@ -63,7 +63,7 @@ namespace {
 
 using Orientation = views::BoxLayout::Orientation;
 
-// Arc's Favorite tiles are 47 DIP tall; three of them and two 8 DIP gaps fill
+// Arc's tiles are 47 DIP tall; three of them and two 8 DIP gaps fill
 // the 212 DIP row.
 constexpr int kTileHeight = 47;
 // Arc's row highlight is 36 DIP tall, the URL pill's height.
@@ -137,13 +137,13 @@ void AlignRowContents(views::MdTextButton& button, int icon_size) {
   button.SetImageLabelSpacing(kRowTextStart - lead - icon_size);
 }
 
-// Arc fills one Favorites row edge to edge: one tile spans it, two halve it,
+// Arc fills one tile row edge to edge: one tile spans it, two halve it,
 // three or more share it in thirds.
-constexpr size_t kFavoriteColumns = 3;
+constexpr size_t kTileColumns = 3;
 
-// A Favorite tile. Arc rings the selected tile in its favicon's colour.
-class FavoriteTile final : public views::MdTextButton {
-  METADATA_HEADER(FavoriteTile, views::MdTextButton)
+// A Favorite or Pin tile. Arc rings the selected tile in its favicon's colour.
+class ItemTile final : public views::MdTextButton {
+  METADATA_HEADER(ItemTile, views::MdTextButton)
 
  public:
   using views::MdTextButton::MdTextButton;
@@ -177,7 +177,7 @@ class FavoriteTile final : public views::MdTextButton {
   std::optional<SkColor> ring_;
 };
 
-BEGIN_METADATA(FavoriteTile)
+BEGIN_METADATA(ItemTile)
 END_METADATA
 
 // The favicon's dominant colour when it has one; grey, black or white icons
@@ -252,10 +252,8 @@ class ItemRow final : public views::View, public views::FocusChangeListener {
     layout->set_cross_axis_alignment(
         views::BoxLayout::CrossAxisAlignment::kCenter);
     layout->SetFlexForView(AddChildView(std::move(activate)), 1);
-    if (close) {
-      close_ = AddChildView(std::move(close));
-      close_->SetVisible(false);
-    }
+    close_ = AddChildView(std::move(close));
+    close_->SetVisible(false);
     SetNotifyEnterExitOnChild(true);
   }
 
@@ -297,7 +295,7 @@ class ItemRow final : public views::View, public views::FocusChangeListener {
     auto* manager = GetFocusManager();
     const bool reveal =
         hovered_ || (manager && Contains(manager->GetFocusedView()));
-    // Same translucent white as the Favorite tiles: Arc's row highlight
+    // Same translucent white as the tiles: Arc's row highlight
     // (#505060 on the New Tab row) for the selected row, the resting tile
     // fill for hover.
     const Fills fills = GetFills(GetColorProvider());
@@ -305,9 +303,7 @@ class ItemRow final : public views::View, public views::FocusChangeListener {
                       ? views::CreateRoundedRectBackground(
                             selected_ ? fills.new_tab : fills.tile, 10)
                       : nullptr);
-    if (close_) {
-      close_->SetVisible(reveal);
-    }
+    close_->SetVisible(reveal);
   }
 
   raw_ptr<views::MdTextButton> close_ = nullptr;
@@ -431,7 +427,7 @@ class SpaceRows final : public views::View {
 BEGIN_METADATA(SpaceRows)
 END_METADATA
 
-// Arc's divider under the Pins is one device pixel thick, so it paints only
+// Arc's divider above Today is one device pixel thick, so it paints only
 // the bottom pixel of its 1 DIP height.
 class Hairline final : public views::Separator {
   METADATA_HEADER(Hairline, views::Separator)
@@ -454,7 +450,7 @@ class Hairline final : public views::Separator {
 BEGIN_METADATA(Hairline)
 END_METADATA
 
-// Arc's divider between the Pins and Today, ending short of Clear at its
+// Arc's divider between the Space title and Today, ending short of Clear at its
 // right. It keeps the hairline's place: 6 DIP down a 14 DIP band.
 class TodayDivider final : public views::View {
   METADATA_HEADER(TodayDivider, views::View)
@@ -814,7 +810,7 @@ std::unique_ptr<views::View> SidebarView::MakeItem(
   auto activate_callback = base::BindRepeating(
       &Delegate::ActivateItem, base::Unretained(&delegate_.get()), item.id);
   std::unique_ptr<views::MdTextButton> activate =
-      tile ? Button<FavoriteTile>(std::move(activate_callback), {})
+      tile ? Button<ItemTile>(std::move(activate_callback), {})
            : Button(std::move(activate_callback), presentation.title);
   if (presentation.icon.IsEmpty()) {
     presentation.icon = ui::ImageModel::FromVectorIcon(
@@ -846,26 +842,18 @@ std::unique_ptr<views::View> SidebarView::MakeItem(
   activate->SetMinSize(gfx::Size(0, kRowHeight));
   AlignRowContents(*activate, presentation.icon.Size().width());
 
-  std::unique_ptr<views::MdTextButton> close;
-  // A dormant temporary row closes too; saved rows close only a live page.
-  if (presentation.is_live ||
-      item.placement == foundation::PlacementKind::Temporary) {
-    close = IconButton(
-        base::BindRepeating(&Delegate::CloseLiveItem,
-                            base::Unretained(&delegate_.get()), item.id),
-        &vector_icons::kCloseIcon);
-    views::InstallRoundRectHighlightPathGenerator(close.get(), gfx::Insets(4),
-                                                  6);
-    const std::u16string close_name =
-        (menu_state.is_pin        ? u"Close live page, keep Space Pin: "
-         : menu_state.is_favorite ? u"Close live page, keep Favorite: "
-         : presentation.is_live   ? u"Close live page: "
-                                  : u"Close tab: ") +
-        presentation.title;
-    close->SetTooltipText(close_name);
-    close->GetViewAccessibility().SetName(close_name);
-    TrackFocus(close.get(), FocusAction::kClose, item.id, menu_state);
-  }
+  // Only Today tabs are rows, and a dormant one closes too.
+  auto close = IconButton(
+      base::BindRepeating(&Delegate::CloseLiveItem,
+                          base::Unretained(&delegate_.get()), item.id),
+      &vector_icons::kCloseIcon);
+  views::InstallRoundRectHighlightPathGenerator(close.get(), gfx::Insets(4), 6);
+  const std::u16string close_name =
+      (presentation.is_live ? u"Close live page: " : u"Close tab: ") +
+      presentation.title;
+  close->SetTooltipText(close_name);
+  close->GetViewAccessibility().SetName(close_name);
+  TrackFocus(close.get(), FocusAction::kClose, item.id, menu_state);
   return std::make_unique<ItemRow>(std::move(activate), std::move(close),
                                    selected);
 }
@@ -1095,24 +1083,31 @@ void SidebarView::SetModel(const foundation::SidebarResult& model,
     AddStatus(*body, status);
   }
 
-  views::View* favorites_row = nullptr;
-  const size_t columns = std::min(model.favorites.size(), kFavoriteColumns);
-  for (size_t i = 0; i < model.favorites.size(); ++i) {
+  // The Profile's Favorites, then the current Space's Pins, share one grid
+  // of favicon tiles, as Arc draws both.
+  std::vector<const foundation::ItemRecord*> tile_items;
+  for (const auto& item : model.favorites) {
+    tile_items.push_back(&item);
+  }
+  for (const auto& item : model.pins) {
+    tile_items.push_back(&item);
+  }
+  views::View* tiles_row = nullptr;
+  const size_t columns = std::min(tile_items.size(), kTileColumns);
+  for (size_t i = 0; i < tile_items.size(); ++i) {
     if (i % columns == 0) {
-      favorites_row = body->AddChildView(Box(Orientation::kHorizontal, 8));
+      tiles_row = body->AddChildView(Box(Orientation::kHorizontal, 8));
     }
-    auto* tile = favorites_row->AddChildView(
-        MakeItem(model.favorites[i], true,
-                 model.favorites[i].id == model.selected_item_id));
-    static_cast<views::BoxLayout*>(favorites_row->GetLayoutManager())
+    auto* tile = tiles_row->AddChildView(MakeItem(
+        *tile_items[i], true, tile_items[i]->id == model.selected_item_id));
+    static_cast<views::BoxLayout*>(tiles_row->GetLayoutManager())
         ->SetFlexForView(tile, 1);
   }
   // Empty layout cells keep a short final row on the grid; never controls.
-  for (size_t i = model.favorites.size(); favorites_row && i % columns != 0;
-       ++i) {
-    auto* cell = favorites_row->AddChildView(std::make_unique<views::View>());
+  for (size_t i = tile_items.size(); tiles_row && i % columns != 0; ++i) {
+    auto* cell = tiles_row->AddChildView(std::make_unique<views::View>());
     cell->SetPreferredSize(gfx::Size(0, kTileHeight));
-    static_cast<views::BoxLayout*>(favorites_row->GetLayoutManager())
+    static_cast<views::BoxLayout*>(tiles_row->GetLayoutManager())
         ->SetFlexForView(cell, 1);
   }
 
@@ -1133,7 +1128,7 @@ void SidebarView::SetModel(const foundation::SidebarResult& model,
   heading->SetImageModel(views::Button::STATE_NORMAL, SpaceIcon(fills.title));
   AlignRowContents(*heading, kSpaceIconSize);
   heading->SetEnabledTextColors(fills.title);
-  if (!model.favorites.empty()) {
+  if (!tile_items.empty()) {
     heading->SetProperty(views::kMarginsKey, gfx::Insets::TLBR(6, 0, 0, 0));
   }
   heading->SetTooltipText(u"Rename Space: " + name);
@@ -1141,17 +1136,9 @@ void SidebarView::SetModel(const foundation::SidebarResult& model,
   TrackFocus(heading.get(), FocusAction::kRename, model.current_space.id);
   rows->AddChildView(std::move(heading));
 
-  for (const auto& item : model.pins) {
-    auto* pin = rows->AddChildView(
-        MakeItem(item, false, item.id == model.selected_item_id));
-    // Arc keeps 40 DIP between the Space title and first Pin row centers.
-    if (&item == &model.pins.front()) {
-      pin->SetProperty(views::kMarginsKey, gfx::Insets::TLBR(3, 0, 0, 0));
-    }
-  }
-  // Arc divides the Pins from Today only while Today has tabs, and puts Clear
-  // at the divider's right end.
-  const bool divider = !model.pins.empty() && !model.temporary.empty();
+  // Arc divides the Space title from Today only while Today has tabs, and
+  // puts Clear at the divider's right end.
+  const bool divider = !model.temporary.empty();
   if (divider) {
     std::vector<uint64_t> today;
     for (const auto& item : model.temporary) {
@@ -1170,13 +1157,10 @@ void SidebarView::SetModel(const foundation::SidebarResult& model,
   new_tab->SetMinSize(gfx::Size(0, kRowHeight));
   AlignRowContents(*new_tab, 16);
   TrackFocus(new_tab.get(), FocusAction::kNewTab);
-  // Arc keeps 41 DIP between New Tab's center and the Space title's, the last
-  // Pin's or the first Today tab's, and 58 DIP across the divider.
+  // Arc keeps 41 DIP between New Tab's center and the Space title's or the
+  // first Today tab's.
   new_tab->SetProperty(views::kMarginsKey,
-                       gfx::Insets::TLBR(divider              ? 0
-                                         : model.pins.empty() ? 3
-                                                              : 1,
-                                         0, 1, 0));
+                       gfx::Insets::TLBR(divider ? 0 : 3, 0, 1, 0));
   new_tab_ = rows->AddChildView(std::move(new_tab));
   for (const auto& item : model.temporary) {
     rows->AddChildView(
@@ -1614,8 +1598,8 @@ void SidebarView::UpdateFills() {
                          std::max<SkAlpha>(SkColorGetA(fill), 0x80));
     }
     tile->SetBgColorOverrideDeprecated(fill);
-    if (auto* favorite = views::AsViewClass<FavoriteTile>(tile.get())) {
-      favorite->SetRing(
+    if (auto* item_tile = views::AsViewClass<ItemTile>(tile.get())) {
+      item_tile->SetRing(
           tint ? std::optional(SkColorSetA(
                      color_utils::AlphaBlend(*tint, SK_ColorWHITE, 0.5f), 0xD9))
                : std::nullopt);

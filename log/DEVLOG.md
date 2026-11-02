@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-11-02: Pins draw as favicon tiles
+
+- The current Space's Pins join the Profile's Favorites in the top grid as favicon-only tiles, after the Favorites, with the same widths, 47 DIP height, selected fill, ring and context menu. The title moves to the tooltip and accessible name. Below the tiles come the Space title, then New Tab 41 DIP down, with the divider and Clear between them only while Today has tabs. Switching Spaces swaps the Pin tiles and keeps the Favorites. Library Space cards still list their Pins. Pin and Favorite branches in the row close button are gone, since only Today tabs are rows now.
+- Verification: `chrome` and `bridge_check` builds, `bridge_check`, `export_patches.py --check` and `check_docs.py` pass. Seeded captures in `research-private/captures/20261102-pin-tiles/` cover the user's 1 Pin and 1 Today tab, 2 Pins, 1 Favorite with 2 Pins and a Today tab, 4 tiles, and each of 2 Spaces. With 2 Pins, `sbs-b-two-pins.png` puts the tile edges at Arc's 2x pixels exactly (x 16 to 220 and 236 to 440, 94 px tall), and the Space title sits at Arc's offset.
+- Arc rings the selected tile with a gradient, and ours stays one colour from 5138bc6, about 1 DIP thinner. Pin tiles swap without the Space slide. The sidebar code lives in `browser/foundation`, so the Chromium checkout has no change to commit.
+
 ## 2026-11-02: Sidebar Favorites, alignment, Clear and URL pill match Arc
 
 - With one Space the footer drops its Space glyph. Favorites share the row evenly (one tile spans it, two halve it, three or more go in thirds), and a selected tile with a colourful favicon gets a tinted fill and a 1.5 DIP ring in that colour. Every row icon centres on New Tab's plus and every title starts at New Tab's text. The Space planet is 18 DIP, and a resting title runs to the row edge because the close button only takes space on hover or focus. The divider shows only when Today has tabs, with a new Clear at its right end that closes them. Without it New Tab sits 41 DIP below the last Pin. The URL text starts 13 DIP into the pill, drawn in white at 60%.
