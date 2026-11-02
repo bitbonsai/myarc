@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-11-02: Pin titles back to regular weight
+
+- Pin titles use the regular weight of Today tabs again. The bold and semibold weights from the last two pinned-section entries copied Arc Basics, which is a folder. The spacing, the 1 px divider, its inset and the Space title icon stay.
+- Verification: `chrome` and `bridge_check` builds, `bridge_check`, `export_patches.py --check` and `check_docs.py` pass. In `after-v3.png`, captured with the same seed, the Pin title carries 0.99x the Today tabs' ink per pixel of title width, down from 1.24x.
+- The sidebar code lives in `browser/foundation`, so the Chromium checkout has no change to commit.
+
 ## 2026-11-02: Dev build says myArc in the menu bar
 
 - New GN arg `myarc_app_name` (in `nightly.gni`) sets the dev bundle's `CFBundleName` to myArc, the name macOS shows next to the Apple menu. `CFBundleDisplayName`, the executable, bundle id `org.chromium.Chromium` and the profile directory stay Chromium's, so `out/MyarcM0/Chromium.app` keeps its path. `browser/args.gn` and `out/MyarcM0/args.gn` set it. Nightly builds are unchanged.
@@ -8,14 +14,14 @@
 
 ## 2026-11-02: Pinned section rhythm and weight match Arc
 
-- Pin titles are bold. The divider under the Pins is one device pixel thick. The first Pin, the divider, New Tab and the first Today tab sit where Arc puts them: 40 DIP from the Space title to the first Pin, 28.5 DIP from the last Pin to the divider, 29.5 DIP from the divider to New Tab, then 41 DIP to the first Today tab.
-- Verification: `chrome` and `bridge_check` builds, `bridge_check`, `export_patches.py --check` and `check_docs.py` pass. With the same seed, row centres at 2x moved from 6, 18.5, 26.5 and 28 px off Arc to 0.5 px or less. Ink per pixel of title width went from 1.15x the Today tabs' to 1.24x, against Arc's 1.28x. The new capture and `side-by-side-v2.png` are in `research-private/captures/20261102-pinned-section/`.
+- The divider under the Pins is one device pixel thick. The first Pin, the divider, New Tab and the first Today tab sit where Arc puts them: 40 DIP from the Space title to the first Pin, 28.5 DIP from the last Pin to the divider, 29.5 DIP from the divider to New Tab, then 41 DIP to the first Today tab.
+- Verification: `chrome` and `bridge_check` builds, `bridge_check`, `export_patches.py --check` and `check_docs.py` pass. With the same seed, row centres at 2x moved from 6, 18.5, 26.5 and 28 px off Arc to 0.5 px or less. This change also set Pin titles bold, matched against Arc Basics. Arc Basics is a folder, and Arc draws Pins in the Today tabs' regular weight, so "Pin titles back to regular weight" undoes it. The new capture and `side-by-side-v2.png` are in `research-private/captures/20261102-pinned-section/`.
 - Row text keeps `kColorSysOnSurface`. It is Chromium's shared text colour, also used by the command palette and URL field, so moving it to Arc's (222,223,255) would restyle more than the rows.
 
 ## 2026-11-02: Pinned section matches Arc
 
-- The Space title now starts with the Space's icon, the same planet the Library cards use, drawn in the title's grey and level with the row icons, so the name lines up with the row titles as in Arc. Pin titles are semibold, and Today tabs stay regular. The divider under the Pins sits 18 DIP in from both sidebar edges instead of spanning the rows.
-- Verification: `chrome` and `bridge_check` builds, `bridge_check`, `export_patches.py --check` and `check_docs.py` pass. A background capture with a seeded workspace (3 Favorites, 1 Pin, 2 Today tabs) puts the divider at 36 to 419 px, exactly as in Arc's shot. The title glyph matches the title's color, the same as Arc's. Pin titles carry about 11% more ink than Today tabs, against Arc's 18%. The capture, seed and side-by-side are in `research-private/captures/20261102-pinned-section/`.
+- The Space title now starts with the Space's icon, the same planet the Library cards use, drawn in the title's grey and level with the row icons, so the name lines up with the row titles as in Arc. Pin titles were set semibold here, which was wrong. Arc draws Pins in the same regular weight as Today tabs. The divider under the Pins sits 18 DIP in from both sidebar edges instead of spanning the rows.
+- Verification: `chrome` and `bridge_check` builds, `bridge_check`, `export_patches.py --check` and `check_docs.py` pass. A background capture with a seeded workspace (3 Favorites, 1 Pin, 2 Today tabs) puts the divider at 36 to 419 px, exactly as in Arc's shot. The title glyph matches the title's color, the same as Arc's. The capture, seed and side-by-side are in `research-private/captures/20261102-pinned-section/`.
 - The sidebar code lives in `browser/foundation`, so the Chromium checkout has no change to commit.
 
 ## 2026-11-02: Dev build shows the myArc icon

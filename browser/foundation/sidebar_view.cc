@@ -732,10 +732,6 @@ std::unique_ptr<views::View> SidebarView::MakeItem(
     return activate;
   }
   activate->SetMinSize(gfx::Size(0, kRowHeight));
-  // Arc sets Pin titles bold, Today tabs regular.
-  if (item.placement == foundation::PlacementKind::Pin) {
-    SetWeight(*activate, gfx::Font::Weight::BOLD);
-  }
 
   std::unique_ptr<views::MdTextButton> close;
   // A dormant temporary row closes too; saved rows close only a live page.
