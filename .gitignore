@@ -30,6 +30,7 @@ site/download/
 site/.publish-receipt.json
 site/index.md
 site/og-image.webp
+site/product-window-*.webp
 site/llms.txt
 site/llms-full.txt
 *.pyc

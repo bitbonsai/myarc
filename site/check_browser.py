@@ -31,8 +31,10 @@ try:
     browser('reload')
     browser(expression="""(async () => {
       await document.fonts.ready
-      await Promise.all(Array.from(document.images).map(image => image.decode()))
-      await Promise.all(document.getAnimations().filter(a => Number.isFinite(a.effect.getTiming().iterations)).map(a => a.finished))
+      // The full-size dialog image gets its source only when opened.
+      await Promise.all(Array.from(document.images).filter(image => image.getAttribute('src')).map(image => image.decode()))
+      // Scroll-driven animations finish only when scrolled, so wait on time-based ones.
+      await Promise.all(document.getAnimations().filter(a => a.timeline === document.timeline && Number.isFinite(a.effect.getTiming().iterations)).map(a => a.finished))
       if (!Array.from(document.fonts).some(font => font.family === 'Outfit' && font.status === 'loaded')) throw new Error('Outfit missing')
       if (performance.getEntriesByType('resource').some(r => /^https?:/.test(r.name))) throw new Error('External resource request')
       return true
@@ -58,13 +60,16 @@ try:
             const style = getComputedStyle(link)
             if (style.color !== 'rgb(24, 36, 50)' || style.textDecorationLine !== 'none') throw new Error('Header navigation style regression')
           }
-          const panel = document.querySelector('.panel')
-          const rows = Array.from(panel.querySelectorAll('.status dd'))
-          if (Array.from(panel.querySelectorAll('.status dt')).some(label => getComputedStyle(label).fontSize !== '24px')) throw new Error('Status label hierarchy regression')
-          const padding = getComputedStyle(panel)
-          const artwork = panel.querySelector('.panel-art').getBoundingClientRect()
-          const overlaps = rect => rect.left < artwork.right - 1 && rect.right > artwork.left + 1 && rect.top < artwork.bottom - 1 && rect.bottom > artwork.top + 1
-          if (Array.from(panel.querySelectorAll('h2,.lead,dt,dd')).some(el => overlaps(el.getBoundingClientRect()))) throw new Error('Panel artwork overlaps text')
+          const stands = document.querySelector('#building')
+          if (Array.from(stands.querySelectorAll('.stands h3')).some(label => getComputedStyle(label).fontSize !== '24px')) throw new Error('Status label hierarchy regression')
+          const crop = stands.querySelector('.peek-crop').getBoundingClientRect()
+          const column = stands.querySelector('h2').getBoundingClientRect()
+          if (Math.abs(crop.left - column.left) > 1 || Math.abs(crop.right - stands.getBoundingClientRect().right) > 1) throw new Error('Screenshot peek is not full content width')
+          const button = [...stands.querySelectorAll('.peek-button')].filter(link => link.getClientRects().length)
+          if (button.length !== 1 || button[0].getBoundingClientRect().top < stands.querySelector('.peek').getBoundingClientRect().bottom) throw new Error('Full-size button missing or overlapping the peek')
+          const columns = Array.from(stands.querySelectorAll('.stands li')).map(item => item.getBoundingClientRect())
+          if (columns.some(rect => rect.top < button[0].getBoundingClientRect().bottom)) throw new Error('Status columns overlap the screenshot')
+          if ((innerWidth <= 768) !== (new Set(columns.map(rect => Math.round(rect.left))).size === 1)) throw new Error('Status columns do not stack on phones only')
           if (document.querySelector('.split,.eyebrow')) throw new Error('Redundant sidebar headings returned')
           const headings = Array.from(document.querySelectorAll('main h2'))
           if (new Set(headings.map(h => getComputedStyle(h).fontSize)).size !== 1) throw new Error('Section heading sizes differ')
@@ -73,14 +78,13 @@ try:
             const wordmark = container.querySelector('.wordmark').getBoundingClientRect()
             if (ribbon.right > wordmark.left || Math.abs(ribbon.width - ribbon.height) > 1) throw new Error('Logo lockup geometry')
           }
-          if (padding.backgroundImage !== getComputedStyle(document.body).backgroundImage ||
-              !padding.backgroundImage.startsWith('url("data:image/webp;')) throw new Error('Panel grain missing')
-          for (const selector of ['.hero-art', '.panel-art']) {
+          if (!getComputedStyle(document.body).backgroundImage.startsWith('url("data:image/webp;')) throw new Error('Page grain missing')
+          for (const selector of ['.hero-art']) {
             const box = document.querySelector(selector).getBoundingClientRect()
             const image = document.querySelector(selector + ' img')
             if (getComputedStyle(image).filter !== 'none') throw new Error('Runtime artwork shadow returned')
             if (Math.abs(box.width - box.height) > 1) throw new Error('Artwork box geometry')
-            const ratio = selector === '.hero-art' ? 1.5 : 2
+            const ratio = 1.5
             if (Math.abs(image.getBoundingClientRect().width - box.width * ratio) > 1) throw new Error('Baked shadow padding scale')
           }
           return {width: innerWidth, base, minimum, headings: 'consistent', logos: 'aligned', grain: 'shared'}
@@ -92,7 +96,7 @@ try:
     for width in (1440, 390):
         browser('set', 'viewport', str(width), '1000')
         print('Dark theme:', browser(expression="""(async () => {
-          await Promise.all(Array.from(document.images).map(image => image.decode()))
+          await Promise.all(Array.from(document.images).filter(image => image.getAttribute('src')).map(image => image.decode()))
           if (!matchMedia('(prefers-color-scheme: dark)').matches) throw new Error('System preference not detected')
           const body = getComputedStyle(document.body)
           if (body.backgroundColor !== 'rgb(11, 20, 32)' || body.color !== 'rgb(210, 217, 225)') throw new Error('Dark palette missing')
@@ -140,6 +144,35 @@ try:
       if (heart.animationName !== 'heartbeat' || heart.animationDuration !== '1.5s') throw new Error('Heartbeat regression')
       return {color: style.color, underline: style.textUnderlineOffset, bpm: 60 / parseFloat(heart.animationDuration)}
     })()"""))
+    browser('hover', '.peek')
+    print('Peek and dialogs:', browser(expression="""(async () => {
+      await new Promise(resolve => setTimeout(resolve, 400))
+      const peek = document.querySelector('.peek')
+      if (getComputedStyle(peek).getPropertyValue('--fade') !== '100%' || getComputedStyle(peek.querySelector('.shot')).translate === 'none') throw new Error('Peek hover reveal missing')
+      const wait = ms => new Promise(resolve => setTimeout(resolve, ms))
+      const button = [...document.querySelectorAll('.peek-button')].find(link => link.getClientRects().length)
+      button.click()
+      await wait(300)
+      const view = document.querySelector('#shot-view')
+      if (!view.matches(':modal') || !view.classList.contains('is-visible')) throw new Error('Full-size dialog did not open')
+      if (view.querySelector('img').src !== peek.querySelector('.shot').currentSrc) throw new Error('Full-size dialog shows the wrong theme image')
+      view.querySelector('form').requestSubmit()
+      await wait(300)
+      if (view.open || document.activeElement !== button) throw new Error('Full-size dialog close or focus return')
+      const link = document.querySelector('.alpha-link')
+      link.click()
+      await wait(300)
+      const alpha = document.querySelector('#alpha-checklist')
+      if (!alpha.matches(':modal')) throw new Error('Alpha checklist did not open')
+      const rows = [...alpha.querySelectorAll('.alpha-groups li')]
+      if (rows.length !== 20 || rows.some(row => !['Done', 'Partial', 'Missing'].includes(row.firstElementChild.textContent))) throw new Error('Alpha checklist rows or text status missing')
+      const lefts = new Set(rows.filter(row => row.getBoundingClientRect().left < innerWidth / 2).map(row => Math.round(row.children[1].getBoundingClientRect().left)))
+      if (lefts.size !== 1) throw new Error('Alpha item text does not line up')
+      alpha.querySelector('form').requestSubmit()
+      await wait(300)
+      if (alpha.open || document.activeElement !== link) throw new Error('Alpha checklist close or focus return')
+      return {peek: 'revealed', shot: 'matching theme', alpha: rows.length + ' rows'}
+    })()"""))
     browser('hover', 'h1')
     browser('focus', '.end .mark')
     browser('press', 'Tab')
@@ -153,6 +186,7 @@ try:
       if (!matchMedia('(prefers-reduced-motion: reduce)').matches) throw new Error('Reduced motion emulation failed')
       if (document.getAnimations().some(a => a.playState === 'running')) throw new Error('Animation still running')
       if (getComputedStyle(document.documentElement).scrollBehavior !== 'auto') throw new Error('Smooth scroll still active')
+      if (getComputedStyle(document.querySelector('.peek')).transitionDuration !== '0s' || getComputedStyle(document.querySelector('.peek-crop')).animationName !== 'none') throw new Error('Peek motion still active')
       for (const link of document.querySelectorAll('a')) {
         if (getComputedStyle(link).transitionDuration !== '0s') throw new Error('Link transition still active')
       }
@@ -424,7 +458,7 @@ try:
                         if (blur.length !== 2 || blur.some(animation => animation.effect.getTiming().duration !== 1000)) throw new Error('Blur/fade duration or snapshot animations missing')
                         if (!blur.every(animation => animation.effect.getKeyframes().some(frame => frame.filter === 'blur(32px)'))) throw new Error('Navigation blur missing')
                       } else if (blur.length) throw new Error('Reduced-motion blur still active')
-                      await Promise.all(animations.filter(animation => Number.isFinite(animation.effect.getTiming().iterations)).map(animation => animation.finished))
+                      await Promise.all(animations.filter(animation => animation.timeline === document.timeline && Number.isFinite(animation.effect.getTiming().iterations)).map(animation => animation.finished))
                       return true
                     })()""")
                     result = browser(expression="JSON.parse(sessionStorage.getItem('navigation-transition'))")

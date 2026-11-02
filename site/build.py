@@ -34,6 +34,17 @@ def logo(name, size=64, shadow=None):
         return uri('image/webp', output.getvalue())
 
 
+def screenshot(name, width, published):
+    with Image.open(ROOT / 'assets' / name) as image:
+        image = image.convert('RGBA')
+        image.thumbnail((width, width), Image.Resampling.LANCZOS)
+        output = io.BytesIO()
+        image.save(output, format='WEBP', quality=80, method=6)
+    # The same bytes ship beside the page, so the no-JS full-size link costs no second encode.
+    (ROOT / published).write_bytes(output.getvalue())
+    return uri('image/webp', output.getvalue())
+
+
 with Image.open(ASSETS / 'grain.png') as grain:
     grain = grain.convert('RGBA')
     grain.putalpha(grain.getchannel('A').point(lambda value: value // 2))
@@ -55,9 +66,9 @@ assets = {
     '@@LOGO_HERO@@': logo('myarc-matte.png', 960, {
         'radius': 48, 'offset': (0, 40), 'color': (24, 36, 50, 46), 'padding': 240,
     }),
-    '@@LOGO_GLASS@@': logo('myarc-glass.png', 416, {
-        'radius': 64, 'offset': (0, 0), 'color': (16, 174, 255, 71), 'padding': 208,
-    }),
+    # 2x the 74rem content width. The peek and the full-size dialog share one embedded copy per theme.
+    '@@PRODUCT_SHOT_LIGHT@@': screenshot('product-window-light.png', 2368, 'product-window-light.webp'),
+    '@@PRODUCT_SHOT_DARK@@': screenshot('product-window-dark.png', 2368, 'product-window-dark.webp'),
     '@@GRAIN@@': uri('image/webp', grain_bytes.getvalue()),
     '@@FAVICON@@': uri('image/png', (BRAND / 'exports' / 'mark-matte-128.png').read_bytes()),
     '@@HEART@@': heart,

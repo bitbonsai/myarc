@@ -383,7 +383,7 @@ class PublisherTests(unittest.TestCase):
         self.assertEqual('e69de29bb2d1d6434b8b29ae775ad8c2e48c5391', blob_sha(b''))
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            for name in ('index.html', 'og-image.png', 'og-image.webp', 'favicon.png', 'favicon.ico', 'robots.txt', 'sitemap.xml', 'index.md', 'llms.txt', 'llms-full.txt'):
+            for name in ('index.html', 'og-image.png', 'og-image.webp', 'product-window-light.webp', 'product-window-dark.webp', 'favicon.png', 'favicon.ico', 'robots.txt', 'sitemap.xml', 'index.md', 'llms.txt', 'llms-full.txt'):
                 (root / name).write_bytes(b'synthetic artifact')
             (root / 'blog').mkdir()
             (root / 'blog/index.html').write_text('synthetic index')

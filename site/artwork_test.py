@@ -35,16 +35,22 @@ class ArtworkTests(unittest.TestCase):
 
     def test_page_uses_baked_webp_and_softer_small_grain(self):
         soup = BeautifulSoup((ROOT / 'index.html').read_text(), 'html.parser')
-        for selector, size in [('.hero-art img', 1440), ('.panel-art img', 832), ('.ribbon', 64)]:
+        for selector, size in [('.hero-art img', 1440), ('.ribbon', 64)]:
             with embedded_image(soup.select_one(selector)['src']) as image:
                 self.assertEqual((size, size), image.size)
                 self.assertEqual('RGBA', image.mode)
                 self.assertEqual(0, image.getpixel((0, 0))[3])
+        for source in (soup.select_one('#building .shot')['src'], soup.select_one('#building picture source')['srcset']):
+            with embedded_image(source) as image:
+                self.assertEqual((2368, 1480), image.size)
         css = soup.style.string
         grain_url = re.search(r"--grain: url\('([^']+)'\)", css).group(1)
         with embedded_image(grain_url) as image:
             self.assertEqual((256, 256), image.size)
             self.assertEqual((6, 6), image.getchannel('A').getextrema())
+        # Light mode doubles the same tile instead of shipping a second one; dark mode keeps one layer.
+        self.assertIn('--grain-layers: var(--grain), var(--grain);', css)
+        self.assertIn('--grain-layers: var(--grain);', css)
         self.assertNotIn('drop-shadow(', css)
         self.assertNotIn('will-change:', css)
 

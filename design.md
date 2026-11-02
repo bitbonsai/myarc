@@ -28,7 +28,6 @@ Light theme:
 - Page: ivory
 - Main text: ink
 - Secondary text: `#54616D`
-- Progress panel: midnight, with ivory text
 - Text links and focus rings: primary blue
 
 Dark theme:
@@ -37,7 +36,6 @@ Dark theme:
 - Main text: `#D2D9E1`
 - Headings: ivory
 - Secondary text: `#B1BCC9`
-- Progress panel: ink, with ivory text
 - Text links and focus rings: `#8FB1FF`, lightened for contrast on navy
 
 Primary buttons keep the same blue fill and white text in both themes. Hover scales them to 1.02 over 180ms with ease-out on hover-capable fine pointers; reduced motion disables scaling. Development CTAs place the user-supplied GitHub SVG mark at 1.125rem before their label, with a .625rem gap; hide this decorative SVG from assistive technology. Text links start at 90% opacity and become opaque on hover or keyboard focus. Header navigation uses the theme's main text color without underlines, becoming the theme's link color on hover/focus.
@@ -57,9 +55,8 @@ Use the embedded variable **Outfit** font. All font sizes use rem; the root rema
 - Body: 1.125rem, line-height 1.55
 - Main headline: 5.5rem, stepping down to 4.5rem / 3.75rem / 2.5rem
 - Section headings: 2.75rem, reduced to 2.25rem below 48rem
-- Subheadings and Now / Next / For launch: 1.5rem, semibold
+- Subheadings and status labels: 1.5rem, semibold
 - Hero introduction: 1.375rem, reduced to 1.125rem on small screens
-- Progress introduction: 1.25rem, reduced to 1.125rem below 48rem
 - Footer: 1rem
 
 Section headings share a size at each breakpoint and sit above their content. Avoid tiny uppercase sidebar labels and empty heading columns. Keep paragraphs at readable measures rather than stretching every line across the page.
@@ -70,9 +67,9 @@ The content wrapper is at most 80rem wide. Horizontal padding is 3rem, then 1.5r
 
 Sections use 6rem vertical padding, reduced to 4.5rem below 48rem. Space separates sections; horizontal divider rules are unnecessary.
 
-Principles and document lists may use useful content columns. Headings stay above their grids. The progress panel gives artwork its own grid area, with three status groups on wide screens and a vertical list below 64rem. Avoid large spacer hacks and artwork overlapping text.
+Principles and document lists may use useful content columns. Headings stay above their grids. Where it stands shows the top of a myArc window under its heading, fading out at the bottom, with a See it full size button and three status columns that stack below 48rem. Light and dark captures follow the page theme. The window rises in as it scrolls into view; hover, or keyboard focus on the button, slides it up and moves the fade down over 300ms. Phones zoom into the sidebar and skip the hover. The screenshot keeps its own window edge; CSS adds a rounded clip, a faint rim and a drop shadow that stays visible on the dark page. Avoid large spacer hacks and artwork overlapping text.
 
-Reuse the original monochrome grain at a 16rem tile size on page and progress panel. Keep it static. Rounded panels use a 1.75rem radius, reduced to 1.25rem on mobile. Primary buttons are pills.
+Reuse the original monochrome grain at a 16rem tile size on the page. Light mode stacks two layers of it so it shows on ivory; dark mode uses one. Keep it static. Rounded panels use a 1.75rem radius, reduced to 1.25rem on mobile. Primary buttons are pills.
 
 ## Progress journal
 

@@ -38,6 +38,8 @@
 
     :root {
       --grain: url('@@GRAIN@@');
+      /* Light mode stacks the grain twice, about twice as visible on ivory, without a second image. */
+      --grain-layers: var(--grain), var(--grain);
       --ivory: #f5f2ec;
       --ink: #182432;
       --quiet: #54616d;
@@ -61,6 +63,7 @@
         --panel: var(--ink);
         --link-rgb: 143 177 255;
         --link-solid: #8fb1ff;
+        --grain-layers: var(--grain);
       }
       h1, h2, h3 { color: var(--ivory) }
     }
@@ -70,7 +73,7 @@
     body {
       margin: 0;
       overflow-x: clip;
-      background: var(--page) var(--grain) repeat;
+      background: var(--page); background-image: var(--grain-layers);
       background-size: 16rem 16rem;
       color: var(--text);
       font-family: Outfit, 'Helvetica Neue', Helvetica, sans-serif;
@@ -140,25 +143,57 @@
     .principles { display: grid; grid-template-columns: 1fr 1fr; gap: 3rem 4rem }
     .principles p { margin-top: .75rem; color: var(--quiet); max-width: 30rem }
 
-    /* Midnight panel. The glass ribbon is the only colour in the page beyond the brand blue.
-       Grid areas keep artwork in its own cell so it can never sit under text. */
-    .panel { position: relative; overflow: hidden; border-radius: 1.75rem; padding: 4.5rem 4rem 4rem; background: var(--panel) var(--grain) repeat; background-size: 16rem 16rem; color: var(--ivory) }
-    .panel-grid {
-      display: grid;
-      grid-template-columns: minmax(0, 1fr) auto;
-      grid-template-areas: "head art" "status status" "sign sign";
-      column-gap: 3rem;
-      align-items: start;
+    /* Where it stands. A peek at the top of the window that fades out at the bottom. Hover or keyboard focus
+       on the button slides it up and moves the fade down; a click opens it full size.
+       The peek bleeds into the gutter so the window shadow fits before it clips at the padding edge.
+       The screenshot carries its own window edge; the elliptical radius follows its rounded corners. */
+    @property --fade { syntax: '<percentage>'; inherits: false; initial-value: 86% }
+    .peek {
+      --bleed: 3rem;
+      --fade: 86%;
+      display: block;
+      margin: 1.5rem calc(-1 * var(--bleed)) 0;
+      padding: 1.5rem var(--bleed) 0;
+      overflow: clip;
+      cursor: zoom-in;
+      -webkit-mask: linear-gradient(#000 calc(var(--fade) - 30%), transparent var(--fade)) no-repeat;
+      mask: linear-gradient(#000 calc(var(--fade) - 30%), transparent var(--fade)) no-repeat;
+      transition: --fade .3s ease-out;
     }
-    .panel-head { grid-area: head; max-width: 40rem }
-    .panel .lead { margin-top: 1.5rem; font-size: 1.25rem; line-height: 1.5; color: rgb(245 242 236 / .82) }
-    .panel-art { grid-area: art; position: relative; width: 13rem; aspect-ratio: 1; justify-self: end; transform: translate(10%, -12%); pointer-events: none }
-    .panel-art img { position: absolute; top: -50%; left: -50%; width: 200%; max-width: none }
-    .status { grid-area: status; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 2.5rem 3rem; margin-top: 3.5rem }
-    .status dt { font-size: 1.5rem; font-weight: 600; letter-spacing: -.02em; line-height: 1.2 }
-    .status dd { margin-top: .75rem; color: rgb(245 242 236 / .86) }
-    .panel .mark { grid-area: sign; margin-top: 3.5rem; align-self: end }
-    .panel .mark .wordmark { height: 1.5rem }
+    .peek-crop { position: relative; aspect-ratio: 2880 / 1200 }
+    .shot {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      border-radius: 1.2% / 1.9%;
+      box-shadow: 0 0 0 .0625rem rgb(16 28 43 / .1), 0 1rem 2.5rem rgb(16 28 43 / .26), 0 .25rem .75rem rgb(16 28 43 / .14);
+      transition: translate .3s ease-out;
+    }
+    .peek-actions { margin-top: 1.25rem }
+    .peek-dark { display: none }
+    @media (prefers-color-scheme: dark) {
+      .shot { box-shadow: 0 0 0 .0625rem rgb(255 255 255 / .16), 0 1rem 2.5rem .25rem rgb(0 0 0 / .8), 0 .25rem .75rem rgb(0 0 0 / .6) }
+      .peek-light { display: none }
+      .peek-dark { display: inline-flex }
+    }
+    @media (prefers-reduced-motion: no-preference) {
+      @media (hover: hover) and (pointer: fine) {
+        .peek:hover { --fade: 100% }
+        .peek:hover .shot { translate: 0 -.75rem }
+      }
+      .stands-shot:has(.peek-button:focus-visible) .peek { --fade: 100% }
+      .stands-shot:has(.peek-button:focus-visible) .shot { translate: 0 -.75rem }
+      /* Scroll-driven entrance where supported; elsewhere the peek is simply in place. */
+      @supports (animation-timeline: view()) {
+        .peek-crop { animation: peek-rise linear both; animation-timeline: view(); animation-range: entry 0% cover 30% }
+      }
+    }
+    @keyframes peek-rise { from { opacity: .35; transform: translateY(3rem) } }
+    .stands { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 2.5rem 3rem; margin-top: 3.5rem }
+    .stands p { margin-top: .75rem; color: var(--quiet) }
+    .stands-links { display: flex; flex-wrap: wrap; gap: 1rem 2.5rem; margin-top: 2.5rem }
+    .stands-links a { font-weight: 500 }
 
     /* Document links */
     .docs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 2.5rem 3rem }
@@ -204,10 +239,6 @@
       h1 { font-size: 4.5rem }
       .hero { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) }
       .hero-art { --shift: 4% }
-      .panel { padding: 3.5rem 3rem 3rem }
-      .panel-art { width: 12rem }
-      .status { grid-template-columns: 1fr; gap: 2rem }
-      .status > div { max-width: 40rem }
       .docs { grid-template-columns: 1fr 1fr }
     }
 
@@ -222,14 +253,12 @@
       .block { padding: 4.5rem 0 }
       .block h2 + .grid { margin-top: 2.25rem }
       .ethos + p { font-size: 1.125rem }
-      .principles, .docs { grid-template-columns: 1fr; gap: 2.25rem }
-      /* Artwork leaves the heading row and closes the panel beside the wordmark, tucked past the corner. */
-      .panel { padding: 2.5rem 1.75rem; border-radius: 1.25rem }
-      .panel-grid { grid-template-areas: "head head" "status status" "sign art"; column-gap: 1.5rem }
-      .panel .lead { font-size: 1.125rem }
-      .panel-art { width: 10rem; align-self: end; transform: translate(28%, 30%) }
-      .status { margin-top: 2.5rem }
-      .panel .mark { margin-top: 2.5rem }
+      .principles, .docs, .stands { grid-template-columns: 1fr; gap: 2.25rem }
+      .stands { margin-top: 2.5rem }
+      /* Phones zoom into the sidebar and the post title; the right and bottom edges fade out. */
+      .peek { --bleed: 1.5rem; margin-top: .75rem; -webkit-mask: linear-gradient(#000 52%, transparent 96%), linear-gradient(to right, #000 82%, transparent); -webkit-mask-composite: source-in; mask: linear-gradient(#000 52%, transparent 96%) intersect, linear-gradient(to right, #000 82%, transparent) }
+      .peek-crop { aspect-ratio: 4 / 3 }
+      .shot { width: 190%; max-width: none }
       .end { flex-direction: column; align-items: flex-start; gap: 1.5rem; padding: 3rem 0 2.5rem }
       .end-copy { text-align: left }
     }
@@ -252,7 +281,7 @@
       @media (max-width: 48rem) {
         html:has(#site-menu:popover-open) { overflow: hidden }
         html { scroll-padding-top: 5rem }
-        .top { position: sticky; top: 0; z-index: 10; flex-wrap: nowrap; justify-content: flex-start; gap: .25rem; margin-inline: -1.5rem; padding: .75rem 1.5rem; background: var(--page) var(--grain) repeat; background-size: 16rem 16rem }
+        .top { position: sticky; top: 0; z-index: 10; flex-wrap: nowrap; justify-content: flex-start; gap: .25rem; margin-inline: -1.5rem; padding: .75rem 1.5rem; background: var(--page); background-image: var(--grain-layers); background-size: 16rem 16rem }
         .top .home-mark { display: none }
         .menu-toggle, .quick-icon, .menu-close { align-items: center; justify-content: center; flex: none; margin: 0; padding: 0; border: 0; background: transparent; color: var(--text); cursor: pointer; transition: color .2s ease-in-out, background-color .2s ease-in-out }
         .menu-toggle { display: inline-flex; width: 2.75rem; height: 2.75rem; margin-left: -.625rem; border-radius: .75rem }
@@ -266,7 +295,7 @@
         .quick-blog:hover, .quick-blog:focus-visible, .quick-blog[aria-current] { color: var(--link-solid) }
         .quick-icon { display: inline-flex; width: 2.75rem; height: 2.75rem; border-radius: .75rem }
         .quick-icon .github-icon { width: 1.375rem; height: 1.375rem }
-        .top nav { position: fixed; inset: auto .75rem calc(.75rem + env(safe-area-inset-bottom)); display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 0 .5rem; max-height: calc(100dvh - 1.5rem); padding: .5rem; overflow: auto; overscroll-behavior: contain; border-radius: 1.75rem; background: var(--page) var(--grain) repeat; background-size: 16rem 16rem; color: var(--text); box-shadow: 0 0 0 .0625rem rgb(var(--link-rgb) / .16), 0 -.5rem 3rem rgb(16 28 43 / .18) }
+        .top nav { position: fixed; inset: auto .75rem calc(.75rem + env(safe-area-inset-bottom)); display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 0 .5rem; max-height: calc(100dvh - 1.5rem); padding: .5rem; overflow: auto; overscroll-behavior: contain; border-radius: 1.75rem; background: var(--page); background-image: var(--grain-layers); background-size: 16rem 16rem; color: var(--text); box-shadow: 0 0 0 .0625rem rgb(var(--link-rgb) / .16), 0 -.5rem 3rem rgb(16 28 43 / .18) }
         .top nav:not(:popover-open) { display: none }
         .top nav::backdrop { background: rgb(16 28 43 / .22); -webkit-backdrop-filter: blur(.875rem) saturate(1.1); backdrop-filter: blur(.875rem) saturate(1.1) }
         .top nav > a:not(.button) { grid-column: 1 / -1; display: flex; align-items: center; min-height: 3.5rem; padding: 0 1.25rem; border-radius: 1.25rem; font-size: 1.75rem; font-weight: 600; letter-spacing: -.025em; line-height: 1.1 }
@@ -346,13 +375,32 @@
       .works { --glass: rgb(16 28 43 / .58); --rim: rgb(255 255 255 / .14); box-shadow: inset 0 .0625rem 0 rgb(255 255 255 / .08), 0 1.5rem 4rem rgb(0 0 0 / .5), 0 .25rem 1rem rgb(0 0 0 / .25) }
       .works.is-visible::backdrop { background: rgb(0 0 0 / .4) }
     }
+    /* Alpha checklist. Each item starts with a text status in a fixed column, so labels line up and state never depends on colour alone. */
+    .alpha { width: min(48rem, calc(100% - 2rem)) }
+    .alpha-groups { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem 2.5rem; margin-top: 1.5rem }
+    .alpha h3 { font-size: 1.125rem; letter-spacing: -.01em }
+    .alpha .alpha-groups ul { margin-top: .5rem; padding: 0; list-style: none }
+    .alpha .alpha-groups li { display: grid; grid-template-columns: 4.75rem minmax(0, 1fr); align-items: baseline; gap: .75rem; margin-top: .375rem; font-size: 1rem; line-height: 1.4 }
+    .state { justify-self: start; padding: 0 .5rem; border: .0625rem solid; border-radius: 1rem; font-size: .875rem; font-weight: 600; line-height: 1.5 }
+    .state-done { border-color: transparent; background: rgb(var(--link-rgb) / .14); color: var(--link-solid) }
+    .state-partial { border-style: dashed; color: var(--text) }
+    .state-missing { border-color: color-mix(in srgb, var(--quiet) 45%, transparent); color: var(--quiet) }
+
+    /* Full-size screenshot. The script copies the peek's current source, so the theme matches and the page carries one copy. */
+    .shot-view { width: fit-content; max-width: calc(100% - 2rem); padding: .625rem; border-radius: 1.5rem }
+    .shot-view form { position: absolute; top: 1.25rem; right: 1.25rem; float: none; margin: 0 }
+    .shot-view .works-close { background: var(--glass); -webkit-backdrop-filter: blur(1rem); backdrop-filter: blur(1rem); box-shadow: 0 0 0 .0625rem var(--rim) }
+    .shot-view img { width: min(80rem, calc(100vw - 3.25rem), calc((100dvh - 3.25rem) * 1.6)); border-radius: 1.2% / 1.9% }
     @media (max-width: 40rem) {
+      .alpha-groups { grid-template-columns: 1fr }
       .works { padding: 1.75rem 1.5rem 1.5rem; border-radius: 1.25rem }
       .works form { margin: -.75rem -.75rem 0 .75rem }
       .works h2 { font-size: 1.75rem }
+      .shot-view { padding: .375rem; border-radius: 1rem }
+      .shot-view form { top: .75rem; right: .75rem; margin: 0 }
     }
     @media (prefers-reduced-motion: reduce) {
-      .works, .works::backdrop, .works-close { transition: none }
+      .works, .works::backdrop, .works-close, .peek, .shot { transition: none }
     }
   </style>
 </head>
@@ -435,32 +483,26 @@
       </section>
 
       <section class="block" id="building" aria-labelledby="building-title">
-        <div class="panel">
-          <div class="panel-grid">
-            <div class="panel-head">
-              <h2 id="building-title">What we're building</h2>
-              <p class="lead">A native desktop browser on Chromium's complete browser layer, with a Rust core that owns the workspace, import, storage and commands. Chromium's engine and extension support stay as they are.</p>
-            </div>
-            <div class="panel-art" aria-hidden="true">
-              <img src="@@LOGO_GLASS@@" alt="" width="832" height="832">
-            </div>
-            <dl class="status">
-              <div>
-                <dt>Now</dt>
-                <dd>A pinned Chromium foundation experiment and an onboarding motion study running on synthetic data. The browser itself, the importer and native onboarding are still ahead.</dd>
-              </div>
-              <div>
-                <dt>Next</dt>
-                <dd>An Arc preservation tool that keeps your workspace safe, then a desktop alpha.</dd>
-              </div>
-              <div>
-                <dt>For launch</dt>
-                <dd>CLI and MCP control over the same commands as the UI. Ad and tracker blocking on by default, with per-site controls. Boosts for appearance, CSS and element hiding.</dd>
-              </div>
-            </dl>
-            <span class="mark"><img class="wordmark" src="@@WORDMARK_IVORY@@" alt="" width="3056" height="1049"></span>
-          </div>
+        <h2 id="building-title">Where it stands</h2>
+        <div class="stands-shot">
+          <div class="peek"><div class="peek-crop"><picture><source media="(prefers-color-scheme: dark)" srcset="@@PRODUCT_SHOT_DARK@@"><img class="shot" src="@@PRODUCT_SHOT_LIGHT@@" alt="A myArc window showing mauriciowolff.com. The sidebar holds the address field, three Favorites, the Everyday Space with its pinned tabs, a New Tab row and two open tabs, with the mauriciowolff.com pin selected." width="2368" height="1480" decoding="async"></picture></div></div>
+          <p class="peek-actions"><a class="button ghost peek-button peek-light" href="/product-window-light.webp">See it full size</a><a class="button ghost peek-button peek-dark" href="/product-window-dark.webp">See it full size</a></p>
         </div>
+        <ul class="grid stands">
+          <li>
+            <h3>Works now</h3>
+            <p>Spaces, pinned tabs and Favorites, the Library, and tabs that survive a restart.</p>
+          </li>
+          <li>
+            <h3>Next, for alpha</h3>
+            <p>Split view, Little Arc, Arc import, ad and tracker blocking on by default, and onboarding.</p>
+          </li>
+          <li>
+            <h3>After alpha</h3>
+            <p>Control from the terminal and AI agents, and builds for Windows and Linux.</p>
+          </li>
+        </ul>
+        <p class="stands-links"><a href="/blog/closer-to-arc/">Latest: the 2026.11.01 nightly &rarr;</a> <a class="alpha-link" href="https://github.com/bitbonsai/myarc/blob/main/docs/ALPHA.md">Full alpha checklist &rarr;</a></p>
       </section>
 
       <section class="block" aria-labelledby="docs-title">
@@ -515,55 +557,131 @@
     <p class="works-later">Not yet: split view, Little Arc, Arc import, ad blocking.</p>
     <div class="works-actions"><!--works-download--><a href="https://github.com/bitbonsai/myarc#try-it">Full list on GitHub →</a></div>
   </dialog>
+  <dialog id="alpha-checklist" class="works alpha" aria-labelledby="alpha-title">
+    <form method="dialog"><button class="works-close" aria-label="Close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button></form>
+    <h2 id="alpha-title">Alpha checklist</h2>
+    <div class="alpha-groups">
+      <section>
+        <h3>Spaces and tabs</h3>
+        <ul>
+          <li><span class="state state-done">Done</span> <span>Create, switch, rename and reorder Spaces</span></li>
+          <li><span class="state state-done">Done</span> <span>Pin with <kbd>Cmd+D</kbd>, and closing keeps the pin</span></li>
+        </ul>
+      </section>
+      <section>
+        <h3>Split view</h3>
+        <ul>
+          <li><span class="state state-missing">Missing</span> <span>Create a split</span></li>
+          <li><span class="state state-missing">Missing</span> <span>One sidebar row, kept after a restart</span></li>
+          <li><span class="state state-missing">Missing</span> <span>Focus and the address bar in a split</span></li>
+          <li><span class="state state-missing">Missing</span> <span>Leave a split</span></li>
+        </ul>
+      </section>
+      <section>
+        <h3>Little Arc</h3>
+        <ul>
+          <li><span class="state state-missing">Missing</span> <span>Open with <kbd>Cmd+Opt+N</kbd></span></li>
+          <li><span class="state state-missing">Missing</span> <span>Links from other apps</span></li>
+          <li><span class="state state-missing">Missing</span> <span>Move it into a Space</span></li>
+          <li><span class="state state-missing">Missing</span> <span>Turn it off</span></li>
+        </ul>
+      </section>
+      <section>
+        <h3>Import and first run</h3>
+        <ul>
+          <li><span class="state state-missing">Missing</span> <span>Arc import</span></li>
+          <li><span class="state state-missing">Missing</span> <span>Import report</span></li>
+          <li><span class="state state-partial">Partial</span> <span>Animated onboarding</span></li>
+          <li><span class="state state-missing">Missing</span> <span>Skip, Back and restart in onboarding</span></li>
+        </ul>
+      </section>
+      <section>
+        <h3>Browsing and privacy</h3>
+        <ul>
+          <li><span class="state state-missing">Missing</span> <span>Ad and tracker blocking, on by default</span></li>
+          <li><span class="state state-partial">Partial</span> <span>Profile isolation</span></li>
+          <li><span class="state state-done">Done</span> <span>Downloads</span></li>
+        </ul>
+      </section>
+      <section>
+        <h3>Durability and distribution</h3>
+        <ul>
+          <li><span class="state state-done">Done</span> <span>Tabs survive quitting</span></li>
+          <li><span class="state state-partial">Partial</span> <span>Changes survive a crash</span></li>
+          <li><span class="state state-missing">Missing</span> <span>Notarized build</span></li>
+        </ul>
+      </section>
+    </div>
+    <div class="works-actions"><a href="https://github.com/bitbonsai/myarc/blob/main/docs/ALPHA.md">Full checklist on GitHub →</a></div>
+  </dialog>
+  <dialog id="shot-view" class="works shot-view" aria-label="myArc window, full size">
+    <form method="dialog"><button class="works-close" aria-label="Close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button></form>
+    <img alt="A myArc window showing mauriciowolff.com. The sidebar holds the address field, three Favorites, the Everyday Space with its pinned tabs, a New Tab row and two open tabs, with the mauriciowolff.com pin selected." width="2368" height="1480">
+  </dialog>
   <script>
+    // One pattern for every glass dialog. Without script the triggers stay ordinary links.
     (() => {
-      const dialog = document.querySelector('#what-works')
-      const link = document.querySelector('.works-link')
-      if (!dialog || !link || typeof dialog.showModal !== 'function') return
       const reduced = () => matchMedia('(prefers-reduced-motion: reduce)').matches
-      let frame = 0
-      let timer = 0
-      const hide = () => {
-        cancelAnimationFrame(frame)
-        dialog.classList.remove('is-visible')
-        clearTimeout(timer)
-        if (reduced()) dialog.close()
-        else timer = setTimeout(() => dialog.close(), 200)
-      }
-      link.setAttribute('aria-haspopup', 'dialog')
-      link.addEventListener('click', event => {
-        if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
-        event.preventDefault()
-        clearTimeout(timer)
-        if (!dialog.open) dialog.showModal()
-        if (reduced()) dialog.classList.add('is-visible')
-        else {
-          // Paint the backdrop before starting the panel transition, as the blog lightbox does.
-          frame = requestAnimationFrame(() => {
-            frame = requestAnimationFrame(() => {
-              if (dialog.open) dialog.classList.add('is-visible')
-            })
-          })
+      const wire = (dialog, triggers, prepare) => {
+        if (!dialog || !triggers.length || typeof dialog.showModal !== 'function') return
+        let frame = 0
+        let timer = 0
+        let opener = null
+        const hide = () => {
+          cancelAnimationFrame(frame)
+          dialog.classList.remove('is-visible')
+          clearTimeout(timer)
+          if (reduced()) dialog.close()
+          else timer = setTimeout(() => dialog.close(), 200)
         }
-      })
-      dialog.addEventListener('cancel', event => {
-        event.preventDefault()
-        hide()
-      })
-      dialog.querySelector('form').addEventListener('submit', event => {
-        event.preventDefault()
-        hide()
-      })
-      dialog.addEventListener('click', event => {
-        if (event.target !== dialog) return
-        const box = dialog.getBoundingClientRect()
-        if (event.clientX < box.left || event.clientX > box.right || event.clientY < box.top || event.clientY > box.bottom) hide()
-      })
-      dialog.addEventListener('close', () => {
-        cancelAnimationFrame(frame)
-        clearTimeout(timer)
-        dialog.classList.remove('is-visible')
-        link.focus({ preventScroll: true })
+        const show = event => {
+          if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
+          event.preventDefault()
+          // The peek itself is not focusable, so focus returns to the visible button.
+          opener = event.currentTarget.matches('a, button') ? event.currentTarget : triggers.find(trigger => trigger.matches('a') && trigger.getClientRects().length)
+          clearTimeout(timer)
+          if (prepare) prepare(dialog)
+          if (!dialog.open) dialog.showModal()
+          if (reduced()) dialog.classList.add('is-visible')
+          else {
+            // Paint the backdrop before starting the panel transition, as the blog lightbox does.
+            frame = requestAnimationFrame(() => {
+              frame = requestAnimationFrame(() => {
+                if (dialog.open) dialog.classList.add('is-visible')
+              })
+            })
+          }
+        }
+        for (const trigger of triggers) {
+          if (trigger.matches('a')) trigger.setAttribute('aria-haspopup', 'dialog')
+          trigger.addEventListener('click', show)
+        }
+        dialog.addEventListener('cancel', event => {
+          event.preventDefault()
+          hide()
+        })
+        dialog.querySelector('form').addEventListener('submit', event => {
+          event.preventDefault()
+          hide()
+        })
+        dialog.addEventListener('click', event => {
+          if (event.target !== dialog) return
+          const box = dialog.getBoundingClientRect()
+          if (event.clientX < box.left || event.clientX > box.right || event.clientY < box.top || event.clientY > box.bottom) hide()
+        })
+        dialog.addEventListener('close', () => {
+          cancelAnimationFrame(frame)
+          clearTimeout(timer)
+          dialog.classList.remove('is-visible')
+          if (opener) opener.focus({ preventScroll: true })
+        })
+      }
+      const $ = selector => [...document.querySelectorAll(selector)]
+      wire(document.querySelector('#what-works'), $('.works-link'))
+      wire(document.querySelector('#alpha-checklist'), $('.alpha-link'))
+      const shot = document.querySelector('.peek .shot')
+      wire(document.querySelector('#shot-view'), $('.peek, .peek-button'), dialog => {
+        dialog.querySelector('img').src = shot.currentSrc || shot.src
       })
     })()
   </script>
