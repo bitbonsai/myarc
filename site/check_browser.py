@@ -74,7 +74,15 @@ try:
             if (ribbon.right > wordmark.left || Math.abs(ribbon.width - ribbon.height) > 1) throw new Error('Logo lockup geometry')
           }
           if (padding.backgroundImage !== getComputedStyle(document.body).backgroundImage ||
-              !padding.backgroundImage.startsWith('url("data:image/png;')) throw new Error('Panel grain missing')
+              !padding.backgroundImage.startsWith('url("data:image/webp;')) throw new Error('Panel grain missing')
+          for (const selector of ['.hero-art', '.panel-art']) {
+            const box = document.querySelector(selector).getBoundingClientRect()
+            const image = document.querySelector(selector + ' img')
+            if (getComputedStyle(image).filter !== 'none') throw new Error('Runtime artwork shadow returned')
+            if (Math.abs(box.width - box.height) > 1) throw new Error('Artwork box geometry')
+            const ratio = selector === '.hero-art' ? 1.5 : 2
+            if (Math.abs(image.getBoundingClientRect().width - box.width * ratio) > 1) throw new Error('Baked shadow padding scale')
+          }
           return {width: innerWidth, base, minimum, headings: 'consistent', logos: 'aligned', grain: 'shared'}
         })()""")
         print('Layout:', result)
@@ -423,7 +431,7 @@ try:
                     if result is None or result['active'] != (not reduced):
                         raise AssertionError(f'Native navigation transition: {width}/{theme}/{reduced}/{route}: {result}')
                     print('Native navigation:', width, theme, 'reduced=' + str(reduced), route, result)
-                    if route not in ('/', '/blog/'):
+                    if route not in ('/', '/blog/') and browser(expression="Boolean(document.querySelector('.post-body figure a img'))"):
                         browser('wait', '--fn', "[...document.querySelectorAll('link[rel=preload][as=image]')].every(link => performance.getEntriesByName(link.href).some(entry => entry.initiatorType === 'link'))")
                         print('Zoom preloads before click:', browser(expression="""(() => {
                           const sources = [...document.querySelectorAll('.post-body figure a')].filter(link => link.querySelector('img') && link.href === link.querySelector('img').src).map(link => link.href)

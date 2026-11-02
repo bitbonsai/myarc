@@ -9,6 +9,7 @@ import re
 from PIL import Image
 from fontTools.ttLib import TTFont
 
+from artwork import bake_shadow
 from blog import build_blog
 from discovery import build_discovery
 from download import apply_release, build_download, read_release
@@ -22,13 +23,22 @@ def uri(mime, data):
     return f'data:{mime};base64,' + base64.b64encode(data).decode('ascii')
 
 
-def logo(name):
+def logo(name, size=64, shadow=None):
     with Image.open(ASSETS / name) as image:
         image = image.convert('RGBA')
-        image.thumbnail((960, 960), Image.Resampling.LANCZOS)
+        image.thumbnail((size, size), Image.Resampling.LANCZOS)
+        if shadow:
+            image = bake_shadow(image, **shadow)
         output = io.BytesIO()
         image.save(output, format='WEBP', quality=90, method=6)
         return uri('image/webp', output.getvalue())
+
+
+with Image.open(ASSETS / 'grain.png') as grain:
+    grain = grain.convert('RGBA')
+    grain.putalpha(grain.getchannel('A').point(lambda value: value // 2))
+    grain_bytes = io.BytesIO()
+    grain.save(grain_bytes, format='WEBP', lossless=True, method=6)
 
 
 font = TTFont(ASSETS / 'Outfit.ttf', recalcTimestamp=False)
@@ -42,8 +52,13 @@ assets = {
     '@@WORDMARK_INK@@': uri('image/svg+xml', (ASSETS / 'wordmark-ink.svg').read_bytes()),
     '@@WORDMARK_IVORY@@': uri('image/svg+xml', (ASSETS / 'wordmark-ivory.svg').read_bytes()),
     '@@LOGO_MATTE@@': logo('myarc-matte.png'),
-    '@@LOGO_GLASS@@': logo('myarc-glass.png'),
-    '@@GRAIN@@': uri('image/png', (ASSETS / 'grain.png').read_bytes()),
+    '@@LOGO_HERO@@': logo('myarc-matte.png', 960, {
+        'radius': 48, 'offset': (0, 40), 'color': (24, 36, 50, 46), 'padding': 240,
+    }),
+    '@@LOGO_GLASS@@': logo('myarc-glass.png', 416, {
+        'radius': 64, 'offset': (0, 0), 'color': (16, 174, 255, 71), 'padding': 208,
+    }),
+    '@@GRAIN@@': uri('image/webp', grain_bytes.getvalue()),
     '@@FAVICON@@': uri('image/png', (BRAND / 'exports' / 'mark-matte-128.png').read_bytes()),
     '@@HEART@@': heart,
 }
@@ -63,15 +78,6 @@ def embed(template, prefix=None):
         if prefix is not None and value.startswith('data:'):
             mime, encoded = value[5:].split(';base64,', 1)
             data = base64.b64decode(encoded)
-            if token in ('@@LOGO_MATTE@@', '@@GRAIN@@'):
-                with Image.open(io.BytesIO(data)) as image:
-                    image = image.convert('RGBA')
-                    if token == '@@LOGO_MATTE@@':
-                        image.thumbnail((64, 64), Image.Resampling.LANCZOS)
-                    output = io.BytesIO()
-                    image.save(output, format='WEBP', lossless=token == '@@GRAIN@@', quality=90, method=6)
-                    data = output.getvalue()
-                    mime = 'image/webp'
             suffix = {'font/woff2': 'woff2', 'image/svg+xml': 'svg', 'image/webp': 'webp', 'image/png': 'png'}[mime]
             name = token.strip('@').lower().replace('_', '-') + '.' + hashlib.sha256(data).hexdigest()[:12] + '.' + suffix
             folder = ROOT / 'blog/_assets'
