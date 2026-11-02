@@ -14,7 +14,7 @@ The new creation menu. New Split stays greyed out until split view works.
 
 The 2026.11.01 nightly is out on the [download page](https://myarc.dev/download/). A nightly is a pre-alpha build I make from the main branch, so you can try myArc without compiling Chromium yourself, which is an 80,000-step build you don't want to run.
 
-Most of this round came from recording Arc and myArc side by side. Any single frame looked close enough, but in motion myArc's sidebar and menus snapped into place where Arc's animate. I've been using Arc since March 2023, so I feel these things before I can name them.
+Most of this round came from recording Arc and myArc side by side. Any single frame looked close enough, but in motion myArc's sidebar and menus snapped into place where Arc's animate. I've been using Arc since 2023, so I feel these things before I can name them.
 
 ## Turning a feeling into numbers
 
