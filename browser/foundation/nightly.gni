@@ -7,4 +7,9 @@ declare_args() {
   # Uses the nightly's myArc app icon without its branding, so a dev build
   # stays Chromium.app with Chromium's bundle id and profile directory.
   myarc_app_icon = false
+
+  # Shows "myArc" as the app name in the menu bar (CFBundleName) while the
+  # dev bundle stays Chromium.app with Chromium's bundle id and profile
+  # directory.
+  myarc_app_name = false
 }

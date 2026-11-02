@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-11-02: Dev build says myArc in the menu bar
+
+- New GN arg `myarc_app_name` (in `nightly.gni`) sets the dev bundle's `CFBundleName` to myArc, the name macOS shows next to the Apple menu. `CFBundleDisplayName`, the executable, bundle id `org.chromium.Chromium` and the profile directory stay Chromium's, so `out/MyarcM0/Chromium.app` keeps its path. `browser/args.gn` and `out/MyarcM0/args.gn` set it. Nightly builds are unchanged.
+- Verification: `chrome` and `bridge_check` builds, `bridge_check`, `export_patches.py --check` and `check_docs.py` pass. On a background launch with a `/tmp` profile, the menu bar read through accessibility shows myArc where it showed Chromium. `lsappinfo` still reports `LSDisplayName` Chromium, taken from the bundle file name. The Dock and app switcher labels weren't checked.
+- About, Hide and Quit still say Chromium because they use `IDS_PRODUCT_NAME`, a string shared across the UI. Chromium `myarc` commit `216e3a9b15`.
+
 ## 2026-11-02: Pinned section rhythm and weight match Arc
 
 - Pin titles are bold. The divider under the Pins is one device pixel thick. The first Pin, the divider, New Tab and the first Today tab sit where Arc puts them: 40 DIP from the Space title to the first Pin, 28.5 DIP from the last Pin to the divider, 29.5 DIP from the divider to New Tab, then 41 DIP to the first Today tab.
