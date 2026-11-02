@@ -60,7 +60,7 @@ Alpha covers two panels. [VIEW-01](PARITY.md) and the [roadmap](../ROADMAP.md) c
 
 - [x] **Tabs survive quitting** (done). Done when Cmd+Q and a relaunch bring back temporary tabs, or leave a dormant row, which loads nothing until clicked, with the saved title that reopens the full address. Maps to [TAB-02](PARITY.md) and [REL-01](PARITY.md).
 - [ ] **Crash and kill durability** (partial). Done when a forced quit after an acknowledged pin, rename, move or Space delete leaves that change in place on relaunch, in a fault-injection suite. Acknowledgement and power-loss durability remain open. Maps to [REL-01](PARITY.md), [GAPS 4](GAPS.md) and the Workspace durability gate in [the scorecard](SCORECARD.md).
-- [ ] **Notarized build** (missing). Notarized means Apple has scanned the build. Done when a clean Apple Silicon Mac opens the downloaded build without a Gatekeeper override. The nightly is ad-hoc signed and not notarized. Maps to [REL-01](PARITY.md) and the Secure distribution gate in [the scorecard](SCORECARD.md).
+- [ ] **Notarized build** (missing). Notarized means Apple has scanned the build. Done when a clean Apple Silicon Mac opens the downloaded build without a Gatekeeper override. The nightly is signed with a local self-signed certificate and not notarized. Maps to [REL-01](PARITY.md) and the Secure distribution gate in [the scorecard](SCORECARD.md).
 
 ## Nice to have
 

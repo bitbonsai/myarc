@@ -1,5 +1,6 @@
 #!/bin/bash
-# Package the nightly build as an ad-hoc signed DMG outside the repository.
+# Package the nightly build as a locally signed DMG outside the repository.
+# Signs with the "myArc Local Signing" identity (SIGN_ID), ad-hoc without it.
 # Usage: tools/package_nightly.sh
 #   env: APP_SRC=<built myArc.app> DATE=YYYY-MM-DD VERSION=<label> TAG=<release tag>
 #        OUT=<output dir, default ~/.cache/myarc-m0/release/DATE>
@@ -34,7 +35,12 @@ if otool -XL "$BIN" "$FRAMEWORK" | grep -E '/out/|/Users/' ; then
 fi
 echo "otool: no build-tree references in $(basename "$BIN") or $(basename "$FRAMEWORK")"
 
-codesign --force --deep --sign - "$APP"
+# A stable local identity keeps the Keychain's Always Allow across builds; an
+# ad-hoc signature changes with every build and asks for the password again.
+SIGN_ID=${SIGN_ID:-myArc Local Signing}
+security find-identity -p codesigning | grep -qF "\"$SIGN_ID\"" || SIGN_ID=-
+echo "signing with: $SIGN_ID"
+codesign --force --deep --sign "$SIGN_ID" "$APP"
 codesign --verify --deep --strict --verbose=2 "$APP"
 
 ln -s /Applications "$STAGE/Applications"
