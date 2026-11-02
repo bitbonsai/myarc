@@ -173,6 +173,8 @@ def apply_release(template, release):
     """Add the header link and homepage call to action only for a published release."""
     link = '<a class="download-link" href="/download/">Download</a>' if release else ''
     template = template.replace('<!--download-nav-->', link)
+    works = '<a class="button" href="/download/">Download pre-alpha</a>' if release else ''
+    template = template.replace('<!--works-download-->', works)
     if release:
         cta = '<a class="button" href="/download/">Download pre-alpha</a>'
         template = re.sub(r'<!--cta-->.*?<!--/cta-->', lambda _: cta, template, count=1, flags=re.S)

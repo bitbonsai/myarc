@@ -7,13 +7,13 @@
   <meta name="theme-color" content="#f5f2ec" media="(prefers-color-scheme: light)">
   <meta name="theme-color" content="#0b1420" media="(prefers-color-scheme: dark)">
   <title>myArc, forever yours. | Open-source browser project</title>
-  <meta name="description" content="An open-source browser project bringing back Arc's browsing experience, with a local workspace and optional AI.">
+  <meta name="description" content="An open-source browser bringing back Arc, with no account required and optional AI.">
   <link rel="canonical" href="https://myarc.dev/">
   <link rel="icon" type="image/png" href="@@FAVICON@@">
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="myArc">
   <meta property="og:title" content="myArc, forever yours.">
-  <meta property="og:description" content="An open-source browser project bringing back Arc's browsing experience, with a local workspace and optional AI.">
+  <meta property="og:description" content="An open-source browser bringing back Arc, with no account required and optional AI.">
   <meta property="og:url" content="https://myarc.dev/">
   <meta name="robots" content="index, follow, max-image-preview:large">
   <meta property="og:image" content="https://myarc.dev/og-image.png">
@@ -24,10 +24,10 @@
   <meta property="og:image:alt" content="myArc, forever yours. Colorful ribbon logo on navy.">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="myArc, forever yours.">
-  <meta name="twitter:description" content="An open-source browser project bringing back Arc's browsing experience, with a local workspace and optional AI.">
+  <meta name="twitter:description" content="An open-source browser bringing back Arc, with no account required and optional AI.">
   <meta name="twitter:image" content="https://myarc.dev/og-image.png">
   <meta name="twitter:image:alt" content="myArc, forever yours. Colorful ribbon logo on navy.">
-  <script type="application/ld+json">{"@context":"https://schema.org","@type":"WebSite","name":"myArc","url":"https://myarc.dev/","description":"An open-source browser project bringing back Arc's browsing experience, with a local workspace and optional AI.","inLanguage":"en","image":"https://myarc.dev/og-image.png"}</script>
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"WebSite","name":"myArc","url":"https://myarc.dev/","description":"An open-source browser bringing back Arc, with no account required and optional AI.","inLanguage":"en","image":"https://myarc.dev/og-image.png"}</script>
   <style>
     @font-face {
       font-family: Outfit;
@@ -302,6 +302,58 @@
     @media (prefers-reduced-motion: reduce) {
       .menu-toggle, .quick-icon, .menu-close { transition: none }
     }
+
+    /* What works dialog. Script upgrades the hero link; without it the link opens GitHub.
+       Like the blog lightbox, the backdrop blur applies at once and the panel starts hidden. */
+    html:has(.works[open]) { overflow: hidden }
+    .works {
+      --glass: rgb(245 242 236 / .62);
+      --rim: rgb(255 255 255 / .7);
+      width: min(34rem, calc(100% - 2rem));
+      max-height: calc(100dvh - 2rem);
+      padding: 2.25rem 2.25rem 2rem;
+      border: .0625rem solid var(--rim);
+      border-radius: 1.75rem;
+      background: var(--glass);
+      -webkit-backdrop-filter: blur(1.5rem) saturate(1.6);
+      backdrop-filter: blur(1.5rem) saturate(1.6);
+      box-shadow: inset 0 .0625rem 0 rgb(255 255 255 / .45), 0 1.5rem 4rem rgb(16 28 43 / .2), 0 .25rem 1rem rgb(16 28 43 / .08);
+      color: var(--text);
+      font: inherit;
+      opacity: 0;
+      transform: scale(.96);
+      transition: opacity .2s ease, transform .2s var(--ease);
+    }
+    .works.is-visible { opacity: 1; transform: none }
+    .works::backdrop { background: rgb(16 28 43 / 0); -webkit-backdrop-filter: blur(.875rem) saturate(1.1); backdrop-filter: blur(.875rem) saturate(1.1); transition: background-color .2s ease }
+    .works.is-visible::backdrop { background: rgb(16 28 43 / .22) }
+    .works form { float: right; margin: -1rem -1rem 0 1rem }
+    .works-close { display: grid; place-items: center; width: 2.75rem; height: 2.75rem; padding: 0; border: 0; border-radius: 50%; background: rgb(var(--link-rgb) / .1); color: inherit; cursor: pointer; transition: background-color .2s ease-in-out, color .2s ease-in-out }
+    .works-close:hover, .works-close:focus-visible { background: rgb(var(--link-rgb) / .16); color: var(--link-solid) }
+    /* No outline ring; keyboard focus shows as the same fill as hover. */
+    .works-close:focus-visible { outline: none }
+    .works-close:focus-visible { outline-offset: 0 }
+    .works-close svg { width: 1.25rem; height: 1.25rem }
+    .works h2 { font-size: 2rem; letter-spacing: -.035em }
+    .works ul { margin-top: 1.25rem; padding-left: 1.25rem; list-style: disc }
+    .works li + li { margin-top: .375rem }
+    .works li::marker { color: rgb(var(--link-rgb) / .7) }
+    .works kbd { padding: .05em .4em; border: 1px solid color-mix(in srgb, currentColor 18%, transparent); border-bottom-width: 2px; border-radius: .375rem; background: color-mix(in srgb, currentColor 6%, transparent); font-family: inherit; font-size: 1rem; font-weight: 500; white-space: nowrap }
+    .works-later { margin-top: 1.25rem; color: var(--quiet) }
+    .works-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 1rem 1.5rem; margin-top: 1.75rem }
+    .works-actions a:not(.button) { font-weight: 500 }
+    @media (prefers-color-scheme: dark) {
+      .works { --glass: rgb(16 28 43 / .58); --rim: rgb(255 255 255 / .14); box-shadow: inset 0 .0625rem 0 rgb(255 255 255 / .08), 0 1.5rem 4rem rgb(0 0 0 / .5), 0 .25rem 1rem rgb(0 0 0 / .25) }
+      .works.is-visible::backdrop { background: rgb(0 0 0 / .4) }
+    }
+    @media (max-width: 40rem) {
+      .works { padding: 1.75rem 1.5rem 1.5rem; border-radius: 1.25rem }
+      .works form { margin: -.75rem -.75rem 0 .75rem }
+      .works h2 { font-size: 1.75rem }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .works, .works::backdrop, .works-close { transition: none }
+    }
   </style>
 </head>
 <body>
@@ -344,10 +396,10 @@
       <section class="hero" aria-labelledby="headline">
         <div class="hero-copy">
           <h1 id="headline" class="rise">myArc,<br>forever yours.</h1>
-          <p class="rise">An open-source browser project bringing back Arc's browsing experience, with a local workspace and optional AI.</p>
+          <p class="rise">An open-source browser bringing back Arc, with no account required and optional AI.</p>
           <div class="cta rise">
             <!--cta--><a class="button" href="https://github.com/bitbonsai/myarc"><svg class="github-icon" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false"><path fill-rule="evenodd" clip-rule="evenodd" d="M8 0C3.58 0 0 3.58 0 8C0 11.54 2.29 14.53 5.47 15.59C5.87 15.66 6.02 15.42 6.02 15.21C6.02 15.02 6.01 14.39 6.01 13.72C4 14.09 3.48 13.23 3.32 12.78C3.23 12.55 2.84 11.84 2.5 11.65C2.22 11.5 1.82 11.13 2.49 11.12C3.12 11.11 3.57 11.7 3.72 11.94C4.44 13.15 5.59 12.81 6.05 12.6C6.12 12.08 6.33 11.73 6.56 11.53C4.78 11.33 2.92 10.64 2.92 7.58C2.92 6.71 3.23 5.99 3.74 5.43C3.66 5.23 3.38 4.41 3.82 3.31C3.82 3.31 4.49 3.1 6.02 4.13C6.66 3.95 7.34 3.86 8.02 3.86C8.7 3.86 9.38 3.95 10.02 4.13C11.55 3.09 12.22 3.31 12.22 3.31C12.66 4.41 12.38 5.23 12.3 5.43C12.81 5.99 13.12 6.7 13.12 7.58C13.12 10.65 11.25 11.33 9.47 11.53C9.76 11.78 10.01 12.26 10.01 13.01C10.01 14.08 10 14.94 10 15.21C10 15.42 10.15 15.67 10.55 15.59C13.71 14.53 16 11.53 16 8C16 3.58 12.42 0 8 0Z" transform="scale(64)" fill="currentColor"/></svg>Follow development</a><!--/cta-->
-            <a href="https://github.com/bitbonsai/myarc#try-it">See what works</a>
+            <a class="works-link" href="https://github.com/bitbonsai/myarc#try-it">See what works</a>
           </div>
         </div>
         <div class="hero-art">
@@ -356,8 +408,8 @@
       </section>
 
       <section class="block" aria-labelledby="why">
-        <h2 class="ethos" id="why">Your Spaces and pinned tabs are part of how you work. They should outlast the company behind your browser.</h2>
-        <p>Arc is being sunsetted. We're building myArc so the sidebar, Spaces, keyboard commands, Peek, Split View and Boosts keep working, with a setup you can export and browsing that doesn't hinge on a subscription.</p>
+        <h2 class="ethos" id="why">How you browse is part of how you work. It should outlast the company behind your browser.</h2>
+        <p><a href="https://arc.net/">Arc is being sunsetted</a>, and its code was never open, so nobody can keep it going. <strong>myArc is open source</strong>, so anyone can.</p>
       </section>
 
       <section class="block" id="principles" aria-labelledby="principles-title">
@@ -365,19 +417,19 @@
         <ul class="grid principles">
           <li>
             <h3>Yours to keep</h3>
-            <p>Keep workspace data local and exportable. Everyday browsing should work without an account.</p>
+            <p>Your workspace stays on your computer, in files you own. Export is on the way.</p>
           </li>
           <li>
             <h3>Keep what worked</h3>
-            <p>Carry forward Arc's Spaces, pinned tabs and keyboard workflow. Teach the differences through onboarding.</p>
+            <p>If you used Arc, you already know myArc. Where they differ, onboarding shows you.</p>
           </li>
           <li>
             <h3>AI by choice</h3>
-            <p>Keep AI off by default. Choose local models, your own API key or optional hosted access, with explicit control over what they can see.</p>
+            <p>AI is off until you turn it on. Then you pick: a local model, your own API key, or a hosted option, and you decide what it can see.</p>
           </li>
           <li>
             <h3>Built in the open</h3>
-            <p>Code, plans and decisions are public, so the project can continue beyond any one team.</p>
+            <p>The plans and decisions are public too, not just the code. If I stop, anyone can pick it up where I left off.</p>
           </li>
         </ul>
       </section>
@@ -449,5 +501,71 @@
       </div>
     </footer>
   </div>
+  <dialog id="what-works" class="works" aria-labelledby="works-title">
+    <form method="dialog"><button class="works-close" aria-label="Close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button></form>
+    <h2 id="works-title">What works today</h2>
+    <ul>
+      <li>Browsing, with Chromium extensions</li>
+      <li>Spaces: create, switch, rename and reorder them</li>
+      <li>Pinned tabs and Favorites, kept across restarts</li>
+      <li>The Library: Downloads, Archived Tabs and your Spaces</li>
+      <li>Command bar <kbd>Cmd+L</kbd> and Arc's shortcuts</li>
+      <li>Hide the sidebar with <kbd>Cmd+S</kbd>, peek it from the window edge</li>
+    </ul>
+    <p class="works-later">Not yet: split view, Little Arc, Arc import, ad blocking.</p>
+    <div class="works-actions"><!--works-download--><a href="https://github.com/bitbonsai/myarc#try-it">Full list on GitHub →</a></div>
+  </dialog>
+  <script>
+    (() => {
+      const dialog = document.querySelector('#what-works')
+      const link = document.querySelector('.works-link')
+      if (!dialog || !link || typeof dialog.showModal !== 'function') return
+      const reduced = () => matchMedia('(prefers-reduced-motion: reduce)').matches
+      let frame = 0
+      let timer = 0
+      const hide = () => {
+        cancelAnimationFrame(frame)
+        dialog.classList.remove('is-visible')
+        clearTimeout(timer)
+        if (reduced()) dialog.close()
+        else timer = setTimeout(() => dialog.close(), 200)
+      }
+      link.setAttribute('aria-haspopup', 'dialog')
+      link.addEventListener('click', event => {
+        if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
+        event.preventDefault()
+        clearTimeout(timer)
+        if (!dialog.open) dialog.showModal()
+        if (reduced()) dialog.classList.add('is-visible')
+        else {
+          // Paint the backdrop before starting the panel transition, as the blog lightbox does.
+          frame = requestAnimationFrame(() => {
+            frame = requestAnimationFrame(() => {
+              if (dialog.open) dialog.classList.add('is-visible')
+            })
+          })
+        }
+      })
+      dialog.addEventListener('cancel', event => {
+        event.preventDefault()
+        hide()
+      })
+      dialog.querySelector('form').addEventListener('submit', event => {
+        event.preventDefault()
+        hide()
+      })
+      dialog.addEventListener('click', event => {
+        if (event.target !== dialog) return
+        const box = dialog.getBoundingClientRect()
+        if (event.clientX < box.left || event.clientX > box.right || event.clientY < box.top || event.clientY > box.bottom) hide()
+      })
+      dialog.addEventListener('close', () => {
+        cancelAnimationFrame(frame)
+        clearTimeout(timer)
+        dialog.classList.remove('is-visible')
+        link.focus({ preventScroll: true })
+      })
+    })()
+  </script>
 </body>
 </html>
