@@ -28,21 +28,21 @@ An open-source browser bringing back Arc, with no account required and optional 
 
   The plans and decisions are public too, not just the code. If I stop, anyone can pick it up where I left off.
 
-## What we're building
+## Where it stands
 
-A native desktop browser on Chromium's complete browser layer, with a Rust core that owns the workspace, import, storage and commands. Chromium's engine and extension support stay as they are.
+[See it full size](https://myarc.dev/product-window-light.webp)[See it full size](https://myarc.dev/product-window-dark.webp)
 
-### Now
+- ### Works now
 
-A pinned Chromium foundation experiment and an onboarding motion study running on synthetic data. The browser itself, the importer and native onboarding are still ahead.
+  Spaces, pinned tabs and Favorites, the Library, and tabs that survive a restart.
+- ### Next, for alpha
 
-### Next
+  Split view, Little Arc, Arc import, ad and tracker blocking on by default, and onboarding.
+- ### After alpha
 
-An Arc preservation tool that keeps your workspace safe, then a desktop alpha.
+  Control from the terminal and AI agents, and builds for Windows and Linux.
 
-### For launch
-
-CLI and MCP control over the same commands as the UI. Ad and tracker blocking on by default, with per-site controls. Boosts for appearance, CSS and element hiding.
+[Latest: the 2026.11.01 nightly →](https://myarc.dev/blog/closer-to-arc/) [Full alpha checklist →](https://github.com/bitbonsai/myarc/blob/main/docs/ALPHA.md)
 
 ## Read along
 
