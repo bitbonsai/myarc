@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-11-02: Pinned section matches Arc
+
+- The Space title now starts with the Space's icon, the same planet the Library cards use, drawn in the title's grey and level with the row icons, so the name lines up with the row titles as in Arc. Pin titles are semibold, and Today tabs stay regular. The divider under the Pins sits 18 DIP in from both sidebar edges instead of spanning the rows.
+- Verification: `chrome` and `bridge_check` builds, `bridge_check`, `export_patches.py --check` and `check_docs.py` pass. A background capture with a seeded workspace (3 Favorites, 1 Pin, 2 Today tabs) puts the divider at 36 to 419 px, exactly as in Arc's shot. The title glyph matches the title's color, the same as Arc's. Pin titles carry about 11% more ink than Today tabs, against Arc's 18%. The capture, seed and side-by-side are in `research-private/captures/20261102-pinned-section/`.
+- The sidebar code lives in `browser/foundation`, so the Chromium checkout has no change to commit.
+
 ## 2026-11-02: Dev build shows the myArc icon
 
 - New GN arg `myarc_app_icon` (in `nightly.gni`) copies the nightly's `app.icns` and `Assets.car` into the bundle without the nightly branding, so `out/MyarcM0` stays `Chromium.app` with bundle id `org.chromium.Chromium` and its usual profile directory. `browser/args.gn` and `out/MyarcM0/args.gn` set it. Nightly builds are unchanged.

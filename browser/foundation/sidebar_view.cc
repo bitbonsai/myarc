@@ -39,6 +39,7 @@
 #include "ui/views/animation/ink_drop.h"
 #include "ui/views/animation/ink_drop_host.h"
 #include "ui/views/background.h"
+#include "ui/views/controls/button/label_button.h"
 #include "ui/views/controls/button/md_text_button.h"
 #include "ui/views/controls/highlight_path_generator.h"
 #include "ui/views/controls/label.h"
@@ -107,6 +108,23 @@ Fills GetFills(const ui::ColorProvider* provider) {
                       GetCurrentSpaceColor(provider),
                       SkColorSetA(SK_ColorBLACK, 0x33),
                       SkColorSetA(SK_ColorBLACK, 0x99)};
+}
+
+// A Space's icon, as the Library shows it. Spaces store no icon yet, so every
+// Space gets Arc's default planet.
+ui::ImageModel SpaceIcon(SkColor color) {
+  return ui::ImageModel::FromVectorIcon(kSaturnIcon, color, 16);
+}
+
+// STYLE_EMPHASIZED is not allowed for CONTEXT_BUTTON_MD and LabelButton hides
+// its label, so reweight the button's Label child directly.
+void SetSemibold(views::LabelButton& button) {
+  for (views::View* child : button.children()) {
+    if (auto* label = views::AsViewClass<views::Label>(child)) {
+      label->SetFontList(
+          label->font_list().DeriveWithWeight(gfx::Font::Weight::SEMIBOLD));
+    }
+  }
 }
 
 // A Space's footer glyph: its icon, or a dot without one, brighter for the
@@ -688,6 +706,10 @@ std::unique_ptr<views::View> SidebarView::MakeItem(
     return activate;
   }
   activate->SetMinSize(gfx::Size(0, kRowHeight));
+  // Arc sets Pin titles semibold, Today tabs regular.
+  if (item.placement == foundation::PlacementKind::Pin) {
+    SetSemibold(*activate);
+  }
 
   std::unique_ptr<views::MdTextButton> close;
   // A dormant temporary row closes too; saved rows close only a live page.
@@ -920,15 +942,13 @@ void SidebarView::SetModel(const foundation::SidebarResult& model,
                         name);
   // Arc's Space title is 13pt semibold in white at 45% (#888892 over its dark
   // sidebar), its baseline 31pt below the Favorites tiles.
-  // STYLE_EMPHASIZED is not allowed for CONTEXT_BUTTON_MD and LabelButton hides
-  // its label, so reweight the button's Label child directly.
-  for (views::View* child : heading->children()) {
-    if (auto* label = views::AsViewClass<views::Label>(child)) {
-      label->SetFontList(
-          label->font_list().DeriveWithWeight(gfx::Font::Weight::SEMIBOLD));
-    }
-  }
-  heading->SetEnabledTextColors(GetFills(GetColorProvider()).title);
+  SetSemibold(*heading);
+  // Arc leads the title with the Space's icon in the title's color, lined up
+  // with the row icons so the name starts where the row titles do.
+  const Fills fills = GetFills(GetColorProvider());
+  heading->SetImageModel(views::Button::STATE_NORMAL, SpaceIcon(fills.title));
+  heading->SetImageLabelSpacing(8);
+  heading->SetEnabledTextColors(fills.title);
   if (!model.favorites.empty()) {
     heading->SetProperty(views::kMarginsKey, gfx::Insets::TLBR(6, 0, 0, 0));
   }
@@ -942,7 +962,10 @@ void SidebarView::SetModel(const foundation::SidebarResult& model,
         MakeItem(item, false, item.id == model.selected_item_id));
   }
   if (!model.pins.empty()) {
-    rows->AddChildView(std::make_unique<views::Separator>());
+    // Arc insets the divider 18 DIP from both sidebar edges, 10 inside the
+    // rows.
+    rows->AddChildView(std::make_unique<views::Separator>())
+        ->SetProperty(views::kMarginsKey, gfx::Insets::VH(0, 10));
   }
 
   auto new_tab = Button(base::BindRepeating(&Delegate::NewTab,
@@ -1394,8 +1417,9 @@ void SidebarView::UpdateFills() {
   const auto rename = std::ranges::find(focus_targets_, FocusAction::kRename,
                                         &FocusTarget::action);
   if (rename != focus_targets_.end()) {
-    static_cast<views::MdTextButton*>(rename->view.get())
-        ->SetEnabledTextColors(fills.title);
+    auto* heading = static_cast<views::MdTextButton*>(rename->view.get());
+    heading->SetEnabledTextColors(fills.title);
+    heading->SetImageModel(views::Button::STATE_NORMAL, SpaceIcon(fills.title));
   }
   for (const auto& target : focus_targets_) {
     if (target.action == FocusAction::kSpaces) {
