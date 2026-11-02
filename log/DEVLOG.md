@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-11-02: Page card corners follow the window corner
+
+- The page card sits 10 DIP inside the window on the top, right and bottom, and on the left too when the sidebar is hidden or peeking. Its radius is now the window's 20 DIP minus that inset, so 10 DIP, derived from `GetRestoredWindowCornerRadius()` and one shared inset constant. The left corners beside the pinned sidebar use the same 10 DIP and look right there. `ContentsWebView` no longer forces its own 7 DIP radius over the layout's. Fullscreen stays square, now for blank pages too.
+- Verification: `chrome` and `bridge_check` builds, `bridge_check`, `export_patches.py --check` and `check_docs.py` pass. Background captures with the sidebar pinned and hidden, plus a blank page, measure 20 px (10 DIP at 2x) insets and matching curves at all four corners. Peek and fullscreen weren't captured, since neither can be reached from a background launch. Crops `concentric-*-corners.png` in `research-private/captures/finesse/page-card-corners/`.
+- Chromium `myarc` commit `a8e0274a5c`.
+
 ## 2026-11-02: Window corners lose the second curve
 
 - The page card was fine (7 DIP, inset 10 DIP, as in Arc). The second curve at each window corner came from the behind-window material: an active window's blur kept a tighter corner (about 12 DIP) than the window's 20 DIP, so its edge showed past the rim. The material now carries a stretchable mask with the window's 20 DIP radius, the value `BrowserNativeWidgetWindow` reports on macOS 26. Fullscreen drops the mask.

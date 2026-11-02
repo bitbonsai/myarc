@@ -1,5 +1,5 @@
 diff --git a/chrome/browser/ui/views/frame/contents_web_view.cc b/chrome/browser/ui/views/frame/contents_web_view.cc
-index 184614e93db97174631601f8b34dd1f9ecec550b..eea0a3ca0d7e296c5b2600ce925be4ec44861eae 100644
+index 184614e93db97174631601f8b34dd1f9ecec550b..d689a2dcf9254eb8972a7bb0f576e0782f95117f 100644
 --- a/chrome/browser/ui/views/frame/contents_web_view.cc
 +++ b/chrome/browser/ui/views/frame/contents_web_view.cc
 @@ -4,8 +4,10 @@
@@ -130,7 +130,7 @@ index 184614e93db97174631601f8b34dd1f9ecec550b..eea0a3ca0d7e296c5b2600ce925be4ec
  void ContentsWebView::UpdateBackgroundColor() {
    const SkColor color = GetColorProvider()->GetColor(
        is_letterboxing() ? kColorWebContentsBackgroundLetterboxing
-@@ -221,9 +287,20 @@ void ContentsWebView::UpdateBackgroundColor() {
+@@ -221,9 +287,19 @@ void ContentsWebView::UpdateBackgroundColor() {
      }
    }
  
@@ -146,8 +146,7 @@ index 184614e93db97174631601f8b34dd1f9ecec550b..eea0a3ca0d7e296c5b2600ce925be4ec
 +      : visual_parity     ? SkColorSetARGB(dark ? 18 : 220, 255, 255, 255)
 +                          : SK_ColorTRANSPARENT));
 +  if (visual_parity) {
-+    layer()->SetRoundedCornerRadius(gfx::RoundedCornersF(7));
-+    layer()->SetIsFastRoundedCorner(true);
++    // The layout sets the card's radii through SetBackgroundRadii().
 +    layer()->SetMasksToBounds(true);
 +  }
  
