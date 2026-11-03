@@ -4,7 +4,7 @@ HTML: https://myarc.dev/blog/
 
 November 2026
 
-## [Chasing Arc's details in the 2026.11.01 nightly](https://myarc.dev/blog/closer-to-arc/)
+## [Chasing Arc's details](https://myarc.dev/blog/closer-to-arc/)
 
 November 01, 2026
 

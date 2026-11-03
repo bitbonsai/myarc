@@ -2,7 +2,7 @@ HTML: https://myarc.dev/blog/closer-to-arc/
 
 [All posts](https://myarc.dev/blog/)
 
-# Chasing Arc's details in the 2026.11.01 nightly
+# Chasing Arc's details
 
 November 01, 2026
 
@@ -12,9 +12,9 @@ November 01, 2026
 
 The new creation menu. New Split stays greyed out until split view works.
 
-The 2026.11.01 nightly is out on the [download page](https://myarc.dev/download/). A nightly is a pre-alpha build I make from the main branch, so you can try myArc without compiling Chromium yourself, which is an 80,000-step build you don't want to run.
+New nightlies keep landing on the [download page](https://myarc.dev/download/). A nightly is a pre-alpha build I make from the main branch, so you can try myArc without compiling Chromium yourself, which is an 80,000-step build you don't want to run.
 
-Most of this round came from recording Arc and myArc side by side. Any single frame looked close enough, but in motion myArc's sidebar and menus snapped into place where Arc's animate. I've been using Arc since 2023, so I feel these things before I can name them.
+Most of the recent work came from recording Arc and myArc side by side. Any single frame looked close enough, but in motion myArc's sidebar and menus snapped into place where Arc's animate. I've been using Arc since 2023, so I feel these things before I can name them.
 
 ## Turning a feeling into numbers
 
@@ -24,7 +24,7 @@ Most of this round came from recording Arc and myArc side by side. Any single fr
 
 ## The bug that emptied Spaces
 
-The worst bug in the 2026.10.29 nightly lost data. If you quit myArc and opened it again, every tab you hadn't pinned was gone and your Spaces came back empty. If you're still on it, please update. Sorry about that.
+The worst bug in older nightlies lost data. If you quit myArc and opened it again, every tab you hadn't pinned was gone and your Spaces came back empty. If you're on one, please update. Sorry about that.
 
 myArc and Chromium disagreed about what to restore on launch, and myArc threw away the tabs it couldn't find. Now it restores your last session by default, and a tab that doesn't come back stays in the sidebar anyway. It loads when you click it.
 
@@ -48,7 +48,7 @@ One place I stepped away from Arc on purpose is the Library's blue. Arc's looked
 
 ## How far from an alpha
 
-Most of this build is about how myArc looks. How it behaves is further behind. The [parity register](https://github.com/bitbonsai/myarc/blob/main/docs/PARITY.md) lists 12 behaviors a release can't ship without, and none of them is fully proven yet. Honest, if a bit painful to write.
+Most of this work is about how myArc looks. How it behaves is further behind. The [parity register](https://github.com/bitbonsai/myarc/blob/main/docs/PARITY.md) lists 12 behaviors a release can't ship without, and none of them is fully proven yet. Honest, if a bit painful to write.
 
 Some big pieces don't exist at all. myArc can't import your Arc workspace yet, there's no ad blocking, split view isn't wired up and there's no onboarding in the browser. So instead of putting a date on alpha, I wrote an [alpha checklist](https://github.com/bitbonsai/myarc/blob/main/docs/ALPHA.md) where each item says what done looks like.
 
@@ -56,6 +56,6 @@ Some big pieces don't exist at all. myArc can't import your Arc workspace yet, t
 
 I could ship features faster if I stopped caring how a sidebar hides. But a two-frame fade is a big part of why Arc felt so good to use, and it's the part I miss most. I wrote about [the joy of sweating tiny details](https://mauriciowolff.com/blog/joy) before. This is the same itch, only now it's a whole browser.
 
-Next I'm working through that checklist, one item at a time. If you try this nightly and something feels off, tell me in an [issue](https://github.com/bitbonsai/myarc/issues), even if all you can say is "the sidebar feels slow". That's the kind of note that started this round.
+Next I'm working through that checklist, one item at a time. If you try a nightly and something feels off, tell me in an [issue](https://github.com/bitbonsai/myarc/issues), even if all you can say is "the sidebar feels slow". That's the kind of note that started this round.
 
 See you in the next nightly.
