@@ -16,12 +16,16 @@
 #include "base/memory/scoped_refptr.h"
 #include "base/task/single_thread_task_runner.h"
 #include "build/build_config.h"
+#include "cc/paint/paint_canvas.h"
 #include "cc/paint/paint_flags.h"
+#include "cc/paint/paint_shader.h"
 #include "chrome/browser/shell_integration.h"
 #include "chrome/common/pref_names.h"
 #include "components/prefs/pref_change_registrar.h"
 #include "components/prefs/pref_service.h"
 #include "third_party/skia/include/core/SkColor.h"
+#include "third_party/skia/include/core/SkPoint.h"
+#include "third_party/skia/include/core/SkRRect.h"
 #include "ui/accessibility/ax_enums.mojom.h"
 #include "ui/base/accelerators/accelerator.h"
 #include "ui/base/hit_test.h"
@@ -219,9 +223,8 @@ constexpr SkColor kGrayButton = SkColorSetRGB(0x45, 0x45, 0x46);
 constexpr SkColor kButtonText = SkColorSetRGB(0xE3, 0xE3, 0xE3);
 constexpr SkColor kSwitchTrack = SkColorSetRGB(0x37, 0x37, 0x38);
 constexpr SkColor kSwitchKnob = SkColorSetRGB(0xC8, 0xC8, 0xC8);
-// myArc brand colors (design.md): midnight card, ivory name, primary blue.
-constexpr SkColor kBrandFill = SkColorSetRGB(0x10, 0x1C, 0x2B);
-constexpr SkColor kBrandStroke = SkColorSetRGB(0x22, 0x31, 0x44);
+// myArc brand colors (design.md): ivory name, primary blue. The card is
+// frosted glass tinted by the ribbon's blue, violet, pink and orange.
 constexpr SkColor kBrandName = SkColorSetRGB(0xF5, 0xF2, 0xEC);
 constexpr SkColor kBrandQuiet = SkColorSetRGB(0xB1, 0xBC, 0xC9);
 constexpr SkColor kBrandFaint = SkColorSetRGB(0x7D, 0x8A, 0x99);
@@ -459,6 +462,77 @@ class Panel : public views::View {
 BEGIN_METADATA(Panel)
 END_METADATA
 
+// The myArc card: a faint white pane that catches light along its top edge,
+// tinted from the icon side by soft glows in the ribbon's colors.
+class GlassCard : public views::View {
+  METADATA_HEADER(GlassCard, views::View)
+
+ public:
+  GlassCard() = default;
+
+  void OnPaintBackground(gfx::Canvas* canvas) override {
+    struct Glow {
+      float x, y, radius;
+      SkColor4f color;
+    };
+    // Centers and radii in DIPs from the card's top left, around the icon.
+    static constexpr Glow kGlows[] = {
+        {30, 44, 110, {0.20f, 0.42f, 1.00f, 0.30f}},
+        {92, 8, 96, {0.55f, 0.32f, 1.00f, 0.20f}},
+        {128, 70, 92, {1.00f, 0.30f, 0.62f, 0.15f}},
+        {178, 84, 80, {1.00f, 0.58f, 0.22f, 0.09f}},
+    };
+
+    gfx::ScopedCanvas scoped(canvas);
+    const float scale = canvas->UndoDeviceScaleFactor();
+    cc::PaintCanvas* paint = canvas->sk_canvas();
+    gfx::RectF rect(GetLocalBounds());
+    rect.Scale(scale);
+    const float radius = kBrandRadius * scale;
+    const SkRect sk_rect =
+        SkRect::MakeXYWH(rect.x(), rect.y(), rect.width(), rect.height());
+    paint->clipRRect(SkRRect::MakeRectXY(sk_rect, radius, radius), true);
+
+    cc::PaintFlags flags;
+    flags.setAntiAlias(true);
+    flags.setColor(SkColorSetA(SK_ColorWHITE, 0x0B));
+    paint->drawRect(sk_rect, flags);
+    // Shaders below carry their own alpha; the paint's alpha would scale it.
+    flags.setColor(SK_ColorBLACK);
+
+    for (const Glow& glow : kGlows) {
+      SkColor4f clear = glow.color;
+      clear.fA = 0;
+      const SkColor4f colors[] = {glow.color, clear};
+      flags.setShader(cc::PaintShader::MakeRadialGradient(
+          SkPoint::Make(rect.x() + glow.x * scale, rect.y() + glow.y * scale),
+          glow.radius * scale, colors, nullptr, 2, SkTileMode::kClamp));
+      paint->drawRect(sk_rect, flags);
+    }
+
+    // A sheen over the top half, brightest at the edge.
+    const SkPoint sheen[] = {{0, rect.y()}, {0, rect.y() + rect.height() / 2}};
+    const SkColor4f sheen_colors[] = {{1, 1, 1, 0.07f}, {1, 1, 1, 0}};
+    flags.setShader(cc::PaintShader::MakeLinearGradient(
+        sheen, sheen_colors, nullptr, 2, SkTileMode::kClamp));
+    paint->drawRect(sk_rect, flags);
+
+    // A hairline that is bright along the top and fades down the sides.
+    const SkPoint edge[] = {{0, rect.y()}, {0, rect.bottom()}};
+    const SkColor4f edge_colors[] = {{1, 1, 1, 0.26f}, {1, 1, 1, 0.07f}};
+    flags.setShader(cc::PaintShader::MakeLinearGradient(
+        edge, edge_colors, nullptr, 2, SkTileMode::kClamp));
+    flags.setStyle(cc::PaintFlags::kStroke_Style);
+    flags.setStrokeWidth(1);
+    paint->drawRRect(SkRRect::MakeRectXY(sk_rect.makeInset(0.5f, 0.5f),
+                                         radius - 0.5f, radius - 0.5f),
+                     flags);
+  }
+};
+
+BEGIN_METADATA(GlassCard)
+END_METADATA
+
 // One panel row: a label at left, `control` at right.
 Panel* AddRowPanel(views::View* parent,
                    std::u16string text,
@@ -535,8 +609,7 @@ class GeneralPage : public views::View {
                                      kButtonText, gfx::Font::Weight::NORMAL,
                                      nullptr));
 
-    brand_ = AddChildView(
-        std::make_unique<Panel>(kBrandFill, kBrandStroke, kBrandRadius));
+    brand_ = AddChildView(std::make_unique<GlassCard>());
     auto* brand_layout =
         brand_->SetLayoutManager(std::make_unique<views::BoxLayout>(
             views::BoxLayout::Orientation::kHorizontal,
@@ -642,7 +715,7 @@ class GeneralPage : public views::View {
   raw_ptr<Panel> quit_panel_ = nullptr;
   raw_ptr<Switch> quit_switch_ = nullptr;
   raw_ptr<Panel> profile_panel_ = nullptr;
-  raw_ptr<Panel> brand_ = nullptr;
+  raw_ptr<views::View> brand_ = nullptr;
   base::WeakPtrFactory<GeneralPage> weak_factory_{this};
 };
 

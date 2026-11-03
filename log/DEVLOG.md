@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-11-03: The myArc card turns to glass
+
+- The myArc card at the foot of General drops its midnight fill for a frosted pane painted in Skia: white at about 4% over the window, four soft radial glows in the ribbon's blue, violet, pink and orange spreading from the icon, a white sheen over the top half, and a hairline that runs from 26% white along the top to 7% at the bottom. Text and the blue "Visit myarc.dev" button stay as they were and still read clearly on the lighter surface.
+- Verification: `chrome` build, `export_patches.py --check` and `check_docs.py` pass. A background capture of General is in `research-private/captures/20261103T065909Z-general-glass/2-general.png`.
+- The glass is painted, so it doesn't blur what's behind the window the way `NSVisualEffectView` would. The code lives in `browser/foundation`, so the Chromium checkout has no change to commit.
+
 ## 2026-11-03: Crashes restore silently
 
 - In workspace mode the first crashed launch skips Chromium's "Restore pages?" bubble and runs the same crash restore the Restore button does, with its lock and recovery-choice order intact, so the sidebar binds straight away. Only each window's active tab loads; the rest wait until clicked. The profile pref `myarc.crashed_launches` brings the stock bubble back on the second crashed launch in a row, and a clean exit clears it. Notes in [native-crash-auto-restore.md](../browser/experiments/native-crash-auto-restore.md).
