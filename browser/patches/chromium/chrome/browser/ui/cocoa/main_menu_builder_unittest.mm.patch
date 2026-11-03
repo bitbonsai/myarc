@@ -1,5 +1,5 @@
 diff --git a/chrome/browser/ui/cocoa/main_menu_builder_unittest.mm b/chrome/browser/ui/cocoa/main_menu_builder_unittest.mm
-index 03f128044c43b1f09a430b15f984fbd674695b4e..1325af6a6f716c2ad6f532373eb0c6b9b8ea542d 100644
+index 03f128044c43b1f09a430b15f984fbd674695b4e..c67217a60bdf5fedd69b9755d0bd9b7bdb62ecae 100644
 --- a/chrome/browser/ui/cocoa/main_menu_builder_unittest.mm
 +++ b/chrome/browser/ui/cocoa/main_menu_builder_unittest.mm
 @@ -4,7 +4,9 @@
@@ -12,7 +12,7 @@ index 03f128044c43b1f09a430b15f984fbd674695b4e..1325af6a6f716c2ad6f532373eb0c6b9
  #include "chrome/app/chrome_command_ids.h"
  #include "chrome/grit/generated_resources.h"
  #include "testing/gtest/include/gtest/gtest.h"
-@@ -134,4 +136,25 @@ TEST(MainMenuBuilderTest, CloseWindowKeyEquivalentApp) {
+@@ -134,4 +136,29 @@ TEST(MainMenuBuilderTest, CloseWindowKeyEquivalentApp) {
    EXPECT_TRUE([@"w" isEqualToString:closeWindowMenuItem.keyEquivalent]);
  }
  
@@ -35,6 +35,10 @@ index 03f128044c43b1f09a430b15f984fbd674695b4e..1325af6a6f716c2ad6f532373eb0c6b9
 +  EXPECT_NSEQ(l10n_util::GetNSStringF(IDS_ABOUT_MAC, u"myArc"),
 +              about_item.title);
 +  EXPECT_TRUE([app_menu itemAtIndex:2].separatorItem);
++  EXPECT_NSEQ(l10n_util::GetNSStringF(IDS_HIDE_APP_MAC, u"myArc"),
++              [app_menu itemWithTag:IDC_HIDE_APP].title);
++  EXPECT_NSEQ(l10n_util::GetNSStringF(IDS_EXIT_MAC, u"myArc"),
++              [app_menu itemWithTag:IDC_EXIT].title);
 +}
 +
  }  // namespace

@@ -1,5 +1,5 @@
 diff --git a/chrome/browser/ui/cocoa/main_menu_builder.mm b/chrome/browser/ui/cocoa/main_menu_builder.mm
-index 047674248727a122fb3aee712981eefd0a4c3049..feaee3239050df96a1ca946f1a03abd6323c34aa 100644
+index 047674248727a122fb3aee712981eefd0a4c3049..5381c91afaf08fdf94dced3a01810311763e1a8f 100644
 --- a/chrome/browser/ui/cocoa/main_menu_builder.mm
 +++ b/chrome/browser/ui/cocoa/main_menu_builder.mm
 @@ -6,6 +6,9 @@
@@ -12,7 +12,7 @@ index 047674248727a122fb3aee712981eefd0a4c3049..feaee3239050df96a1ca946f1a03abd6
  #include "base/feature_list.h"
  #include "base/i18n/rtl.h"
  #include "base/mac/mac_util.h"
-@@ -34,6 +37,28 @@ namespace {
+@@ -34,6 +37,33 @@ namespace {
  
  using Item = internal::MenuItemBuilder;
  
@@ -25,6 +25,7 @@ index 047674248727a122fb3aee712981eefd0a4c3049..feaee3239050df96a1ca946f1a03abd6
 +
 +// myArc puts its nightly label (Info.plist `MyarcVersion`, written when the
 +// nightly is packaged) above About, read-only. Builds without it say "dev".
++// About, Hide and Quit name myArc, not the Chromium product name.
 +void AddMyarcVersionItem(NSMenu* app_menu) {
 +  NSString* version = base::apple::ObjCCast<NSString>(
 +      [base::apple::OuterBundle() objectForInfoDictionaryKey:@"MyarcVersion"]);
@@ -36,12 +37,16 @@ index 047674248727a122fb3aee712981eefd0a4c3049..feaee3239050df96a1ca946f1a03abd6
 +  [app_menu insertItem:version_item atIndex:0];
 +  [app_menu itemWithTag:IDC_ABOUT].title =
 +      l10n_util::GetNSStringFWithFixup(IDS_ABOUT_MAC, u"myArc");
++  [app_menu itemWithTag:IDC_HIDE_APP].title =
++      l10n_util::GetNSStringFWithFixup(IDS_HIDE_APP_MAC, u"myArc");
++  [app_menu itemWithTag:IDC_EXIT].title =
++      l10n_util::GetNSStringFWithFixup(IDS_EXIT_MAC, u"myArc");
 +}
 +
  // Capitalization Policy (go/chrome-capitalization):
  // Native macOS system menu bar items follow Apple Human Interface
  // Guidelines (HIG) and must use Title Case (via `_MAC` string variants or
-@@ -107,6 +132,10 @@ NSMenuItem* BuildAppMenu(NSApplication* nsapp,
+@@ -107,6 +137,10 @@ NSMenuItem* BuildAppMenu(NSApplication* nsapp,
  
    nsapp.servicesMenu = services_item.submenu;
  
