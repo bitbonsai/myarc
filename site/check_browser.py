@@ -119,7 +119,7 @@ try:
             if ((luminance('rgb(' + blended.join(',') + ')') + .05) / (background + .05) < 4.5) throw new Error('Dark text contrast')
           }
           if (document.documentElement.scrollWidth > innerWidth) throw new Error('Dark horizontal overflow')
-          const githubButtons = [...document.querySelectorAll('.button[href="https://github.com/bitbonsai/myarc"]')]
+          const githubButtons = [...document.querySelectorAll('.button[href="https://github.com/bitbonsai/myarc"], .nav-github')]
           if (!githubButtons.length || githubButtons.some(button => !button.querySelector('.github-icon[aria-hidden="true"]'))) throw new Error('GitHub CTA icons missing')
           for (const icon of document.querySelectorAll('.github-icon')) {
             if (icon.viewBox.baseVal.width !== 1024 || getComputedStyle(icon.querySelector('path')).fill !== getComputedStyle(icon).color) throw new Error('GitHub supplied mark or color regression')
