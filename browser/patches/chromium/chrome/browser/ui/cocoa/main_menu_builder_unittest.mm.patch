@@ -1,0 +1,40 @@
+diff --git a/chrome/browser/ui/cocoa/main_menu_builder_unittest.mm b/chrome/browser/ui/cocoa/main_menu_builder_unittest.mm
+index 03f128044c43b1f09a430b15f984fbd674695b4e..1325af6a6f716c2ad6f532373eb0c6b9b8ea542d 100644
+--- a/chrome/browser/ui/cocoa/main_menu_builder_unittest.mm
++++ b/chrome/browser/ui/cocoa/main_menu_builder_unittest.mm
+@@ -4,7 +4,9 @@
+ 
+ #import "chrome/browser/ui/cocoa/main_menu_builder.h"
+ 
++#include "base/command_line.h"
+ #include "base/strings/utf_string_conversions.h"
++#include "base/test/scoped_command_line.h"
+ #include "chrome/app/chrome_command_ids.h"
+ #include "chrome/grit/generated_resources.h"
+ #include "testing/gtest/include/gtest/gtest.h"
+@@ -134,4 +136,25 @@ TEST(MainMenuBuilderTest, CloseWindowKeyEquivalentApp) {
+   EXPECT_TRUE([@"w" isEqualToString:closeWindowMenuItem.keyEquivalent]);
+ }
+ 
++TEST(MainMenuBuilderTest, MyarcAppMenuShowsVersionAboveAbout) {
++  base::test::ScopedCommandLine scoped_command_line;
++  base::CommandLine* command_line = scoped_command_line.GetProcessCommandLine();
++  command_line->AppendSwitch("myarc-visual-parity");
++  command_line->AppendSwitch("myarc-workspace-sidebar");
++
++  NSMenu* app_menu =
++      [chrome::BuildMainMenu(nil, nil, u"Chromium", /*is_pwa=*/false,
++                             /*is_rtl=*/false) itemAtIndex:0]
++          .submenu;
++  NSMenuItem* version_item = [app_menu itemAtIndex:0];
++  EXPECT_NSEQ(@"dev", version_item.title);
++  EXPECT_FALSE(version_item.enabled);
++  EXPECT_EQ(nil, version_item.action);
++  NSMenuItem* about_item = [app_menu itemAtIndex:1];
++  EXPECT_EQ(IDC_ABOUT, about_item.tag);
++  EXPECT_NSEQ(l10n_util::GetNSStringF(IDS_ABOUT_MAC, u"myArc"),
++              about_item.title);
++  EXPECT_TRUE([app_menu itemAtIndex:2].separatorItem);
++}
++
+ }  // namespace

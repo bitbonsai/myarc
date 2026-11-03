@@ -1,0 +1,54 @@
+diff --git a/chrome/browser/ui/cocoa/main_menu_builder.mm b/chrome/browser/ui/cocoa/main_menu_builder.mm
+index 047674248727a122fb3aee712981eefd0a4c3049..feaee3239050df96a1ca946f1a03abd6323c34aa 100644
+--- a/chrome/browser/ui/cocoa/main_menu_builder.mm
++++ b/chrome/browser/ui/cocoa/main_menu_builder.mm
+@@ -6,6 +6,9 @@
+ 
+ #include <AvailabilityVersions.h>
+ 
++#include "base/apple/bundle_locations.h"
++#include "base/apple/foundation_util.h"
++#include "base/command_line.h"
+ #include "base/feature_list.h"
+ #include "base/i18n/rtl.h"
+ #include "base/mac/mac_util.h"
+@@ -34,6 +37,28 @@ namespace {
+ 
+ using Item = internal::MenuItemBuilder;
+ 
++bool UseMyarcAppMenu() {
++  const base::CommandLine* command_line =
++      base::CommandLine::ForCurrentProcess();
++  return command_line->HasSwitch("myarc-visual-parity") &&
++         command_line->HasSwitch("myarc-workspace-sidebar");
++}
++
++// myArc puts its nightly label (Info.plist `MyarcVersion`, written when the
++// nightly is packaged) above About, read-only. Builds without it say "dev".
++void AddMyarcVersionItem(NSMenu* app_menu) {
++  NSString* version = base::apple::ObjCCast<NSString>(
++      [base::apple::OuterBundle() objectForInfoDictionaryKey:@"MyarcVersion"]);
++  NSMenuItem* version_item =
++      [[NSMenuItem alloc] initWithTitle:version.length ? version : @"dev"
++                                 action:nil
++                          keyEquivalent:@""];
++  version_item.enabled = NO;
++  [app_menu insertItem:version_item atIndex:0];
++  [app_menu itemWithTag:IDC_ABOUT].title =
++      l10n_util::GetNSStringFWithFixup(IDS_ABOUT_MAC, u"myArc");
++}
++
+ // Capitalization Policy (go/chrome-capitalization):
+ // Native macOS system menu bar items follow Apple Human Interface
+ // Guidelines (HIG) and must use Title Case (via `_MAC` string variants or
+@@ -107,6 +132,10 @@ NSMenuItem* BuildAppMenu(NSApplication* nsapp,
+ 
+   nsapp.servicesMenu = services_item.submenu;
+ 
++  if (UseMyarcAppMenu()) {
++    AddMyarcVersionItem(item.submenu);
++  }
++
+   return item;
+ }
+ 

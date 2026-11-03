@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-11-03: App menu shows the nightly label and About myArc
+
+- In myArc workspace mode the app menu opens with a disabled item showing the nightly label, then "About myArc" with the old About action, then the separator and Settings. `tools/package_nightly.sh` writes the label into the staged bundle's Info.plist as `MyarcVersion` before signing, and Chromium's version stays 158.0.8122.0. Builds without the key, such as `out/MyarcM0`, show `dev` there, which marks them apart from a nightly at a glance.
+- Verification: `chrome`, `bridge_check` and `unit_tests` builds, `bridge_check`, `export_patches.py --check` and `check_docs.py` pass, and the 11 `MainMenuBuilderTest` cases pass, including a new one for this menu. On background launches read through accessibility, the dev build lists `dev` (disabled), About myArc and the separator, and a `/tmp` copy with `MyarcVersion` set to 2026.11.02.4 lists that label disabled in the same place. Without the myArc switches the menu still starts with About Chromium. A partial run of the packaging script into `/tmp` wrote the key.
+- Hide and Quit still say Chromium, since they share `IDS_PRODUCT_NAME` with the rest of the UI. The packaged nightly itself wasn't rebuilt or launched. Chromium `myarc` commit `11936e3f29`.
+
 ## 2026-11-02: Pins draw as favicon tiles
 
 - The current Space's Pins join the Profile's Favorites in the top grid as favicon-only tiles, after the Favorites, with the same widths, 47 DIP height, selected fill, ring and context menu. The title moves to the tooltip and accessible name. Below the tiles come the Space title, then New Tab 41 DIP down, with the divider and Clear between them only while Today has tabs. Switching Spaces swaps the Pin tiles and keeps the Favorites. Library Space cards still list their Pins. Pin and Favorite branches in the row close button are gone, since only Today tabs are rows now.

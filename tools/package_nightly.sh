@@ -26,6 +26,12 @@ mkdir -p "$STAGE"
 ditto "$APP_SRC" "$APP"
 xattr -cr "$APP"
 
+# The app menu shows this label above About. Chromium's own version stays.
+PLIST="$APP/Contents/Info.plist"
+/usr/libexec/PlistBuddy -c 'Delete :MyarcVersion' "$PLIST" 2>/dev/null || true
+/usr/libexec/PlistBuddy -c "Add :MyarcVersion string $VERSION" "$PLIST"
+echo "MyarcVersion: $(/usr/libexec/PlistBuddy -c 'Print :MyarcVersion' "$PLIST")"
+
 # The bundle must not load anything from the build tree.
 BIN="$APP/Contents/MacOS/myArc"
 FRAMEWORK=$(find "$APP/Contents/Frameworks/myArc Framework.framework/Versions" -maxdepth 2 -type f -name 'myArc Framework' | head -1)
