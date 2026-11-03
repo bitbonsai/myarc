@@ -223,12 +223,11 @@ constexpr SkColor kGrayButton = SkColorSetRGB(0x45, 0x45, 0x46);
 constexpr SkColor kButtonText = SkColorSetRGB(0xE3, 0xE3, 0xE3);
 constexpr SkColor kSwitchTrack = SkColorSetRGB(0x37, 0x37, 0x38);
 constexpr SkColor kSwitchKnob = SkColorSetRGB(0xC8, 0xC8, 0xC8);
-// myArc brand colors (design.md): ivory name, primary blue. The card is
+// myArc brand colors (design.md): ivory name and quiet grays. The card is
 // frosted glass tinted by the ribbon's blue, violet, pink and orange.
 constexpr SkColor kBrandName = SkColorSetRGB(0xF5, 0xF2, 0xEC);
 constexpr SkColor kBrandQuiet = SkColorSetRGB(0xB1, 0xBC, 0xC9);
 constexpr SkColor kBrandFaint = SkColorSetRGB(0x7D, 0x8A, 0x99);
-constexpr SkColor kBrandBlue = SkColorSetRGB(0x03, 0x4B, 0xF4);
 
 constexpr char16_t kComingLater[] = u"Not in myArc yet";
 
@@ -463,7 +462,7 @@ BEGIN_METADATA(Panel)
 END_METADATA
 
 // The myArc card: a faint white pane that catches light along its top edge,
-// tinted from the icon side by soft glows in the ribbon's colors.
+// tinted across its width by soft glows in the ribbon's colors.
 class GlassCard : public views::View {
   METADATA_HEADER(GlassCard, views::View)
 
@@ -475,12 +474,16 @@ class GlassCard : public views::View {
       float x, y, radius;
       SkColor4f color;
     };
-    // Centers and radii in DIPs from the card's top left, around the icon.
+    // Centers and radii in DIPs from the card's top left. A negative x
+    // counts from the right edge, so the button side keeps its tint at any
+    // width.
     static constexpr Glow kGlows[] = {
-        {30, 44, 110, {0.20f, 0.42f, 1.00f, 0.30f}},
-        {92, 8, 96, {0.55f, 0.32f, 1.00f, 0.20f}},
-        {128, 70, 92, {1.00f, 0.30f, 0.62f, 0.15f}},
-        {178, 84, 80, {1.00f, 0.58f, 0.22f, 0.09f}},
+        {30, 44, 150, {0.20f, 0.42f, 1.00f, 0.30f}},
+        {100, 8, 140, {0.55f, 0.32f, 1.00f, 0.20f}},
+        {150, 70, 140, {1.00f, 0.30f, 0.62f, 0.14f}},
+        {230, 84, 130, {1.00f, 0.58f, 0.22f, 0.08f}},
+        {-150, 10, 210, {0.55f, 0.32f, 1.00f, 0.14f}},
+        {-40, 66, 170, {0.20f, 0.42f, 1.00f, 0.15f}},
     };
 
     gfx::ScopedCanvas scoped(canvas);
@@ -505,7 +508,9 @@ class GlassCard : public views::View {
       clear.fA = 0;
       const SkColor4f colors[] = {glow.color, clear};
       flags.setShader(cc::PaintShader::MakeRadialGradient(
-          SkPoint::Make(rect.x() + glow.x * scale, rect.y() + glow.y * scale),
+          SkPoint::Make(
+              (glow.x < 0 ? rect.right() : rect.x()) + glow.x * scale,
+              rect.y() + glow.y * scale),
           glow.radius * scale, colors, nullptr, 2, SkTileMode::kClamp));
       paint->drawRect(sk_rect, flags);
     }
@@ -632,7 +637,7 @@ class GeneralPage : public views::View {
         ->SetHorizontalAlignment(gfx::ALIGN_LEFT);
     brand_layout->SetFlexForView(text, 1);
     brand_->AddChildView(std::make_unique<PillButton>(
-        std::move(open_site), u"Visit myarc.dev", kBrandBlue, SK_ColorWHITE,
+        std::move(open_site), u"Visit myarc.dev", kBlueButton, SK_ColorWHITE,
         gfx::Font::Weight::NORMAL, nullptr));
 
     Refresh();

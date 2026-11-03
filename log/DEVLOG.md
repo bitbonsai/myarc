@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-11-03: The glass tint spans the whole myArc card
+
+- The glows around the icon now reach about 40% further, and two faint new ones in violet and blue sit behind the button, placed from the card's right edge so they stay there at any width. The right half no longer reads as flat gray. "Visit myarc.dev" now uses `kBlueButton`, the same blue as "Make myArc your default" in the banner, and the unused `kBrandBlue` is gone.
+- Verification: `chrome` build, `export_patches.py --check` and `check_docs.py` pass. A background capture of General is in `research-private/captures/20261103T070419Z-general-glass-spread/general.png`.
+- The code lives in `browser/foundation`, so the Chromium checkout has no change to commit.
+
 ## 2026-11-03: The myArc card turns to glass
 
 - The myArc card at the foot of General drops its midnight fill for a frosted pane painted in Skia: white at about 4% over the window, four soft radial glows in the ribbon's blue, violet, pink and orange spreading from the icon, a white sheen over the top half, and a hairline that runs from 26% white along the top to 7% at the bottom. Text and the blue "Visit myarc.dev" button stay as they were and still read clearly on the lighter surface.
