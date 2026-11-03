@@ -4,12 +4,12 @@ HTML: https://myarc.dev/download/
 
 Pre-alpha nightly, for trying the Arc-like shell. Not for daily or sensitive browsing.
 
-[Download for macOS (Apple silicon)](https://github.com/bitbonsai/myarc/releases/download/nightly-2026.11.02.4/myArc-Nightly-2026.11.02.4-arm64.dmg)
+[Download for macOS (Apple silicon)](https://github.com/bitbonsai/myarc/releases/download/nightly-2026.11.03/myArc-Nightly-2026.11.03-arm64.dmg)
 
-- **Version:** 2026.11.02.4
-- **Date:** November 2, 2026
+- **Version:** 2026.11.03
+- **Date:** November 3, 2026
 - **Size:** 234.3 MB
-- **SHA-256:** `b7dc0f50eb0d60b74bfdb3f2c9e2c42fcf635e06379f4720a5f10e8ebf5cdbdc`
+- **SHA-256:** `41ba4008d1de514c6a10582fae079a2baf6aa939127f60c0ae7b4c52fe33b6a4`
 
 ## System requirements
 
@@ -21,7 +21,7 @@ Pre-alpha nightly, for trying the Arc-like shell. Not for daily or sensitive bro
 1. Check the download against the SHA-256 listed with it. The two values must match.
 
    ```
-   shasum -a 256 ~/Downloads/myArc-Nightly-2026.11.02.4-arm64.dmg
+   shasum -a 256 ~/Downloads/myArc-Nightly-2026.11.03-arm64.dmg
    ```
 2. Open the DMG and drag myArc Nightly to Applications.
 3. macOS blocks the first launch because the app is not notarized. Right-click myArc Nightly, choose Open, then Open again. If macOS only offers Done or Move to Trash, which macOS 15 and later usually does, open System Settings \> Privacy \& Security, scroll to the myArc Nightly message and choose Open Anyway.
@@ -57,8 +57,8 @@ Each item was seen working in a native run or experiment note. None of it has ha
 
 - Built from a Chromium 158 development revision, not a stable release.
 - No automatic updates and no security updates. Install each new nightly by hand.
-- From 2026.11.02.3 on, nightlies are signed with a local certificate that later nightlies keep. macOS asks once more for your login password so it can read the saved-data key; choose Always Allow, and newer nightlies stop asking.
-- The app is self-signed and not notarized by Apple.
+- From 2026.11.03 on, nightlies are signed with an Apple Developer ID that later nightlies keep. macOS asks once more for your login password so it can read the saved-data key; choose Always Allow, and newer nightlies stop asking.
+- The app is signed with a Developer ID but not yet notarized by Apple.
 - Recent tabs and navigation can be lost after a crash or force quit.
 - Private window, Profile, cookie and credential guarantees are not verified.
 - RAR downloads are not scanned by Safe Browsing, because the UnRAR license conflicts with GPL-3.0.
@@ -68,7 +68,7 @@ Each item was seen working in a native run or experiment note. None of it has ha
 
 ## Other ways to get it
 
-- [GitHub releases](https://github.com/bitbonsai/myarc/releases/tag/nightly-2026.11.02.4) lists every nightly.
+- [GitHub releases](https://github.com/bitbonsai/myarc/releases/tag/nightly-2026.11.03) lists every nightly.
 - [Source on GitHub](https://github.com/bitbonsai/myarc), with instructions to [build it from source](https://github.com/bitbonsai/myarc/blob/main/browser/README.md).
 - [GitHub issues](https://github.com/bitbonsai/myarc/issues) take bug reports. Include the version, your macOS version and the steps that trigger the problem, and leave out private pages.
 
