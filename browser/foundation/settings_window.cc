@@ -18,6 +18,9 @@
 #include "build/build_config.h"
 #include "cc/paint/paint_flags.h"
 #include "chrome/browser/shell_integration.h"
+#include "chrome/common/pref_names.h"
+#include "components/prefs/pref_change_registrar.h"
+#include "components/prefs/pref_service.h"
 #include "third_party/skia/include/core/SkColor.h"
 #include "ui/accessibility/ax_enums.mojom.h"
 #include "ui/base/accelerators/accelerator.h"
@@ -55,9 +58,18 @@ namespace myarc {
 // settings_window_mac.mm: a titled window whose content fills the title bar.
 views::NativeWidget* CreateSettingsNativeWidget(views::Widget* widget);
 bool IsSettingsAppActive();
+// "Nightly <label>" from the packaged bundle, else "Development build".
+std::u16string MyarcVersionLabel();
+ui::ImageModel AppIconImage();
 #else
 bool IsSettingsAppActive() {
   return true;
+}
+std::u16string MyarcVersionLabel() {
+  return u"Development build";
+}
+ui::ImageModel AppIconImage() {
+  return ui::ImageModel();
 }
 #endif
 
@@ -170,6 +182,24 @@ constexpr float kCardRadius = 6;
 constexpr int kButtonHeight = 24;
 constexpr float kButtonRadius = 5;
 constexpr int kButtonPad = 12;
+// Arc's General panels: wider margins than the other pages, 30 DIP under the
+// banner, 9 DIP apart.
+constexpr int kGeneralMargin = 64;
+constexpr int kGeneralTop = kContentTop + kBannerHeight + 30;
+constexpr int kGeneralGap = 9;
+constexpr int kGeneralRowPad = 10;
+constexpr int kSwitchRowHeight = 36;
+constexpr int kProfileRowHeight = 47;
+constexpr int kProfileTextWidth = 340;
+// AppKit's regular switch: a 36 × 16 track around a 22 × 12 pill knob.
+constexpr gfx::Size kSwitchSize(36, 16);
+constexpr gfx::Size kKnobSize(22, 12);
+// The myArc card at the foot of General.
+constexpr int kBrandHeight = 76;
+constexpr int kBrandBottom = 40;
+constexpr int kBrandPad = 16;
+constexpr int kBrandIconSize = 44;
+constexpr float kBrandRadius = 10;
 
 constexpr SkColor kWindowFill = SkColorSetRGB(0x22, 0x22, 0x23);
 constexpr SkColor kTitleText = SkColorSetRGB(0x9E, 0x9E, 0x9F);
@@ -187,6 +217,15 @@ constexpr SkColor kCardStroke = SkColorSetRGB(0x3A, 0x3A, 0x3B);
 constexpr SkColor kCardText = SkColorSetRGB(0xC2, 0xC2, 0xC3);
 constexpr SkColor kGrayButton = SkColorSetRGB(0x45, 0x45, 0x46);
 constexpr SkColor kButtonText = SkColorSetRGB(0xE3, 0xE3, 0xE3);
+constexpr SkColor kSwitchTrack = SkColorSetRGB(0x37, 0x37, 0x38);
+constexpr SkColor kSwitchKnob = SkColorSetRGB(0xC8, 0xC8, 0xC8);
+// myArc brand colors (design.md): midnight card, ivory name, primary blue.
+constexpr SkColor kBrandFill = SkColorSetRGB(0x10, 0x1C, 0x2B);
+constexpr SkColor kBrandStroke = SkColorSetRGB(0x22, 0x31, 0x44);
+constexpr SkColor kBrandName = SkColorSetRGB(0xF5, 0xF2, 0xEC);
+constexpr SkColor kBrandQuiet = SkColorSetRGB(0xB1, 0xBC, 0xC9);
+constexpr SkColor kBrandFaint = SkColorSetRGB(0x7D, 0x8A, 0x99);
+constexpr SkColor kBrandBlue = SkColorSetRGB(0x03, 0x4B, 0xF4);
 
 constexpr char16_t kComingLater[] = u"Not in myArc yet";
 
@@ -352,6 +391,53 @@ class SectionTab : public views::Button {
 BEGIN_METADATA(SectionTab)
 END_METADATA
 
+// Arc's on/off switch: a gray track with a light pill knob, blue when on.
+class Switch : public views::Button {
+  METADATA_HEADER(Switch, views::Button)
+
+ public:
+  Switch(PressedCallback callback, std::u16string name)
+      : views::Button(std::move(callback)) {
+    GetViewAccessibility().SetRole(ax::mojom::Role::kSwitch);
+    SetAccessibleName(name);
+    SetOn(false);
+  }
+
+  void SetOn(bool on) {
+    on_ = on;
+    GetViewAccessibility().SetCheckedState(
+        on ? ax::mojom::CheckedState::kTrue : ax::mojom::CheckedState::kFalse);
+    SchedulePaint();
+  }
+
+  gfx::Size CalculatePreferredSize(
+      const views::SizeBounds& available_size) const override {
+    return kSwitchSize;
+  }
+
+  void OnPaintBackground(gfx::Canvas* canvas) override {
+    const gfx::Rect track(
+        gfx::Point(0, (height() - kSwitchSize.height()) / 2), kSwitchSize);
+    const SkColor alpha = GetEnabled() ? 0xFF : 0x66;
+    PaintPanel(canvas, track, kSwitchSize.height() / 2.f,
+               SkColorSetA(on_ ? kAccent : kSwitchTrack, alpha), std::nullopt);
+    const int inset_x = 1;
+    const int inset_y = (kSwitchSize.height() - kKnobSize.height()) / 2;
+    const int x = on_ ? track.right() - inset_x - kKnobSize.width()
+                      : track.x() + inset_x;
+    const gfx::Rect knob(gfx::Point(x, track.y() + inset_y), kKnobSize);
+    PaintPanel(canvas, knob, kKnobSize.height() / 2.f,
+               SkColorSetA(on_ ? SK_ColorWHITE : kSwitchKnob, alpha),
+               std::nullopt);
+  }
+
+ private:
+  bool on_ = false;
+};
+
+BEGIN_METADATA(Switch)
+END_METADATA
+
 // Rounded fill with a hairline edge, laid out by its own layout manager.
 class Panel : public views::View {
   METADATA_HEADER(Panel, views::View)
@@ -373,12 +459,40 @@ class Panel : public views::View {
 BEGIN_METADATA(Panel)
 END_METADATA
 
-// General: Arc's default-browser banner, backed by Chromium's worker.
+// One panel row: a label at left, `control` at right.
+Panel* AddRowPanel(views::View* parent,
+                   std::u16string text,
+                   bool multi_line,
+                   std::unique_ptr<views::View> control) {
+  auto* panel = parent->AddChildView(
+      std::make_unique<Panel>(kCardFill, kCardStroke, kCardRadius));
+  auto* layout = panel->SetLayoutManager(std::make_unique<views::BoxLayout>(
+      views::BoxLayout::Orientation::kHorizontal,
+      gfx::Insets::VH(0, kGeneralRowPad)));
+  layout->set_cross_axis_alignment(
+      views::BoxLayout::CrossAxisAlignment::kCenter);
+  auto* label =
+      AddLabel(panel, text, 13, gfx::Font::Weight::NORMAL, kCardText);
+  label->SetHorizontalAlignment(gfx::ALIGN_LEFT);
+  if (multi_line) {
+    label->SetMultiLine(true);
+    label->SetMaximumWidth(kProfileTextWidth);
+  }
+  layout->SetFlexForView(label, 1);
+  panel->AddChildView(std::move(control));
+  return panel;
+}
+
+// General: Arc's default-browser banner, backed by Chromium's worker, its
+// quit warning and Profile Settings rows, and a card about myArc.
 class GeneralPage : public views::View {
   METADATA_HEADER(GeneralPage, views::View)
 
  public:
-  GeneralPage() {
+  GeneralPage(PrefService* local_state,
+              base::RepeatingClosure show_profiles,
+              base::RepeatingClosure open_site)
+      : local_state_(local_state) {
     banner_ = AddChildView(
         std::make_unique<Panel>(kBannerFill, std::nullopt, kBannerRadius));
     auto* layout = banner_->SetLayoutManager(std::make_unique<views::BoxLayout>(
@@ -393,6 +507,61 @@ class GeneralPage : public views::View {
         u"Make myArc your default", kBlueButton, SK_ColorWHITE,
         gfx::Font::Weight::NORMAL, &kHeartIcon));
     make_default_->SetVisible(false);
+
+    // Chromium's Local State pref behind the app menu's "Warn Before
+    // Quitting"; either side sees the other's change.
+    auto quit_switch = std::make_unique<Switch>(
+        base::BindRepeating(&GeneralPage::ToggleQuitWarning,
+                            base::Unretained(this)),
+        u"Warn before quitting");
+    quit_switch_ = quit_switch.get();
+    quit_panel_ = AddRowPanel(this, u"Warn before quitting",
+                              /*multi_line=*/false, std::move(quit_switch));
+#if BUILDFLAG(IS_MAC)
+    registrar_.Init(local_state_);
+    registrar_.Add(prefs::kConfirmToQuitEnabled,
+                   base::BindRepeating(&GeneralPage::UpdateQuitWarning,
+                                       base::Unretained(this)));
+#endif
+    UpdateQuitWarning();
+
+    profile_panel_ = AddRowPanel(
+        this,
+        u"Manage your default search engine, Auto Archive and downloads in "
+        u"Profile Settings.",
+        /*multi_line=*/true,
+        std::make_unique<PillButton>(std::move(show_profiles),
+                                     u"Profile Settings…", kGrayButton,
+                                     kButtonText, gfx::Font::Weight::NORMAL,
+                                     nullptr));
+
+    brand_ = AddChildView(
+        std::make_unique<Panel>(kBrandFill, kBrandStroke, kBrandRadius));
+    auto* brand_layout =
+        brand_->SetLayoutManager(std::make_unique<views::BoxLayout>(
+            views::BoxLayout::Orientation::kHorizontal,
+            gfx::Insets::VH(0, kBrandPad), 12));
+    brand_layout->set_cross_axis_alignment(
+        views::BoxLayout::CrossAxisAlignment::kCenter);
+    auto* icon = brand_->AddChildView(
+        std::make_unique<views::ImageView>(AppIconImage()));
+    icon->SetImageSize(gfx::Size(kBrandIconSize, kBrandIconSize));
+    auto* text = brand_->AddChildView(std::make_unique<views::View>());
+    text->SetLayoutManager(std::make_unique<views::BoxLayout>(
+        views::BoxLayout::Orientation::kVertical, gfx::Insets(), 1));
+    AddLabel(text, u"myArc", 15, gfx::Font::Weight::SEMIBOLD, kBrandName)
+        ->SetHorizontalAlignment(gfx::ALIGN_LEFT);
+    AddLabel(text, u"forever yours.", 12, gfx::Font::Weight::NORMAL,
+             kBrandQuiet)
+        ->SetHorizontalAlignment(gfx::ALIGN_LEFT);
+    AddLabel(text, MyarcVersionLabel(), 11, gfx::Font::Weight::NORMAL,
+             kBrandFaint)
+        ->SetHorizontalAlignment(gfx::ALIGN_LEFT);
+    brand_layout->SetFlexForView(text, 1);
+    brand_->AddChildView(std::make_unique<PillButton>(
+        std::move(open_site), u"Visit myarc.dev", kBrandBlue, SK_ColorWHITE,
+        gfx::Font::Weight::NORMAL, nullptr));
+
     Refresh();
   }
 
@@ -400,15 +569,52 @@ class GeneralPage : public views::View {
     base::MakeRefCounted<shell_integration::DefaultBrowserWorker>()
         ->StartCheckIsDefault(base::BindOnce(&GeneralPage::OnDefaultState,
                                              weak_factory_.GetWeakPtr()));
+    UpdateQuitWarning();
   }
 
   void Layout(PassKey) override {
     const gfx::Size size = banner_->GetPreferredSize();
     banner_->SetBounds((width() - size.width()) / 2, kContentTop,
                        size.width(), kBannerHeight);
+    const int panel_width = width() - 2 * kGeneralMargin;
+    quit_panel_->SetBounds(kGeneralMargin, kGeneralTop, panel_width,
+                           kSwitchRowHeight);
+    profile_panel_->SetBounds(kGeneralMargin,
+                              quit_panel_->bounds().bottom() + kGeneralGap,
+                              panel_width, kProfileRowHeight);
+    brand_->SetBounds(kGeneralMargin, height() - kBrandBottom - kBrandHeight,
+                      panel_width, kBrandHeight);
   }
 
  private:
+  // The pref is Mac only; elsewhere the switch stays off and disabled.
+  const PrefService::Preference* QuitPref() const {
+#if BUILDFLAG(IS_MAC)
+    return local_state_
+               ? local_state_->FindPreference(prefs::kConfirmToQuitEnabled)
+               : nullptr;
+#else
+    return nullptr;
+#endif
+  }
+
+  void UpdateQuitWarning() {
+    const PrefService::Preference* pref = QuitPref();
+    quit_switch_->SetOn(pref && pref->GetValue()->is_bool() &&
+                        pref->GetValue()->GetBool());
+    // Like the menu item, a managed value can't be changed here.
+    quit_switch_->SetEnabled(pref && pref->IsUserModifiable());
+  }
+
+  void ToggleQuitWarning() {
+    const PrefService::Preference* pref = QuitPref();
+    if (!pref || !pref->IsUserModifiable() || !pref->GetValue()->is_bool()) {
+      return;
+    }
+    local_state_->SetBoolean(pref->name(), !pref->GetValue()->GetBool());
+    UpdateQuitWarning();
+  }
+
   void MakeDefault() {
     make_default_->SetEnabled(false);
     base::MakeRefCounted<shell_integration::DefaultBrowserWorker>()
@@ -428,9 +634,15 @@ class GeneralPage : public views::View {
     InvalidateLayout();
   }
 
+  const raw_ptr<PrefService> local_state_;
+  PrefChangeRegistrar registrar_;
   raw_ptr<Panel> banner_ = nullptr;
   raw_ptr<views::Label> message_ = nullptr;
   raw_ptr<PillButton> make_default_ = nullptr;
+  raw_ptr<Panel> quit_panel_ = nullptr;
+  raw_ptr<Switch> quit_switch_ = nullptr;
+  raw_ptr<Panel> profile_panel_ = nullptr;
+  raw_ptr<Panel> brand_ = nullptr;
   base::WeakPtrFactory<GeneralPage> weak_factory_{this};
 };
 
@@ -613,7 +825,9 @@ class SettingsView : public views::View {
   METADATA_HEADER(SettingsView, views::View)
 
  public:
-  SettingsView(base::RepeatingClosure more_settings,
+  SettingsView(PrefService* local_state,
+               base::RepeatingClosure more_settings,
+               base::RepeatingClosure open_site,
                SettingsWindow::ArchiveTimer archive_timer,
                base::RepeatingClosure close)
       : close_(std::move(close)) {
@@ -632,7 +846,11 @@ class SettingsView : public views::View {
       }
       tabs_.push_back(tab);
     }
-    general_ = AddChildView(std::make_unique<GeneralPage>());
+    general_ = AddChildView(std::make_unique<GeneralPage>(
+        local_state,
+        base::BindRepeating(&SettingsView::Select, base::Unretained(this),
+                            SettingsWindow::Section::kProfiles),
+        std::move(open_site)));
     profiles_ =
         AddChildView(std::make_unique<ProfilesPage>(std::move(archive_timer)));
     advanced_ = AddChildView(std::make_unique<AdvancedPage>(more_settings));
@@ -731,10 +949,14 @@ SettingsWindow* g_open = nullptr;
 }  // namespace
 
 SettingsWindow::SettingsWindow(const Profile* profile,
+                               PrefService* local_state,
                                base::RepeatingClosure open_more_settings,
+                               base::RepeatingClosure open_site,
                                ArchiveTimer archive_timer)
     : profile_(profile),
+      local_state_(local_state),
       open_more_settings_(std::move(open_more_settings)),
+      open_site_(std::move(open_site)),
       archive_timer_(std::move(archive_timer)) {}
 
 SettingsWindow::~SettingsWindow() {
@@ -776,7 +998,10 @@ void SettingsWindow::Show(Section section, bool inactive) {
     delegate_->SetCanMinimize(true);
     delegate_->SetTitle(u"Settings");
     view = delegate_->SetContentsView(std::make_unique<SettingsView>(
+        local_state_,
         base::BindRepeating(&SettingsWindow::OpenMoreSettings,
+                            weak_factory_.GetWeakPtr()),
+        base::BindRepeating(&SettingsWindow::OpenSite,
                             weak_factory_.GetWeakPtr()),
         archive_timer_,
         base::BindRepeating(&SettingsWindow::Close,
@@ -847,6 +1072,11 @@ void SettingsWindow::Close() {
 
 void SettingsWindow::OpenMoreSettings() {
   open_more_settings_.Run();
+  Close();
+}
+
+void SettingsWindow::OpenSite() {
+  open_site_.Run();
   Close();
 }
 

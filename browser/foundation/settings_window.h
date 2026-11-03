@@ -10,6 +10,7 @@
 #include "base/memory/raw_ptr.h"
 #include "base/memory/weak_ptr.h"
 
+class PrefService;
 class Profile;
 
 namespace views {
@@ -38,10 +39,13 @@ class SettingsWindow {
   };
 
   // `profile` is the original (never off-the-record) Profile the window edits;
-  // it must outlive this object. `open_more_settings` opens chrome://settings
-  // in the owning browser window.
+  // it and `local_state` must outlive this object. `open_more_settings` opens
+  // chrome://settings and `open_site` opens myarc.dev, both in the owning
+  // browser window.
   SettingsWindow(const Profile* profile,
+                 PrefService* local_state,
                  base::RepeatingClosure open_more_settings,
+                 base::RepeatingClosure open_site,
                  ArchiveTimer archive_timer);
   SettingsWindow(const SettingsWindow&) = delete;
   SettingsWindow& operator=(const SettingsWindow&) = delete;
@@ -64,9 +68,12 @@ class SettingsWindow {
 
  private:
   void OpenMoreSettings();
+  void OpenSite();
 
   const raw_ptr<const Profile> profile_;
+  const raw_ptr<PrefService> local_state_;
   base::RepeatingClosure open_more_settings_;
+  base::RepeatingClosure open_site_;
   ArchiveTimer archive_timer_;
   std::unique_ptr<views::WidgetDelegate> delegate_;
   std::unique_ptr<views::Widget> widget_;

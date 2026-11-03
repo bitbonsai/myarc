@@ -1,5 +1,5 @@
 diff --git a/chrome/browser/ui/views/frame/browser_view.cc b/chrome/browser/ui/views/frame/browser_view.cc
-index 7b568f6de760af21d6e9d2aa44415a7cef617c51..f7e841dda9d54a9515e1dd8ec45a6bafddc71a55 100644
+index 7b568f6de760af21d6e9d2aa44415a7cef617c51..9f78ad723f483796eaf3f8696d507715f0743bc1 100644
 --- a/chrome/browser/ui/views/frame/browser_view.cc
 +++ b/chrome/browser/ui/views/frame/browser_view.cc
 @@ -22,6 +22,7 @@
@@ -1532,7 +1532,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..f7e841dda9d54a9515e1dd8ec45a6baf
  }
  
  void BrowserView::RemovedFromWidget() {
-@@ -5267,6 +6499,941 @@ const views::View* BrowserView::GetViewByElementId(
+@@ -5267,6 +6499,947 @@ const views::View* BrowserView::GetViewByElementId(
  ///////////////////////////////////////////////////////////////////////////////
  // BrowserView, ui::AcceleratorTarget overrides:
  
@@ -1580,6 +1580,11 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..f7e841dda9d54a9515e1dd8ec45a6baf
 +  chrome::ShowSettings(browser());
 +}
 +
++void BrowserView::OpenMyarcSite() {
++  chrome::AddSelectedTabWithURL(browser(), GURL("https://myarc.dev"),
++                                ui::PAGE_TRANSITION_LINK);
++}
++
 +std::unique_ptr<myarc::SettingsWindow> BrowserView::CreateMyarcSettingsWindow() {
 +  // Settings edit the original Profile's workspace: an Incognito window's
 +  // workspace is thrown away, so its Settings set its regular Profile's timer.
@@ -1621,8 +1626,9 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..f7e841dda9d54a9515e1dd8ec45a6baf
 +      },
 +      profile->GetWeakPtr(), GetAsWeakPtr());
 +  return std::make_unique<myarc::SettingsWindow>(
-+      profile,
++      profile, g_browser_process->local_state(),
 +      base::BindRepeating(&BrowserView::OpenChromiumSettings, GetAsWeakPtr()),
++      base::BindRepeating(&BrowserView::OpenMyarcSite, GetAsWeakPtr()),
 +      std::move(timer));
 +}
 +
@@ -2474,7 +2480,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..f7e841dda9d54a9515e1dd8ec45a6baf
  bool BrowserView::AcceleratorPressed(const ui::Accelerator& accelerator) {
  #if BUILDFLAG(IS_MAC)
    // Forward accelerators to ExclusiveAccessManager to handle Esc press-and-hold
-@@ -5342,7 +7509,8 @@ void BrowserView::LoadingAnimationCallback(base::TimeTicks timestamp) {
+@@ -5342,7 +7515,8 @@ void BrowserView::LoadingAnimationCallback(base::TimeTicks timestamp) {
      // GetActiveWebContents can return null for example under Purify when
      // the animations are running slowly and this function is called on a timer
      // through LoadingAnimationCallback.
@@ -2484,7 +2490,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..f7e841dda9d54a9515e1dd8ec45a6baf
    }
  }
  
-@@ -5471,6 +7639,10 @@ bool BrowserView::MaybeUpdateDevtools(content::WebContents* contents) {
+@@ -5471,6 +7645,10 @@ bool BrowserView::MaybeUpdateDevtools(content::WebContents* contents) {
  
  void BrowserView::UpdateUIForContents(WebContents* contents,
                                        bool should_layout_immediately) {
@@ -2495,7 +2501,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..f7e841dda9d54a9515e1dd8ec45a6baf
    TRACE_EVENT0("ui", "BrowserView::UpdateUIForContents");
    bool needs_layout = MaybeShowBookmarkBar(contents);
  
-@@ -5706,6 +7878,26 @@ void BrowserView::LoadAccelerators() {
+@@ -5706,6 +7884,26 @@ void BrowserView::LoadAccelerators() {
    }
  
  #if BUILDFLAG(IS_MAC)

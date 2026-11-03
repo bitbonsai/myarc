@@ -1,5 +1,5 @@
 diff --git a/chrome/browser/ui/views/frame/browser_view.h b/chrome/browser/ui/views/frame/browser_view.h
-index 750e46c97b64dccccf4268e912df5dbdb6516b3c..fac8f8ddf1715535bcb14033f1e1e95777ccd47c 100644
+index 750e46c97b64dccccf4268e912df5dbdb6516b3c..c94a4b620df17dd5452dbff1f72c756ab0eba31a 100644
 --- a/chrome/browser/ui/views/frame/browser_view.h
 +++ b/chrome/browser/ui/views/frame/browser_view.h
 @@ -8,11 +8,13 @@
@@ -71,7 +71,7 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..fac8f8ddf1715535bcb14033f1e1e957
    std::optional<int> theme_background_y_offset() const {
      return theme_background_y_offset_;
    }
-@@ -311,6 +330,32 @@ class BrowserView : public BrowserWindow,
+@@ -311,6 +330,34 @@ class BrowserView : public BrowserWindow,
  
    ScrimView* window_scrim_view() { return window_scrim_view_; }
  
@@ -97,6 +97,8 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..fac8f8ddf1715535bcb14033f1e1e957
 +  bool ShowMyarcSettings() override;
 +  // Opens chrome://settings in this window, for myArc Settings.
 +  void OpenChromiumSettings();
++  // Opens https://myarc.dev in a new foreground tab here, for myArc Settings.
++  void OpenMyarcSite();
 +  // myArc Settings owned by this window: More Settings… opens here, and the
 +  // archive timer is the original Profile's.
 +  std::unique_ptr<myarc::SettingsWindow> CreateMyarcSettingsWindow();
@@ -104,7 +106,7 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..fac8f8ddf1715535bcb14033f1e1e957
    base::WeakPtr<BrowserView> GetAsWeakPtr() {
      return weak_ptr_factory_.GetWeakPtr();
    }
-@@ -1253,12 +1298,94 @@ class BrowserView : public BrowserWindow,
+@@ -1253,12 +1300,94 @@ class BrowserView : public BrowserWindow,
  
    // Anchor point for help bubbles and other dialogs that want to reliably
    // anchor outside the content area of the window.
@@ -199,7 +201,7 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..fac8f8ddf1715535bcb14033f1e1e957
  
    // A mapping between accelerators and command IDs.
    std::map<ui::Accelerator, int> accelerator_table_;
-@@ -1411,6 +1538,7 @@ class BrowserView : public BrowserWindow,
+@@ -1411,6 +1540,7 @@ class BrowserView : public BrowserWindow,
    base::EnumSet<TabStripAndWebAppViewsReparentedState>
        tab_strip_web_apps_reparented_state_;
  

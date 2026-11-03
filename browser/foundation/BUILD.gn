@@ -192,6 +192,8 @@ source_set("settings_window") {
   deps = [
     "//cc/paint",
     "//chrome/browser:shell_integration",
+    "//chrome/common:constants",
+    "//components/prefs",
     "//skia",
     "//ui/accessibility",
     "//ui/base",

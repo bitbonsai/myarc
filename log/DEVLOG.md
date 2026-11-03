@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-11-03: General settings fill in below the banner
+
+- Under the default-browser banner, General now has Arc's "Warn before quitting" switch on Chromium's `browser.confirm_to_quit` Local State pref, a row with Arc's Profile Settings copy whose button switches to the Profiles tab, and a midnight myArc card at the foot of the page. The card shows the ribbon icon from the bundle's `app.icns`, "forever yours.", the `MyarcVersion` label (or "Development build") and a "Visit myarc.dev" button that opens the site in a new foreground tab of the owning window and closes Settings.
+- Verification: `chrome` build, `export_patches.py --check` and `check_docs.py` pass. A background launch with the pref seeded on, driven through accessibility, showed the switch on, then off after a press (Local State then read `false`), then on again after the app menu's "Warn Before Quitting" item, with Settings open the whole time. Profile Settings… opened the Profiles tab, and Visit myarc.dev loaded the site's title in the browser window. Captures are in `research-private/captures/20261103T065030Z-general-visit/`.
+- Panels use Arc's 64 DIP side margin, 36 DIP switch row and 9 DIP gap, and sit 30 DIP under the banner. The nightly's version label and a managed pref, which disables the switch, weren't checked in a launch. Chromium `myarc` commit `20b985b7bc`.
+
 ## 2026-11-03: App menu shows the nightly label and About myArc
 
 - In myArc workspace mode the app menu opens with a disabled item showing the nightly label, then "About myArc" with the old About action, then the separator and Settings. `tools/package_nightly.sh` writes the label into the staged bundle's Info.plist as `MyarcVersion` before signing, and Chromium's version stays 158.0.8122.0. Builds without the key, such as `out/MyarcM0`, show `dev` there, which marks them apart from a nightly at a glance.
