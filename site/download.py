@@ -92,8 +92,8 @@ def limitations(release):
     codecs = (release or DEFAULTS)['proprietary_codecs']
     return ['Built from a Chromium 158 development revision, not a stable release.',
             'No automatic updates and no security updates. Install each new nightly by hand.',
-            'From 2026.11.02.3 on, nightlies are signed with a local certificate that later nightlies keep. macOS asks once more for your login password so it can read the saved-data key; choose Always Allow, and newer nightlies stop asking.',
-            'The app is self-signed and not notarized by Apple.',
+            'From 2026.11.03 on, nightlies are signed with an Apple Developer ID that later nightlies keep. macOS asks once more for your login password so it can read the saved-data key; choose Always Allow, and newer nightlies stop asking.',
+            'The app is signed with a Developer ID but not yet notarized by Apple.',
             'Recent tabs and navigation can be lost after a crash or force quit.',
             'Private window, Profile, cookie and credential guarantees are not verified.',
             'RAR downloads are not scanned by Safe Browsing, because the UnRAR license conflicts with GPL-3.0.',

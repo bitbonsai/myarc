@@ -1,6 +1,7 @@
 #!/bin/bash
 # Package the nightly build as a locally signed DMG outside the repository.
-# Signs with the "myArc Local Signing" identity (SIGN_ID), ad-hoc without it.
+# Signs with a Developer ID or Apple Development identity when the keychain has one, then
+# "myArc Local Signing", then ad-hoc. SIGN_ID overrides the choice.
 # Usage: tools/package_nightly.sh
 #   env: APP_SRC=<built myArc.app> DATE=YYYY-MM-DD VERSION=<label> TAG=<release tag>
 #        OUT=<output dir, default ~/.cache/myarc-m0/release/DATE>
@@ -41,9 +42,16 @@ if otool -XL "$BIN" "$FRAMEWORK" | grep -E '/out/|/Users/' ; then
 fi
 echo "otool: no build-tree references in $(basename "$BIN") or $(basename "$FRAMEWORK")"
 
-# A stable local identity keeps the Keychain's Always Allow across builds; an
-# ad-hoc signature changes with every build and asks for the password again.
-SIGN_ID=${SIGN_ID:-myArc Local Signing}
+# The Keychain pins Safe Storage access to the signer's Team ID when the cert
+# has one, so an Apple Development cert keeps Always Allow across builds. A
+# self-signed or ad-hoc signature gets pinned to each build's hash instead,
+# and every new build asks for the password again.
+if [ -z "${SIGN_ID:-}" ]; then
+  IDS=$(security find-identity -v -p codesigning)
+  SIGN_ID=$(sed -n 's/.*"\(Developer ID Application: [^"]*\)".*/\1/p' <<<"$IDS" | head -1)
+  [ -n "$SIGN_ID" ] || SIGN_ID=$(sed -n 's/.*"\(Apple Development: [^"]*\)".*/\1/p' <<<"$IDS" | head -1)
+  SIGN_ID=${SIGN_ID:-myArc Local Signing}
+fi
 security find-identity -p codesigning | grep -qF "\"$SIGN_ID\"" || SIGN_ID=-
 echo "signing with: $SIGN_ID"
 codesign --force --deep --sign "$SIGN_ID" "$APP"
