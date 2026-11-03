@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-11-03: Crashes restore silently
+
+- In workspace mode the first crashed launch skips Chromium's "Restore pages?" bubble and runs the same crash restore the Restore button does, with its lock and recovery-choice order intact, so the sidebar binds straight away. Only each window's active tab loads; the rest wait until clicked. The profile pref `myarc.crashed_launches` brings the stock bubble back on the second crashed launch in a row, and a clean exit clears it. Notes in [native-crash-auto-restore.md](../browser/experiments/native-crash-auto-restore.md).
+- Verification: `chrome` build, `export_patches.py --check` and `check_docs.py` pass, and the updated `SessionCrashedBubbleMyarcViewTest` passes a syntax-only compile. On a synthetic `/tmp` profile with two Spaces, a Favorite and two Temporary tabs, SIGKILL then a plain relaunch kept every item ID and URL with no bubble. After a clean exit the count reset. The next crash restore fetched only the active page, and a second SIGKILL in a row showed the stock bubble. Evidence is in `/tmp/crashrestore/evidence/`.
+- The first crashed relaunch also loaded one Temporary tab, probably because the setup session recorded it as active; that's unconfirmed. Interactive tests weren't run, and multiwindow restores weren't tried. Chromium `myarc` commit `dc761bfed3`.
+
 ## 2026-11-03: General settings fill in below the banner
 
 - Under the default-browser banner, General now has Arc's "Warn before quitting" switch on Chromium's `browser.confirm_to_quit` Local State pref, a row with Arc's Profile Settings copy whose button switches to the Profiles tab, and a midnight myArc card at the foot of the page. The card shows the ribbon icon from the bundle's `app.icns`, "forever yours.", the `MyarcVersion` label (or "Development build") and a "Visit myarc.dev" button that opens the site in a new foreground tab of the owning window and closes Settings.

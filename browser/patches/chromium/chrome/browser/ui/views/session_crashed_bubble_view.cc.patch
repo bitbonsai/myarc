@@ -1,8 +1,16 @@
 diff --git a/chrome/browser/ui/views/session_crashed_bubble_view.cc b/chrome/browser/ui/views/session_crashed_bubble_view.cc
-index 352f95135d8a0a05f1ff9f5079d2509604629070..e44c9f5d35ecd7c0a6b0d1e17411c3a409b6bbf2 100644
+index 352f95135d8a0a05f1ff9f5079d2509604629070..17314be108358e6488a1d47aa984beb97a4c6800 100644
 --- a/chrome/browser/ui/views/session_crashed_bubble_view.cc
 +++ b/chrome/browser/ui/views/session_crashed_bubble_view.cc
-@@ -21,6 +21,7 @@
+@@ -10,6 +10,7 @@
+ #include <utility>
+ #include <vector>
+ 
++#include "base/command_line.h"
+ #include "base/functional/bind.h"
+ #include "base/functional/callback_helpers.h"
+ #include "base/memory/raw_ptr.h"
+@@ -21,6 +22,7 @@
  #include "chrome/browser/metrics/metrics_reporting_state.h"
  #include "chrome/browser/prefs/session_startup_pref.h"
  #include "chrome/browser/profiles/profile.h"
@@ -10,7 +18,12 @@ index 352f95135d8a0a05f1ff9f5079d2509604629070..e44c9f5d35ecd7c0a6b0d1e17411c3a4
  #include "chrome/browser/sessions/exit_type_service.h"
  #include "chrome/browser/sessions/session_restore.h"
  #include "chrome/browser/ui/browser_window/public/browser_collection_observer.h"
-@@ -42,6 +43,7 @@
+@@ -38,10 +40,12 @@
+ #include "chrome/grit/branded_strings.h"
+ #include "chrome/grit/generated_resources.h"
+ #include "chrome/installer/util/google_update_settings.h"
++#include "components/prefs/pref_service.h"
+ #include "components/strings/grit/components_branded_strings.h"
  #include "components/strings/grit/components_strings.h"
  #include "content/public/browser/browser_context.h"
  #include "content/public/browser/browser_thread.h"
@@ -18,7 +31,7 @@ index 352f95135d8a0a05f1ff9f5079d2509604629070..e44c9f5d35ecd7c0a6b0d1e17411c3a4
  #include "ui/base/buildflags.h"
  #include "ui/base/interaction/element_identifier.h"
  #include "ui/base/l10n/l10n_util.h"
-@@ -59,6 +61,62 @@
+@@ -59,6 +63,62 @@
  #include "ui/views/layout/box_layout.h"
  #include "ui/views/widget/widget.h"
  
@@ -81,7 +94,7 @@ index 352f95135d8a0a05f1ff9f5079d2509604629070..e44c9f5d35ecd7c0a6b0d1e17411c3a4
  namespace {
  
  views::BubbleDialogDelegate* g_instance_for_test = nullptr;
-@@ -101,7 +159,11 @@ DEFINE_LOCAL_ELEMENT_IDENTIFIER_VALUE(kUmaConsentCheckboxId);
+@@ -101,7 +161,11 @@ DEFINE_LOCAL_ELEMENT_IDENTIFIER_VALUE(kUmaConsentCheckboxId);
  
  class SessionCrashedBubbleDelegate : public ui::DialogModelDelegate {
   public:
@@ -94,7 +107,7 @@ index 352f95135d8a0a05f1ff9f5079d2509604629070..e44c9f5d35ecd7c0a6b0d1e17411c3a4
      if (ExitTypeService* exit_type_service =
              ExitTypeService::GetInstanceForProfile(profile)) {
        crashed_lock_ = exit_type_service->CreateCrashedLock();
-@@ -116,6 +178,7 @@ class SessionCrashedBubbleDelegate : public ui::DialogModelDelegate {
+@@ -116,6 +180,7 @@ class SessionCrashedBubbleDelegate : public ui::DialogModelDelegate {
      }
      ignored_ = false;
      MaybeEnableUma();
@@ -102,7 +115,7 @@ index 352f95135d8a0a05f1ff9f5079d2509604629070..e44c9f5d35ecd7c0a6b0d1e17411c3a4
      dialog_model()->host()->Close();
  
      RecordBubbleHistogramValue(SESSION_CRASHED_BUBBLE_STARTUP_PAGES);
-@@ -142,6 +205,7 @@ class SessionCrashedBubbleDelegate : public ui::DialogModelDelegate {
+@@ -142,6 +207,7 @@ class SessionCrashedBubbleDelegate : public ui::DialogModelDelegate {
      // won't wait for restore to complete.
      std::unique_ptr<ExitTypeService::CrashedLock> lock =
          std::move(crashed_lock_);
@@ -110,7 +123,7 @@ index 352f95135d8a0a05f1ff9f5079d2509604629070..e44c9f5d35ecd7c0a6b0d1e17411c3a4
      dialog_model()->host()->Close();
  
      RecordBubbleHistogramValue(SESSION_CRASHED_BUBBLE_RESTORED);
-@@ -169,7 +233,8 @@ class SessionCrashedBubbleDelegate : public ui::DialogModelDelegate {
+@@ -169,7 +235,8 @@ class SessionCrashedBubbleDelegate : public ui::DialogModelDelegate {
  
   private:
    bool RejectActionIfBrowserClosing(BrowserWindowInterface* browser) {
@@ -120,7 +133,7 @@ index 352f95135d8a0a05f1ff9f5079d2509604629070..e44c9f5d35ecd7c0a6b0d1e17411c3a4
          !browser->IsDeleteScheduled()) {
        return false;
      }
-@@ -181,42 +246,13 @@ class SessionCrashedBubbleDelegate : public ui::DialogModelDelegate {
+@@ -181,42 +248,13 @@ class SessionCrashedBubbleDelegate : public ui::DialogModelDelegate {
    }
  
    bool ignored_ = true;
@@ -165,7 +178,39 @@ index 352f95135d8a0a05f1ff9f5079d2509604629070..e44c9f5d35ecd7c0a6b0d1e17411c3a4
  // static
  void SessionCrashedBubble::ShowIfNotOffTheRecordProfile(
      BrowserWindowInterface* browser,
-@@ -262,7 +298,8 @@ void SessionCrashedBubbleView::Show(
+@@ -231,6 +269,31 @@ void SessionCrashedBubble::ShowIfNotOffTheRecordProfile(
+       std::make_unique<SessionCrashedBubbleView::BrowserRemovalObserver>(
+           browser);
+ 
++  // myArc restores silently after a crash, as Arc does. The second crashed
++  // launch in a row asks instead, so a session that crashes on restore cannot
++  // loop.
++  if (base::CommandLine::ForCurrentProcess()->HasSwitch(
++          "myarc-workspace-sidebar")) {
++    PrefService* prefs = browser->GetProfile()->GetPrefs();
++    const int crashed_launches =
++        prefs->GetInteger(SessionStartupPref::kMyarcCrashedLaunches) + 1;
++    prefs->SetInteger(SessionStartupPref::kMyarcCrashedLaunches,
++                      crashed_launches);
++    prefs->CommitPendingWrite();
++    if (crashed_launches == 1) {
++      // Same ordering as the Restore button: the restorer exists before the
++      // lock and the recovery choice release.
++      std::unique_ptr<ExitTypeService::CrashedLock> lock;
++      if (ExitTypeService* exit_type_service =
++              ExitTypeService::GetInstanceForProfile(browser->GetProfile())) {
++        lock = exit_type_service->CreateCrashedLock();
++      }
++      auto recovery_choice = std::move(browser_observer);
++      SessionRestore::RestoreSessionAfterCrash(browser);
++      return;
++    }
++  }
++
+   if (DoesSupportConsentCheck()) {
+     GoogleUpdateSettings::CollectStatsConsentTaskRunner()
+         ->PostTaskAndReplyWithResult(
+@@ -262,7 +325,8 @@ void SessionCrashedBubbleView::Show(
  
    if (browser && (skip_tab_checking ||
                    browser->GetTabStripModel()->GetActiveWebContents())) {
@@ -175,7 +220,7 @@ index 352f95135d8a0a05f1ff9f5079d2509604629070..e44c9f5d35ecd7c0a6b0d1e17411c3a4
      return;
    }
  
-@@ -278,6 +315,15 @@ views::BubbleDialogDelegate* SessionCrashedBubbleView::ShowBubble(
+@@ -278,6 +342,15 @@ views::BubbleDialogDelegate* SessionCrashedBubbleView::ShowBubble(
      BrowserWindowInterface* browser,
      bool uma_opted_in_already,
      bool offer_uma_optin) {
@@ -191,7 +236,7 @@ index 352f95135d8a0a05f1ff9f5079d2509604629070..e44c9f5d35ecd7c0a6b0d1e17411c3a4
    BrowserView* browser_view = BrowserView::GetBrowserViewForBrowser(browser);
    // TODO(webium): WebUI browser does not use BrowserView. Make an WebUI anchor
    // for the bubble.
-@@ -289,8 +335,8 @@ views::BubbleDialogDelegate* SessionCrashedBubbleView::ShowBubble(
+@@ -289,8 +362,8 @@ views::BubbleDialogDelegate* SessionCrashedBubbleView::ShowBubble(
    views::BubbleAnchor anchor =
        control ? control->GetAnchor() : views::BubbleAnchor();
  

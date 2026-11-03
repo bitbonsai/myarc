@@ -1,8 +1,16 @@
 diff --git a/chrome/browser/ui/startup/startup_browser_creator_impl.cc b/chrome/browser/ui/startup/startup_browser_creator_impl.cc
-index 1d9b0f07e883f37e68a5eaeff146b0ce4285ab58..c615660a97a942fefd9a84869028d451f50b68c3 100644
+index 1d9b0f07e883f37e68a5eaeff146b0ce4285ab58..226581973cd1b687ef1abce5d773ad1925e3bc42 100644
 --- a/chrome/browser/ui/startup/startup_browser_creator_impl.cc
 +++ b/chrome/browser/ui/startup/startup_browser_creator_impl.cc
-@@ -69,6 +69,7 @@
+@@ -30,6 +30,7 @@
+ #include "chrome/browser/profiles/keep_alive/scoped_profile_keep_alive.h"
+ #include "chrome/browser/profiles/profile.h"
+ #include "chrome/browser/profiles/profile_io_data.h"
++#include "chrome/browser/sessions/exit_type_service.h"
+ #include "chrome/browser/sessions/session_service.h"
+ #include "chrome/browser/sessions/session_service_factory.h"
+ #include "chrome/browser/signin/account_consistency_mode_manager.h"
+@@ -69,6 +70,7 @@
  #include "content/public/browser/dom_storage_context.h"
  #include "content/public/browser/storage_partition.h"
  #include "content/public/common/content_switches.h"
@@ -10,10 +18,15 @@ index 1d9b0f07e883f37e68a5eaeff146b0ce4285ab58..c615660a97a942fefd9a84869028d451
  #include "ui/base/page_transition_types.h"
  #include "ui/base/window_open_disposition.h"
  #include "url/origin.h"
-@@ -264,7 +265,12 @@ void StartupBrowserCreatorImpl::Launch(
+@@ -264,7 +266,17 @@ void StartupBrowserCreatorImpl::Launch(
    }
  #endif
  
++  // A clean previous exit ends any run of crashed launches.
++  if (ExitTypeService::GetLastSessionExitType(profile_) != ExitType::kCrashed) {
++    profile_->GetOriginalProfile()->GetPrefs()->ClearPref(
++        SessionStartupPref::kMyarcCrashedLaunches);
++  }
 +  myarc::WorkspaceLifecycle::Notify(
 +      profile_, myarc::WorkspaceLifecycle::Event::kStartupStarted);
    DetermineURLsAndLaunch(process_startup, restore_tabbed_browser);

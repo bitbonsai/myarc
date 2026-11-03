@@ -1,8 +1,16 @@
 diff --git a/chrome/browser/sessions/session_restore.cc b/chrome/browser/sessions/session_restore.cc
-index ea1990e8cd42875e6d651edbe429c76de7e8ab9f..a1c748c288da576d3947d192090f06fc902c3035 100644
+index ea1990e8cd42875e6d651edbe429c76de7e8ab9f..d5d0311e610f68fc500644295e3fccc1927648d2 100644
 --- a/chrome/browser/sessions/session_restore.cc
 +++ b/chrome/browser/sessions/session_restore.cc
-@@ -115,6 +115,7 @@
+@@ -51,6 +51,7 @@
+ #include "chrome/browser/search/search.h"
+ #include "chrome/browser/sessions/app_session_service.h"
+ #include "chrome/browser/sessions/app_session_service_factory.h"
++#include "chrome/browser/sessions/exit_type_service.h"
+ #include "chrome/browser/sessions/session_restore_delegate.h"
+ #include "chrome/browser/sessions/session_restore_metrics.h"
+ #include "chrome/browser/sessions/session_service.h"
+@@ -115,6 +116,7 @@
  #include "content/public/browser/web_contents.h"
  #include "extensions/browser/extension_registry.h"
  #include "extensions/common/extension_set.h"
@@ -10,7 +18,7 @@ index ea1990e8cd42875e6d651edbe429c76de7e8ab9f..a1c748c288da576d3947d192090f06fc
  #include "ui/base/mojom/window_show_state.mojom.h"
  #include "ui/base/page_transition_types.h"
  #include "ui/base/window_open_disposition.h"
-@@ -364,6 +365,8 @@ class SessionRestoreImpl : public BrowserCollectionObserver {
+@@ -364,6 +366,8 @@ class SessionRestoreImpl : public BrowserCollectionObserver {
          KeepAliveOrigin::SESSION_RESTORE, KeepAliveRestartOption::DISABLED);
      profile_keep_alive_ = std::make_unique<ScopedProfileKeepAlive>(
          profile, ProfileKeepAliveOrigin::kBrowserWindow);
@@ -19,7 +27,7 @@ index ea1990e8cd42875e6d651edbe429c76de7e8ab9f..a1c748c288da576d3947d192090f06fc
    }
  
    bool synchronous() const { return synchronous_; }
-@@ -532,17 +535,20 @@ class SessionRestoreImpl : public BrowserCollectionObserver {
+@@ -532,17 +536,20 @@ class SessionRestoreImpl : public BrowserCollectionObserver {
      // IsAnySessionCurrentlyRestoring() from OnProfileSessionRestored() to
      // decide whether the last in-flight restore has completed.
      GetActiveSessionRestorers().erase(this);
@@ -47,7 +55,23 @@ index ea1990e8cd42875e6d651edbe429c76de7e8ab9f..a1c748c288da576d3947d192090f06fc
    }
  
    bool is_foreign_session_restore() const {
-@@ -879,6 +885,9 @@ class SessionRestoreImpl : public BrowserCollectionObserver {
+@@ -600,6 +607,15 @@ class SessionRestoreImpl : public BrowserCollectionObserver {
+                   [](RestoredTab& tab) { return tab.contents() == nullptr; });
+ 
+     if (succeeded) {
++      // After a crash, myArc loads only each window's active tab. The others
++      // stay unloaded until they are activated.
++      if (base::CommandLine::ForCurrentProcess()->HasSwitch(
++              "myarc-workspace-sidebar") &&
++          ExitTypeService::GetLastSessionExitType(profile_) ==
++              ExitType::kCrashed) {
++        std::erase_if(restored_tabs,
++                      [](const RestoredTab& tab) { return !tab.is_active(); });
++      }
+       // Sort the tabs in the order they should be restored, and start loading
+       // them.
+       std::stable_sort(restored_tabs.begin(), restored_tabs.end());
+@@ -879,6 +895,9 @@ class SessionRestoreImpl : public BrowserCollectionObserver {
            ShouldRestoreToExistingBrowser()) {
          // The first set of tabs is added to the existing browser.
          browser = browser_;
@@ -57,7 +81,7 @@ index ea1990e8cd42875e6d651edbe429c76de7e8ab9f..a1c748c288da576d3947d192090f06fc
        } else {
  #if BUILDFLAG(IS_CHROMEOS)
          ash::BootTimesRecorder::Get()->AddLoginTimeMarker(
-@@ -1404,6 +1413,9 @@ class SessionRestoreImpl : public BrowserCollectionObserver {
+@@ -1404,6 +1423,9 @@ class SessionRestoreImpl : public BrowserCollectionObserver {
        manager->SetWindowCreationInfo(
            waap::NewWindowCreationSource::kSessionRestore, now);
      }

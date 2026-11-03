@@ -1,0 +1,15 @@
+diff --git a/chrome/browser/prefs/session_startup_pref.h b/chrome/browser/prefs/session_startup_pref.h
+index 666bd803fa9e9812805714f71d4c0dce88a638ca..d713547bf382d24f10e1fe9627a1bf421fc426e7 100644
+--- a/chrome/browser/prefs/session_startup_pref.h
++++ b/chrome/browser/prefs/session_startup_pref.h
+@@ -58,6 +58,10 @@ struct SessionStartupPref {
+ 
+   static void RegisterProfilePrefs(user_prefs::PrefRegistrySyncable* registry);
+ 
++  // Consecutive crashed launches that myArc restored without asking. A clean
++  // exit resets the count.
++  static constexpr char kMyarcCrashedLaunches[] = "myarc.crashed_launches";
++
+   // Returns the default value for |type|.
+   static Type GetDefaultStartupType();
+ 

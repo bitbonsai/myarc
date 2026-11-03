@@ -1,5 +1,5 @@
 diff --git a/chrome/browser/ui/views/session_crashed_bubble_view_interactive_uitest.cc b/chrome/browser/ui/views/session_crashed_bubble_view_interactive_uitest.cc
-index c30c90bfe44ba4c558688af71f1d3b8ba1320544..43defda0650074c248c5d8a477bd2e10c003b5ce 100644
+index c30c90bfe44ba4c558688af71f1d3b8ba1320544..04cc13b6a2400bfbecfa59f076a13e5d955e7a4a 100644
 --- a/chrome/browser/ui/views/session_crashed_bubble_view_interactive_uitest.cc
 +++ b/chrome/browser/ui/views/session_crashed_bubble_view_interactive_uitest.cc
 @@ -5,8 +5,16 @@
@@ -101,7 +101,7 @@ index c30c90bfe44ba4c558688af71f1d3b8ba1320544..43defda0650074c248c5d8a477bd2e10
  
  class SessionCrashedBubbleViewTest : public DialogBrowserTest {
   public:
-@@ -51,6 +119,345 @@ class SessionCrashedBubbleViewTest : public DialogBrowserTest {
+@@ -51,6 +119,381 @@ class SessionCrashedBubbleViewTest : public DialogBrowserTest {
    raw_ptr<views::BubbleDialogDelegate, DanglingUntriaged> crash_bubble_;
  };
  
@@ -148,9 +148,11 @@ index c30c90bfe44ba4c558688af71f1d3b8ba1320544..43defda0650074c248c5d8a477bd2e10
 +  EXPECT_EQ(anchor, menu->GetAnchor().GetIfView());
 +
 +  // Exercise the startup entry point, with a forced exit type rather than an
-+  // actual browser crash. The tracked fallback does not exist yet.
++  // actual browser crash. The tracked fallback does not exist yet. A previous
++  // crashed launch makes this one ask instead of restoring silently.
 +  ExitTypeService::GetInstanceForProfile(profile)
 +      ->SetLastSessionExitTypeForTest(ExitType::kCrashed);
++  profile->GetPrefs()->SetInteger(SessionStartupPref::kMyarcCrashedLaunches, 1);
 +  SessionCrashedBubble::ShowIfNotOffTheRecordProfile(window, false);
 +  ASSERT_TRUE(base::test::RunUntil(
 +      [] { return SessionCrashedBubbleView::GetInstanceForTest(); }));
@@ -179,6 +181,39 @@ index c30c90bfe44ba4c558688af71f1d3b8ba1320544..43defda0650074c248c5d8a477bd2e10
 +  bubble->GetWidget()->CloseNow();
 +  EXPECT_FALSE(myarc::WorkspaceLifecycle::HasPendingSessionRestore(profile));
 +  EXPECT_EQ(nullptr, SessionCrashedBubbleView::GetInstanceForTest());
++  CloseBrowserSynchronously(window);
++}
++
++IN_PROC_BROWSER_TEST_P(SessionCrashedBubbleMyarcViewTest,
++                       FirstCrashedLaunchRestoresWithoutBubble) {
++  Profile* const profile = browser()->GetProfile();
++  PrefService* const prefs = profile->GetPrefs();
++  BrowserWindowCreateParams params(profile, /*from_user_gesture=*/true);
++  params.vertical_tab_strip_collapsed = GetParam();
++  auto* const window = CreateBrowserWindow(std::move(params));
++  chrome::AddTabAt(window, GURL("about:blank"), -1, true);
++  ExitTypeService::GetInstanceForProfile(profile)
++      ->SetLastSessionExitTypeForTest(ExitType::kCrashed);
++  ASSERT_EQ(0, prefs->GetInteger(SessionStartupPref::kMyarcCrashedLaunches));
++
++  // The restorer holds the workspace barrier after the choice is released.
++  SessionCrashedBubble::ShowIfNotOffTheRecordProfile(window, false);
++  EXPECT_EQ(nullptr, SessionCrashedBubbleView::GetInstanceForTest());
++  EXPECT_EQ(1, prefs->GetInteger(SessionStartupPref::kMyarcCrashedLaunches));
++  EXPECT_TRUE(myarc::WorkspaceLifecycle::HasPendingSessionRestore(profile));
++  ASSERT_TRUE(base::test::RunUntil([profile] {
++    return !myarc::WorkspaceLifecycle::HasPendingSessionRestore(profile);
++  }));
++  EXPECT_EQ(nullptr, SessionCrashedBubbleView::GetInstanceForTest());
++
++  // A second crashed launch in a row falls back to the stock bubble.
++  SessionCrashedBubble::ShowIfNotOffTheRecordProfile(window, false);
++  ASSERT_TRUE(base::test::RunUntil(
++      [] { return SessionCrashedBubbleView::GetInstanceForTest(); }));
++  EXPECT_EQ(2, prefs->GetInteger(SessionStartupPref::kMyarcCrashedLaunches));
++  EXPECT_TRUE(myarc::WorkspaceLifecycle::HasPendingSessionRestore(profile));
++  SessionCrashedBubbleView::GetInstanceForTest()->GetWidget()->CloseNow();
++  EXPECT_FALSE(myarc::WorkspaceLifecycle::HasPendingSessionRestore(profile));
 +  CloseBrowserSynchronously(window);
 +}
 +
@@ -233,6 +268,7 @@ index c30c90bfe44ba4c558688af71f1d3b8ba1320544..43defda0650074c248c5d8a477bd2e10
 +
 +  ExitTypeService::GetInstanceForProfile(profile)
 +      ->SetLastSessionExitTypeForTest(ExitType::kCrashed);
++  profile->GetPrefs()->SetInteger(SessionStartupPref::kMyarcCrashedLaunches, 1);
 +  SessionCrashedBubble::ShowIfNotOffTheRecordProfile(window, false);
 +  ASSERT_TRUE(base::test::RunUntil(
 +      [] { return SessionCrashedBubbleView::GetInstanceForTest(); }));
@@ -447,7 +483,7 @@ index c30c90bfe44ba4c558688af71f1d3b8ba1320544..43defda0650074c248c5d8a477bd2e10
  IN_PROC_BROWSER_TEST_F(SessionCrashedBubbleViewTest,
                         InvokeUi_SessionCrashedBubble) {
    ShowAndVerifyUi();
-@@ -120,6 +527,75 @@ IN_PROC_BROWSER_TEST_F(SessionCrashedBubbleViewTest, HasCloseButton) {
+@@ -120,6 +563,75 @@ IN_PROC_BROWSER_TEST_F(SessionCrashedBubbleViewTest, HasCloseButton) {
    EXPECT_TRUE(crash_bubble_->ShouldShowCloseButton());
  }
  
@@ -523,7 +559,7 @@ index c30c90bfe44ba4c558688af71f1d3b8ba1320544..43defda0650074c248c5d8a477bd2e10
  IN_PROC_BROWSER_TEST_F(SessionCrashedBubbleViewTest,
                         RejectsRestoreAfterShutdownStarts) {
    Profile* const profile = browser()->GetProfile();
-@@ -132,6 +608,7 @@ IN_PROC_BROWSER_TEST_F(SessionCrashedBubbleViewTest,
+@@ -132,6 +644,7 @@ IN_PROC_BROWSER_TEST_F(SessionCrashedBubbleViewTest,
    crash_bubble_->AcceptDialog();
  
    EXPECT_FALSE(SessionRestore::IsRestoring(profile));
@@ -531,7 +567,7 @@ index c30c90bfe44ba4c558688af71f1d3b8ba1320544..43defda0650074c248c5d8a477bd2e10
    EXPECT_FALSE(KeepAliveRegistry::GetInstance()->IsOriginRegistered(
        KeepAliveOrigin::SESSION_RESTORE));
  }
-@@ -152,4 +629,5 @@ IN_PROC_BROWSER_TEST_F(SessionCrashedBubbleViewTest,
+@@ -152,4 +665,5 @@ IN_PROC_BROWSER_TEST_F(SessionCrashedBubbleViewTest,
    crash_bubble_->CancelDialog();
  
    EXPECT_EQ(initial_tab_count, browser()->tab_strip_model()->count());
