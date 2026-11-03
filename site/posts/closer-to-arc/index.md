@@ -9,7 +9,7 @@ thumbnail: creation-menu-thumbnail.png
 
 [![myArc's sidebar with the creation menu open above the "+" button, listing New Space, a greyed-out New Split and a highlighted New Tab](creation-menu.png)](creation-menu.png)
 
-*The new creation menu. New Split stays greyed out until split view works. 2026.11.01 nightly.*
+*The new creation menu. New Split stays greyed out until split view works. `2026.11.01 nightly`.*
 
 New nightlies keep landing on the [download page](https://myarc.dev/download/). A nightly is a pre-alpha build I make from the main branch, so you can try myArc without compiling Chromium yourself, which is an 80,000-step build you don't want to run.
 
@@ -35,13 +35,13 @@ Each Space gets a card with its pinned tabs. You can rename a Space from its car
 
 [![The Library's Spaces section with three Space cards, Everyday, Research and Reading, each listing synthetic pinned tabs, and the icon rail on the left](library-space-cards.png)](library-space-cards.png)
 
-*Space cards in the Library, filled with synthetic tabs. 2026.11.01 nightly.*
+*Space cards in the Library, filled with synthetic tabs. `2026.11.01 nightly`.*
 
 Tabs you close land in Archived Tabs, and tabs you ignore for 12 hours get archived for you, like in Arc. Hover the Library button and your latest downloads fan out above it, ready to open or drag into another app.
 
 [![Two crops of the sidebar footer: at rest with no downloads showing, then with the downloads stack showing sample.zip above the Library button](downloads-stack.png)](downloads-stack.png)
 
-*The footer at rest, then with the downloads stack open. 2026.11.01 nightly.*
+*The footer at rest, then with the downloads stack open. `2026.11.01 nightly`.*
 
 One place I stepped away from Arc on purpose is the Library's blue. Arc's looked too loud next to the rest of the sidebar, so myArc uses a softer one.
 

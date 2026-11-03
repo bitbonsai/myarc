@@ -72,7 +72,7 @@ class DownloadTests(unittest.TestCase):
             page = (Path(directory) / 'download/index.html').read_text()
         self.assertIn('rel="canonical" href="https://myarc.dev/download/"', page)
         self.assertIn('"@type": "WebPage"', page)
-        self.assertIn('class="download-link" aria-current="page"', page)
+        self.assertIn('class="button download-link" aria-current="page"', page)
         self.assertNotIn('class="blog-link" aria-current', page)
         self.assertIn('<h1>myArc pre-alpha nightly</h1>', page)
 

@@ -171,7 +171,7 @@ CSS = '''
 
 def apply_release(template, release):
     """Add the header link and homepage call to action only for a published release."""
-    link = '<a class="download-link" href="/download/">Download</a>' if release else ''
+    link = '<a class="button download-link" href="/download/">Download pre-alpha</a>' if release else ''
     template = template.replace('<!--download-nav-->', link)
     works = '<a class="button" href="/download/">Download pre-alpha</a>' if release else ''
     template = template.replace('<!--works-download-->', works)
@@ -191,7 +191,7 @@ def build_download(root, template, embed, release):
     page = re.sub(r'(<script type="application/ld\+json">).*?(</script>)', lambda match: match[1] + json.dumps(schema).replace('<', '\\u003c') + match[2], page, count=1, flags=re.S)
     page = page.replace(' aria-current="page"', '').replace('</style>', CSS + '  </style>', 1)
     if release:
-        page = page.replace('class="download-link"', 'class="download-link" aria-current="page"')
+        page = page.replace('class="button download-link"', 'class="button download-link" aria-current="page"')
     folder = Path(root) / 'download'
     folder.mkdir(exist_ok=True)
     # Shared hashed assets live with the blog, which the build always creates first.
