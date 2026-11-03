@@ -1,5 +1,5 @@
 diff --git a/chrome/browser/ui/views/session_crashed_bubble_view_interactive_uitest.cc b/chrome/browser/ui/views/session_crashed_bubble_view_interactive_uitest.cc
-index c30c90bfe44ba4c558688af71f1d3b8ba1320544..04cc13b6a2400bfbecfa59f076a13e5d955e7a4a 100644
+index c30c90bfe44ba4c558688af71f1d3b8ba1320544..4f524d16feccfffa44fb138a8d426f594d1c8aca 100644
 --- a/chrome/browser/ui/views/session_crashed_bubble_view_interactive_uitest.cc
 +++ b/chrome/browser/ui/views/session_crashed_bubble_view_interactive_uitest.cc
 @@ -5,8 +5,16 @@
@@ -101,7 +101,7 @@ index c30c90bfe44ba4c558688af71f1d3b8ba1320544..04cc13b6a2400bfbecfa59f076a13e5d
  
  class SessionCrashedBubbleViewTest : public DialogBrowserTest {
   public:
-@@ -51,6 +119,381 @@ class SessionCrashedBubbleViewTest : public DialogBrowserTest {
+@@ -51,6 +119,382 @@ class SessionCrashedBubbleViewTest : public DialogBrowserTest {
    raw_ptr<views::BubbleDialogDelegate, DanglingUntriaged> crash_bubble_;
  };
  
@@ -196,7 +196,8 @@ index c30c90bfe44ba4c558688af71f1d3b8ba1320544..04cc13b6a2400bfbecfa59f076a13e5d
 +      ->SetLastSessionExitTypeForTest(ExitType::kCrashed);
 +  ASSERT_EQ(0, prefs->GetInteger(SessionStartupPref::kMyarcCrashedLaunches));
 +
-+  // The restorer holds the workspace barrier after the choice is released.
++  // The recovery choice holds the workspace barrier until the count is written,
++  // then the restorer holds it.
 +  SessionCrashedBubble::ShowIfNotOffTheRecordProfile(window, false);
 +  EXPECT_EQ(nullptr, SessionCrashedBubbleView::GetInstanceForTest());
 +  EXPECT_EQ(1, prefs->GetInteger(SessionStartupPref::kMyarcCrashedLaunches));
@@ -483,7 +484,7 @@ index c30c90bfe44ba4c558688af71f1d3b8ba1320544..04cc13b6a2400bfbecfa59f076a13e5d
  IN_PROC_BROWSER_TEST_F(SessionCrashedBubbleViewTest,
                         InvokeUi_SessionCrashedBubble) {
    ShowAndVerifyUi();
-@@ -120,6 +563,75 @@ IN_PROC_BROWSER_TEST_F(SessionCrashedBubbleViewTest, HasCloseButton) {
+@@ -120,6 +564,75 @@ IN_PROC_BROWSER_TEST_F(SessionCrashedBubbleViewTest, HasCloseButton) {
    EXPECT_TRUE(crash_bubble_->ShouldShowCloseButton());
  }
  
@@ -559,7 +560,7 @@ index c30c90bfe44ba4c558688af71f1d3b8ba1320544..04cc13b6a2400bfbecfa59f076a13e5d
  IN_PROC_BROWSER_TEST_F(SessionCrashedBubbleViewTest,
                         RejectsRestoreAfterShutdownStarts) {
    Profile* const profile = browser()->GetProfile();
-@@ -132,6 +644,7 @@ IN_PROC_BROWSER_TEST_F(SessionCrashedBubbleViewTest,
+@@ -132,6 +645,7 @@ IN_PROC_BROWSER_TEST_F(SessionCrashedBubbleViewTest,
    crash_bubble_->AcceptDialog();
  
    EXPECT_FALSE(SessionRestore::IsRestoring(profile));
@@ -567,7 +568,7 @@ index c30c90bfe44ba4c558688af71f1d3b8ba1320544..04cc13b6a2400bfbecfa59f076a13e5d
    EXPECT_FALSE(KeepAliveRegistry::GetInstance()->IsOriginRegistered(
        KeepAliveOrigin::SESSION_RESTORE));
  }
-@@ -152,4 +665,5 @@ IN_PROC_BROWSER_TEST_F(SessionCrashedBubbleViewTest,
+@@ -152,4 +666,5 @@ IN_PROC_BROWSER_TEST_F(SessionCrashedBubbleViewTest,
    crash_bubble_->CancelDialog();
  
    EXPECT_EQ(initial_tab_count, browser()->tab_strip_model()->count());

@@ -1,0 +1,27 @@
+diff --git a/chrome/browser/sessions/session_restore.h b/chrome/browser/sessions/session_restore.h
+index 9976d1a7010d4cab28d55174aa702ad6d3a11ea3..aaa334e5f755591adcab62388b2a8683ecf52125 100644
+--- a/chrome/browser/sessions/session_restore.h
++++ b/chrome/browser/sessions/session_restore.h
+@@ -74,6 +74,9 @@ class SessionRestore {
+ 
+     // Restores normal browsers.
+     RESTORE_BROWSER = 1 << 4,
++
++    // myArc's silent crash restore: load only each window's active tab.
++    MYARC_ACTIVE_TABS_ONLY = 1 << 5,
+   };
+ 
+   // Notification callback list.
+@@ -95,8 +98,10 @@ class SessionRestore {
+       const StartupTabs& startup_tabs);
+ 
+   // Restores the last session when the last session crashed. It's a wrapper
+-  // of function RestoreSession.
+-  static void RestoreSessionAfterCrash(BrowserWindowInterface* browser);
++  // of function RestoreSession. |active_tabs_only| loads only each window's
++  // active tab and is set by myArc's silent crash restore.
++  static void RestoreSessionAfterCrash(BrowserWindowInterface* browser,
++                                       bool active_tabs_only = false);
+ 
+   // Opens the startup pages when the last session crashed.
+   static void OpenStartupPagesAfterCrash(BrowserWindowInterface* browser);

@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-11-03: Only the silent crash restore loads active tabs alone
+
+- The active-tab-only filter used to key off the profile's crashed exit type, which stays set for the whole run, so foreign-session restores and the stock bubble's Restore also skipped background tabs. A `MYARC_ACTIVE_TABS_ONLY` behavior bit now marks the silent path alone. That path also waits for the `myarc.crashed_launches` write to land before it locks and restores, and skips the restore if the window closed meanwhile.
+- Verification: `chrome` build, `export_patches.py --check` and `check_docs.py` pass, and `SessionCrashedBubbleMyarcViewTest` passes a syntax-only compile. On a fresh synthetic `/tmp` profile, one SIGKILL and a plain relaunch showed no bubble, wrote a count of 1 and kept item IDs 1 to 3. One Temporary stayed unloaded. Evidence is in `/tmp/crashfix/evidence/`.
+- Foreign-session and bubble Restore loads weren't exercised natively, and interactive tests weren't run. Chromium `myarc` commit `90c5d5d654`.
+
 ## 2026-11-03: The glass tint spans the whole myArc card
 
 - The glows around the icon now reach about 40% further, and two faint new ones in violet and blue sit behind the button, placed from the card's right edge so they stay there at any width. The right half no longer reads as flat gray. "Visit myarc.dev" now uses `kBlueButton`, the same blue as "Make myArc your default" in the banner, and the unused `kBrandBlue` is gone.

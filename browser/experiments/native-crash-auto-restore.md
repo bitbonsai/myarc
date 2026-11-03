@@ -6,7 +6,7 @@ MA-007.c, 2026-11-03. Arc doesn't ask after a crash; it brings the last session 
 
 With `--myarc-workspace-sidebar`, the switch that also gates the adapter, the first crashed launch skips the bubble. `SessionCrashedBubble::ShowIfNotOffTheRecordProfile` still creates the recovery-choice observer, takes the same `ExitTypeService` crashed lock the bubble's Restore button takes, and calls `SessionRestore::RestoreSessionAfterCrash`. The restorer exists before the lock and the choice are released, so the barrier and restorer count keep the order Restore already had and stable item IDs survive.
 
-After a crash, `SessionRestoreImpl` passes only each window's active tab to Chromium's background tab loader. The other restored tabs stay unloaded, and `TabModel::LoadIfNeeded` loads each one when it's activated.
+The silent path passes only each window's active tab to Chromium's background tab loader. The other restored tabs stay unloaded, and `TabModel::LoadIfNeeded` loads each one when it's activated. A `MYARC_ACTIVE_TABS_ONLY` behavior bit carries this, so foreign-session restores and the stock bubble's Restore later in the same run still load every tab. The silent path starts the restore from the `CommitPendingWrite` reply, after the count is on disk, and skips it if the window closed while the write was pending.
 
 The profile pref `myarc.crashed_launches` counts consecutive crashed launches. The second one in a row shows the stock bubble, so a session that crashes while restoring can't loop. `StartupBrowserCreatorImpl::Launch` clears the count when the previous run exited cleanly. Without the switch, the bubble, loading and prefs behave as in stock Chromium; the only change there is a registered pref that's never written.
 

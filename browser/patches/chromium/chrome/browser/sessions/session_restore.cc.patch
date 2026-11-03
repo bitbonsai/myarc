@@ -1,16 +1,8 @@
 diff --git a/chrome/browser/sessions/session_restore.cc b/chrome/browser/sessions/session_restore.cc
-index ea1990e8cd42875e6d651edbe429c76de7e8ab9f..d5d0311e610f68fc500644295e3fccc1927648d2 100644
+index ea1990e8cd42875e6d651edbe429c76de7e8ab9f..f55cf8d61fa21921879646f0e86120ef48b115d5 100644
 --- a/chrome/browser/sessions/session_restore.cc
 +++ b/chrome/browser/sessions/session_restore.cc
-@@ -51,6 +51,7 @@
- #include "chrome/browser/search/search.h"
- #include "chrome/browser/sessions/app_session_service.h"
- #include "chrome/browser/sessions/app_session_service_factory.h"
-+#include "chrome/browser/sessions/exit_type_service.h"
- #include "chrome/browser/sessions/session_restore_delegate.h"
- #include "chrome/browser/sessions/session_restore_metrics.h"
- #include "chrome/browser/sessions/session_service.h"
-@@ -115,6 +116,7 @@
+@@ -115,6 +115,7 @@
  #include "content/public/browser/web_contents.h"
  #include "extensions/browser/extension_registry.h"
  #include "extensions/common/extension_set.h"
@@ -18,7 +10,7 @@ index ea1990e8cd42875e6d651edbe429c76de7e8ab9f..d5d0311e610f68fc500644295e3fccc1
  #include "ui/base/mojom/window_show_state.mojom.h"
  #include "ui/base/page_transition_types.h"
  #include "ui/base/window_open_disposition.h"
-@@ -364,6 +366,8 @@ class SessionRestoreImpl : public BrowserCollectionObserver {
+@@ -364,10 +365,14 @@ class SessionRestoreImpl : public BrowserCollectionObserver {
          KeepAliveOrigin::SESSION_RESTORE, KeepAliveRestartOption::DISABLED);
      profile_keep_alive_ = std::make_unique<ScopedProfileKeepAlive>(
          profile, ProfileKeepAliveOrigin::kBrowserWindow);
@@ -27,7 +19,13 @@ index ea1990e8cd42875e6d651edbe429c76de7e8ab9f..d5d0311e610f68fc500644295e3fccc1
    }
  
    bool synchronous() const { return synchronous_; }
-@@ -532,17 +536,20 @@ class SessionRestoreImpl : public BrowserCollectionObserver {
+ 
++  void set_active_tabs_only() { active_tabs_only_ = true; }
++
+   BrowserWindowInterface* Restore() {
+     DCHECK(!is_foreign_session_restore_);
+     if (restore_browser_) {
+@@ -532,17 +537,20 @@ class SessionRestoreImpl : public BrowserCollectionObserver {
      // IsAnySessionCurrentlyRestoring() from OnProfileSessionRestored() to
      // decide whether the last in-flight restore has completed.
      GetActiveSessionRestorers().erase(this);
@@ -55,23 +53,20 @@ index ea1990e8cd42875e6d651edbe429c76de7e8ab9f..d5d0311e610f68fc500644295e3fccc1
    }
  
    bool is_foreign_session_restore() const {
-@@ -600,6 +607,15 @@ class SessionRestoreImpl : public BrowserCollectionObserver {
+@@ -600,6 +608,12 @@ class SessionRestoreImpl : public BrowserCollectionObserver {
                    [](RestoredTab& tab) { return tab.contents() == nullptr; });
  
      if (succeeded) {
-+      // After a crash, myArc loads only each window's active tab. The others
-+      // stay unloaded until they are activated.
-+      if (base::CommandLine::ForCurrentProcess()->HasSwitch(
-+              "myarc-workspace-sidebar") &&
-+          ExitTypeService::GetLastSessionExitType(profile_) ==
-+              ExitType::kCrashed) {
++      // myArc's silent crash restore loads only each window's active tab. The
++      // others stay unloaded until they are activated.
++      if (active_tabs_only_) {
 +        std::erase_if(restored_tabs,
 +                      [](const RestoredTab& tab) { return !tab.is_active(); });
 +      }
        // Sort the tabs in the order they should be restored, and start loading
        // them.
        std::stable_sort(restored_tabs.begin(), restored_tabs.end());
-@@ -879,6 +895,9 @@ class SessionRestoreImpl : public BrowserCollectionObserver {
+@@ -879,6 +893,9 @@ class SessionRestoreImpl : public BrowserCollectionObserver {
            ShouldRestoreToExistingBrowser()) {
          // The first set of tabs is added to the existing browser.
          browser = browser_;
@@ -81,7 +76,7 @@ index ea1990e8cd42875e6d651edbe429c76de7e8ab9f..d5d0311e610f68fc500644295e3fccc1
        } else {
  #if BUILDFLAG(IS_CHROMEOS)
          ash::BootTimesRecorder::Get()->AddLoginTimeMarker(
-@@ -1404,6 +1423,9 @@ class SessionRestoreImpl : public BrowserCollectionObserver {
+@@ -1404,6 +1421,9 @@ class SessionRestoreImpl : public BrowserCollectionObserver {
        manager->SetWindowCreationInfo(
            waap::NewWindowCreationSource::kSessionRestore, now);
      }
@@ -91,3 +86,41 @@ index ea1990e8cd42875e6d651edbe429c76de7e8ab9f..d5d0311e610f68fc500644295e3fccc1
      g_is_any_session_restored = true;
      return browser_window;
    }
+@@ -1545,6 +1565,10 @@ class SessionRestoreImpl : public BrowserCollectionObserver {
+   // If true, restores the normal browser.
+   bool restore_browser_ = true;
+ 
++  // If true, loads only each window's active tab. Set by myArc's silent crash
++  // restore.
++  bool active_tabs_only_ = false;
++
+   // True if this instance is restoring a session from another device, rather
+   // than this profile's own last session. Foreign restores are not reported to
+   // SessionRestoreObservers.
+@@ -1635,11 +1659,15 @@ BrowserWindowInterface* SessionRestore::RestoreSession(
+       (behavior & RESTORE_APPS) != 0, (behavior & RESTORE_BROWSER) != 0,
+       /* log_event */ true, /* is_foreign_session_restore */ false,
+       startup_tabs);
++  if (behavior & MYARC_ACTIVE_TABS_ONLY) {
++    restorer->set_active_tabs_only();
++  }
+   return restorer->Restore();
+ }
+ 
+ // static
+-void SessionRestore::RestoreSessionAfterCrash(BrowserWindowInterface* browser) {
++void SessionRestore::RestoreSessionAfterCrash(BrowserWindowInterface* browser,
++                                              bool active_tabs_only) {
+   auto* profile = browser->GetProfile();
+ 
+ #if BUILDFLAG(IS_CHROMEOS)
+@@ -1657,6 +1685,9 @@ void SessionRestore::RestoreSessionAfterCrash(BrowserWindowInterface* browser) {
+       (browser && HasSingleNewTabPage(browser)
+            ? SessionRestore::CLOBBER_CURRENT_TAB
+            : 0);
++  if (active_tabs_only) {
++    behavior |= SessionRestore::MYARC_ACTIVE_TABS_ONLY;
++  }
+ 
+ #if !BUILDFLAG(IS_CHROMEOS)
+   // Apps should always be restored on crash restore except on Chrome OS. In
