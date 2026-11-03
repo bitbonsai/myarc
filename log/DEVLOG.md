@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-11-03: Quitting no longer crashes
+
+- `BrowserView`'s destructor reset its other child-view raw pointers before `RemoveAllChildViews()` but missed `myarc_popup_anchor_`, the plain view that anchors myArc popups. In BackupRefPtr builds like the nightly, every quit then hit `DanglingRawPtrReleased`. Each quit counted as a crash and raised `myarc.crashed_launches`, so from the second quit onward the next launch showed the stock "Restore pages?" bubble. The destructor now clears the pointer with the others.
+- Verification: the dev build can't catch this, because its component build has BackupRefPtr off. The nightly build printed the dangling report on a quit sent by PID through `NSRunningApplication.terminate`, the same path as Cmd+Q. With the fix, two quit and relaunch cycles on one synthetic `/tmp` profile left no new crash report and an exit type of `Normal`. `export_patches.py --check` and `check_docs.py` pass.
+- Chromium `myarc` commit `dcc1636ae7`.
+
 ## 2026-11-03: Only the silent crash restore loads active tabs alone
 
 - The active-tab-only filter used to key off the profile's crashed exit type, which stays set for the whole run, so foreign-session restores and the stock bubble's Restore also skipped background tabs. A `MYARC_ACTIVE_TABS_ONLY` behavior bit now marks the silent path alone. That path also waits for the `myarc.crashed_launches` write to land before it locks and restores, and skips the restore if the window closed meanwhile.
