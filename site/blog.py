@@ -93,6 +93,7 @@ BLOG_CSS = '''
       .journal h1 { font-size: 2.5rem }
       .post-body > figure.portrait { width: 6rem; margin-left: 1rem }
       .post-body .image-grid { gap: 1rem }
+      .post-body :not(pre) > code { white-space: normal }
       .post-preview { gap: 1rem }
       .post-preview h2 { font-size: 1.5rem }
       .post-thumb { width: 5.5rem }
