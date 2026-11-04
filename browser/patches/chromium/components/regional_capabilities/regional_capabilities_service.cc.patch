@@ -1,0 +1,17 @@
+diff --git a/components/regional_capabilities/regional_capabilities_service.cc b/components/regional_capabilities/regional_capabilities_service.cc
+index b1d74e7c06144371a7e6c92ca862f8c28497c388..01739a4a8d6fa0cec2870500c8196770c25aad1f 100644
+--- a/components/regional_capabilities/regional_capabilities_service.cc
++++ b/components/regional_capabilities/regional_capabilities_service.cc
+@@ -418,6 +418,12 @@ RegionalCapabilitiesService::GetRegionalPrepopulatedEngines() {
+     engines = GetPrepopulatedEngines(
+         GetCountryIdInternal(), profile_prefs_.get(),
+         GetActiveProgramSettings().search_engine_list_type);
++    if (base::FeatureList::IsEnabled(switches::kMyarcStartpageDefault) &&
++        !std::ranges::contains(engines,
++                               TemplateURLPrepopulateData::startpage.id,
++                               &PrepopulatedEngine::id)) {
++      engines.push_back(&TemplateURLPrepopulateData::startpage);
++    }
+   }
+ 
+   ApplyPrepopulatedEnginesMigration(engines);

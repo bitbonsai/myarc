@@ -1,0 +1,14 @@
+diff --git a/base/test/test_suite_helper.cc b/base/test/test_suite_helper.cc
+index 8fcb16a542705be80c031b63e8a87547625dc695..79cdba15f0952f41eb9cf8c103c3b6b19d5db3d1 100644
+--- a/base/test/test_suite_helper.cc
++++ b/base/test/test_suite_helper.cc
+@@ -28,6 +28,9 @@ void InitScopedFeatureListForTesting(ScopedFeatureList& scoped_feature_list) {
+       command_line->GetSwitchValueASCII(switches::kDisableFeatures);
+   enabled += ",TestFeatureForBrowserTest1,*TestBlinkFeatureDefault";
+   disabled += ",TestFeatureForBrowserTest2";
++  // myArc: upstream tests expect Google as the fallback default search engine.
++  // Tests of the Startpage default enable MyarcStartpageDefault themselves.
++  disabled += ",MyarcStartpageDefault";
+   scoped_feature_list.InitFromCommandLine(enabled, disabled);
+ 
+   // The enable-features and disable-features flags were just slurped into a

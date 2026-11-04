@@ -1,0 +1,47 @@
+diff --git a/components/search_engines/template_url_prepopulate_data_unittest.cc b/components/search_engines/template_url_prepopulate_data_unittest.cc
+index bf0cdb2127ce94cd20442e951461bda7daca8611..82473ac908fdc258fc013de8e2e5874bc45de89f 100644
+--- a/components/search_engines/template_url_prepopulate_data_unittest.cc
++++ b/components/search_engines/template_url_prepopulate_data_unittest.cc
+@@ -6,6 +6,7 @@
+ 
+ #include <stddef.h>
+ 
++#include <algorithm>
+ #include <memory>
+ #include <numeric>
+ #include <optional>
+@@ -808,6 +809,34 @@ TEST_F(TemplateURLPrepopulateDataTest, FindGoogleAsFallback) {
+             TemplateURLPrepopulateData::google.id);
+ }
+ 
++TEST_F(TemplateURLPrepopulateDataTest, MyarcFindStartpageAsFallback) {
++  base::test::ScopedFeatureList feature_list{switches::kMyarcStartpageDefault};
++
++  // Startpage is the fallback whether a country lists Google first (US),
++  // further down (CN), or already lists Startpage (DE). Google stays
++  // available, and Startpage is listed once.
++  for (const char* country : {"US", "CN", "DE"}) {
++    SCOPED_TRACE(country);
++    OverrideCountryId(CountryId(country));
++
++    std::unique_ptr<TemplateURLData> fallback_url =
++        prepopulate_data_resolver().GetFallbackSearch();
++    ASSERT_TRUE(fallback_url);
++    EXPECT_EQ(fallback_url->prepopulate_id,
++              TemplateURLPrepopulateData::startpage.id);
++    EXPECT_EQ(fallback_url->url(),
++              TemplateURLPrepopulateData::startpage.search_url);
++
++    std::vector<std::unique_ptr<TemplateURLData>> t_urls =
++        prepopulate_data_resolver().GetPrepopulatedEngines();
++    EXPECT_EQ(1, std::ranges::count(t_urls,
++                                    TemplateURLPrepopulateData::startpage.id,
++                                    &TemplateURLData::prepopulate_id));
++    EXPECT_TRUE(prepopulate_data_resolver().GetPrepopulatedEngine(
++        TemplateURLPrepopulateData::google.id));
++  }
++}
++
+ // Regression test for https://crbug.com/1500526.
+ TEST_F(TemplateURLPrepopulateDataTest, GetPrepopulatedEngineFromFullList) {
+   // Ensure that we use the default set of search engines, which is google,

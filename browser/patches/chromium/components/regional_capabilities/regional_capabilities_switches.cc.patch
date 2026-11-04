@@ -1,0 +1,11 @@
+diff --git a/components/regional_capabilities/regional_capabilities_switches.cc b/components/regional_capabilities/regional_capabilities_switches.cc
+index 9104775ae0302652b2e1402c3416d1e9a7ffd763..bc504c2acca7c14b6c521a213f6aa61aa871787a 100644
+--- a/components/regional_capabilities/regional_capabilities_switches.cc
++++ b/components/regional_capabilities/regional_capabilities_switches.cc
+@@ -52,4 +52,6 @@ bool ArePrepopulatedEnginesShadowVariantsEnabled() {
+ BASE_FEATURE(kApplySearchEngineTypeMigration,
+              base::FEATURE_DISABLED_BY_DEFAULT);
+ 
++BASE_FEATURE(kMyarcStartpageDefault, base::FEATURE_ENABLED_BY_DEFAULT);
++
+ }  // namespace switches

@@ -1,0 +1,15 @@
+diff --git a/components/regional_capabilities/regional_capabilities_switches.h b/components/regional_capabilities/regional_capabilities_switches.h
+index a9af68dd126760b0430e6463d09c96b52bc92bc7..3949e4a25bfe9a1c562ce51893781b7d860b1f1c 100644
+--- a/components/regional_capabilities/regional_capabilities_switches.h
++++ b/components/regional_capabilities/regional_capabilities_switches.h
+@@ -101,6 +101,10 @@ bool ArePrepopulatedEnginesShadowVariantsEnabled();
+ // also enabled.
+ BASE_DECLARE_FEATURE(kApplySearchEngineTypeMigration);
+ 
++// myArc: makes Startpage the fallback default search engine in every country
++// and adds it to every regional list of prepopulated engines.
++BASE_DECLARE_FEATURE(kMyarcStartpageDefault);
++
+ }  // namespace switches
+ 
+ #endif  // COMPONENTS_REGIONAL_CAPABILITIES_REGIONAL_CAPABILITIES_SWITCHES_H_

@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-11-04: Startpage is the default search engine
+
+- New profiles in every country now get Startpage as their default search engine. The `kMyarcStartpageDefault` feature, on by default, adds Chromium's existing Startpage entry (ID 113) to each regional list that lacks it and makes it the fallback default in place of Google. Google and the regional engines stay in settings. Chromium's choice screen only runs in Google Chrome branded builds or with `--force-search-engine-choice-screen`, so it never replaces the default here.
+- Verification: `chrome` and `components_unittests` build. The search engine filter passes 365 of 365, including the new `MyarcFindStartpageAsFallback` test for US, CN and DE, and a wider search, omnibox and autocomplete filter passes 2096 of 2096. Unit tests turn the feature off in `InitScopedFeatureListForTesting` so upstream tests keep checking Google. `export_patches.py --check` and `check_docs.py` pass.
+- The upstream entry searches with `q=`, while Startpage's OpenSearch file uses `query=`. Startpage redirects both forms to the same `query=` search, so the entry stays as is. Chromium `myarc` commit `afb2bab1d7`.
+
 ## 2026-11-04: The nightly takes four privacy flags and five patches from ungoogled-chromium
 
 - `browser/args-nightly.gn` now sets `disable_fieldtrial_testing_config = true`, `enable_reporting = false`, `enable_remoting = false` and `enable_hangout_services_extension = false`, taken from ungoogled-chromium's `flags.gn` (BSD-3-Clause, credited in `ATTRIBUTION.md`). The nightly ships stable feature defaults, sends no Reporting API or Network Error Logging uploads, and drops the Chrome Remote Desktop host and the Hangouts services extension.

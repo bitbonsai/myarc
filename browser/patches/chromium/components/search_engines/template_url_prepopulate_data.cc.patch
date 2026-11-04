@@ -1,0 +1,28 @@
+diff --git a/components/search_engines/template_url_prepopulate_data.cc b/components/search_engines/template_url_prepopulate_data.cc
+index a25ad76e9ceb3bc36c6be72c6fa3250e88928992..d4010c07311706c0c3c9210058e42dea4f50412b 100644
+--- a/components/search_engines/template_url_prepopulate_data.cc
++++ b/components/search_engines/template_url_prepopulate_data.cc
+@@ -24,6 +24,7 @@
+ #include "components/pref_registry/pref_registry_syncable.h"
+ #include "components/prefs/pref_service.h"
+ #include "components/regional_capabilities/program_settings.h"
++#include "components/regional_capabilities/regional_capabilities_switches.h"
+ #include "components/regional_capabilities/regional_capabilities_utils.h"
+ #include "components/search_engines/search_engines_pref_names.h"
+ #include "components/search_engines/search_engines_switches.h"
+@@ -358,9 +359,12 @@ std::unique_ptr<TemplateURLData> GetPrepopulatedFallbackSearch(
+     PrefService& prefs,
+     const std::vector<raw_ptr<const PrepopulatedEngine>>&
+         regional_prepopulated_engines) {
+-  return FindPrepopulatedEngineInternal(prefs, regional_prepopulated_engines,
+-                                        google.id,
+-                                        /*use_first_as_fallback=*/true);
++  return FindPrepopulatedEngineInternal(
++      prefs, regional_prepopulated_engines,
++      base::FeatureList::IsEnabled(switches::kMyarcStartpageDefault)
++          ? startpage.id
++          : google.id,
++      /*use_first_as_fallback=*/true);
+ }
+ 
+ }  // namespace TemplateURLPrepopulateData

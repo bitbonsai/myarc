@@ -1,0 +1,16 @@
+diff --git a/components/search_engines/template_url_prepopulate_data_resolver.h b/components/search_engines/template_url_prepopulate_data_resolver.h
+index d959c56b634a29d0674f5acbc32d09452b912024..099b200ac18b656e5f408ce48bb176badd9f27b1 100644
+--- a/components/search_engines/template_url_prepopulate_data_resolver.h
++++ b/components/search_engines/template_url_prepopulate_data_resolver.h
+@@ -78,8 +78,9 @@ class Resolver : public KeyedService {
+       const;
+ 
+   // Returns the fallback default search provider, currently hardcoded to be
+-  // Google, or whichever one is the first of the list if Google is not in the
+-  // list of prepopulated search engines.
++  // Google (Startpage when `switches::kMyarcStartpageDefault` is enabled), or
++  // whichever one is the first of the list if that engine is not in the list
++  // of prepopulated search engines.
+   // May return `nullptr` if for some reason there are no prepopulated search
+   // engines available.
+   std::unique_ptr<TemplateURLData> GetFallbackSearch() const;
