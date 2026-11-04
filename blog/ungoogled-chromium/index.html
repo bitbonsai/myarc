@@ -6,14 +6,14 @@
   <meta name="color-scheme" content="light dark">
   <meta name="theme-color" content="#f5f2ec" media="(prefers-color-scheme: light)">
   <meta name="theme-color" content="#0b1420" media="(prefers-color-scheme: dark)">
-  <title>Taking a few privacy pieces from ungoogled-chromium | myArc</title>
-  <meta name="description" content="myArc now borrows four build flags and five patches from ungoogled-chromium. I left the rest, because it would break Google sign-in, sync and the Chrome Web Store.">
+  <title>Taking a few patches from ungoogled-chromium | myArc</title>
+  <meta name="description" content="myArc now borrows four build flags and five patches from ungoogled-chromium. I left out the patches that would cost myArc more than they give, like the ones that break the Chrome Web Store.">
   <link rel="canonical" href="https://myarc.dev/blog/ungoogled-chromium/">
   <link rel="icon" type="image/png" href="../_assets/favicon.5bca6dcdff1e.png">
   <meta property="og:type" content="article">
   <meta property="og:site_name" content="myArc">
-  <meta property="og:title" content="Taking a few privacy pieces from ungoogled-chromium">
-  <meta property="og:description" content="myArc now borrows four build flags and five patches from ungoogled-chromium. I left the rest, because it would break Google sign-in, sync and the Chrome Web Store.">
+  <meta property="og:title" content="Taking a few patches from ungoogled-chromium">
+  <meta property="og:description" content="myArc now borrows four build flags and five patches from ungoogled-chromium. I left out the patches that would cost myArc more than they give, like the ones that break the Chrome Web Store.">
   <meta property="og:url" content="https://myarc.dev/blog/ungoogled-chromium/">
   <meta name="robots" content="index, follow, max-image-preview:large">
   <meta property="og:image" content="https://myarc.dev/og-image.webp">
@@ -23,11 +23,11 @@
   <meta property="og:image:height" content="630">
   <meta property="og:image:alt" content="myArc, forever yours. Colorful ribbon logo on navy.">
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="Taking a few privacy pieces from ungoogled-chromium">
-  <meta name="twitter:description" content="myArc now borrows four build flags and five patches from ungoogled-chromium. I left the rest, because it would break Google sign-in, sync and the Chrome Web Store.">
+  <meta name="twitter:title" content="Taking a few patches from ungoogled-chromium">
+  <meta name="twitter:description" content="myArc now borrows four build flags and five patches from ungoogled-chromium. I left out the patches that would cost myArc more than they give, like the ones that break the Chrome Web Store.">
   <meta name="twitter:image" content="https://myarc.dev/og-image.webp">
   <meta name="twitter:image:alt" content="myArc, forever yours. Colorful ribbon logo on navy.">
-  <script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "BlogPosting", "name": "Taking a few privacy pieces from ungoogled-chromium", "description": "myArc now borrows four build flags and five patches from ungoogled-chromium. I left the rest, because it would break Google sign-in, sync and the Chrome Web Store.", "url": "https://myarc.dev/blog/ungoogled-chromium/", "inLanguage": "en", "publisher": {"@type": "Person", "name": "Mauricio Wolff", "url": "https://github.com/bitbonsai"}, "headline": "Taking a few privacy pieces from ungoogled-chromium", "datePublished": "2026-11-04", "author": {"@type": "Person", "name": "Mauricio Wolff", "url": "https://github.com/bitbonsai"}, "mainEntityOfPage": "https://myarc.dev/blog/ungoogled-chromium/", "isPartOf": {"@type": "Blog", "name": "myArc Blog", "url": "https://myarc.dev/blog/"}}, {"@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "myArc", "item": "https://myarc.dev/"}, {"@type": "ListItem", "position": 2, "name": "Blog", "item": "https://myarc.dev/blog/"}, {"@type": "ListItem", "position": 3, "name": "Taking a few privacy pieces from ungoogled-chromium", "item": "https://myarc.dev/blog/ungoogled-chromium/"}]}]}</script>
+  <script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "BlogPosting", "name": "Taking a few patches from ungoogled-chromium", "description": "myArc now borrows four build flags and five patches from ungoogled-chromium. I left out the patches that would cost myArc more than they give, like the ones that break the Chrome Web Store.", "url": "https://myarc.dev/blog/ungoogled-chromium/", "inLanguage": "en", "publisher": {"@type": "Person", "name": "Mauricio Wolff", "url": "https://github.com/bitbonsai"}, "headline": "Taking a few patches from ungoogled-chromium", "datePublished": "2026-11-04", "author": {"@type": "Person", "name": "Mauricio Wolff", "url": "https://github.com/bitbonsai"}, "mainEntityOfPage": "https://myarc.dev/blog/ungoogled-chromium/", "isPartOf": {"@type": "Blog", "name": "myArc Blog", "url": "https://myarc.dev/blog/"}}, {"@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "myArc", "item": "https://myarc.dev/"}, {"@type": "ListItem", "position": 2, "name": "Blog", "item": "https://myarc.dev/blog/"}, {"@type": "ListItem", "position": 3, "name": "Taking a few patches from ungoogled-chromium", "item": "https://myarc.dev/blog/ungoogled-chromium/"}]}]}</script>
   <style>
     @font-face {
       font-family: Outfit;
@@ -519,37 +519,38 @@
           })
         })()
       </script>
-    </header><main id="main" class="journal"><a class="post-back" href="/blog/">All posts</a><header class="post-header"><h1>Taking a few privacy pieces from ungoogled-chromium</h1><time class="post-date" datetime="2026-11-04">November 04, 2026</time><p class="post-author"><a rel="author" href="https://github.com/bitbonsai"><img src="../_assets/mauricio-wolff.19cc16ecf8b8.webp" alt="" width="28" height="28">Mauricio Wolff</a><span class="post-read-time">2 min read</span></p></header><article class="post-body"><p>myArc's nightly now takes a handful of privacy changes from <a href="https://github.com/ungoogled-software/ungoogled-chromium">ungoogled-chromium</a>, a Chromium fork that exists to cut out the parts that talk back to Google. Its code is BSD-3-Clause, which lets me reuse it as long as I credit it. The credit is in <a href="https://github.com/bitbonsai/myarc/blob/main/ATTRIBUTION.md">ATTRIBUTION.md</a> and in a comment at every edit.</p>
-<p>I only took the pieces that fit myArc, and skipped the rest on purpose.</p>
+    </header><main id="main" class="journal"><a class="post-back" href="/blog/">All posts</a><header class="post-header"><h1>Taking a few patches from ungoogled-chromium</h1><time class="post-date" datetime="2026-11-04">November 04, 2026</time><p class="post-author"><a rel="author" href="https://github.com/bitbonsai"><img src="../_assets/mauricio-wolff.19cc16ecf8b8.webp" alt="" width="28" height="28">Mauricio Wolff</a><span class="post-read-time">3 min read</span></p></header><article class="post-body"><p>myArc's nightly now takes a handful of privacy changes from <a href="https://github.com/ungoogled-software/ungoogled-chromium">ungoogled-chromium</a>, a Chromium fork that exists to cut out the parts that talk back to Google. Its code is BSD-3-Clause, which lets me reuse it as long as I credit it. The credit is in <a href="https://github.com/bitbonsai/myarc/blob/main/ATTRIBUTION.md">ATTRIBUTION.md</a> and in a comment at every edit.</p>
+<p>I only took the pieces that fit myArc.</p>
 <h2>Why not rebase on it</h2>
-<p>The obvious move would be to build myArc on top of ungoogled-chromium and be done. Two things stop me. It tracks Chromium's stable releases, while myArc tracks Chromium main, so I'd be changing the ground under the whole project. And it removes things I want to keep, like the real Chrome Web Store and Google sign-in with sync. myArc keeps both.</p>
+<p>The obvious move would be to build myArc on top of ungoogled-chromium and be done. Two things stop me. It follows Chromium's stable releases, while myArc follows Chromium's main branch, so switching would move the whole project onto an older base. And it strips out the real Chrome Web Store, which people coming from Arc need for their extensions.</p>
 <p>So I read through its flags and patches and cherry-picked.</p>
 <h2>The four flags</h2>
 <p>Build flags are switches you set when Chromium gets compiled. These four now live in <code>browser/args-nightly.gn</code>:</p>
 <ul>
-<li><code>disable_fieldtrial_testing_config</code> ships stable feature defaults instead of the testing field trial config.</li>
-<li><code>enable_reporting = false</code> removes the Reporting API and Network Error Logging.</li>
-<li><code>enable_remoting = false</code> removes the Remote Desktop host.</li>
-<li><code>enable_hangout_services_extension = false</code> removes the Hangouts services extension.</li>
+<li><code>disable_fieldtrial_testing_config</code> gives the nightly Chromium's stable feature defaults, instead of the experiments Chromium switches on for test builds.</li>
+<li><code>enable_reporting = false</code> removes the Reporting API and Network Error Logging, which let sites collect error reports from your browser.</li>
+<li><code>enable_remoting = false</code> removes the Chrome Remote Desktop host.</li>
+<li><code>enable_hangout_services_extension = false</code> removes the built-in Hangouts services extension.</li>
 </ul>
 <h2>The five patches</h2>
-<p>Flags only go so far, so I also adapted five of ungoogled-chromium's patches. Some of them touch more than I wanted, so I kept only the hunks I needed. Agents dry-ran each one before it went in, and the nightly build passes with them applied.</p>
+<p>Flags only go so far, so I also adapted five of ungoogled-chromium's patches. Some of them change more than I wanted, so I kept only the parts I needed. Agents dry-ran each one against myArc's Chromium before it went in, and the nightly builds with all five.</p>
 <ul>
-<li>No network time queries.</li>
-<li>No Domain Reliability beacons, which are small reports Chromium sends when a connection to a site fails.</li>
-<li>WebRTC text log uploads default to off.</li>
-<li>No bundled Privacy Sandbox attestations list.</li>
-<li>MV2 extensions stay enabled, without the deprecation warnings.</li>
+<li>Chromium no longer asks Google's servers for the current time.</li>
+<li>No Domain Reliability beacons, the small reports Chromium sends Google when a connection to one of its sites fails.</li>
+<li>WebRTC text logs, which video calls can upload for debugging, are off by default.</li>
+<li>No bundled Privacy Sandbox attestations list, the list of ad companies allowed to use Chrome's built-in ad APIs.</li>
+<li>Manifest V2 extensions keep working. That's the older extension format that full ad blockers like uBlock Origin were built on, and Chromium now disables it.</li>
 </ul>
 <h2>What I left out</h2>
-<p>Some of ungoogled-chromium's best-known changes would hurt myArc more than help.</p>
+<p>Some of ungoogled-chromium's changes would hurt myArc, and others add little here.</p>
 <ul>
-<li><strong>disable-ai</strong> deletes pieces of Reading mode and PDF OCR along with the AI features. myArc keeps AI off by default instead, so those pieces still work.</li>
-<li><strong>Google host detection</strong> would break Google sign-in and sync.</li>
-<li><strong>The crash reporter</strong> change was unnecessary here. Uploads are already off, and a pre-alpha needs local crash dumps.</li>
-<li><strong>Web Store, domain substitution and binary pruning</strong> would break the real Chrome Web Store and extensions.</li>
-<li><strong>mei-preload</strong> blocks sound autoplay on media sites.</li>
+<li><code>disable-ai</code> deletes pieces of Reading mode and PDF text recognition along with the AI features. myArc keeps AI off by default instead, so those pieces still work.</li>
+<li>Google host detection mostly stops Chromium from sending Google's sites an experiments header, <code>X-Client-Data</code>. With stable feature defaults that header should already carry very little, and the patch touches hundreds of lines.</li>
+<li>The crash reporter patch wasn't needed. Uploads are already off in myArc's builds, and a pre-alpha needs its local crash dumps.</li>
+<li>The Web Store patches, domain substitution (rewriting Google domains across the whole source) and binary pruning would break the real Chrome Web Store and extensions.</li>
+<li><code>mei-preload</code> drops the list of media sites allowed to autoplay with sound, so those sites would stay muted until you'd used them for a while.</li>
 </ul>
+<p>So myArc talks back to Google a little less now, and the Chrome Web Store still works. ungoogled-chromium itself cuts much deeper. myArc wants something narrower, a browser Arc's people can move into with their extensions intact, and these patches fit inside that.</p>
 </article></main><footer class="end">
       <a class="mark plain" href="#main" aria-label="Back to top"><img class="ribbon" src="../_assets/logo-matte.adbb3c7ddc14.webp" alt="" width="1254" height="1254"><picture><source media="(prefers-color-scheme: dark)" srcset="../_assets/wordmark-ivory.3a99cf025832.svg"><img class="wordmark" src="../_assets/wordmark-ink.18b9e7ae3785.svg" alt="myArc" width="3056" height="1049"></picture></a>
       <div class="end-copy">
