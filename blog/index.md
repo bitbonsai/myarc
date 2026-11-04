@@ -4,6 +4,12 @@ HTML: https://myarc.dev/blog/
 
 November 2026
 
+## [Taking a few privacy pieces from ungoogled-chromium](https://myarc.dev/blog/ungoogled-chromium/)
+
+November 04, 2026
+
+myArc now borrows four build flags and five patches from ungoogled-chromium. I left the rest, because it would break Google sign-in, sync and the Chrome Web Store.
+
 ## [Chasing Arc's details](https://myarc.dev/blog/closer-to-arc/)
 
 November 01, 2026
