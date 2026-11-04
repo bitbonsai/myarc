@@ -12,3 +12,11 @@ myarc_nightly = true
 branding_file_path = "//myarc/nightly/BRANDING"
 # UnRAR's license conflicts with GPL-3.0, so RAR downloads are not scanned.
 safe_browsing_use_unrar = false
+# Privacy defaults taken from ungoogled-chromium's flags.gn (BSD-3-Clause).
+# Ship stable feature defaults instead of the testing field trial config.
+disable_fieldtrial_testing_config = true
+# No Reporting API or Network Error Logging uploads.
+enable_reporting = false
+# No Chrome Remote Desktop host or Hangouts services extension.
+enable_remoting = false
+enable_hangout_services_extension = false

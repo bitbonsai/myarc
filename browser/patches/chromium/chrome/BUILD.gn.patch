@@ -1,5 +1,5 @@
 diff --git a/chrome/BUILD.gn b/chrome/BUILD.gn
-index 06bfcf5a90d093b9ac8e255e93ef2ffd0a00421e..ea7f37aefd33d351b76a409017bb6d1b8ded291b 100644
+index 06bfcf5a90d093b9ac8e255e93ef2ffd0a00421e..d34f7ab6f2fb73b7a84ba22b8a244210825b20a6 100644
 --- a/chrome/BUILD.gn
 +++ b/chrome/BUILD.gn
 @@ -54,6 +54,7 @@ if (is_android) {
@@ -73,3 +73,14 @@ index 06bfcf5a90d093b9ac8e255e93ef2ffd0a00421e..ea7f37aefd33d351b76a409017bb6d1b
        "//third_party/cld_3/src/src:cld_3",
      ]
  
+@@ -1409,7 +1431,9 @@ if (is_win) {
+       ":widevine_cdm_library",
+       "//chrome/browser/resources/media/mei_preload:component_bundle",
+       "//chrome/browser/web_applications/isolated_web_apps/key_distribution/preload:component_bundle",
+-      "//components/privacy_sandbox/privacy_sandbox_attestations/preload:component_bundle",
++
++      # myArc: no bundled Privacy Sandbox attestations list (from
++      # ungoogled-chromium's disable-privacy-sandbox.patch).
+     ]
+ 
+     if (is_chrome_branded) {

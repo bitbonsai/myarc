@@ -1,0 +1,15 @@
+diff --git a/chrome/browser/ui/browser_ui_prefs.cc b/chrome/browser/ui/browser_ui_prefs.cc
+index d2264ce903105d12d76e111befbc55e8ce4428c9..5815b2d944da568eb52c4d64a4520bb632c08d61 100644
+--- a/chrome/browser/ui/browser_ui_prefs.cc
++++ b/chrome/browser/ui/browser_ui_prefs.cc
+@@ -164,7 +164,9 @@ void RegisterBrowserUserPrefs(user_prefs::PrefRegistrySyncable* registry) {
+   registry->RegisterStringPref(prefs::kWebRTCUDPPortRange, std::string());
+   registry->RegisterBooleanPref(prefs::kWebRtcEventLogCollectionAllowed, false);
+   registry->RegisterListPref(prefs::kWebRtcLocalIpsAllowedUrls);
+-  registry->RegisterBooleanPref(prefs::kWebRtcTextLogCollectionAllowed, true);
++  // myArc: no WebRTC text log uploads by default (from ungoogled-chromium's
++  // disable-webrtc-log-uploader.patch).
++  registry->RegisterBooleanPref(prefs::kWebRtcTextLogCollectionAllowed, false);
+   registry->RegisterListPref(
+       prefs::kWebRTCDiagnosticLogCollectionAllowedForOrigins,
+       base::ListValue());

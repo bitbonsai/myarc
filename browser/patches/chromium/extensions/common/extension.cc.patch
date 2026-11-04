@@ -1,0 +1,19 @@
+diff --git a/extensions/common/extension.cc b/extensions/common/extension.cc
+index 28a3cac3756c7dab50819987ab0a924678042a43..8dea272d4972bb42bda42e6b3c066a865618f351 100644
+--- a/extensions/common/extension.cc
++++ b/extensions/common/extension.cc
+@@ -97,12 +97,8 @@ bool IsManifestSupported(int manifest_version,
+   // Supported versions are always safe.
+   if (manifest_version >= kMinimumSupportedManifestVersion &&
+       manifest_version <= kMaximumSupportedManifestVersion) {
+-    // Emit a warning for unpacked extensions on Manifest V2 warning that
+-    // MV2 is deprecated.
+-    if (type == Manifest::Type::kExtension && manifest_version == 2 &&
+-        Manifest::IsUnpackedLocation(location)) {
+-      *warning = errors::kManifestV2IsDeprecatedWarning;
+-    }
++    // myArc: no MV2 deprecation warning for unpacked extensions (from
++    // ungoogled-chromium's extensions-manifestv2.patch).
+     return true;
+   }
+ 

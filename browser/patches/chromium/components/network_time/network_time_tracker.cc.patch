@@ -1,0 +1,16 @@
+diff --git a/components/network_time/network_time_tracker.cc b/components/network_time/network_time_tracker.cc
+index 3bb0f02378021fc2703be508d95af77c65bdaa23..1e9667a47af8653476bbbd77c833e9b877f24f27 100644
+--- a/components/network_time/network_time_tracker.cc
++++ b/components/network_time/network_time_tracker.cc
+@@ -451,8 +451,9 @@ void NetworkTimeTracker::UpdateNetworkTime(base::Time network_time,
+ }
+ 
+ bool NetworkTimeTracker::AreTimeFetchesEnabled() const {
+-  return is_initialized() &&
+-         base::FeatureList::IsEnabled(kNetworkTimeServiceQuerying);
++  // myArc: never query Google's time service (from ungoogled-chromium's
++  // disable-network-time-tracker.patch).
++  return false;
+ }
+ 
+ NetworkTimeTracker::FetchBehavior NetworkTimeTracker::GetFetchBehavior() const {

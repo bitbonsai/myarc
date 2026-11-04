@@ -1,5 +1,12 @@
 # Development log
 
+## 2026-11-04: The nightly takes four privacy flags and five patches from ungoogled-chromium
+
+- `browser/args-nightly.gn` now sets `disable_fieldtrial_testing_config = true`, `enable_reporting = false`, `enable_remoting = false` and `enable_hangout_services_extension = false`, taken from ungoogled-chromium's `flags.gn` (BSD-3-Clause, credited in `ATTRIBUTION.md`). The nightly ships stable feature defaults, sends no Reporting API or Network Error Logging uploads, and drops the Chrome Remote Desktop host and the Hangouts services extension.
+- Verification: `gn gen out/MyarcNightly` and `autoninja -C out/MyarcNightly -j 14 chrome` pass under the build lock, 09:02:01Z to 09:25:31Z, and the framework binary relinked. `check_docs.py` passes. The build wasn't launched or packaged.
+- Five Chromium edits adapt ungoogled-chromium patches, each with a comment naming its source. Network time fetches, the Domain Reliability service and the bundled Privacy Sandbox attestations list are off, and WebRTC text log uploads default to off. MV2 extensions stay enabled without deprecation warnings. The domain reliability and WebRTC edits take only the service factory and pref default hunks, and the MV2 edit skips the unrelated Safety Hub hunk.
+- Verification: the `chrome` build passes again under the lock in 44s and recompiled the four changed sources. A no-op rerun passes too. Ninja never deletes outputs a build drops, so the attestations folder from Oct 27 sat in the out-dir framework and got copied into `myArc.app`. That folder was removed by hand. `export_patches.py --check` and `check_docs.py` pass. Chromium `myarc` commit `53e4a87ba2`.
+
 ## 2026-11-03: Quitting no longer crashes
 
 - `BrowserView`'s destructor reset its other child-view raw pointers before `RemoveAllChildViews()` but missed `myarc_popup_anchor_`, the plain view that anchors myArc popups. In BackupRefPtr builds like the nightly, every quit then hit `DanglingRawPtrReleased`. Each quit counted as a crash and raised `myarc.crashed_launches`, so from the second quit onward the next launch showed the stock "Restore pages?" bubble. The destructor now clears the pointer with the others.

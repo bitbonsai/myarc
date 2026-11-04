@@ -1,0 +1,20 @@
+diff --git a/extensions/browser/manifest_v2_handler.cc b/extensions/browser/manifest_v2_handler.cc
+index 5841d3dfbc88884916629485c70b7c2671a6bc6b..9008a30255977d9256c3542ca18c8019c7ec0f7a 100644
+--- a/extensions/browser/manifest_v2_handler.cc
++++ b/extensions/browser/manifest_v2_handler.cc
+@@ -109,12 +109,9 @@ bool ManifestV2HandlerFactory::ServiceIsCreatedWithBrowserContext() const {
+ 
+ // Returns true if legacy extensions should be disabled.
+ bool ShouldDisableLegacyExtensions() {
+-  if (g_allow_mv2_for_testing) {
+-    // We allow legacy MV2 extensions for testing purposes.
+-    return false;
+-  }
+-
+-  return true;
++  // myArc: keep MV2 extensions enabled (from ungoogled-chromium's
++  // extensions-manifestv2.patch).
++  return false;
+ }
+ 
+ }  // namespace

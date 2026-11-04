@@ -1,0 +1,50 @@
+diff --git a/chrome/browser/domain_reliability/service_factory.cc b/chrome/browser/domain_reliability/service_factory.cc
+index e3f85943ed5b9b3b6c194f48c823ef409f324436..5d0c6949af84b12edf532aa80df58bb540c5331b 100644
+--- a/chrome/browser/domain_reliability/service_factory.cc
++++ b/chrome/browser/domain_reliability/service_factory.cc
+@@ -4,42 +4,14 @@
+ 
+ #include "chrome/browser/domain_reliability/service_factory.h"
+ 
+-#include "base/command_line.h"
+-#include "base/metrics/field_trial.h"
+-#include "chrome/common/chrome_switches.h"
+-
+ namespace domain_reliability {
+ 
+-namespace {
+-
+-// If Domain Reliability is enabled in the absence of a flag or field trial.
+-const bool kDefaultEnabled = true;
+-
+-// The name and value of the field trial to turn Domain Reliability on.
+-const char kFieldTrialName[] = "DomRel-Enable";
+-const char kFieldTrialValueEnable[] = "enable";
+-
+-}  // namespace
+-
+ const char kUploadReporterString[] = "chrome";
+ 
+ bool ShouldCreateService(const DomainReliabilityServiceDelegate* delegate) {
+-  base::CommandLine* command_line = base::CommandLine::ForCurrentProcess();
+-  if (command_line->HasSwitch(switches::kDisableDomainReliability))
+-    return false;
+-  if (command_line->HasSwitch(switches::kEnableDomainReliability))
+-    return true;
+-  if (!delegate->IsDomainReliabilityAllowed()) {
+-    return false;
+-  }
+-  if (!delegate->IsMetricsAndCrashReportingEnabled()) {
+-    return false;
+-  }
+-  if (base::FieldTrialList::TrialExists(kFieldTrialName)) {
+-    std::string value = base::FieldTrialList::FindFullName(kFieldTrialName);
+-    return (value == kFieldTrialValueEnable);
+-  }
+-  return kDefaultEnabled;
++  // myArc: never create the Domain Reliability service, so no beacons are
++  // uploaded (from ungoogled-chromium's disable-domain-reliability.patch).
++  return false;
+ }
+ 
+ }  // namespace domain_reliability
