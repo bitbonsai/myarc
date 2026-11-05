@@ -12,4 +12,10 @@ declare_args() {
   # dev bundle stays Chromium.app with Chromium's bundle id and profile
   # directory.
   myarc_app_name = false
+
+  # Compiles test hooks that a local test client drives through pages, such
+  # as the --myarc-capture-profile-swap=cdp title requests that
+  # tools/check_profile_isolation.sh uses. Dev builds set it in args.gn; the
+  # nightly never does.
+  myarc_test_hooks = false
 }

@@ -6,3 +6,5 @@ target_cpu = "arm64"
 use_remoteexec = false
 myarc_app_icon = true
 myarc_app_name = true
+# Page-driven test hooks for tools/check_profile_isolation.sh.
+myarc_test_hooks = true

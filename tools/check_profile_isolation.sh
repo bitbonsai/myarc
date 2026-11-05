@@ -2,7 +2,9 @@
 # Profile isolation check (BC-001): launches the native build in the background
 # with a marked, disposable user-data dir, the synthetic fixture server and the
 # test extension's path, runs the profile-isolation scenario, relaunches, runs
-# profile-isolation-restart.
+# profile-isolation-restart, then relaunches with only the ordered-out
+# Profile set to continue where it left off and runs profile-isolation-group. Needs a build with the GN arg
+# myarc_test_hooks = true, as browser/args.gn sets.
 # Each phase quits the browser and then reads the Cookies and History files.
 # Usage: tools/check_profile_isolation.sh   env: APP=<Chromium.app> KEEP=1 keeps the dir
 set -euo pipefail
@@ -12,6 +14,11 @@ APP="${APP:-$HOME/.cache/myarc-m0/chromium/src/out/MyarcM0/Chromium.app}"
 
 if [ "${1:-}" = "--inner" ]; then
   [ -x "$APP/Contents/MacOS/Chromium" ] || { echo "native binary missing: $APP" >&2; exit 1; }
+  # The title requests exist only in builds with the GN arg myarc_test_hooks.
+  ARGS="$(dirname "$APP")/args.gn"
+  if [ -f "$ARGS" ] && ! grep -Eq '^myarc_test_hooks *= *true' "$ARGS"; then
+    echo "build lacks myarc_test_hooks = true in $ARGS; see browser/README.md" >&2; exit 1
+  fi
   PROFILE=$(mktemp -d "${TMPDIR:-/tmp}/myarc-isolation.XXXXXX")
   SERVER=""
   PID=""
@@ -59,6 +66,11 @@ if [ "${1:-}" = "--inner" ]; then
   node "$ROOT/tools/check_browser_foundation.mjs" "$PROFILE" "$PID" profile-isolation
   launch --restore-last-session
   node "$ROOT/tools/check_browser_foundation.mjs" "$PROFILE" "$PID" profile-isolation-restart
+  # Without --restore-last-session only the Profile ordered out at quit
+  # restores; the shown one is set to open a new window. The restored window
+  # must come on screen by itself.
+  launch
+  node "$ROOT/tools/check_browser_foundation.mjs" "$PROFILE" "$PID" profile-isolation-group
   exit 0
 fi
 

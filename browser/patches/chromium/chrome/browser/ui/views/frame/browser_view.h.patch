@@ -1,5 +1,5 @@
 diff --git a/chrome/browser/ui/views/frame/browser_view.h b/chrome/browser/ui/views/frame/browser_view.h
-index 750e46c97b64dccccf4268e912df5dbdb6516b3c..c4d55e2ca35675707e716256bf2c3a6aba6590e6 100644
+index 750e46c97b64dccccf4268e912df5dbdb6516b3c..94326ec9fa66a44ecb189620cd2a7f383b7ade8f 100644
 --- a/chrome/browser/ui/views/frame/browser_view.h
 +++ b/chrome/browser/ui/views/frame/browser_view.h
 @@ -8,11 +8,13 @@
@@ -115,7 +115,7 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..c4d55e2ca35675707e716256bf2c3a6a
    base::WeakPtr<BrowserView> GetAsWeakPtr() {
      return weak_ptr_factory_.GetWeakPtr();
    }
-@@ -1253,12 +1302,182 @@ class BrowserView : public BrowserWindow,
+@@ -1253,12 +1302,197 @@ class BrowserView : public BrowserWindow,
  
    // Anchor point for help bubbles and other dialogs that want to reliably
    // anchor outside the content area of the window.
@@ -152,10 +152,15 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..c4d55e2ca35675707e716256bf2c3a6a
 +  // is ready and orders this window out without closing it. Blocked in full
 +  // screen.
 +  void SwapToMyarcProfile(Profile& profile, uint64_t space);
++  // Each swap request gets its group's next `generation`. One that isn't the
++  // group's latest when it gets to act drops out, so a slow Profile load
++  // can't undo a later swap.
 +  void FinishMyarcProfileSwap(
 +      base::WeakPtr<Profile> profile,
 +      uint64_t space,
++      uint64_t generation,
 +      std::unique_ptr<ScopedProfileKeepAlive> keep_alive);
++  bool IsLatestMyarcSwap(uint64_t generation) const;
 +  // Selects `space` now, or once this window's workspace is ready.
 +  void SelectMyarcSpaceWhenReady(uint64_t space);
 +  // Profile swap slide, on the incoming window: covers it with `image`, the
@@ -165,6 +170,7 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..c4d55e2ca35675707e716256bf2c3a6a
 +  void CoverMyarcSwap(base::WeakPtr<BrowserView> from,
 +                      gfx::Rect rows,
 +                      bool activate,
++                      uint64_t generation,
 +                      gfx::ImageSkia image);
 +  void WaitForMyarcSwapFrame(int frame);
 +  void OnMyarcSwapFrame(int frame);
@@ -177,19 +183,28 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..c4d55e2ca35675707e716256bf2c3a6a
 +  // Puts a restored window back in its saved group, ordered out if it was.
 +  void RestoreMyarcWindowGroup();
 +  void PersistMyarcWindowGroup();
-+  // Closing the group's shown window closes its ordered-out windows too.
++  // The user closing the group's shown window closes its ordered-out windows
++  // too, each with its own warnings. When Chromium closes it instead, for
++  // example to delete its Profile, an ordered-out window takes its place.
 +  void CloseMyarcWindowGroup();
++  // An ordered-out window whose close is held for a beforeunload or
++  // downloads warning comes on screen, so the user can answer it.
++  void ShowMyarcWindowForCloseWarning();
++  // After session restore: shows one ordered-out window of each group that
++  // has no shown window.
++  static void ShowOrphanedMyarcGroupWindows();
 +  // --myarc-capture-profile-swap: creates Profile "work" with Space "Client",
 +  // then swaps back and forth, logging every window at each step.
 +  static void MyarcProfileSwapCaptureStep(int step);
 +  static void MyarcProfileSwapCaptureAction(base::WeakPtr<BrowserView> view,
 +                                            int step);
-+  // --myarc-capture-profile-swap=cdp: a test client asks for each step by
-+  // setting any tab's title to "myarc-swap:<n>:create", "myarc-swap:<n>:swap",
-+  // "myarc-swap:<n>:tab" (opens about:blank) or
-+  // "myarc-swap:<n>:palette:<text>". Steps act on the shown window and log
-+  // it by Profile, other actions only log; a palette step logs the command
-+  // bar's rows for <text>.
++  // --myarc-capture-profile-swap=cdp, only in builds with the GN arg
++  // myarc_test_hooks: a test client asks for each step by setting the title
++  // of a tab on the fixture origin http://127.0.0.1:8766 to
++  // "myarc-swap:<n>:<request>". See tests/fixtures/browser/README.md for the
++  // requests. Steps act on the shown window and log it by Profile, other
++  // actions only log; a palette step logs the command bar's rows for <text>.
++  // Off-the-record tabs are never read.
 +  static void MyarcProfileSwapTestPoll();
 +  void MyarcPaletteTestQuery(int request, const std::u16string& text);
 +  void RenameSpace(uint64_t space) override;
@@ -298,7 +313,7 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..c4d55e2ca35675707e716256bf2c3a6a
  
    // A mapping between accelerators and command IDs.
    std::map<ui::Accelerator, int> accelerator_table_;
-@@ -1411,6 +1630,7 @@ class BrowserView : public BrowserWindow,
+@@ -1411,6 +1645,7 @@ class BrowserView : public BrowserWindow,
    base::EnumSet<TabStripAndWebAppViewsReparentedState>
        tab_strip_web_apps_reparented_state_;
  

@@ -82,6 +82,13 @@ class WorkspaceService final : public base::SupportsUserData::Data {
       foundation::SpaceIconKind icon_kind,
       std::string_view icon,
       const foundation::SpaceThemeRecord& theme);
+  // The same, except that in a workspace still in its untouched default
+  // state the new Space replaces the default Space and keeps its ID.
+  foundation::MutationResult CreateFirstSpace(
+      std::string_view name,
+      foundation::SpaceIconKind icon_kind,
+      std::string_view icon,
+      const foundation::SpaceThemeRecord& theme);
   foundation::MutationResult RenameSpace(uint64_t space, std::string_view name);
   // `id` is 1 when the icon changed, else 0. Unset restores the default glyph.
   foundation::MutationResult SetSpaceIcon(uint64_t space,

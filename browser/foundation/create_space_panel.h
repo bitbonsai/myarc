@@ -74,8 +74,10 @@ class CreateSpacePanel final : public views::View,
                                    ProfileDoneCallback done)>;
   static constexpr size_t kMaxProfileName = 64;
 
+  // `own_profile` is the window's Profile. It starts selected, and is added
+  // when `profiles` lacks it.
   CreateSpacePanel(std::vector<ProfileChoice> profiles,
-                   std::string selected_profile_id,
+                   ProfileChoice own_profile,
                    CreateCallback create,
                    CreateProfileCallback create_profile,
                    base::RepeatingClosure cancel);
@@ -88,7 +90,9 @@ class CreateSpacePanel final : public views::View,
   // Opens the theme popover beside the Choose a Theme row. `hold` as above.
   void OpenThemePicker(bool hold = false);
   // Replaces the Profile menu's choices and selects `selected_id`, or the
-  // first choice when it isn't listed. Closes the Profile name field.
+  // window's own Profile when it isn't listed. The own Profile is added when
+  // the choices lack it, so a Space never lands in a Profile nobody picked.
+  // Closes the Profile name field.
   void SetProfiles(std::vector<ProfileChoice> profiles,
                    const std::string& selected_id);
   void OpenProfileMenu();
@@ -133,6 +137,7 @@ class CreateSpacePanel final : public views::View,
   CreateCallback create_;
   CreateProfileCallback create_profile_;
   base::RepeatingClosure cancel_;
+  const ProfileChoice own_profile_;
   std::vector<ProfileChoice> profiles_;
   size_t selected_profile_ = 0;
   bool profile_pending_ = false;

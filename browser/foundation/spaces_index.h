@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "base/containers/span.h"
+#include "base/functional/function_ref.h"
 #include "base/values.h"
 
 class PrefRegistrySimple;
@@ -62,10 +63,26 @@ bool MergeIndexedSpaces(base::DictValue& index,
 // kMaxIndexedProfiles Profiles of kMaxIndexedSpaces Spaces each.
 std::vector<IndexedSpace> DecodeSpacesIndex(const base::DictValue& index);
 
-// The same, on Local State. UI sequence only.
+// Drops every entry whose Profile directory `keep` rejects. Returns whether
+// `index` changed.
+bool PruneSpacesIndex(base::DictValue& index,
+                      base::FunctionRef<bool(std::string_view)> keep);
+
+// Whether the index may keep a Profile directory's entry: the Profile is
+// listed in ProfileAttributesStorage and isn't marked for deletion. The
+// browser sets it once, since this target can't depend on the Profile
+// manager. Until then nothing is dropped.
+using IndexedProfileFilter = bool (*)(std::string_view profile_dir);
+void SetIndexedProfileFilter(IndexedProfileFilter filter);
+
+// The same, on Local State. UI sequence only. Each write first drops the
+// entries the filter rejects, so deleted Profiles never count toward
+// kMaxIndexedProfiles, and writes nothing for a rejected `profile_dir`.
 void WriteIndexedSpaces(PrefService& local_state,
                         std::string_view profile_dir,
                         base::span<const IndexedSpace> spaces);
+// Drops the entries the filter rejects, as when a Profile is removed.
+void PruneSpacesIndex(PrefService& local_state);
 std::vector<IndexedSpace> ReadSpacesIndex(const PrefService& local_state);
 
 }  // namespace myarc

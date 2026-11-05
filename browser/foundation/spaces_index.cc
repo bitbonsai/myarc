@@ -49,6 +49,8 @@ base::ListValue Encode(base::span<const IndexedSpace> spaces) {
   return list;
 }
 
+IndexedProfileFilter g_profile_filter = nullptr;
+
 }  // namespace
 
 void RegisterSpacesIndexPref(PrefRegistrySimple& registry) {
@@ -128,12 +130,45 @@ std::vector<IndexedSpace> DecodeSpacesIndex(const base::DictValue& index) {
   return result;
 }
 
+bool PruneSpacesIndex(base::DictValue& index,
+                      base::FunctionRef<bool(std::string_view)> keep) {
+  std::vector<std::string> gone;
+  for (const auto [dir, value] : index) {
+    if (!keep(dir)) {
+      gone.push_back(dir);
+    }
+  }
+  for (const std::string& dir : gone) {
+    index.Remove(dir);
+  }
+  return !gone.empty();
+}
+
+void SetIndexedProfileFilter(IndexedProfileFilter filter) {
+  g_profile_filter = filter;
+}
+
 void WriteIndexedSpaces(PrefService& local_state,
                         std::string_view profile_dir,
                         base::span<const IndexedSpace> spaces) {
   // Merge into a copy first, so an unchanged index schedules no write.
   base::DictValue index = local_state.GetDict(kSpacesIndexPref).Clone();
-  if (MergeIndexedSpaces(index, profile_dir, spaces)) {
+  bool changed = false;
+  if (g_profile_filter) {
+    changed = PruneSpacesIndex(index, g_profile_filter);
+    if (!g_profile_filter(profile_dir)) {
+      spaces = {};
+    }
+  }
+  changed |= MergeIndexedSpaces(index, profile_dir, spaces);
+  if (changed) {
+    local_state.SetDict(kSpacesIndexPref, std::move(index));
+  }
+}
+
+void PruneSpacesIndex(PrefService& local_state) {
+  base::DictValue index = local_state.GetDict(kSpacesIndexPref).Clone();
+  if (g_profile_filter && PruneSpacesIndex(index, g_profile_filter)) {
     local_state.SetDict(kSpacesIndexPref, std::move(index));
   }
 }

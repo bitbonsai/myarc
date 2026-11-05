@@ -152,6 +152,15 @@ mod ffi {
             icon: &str,
             theme: SpaceThemeRecord,
         ) -> MutationResult;
+        // Like create_styled_space, for a new Space in a fresh Profile: it
+        // takes the place of an untouched default Space, keeping its ID.
+        fn create_first_space(
+            workspace: &mut Workspace,
+            name: &str,
+            icon_kind: SpaceIconKind,
+            icon: &str,
+            theme: SpaceThemeRecord,
+        ) -> MutationResult;
         // Unset restores the default glyph. `id` is 1 when the icon changed,
         // else 0.
         fn set_space_icon(
@@ -365,6 +374,24 @@ pub fn create_styled_space(
 ) -> ffi::MutationResult {
     match space_icon(icon_kind, icon) {
         Ok(icon) => outcome(workspace.0.create_styled_space(
+            workspace::DEFAULT_PROFILE_ID,
+            name,
+            icon,
+            space_theme(&theme),
+        )),
+        Err(error) => reject(error),
+    }
+}
+
+pub fn create_first_space(
+    workspace: &mut Workspace,
+    name: &str,
+    icon_kind: ffi::SpaceIconKind,
+    icon: &str,
+    theme: ffi::SpaceThemeRecord,
+) -> ffi::MutationResult {
+    match space_icon(icon_kind, icon) {
+        Ok(icon) => outcome(workspace.0.create_first_space(
             workspace::DEFAULT_PROFILE_ID,
             name,
             icon,

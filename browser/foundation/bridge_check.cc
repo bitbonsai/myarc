@@ -466,6 +466,29 @@ bool CheckSpaceThemes() {
          theme_of(*loaded, 1) == std::tuple{true, 0x6DBAD9u, uint8_t{100}};
 }
 
+// A fresh Profile's first Space replaces the untouched default Space in one
+// call; a renamed default Space stays.
+bool CheckFirstSpace() {
+  using namespace myarc::foundation;
+  auto fresh = new_workspace();
+  auto first = create_first_space(*fresh, "Client", SpaceIconKind::Unset, "",
+                                  {true, 0x336699, 50});
+  if (!first.ok || first.id != 1 ||
+      export_snapshot(*fresh).spaces.size() != 1 ||
+      std::string(export_snapshot(*fresh).spaces[0].name) != "Client") {
+    return false;
+  }
+  auto renamed = new_workspace();
+  if (!rename_space(*renamed, 1, "Mine").ok) {
+    return false;
+  }
+  auto added = create_first_space(*renamed, "Client", SpaceIconKind::Unset, "",
+                                  {});
+  const auto state = export_snapshot(*renamed);
+  return added.ok && added.id == 2 && state.spaces.size() == 2 &&
+         std::string(state.spaces[0].name) == "Mine";
+}
+
 bool CheckDeleteFirstSpace() {
   using namespace myarc::foundation;
   auto model = new_workspace();
@@ -992,6 +1015,14 @@ bool CheckSpacesIndex() {
       !myarc::MergeIndexedSpaces(full, "P0", personal)) {
     return false;
   }
+  // Pruning a deleted Profile frees its slot for a new one.
+  if (!myarc::PruneSpacesIndex(
+          full, [](std::string_view dir) { return dir != "P3"; }) ||
+      full.Find("P3") || full.size() != myarc::kMaxIndexedProfiles - 1 ||
+      myarc::PruneSpacesIndex(full, [](std::string_view) { return true; }) ||
+      !myarc::MergeIndexedSpaces(full, "Extra", work)) {
+    return false;
+  }
   full.Set("Q", base::ListValue().Append(
                     base::DictValue().Set("id", "1").Set("name", "Over")));
   return myarc::DecodeSpacesIndex(full).size() ==
@@ -1090,6 +1121,10 @@ int main() {
     std::cerr << "Space theme checks failed\n";
     return 22;
   }
+  if (!CheckFirstSpace()) {
+    std::cerr << "First Space checks failed\n";
+    return 23;
+  }
   if (!CheckSpacesIndex()) {
     std::cerr << "Spaces index checks failed\n";
     return 21;
@@ -1099,8 +1134,8 @@ int main() {
          "round trips; workspace transitions, Space 1 deletion and "
          "metadata codec, saved title, Archived Tabs, Auto Archive, "
          "archive timer, Clear Archive, downloads stack, dormant "
-         "temporary item, Space reorder, Space icon, Space theme and Spaces "
-         "index checks "
+         "temporary item, Space reorder, Space icon, Space theme, first "
+         "Space and Spaces index checks "
          "passed\n";
   return 0;
 }

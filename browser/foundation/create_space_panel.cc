@@ -232,13 +232,14 @@ void ShowPopover(views::Widget& widget, bool hold) {
 }  // namespace
 
 CreateSpacePanel::CreateSpacePanel(std::vector<ProfileChoice> profiles,
-                                   std::string selected_profile_id,
+                                   ProfileChoice own_profile,
                                    CreateCallback create,
                                    CreateProfileCallback create_profile,
                                    base::RepeatingClosure cancel)
     : create_(std::move(create)),
       create_profile_(std::move(create_profile)),
-      cancel_(std::move(cancel)) {
+      cancel_(std::move(cancel)),
+      own_profile_(std::move(own_profile)) {
   auto* layout = SetLayoutManager(std::make_unique<views::BoxLayout>(
       Orientation::kVertical, gfx::Insets::TLBR(23, kSideInset, 14, kSideInset),
       0));
@@ -424,7 +425,7 @@ CreateSpacePanel::CreateSpacePanel(std::vector<ProfileChoice> profiles,
 
   AddAccelerator(ui::Accelerator(ui::VKEY_ESCAPE, ui::EF_NONE));
   UpdateCreateButton();
-  SetProfiles(std::move(profiles), selected_profile_id);
+  SetProfiles(std::move(profiles), own_profile_.id);
 }
 
 CreateSpacePanel::~CreateSpacePanel() = default;
@@ -713,11 +714,17 @@ void CreateSpacePanel::SetProfiles(std::vector<ProfileChoice> profiles,
     profile_menu_runner_->Cancel();
   }
   profiles_ = std::move(profiles);
-  selected_profile_ = 0;
-  for (size_t i = 0; i < profiles_.size(); ++i) {
-    if (profiles_[i].id == selected_id) {
-      selected_profile_ = i;
-    }
+  const auto find = [this](const std::string& id) {
+    return static_cast<size_t>(
+        std::ranges::find(profiles_, id, &ProfileChoice::id) -
+        profiles_.begin());
+  };
+  if (find(own_profile_.id) == profiles_.size()) {
+    profiles_.push_back(own_profile_);
+  }
+  selected_profile_ = find(selected_id);
+  if (selected_profile_ == profiles_.size()) {
+    selected_profile_ = find(own_profile_.id);
   }
   profile_pending_ = false;
   UpdateProfilePill();

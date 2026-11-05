@@ -255,6 +255,14 @@ executable("bridge_check") {
   ]
 }
 
+assert(!myarc_nightly || !myarc_test_hooks,
+       "The nightly ships without test hooks; drop myarc_test_hooks")
+
+buildflag_header("test_buildflags") {
+  header = "test_buildflags.h"
+  flags = [ "MYARC_TEST_HOOKS=$myarc_test_hooks" ]
+}
+
 buildflag_header("nightly_buildflags") {
   header = "nightly_buildflags.h"
   flags = [ "MYARC_NIGHTLY=$myarc_nightly" ]

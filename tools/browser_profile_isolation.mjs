@@ -187,9 +187,11 @@ const historyExpression = `(() => {
   return { items, empty: Boolean(empty && !empty.hidden && empty.getClientRects().length && empty.textContent.trim()) }
 })()`
 
+export const isolationScenarios = ['profile-isolation', 'profile-isolation-restart', 'profile-isolation-group']
+
 export const runProfileIsolation = async ({ send, profile, ownedPid, scenario }) => {
-  assert.ok(['profile-isolation', 'profile-isolation-restart'].includes(scenario), 'Unknown isolation phase')
-  const restart = scenario === 'profile-isolation-restart'
+  assert.ok(isolationScenarios.includes(scenario), 'Unknown isolation phase')
+  const restart = scenario !== 'profile-isolation'
   const checkpointPath = `${profile}/${isolationCheckpointName}`
   const logPath = `${profile}/${isolationLogName}`
   assert.ok(fs.existsSync(logPath), 'Launch with --enable-logging --log-file=PROFILE/myarc-test.log')
@@ -322,6 +324,7 @@ export const runProfileIsolation = async ({ send, profile, ownedPid, scenario })
 
   let a
   let b
+  let shownAtQuit = null
   if (!previous) {
     const initial = await pages()
     assert.equal(initial.length, 1, 'Start from a fresh browser with one fixture tab')
@@ -373,6 +376,80 @@ export const runProfileIsolation = async ({ send, profile, ownedPid, scenario })
     await expectOwn(a, sides.a)
     await expectSearches(a, sides.a, sides.b, 'A after swap back')
     await expectExtension(a, true, 'A after swap back')
+  } else if (scenario === 'profile-isolation-group') {
+    // Only the Profile that was ordered out at quit restored its session, so
+    // its group restored no shown window. The other one opened a new window
+    // of its own.
+    assert.ok(previous.shown, 'Run profile-isolation-restart first')
+    let hidden
+    for (const info of await pages()) {
+      if (!info.url.startsWith(`${fixtureOrigin}/`)) continue
+      const target = await page(info.targetId)
+      const probe = await target.evaluate(probeExpression(sides.a))
+      if (probe.cookie === (previous.shown !== 'Default')) hidden = target
+    }
+    assert.ok(hidden, 'Restored page of the ordered-out Profile not found')
+    const logged = text => readBoundedLog(logPath).includes(text)
+    await waitFor(() => visible(hidden), 'restored window with no shown group member comes on screen', 15000)
+    const id = await ask(hidden, 'noop')
+    const dir = readBoundedLog(logPath).match(new RegExp(`myarc-swap test ${id} noop in (.+)`))[1]
+    assert.notEqual(dir, previous.shown)
+    assert.ok(logged(`myarc-swap showing orphaned window of ${dir}`), 'Orphaned window not shown by the restore pass')
+    record('group orphan shown', { profile: dir })
+
+    // A beforeunload prompt needs a user gesture on the page.
+    const evaluateGesture = async expression => {
+      const sessionId = sessions.get(hidden.targetId)
+      return (await send('Runtime.evaluate', { expression, userGesture: true, returnByValue: true }, sessionId)).result.value
+    }
+    assert.equal(await evaluateGesture(`window.myarcStay = event => { event.preventDefault(); event.returnValue = '' }
+      addEventListener('beforeunload', window.myarcStay)
+      navigator.userActivation.hasBeenActive`), true, 'Page has no user activation')
+
+    // Two swaps back to back: the older one drops out, the newer one shows.
+    const twice = await ask(hidden, 'swap-twice')
+    await waitFor(async () => !(await visible(hidden)), 'second swap shows the other Profile')
+    const stale = readBoundedLog(logPath).split('\n').filter(line => line.includes('myarc-swap dropped stale swap'))
+    assert.equal(stale.length, 1, `Expected one dropped stale swap, found ${stale.length}`)
+    record('group stale swap dropped', { request: twice, stale: stale.length })
+
+    // Closing the shown window closes the ordered-out one with its warning,
+    // which brings it on screen. Staying keeps it.
+    const sessionId = sessions.get(hidden.targetId)
+    await send('Page.enable', {}, sessionId)
+    await ask(hidden, 'close')
+    await waitFor(async () => {
+      try {
+        await send('Page.handleJavaScriptDialog', { accept: false }, sessionId)
+        return true
+      } catch {
+        return false
+      }
+    }, 'beforeunload prompt from the ordered-out window')
+    assert.ok(logged(`myarc-swap close warning in ${dir}`), 'Window with a close warning not brought on screen')
+    await waitFor(() => visible(hidden), 'window that warned stays on screen after Stay')
+    record('group close warns', { profile: dir })
+
+    // Chromium closing the other Profile's windows shows this one instead of
+    // closing it.
+    await ask(hidden, 'swap')
+    await waitFor(async () => !(await visible(hidden)), 'swap before closing the other Profile')
+    const warnings = readBoundedLog(logPath).split('\n').filter(line => line.includes('myarc-swap close warning')).length
+    await ask(hidden, 'close-profile')
+    await waitFor(() => visible(hidden), 'ordered-out window replaces the closed Profile window')
+    assert.equal(readBoundedLog(logPath).split('\n').filter(line => line.includes('myarc-swap close warning')).length, warnings,
+      'Closing the other Profile closed this window too')
+    record('group profile close keeps', { profile: dir })
+    await hidden.evaluate(`removeEventListener('beforeunload', window.myarcStay)`)
+
+    // Only fixture pages reach the hook.
+    await hidden.navigate('data:text/html,<title>other origin</title>')
+    request += 1
+    await hidden.evaluate(`document.title = ${JSON.stringify(`myarc-swap:${request}:noop`)}`)
+    await delay(1500)
+    assert.ok(!logged(`myarc-swap test ${request} `), 'Hook took a request from another origin')
+    await hidden.navigate(`${fixtureOrigin}/`)
+    record('group hook ignores other origins', { request })
   } else {
     const all = await pages()
     const contexts = [...new Set(all.map(info => info.browserContextId))]
@@ -421,10 +498,15 @@ export const runProfileIsolation = async ({ send, profile, ownedPid, scenario })
     const third = await restartSwap(second)
     assert.equal(third, first, 'Second swap after relaunch did not come back')
     await expectSearches(shown, own, other, `restart ${own.side.toUpperCase()} (${third})`)
+    // At the next launch the shown Profile opens a new window instead of
+    // continuing where it left off, so the restored group has no shown
+    // window.
+    await ask(shown, 'no-restore')
+    shownAtQuit = third
   }
 
   fs.writeFileSync(checkpointPath, JSON.stringify({
-    format: 1, browserPid: ownedPid, tokens: { a: sides.a.token, b: sides.b.token }, request
+    format: 1, browserPid: ownedPid, tokens: { a: sides.a.token, b: sides.b.token }, request, shown: shownAtQuit
   }) + '\n')
   for (const sessionId of sessions.values()) await send('Target.detachFromTarget', { sessionId }).catch(() => {})
   // Quit like Cmd+Q, then read the files the browser wrote.

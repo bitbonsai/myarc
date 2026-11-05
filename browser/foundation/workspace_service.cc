@@ -672,6 +672,22 @@ foundation::MutationResult WorkspaceService::CreateSpace(
       rust::Str(icon.data(), icon.size()), theme));
 }
 
+foundation::MutationResult WorkspaceService::CreateFirstSpace(
+    std::string_view name,
+    foundation::SpaceIconKind icon_kind,
+    std::string_view icon,
+    const foundation::SpaceThemeRecord& theme) {
+  if (!CanMutate())
+    return Failure("Workspace is not loaded. Check storage state.");
+  if (!BoundedText(name, foundation::bridge_limits().name_bytes))
+    return Failure("Invalid UTF-8 or oversized Space name.");
+  if (!BoundedText(icon, foundation::bridge_limits().icon_bytes))
+    return Failure("Invalid UTF-8 or oversized Space icon.");
+  return SpacesChanged(foundation::create_first_space(
+      *workspace_, rust::Str(name.data(), name.size()), icon_kind,
+      rust::Str(icon.data(), icon.size()), theme));
+}
+
 foundation::MutationResult WorkspaceService::RenameSpace(
     uint64_t space,
     std::string_view name) {

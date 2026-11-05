@@ -416,6 +416,46 @@ impl Workspace {
         Ok(id)
     }
 
+    /// Like `create_styled_space`, for a Space made in a new Profile from
+    /// another Profile's window. While the workspace is still the untouched
+    /// default (one Space named "Everyday" with no icon or theme, no items or
+    /// archive, and no Space ever created), the new Space takes the default
+    /// Space's place and keeps its ID, so the Profile holds only the Space the
+    /// user made. Otherwise it is created as usual. Atomic either way.
+    pub fn create_first_space(
+        &mut self,
+        profile_id: ProfileId,
+        name: &str,
+        icon: Option<SpaceIcon>,
+        theme: Option<SpaceTheme>,
+    ) -> Result<SpaceId, WorkspaceError> {
+        let untouched = self.state.next_space_id == DEFAULT_SPACE_ID + 1
+            && self.state.items.is_empty()
+            && self.state.archived.is_empty()
+            && matches!(
+                self.state.spaces.as_slice(),
+                [space] if space.id == DEFAULT_SPACE_ID
+                    && space.profile_id == profile_id
+                    && space.name == "Everyday"
+                    && space.icon.is_none()
+                    && space.theme.is_none()
+            );
+        if !untouched {
+            return self.create_styled_space(profile_id, name, icon, theme);
+        }
+        validate_profile(profile_id)?;
+        validate_name(name).map_err(WorkspaceError::InvalidName)?;
+        if let Some(icon) = &icon {
+            validate_icon(icon)?;
+        }
+        validate_theme(theme)?;
+        let space = &mut self.state.spaces[0];
+        space.name = name.to_owned();
+        space.icon = icon;
+        space.theme = theme;
+        Ok(DEFAULT_SPACE_ID)
+    }
+
     /// Replace a Space's icon; `None` restores the default glyph. Returns
     /// whether it changed, so adapters can skip writes.
     pub fn set_space_icon(
@@ -1642,6 +1682,74 @@ mod tests {
         assert_eq!(restored.space_theme_of(DEFAULT_SPACE_ID), None);
         assert_eq!(workspace.set_space_theme(plain, None), Ok(true));
         assert_eq!(workspace.space_theme_of(plain), None);
+    }
+
+    #[test]
+    fn first_space_replaces_only_the_untouched_default() {
+        let mut fresh = Workspace::default();
+        assert_eq!(
+            fresh.create_first_space(
+                DEFAULT_PROFILE_ID,
+                "Client",
+                emoji("🚀"),
+                theme(0x336699, 50)
+            ),
+            Ok(DEFAULT_SPACE_ID)
+        );
+        assert_eq!(fresh.space_name_of(DEFAULT_SPACE_ID), Some("Client"));
+        assert_eq!(fresh.space_icon_of(DEFAULT_SPACE_ID), emoji("🚀").as_ref());
+        assert_eq!(fresh.space_theme_of(DEFAULT_SPACE_ID), theme(0x336699, 50));
+        assert_eq!(fresh.snapshot().spaces.len(), 1);
+        assert_eq!(fresh.snapshot().next_space_id, 2);
+
+        // A bad request leaves the default Space alone.
+        let mut fresh = Workspace::default();
+        let before = fresh.snapshot();
+        assert_eq!(
+            fresh.create_first_space(DEFAULT_PROFILE_ID, "Client", None, theme(0, 101)),
+            Err(WorkspaceError::InvalidTheme)
+        );
+        assert!(
+            fresh
+                .create_first_space(DEFAULT_PROFILE_ID, "", None, None)
+                .is_err()
+        );
+        assert_eq!(fresh.snapshot(), before);
+
+        // Any trace of use keeps the default Space and adds a new one.
+        let renamed = |workspace: &mut Workspace| {
+            workspace.rename_space(DEFAULT_SPACE_ID, "Mine").unwrap();
+        };
+        let iconed = |workspace: &mut Workspace| {
+            workspace
+                .set_space_icon(DEFAULT_SPACE_ID, emoji("☕"))
+                .unwrap();
+        };
+        let themed = |workspace: &mut Workspace| {
+            workspace
+                .set_space_theme(DEFAULT_SPACE_ID, theme(0, 0))
+                .unwrap();
+        };
+        let with_item = |workspace: &mut Workspace| {
+            workspace.add_temporary_item(DEFAULT_SPACE_ID).unwrap();
+        };
+        let created_and_deleted = |workspace: &mut Workspace| {
+            let extra = workspace.create_space(DEFAULT_PROFILE_ID, "Extra").unwrap();
+            workspace.delete_space(extra).unwrap();
+        };
+        let touches: [&dyn Fn(&mut Workspace); 5] =
+            [&renamed, &iconed, &themed, &with_item, &created_and_deleted];
+        for touch in touches {
+            let mut workspace = Workspace::default();
+            touch(&mut workspace);
+            let kept = workspace.snapshot().spaces[0].clone();
+            let id = workspace
+                .create_first_space(DEFAULT_PROFILE_ID, "Client", None, None)
+                .unwrap();
+            assert_ne!(id, DEFAULT_SPACE_ID);
+            assert_eq!(workspace.snapshot().spaces[0], kept);
+            assert_eq!(workspace.space_name_of(id), Some("Client"));
+        }
     }
 
     #[test]

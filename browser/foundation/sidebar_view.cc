@@ -692,7 +692,7 @@ void SidebarView::DropRows() {
 }
 
 void SidebarView::OpenCreateSpace(std::vector<ProfileChoice> profiles,
-                                  std::string selected_profile_id,
+                                  ProfileChoice own_profile,
                                   bool profile_menu) {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
   if (create_panel_) {
@@ -738,7 +738,7 @@ void SidebarView::OpenCreateSpace(std::vector<ProfileChoice> profiles,
   // this view, and the delegate outlives both.
   create_panel_ =
       AddChildViewAt(std::make_unique<CreateSpacePanel>(
-                         std::move(profiles), std::move(selected_profile_id),
+                         std::move(profiles), std::move(own_profile),
                          base::BindRepeating(&SidebarView::SubmitCreateSpace,
                                              base::Unretained(this)),
                          profile_menu
