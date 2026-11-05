@@ -76,15 +76,21 @@ class WorkspaceService final : public base::SupportsUserData::Data {
   // ID.
   foundation::MutationResult CreateSpace(std::string_view name);
   // `icon` is one emoji or a bundled icon name, per `icon_kind`; empty for
-  // Unset, the default glyph.
-  foundation::MutationResult CreateSpace(std::string_view name,
-                                         foundation::SpaceIconKind icon_kind,
-                                         std::string_view icon);
+  // Unset, the default glyph. An unset `theme` keeps the default tint.
+  foundation::MutationResult CreateSpace(
+      std::string_view name,
+      foundation::SpaceIconKind icon_kind,
+      std::string_view icon,
+      const foundation::SpaceThemeRecord& theme);
   foundation::MutationResult RenameSpace(uint64_t space, std::string_view name);
   // `id` is 1 when the icon changed, else 0. Unset restores the default glyph.
   foundation::MutationResult SetSpaceIcon(uint64_t space,
                                           foundation::SpaceIconKind icon_kind,
                                           std::string_view icon);
+  // `id` is 1 when the theme changed, else 0. Unset restores the default tint.
+  foundation::MutationResult SetSpaceTheme(
+      uint64_t space,
+      const foundation::SpaceThemeRecord& theme);
   foundation::MutationResult CreateWindow(uint64_t space);
   foundation::MutationResult CloseWindow(uint64_t window);
   foundation::MutationResult SelectSpace(uint64_t window, uint64_t space);

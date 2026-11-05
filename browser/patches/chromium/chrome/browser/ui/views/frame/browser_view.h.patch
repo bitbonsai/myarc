@@ -1,5 +1,5 @@
 diff --git a/chrome/browser/ui/views/frame/browser_view.h b/chrome/browser/ui/views/frame/browser_view.h
-index 750e46c97b64dccccf4268e912df5dbdb6516b3c..71bc1664721e26605a0ada4a9002218a0ba45492 100644
+index 750e46c97b64dccccf4268e912df5dbdb6516b3c..6b7bc15deac01aa66d1fbdc1004998a1e6b123b3 100644
 --- a/chrome/browser/ui/views/frame/browser_view.h
 +++ b/chrome/browser/ui/views/frame/browser_view.h
 @@ -8,11 +8,13 @@
@@ -106,7 +106,7 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..71bc1664721e26605a0ada4a9002218a
    base::WeakPtr<BrowserView> GetAsWeakPtr() {
      return weak_ptr_factory_.GetWeakPtr();
    }
-@@ -1253,12 +1300,116 @@ class BrowserView : public BrowserWindow,
+@@ -1253,12 +1300,118 @@ class BrowserView : public BrowserWindow,
  
    // Anchor point for help bubbles and other dialogs that want to reliably
    // anchor outside the content area of the window.
@@ -124,6 +124,7 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..71bc1664721e26605a0ada4a9002218a
 +  void CreateSpace() override;
 +  std::u16string CreateNamedSpace(const std::u16string& name,
 +                                  const myarc::SpaceIconChoice& icon,
++                                  const std::optional<myarc::SpaceTheme>& theme,
 +                                  const std::string& profile_id) override;
 +  void CreateProfile(
 +      const std::u16string& name,
@@ -135,7 +136,8 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..71bc1664721e26605a0ada4a9002218a
 +  std::u16string CreateMyarcSpaceInProfile(
 +      const std::string& profile_id,
 +      std::string name,
-+      const myarc::SpaceIconChoice& icon);
++      const myarc::SpaceIconChoice& icon,
++      const std::optional<myarc::SpaceTheme>& theme);
 +  void RenameSpace(uint64_t space) override;
 +  void MoveSpace(uint64_t space, uint64_t before) override;
 +  void NewTab() override;
@@ -223,7 +225,7 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..71bc1664721e26605a0ada4a9002218a
  
    // A mapping between accelerators and command IDs.
    std::map<ui::Accelerator, int> accelerator_table_;
-@@ -1411,6 +1562,7 @@ class BrowserView : public BrowserWindow,
+@@ -1411,6 +1564,7 @@ class BrowserView : public BrowserWindow,
    base::EnumSet<TabStripAndWebAppViewsReparentedState>
        tab_strip_web_apps_reparented_state_;
  

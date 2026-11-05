@@ -35,12 +35,23 @@ mod ffi {
         Named,
     }
 
+    // A Space's sidebar colour. `set` false is the default tint, with zero
+    // `color` and `opacity`.
+    struct SpaceThemeRecord {
+        set: bool,
+        // 0xRRGGBB.
+        color: u32,
+        // 0 to 100 percent.
+        opacity: u8,
+    }
+
     struct SpaceRecord {
         id: u64,
         profile_id: u64,
         name: String,
         icon_kind: SpaceIconKind,
         icon: String,
+        theme: SpaceThemeRecord,
     }
 
     struct ItemRecord {
@@ -132,12 +143,14 @@ mod ffi {
         fn bridge_limits() -> BridgeLimits;
         fn create_space(workspace: &mut Workspace, name: &str) -> MutationResult;
         // Create a Space panel: like create_space, with an icon unless
-        // `icon_kind` is Unset, in which case `icon` must be empty.
-        fn create_space_with_icon(
+        // `icon_kind` is Unset, in which case `icon` must be empty, and a
+        // theme when `theme.set`.
+        fn create_styled_space(
             workspace: &mut Workspace,
             name: &str,
             icon_kind: SpaceIconKind,
             icon: &str,
+            theme: SpaceThemeRecord,
         ) -> MutationResult;
         // Unset restores the default glyph. `id` is 1 when the icon changed,
         // else 0.
@@ -146,6 +159,13 @@ mod ffi {
             space_id: u64,
             icon_kind: SpaceIconKind,
             icon: &str,
+        ) -> MutationResult;
+        // Unset `theme` restores the default tint. `id` is 1 when the theme
+        // changed, else 0.
+        fn set_space_theme(
+            workspace: &mut Workspace,
+            space_id: u64,
+            theme: SpaceThemeRecord,
         ) -> MutationResult;
         fn create_window(workspace: &mut Workspace, space_id: u64) -> MutationResult;
         fn close_window(workspace: &mut Workspace, window_id: u64) -> MutationResult;
@@ -329,19 +349,56 @@ fn space_icon(
     }
 }
 
-pub fn create_space_with_icon(
+fn space_theme(theme: &ffi::SpaceThemeRecord) -> Option<workspace::SpaceTheme> {
+    theme.set.then_some(workspace::SpaceTheme {
+        color: theme.color,
+        opacity: theme.opacity,
+    })
+}
+
+pub fn create_styled_space(
     workspace: &mut Workspace,
     name: &str,
     icon_kind: ffi::SpaceIconKind,
     icon: &str,
+    theme: ffi::SpaceThemeRecord,
 ) -> ffi::MutationResult {
     match space_icon(icon_kind, icon) {
-        Ok(icon) => outcome(workspace.0.create_space_with_icon(
+        Ok(icon) => outcome(workspace.0.create_styled_space(
             workspace::DEFAULT_PROFILE_ID,
             name,
             icon,
+            space_theme(&theme),
         )),
         Err(error) => reject(error),
+    }
+}
+
+pub fn set_space_theme(
+    workspace: &mut Workspace,
+    space_id: u64,
+    theme: ffi::SpaceThemeRecord,
+) -> ffi::MutationResult {
+    outcome(
+        workspace
+            .0
+            .set_space_theme(space_id, space_theme(&theme))
+            .map(u64::from),
+    )
+}
+
+fn theme_record(theme: Option<workspace::SpaceTheme>) -> ffi::SpaceThemeRecord {
+    match theme {
+        Some(theme) => ffi::SpaceThemeRecord {
+            set: true,
+            color: theme.color,
+            opacity: theme.opacity,
+        },
+        None => ffi::SpaceThemeRecord {
+            set: false,
+            color: 0,
+            opacity: 0,
+        },
     }
 }
 
@@ -647,6 +704,7 @@ fn space_record(space: workspace::Space) -> ffi::SpaceRecord {
         name: space.name,
         icon_kind,
         icon,
+        theme: theme_record(space.theme),
     }
 }
 
@@ -691,6 +749,7 @@ pub fn sidebar_snapshot(workspace: &Workspace, window_id: u64) -> ffi::SidebarRe
                 name: String::new(),
                 icon_kind: ffi::SpaceIconKind::Unset,
                 icon: String::new(),
+                theme: theme_record(None),
             },
             selected_item_id: 0,
             spaces: Vec::new(),
@@ -782,6 +841,8 @@ pub fn restore_snapshot(
                         } else {
                             space_icon(space.icon_kind, &space.icon).unwrap_or_default()
                         },
+                        // The core drops a bad theme on restore.
+                        theme: space_theme(&space.theme),
                         name: space.name,
                     })
                     .collect(),

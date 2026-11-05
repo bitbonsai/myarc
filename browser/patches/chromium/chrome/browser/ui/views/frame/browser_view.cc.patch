@@ -1,5 +1,5 @@
 diff --git a/chrome/browser/ui/views/frame/browser_view.cc b/chrome/browser/ui/views/frame/browser_view.cc
-index 7b568f6de760af21d6e9d2aa44415a7cef617c51..da9b98dbd52a56430df66ff3b914357153553eb4 100644
+index 7b568f6de760af21d6e9d2aa44415a7cef617c51..97533b83b51cd30e0a6acbfbfe13de4995731a64 100644
 --- a/chrome/browser/ui/views/frame/browser_view.cc
 +++ b/chrome/browser/ui/views/frame/browser_view.cc
 @@ -22,6 +22,7 @@
@@ -1576,7 +1576,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..da9b98dbd52a56430df66ff3b9143571
  }
  
  void BrowserView::RemovedFromWidget() {
-@@ -5267,6 +6536,1225 @@ const views::View* BrowserView::GetViewByElementId(
+@@ -5267,6 +6536,1245 @@ const views::View* BrowserView::GetViewByElementId(
  ///////////////////////////////////////////////////////////////////////////////
  // BrowserView, ui::AcceleratorTarget overrides:
  
@@ -2128,9 +2128,25 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..da9b98dbd52a56430df66ff3b9143571
 +  }
 +}
 +
-+std::u16string BrowserView::CreateNamedSpace(const std::u16string& name,
-+                                             const myarc::SpaceIconChoice& icon,
-+                                             const std::string& profile_id) {
++namespace {
++
++myarc::foundation::SpaceThemeRecord MyarcThemeRecord(
++    const std::optional<myarc::SpaceTheme>& theme) {
++  if (!theme) {
++    return {};
++  }
++  return {.set = true,
++          .color = static_cast<uint32_t>(theme->color & 0xFFFFFF),
++          .opacity = static_cast<uint8_t>(std::clamp(theme->opacity, 0, 100))};
++}
++
++}  // namespace
++
++std::u16string BrowserView::CreateNamedSpace(
++    const std::u16string& name,
++    const myarc::SpaceIconChoice& icon,
++    const std::optional<myarc::SpaceTheme>& theme,
++    const std::string& profile_id) {
 +  if (!myarc_workspace_adapter_) {
 +    return u"Workspace unavailable.";
 +  }
@@ -2150,11 +2166,11 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..da9b98dbd52a56430df66ff3b9143571
 +                        : myarc::foundation::SpaceIconKind::Unset;
 +  if (profile_id !=
 +      GetProfile()->GetOriginalProfile()->GetBaseName().AsUTF8Unsafe()) {
-+    return CreateMyarcSpaceInProfile(profile_id, base::UTF16ToUTF8(name),
-+                                     icon);
++    return CreateMyarcSpaceInProfile(profile_id, base::UTF16ToUTF8(name), icon,
++                                     theme);
 +  }
-+  auto result = myarc_workspace_adapter_->CreateSpace(base::UTF16ToUTF8(name),
-+                                                      kind, icon.value);
++  auto result = myarc_workspace_adapter_->CreateSpace(
++      base::UTF16ToUTF8(name), kind, icon.value, MyarcThemeRecord(theme));
 +  if (!result.ok) {
 +    return base::UTF8ToUTF16(std::string(result.error));
 +  }
@@ -2213,8 +2229,11 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..da9b98dbd52a56430df66ff3b9143571
 +std::u16string BrowserView::CreateMyarcSpaceInProfile(
 +    const std::string& profile_id,
 +    std::string name,
-+    const myarc::SpaceIconChoice& choice) {
++    const myarc::SpaceIconChoice& choice,
++    const std::optional<myarc::SpaceTheme>& theme) {
 +  using Kind = myarc::SpaceIconChoice::Kind;
++  const myarc::foundation::SpaceThemeRecord theme_record =
++      MyarcThemeRecord(theme);
 +  const auto kind = choice.kind == Kind::kEmoji
 +                        ? myarc::foundation::SpaceIconKind::Emoji
 +                    : choice.kind == Kind::kNamed
@@ -2241,7 +2260,8 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..da9b98dbd52a56430df66ff3b9143571
 +      base::BindOnce(
 +          [](base::WeakPtr<BrowserView> view, decltype(fail) fail,
 +             std::string name, myarc::foundation::SpaceIconKind kind,
-+             std::string icon, Profile* profile) {
++             std::string icon, myarc::foundation::SpaceThemeRecord theme,
++             Profile* profile) {
 +            if (!profile ||
 +                MyarcProfilePath(profile->GetBaseName().AsUTF8Unsafe())
 +                    .empty()) {
@@ -2253,8 +2273,8 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..da9b98dbd52a56430df66ff3b9143571
 +                base::BindOnce(
 +                    [](base::WeakPtr<BrowserView> view, decltype(fail) fail,
 +                       base::WeakPtr<Profile> profile, std::string name,
-+                       myarc::foundation::SpaceIconKind kind,
-+                       std::string icon) {
++                       myarc::foundation::SpaceIconKind kind, std::string icon,
++                       myarc::foundation::SpaceThemeRecord theme) {
 +                      if (!profile) {
 +                        fail(view,
 +                             "The Profile closed before its new Space "
@@ -2263,7 +2283,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..da9b98dbd52a56430df66ff3b9143571
 +                      }
 +                      auto result =
 +                          myarc::WorkspaceService::ForProfile(*profile)
-+                              .CreateSpace(name, kind, icon);
++                              .CreateSpace(name, kind, icon, theme);
 +                      if (!result.ok) {
 +                        fail(view,
 +                             "Couldn't create the Space in that "
@@ -2275,10 +2295,10 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..da9b98dbd52a56430df66ff3b9143571
 +                      }
 +                    },
 +                    view, fail, profile->GetWeakPtr(), std::move(name), kind,
-+                    std::move(icon)));
++                    std::move(icon), theme));
 +          },
 +          myarc_workspace_weak_factory_.GetWeakPtr(), fail, std::move(name),
-+          kind, std::move(icon)));
++          kind, std::move(icon), theme_record));
 +  return {};
 +}
 +
@@ -2802,7 +2822,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..da9b98dbd52a56430df66ff3b9143571
  bool BrowserView::AcceleratorPressed(const ui::Accelerator& accelerator) {
  #if BUILDFLAG(IS_MAC)
    // Forward accelerators to ExclusiveAccessManager to handle Esc press-and-hold
-@@ -5342,7 +7830,8 @@ void BrowserView::LoadingAnimationCallback(base::TimeTicks timestamp) {
+@@ -5342,7 +7850,8 @@ void BrowserView::LoadingAnimationCallback(base::TimeTicks timestamp) {
      // GetActiveWebContents can return null for example under Purify when
      // the animations are running slowly and this function is called on a timer
      // through LoadingAnimationCallback.
@@ -2812,7 +2832,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..da9b98dbd52a56430df66ff3b9143571
    }
  }
  
-@@ -5471,6 +7960,10 @@ bool BrowserView::MaybeUpdateDevtools(content::WebContents* contents) {
+@@ -5471,6 +7980,10 @@ bool BrowserView::MaybeUpdateDevtools(content::WebContents* contents) {
  
  void BrowserView::UpdateUIForContents(WebContents* contents,
                                        bool should_layout_immediately) {
@@ -2823,7 +2843,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..da9b98dbd52a56430df66ff3b9143571
    TRACE_EVENT0("ui", "BrowserView::UpdateUIForContents");
    bool needs_layout = MaybeShowBookmarkBar(contents);
  
-@@ -5706,6 +8199,26 @@ void BrowserView::LoadAccelerators() {
+@@ -5706,6 +8219,26 @@ void BrowserView::LoadAccelerators() {
    }
  
  #if BUILDFLAG(IS_MAC)

@@ -200,6 +200,11 @@ std::optional<std::string> EncodeWorkspaceMetadata(
       record.Set("icon_kind", static_cast<int>(space.icon_kind));
       record.Set("icon", std::string(space.icon));
     }
+    // Likewise for themes.
+    if (space.theme.set) {
+      record.Set("theme_color", static_cast<int>(space.theme.color));
+      record.Set("theme_opacity", static_cast<int>(space.theme.opacity));
+    }
     spaces.Append(std::move(record));
   }
   root.Set("spaces", std::move(spaces));
@@ -327,6 +332,18 @@ MetadataResult DecodeWorkspaceMetadata(std::string_view json) {
          *icon_kind == static_cast<int>(foundation::SpaceIconKind::Named))) {
       space.icon_kind = static_cast<foundation::SpaceIconKind>(*icon_kind);
       space.icon = *icon;
+    }
+    // Files written before themes have no theme keys; a bad theme reads as
+    // none, like a bad icon.
+    const auto theme_color = record->FindInt("theme_color");
+    const auto theme_opacity = record->FindInt("theme_opacity");
+    space.theme = {};
+    if (theme_color && theme_opacity && *theme_color >= 0 &&
+        *theme_color <= 0xFFFFFF && *theme_opacity >= 0 &&
+        *theme_opacity <= 100) {
+      space.theme = {.set = true,
+                     .color = static_cast<uint32_t>(*theme_color),
+                     .opacity = static_cast<uint8_t>(*theme_opacity)};
     }
     snapshot.spaces.push_back(std::move(space));
   }
@@ -642,16 +659,17 @@ foundation::MutationResult WorkspaceService::CreateSpace(
 foundation::MutationResult WorkspaceService::CreateSpace(
     std::string_view name,
     foundation::SpaceIconKind icon_kind,
-    std::string_view icon) {
+    std::string_view icon,
+    const foundation::SpaceThemeRecord& theme) {
   if (!CanMutate())
     return Failure("Workspace is not loaded. Check storage state.");
   if (!BoundedText(name, foundation::bridge_limits().name_bytes))
     return Failure("Invalid UTF-8 or oversized Space name.");
   if (!BoundedText(icon, foundation::bridge_limits().icon_bytes))
     return Failure("Invalid UTF-8 or oversized Space icon.");
-  return SpacesChanged(foundation::create_space_with_icon(
+  return SpacesChanged(foundation::create_styled_space(
       *workspace_, rust::Str(name.data(), name.size()), icon_kind,
-      rust::Str(icon.data(), icon.size())));
+      rust::Str(icon.data(), icon.size()), theme));
 }
 
 foundation::MutationResult WorkspaceService::RenameSpace(
@@ -676,6 +694,14 @@ foundation::MutationResult WorkspaceService::SetSpaceIcon(
     return Failure("Invalid UTF-8 or oversized Space icon.");
   return SpacesChanged(foundation::set_space_icon(
       *workspace_, space, icon_kind, rust::Str(icon.data(), icon.size())));
+}
+
+foundation::MutationResult WorkspaceService::SetSpaceTheme(
+    uint64_t space,
+    const foundation::SpaceThemeRecord& theme) {
+  if (!CanMutate())
+    return Failure("Workspace is not loaded. Check storage state.");
+  return SpacesChanged(foundation::set_space_theme(*workspace_, space, theme));
 }
 
 foundation::MutationResult WorkspaceService::CreateWindow(uint64_t space) {

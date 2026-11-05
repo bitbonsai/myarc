@@ -24,6 +24,7 @@
 #include "myarc/footer_button.h"
 #include "myarc/icons.h"
 #include "myarc/library_view.h"
+#include "myarc/sidebar_tint.h"
 #include "myarc/space_icon_catalog.h"
 #include "third_party/skia/include/core/SkColor.h"
 #include "ui/base/metadata/metadata_impl_macros.h"
@@ -119,6 +120,14 @@ Fills GetFills(const ui::ColorProvider* provider) {
 }
 
 // A Space record's icon. Unknown kinds read as none.
+std::optional<SpaceTheme> SpaceThemeOf(const foundation::SpaceRecord& space) {
+  if (!space.theme.set) {
+    return std::nullopt;
+  }
+  return SpaceTheme{.color = SkColorSetA(space.theme.color, SK_AlphaOPAQUE),
+                    .opacity = space.theme.opacity};
+}
+
 SpaceIconChoice SpaceIconOf(const foundation::SpaceRecord& space) {
   if (space.icon_kind == foundation::SpaceIconKind::Emoji) {
     return {SpaceIconChoice::Kind::kEmoji, std::string(space.icon)};
@@ -764,12 +773,15 @@ void SidebarView::SetCreateSpaceProfiles(std::vector<ProfileChoice> profiles,
   }
 }
 
-std::u16string SidebarView::SubmitCreateSpace(const std::u16string& name,
-                                              const SpaceIconChoice& icon,
-                                              const std::string& profile_id) {
+std::u16string SidebarView::SubmitCreateSpace(
+    const std::u16string& name,
+    const SpaceIconChoice& icon,
+    const std::optional<SpaceTheme>& theme,
+    const std::string& profile_id) {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
   auto weak = weak_factory_.GetWeakPtr();
-  std::u16string error = delegate_->CreateNamedSpace(name, icon, profile_id);
+  std::u16string error =
+      delegate_->CreateNamedSpace(name, icon, theme, profile_id);
   if (weak && error.empty()) {
     CloseCreateSpace();
   }
@@ -783,6 +795,10 @@ void SidebarView::CloseCreateSpace() {
   }
   RemoveChildViewT(std::exchange(create_panel_, nullptr));
   current_space_id_ = 0;
+  // Drops the panel's preview; Create's new Space arrives with SetModel.
+  if (GetWidget()) {
+    SetSidebarTheme(*GetWidget(), space_theme_, /*fade=*/true);
+  }
   delegate_->CreateSpacePanelClosed();
 }
 
@@ -1148,6 +1164,12 @@ void SidebarView::SetModel(const foundation::SidebarResult& model,
                              .title = std::move(presentation.title),
                              .icon = std::move(presentation.icon)});
     }
+  }
+  // Each Space tints the sidebar with its theme, crossfading on a switch.
+  // While the Create a Space panel is open, its preview owns the tint.
+  space_theme_ = SpaceThemeOf(model.current_space);
+  if (!create_panel_ && GetWidget()) {
+    SetSidebarTheme(*GetWidget(), space_theme_, /*fade=*/true);
   }
   if (create_panel_) {
     // The rows rebuild when the panel closes. A Space picked in the footer
@@ -1656,6 +1678,13 @@ void SidebarView::ShowDownloadsStackForCapture() {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
   if (downloads_stack_) {
     downloads_stack_->ShowNow();
+  }
+}
+
+void SidebarView::AddedToWidget() {
+  views::View::AddedToWidget();
+  if (!create_panel_) {
+    SetSidebarTheme(*GetWidget(), space_theme_, /*fade=*/false);
   }
 }
 

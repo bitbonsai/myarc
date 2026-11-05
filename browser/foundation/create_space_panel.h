@@ -2,12 +2,14 @@
 #define MYARC_CREATE_SPACE_PANEL_H_
 
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
 #include "base/functional/callback.h"
 #include "base/memory/raw_ptr.h"
 #include "base/memory/weak_ptr.h"
+#include "myarc/sidebar_tint.h"
 #include "myarc/space_icon_catalog.h"
 #include "ui/base/metadata/metadata_header_macros.h"
 #include "ui/menus/simple_menu_model.h"
@@ -28,6 +30,7 @@ class Widget;
 namespace myarc {
 
 class SpaceIconPickerView;
+class SpaceThemePickerView;
 
 // A Profile the new Space can use. `id` is the caller's; the panel only hands
 // it back.
@@ -39,8 +42,10 @@ struct ProfileChoice {
 // Arc's "Create a Space" panel, which takes the sidebar's place: a name field,
 // the Profile the Space will use, and Create or Cancel. Return creates and Esc
 // cancels. The icon button opens the emoji and icon picker, and the Profile
-// pill, by click, Space or Return, a menu of Profiles with New Profile…; the
-// theme row is a placeholder for now.
+// pill, by click, Space or Return, a menu of Profiles with New Profile…. Choose
+// a Theme opens colour chips and an opacity slider; a picked theme tints the
+// window's sidebar while the panel is open, and the owner restores the current
+// Space's tint once it closes.
 class CreateSpacePanel final : public views::View,
                                public views::TextfieldController,
                                public ui::SimpleMenuModel::Delegate {
@@ -48,13 +53,15 @@ class CreateSpacePanel final : public views::View,
 
  public:
   // `create` gets the trimmed name, the picked icon (Kind::kNone for the
-  // default glyph) and the selected Profile's id, and returns why it failed,
-  // or nothing once the Space exists. `create` and `cancel` run after the
-  // pressed control's handlers unwind and may delete the panel.
-  using CreateCallback =
-      base::RepeatingCallback<std::u16string(const std::u16string& name,
-                                             const SpaceIconChoice& icon,
-                                             const std::string& profile_id)>;
+  // default glyph), the picked theme (none for the default tint) and the
+  // selected Profile's id, and returns why it failed, or nothing once the
+  // Space exists. `create` and `cancel` run after the pressed control's
+  // handlers unwind and may delete the panel.
+  using CreateCallback = base::RepeatingCallback<std::u16string(
+      const std::u16string& name,
+      const SpaceIconChoice& icon,
+      const std::optional<SpaceTheme>& theme,
+      const std::string& profile_id)>;
   // Reports why creating a Profile failed, or nothing once it exists.
   using ProfileDoneCallback =
       base::OnceCallback<void(const std::u16string& error)>;
@@ -78,6 +85,8 @@ class CreateSpacePanel final : public views::View,
   // Opens the icon picker under the icon button on `tab`. `hold` keeps it open
   // in an inactive window, for background captures.
   void OpenIconPicker(SpaceIconChoice::Kind tab, bool hold = false);
+  // Opens the theme popover beside the Choose a Theme row. `hold` as above.
+  void OpenThemePicker(bool hold = false);
   // Replaces the Profile menu's choices and selects `selected_id`, or the
   // first choice when it isn't listed. Closes the Profile name field.
   void SetProfiles(std::vector<ProfileChoice> profiles,
@@ -108,6 +117,10 @@ class CreateSpacePanel final : public views::View,
   void RunCreate();
   void PickIcon(SpaceIconChoice icon);
   void OnIconPickerClosed();
+  void PickTheme(SpaceTheme theme);
+  void OnThemePickerClosed();
+  // The brush in the theme colour, or muted without one.
+  void UpdateThemeIcon();
   // The picked icon in place of the dashed "+".
   void UpdateIconButton();
   void UpdateProfilePill();
@@ -141,18 +154,22 @@ class CreateSpacePanel final : public views::View,
   raw_ptr<views::ImageView> new_profile_icon_ = nullptr;
   raw_ptr<views::Textfield> new_profile_name_ = nullptr;
   raw_ptr<views::Label> profile_error_ = nullptr;
-  raw_ptr<views::View> theme_row_ = nullptr;
+  raw_ptr<views::Button> theme_row_ = nullptr;
   raw_ptr<views::ImageView> theme_icon_ = nullptr;
   raw_ptr<views::Label> theme_label_ = nullptr;
   raw_ptr<views::LabelButton> create_button_ = nullptr;
   raw_ptr<views::LabelButton> cancel_button_ = nullptr;
   SpaceIconChoice icon_;
+  std::optional<SpaceTheme> theme_;
   bool capture_scheduled_ = false;
   // The picker's delegate outlives its widget; both close with the panel,
   // before the name field they anchor to.
   std::unique_ptr<views::BubbleDialogDelegate> picker_delegate_;
   std::unique_ptr<views::Widget> picker_widget_;
   raw_ptr<SpaceIconPickerView> picker_ = nullptr;
+  // Likewise for the theme popover, anchored to the theme row.
+  std::unique_ptr<views::BubbleDialogDelegate> theme_picker_delegate_;
+  std::unique_ptr<views::Widget> theme_picker_widget_;
   // The runner goes before its model.
   std::unique_ptr<ui::SimpleMenuModel> profile_menu_model_;
   std::unique_ptr<views::MenuRunner> profile_menu_runner_;

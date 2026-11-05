@@ -16,6 +16,7 @@
 #include "base/time/time.h"
 #include "myarc/icons.h"
 #include "myarc/space_icon_picker.h"
+#include "myarc/space_theme_picker.h"
 #include "third_party/skia/include/core/SkColor.h"
 #include "ui/base/metadata/metadata_impl_macros.h"
 #include "ui/base/mojom/menu_source_type.mojom.h"
@@ -63,7 +64,8 @@ constexpr int kArtSize = 48;
 
 // The switch that opens the panel for captures; "emoji" or "icon" also opens
 // the icon picker on that tab and holds it open, "profile" opens the Profile
-// menu and "profile-new" the Profile name field.
+// menu, "profile-new" the Profile name field, and "theme" the theme popover
+// with pink picked at 60%.
 constexpr char kCaptureCreateSpace[] = "myarc-capture-create-space";
 
 // Profile menu commands: New Profile…, then one per Profile from
@@ -140,19 +142,20 @@ void SetButtonFont(views::LabelButton& button, const gfx::FontList& font) {
   }
 }
 
-// views::Button's constructor is protected.
-class ProfilePill : public views::Button {
-  METADATA_HEADER(ProfilePill, views::Button)
+// views::Button's constructor is protected. Opens the Profile menu or the theme
+// popover.
+class PopupButton : public views::Button {
+  METADATA_HEADER(PopupButton, views::Button)
 
  public:
-  explicit ProfilePill(PressedCallback callback)
+  explicit PopupButton(PressedCallback callback)
       : views::Button(std::move(callback)) {
     // macOS buttons take focus only with Full Keyboard Access, which would
     // leave the pill unreachable after the Profile name field closes.
     SetFocusBehavior(FocusBehavior::ALWAYS);
   }
 
-  // Space and Return open the menu on press, like a native pop-up button.
+  // Space and Return open the popup on press, like a native pop-up button.
   // macOS views buttons ignore Return.
   bool OnKeyPressed(const ui::KeyEvent& event) override {
     if (IsMenuKey(event)) {
@@ -179,8 +182,52 @@ class ProfilePill : public views::Button {
   }
 };
 
-BEGIN_METADATA(ProfilePill)
+BEGIN_METADATA(PopupButton)
 END_METADATA
+
+// Arc's popover: no title, buttons or margins, and 14 DIP corners. `hold`
+// keeps it open in an inactive window, for background captures.
+std::unique_ptr<views::BubbleDialogDelegate> MakePopover(
+    views::View* anchor,
+    views::BubbleBorder::Arrow arrow,
+    const std::u16string& title,
+    bool dark,
+    bool hold) {
+  auto delegate = std::make_unique<views::BubbleDialogDelegate>(anchor, arrow);
+  delegate->SetButtons(static_cast<int>(ui::mojom::DialogButton::kNone));
+  delegate->SetShowCloseButton(false);
+  delegate->SetShowTitle(false);
+  delegate->SetTitle(title);
+  delegate->set_margins(gfx::Insets());
+  delegate->set_corner_radius(kPickerRadius);
+  delegate->set_close_on_deactivate(!hold);
+  delegate->SetBackgroundColor(dark ? kPickerDark : SK_ColorWHITE);
+  return delegate;
+}
+
+// The widget is mid-close; free it and its delegate once that unwinds.
+void ReleasePopover(std::unique_ptr<views::Widget>& widget,
+                    std::unique_ptr<views::BubbleDialogDelegate>& delegate) {
+  if (delegate) {
+    delegate->SetAnchorView(nullptr);
+  }
+  if (widget) {
+    base::SingleThreadTaskRunner::GetCurrentDefault()->DeleteSoon(
+        FROM_HERE, std::move(widget));
+  }
+  if (delegate) {
+    base::SingleThreadTaskRunner::GetCurrentDefault()->DeleteSoon(
+        FROM_HERE, std::move(delegate));
+  }
+}
+
+void ShowPopover(views::Widget& widget, bool hold) {
+  if (hold) {
+    widget.ShowInactive();
+  } else {
+    widget.Show();
+  }
+}
 
 }  // namespace
 
@@ -262,7 +309,7 @@ CreateSpacePanel::CreateSpacePanel(std::vector<ProfileChoice> profiles,
   profile_label_->SetProperty(views::kMarginsKey,
                               gfx::Insets::TLBR(0, 10, 0, 8));
   auto* pill = profile_row->AddChildView(
-      std::make_unique<ProfilePill>(base::BindRepeating(
+      std::make_unique<PopupButton>(base::BindRepeating(
           &CreateSpacePanel::OpenProfileMenu, base::Unretained(this))));
   pill
       ->SetLayoutManager(std::make_unique<views::BoxLayout>(
@@ -324,16 +371,27 @@ CreateSpacePanel::CreateSpacePanel(std::vector<ProfileChoice> profiles,
                               gfx::Insets::TLBR(6, 4, 0, 4));
   profile_error_->SetVisible(false);
 
-  // Choose a Theme: a placeholder row until the theme picker exists.
-  auto* theme_row = AddChildView(Row(gfx::Insets::VH(0, 10), 10));
+  // Choose a Theme opens the theme popover.
+  auto* theme_row = AddChildView(std::make_unique<PopupButton>(
+      base::BindRepeating(&CreateSpacePanel::OpenThemePicker,
+                          base::Unretained(this), /*hold=*/false)));
+  theme_row
+      ->SetLayoutManager(std::make_unique<views::BoxLayout>(
+          Orientation::kHorizontal, gfx::Insets::VH(0, 10), 10))
+      ->set_cross_axis_alignment(CrossAxis::kCenter);
+  views::InstallRoundRectHighlightPathGenerator(theme_row, gfx::Insets(),
+                                                kRowRadius);
+  theme_row->GetViewAccessibility().SetName(u"Choose a Theme");
+  theme_row->GetViewAccessibility().SetHasPopup(ax::mojom::HasPopup::kDialog);
   theme_row_ = theme_row;
   theme_row->SetPreferredSize(gfx::Size(0, kRowHeight));
   theme_row->SetProperty(views::kMarginsKey,
                          gfx::Insets::TLBR(kRowGap, 0, 0, 0));
   theme_icon_ = theme_row->AddChildView(std::make_unique<views::ImageView>());
+  theme_icon_->SetCanProcessEventsWithinSubtree(false);
   theme_label_ = theme_row->AddChildView(
       MakeLabel(u"Choose a Theme", Font(0, gfx::Font::Weight::SEMIBOLD)));
-  theme_label_->SetCustomTooltipText(u"Space themes are not available yet.");
+  theme_label_->SetCanProcessEventsWithinSubtree(false);
 
   auto* fill = AddChildView(std::make_unique<views::View>());
   layout->SetFlexForView(fill, 1);
@@ -388,18 +446,10 @@ void CreateSpacePanel::OpenIconPicker(SpaceIconChoice::Kind tab, bool hold) {
   }
   // Arc hangs the popover under the whole name field, its left edge on the
   // field's.
-  picker_delegate_ = std::make_unique<views::BubbleDialogDelegate>(
-      name_row_.get(), views::BubbleBorder::TOP_LEFT);
+  picker_delegate_ =
+      MakePopover(name_row_.get(), views::BubbleBorder::TOP_LEFT, u"Space icon",
+                  GetColors(GetColorProvider()).dark, hold);
   auto* delegate = picker_delegate_.get();
-  delegate->SetButtons(static_cast<int>(ui::mojom::DialogButton::kNone));
-  delegate->SetShowCloseButton(false);
-  delegate->SetShowTitle(false);
-  delegate->SetTitle(u"Space icon");
-  delegate->set_margins(gfx::Insets());
-  delegate->set_corner_radius(kPickerRadius);
-  delegate->set_close_on_deactivate(!hold);
-  const Colors colors = GetColors(GetColorProvider());
-  delegate->SetBackgroundColor(colors.dark ? kPickerDark : SK_ColorWHITE);
   SpaceIconChoice current = icon_;
   current.kind = tab;
   picker_ = delegate->SetContentsView(std::make_unique<SpaceIconPickerView>(
@@ -413,11 +463,60 @@ void CreateSpacePanel::OpenIconPicker(SpaceIconChoice::Kind tab, bool hold) {
   // Arc points a caret at the icon button. macOS bubbles use the OS shadow,
   // which can't be combined with views' visible arrow, so the popover has
   // none.
-  if (hold) {
-    picker_widget_->ShowInactive();
-  } else {
-    picker_widget_->Show();
+  ShowPopover(*picker_widget_, hold);
+}
+
+void CreateSpacePanel::OpenThemePicker(bool hold) {
+  if (theme_picker_widget_ && !theme_picker_widget_->IsClosed()) {
+    theme_picker_widget_->Activate();
+    return;
   }
+  if (theme_picker_widget_) {
+    OnThemePickerClosed();
+  }
+  if (!GetWidget()) {
+    return;
+  }
+  // Arc opens the popover to the right of the row. As with the icon picker,
+  // macOS leaves out the caret.
+  theme_picker_delegate_ =
+      MakePopover(theme_row_.get(), views::BubbleBorder::LEFT_CENTER,
+                  u"Space theme", GetColors(GetColorProvider()).dark, hold);
+  auto* picker = theme_picker_delegate_->SetContentsView(
+      std::make_unique<SpaceThemePickerView>(
+          theme_, base::BindRepeating(&CreateSpacePanel::PickTheme,
+                                      weak_factory_.GetWeakPtr())));
+  theme_picker_widget_ = views::BubbleDialogDelegate::CreateBubble(
+      theme_picker_delegate_.get(),
+      base::IgnoreArgs<views::Widget::ClosedReason>(base::BindOnce(
+          &CreateSpacePanel::OnThemePickerClosed, weak_factory_.GetWeakPtr())));
+  ShowPopover(*theme_picker_widget_, hold);
+  if (hold) {
+    picker->Select(1, 60);
+  }
+}
+
+void CreateSpacePanel::PickTheme(SpaceTheme theme) {
+  theme_ = theme;
+  UpdateThemeIcon();
+  // Previews the theme on the sidebar; the owner restores the current
+  // Space's once the panel closes.
+  if (GetWidget()) {
+    SetSidebarTheme(*GetWidget(), theme_, /*fade=*/false);
+  }
+}
+
+void CreateSpacePanel::OnThemePickerClosed() {
+  ReleasePopover(theme_picker_widget_, theme_picker_delegate_);
+}
+
+void CreateSpacePanel::UpdateThemeIcon() {
+  if (!GetColorProvider()) {
+    return;
+  }
+  const Colors colors = GetColors(GetColorProvider());
+  theme_icon_->SetImage(ui::ImageModel::FromVectorIcon(
+      kBrushIcon, theme_ ? theme_->color : colors.muted, kRowIconSize));
 }
 
 void CreateSpacePanel::PickIcon(SpaceIconChoice icon) {
@@ -434,18 +533,7 @@ void CreateSpacePanel::PickIcon(SpaceIconChoice icon) {
 
 void CreateSpacePanel::OnIconPickerClosed() {
   picker_ = nullptr;
-  if (picker_delegate_) {
-    picker_delegate_->SetAnchorView(nullptr);
-  }
-  // The widget is mid-close; free it and its delegate once that unwinds.
-  if (picker_widget_) {
-    base::SingleThreadTaskRunner::GetCurrentDefault()->DeleteSoon(
-        FROM_HERE, std::move(picker_widget_));
-  }
-  if (picker_delegate_) {
-    base::SingleThreadTaskRunner::GetCurrentDefault()->DeleteSoon(
-        FROM_HERE, std::move(picker_delegate_));
-  }
+  ReleasePopover(picker_widget_, picker_delegate_);
 }
 
 void CreateSpacePanel::UpdateIconButton() {
@@ -475,7 +563,7 @@ void CreateSpacePanel::AddedToWidget() {
           kCaptureCreateSpace);
   if (capture_scheduled_ ||
       (capture != "emoji" && capture != "icon" && capture != "profile" &&
-       capture != "profile-new")) {
+       capture != "profile-new" && capture != "theme")) {
     return;
   }
   capture_scheduled_ = true;
@@ -488,6 +576,8 @@ void CreateSpacePanel::AddedToWidget() {
             }
             if (capture == "profile") {
               panel->OpenProfileMenu();
+            } else if (capture == "theme") {
+              panel->OpenThemePicker(/*hold=*/true);
             } else if (capture == "profile-new") {
               panel->ShowNewProfile();
             } else {
@@ -533,8 +623,7 @@ void CreateSpacePanel::OnThemeChanged() {
   profile_error_->SetEnabledColor(colors.error);
   theme_row_->SetBackground(
       views::CreateRoundedRectBackground(colors.row, kRowRadius));
-  theme_icon_->SetImage(
-      ui::ImageModel::FromVectorIcon(kBrushIcon, colors.muted, kRowIconSize));
+  UpdateThemeIcon();
   theme_label_->SetEnabledColor(colors.ink);
   cancel_button_->SetEnabledTextColors(colors.cancel);
   UpdateCreateButton();
@@ -810,7 +899,7 @@ void CreateSpacePanel::RunCreate() {
   const std::string profile_id = selected_profile_ < profiles_.size()
                                      ? profiles_[selected_profile_].id
                                      : std::string();
-  const std::u16string error = create.Run(name, icon_, profile_id);
+  const std::u16string error = create.Run(name, icon_, theme_, profile_id);
   if (!weak || error.empty()) {
     return;
   }

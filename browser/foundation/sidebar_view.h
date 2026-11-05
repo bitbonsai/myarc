@@ -146,11 +146,13 @@ class SidebarView final : public views::View,
     // Asks the parent to open the Create a Space panel with OpenCreateSpace.
     virtual void CreateSpace() = 0;
     // The panel's Create: adds and selects the Space with `icon` (Kind::kNone
-    // for the default glyph) in the Profile `profile_id`, or returns why it
-    // can't.
-    virtual std::u16string CreateNamedSpace(const std::u16string& name,
-                                            const SpaceIconChoice& icon,
-                                            const std::string& profile_id) = 0;
+    // for the default glyph) and `theme` (none for the default tint) in the
+    // Profile `profile_id`, or returns why it can't.
+    virtual std::u16string CreateNamedSpace(
+        const std::u16string& name,
+        const SpaceIconChoice& icon,
+        const std::optional<SpaceTheme>& theme,
+        const std::string& profile_id) = 0;
     // The panel's New Profile…: see CreateSpacePanel::CreateProfileCallback.
     virtual void CreateProfile(const std::u16string& name,
                                CreateSpacePanel::ProfileDoneCallback done) = 0;
@@ -271,6 +273,7 @@ class SidebarView final : public views::View,
                   std::optional<ItemMenuState> item_menu = std::nullopt);
   // views::View:
   void Layout(PassKey) override;
+  void AddedToWidget() override;
   // views::AnimationDelegateViews:
   void AnimationProgressed(const gfx::Animation* animation) override;
   void AnimationEnded(const gfx::Animation* animation) override;
@@ -292,6 +295,7 @@ class SidebarView final : public views::View,
   // The Create a Space panel's callbacks.
   std::u16string SubmitCreateSpace(const std::u16string& name,
                                    const SpaceIconChoice& icon,
+                                   const std::optional<SpaceTheme>& theme,
                                    const std::string& profile_id);
   void CloseCreateSpace();
   // Checked when the rows replace the Library, not when closing starts.
@@ -337,6 +341,9 @@ class SidebarView final : public views::View,
   std::vector<std::pair<raw_ptr<views::MdTextButton>, bool>> tiles_;
   bool new_tab_intent_ = false;
   uint64_t current_space_id_ = 0;
+  // The current Space's theme, which tints the window's sidebar unless the
+  // Create a Space panel previews another.
+  std::optional<SpaceTheme> space_theme_;
   uint64_t menu_space_id_ = 0;
   uint64_t menu_item_id_ = 0;
   std::vector<SpaceEntry> spaces_;

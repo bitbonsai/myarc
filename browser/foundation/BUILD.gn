@@ -147,9 +147,12 @@ source_set("sidebar_view") {
     "space_icon_data.cc",
     "space_icon_picker.cc",
     "space_icon_picker.h",
+    "space_theme_picker.cc",
+    "space_theme_picker.h",
   ]
   public_deps = [
     ":library_logic",
+    ":sidebar_tint",
     "//base",
     "//ui/base",
     "//ui/menus",
@@ -177,10 +180,15 @@ source_set("sidebar_tint") {
     "sidebar_tint.cc",
     "sidebar_tint.h",
   ]
-  public_deps = [ "//skia" ]
+  public_deps = [
+    "//base",
+    "//skia",
+  ]
   deps = [
+    "//ui/base",
     "//ui/color",
     "//ui/gfx",
+    "//ui/views",
   ]
 }
 

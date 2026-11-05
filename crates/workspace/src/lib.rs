@@ -37,6 +37,8 @@ pub const MAX_SPACE_NAME_BYTES: usize = 128;
 /// Bound for either kind of Space icon. Long emoji ZWJ sequences with skin
 /// tones stay under 40 bytes.
 pub const MAX_SPACE_ICON_BYTES: usize = 64;
+/// A Space theme's opacity runs from 0 to this, in percent.
+pub const MAX_SPACE_THEME_OPACITY: u8 = 100;
 pub const MAX_URL_BYTES: usize = 8192;
 pub const MAX_TITLE_BYTES: usize = 1024;
 pub const MAX_SPACES: usize = 64;
@@ -91,6 +93,7 @@ pub enum WorkspaceError {
     UnknownArchivedTab(ItemId),
     InvalidName(RenameError),
     InvalidIcon,
+    InvalidTheme,
     InvalidUrl,
     CanonicalUrlRequired,
     UnexpectedCanonicalUrl,
@@ -120,6 +123,9 @@ impl fmt::Display for WorkspaceError {
             Self::InvalidName(error) => error.fmt(formatter),
             Self::InvalidIcon => formatter.write_str(
                 "Use an emoji or an icon name of lowercase letters, digits and hyphens, at most 64 bytes",
+            ),
+            Self::InvalidTheme => formatter.write_str(
+                "Use a theme colour of 0xRRGGBB and an opacity from 0 to 100",
             ),
             Self::InvalidUrl => formatter.write_str(
                 "Use either a browser-validated canonical HTTP(S) URL without credentials, or about:blank; at most 8192 bytes and without whitespace/control characters",
@@ -157,6 +163,16 @@ pub enum SpaceIcon {
     Named(String),
 }
 
+/// Colour the sidebar takes in the Space, picked in Choose a Theme.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct SpaceTheme {
+    /// 0xRRGGBB.
+    pub color: u32,
+    /// How strongly the colour tints the sidebar, 0 to
+    /// `MAX_SPACE_THEME_OPACITY` percent.
+    pub opacity: u8,
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Space {
     pub id: SpaceId,
@@ -164,6 +180,9 @@ pub struct Space {
     pub name: String,
     /// `None` shows the default glyph. Snapshots from before icons have none.
     pub icon: Option<SpaceIcon>,
+    /// `None` keeps the default sidebar tint. Snapshots from before themes
+    /// have none.
+    pub theme: Option<SpaceTheme>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -297,6 +316,7 @@ impl Default for Workspace {
                     profile_id: DEFAULT_PROFILE_ID,
                     name: String::from("Everyday"),
                     icon: None,
+                    theme: None,
                 }],
                 items: Vec::new(),
                 windows: vec![WindowState {
@@ -353,27 +373,35 @@ impl Workspace {
         self.space(id).ok().and_then(|space| space.icon.as_ref())
     }
 
+    /// Theme of the Space with `id`, if it exists and has one.
+    pub fn space_theme_of(&self, id: SpaceId) -> Option<SpaceTheme> {
+        self.space(id).ok().and_then(|space| space.theme)
+    }
+
     pub fn create_space(
         &mut self,
         profile_id: ProfileId,
         name: &str,
     ) -> Result<SpaceId, WorkspaceError> {
-        self.create_space_with_icon(profile_id, name, None)
+        self.create_styled_space(profile_id, name, None, None)
     }
 
-    /// Like `create_space`, for the Create a Space panel, which can pick an icon.
-    /// Atomic: a bad name or icon leaves the workspace unchanged.
-    pub fn create_space_with_icon(
+    /// Like `create_space`, for the Create a Space panel, which can pick an icon
+    /// and a theme. Atomic: a bad name, icon or theme leaves the workspace
+    /// unchanged.
+    pub fn create_styled_space(
         &mut self,
         profile_id: ProfileId,
         name: &str,
         icon: Option<SpaceIcon>,
+        theme: Option<SpaceTheme>,
     ) -> Result<SpaceId, WorkspaceError> {
         validate_profile(profile_id)?;
         validate_name(name).map_err(WorkspaceError::InvalidName)?;
         if let Some(icon) = &icon {
             validate_icon(icon)?;
         }
+        validate_theme(theme)?;
         check_limit(self.state.spaces.len(), MAX_SPACES, "Spaces")?;
         let id = self.state.next_space_id;
         let next = next_id(id, "Space")?;
@@ -382,6 +410,7 @@ impl Workspace {
             profile_id,
             name: name.to_owned(),
             icon,
+            theme,
         });
         self.state.next_space_id = next;
         Ok(id)
@@ -407,6 +436,27 @@ impl Workspace {
             return Ok(false);
         }
         space.icon = icon;
+        Ok(true)
+    }
+
+    /// Replace a Space's theme; `None` restores the default tint. Returns
+    /// whether it changed, so adapters can skip writes.
+    pub fn set_space_theme(
+        &mut self,
+        id: SpaceId,
+        theme: Option<SpaceTheme>,
+    ) -> Result<bool, WorkspaceError> {
+        validate_theme(theme)?;
+        let space = self
+            .state
+            .spaces
+            .iter_mut()
+            .find(|space| space.id == id)
+            .ok_or(WorkspaceError::UnknownSpace(id))?;
+        if space.theme == theme {
+            return Ok(false);
+        }
+        space.theme = theme;
         Ok(true)
     }
 
@@ -956,8 +1006,8 @@ impl Workspace {
         Ok(())
     }
 
-    /// A bad icon falls back to the default glyph instead of failing the
-    /// snapshot: it is cosmetic, and a newer build may allow more icon names.
+    /// A bad icon or theme falls back to the default instead of failing the
+    /// snapshot: both are cosmetic, and a newer build may allow more icon names.
     fn sanitize_icons(&mut self) {
         for space in &mut self.state.spaces {
             if space
@@ -966,6 +1016,9 @@ impl Workspace {
                 .is_some_and(|icon| validate_icon(icon).is_err())
             {
                 space.icon = None;
+            }
+            if validate_theme(space.theme).is_err() {
+                space.theme = None;
             }
         }
     }
@@ -1116,6 +1169,15 @@ fn validate_icon(icon: &SpaceIcon) -> Result<(), WorkspaceError> {
         Ok(())
     } else {
         Err(WorkspaceError::InvalidIcon)
+    }
+}
+
+fn validate_theme(theme: Option<SpaceTheme>) -> Result<(), WorkspaceError> {
+    match theme {
+        Some(theme) if theme.color > 0xFF_FFFF || theme.opacity > MAX_SPACE_THEME_OPACITY => {
+            Err(WorkspaceError::InvalidTheme)
+        }
+        _ => Ok(()),
     }
 }
 
@@ -1460,10 +1522,10 @@ mod tests {
     fn space_icon_round_trips_through_snapshot() {
         let mut workspace = Workspace::default();
         let coffee = workspace
-            .create_space_with_icon(DEFAULT_PROFILE_ID, "Coffee", emoji("☕"))
+            .create_styled_space(DEFAULT_PROFILE_ID, "Coffee", emoji("☕"), None)
             .unwrap();
         let book = workspace
-            .create_space_with_icon(DEFAULT_PROFILE_ID, "Reading", named("book-open"))
+            .create_styled_space(DEFAULT_PROFILE_ID, "Reading", named("book-open"), None)
             .unwrap();
         let plain = workspace.create_space(DEFAULT_PROFILE_ID, "Plain").unwrap();
         for text in ["👩🏽‍💻", "🇧🇷", "1️⃣", "❤️", "👩🏽‍❤️‍💋‍👨🏻"]
@@ -1486,7 +1548,7 @@ mod tests {
     fn rejects_invalid_space_icons_without_mutation() {
         let mut workspace = Workspace::default();
         let space = workspace
-            .create_space_with_icon(DEFAULT_PROFILE_ID, "Two", emoji("☕"))
+            .create_styled_space(DEFAULT_PROFILE_ID, "Two", emoji("☕"), None)
             .unwrap();
         let before = workspace.snapshot();
         let long_emoji = "☕".repeat(MAX_SPACE_ICON_BYTES / 3 + 1);
@@ -1512,7 +1574,7 @@ mod tests {
         ];
         for icon in bad {
             assert_eq!(
-                workspace.create_space_with_icon(DEFAULT_PROFILE_ID, "Three", icon.clone()),
+                workspace.create_styled_space(DEFAULT_PROFILE_ID, "Three", icon.clone(), None),
                 Err(WorkspaceError::InvalidIcon),
                 "{icon:?}"
             );
@@ -1542,6 +1604,7 @@ mod tests {
             profile_id: DEFAULT_PROFILE_ID,
             name: "Work".into(),
             icon: None,
+            theme: None,
         });
         legacy.next_space_id = 3;
         let workspace = Workspace::from_snapshot(legacy.clone()).unwrap();
@@ -1552,6 +1615,86 @@ mod tests {
         legacy.spaces[1].icon = emoji("☕");
         let workspace = Workspace::from_snapshot(legacy).unwrap();
         assert_eq!(workspace.space_icon_of(DEFAULT_SPACE_ID), None);
+        assert_eq!(workspace.space_icon_of(2), emoji("☕").as_ref());
+    }
+
+    fn theme(color: u32, opacity: u8) -> Option<SpaceTheme> {
+        Some(SpaceTheme { color, opacity })
+    }
+
+    #[test]
+    fn space_theme_round_trips_through_snapshot() {
+        let mut workspace = Workspace::default();
+        let pink = workspace
+            .create_styled_space(DEFAULT_PROFILE_ID, "Pink", None, theme(0xF29BBB, 60))
+            .unwrap();
+        let plain = workspace.create_space(DEFAULT_PROFILE_ID, "Plain").unwrap();
+        assert_eq!(workspace.set_space_theme(plain, theme(0, 0)), Ok(true));
+        assert_eq!(workspace.set_space_theme(plain, theme(0, 0)), Ok(false));
+        assert_eq!(
+            workspace.set_space_theme(plain, theme(0xFF_FFFF, 100)),
+            Ok(true)
+        );
+        let restored = Workspace::from_snapshot(workspace.snapshot()).unwrap();
+        assert_eq!(restored, workspace);
+        assert_eq!(restored.space_theme_of(pink), theme(0xF29BBB, 60));
+        assert_eq!(restored.space_theme_of(plain), theme(0xFF_FFFF, 100));
+        assert_eq!(restored.space_theme_of(DEFAULT_SPACE_ID), None);
+        assert_eq!(workspace.set_space_theme(plain, None), Ok(true));
+        assert_eq!(workspace.space_theme_of(plain), None);
+    }
+
+    #[test]
+    fn rejects_invalid_space_themes_without_mutation() {
+        let mut workspace = Workspace::default();
+        let space = workspace
+            .create_styled_space(DEFAULT_PROFILE_ID, "Two", None, theme(0x336699, 50))
+            .unwrap();
+        let before = workspace.snapshot();
+        for bad in [
+            theme(0x100_0000, 50),
+            theme(0x336699, 101),
+            theme(u32::MAX, u8::MAX),
+        ] {
+            assert_eq!(
+                workspace.create_styled_space(DEFAULT_PROFILE_ID, "Three", emoji("☕"), bad),
+                Err(WorkspaceError::InvalidTheme),
+                "{bad:?}"
+            );
+            assert_eq!(
+                workspace.set_space_theme(space, bad),
+                Err(WorkspaceError::InvalidTheme),
+                "{bad:?}"
+            );
+        }
+        assert_eq!(
+            workspace.set_space_theme(99, theme(0, 0)),
+            Err(WorkspaceError::UnknownSpace(99))
+        );
+        assert_eq!(workspace.snapshot(), before);
+    }
+
+    #[test]
+    fn snapshot_without_or_with_bad_theme_loads_with_default_tint() {
+        // Snapshots written before themes carry none.
+        let mut legacy = Workspace::default().snapshot();
+        legacy.spaces.push(Space {
+            id: 2,
+            profile_id: DEFAULT_PROFILE_ID,
+            name: "Work".into(),
+            icon: emoji("☕"),
+            theme: None,
+        });
+        legacy.next_space_id = 3;
+        let workspace = Workspace::from_snapshot(legacy.clone()).unwrap();
+        assert_eq!(workspace.snapshot(), legacy);
+        assert_eq!(workspace.space_theme_of(2), None);
+
+        legacy.spaces[0].theme = theme(0x123456, 101);
+        legacy.spaces[1].theme = theme(0x123456, 40);
+        let workspace = Workspace::from_snapshot(legacy).unwrap();
+        assert_eq!(workspace.space_theme_of(DEFAULT_SPACE_ID), None);
+        assert_eq!(workspace.space_theme_of(2), theme(0x123456, 40));
         assert_eq!(workspace.space_icon_of(2), emoji("☕").as_ref());
     }
 

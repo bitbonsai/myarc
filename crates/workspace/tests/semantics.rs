@@ -1116,12 +1116,14 @@ fn old_snapshot_with_space_one_loads_unchanged() {
                 profile_id: P1,
                 name: "Everyday".into(),
                 icon: None,
+                theme: None,
             },
             Space {
                 id: 2,
                 profile_id: P1,
                 name: "Work".into(),
                 icon: None,
+                theme: None,
             },
         ],
         items: vec![Item {

@@ -1,6 +1,7 @@
 #include <iostream>
 #include <limits>
 #include <string>
+#include <tuple>
 #include <utility>
 #include <vector>
 
@@ -346,11 +347,11 @@ bool CheckSpaceIcons() {
   const std::string books = "\xf0\x9f\x93\x9a";
   auto model = new_workspace();
   auto space =
-      create_space_with_icon(*model, "Reading", SpaceIconKind::Emoji, books);
+      create_styled_space(*model, "Reading", SpaceIconKind::Emoji, books, {});
   if (!space.ok ||
       icon_of(*model, space.id) != std::pair{SpaceIconKind::Emoji, books} ||
-      create_space_with_icon(*model, "Bad", SpaceIconKind::Unset, books).ok ||
-      create_space_with_icon(*model, "Bad", SpaceIconKind::Emoji, "a").ok ||
+      create_styled_space(*model, "Bad", SpaceIconKind::Unset, books, {}).ok ||
+      create_styled_space(*model, "Bad", SpaceIconKind::Emoji, "a", {}).ok ||
       icon_of(*model, 1) != std::pair{SpaceIconKind::Unset, std::string()}) {
     return false;
   }
@@ -389,6 +390,80 @@ bool CheckSpaceIcons() {
   }
   const auto cleared = EncodeWorkspaceMetadata(export_snapshot(*restored));
   return cleared && cleared->find("icon_kind") == std::string::npos;
+}
+
+// A Space's theme survives the bridge, the metadata file and restore. A bad
+// theme fails without changing the stored one, and one in the file reads as
+// none.
+bool CheckSpaceThemes() {
+  using namespace myarc::foundation;
+  using myarc::internal::DecodeWorkspaceMetadata;
+  using myarc::internal::EncodeWorkspaceMetadata;
+  const auto theme_of = [](const Workspace& model, uint64_t id) {
+    for (const auto& space : sidebar_snapshot(model, 1).spaces) {
+      if (space.id == id) {
+        return std::tuple{space.theme.set, space.theme.color,
+                          space.theme.opacity};
+      }
+    }
+    return std::tuple{true, uint32_t{0xFFFFFFFF}, uint8_t{0}};
+  };
+  const SpaceThemeRecord pink{true, 0xF29BBB, 60};
+  auto model = new_workspace();
+  auto space =
+      create_styled_space(*model, "Pink", SpaceIconKind::Unset, "", pink);
+  if (!space.ok ||
+      theme_of(*model, space.id) != std::tuple{true, 0xF29BBBu, uint8_t{60}} ||
+      create_styled_space(*model, "Bad", SpaceIconKind::Unset, "",
+                          {true, 0x1000000, 50})
+          .ok ||
+      theme_of(*model, 1) != std::tuple{false, 0u, uint8_t{0}}) {
+    return false;
+  }
+  auto blue = set_space_theme(*model, 1, {true, 0x6DBAD9, 100});
+  auto same = set_space_theme(*model, 1, {true, 0x6DBAD9, 100});
+  if (!blue.ok || blue.id != 1 || !same.ok || same.id != 0 ||
+      set_space_theme(*model, 1, {true, 0x6DBAD9, 101}).ok ||
+      theme_of(*model, 1) != std::tuple{true, 0x6DBAD9u, uint8_t{100}}) {
+    return false;
+  }
+  const auto encoded = EncodeWorkspaceMetadata(export_snapshot(*model));
+  if (!encoded) {
+    return false;
+  }
+  auto decoded = DecodeWorkspaceMetadata(*encoded);
+  auto restored = new_workspace();
+  if (!decoded.snapshot ||
+      !restore_snapshot(*restored, std::move(*decoded.snapshot)).ok ||
+      theme_of(*restored, space.id) !=
+          std::tuple{true, 0xF29BBBu, uint8_t{60}} ||
+      theme_of(*restored, 1) != std::tuple{true, 0x6DBAD9u, uint8_t{100}}) {
+    std::cerr << "Space theme round trip failed: " << decoded.error << '\n';
+    return false;
+  }
+  // Unset restores the default tint and leaves no theme keys in the file.
+  if (!set_space_theme(*restored, 1, {}).ok ||
+      !set_space_theme(*restored, space.id, {}).ok ||
+      theme_of(*restored, space.id) != std::tuple{false, 0u, uint8_t{0}}) {
+    return false;
+  }
+  const auto cleared = EncodeWorkspaceMetadata(export_snapshot(*restored));
+  if (!cleared || cleared->find("theme_") != std::string::npos) {
+    return false;
+  }
+  // A bad theme reads as none and leaves the rest of the file.
+  std::string damaged = *encoded;
+  const size_t at = damaged.find("\"theme_opacity\":60");
+  if (at == std::string::npos) {
+    return false;
+  }
+  damaged.replace(at, 18, "\"theme_opacity\":160");
+  auto bad = DecodeWorkspaceMetadata(damaged);
+  auto loaded = new_workspace();
+  return bad.snapshot &&
+         restore_snapshot(*loaded, std::move(*bad.snapshot)).ok &&
+         theme_of(*loaded, space.id) == std::tuple{false, 0u, uint8_t{0}} &&
+         theme_of(*loaded, 1) == std::tuple{true, 0x6DBAD9u, uint8_t{100}};
 }
 
 bool CheckDeleteFirstSpace() {
@@ -1011,6 +1086,10 @@ int main() {
     std::cerr << "Space icon checks failed\n";
     return 20;
   }
+  if (!CheckSpaceThemes()) {
+    std::cerr << "Space theme checks failed\n";
+    return 22;
+  }
   if (!CheckSpacesIndex()) {
     std::cerr << "Spaces index checks failed\n";
     return 21;
@@ -1020,7 +1099,8 @@ int main() {
          "round trips; workspace transitions, Space 1 deletion and "
          "metadata codec, saved title, Archived Tabs, Auto Archive, "
          "archive timer, Clear Archive, downloads stack, dormant "
-         "temporary item, Space reorder, Space icon and Spaces index checks "
+         "temporary item, Space reorder, Space icon, Space theme and Spaces "
+         "index checks "
          "passed\n";
   return 0;
 }

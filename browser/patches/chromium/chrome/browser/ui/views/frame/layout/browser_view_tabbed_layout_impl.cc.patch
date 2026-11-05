@@ -1,5 +1,5 @@
 diff --git a/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl.cc b/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl.cc
-index b1ea4a69f42333b238abbf67b0278467ea41bb28..5f3601739583c3f014f30eeb1f026022367469d7 100644
+index b1ea4a69f42333b238abbf67b0278467ea41bb28..64e90364545f45138d26fc920ae0f1dac35c3972 100644
 --- a/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl.cc
 +++ b/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl.cc
 @@ -9,6 +9,7 @@
@@ -226,11 +226,11 @@ index b1ea4a69f42333b238abbf67b0278467ea41bb28..5f3601739583c3f014f30eeb1f026022
  
 +    // Arc fills its peek panel with the Space colour, not the frame grey.
 +    auto peek_color = [&](CustomCorners::ColorChoiceWithAlpha color) {
-+      const ui::ColorProvider* const provider =
-+          views().vertical_tab_strip_region_view->GetColorProvider();
++      const views::View* const region = views().vertical_tab_strip_region_view;
++      const ui::ColorProvider* const provider = region->GetColorProvider();
 +      if (myarc_peek && animation.expand_on_hover_width > 0.0 && provider) {
-+        color.color =
-+            CustomCorners::ExplicitColor(myarc::GetSidebarPeekColor(*provider));
++        color.color = CustomCorners::ExplicitColor(myarc::GetSidebarPeekColor(
++            *provider, myarc::GetSidebarTheme(region->GetWidget())));
 +      }
 +      return color;
 +    };
