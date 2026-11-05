@@ -1,5 +1,5 @@
 diff --git a/chrome/browser/ui/views/frame/browser_view.h b/chrome/browser/ui/views/frame/browser_view.h
-index 750e46c97b64dccccf4268e912df5dbdb6516b3c..7a891ccbc096ff1fa8ee32a1e1ce45e0954dfce5 100644
+index 750e46c97b64dccccf4268e912df5dbdb6516b3c..e03aad32459fa8168a242e4d3078c12344be7868 100644
 --- a/chrome/browser/ui/views/frame/browser_view.h
 +++ b/chrome/browser/ui/views/frame/browser_view.h
 @@ -8,11 +8,13 @@
@@ -114,7 +114,7 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..7a891ccbc096ff1fa8ee32a1e1ce45e0
    base::WeakPtr<BrowserView> GetAsWeakPtr() {
      return weak_ptr_factory_.GetWeakPtr();
    }
-@@ -1253,12 +1301,140 @@ class BrowserView : public BrowserWindow,
+@@ -1253,12 +1301,152 @@ class BrowserView : public BrowserWindow,
  
    // Anchor point for help bubbles and other dialogs that want to reliably
    // anchor outside the content area of the window.
@@ -157,6 +157,15 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..7a891ccbc096ff1fa8ee32a1e1ce45e0
 +      std::unique_ptr<ScopedProfileKeepAlive> keep_alive);
 +  // Selects `space` now, or once this window's workspace is ready.
 +  void SelectMyarcSpaceWhenReady(uint64_t space);
++  // Profile window group: shows this ordered-out window at the shown
++  // window's frame and orders that one out, so the group stays one window.
++  // Returns false, doing nothing, when this window isn't ordered out.
++  bool ShowMyarcGroupWindow(bool activate);
++  // Puts a restored window back in its saved group, ordered out if it was.
++  void RestoreMyarcWindowGroup();
++  void PersistMyarcWindowGroup();
++  // Closing the group's shown window closes its ordered-out windows too.
++  void CloseMyarcWindowGroup();
 +  // --myarc-capture-profile-swap: creates Profile "work" with Space "Client",
 +  // then swaps back and forth, logging every window at each step.
 +  static void MyarcProfileSwapCaptureStep(int step);
@@ -231,6 +240,9 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..7a891ccbc096ff1fa8ee32a1e1ce45e0
 +  // shown in the slot has its own Browser, and one of them is visible.
 +  static int NextMyarcWindowGroup();
 +  int myarc_window_group_ = NextMyarcWindowGroup();
++  // Ordered out: another window of the group is shown in its place.
++  bool myarc_swapped_out_ = false;
++  bool myarc_group_restore_checked_ = false;
 +  // Space to select once the workspace is ready, or 0.
 +  uint64_t myarc_pending_space_ = 0;
 +  // File icon loads for the downloads stack, started from a const lookup.
@@ -255,7 +267,7 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..7a891ccbc096ff1fa8ee32a1e1ce45e0
  
    // A mapping between accelerators and command IDs.
    std::map<ui::Accelerator, int> accelerator_table_;
-@@ -1411,6 +1587,7 @@ class BrowserView : public BrowserWindow,
+@@ -1411,6 +1599,7 @@ class BrowserView : public BrowserWindow,
    base::EnumSet<TabStripAndWebAppViewsReparentedState>
        tab_strip_web_apps_reparented_state_;
  

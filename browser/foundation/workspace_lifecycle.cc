@@ -86,7 +86,8 @@ WorkspaceLifecycle::ExtraData WorkspaceLifecycle::PreserveUnknownData(
   // shortcut: private upstream keys require auditing on each Chromium rebase.
   // Mirrors browser_tabrestore, BrowserLiveTabContext and the adapter.
   for (const char* key :
-       {"myarc.item.v1", "myarc.window.v1", "myarc.space.v1",
+       {"myarc.item.v1", "myarc.window.v1", "myarc.space.v1", "myarc.group.v1",
+        "myarc.group_hidden.v1",
         "glic.instance_id", "glic.conversation_id", "glic.panel_open",
         "glic.pinned_instances", "contextual_tasks.task_id",
         "contextual_tasks.thread_url", "send_tab_to_self.entry_guid",

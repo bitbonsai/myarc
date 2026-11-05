@@ -90,7 +90,7 @@ if [ "${1:-}" = "--inner" ]; then
   # -g: launch without activating, so the user's frontmost app keeps focus.
   open -g -n -a "$APP" --args --user-data-dir="$PROFILE" --no-first-run --no-default-browser-check \
     --enable-features=GlassFrame --disable-features=InitialWebUI \
-    --disable-backgrounding-occluded-windows ${EXTRA[@]+"${EXTRA[@]}"} \
+    --disable-backgrounding-occluded-windows --myarc-background-launch ${EXTRA[@]+"${EXTRA[@]}"} \
     --myarc-visual-parity --myarc-workspace-sidebar --window-size="$W,$H" --window-position=40,60 ${URLS[@]+"${URLS[@]}"}
   for _ in $(seq 1 60); do
     for p in $(pgrep -f -- "--user-data-dir=$PROFILE" || true); do

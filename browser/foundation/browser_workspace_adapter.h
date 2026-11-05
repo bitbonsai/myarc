@@ -38,6 +38,10 @@ class BrowserWorkspaceAdapter final : public TabStripModelObserver {
   static constexpr char kItemKey[] = "myarc.item.v1";
   static constexpr char kWindowKey[] = "myarc.window.v1";
   static constexpr char kSpaceKey[] = "myarc.space.v1";
+  // The window's Profile window group, and "1" while the window is ordered
+  // out in it. BrowserView owns both.
+  static constexpr char kGroupKey[] = "myarc.group.v1";
+  static constexpr char kGroupHiddenKey[] = "myarc.group_hidden.v1";
 
   explicit BrowserWorkspaceAdapter(BrowserWindowInterface& browser);
   ~BrowserWorkspaceAdapter() override;
@@ -78,6 +82,13 @@ class BrowserWorkspaceAdapter final : public TabStripModelObserver {
   // since upstream only preserves its own known extra-data keys during rebuild.
   // Forces emission even when bindings equal the adapter's last-write cache.
   static void PersistSessionBindings(Profile& profile);
+
+  // The Profile window group restored with this window, or 0, and whether
+  // the window was ordered out in it.
+  uint64_t restored_group() const { return restored_group_; }
+  bool restored_group_hidden() const { return restored_group_hidden_; }
+  // Saves the window's Profile window group with its session binding.
+  void SetWindowGroup(uint64_t group, bool hidden);
 
   bool ready() const;
   std::string error() const;
@@ -198,6 +209,10 @@ class BrowserWorkspaceAdapter final : public TabStripModelObserver {
   uint64_t window_id_ = 0;
   uint64_t restored_window_id_ = 0;
   uint64_t restored_space_id_ = 0;
+  uint64_t restored_group_ = 0;
+  bool restored_group_hidden_ = false;
+  uint64_t group_ = 0;
+  bool group_hidden_ = false;
   bool changing_ = false;
   bool bound_ = false;
   bool refresh_pending_ = false;

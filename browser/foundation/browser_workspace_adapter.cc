@@ -565,6 +565,10 @@ foundation::MutationResult BrowserWorkspaceAdapter::RestoreWindowBinding(
   const auto id = ReadBinding(extra_data, kWindowKey);
   restored_window_id_ = id.value_or(0);
   restored_space_id_ = ReadBinding(extra_data, kSpaceKey).value_or(0);
+  restored_group_ = ReadBinding(extra_data, kGroupKey).value_or(0);
+  const auto hidden = extra_data.find(kGroupHiddenKey);
+  restored_group_hidden_ =
+      hidden != extra_data.end() && hidden->second == "1";
   if (!id)
     binding_warning_ = "Invalid native window identity. Rebinding this window.";
   return Ok();
@@ -1179,7 +1183,18 @@ std::map<std::string, std::string> BrowserWorkspaceAdapter::WindowExtraData()
       sidebar.ok ? sidebar.current_space.id : restored_space_id_;
   if (space)
     data[kSpaceKey] = base::NumberToString(space);
+  if (group_) {
+    data[kGroupKey] = base::NumberToString(group_);
+    data[kGroupHiddenKey] = group_hidden_ ? "1" : "0";
+  }
   return data;
+}
+
+void BrowserWorkspaceAdapter::SetWindowGroup(uint64_t group, bool hidden) {
+  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
+  group_ = group;
+  group_hidden_ = hidden;
+  PersistBindings();
 }
 
 void BrowserWorkspaceAdapter::PersistBindings(bool force) {

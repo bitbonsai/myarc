@@ -54,7 +54,7 @@ JSON
   LAUNCHED=$SECONDS
   open -g -n -a "$APP" --args --user-data-dir="$PROFILE" --no-first-run --no-default-browser-check \
     --enable-features=GlassFrame --disable-features=InitialWebUI \
-    --disable-backgrounding-occluded-windows --myarc-capture-open-palette="$PALETTE_MS" \
+    --disable-backgrounding-occluded-windows --myarc-background-launch --myarc-capture-open-palette="$PALETTE_MS" \
     --myarc-visual-parity --myarc-workspace-sidebar --window-size="$W,$H" --window-position=40,60 ${START_URL:-}
   for _ in $(seq 1 60); do
     for p in $(pgrep -f -- "--user-data-dir=$PROFILE" || true); do
