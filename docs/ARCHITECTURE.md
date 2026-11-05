@@ -24,6 +24,14 @@ The [native row/footer slice](../browser/experiments/native-sidebar-row-footer.m
 
 The [recovery-anchor fix](../browser/experiments/native-recovery-anchor.md) gives the opt-in shell a noninteractive BrowserView-owned popup anchor at the existing fallback coordinates, independent of sidebar visibility and startup element registration. [Manual native evidence](../browser/evidence/recovery-anchor.json) covers popup startup and hide/resize, with button invocation. [One explicit clean restart](../browser/evidence/workspace-clean-restart.json) retained native pages, Spaces and stable IDs. Crash restoration and durability remain unaccepted. The [two-process developer checkpoint/verify probe](../tests/fixtures/browser/README.md#two-process-workspace-crash-probe) now compares real fixture-page projection with retained on-disk workspace IDs and a form canary. Its local tests use API doubles only; the parent owns actual crash/relaunch/Restore and native acceptance. It neither controls browser lifetime nor exposes a product control endpoint.
 
+## Profiles, Spaces and window groups
+
+Each myarc Profile is a Chromium Profile with its own directory under the user data dir, so cookies, storage, history and extensions stay with it. Its workspace file, `myarc-workspace-v1.json` in that directory, holds the Profile's Spaces, Favorites and windows; the Profile's `WorkspaceService` loads and saves it through the Rust core. Several Spaces can share a Profile. Favorites belong to the Profile, Pins to a Space.
+
+The Spaces index is the Local State preference `myarc.spaces_index` (`browser/foundation/spaces_index.cc`). It maps each Profile directory to its Spaces in order, with id, name and icon. Each `WorkspaceService` rewrites only its own entry after it loads and after a change. The sidebar footer reads it to list other Profiles' Spaces after a divider without loading those Profiles.
+
+A window group is one window slot on screen. It holds one Browser per Profile shown there, and one of them is visible; the others are ordered out, not closed. Pressing another Profile's Space loads that Profile, reuses or creates its Browser in the group at the same frame, selects the Space and swaps the windows. During the swap the incoming window shows a window-server snapshot of the outgoing one until its own page is on screen, then drops it and runs the Space slide with a picture of the outgoing rows (`browser/foundation/profile_swap_cover.cc`). Closing the shown window closes the group. Quitting keeps the group for session restore, and ordered-out windows stay off screen after a relaunch.
+
 ## Candidate comparison
 
 | Foundation | Why evaluate it | Main cost / disqualifier | Decision posture |

@@ -7,7 +7,7 @@ Legend: `DOC` = public documentation/index evidence; `BRIEF` = project requireme
 | ID | Behavior to specify | Priority | Reference basis | Evidence still needed |
 | --- | --- | --- | --- | --- |
 | UX-01 | Animated welcome, workspace reveal, guided practice, handoff | P0 | BRIEF; original [storyboard](ONBOARDING.md); [web study](../design/onboarding/README.md) with state/focus checks and recordings | Native integration/recordings, screen-reader review, frame traces and user tasks |
-| WS-01 | Several Spaces can share a Profile; Profiles isolate data | P0 | DOC: Profiles | Shared/isolation browser tests and import mappings |
+| WS-01 | Several Spaces can share a Profile; Profiles isolate data | P0 | DOC: Profiles; `tools/check_profile_isolation.sh` passes for cookies, storage, IndexedDB, service workers, history and command bar results across a window swap and a relaunch | Extension isolation, Spaces sharing one Profile's data, import mappings |
 | WS-02 | Switch, reorder, rename, remove and restore Spaces | P0 | DOC: Spaces index; details UNKNOWN | Commands, deletion safeguards, keyboard behavior |
 | TAB-01 | Profile favorites and Space pins/folders retain order/names | P0 | DOC: organization index; details UNKNOWN | Canonical pinned URL, reset, close, move, cross-Space behavior |
 | TAB-02 | Temporary tabs, archive eligibility, timing and restoration | P0 | DOC: organization index; details UNKNOWN | Time model, active/media/form exclusions, recovery guarantees |

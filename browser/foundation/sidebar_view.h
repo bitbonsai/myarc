@@ -20,6 +20,8 @@
 #include "ui/base/models/image_model.h"
 #include "ui/gfx/animation/linear_animation.h"
 #include "ui/gfx/geometry/point_f.h"
+#include "ui/gfx/geometry/rect.h"
+#include "ui/gfx/image/image_skia.h"
 #include "ui/menus/simple_menu_model.h"
 #include "ui/views/animation/animation_delegate_views.h"
 #include "ui/views/context_menu_controller.h"
@@ -209,6 +211,13 @@ class SidebarView final : public views::View,
                       StorageRetry retry = StorageRetry::kNone);
   // Fills the New Tab row while the parent's New Tab palette is open.
   void SetNewTabIntent(bool intent);
+  // The current Space's rows in widget coordinates, cut to the part that
+  // shows. Empty while the Library or the Create a Space panel shows.
+  gfx::Rect GetSpaceRowsBoundsInWidget() const;
+  // Runs the Space switch slide with `outgoing`, a picture of another
+  // window's rows, leaving as the current rows come in. A Profile swap uses
+  // it. +1 slides them right.
+  void SlideInSpace(const gfx::ImageSkia& outgoing, int shift);
   // Replaces the sidebar contents with the Library until back or Esc. Needs a
   // usable model.
   void OpenLibrary(LibrarySection section = LibrarySection::kSpaces);

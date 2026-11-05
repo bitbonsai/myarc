@@ -53,7 +53,7 @@ Alpha covers two panels. [VIEW-01](PARITY.md) and the [roadmap](../ROADMAP.md) c
 ### Browsing and privacy
 
 - [ ] **Ad and tracker blocking, on by default** (missing). Done when a fresh Profile blocks a synthetic tracker request on its first page load and one site can be switched off. Maps to [PRV-01](PARITY.md).
-- [ ] **Profile isolation** (partial). Kept required because shared cookies between Profiles would leak user data, and the [roadmap](../ROADMAP.md) M2 gate lists it. Done when a test with two Profiles shows no shared cookies, storage or history. Maps to [WS-01](PARITY.md) and the Profile isolation gate in [the scorecard](SCORECARD.md).
+- [x] **Profile isolation** (done). Kept required because shared cookies between Profiles would leak user data, and the [roadmap](../ROADMAP.md) M2 gate lists it. Done when a test with two Profiles shows no shared cookies, storage or history. `tools/check_profile_isolation.sh` swaps one window between two Profiles in both directions, before and after a relaunch, and finds none of the other Profile's cookie, localStorage key, IndexedDB database, service worker, history entry or command bar result; after quitting, each Profile's Cookies and History files hold only its own. Extensions aren't covered yet. Maps to [WS-01](PARITY.md) and the Profile isolation gate in [the scorecard](SCORECARD.md).
 - [x] **Downloads** (done). Done when finished downloads show in the footer stack and in the Library, and still show after a relaunch. Maps to [CORE-01](PARITY.md).
 
 ### Durability and distribution

@@ -26,4 +26,12 @@ std::string DescribeWindowsMenu() {
   return titles;
 }
 
+void OrderWindowAbove(gfx::NativeWindow window, gfx::NativeWindow other) {
+  NSWindow* ns_window = window.GetNativeNSWindow();
+  NSWindow* ns_other = other.GetNativeNSWindow();
+  if (ns_window.visible && ns_other.visible) {
+    [ns_window orderWindow:NSWindowAbove relativeTo:ns_other.windowNumber];
+  }
+}
+
 }  // namespace myarc

@@ -345,6 +345,15 @@ fresh acknowledged localStorage still failed. Upstream's five-second default
 commit delay is source configuration, not measured durability. Renderer stays
 off by default.
 
+## Profile isolation check
+
+`tools/check_profile_isolation.sh` checks that two Profiles share no browser data (BC-001). It takes the build lock, starts the fixture server if port 8766 is free and launches the build in the background with a marked user-data dir under `$TMPDIR`, `--use-mock-keychain`, a log file and `--myarc-capture-profile-swap=cdp`. Under that switch the build reads requests from tab titles (`myarc-swap:<n>:create`, `swap`, `tab`, `palette:<text>`) and acts in the shown window, so the client never sends input to the screen. Then it runs two phases of `tools/check_browser_foundation.mjs`:
+
+- `profile-isolation`: Profile A visits a unique URL and sets a cookie, a localStorage key, an IndexedDB database and a service worker from [isolation-sw.js](isolation-sw.js). Creating a Space in new Profile B swaps the window in place. B must see an empty `document.cookie`, none of A's data and no service worker, and its history and command bar must return nothing for A's URL. B then sets its own data, the window swaps back and A must see none of B's. Each side's own URL is found first, so an empty search counts.
+- `profile-isolation-restart`, after a relaunch with `--restore-last-session`: both sides keep their own data and lack the other's, and the same searches pass after a swap each way.
+
+Each phase quits through CDP `Browser.close` and then reads `Network/Cookies` and `History` in both Profile directories with `sqlite3`: each holds only its own cookie and URL. `KEEP=1` keeps the user-data dir. Local tests for the log and file parsing run with `node --test tools/check_browser_foundation.test.mjs`. Extensions are not covered.
+
 ## Scope and limits
 
 - Renderer check deliberately crashes the selected renderer, reloads it and checks acknowledged localStorage, with the browser PID unchanged. It does not prove automatic workspace recovery.

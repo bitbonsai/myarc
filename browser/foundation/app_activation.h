@@ -18,6 +18,9 @@ bool IsAppActive();
 void SetShownInWindowsMenu(gfx::NativeWindow window, bool shown);
 // The Window menu's window titles, for capture logs.
 std::string DescribeWindowsMenu();
+// Orders `window` just above `other` without activating either. An app in
+// the background shows a window behind its other ones.
+void OrderWindowAbove(gfx::NativeWindow window, gfx::NativeWindow other);
 #else
 inline bool IsAppActive() {
   return true;
@@ -26,6 +29,8 @@ inline void SetShownInWindowsMenu(gfx::NativeWindow window, bool shown) {}
 inline std::string DescribeWindowsMenu() {
   return {};
 }
+inline void OrderWindowAbove(gfx::NativeWindow window,
+                             gfx::NativeWindow other) {}
 #endif
 
 }  // namespace myarc

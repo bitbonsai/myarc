@@ -140,6 +140,8 @@ source_set("sidebar_view") {
     "icons.h",
     "library_view.cc",
     "library_view.h",
+    "profile_swap_cover.cc",
+    "profile_swap_cover.h",
     "sidebar_view.cc",
     "sidebar_view.h",
     "space_icon_catalog.cc",
@@ -172,6 +174,7 @@ source_set("sidebar_view") {
     "//ui/gfx",
     "//ui/gfx/animation",
     "//ui/gfx/geometry",
+    "//ui/snapshot",
   ]
 }
 

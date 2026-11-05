@@ -1,5 +1,5 @@
 diff --git a/chrome/browser/ui/views/frame/browser_view.h b/chrome/browser/ui/views/frame/browser_view.h
-index 750e46c97b64dccccf4268e912df5dbdb6516b3c..e03aad32459fa8168a242e4d3078c12344be7868 100644
+index 750e46c97b64dccccf4268e912df5dbdb6516b3c..bbb45a318841c3eaff0ac708e2829c11d6a20c41 100644
 --- a/chrome/browser/ui/views/frame/browser_view.h
 +++ b/chrome/browser/ui/views/frame/browser_view.h
 @@ -8,11 +8,13 @@
@@ -32,13 +32,14 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..e03aad32459fa8168a242e4d3078c123
  class ScrimView;
  class SidePanel;
  class SidePanelAnimationContentView;
-@@ -104,6 +108,15 @@ class TopControlsSlideControllerTest;
+@@ -104,6 +108,16 @@ class TopControlsSlideControllerTest;
  class VerticalTabStripRegionView;
  class WebAppFrameToolbarView;
  
 +namespace myarc {
 +class BrowserWorkspaceAdapter;
 +class CopiedUrlToast;
++class ProfileSwapCover;
 +class SettingsWindow;
 +namespace foundation {
 +struct MutationResult;
@@ -48,7 +49,7 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..e03aad32459fa8168a242e4d3078c123
  namespace gfx {
  class AnimationRunner;
  }  // namespace gfx
-@@ -121,7 +134,11 @@ enum class Channel;
+@@ -121,7 +135,11 @@ enum class Channel;
  }
  
  namespace views {
@@ -60,7 +61,7 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..e03aad32459fa8168a242e4d3078c123
  class NativeViewHost;
  class WebView;
  }  // namespace views
-@@ -143,7 +160,8 @@ class BrowserView : public BrowserWindow,
+@@ -143,7 +161,8 @@ class BrowserView : public BrowserWindow,
                      public ImmersiveModeController::Observer,
                      public GlobalErrorObserver,
                      public views::FocusChangeListener,
@@ -70,7 +71,7 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..e03aad32459fa8168a242e4d3078c123
    METADATA_HEADER(BrowserView, views::ClientView)
  
   public:
-@@ -234,6 +252,8 @@ class BrowserView : public BrowserWindow,
+@@ -234,6 +253,8 @@ class BrowserView : public BrowserWindow,
    // Container for the tabstrip, toolbar, etc.
    TopContainerView* top_container() { return top_container_; }
  
@@ -79,7 +80,7 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..e03aad32459fa8168a242e4d3078c123
    std::optional<int> theme_background_y_offset() const {
      return theme_background_y_offset_;
    }
-@@ -311,6 +331,34 @@ class BrowserView : public BrowserWindow,
+@@ -311,6 +332,34 @@ class BrowserView : public BrowserWindow,
  
    ScrimView* window_scrim_view() { return window_scrim_view_; }
  
@@ -114,7 +115,7 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..e03aad32459fa8168a242e4d3078c123
    base::WeakPtr<BrowserView> GetAsWeakPtr() {
      return weak_ptr_factory_.GetWeakPtr();
    }
-@@ -1253,12 +1301,152 @@ class BrowserView : public BrowserWindow,
+@@ -1253,12 +1302,181 @@ class BrowserView : public BrowserWindow,
  
    // Anchor point for help bubbles and other dialogs that want to reliably
    // anchor outside the content area of the window.
@@ -157,6 +158,18 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..e03aad32459fa8168a242e4d3078c123
 +      std::unique_ptr<ScopedProfileKeepAlive> keep_alive);
 +  // Selects `space` now, or once this window's workspace is ready.
 +  void SelectMyarcSpaceWhenReady(uint64_t space);
++  // Profile swap slide, on the incoming window: covers it with `image`, the
++  // outgoing window `from`, shows it, waits until its content is on screen,
++  // then drops the cover and slides `rows`, the part of `image` holding
++  // from's Space rows, out of the sidebar. A null image shows it at once.
++  void CoverMyarcSwap(base::WeakPtr<BrowserView> from,
++                      gfx::Rect rows,
++                      bool activate,
++                      gfx::ImageSkia image);
++  void WaitForMyarcSwapFrame(int frame);
++  void OnMyarcSwapFrame(int frame);
++  bool IsMyarcSwapContentReady();
++  void DropMyarcSwapCover();
 +  // Profile window group: shows this ordered-out window at the shown
 +  // window's frame and orders that one out, so the group stays one window.
 +  // Returns false, doing nothing, when this window isn't ordered out.
@@ -171,6 +184,14 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..e03aad32459fa8168a242e4d3078c123
 +  static void MyarcProfileSwapCaptureStep(int step);
 +  static void MyarcProfileSwapCaptureAction(base::WeakPtr<BrowserView> view,
 +                                            int step);
++  // --myarc-capture-profile-swap=cdp: a test client asks for each step by
++  // setting any tab's title to "myarc-swap:<n>:create", "myarc-swap:<n>:swap",
++  // "myarc-swap:<n>:tab" (opens about:blank) or
++  // "myarc-swap:<n>:palette:<text>". Steps act on the shown window and log
++  // it by Profile, other actions only log; a palette step logs the command
++  // bar's rows for <text>.
++  static void MyarcProfileSwapTestPoll();
++  void MyarcPaletteTestQuery(int request, const std::u16string& text);
 +  void RenameSpace(uint64_t space) override;
 +  void MoveSpace(uint64_t space, uint64_t before) override;
 +  void NewTab() override;
@@ -245,6 +266,15 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..e03aad32459fa8168a242e4d3078c123
 +  bool myarc_group_restore_checked_ = false;
 +  // Space to select once the workspace is ready, or 0.
 +  uint64_t myarc_pending_space_ = 0;
++  // While a Profile swap slide covers this window: the cover, the outgoing
++  // rows to slide, the window to order out when the cover drops, and a limit
++  // on the wait.
++  std::unique_ptr<myarc::ProfileSwapCover> myarc_swap_cover_;
++  gfx::ImageSkia myarc_swap_rows_;
++  base::WeakPtr<BrowserView> myarc_swap_outgoing_;
++  base::OneShotTimer myarc_swap_timeout_;
++  // The cover gave this view a layer, dropped with the cover.
++  bool myarc_swap_layered_ = false;
 +  // File icon loads for the downloads stack, started from a const lookup.
 +  mutable base::CancelableTaskTracker myarc_download_icon_tracker_;
 +  // File icons already requested, so a failed load isn't retried.
@@ -267,7 +297,7 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..e03aad32459fa8168a242e4d3078c123
  
    // A mapping between accelerators and command IDs.
    std::map<ui::Accelerator, int> accelerator_table_;
-@@ -1411,6 +1599,7 @@ class BrowserView : public BrowserWindow,
+@@ -1411,6 +1629,7 @@ class BrowserView : public BrowserWindow,
    base::EnumSet<TabStripAndWebAppViewsReparentedState>
        tab_strip_web_apps_reparented_state_;
  

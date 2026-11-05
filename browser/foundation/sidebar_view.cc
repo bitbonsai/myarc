@@ -51,6 +51,7 @@
 #include "ui/views/controls/button/label_button.h"
 #include "ui/views/controls/button/md_text_button.h"
 #include "ui/views/controls/highlight_path_generator.h"
+#include "ui/views/controls/image_view.h"
 #include "ui/views/controls/label.h"
 #include "ui/views/controls/menu/menu_runner.h"
 #include "ui/views/controls/scroll_view.h"
@@ -1795,6 +1796,31 @@ void SidebarView::UpdateSpaceSlide(bool done) {
   transform.Translate(
       -space_slide_shift_ * (width() - kSidebarInsets.width()) * left, 0);
   space_rows_->layer()->SetTransform(transform);
+}
+
+gfx::Rect SidebarView::GetSpaceRowsBoundsInWidget() const {
+  if (!space_rows_ || !space_rows_->GetWidget() || library_ || create_panel_) {
+    return gfx::Rect();
+  }
+  return space_rows_->ConvertRectToWidget(space_rows_->GetVisibleBounds());
+}
+
+void SidebarView::SlideInSpace(const gfx::ImageSkia& outgoing, int shift) {
+  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
+  if (!space_rows_ || outgoing.isNull() ||
+      gfx::Animation::PrefersReducedMotion() || !IsDrawn()) {
+    return;
+  }
+  // The picture takes the outgoing rows' place, so the slide is the same.
+  auto rows = std::make_unique<SpaceRows>();
+  auto* image = rows->AddChildView(std::make_unique<views::ImageView>(
+      ui::ImageModel::FromImageSkia(outgoing)));
+  image->SetHorizontalAlignment(views::ImageViewBase::Alignment::kLeading);
+  space_slide_.Stop();
+  space_slide_shift_ = shift;
+  space_rows_->SetOutgoing(std::move(rows), shift);
+  space_slide_.Start();
+  UpdateSpaceSlide(false);
 }
 
 void SidebarView::SetNewTabIntent(bool intent) {

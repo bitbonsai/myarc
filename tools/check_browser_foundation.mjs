@@ -4,12 +4,14 @@ import fs from 'node:fs'
 import { setTimeout as delay } from 'node:timers/promises'
 import { readBoundedText, runWorkspaceRecovery } from './browser_workspace_recovery.mjs'
 import { runTwoWindowRecovery } from './browser_workspace_two_window.mjs'
+import { runProfileIsolation } from './browser_profile_isolation.mjs'
 
 const [profileArg, pidArg, scenario] = process.argv.slice(2)
 const twoWindowScenario = ['workspace-two-window-checkpoint', 'workspace-two-window-verify'].includes(scenario)
 const recoveryScenario = twoWindowScenario || ['workspace-crash-checkpoint', 'workspace-crash-verify'].includes(scenario)
-assert.ok(process.argv.length === 5 && profileArg && /^\d+$/.test(pidArg ?? '') && (recoveryScenario || ['extension', 'restart', 'runtime', 'workspace-pin'].includes(scenario)),
-  'Usage: node tools/check_browser_foundation.mjs PROFILE_DIR BROWSER_PID extension|restart|runtime|workspace-pin|workspace-crash-checkpoint|workspace-crash-verify|workspace-two-window-checkpoint|workspace-two-window-verify')
+const isolationScenario = ['profile-isolation', 'profile-isolation-restart'].includes(scenario)
+assert.ok(process.argv.length === 5 && profileArg && /^\d+$/.test(pidArg ?? '') && (recoveryScenario || isolationScenario || ['extension', 'restart', 'runtime', 'workspace-pin'].includes(scenario)),
+  'Usage: node tools/check_browser_foundation.mjs PROFILE_DIR BROWSER_PID extension|restart|runtime|workspace-pin|workspace-crash-checkpoint|workspace-crash-verify|workspace-two-window-checkpoint|workspace-two-window-verify|profile-isolation|profile-isolation-restart')
 const ownedPid = Number(pidArg)
 assert.ok(Number.isSafeInteger(ownedPid) && ownedPid > 0, 'Expected a positive safe-integer browser PID')
 const profile = fs.realpathSync(profileArg)
@@ -67,6 +69,7 @@ const check = async () => {
   assert.ok(processInfo.processInfo.some(process => process.type === 'browser' && process.id === ownedPid), 'CDP browser PID does not match the requested test process')
   if (twoWindowScenario) return runTwoWindowRecovery({ send, profile, ownedPid, scenario })
   if (recoveryScenario) return runWorkspaceRecovery({ send, profile, ownedPid, scenario })
+  if (isolationScenario) return runProfileIsolation({ send, profile, ownedPid, scenario })
   // shortcut: reuse an open test tab, isolate the default-profile Target.createTarget assertion before extending this path.
   const { targetInfos } = await send('Target.getTargets')
   if (scenario === 'workspace-pin') {

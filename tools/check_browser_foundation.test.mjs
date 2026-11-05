@@ -6,6 +6,8 @@ import os from 'node:os'
 import { checkpointName, fixtureURLs, readBoundedJSON, runWorkspaceRecovery, validateCheckpoint, validateOwnership,
   validateTargets, workspaceProjection } from './browser_workspace_recovery.mjs'
 import { spawnSync } from 'node:child_process'
+import { checkProfileFiles, isolationData, newToken, otherProfileDir, parsePaletteRows,
+  rowsNaming } from './browser_profile_isolation.mjs'
 import vm from 'node:vm'
 import test from 'node:test'
 
@@ -87,7 +89,7 @@ test('CLI preserves existing modes and rejects unsafe arguments before connectin
   }
   assert.match(run(['.', '1', 'runtime', 'unexpected']).stderr, /Usage:/)
   for (const mode of ['extension', 'restart', 'runtime', 'workspace-pin', 'workspace-crash-checkpoint', 'workspace-crash-verify',
-    'workspace-two-window-checkpoint', 'workspace-two-window-verify']) {
+    'workspace-two-window-checkpoint', 'workspace-two-window-verify', 'profile-isolation', 'profile-isolation-restart']) {
     const result = run(['.', '1', mode])
     assert.equal(result.status, 1)
     assert.match(result.stderr, /Expected marked, disposable test profile/)
@@ -309,4 +311,47 @@ test('API double: verify never accepts a subset of restored pages', { timeout: 2
   fake.pid = 20
   fake.pages = [pageTargets('context-20')[0]]
   await assert.rejects(fake.run('workspace-crash-verify'), /Restore not ready or recovery loss.*require both real fixture pages/s)
+})
+
+test('profile isolation names each side apart and rejects bad tokens', () => {
+  const token = newToken()
+  assert.match(token, /^iso[0-9a-f]{12}$/)
+  const a = isolationData('a', token)
+  const b = isolationData('b', token)
+  for (const key of ['cookie', 'storageKey', 'database', 'scope']) assert.notEqual(a[key], b[key])
+  assert.equal(a.url, `http://127.0.0.1:8766/?myarc-iso=${token}`)
+  assert.throws(() => isolationData('c', token), /Unknown side/)
+  for (const bad of ['iso', "iso0000000000'0", 'abc123456789012']) assert.throws(() => isolationData('a', bad), /Bad token/)
+})
+
+test('profile isolation reads command bar rows and ignores search echoes', () => {
+  const log = [
+    '[1:2:WARNING:browser_view.cc] myarc-swap test 3 palette:iso0123456789ab in Default',
+    '[1:2:WARNING:browser_view.cc] myarc-swap palette 3 rows=search:https://www.google.com/search?q=iso0123456789ab ' +
+      'tab:http://127.0.0.1:8766/?myarc-iso=iso0123456789ab page:http://127.0.0.1:8766/ '
+  ].join('\n')
+  const rows = parsePaletteRows(log, 3)
+  assert.deepEqual(rows.map(row => row.kind), ['search', 'tab', 'page'])
+  assert.deepEqual(rowsNaming(rows, 'iso0123456789ab'), [rows[1]])
+  assert.equal(parsePaletteRows(log, 4), null)
+  assert.deepEqual(parsePaletteRows('myarc-swap palette 5 rows=', 5), [])
+  assert.throws(() => parsePaletteRows('myarc-swap palette 6 rows=other:x', 6), /Bad palette row kind/)
+})
+
+test('profile isolation finds the one other Profile in Local State', () => {
+  assert.equal(otherProfileDir({ profile: { info_cache: { Default: {}, 'Profile 1': {} } } }), 'Profile 1')
+  assert.throws(() => otherProfileDir({ profile: { info_cache: { Default: {} } } }), /exactly one Profile/)
+  assert.throws(() => otherProfileDir({ profile: { info_cache: { Default: {}, 'Profile 1': {}, 'Profile 2': {} } } }), /exactly one/)
+  assert.throws(() => otherProfileDir({ profile: { info_cache: { Default: {}, '../x': {} } } }))
+})
+
+test('profile isolation file check fails on a shared cookie or a foreign history row', () => {
+  const sides = { a: isolationData('a', 'iso00000000000a'), b: isolationData('b', 'iso00000000000b') }
+  const dirs = { a: 'Default', b: 'Profile 1' }
+  const fake = rows => (file, sql) => rows.find(([dir, needle]) => file.includes(`/${dir}/`) && sql.includes(needle))?.[2] ?? 0
+  const clean = [['Default', 'myarc_iso_a', 1], ['Default', sides.a.token, 2], ['Profile 1', 'myarc_iso_b', 1], ['Profile 1', sides.b.token, 1]]
+  assert.equal(checkProfileFiles('/p', dirs, sides, fake(clean)).length, 2)
+  assert.throws(() => checkProfileFiles('/p', dirs, sides, fake([...clean, ['Profile 1', 'myarc_iso_a', 1]])), /other Profile's cookie/)
+  assert.throws(() => checkProfileFiles('/p', dirs, sides, fake([...clean, ['Profile 1', sides.a.token, 1]])), /other Profile's URL/)
+  assert.throws(() => checkProfileFiles('/p', dirs, sides, fake(clean.slice(1))), /lacks its own cookie/)
 })

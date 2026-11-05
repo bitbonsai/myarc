@@ -8,7 +8,7 @@ All results: **not measured**. Numbers below are proposed acceptance budgets to 
 | Animated onboarding | All acceptance criteria in [ONBOARDING.md](ONBOARDING.md) pass | Native recordings, screen-reader review, reduced-motion variant, interaction and frame traces |
 | Migration | All supported semantic fields survive fixtures/round trips; every unsupported field is reported; zero source writes | Versioned corpus summaries, source hashes, duplicate/rollback tests |
 | Workspace durability | Zero unrecovered state loss in the defined command-acknowledgement/fault-injection suite | Restart, kill, disk-full, corrupt-generation and schema-upgrade evidence |
-| Profile isolation | Zero cookie/storage/history/extension/context leakage across test Profiles | Browser integration tests and manual adversarial cases |
+| Profile isolation | Zero cookie/storage/history/extension/context leakage across test Profiles | Browser integration tests and manual adversarial cases. `tools/check_profile_isolation.sh` covers cookies, localStorage, IndexedDB, service workers, history and command bar results; extensions are not measured |
 | Private browsing | No private titles, URLs, archive entries, or AI history persisted to the workspace | Storage/network inspection after exit/crash |
 | Extensions | Named representative suite passes install, use, restart, update, remove on every supported platform | Versioned matrix; failures/limitations visible; no “all extensions” claim |
 | Upstream maintenance | Named owner and tested update path; initial target ≤72 h from an applicable urgent upstream security fix to a validated release | Two rehearsals, timestamps, sign/update logs; target reviewed against real capacity |

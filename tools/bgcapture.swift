@@ -3,13 +3,18 @@
 //   swift tools/bgcapture.swift shot <pid> <out.png> [title] (all on-screen windows
 //     of the PID, cropped to its largest window; works while other windows cover
 //     it. With a title, only the PID's window with that title.)
+//   swift tools/bgcapture.swift burst <pid> <outdir> <seconds> (every frame that
+//     changes in the PID's largest window's area, all its windows included, as
+//     numbered PNGs named with milliseconds since the start)
 import CoreGraphics
+import CoreImage
+import CoreMedia
 import Foundation
 import ScreenCaptureKit
 
 let args = CommandLine.arguments
 guard args.count == 4 || args.count == 5, let pid = Int32(args[2]) else {
-  FileHandle.standardError.write("usage: bgcapture.swift key|shot <pid> <arg> [title]\n".data(using: .utf8)!)
+  FileHandle.standardError.write("usage: bgcapture.swift key|shot|burst <pid> <arg> [title|seconds]\n".data(using: .utf8)!)
   exit(64)
 }
 
@@ -77,12 +82,88 @@ func shot(_ out: String) async throws {
   exit(CGImageDestinationFinalize(dest) ? 0 : 74)
 }
 
+final class FrameWriter: NSObject, SCStreamOutput {
+  let dir: String
+  let start = Date()
+  let context = CIContext()
+  let queue = DispatchQueue(label: "bgcapture.write")
+  var count = 0
+
+  init(dir: String) { self.dir = dir }
+
+  func stream(_ stream: SCStream, didOutputSampleBuffer buffer: CMSampleBuffer,
+              of type: SCStreamOutputType) {
+    // Only complete frames carry new content; idle frames repeat the last one.
+    guard type == .screen, buffer.isValid,
+      let info = CMSampleBufferGetSampleAttachmentsArray(buffer, createIfNecessary: false)
+        as? [[SCStreamFrameInfo: Any]],
+      let raw = info.first?[.status] as? Int, SCFrameStatus(rawValue: raw) == .complete,
+      let pixels = CMSampleBufferGetImageBuffer(buffer) else { return }
+    let image = CIImage(cvPixelBuffer: pixels)
+    guard let cg = context.createCGImage(image, from: image.extent) else { return }
+    count += 1
+    let name = String(format: "%@/frame-%04d-%06d.png", dir, count,
+                      Int(Date().timeIntervalSince(start) * 1000))
+    queue.async {
+      let url = URL(fileURLWithPath: name) as CFURL
+      guard let dest = CGImageDestinationCreateWithURL(url, "public.png" as CFString, 1, nil)
+      else { return }
+      CGImageDestinationAddImage(dest, cg, nil)
+      CGImageDestinationFinalize(dest)
+    }
+  }
+}
+
+func burst(_ dir: String, seconds: Double) async throws {
+  let content = try await SCShareableContent.excludingDesktopWindows(
+    false, onScreenWindowsOnly: true)
+  guard let app = content.applications.first(where: { $0.processID == pid }),
+    let main = content.windows.filter({
+      $0.owningApplication?.processID == pid && $0.frame.width > 40 && $0.frame.height > 40
+    }).max(by: { $0.frame.width * $0.frame.height < $1.frame.width * $1.frame.height })
+  else {
+    FileHandle.standardError.write("no on-screen window for pid \(pid)\n".data(using: .utf8)!)
+    exit(66)
+  }
+  let display = content.displays.first { $0.frame.intersects(main.frame) } ?? content.displays[0]
+  // Every window of the app, so windows that show later are caught too.
+  let filter = SCContentFilter(display: display, including: [app], exceptingWindows: [])
+  let config = SCStreamConfiguration()
+  config.sourceRect = main.frame.offsetBy(dx: -display.frame.minX, dy: -display.frame.minY)
+  config.width = Int(main.frame.width)
+  config.height = Int(main.frame.height)
+  config.minimumFrameInterval = CMTime(value: 1, timescale: 120)
+  config.queueDepth = 8
+  config.showsCursor = false
+  let writer = FrameWriter(dir: dir)
+  let stream = SCStream(filter: filter, configuration: config, delegate: nil)
+  try stream.addStreamOutput(writer, type: .screen,
+                             sampleHandlerQueue: DispatchQueue(label: "bgcapture.frames"))
+  try await stream.startCapture()
+  print(String(format: "start=%.3f", writer.start.timeIntervalSince1970))
+  try await Task.sleep(nanoseconds: UInt64(seconds * 1_000_000_000))
+  try await stream.stopCapture()
+  writer.queue.sync {}
+  print("frames=\(writer.count) dir=\(dir)")
+  exit(0)
+}
+
 switch args[1] {
 case "key":
   postKey(args[3])
 case "shot":
   Task {
     do { try await shot(args[3]) } catch {
+      FileHandle.standardError.write("capture failed: \(error)\n".data(using: .utf8)!)
+      exit(1)
+    }
+  }
+  dispatchMain()
+case "burst":
+  guard args.count == 5, let seconds = Double(args[4]) else { exit(64) }
+  try? FileManager.default.createDirectory(atPath: args[3], withIntermediateDirectories: true)
+  Task {
+    do { try await burst(args[3], seconds: seconds) } catch {
       FileHandle.standardError.write("capture failed: \(error)\n".data(using: .utf8)!)
       exit(1)
     }
