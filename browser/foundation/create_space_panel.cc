@@ -715,7 +715,7 @@ void CreateSpacePanel::SubmitProfile() {
   if (std::ranges::any_of(profiles_, [&folded](const ProfileChoice& profile) {
         return base::i18n::FoldCase(profile.name) == folded;
       })) {
-    ShowProfileError(u"A Profile with that name already exists.");
+    ShowProfileError(u"Name already in use.");
     return;
   }
   profile_pending_ = true;
