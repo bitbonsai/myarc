@@ -39,8 +39,8 @@ struct ProfileChoice {
 // Arc's "Create a Space" panel, which takes the sidebar's place: a name field,
 // the Profile the Space will use, and Create or Cancel. Return creates and Esc
 // cancels. The icon button opens the emoji and icon picker, and the Profile
-// pill a menu of Profiles with New Profile…; the theme row is a placeholder
-// for now.
+// pill, by click, Space or Return, a menu of Profiles with New Profile…; the
+// theme row is a placeholder for now.
 class CreateSpacePanel final : public views::View,
                                public views::TextfieldController,
                                public ui::SimpleMenuModel::Delegate {
@@ -59,8 +59,9 @@ class CreateSpacePanel final : public views::View,
   using ProfileDoneCallback =
       base::OnceCallback<void(const std::u16string& error)>;
   // `create_profile` gets a trimmed name of at most kMaxProfileName
-  // characters. On success the caller calls SetProfiles before `done`. A null
-  // `create_profile` keeps the pill on the one Profile, without a menu.
+  // characters that no listed Profile has, ignoring case. On success the caller
+  // calls SetProfiles before `done`. A null `create_profile` keeps the pill on
+  // the one Profile, without a menu.
   using CreateProfileCallback =
       base::RepeatingCallback<void(const std::u16string& name,
                                    ProfileDoneCallback done)>;

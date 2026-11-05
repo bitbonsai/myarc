@@ -1,11 +1,13 @@
 #include "myarc/create_space_panel.h"
 
+#include <algorithm>
 #include <memory>
 #include <utility>
 
 #include "base/command_line.h"
 #include "base/functional/bind.h"
 #include "base/functional/callback_helpers.h"
+#include "base/i18n/case_conversion.h"
 #include "base/location.h"
 #include "base/strings/string_util.h"
 #include "base/strings/utf_string_conversions.h"
@@ -19,6 +21,7 @@
 #include "ui/base/mojom/menu_source_type.mojom.h"
 #include "ui/color/color_id.h"
 #include "ui/color/color_provider.h"
+#include "ui/events/event.h"
 #include "ui/events/keycodes/keyboard_codes.h"
 #include "ui/gfx/color_utils.h"
 #include "ui/gfx/font_list.h"
@@ -143,7 +146,37 @@ class ProfilePill : public views::Button {
 
  public:
   explicit ProfilePill(PressedCallback callback)
-      : views::Button(std::move(callback)) {}
+      : views::Button(std::move(callback)) {
+    // macOS buttons take focus only with Full Keyboard Access, which would
+    // leave the pill unreachable after the Profile name field closes.
+    SetFocusBehavior(FocusBehavior::ALWAYS);
+  }
+
+  // Space and Return open the menu on press, like a native pop-up button.
+  // macOS views buttons ignore Return.
+  bool OnKeyPressed(const ui::KeyEvent& event) override {
+    if (IsMenuKey(event)) {
+      if (GetEnabled()) {
+        NotifyClick(event);
+      }
+      return true;
+    }
+    return views::Button::OnKeyPressed(event);
+  }
+  bool OnKeyReleased(const ui::KeyEvent& event) override {
+    return IsMenuKey(event) || views::Button::OnKeyReleased(event);
+  }
+  // Keeps Return from reaching the window's accelerators first.
+  bool SkipDefaultKeyEventProcessing(const ui::KeyEvent& event) override {
+    return IsMenuKey(event) ||
+           views::Button::SkipDefaultKeyEventProcessing(event);
+  }
+
+ private:
+  static bool IsMenuKey(const ui::KeyEvent& event) {
+    return event.key_code() == ui::VKEY_SPACE ||
+           event.key_code() == ui::VKEY_RETURN;
+  }
 };
 
 BEGIN_METADATA(ProfilePill)
@@ -678,8 +711,18 @@ void CreateSpacePanel::SubmitProfile() {
     ShowProfileError(u"Profile names can be up to 64 characters.");
     return;
   }
+  const std::u16string folded = base::i18n::FoldCase(name);
+  if (std::ranges::any_of(profiles_, [&folded](const ProfileChoice& profile) {
+        return base::i18n::FoldCase(profile.name) == folded;
+      })) {
+    ShowProfileError(u"A Profile with that name already exists.");
+    return;
+  }
   profile_pending_ = true;
   new_profile_name_->SetReadOnly(true);
+  // SetReadOnly leaves the caret blinking, and its next tick DCHECKs on a
+  // read-only field. A selection hides the caret and stops the timer.
+  new_profile_name_->SelectAll(false);
   // Posted like Create, so the key handler unwinds first.
   base::SequencedTaskRunner::GetCurrentDefault()->PostTask(
       FROM_HERE,
@@ -698,6 +741,8 @@ void CreateSpacePanel::SubmitProfile() {
 void CreateSpacePanel::OnProfileDone(const std::u16string& error) {
   profile_pending_ = false;
   new_profile_name_->SetReadOnly(false);
+  // Brings the caret back.
+  new_profile_name_->ClearSelection();
   if (error.empty()) {
     CloseNewProfile();
     return;

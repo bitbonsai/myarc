@@ -21,8 +21,10 @@
 #include "base/threading/sequence_local_storage_slot.h"
 #include "base/time/time.h"
 #include "base/values.h"
+#include "chrome/browser/browser_process.h"
 #include "chrome/browser/profiles/profile.h"
 #include "content/public/browser/browser_thread.h"
+#include "myarc/spaces_index.h"
 #include "url/gurl.h"
 
 namespace myarc {
@@ -419,6 +421,7 @@ WorkspaceService& WorkspaceService::ForProfile(Profile& profile) {
 WorkspaceService::WorkspaceService(Profile& profile)
     : ephemeral_(profile.IsOffTheRecord() || profile.IsGuestSession() ||
                  profile.IsSystemProfile()),
+      profile_dir_(profile.GetBaseName().AsUTF8Unsafe()),
       metadata_path_(ephemeral_ ? base::FilePath()
                                 : profile.GetPath().AppendASCII(
                                       "myarc-workspace-v1.json")),
@@ -486,6 +489,15 @@ void WorkspaceService::StartLoad() {
   }
 }
 
+void WorkspaceService::WhenLoaded(base::OnceClosure done) {
+  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
+  if (storage_state_ == StorageState::kLoading) {
+    when_loaded_.push_back(std::move(done));
+  } else {
+    std::move(done).Run();
+  }
+}
+
 void WorkspaceService::RetryLoad() {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
   if (storage_state_ == StorageState::kLoadError) {
@@ -510,9 +522,20 @@ void WorkspaceService::OnLoaded(internal::MetadataResult result) {
   storage_error_ = std::move(result.error);
   storage_state_ =
       storage_error_.empty() ? StorageState::kReady : StorageState::kLoadError;
-  if (storage_state_ == StorageState::kReady)
+  if (storage_state_ == StorageState::kReady) {
     ScheduleWrite();
+    // Brings the index up to date after edits by an older build or by hand.
+    UpdateSpacesIndex();
+  }
   changed_.Notify();
+  // A callback may destroy this service, so run them from a local list.
+  auto weak = weak_factory_.GetWeakPtr();
+  for (auto& done : std::exchange(when_loaded_, {})) {
+    if (!weak) {
+      return;
+    }
+    std::move(done).Run();
+  }
 }
 
 foundation::MutationResult WorkspaceService::Changed(
@@ -528,6 +551,35 @@ foundation::MutationResult WorkspaceService::Changed(
     changed_.Notify();
   }
   return result;
+}
+
+foundation::MutationResult WorkspaceService::SpacesChanged(
+    foundation::MutationResult result) {
+  result = Changed(std::move(result));
+  if (result.ok) {
+    UpdateSpacesIndex();
+  }
+  return result;
+}
+
+void WorkspaceService::UpdateSpacesIndex() {
+  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
+  PrefService* local_state =
+      g_browser_process ? g_browser_process->local_state() : nullptr;
+  if (ephemeral_ || !CanMutate() || !local_state) {
+    return;
+  }
+  const auto snapshot = foundation::export_snapshot(*workspace_);
+  std::vector<IndexedSpace> spaces;
+  spaces.reserve(snapshot.spaces.size());
+  for (const auto& space : snapshot.spaces) {
+    spaces.push_back(
+        {.space_id = space.id,
+         .name = std::string(space.name),
+         .icon_kind = static_cast<IndexedSpace::IconKind>(space.icon_kind),
+         .icon = std::string(space.icon)});
+  }
+  WriteIndexedSpaces(*local_state, profile_dir_, spaces);
 }
 
 void WorkspaceService::ScheduleWrite() {
@@ -583,8 +635,8 @@ foundation::MutationResult WorkspaceService::CreateSpace(
     return Failure("Workspace is not loaded. Check storage state.");
   if (!BoundedText(name, foundation::bridge_limits().name_bytes))
     return Failure("Invalid UTF-8 or oversized Space name.");
-  return Changed(foundation::create_space(*workspace_,
-                                          rust::Str(name.data(), name.size())));
+  return SpacesChanged(foundation::create_space(
+      *workspace_, rust::Str(name.data(), name.size())));
 }
 
 foundation::MutationResult WorkspaceService::CreateSpace(
@@ -597,7 +649,7 @@ foundation::MutationResult WorkspaceService::CreateSpace(
     return Failure("Invalid UTF-8 or oversized Space name.");
   if (!BoundedText(icon, foundation::bridge_limits().icon_bytes))
     return Failure("Invalid UTF-8 or oversized Space icon.");
-  return Changed(foundation::create_space_with_icon(
+  return SpacesChanged(foundation::create_space_with_icon(
       *workspace_, rust::Str(name.data(), name.size()), icon_kind,
       rust::Str(icon.data(), icon.size())));
 }
@@ -611,7 +663,7 @@ foundation::MutationResult WorkspaceService::RenameSpace(
     return Failure("Invalid UTF-8 or oversized Space name.");
   auto result = foundation::rename_space(*workspace_, space,
                                          rust::Str(name.data(), name.size()));
-  return Changed({result.ok, 0, std::move(result.error)});
+  return SpacesChanged({result.ok, 0, std::move(result.error)});
 }
 
 foundation::MutationResult WorkspaceService::SetSpaceIcon(
@@ -622,7 +674,7 @@ foundation::MutationResult WorkspaceService::SetSpaceIcon(
     return Failure("Workspace is not loaded. Check storage state.");
   if (!BoundedText(icon, foundation::bridge_limits().icon_bytes))
     return Failure("Invalid UTF-8 or oversized Space icon.");
-  return Changed(foundation::set_space_icon(
+  return SpacesChanged(foundation::set_space_icon(
       *workspace_, space, icon_kind, rust::Str(icon.data(), icon.size())));
 }
 
@@ -860,7 +912,8 @@ foundation::MutationResult WorkspaceService::MoveSpaceBefore(uint64_t space,
   if (!CanMutate()) {
     return Failure("Workspace is not loaded. Check storage state.");
   }
-  return Changed(foundation::move_space_before(*workspace_, space, before));
+  return SpacesChanged(
+      foundation::move_space_before(*workspace_, space, before));
 }
 
 foundation::MutationResult WorkspaceService::ReconcileLiveItems(
@@ -897,7 +950,7 @@ foundation::MutationResult WorkspaceService::RestoreSnapshot(
   auto result = foundation::restore_snapshot(*workspace_, std::move(snapshot));
   if (result.ok)
     foundation::prune_archived_tabs(*workspace_, NowSecs());
-  return Changed(std::move(result));
+  return SpacesChanged(std::move(result));
 }
 
 }  // namespace myarc

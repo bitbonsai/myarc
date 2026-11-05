@@ -109,6 +109,18 @@ class SidebarView final : public views::View,
     bool operator==(const SpaceEntry&) const = default;
   };
 
+  // A Space in another Profile, from the Spaces index, as the footer shows it
+  // after a divider.
+  struct OtherSpaceEntry {
+    std::string profile_dir;  // The Profile's directory name.
+    uint64_t space_id = 0;    // That Profile's Rust ID.
+    std::u16string name;
+    std::u16string profile_name;
+    SpaceIconChoice icon;
+    size_t order = 0;  // Its place among its Profile's Spaces.
+    bool operator==(const OtherSpaceEntry&) const = default;
+  };
+
   class Delegate {
    public:
     virtual ~Delegate() = default;
@@ -128,6 +140,9 @@ class SidebarView final : public views::View,
     virtual bool DropFavorite(uint64_t item_id, uint64_t before_id) = 0;
     virtual void UnsaveItem(uint64_t item_id) = 0;
     virtual void SelectSpace(uint64_t space_id) = 0;
+    // A footer glyph of another Profile's Space was pressed.
+    virtual void SwitchToSpaceInProfile(const std::string& profile_dir,
+                                        uint64_t space_id) = 0;
     // Asks the parent to open the Create a Space panel with OpenCreateSpace.
     virtual void CreateSpace() = 0;
     // The panel's Create: adds and selects the Space with `icon` (Kind::kNone
@@ -183,6 +198,9 @@ class SidebarView final : public views::View,
   void SetModel(const foundation::SidebarResult& model,
                 const std::u16string& status = {},
                 StorageRetry retry = StorageRetry::kNone);
+  // Other Profiles' Spaces, grouped by Profile in the order to show. Takes
+  // effect with the next SetModel.
+  void SetOtherSpaces(std::vector<OtherSpaceEntry> spaces);
   // Drops mutation controls while loading or after a read/snapshot failure.
   // Parent supplies only a retry supported by its current storage state.
   void SetUnavailable(const std::u16string& reason,
@@ -225,6 +243,8 @@ class SidebarView final : public views::View,
     kNewTab,
     kClearToday,
     kSpaces,
+    // Another Profile's Space; the id indexes footer_other_spaces_.
+    kOtherSpace,
     kCreate,
     kLibrary,
     kRetryLoad,
@@ -307,6 +327,7 @@ class SidebarView final : public views::View,
   raw_ptr<CreateButton> create_button_ = nullptr;
   std::vector<FocusTarget> footer_targets_;
   std::vector<SpaceEntry> footer_spaces_;
+  std::vector<OtherSpaceEntry> footer_other_spaces_;
   uint64_t footer_space_id_ = 0;
   raw_ptr<views::ScrollView> spaces_scroll_ = nullptr;
   raw_ptr<views::MdTextButton> new_tab_ = nullptr;
@@ -319,6 +340,7 @@ class SidebarView final : public views::View,
   uint64_t menu_space_id_ = 0;
   uint64_t menu_item_id_ = 0;
   std::vector<SpaceEntry> spaces_;
+  std::vector<OtherSpaceEntry> other_spaces_;
   // The same Spaces with their Pins, for the Library's cards.
   std::vector<LibrarySpace> library_spaces_;
   raw_ptr<LibraryView> library_ = nullptr;

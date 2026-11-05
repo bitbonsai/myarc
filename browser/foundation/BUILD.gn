@@ -48,10 +48,22 @@ source_set("workspace_service") {
     "//base",
   ]
   deps = [
+    ":spaces_index",
+    "//chrome/browser:browser_process",
     "//chrome/browser/profiles:profile",
+    "//components/prefs",
     "//content/public/browser",
     "//url",
   ]
+}
+
+source_set("spaces_index") {
+  sources = [
+    "spaces_index.cc",
+    "spaces_index.h",
+  ]
+  public_deps = [ "//base" ]
+  deps = [ "//components/prefs" ]
 }
 
 source_set("command_ids") {
@@ -225,6 +237,7 @@ executable("bridge_check") {
   sources = [ "bridge_check.cc" ]
   deps = [
     ":library_logic",
+    ":spaces_index",
     ":workspace_service",
   ]
 }

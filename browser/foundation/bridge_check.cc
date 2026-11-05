@@ -6,9 +6,11 @@
 
 #include "base/json/json_reader.h"
 #include "base/json/json_writer.h"
+#include "base/strings/string_number_conversions.h"
 #include "base/time/time.h"
 #include "myarc/bridge.rs.h"
 #include "myarc/library_logic.h"
+#include "myarc/spaces_index.h"
 #include "myarc/workspace_service.h"
 
 namespace {
@@ -802,6 +804,125 @@ bool CheckDownloadsStack() {
              std::vector<Download>{{7, true}};
 }
 
+// The Spaces index round-trips each Profile's Spaces in order, rewrites only
+// the named Profile, and reads a tampered Local State dictionary safely.
+bool CheckSpacesIndex() {
+  using myarc::IndexedSpace;
+  using Kind = IndexedSpace::IconKind;
+  base::DictValue index;
+  const std::vector<IndexedSpace> personal = {
+      {.space_id = 1, .name = "Everyday"},
+      {.space_id = 3, .name = "Home", .icon_kind = Kind::kEmoji, .icon = "🏠"}};
+  const std::vector<IndexedSpace> work = {{.space_id = 2,
+                                           .name = "Client",
+                                           .icon_kind = Kind::kNamed,
+                                           .icon = "book-open"}};
+  if (!myarc::MergeIndexedSpaces(index, "Default", personal) ||
+      !myarc::MergeIndexedSpaces(index, "Profile 1", work) ||
+      // Unchanged entries report no change, so Local State isn't rewritten.
+      myarc::MergeIndexedSpaces(index, "Profile 1", work)) {
+    return false;
+  }
+  // Round trip through JSON, as Local State stores it.
+  auto json = base::WriteJson(index);
+  auto parsed = json ? base::JSONReader::ReadDict(*json, base::JSON_PARSE_RFC)
+                     : std::nullopt;
+  if (!parsed) {
+    return false;
+  }
+  const std::vector<IndexedSpace> expected = {
+      {"Default", 1, "Everyday", Kind::kUnset, "", 0},
+      {"Default", 3, "Home", Kind::kEmoji, "🏠", 1},
+      {"Profile 1", 2, "Client", Kind::kNamed, "book-open", 0}};
+  if (myarc::DecodeSpacesIndex(*parsed) != expected) {
+    return false;
+  }
+  // Reordering one Profile leaves the other alone; emptying it drops it.
+  const std::vector<IndexedSpace> reordered = {personal[1], personal[0]};
+  if (!myarc::MergeIndexedSpaces(index, "Default", reordered) ||
+      myarc::DecodeSpacesIndex(index)[0].space_id != 3 ||
+      myarc::DecodeSpacesIndex(index)[2].profile_dir != "Profile 1" ||
+      !myarc::MergeIndexedSpaces(index, "Default", {}) ||
+      myarc::DecodeSpacesIndex(index).size() != 1) {
+    return false;
+  }
+  // Writers refuse path-like keys and skip invalid Spaces.
+  const std::vector<IndexedSpace> bad_spaces = {
+      {.space_id = 0, .name = "Zero"},
+      {.space_id = 4, .name = ""},
+      {.space_id = 5, .name = std::string(129, 'x')},
+      {.space_id = 6, .name = "Ok", .icon_kind = Kind::kEmoji, .icon = ""}};
+  if (myarc::MergeIndexedSpaces(index, "../Default", personal) ||
+      myarc::MergeIndexedSpaces(index, "a/b", personal) ||
+      myarc::MergeIndexedSpaces(index, "", personal) ||
+      !myarc::MergeIndexedSpaces(index, "Profile 2", bad_spaces)) {
+    return false;
+  }
+  auto decoded = myarc::DecodeSpacesIndex(index);
+  if (decoded.size() != 2 || decoded[1].space_id != 6 ||
+      decoded[1].icon_kind != Kind::kUnset) {
+    return false;
+  }
+  // A tampered file: wrong types, bad ids, oversized or invalid text, path
+  // keys, unknown icon kinds and too many entries.
+  auto tampered = base::JSONReader::ReadDict(
+      R"({"..": [{"id": "1", "name": "Up"}],
+          "x/y": [{"id": "1", "name": "Path"}],
+          "Profile 3": "not a list",
+          "Profile 4": [7, {"id": 1, "name": "Int id"},
+                        {"id": "01", "name": "Padded"},
+                        {"id": "-1", "name": "Negative"},
+                        {"id": "99999999999999999999", "name": "Overflow"},
+                        {"id": "0", "name": "Zero"},
+                        {"id": "2"},
+                        {"id": "3", "name": ""},
+                        {"id": "4", "name": "Icon", "icon_kind": 9,
+                         "icon": "x"},
+                        {"id": "5", "name": "Good", "icon_kind": 1,
+                         "icon": "🚀"}]})",
+      base::JSON_PARSE_RFC);
+  if (!tampered) {
+    return false;
+  }
+  tampered->Set("Profile 5",
+                base::ListValue().Append(base::DictValue().Set("id", "1").Set(
+                    "name", std::string(129, 'n'))));
+  base::ListValue many;
+  for (int i = 1; i <= 70; ++i) {
+    many.Append(base::DictValue()
+                    .Set("id", base::NumberToString(i))
+                    .Set("name", "Space"));
+  }
+  tampered->Set("Profile 6", std::move(many));
+  decoded = myarc::DecodeSpacesIndex(*tampered);
+  size_t profile6 = 0;
+  for (const auto& space : decoded) {
+    profile6 += space.profile_dir == "Profile 6";
+  }
+  if (decoded.size() != 2 + myarc::kMaxIndexedSpaces ||
+      decoded[0].profile_dir != "Profile 4" || decoded[0].space_id != 4 ||
+      decoded[0].icon_kind != Kind::kUnset || decoded[1].space_id != 5 ||
+      decoded[1].icon != "🚀" || decoded[1].order != 1 ||
+      profile6 != myarc::kMaxIndexedSpaces) {
+    return false;
+  }
+  // The writer stops adding Profiles at the cap; readers read no more.
+  base::DictValue full;
+  for (size_t i = 0; i < myarc::kMaxIndexedProfiles; ++i) {
+    if (!myarc::MergeIndexedSpaces(full, "P" + base::NumberToString(i), work)) {
+      return false;
+    }
+  }
+  if (myarc::MergeIndexedSpaces(full, "Extra", work) ||
+      !myarc::MergeIndexedSpaces(full, "P0", personal)) {
+    return false;
+  }
+  full.Set("Q", base::ListValue().Append(
+                    base::DictValue().Set("id", "1").Set("name", "Over")));
+  return myarc::DecodeSpacesIndex(full).size() ==
+         myarc::kMaxIndexedProfiles + 1;
+}
+
 }  // namespace
 
 int main() {
@@ -890,10 +1011,16 @@ int main() {
     std::cerr << "Space icon checks failed\n";
     return 20;
   }
-  std::cout << "7 legacy C++/Rust checks passed, including 1000 ownership "
-               "round trips; workspace transitions, Space 1 deletion and "
-               "metadata codec, saved title, Archived Tabs, Auto Archive, "
-               "archive timer, Clear Archive, downloads stack, dormant "
-               "temporary item, Space reorder and Space icon checks passed\n";
+  if (!CheckSpacesIndex()) {
+    std::cerr << "Spaces index checks failed\n";
+    return 21;
+  }
+  std::cout
+      << "7 legacy C++/Rust checks passed, including 1000 ownership "
+         "round trips; workspace transitions, Space 1 deletion and "
+         "metadata codec, saved title, Archived Tabs, Auto Archive, "
+         "archive timer, Clear Archive, downloads stack, dormant "
+         "temporary item, Space reorder, Space icon and Spaces index checks "
+         "passed\n";
   return 0;
 }

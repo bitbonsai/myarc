@@ -6,6 +6,7 @@
 #include <string>
 #include <string_view>
 #include <utility>
+#include <vector>
 
 #include "base/callback_list.h"
 #include "base/containers/span.h"
@@ -61,6 +62,9 @@ class WorkspaceService final : public base::SupportsUserData::Data {
   StorageState storage_state() const;
   std::string storage_error() const;
   base::CallbackListSubscription Subscribe(base::RepeatingClosure callback);
+  // Runs `done` once loading ends, ready or failed, or now when it has.
+  // Dropped if the service dies first.
+  void WhenLoaded(base::OnceClosure done);
   void RetryLoad();
   void RetrySave();
   // Queue an owned latest dirty snapshot before ThreadPool shutdown. Leaves
@@ -159,6 +163,9 @@ class WorkspaceService final : public base::SupportsUserData::Data {
   explicit WorkspaceService(Profile& profile);
   bool CanMutate() const;
   foundation::MutationResult Changed(foundation::MutationResult result);
+  // Changed, then rewrites this Profile's entry in the Spaces index.
+  foundation::MutationResult SpacesChanged(foundation::MutationResult result);
+  void UpdateSpacesIndex();
   void StartLoad();
   void OnLoaded(internal::MetadataResult result);
   void ScheduleWrite();
@@ -166,6 +173,8 @@ class WorkspaceService final : public base::SupportsUserData::Data {
 
   // Copies only, destructor/background work never dereference the dead Profile.
   const bool ephemeral_;
+  // The Profile's directory name, its key in the Spaces index.
+  const std::string profile_dir_;
   const base::FilePath metadata_path_;
   const scoped_refptr<base::SequencedTaskRunner> io_runner_;
   rust::Box<foundation::Workspace> workspace_;
@@ -176,6 +185,7 @@ class WorkspaceService final : public base::SupportsUserData::Data {
   // When the last Auto Archive pass advanced the clock; null before the first.
   base::TimeTicks last_pass_;
   base::RepeatingClosureList changed_;
+  std::vector<base::OnceClosure> when_loaded_;
   SEQUENCE_CHECKER(sequence_checker_);
   // Invalidates replies on destruction. Queued writes own their path/records
   // and block normal shutdown. Ephemeral Profiles queue none.
