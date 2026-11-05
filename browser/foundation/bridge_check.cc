@@ -327,6 +327,68 @@ bool CheckMetadataRecords() {
 
 // Space 1 is not special: after it is deleted the sidebar, selection and
 // rename follow the remaining Space, and the last Space cannot be deleted.
+// A Space's icon survives the bridge, the metadata file and restore, and a
+// bad icon fails without changing the stored one.
+bool CheckSpaceIcons() {
+  using namespace myarc::foundation;
+  using myarc::internal::DecodeWorkspaceMetadata;
+  using myarc::internal::EncodeWorkspaceMetadata;
+  const auto icon_of = [](const Workspace& model, uint64_t id) {
+    for (const auto& space : sidebar_snapshot(model, 1).spaces) {
+      if (space.id == id) {
+        return std::pair{space.icon_kind, std::string(space.icon)};
+      }
+    }
+    return std::pair{SpaceIconKind::Unset, std::string("missing")};
+  };
+  const std::string books = "\xf0\x9f\x93\x9a";
+  auto model = new_workspace();
+  auto space =
+      create_space_with_icon(*model, "Reading", SpaceIconKind::Emoji, books);
+  if (!space.ok ||
+      icon_of(*model, space.id) != std::pair{SpaceIconKind::Emoji, books} ||
+      create_space_with_icon(*model, "Bad", SpaceIconKind::Unset, books).ok ||
+      create_space_with_icon(*model, "Bad", SpaceIconKind::Emoji, "a").ok ||
+      icon_of(*model, 1) != std::pair{SpaceIconKind::Unset, std::string()}) {
+    return false;
+  }
+  auto named =
+      set_space_icon(*model, space.id, SpaceIconKind::Named, "book-open");
+  auto same =
+      set_space_icon(*model, space.id, SpaceIconKind::Named, "book-open");
+  if (!named.ok || named.id != 1 || !same.ok || same.id != 0 ||
+      set_space_icon(*model, space.id, SpaceIconKind::Named,
+                     std::string(bridge_limits().icon_bytes + 1, 'a'))
+          .ok ||
+      set_space_icon(*model, space.id, SpaceIconKind::Named, "Book").ok ||
+      icon_of(*model, space.id) !=
+          std::pair{SpaceIconKind::Named, std::string("book-open")}) {
+    return false;
+  }
+  const auto encoded = EncodeWorkspaceMetadata(export_snapshot(*model));
+  if (!encoded) {
+    return false;
+  }
+  auto decoded = DecodeWorkspaceMetadata(*encoded);
+  auto restored = new_workspace();
+  if (!decoded.snapshot ||
+      !restore_snapshot(*restored, std::move(*decoded.snapshot)).ok ||
+      icon_of(*restored, space.id) !=
+          std::pair{SpaceIconKind::Named, std::string("book-open")} ||
+      icon_of(*restored, 1) != std::pair{SpaceIconKind::Unset, std::string()}) {
+    std::cerr << "Space icon round trip failed: " << decoded.error << '\n';
+    return false;
+  }
+  // Unset restores the default glyph and leaves no icon keys in the file.
+  if (!set_space_icon(*restored, space.id, SpaceIconKind::Unset, "").ok ||
+      icon_of(*restored, space.id) !=
+          std::pair{SpaceIconKind::Unset, std::string()}) {
+    return false;
+  }
+  const auto cleared = EncodeWorkspaceMetadata(export_snapshot(*restored));
+  return cleared && cleared->find("icon_kind") == std::string::npos;
+}
+
 bool CheckDeleteFirstSpace() {
   using namespace myarc::foundation;
   auto model = new_workspace();
@@ -824,10 +886,14 @@ int main() {
     std::cerr << "Space reorder checks failed\n";
     return 19;
   }
+  if (!CheckSpaceIcons()) {
+    std::cerr << "Space icon checks failed\n";
+    return 20;
+  }
   std::cout << "7 legacy C++/Rust checks passed, including 1000 ownership "
                "round trips; workspace transitions, Space 1 deletion and "
                "metadata codec, saved title, Archived Tabs, Auto Archive, "
                "archive timer, Clear Archive, downloads stack, dormant "
-               "temporary item and Space reorder checks passed\n";
+               "temporary item, Space reorder and Space icon checks passed\n";
   return 0;
 }

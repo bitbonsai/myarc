@@ -1627,10 +1627,24 @@ foundation::MutationResult BrowserWorkspaceAdapter::CreateSpace(
     std::string_view name) {
   return Remember(ready() ? service_->CreateSpace(name) : Fail(error()));
 }
+foundation::MutationResult BrowserWorkspaceAdapter::CreateSpace(
+    std::string_view name,
+    foundation::SpaceIconKind icon_kind,
+    std::string_view icon) {
+  return Remember(ready() ? service_->CreateSpace(name, icon_kind, icon)
+                          : Fail(error()));
+}
 foundation::MutationResult BrowserWorkspaceAdapter::RenameSpace(
     uint64_t space,
     std::string_view name) {
   return Remember(ready() ? service_->RenameSpace(space, name) : Fail(error()));
+}
+foundation::MutationResult BrowserWorkspaceAdapter::SetSpaceIcon(
+    uint64_t space,
+    foundation::SpaceIconKind icon_kind,
+    std::string_view icon) {
+  return Remember(ready() ? service_->SetSpaceIcon(space, icon_kind, icon)
+                          : Fail(error()));
 }
 foundation::MutationResult BrowserWorkspaceAdapter::SelectSpace(
     uint64_t space) {

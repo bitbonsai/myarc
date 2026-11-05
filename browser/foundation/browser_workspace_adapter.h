@@ -123,7 +123,13 @@ class BrowserWorkspaceAdapter final : public TabStripModelObserver {
   // Close this window's projection only. Dormant saved rows remain unchanged.
   foundation::MutationResult CloseItem(uint64_t item);
   foundation::MutationResult CreateSpace(std::string_view name);
+  foundation::MutationResult CreateSpace(std::string_view name,
+                                         foundation::SpaceIconKind icon_kind,
+                                         std::string_view icon);
   foundation::MutationResult RenameSpace(uint64_t space, std::string_view name);
+  foundation::MutationResult SetSpaceIcon(uint64_t space,
+                                          foundation::SpaceIconKind icon_kind,
+                                          std::string_view icon);
   foundation::MutationResult SelectSpace(uint64_t space);
   foundation::MutationResult Pin(uint64_t item);
   foundation::MutationResult Favorite(uint64_t item);

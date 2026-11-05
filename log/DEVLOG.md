@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-11-05: Create a Space opens in the sidebar
+
+- The "+" menu's New Space and the Library's Create Space now swap the sidebar for Arc's Create a Space panel (`create_space_panel.cc`) in place of the modal dialog, which only renames now. The panel shows a placeholder for Arc's illustration, the title and subtitle, a name field with a disabled icon button, the current Profile's name in a static pill, an inert Choose a Theme row, a Create Space button that stays disabled while the name is blank, and Cancel. Return creates, Esc cancels, and a failed create shows its error under the field. Icons are Lucide. `WorkspaceService` and the adapter gain `CreateSpace(name, icon_kind, icon)` and `SetSpaceIcon` over the new FFI, with the same UTF-8 and size checks as `CreateSpace`.
+- Verification: `chrome` and `bridge_check` build under the lock, and `bridge_check` passes with a new Space icon case covering the bridge, the metadata file, restore and clearing. `CREATE_SPACE=1 tools/capture_native.sh` captured the panel, and a side-by-side with Arc's screenshot matches its row sizes, colors and order. Pressing Create, Return and Esc wasn't exercised in a live window. `export_patches.py --check`, `check_docs.py` and `cargo fmt --check` pass. Chromium `myarc` commit `aa617362bd`.
+- Still different from Arc: the URL pill stays above the panel, the Space footer goes away while the panel shows, and Cancel is a little brighter. The build ran with `src/myarc` pointed at this worktree and was restored afterwards, and the main checkout's differing files were touched so the next build there recompiles them.
+
 ## 2026-11-05: Spaces can carry an icon
 
 - `Space` gains an optional `SpaceIcon`, either one emoji or a bundled icon name (lowercase letters, digits and single hyphens), at most 64 bytes. `Workspace::create_space_with_icon` and `set_space_icon` validate it, and the FFI exposes both with a `SpaceIconKind` plus `icon` string on `SpaceRecord`. `create_space` keeps its signature, so no C++ caller changed. This prepares the Create a Space panel; the in-file Profile is still `DEFAULT_PROFILE_ID`.

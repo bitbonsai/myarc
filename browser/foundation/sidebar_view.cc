@@ -19,6 +19,7 @@
 #include "components/vector_icons/vector_icons.h"
 #include "myarc/bridge.rs.h"
 #include "myarc/create_menu.h"
+#include "myarc/create_space_panel.h"
 #include "myarc/downloads_stack.h"
 #include "myarc/footer_button.h"
 #include "myarc/icons.h"
@@ -582,18 +583,7 @@ void SidebarView::OpenLibrary(LibrarySection section) {
     menu_runner_->Cancel();
   }
   space_slide_.Stop();
-  focus_targets_.clear();
-  footer_targets_.clear();
-  footer_ = nullptr;
-  downloads_stack_ = nullptr;
-  create_menu_ = nullptr;
-  create_button_ = nullptr;
-  create_menu_open_ = false;
-  spaces_scroll_ = nullptr;
-  new_tab_ = nullptr;
-  space_rows_ = nullptr;
-  tiles_.clear();
-  RemoveAllChildViews();
+  DropRows();
   // The Library sets its own width and edges, as Arc swaps out its sidebar.
   auto* layout = static_cast<views::BoxLayout*>(GetLayoutManager());
   layout->set_inside_border_insets(gfx::Insets());
@@ -617,6 +607,84 @@ void SidebarView::OpenLibrary(LibrarySection section) {
   library_return_focus_.SetView(
       GetFocusManager() ? GetFocusManager()->GetFocusedView() : nullptr);
   library_->HoldFocus();
+}
+
+void SidebarView::DropRows() {
+  focus_targets_.clear();
+  footer_targets_.clear();
+  footer_ = nullptr;
+  downloads_stack_ = nullptr;
+  create_menu_ = nullptr;
+  create_button_ = nullptr;
+  create_menu_open_ = false;
+  spaces_scroll_ = nullptr;
+  new_tab_ = nullptr;
+  space_rows_ = nullptr;
+  tiles_.clear();
+  create_panel_ = nullptr;
+  RemoveAllChildViews();
+}
+
+void SidebarView::OpenCreateSpace(const std::u16string& profile_name) {
+  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
+  if (create_panel_) {
+    create_panel_->FocusName();
+    return;
+  }
+  if (spaces_.empty()) {
+    return;
+  }
+  const bool from_library = library_ || library_exit_.is_animating();
+  library_exit_.Stop();
+  ResetLibrary();
+  menu_item_id_ = 0;
+  if (menu_runner_) {
+    menu_runner_->Cancel();
+  }
+  space_slide_.Stop();
+  DropRows();
+  // SetModel rebuilds the rows from scratch once the panel closes.
+  current_space_id_ = 0;
+  // The panel posts both callbacks and this view owns it, so neither outlives
+  // this view.
+  create_panel_ = AddChildView(std::make_unique<CreateSpacePanel>(
+      profile_name,
+      base::BindRepeating(&SidebarView::SubmitCreateSpace,
+                          base::Unretained(this)),
+      base::BindRepeating(&SidebarView::CloseCreateSpace,
+                          base::Unretained(this))));
+  static_cast<views::BoxLayout*>(GetLayoutManager())
+      ->SetFlexForView(create_panel_, 1);
+  if (from_library) {
+    // The parent narrows back to the rows' width; its model waits for the
+    // panel to close.
+    auto weak = weak_factory_.GetWeakPtr();
+    delegate_->SetLibraryOpen(false);
+    if (!weak || !create_panel_) {
+      return;
+    }
+  }
+  create_panel_->FocusName();
+}
+
+std::u16string SidebarView::SubmitCreateSpace(const std::u16string& name) {
+  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
+  auto weak = weak_factory_.GetWeakPtr();
+  std::u16string error = delegate_->CreateNamedSpace(name);
+  if (weak && error.empty()) {
+    CloseCreateSpace();
+  }
+  return error;
+}
+
+void SidebarView::CloseCreateSpace() {
+  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
+  if (!create_panel_) {
+    return;
+  }
+  RemoveChildViewT(std::exchange(create_panel_, nullptr));
+  current_space_id_ = 0;
+  delegate_->CreateSpacePanelClosed();
 }
 
 void SidebarView::ResetLibrary() {
@@ -931,21 +999,10 @@ void SidebarView::SetUnavailable(const std::u16string& reason,
   space_slide_.Stop();
   ResetLibrary();
   library_closed_ = false;
-  focus_targets_.clear();
-  footer_targets_.clear();
-  footer_ = nullptr;
-  downloads_stack_ = nullptr;
-  create_menu_ = nullptr;
-  create_button_ = nullptr;
-  create_menu_open_ = false;
-  spaces_scroll_ = nullptr;
-  new_tab_ = nullptr;
-  space_rows_ = nullptr;
-  tiles_.clear();
+  DropRows();
   current_space_id_ = 0;
   spaces_.clear();
   library_spaces_.clear();
-  RemoveAllChildViews();
   auto* scroll = AddChildView(std::make_unique<views::ScrollView>());
   scroll->ClipHeightTo(0, std::numeric_limits<int>::max());
   scroll->SetHorizontalScrollBarMode(
@@ -990,6 +1047,10 @@ void SidebarView::SetModel(const foundation::SidebarResult& model,
                              .title = std::move(presentation.title),
                              .icon = std::move(presentation.icon)});
     }
+  }
+  if (create_panel_) {
+    // The rows rebuild when the panel closes.
+    return;
   }
   if (library_) {
     // The Library shows Spaces and the archive; rows rebuild when it closes.

@@ -39,6 +39,7 @@ namespace myarc {
 
 class CreateButton;
 class CreateMenu;
+class CreateSpacePanel;
 class DownloadsStack;
 class FooterTooltip;
 class LibraryView;
@@ -118,7 +119,12 @@ class SidebarView final : public views::View,
     virtual bool DropFavorite(uint64_t item_id, uint64_t before_id) = 0;
     virtual void UnsaveItem(uint64_t item_id) = 0;
     virtual void SelectSpace(uint64_t space_id) = 0;
+    // Asks the parent to open the Create a Space panel with OpenCreateSpace.
     virtual void CreateSpace() = 0;
+    // The panel's Create: adds and selects the Space, or returns why it can't.
+    virtual std::u16string CreateNamedSpace(const std::u16string& name) = 0;
+    // The panel closed; the parent supplies the rows' model with SetModel.
+    virtual void CreateSpacePanelClosed() = 0;
     virtual void RenameSpace(uint64_t space_id) = 0;
     // Places `space_id` before `before_id` (0 = last) in the Space order
     // the footer, Ctrl+1..9 and the Library share. The parent reports errors.
@@ -175,6 +181,10 @@ class SidebarView final : public views::View,
   // Reloads an open Library's Downloads list if it changed.
   void RefreshLibraryDownloads();
   bool library_open() const { return !!library_; }
+  // Replaces the rows, or the Library, with Arc's Create a Space panel until
+  // Create or Cancel. Needs a usable model.
+  void OpenCreateSpace(const std::u16string& profile_name);
+  bool create_space_open() const { return !!create_panel_; }
   // Shows the footer tooltip of "library", "space" (the current one) or
   // "create" without hover and keeps it up, for background captures.
   void ShowFooterTooltipForCapture(std::string_view target);
@@ -233,8 +243,13 @@ class SidebarView final : public views::View,
       views::View* source,
       const gfx::Point& point,
       ui::mojom::MenuSourceType source_type) override;
+  // Removes every child and forgets the rows', footer's and panel's views.
+  void DropRows();
   // Drops the Library view without notifying the parent.
   void ResetLibrary();
+  // The Create a Space panel's callbacks.
+  std::u16string SubmitCreateSpace(const std::u16string& name);
+  void CloseCreateSpace();
   // Checked when the rows replace the Library, not when closing starts.
   bool LibraryHasFocus();
   // Drops the Library and has the parent rebuild the rows.
@@ -283,6 +298,7 @@ class SidebarView final : public views::View,
   // The same Spaces with their Pins, for the Library's cards.
   std::vector<LibrarySpace> library_spaces_;
   raw_ptr<LibraryView> library_ = nullptr;
+  raw_ptr<CreateSpacePanel> create_panel_ = nullptr;
   ItemMenuState menu_state_ = {};
   // Stable sidebar owns both; no menu callback or anchor retains a child row.
   // Runner must be destroyed before its model and before children.

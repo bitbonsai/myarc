@@ -119,6 +119,8 @@ source_set("sidebar_view") {
   sources = [
     "create_menu.cc",
     "create_menu.h",
+    "create_space_panel.cc",
+    "create_space_panel.h",
     "downloads_stack.cc",
     "downloads_stack.h",
     "footer_button.cc",

@@ -72,6 +72,75 @@ inline constexpr gfx::VectorIcon kPlusIcon(kPlusRep,
                                            std::size(kPlusRep),
                                            "myarc_plus");
 
+// The Create a Space panel's Lucide icons, at stroke 2: "square-dashed-plus"
+// for the icon picker, "smile" and "info" for the Profile row, "chevron-down"
+// for its Profile pill, and "brush" for Choose a Theme.
+inline constexpr gfx::PathElement kSquareDashedPlusPath[] = {
+    gfx::CANVAS_DIMENSIONS, 24, gfx::STROKE, 2,
+    gfx::MOVE_TO, 5, 3, gfx::R_ARC_TO, 2, 2, 0, 0, 0, -2, 2,
+    gfx::MOVE_TO, 19, 3, gfx::R_ARC_TO, 2, 2, 0, 0, 1, 2, 2,
+    gfx::MOVE_TO, 21, 19, gfx::R_ARC_TO, 2, 2, 0, 0, 1, -2, 2,
+    gfx::MOVE_TO, 5, 21, gfx::R_ARC_TO, 2, 2, 0, 0, 1, -2, -2,
+    gfx::MOVE_TO, 9, 3, gfx::R_H_LINE_TO, 1,
+    gfx::MOVE_TO, 9, 21, gfx::R_H_LINE_TO, 1,
+    gfx::MOVE_TO, 14, 3, gfx::R_H_LINE_TO, 1,
+    gfx::MOVE_TO, 14, 21, gfx::R_H_LINE_TO, 1,
+    gfx::MOVE_TO, 3, 9, gfx::R_V_LINE_TO, 1,
+    gfx::MOVE_TO, 21, 9, gfx::R_V_LINE_TO, 1,
+    gfx::MOVE_TO, 3, 14, gfx::R_V_LINE_TO, 1,
+    gfx::MOVE_TO, 21, 14, gfx::R_V_LINE_TO, 1,
+    gfx::MOVE_TO, 8, 12, gfx::R_H_LINE_TO, 8,
+    gfx::MOVE_TO, 12, 8, gfx::R_V_LINE_TO, 8};
+inline constexpr gfx::VectorIconRep kSquareDashedPlusRep[] = {
+    {kSquareDashedPlusPath}};
+inline constexpr gfx::VectorIcon kSquareDashedPlusIcon(
+    kSquareDashedPlusRep,
+    std::size(kSquareDashedPlusRep),
+    "myarc_square_dashed_plus");
+
+inline constexpr gfx::PathElement kSmilePath[] = {
+    gfx::CANVAS_DIMENSIONS, 24, gfx::STROKE, 2, gfx::CIRCLE, 12, 12, 10,
+    gfx::NEW_PATH, gfx::STROKE, 2,
+    gfx::MOVE_TO, 15, 10, gfx::V_LINE_TO, 9,
+    gfx::MOVE_TO, 16.472f, 15, gfx::R_ARC_TO, 6, 6, 0, 0, 1, -8.943f, 0,
+    gfx::MOVE_TO, 9, 10, gfx::V_LINE_TO, 9};
+inline constexpr gfx::VectorIconRep kSmileRep[] = {{kSmilePath}};
+inline constexpr gfx::VectorIcon kSmileIcon(kSmileRep,
+                                            std::size(kSmileRep),
+                                            "myarc_smile");
+
+inline constexpr gfx::PathElement kInfoPath[] = {
+    gfx::CANVAS_DIMENSIONS, 24, gfx::STROKE, 2, gfx::CIRCLE, 12, 12, 10,
+    gfx::NEW_PATH, gfx::STROKE, 2,
+    gfx::MOVE_TO, 12, 16, gfx::R_V_LINE_TO, -4,
+    gfx::MOVE_TO, 12, 8, gfx::R_H_LINE_TO, 0.01f};
+inline constexpr gfx::VectorIconRep kInfoRep[] = {{kInfoPath}};
+inline constexpr gfx::VectorIcon kInfoIcon(kInfoRep,
+                                           std::size(kInfoRep),
+                                           "myarc_info");
+
+inline constexpr gfx::PathElement kChevronDownPath[] = {
+    gfx::CANVAS_DIMENSIONS, 24, gfx::STROKE, 2, gfx::MOVE_TO, 6, 9,
+    gfx::R_LINE_TO, 6, 6, gfx::R_LINE_TO, 6, -6};
+inline constexpr gfx::VectorIconRep kChevronDownRep[] = {{kChevronDownPath}};
+inline constexpr gfx::VectorIcon kChevronDownIcon(kChevronDownRep,
+                                                  std::size(kChevronDownRep),
+                                                  "myarc_chevron_down");
+
+inline constexpr gfx::PathElement kBrushPath[] = {
+    gfx::CANVAS_DIMENSIONS, 24, gfx::STROKE, 2,
+    gfx::MOVE_TO, 11, 10, gfx::R_LINE_TO, 3, 3,
+    gfx::MOVE_TO, 6.5f, 21, gfx::ARC_TO, 3.5f, 3.5f, 0, 1, 0, 3, 17.5f,
+    gfx::R_ARC_TO, 2.62f, 2.62f, 0, 0, 1, -0.708f, 1.792f,
+    gfx::ARC_TO, 1, 1, 0, 0, 0, 3, 21, gfx::CLOSE,
+    gfx::MOVE_TO, 9.969f, 17.031f, gfx::LINE_TO, 21.378f, 5.624f,
+    gfx::R_ARC_TO, 1, 1, 0, 0, 0, -3.002f, -3.002f,
+    gfx::LINE_TO, 6.967f, 14.031f};
+inline constexpr gfx::VectorIconRep kBrushRep[] = {{kBrushPath}};
+inline constexpr gfx::VectorIcon kBrushIcon(kBrushRep,
+                                            std::size(kBrushRep),
+                                            "myarc_brush");
+
 // The creation menu's row icons, traced from Arc's. New Space is the Spaces
 // rail glyph's two cards with a plus on the front one, on its 28 DIP canvas.
 // New Split and New Tab use an 18 DIP canvas at stroke 1.6: a window split a
