@@ -212,6 +212,7 @@ source_set("copied_url_toast") {
 
 source_set("settings_window") {
   sources = [
+    "app_activation.h",
     "settings_window.cc",
     "settings_window.h",
   ]
@@ -232,6 +233,7 @@ source_set("settings_window") {
   ]
   if (is_mac) {
     sources += [
+      "app_activation_mac.mm",
       "footer_tooltip_mac.mm",
       "settings_window_mac.mm",
     ]

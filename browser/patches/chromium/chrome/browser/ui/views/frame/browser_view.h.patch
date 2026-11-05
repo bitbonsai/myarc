@@ -1,5 +1,5 @@
 diff --git a/chrome/browser/ui/views/frame/browser_view.h b/chrome/browser/ui/views/frame/browser_view.h
-index 750e46c97b64dccccf4268e912df5dbdb6516b3c..6b7bc15deac01aa66d1fbdc1004998a1e6b123b3 100644
+index 750e46c97b64dccccf4268e912df5dbdb6516b3c..7a891ccbc096ff1fa8ee32a1e1ce45e0954dfce5 100644
 --- a/chrome/browser/ui/views/frame/browser_view.h
 +++ b/chrome/browser/ui/views/frame/browser_view.h
 @@ -8,11 +8,13 @@
@@ -24,7 +24,15 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..6b7bc15deac01aa66d1fbdc1004998a1
  #include "third_party/blink/public/common/permissions/permission_utils.h"
  #include "ui/base/accelerators/accelerator.h"
  #include "ui/base/identifier/typed_identifier.h"
-@@ -104,6 +107,15 @@ class TopControlsSlideControllerTest;
+@@ -89,6 +92,7 @@ class InfoBarContainerView;
+ class LocationBarView;
+ class MultiContentsView;
+ class OrganizerTrayView;
++class ScopedProfileKeepAlive;
+ class ScrimView;
+ class SidePanel;
+ class SidePanelAnimationContentView;
+@@ -104,6 +108,15 @@ class TopControlsSlideControllerTest;
  class VerticalTabStripRegionView;
  class WebAppFrameToolbarView;
  
@@ -40,7 +48,7 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..6b7bc15deac01aa66d1fbdc1004998a1
  namespace gfx {
  class AnimationRunner;
  }  // namespace gfx
-@@ -121,7 +133,11 @@ enum class Channel;
+@@ -121,7 +134,11 @@ enum class Channel;
  }
  
  namespace views {
@@ -52,7 +60,7 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..6b7bc15deac01aa66d1fbdc1004998a1
  class NativeViewHost;
  class WebView;
  }  // namespace views
-@@ -143,7 +159,8 @@ class BrowserView : public BrowserWindow,
+@@ -143,7 +160,8 @@ class BrowserView : public BrowserWindow,
                      public ImmersiveModeController::Observer,
                      public GlobalErrorObserver,
                      public views::FocusChangeListener,
@@ -62,7 +70,7 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..6b7bc15deac01aa66d1fbdc1004998a1
    METADATA_HEADER(BrowserView, views::ClientView)
  
   public:
-@@ -234,6 +251,8 @@ class BrowserView : public BrowserWindow,
+@@ -234,6 +252,8 @@ class BrowserView : public BrowserWindow,
    // Container for the tabstrip, toolbar, etc.
    TopContainerView* top_container() { return top_container_; }
  
@@ -71,7 +79,7 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..6b7bc15deac01aa66d1fbdc1004998a1
    std::optional<int> theme_background_y_offset() const {
      return theme_background_y_offset_;
    }
-@@ -311,6 +330,34 @@ class BrowserView : public BrowserWindow,
+@@ -311,6 +331,34 @@ class BrowserView : public BrowserWindow,
  
    ScrimView* window_scrim_view() { return window_scrim_view_; }
  
@@ -106,7 +114,7 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..6b7bc15deac01aa66d1fbdc1004998a1
    base::WeakPtr<BrowserView> GetAsWeakPtr() {
      return weak_ptr_factory_.GetWeakPtr();
    }
-@@ -1253,12 +1300,118 @@ class BrowserView : public BrowserWindow,
+@@ -1253,12 +1301,140 @@ class BrowserView : public BrowserWindow,
  
    // Anchor point for help bubbles and other dialogs that want to reliably
    // anchor outside the content area of the window.
@@ -130,14 +138,30 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..6b7bc15deac01aa66d1fbdc1004998a1
 +      const std::u16string& name,
 +      myarc::CreateSpacePanel::ProfileDoneCallback done) override;
 +  void CreateSpacePanelClosed() override;
-+  // Loads the Profile `profile_id` and creates the Space there once its
-+  // workspace has loaded, keeping this window. Returns why it can't start;
-+  // later failures show in this window's sidebar.
++  // Loads the Profile `profile_id`, creates the Space there once its
++  // workspace has loaded and swaps to it. Returns why it can't start; later
++  // failures show in this window's sidebar.
 +  std::u16string CreateMyarcSpaceInProfile(
 +      const std::string& profile_id,
 +      std::string name,
 +      const myarc::SpaceIconChoice& icon,
 +      const std::optional<myarc::SpaceTheme>& theme);
++  // Profile swap: shows `profile`'s window from this window's Profile window
++  // group at this window's frame, selects `space` there once its workspace
++  // is ready and orders this window out without closing it. Blocked in full
++  // screen.
++  void SwapToMyarcProfile(Profile& profile, uint64_t space);
++  void FinishMyarcProfileSwap(
++      base::WeakPtr<Profile> profile,
++      uint64_t space,
++      std::unique_ptr<ScopedProfileKeepAlive> keep_alive);
++  // Selects `space` now, or once this window's workspace is ready.
++  void SelectMyarcSpaceWhenReady(uint64_t space);
++  // --myarc-capture-profile-swap: creates Profile "work" with Space "Client",
++  // then swaps back and forth, logging every window at each step.
++  static void MyarcProfileSwapCaptureStep(int step);
++  static void MyarcProfileSwapCaptureAction(base::WeakPtr<BrowserView> view,
++                                            int step);
 +  void RenameSpace(uint64_t space) override;
 +  void MoveSpace(uint64_t space, uint64_t before) override;
 +  void NewTab() override;
@@ -203,6 +227,12 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..6b7bc15deac01aa66d1fbdc1004998a1
 +  bool myarc_capture_tooltip_scheduled_ = false;
 +  // --myarc-capture-downloads-stack shows the downloads stack once per window.
 +  bool myarc_capture_stack_scheduled_ = false;
++  // Profile window group: the window slot this window fills. Each Profile
++  // shown in the slot has its own Browser, and one of them is visible.
++  static int NextMyarcWindowGroup();
++  int myarc_window_group_ = NextMyarcWindowGroup();
++  // Space to select once the workspace is ready, or 0.
++  uint64_t myarc_pending_space_ = 0;
 +  // File icon loads for the downloads stack, started from a const lookup.
 +  mutable base::CancelableTaskTracker myarc_download_icon_tracker_;
 +  // File icons already requested, so a failed load isn't retried.
@@ -225,7 +255,7 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..6b7bc15deac01aa66d1fbdc1004998a1
  
    // A mapping between accelerators and command IDs.
    std::map<ui::Accelerator, int> accelerator_table_;
-@@ -1411,6 +1564,7 @@ class BrowserView : public BrowserWindow,
+@@ -1411,6 +1587,7 @@ class BrowserView : public BrowserWindow,
    base::EnumSet<TabStripAndWebAppViewsReparentedState>
        tab_strip_web_apps_reparented_state_;
  

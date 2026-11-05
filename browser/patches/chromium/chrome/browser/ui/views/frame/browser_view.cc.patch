@@ -1,5 +1,5 @@
 diff --git a/chrome/browser/ui/views/frame/browser_view.cc b/chrome/browser/ui/views/frame/browser_view.cc
-index 7b568f6de760af21d6e9d2aa44415a7cef617c51..97533b83b51cd30e0a6acbfbfe13de4995731a64 100644
+index 7b568f6de760af21d6e9d2aa44415a7cef617c51..9074c3f1c8173d80b30ff26107bb8210182d5193 100644
 --- a/chrome/browser/ui/views/frame/browser_view.cc
 +++ b/chrome/browser/ui/views/frame/browser_view.cc
 @@ -22,6 +22,7 @@
@@ -10,7 +10,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..97533b83b51cd30e0a6acbfbfe13de49
  #include "base/i18n/rtl.h"
  #include "base/location.h"
  #include "base/memory/raw_ptr.h"
-@@ -31,33 +32,48 @@
+@@ -31,33 +32,50 @@
  #include "base/metrics/histogram_macros.h"
  #include "base/metrics/user_metrics.h"
  #include "base/notreached.h"
@@ -52,6 +52,8 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..97533b83b51cd30e0a6acbfbfe13de49
 +#include "chrome/browser/icon_loader.h"
 +#include "chrome/browser/icon_manager.h"
  #include "chrome/browser/platform_util.h"
++#include "chrome/browser/profiles/keep_alive/profile_keep_alive_types.h"
++#include "chrome/browser/profiles/keep_alive/scoped_profile_keep_alive.h"
 +#include "chrome/browser/profiles/nuke_profile_directory_utils.h"
  #include "chrome/browser/profiles/profile.h"
  #include "chrome/browser/profiles/profile_attributes_entry.h"
@@ -59,15 +61,21 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..97533b83b51cd30e0a6acbfbfe13de49
  #include "chrome/browser/profiles/profile_avatar_icon_util.h"
  #include "chrome/browser/profiles/profile_manager.h"
  #include "chrome/browser/profiles/profile_window.h"
-@@ -83,6 +99,7 @@
- #include "chrome/browser/ui/browser_active_state_manager/browser_active_state_manager.h"
- #include "chrome/browser/ui/browser_command_controller.h"
- #include "chrome/browser/ui/browser_commands.h"
-+#include "chrome/browser/ui/chrome_pages.h"
- #include "chrome/browser/ui/browser_element_identifiers.h"
- #include "chrome/browser/ui/browser_init_state.h"
+@@ -88,11 +106,13 @@
  #include "chrome/browser/ui/browser_tabstrip.h"
-@@ -152,6 +169,7 @@
+ #include "chrome/browser/ui/browser_window/public/browser_window_features.h"
+ #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
++#include "chrome/browser/ui/browser_window/public/browser_window_interface_iterator.h"
+ #include "chrome/browser/ui/browser_window/public/create_browser_window.h"
+ #include "chrome/browser/ui/browser_window/public/desktop_browser_window_capabilities.h"
+ #include "chrome/browser/ui/browser_window/public/global_browser_collection.h"
+ #include "chrome/browser/ui/browser_window_state.h"
+ #include "chrome/browser/ui/browser_window_theme_observer.h"
++#include "chrome/browser/ui/chrome_pages.h"
+ #include "chrome/browser/ui/color/chrome_color_id.h"
+ #include "chrome/browser/ui/dialogs/browser_dialogs.h"
+ #include "chrome/browser/ui/exclusive_access/exclusive_access_bubble_type.h"
+@@ -152,6 +172,7 @@
  #include "chrome/browser/ui/views/bookmarks/bookmark_page_action_controller.h"
  #include "chrome/browser/ui/views/bubble_anchor_util_views.h"
  #include "chrome/browser/ui/views/color_provider_browser_helper.h"
@@ -75,7 +83,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..97533b83b51cd30e0a6acbfbfe13de49
  #include "chrome/browser/ui/views/download/download_in_progress_dialog_view.h"
  #include "chrome/browser/ui/views/exclusive_access/exclusive_access_bubble_views.h"
  #include "chrome/browser/ui/views/exclusive_access/exclusive_access_bubble_views_context.h"
-@@ -233,7 +251,9 @@
+@@ -233,7 +254,9 @@
  #include "chrome/browser/ui/views/toolbar/browser_app_menu_button.h"
  #include "chrome/browser/ui/views/toolbar/chrome_labs/chrome_labs_coordinator.h"
  #include "chrome/browser/ui/views/toolbar/pinned_toolbar_actions_container.h"
@@ -85,7 +93,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..97533b83b51cd30e0a6acbfbfe13de49
  #include "chrome/browser/ui/views/toolbar/toolbar_view.h"
  #include "chrome/browser/ui/views/translate/translate_bubble_controller.h"
  #include "chrome/browser/ui/views/translate/translate_bubble_view.h"
-@@ -259,7 +279,11 @@
+@@ -259,7 +282,11 @@
  #include "chrome/grit/theme_resources.h"
  #include "components/autofill/core/common/autofill_payments_features.h"
  #include "components/collaboration/public/messaging/message.h"
@@ -97,7 +105,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..97533b83b51cd30e0a6acbfbfe13de49
  #include "components/feature_engagement/public/event_constants.h"
  #include "components/feature_engagement/public/feature_constants.h"
  #include "components/feature_engagement/public/tracker.h"
-@@ -267,6 +291,12 @@
+@@ -267,6 +294,12 @@
  #include "components/javascript_dialogs/app_modal_dialog_controller.h"
  #include "components/javascript_dialogs/app_modal_dialog_queue.h"
  #include "components/javascript_dialogs/app_modal_dialog_view.h"
@@ -110,7 +118,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..97533b83b51cd30e0a6acbfbfe13de49
  #include "components/performance_manager/public/features.h"
  #include "components/permissions/permission_request_manager.h"
  #include "components/prefs/pref_service.h"
-@@ -285,12 +315,14 @@
+@@ -285,12 +318,14 @@
  #include "components/tabs/public/tab_interface.h"
  #include "components/translate/core/browser/language_state.h"
  #include "components/translate/core/browser/translate_manager.h"
@@ -125,10 +133,11 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..97533b83b51cd30e0a6acbfbfe13de49
  #include "components/version_info/channel.h"
  #include "components/web_modal/web_contents_modal_dialog_manager.h"
  #include "content/public/browser/browser_accessibility_state.h"
-@@ -311,6 +343,14 @@
+@@ -311,6 +346,15 @@
  #include "content/public/common/drop_data.h"
  #include "extensions/common/command.h"
  #include "media/capture/capture_switches.h"
++#include "myarc/app_activation.h"
 +#include "myarc/browser_workspace_adapter.h"
 +#include "myarc/copied_url_toast.h"
 +#include "myarc/library_logic.h"
@@ -140,7 +149,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..97533b83b51cd30e0a6acbfbfe13de49
  #include "third_party/blink/public/common/features.h"
  #include "third_party/blink/public/common/permissions/permission_utils.h"
  #include "ui/accessibility/ax_enums.mojom-shared.h"
-@@ -324,6 +364,7 @@
+@@ -324,6 +368,7 @@
  #include "ui/base/l10n/l10n_util.h"
  #include "ui/base/metadata/metadata_header_macros.h"
  #include "ui/base/metadata/metadata_impl_macros.h"
@@ -148,7 +157,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..97533b83b51cd30e0a6acbfbfe13de49
  #include "ui/base/models/image_model.h"
  #include "ui/base/mojom/window_show_state.mojom.h"
  #include "ui/base/resource/resource_bundle.h"
-@@ -335,11 +376,14 @@
+@@ -335,11 +380,14 @@
  #include "ui/color/color_id.h"
  #include "ui/compositor/debug_utils.h"
  #include "ui/compositor/layer.h"
@@ -163,7 +172,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..97533b83b51cd30e0a6acbfbfe13de49
  #include "ui/gfx/animation/animation_runner.h"
  #include "ui/gfx/canvas.h"
  #include "ui/gfx/color_utils.h"
-@@ -353,12 +397,22 @@
+@@ -353,12 +401,22 @@
  #include "ui/views/accessibility/view_accessibility.h"
  #include "ui/views/accessibility/view_accessibility_utils.h"
  #include "ui/views/animation/compositor_animation_runner.h"
@@ -186,7 +195,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..97533b83b51cd30e0a6acbfbfe13de49
  #include "ui/views/layout/fill_layout.h"
  #include "ui/views/view.h"
  #include "ui/views/view_class_properties.h"
-@@ -370,6 +424,7 @@
+@@ -370,6 +428,7 @@
  #include "ui/views/widget/widget.h"
  #include "ui/views/window/dialog_delegate.h"
  #include "ui/views/window/hit_test_utils.h"
@@ -194,7 +203,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..97533b83b51cd30e0a6acbfbfe13de49
  
  #if BUILDFLAG(IS_CHROMEOS)
  #include "ash/constants/ash_switches.h"
-@@ -659,6 +714,727 @@ bool ConvertedHitTest(views::View* src, views::View* dst, gfx::Point* point) {
+@@ -659,6 +718,730 @@ bool ConvertedHitTest(views::View* src, views::View* dst, gfx::Point* point) {
    return dst->HitTestPoint(*point);
  }
  
@@ -218,6 +227,9 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..97533b83b51cd30e0a6acbfbfe13de49
 +constexpr char kMyarcCaptureFooterTooltip[] = "myarc-capture-footer-tooltip";
 +// Shows the downloads stack above the Library button once and keeps it up.
 +constexpr char kMyarcCaptureDownloadsStack[] = "myarc-capture-downloads-stack";
++// Creates Profile "work" with Space "Client", then swaps between the Profiles'
++// windows, logging every window at each step.
++constexpr char kMyarcCaptureProfileSwap[] = "myarc-capture-profile-swap";
 +
 +// Arc's large shadow makes the Mac bubble window much bigger than the visible
 +// palette, and BubbleCloser ignores clicks inside the bubble window. Presses
@@ -922,7 +934,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..97533b83b51cd30e0a6acbfbfe13de49
  }  // namespace
  
  // Implements the exclusive access context and bubble context.
-@@ -893,6 +1669,43 @@ class BrowserView::PipExclusionObserverImpl
+@@ -893,6 +1676,43 @@ class BrowserView::PipExclusionObserverImpl
  };
  #endif
  
@@ -966,7 +978,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..97533b83b51cd30e0a6acbfbfe13de49
  ///////////////////////////////////////////////////////////////////////////////
  // BrowserView, public:
  
-@@ -1124,6 +1937,22 @@ BrowserView::~BrowserView() {
+@@ -1124,6 +1944,22 @@ BrowserView::~BrowserView() {
    // other cleanups that destroy views referenced in the layout manager.
    SetLayoutManager(nullptr);
  
@@ -989,7 +1001,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..97533b83b51cd30e0a6acbfbfe13de49
    tab_search_bubble_host_.reset();
  
    global_error_observation_.Reset();
-@@ -1168,6 +1997,7 @@ BrowserView::~BrowserView() {
+@@ -1168,6 +2004,7 @@ BrowserView::~BrowserView() {
    vertical_tab_strip_bottom_corner_ = nullptr;
    organizer_tray_ = nullptr;
    side_panel_ = nullptr;
@@ -997,7 +1009,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..97533b83b51cd30e0a6acbfbfe13de49
  
  #if BUILDFLAG(IS_MAC)
    tab_overlay_view_ = nullptr;
-@@ -1624,6 +2454,7 @@ void BrowserView::OnVerticalTabStripModeChanged(
+@@ -1624,6 +2461,7 @@ void BrowserView::OnVerticalTabStripModeChanged(
      horizontal_tab_strip_region_view_->InitializeTabStrip();
    }
  
@@ -1005,7 +1017,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..97533b83b51cd30e0a6acbfbfe13de49
    GetFrameView()->OnTabStripStateChanged();
  
    UpdateTabSearchBubbleHost();
-@@ -1681,6 +2512,174 @@ void BrowserView::Show() {
+@@ -1681,6 +2519,183 @@ void BrowserView::Show() {
  
    OnWindowDidShow();
  
@@ -1176,11 +1188,20 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..97533b83b51cd30e0a6acbfbfe13de49
 +            weak_ptr_factory_.GetWeakPtr()),
 +        base::Milliseconds(2000));
 +  }
++  static bool myarc_capture_swap_scheduled = false;
++  if (!myarc_capture_swap_scheduled &&
++      base::CommandLine::ForCurrentProcess()->HasSwitch(
++          kMyarcCaptureProfileSwap)) {
++    myarc_capture_swap_scheduled = true;
++    base::SingleThreadTaskRunner::GetCurrentDefault()->PostDelayedTask(
++        FROM_HERE, base::BindOnce(&BrowserView::MyarcProfileSwapCaptureStep, 0),
++        base::Milliseconds(3000));
++  }
 +
    // The fullscreen transition clears out focus, but there are some cases (for
    // example, new window in Mac fullscreen with toolbar showing) where we need
    // restore it.
-@@ -1992,6 +2991,15 @@ void BrowserView::OnActiveTabChanged(content::WebContents* old_contents,
+@@ -1992,6 +3007,15 @@ void BrowserView::OnActiveTabChanged(content::WebContents* old_contents,
                                       int index,
                                       int reason) {
    CHECK(new_contents, base::NotFatalUntil::M162);
@@ -1196,7 +1217,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..97533b83b51cd30e0a6acbfbfe13de49
    TRACE_EVENT0("ui", "BrowserView::OnActiveTabChanged");
    views::WebView* active_contents_view = GetActiveContentsWebView();
    bool tab_change_in_split_view =
-@@ -2014,6 +3022,47 @@ void BrowserView::OnActiveTabChanged(content::WebContents* old_contents,
+@@ -2014,6 +3038,47 @@ void BrowserView::OnActiveTabChanged(content::WebContents* old_contents,
        active_contents_view->web_contents() != new_contents &&
        !tab_change_in_split_view;
  
@@ -1244,7 +1265,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..97533b83b51cd30e0a6acbfbfe13de49
    bool will_restore_focus = !browser_->GetTabStripModel()->closing_all() &&
                              GetWidget()->IsVisible() &&
                              !tab_change_in_split_view;
-@@ -2139,6 +3188,23 @@ void BrowserView::OnActiveTabChanged(content::WebContents* old_contents,
+@@ -2139,6 +3204,23 @@ void BrowserView::OnActiveTabChanged(content::WebContents* old_contents,
    UpdateTitleBar();
  
    CHECK_DEREF(TranslateBubbleController::From(browser_.get())).CloseBubble();
@@ -1268,7 +1289,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..97533b83b51cd30e0a6acbfbfe13de49
  }
  
  void BrowserView::OnTabDetached(content::WebContents* contents,
-@@ -2258,6 +3324,20 @@ bool BrowserView::IsFullscreen() const {
+@@ -2258,6 +3340,20 @@ bool BrowserView::IsFullscreen() const {
  }
  
  void BrowserView::RestoreFocus() {
@@ -1289,7 +1310,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..97533b83b51cd30e0a6acbfbfe13de49
    WebContents* selected_web_contents = GetActiveWebContents();
    if (selected_web_contents) {
      selected_web_contents->RestoreFocus();
-@@ -2363,6 +3443,13 @@ PinnedToolbarActions* BrowserView::GetPinnedToolbarActions() {
+@@ -2363,6 +3459,13 @@ PinnedToolbarActions* BrowserView::GetPinnedToolbarActions() {
  }
  
  void BrowserView::SetFocusToLocationBar(bool is_user_initiated) {
@@ -1303,7 +1324,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..97533b83b51cd30e0a6acbfbfe13de49
    // On Windows, changing focus to the location bar causes the browser window to
    // become active. This can steal focus if the user has another window open
    // already. On Chrome OS, changing focus makes a view believe it has a focus
-@@ -2383,16 +3470,25 @@ void BrowserView::SetFocusToLocationBar(bool is_user_initiated) {
+@@ -2383,16 +3486,25 @@ void BrowserView::SetFocusToLocationBar(bool is_user_initiated) {
  }
  
  void BrowserView::UpdateReloadStopState(bool is_loading, bool force) {
@@ -1329,7 +1350,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..97533b83b51cd30e0a6acbfbfe13de49
    // We may end up here during destruction.
    if (toolbar_) {
      toolbar_->Update(contents);
-@@ -2404,6 +3500,9 @@ void BrowserView::UpdateToolbar(content::WebContents* contents) {
+@@ -2404,6 +3516,9 @@ void BrowserView::UpdateToolbar(content::WebContents* contents) {
  }
  
  bool BrowserView::UpdateToolbarSecurityState() {
@@ -1339,7 +1360,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..97533b83b51cd30e0a6acbfbfe13de49
    // We may end up here during destruction.
    if (toolbar_) {
      return toolbar_->UpdateSecurityState();
-@@ -3414,7 +4513,7 @@ void BrowserView::CutCopyPaste(int command_id) {
+@@ -3414,7 +4529,7 @@ void BrowserView::CutCopyPaste(int command_id) {
    // key events (and not accelerators) to the WebContents so it can give the web
    // page a chance to override them.
    WebContents* contents = browser_->GetTabStripModel()->GetActiveWebContents();
@@ -1348,7 +1369,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..97533b83b51cd30e0a6acbfbfe13de49
      void (WebContents::*method)();
      if (command_id == IDC_CUT) {
        method = &content::WebContents::Cut;
-@@ -3483,6 +4582,10 @@ LocationBarView* BrowserView::GetLocationBarView() const {
+@@ -3483,6 +4598,10 @@ LocationBarView* BrowserView::GetLocationBarView() const {
  // BrowserView, TabStripModelObserver implementation:
  
  void BrowserView::OnSplitTabChanged(const SplitTabChange& change) {
@@ -1359,7 +1380,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..97533b83b51cd30e0a6acbfbfe13de49
    switch (change.type) {
      case SplitTabChange::Type::kAdded: {
        const tabs::TabInterface* active_tab =
-@@ -3690,6 +4793,9 @@ bool BrowserView::CanActivate() const {
+@@ -3690,6 +4809,9 @@ bool BrowserView::CanActivate() const {
  }
  
  std::u16string BrowserView::GetWindowTitle() const {
@@ -1369,7 +1390,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..97533b83b51cd30e0a6acbfbfe13de49
    std::u16string title =
        WindowMetadataController::From(browser_.get())
            ->GetWindowTitleForCurrentTab(true /* include_app_name */);
-@@ -3710,6 +4816,9 @@ std::u16string BrowserView::GetWindowTitle() const {
+@@ -3710,6 +4832,9 @@ std::u16string BrowserView::GetWindowTitle() const {
  }
  
  std::u16string BrowserView::GetAccessibleWindowTitle() const {
@@ -1379,7 +1400,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..97533b83b51cd30e0a6acbfbfe13de49
    // If there is a focused and visible tab-modal dialog, report the dialog's
    // title instead of the page title.
    views::Widget* tab_modal =
-@@ -3947,7 +5056,10 @@ bool BrowserView::CanChangeWindowIcon() const {
+@@ -3947,7 +5072,10 @@ bool BrowserView::CanChangeWindowIcon() const {
  }
  
  views::View* BrowserView::GetInitiallyFocusedView() {
@@ -1391,7 +1412,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..97533b83b51cd30e0a6acbfbfe13de49
  }
  
  bool BrowserView::ShouldShowWindowTitle() const {
-@@ -3971,6 +5083,9 @@ ui::ImageModel BrowserView::GetWindowAppIcon() {
+@@ -3971,6 +5099,9 @@ ui::ImageModel BrowserView::GetWindowAppIcon() {
  }
  
  ui::ImageModel BrowserView::GetWindowIcon() {
@@ -1401,7 +1422,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..97533b83b51cd30e0a6acbfbfe13de49
    // Use the default icon for devtools.
    if (browser_->GetType() == BrowserWindowInterface::Type::TYPE_DEVTOOLS) {
      return ui::ImageModel();
-@@ -4336,6 +5451,10 @@ void BrowserView::UpdateTabSearchBubbleHost() {
+@@ -4336,6 +5467,10 @@ void BrowserView::UpdateTabSearchBubbleHost() {
  }
  
  void BrowserView::ShowSplitView(bool focus_active_view) {
@@ -1412,7 +1433,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..97533b83b51cd30e0a6acbfbfe13de49
    const int active_index = browser_->GetTabStripModel()->active_index();
  
    std::optional<split_tabs::SplitTabId> split_tab_id =
-@@ -4954,6 +6073,9 @@ void BrowserView::Layout(PassKey) {
+@@ -4954,6 +6089,9 @@ void BrowserView::Layout(PassKey) {
      if (fallback_popup_anchor_) {
        fallback_popup_anchor_->MaybeUpdateAnchor(rect);
      }
@@ -1422,13 +1443,18 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..97533b83b51cd30e0a6acbfbfe13de49
  
      if (dialog_anchor_) {
        rect.Offset(0, -kAdditionalDialogToolbarOverlap);
-@@ -5197,6 +6319,153 @@ void BrowserView::AddedToWidget() {
+@@ -5197,19 +6335,166 @@ void BrowserView::AddedToWidget() {
        kFallbackPopupAnchorElementId, *this);
  
    initialized_ = true;
 +  UpdateMyarcTabStripMode();
-+}
-+
+ }
+ 
+-void BrowserView::RemovedFromWidget() {
+-  CHECK(GetFocusManager());
+-#if BUILDFLAG(IS_WIN)
+-  pip_exclusion_observer_.reset();
+-#endif
 +void BrowserView::UpdateMyarcTabStripMode() {
 +  // Mode notifications can precede toolbar/widget initialization. Startup
 +  // calls this again once layout and native dialog anchors are ready.
@@ -1496,7 +1522,8 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..97533b83b51cd30e0a6acbfbfe13de49
 +                         myarc_workspace_weak_factory_.GetWeakPtr(), vertical));
 +    }
 +  }
-+
+ 
+-  focus_manager_observation_.Reset();
 +  // Native restore delivers identity hints before returning the new window.
 +  // Consume them even when this window starts with horizontal presentation.
 +  if (!myarc_workspace_adapter_ &&
@@ -1540,8 +1567,10 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..97533b83b51cd30e0a6acbfbfe13de49
 +    RefreshMyarcWorkspaceSidebar();
 +    LoadMyarcDownloadHistory();
 +  }
-+}
-+
+ }
+ 
+-void BrowserView::PaintChildren(const views::PaintInfo& paint_info) {
+-  if (GetWidget()) {
 +void BrowserView::LoadMyarcDownloadHistory() {
 +  Profile* profile = browser_->GetProfile();
 +  content::DownloadManager* manager = profile->GetDownloadManager();
@@ -1573,10 +1602,23 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..97533b83b51cd30e0a6acbfbfe13de49
 +            }
 +          },
 +          base::Unretained(this)));
- }
- 
- void BrowserView::RemovedFromWidget() {
-@@ -5267,6 +6536,1245 @@ const views::View* BrowserView::GetViewByElementId(
++}
++
++void BrowserView::RemovedFromWidget() {
++  CHECK(GetFocusManager());
++#if BUILDFLAG(IS_WIN)
++  pip_exclusion_observer_.reset();
++#endif
++
++  focus_manager_observation_.Reset();
++}
++
++void BrowserView::PaintChildren(const views::PaintInfo& paint_info) {
++  if (GetWidget()) {
+     GetWidget()->GetCompositor()->RequestSuccessfulPresentationTimeForNextFrame(
+         base::BindOnce(&BrowserView::OnFirstPresentation,
+                        weak_ptr_factory_.GetWeakPtr()));
+@@ -5267,6 +6552,1513 @@ const views::View* BrowserView::GetViewByElementId(
  ///////////////////////////////////////////////////////////////////////////////
  // BrowserView, ui::AcceleratorTarget overrides:
  
@@ -1894,6 +1936,13 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..97533b83b51cd30e0a6acbfbfe13de49
 +  if (!myarc_workspace_adapter_) {
 +    return;
 +  }
++  if (myarc_pending_space_ && myarc_workspace_adapter_->ready()) {
++    // Posted, since this may run inside the adapter's own notification.
++    base::SingleThreadTaskRunner::GetCurrentDefault()->PostTask(
++        FROM_HERE, base::BindOnce(&BrowserView::SelectSpace,
++                                  myarc_workspace_weak_factory_.GetWeakPtr(),
++                                  std::exchange(myarc_pending_space_, 0)));
++  }
 +  if (!myarc_workspace_sidebar_ || !vertical_tab_strip_region_view_) {
 +    UpdateMyarcWorkspaceCanvas();
 +    return;
@@ -2104,10 +2153,268 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..97533b83b51cd30e0a6acbfbfe13de49
 +  MyarcWorkspaceResult(myarc_workspace_adapter_->SelectSpace(space));
 +}
 +
++namespace {
++
++constexpr char kMyarcSwapFullscreenError[] =
++    "Exit full screen to switch Profiles.";
++
++myarc::foundation::MutationResult MyarcSwapError(std::string error) {
++  return {false, 0, rust::String(error)};
++}
++
++}  // namespace
++
 +void BrowserView::SwitchToSpaceInProfile(const std::string& profile_dir,
 +                                         uint64_t space_id) {
-+  // The window swap comes next.
-+  DLOG(INFO) << "SwitchToSpaceInProfile " << profile_dir << " " << space_id;
++  if (IsFullscreen()) {
++    MyarcWorkspaceResult(MyarcSwapError(kMyarcSwapFullscreenError));
++    return;
++  }
++  if (GetProfile()->IsOffTheRecord() || GetProfile()->IsGuestSession()) {
++    MyarcWorkspaceResult(
++        MyarcSwapError("This window can't switch to another Profile."));
++    return;
++  }
++  if (profile_dir == GetProfile()->GetBaseName().AsUTF8Unsafe()) {
++    SelectSpace(space_id);
++    return;
++  }
++  // The footer listed it, but it may have been deleted since.
++  const base::FilePath path = MyarcProfilePath(profile_dir);
++  if (path.empty()) {
++    MyarcWorkspaceResult(MyarcSwapError("That Profile no longer exists."));
++    return;
++  }
++  profiles::LoadProfileAsync(
++      path, base::BindOnce(
++                [](base::WeakPtr<BrowserView> view, uint64_t space,
++                   Profile* profile) {
++                  if (!view) {
++                    return;
++                  }
++                  if (!profile ||
++                      MyarcProfilePath(profile->GetBaseName().AsUTF8Unsafe())
++                          .empty()) {
++                    view->MyarcWorkspaceResult(
++                        MyarcSwapError("Couldn't open that Profile."));
++                    return;
++                  }
++                  view->SwapToMyarcProfile(*profile, space);
++                },
++                myarc_workspace_weak_factory_.GetWeakPtr(), space_id));
++}
++
++void BrowserView::SwapToMyarcProfile(Profile& profile, uint64_t space) {
++  // kSessionRestore is the closest origin: a browser window opens soon.
++  auto keep_alive = ScopedProfileKeepAlive::TryAcquire(
++      &profile, ProfileKeepAliveOrigin::kSessionRestore);
++  if (!keep_alive) {
++    MyarcWorkspaceResult(MyarcSwapError("That Profile is being deleted."));
++    return;
++  }
++  // Waits once if the Profile's workspace is still loading. Posted, so the
++  // swap never runs inside the pressed footer button's callback.
++  myarc::WorkspaceService::ForProfile(profile).WhenLoaded(base::BindOnce(
++      [](base::WeakPtr<BrowserView> view, base::WeakPtr<Profile> profile,
++         uint64_t space, std::unique_ptr<ScopedProfileKeepAlive> keep_alive) {
++        base::SingleThreadTaskRunner::GetCurrentDefault()->PostTask(
++            FROM_HERE,
++            base::BindOnce(&BrowserView::FinishMyarcProfileSwap, view, profile,
++                           space, std::move(keep_alive)));
++      },
++      myarc_workspace_weak_factory_.GetWeakPtr(), profile.GetWeakPtr(), space,
++      std::move(keep_alive)));
++}
++
++void BrowserView::FinishMyarcProfileSwap(
++    base::WeakPtr<Profile> profile,
++    uint64_t space,
++    std::unique_ptr<ScopedProfileKeepAlive> keep_alive) {
++  if (!profile) {
++    MyarcWorkspaceResult(
++        MyarcSwapError("The Profile closed before the switch."));
++    return;
++  }
++  // Full screen may have started while the Profile loaded.
++  if (IsFullscreen()) {
++    MyarcWorkspaceResult(MyarcSwapError(kMyarcSwapFullscreenError));
++    return;
++  }
++  if (!IsVisible() || GetWidget()->IsClosed()) {
++    return;
++  }
++  BrowserView* target = nullptr;
++  for (BrowserWindowInterface* browser : GetAllBrowserWindowInterfaces()) {
++    BrowserView* view = GetBrowserViewForBrowser(browser);
++    if (view && view != this && view->browser_->GetProfile() == profile.get() &&
++        view->myarc_window_group_ == myarc_window_group_ &&
++        !view->GetWidget()->IsClosed()) {
++      target = view;
++      break;
++    }
++  }
++  const gfx::Rect bounds = GetRestoredBounds();
++  const bool maximized = IsMaximized();
++  if (!target) {
++    if (GetBrowserWindowCreationStatusForProfile(*profile) !=
++        BrowserWindowInterface::CreationStatus::kOk) {
++      MyarcWorkspaceResult(
++          MyarcSwapError("Couldn't open a window for that Profile."));
++      return;
++    }
++    BrowserWindowCreateParams params(*profile, /*from_user_gesture=*/true);
++    params.initial_bounds = bounds;
++    params.initial_show_state = maximized
++                                    ? ui::mojom::WindowShowState::kMaximized
++                                    : ui::mojom::WindowShowState::kNormal;
++    // The workspace decides what the window shows, without a first-run tab
++    // or that Profile's startup pages.
++    params.should_trigger_session_restore = false;
++    BrowserWindowInterface* browser = ::CreateBrowserWindow(std::move(params));
++    target = browser ? GetBrowserViewForBrowser(browser) : nullptr;
++    if (!target) {
++      MyarcWorkspaceResult(
++          MyarcSwapError("Couldn't open a window for that Profile."));
++      return;
++    }
++    target->myarc_window_group_ = myarc_window_group_;
++    myarc::WorkspaceLifecycle::Notify(
++        profile.get(), myarc::WorkspaceLifecycle::Event::kNativeReady);
++  } else if (maximized) {
++    target->SetBounds(bounds);
++    target->Maximize();
++  } else {
++    if (target->IsMaximized()) {
++      target->Restore();
++    }
++    target->SetBounds(bounds);
++  }
++  target->SelectMyarcSpaceWhenReady(space);
++  // Keep focus where the user has it: a background window swaps without
++  // bringing the app forward.
++  if (IsActive() && myarc::IsAppActive()) {
++    target->Show();
++  } else {
++    target->ShowInactive();
++  }
++  // Ordered out, not closed: its tabs and state stay for the swap back.
++  Hide();
++}
++
++// static
++int BrowserView::NextMyarcWindowGroup() {
++  static int next = 0;
++  return ++next;
++}
++
++void BrowserView::SelectMyarcSpaceWhenReady(uint64_t space) {
++  if (!myarc_workspace_adapter_) {
++    return;
++  }
++  if (myarc_workspace_adapter_->ready()) {
++    myarc_pending_space_ = 0;
++    SelectSpace(space);
++    return;
++  }
++  // RefreshMyarcWorkspaceSidebar selects it once the adapter is ready.
++  myarc_pending_space_ = space;
++}
++
++// static
++void BrowserView::MyarcProfileSwapCaptureStep(int step) {
++  BrowserView* shown = nullptr;
++  std::string state;
++  for (BrowserWindowInterface* browser : GetAllBrowserWindowInterfaces()) {
++    BrowserView* view = GetBrowserViewForBrowser(browser);
++    if (!view || !view->myarc_workspace_adapter_) {
++      continue;
++    }
++    state += base::StringPrintf(
++        " [%s group=%d visible=%d active=%d frame=%s tabs=",
++        browser->GetProfile()->GetBaseName().AsUTF8Unsafe().c_str(),
++        view->myarc_window_group_, view->IsVisible(), view->IsActive(),
++        view->GetBounds().ToString().c_str());
++    TabStripModel* tabs = browser->GetTabStripModel();
++    for (int i = 0; i < tabs->count(); ++i) {
++      state += base::UTF16ToUTF8(tabs->GetWebContentsAt(i)->GetTitle()) + ";";
++    }
++    state += "]";
++    if (view->IsVisible()) {
++      shown = view;
++    }
++  }
++  LOG(WARNING) << "myarc-swap step " << step << state;
++  if (!shown || step > 3) {
++    return;
++  }
++  // Acts 2 seconds after logging, so a capture sees the logged state.
++  base::SingleThreadTaskRunner::GetCurrentDefault()->PostDelayedTask(
++      FROM_HERE,
++      base::BindOnce(&BrowserView::MyarcProfileSwapCaptureAction,
++                     shown->myarc_workspace_weak_factory_.GetWeakPtr(), step),
++      base::Milliseconds(2000));
++  base::SingleThreadTaskRunner::GetCurrentDefault()->PostDelayedTask(
++      FROM_HERE,
++      base::BindOnce(&BrowserView::MyarcProfileSwapCaptureStep, step + 1),
++      base::Milliseconds(7000));
++}
++
++// static
++void BrowserView::MyarcProfileSwapCaptureAction(base::WeakPtr<BrowserView> view,
++                                                int step) {
++  if (!view) {
++    return;
++  }
++  BrowserView* shown = view.get();
++  // The footer button calls SwitchToSpaceInProfile with its entry.
++  const auto press_footer = [](BrowserView& view, auto matches) {
++    for (const auto& entry : MyarcOtherSpaces(*view.GetProfile())) {
++      if (matches(entry)) {
++        view.SwitchToSpaceInProfile(entry.profile_dir, entry.space_id);
++        return;
++      }
++    }
++    LOG(WARNING) << "myarc-swap no footer entry";
++  };
++  switch (step) {
++    case 0:
++      // Creating Space "Client" in new Profile "work" swaps to it.
++      shown->CreateProfile(
++          u"work",
++          base::BindOnce(
++              [](base::WeakPtr<BrowserView> view, const std::u16string& error) {
++                if (!view || !error.empty()) {
++                  LOG(WARNING) << "myarc-swap create failed " << error;
++                  return;
++                }
++                for (const auto& choice : MyarcProfileChoices()) {
++                  if (choice.name == u"work") {
++                    LOG(WARNING) << "myarc-swap created " << choice.id << " "
++                                 << view->CreateNamedSpace(
++                                        u"Client", {}, std::nullopt, choice.id);
++                  }
++                }
++              },
++              shown->myarc_workspace_weak_factory_.GetWeakPtr()));
++      break;
++    case 1:
++      // A page only work's window has, to tell the windows' tabs apart.
++      chrome::AddTabAt(shown->browser(),
++                       GURL("data:text/html,<title>work tab</title>work"), -1,
++                       true);
++      break;
++    case 2:
++      press_footer(*shown, [](const auto& entry) {
++        return entry.profile_dir == "Default";
++      });
++      break;
++    case 3:
++      press_footer(*shown,
++                   [](const auto& entry) { return entry.name == u"Client"; });
++      break;
++    default:
++      break;
++  }
 +}
 +
 +void BrowserView::CreateSpace() {
@@ -2291,7 +2598,10 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..97533b83b51cd30e0a6acbfbfe13de49
 +                                 std::string(result.error));
 +                      } else if (view) {
 +                        // The Spaces index tells every window's footer.
++                        const uint64_t created = result.id;
 +                        view->MyarcWorkspaceResult(std::move(result));
++                        // Arc shows a new Space right away, in its Profile.
++                        view->SwapToMyarcProfile(*profile, created);
 +                      }
 +                    },
 +                    view, fail, profile->GetWeakPtr(), std::move(name), kind,
@@ -2822,7 +3132,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..97533b83b51cd30e0a6acbfbfe13de49
  bool BrowserView::AcceleratorPressed(const ui::Accelerator& accelerator) {
  #if BUILDFLAG(IS_MAC)
    // Forward accelerators to ExclusiveAccessManager to handle Esc press-and-hold
-@@ -5342,7 +7850,8 @@ void BrowserView::LoadingAnimationCallback(base::TimeTicks timestamp) {
+@@ -5342,7 +8134,8 @@ void BrowserView::LoadingAnimationCallback(base::TimeTicks timestamp) {
      // GetActiveWebContents can return null for example under Purify when
      // the animations are running slowly and this function is called on a timer
      // through LoadingAnimationCallback.
@@ -2832,7 +3142,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..97533b83b51cd30e0a6acbfbfe13de49
    }
  }
  
-@@ -5471,6 +7980,10 @@ bool BrowserView::MaybeUpdateDevtools(content::WebContents* contents) {
+@@ -5471,6 +8264,10 @@ bool BrowserView::MaybeUpdateDevtools(content::WebContents* contents) {
  
  void BrowserView::UpdateUIForContents(WebContents* contents,
                                        bool should_layout_immediately) {
@@ -2843,7 +3153,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..97533b83b51cd30e0a6acbfbfe13de49
    TRACE_EVENT0("ui", "BrowserView::UpdateUIForContents");
    bool needs_layout = MaybeShowBookmarkBar(contents);
  
-@@ -5706,6 +8219,26 @@ void BrowserView::LoadAccelerators() {
+@@ -5706,6 +8503,26 @@ void BrowserView::LoadAccelerators() {
    }
  
  #if BUILDFLAG(IS_MAC)
