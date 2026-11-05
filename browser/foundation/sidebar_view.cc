@@ -41,6 +41,7 @@
 #include "ui/gfx/geometry/rect.h"
 #include "ui/gfx/geometry/size.h"
 #include "ui/gfx/geometry/transform.h"
+#include "ui/gfx/image/image_skia_operations.h"
 #include "ui/gfx/scoped_canvas.h"
 #include "ui/gfx/vector_icon_types.h"
 #include "ui/native_theme/native_theme.h"
@@ -48,6 +49,7 @@
 #include "ui/views/animation/ink_drop.h"
 #include "ui/views/animation/ink_drop_host.h"
 #include "ui/views/background.h"
+#include "ui/views/border.h"
 #include "ui/views/controls/button/label_button.h"
 #include "ui/views/controls/button/md_text_button.h"
 #include "ui/views/controls/highlight_path_generator.h"
@@ -1805,17 +1807,34 @@ gfx::Rect SidebarView::GetSpaceRowsBoundsInWidget() const {
   return space_rows_->ConvertRectToWidget(space_rows_->GetVisibleBounds());
 }
 
-void SidebarView::SlideInSpace(const gfx::ImageSkia& outgoing, int shift) {
+void SidebarView::SlideInSpace(const gfx::ImageSkia& outgoing,
+                               const gfx::Point& origin,
+                               int shift) {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
   if (!space_rows_ || outgoing.isNull() ||
       gfx::Animation::PrefersReducedMotion() || !IsDrawn()) {
     return;
   }
+  // The picture starts where it showed in the other window, which has this
+  // window's frame, however far each sidebar is scrolled. Whatever showed
+  // above these rows' top is cut, as the rows' layer is.
+  int top = origin.y() - space_rows_->ConvertRectToWidget(gfx::Rect()).y();
+  gfx::ImageSkia picture = outgoing;
+  if (top < 0) {
+    if (-top >= outgoing.height()) {
+      return;
+    }
+    picture = gfx::ImageSkiaOperations::ExtractSubset(
+        outgoing,
+        gfx::Rect(0, -top, outgoing.width(), outgoing.height() + top));
+    top = 0;
+  }
   // The picture takes the outgoing rows' place, so the slide is the same.
   auto rows = std::make_unique<SpaceRows>();
   auto* image = rows->AddChildView(std::make_unique<views::ImageView>(
-      ui::ImageModel::FromImageSkia(outgoing)));
+      ui::ImageModel::FromImageSkia(picture)));
   image->SetHorizontalAlignment(views::ImageViewBase::Alignment::kLeading);
+  image->SetBorder(views::CreateEmptyBorder(gfx::Insets::TLBR(top, 0, 0, 0)));
   space_slide_.Stop();
   space_slide_shift_ = shift;
   space_rows_->SetOutgoing(std::move(rows), shift);

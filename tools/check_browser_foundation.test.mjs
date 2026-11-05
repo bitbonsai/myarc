@@ -6,8 +6,8 @@ import os from 'node:os'
 import { checkpointName, fixtureURLs, readBoundedJSON, runWorkspaceRecovery, validateCheckpoint, validateOwnership,
   validateTargets, workspaceProjection } from './browser_workspace_recovery.mjs'
 import { spawnSync } from 'node:child_process'
-import { checkProfileFiles, isolationData, newToken, otherProfileDir, parsePaletteRows,
-  rowsNaming } from './browser_profile_isolation.mjs'
+import { checkExtension, checkProfileFiles, extensionName, isolationData, newToken, otherProfileDir,
+  parseExtensionLoad, parsePaletteRows, rowsNaming } from './browser_profile_isolation.mjs'
 import vm from 'node:vm'
 import test from 'node:test'
 
@@ -354,4 +354,30 @@ test('profile isolation file check fails on a shared cookie or a foreign history
   assert.throws(() => checkProfileFiles('/p', dirs, sides, fake([...clean, ['Profile 1', 'myarc_iso_a', 1]])), /other Profile's cookie/)
   assert.throws(() => checkProfileFiles('/p', dirs, sides, fake([...clean, ['Profile 1', sides.a.token, 1]])), /other Profile's URL/)
   assert.throws(() => checkProfileFiles('/p', dirs, sides, fake(clean.slice(1))), /lacks its own cookie/)
+})
+
+test('profile isolation reads the test extension load and checks where it runs', () => {
+  const id = 'abcdefghijklmnopabcdefghijklmnop'
+  const log = `x myarc-swap extension 7 id=${id}\ny myarc-swap extension 8 error=Manifest is not valid JSON.`
+  assert.equal(parseExtensionLoad(log, 7), id)
+  assert.equal(parseExtensionLoad(log, 9), null)
+  assert.throws(() => parseExtensionLoad(log, 8), /did not load: error=Manifest/)
+  const listed = [{ id, name: extensionName, state: 'ENABLED' }]
+  assert.deepEqual(checkExtension(listed, id, true, 'A'), { listed: 1, mark: id })
+  assert.deepEqual(checkExtension([], null, false, 'B'), { listed: 0, mark: null })
+  assert.throws(() => checkExtension([], id, true, 'A'), /lacks the test extension/)
+  assert.throws(() => checkExtension([{ ...listed[0], state: 'DISABLED' }], id, true, 'A'), /is DISABLED/)
+  assert.throws(() => checkExtension(listed, null, true, 'A'), /content script did not run/)
+  assert.throws(() => checkExtension(listed, null, false, 'B'), /shows the other Profile's extension/)
+  assert.throws(() => checkExtension([], id, false, 'B'), /content script ran/)
+})
+
+test('profile isolation extension fixture only marks fixture pages', () => {
+  const dir = new URL('../tests/fixtures/browser/isolation-extension/', import.meta.url)
+  const manifest = JSON.parse(fs.readFileSync(new URL('manifest.json', dir), 'utf8'))
+  assert.equal(manifest.manifest_version, 3)
+  assert.equal(manifest.name, extensionName)
+  assert.deepEqual(Object.keys(manifest).sort(), ['content_scripts', 'manifest_version', 'name', 'version'])
+  assert.deepEqual(manifest.content_scripts, [{ matches: ['http://127.0.0.1:8766/*'], js: ['content.js'], run_at: 'document_end' }])
+  assert.match(fs.readFileSync(new URL('content.js', dir), 'utf8'), /dataset\.myarcIsolationExtension = chrome\.runtime\.id/)
 })

@@ -1,5 +1,5 @@
 diff --git a/chrome/browser/ui/views/frame/browser_view.h b/chrome/browser/ui/views/frame/browser_view.h
-index 750e46c97b64dccccf4268e912df5dbdb6516b3c..bbb45a318841c3eaff0ac708e2829c11d6a20c41 100644
+index 750e46c97b64dccccf4268e912df5dbdb6516b3c..c4d55e2ca35675707e716256bf2c3a6aba6590e6 100644
 --- a/chrome/browser/ui/views/frame/browser_view.h
 +++ b/chrome/browser/ui/views/frame/browser_view.h
 @@ -8,11 +8,13 @@
@@ -115,7 +115,7 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..bbb45a318841c3eaff0ac708e2829c11
    base::WeakPtr<BrowserView> GetAsWeakPtr() {
      return weak_ptr_factory_.GetWeakPtr();
    }
-@@ -1253,12 +1302,181 @@ class BrowserView : public BrowserWindow,
+@@ -1253,12 +1302,182 @@ class BrowserView : public BrowserWindow,
  
    // Anchor point for help bubbles and other dialogs that want to reliably
    // anchor outside the content area of the window.
@@ -267,10 +267,11 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..bbb45a318841c3eaff0ac708e2829c11
 +  // Space to select once the workspace is ready, or 0.
 +  uint64_t myarc_pending_space_ = 0;
 +  // While a Profile swap slide covers this window: the cover, the outgoing
-+  // rows to slide, the window to order out when the cover drops, and a limit
-+  // on the wait.
++  // rows to slide and where they showed, the window to order out when the
++  // cover drops, and a limit on the wait.
 +  std::unique_ptr<myarc::ProfileSwapCover> myarc_swap_cover_;
 +  gfx::ImageSkia myarc_swap_rows_;
++  gfx::Point myarc_swap_rows_origin_;
 +  base::WeakPtr<BrowserView> myarc_swap_outgoing_;
 +  base::OneShotTimer myarc_swap_timeout_;
 +  // The cover gave this view a layer, dropped with the cover.
@@ -297,7 +298,7 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..bbb45a318841c3eaff0ac708e2829c11
  
    // A mapping between accelerators and command IDs.
    std::map<ui::Accelerator, int> accelerator_table_;
-@@ -1411,6 +1629,7 @@ class BrowserView : public BrowserWindow,
+@@ -1411,6 +1630,7 @@ class BrowserView : public BrowserWindow,
    base::EnumSet<TabStripAndWebAppViewsReparentedState>
        tab_strip_web_apps_reparented_state_;
  

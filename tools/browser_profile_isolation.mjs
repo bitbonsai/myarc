@@ -1,7 +1,8 @@
 // Developer acceptance tooling for BC-001: two Profiles share no cookies,
-// storage, service workers, history or command bar results across an in-place
-// Profile swap. Needs a build launched with --myarc-capture-profile-swap=cdp
-// and --log-file=PROFILE/myarc-test.log (see tools/check_profile_isolation.sh).
+// storage, service workers, history, command bar results or extensions across
+// an in-place Profile swap. Needs a build launched with
+// --myarc-capture-profile-swap=cdp, --myarc-test-extension=<fixture> and
+// --log-file=PROFILE/myarc-test.log (see tools/check_profile_isolation.sh).
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
 import { randomBytes } from 'node:crypto'
@@ -28,6 +29,10 @@ export const isolationData = (side, token) => {
   }
 }
 
+// The unpacked fixture under tests/fixtures/browser/isolation-extension. Its
+// content script marks fixture pages with its ID.
+export const extensionName = 'myarc isolation fixture'
+
 export const newToken = () => `iso${randomBytes(6).toString('hex')}`
 
 // "myarc-swap palette <n> rows=tab:<url> page:<url> search:<url> "
@@ -47,6 +52,31 @@ export const parsePaletteRows = (log, request) => {
 // A search row only echoes the typed text; any other row naming the token
 // came from history, bookmarks or open tabs.
 export const rowsNaming = (rows, token) => rows.filter(row => row.kind !== 'search' && row.url.includes(token))
+
+// "myarc-swap extension <n> id=<id>" or "... error=<text>"
+export const parseExtensionLoad = (log, request) => {
+  const marker = `myarc-swap extension ${request} `
+  const line = log.split('\n').find(each => each.includes(marker))
+  if (line === undefined) return null
+  const result = line.slice(line.indexOf(marker) + marker.length).trim()
+  const id = result.match(/^id=([a-p]{32})$/)?.[1]
+  assert.ok(id, `Test extension did not load: ${result}`)
+  return id
+}
+
+// `listed` holds the fixture's entries in a Profile's extension list and
+// `mark` its content script's mark on the fixture page there.
+export const checkExtension = (listed, mark, present, label) => {
+  if (present) {
+    assert.equal(listed.length, 1, `${label}: extension list lacks the test extension`)
+    assert.equal(listed[0].state, 'ENABLED', `${label}: test extension is ${listed[0].state}`)
+    assert.equal(mark, listed[0].id, `${label}: test extension's content script did not run`)
+  } else {
+    assert.deepEqual(listed, [], `${label}: extension list shows the other Profile's extension`)
+    assert.equal(mark, null, `${label}: the other Profile's content script ran`)
+  }
+  return { listed: listed.length, mark }
+}
 
 export const readBoundedLog = (path, limit = 16 * 1024 * 1024) => {
   const size = fs.statSync(path).size
@@ -125,6 +155,22 @@ const probeExpression = data => `(async () => ({
   database: (await indexedDB.databases()).some(each => each.name === '${data.database}'),
   workers: (await navigator.serviceWorker.getRegistrations()).map(each => each.scope)
 }))()`
+
+const markExpression = 'document.documentElement.dataset.myarcIsolationExtension ?? null'
+const extensionsExpression = `(async () => (await chrome.developerPrivate.getExtensionsInfo({
+  includeDisabled: true, includeTerminated: true
+})).map(each => ({ id: each.id, name: each.name, state: each.state })))()`
+
+// Animation frames a page runs in half a second; none while it's hidden.
+const framesExpression = `new Promise(resolve => {
+  let frames = 0
+  const tick = () => {
+    frames += 1
+    requestAnimationFrame(tick)
+  }
+  requestAnimationFrame(tick)
+  setTimeout(() => resolve(frames), 500)
+})`
 
 // Reads chrome://history's rendered results, searching through shadow roots.
 const historyExpression = `(() => {
@@ -207,6 +253,21 @@ export const runProfileIsolation = async ({ send, profile, ownedPid, scenario })
     const id = await ask(target, `palette:${token}`)
     return waitFor(() => parsePaletteRows(readBoundedLog(logPath), id), `palette rows for request ${id}`)
   }
+  // The Profile's own extension list on chrome://extensions, then the
+  // content script's mark on the fixture page.
+  const expectExtension = async (target, present, label) => {
+    await target.navigate('chrome://extensions/')
+    const listed = (await target.evaluate(extensionsExpression)).filter(each => each.name === extensionName)
+    await target.navigate(`${fixtureOrigin}/`)
+    let mark
+    if (present) mark = await waitFor(() => target.evaluate(markExpression), `${label}: content script mark`, 5000)
+    else {
+      // The script runs at document_end, before load; this leaves it time.
+      await delay(500)
+      mark = await target.evaluate(markExpression)
+    }
+    record(`${label} extension`, checkExtension(listed, mark, present, label))
+  }
   const history = async (target, token, back) => {
     await target.navigate(`chrome://history/?q=${token}`)
     const state = await waitFor(async () => {
@@ -273,6 +334,15 @@ export const runProfileIsolation = async ({ send, profile, ownedPid, scenario })
     assert.ok(await visible(a), 'Profile A window is not shown')
     record('A seeded', { url: sides.a.url })
     await expectSearches(a, sides.a, sides.b, 'A before swap')
+    // Only A gets the extension, and it stays installed across the relaunch.
+    // Chromium runs unpacked extensions only in developer mode, a protected
+    // pref, so A turns it on as chrome://extensions does.
+    await a.navigate('chrome://extensions/')
+    await a.evaluate('chrome.developerPrivate.updateProfileConfiguration({ inDeveloperMode: true })')
+    await a.navigate(`${fixtureOrigin}/`)
+    const load = await ask(a, 'extension')
+    await waitFor(() => parseExtensionLoad(readBoundedLog(logPath), load), 'test extension load')
+    await expectExtension(a, true, 'A')
 
     // Creating a Space in a new Profile swaps to it; its window has no tab yet.
     await swap(a, null, 'create')
@@ -290,6 +360,7 @@ export const runProfileIsolation = async ({ send, profile, ownedPid, scenario })
     const historyB = await history(b, sides.a.token, `${fixtureOrigin}/`)
     assert.deepEqual(historyB, [], 'B history shows A URL')
     record('A to B searches', { commandBar: rowsB.length, history: historyB.length })
+    await expectExtension(b, false, 'A to B')
 
     await b.navigate(sides.b.url)
     await b.evaluate(seedExpression(sides.b))
@@ -301,6 +372,7 @@ export const runProfileIsolation = async ({ send, profile, ownedPid, scenario })
     record('B to A absent', await expectAbsent(a, sides.b, false))
     await expectOwn(a, sides.a)
     await expectSearches(a, sides.a, sides.b, 'A after swap back')
+    await expectExtension(a, true, 'A after swap back')
   } else {
     const all = await pages()
     const contexts = [...new Set(all.map(info => info.browserContextId))]
@@ -317,8 +389,7 @@ export const runProfileIsolation = async ({ send, profile, ownedPid, scenario })
     record('restart B keeps', { own: await expectOwn(b, sides.b) })
     record('restart A absent', await expectAbsent(a, sides.b, false))
     record('restart B absent', await expectAbsent(b, sides.a, false))
-    // A restored ordered-out window was never shown, so its page still
-    // reports visible. The hook names the Profile it acts in instead.
+    // The hook names the Profile it acts in.
     const shownDir = async () => {
       const id = await ask(a, 'noop')
       return readBoundedLog(logPath).match(new RegExp(`myarc-swap test ${id} noop in (.+)`))[1]
@@ -331,6 +402,20 @@ export const runProfileIsolation = async ({ send, profile, ownedPid, scenario })
     const first = await shownDir()
     const [shown, hidden, own, other] = first === 'Default' ? [a, b, sides.a, sides.b] : [b, a, sides.b, sides.a]
     record('restart shown', { profile: first })
+    // The restored ordered-out window was never shown. Its page must be
+    // hidden and throttled, with no animation frames, also after it loads a
+    // new page.
+    const expectHidden = async label => {
+      await waitFor(async () => !(await visible(hidden)), `${label}: ordered-out page hidden`, 5000)
+      assert.ok(await visible(shown), `${label}: shown page is not visible`)
+      const frames = await hidden.evaluate(framesExpression)
+      assert.equal(frames, 0, `${label}: ordered-out page ran animation frames`)
+      record(label, { visibility: 'hidden', frames })
+    }
+    await expectHidden('restart hidden')
+    await expectExtension(a, true, 'restart A')
+    await expectExtension(b, false, 'restart B')
+    await expectHidden('restart hidden after navigating')
     const second = await restartSwap(first)
     await expectSearches(hidden, other, own, `restart ${other.side.toUpperCase()} (${second})`)
     const third = await restartSwap(second)
@@ -355,6 +440,6 @@ export const runProfileIsolation = async ({ send, profile, ownedPid, scenario })
   const localState = JSON.parse(fs.readFileSync(`${profile}/Local State`, 'utf8'))
   const files = checkProfileFiles(profile, { a: 'Default', b: otherProfileDir(localState) }, sides)
   record('files after quit', { files })
-  console.log(`PASS: ${scenario}: ${results.length} steps, no shared cookies, storage, service workers, history or command bar results`)
+  console.log(`PASS: ${scenario}: ${results.length} steps, no shared cookies, storage, service workers, history, command bar results or extensions`)
   return results
 }

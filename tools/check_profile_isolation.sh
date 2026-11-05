@@ -1,7 +1,8 @@
 #!/bin/bash
 # Profile isolation check (BC-001): launches the native build in the background
-# with a marked, disposable user-data dir and the synthetic fixture server, runs
-# the profile-isolation scenario, relaunches, runs profile-isolation-restart.
+# with a marked, disposable user-data dir, the synthetic fixture server and the
+# test extension's path, runs the profile-isolation scenario, relaunches, runs
+# profile-isolation-restart.
 # Each phase quits the browser and then reads the Cookies and History files.
 # Usage: tools/check_profile_isolation.sh   env: APP=<Chromium.app> KEEP=1 keeps the dir
 set -euo pipefail
@@ -41,6 +42,7 @@ if [ "${1:-}" = "--inner" ]; then
       --remote-debugging-address=127.0.0.1 --remote-debugging-port=0 \
       --enable-features=GlassFrame --disable-features=InitialWebUI \
       --disable-backgrounding-occluded-windows --myarc-background-launch --myarc-capture-profile-swap=cdp \
+      --myarc-test-extension="$ROOT/tests/fixtures/browser/isolation-extension" \
       --myarc-visual-parity --myarc-workspace-sidebar --window-size=1280,800 --window-position=40,60 "$@"
     PID=""
     for _ in $(seq 1 80); do

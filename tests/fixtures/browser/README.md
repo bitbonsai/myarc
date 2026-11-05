@@ -82,7 +82,7 @@ Check these in the preview window, recording failures rather than assuming parit
    Browser theme alone need not recolor websites. Check with pages you can inspect;
    this smoke does not measure pixel parity, motion timing or accessibility.
 6. Focus the preview app, then Cmd+Q to quit its windows. A fresh myArc profile
-   should quit immediately. Enabling the existing app-menu “Warn Before Quitting”
+   should quit immediately. Enabling the existing app-menu "Warn Before Quitting"
    item should restore Chromium's hold-to-quit panel and persist after a graceful
    relaunch. Leave your normal browser running. Running the launcher again
    intentionally creates another fresh profile. Use `--review` with the same marked
@@ -216,7 +216,7 @@ Both launches need these explicit flags, in addition to the normal disposable-pr
   --remote-debugging-address=127.0.0.1 --remote-debugging-port=0
 ```
 
-`PROFILE` must be the canonical absolute path, for example `PROFILE=$(cd "$PROFILE" && pwd -P)`. `--enable-automation` permits the existing upstream `Browser.getBrowserCommandLine` inspection. It does not bypass browser privileges. The browser-reported user-data directory must match exactly; the actual default browser context must own every fixture page. Bounded `Local State` inspection additionally requires `profile.last_used` to resolve to `Default` and `profile.info_cache` to contain only `Default`. An absent or empty `last_used` uses upstream's `Default` fallback. Close private contexts. `Default` must not be a symlink. Missing flags, a different Profile, copied port files or a mismatching expected browser PID fail before canary submission.
+`PROFILE` must be the canonical absolute path, for example `PROFILE=$(cd "$PROFILE" && pwd -P)`. `--enable-automation` permits the existing upstream `Browser.getBrowserCommandLine` inspection. It does not bypass browser privileges. The browser-reported user-data directory must match exactly; the actual default browser context must own every fixture page. Bounded `Local State` inspection also requires `profile.last_used` to resolve to `Default` and `profile.info_cache` to contain only `Default`. An absent or empty `last_used` uses upstream's `Default` fallback. Close private contexts. `Default` must not be a symlink. Missing flags, a different Profile, copied port files or a mismatching expected browser PID fail before canary submission.
 
 Through native controls, prepare exactly:
 
@@ -347,12 +347,12 @@ off by default.
 
 ## Profile isolation check
 
-`tools/check_profile_isolation.sh` checks that two Profiles share no browser data (BC-001). It takes the build lock, starts the fixture server if port 8766 is free and launches the build in the background with a marked user-data dir under `$TMPDIR`, `--use-mock-keychain`, a log file and `--myarc-capture-profile-swap=cdp`. Under that switch the build reads requests from tab titles (`myarc-swap:<n>:create`, `swap`, `tab`, `palette:<text>`) and acts in the shown window, so the client never sends input to the screen. Then it runs two phases of `tools/check_browser_foundation.mjs`:
+`tools/check_profile_isolation.sh` checks that two Profiles share no browser data (BC-001). It takes the build lock, starts the fixture server if port 8766 is free and launches the build in the background with a marked user-data dir under `$TMPDIR`, `--use-mock-keychain`, a log file, `--myarc-capture-profile-swap=cdp` and `--myarc-test-extension` pointing at [isolation-extension](isolation-extension/manifest.json). Under the capture switch the build reads requests from tab titles (`myarc-swap:<n>:create`, `swap`, `tab`, `palette:<text>`, `extension`) and acts in the shown window, so the client never sends input to the screen. `extension` loads only the path given on the command line, never one from a page. Then it runs two phases of `tools/check_browser_foundation.mjs`:
 
-- `profile-isolation`: Profile A visits a unique URL and sets a cookie, a localStorage key, an IndexedDB database and a service worker from [isolation-sw.js](isolation-sw.js). Creating a Space in new Profile B swaps the window in place. B must see an empty `document.cookie`, none of A's data and no service worker, and its history and command bar must return nothing for A's URL. B then sets its own data, the window swaps back and A must see none of B's. Each side's own URL is found first, so an empty search counts.
-- `profile-isolation-restart`, after a relaunch with `--restore-last-session`: both sides keep their own data and lack the other's, and the same searches pass after a swap each way.
+- `profile-isolation`: Profile A visits a unique URL and sets a cookie, a localStorage key, an IndexedDB database and a service worker from [isolation-sw.js](isolation-sw.js). Creating a Space in new Profile B swaps the window in place. B must see an empty `document.cookie`, none of A's data and no service worker, and its history and command bar must return nothing for A's URL. B then sets its own data, the window swaps back and A must see none of B's. Each side's own URL is found first, so an empty search counts. Before the swap, A turns on developer mode through `chrome.developerPrivate` on `chrome://extensions` (Chromium disables unpacked extensions without it, and the pref is protected, so it can't be seeded) and loads the test extension. Its content script marks fixture pages with its ID. A must list it as enabled and show the mark; B must list nothing by that name and show no mark.
+- `profile-isolation-restart`, after a relaunch with `--restore-last-session`: both sides keep their own data and lack the other's, the extension still runs in A only, and the same searches pass after a swap each way. The restored window that stays ordered out was never shown, and its page must report `hidden` and run no animation frames, before and after it loads another page.
 
-Each phase quits through CDP `Browser.close` and then reads `Network/Cookies` and `History` in both Profile directories with `sqlite3`: each holds only its own cookie and URL. `KEEP=1` keeps the user-data dir. Local tests for the log and file parsing run with `node --test tools/check_browser_foundation.test.mjs`. Extensions are not covered.
+Each phase quits through CDP `Browser.close` and then reads `Network/Cookies` and `History` in both Profile directories with `sqlite3`: each holds only its own cookie and URL. `KEEP=1` keeps the user-data dir. Local tests for the log, file and extension checks run with `node --test tools/check_browser_foundation.test.mjs`.
 
 ## Scope and limits
 

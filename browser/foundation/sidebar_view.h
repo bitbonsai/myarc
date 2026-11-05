@@ -19,6 +19,7 @@
 #include "ui/base/metadata/metadata_header_macros.h"
 #include "ui/base/models/image_model.h"
 #include "ui/gfx/animation/linear_animation.h"
+#include "ui/gfx/geometry/point.h"
 #include "ui/gfx/geometry/point_f.h"
 #include "ui/gfx/geometry/rect.h"
 #include "ui/gfx/image/image_skia.h"
@@ -215,9 +216,11 @@ class SidebarView final : public views::View,
   // shows. Empty while the Library or the Create a Space panel shows.
   gfx::Rect GetSpaceRowsBoundsInWidget() const;
   // Runs the Space switch slide with `outgoing`, a picture of another
-  // window's rows, leaving as the current rows come in. A Profile swap uses
-  // it. +1 slides them right.
-  void SlideInSpace(const gfx::ImageSkia& outgoing, int shift);
+  // window's rows that showed at `origin` in widget coordinates, leaving as
+  // the current rows come in. A Profile swap uses it. +1 slides them right.
+  void SlideInSpace(const gfx::ImageSkia& outgoing,
+                    const gfx::Point& origin,
+                    int shift);
   // Replaces the sidebar contents with the Library until back or Esc. Needs a
   // usable model.
   void OpenLibrary(LibrarySection section = LibrarySection::kSpaces);
