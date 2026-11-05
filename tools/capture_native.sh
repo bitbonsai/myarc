@@ -15,7 +15,8 @@
 #   --myarc-capture-create-menu and keeps it up.
 #   CREATE_SPACE=1 opens the Create a Space panel via
 #   --myarc-capture-create-space. CREATE_SPACE=emoji or CREATE_SPACE=icon also
-#   opens its icon picker on that tab and keeps it up.
+#   opens its icon picker on that tab and keeps it up; CREATE_SPACE=profile
+#   opens the Profile menu and CREATE_SPACE=profile-new the Profile name field.
 #   STACK=1 shows the downloads stack above the Library button via
 #   --myarc-capture-downloads-stack and keeps it up. file:// URLs of files
 #   Chromium can't show download and seed the stack.
@@ -73,7 +74,7 @@ if [ "${1:-}" = "--inner" ]; then
   [ -n "${MENU:-}" ] && EXTRA+=(--myarc-capture-create-menu)
   case "${CREATE_SPACE:-}" in
     '') ;;
-    emoji | icon) EXTRA+=(--myarc-capture-create-space="$CREATE_SPACE") ;;
+    emoji | icon | profile | profile-new) EXTRA+=(--myarc-capture-create-space="$CREATE_SPACE") ;;
     *) EXTRA+=(--myarc-capture-create-space) ;;
   esac
   [ -n "${ACTIVATE:-}" ] && EXTRA+=(--myarc-capture-activate="$ACTIVATE")

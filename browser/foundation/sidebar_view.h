@@ -14,6 +14,7 @@
 #include "base/memory/weak_ptr.h"
 #include "base/sequence_checker.h"
 #include "base/time/time.h"
+#include "myarc/create_space_panel.h"
 #include "myarc/space_icon_catalog.h"
 #include "ui/base/metadata/metadata_header_macros.h"
 #include "ui/base/models/image_model.h"
@@ -40,7 +41,6 @@ namespace myarc {
 
 class CreateButton;
 class CreateMenu;
-class CreateSpacePanel;
 class DownloadsStack;
 class FooterTooltip;
 class LibraryView;
@@ -131,9 +131,14 @@ class SidebarView final : public views::View,
     // Asks the parent to open the Create a Space panel with OpenCreateSpace.
     virtual void CreateSpace() = 0;
     // The panel's Create: adds and selects the Space with `icon` (Kind::kNone
-    // for the default glyph), or returns why it can't.
+    // for the default glyph) in the Profile `profile_id`, or returns why it
+    // can't.
     virtual std::u16string CreateNamedSpace(const std::u16string& name,
-                                            const SpaceIconChoice& icon) = 0;
+                                            const SpaceIconChoice& icon,
+                                            const std::string& profile_id) = 0;
+    // The panel's New Profile…: see CreateSpacePanel::CreateProfileCallback.
+    virtual void CreateProfile(const std::u16string& name,
+                               CreateSpacePanel::ProfileDoneCallback done) = 0;
     // The panel closed; the parent supplies the rows' model with SetModel.
     virtual void CreateSpacePanelClosed() = 0;
     virtual void RenameSpace(uint64_t space_id) = 0;
@@ -194,7 +199,8 @@ class SidebarView final : public views::View,
   bool library_open() const { return !!library_; }
   // Replaces the rows, or the Library, with Arc's Create a Space panel until
   // Create or Cancel. Needs a usable model.
-  void OpenCreateSpace(const std::u16string& profile_name);
+  void OpenCreateSpace(std::vector<ProfileChoice> profiles,
+                       std::string selected_profile_id);
   bool create_space_open() const { return !!create_panel_; }
   // Shows the footer tooltip of "library", "space" (the current one) or
   // "create" without hover and keeps it up, for background captures.
@@ -260,7 +266,8 @@ class SidebarView final : public views::View,
   void ResetLibrary();
   // The Create a Space panel's callbacks.
   std::u16string SubmitCreateSpace(const std::u16string& name,
-                                   const SpaceIconChoice& icon);
+                                   const SpaceIconChoice& icon,
+                                   const std::string& profile_id);
   void CloseCreateSpace();
   // Checked when the rows replace the Library, not when closing starts.
   bool LibraryHasFocus();

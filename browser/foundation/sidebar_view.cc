@@ -649,7 +649,8 @@ void SidebarView::DropRows() {
   RemoveAllChildViews();
 }
 
-void SidebarView::OpenCreateSpace(const std::u16string& profile_name) {
+void SidebarView::OpenCreateSpace(std::vector<ProfileChoice> profiles,
+                                  std::string selected_profile_id) {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
   if (create_panel_) {
     create_panel_->FocusName();
@@ -690,13 +691,15 @@ void SidebarView::OpenCreateSpace(const std::u16string& profile_name) {
   }
   // SetModel rebuilds the rows from scratch once the panel closes.
   current_space_id_ = 0;
-  // The panel posts both callbacks and this view owns it, so neither outlives
-  // this view.
+  // The panel posts its callbacks and this view owns it, so none outlives
+  // this view, and the delegate outlives both.
   create_panel_ =
       AddChildViewAt(std::make_unique<CreateSpacePanel>(
-                         profile_name,
+                         std::move(profiles), std::move(selected_profile_id),
                          base::BindRepeating(&SidebarView::SubmitCreateSpace,
                                              base::Unretained(this)),
+                         base::BindRepeating(&Delegate::CreateProfile,
+                                             base::Unretained(&*delegate_)),
                          base::BindRepeating(&SidebarView::CloseCreateSpace,
                                              base::Unretained(this))),
                      0);
@@ -715,10 +718,11 @@ void SidebarView::OpenCreateSpace(const std::u16string& profile_name) {
 }
 
 std::u16string SidebarView::SubmitCreateSpace(const std::u16string& name,
-                                              const SpaceIconChoice& icon) {
+                                              const SpaceIconChoice& icon,
+                                              const std::string& profile_id) {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
   auto weak = weak_factory_.GetWeakPtr();
-  std::u16string error = delegate_->CreateNamedSpace(name, icon);
+  std::u16string error = delegate_->CreateNamedSpace(name, icon, profile_id);
   if (weak && error.empty()) {
     CloseCreateSpace();
   }

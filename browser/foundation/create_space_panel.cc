@@ -16,6 +16,7 @@
 #include "myarc/space_icon_picker.h"
 #include "third_party/skia/include/core/SkColor.h"
 #include "ui/base/metadata/metadata_impl_macros.h"
+#include "ui/base/mojom/menu_source_type.mojom.h"
 #include "ui/color/color_id.h"
 #include "ui/color/color_provider.h"
 #include "ui/events/keycodes/keyboard_codes.h"
@@ -28,11 +29,13 @@
 #include "ui/views/border.h"
 #include "ui/views/bubble/bubble_border.h"
 #include "ui/views/bubble/bubble_dialog_delegate_view.h"
+#include "ui/views/controls/button/button.h"
 #include "ui/views/controls/button/image_button.h"
 #include "ui/views/controls/button/label_button.h"
 #include "ui/views/controls/highlight_path_generator.h"
 #include "ui/views/controls/image_view.h"
 #include "ui/views/controls/label.h"
+#include "ui/views/controls/menu/menu_runner.h"
 #include "ui/views/controls/textfield/textfield.h"
 #include "ui/views/focus/focus_manager.h"
 #include "ui/views/layout/box_layout.h"
@@ -56,8 +59,14 @@ constexpr int kRowIconSize = 16;
 constexpr int kArtSize = 48;
 
 // The switch that opens the panel for captures; "emoji" or "icon" also opens
-// the icon picker on that tab and holds it open.
+// the icon picker on that tab and holds it open, "profile" opens the Profile
+// menu and "profile-new" the Profile name field.
 constexpr char kCaptureCreateSpace[] = "myarc-capture-create-space";
+
+// Profile menu commands: New Profile…, then one per Profile from
+// kFirstProfileCommand.
+constexpr int kNewProfileCommand = 1;
+constexpr int kFirstProfileCommand = 100;
 
 // Arc's popover: 14 DIP corners on its dark sidebar navy.
 constexpr int kPickerRadius = 14;
@@ -128,12 +137,28 @@ void SetButtonFont(views::LabelButton& button, const gfx::FontList& font) {
   }
 }
 
+// views::Button's constructor is protected.
+class ProfilePill : public views::Button {
+  METADATA_HEADER(ProfilePill, views::Button)
+
+ public:
+  explicit ProfilePill(PressedCallback callback)
+      : views::Button(std::move(callback)) {}
+};
+
+BEGIN_METADATA(ProfilePill)
+END_METADATA
+
 }  // namespace
 
-CreateSpacePanel::CreateSpacePanel(std::u16string profile_name,
+CreateSpacePanel::CreateSpacePanel(std::vector<ProfileChoice> profiles,
+                                   std::string selected_profile_id,
                                    CreateCallback create,
+                                   CreateProfileCallback create_profile,
                                    base::RepeatingClosure cancel)
-    : create_(std::move(create)), cancel_(std::move(cancel)) {
+    : create_(std::move(create)),
+      create_profile_(std::move(create_profile)),
+      cancel_(std::move(cancel)) {
   auto* layout = SetLayoutManager(std::make_unique<views::BoxLayout>(
       Orientation::kVertical, gfx::Insets::TLBR(23, kSideInset, 14, kSideInset),
       0));
@@ -190,8 +215,8 @@ CreateSpacePanel::CreateSpacePanel(std::u16string profile_name,
   error_->SetProperty(views::kMarginsKey, gfx::Insets::TLBR(6, 4, 0, 4));
   error_->SetVisible(false);
 
-  // Profile row: which Profile the new Space uses. The pill becomes a menu
-  // with New Profile… later; for now it names the current Profile.
+  // Profile row: which Profile the new Space uses. The pill opens a menu of
+  // Profiles with New Profile….
   auto* profile_row = AddChildView(Row(gfx::Insets::VH(0, 10), 0));
   profile_row_ = profile_row;
   profile_row->SetPreferredSize(gfx::Size(0, kRowHeight));
@@ -203,16 +228,24 @@ CreateSpacePanel::CreateSpacePanel(std::u16string profile_name,
       MakeLabel(u"Profile", Font(0, gfx::Font::Weight::SEMIBOLD)));
   profile_label_->SetProperty(views::kMarginsKey,
                               gfx::Insets::TLBR(0, 10, 0, 8));
-  auto* pill = profile_row->AddChildView(Row(gfx::Insets::TLBR(2, 8, 2, 6), 3));
+  auto* pill = profile_row->AddChildView(
+      std::make_unique<ProfilePill>(base::BindRepeating(
+          &CreateSpacePanel::OpenProfileMenu, base::Unretained(this))));
+  pill
+      ->SetLayoutManager(std::make_unique<views::BoxLayout>(
+          Orientation::kHorizontal, gfx::Insets::TLBR(2, 8, 2, 6), 3))
+      ->set_cross_axis_alignment(CrossAxis::kCenter);
+  views::InstallRoundRectHighlightPathGenerator(pill, gfx::Insets(), 10);
+  pill->GetViewAccessibility().SetHasPopup(ax::mojom::HasPopup::kMenu);
   profile_pill_ = pill;
-  profile_name_ = pill->AddChildView(
-      MakeLabel(profile_name, Font(-1, gfx::Font::Weight::SEMIBOLD)));
+  profile_name_ =
+      pill->AddChildView(MakeLabel({}, Font(-1, gfx::Font::Weight::SEMIBOLD)));
   profile_name_->SetElideBehavior(gfx::ELIDE_TAIL);
   // Long names elide so the chevron and the info icon stay in the row.
   profile_name_->SetMaximumWidthSingleLine(44);
+  profile_name_->SetCanProcessEventsWithinSubtree(false);
   profile_chevron_ = pill->AddChildView(std::make_unique<views::ImageView>());
-  pill->GetViewAccessibility().SetRole(ax::mojom::Role::kStaticText);
-  pill->GetViewAccessibility().SetName(u"Profile: " + profile_name);
+  profile_chevron_->SetCanProcessEventsWithinSubtree(false);
   auto* spacer = profile_row->AddChildView(std::make_unique<views::View>());
   static_cast<views::BoxLayout*>(profile_row->GetLayoutManager())
       ->SetFlexForView(spacer, 1);
@@ -220,6 +253,36 @@ CreateSpacePanel::CreateSpacePanel(std::u16string profile_name,
       profile_row->AddChildView(std::make_unique<views::ImageView>());
   profile_info_->SetTooltipText(
       u"Spaces that share a Profile share its logins, history and Favorites.");
+
+  // New Profile… swaps the Profile row for this name field.
+  auto* new_profile_row =
+      AddChildView(Row(gfx::Insets::TLBR(0, 10, 0, 10), 10));
+  new_profile_row_ = new_profile_row;
+  new_profile_row->SetPreferredSize(gfx::Size(0, kRowHeight));
+  new_profile_row->SetProperty(views::kMarginsKey,
+                               gfx::Insets::TLBR(kRowGap, 0, 0, 0));
+  new_profile_row->SetVisible(false);
+  new_profile_icon_ =
+      new_profile_row->AddChildView(std::make_unique<views::ImageView>());
+  auto new_profile_name = std::make_unique<views::Textfield>();
+  new_profile_name->SetBackgroundEnabled(false);
+  new_profile_name->SetBorder(views::CreateEmptyBorder(gfx::Insets()));
+  new_profile_name->SetFontList(Font(0, gfx::Font::Weight::NORMAL));
+  new_profile_name->SetPlaceholderText(u"Profile name…");
+  new_profile_name->GetViewAccessibility().SetName(u"New Profile name");
+  new_profile_name->set_controller(this);
+  new_profile_name_ =
+      new_profile_row->AddChildView(std::move(new_profile_name));
+  static_cast<views::BoxLayout*>(new_profile_row->GetLayoutManager())
+      ->SetFlexForView(new_profile_name_, 1);
+
+  profile_error_ =
+      AddChildView(MakeLabel({}, Font(-1, gfx::Font::Weight::NORMAL)));
+  profile_error_->SetMultiLine(true);
+  profile_error_->SetHorizontalAlignment(gfx::ALIGN_LEFT);
+  profile_error_->SetProperty(views::kMarginsKey,
+                              gfx::Insets::TLBR(6, 4, 0, 4));
+  profile_error_->SetVisible(false);
 
   // Choose a Theme: a placeholder row until the theme picker exists.
   auto* theme_row = AddChildView(Row(gfx::Insets::VH(0, 10), 10));
@@ -263,6 +326,7 @@ CreateSpacePanel::CreateSpacePanel(std::u16string profile_name,
 
   AddAccelerator(ui::Accelerator(ui::VKEY_ESCAPE, ui::EF_NONE));
   UpdateCreateButton();
+  SetProfiles(std::move(profiles), selected_profile_id);
 }
 
 CreateSpacePanel::~CreateSpacePanel() = default;
@@ -369,21 +433,31 @@ void CreateSpacePanel::AddedToWidget() {
   const std::string capture =
       base::CommandLine::ForCurrentProcess()->GetSwitchValueASCII(
           kCaptureCreateSpace);
-  if (capture_scheduled_ || (capture != "emoji" && capture != "icon")) {
+  if (capture_scheduled_ ||
+      (capture != "emoji" && capture != "icon" && capture != "profile" &&
+       capture != "profile-new")) {
     return;
   }
   capture_scheduled_ = true;
   base::SequencedTaskRunner::GetCurrentDefault()->PostDelayedTask(
       FROM_HERE,
       base::BindOnce(
-          [](base::WeakPtr<CreateSpacePanel> panel, bool icon) {
-            if (panel) {
-              panel->OpenIconPicker(icon ? SpaceIconChoice::Kind::kNamed
-                                         : SpaceIconChoice::Kind::kEmoji,
+          [](base::WeakPtr<CreateSpacePanel> panel, std::string capture) {
+            if (!panel) {
+              return;
+            }
+            if (capture == "profile") {
+              panel->OpenProfileMenu();
+            } else if (capture == "profile-new") {
+              panel->ShowNewProfile();
+            } else {
+              panel->OpenIconPicker(capture == "icon"
+                                        ? SpaceIconChoice::Kind::kNamed
+                                        : SpaceIconChoice::Kind::kEmoji,
                                     /*hold=*/true);
             }
           },
-          weak_factory_.GetWeakPtr(), capture == "icon"),
+          weak_factory_.GetWeakPtr(), capture),
       base::Milliseconds(800));
 }
 
@@ -411,6 +485,12 @@ void CreateSpacePanel::OnThemeChanged() {
       ui::ImageModel::FromVectorIcon(kChevronDownIcon, colors.ink, 12));
   profile_info_->SetImage(
       ui::ImageModel::FromVectorIcon(kInfoIcon, colors.muted, 15));
+  new_profile_row_->SetBackground(
+      views::CreateRoundedRectBackground(colors.row, kRowRadius));
+  new_profile_icon_->SetImage(
+      ui::ImageModel::FromVectorIcon(kSmileIcon, colors.muted, kRowIconSize));
+  new_profile_name_->SetColor(colors.ink);
+  profile_error_->SetEnabledColor(colors.error);
   theme_row_->SetBackground(
       views::CreateRoundedRectBackground(colors.row, kRowRadius));
   theme_icon_->SetImage(
@@ -428,12 +508,22 @@ bool CreateSpacePanel::AcceleratorPressed(const ui::Accelerator& accelerator) {
   if (focused && parent() && !parent()->Contains(focused)) {
     return false;
   }
-  Cancel();
+  // Esc leaves the Profile name field before it leaves the panel.
+  if (new_profile_row_->GetVisible()) {
+    CloseNewProfile();
+  } else {
+    Cancel();
+  }
   return true;
 }
 
 void CreateSpacePanel::ContentsChanged(views::Textfield* sender,
                                        const std::u16string& new_contents) {
+  if (sender == new_profile_name_) {
+    profile_error_->SetVisible(false);
+    new_profile_name_->SetInvalid(false);
+    return;
+  }
   error_->SetVisible(false);
   name_->SetInvalid(false);
   UpdateCreateButton();
@@ -444,16 +534,173 @@ bool CreateSpacePanel::HandleKeyEvent(views::Textfield* sender,
   if (key_event.type() != ui::EventType::kKeyPressed) {
     return false;
   }
+  const bool profile = sender == new_profile_name_;
   switch (key_event.key_code()) {
     case ui::VKEY_RETURN:
-      Create();
+      if (profile) {
+        SubmitProfile();
+      } else {
+        Create();
+      }
       return true;
     case ui::VKEY_ESCAPE:
-      Cancel();
+      if (profile) {
+        CloseNewProfile();
+      } else {
+        Cancel();
+      }
       return true;
     default:
       return false;
   }
+}
+
+bool CreateSpacePanel::IsCommandIdChecked(int command_id) const {
+  return command_id ==
+         kFirstProfileCommand + static_cast<int>(selected_profile_);
+}
+
+bool CreateSpacePanel::IsCommandIdEnabled(int command_id) const {
+  return command_id != kNewProfileCommand || !profile_pending_;
+}
+
+void CreateSpacePanel::ExecuteCommand(int command_id, int event_flags) {
+  if (command_id == kNewProfileCommand) {
+    if (!profile_pending_) {
+      ShowNewProfile();
+    }
+    return;
+  }
+  const int index = command_id - kFirstProfileCommand;
+  if (index >= 0 && static_cast<size_t>(index) < profiles_.size()) {
+    selected_profile_ = static_cast<size_t>(index);
+    UpdateProfilePill();
+  }
+}
+
+void CreateSpacePanel::SetProfiles(std::vector<ProfileChoice> profiles,
+                                   const std::string& selected_id) {
+  if (profile_menu_runner_) {
+    profile_menu_runner_->Cancel();
+  }
+  profiles_ = std::move(profiles);
+  selected_profile_ = 0;
+  for (size_t i = 0; i < profiles_.size(); ++i) {
+    if (profiles_[i].id == selected_id) {
+      selected_profile_ = i;
+    }
+  }
+  profile_pending_ = false;
+  UpdateProfilePill();
+  CloseNewProfile();
+}
+
+void CreateSpacePanel::UpdateProfilePill() {
+  const std::u16string name = selected_profile_ < profiles_.size()
+                                  ? profiles_[selected_profile_].name
+                                  : std::u16string();
+  profile_name_->SetText(name);
+  profile_pill_->GetViewAccessibility().SetName(u"Profile: " + name);
+  profile_pill_->SetTooltipText(u"Choose a Profile");
+}
+
+void CreateSpacePanel::OpenProfileMenu() {
+  if (!GetWidget() || new_profile_row_->GetVisible() ||
+      (profile_menu_runner_ && profile_menu_runner_->IsRunning())) {
+    return;
+  }
+  profile_menu_runner_.reset();
+  profile_menu_model_ = std::make_unique<ui::SimpleMenuModel>(this);
+  for (size_t i = 0; i < profiles_.size(); ++i) {
+    profile_menu_model_->AddCheckItem(
+        kFirstProfileCommand + static_cast<int>(i), profiles_[i].name);
+  }
+  profile_menu_model_->AddSeparator(ui::NORMAL_SEPARATOR);
+  profile_menu_model_->AddItem(kNewProfileCommand, u"New Profile…");
+  // CONTEXT_MENU gets the native menu on macOS, as in Arc.
+  profile_menu_runner_ = std::make_unique<views::MenuRunner>(
+      profile_menu_model_.get(), views::MenuRunner::CONTEXT_MENU);
+  // Arc drops the menu from the pill's lower right.
+  const gfx::Rect pill = profile_pill_->GetBoundsInScreen();
+  profile_menu_runner_->RunMenuAt(
+      GetWidget(), nullptr,
+      gfx::Rect(gfx::Point(pill.right() - 8, pill.bottom()), gfx::Size()),
+      views::MenuAnchorPosition::kTopLeft, ui::mojom::MenuSourceType::kMouse);
+}
+
+void CreateSpacePanel::ShowNewProfile() {
+  profile_error_->SetVisible(false);
+  new_profile_name_->SetInvalid(false);
+  new_profile_name_->SetText({});
+  new_profile_name_->SetReadOnly(false);
+  profile_row_->SetVisible(false);
+  new_profile_row_->SetVisible(true);
+  new_profile_name_->RequestFocus();
+}
+
+void CreateSpacePanel::CloseNewProfile() {
+  if (!new_profile_row_->GetVisible()) {
+    return;
+  }
+  const bool had_focus = new_profile_name_->HasFocus();
+  new_profile_row_->SetVisible(false);
+  profile_error_->SetVisible(false);
+  profile_row_->SetVisible(true);
+  if (had_focus) {
+    profile_pill_->RequestFocus();
+  }
+}
+
+void CreateSpacePanel::SubmitProfile() {
+  if (profile_pending_) {
+    return;
+  }
+  std::u16string name;
+  base::TrimWhitespace(new_profile_name_->GetText(), base::TRIM_ALL, &name);
+  if (name.empty()) {
+    ShowProfileError(u"Enter a Profile name.");
+    return;
+  }
+  // Counted in UTF-16 units, so emoji count double.
+  if (name.size() > kMaxProfileName) {
+    ShowProfileError(u"Profile names can be up to 64 characters.");
+    return;
+  }
+  profile_pending_ = true;
+  new_profile_name_->SetReadOnly(true);
+  // Posted like Create, so the key handler unwinds first.
+  base::SequencedTaskRunner::GetCurrentDefault()->PostTask(
+      FROM_HERE,
+      base::BindOnce(
+          [](base::WeakPtr<CreateSpacePanel> panel, std::u16string name) {
+            if (!panel) {
+              return;
+            }
+            auto create_profile = panel->create_profile_;
+            create_profile.Run(
+                name, base::BindOnce(&CreateSpacePanel::OnProfileDone, panel));
+          },
+          weak_factory_.GetWeakPtr(), std::move(name)));
+}
+
+void CreateSpacePanel::OnProfileDone(const std::u16string& error) {
+  profile_pending_ = false;
+  new_profile_name_->SetReadOnly(false);
+  if (error.empty()) {
+    CloseNewProfile();
+    return;
+  }
+  ShowProfileError(error);
+}
+
+void CreateSpacePanel::ShowProfileError(const std::u16string& error) {
+  if (!new_profile_row_->GetVisible()) {
+    return;
+  }
+  new_profile_name_->SetInvalid(true);
+  profile_error_->SetText(error);
+  profile_error_->SetVisible(true);
+  profile_error_->GetViewAccessibility().AnnounceText(error);
 }
 
 std::u16string CreateSpacePanel::TrimmedName() const {
@@ -503,7 +750,10 @@ void CreateSpacePanel::RunCreate() {
   auto weak = weak_factory_.GetWeakPtr();
   // A copy, since success deletes the panel.
   auto create = create_;
-  const std::u16string error = create.Run(name, icon_);
+  const std::string profile_id = selected_profile_ < profiles_.size()
+                                     ? profiles_[selected_profile_].id
+                                     : std::string();
+  const std::u16string error = create.Run(name, icon_, profile_id);
   if (!weak || error.empty()) {
     return;
   }

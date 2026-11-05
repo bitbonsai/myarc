@@ -1,5 +1,5 @@
 diff --git a/chrome/browser/ui/views/frame/browser_view.cc b/chrome/browser/ui/views/frame/browser_view.cc
-index 7b568f6de760af21d6e9d2aa44415a7cef617c51..293788a73847ba6c3daf17009b0eccd7308974da 100644
+index 7b568f6de760af21d6e9d2aa44415a7cef617c51..2aa39f236be58ea1b02bde4d5a9e53c622bec46b 100644
 --- a/chrome/browser/ui/views/frame/browser_view.cc
 +++ b/chrome/browser/ui/views/frame/browser_view.cc
 @@ -22,6 +22,7 @@
@@ -1558,7 +1558,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..293788a73847ba6c3daf17009b0eccd7
  }
  
  void BrowserView::RemovedFromWidget() {
-@@ -5267,6 +6518,1007 @@ const views::View* BrowserView::GetViewByElementId(
+@@ -5267,6 +6518,1021 @@ const views::View* BrowserView::GetViewByElementId(
  ///////////////////////////////////////////////////////////////////////////////
  // BrowserView, ui::AcceleratorTarget overrides:
  
@@ -2003,17 +2003,25 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..293788a73847ba6c3daf17009b0eccd7
 +void BrowserView::CreateSpace() {
 +  if (myarc_workspace_sidebar_ && myarc_workspace_adapter_ &&
 +      myarc_workspace_adapter_->ready()) {
++    // One Profile until Profiles map to storage.
++    Profile& profile = *GetProfile()->GetOriginalProfile();
 +    myarc_workspace_sidebar_->OpenCreateSpace(
-+        MyarcProfileName(*GetProfile()->GetOriginalProfile()));
++        {{.id = profile.GetBaseName().AsUTF8Unsafe(),
++          .name = MyarcProfileName(profile)}},
++        profile.GetBaseName().AsUTF8Unsafe());
 +    UpdateMyarcUrlPill();
 +  }
 +}
 +
-+std::u16string BrowserView::CreateNamedSpace(
-+    const std::u16string& name,
-+    const myarc::SpaceIconChoice& icon) {
++std::u16string BrowserView::CreateNamedSpace(const std::u16string& name,
++                                             const myarc::SpaceIconChoice& icon,
++                                             const std::string& profile_id) {
 +  if (!myarc_workspace_adapter_) {
 +    return u"Workspace unavailable.";
++  }
++  if (profile_id !=
++      GetProfile()->GetOriginalProfile()->GetBaseName().AsUTF8Unsafe()) {
++    return u"Spaces can only use this window's Profile for now.";
 +  }
 +  // Bound UTF-16 before converting. Rust owns the UTF-8 length/name rules.
 +  if (name.size() > 128) {
@@ -2040,6 +2048,12 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..293788a73847ba6c3daf17009b0eccd7
 +  // sidebar, since the Space exists.
 +  MyarcWorkspaceResult(myarc_workspace_adapter_->SelectSpace(created));
 +  return {};
++}
++
++void BrowserView::CreateProfile(
++    const std::u16string& name,
++    myarc::CreateSpacePanel::ProfileDoneCallback done) {
++  std::move(done).Run(u"Profiles aren't available yet.");
 +}
 +
 +void BrowserView::CreateSpacePanelClosed() {
@@ -2566,7 +2580,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..293788a73847ba6c3daf17009b0eccd7
  bool BrowserView::AcceleratorPressed(const ui::Accelerator& accelerator) {
  #if BUILDFLAG(IS_MAC)
    // Forward accelerators to ExclusiveAccessManager to handle Esc press-and-hold
-@@ -5342,7 +7594,8 @@ void BrowserView::LoadingAnimationCallback(base::TimeTicks timestamp) {
+@@ -5342,7 +7608,8 @@ void BrowserView::LoadingAnimationCallback(base::TimeTicks timestamp) {
      // GetActiveWebContents can return null for example under Purify when
      // the animations are running slowly and this function is called on a timer
      // through LoadingAnimationCallback.
@@ -2576,7 +2590,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..293788a73847ba6c3daf17009b0eccd7
    }
  }
  
-@@ -5471,6 +7724,10 @@ bool BrowserView::MaybeUpdateDevtools(content::WebContents* contents) {
+@@ -5471,6 +7738,10 @@ bool BrowserView::MaybeUpdateDevtools(content::WebContents* contents) {
  
  void BrowserView::UpdateUIForContents(WebContents* contents,
                                        bool should_layout_immediately) {
@@ -2587,7 +2601,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..293788a73847ba6c3daf17009b0eccd7
    TRACE_EVENT0("ui", "BrowserView::UpdateUIForContents");
    bool needs_layout = MaybeShowBookmarkBar(contents);
  
-@@ -5706,6 +7963,26 @@ void BrowserView::LoadAccelerators() {
+@@ -5706,6 +7977,26 @@ void BrowserView::LoadAccelerators() {
    }
  
  #if BUILDFLAG(IS_MAC)
