@@ -236,7 +236,6 @@ CreateSpacePanel::CreateSpacePanel(std::vector<ProfileChoice> profiles,
           Orientation::kHorizontal, gfx::Insets::TLBR(2, 8, 2, 6), 3))
       ->set_cross_axis_alignment(CrossAxis::kCenter);
   views::InstallRoundRectHighlightPathGenerator(pill, gfx::Insets(), 10);
-  pill->GetViewAccessibility().SetHasPopup(ax::mojom::HasPopup::kMenu);
   profile_pill_ = pill;
   profile_name_ =
       pill->AddChildView(MakeLabel({}, Font(-1, gfx::Font::Weight::SEMIBOLD)));
@@ -246,6 +245,14 @@ CreateSpacePanel::CreateSpacePanel(std::vector<ProfileChoice> profiles,
   profile_name_->SetCanProcessEventsWithinSubtree(false);
   profile_chevron_ = pill->AddChildView(std::make_unique<views::ImageView>());
   profile_chevron_->SetCanProcessEventsWithinSubtree(false);
+  // Without `create_profile` (Incognito, Guest) the pill only names the
+  // window's Profile.
+  if (create_profile_) {
+    pill->GetViewAccessibility().SetHasPopup(ax::mojom::HasPopup::kMenu);
+  } else {
+    pill->SetEnabled(false);
+    profile_chevron_->SetVisible(false);
+  }
   auto* spacer = profile_row->AddChildView(std::make_unique<views::View>());
   static_cast<views::BoxLayout*>(profile_row->GetLayoutManager())
       ->SetFlexForView(spacer, 1);
@@ -601,11 +608,13 @@ void CreateSpacePanel::UpdateProfilePill() {
                                   : std::u16string();
   profile_name_->SetText(name);
   profile_pill_->GetViewAccessibility().SetName(u"Profile: " + name);
-  profile_pill_->SetTooltipText(u"Choose a Profile");
+  if (create_profile_) {
+    profile_pill_->SetTooltipText(u"Choose a Profile");
+  }
 }
 
 void CreateSpacePanel::OpenProfileMenu() {
-  if (!GetWidget() || new_profile_row_->GetVisible() ||
+  if (!create_profile_ || !GetWidget() || new_profile_row_->GetVisible() ||
       (profile_menu_runner_ && profile_menu_runner_->IsRunning())) {
     return;
   }
@@ -620,11 +629,14 @@ void CreateSpacePanel::OpenProfileMenu() {
   // CONTEXT_MENU gets the native menu on macOS, as in Arc.
   profile_menu_runner_ = std::make_unique<views::MenuRunner>(
       profile_menu_model_.get(), views::MenuRunner::CONTEXT_MENU);
-  // Arc drops the menu from the pill's lower right.
+  // Arc's menu covers the pill's end: its left edge just past the chevron, its
+  // top just under the pill's top. macOS draws a context menu about 6 DIP
+  // right of and 8 DIP above the point it gets.
   const gfx::Rect pill = profile_pill_->GetBoundsInScreen();
+  const gfx::Rect chevron = profile_chevron_->GetBoundsInScreen();
   profile_menu_runner_->RunMenuAt(
       GetWidget(), nullptr,
-      gfx::Rect(gfx::Point(pill.right() - 8, pill.bottom()), gfx::Size()),
+      gfx::Rect(gfx::Point(chevron.right() - 4, pill.y() + 10), gfx::Size()),
       views::MenuAnchorPosition::kTopLeft, ui::mojom::MenuSourceType::kMouse);
 }
 

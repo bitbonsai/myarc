@@ -59,7 +59,8 @@ class CreateSpacePanel final : public views::View,
   using ProfileDoneCallback =
       base::OnceCallback<void(const std::u16string& error)>;
   // `create_profile` gets a trimmed name of at most kMaxProfileName
-  // characters. On success the caller calls SetProfiles before `done`.
+  // characters. On success the caller calls SetProfiles before `done`. A null
+  // `create_profile` keeps the pill on the one Profile, without a menu.
   using CreateProfileCallback =
       base::RepeatingCallback<void(const std::u16string& name,
                                    ProfileDoneCallback done)>;

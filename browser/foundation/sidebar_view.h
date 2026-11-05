@@ -198,9 +198,14 @@ class SidebarView final : public views::View,
   void RefreshLibraryDownloads();
   bool library_open() const { return !!library_; }
   // Replaces the rows, or the Library, with Arc's Create a Space panel until
-  // Create or Cancel. Needs a usable model.
+  // Create or Cancel. Needs a usable model. Without `profile_menu` the
+  // Profile pill only names the selected Profile.
   void OpenCreateSpace(std::vector<ProfileChoice> profiles,
-                       std::string selected_profile_id);
+                       std::string selected_profile_id,
+                       bool profile_menu);
+  // Refreshes the open panel's Profiles; see CreateSpacePanel::SetProfiles.
+  void SetCreateSpaceProfiles(std::vector<ProfileChoice> profiles,
+                              const std::string& selected_id);
   bool create_space_open() const { return !!create_panel_; }
   // Shows the footer tooltip of "library", "space" (the current one) or
   // "create" without hover and keeps it up, for background captures.

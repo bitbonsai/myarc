@@ -650,7 +650,8 @@ void SidebarView::DropRows() {
 }
 
 void SidebarView::OpenCreateSpace(std::vector<ProfileChoice> profiles,
-                                  std::string selected_profile_id) {
+                                  std::string selected_profile_id,
+                                  bool profile_menu) {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
   if (create_panel_) {
     create_panel_->FocusName();
@@ -698,8 +699,11 @@ void SidebarView::OpenCreateSpace(std::vector<ProfileChoice> profiles,
                          std::move(profiles), std::move(selected_profile_id),
                          base::BindRepeating(&SidebarView::SubmitCreateSpace,
                                              base::Unretained(this)),
-                         base::BindRepeating(&Delegate::CreateProfile,
-                                             base::Unretained(&*delegate_)),
+                         profile_menu
+                             ? base::BindRepeating(
+                                   &Delegate::CreateProfile,
+                                   base::Unretained(&*delegate_))
+                             : CreateSpacePanel::CreateProfileCallback(),
                          base::BindRepeating(&SidebarView::CloseCreateSpace,
                                              base::Unretained(this))),
                      0);
@@ -715,6 +719,14 @@ void SidebarView::OpenCreateSpace(std::vector<ProfileChoice> profiles,
     }
   }
   create_panel_->FocusName();
+}
+
+void SidebarView::SetCreateSpaceProfiles(std::vector<ProfileChoice> profiles,
+                                         const std::string& selected_id) {
+  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
+  if (create_panel_) {
+    create_panel_->SetProfiles(std::move(profiles), selected_id);
+  }
 }
 
 std::u16string SidebarView::SubmitCreateSpace(const std::u16string& name,
