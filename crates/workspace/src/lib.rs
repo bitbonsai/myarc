@@ -34,6 +34,9 @@ use std::fmt;
 pub mod archive;
 
 pub const MAX_SPACE_NAME_BYTES: usize = 128;
+/// Bound for either kind of Space icon. Long emoji ZWJ sequences with skin
+/// tones stay under 40 bytes.
+pub const MAX_SPACE_ICON_BYTES: usize = 64;
 pub const MAX_URL_BYTES: usize = 8192;
 pub const MAX_TITLE_BYTES: usize = 1024;
 pub const MAX_SPACES: usize = 64;
@@ -87,6 +90,7 @@ pub enum WorkspaceError {
     UnknownWindow(WindowId),
     UnknownArchivedTab(ItemId),
     InvalidName(RenameError),
+    InvalidIcon,
     InvalidUrl,
     CanonicalUrlRequired,
     UnexpectedCanonicalUrl,
@@ -114,6 +118,9 @@ impl fmt::Display for WorkspaceError {
             Self::UnknownWindow(id) => write!(formatter, "Window {id} does not exist; create it first"),
             Self::UnknownArchivedTab(id) => write!(formatter, "Archived tab {id} does not exist"),
             Self::InvalidName(error) => error.fmt(formatter),
+            Self::InvalidIcon => formatter.write_str(
+                "Use an emoji or an icon name of lowercase letters, digits and hyphens, at most 64 bytes",
+            ),
             Self::InvalidUrl => formatter.write_str(
                 "Use either a browser-validated canonical HTTP(S) URL without credentials, or about:blank; at most 8192 bytes and without whitespace/control characters",
             ),
@@ -136,11 +143,27 @@ impl fmt::Display for WorkspaceError {
 
 impl std::error::Error for WorkspaceError {}
 
+/// Icon the Space shows in place of its default glyph, picked in the Emoji/Icon
+/// picker. Both kinds are bounded by `MAX_SPACE_ICON_BYTES`.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum SpaceIcon {
+    /// One emoji as the picker inserts it, including ZWJ sequences, skin tones
+    /// and keycaps. The core gate bounds size and rejects controls, whitespace
+    /// and plain ASCII; it has no emoji table, so the picker owns the set.
+    Emoji(String),
+    /// Name of a bundled icon, such as `star` or `book-open`: lowercase ASCII
+    /// letters, digits and single hyphens, starting with a letter. Native code
+    /// maps names it does not know to the default glyph.
+    Named(String),
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Space {
     pub id: SpaceId,
     pub profile_id: ProfileId,
     pub name: String,
+    /// `None` shows the default glyph. Snapshots from before icons have none.
+    pub icon: Option<SpaceIcon>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -273,6 +296,7 @@ impl Default for Workspace {
                     id: DEFAULT_SPACE_ID,
                     profile_id: DEFAULT_PROFILE_ID,
                     name: String::from("Everyday"),
+                    icon: None,
                 }],
                 items: Vec::new(),
                 windows: vec![WindowState {
@@ -324,13 +348,32 @@ impl Workspace {
         Ok(())
     }
 
+    /// Icon of the Space with `id`, if it exists and has one.
+    pub fn space_icon_of(&self, id: SpaceId) -> Option<&SpaceIcon> {
+        self.space(id).ok().and_then(|space| space.icon.as_ref())
+    }
+
     pub fn create_space(
         &mut self,
         profile_id: ProfileId,
         name: &str,
     ) -> Result<SpaceId, WorkspaceError> {
+        self.create_space_with_icon(profile_id, name, None)
+    }
+
+    /// Like `create_space`, for the Create a Space panel, which can pick an icon.
+    /// Atomic: a bad name or icon leaves the workspace unchanged.
+    pub fn create_space_with_icon(
+        &mut self,
+        profile_id: ProfileId,
+        name: &str,
+        icon: Option<SpaceIcon>,
+    ) -> Result<SpaceId, WorkspaceError> {
         validate_profile(profile_id)?;
         validate_name(name).map_err(WorkspaceError::InvalidName)?;
+        if let Some(icon) = &icon {
+            validate_icon(icon)?;
+        }
         check_limit(self.state.spaces.len(), MAX_SPACES, "Spaces")?;
         let id = self.state.next_space_id;
         let next = next_id(id, "Space")?;
@@ -338,9 +381,33 @@ impl Workspace {
             id,
             profile_id,
             name: name.to_owned(),
+            icon,
         });
         self.state.next_space_id = next;
         Ok(id)
+    }
+
+    /// Replace a Space's icon; `None` restores the default glyph. Returns
+    /// whether it changed, so adapters can skip writes.
+    pub fn set_space_icon(
+        &mut self,
+        id: SpaceId,
+        icon: Option<SpaceIcon>,
+    ) -> Result<bool, WorkspaceError> {
+        if let Some(icon) = &icon {
+            validate_icon(icon)?;
+        }
+        let space = self
+            .state
+            .spaces
+            .iter_mut()
+            .find(|space| space.id == id)
+            .ok_or(WorkspaceError::UnknownSpace(id))?;
+        if space.icon == icon {
+            return Ok(false);
+        }
+        space.icon = icon;
+        Ok(true)
     }
 
     /// Delete a Space with the Temporary and Pin items it owns (BC-009). Any Space
@@ -878,6 +945,7 @@ impl Workspace {
             space_selections: Vec::new(),
         };
         workspace.sanitize_archive();
+        workspace.sanitize_icons();
         workspace.validate()?;
         Ok(workspace)
     }
@@ -886,6 +954,20 @@ impl Workspace {
     pub fn restore(&mut self, snapshot: WorkspaceSnapshot) -> Result<(), WorkspaceError> {
         *self = Self::from_snapshot(snapshot)?;
         Ok(())
+    }
+
+    /// A bad icon falls back to the default glyph instead of failing the
+    /// snapshot: it is cosmetic, and a newer build may allow more icon names.
+    fn sanitize_icons(&mut self) {
+        for space in &mut self.state.spaces {
+            if space
+                .icon
+                .as_ref()
+                .is_some_and(|icon| validate_icon(icon).is_err())
+            {
+                space.icon = None;
+            }
+        }
     }
 
     fn space(&self, id: SpaceId) -> Result<&Space, WorkspaceError> {
@@ -1010,6 +1092,31 @@ fn validate_name(name: &str) -> Result<(), RenameError> {
         return Err(RenameError::ControlCharacter);
     }
     Ok(())
+}
+
+fn validate_icon(icon: &SpaceIcon) -> Result<(), WorkspaceError> {
+    let valid = match icon {
+        SpaceIcon::Emoji(text) => {
+            !text.is_empty()
+                && text.len() <= MAX_SPACE_ICON_BYTES
+                && !text.is_ascii()
+                && !text.chars().any(|ch| ch.is_control() || ch.is_whitespace())
+        }
+        SpaceIcon::Named(name) => {
+            name.len() <= MAX_SPACE_ICON_BYTES
+                && name.starts_with(|ch: char| ch.is_ascii_lowercase())
+                && !name.ends_with('-')
+                && !name.contains("--")
+                && name
+                    .chars()
+                    .all(|ch| ch.is_ascii_lowercase() || ch.is_ascii_digit() || ch == '-')
+        }
+    };
+    if valid {
+        Ok(())
+    } else {
+        Err(WorkspaceError::InvalidIcon)
+    }
 }
 
 /// Control characters become spaces; the text is cut to `MAX_TITLE_BYTES` on a
@@ -1339,6 +1446,113 @@ mod tests {
             Workspace::from_snapshot(workspace.snapshot()).unwrap(),
             workspace
         );
+    }
+
+    fn emoji(text: &str) -> Option<SpaceIcon> {
+        Some(SpaceIcon::Emoji(text.into()))
+    }
+
+    fn named(name: &str) -> Option<SpaceIcon> {
+        Some(SpaceIcon::Named(name.into()))
+    }
+
+    #[test]
+    fn space_icon_round_trips_through_snapshot() {
+        let mut workspace = Workspace::default();
+        let coffee = workspace
+            .create_space_with_icon(DEFAULT_PROFILE_ID, "Coffee", emoji("☕"))
+            .unwrap();
+        let book = workspace
+            .create_space_with_icon(DEFAULT_PROFILE_ID, "Reading", named("book-open"))
+            .unwrap();
+        let plain = workspace.create_space(DEFAULT_PROFILE_ID, "Plain").unwrap();
+        for text in ["👩🏽‍💻", "🇧🇷", "1️⃣", "❤️", "👩🏽‍❤️‍💋‍👨🏻"]
+        {
+            assert_eq!(workspace.set_space_icon(plain, emoji(text)), Ok(true));
+        }
+        assert_eq!(workspace.set_space_icon(plain, named("h1")), Ok(true));
+        assert_eq!(workspace.set_space_icon(plain, named("h1")), Ok(false));
+        let restored = Workspace::from_snapshot(workspace.snapshot()).unwrap();
+        assert_eq!(restored, workspace);
+        assert_eq!(restored.space_icon_of(coffee), emoji("☕").as_ref());
+        assert_eq!(restored.space_icon_of(book), named("book-open").as_ref());
+        assert_eq!(restored.space_icon_of(plain), named("h1").as_ref());
+        assert_eq!(restored.space_icon_of(DEFAULT_SPACE_ID), None);
+        assert_eq!(workspace.set_space_icon(plain, None), Ok(true));
+        assert_eq!(workspace.space_icon_of(plain), None);
+    }
+
+    #[test]
+    fn rejects_invalid_space_icons_without_mutation() {
+        let mut workspace = Workspace::default();
+        let space = workspace
+            .create_space_with_icon(DEFAULT_PROFILE_ID, "Two", emoji("☕"))
+            .unwrap();
+        let before = workspace.snapshot();
+        let long_emoji = "☕".repeat(MAX_SPACE_ICON_BYTES / 3 + 1);
+        let long_name = "a".repeat(MAX_SPACE_ICON_BYTES + 1);
+        let bad = [
+            emoji(""),
+            emoji("a"),
+            emoji(":)"),
+            emoji("☕ "),
+            emoji("☕\n"),
+            emoji("\u{2003}"),
+            emoji(&long_emoji),
+            named(""),
+            named("Star"),
+            named("1star"),
+            named("-star"),
+            named("star-"),
+            named("book--open"),
+            named("book_open"),
+            named("star "),
+            named("é"),
+            named(&long_name),
+        ];
+        for icon in bad {
+            assert_eq!(
+                workspace.create_space_with_icon(DEFAULT_PROFILE_ID, "Three", icon.clone()),
+                Err(WorkspaceError::InvalidIcon),
+                "{icon:?}"
+            );
+            assert_eq!(
+                workspace.set_space_icon(space, icon.clone()),
+                Err(WorkspaceError::InvalidIcon),
+                "{icon:?}"
+            );
+        }
+        assert_eq!(
+            workspace.set_space_icon(99, emoji("☕")),
+            Err(WorkspaceError::UnknownSpace(99))
+        );
+        assert_eq!(workspace.snapshot(), before);
+        assert_eq!(
+            workspace.create_space(DEFAULT_PROFILE_ID, "Three"),
+            Ok(space + 1)
+        );
+    }
+
+    #[test]
+    fn snapshot_without_or_with_bad_icon_loads_with_default_glyph() {
+        // Snapshots written before icons carry none.
+        let mut legacy = Workspace::default().snapshot();
+        legacy.spaces.push(Space {
+            id: 2,
+            profile_id: DEFAULT_PROFILE_ID,
+            name: "Work".into(),
+            icon: None,
+        });
+        legacy.next_space_id = 3;
+        let workspace = Workspace::from_snapshot(legacy.clone()).unwrap();
+        assert_eq!(workspace.snapshot(), legacy);
+        assert_eq!(workspace.space_icon_of(2), None);
+
+        legacy.spaces[0].icon = named("Not An Icon");
+        legacy.spaces[1].icon = emoji("☕");
+        let workspace = Workspace::from_snapshot(legacy).unwrap();
+        assert_eq!(workspace.space_icon_of(DEFAULT_SPACE_ID), None);
+        assert_eq!(workspace.space_icon_of(2), emoji("☕").as_ref());
     }
 
     #[test]

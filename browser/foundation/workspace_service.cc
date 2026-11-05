@@ -193,6 +193,11 @@ std::optional<std::string> EncodeWorkspaceMetadata(
     record.Set("id", base::NumberToString(space.id));
     record.Set("profile_id", base::NumberToString(space.profile_id));
     record.Set("name", std::string(space.name));
+    // Builds without Space icons reject the keys, so write them only when set.
+    if (space.icon_kind != foundation::SpaceIconKind::Unset) {
+      record.Set("icon_kind", static_cast<int>(space.icon_kind));
+      record.Set("icon", std::string(space.icon));
+    }
     spaces.Append(std::move(record));
   }
   root.Set("spaces", std::move(spaces));
@@ -309,6 +314,18 @@ MetadataResult DecodeWorkspaceMetadata(std::string_view json) {
       return InvalidMetadata();
     }
     space.name = *name;
+    // Files written before Space icons have neither key. A bad icon reads as
+    // none rather than failing the file: it is cosmetic, and Rust restore
+    // drops one it rejects the same way.
+    const auto icon_kind = record->FindInt("icon_kind");
+    const auto* icon = record->FindString("icon");
+    space.icon_kind = foundation::SpaceIconKind::Unset;
+    if (icon_kind && icon && BoundedText(*icon, limits.icon_bytes) &&
+        (*icon_kind == static_cast<int>(foundation::SpaceIconKind::Emoji) ||
+         *icon_kind == static_cast<int>(foundation::SpaceIconKind::Named))) {
+      space.icon_kind = static_cast<foundation::SpaceIconKind>(*icon_kind);
+      space.icon = *icon;
+    }
     snapshot.spaces.push_back(std::move(space));
   }
   for (const auto& value : *items) {

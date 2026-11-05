@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-11-05: Spaces can carry an icon
+
+- `Space` gains an optional `SpaceIcon`, either one emoji or a bundled icon name (lowercase letters, digits and single hyphens), at most 64 bytes. `Workspace::create_space_with_icon` and `set_space_icon` validate it, and the FFI exposes both with a `SpaceIconKind` plus `icon` string on `SpaceRecord`. `create_space` keeps its signature, so no C++ caller changed. This prepares the Create a Space panel; the in-file Profile is still `DEFAULT_PROFILE_ID`.
+- `workspace_service.cc` writes `icon_kind` and `icon` only when a Space has an icon. Files without the keys load with no icon, and a malformed or rejected icon reads as none on both the C++ and Rust side.
+- Verification: `cargo fmt --check`, `cargo clippy -D warnings` and `cargo test` pass (98 unit, 38 semantics), with three new icon tests. `bridge.rs` typechecks and passes clippy in a scratch crate against Chromium's vendored `cxx`. `workspace_service.cc` and `bridge_check.cc` weren't compiled, since no Chromium build ran.
+
 ## 2026-11-04: Startpage is the default search engine
 
 - New profiles in every country now get Startpage as their default search engine. The `kMyarcStartpageDefault` feature, on by default, adds Chromium's existing Startpage entry (ID 113) to each regional list that lacks it and makes it the fallback default in place of Google. Google and the regional engines stay in settings. Chromium's choice screen only runs in Google Chrome branded builds or with `--force-search-engine-choice-screen`, so it never replaces the default here.

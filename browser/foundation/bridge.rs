@@ -26,10 +26,21 @@ mod ffi {
         Favorite,
     }
 
+    enum SpaceIconKind {
+        // The default glyph; `icon` is empty.
+        Unset,
+        // `icon` is one emoji.
+        Emoji,
+        // `icon` names a bundled icon, such as `book-open`.
+        Named,
+    }
+
     struct SpaceRecord {
         id: u64,
         profile_id: u64,
         name: String,
+        icon_kind: SpaceIconKind,
+        icon: String,
     }
 
     struct ItemRecord {
@@ -108,6 +119,7 @@ mod ffi {
         windows: usize,
         archived_tabs: usize,
         name_bytes: usize,
+        icon_bytes: usize,
         url_bytes: usize,
         title_bytes: usize,
     }
@@ -119,6 +131,22 @@ mod ffi {
         fn rename_space(workspace: &mut Workspace, id: u64, name: &str) -> RenameResult;
         fn bridge_limits() -> BridgeLimits;
         fn create_space(workspace: &mut Workspace, name: &str) -> MutationResult;
+        // Create a Space panel: like create_space, with an icon unless
+        // `icon_kind` is Unset, in which case `icon` must be empty.
+        fn create_space_with_icon(
+            workspace: &mut Workspace,
+            name: &str,
+            icon_kind: SpaceIconKind,
+            icon: &str,
+        ) -> MutationResult;
+        // Unset restores the default glyph. `id` is 1 when the icon changed,
+        // else 0.
+        fn set_space_icon(
+            workspace: &mut Workspace,
+            space_id: u64,
+            icon_kind: SpaceIconKind,
+            icon: &str,
+        ) -> MutationResult;
         fn create_window(workspace: &mut Workspace, space_id: u64) -> MutationResult;
         fn close_window(workspace: &mut Workspace, window_id: u64) -> MutationResult;
         fn select_space(workspace: &mut Workspace, window_id: u64, space_id: u64)
@@ -255,6 +283,7 @@ pub fn bridge_limits() -> ffi::BridgeLimits {
         windows: workspace::MAX_WINDOWS,
         archived_tabs: workspace::MAX_ARCHIVED_TABS,
         name_bytes: workspace::MAX_SPACE_NAME_BYTES,
+        icon_bytes: workspace::MAX_SPACE_ICON_BYTES,
         url_bytes: workspace::MAX_URL_BYTES,
         title_bytes: workspace::MAX_TITLE_BYTES,
     }
@@ -285,6 +314,47 @@ pub fn create_space(workspace: &mut Workspace, name: &str) -> ffi::MutationResul
             .0
             .create_space(workspace::DEFAULT_PROFILE_ID, name),
     )
+}
+
+fn space_icon(
+    kind: ffi::SpaceIconKind,
+    icon: &str,
+) -> Result<Option<workspace::SpaceIcon>, &'static str> {
+    match kind {
+        ffi::SpaceIconKind::Unset if icon.is_empty() => Ok(None),
+        ffi::SpaceIconKind::Unset => Err("Icon supplied without an icon kind"),
+        ffi::SpaceIconKind::Emoji => Ok(Some(workspace::SpaceIcon::Emoji(icon.to_owned()))),
+        ffi::SpaceIconKind::Named => Ok(Some(workspace::SpaceIcon::Named(icon.to_owned()))),
+        _ => Err("Unknown Space icon kind"),
+    }
+}
+
+pub fn create_space_with_icon(
+    workspace: &mut Workspace,
+    name: &str,
+    icon_kind: ffi::SpaceIconKind,
+    icon: &str,
+) -> ffi::MutationResult {
+    match space_icon(icon_kind, icon) {
+        Ok(icon) => outcome(workspace.0.create_space_with_icon(
+            workspace::DEFAULT_PROFILE_ID,
+            name,
+            icon,
+        )),
+        Err(error) => reject(error),
+    }
+}
+
+pub fn set_space_icon(
+    workspace: &mut Workspace,
+    space_id: u64,
+    icon_kind: ffi::SpaceIconKind,
+    icon: &str,
+) -> ffi::MutationResult {
+    match space_icon(icon_kind, icon) {
+        Ok(icon) => outcome(workspace.0.set_space_icon(space_id, icon).map(u64::from)),
+        Err(error) => reject(error),
+    }
 }
 
 pub fn create_window(workspace: &mut Workspace, space_id: u64) -> ffi::MutationResult {
@@ -566,10 +636,17 @@ pub fn reconcile_live_items(workspace: &mut Workspace, live: &[u64]) -> ffi::Mut
 }
 
 fn space_record(space: workspace::Space) -> ffi::SpaceRecord {
+    let (icon_kind, icon) = match space.icon {
+        None => (ffi::SpaceIconKind::Unset, String::new()),
+        Some(workspace::SpaceIcon::Emoji(text)) => (ffi::SpaceIconKind::Emoji, text),
+        Some(workspace::SpaceIcon::Named(name)) => (ffi::SpaceIconKind::Named, name),
+    };
     ffi::SpaceRecord {
         id: space.id,
         profile_id: space.profile_id,
         name: space.name,
+        icon_kind,
+        icon,
     }
 }
 
@@ -612,6 +689,8 @@ pub fn sidebar_snapshot(workspace: &Workspace, window_id: u64) -> ffi::SidebarRe
                 id: 0,
                 profile_id: 0,
                 name: String::new(),
+                icon_kind: ffi::SpaceIconKind::Unset,
+                icon: String::new(),
             },
             selected_item_id: 0,
             spaces: Vec::new(),
@@ -696,6 +775,13 @@ pub fn restore_snapshot(
                     .map(|space| workspace::Space {
                         id: space.id,
                         profile_id: space.profile_id,
+                        // An oversized or malformed icon reads as none, like
+                        // any other bad icon on restore.
+                        icon: if space.icon.len() > workspace::MAX_SPACE_ICON_BYTES {
+                            None
+                        } else {
+                            space_icon(space.icon_kind, &space.icon).unwrap_or_default()
+                        },
                         name: space.name,
                     })
                     .collect(),
