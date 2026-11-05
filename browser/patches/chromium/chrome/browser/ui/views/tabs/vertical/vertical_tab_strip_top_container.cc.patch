@@ -1,8 +1,8 @@
 diff --git a/chrome/browser/ui/views/tabs/vertical/vertical_tab_strip_top_container.cc b/chrome/browser/ui/views/tabs/vertical/vertical_tab_strip_top_container.cc
-index 485aa1faf322a7cab9f33c029986c373caccaf8a..acdd373627aba386a9b428f9e9fbab2fe169ec45 100644
+index 485aa1faf322a7cab9f33c029986c373caccaf8a..011f0e8a4f09b5052db664c343e73688c035ddf2 100644
 --- a/chrome/browser/ui/views/tabs/vertical/vertical_tab_strip_top_container.cc
 +++ b/chrome/browser/ui/views/tabs/vertical/vertical_tab_strip_top_container.cc
-@@ -95,6 +95,20 @@ VerticalTabStripTopContainer::VerticalTabStripTopContainer(
+@@ -95,6 +95,27 @@ VerticalTabStripTopContainer::VerticalTabStripTopContainer(
  
  VerticalTabStripTopContainer::~VerticalTabStripTopContainer() = default;
  
@@ -20,10 +20,17 @@ index 485aa1faf322a7cab9f33c029986c373caccaf8a..acdd373627aba386a9b428f9e9fbab2f
 +  return RemoveChildViewT(toolbar);
 +}
 +
++void VerticalTabStripTopContainer::SetMyarcUrlPillHidden(bool hidden) {
++  if (myarc_url_pill_hidden_ != hidden) {
++    myarc_url_pill_hidden_ = hidden;
++    PreferredSizeChanged();
++  }
++}
++
  void VerticalTabStripTopContainer::Layout(PassKey) {
    LayoutSuperclass<views::View>(this);
    combo_button_->SetOrientation(combo_button_orientation_);
-@@ -103,6 +117,19 @@ void VerticalTabStripTopContainer::Layout(PassKey) {
+@@ -103,6 +124,20 @@ void VerticalTabStripTopContainer::Layout(PassKey) {
  views::ProposedLayout VerticalTabStripTopContainer::CalculateProposedLayout(
      const views::SizeBounds& size_bounds) const {
    views::ProposedLayout layout;
@@ -32,7 +39,8 @@ index 485aa1faf322a7cab9f33c029986c373caccaf8a..acdd373627aba386a9b428f9e9fbab2f
 +                          ? size_bounds.width().value()
 +                          : parent()->width();
 +    // The URL pill ends at 82, leaving Arc's 8 DIP gap to the Favorites.
-+    layout.host_size = gfx::Size(width, 82);
++    // Without it the header ends under the navigation row.
++    layout.host_size = gfx::Size(width, myarc_url_pill_hidden_ ? 46 : 82);
 +    for (views::View* child : children()) {
 +      const bool toolbar = child == myarc_sidebar_toolbar_;
 +      layout.child_layouts.emplace_back(

@@ -1,5 +1,5 @@
 diff --git a/chrome/browser/ui/views/toolbar/toolbar_view.cc b/chrome/browser/ui/views/toolbar/toolbar_view.cc
-index 80b0e24263170de768a6684c8aabf106018710e7..34fc2ec5ffa3d7b389105de4f7a715889edb1424 100644
+index 80b0e24263170de768a6684c8aabf106018710e7..fdd58d92a60b7175032594b0769aa9a16d437e8e 100644
 --- a/chrome/browser/ui/views/toolbar/toolbar_view.cc
 +++ b/chrome/browser/ui/views/toolbar/toolbar_view.cc
 @@ -5,6 +5,7 @@
@@ -59,7 +59,7 @@ index 80b0e24263170de768a6684c8aabf106018710e7..34fc2ec5ffa3d7b389105de4f7a71588
    bool is_glic_left_of_profile =
        features::kGlicToolbarButtonLocationParam.Get() ==
            features::GlicToolbarButtonLocation::kLeftOfProfileChip ||
-@@ -1463,12 +1478,89 @@ gfx::Size ToolbarView::GetMinimumSize() const {
+@@ -1463,12 +1478,97 @@ gfx::Size ToolbarView::GetMinimumSize() const {
    return size;
  }
  
@@ -91,6 +91,13 @@ index 80b0e24263170de768a6684c8aabf106018710e7..34fc2ec5ffa3d7b389105de4f7a71588
 +  return owned;
 +}
 +
++void ToolbarView::SetMyarcUrlPillHidden(bool hidden) {
++  if (myarc_url_pill_hidden_ != hidden) {
++    myarc_url_pill_hidden_ = hidden;
++    InvalidateLayout();
++  }
++}
++
  void ToolbarView::Layout(PassKey) {
    // If we have not been initialized yet just do nothing.
    if (!initialized_) {
@@ -113,9 +120,10 @@ index 80b0e24263170de768a6684c8aabf106018710e7..34fc2ec5ffa3d7b389105de4f7a71588
 +    views::ProposedLayout layout;
 +    layout.host_size = size();
 +    for (views::View* child : children()) {
-+      const bool visible = child == myarc_sidebar_toggle_ ||
-+                           child == location_bar_view_ || child == back_ ||
-+                           child == forward_ || child == reload_;
++      const bool visible =
++          child == myarc_sidebar_toggle_ ||
++          (child == location_bar_view_ && !myarc_url_pill_hidden_) ||
++          child == back_ || child == forward_ || child == reload_;
 +      gfx::Rect bounds;
 +      if (child == myarc_sidebar_toggle_) {
 +        // Arc's 32 DIP toggle chip sits 4.5 DIP right of the traffic lights.
@@ -149,7 +157,7 @@ index 80b0e24263170de768a6684c8aabf106018710e7..34fc2ec5ffa3d7b389105de4f7a71588
    if (display_mode_ == DisplayMode::kCustomTab) {
      custom_tab_bar_->SetBounds(0, 0, width(),
                                 custom_tab_bar_->GetPreferredSize().height());
-@@ -1580,7 +1672,7 @@ void ToolbarView::InitLayout() {
+@@ -1580,7 +1680,7 @@ void ToolbarView::InitLayout() {
                                 views::MaximumFlexSizeRule::kUnbounded)
            .WithOrder(location_bar_flex_order);
  

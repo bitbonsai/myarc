@@ -14,6 +14,7 @@
 #include "base/memory/weak_ptr.h"
 #include "base/sequence_checker.h"
 #include "base/time/time.h"
+#include "myarc/space_icon_catalog.h"
 #include "ui/base/metadata/metadata_header_macros.h"
 #include "ui/base/models/image_model.h"
 #include "ui/gfx/animation/linear_animation.h"
@@ -100,6 +101,14 @@ class SidebarView final : public views::View,
     bool operator==(const LibrarySpace&) const = default;
   };
 
+  // A Space as the footer and title show it.
+  struct SpaceEntry {
+    uint64_t id = 0;
+    std::u16string name;
+    SpaceIconChoice icon;
+    bool operator==(const SpaceEntry&) const = default;
+  };
+
   class Delegate {
    public:
     virtual ~Delegate() = default;
@@ -121,8 +130,10 @@ class SidebarView final : public views::View,
     virtual void SelectSpace(uint64_t space_id) = 0;
     // Asks the parent to open the Create a Space panel with OpenCreateSpace.
     virtual void CreateSpace() = 0;
-    // The panel's Create: adds and selects the Space, or returns why it can't.
-    virtual std::u16string CreateNamedSpace(const std::u16string& name) = 0;
+    // The panel's Create: adds and selects the Space with `icon` (Kind::kNone
+    // for the default glyph), or returns why it can't.
+    virtual std::u16string CreateNamedSpace(const std::u16string& name,
+                                            const SpaceIconChoice& icon) = 0;
     // The panel closed; the parent supplies the rows' model with SetModel.
     virtual void CreateSpacePanelClosed() = 0;
     virtual void RenameSpace(uint64_t space_id) = 0;
@@ -248,7 +259,8 @@ class SidebarView final : public views::View,
   // Drops the Library view without notifying the parent.
   void ResetLibrary();
   // The Create a Space panel's callbacks.
-  std::u16string SubmitCreateSpace(const std::u16string& name);
+  std::u16string SubmitCreateSpace(const std::u16string& name,
+                                   const SpaceIconChoice& icon);
   void CloseCreateSpace();
   // Checked when the rows replace the Library, not when closing starts.
   bool LibraryHasFocus();
@@ -282,7 +294,7 @@ class SidebarView final : public views::View,
   raw_ptr<CreateMenu> create_menu_ = nullptr;
   raw_ptr<CreateButton> create_button_ = nullptr;
   std::vector<FocusTarget> footer_targets_;
-  std::vector<std::pair<uint64_t, std::u16string>> footer_spaces_;
+  std::vector<SpaceEntry> footer_spaces_;
   uint64_t footer_space_id_ = 0;
   raw_ptr<views::ScrollView> spaces_scroll_ = nullptr;
   raw_ptr<views::MdTextButton> new_tab_ = nullptr;
@@ -294,7 +306,7 @@ class SidebarView final : public views::View,
   uint64_t current_space_id_ = 0;
   uint64_t menu_space_id_ = 0;
   uint64_t menu_item_id_ = 0;
-  std::vector<std::pair<uint64_t, std::u16string>> spaces_;
+  std::vector<SpaceEntry> spaces_;
   // The same Spaces with their Pins, for the Library's cards.
   std::vector<LibrarySpace> library_spaces_;
   raw_ptr<LibraryView> library_ = nullptr;

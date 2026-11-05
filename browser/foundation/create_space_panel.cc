@@ -3,11 +3,17 @@
 #include <memory>
 #include <utility>
 
+#include "base/command_line.h"
 #include "base/functional/bind.h"
+#include "base/functional/callback_helpers.h"
 #include "base/location.h"
 #include "base/strings/string_util.h"
+#include "base/strings/utf_string_conversions.h"
 #include "base/task/sequenced_task_runner.h"
+#include "base/task/single_thread_task_runner.h"
+#include "base/time/time.h"
 #include "myarc/icons.h"
+#include "myarc/space_icon_picker.h"
 #include "third_party/skia/include/core/SkColor.h"
 #include "ui/base/metadata/metadata_impl_macros.h"
 #include "ui/color/color_id.h"
@@ -20,6 +26,8 @@
 #include "ui/views/accessibility/view_accessibility.h"
 #include "ui/views/background.h"
 #include "ui/views/border.h"
+#include "ui/views/bubble/bubble_border.h"
+#include "ui/views/bubble/bubble_dialog_delegate_view.h"
 #include "ui/views/controls/button/image_button.h"
 #include "ui/views/controls/button/label_button.h"
 #include "ui/views/controls/highlight_path_generator.h"
@@ -38,13 +46,22 @@ using Orientation = views::BoxLayout::Orientation;
 using CrossAxis = views::BoxLayout::CrossAxisAlignment;
 
 // Measured from Arc's panel in a 230 DIP sidebar: 200 DIP wide controls, 36
-// DIP rows 8 apart, and the buttons pinned to the bottom.
+// DIP rows 8 apart, and the buttons pinned to the bottom, 22 DIP above the
+// Space footer.
 constexpr int kSideInset = 7;
 constexpr int kRowHeight = 36;
 constexpr int kRowRadius = 7;
 constexpr int kRowGap = 8;
 constexpr int kRowIconSize = 16;
 constexpr int kArtSize = 48;
+
+// The switch that opens the panel for captures; "emoji" or "icon" also opens
+// the icon picker on that tab and holds it open.
+constexpr char kCaptureCreateSpace[] = "myarc-capture-create-space";
+
+// Arc's popover: 14 DIP corners on its dark sidebar navy.
+constexpr int kPickerRadius = 14;
+constexpr SkColor kPickerDark = SkColorSetRGB(0x25, 0x24, 0x2E);
 
 // Arc's primary blue, sampled from its Create Space button; disabled, the
 // button fades into the sidebar.
@@ -59,6 +76,7 @@ struct Colors {
   SkColor pill;
   SkColor cancel;
   SkColor error;
+  bool dark;
 };
 
 // Dark values are sampled from Arc's dark sidebar: rows lift it with white at
@@ -73,9 +91,11 @@ Colors GetColors(const ui::ColorProvider* provider) {
           .row = SkColorSetA(SK_ColorWHITE, dark ? 0x16 : 0x80),
           .pill = SkColorSetA(dark ? SK_ColorWHITE : SK_ColorBLACK,
                               dark ? 0x2E : 0x14),
-          .cancel = SkColorSetA(ink, 0xCC),
+          // Arc's Cancel is a step dimmer than its labels.
+          .cancel = SkColorSetA(ink, 0xB3),
           .error = dark ? SkColorSetRGB(0xFF, 0x8A, 0x8A)
-                        : SkColorSetRGB(0xB3, 0x26, 0x1E)};
+                        : SkColorSetRGB(0xB3, 0x26, 0x1E),
+          .dark = dark};
 }
 
 std::unique_ptr<views::View> Row(const gfx::Insets& insets, int spacing) {
@@ -115,7 +135,7 @@ CreateSpacePanel::CreateSpacePanel(std::u16string profile_name,
                                    base::RepeatingClosure cancel)
     : create_(std::move(create)), cancel_(std::move(cancel)) {
   auto* layout = SetLayoutManager(std::make_unique<views::BoxLayout>(
-      Orientation::kVertical, gfx::Insets::TLBR(18, kSideInset, 40, kSideInset),
+      Orientation::kVertical, gfx::Insets::TLBR(23, kSideInset, 14, kSideInset),
       0));
   layout->set_cross_axis_alignment(CrossAxis::kStretch);
   GetViewAccessibility().SetRole(ax::mojom::Role::kGroup);
@@ -143,15 +163,15 @@ CreateSpacePanel::CreateSpacePanel(std::u16string profile_name,
   name_row_ = name_row;
   name_row->SetPreferredSize(gfx::Size(0, kRowHeight));
   name_row->SetProperty(views::kMarginsKey, gfx::Insets::TLBR(30, 0, 0, 0));
-  auto icon_button = std::make_unique<views::ImageButton>();
+  auto icon_button = std::make_unique<views::ImageButton>(base::BindRepeating(
+      [](CreateSpacePanel* panel) { panel->OpenIconPicker(panel->icon_.kind); },
+      base::Unretained(this)));
   icon_button->SetPreferredSize(gfx::Size(20, 20));
   icon_button->SetImageHorizontalAlignment(views::ImageButton::ALIGN_CENTER);
   icon_button->SetImageVerticalAlignment(views::ImageButton::ALIGN_MIDDLE);
-  // The emoji and icon picker comes next; until then the button is off.
-  icon_button->SetEnabled(false);
-  icon_button->GetViewAccessibility().SetName(u"Space icon");
-  icon_button->GetViewAccessibility().SetDescription(
-      u"Choosing a Space icon is not available yet.");
+  icon_button->SetTooltipText(u"Choose an icon");
+  views::InstallRoundRectHighlightPathGenerator(icon_button.get(),
+                                                gfx::Insets(-2), 5);
   icon_button_ = name_row->AddChildView(std::move(icon_button));
   auto name = std::make_unique<views::Textfield>();
   name->SetBackgroundEnabled(false);
@@ -251,6 +271,122 @@ void CreateSpacePanel::FocusName() {
   name_->RequestFocus();
 }
 
+void CreateSpacePanel::OpenIconPicker(SpaceIconChoice::Kind tab, bool hold) {
+  if (picker_widget_ && !picker_widget_->IsClosed()) {
+    picker_widget_->Activate();
+    return;
+  }
+  if (picker_widget_) {
+    OnIconPickerClosed();
+  }
+  if (!GetWidget()) {
+    return;
+  }
+  // Arc hangs the popover under the whole name field, its left edge on the
+  // field's.
+  picker_delegate_ = std::make_unique<views::BubbleDialogDelegate>(
+      name_row_.get(), views::BubbleBorder::TOP_LEFT);
+  auto* delegate = picker_delegate_.get();
+  delegate->SetButtons(static_cast<int>(ui::mojom::DialogButton::kNone));
+  delegate->SetShowCloseButton(false);
+  delegate->SetShowTitle(false);
+  delegate->SetTitle(u"Space icon");
+  delegate->set_margins(gfx::Insets());
+  delegate->set_corner_radius(kPickerRadius);
+  delegate->set_close_on_deactivate(!hold);
+  const Colors colors = GetColors(GetColorProvider());
+  delegate->SetBackgroundColor(colors.dark ? kPickerDark : SK_ColorWHITE);
+  SpaceIconChoice current = icon_;
+  current.kind = tab;
+  picker_ = delegate->SetContentsView(std::make_unique<SpaceIconPickerView>(
+      current,
+      base::BindOnce(&CreateSpacePanel::PickIcon, weak_factory_.GetWeakPtr())));
+  delegate->SetInitiallyFocusedView(picker_->search());
+  picker_widget_ = views::BubbleDialogDelegate::CreateBubble(
+      delegate,
+      base::IgnoreArgs<views::Widget::ClosedReason>(base::BindOnce(
+          &CreateSpacePanel::OnIconPickerClosed, weak_factory_.GetWeakPtr())));
+  // Arc points a caret at the icon button. macOS bubbles use the OS shadow,
+  // which can't be combined with views' visible arrow, so the popover has
+  // none.
+  if (hold) {
+    picker_widget_->ShowInactive();
+  } else {
+    picker_widget_->Show();
+  }
+}
+
+void CreateSpacePanel::PickIcon(SpaceIconChoice icon) {
+  if (!IsBundledSpaceIcon(icon)) {
+    return;
+  }
+  icon_ = std::move(icon);
+  UpdateIconButton();
+  if (picker_widget_) {
+    picker_widget_->Close();
+  }
+  name_->RequestFocus();
+}
+
+void CreateSpacePanel::OnIconPickerClosed() {
+  picker_ = nullptr;
+  if (picker_delegate_) {
+    picker_delegate_->SetAnchorView(nullptr);
+  }
+  // The widget is mid-close; free it and its delegate once that unwinds.
+  if (picker_widget_) {
+    base::SingleThreadTaskRunner::GetCurrentDefault()->DeleteSoon(
+        FROM_HERE, std::move(picker_widget_));
+  }
+  if (picker_delegate_) {
+    base::SingleThreadTaskRunner::GetCurrentDefault()->DeleteSoon(
+        FROM_HERE, std::move(picker_delegate_));
+  }
+}
+
+void CreateSpacePanel::UpdateIconButton() {
+  if (!GetColorProvider()) {
+    return;
+  }
+  const Colors colors = GetColors(GetColorProvider());
+  ui::ImageModel image = SpaceIconImage(icon_, colors.ink, 18);
+  std::u16string name = u"Space icon";
+  if (image.IsEmpty()) {
+    image =
+        ui::ImageModel::FromVectorIcon(kSquareDashedPlusIcon, colors.muted, 18);
+  } else if (icon_.kind == SpaceIconChoice::Kind::kEmoji) {
+    const std::string_view keywords = FindBundledEmoji(icon_.value)->keywords;
+    name += u": " + base::UTF8ToUTF16(keywords.substr(0, keywords.find('|')));
+  } else {
+    name += u": " + base::UTF8ToUTF16(icon_.value);
+  }
+  icon_button_->SetImageModel(views::Button::STATE_NORMAL, image);
+  icon_button_->GetViewAccessibility().SetName(name);
+}
+
+void CreateSpacePanel::AddedToWidget() {
+  views::View::AddedToWidget();
+  const std::string capture =
+      base::CommandLine::ForCurrentProcess()->GetSwitchValueASCII(
+          kCaptureCreateSpace);
+  if (capture_scheduled_ || (capture != "emoji" && capture != "icon")) {
+    return;
+  }
+  capture_scheduled_ = true;
+  base::SequencedTaskRunner::GetCurrentDefault()->PostDelayedTask(
+      FROM_HERE,
+      base::BindOnce(
+          [](base::WeakPtr<CreateSpacePanel> panel, bool icon) {
+            if (panel) {
+              panel->OpenIconPicker(icon ? SpaceIconChoice::Kind::kNamed
+                                         : SpaceIconChoice::Kind::kEmoji,
+                                    /*hold=*/true);
+            }
+          },
+          weak_factory_.GetWeakPtr(), capture == "icon"),
+      base::Milliseconds(800));
+}
+
 void CreateSpacePanel::OnThemeChanged() {
   views::View::OnThemeChanged();
   const Colors colors = GetColors(GetColorProvider());
@@ -260,10 +396,7 @@ void CreateSpacePanel::OnThemeChanged() {
   subtitle_->SetEnabledColor(colors.subtitle);
   name_row_->SetBackground(
       views::CreateRoundedRectBackground(colors.row, kRowRadius));
-  const auto dashed =
-      ui::ImageModel::FromVectorIcon(kSquareDashedPlusIcon, colors.muted, 18);
-  icon_button_->SetImageModel(views::Button::STATE_NORMAL, dashed);
-  icon_button_->SetImageModel(views::Button::STATE_DISABLED, dashed);
+  UpdateIconButton();
   name_->SetColor(colors.ink);
   error_->SetEnabledColor(colors.error);
   profile_row_->SetBackground(
@@ -370,7 +503,7 @@ void CreateSpacePanel::RunCreate() {
   auto weak = weak_factory_.GetWeakPtr();
   // A copy, since success deletes the panel.
   auto create = create_;
-  const std::u16string error = create.Run(name);
+  const std::u16string error = create.Run(name, icon_);
   if (!weak || error.empty()) {
     return;
   }

@@ -130,6 +130,11 @@ source_set("sidebar_view") {
     "library_view.h",
     "sidebar_view.cc",
     "sidebar_view.h",
+    "space_icon_catalog.cc",
+    "space_icon_catalog.h",
+    "space_icon_data.cc",
+    "space_icon_picker.cc",
+    "space_icon_picker.h",
   ]
   public_deps = [
     ":library_logic",

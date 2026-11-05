@@ -24,6 +24,7 @@
 #include "myarc/footer_button.h"
 #include "myarc/icons.h"
 #include "myarc/library_view.h"
+#include "myarc/space_icon_catalog.h"
 #include "third_party/skia/include/core/SkColor.h"
 #include "ui/base/metadata/metadata_impl_macros.h"
 #include "ui/base/mojom/menu_source_type.mojom.h"
@@ -117,12 +118,26 @@ Fills GetFills(const ui::ColorProvider* provider) {
                       SkColorSetA(SK_ColorBLACK, 0x99)};
 }
 
-// The Space title's icon. Spaces store no icon yet, so every Space gets Arc's
-// default planet, drawn 18 DIP as Arc's title glyph is a size up from the
-// rows' 16 DIP favicons.
+// A Space record's icon. Unknown kinds read as none.
+SpaceIconChoice SpaceIconOf(const foundation::SpaceRecord& space) {
+  if (space.icon_kind == foundation::SpaceIconKind::Emoji) {
+    return {SpaceIconChoice::Kind::kEmoji, std::string(space.icon)};
+  }
+  if (space.icon_kind == foundation::SpaceIconKind::Named) {
+    return {SpaceIconChoice::Kind::kNamed, std::string(space.icon)};
+  }
+  return {};
+}
+
+// The Space title's icon: the Space's emoji or icon, else Arc's default
+// planet. 18 DIP, as Arc's title glyph is a size up from the rows' 16 DIP
+// favicons.
 constexpr int kSpaceIconSize = 18;
-ui::ImageModel SpaceIcon(SkColor color) {
-  return ui::ImageModel::FromVectorIcon(kSaturnIcon, color, kSpaceIconSize);
+ui::ImageModel SpaceIcon(const SpaceIconChoice& icon, SkColor color) {
+  ui::ImageModel image = SpaceIconImage(icon, color, kSpaceIconSize);
+  return image.IsEmpty() ? ui::ImageModel::FromVectorIcon(kSaturnIcon, color,
+                                                          kSpaceIconSize)
+                         : image;
 }
 
 // Arc centres every row icon 18 DIP into the row, on New Tab's plus, and starts
@@ -208,10 +223,19 @@ void SetWeight(views::LabelButton& button, gfx::Font::Weight weight) {
   }
 }
 
-// A Space's footer glyph: its icon, or a dot without one, brighter for the
-// current Space. Spaces store no icon yet; Arc's default planet is Space 1's.
-ui::ImageModel SpaceGlyph(size_t index, bool current, const Fills& fills) {
+// A Space's footer glyph, brighter for the current Space: its emoji or icon,
+// else Arc's default planet for the first Space and a dot for the rest.
+// Other Spaces' emoji fade to half.
+ui::ImageModel SpaceGlyph(size_t index,
+                          const SpaceIconChoice& icon,
+                          bool current,
+                          const Fills& fills) {
   const SkColor color = current ? fills.current_space : fills.space_dot;
+  ui::ImageModel image =
+      SpaceIconImage(icon, color, 16, current ? SK_AlphaOPAQUE : 0x80);
+  if (!image.IsEmpty()) {
+    return image;
+  }
   return index == 0 ? ui::ImageModel::FromVectorIcon(kSaturnIcon, color, 16)
                     : ui::ImageModel::FromVectorIcon(kDotIcon, color, 8);
 }
@@ -635,6 +659,7 @@ void SidebarView::OpenCreateSpace(const std::u16string& profile_name) {
     return;
   }
   const bool from_library = library_ || library_exit_.is_animating();
+  const uint64_t space_id = current_space_id_;
   library_exit_.Stop();
   ResetLibrary();
   menu_item_id_ = 0;
@@ -642,17 +667,39 @@ void SidebarView::OpenCreateSpace(const std::u16string& profile_name) {
     menu_runner_->Cancel();
   }
   space_slide_.Stop();
-  DropRows();
+  // Arc keeps the Space footer under the panel.
+  if (footer_ && !from_library) {
+    focus_targets_ = footer_targets_;
+    new_tab_ = nullptr;
+    space_rows_ = nullptr;
+    tiles_.clear();
+    while (children().front() != footer_) {
+      RemoveChildViewT(children().front());
+    }
+  } else {
+    DropRows();
+    current_space_id_ = space_id;
+    BuildFooter(gfx::PointF(), /*space_changed=*/false);
+    // Built while the Library's width animates away, the Spaces strip keeps a
+    // stale overflow hairline at its right edge. The indicator stays off
+    // until the Spaces or the current one change and SetModel rebuilds the
+    // footer.
+    spaces_scroll_->SetDrawOverflowIndicator(false);
+    footer_targets_ = focus_targets_;
+    UpdateFills();
+  }
   // SetModel rebuilds the rows from scratch once the panel closes.
   current_space_id_ = 0;
   // The panel posts both callbacks and this view owns it, so neither outlives
   // this view.
-  create_panel_ = AddChildView(std::make_unique<CreateSpacePanel>(
-      profile_name,
-      base::BindRepeating(&SidebarView::SubmitCreateSpace,
-                          base::Unretained(this)),
-      base::BindRepeating(&SidebarView::CloseCreateSpace,
-                          base::Unretained(this))));
+  create_panel_ =
+      AddChildViewAt(std::make_unique<CreateSpacePanel>(
+                         profile_name,
+                         base::BindRepeating(&SidebarView::SubmitCreateSpace,
+                                             base::Unretained(this)),
+                         base::BindRepeating(&SidebarView::CloseCreateSpace,
+                                             base::Unretained(this))),
+                     0);
   static_cast<views::BoxLayout*>(GetLayoutManager())
       ->SetFlexForView(create_panel_, 1);
   if (from_library) {
@@ -667,10 +714,11 @@ void SidebarView::OpenCreateSpace(const std::u16string& profile_name) {
   create_panel_->FocusName();
 }
 
-std::u16string SidebarView::SubmitCreateSpace(const std::u16string& name) {
+std::u16string SidebarView::SubmitCreateSpace(const std::u16string& name,
+                                              const SpaceIconChoice& icon) {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
   auto weak = weak_factory_.GetWeakPtr();
-  std::u16string error = delegate_->CreateNamedSpace(name);
+  std::u16string error = delegate_->CreateNamedSpace(name, icon);
   if (weak && error.empty()) {
     CloseCreateSpace();
   }
@@ -1035,8 +1083,10 @@ void SidebarView::SetModel(const foundation::SidebarResult& model,
   spaces_.clear();
   library_spaces_.clear();
   for (const auto& space : model.spaces) {
-    spaces_.emplace_back(space.id, base::UTF8ToUTF16(std::string(space.name)));
-    library_spaces_.push_back({.id = space.id, .name = spaces_.back().second});
+    spaces_.push_back({.id = space.id,
+                       .name = base::UTF8ToUTF16(std::string(space.name)),
+                       .icon = SpaceIconOf(space)});
+    library_spaces_.push_back({.id = space.id, .name = spaces_.back().name});
   }
   for (const auto& pin : model.space_pins) {
     const auto space =
@@ -1049,7 +1099,13 @@ void SidebarView::SetModel(const foundation::SidebarResult& model,
     }
   }
   if (create_panel_) {
-    // The rows rebuild when the panel closes.
+    // The rows rebuild when the panel closes. A Space picked in the footer
+    // leaves the panel; Create closes it itself.
+    if (footer_space_id_ && model.current_space.id != footer_space_id_) {
+      base::SequencedTaskRunner::GetCurrentDefault()->PostTask(
+          FROM_HERE, base::BindOnce(&SidebarView::CloseCreateSpace,
+                                    weak_factory_.GetWeakPtr()));
+    }
     return;
   }
   if (library_) {
@@ -1085,9 +1141,7 @@ void SidebarView::SetModel(const foundation::SidebarResult& model,
   bool slide = false;
   if (space_rows_ && space_changed) {
     const auto index_of = [this](uint64_t id) {
-      return std::ranges::find(spaces_, id,
-                               &std::pair<uint64_t, std::u16string>::first) -
-             spaces_.begin();
+      return std::ranges::find(spaces_, id, &SpaceEntry::id) - spaces_.begin();
     };
     const auto from = index_of(current_space_id_);
     const auto to = index_of(model.current_space.id);
@@ -1186,7 +1240,9 @@ void SidebarView::SetModel(const foundation::SidebarResult& model,
   // Arc leads the title with the Space's icon in the title's color, lined up
   // with the row icons so the name starts where the row titles do.
   const Fills fills = GetFills(GetColorProvider());
-  heading->SetImageModel(views::Button::STATE_NORMAL, SpaceIcon(fills.title));
+  heading->SetImageModel(
+      views::Button::STATE_NORMAL,
+      SpaceIcon(SpaceIconOf(model.current_space), fills.title));
   AlignRowContents(*heading, kSpaceIconSize);
   heading->SetEnabledTextColors(fills.title);
   if (!tile_items.empty()) {
@@ -1375,16 +1431,17 @@ void SidebarView::BuildFooter(const gfx::PointF& spaces_offset,
   // With one Space, Arc's footer shows no Space glyph.
   for (size_t index = 0; spaces_.size() > 1 && index < spaces_.size();
        ++index) {
-    const auto& [space_id, space_name] = spaces_[index];
+    const uint64_t space_id = spaces_[index].id;
+    const std::u16string& space_name = spaces_[index].name;
     const bool current = space_id == current_space_id_;
     // Button presses request a switch; only a Rust snapshot changes selection.
     auto choice = IconButton<FooterButton>(
         base::BindRepeating(&Delegate::SelectSpace,
                             base::Unretained(&delegate_.get()), space_id),
         nullptr);
-    choice->SetImageModel(
-        views::Button::STATE_NORMAL,
-        SpaceGlyph(index, current, GetFills(GetColorProvider())));
+    choice->SetImageModel(views::Button::STATE_NORMAL,
+                          SpaceGlyph(index, spaces_[index].icon, current,
+                                     GetFills(GetColorProvider())));
     // Arc spaces its Space dots 34 DIP apart.
     choice->SetMinSize(gfx::Size(34, 32));
     choice->SetMaxSize(gfx::Size(34, 32));
@@ -1711,19 +1768,24 @@ void SidebarView::UpdateFills() {
   if (rename != focus_targets_.end()) {
     auto* heading = static_cast<views::MdTextButton*>(rename->view.get());
     heading->SetEnabledTextColors(fills.title);
-    heading->SetImageModel(views::Button::STATE_NORMAL, SpaceIcon(fills.title));
+    const auto space =
+        std::ranges::find(spaces_, current_space_id_, &SpaceEntry::id);
+    heading->SetImageModel(
+        views::Button::STATE_NORMAL,
+        SpaceIcon(space != spaces_.end() ? space->icon : SpaceIconChoice(),
+                  fills.title));
   }
   for (const auto& target : focus_targets_) {
     if (target.action == FocusAction::kSpaces) {
-      const auto space = std::ranges::find(spaces_, target.id,
-                                           [](const auto& entry) {
-                                             return entry.first;
-                                           });
+      const auto space = std::ranges::find(spaces_, target.id, &SpaceEntry::id);
+      if (space == spaces_.end()) {
+        continue;
+      }
       static_cast<views::MdTextButton*>(target.view.get())
           ->SetImageModel(
               views::Button::STATE_NORMAL,
               SpaceGlyph(static_cast<size_t>(space - spaces_.begin()),
-                         target.id == current_space_id_, fills));
+                         space->icon, target.id == footer_space_id_, fills));
     }
   }
   SetCreateMenuOpen(create_menu_open_);

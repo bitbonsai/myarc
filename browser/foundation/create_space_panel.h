@@ -6,41 +6,53 @@
 #include "base/functional/callback.h"
 #include "base/memory/raw_ptr.h"
 #include "base/memory/weak_ptr.h"
+#include "myarc/space_icon_catalog.h"
 #include "ui/base/metadata/metadata_header_macros.h"
 #include "ui/views/controls/textfield/textfield_controller.h"
 #include "ui/views/view.h"
 
 namespace views {
+class BubbleDialogDelegate;
 class ImageButton;
 class ImageView;
 class Label;
 class LabelButton;
+class Widget;
 }  // namespace views
 
 namespace myarc {
 
+class SpaceIconPickerView;
+
 // Arc's "Create a Space" panel, which takes the sidebar's place: a name field,
 // the Profile the Space will use, and Create or Cancel. Return creates and Esc
-// cancels. The icon button and the theme row are placeholders for now.
+// cancels. The icon button opens the emoji and icon picker; the theme row is a
+// placeholder for now.
 class CreateSpacePanel final : public views::View,
                                public views::TextfieldController {
   METADATA_HEADER(CreateSpacePanel, views::View)
 
  public:
-  // `create` gets the trimmed name and returns why it failed, or nothing once
-  // the Space exists. Both callbacks run after the pressed control's handlers
-  // unwind and may delete the panel.
+  // `create` gets the trimmed name and the picked icon (Kind::kNone for the
+  // default glyph) and returns why it failed, or nothing once the Space
+  // exists. Both callbacks run after the pressed control's handlers unwind and
+  // may delete the panel.
   using CreateCallback =
-      base::RepeatingCallback<std::u16string(const std::u16string& name)>;
+      base::RepeatingCallback<std::u16string(const std::u16string& name,
+                                             const SpaceIconChoice& icon)>;
   CreateSpacePanel(std::u16string profile_name,
                    CreateCallback create,
                    base::RepeatingClosure cancel);
   ~CreateSpacePanel() override;
 
   void FocusName();
+  // Opens the icon picker under the icon button on `tab`. `hold` keeps it open
+  // in an inactive window, for background captures.
+  void OpenIconPicker(SpaceIconChoice::Kind tab, bool hold = false);
 
  private:
   // views::View:
+  void AddedToWidget() override;
   void OnThemeChanged() override;
   bool AcceleratorPressed(const ui::Accelerator& accelerator) override;
   // views::TextfieldController:
@@ -54,6 +66,10 @@ class CreateSpacePanel final : public views::View,
   void Create();
   void Cancel();
   void RunCreate();
+  void PickIcon(SpaceIconChoice icon);
+  void OnIconPickerClosed();
+  // The picked icon in place of the dashed "+".
+  void UpdateIconButton();
 
   CreateCallback create_;
   base::RepeatingClosure cancel_;
@@ -76,6 +92,13 @@ class CreateSpacePanel final : public views::View,
   raw_ptr<views::Label> theme_label_ = nullptr;
   raw_ptr<views::LabelButton> create_button_ = nullptr;
   raw_ptr<views::LabelButton> cancel_button_ = nullptr;
+  SpaceIconChoice icon_;
+  bool capture_scheduled_ = false;
+  // The picker's delegate outlives its widget; both close with the panel,
+  // before the name field they anchor to.
+  std::unique_ptr<views::BubbleDialogDelegate> picker_delegate_;
+  std::unique_ptr<views::Widget> picker_widget_;
+  raw_ptr<SpaceIconPickerView> picker_ = nullptr;
   base::WeakPtrFactory<CreateSpacePanel> weak_factory_{this};
 };
 
