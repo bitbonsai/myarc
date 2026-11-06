@@ -143,7 +143,6 @@ source_set("browser_workspace_adapter") {
     "//components/history/core/common",
     "//components/input",
     "//components/keyed_service/core",
-    "//components/page_content_annotations/content/mojom",
     "//components/prefs",
     "//components/sessions",
     "//components/tabs:public",

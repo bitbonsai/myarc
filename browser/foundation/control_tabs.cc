@@ -1,12 +1,15 @@
 #include "myarc/control_tabs.h"
 
+#include <algorithm>
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <utility>
 #include <vector>
 
 #include "base/functional/bind.h"
+#include "base/functional/callback_helpers.h"
 #include "base/location.h"
 #include "base/memory/weak_ptr.h"
 #include "base/process/kill.h"
@@ -21,7 +24,6 @@
 #include "components/actor/core/task_id.h"
 #include "components/actor/public/mojom/actor_types.mojom.h"
 #include "components/input/native_web_keyboard_event.h"
-#include "components/page_content_annotations/content/mojom/page_stability.mojom.h"
 #include "content/public/browser/browser_thread.h"
 #include "content/public/browser/document_user_data.h"
 #include "content/public/browser/navigation_controller.h"
@@ -47,6 +49,7 @@
 #include "ui/events/keycodes/dom/dom_code.h"
 #include "ui/events/keycodes/dom/dom_key.h"
 #include "ui/events/keycodes/dom/keycode_converter.h"
+#include "ui/gfx/geometry/size.h"
 #include "url/gurl.h"
 
 namespace myarc {
@@ -375,6 +378,30 @@ void TakeSnapshot(content::WebContents& page,
   (new SnapshotTaker(page, std::move(done)))->Start(timeout);
 }
 
+// Compares two nodes at the same position of two snapshots. Leaves out
+// node IDs, since nodes without a DOM node, such as list markers, get a new
+// one in every snapshot; the child counts keep the tree's shape.
+bool SameNode(const foundation::AxNodeRecord& a,
+              const foundation::AxNodeRecord& b) {
+  return a.role == b.role && a.name == b.name && a.value == b.value &&
+         a.url == b.url && a.children.size() == b.children.size() &&
+         a.level == b.level && a.focusable == b.focusable &&
+         a.clickable == b.clickable && a.invisible == b.invisible &&
+         a.ignored == b.ignored && a.checked == b.checked &&
+         a.expanded == b.expanded && a.disabled == b.disabled &&
+         a.selected == b.selected && a.required == b.required &&
+         a.is_protected == b.is_protected && a.editable == b.editable &&
+         a.read_only == b.read_only;
+}
+
+// Whether two snapshots of one document hold the same outline. Layout isn't
+// recorded, so an animation alone doesn't count as a change.
+bool SameContent(const Collected& a, const Collected& b) {
+  return a.document == b.document && a.root == b.root && a.focus == b.focus &&
+         a.source_truncated == b.source_truncated &&
+         std::ranges::equal(a.nodes, b.nodes, SameNode);
+}
+
 // Answers page.snapshot with what `TakeSnapshot` collected for `page`.
 void AnswerSnapshot(base::WeakPtr<content::WebContents> page,
                     uint64_t item,
@@ -483,6 +510,10 @@ bool SelectOptionsOf(const blink::mojom::AIPageContent& content,
 // main frame: they scroll the element into view, check it is still there,
 // enabled and not covered, and send real input events. Owns itself and
 // deletes itself after answering.
+//
+// The agent's tab is usually in the background. While the action runs it
+// counts as captured, as Chrome's own actor does, so the renderer treats the
+// page as visible and runs its timers on time instead of batching them.
 class ActionRun final : public content::WebContentsObserver {
  public:
   ActionRun(content::WebContents& page,
@@ -506,10 +537,9 @@ class ActionRun final : public content::WebContentsObserver {
     frame->GetRemoteAssociatedInterfaces()->GetInterface(&frame_);
     frame_.set_disconnect_handler(base::BindOnce(&ActionRun::OnFrameGone,
                                                  base::Unretained(this)));
-    // Before acting, so it sees the requests the action starts.
-    frame_->CreatePageStabilityMonitor(monitor_.BindNewPipeAndPassReceiver(),
-                                       task_id_,
-                                       /*supports_paint_stability=*/false);
+    awake_ = web_contents()->IncrementCapturerCount(
+        gfx::Size(), /*stay_hidden=*/false, /*stay_awake=*/true,
+        /*is_activity=*/true);
     timer_.Start(FROM_HERE, base::Milliseconds(limits_.action_wait_ms),
                  base::BindOnce(&ActionRun::OnActionTimeout,
                                 base::Unretained(this)));
@@ -673,9 +703,11 @@ class ActionRun final : public content::WebContentsObserver {
   }
 
   // Waits for the page to settle: for a started navigation to finish and
-  // the new page to load, or else for the renderer's page stability monitor
-  // to see the network and main thread idle. Gives up after the cap and
-  // snapshots what is there.
+  // the new page to load, or else for the page to go quiet. Quiet means two
+  // snapshots `kQuietWindow` apart hold the same outline while the tab
+  // isn't navigating or loading; the first is taken right after the action.
+  // The window is longer than the short timers pages use to show a result.
+  // Gives up after the cap and snapshots what is there.
   void Settle() {
     if (phase_ != Phase::kActing || done_) {
       return;
@@ -684,22 +716,43 @@ class ActionRun final : public content::WebContentsObserver {
     timer_.Start(FROM_HERE, base::Milliseconds(limits_.settle_cap_ms),
                  base::BindOnce(&ActionRun::OnSettleTimeout,
                                 base::Unretained(this)));
-    if (monitor_.is_bound() && monitor_.is_connected()) {
-      monitor_.set_disconnect_handler(base::BindOnce(
-          &ActionRun::OnStable, base::Unretained(this)));
-      monitor_->NotifyWhenStable(
-          base::TimeDelta(),
-          base::BindOnce(&ActionRun::OnStable, weak_factory_.GetWeakPtr()));
-    } else {
-      stable_ = true;
-    }
     MaybeSnapshot();
   }
 
-  void OnStable() {
-    stable_ = true;
-    monitor_.reset();
-    MaybeSnapshot();
+  static constexpr base::TimeDelta kQuietWindow = base::Milliseconds(250);
+
+  void Probe() {
+    if (phase_ != Phase::kSettling || done_ || navigating_ || new_document_ ||
+        probing_) {
+      return;
+    }
+    probing_ = true;
+    TakeSnapshot(*web_contents(),
+                 base::Milliseconds(limits_.snapshot_timeout_ms),
+                 base::BindOnce(&ActionRun::OnProbe,
+                                weak_factory_.GetWeakPtr()));
+  }
+
+  void OnProbe(Collected collected) {
+    probing_ = false;
+    if (phase_ != Phase::kSettling || done_ || navigating_ || new_document_) {
+      // A navigation took over; it settles through MaybeSnapshot.
+      MaybeSnapshot();
+      return;
+    }
+    if (collected.status == TabStatus::Done && probe_ &&
+        SameContent(*probe_, collected) && !web_contents()->IsLoading()) {
+      phase_ = Phase::kSnapshot;
+      timer_.Stop();
+      OnSnapshot(std::move(collected));
+      return;
+    }
+    if (collected.status == TabStatus::Done) {
+      probe_ = std::move(collected);
+    }
+    quiet_timer_.Start(FROM_HERE, kQuietWindow,
+                       base::BindOnce(&ActionRun::Probe,
+                                      base::Unretained(this)));
   }
 
   void OnSettleTimeout() {
@@ -711,8 +764,12 @@ class ActionRun final : public content::WebContentsObserver {
     if (phase_ != Phase::kSettling || done_ || navigating_) {
       return;
     }
-    if (new_document_ ? loaded_ : stable_) {
-      Snapshot();
+    if (new_document_) {
+      if (loaded_) {
+        Snapshot();
+      }
+    } else if (!quiet_timer_.IsRunning()) {
+      Probe();
     }
   }
 
@@ -722,7 +779,7 @@ class ActionRun final : public content::WebContentsObserver {
     }
     phase_ = Phase::kSnapshot;
     timer_.Stop();
-    monitor_.reset();
+    quiet_timer_.Stop();
     if (web_contents()->IsCrashed()) {
       Finish(foundation::ActionStatus::Unknown,
              "The page crashed after the action; reload it and take "
@@ -826,18 +883,21 @@ class ActionRun final : public content::WebContentsObserver {
   const foundation::ActionLimits limits_;
   const actor::TaskId task_id_;
   mojo::AssociatedRemote<chrome::mojom::ChromeRenderFrame> frame_;
-  mojo::Remote<page_content_annotations::mojom::PageStabilityMonitor>
-      monitor_;
+  // Keeps the page treated as visible until the answer.
+  base::ScopedClosureRunner awake_;
   mojo::Remote<blink::mojom::AIPageContentAgent> agent_;
   Phase phase_ = Phase::kActing;
   bool navigating_ = false;
   bool navigated_ = false;
   bool new_document_ = false;
   bool loaded_ = false;
-  bool stable_ = false;
   bool settled_ = true;
   bool done_ = false;
+  bool probing_ = false;
+  // The latest quiet-window snapshot.
+  std::optional<Collected> probe_;
   base::OneShotTimer timer_;
+  base::OneShotTimer quiet_timer_;
   base::WeakPtrFactory<ActionRun> weak_factory_{this};
 };
 
