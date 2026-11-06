@@ -1,6 +1,6 @@
 # Browser control: CLI and MCP
 
-Status: specified. A core stub in [crates/control](../crates/control/src/lib.rs) holds the command registry and runs the Space commands, but the CLI, MCP server and browser attachment don't exist yet. **Both interfaces are P0 browser launch requirements**, not just developer test tooling or a later paid AI feature. MA-011 delivers them. An external agent can control explicitly granted browser context while built-in AI remains off; the control interface itself requires no myarc account, subscription, model download or provider key.
+Status: specified. A core stub in [crates/control](../crates/control/src/lib.rs) holds the command registry and runs the Space commands. The `myarcctl` CLI and its MCP server in [crates/myarcctl](../crates/myarcctl/src/main.rs) expose that stub, but browser attachment doesn't exist yet. **Both interfaces are P0 browser launch requirements**, not just developer test tooling or a later paid AI feature. MA-011 delivers them. An external agent can control explicitly granted browser context while built-in AI remains off; the control interface itself requires no myarc account, subscription, model download or provider key.
 
 ## One control layer, two public interfaces
 
@@ -10,7 +10,7 @@ Status: specified. A core stub in [crates/control](../crates/control/src/lib.rs)
 | MCP server launched by `myarcctl` | AI clients supporting the implemented transport/protocol | Discoverable typed tools and structured results; translates requests into the same operations |
 | Shared control service | UI, CLI, MCP and future built-in agents | Validate scope/parameters, dispatch workspace commands or browser adapters, serialize conflicting actions and honor cancellation |
 
-These executable names are proposed, not commands that run today. Browser UI and command bar share underlying operations, but their authorization context differs from an external agent's grant. Do not expose every internal command automatically through MCP.
+`myarcctl` and `myarcctl mcp` run today against the stub (see Try the stub below). Browser UI and command bar share underlying operations, but their authorization context differs from an external agent's grant. Do not expose every internal command automatically through MCP.
 
 ## Required control surface
 
@@ -53,6 +53,25 @@ CLI/MCP attach to the live browser through authenticated same-user local IPC and
 Local stdio does not imply compatibility with every MCP host or ChatGPT on the web. Publish a tested client/version/transport matrix. Remote/cloud clients require a separately authorized bridge and authenticated transport. Such a convenience service remains optional and cannot become a prerequisite for local control.
 
 References: [MCP transports](https://modelcontextprotocol.io/specification/2026-07-28/basic/transports) and [MCP tools](https://modelcontextprotocol.io/specification/2026-07-28/server/tools). These inform design, not a claim that interfaces have shipped.
+
+## Try the stub
+
+`myarcctl` runs against an in-memory workspace with no browser attached. Only the Space commands work; every other command answers `unsupported`. Each CLI invocation starts from a fresh workspace, so a Space created by one `run` is gone by the next.
+
+```sh
+cargo build -p myarcctl
+target/debug/myarcctl commands
+target/debug/myarcctl run space.create '{"name":"Work"}'
+target/debug/myarcctl run space.rename '{"space_id":1,"name":"Home"}' --json
+```
+
+`run` exits 0 on success, 1 when the command returns an error and 2 on a usage error. `--json` prints the full response.
+
+`myarcctl mcp` serves the same registry as MCP tools over stdio, with dots in command IDs replaced by underscores (`space.create` becomes `space_create`). One MCP session keeps its workspace until the client disconnects. To add it to an MCP client, put the built binary on your `PATH` and use this server entry:
+
+```json
+{"command": "myarcctl", "args": ["mcp"]}
+```
 
 ## Launch evidence
 

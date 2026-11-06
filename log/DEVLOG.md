@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-11-06: myarcctl CLI and MCP server over the control stub
+
+- New crate `myarcctl` (`crates/myarcctl`) puts the `myarc-control` stub behind two interfaces. The CLI has `commands`, `run <command> [params-json]` and `--json`, and exits 0, 1 or 2 for success, an error outcome or a usage error. `myarcctl mcp` speaks newline-delimited JSON-RPC 2.0 on stdio with `initialize`, `ping`, `tools/list` and `tools/call`, publishes one tool per registry entry with its params schema, and keeps one `ControlService` for the session. Both call `ControlService::handle`. The JSON-RPC handling is written by hand with only `serde_json`, and input lines over 1 MiB get an error reply.
+- Verification: `cargo fmt --check`, `cargo clippy -D warnings` and `cargo test` pass across the workspace, with 18 new tests that run the built binary: CLI listing, runs, exit codes and JSON shape, plus a scripted MCP session (initialize, notification, tool list, Space create and list, an unsupported tool, an unknown method, a malformed line), bad params, invalid messages and an oversized line. `check_docs.py` passes.
+- Still open. No real external MCP client has connected yet, and the MCP layer uses no maintained SDK. Each CLI run uses a fresh in-memory workspace, and there are still no grants, cancellation or browser attachment.
+
 ## 2026-11-06: Control layer stub for CLI and MCP
 
 - New crate `myarc-control` (`crates/control`) holds the shared control layer for MA-011. `registry()` lists the 31 command IDs from the spec's control surface table, each with an area, a summary, a JSON Schema for its parameters and an `implemented` flag. `ControlService::handle` takes a `Request` and returns a `Response` whose `status` tag is success, denied, unsupported, stale, cancelled, timeout, outcome_unknown or invalid. `space.list`, `space.create`, `space.select` and `space.rename` run on an in-memory `Workspace`; every other command answers unsupported until a browser is attached.
