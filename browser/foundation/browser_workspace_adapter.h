@@ -130,7 +130,19 @@ class BrowserWorkspaceAdapter final : public TabStripModelObserver {
   foundation::MutationResult OpenInSpace(const GURL& url,
                                          uint64_t space,
                                          bool* opened);
+  // Like OpenInSpace, but a window showing another Space stays there: the
+  // page opens behind and becomes the item the window shows when it next
+  // selects `space`.
+  foundation::MutationResult OpenWithoutSwitching(const GURL& url,
+                                                  uint64_t space);
   foundation::MutationResult ActivateItem(uint64_t item);
+  // ActivateItem when this window shows the item's Space; otherwise makes
+  // it the item the window shows when it next selects that Space.
+  foundation::MutationResult ActivateInItsSpace(uint64_t item);
+  // The live page of `item` in this window's Profile, or null. Sets `owner`
+  // to the window whose tab strip holds it, or null while it is detached.
+  content::WebContents* FindPage(uint64_t item,
+                                 BrowserWorkspaceAdapter** owner) const;
   // Close this window's projection only. Dormant saved rows remain unchanged.
   foundation::MutationResult CloseItem(uint64_t item);
   foundation::MutationResult CreateSpace(std::string_view name);
@@ -151,7 +163,8 @@ class BrowserWorkspaceAdapter final : public TabStripModelObserver {
       const foundation::SpaceThemeRecord& theme);
   foundation::MutationResult SelectSpace(uint64_t space);
   // Runs a browser control request against this window's workspace, and
-  // shows the newly selected Space when the request changed it.
+  // shows the newly selected Space when the request changed it. Tab commands
+  // run in this window and may answer later.
   void AnswerControlRequest(rust::Box<foundation::ControlReply> reply);
   foundation::MutationResult Pin(uint64_t item);
   foundation::MutationResult Favorite(uint64_t item);
@@ -181,6 +194,10 @@ class BrowserWorkspaceAdapter final : public TabStripModelObserver {
   foundation::MutationResult BindTabs();
   foundation::MutationResult Save(uint64_t item,
                                   foundation::PlacementKind kind);
+  foundation::MutationResult Open(const GURL& url,
+                                  uint64_t space,
+                                  bool* opened,
+                                  bool switch_space);
   static std::map<std::string, std::string> TabBindingExtraData(
       content::WebContents& contents,
       const foundation::ItemRecord* row,

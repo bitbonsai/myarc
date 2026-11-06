@@ -1583,3 +1583,35 @@ fn agent_space_does_not_count_as_an_untouched_default() {
     assert_ne!(created, S1);
     assert_eq!(workspace.agent_space_of(P1), Some(S1));
 }
+
+#[test]
+fn selecting_an_item_in_a_hidden_space_waits_for_that_space() {
+    let mut workspace = Workspace::default();
+    let agent = workspace.ensure_agent_space(P1).unwrap();
+    let shown = workspace.add_temporary_item(S1).unwrap();
+    workspace.select_item(W1, shown).unwrap();
+    let first = workspace.add_temporary_item(agent).unwrap();
+    let second = workspace.add_temporary_item(agent).unwrap();
+
+    workspace.select_item_in_its_space(W1, first).unwrap();
+    workspace.select_item_in_its_space(W1, second).unwrap();
+    let sidebar = workspace.sidebar_snapshot(W1).unwrap();
+    assert_eq!(sidebar.current_space.id, S1);
+    assert_eq!(sidebar.selected_item_id, Some(shown));
+
+    workspace.select_space(W1, agent).unwrap();
+    assert_eq!(
+        workspace.sidebar_snapshot(W1).unwrap().selected_item_id,
+        Some(second)
+    );
+    // In the shown Space it selects at once.
+    workspace.select_item_in_its_space(W1, first).unwrap();
+    assert_eq!(
+        workspace.sidebar_snapshot(W1).unwrap().selected_item_id,
+        Some(first)
+    );
+    assert_eq!(
+        workspace.select_item_in_its_space(W1, 999),
+        Err(WorkspaceError::UnknownItem(999))
+    );
+}

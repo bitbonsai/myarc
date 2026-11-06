@@ -144,6 +144,50 @@ mod ffi {
         title_bytes: usize,
     }
 
+    // What the browser does for a control request once the core checked it.
+    enum TabActionKind {
+        // Answered already; nothing to run.
+        Answered,
+        List,
+        Open,
+        Activate,
+        Close,
+        Navigate,
+        Back,
+        Forward,
+        Reload,
+    }
+
+    // Every item is a tab in the agent Space. `url` is set for Open and
+    // Navigate, `space` for Open and `items` for List.
+    struct ControlPlan {
+        // The workspace changed, so the caller saves and notifies.
+        changed: bool,
+        action: TabActionKind,
+        item: u64,
+        space: u64,
+        url: String,
+        items: Vec<u64>,
+    }
+
+    enum TabStatus {
+        Done,
+        // The navigation did not commit in time or ended without committing.
+        NotCommitted,
+        Denied,
+        Stale,
+        Invalid,
+    }
+
+    struct TabStateRecord {
+        item: u64,
+        url: String,
+        title: String,
+        loading: bool,
+        can_go_back: bool,
+        can_go_forward: bool,
+    }
+
     extern "Rust" {
         type Workspace;
         fn new_workspace() -> Box<Workspace>;
@@ -279,6 +323,13 @@ mod ffi {
         // confirms first and closes live pages of the deleted Space's items.
         fn delete_space(workspace: &mut Workspace, space_id: u64) -> MutationResult;
         fn reveal_item(workspace: &mut Workspace, window_id: u64, item_id: u64) -> MutationResult;
+        // Selects the item now when the window shows its Space, else when the
+        // window next selects that Space.
+        fn select_item_in_its_space(
+            workspace: &mut Workspace,
+            window_id: u64,
+            item_id: u64,
+        ) -> MutationResult;
         // Zero destination means no live page; zero before means append.
         fn unsave_item(workspace: &mut Workspace, item_id: u64, live_space: u64) -> MutationResult;
         fn move_item_before(workspace: &mut Workspace, item_id: u64, before: u64)
@@ -313,15 +364,27 @@ mod ffi {
         // False when the client already got timeout or cancelled; drop it.
         fn control_request_live(reply: &ControlReply) -> bool;
         // UI thread: runs the request against `workspace` as seen from
-        // `window_id` and sends the answer. True when the workspace changed,
-        // so the caller saves and notifies.
+        // `window_id`. A Space command is answered at once and leaves `reply`
+        // empty. A tab command that passed its checks keeps the request in
+        // `reply` and names the action; the caller runs it and answers with
+        // answer_tab_request, now or later.
         fn answer_control_request(
-            reply: Box<ControlReply>,
+            reply: &mut ControlReply,
             workspace: &mut Workspace,
             window_id: u64,
-        ) -> bool;
+        ) -> ControlPlan;
+        // Answers a tab command kept by answer_control_request. `tabs` holds
+        // the tab afterwards, or each live tab for List.
+        fn answer_tab_request(
+            reply: &mut ControlReply,
+            status: TabStatus,
+            reason: &str,
+            tabs: Vec<TabStateRecord>,
+        );
+        // Milliseconds to wait for a navigation to commit.
+        fn control_navigation_wait_ms() -> u64;
         // Answers denied without running the request.
-        fn refuse_control_request(reply: Box<ControlReply>, reason: &str);
+        fn refuse_control_request(reply: &mut ControlReply, reason: &str);
         // UI thread: stops serving and removes the endpoint before returning.
         fn stop_control_host();
     }
@@ -727,6 +790,19 @@ pub fn reveal_item(workspace: &mut Workspace, window_id: u64, item_id: u64) -> f
     outcome(workspace.0.reveal_item(window_id, item_id).map(|()| 0))
 }
 
+pub fn select_item_in_its_space(
+    workspace: &mut Workspace,
+    window_id: u64,
+    item_id: u64,
+) -> ffi::MutationResult {
+    outcome(
+        workspace
+            .0
+            .select_item_in_its_space(window_id, item_id)
+            .map(|()| 0),
+    )
+}
+
 pub fn unsave_item(
     workspace: &mut Workspace,
     item_id: u64,
@@ -1030,22 +1106,95 @@ pub fn control_request_live(reply: &ControlReply) -> bool {
 }
 
 pub fn answer_control_request(
-    reply: Box<ControlReply>,
+    reply: &mut ControlReply,
     workspace: &mut Workspace,
     window_id: u64,
-) -> bool {
-    let Some(pending) = reply.0 else {
-        return false;
+) -> ffi::ControlPlan {
+    use control::TabAction;
+    use ffi::TabActionKind as Kind;
+    let mut plan = ffi::ControlPlan {
+        changed: false,
+        action: Kind::Answered,
+        item: 0,
+        space: 0,
+        url: String::new(),
+        items: Vec::new(),
+    };
+    let Some(pending) = reply.0.take() else {
+        return plan;
     };
     let before = workspace.0.snapshot();
-    let response = control::dispatch(&mut workspace.0, window_id, pending.request().clone());
-    let changed = workspace.0.snapshot() != before;
-    pending.reply(response);
-    changed
+    let routed = control::route(&mut workspace.0, window_id, pending.request());
+    plan.changed = workspace.0.snapshot() != before;
+    let action = match routed {
+        control::Routed::Answered(response) => {
+            pending.reply(response);
+            return plan;
+        }
+        control::Routed::Tab(action) => action,
+    };
+    reply.0 = Some(pending);
+    (plan.action, plan.item) = match action {
+        TabAction::List { items } => {
+            plan.items = items;
+            (Kind::List, 0)
+        }
+        TabAction::Open { space_id, url } => {
+            (plan.space, plan.url) = (space_id, url);
+            (Kind::Open, 0)
+        }
+        TabAction::Navigate { item, url } => {
+            plan.url = url;
+            (Kind::Navigate, item)
+        }
+        TabAction::Activate { item } => (Kind::Activate, item),
+        TabAction::Close { item } => (Kind::Close, item),
+        TabAction::Back { item } => (Kind::Back, item),
+        TabAction::Forward { item } => (Kind::Forward, item),
+        TabAction::Reload { item } => (Kind::Reload, item),
+    };
+    plan
 }
 
-pub fn refuse_control_request(reply: Box<ControlReply>, reason: &str) {
-    if let Some(pending) = reply.0 {
+pub fn answer_tab_request(
+    reply: &mut ControlReply,
+    status: ffi::TabStatus,
+    reason: &str,
+    tabs: Vec<ffi::TabStateRecord>,
+) {
+    use ffi::TabStatus as Status;
+    let Some(pending) = reply.0.take() else {
+        return;
+    };
+    let tabs: Vec<control::TabState> = tabs
+        .into_iter()
+        .map(|tab| control::TabState {
+            item: tab.item,
+            url: tab.url,
+            title: tab.title,
+            loading: tab.loading,
+            can_go_back: tab.can_go_back,
+            can_go_forward: tab.can_go_forward,
+        })
+        .collect();
+    let reason = reason.to_owned();
+    let result = match status {
+        Status::Done => control::TabResult::Done(tabs),
+        Status::NotCommitted => control::TabResult::Unknown { reason, tabs },
+        Status::Denied => control::TabResult::Failed(control::Outcome::Denied { reason }),
+        Status::Stale => control::TabResult::Failed(control::Outcome::Stale { reason }),
+        _ => control::TabResult::Failed(control::Outcome::Invalid { reason }),
+    };
+    let response = control::tab_response(pending.request(), result);
+    pending.reply(response);
+}
+
+pub fn control_navigation_wait_ms() -> u64 {
+    control::NAVIGATION_WAIT_MS
+}
+
+pub fn refuse_control_request(reply: &mut ControlReply, reason: &str) {
+    if let Some(pending) = reply.0.take() {
         let response = control::deny(pending.request(), reason);
         pending.reply(response);
     }

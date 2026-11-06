@@ -164,6 +164,10 @@ class WorkspaceService final : public base::SupportsUserData::Data {
                                 base::span<const uint64_t> live) const;
   foundation::MutationResult RemoveSavedItem(uint64_t item);
   foundation::MutationResult RevealItem(uint64_t window, uint64_t item);
+  // Selects `item` now when `window` shows its Space, else when `window`
+  // next selects that Space. Never switches Space.
+  foundation::MutationResult SelectItemInItsSpace(uint64_t window,
+                                                  uint64_t item);
   foundation::MutationResult UnsaveItem(uint64_t item, uint64_t live_space);
   foundation::MutationResult MoveItemBefore(uint64_t item, uint64_t before);
   // Zero before moves the Space to the end.
@@ -176,9 +180,11 @@ class WorkspaceService final : public base::SupportsUserData::Data {
       foundation::StateSnapshot snapshot);
   // Runs a browser control request as seen from `window`, saving and
   // notifying like the UI commands when it changes the workspace. Refused
-  // while the workspace is not loaded.
-  void AnswerControlRequest(uint64_t window,
-                            rust::Box<foundation::ControlReply> reply);
+  // while the workspace is not loaded. A tab command that passed the core's
+  // checks stays in `reply`, and the plan names what to run.
+  foundation::ControlPlan AnswerControlRequest(
+      uint64_t window,
+      foundation::ControlReply& reply);
 
  private:
   explicit WorkspaceService(Profile& profile);

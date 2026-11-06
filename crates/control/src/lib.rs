@@ -4,12 +4,16 @@
 //! MCP server translate requests into `Request` values and print `Response`
 //! values; both use the one command registry below.
 //!
-//! [`dispatch`] runs the Space commands against a workspace the caller owns,
-//! such as the browser's. [`ControlService`] wraps it around an in-memory
-//! workspace for `myarcctl --local` and `serve-local`. Commands that need a live browser are listed in the
-//! registry with `implemented: false` and answer `Unsupported`. Requests are
-//! untrusted: strings are bounded, unknown parameters are rejected and no input
-//! panics.
+//! [`dispatch`] runs the Space commands against a workspace the caller owns.
+//! [`ControlService`] wraps it around an in-memory workspace for
+//! `myarcctl --local` and `serve-local`, where the tab commands answer
+//! `Unsupported` because there are no pages. A browser calls [`route`]
+//! instead: it answers the Space commands the same way and turns each tab
+//! command into a [`TabAction`] scoped to the agent Space, which the browser
+//! runs and answers later with [`tab_response`]. Commands not built yet are
+//! listed in the registry with `implemented: false` and answer `Unsupported`.
+//! Requests are untrusted: strings are bounded, unknown parameters are
+//! rejected and no input panics.
 //!
 //! On Unix, `ipc` carries requests from a client process to the service hosted
 //! by a running browser over an authenticated same-user socket.
@@ -20,8 +24,8 @@ use std::sync::OnceLock;
 pub mod ipc;
 
 use myarc_workspace::{
-    DEFAULT_PROFILE_ID, DEFAULT_WINDOW_ID, RenameError, SpaceId, WindowId, Workspace,
-    WorkspaceError,
+    DEFAULT_PROFILE_ID, DEFAULT_WINDOW_ID, ItemId, MAX_TITLE_BYTES, Placement, RenameError,
+    SpaceId, WindowId, Workspace, WorkspaceError,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value, json};
@@ -36,7 +40,12 @@ pub const MAX_COMMAND_BYTES: usize = 64;
 pub const MAX_STRING_PARAM_BYTES: usize = 256;
 /// Longest piece of untrusted input quoted inside an error message.
 const MAX_QUOTED_BYTES: usize = 64;
-const MAX_URL_LENGTH: usize = myarc_workspace::MAX_URL_BYTES;
+/// Longest URL a tab command accepts or reports, 8 KiB.
+pub const MAX_URL_LENGTH: usize = myarc_workspace::MAX_URL_BYTES;
+/// How long a browser waits for a tab's navigation to commit before it
+/// answers `outcome_unknown` with the latest state. Shorter than the host's
+/// 10 second reply timeout, so the client gets that state, not `timeout`.
+pub const NAVIGATION_WAIT_MS: u64 = 9_000;
 const MAX_PATH_LENGTH: usize = 4096;
 
 /// Group a command belongs to, matching the areas in docs/CONTROL-PROTOCOL.md.
@@ -91,6 +100,10 @@ pub enum Outcome {
     Timeout,
     OutcomeUnknown {
         reason: String,
+        /// Latest known state, such as a tab whose navigation had not
+        /// committed yet.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        data: Option<Value>,
     },
     /// Bad parameters or an unknown command.
     Invalid {
@@ -146,29 +159,98 @@ impl ControlService {
 /// window `space.select` changes and `selected` describes. Commands act on
 /// the workspace's own Profile, Profile 1. The caller saves and refreshes its
 /// UI after a change.
+/// The tab commands answer `unsupported` here, since there are no pages.
 pub fn dispatch(workspace: &mut Workspace, window_id: WindowId, req: Request) -> Response {
+    match run(workspace, window_id, &req, false) {
+        Routed::Answered(response) => response,
+        // Not reached: without pages, tab commands are answered above.
+        Routed::Tab(_) => answer(
+            &req,
+            Outcome::Unsupported {
+                command: bounded(&req.command).to_owned(),
+                reason: no_pages(&req.command),
+            },
+        ),
+    }
+}
+
+/// A request [`route`] has handled.
+#[derive(Clone, Debug, PartialEq)]
+pub enum Routed {
+    /// Ran in the core, or failed its checks; send this answer.
+    Answered(Response),
+    /// A tab command that passed its checks. The browser runs it and answers
+    /// with [`tab_response`].
+    Tab(TabAction),
+}
+
+/// What the browser does for a tab command after the core checked its
+/// parameters and scope. Every `item` is a tab in the agent Space of the
+/// workspace's Profile.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum TabAction {
+    /// Report the tabs among `items` that have a live page, in this order.
+    List {
+        items: Vec<ItemId>,
+    },
+    /// Open `url` as a temporary tab of `space_id`, the agent Space, without
+    /// switching the window's Space or selecting the tab.
+    Open {
+        space_id: SpaceId,
+        url: String,
+    },
+    Activate {
+        item: ItemId,
+    },
+    Close {
+        item: ItemId,
+    },
+    Navigate {
+        item: ItemId,
+        url: String,
+    },
+    Back {
+        item: ItemId,
+    },
+    Forward {
+        item: ItemId,
+    },
+    Reload {
+        item: ItemId,
+    },
+}
+
+/// Like [`dispatch`] for a host with live pages, such as the browser. Space
+/// commands run at once. A tab command is checked against the agent Space and
+/// handed back as a [`TabAction`]; `tab.open` creates the agent Space first
+/// when the Profile has none.
+pub fn route(workspace: &mut Workspace, window_id: WindowId, req: &Request) -> Routed {
+    run(workspace, window_id, req, true)
+}
+
+fn run(workspace: &mut Workspace, window_id: WindowId, req: &Request, live: bool) -> Routed {
     let Request {
         id,
         command,
         params,
     } = req;
     if id.len() > MAX_REQUEST_ID_BYTES {
-        return Response {
+        return Routed::Answered(Response {
             id: String::new(),
-            command: bounded(&command).to_owned(),
+            command: bounded(command).to_owned(),
             outcome: invalid(format!(
                 "Request ID exceeds {MAX_REQUEST_ID_BYTES} bytes; use a shorter ID"
             )),
-        };
+        });
     }
     if command.len() > MAX_COMMAND_BYTES {
-        return Response {
-            id,
+        return Routed::Answered(Response {
+            id: id.clone(),
             command: String::new(),
             outcome: invalid(format!(
                 "Command exceeds {MAX_COMMAND_BYTES} bytes; use an ID from the registry"
             )),
-        };
+        });
     }
     let outcome = match registry().iter().find(|spec| spec.id == command) {
         None => invalid(format!(
@@ -181,27 +263,246 @@ pub fn dispatch(workspace: &mut Workspace, window_id: WindowId, req: Request) ->
                 "{command} needs live browser attachment (MA-011), which this core stub does not have"
             ),
         },
+        Some(spec) if spec.area == Area::Tabs && !live => Outcome::Unsupported {
+            command: command.clone(),
+            reason: no_pages(command),
+        },
+        Some(spec) if spec.area == Area::Tabs => match tab_action(workspace, command, params) {
+            Ok(action) => return Routed::Tab(action),
+            Err(outcome) => outcome,
+        },
         Some(_) => {
             let mut context = Context {
                 workspace,
                 window_id,
             };
-            match context.run(&command, &params) {
+            match context.run(command, params) {
                 Ok(data) => Outcome::Success { data },
                 Err(reason) => invalid(reason),
             }
         }
     };
-    Response {
-        id,
-        command,
+    Routed::Answered(Response {
+        id: id.clone(),
+        command: command.clone(),
         outcome,
+    })
+}
+
+fn no_pages(command: &str) -> String {
+    format!(
+        "{} needs a running myArc browser; --local and serve-local have no tabs",
+        bounded(command)
+    )
+}
+
+/// Stable handle of a tab, valid while its item lives.
+pub fn tab_handle(item: ItemId) -> String {
+    format!("t{item}")
+}
+
+/// The item a handle from [`tab_handle`] names, or `None` when `handle` is
+/// not one.
+pub fn parse_tab_handle(handle: &str) -> Option<ItemId> {
+    let digits = handle.strip_prefix('t')?;
+    if digits.is_empty()
+        || digits.len() > 20
+        || digits.starts_with('0')
+        || !digits.bytes().all(|byte| byte.is_ascii_digit())
+    {
+        return None;
+    }
+    digits.parse().ok()
+}
+
+/// Checks a URL an agent asked to load. It must be at most
+/// [`MAX_URL_LENGTH`] bytes with no whitespace or control characters, use
+/// http or https and carry no user name or password. Anything else, such as
+/// `chrome:`, `file:`, `javascript:` or `data:`, is denied. The browser
+/// parses the URL again and repeats the scheme check on its result.
+pub fn check_url(url: &str) -> Result<(), Outcome> {
+    if url.len() > MAX_URL_LENGTH {
+        return Err(invalid(format!("URL exceeds {MAX_URL_LENGTH} bytes")));
+    }
+    if url.chars().any(|c| c.is_whitespace() || c.is_control()) {
+        return Err(invalid(String::from(
+            "URL contains whitespace or control characters; percent-encode them",
+        )));
+    }
+    let scheme = url
+        .split_once(':')
+        .map(|(scheme, _)| scheme)
+        .filter(|scheme| {
+            scheme.starts_with(|c: char| c.is_ascii_alphabetic())
+                && scheme
+                    .bytes()
+                    .all(|byte| byte.is_ascii_alphanumeric() || b"+-.".contains(&byte))
+        });
+    let Some(scheme) = scheme else {
+        return Err(invalid(String::from(
+            "URL needs a scheme; use one that starts with https://",
+        )));
+    };
+    if !scheme.eq_ignore_ascii_case("http") && !scheme.eq_ignore_ascii_case("https") {
+        return Err(Outcome::Denied {
+            reason: format!(
+                "Only http and https URLs are allowed, not {:?}",
+                bounded(scheme)
+            ),
+        });
+    }
+    let rest = url[scheme.len() + 1..].trim_start_matches(['/', '\\']);
+    let authority = rest.split(['/', '\\', '?', '#']).next().unwrap_or_default();
+    if authority.contains('@') {
+        return Err(Outcome::Denied {
+            reason: String::from("URLs with a user name or password are not allowed"),
+        });
+    }
+    Ok(())
+}
+
+fn tab_action(
+    workspace: &mut Workspace,
+    command: &str,
+    params: &Value,
+) -> Result<TabAction, Outcome> {
+    match command {
+        "tabs.list" => {
+            Params::parse(params, &[]).map_err(invalid)?;
+            let agent = workspace.agent_space_of(DEFAULT_PROFILE_ID);
+            let items = workspace
+                .items()
+                .iter()
+                .filter(|item| agent.is_some() && space_of(item.placement) == agent)
+                .map(|item| item.id)
+                .collect();
+            Ok(TabAction::List { items })
+        }
+        "tab.open" => {
+            let params = Params::parse(params, &["url"]).map_err(invalid)?;
+            let url = params.url()?;
+            let space_id = workspace
+                .ensure_agent_space(DEFAULT_PROFILE_ID)
+                .map_err(|error| invalid(workspace_error(error)))?;
+            Ok(TabAction::Open { space_id, url })
+        }
+        "tab.navigate" => {
+            let params = Params::parse(params, &["tab", "url"]).map_err(invalid)?;
+            let item = agent_tab(workspace, &params)?;
+            let url = params.url()?;
+            Ok(TabAction::Navigate { item, url })
+        }
+        _ => {
+            let params = Params::parse(params, &["tab"]).map_err(invalid)?;
+            let item = agent_tab(workspace, &params)?;
+            match command {
+                "tab.activate" => Ok(TabAction::Activate { item }),
+                "tab.close" => Ok(TabAction::Close { item }),
+                "tab.back" => Ok(TabAction::Back { item }),
+                "tab.forward" => Ok(TabAction::Forward { item }),
+                "tab.reload" => Ok(TabAction::Reload { item }),
+                other => Err(invalid(format!(
+                    "{other} is registered as implemented but has no handler"
+                ))),
+            }
+        }
     }
 }
 
-/// Answers `req` with `denied` without running it, for a host that can't run
-/// commands right now, such as a browser whose workspace is still loading.
-pub fn deny(req: &Request, reason: &str) -> Response {
+fn space_of(placement: Placement) -> Option<SpaceId> {
+    match placement {
+        Placement::Temporary { space_id } | Placement::Pin { space_id } => Some(space_id),
+        Placement::Favorite { .. } => None,
+    }
+}
+
+/// The item behind the `tab` parameter: `stale` when no such item lives,
+/// `denied` when it is not in the agent Space.
+fn agent_tab(workspace: &Workspace, params: &Params) -> Result<ItemId, Outcome> {
+    let handle = params.string("tab").map_err(invalid)?;
+    let Some(item) = parse_tab_handle(handle) else {
+        return Err(invalid(format!(
+            "Tab handle {:?} is not a handle from tabs.list, such as t12",
+            bounded(handle)
+        )));
+    };
+    let Some(found) = workspace.items().iter().find(|found| found.id == item) else {
+        return Err(Outcome::Stale {
+            reason: format!("Tab {handle} is closed or unknown; run tabs.list for current handles"),
+        });
+    };
+    let agent = workspace.agent_space_of(DEFAULT_PROFILE_ID);
+    if agent.is_none() || space_of(found.placement) != agent {
+        return Err(Outcome::Denied {
+            reason: format!("Tab {handle} is outside the agent Space"),
+        });
+    }
+    Ok(item)
+}
+
+/// State of one tab as the browser reports it after a tab command.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct TabState {
+    pub item: ItemId,
+    pub url: String,
+    pub title: String,
+    pub loading: bool,
+    pub can_go_back: bool,
+    pub can_go_forward: bool,
+}
+
+/// How the browser finished a [`TabAction`].
+#[derive(Clone, Debug, PartialEq)]
+pub enum TabResult {
+    /// Done. `tabs` holds the tab afterwards, every live tab for `tabs.list`,
+    /// or the tab just before it closed for `tab.close`.
+    Done(Vec<TabState>),
+    /// The navigation did not commit in time, or ended without committing.
+    /// `tabs` holds the tab's latest state.
+    Unknown { reason: String, tabs: Vec<TabState> },
+    /// Not run, or the tab went away, such as `stale` or `denied`.
+    Failed(Outcome),
+}
+
+/// The answer to a tab command from how the browser finished it. Data is
+/// `{"tabs": [...]}` for `tabs.list` and `{"tab": {...}}` otherwise, with
+/// `"closed": true` added for `tab.close`. Each tab has `handle`, `url`,
+/// `title`, `loading`, `can_go_back` and `can_go_forward`; URLs and titles
+/// are cut to their workspace limits.
+pub fn tab_response(req: &Request, result: TabResult) -> Response {
+    let data = |tabs: Vec<TabState>| {
+        if req.command == "tabs.list" {
+            return json!({ "tabs": tabs.iter().map(tab_json).collect::<Vec<_>>() });
+        }
+        let mut data = json!({ "tab": tabs.first().map(tab_json) });
+        if req.command == "tab.close" {
+            data["closed"] = Value::Bool(true);
+        }
+        data
+    };
+    let outcome = match result {
+        TabResult::Done(tabs) => Outcome::Success { data: data(tabs) },
+        TabResult::Unknown { reason, tabs } => Outcome::OutcomeUnknown {
+            reason,
+            data: Some(data(tabs)),
+        },
+        TabResult::Failed(outcome) => outcome,
+    };
+    answer(req, outcome)
+}
+
+fn tab_json(tab: &TabState) -> Value {
+    json!({
+        "handle": tab_handle(tab.item),
+        "url": truncate(&tab.url, MAX_URL_LENGTH),
+        "title": truncate(&tab.title, MAX_TITLE_BYTES),
+        "loading": tab.loading,
+        "can_go_back": tab.can_go_back,
+        "can_go_forward": tab.can_go_forward,
+    })
+}
+
+fn answer(req: &Request, outcome: Outcome) -> Response {
     Response {
         id: if req.id.len() > MAX_REQUEST_ID_BYTES {
             String::new()
@@ -209,10 +510,19 @@ pub fn deny(req: &Request, reason: &str) -> Response {
             req.id.clone()
         },
         command: bounded(&req.command).to_owned(),
-        outcome: Outcome::Denied {
+        outcome,
+    }
+}
+
+/// Answers `req` with `denied` without running it, for a host that can't run
+/// commands right now, such as a browser whose workspace is still loading.
+pub fn deny(req: &Request, reason: &str) -> Response {
+    answer(
+        req,
+        Outcome::Denied {
             reason: reason.to_owned(),
         },
-    }
+    )
 }
 
 struct Context<'a> {
@@ -335,16 +645,25 @@ impl<'a> Params<'a> {
     }
 
     fn string(&self, key: &str) -> Result<&'a str, String> {
+        self.text(key, MAX_STRING_PARAM_BYTES)
+    }
+
+    fn text(&self, key: &str, max: usize) -> Result<&'a str, String> {
         let value = self
             .get(key)?
             .as_str()
             .ok_or_else(|| format!("Parameter {key} must be a string"))?;
-        if value.len() > MAX_STRING_PARAM_BYTES {
-            return Err(format!(
-                "Parameter {key} exceeds {MAX_STRING_PARAM_BYTES} bytes"
-            ));
+        if value.len() > max {
+            return Err(format!("Parameter {key} exceeds {max} bytes"));
         }
         Ok(value)
+    }
+
+    /// The `url` parameter, checked by [`check_url`].
+    fn url(&self) -> Result<String, Outcome> {
+        let url = self.text("url", MAX_URL_LENGTH).map_err(invalid)?;
+        check_url(url)?;
+        Ok(url.to_owned())
     }
 
     fn id(&self, key: &str) -> Result<u64, String> {
@@ -372,7 +691,12 @@ fn workspace_error(error: WorkspaceError) -> String {
 
 /// Prefix of untrusted text short enough to quote in an error.
 fn bounded(text: &str) -> &str {
-    let mut end = text.len().min(MAX_QUOTED_BYTES);
+    truncate(text, MAX_QUOTED_BYTES)
+}
+
+/// Longest prefix of `text` of at most `max` bytes that ends on a character.
+fn truncate(text: &str, max: usize) -> &str {
+    let mut end = text.len().min(max);
     while !text.is_char_boundary(end) {
         end -= 1;
     }
@@ -400,8 +724,11 @@ fn id(description: &str) -> Value {
     json!({ "type": "integer", "minimum": 1, "description": description })
 }
 
-fn tab_id() -> Value {
-    text("Stable tab handle from tabs.list", MAX_STRING_PARAM_BYTES)
+fn tab_param() -> Value {
+    text(
+        "Tab handle from tabs.list or tab.open, such as t12",
+        MAX_STRING_PARAM_BYTES,
+    )
 }
 
 fn revision() -> Value {
@@ -420,7 +747,7 @@ fn element_ref() -> Value {
 }
 
 fn tab_only() -> Value {
-    schema(json!({ "tab_id": tab_id() }), &["tab_id"])
+    schema(json!({ "tab": tab_param() }), &["tab"])
 }
 
 fn spec(
@@ -476,59 +803,68 @@ fn build_registry() -> Vec<CommandSpec> {
         spec(
             "tabs.list",
             Tabs,
-            "List tabs in the grant with stable handles, URL and title",
+            "List the open tabs in the agent Space with handles, URL, title and navigation state",
             no_params(),
-            false,
+            true,
         ),
         spec(
             "tab.open",
             Tabs,
-            "Open a tab at a URL",
+            "Open a tab at a URL in the agent Space, creating that Space if needed, without switching the user's Space",
             schema(
-                json!({
-                    "url": text("HTTP(S) URL to open", MAX_URL_LENGTH),
-                    "space_id": id("Space to open the tab in; defaults to the selected Space"),
-                }),
+                json!({ "url": text("HTTP(S) URL to open", MAX_URL_LENGTH) }),
                 &["url"],
             ),
-            false,
+            true,
         ),
         spec(
             "tab.activate",
             Tabs,
-            "Bring a tab to the front",
+            "Make an agent Space tab the one it shows; the user's window switches only when it already shows the agent Space",
             tab_only(),
-            false,
+            true,
         ),
-        spec("tab.close", Tabs, "Close a tab", tab_only(), false),
+        spec(
+            "tab.close",
+            Tabs,
+            "Close an agent Space tab",
+            tab_only(),
+            true,
+        ),
         spec(
             "tab.navigate",
             Tabs,
-            "Load a URL in a tab",
+            "Load a URL in an agent Space tab and wait for it to commit",
             schema(
                 json!({
-                    "tab_id": tab_id(),
+                    "tab": tab_param(),
                     "url": text("HTTP(S) URL to load", MAX_URL_LENGTH),
                 }),
-                &["tab_id", "url"],
+                &["tab", "url"],
             ),
-            false,
+            true,
         ),
         spec(
             "tab.back",
             Tabs,
-            "Go back in a tab's history",
+            "Go back in an agent Space tab's history and wait for it to commit",
             tab_only(),
-            false,
+            true,
         ),
         spec(
             "tab.forward",
             Tabs,
-            "Go forward in a tab's history",
+            "Go forward in an agent Space tab's history and wait for it to commit",
             tab_only(),
-            false,
+            true,
         ),
-        spec("tab.reload", Tabs, "Reload a tab", tab_only(), false),
+        spec(
+            "tab.reload",
+            Tabs,
+            "Reload an agent Space tab and wait for it to commit",
+            tab_only(),
+            true,
+        ),
         spec(
             "page.snapshot",
             Observation,
@@ -548,8 +884,8 @@ fn build_registry() -> Vec<CommandSpec> {
             Interaction,
             "Click an element from the current snapshot",
             schema(
-                json!({ "tab_id": tab_id(), "revision": revision(), "ref": element_ref() }),
-                &["tab_id", "revision", "ref"],
+                json!({ "tab": tab_param(), "revision": revision(), "ref": element_ref() }),
+                &["tab", "revision", "ref"],
             ),
             false,
         ),
@@ -559,12 +895,12 @@ fn build_registry() -> Vec<CommandSpec> {
             "Fill a text field from the current snapshot",
             schema(
                 json!({
-                    "tab_id": tab_id(),
+                    "tab": tab_param(),
                     "revision": revision(),
                     "ref": element_ref(),
                     "value": text("Text to enter", MAX_STRING_PARAM_BYTES),
                 }),
-                &["tab_id", "revision", "ref", "value"],
+                &["tab", "revision", "ref", "value"],
             ),
             false,
         ),
@@ -574,12 +910,12 @@ fn build_registry() -> Vec<CommandSpec> {
             "Choose an option in a select element from the current snapshot",
             schema(
                 json!({
-                    "tab_id": tab_id(),
+                    "tab": tab_param(),
                     "revision": revision(),
                     "ref": element_ref(),
                     "value": text("Option value to choose", MAX_STRING_PARAM_BYTES),
                 }),
-                &["tab_id", "revision", "ref", "value"],
+                &["tab", "revision", "ref", "value"],
             ),
             false,
         ),
@@ -589,12 +925,12 @@ fn build_registry() -> Vec<CommandSpec> {
             "Press a key, optionally on an element from the current snapshot",
             schema(
                 json!({
-                    "tab_id": tab_id(),
+                    "tab": tab_param(),
                     "revision": revision(),
                     "ref": element_ref(),
                     "key": text("Key name, such as Enter or Tab", MAX_QUOTED_BYTES),
                 }),
-                &["tab_id", "revision", "key"],
+                &["tab", "revision", "key"],
             ),
             false,
         ),
@@ -604,12 +940,12 @@ fn build_registry() -> Vec<CommandSpec> {
             "Scroll the page or an element from the current snapshot",
             schema(
                 json!({
-                    "tab_id": tab_id(),
+                    "tab": tab_param(),
                     "revision": revision(),
                     "ref": element_ref(),
                     "direction": { "type": "string", "enum": ["up", "down", "left", "right"] },
                 }),
-                &["tab_id", "revision", "direction"],
+                &["tab", "revision", "direction"],
             ),
             false,
         ),
@@ -619,7 +955,7 @@ fn build_registry() -> Vec<CommandSpec> {
             "Wait, within a bound, for a tab to finish loading",
             schema(
                 json!({
-                    "tab_id": tab_id(),
+                    "tab": tab_param(),
                     "timeout_ms": {
                         "type": "integer",
                         "minimum": 0,
@@ -627,7 +963,7 @@ fn build_registry() -> Vec<CommandSpec> {
                         "description": "Longest wait in milliseconds",
                     },
                 }),
-                &["tab_id", "timeout_ms"],
+                &["tab", "timeout_ms"],
             ),
             false,
         ),

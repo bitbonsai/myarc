@@ -1,6 +1,6 @@
 # Browser control: CLI and MCP
 
-Status: specified. A core stub in [crates/control](../crates/control/src/lib.rs) holds the command registry and runs the Space commands. Its [ipc module](../crates/control/src/ipc.rs) carries requests from a client to a running browser over an authenticated same-user Unix socket. The `myarcctl` CLI and its MCP server in [crates/myarcctl](../crates/myarcctl/src/main.rs) connect through that socket by default. The browser hosts the socket when started with `--myarc-enable-control` (see Browser host below), and `myarcctl serve-local` stands in for it in development. **Both interfaces are P0 browser launch requirements**, not just developer test tooling or a later paid AI feature. MA-011 delivers them. An external agent can control explicitly granted browser context while built-in AI remains off; the control interface itself requires no myarc account, subscription, model download or provider key.
+Status: specified. A core stub in [crates/control](../crates/control/src/lib.rs) holds the command registry, runs the Space commands and checks the tab commands. Its [ipc module](../crates/control/src/ipc.rs) carries requests from a client to a running browser over an authenticated same-user Unix socket. The `myarcctl` CLI and its MCP server in [crates/myarcctl](../crates/myarcctl/src/main.rs) connect through that socket by default. The browser hosts the socket when started with `--myarc-enable-control` (see Browser host below), and `myarcctl serve-local` stands in for it in development. **Both interfaces are P0 browser launch requirements**, not just developer test tooling or a later paid AI feature. MA-011 delivers them. An external agent can control explicitly granted browser context while built-in AI remains off; the control interface itself requires no myarc account, subscription, model download or provider key.
 
 ## One control layer, two public interfaces
 
@@ -58,7 +58,7 @@ References: [MCP transports](https://modelcontextprotocol.io/specification/2026-
 
 `run` and `mcp` connect to the running browser by default. The browser publishes its control endpoint in `~/Library/Application Support/myarc/control/`, or in `$MYARC_CONTROL_DIR` when that is set. The directory holds `control.json` with the socket path, a token that changes each time the server starts, the server's pid and its protocol version. Clients refuse the endpoint unless the directory (mode 700), the file and the socket (mode 600) belong to the current user and are closed to group and others. Each connection opens with a hello that carries the token, and every message after it is a length-prefixed JSON frame of at most 1 MiB.
 
-Only the Space commands work, and every other command answers `unsupported`. `myarcctl serve-local` is a development stub that serves an in-memory workspace in place of the browser. That workspace lasts as long as `serve-local` runs, so a Space created by one `run` shows up in the next.
+The Space commands work everywhere. The tab commands work only in the browser, and `--local` and `serve-local` answer them with `unsupported` because they have no pages. Every other command answers `unsupported`. `myarcctl serve-local` is a development stub that serves an in-memory workspace in place of the browser. That workspace lasts as long as `serve-local` runs, so a Space created by one `run` shows up in the next.
 
 ```sh
 cargo build -p myarcctl
@@ -81,11 +81,19 @@ target/debug/myarcctl run space.list --json
 
 ## Browser host
 
-The browser serves the endpoint only when launched with `--myarc-enable-control`. Without the switch it writes nothing to the control directory. The switch is a stand-in: a Settings toggle and the grant UI described above replace it later, and until then every same-user process that can read `control.json` gets full control of the Space commands.
+The browser serves the endpoint only when launched with `--myarc-enable-control`. Without the switch it writes nothing to the control directory. The switch is a stand-in: a Settings toggle and the grant UI described above replace it later, and until then every same-user process that can read `control.json` gets full control of the Space commands and the agent Space's tabs.
 
 The first browser window starts the host after its Profile's workspace service exists. A dedicated background thread binds the endpoint in `$MYARC_CONTROL_DIR` or the default directory, and `myarc_control::ipc::Host` serves it. Each request goes to the UI thread, which runs `myarc_control::dispatch` against the browser's own workspace and then saves and notifies through the same path the sidebar's commands use, so the footer updates at once and the change survives a restart. A request with no answer after 10 seconds gets `timeout`, and the UI thread skips it if it hasn't started it yet. Quitting stops the host before the workspace's final save and removes `control.json` and the socket. A cancelled quit starts it again.
 
 Each Profile has its own workspace. A request runs in the most recently active normal window that isn't private, against that window's Profile, and `space.select` and `selected` refer to that window. With no such window open, or while its workspace is still loading, the request gets `denied` with the reason.
+
+### Tabs in the agent Space
+
+The tab commands reach only tabs in the agent Space of that window's Profile. `tab.open {url}` creates the agent Space first when the Profile has none, then opens the page there as a temporary tab behind the user's page. The window keeps the user's Space, and the new tab is the one the agent Space shows when the user selects it, for example by clicking the bot in the footer. `tab.activate` works the same way: it brings the tab forward only in a window that already shows the agent Space.
+
+Each tab has a handle such as `t12` that stays valid while the tab lives. `tabs.list` returns the open agent Space tabs. A handle of a closed or unknown tab gets `stale`, and a tab in any other Space gets `denied` with "outside the agent Space". URLs must be http or https, without a user name or password, and at most 8 KiB. The core checks the text and the browser checks what it parsed from it, so `chrome:`, `file:`, `javascript:`, `data:` and other schemes get `denied`.
+
+A tab command answers with `{"tab": {...}}`, or `{"tabs": [...]}` for `tabs.list`, where each tab has `handle`, `url`, `title`, `loading`, `can_go_back` and `can_go_forward`. `tab.close` adds `"closed": true` and reports the tab as it was before closing. `tab.open`, `tab.navigate`, `tab.back`, `tab.forward` and `tab.reload` answer once the navigation commits, without waiting for the page to finish loading. When it hasn't committed after 9 seconds, or ends without committing, the answer is `outcome_unknown` with the latest state under `data`. The 9 seconds stay under the host's 10 second reply timeout. The UI thread never blocks on the wait: the browser keeps the request and answers it from a navigation observer.
 
 ## Launch evidence
 

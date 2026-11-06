@@ -112,6 +112,8 @@ source_set("browser_workspace_adapter") {
     "browser_workspace_adapter.h",
     "control_host.cc",
     "control_host.h",
+    "control_tabs.cc",
+    "control_tabs.h",
   ]
   public_deps = [
     ":workspace_service",

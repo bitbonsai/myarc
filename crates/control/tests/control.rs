@@ -68,7 +68,7 @@ fn registry_ids_are_unique_and_match_the_spec_table() {
 }
 
 #[test]
-fn registry_schemas_are_objects_and_only_space_commands_are_implemented() {
+fn registry_schemas_are_objects_and_only_tab_and_space_commands_are_implemented() {
     for spec in registry() {
         assert_eq!(spec.params["type"], "object", "{}", spec.id);
         assert_eq!(spec.params["additionalProperties"], false, "{}", spec.id);
@@ -83,6 +83,14 @@ fn registry_schemas_are_objects_and_only_space_commands_are_implemented() {
     assert_eq!(
         implemented,
         [
+            "tabs.list",
+            "tab.open",
+            "tab.activate",
+            "tab.close",
+            "tab.navigate",
+            "tab.back",
+            "tab.forward",
+            "tab.reload",
             "space.list",
             "space.create",
             "space.select",
@@ -272,7 +280,7 @@ fn bad_params_are_invalid() {
 fn unimplemented_commands_are_unsupported() {
     let mut service = ControlService::new();
     for spec in registry().iter().filter(|spec| !spec.implemented) {
-        let response = service.handle(request(spec.id, json!({ "tab_id": "t1" })));
+        let response = service.handle(request(spec.id, json!({ "tab": "t1" })));
         assert_eq!(response.id, "r1");
         assert_eq!(response.command, spec.id);
         match response.outcome {
@@ -336,6 +344,7 @@ fn response_json_has_a_status_tag_and_flattened_fields() {
         (
             Outcome::OutcomeUnknown {
                 reason: String::from("r"),
+                data: None,
             },
             json!({ "id": "a", "command": "c", "status": "outcome_unknown", "reason": "r" }),
         ),

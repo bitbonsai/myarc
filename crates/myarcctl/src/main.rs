@@ -300,6 +300,7 @@ fn call(client: &mut Client, request: Request) -> Result<Response, Response> {
                 reason: format!(
                     "lost the connection to myArc ({error}); check the result before retrying"
                 ),
+                data: None,
             }
         };
         Response {
@@ -366,7 +367,10 @@ fn readable(response: &Response) -> String {
         Outcome::Stale { reason } => format!("{command}: stale: {reason}"),
         Outcome::Cancelled => format!("{command}: cancelled"),
         Outcome::Timeout => format!("{command}: timeout"),
-        Outcome::OutcomeUnknown { reason } => format!("{command}: outcome unknown: {reason}"),
+        Outcome::OutcomeUnknown { reason, data } => match data {
+            Some(data) => format!("{command}: outcome unknown: {reason} {data}"),
+            None => format!("{command}: outcome unknown: {reason}"),
+        },
         Outcome::Invalid { reason } => format!("{command}: invalid: {reason}"),
     }
 }

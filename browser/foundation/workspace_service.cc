@@ -695,19 +695,19 @@ foundation::MutationResult WorkspaceService::CreateFirstSpace(
       rust::Str(icon.data(), icon.size()), theme));
 }
 
-void WorkspaceService::AnswerControlRequest(
+foundation::ControlPlan WorkspaceService::AnswerControlRequest(
     uint64_t window,
-    rust::Box<foundation::ControlReply> reply) {
+    foundation::ControlReply& reply) {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
   if (!CanMutate()) {
     foundation::refuse_control_request(
-        std::move(reply), "Workspace is not loaded yet; retry shortly");
-    return;
+        reply, "Workspace is not loaded yet; retry shortly");
+    return {};
   }
-  if (foundation::answer_control_request(std::move(reply), *workspace_,
-                                         window)) {
+  auto plan = foundation::answer_control_request(reply, *workspace_, window);
+  if (plan.changed)
     SpacesChanged(foundation::MutationResult{true, 0, {}});
-  }
+  return plan;
 }
 
 foundation::MutationResult WorkspaceService::EnsureAgentSpace() {
@@ -961,6 +961,15 @@ foundation::MutationResult WorkspaceService::RevealItem(uint64_t window,
   if (!CanMutate())
     return Failure("Workspace is not loaded. Check storage state.");
   return Changed(foundation::reveal_item(*workspace_, window, item));
+}
+
+foundation::MutationResult WorkspaceService::SelectItemInItsSpace(
+    uint64_t window,
+    uint64_t item) {
+  if (!CanMutate())
+    return Failure("Workspace is not loaded. Check storage state.");
+  return Changed(
+      foundation::select_item_in_its_space(*workspace_, window, item));
 }
 
 foundation::MutationResult WorkspaceService::UnsaveItem(uint64_t item,

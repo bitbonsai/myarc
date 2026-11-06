@@ -379,6 +379,11 @@ impl Workspace {
     }
 
     /// Icon of the Space with `id`, if it exists and has one.
+    /// Every item in workspace order.
+    pub fn items(&self) -> &[Item] {
+        &self.state.items
+    }
+
     pub fn space_icon_of(&self, id: SpaceId) -> Option<&SpaceIcon> {
         self.space(id).ok().and_then(|space| space.icon.as_ref())
     }
@@ -682,6 +687,28 @@ impl Workspace {
             }
         }
         Ok(())
+    }
+
+    /// Selects `item_id` in `window_id` when the window shows its Space, or
+    /// makes it the item the window returns to the next time it selects that
+    /// Space, without switching Space. Favorites select now.
+    pub fn select_item_in_its_space(
+        &mut self,
+        window_id: WindowId,
+        item_id: ItemId,
+    ) -> Result<(), WorkspaceError> {
+        let shown = self.window(window_id)?.space_id;
+        match self.item(item_id)?.placement {
+            Placement::Temporary { space_id } | Placement::Pin { space_id }
+                if space_id != shown =>
+            {
+                self.space_selections
+                    .retain(|&(window, space, _)| (window, space) != (window_id, space_id));
+                self.space_selections.push((window_id, space_id, item_id));
+                Ok(())
+            }
+            _ => self.select_item(window_id, item_id),
+        }
     }
 
     /// Native keyboard/palette activation reveals the owning Space through the

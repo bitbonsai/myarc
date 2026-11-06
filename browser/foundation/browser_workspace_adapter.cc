@@ -46,6 +46,7 @@
 #include "content/public/common/page_type.h"
 #include "content/public/common/url_constants.h"
 #include "myarc/control_host.h"
+#include "myarc/control_tabs.h"
 #include "myarc/test_buildflags.h"
 #include "myarc/workspace_lifecycle.h"
 #include "url/origin.h"
@@ -1588,6 +1589,39 @@ foundation::MutationResult BrowserWorkspaceAdapter::ActivateItem(
   return Remember(Ok(item));
 }
 
+foundation::MutationResult BrowserWorkspaceAdapter::ActivateInItsSpace(
+    uint64_t item) {
+  if (!ready())
+    return Fail(error());
+  const auto sidebar = Sidebar();
+  if (!sidebar.ok)
+    return Fail("Workspace window is not ready.");
+  const auto shown = [item](const rust::Vec<foundation::ItemRecord>& rows) {
+    return std::ranges::any_of(
+        rows, [item](const auto& row) { return row.id == item; });
+  };
+  if (shown(sidebar.pins) || shown(sidebar.temporary))
+    return ActivateItem(item);
+  return Remember(service_->SelectItemInItsSpace(window_id_, item));
+}
+
+content::WebContents* BrowserWorkspaceAdapter::FindPage(
+    uint64_t item,
+    BrowserWorkspaceAdapter** owner) const {
+  *owner = nullptr;
+  if (!item)
+    return nullptr;
+  for (const auto& adapter : ForProfile(*profile_).adapters) {
+    if (!adapter->tabs_)
+      continue;
+    if (auto* page = LocalPage(*adapter->tabs_, item)) {
+      *owner = adapter;
+      return page;
+    }
+  }
+  return AnyPage(*profile_, item);
+}
+
 foundation::MutationResult BrowserWorkspaceAdapter::OpenInCurrentSpace(
     const GURL& url) {
   if (!ready())
@@ -1602,6 +1636,19 @@ foundation::MutationResult BrowserWorkspaceAdapter::OpenInSpace(
     const GURL& url,
     uint64_t space,
     bool* opened) {
+  return Open(url, space, opened, /*switch_space=*/true);
+}
+
+foundation::MutationResult BrowserWorkspaceAdapter::OpenWithoutSwitching(
+    const GURL& url,
+    uint64_t space) {
+  return Open(url, space, nullptr, /*switch_space=*/false);
+}
+
+foundation::MutationResult BrowserWorkspaceAdapter::Open(const GURL& url,
+                                                         uint64_t space,
+                                                         bool* opened,
+                                                         bool switch_space) {
   if (!ready())
     return Fail(error());
   if (!url.is_valid())
@@ -1633,6 +1680,12 @@ foundation::MutationResult BrowserWorkspaceAdapter::OpenInSpace(
     DCHECK_EQ(ItemIdForContents(*page), item);
     if (opened)
       *opened = true;
+    if (space != sidebar.current_space.id && !switch_space) {
+      result = service_->SelectItemInItsSpace(window_id_, item);
+      if (result.ok)
+        PersistBindings();
+      return Remember(result.ok ? Ok(item) : std::move(result));
+    }
     // Switch Space only once the page is open in it.
     if (space != sidebar.current_space.id)
       result = service_->SelectSpace(window_id_, space);
@@ -1719,15 +1772,17 @@ foundation::MutationResult BrowserWorkspaceAdapter::SelectSpace(
 void BrowserWorkspaceAdapter::AnswerControlRequest(
     rust::Box<foundation::ControlReply> reply) {
   if (!ready()) {
-    foundation::refuse_control_request(std::move(reply), error());
+    foundation::refuse_control_request(*reply, error());
     return;
   }
   const auto before = Sidebar();
-  service_->AnswerControlRequest(window_id_, std::move(reply));
+  const auto plan = service_->AnswerControlRequest(window_id_, *reply);
   const auto after = Sidebar();
   if (before.ok && after.ok &&
       before.current_space.id != after.current_space.id)
     ShowSelected();
+  if (plan.action != foundation::TabActionKind::Answered)
+    RunTabAction(*this, std::move(reply), plan);
 }
 foundation::MutationResult BrowserWorkspaceAdapter::Save(
     uint64_t item,

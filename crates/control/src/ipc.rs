@@ -625,6 +625,7 @@ impl<F: FnMut(Request) -> Response> Shared<'_, F> {
                 reason: String::from(
                     "myArc failed while handling this request; check the result before retrying",
                 ),
+                data: None,
             },
         })
     }

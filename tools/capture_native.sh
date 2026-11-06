@@ -32,6 +32,11 @@
 #   SETTINGS=1 (or general/profiles/advanced/more) opens the native Settings window via
 #   --myarc-capture-open-settings and captures only that window; "more" presses
 #   More Settings… and captures the browser window instead.
+#   CONTROL=<dir> passes --myarc-enable-control and serves the control
+#   endpoint in <dir> (MYARC_CONTROL_DIR) for myarcctl.
+#   SCRIPT=<file> runs that bash script once the window settles, before the
+#   capture, with PID and MYARC_CONTROL_DIR set; it can drive myarcctl and
+#   take its own shots with bgcapture.swift.
 #   Every capture downloads into the disposable profile's Downloads folder
 #   without asking.
 #   The browser launches in the background (open -g) and is captured with
@@ -89,6 +94,11 @@ if [ "${1:-}" = "--inner" ]; then
     select) EXTRA+=(--myarc-test-agent-space=select) ;;
     *) EXTRA+=(--myarc-test-agent-space) ;;
   esac
+  OPEN_ENV=()
+  if [ -n "${CONTROL:-}" ]; then
+    EXTRA+=(--myarc-enable-control)
+    OPEN_ENV=(--env "MYARC_CONTROL_DIR=$CONTROL")
+  fi
   SHOT_TITLE=()
   case "${SETTINGS:-}" in
     "") ;;
@@ -98,7 +108,7 @@ if [ "${1:-}" = "--inner" ]; then
     *) EXTRA+=(--myarc-capture-open-settings); SHOT_TITLE=(General) ;;
   esac
   # -g: launch without activating, so the user's frontmost app keeps focus.
-  open -g -n -a "$APP" --args --user-data-dir="$PROFILE" --no-first-run --no-default-browser-check \
+  open -g -n ${OPEN_ENV[@]+"${OPEN_ENV[@]}"} -a "$APP" --args --user-data-dir="$PROFILE" --no-first-run --no-default-browser-check \
     --enable-features=GlassFrame --disable-features=InitialWebUI \
     --disable-backgrounding-occluded-windows --myarc-background-launch ${EXTRA[@]+"${EXTRA[@]}"} \
     --myarc-visual-parity --myarc-workspace-sidebar --window-size="$W,$H" --window-position=40,60 ${URLS[@]+"${URLS[@]}"}
@@ -113,6 +123,9 @@ if [ "${1:-}" = "--inner" ]; then
   sleep "$SETTLE"
   [ -n "${EXTRA[*]-}" ] && sleep "$KEY_SETTLE"
   kill -0 "$PID" 2>/dev/null || { echo "native process exited early" >&2; exit 1; }
+  if [ -n "${SCRIPT:-}" ]; then
+    PID=$PID MYARC_CONTROL_DIR=${CONTROL:-} bash "$SCRIPT" || echo "script exited $?" >&2
+  fi
   swift "$(dirname "$0")/bgcapture.swift" shot "$PID" "$OUT" ${SHOT_TITLE[@]+"${SHOT_TITLE[@]}"}
   WID=bg; RECT=window
   echo "pid=$PID window=$WID rect=$RECT"

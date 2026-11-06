@@ -71,7 +71,7 @@ fn commands_json_has_id_area_implemented_and_summary() {
     }
     let tab_open = list.iter().find(|entry| entry["id"] == "tab.open").unwrap();
     assert_eq!(tab_open["area"], "tabs");
-    assert_eq!(tab_open["implemented"], false);
+    assert_eq!(tab_open["implemented"], true);
 }
 
 #[test]

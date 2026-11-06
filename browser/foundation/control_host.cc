@@ -45,7 +45,7 @@ void AnswerRequest(rust::Box<foundation::ControlReply> reply) {
       BrowserCollection::Order::kActivation);
   if (!target) {
     foundation::refuse_control_request(
-        std::move(reply), "No myArc window is open; open one and retry");
+        *reply, "No myArc window is open; open one and retry");
     return;
   }
   target->AnswerControlRequest(std::move(reply));
