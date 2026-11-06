@@ -68,7 +68,7 @@ fn registry_ids_are_unique_and_match_the_spec_table() {
 }
 
 #[test]
-fn registry_schemas_are_objects_and_only_tab_and_space_commands_are_implemented() {
+fn registry_schemas_are_objects_and_only_tab_snapshot_and_space_commands_are_implemented() {
     for spec in registry() {
         assert_eq!(spec.params["type"], "object", "{}", spec.id);
         assert_eq!(spec.params["additionalProperties"], false, "{}", spec.id);
@@ -91,6 +91,7 @@ fn registry_schemas_are_objects_and_only_tab_and_space_commands_are_implemented(
             "tab.back",
             "tab.forward",
             "tab.reload",
+            "page.snapshot",
             "space.list",
             "space.create",
             "space.select",

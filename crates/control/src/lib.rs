@@ -10,7 +10,9 @@
 //! `Unsupported` because there are no pages. A browser calls [`route`]
 //! instead: it answers the Space commands the same way and turns each tab
 //! command into a [`TabAction`] scoped to the agent Space, which the browser
-//! runs and answers later with [`tab_response`]. Commands not built yet are
+//! runs and answers later with [`tab_response`]. `page.snapshot` becomes
+//! [`TabAction::Snapshot`] the same way, and [`snapshot`] formats the page's
+//! accessibility tree into the answer. Commands not built yet are
 //! listed in the registry with `implemented: false` and answer `Unsupported`.
 //! Requests are untrusted: strings are bounded, unknown parameters are
 //! rejected and no input panics.
@@ -22,6 +24,7 @@ use std::sync::OnceLock;
 
 #[cfg(unix)]
 pub mod ipc;
+pub mod snapshot;
 
 use myarc_workspace::{
     DEFAULT_PROFILE_ID, DEFAULT_WINDOW_ID, ItemId, MAX_TITLE_BYTES, Placement, RenameError,
@@ -218,6 +221,11 @@ pub enum TabAction {
     Reload {
         item: ItemId,
     },
+    /// Snapshot the page's accessibility tree and answer with
+    /// [`snapshot::snapshot_response`].
+    Snapshot {
+        item: ItemId,
+    },
 }
 
 /// Like [`dispatch`] for a host with live pages, such as the browser. Space
@@ -263,11 +271,11 @@ fn run(workspace: &mut Workspace, window_id: WindowId, req: &Request, live: bool
                 "{command} needs live browser attachment (MA-011), which this core stub does not have"
             ),
         },
-        Some(spec) if spec.area == Area::Tabs && !live => Outcome::Unsupported {
+        Some(spec) if on_pages(spec.area) && !live => Outcome::Unsupported {
             command: command.clone(),
             reason: no_pages(command),
         },
-        Some(spec) if spec.area == Area::Tabs => match tab_action(workspace, command, params) {
+        Some(spec) if on_pages(spec.area) => match tab_action(workspace, command, params) {
             Ok(action) => return Routed::Tab(action),
             Err(outcome) => outcome,
         },
@@ -287,6 +295,11 @@ fn run(workspace: &mut Workspace, window_id: WindowId, req: &Request, live: bool
         command: command.clone(),
         outcome,
     })
+}
+
+/// Areas whose commands act on live pages.
+fn on_pages(area: Area) -> bool {
+    matches!(area, Area::Tabs | Area::Observation)
 }
 
 fn no_pages(command: &str) -> String {
@@ -401,6 +414,7 @@ fn tab_action(
                 "tab.back" => Ok(TabAction::Back { item }),
                 "tab.forward" => Ok(TabAction::Forward { item }),
                 "tab.reload" => Ok(TabAction::Reload { item }),
+                "page.snapshot" => Ok(TabAction::Snapshot { item }),
                 other => Err(invalid(format!(
                     "{other} is registered as implemented but has no handler"
                 ))),
@@ -732,11 +746,10 @@ fn tab_param() -> Value {
 }
 
 fn revision() -> Value {
-    json!({
-        "type": "integer",
-        "minimum": 0,
-        "description": "Document revision from the page.snapshot the reference came from",
-    })
+    text(
+        "Revision from the page.snapshot the reference came from",
+        MAX_QUOTED_BYTES,
+    )
 }
 
 fn element_ref() -> Value {
@@ -868,9 +881,9 @@ fn build_registry() -> Vec<CommandSpec> {
         spec(
             "page.snapshot",
             Observation,
-            "Bounded semantic view of a page with element references, URL, revision and loading state",
+            "Compact outline of an agent Space tab's accessibility tree, one node per line, with [ref=eN] on interactive nodes, plus URL, title, revision and loading state",
             tab_only(),
-            false,
+            true,
         ),
         spec(
             "page.screenshot",

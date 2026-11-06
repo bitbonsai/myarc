@@ -12,7 +12,8 @@ class BrowserWorkspaceAdapter;
 // List, activate and close answer `reply` at once. Open, navigate, back,
 // forward and reload answer once the tab's navigation commits, or with
 // outcome_unknown and the latest state when it ends without committing or
-// the wait runs out. Waiting never blocks the UI thread.
+// the wait runs out. Snapshot answers once the page's accessibility
+// snapshot arrives, or with timeout. Waiting never blocks the UI thread.
 void RunTabAction(BrowserWorkspaceAdapter& target,
                   rust::Box<foundation::ControlReply> reply,
                   const foundation::ControlPlan& plan);

@@ -58,7 +58,7 @@ References: [MCP transports](https://modelcontextprotocol.io/specification/2026-
 
 `run` and `mcp` connect to the running browser by default. The browser publishes its control endpoint in `~/Library/Application Support/myarc/control/`, or in `$MYARC_CONTROL_DIR` when that is set. The directory holds `control.json` with the socket path, a token that changes each time the server starts, the server's pid and its protocol version. Clients refuse the endpoint unless the directory (mode 700), the file and the socket (mode 600) belong to the current user and are closed to group and others. Each connection opens with a hello that carries the token, and every message after it is a length-prefixed JSON frame of at most 1 MiB.
 
-The Space commands work everywhere. The tab commands work only in the browser, and `--local` and `serve-local` answer them with `unsupported` because they have no pages. Every other command answers `unsupported`. `myarcctl serve-local` is a development stub that serves an in-memory workspace in place of the browser. That workspace lasts as long as `serve-local` runs, so a Space created by one `run` shows up in the next.
+The Space commands work everywhere. The tab commands and `page.snapshot` work only in the browser, and `--local` and `serve-local` answer them with `unsupported` because they have no pages. Every other command answers `unsupported`. `myarcctl serve-local` is a development stub that serves an in-memory workspace in place of the browser. That workspace lasts as long as `serve-local` runs, so a Space created by one `run` shows up in the next.
 
 ```sh
 cargo build -p myarcctl
@@ -94,6 +94,30 @@ The tab commands reach only tabs in the agent Space of that window's Profile. `t
 Each tab has a handle such as `t12` that stays valid while the tab lives. `tabs.list` returns the open agent Space tabs. A handle of a closed or unknown tab gets `stale`, and a tab in any other Space gets `denied` with "outside the agent Space". URLs must be http or https, without a user name or password, and at most 8 KiB. The core checks the text and the browser checks what it parsed from it, so `chrome:`, `file:`, `javascript:`, `data:` and other schemes get `denied`.
 
 A tab command answers with `{"tab": {...}}`, or `{"tabs": [...]}` for `tabs.list`, where each tab has `handle`, `url`, `title`, `loading`, `can_go_back` and `can_go_forward`. `tab.close` adds `"closed": true` and reports the tab as it was before closing. `tab.open`, `tab.navigate`, `tab.back`, `tab.forward` and `tab.reload` answer once the navigation commits, without waiting for the page to finish loading. When it hasn't committed after 9 seconds, or ends without committing, the answer is `outcome_unknown` with the latest state under `data`. The 9 seconds stay under the host's 10 second reply timeout. The UI thread never blocks on the wait: the browser keeps the request and answers it from a navigation observer.
+
+### Page snapshot
+
+`page.snapshot {tab}` answers with `{tab, url, title, revision, loading, truncated, text}` for a tab in the agent Space, under the same `denied` and `stale` rules as the tab commands. `text` is an indented outline of the page's accessibility tree, one node per line:
+
+```text
+main
+  heading "Agent page one" [level=1]
+  form
+    textbox "Email" [ref=e1] [required] value=""
+    checkbox "Send me news" [ref=e2]
+    combobox "Plan" [ref=e3] [collapsed] value="Pro"
+      option "Free"
+      option "Pro" [selected]
+    button "Send" [ref=e4]
+  text "Read the"
+  link "Docs" [ref=e5] -> /docs.html
+```
+
+Links, buttons, form controls and anything focusable or clickable get `[ref=eN]`, numbered in output order. Headings, landmarks and text appear without one. Generic containers fold away, adjacent text joins into one `text` line, and text that repeats a control's name or label is dropped. States print as `[checked]`, `[checked=mixed]`, `[expanded]`, `[collapsed]`, `[selected]`, `[required]`, `[disabled]` and `[focused]`. Text fields show `value="…"` except password fields. Same-origin link targets print as paths. Nodes the tree marks invisible or ignored are left out; content scrolled out of view stays.
+
+Page text is untrusted. Every name, value and text sits inside double quotes, with `"`, `\`, newlines, control characters and bidirectional formatting characters escaped, so a page can't start a line or forge a reference. The outline stops at 2000 lines or 64 KiB, cuts names at 200 characters, clamps indentation at 24 levels and leaves out subtrees deeper than 256. When it cuts anything, `truncated` is true and `cut` says what went.
+
+`revision`, such as `1.2`, changes on every snapshot and whenever the tab's main document changes. The browser keeps the references of the latest revision per document for the interaction commands, which will refuse an older revision as `stale`. The snapshot comes from Chromium's `WebContents::RequestAXTreeSnapshot`, which asks the renderer for a one-time tree of the page and its same-origin frames, at most 5000 nodes per frame, without turning on accessibility, running page script or opening a debugging port. With no answer after 5 seconds the result is `timeout`.
 
 ## Launch evidence
 

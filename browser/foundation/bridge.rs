@@ -156,6 +156,8 @@ mod ffi {
         Back,
         Forward,
         Reload,
+        // page.snapshot: answer with answer_snapshot_request.
+        Snapshot,
     }
 
     // Every item is a tab in the agent Space. `url` is set for Open and
@@ -177,6 +179,8 @@ mod ffi {
         Denied,
         Stale,
         Invalid,
+        // page.snapshot ran out of time.
+        TimedOut,
     }
 
     struct TabStateRecord {
@@ -186,6 +190,29 @@ mod ffi {
         loading: bool,
         can_go_back: bool,
         can_go_forward: bool,
+    }
+
+    // One accessibility node for page.snapshot. `role` is Chromium's role
+    // name. `checked` is 0 no, 1 yes, 2 mixed; `expanded` is 0 neither,
+    // 1 expanded, 2 collapsed.
+    struct AxNodeRecord {
+        id: i32,
+        role: String,
+        name: String,
+        value: String,
+        url: String,
+        children: Vec<i32>,
+        level: u32,
+        focusable: bool,
+        clickable: bool,
+        invisible: bool,
+        ignored: bool,
+        checked: u8,
+        expanded: u8,
+        disabled: bool,
+        selected: bool,
+        required: bool,
+        is_protected: bool,
     }
 
     extern "Rust" {
@@ -383,6 +410,25 @@ mod ffi {
         );
         // Milliseconds to wait for a navigation to commit.
         fn control_navigation_wait_ms() -> u64;
+        // Answers page.snapshot. With Done, formats the accessibility tree
+        // `nodes` under `root` for `tab`, whose main document the browser
+        // numbered `document`, and keeps its references for later commands.
+        // `source_truncated` says Chromium stopped at the node limit.
+        fn answer_snapshot_request(
+            reply: &mut ControlReply,
+            status: TabStatus,
+            reason: &str,
+            tab: TabStateRecord,
+            document: u64,
+            root: i32,
+            focus: i32,
+            source_truncated: bool,
+            nodes: Vec<AxNodeRecord>,
+        );
+        // Milliseconds to wait for a snapshot before answering timeout.
+        fn control_snapshot_timeout_ms() -> u64;
+        // Most accessibility nodes to ask each frame for.
+        fn control_snapshot_max_nodes() -> usize;
         // Answers denied without running the request.
         fn refuse_control_request(reply: &mut ControlReply, reason: &str);
         // UI thread: stops serving and removes the endpoint before returning.
@@ -1152,6 +1198,7 @@ pub fn answer_control_request(
         TabAction::Back { item } => (Kind::Back, item),
         TabAction::Forward { item } => (Kind::Forward, item),
         TabAction::Reload { item } => (Kind::Reload, item),
+        TabAction::Snapshot { item } => (Kind::Snapshot, item),
     };
     plan
 }
@@ -1166,31 +1213,116 @@ pub fn answer_tab_request(
     let Some(pending) = reply.0.take() else {
         return;
     };
-    let tabs: Vec<control::TabState> = tabs
-        .into_iter()
-        .map(|tab| control::TabState {
-            item: tab.item,
-            url: tab.url,
-            title: tab.title,
-            loading: tab.loading,
-            can_go_back: tab.can_go_back,
-            can_go_forward: tab.can_go_forward,
-        })
-        .collect();
+    let tabs: Vec<control::TabState> = tabs.into_iter().map(tab_state).collect();
     let reason = reason.to_owned();
     let result = match status {
         Status::Done => control::TabResult::Done(tabs),
         Status::NotCommitted => control::TabResult::Unknown { reason, tabs },
-        Status::Denied => control::TabResult::Failed(control::Outcome::Denied { reason }),
-        Status::Stale => control::TabResult::Failed(control::Outcome::Stale { reason }),
-        _ => control::TabResult::Failed(control::Outcome::Invalid { reason }),
+        other => control::TabResult::Failed(failure(other, reason)),
     };
     let response = control::tab_response(pending.request(), result);
     pending.reply(response);
 }
 
+fn tab_state(tab: ffi::TabStateRecord) -> control::TabState {
+    control::TabState {
+        item: tab.item,
+        url: tab.url,
+        title: tab.title,
+        loading: tab.loading,
+        can_go_back: tab.can_go_back,
+        can_go_forward: tab.can_go_forward,
+    }
+}
+
+fn failure(status: ffi::TabStatus, reason: String) -> control::Outcome {
+    use ffi::TabStatus as Status;
+    match status {
+        Status::Denied => control::Outcome::Denied { reason },
+        Status::Stale => control::Outcome::Stale { reason },
+        Status::TimedOut => control::Outcome::Timeout,
+        _ => control::Outcome::Invalid { reason },
+    }
+}
+
 pub fn control_navigation_wait_ms() -> u64 {
     control::NAVIGATION_WAIT_MS
+}
+
+/// References of the latest snapshot of each recent main document.
+static SNAPSHOTS: Mutex<control::snapshot::SnapshotStore> =
+    Mutex::new(control::snapshot::SnapshotStore::new());
+
+#[allow(clippy::too_many_arguments)]
+pub fn answer_snapshot_request(
+    reply: &mut ControlReply,
+    status: ffi::TabStatus,
+    reason: &str,
+    tab: ffi::TabStateRecord,
+    document: u64,
+    root: i32,
+    focus: i32,
+    source_truncated: bool,
+    nodes: Vec<ffi::AxNodeRecord>,
+) {
+    use control::snapshot::{AxNode, Checked, SnapshotPage, SnapshotResult};
+    let Some(pending) = reply.0.take() else {
+        return;
+    };
+    let result = if status == ffi::TabStatus::Done {
+        let nodes = nodes
+            .into_iter()
+            .map(|node| AxNode {
+                id: node.id,
+                role: node.role,
+                name: node.name,
+                value: node.value,
+                url: node.url,
+                children: node.children,
+                level: node.level,
+                focusable: node.focusable,
+                clickable: node.clickable,
+                invisible: node.invisible,
+                ignored: node.ignored,
+                checked: match node.checked {
+                    1 => Checked::Yes,
+                    2 => Checked::Mixed,
+                    _ => Checked::No,
+                },
+                expanded: match node.expanded {
+                    1 => Some(true),
+                    2 => Some(false),
+                    _ => None,
+                },
+                disabled: node.disabled,
+                selected: node.selected,
+                required: node.required,
+                protected: node.is_protected,
+            })
+            .collect();
+        SnapshotResult::Done(SnapshotPage {
+            tab: tab_state(tab),
+            document,
+            root,
+            focus,
+            source_truncated,
+            nodes,
+        })
+    } else {
+        SnapshotResult::Failed(failure(status, reason.to_owned()))
+    };
+    let mut store = SNAPSHOTS.lock().unwrap_or_else(PoisonError::into_inner);
+    let response = control::snapshot::snapshot_response(pending.request(), result, &mut store);
+    drop(store);
+    pending.reply(response);
+}
+
+pub fn control_snapshot_timeout_ms() -> u64 {
+    control::snapshot::SNAPSHOT_TIMEOUT_MS
+}
+
+pub fn control_snapshot_max_nodes() -> usize {
+    control::snapshot::MAX_SNAPSHOT_NODES
 }
 
 pub fn refuse_control_request(reply: &mut ControlReply, reason: &str) {

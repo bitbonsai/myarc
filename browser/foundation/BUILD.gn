@@ -22,6 +22,7 @@ rust_static_library("control") {
   sources = [
     "control/src/ipc.rs",
     "control/src/lib.rs",
+    "control/src/snapshot.rs",
   ]
   aliased_deps = {
     myarc_workspace = ":workspace"
@@ -141,6 +142,7 @@ source_set("browser_workspace_adapter") {
     "//components/sessions",
     "//components/tabs:public",
     "//content/public/browser",
+    "//ui/accessibility",
     "//ui/base",
   ]
 }

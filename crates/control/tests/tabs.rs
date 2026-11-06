@@ -320,3 +320,39 @@ fn tab_responses_carry_the_tab_state() {
         json!({ "id": "r1", "command": "tab.reload", "status": "stale", "reason": "gone" })
     );
 }
+
+#[test]
+fn snapshot_is_scoped_to_the_agent_space() {
+    let (mut workspace, agent_tab, user_tab) = seeded();
+    assert_eq!(
+        action(
+            &mut workspace,
+            "page.snapshot",
+            json!({ "tab": tab_handle(agent_tab) })
+        ),
+        TabAction::Snapshot { item: agent_tab }
+    );
+    match refused(
+        &mut workspace,
+        "page.snapshot",
+        json!({ "tab": tab_handle(user_tab) }),
+    ) {
+        Outcome::Denied { reason } => assert!(reason.contains("outside the agent Space")),
+        other => panic!("should be denied: {other:?}"),
+    }
+    assert!(matches!(
+        refused(&mut workspace, "page.snapshot", json!({ "tab": "t999" })),
+        Outcome::Stale { .. }
+    ));
+    assert!(matches!(
+        refused(
+            &mut workspace,
+            "page.snapshot",
+            json!({ "tab": tab_handle(agent_tab), "depth": 3 })
+        ),
+        Outcome::Invalid { .. }
+    ));
+    let mut service = ControlService::new();
+    let response = service.handle(request("page.snapshot", json!({ "tab": "t1" })));
+    assert!(matches!(response.outcome, Outcome::Unsupported { .. }));
+}

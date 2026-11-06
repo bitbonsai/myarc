@@ -13,12 +13,18 @@
 #include "base/time/time.h"
 #include "base/timer/timer.h"
 #include "content/public/browser/browser_thread.h"
+#include "content/public/browser/document_user_data.h"
 #include "content/public/browser/navigation_controller.h"
 #include "content/public/browser/navigation_handle.h"
 #include "content/public/browser/reload_type.h"
+#include "content/public/browser/render_frame_host.h"
 #include "content/public/browser/web_contents.h"
 #include "content/public/browser/web_contents_observer.h"
 #include "myarc/browser_workspace_adapter.h"
+#include "ui/accessibility/ax_enum_util.h"
+#include "ui/accessibility/ax_mode.h"
+#include "ui/accessibility/ax_node_data.h"
+#include "ui/accessibility/ax_tree_update.h"
 #include "ui/base/page_transition_types.h"
 #include "url/gurl.h"
 
@@ -165,6 +171,177 @@ class CommitWait final : public content::WebContentsObserver {
   base::WeakPtrFactory<CommitWait> weak_factory_{this};
 };
 
+// Numbers each main document page.snapshot looks at. A cross-document
+// navigation gives the tab a new document and so a new number, which makes
+// the next snapshot's revision differ and the old references unusable.
+class SnapshotDocument final
+    : public content::DocumentUserData<SnapshotDocument> {
+ public:
+  ~SnapshotDocument() override = default;
+
+  uint64_t id() const { return id_; }
+
+ private:
+  friend content::DocumentUserData<SnapshotDocument>;
+
+  explicit SnapshotDocument(content::RenderFrameHost* frame)
+      : DocumentUserData(frame), id_(++last_id_) {}
+
+  static inline uint64_t last_id_ = 0;
+  const uint64_t id_;
+
+  DOCUMENT_USER_DATA_KEY_DECL();
+};
+
+DOCUMENT_USER_DATA_KEY_IMPL(SnapshotDocument);
+
+uint64_t DocumentOf(content::WebContents& page) {
+  return SnapshotDocument::GetOrCreateForCurrentDocument(
+             page.GetPrimaryMainFrame())
+      ->id();
+}
+
+foundation::AxNodeRecord RecordOf(const ui::AXNodeData& node) {
+  using ax::mojom::BoolAttribute;
+  using ax::mojom::State;
+  using ax::mojom::StringAttribute;
+  foundation::AxNodeRecord record;
+  record.id = node.id;
+  record.role = rust::String::lossy(ui::ToString(node.role));
+  record.name =
+      rust::String::lossy(node.GetStringAttribute(StringAttribute::kName));
+  record.value =
+      rust::String::lossy(node.GetStringAttribute(StringAttribute::kValue));
+  record.url =
+      rust::String::lossy(node.GetStringAttribute(StringAttribute::kUrl));
+  for (const int32_t child : node.child_ids) {
+    record.children.push_back(child);
+  }
+  const int level =
+      node.GetIntAttribute(ax::mojom::IntAttribute::kHierarchicalLevel);
+  record.level = level > 0 ? static_cast<uint32_t>(level) : 0;
+  record.focusable = node.HasState(State::kFocusable);
+  record.clickable = node.IsClickable();
+  record.invisible = node.IsInvisible();
+  record.ignored = node.IsIgnored();
+  switch (node.GetCheckedState()) {
+    case ax::mojom::CheckedState::kTrue:
+      record.checked = 1;
+      break;
+    case ax::mojom::CheckedState::kMixed:
+      record.checked = 2;
+      break;
+    default:
+      record.checked = 0;
+  }
+  record.expanded = node.HasState(State::kExpanded)    ? 1
+                    : node.HasState(State::kCollapsed) ? 2
+                                                       : 0;
+  record.disabled =
+      node.GetRestriction() == ax::mojom::Restriction::kDisabled;
+  record.selected = node.GetBoolAttribute(BoolAttribute::kSelected);
+  record.required = node.HasState(State::kRequired);
+  record.is_protected = node.HasState(State::kProtected);
+  return record;
+}
+
+// Takes one accessibility snapshot of a tab's page through
+// WebContents::RequestAXTreeSnapshot and answers page.snapshot with it, or
+// with timeout or stale. The snapshot runs in the renderer without turning
+// on accessibility for the page, opening a debugging port or running page
+// script. Owns itself and deletes itself after answering, in a task of its
+// own.
+class SnapshotWait final : public content::WebContentsObserver {
+ public:
+  SnapshotWait(content::WebContents& page,
+               uint64_t item,
+               rust::Box<foundation::ControlReply> reply)
+      : content::WebContentsObserver(&page),
+        item_(item),
+        document_(DocumentOf(page)),
+        reply_(std::move(reply)) {}
+
+  void Start() {
+    const auto timeout =
+        base::Milliseconds(foundation::control_snapshot_timeout_ms());
+    timer_.Start(FROM_HERE, timeout,
+                 base::BindOnce(&SnapshotWait::Finish, base::Unretained(this),
+                                TabStatus::TimedOut,
+                                "The page did not answer within the snapshot "
+                                "time limit"));
+    // Same-origin frames only: a cross-origin frame's content is another
+    // site's, and the agent's scope is this tab's page. The renderer gets
+    // most of the time limit, so a slow page still answers with what it had.
+    web_contents()->RequestAXTreeSnapshot(
+        base::BindOnce(&SnapshotWait::Received, weak_factory_.GetWeakPtr()),
+        ui::kAXModeWebContentsOnly, foundation::control_snapshot_max_nodes(),
+        timeout * 3 / 4,
+        content::WebContents::AXTreeSnapshotPolicy::
+            kSameOriginDirectDescendants);
+  }
+
+ private:
+  void Received(ui::AXTreeUpdate& update) {
+    if (done_ || !web_contents()) {
+      return;
+    }
+    if (DocumentOf(*web_contents()) != document_) {
+      Finish(TabStatus::Stale,
+             "The page navigated during the snapshot; run page.snapshot "
+             "again");
+      return;
+    }
+    root_ = update.root_id;
+    focus_ = update.has_tree_data ? update.tree_data.focus_id : 0;
+    source_truncated_ =
+        update.nodes.size() >= foundation::control_snapshot_max_nodes();
+    for (const ui::AXNodeData& node : update.nodes) {
+      nodes_.push_back(RecordOf(node));
+    }
+    Finish(TabStatus::Done, {});
+  }
+
+  void Finish(TabStatus status, std::string reason) {
+    if (done_) {
+      return;
+    }
+    done_ = true;
+    timer_.Stop();
+    base::SingleThreadTaskRunner::GetCurrentDefault()->PostTask(
+        FROM_HERE,
+        base::BindOnce(&SnapshotWait::AnswerAndDelete,
+                       weak_factory_.GetWeakPtr(), status, std::move(reason)));
+  }
+
+  void WebContentsDestroyed() override {
+    Finish(TabStatus::Stale, "The tab closed during the snapshot");
+  }
+
+  void AnswerAndDelete(TabStatus status, std::string reason) {
+    foundation::TabStateRecord tab{};
+    tab.item = item_;
+    if (auto* page = web_contents()) {
+      tab = StateOf(item_, *page);
+    }
+    foundation::answer_snapshot_request(
+        *reply_, status, rust::Str(reason.data(), reason.size()),
+        std::move(tab), document_, root_, focus_, source_truncated_,
+        std::move(nodes_));
+    delete this;
+  }
+
+  const uint64_t item_;
+  const uint64_t document_;
+  rust::Box<foundation::ControlReply> reply_;
+  int32_t root_ = 0;
+  int32_t focus_ = 0;
+  bool source_truncated_ = false;
+  rust::Vec<foundation::AxNodeRecord> nodes_;
+  bool done_ = false;
+  base::OneShotTimer timer_;
+  base::WeakPtrFactory<SnapshotWait> weak_factory_{this};
+};
+
 }  // namespace
 
 void RunTabAction(BrowserWorkspaceAdapter& target,
@@ -263,6 +440,14 @@ void RunTabAction(BrowserWorkspaceAdapter& target,
       wait->Arm(0);
       return;
     }
+    case TabActionKind::Snapshot:
+      if (page->IsCrashed()) {
+        Answer(*reply, TabStatus::Invalid,
+               "The page crashed; reload it with tab.reload first");
+        return;
+      }
+      (new SnapshotWait(*page, plan.item, std::move(reply)))->Start();
+      return;
     case TabActionKind::Navigate: {
       const GURL url{std::string(plan.url)};
       if (const std::string refusal = Refusal(url); !refusal.empty()) {
