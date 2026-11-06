@@ -1,0 +1,15 @@
+diff --git a/third_party/blink/renderer/core/exported/web_element.cc b/third_party/blink/renderer/core/exported/web_element.cc
+index cd2b893025d8e36b27930c04afb0717c7f78ddbb..41350d3d8f8af0947dc80cd468fe5b458315963d 100644
+--- a/third_party/blink/renderer/core/exported/web_element.cc
++++ b/third_party/blink/renderer/core/exported/web_element.cc
+@@ -523,6 +523,10 @@ gfx::Rect WebElement::BoundsInWidget() const {
+ 
+ gfx::Rect WebElement::VisibleBoundsInWidget() const {
+   const Element* element = ConstUnwrap<Element>();
++  // Like BoundsInWidget(), read current layout. A hidden page gets no frames,
++  // so its layout can stay dirty until something forces an update.
++  element->GetDocument().UpdateStyleAndLayoutForNode(
++      element, DocumentUpdateReason::kUnknown);
+   LocalFrame* frame = element->GetDocument().GetFrame();
+   if (!frame || !frame->View()) {
+     return gfx::Rect();

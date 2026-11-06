@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-11-06: Fix the renderer abort on click in a background agent tab
+
+- The `exit=6` crash after fill, 12 s idle, click was a Blink DCHECK in `LayoutInline::AddOutlineRectsInternal` (lifecycle state 2, needs 6). The actor's `ToolBase::EnsureTargetInView` calls `WebElement::VisibleBoundsInWidget`, which read layout without updating it, and the hidden agent tab gets no frames to clean it. Crashpad had written dumps all along to `~/Library/Application Support/Chromium/Crashpad/pending`. Both earlier crashes and a fresh one had the same stack.
+- Fix in `web_element.cc`: `VisibleBoundsInWidget` runs `UpdateStyleAndLayoutForNode` first, as `BoundsInWidget` already does. That also covers the autofill caller. Before the fix the repro crashed on round 7. After it, 15 of 15 rounds clicked and navigated, with no new dump.
+- Also ran the concurrent control host live for the first time. Of two clicks on one revision, one acted and the other answered `stale` in 5 of 5 rounds. `tabs.list` and `page.snapshot` answered in 50 to 110 ms beside an 8 s `tab.navigate`, and ten parallel snapshots all returned rev 2.1. `tab.close` racing a click answered `stale` or `outcome_unknown`, with no hang or crash. Transcripts are in `/tmp/myarc-concurrency/`, outside the repo. `chrome` builds, and `cargo fmt --check`, the `bridge.rs` rustfmt check, `cargo clippy -D warnings`, `cargo test` (301 tests), `export_patches.py --check` and `check_docs.py` pass.
+
 ## 2026-11-06: Browser control review fixes
 
 - Tab handles now name their Profile (`t12` in Default, `t12-p1` in Profile 1), the host stays in the Profile of its first request, and a handle from another Profile answers `denied`. Pages in the agent Space open `window.open` and `target=_blank` tabs as background agent tabs through a new `Navigate` hook. `page.press` refuses keys while focus sits in a frame the snapshot leaves out, a `select` whose options never arrive answers `timeout` with its revision intact, and crash answers carry the renderer's termination status and exit code.
