@@ -240,3 +240,35 @@ fn version_prints_crate_and_protocol_versions() {
         )
     );
 }
+
+#[test]
+fn a_declined_client_exits_4_and_says_what_to_do() {
+    use myarc_control::ipc::{APPROVAL_TIMEOUT, Host, Incoming, REPLY_TIMEOUT};
+    let dir = std::env::temp_dir().join(format!("myarcctl-deny-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    let host = Host::start_gated(&dir, REPLY_TIMEOUT, APPROVAL_TIMEOUT).unwrap();
+    let child = Command::new(env!("CARGO_BIN_EXE_myarcctl"))
+        .args(["run", "space.list"])
+        .env("MYARC_CONTROL_DIR", &dir)
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .spawn()
+        .expect("myarcctl should start");
+    match host.next_incoming() {
+        Some(Incoming::Hello(approval)) => {
+            assert_eq!(approval.name(), "myarcctl");
+            approval.decide(false);
+        }
+        other => panic!("expected a hello, got {other:?}"),
+    }
+    let output = child.wait_with_output().unwrap();
+    host.stop();
+    let _ = std::fs::remove_dir_all(&dir);
+    assert_eq!(output.status.code(), Some(4));
+    let text = stderr(&output);
+    assert!(
+        text.starts_with("myarcctl: denied: the user declined; "),
+        "{text}"
+    );
+    assert!(text.contains("Ask the user"), "{text}");
+}

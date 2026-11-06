@@ -118,14 +118,17 @@ source_set("browser_workspace_adapter") {
     "control_tabs.h",
   ]
   public_deps = [
+    ":control_prefs",
     ":workspace_service",
     "//chrome/browser/ui/tabs:tab_strip_model_observer",
     "//ui/gfx",
     "//url",
   ]
   deps = [
+    ":control_prompt",
     ":test_buildflags",
     ":workspace_lifecycle",
+    "//chrome/browser:browser_process",
     "//chrome/browser/favicon",
     "//chrome/browser/history",
     "//chrome/browser/lifetime",
@@ -155,6 +158,36 @@ source_set("browser_workspace_adapter") {
     "//ui/base",
     "//ui/events:dom_keycode_converter",
     "//ui/events:events_base",
+    "//ui/views",
+  ]
+}
+
+source_set("control_prefs") {
+  sources = [
+    "control_prefs.cc",
+    "control_prefs.h",
+  ]
+  public_deps = [ "//base" ]
+  deps = [ "//components/prefs" ]
+}
+
+source_set("control_prompt") {
+  sources = [
+    "control_prompt.cc",
+    "control_prompt.h",
+  ]
+  public_deps = [
+    "//base",
+    "//ui/views",
+  ]
+  deps = [
+    "//cc/paint",
+    "//skia",
+    "//ui/accessibility",
+    "//ui/base",
+    "//ui/compositor",
+    "//ui/gfx",
+    "//ui/gfx/geometry",
   ]
 }
 
@@ -261,6 +294,7 @@ source_set("settings_window") {
   ]
   public_deps = [ "//base" ]
   deps = [
+    ":control_prefs",
     "//cc/paint",
     "//chrome/browser:shell_integration",
     "//chrome/common:constants",

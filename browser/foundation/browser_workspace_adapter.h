@@ -97,6 +97,8 @@ class BrowserWorkspaceAdapter final : public TabStripModelObserver {
   WorkspaceService& service() const { return *service_; }
   foundation::SidebarResult Sidebar() const;
   base::CallbackListSubscription Subscribe(base::RepeatingClosure callback);
+  // Browser control's active client changed; subscribers redraw.
+  void NotifyControlChanged() { changed_.Notify(); }
 
   struct LiveMetadata {
     std::u16string title;

@@ -23,6 +23,7 @@
 #include "chrome/common/pref_names.h"
 #include "components/prefs/pref_change_registrar.h"
 #include "components/prefs/pref_service.h"
+#include "myarc/control_prefs.h"
 #include "third_party/skia/include/core/SkColor.h"
 #include "third_party/skia/include/core/SkPoint.h"
 #include "third_party/skia/include/core/SkRRect.h"
@@ -727,12 +728,15 @@ class GeneralPage : public views::View {
 BEGIN_METADATA(GeneralPage)
 END_METADATA
 
-// Advanced: the way out to Chromium's full settings page.
+// Advanced: the way out to Chromium's full settings page, then the Browser
+// control switch that lets tools such as Claude Code drive the Agent Space
+// through myarcctl.
 class AdvancedPage : public views::View {
   METADATA_HEADER(AdvancedPage, views::View)
 
  public:
-  explicit AdvancedPage(base::RepeatingClosure more_settings) {
+  AdvancedPage(PrefService* local_state, base::RepeatingClosure more_settings)
+      : local_state_(local_state) {
     card_ = AddChildView(
         std::make_unique<Panel>(kCardFill, kCardStroke, kCardRadius));
     auto* layout = card_->SetLayoutManager(std::make_unique<views::BoxLayout>(
@@ -747,15 +751,73 @@ class AdvancedPage : public views::View {
     card_->AddChildView(std::make_unique<PillButton>(
         base::BindRepeating(std::move(more_settings)), u"More Settings…",
         kGrayButton, kButtonText, gfx::Font::Weight::NORMAL, nullptr));
+
+    control_title_ = AddLabel(this, u"Browser control", 13,
+                              gfx::Font::Weight::SEMIBOLD, kCardText);
+    control_title_->SetHorizontalAlignment(gfx::ALIGN_LEFT);
+    auto control_switch = std::make_unique<Switch>(
+        base::BindRepeating(&AdvancedPage::ToggleControl,
+                            base::Unretained(this)),
+        u"Allow agents to control myArc");
+    control_switch_ = control_switch.get();
+    control_panel_ =
+        AddRowPanel(this, u"Allow agents to control myArc",
+                    /*multi_line=*/false, std::move(control_switch));
+    control_help_ = AddLabel(
+        this,
+        u"Lets tools like Claude Code use the myarcctl command to open and "
+        u"use tabs in your Agent Space. You approve each tool the first time "
+        u"it connects.",
+        12, gfx::Font::Weight::NORMAL, kTabText);
+    control_help_->SetHorizontalAlignment(gfx::ALIGN_LEFT);
+    control_help_->SetMultiLine(true);
+    if (local_state_) {
+      registrar_.Init(local_state_);
+      registrar_.Add(kControlEnabledPref,
+                     base::BindRepeating(&AdvancedPage::UpdateControl,
+                                         base::Unretained(this)));
+    }
+    UpdateControl();
   }
 
   void Layout(PassKey) override {
-    card_->SetBounds(kSideMargin, kContentTop, width() - 2 * kSideMargin,
-                     kRowHeight);
+    const int panel_width = width() - 2 * kSideMargin;
+    card_->SetBounds(kSideMargin, kContentTop, panel_width, kRowHeight);
+    const int title_height = control_title_->GetPreferredSize().height();
+    control_title_->SetBounds(kSideMargin + kGeneralRowPad,
+                              card_->bounds().bottom() + 24,
+                              panel_width - kGeneralRowPad, title_height);
+    control_panel_->SetBounds(kSideMargin, control_title_->bounds().bottom() + 8,
+                              panel_width, kSwitchRowHeight);
+    const int help_width = panel_width - 2 * kGeneralRowPad;
+    control_help_->SetBounds(kSideMargin + kGeneralRowPad,
+                             control_panel_->bounds().bottom() + 8, help_width,
+                             control_help_->GetHeightForWidth(help_width));
   }
 
  private:
+  void UpdateControl() {
+    control_switch_->SetOn(IsControlEnabled(local_state_));
+    // --myarc-enable-control keeps it on for this run.
+    control_switch_->SetEnabled(local_state_ && !IsControlForcedOn());
+  }
+
+  void ToggleControl() {
+    if (!local_state_ || IsControlForcedOn()) {
+      return;
+    }
+    local_state_->SetBoolean(kControlEnabledPref,
+                             !local_state_->GetBoolean(kControlEnabledPref));
+    UpdateControl();
+  }
+
+  const raw_ptr<PrefService> local_state_;
+  PrefChangeRegistrar registrar_;
   raw_ptr<Panel> card_ = nullptr;
+  raw_ptr<views::Label> control_title_ = nullptr;
+  raw_ptr<Panel> control_panel_ = nullptr;
+  raw_ptr<Switch> control_switch_ = nullptr;
+  raw_ptr<views::Label> control_help_ = nullptr;
 };
 
 BEGIN_METADATA(AdvancedPage)
@@ -931,7 +993,8 @@ class SettingsView : public views::View {
         std::move(open_site)));
     profiles_ =
         AddChildView(std::make_unique<ProfilesPage>(std::move(archive_timer)));
-    advanced_ = AddChildView(std::make_unique<AdvancedPage>(more_settings));
+    advanced_ = AddChildView(
+        std::make_unique<AdvancedPage>(local_state, more_settings));
     AddAccelerator(ui::Accelerator(ui::VKEY_ESCAPE, ui::EF_NONE));
     AddAccelerator(ui::Accelerator(ui::VKEY_W, ui::EF_PLATFORM_ACCELERATOR));
     GetViewAccessibility().SetRole(ax::mojom::Role::kTabList);

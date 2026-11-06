@@ -696,10 +696,7 @@ pub fn run(short: Short, overrides: Overrides, json_output: bool) -> ExitCode {
     }
     let mut client = match connect() {
         Ok(client) => client,
-        Err(message) => {
-            write_line(&mut io::stderr(), &format!("myarcctl: {message}"));
-            return ExitCode::from(EXIT_NOT_CONNECTED);
-        }
+        Err(failure) => return failure.report(),
     };
     let first = send(&mut client, command, params);
     state.apply(&first);

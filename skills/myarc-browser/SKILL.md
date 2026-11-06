@@ -9,8 +9,11 @@ description: Drive the myArc browser through the myarcctl CLI. Use when the user
 
 ## Before you start
 
-- myArc must be running with `--myarc-enable-control`, and `myarcctl` must be on PATH.
-- Exit code 3 means myArc can't be reached. Don't retry. Tell the user to start myArc with `--myarc-enable-control` and pass on the cause from stderr.
+- myArc must be running with browser control on, and `myarcctl` must be on PATH. The user turns control on in myArc under Settings > Advanced > "Allow agents to control myArc".
+- The first command in a browser session waits, up to a minute, while myArc asks the user to allow `myarcctl`. Tell the user to look for the prompt in their myArc window.
+- Exit code 3 means myArc can't be reached or browser control is off. Don't retry. Tell the user to start myArc and turn on the switch, and pass on the cause from stderr.
+- Exit code 4 means myArc refused control. After `denied: the user declined`, stop and ask the user before trying again, because the next try shows them the prompt again. After `denied: waiting for approval timed out`, nobody answered: ask the user to watch for the prompt, then retry once.
+- The user can stop you at any time with Stop on the Agent Space. A command that was waiting then answers `cancelled`, and the next one asks the user again. Treat a Stop as the user taking over: don't retry until they say so.
 
 ## The loop
 

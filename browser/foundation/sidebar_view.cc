@@ -41,6 +41,7 @@
 #include "ui/gfx/geometry/rect.h"
 #include "ui/gfx/geometry/size.h"
 #include "ui/gfx/geometry/transform.h"
+#include "ui/gfx/image/canvas_image_source.h"
 #include "ui/gfx/image/image_skia_operations.h"
 #include "ui/gfx/scoped_canvas.h"
 #include "ui/gfx/vector_icon_types.h"
@@ -413,7 +414,40 @@ class SpaceStrip final : public views::View {
 BEGIN_METADATA(SpaceStrip)
 END_METADATA
 
-enum ItemCommand { kPin = 1, kFavorite, kUnsave, kClose };
+enum ItemCommand { kPin = 1, kFavorite, kUnsave, kClose, kStopControl };
+
+// Browser control's accent: a small dot on the agent Space's footer glyph
+// while a client is active.
+constexpr SkColor kControlAccent = SkColorSetRGB(0x0B, 0x86, 0xFE);
+
+// `glyph` with the control dot at its top-right corner.
+class ActiveGlyphSource : public gfx::CanvasImageSource {
+ public:
+  explicit ActiveGlyphSource(gfx::ImageSkia glyph)
+      : gfx::CanvasImageSource(glyph.size()), glyph_(std::move(glyph)) {}
+
+  void Draw(gfx::Canvas* canvas) override {
+    canvas->DrawImageInt(glyph_, 0, 0);
+    cc::PaintFlags flags;
+    flags.setAntiAlias(true);
+    flags.setColor(kControlAccent);
+    canvas->DrawCircle(gfx::PointF(size().width() - 2.5f, 2.5f), 2.5f, flags);
+  }
+
+ private:
+  const gfx::ImageSkia glyph_;
+};
+
+ui::ImageModel ActiveGlyph(const ui::ImageModel& glyph,
+                           const ui::ColorProvider* provider) {
+  gfx::ImageSkia image = glyph.Rasterize(provider);
+  if (image.isNull()) {
+    return glyph;
+  }
+  return ui::ImageModel::FromImageSkia(
+      gfx::CanvasImageSource::MakeImageSkia<ActiveGlyphSource>(
+          std::move(image)));
+}
 
 // Opens the creation menu once, held open, for background captures.
 constexpr char kCaptureCreateMenu[] = "myarc-capture-create-menu";
@@ -710,6 +744,20 @@ void SidebarView::ShowContextMenuForViewImpl(
   }
   const auto target =
       std::ranges::find(focus_targets_, source, &FocusTarget::view);
+  const auto agent = std::ranges::find(spaces_, true, &SpaceEntry::agent);
+  if (target != focus_targets_.end() &&
+      target->action == FocusAction::kSpaces && agent != spaces_.end() &&
+      target->id == agent->id && !control_client_.empty()) {
+    menu_item_id_ = 0;
+    menu_runner_.reset();
+    menu_model_ = std::make_unique<ui::SimpleMenuModel>(this);
+    menu_model_->AddItem(kStopControl, u"Stop " + control_client_);
+    menu_runner_ = std::make_unique<views::MenuRunner>(
+        menu_model_.get(), views::MenuRunner::CONTEXT_MENU);
+    menu_runner_->RunMenuAt(GetWidget(), nullptr, gfx::Rect(point, gfx::Size()),
+                            views::MenuAnchorPosition::kTopLeft, source_type);
+    return;
+  }
   if (target == focus_targets_.end() || !target->item_menu) {
     return;
   }
@@ -1058,8 +1106,26 @@ void SidebarView::ChooseCreateItem(int item) {
                      weak_factory_.GetWeakPtr(), item));
 }
 
+void SidebarView::SetControlClient(std::u16string client,
+                                   base::RepeatingClosure stop) {
+  control_client_ = std::move(client);
+  stop_control_ = std::move(stop);
+}
+
+void SidebarView::StopControl() {
+  // Stopping redraws this view; run it once the press or menu unwinds.
+  if (stop_control_) {
+    base::SequencedTaskRunner::GetCurrentDefault()->PostTask(FROM_HERE,
+                                                             stop_control_);
+  }
+}
+
 void SidebarView::ExecuteCommand(int command_id, int event_flags) {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
+  if (command_id == kStopControl) {
+    StopControl();
+    return;
+  }
   const uint64_t id = std::exchange(menu_item_id_, 0);
   if (!id) {
     return;
@@ -1365,7 +1431,8 @@ void SidebarView::SetModel(const foundation::SidebarResult& model,
   // change.
   const bool keep_footer = footer_ && footer_spaces_ == spaces_ &&
                            footer_other_spaces_ == other_spaces_ &&
-                           footer_space_id_ == current_space_id_;
+                           footer_space_id_ == current_space_id_ &&
+                           footer_control_client_ == control_client_;
   if (keep_footer) {
     while (children().front() != footer_) {
       RemoveChildViewT(children().front());
@@ -1455,7 +1522,31 @@ void SidebarView::SetModel(const foundation::SidebarResult& model,
   heading->GetViewAccessibility().SetName(
       (agent ? u"Rename Agent Space: " : u"Rename Space: ") + name);
   TrackFocus(heading.get(), FocusAction::kRename, model.current_space.id);
-  rows->AddChildView(std::move(heading));
+  if (agent && !control_client_.empty()) {
+    // While a control client is active, a Stop button follows the title.
+    auto header = Box(Orientation::kHorizontal, 4);
+    auto* layout = static_cast<views::BoxLayout*>(header->GetLayoutManager());
+    layout->set_cross_axis_alignment(
+        views::BoxLayout::CrossAxisAlignment::kCenter);
+    header->SetProperty(views::kMarginsKey,
+                        heading->GetProperty(views::kMarginsKey)
+                            ? *heading->GetProperty(views::kMarginsKey)
+                            : gfx::Insets());
+    heading->ClearProperty(views::kMarginsKey);
+    layout->SetFlexForView(header->AddChildView(std::move(heading)), 1);
+    auto stop = Button(base::BindRepeating(&SidebarView::StopControl,
+                                           base::Unretained(this)),
+                       u"Stop");
+    stop->SetEnabledTextColors(fills.title);
+    stop->SetBgColorOverrideDeprecated(fills.tile);
+    stop->SetCornerRadius(6);
+    stop->SetTooltipText(u"Stop " + control_client_);
+    stop->GetViewAccessibility().SetName(u"Stop " + control_client_);
+    header->AddChildView(std::move(stop));
+    rows->AddChildView(std::move(header));
+  } else {
+    rows->AddChildView(std::move(heading));
+  }
 
   // Arc divides the Space title from Today only while Today has tabs, and
   // puts Clear at the divider's right end.
@@ -1568,6 +1659,7 @@ void SidebarView::BuildFooter(const gfx::PointF& spaces_offset,
   footer_spaces_ = spaces_;
   footer_other_spaces_ = other_spaces_;
   footer_space_id_ = current_space_id_;
+  footer_control_client_ = control_client_;
   auto* footer = AddChildView(Box(Orientation::kHorizontal, 4));
   // Arc's footer controls sit 2 DIP higher than the sidebar's bottom inset.
   footer->SetProperty(views::kMarginsKey, gfx::Insets::TLBR(0, 0, 2, 0));
@@ -1659,10 +1751,13 @@ void SidebarView::BuildFooter(const gfx::PointF& spaces_offset,
         base::BindRepeating(&Delegate::SelectSpace,
                             base::Unretained(&delegate_.get()), space_id),
         nullptr);
-    choice->SetImageModel(
-        views::Button::STATE_NORMAL,
+    const bool controlled = agent && !control_client_.empty();
+    ui::ImageModel glyph =
         SpaceGlyph(position == 0 && !agent, spaces_[index].icon, current,
-                   GetFills(GetColorProvider()), agent));
+                   GetFills(GetColorProvider()), agent);
+    choice->SetImageModel(views::Button::STATE_NORMAL,
+                          controlled ? ActiveGlyph(glyph, GetColorProvider())
+                                     : glyph);
     // Arc spaces its Space dots 34 DIP apart.
     choice->SetMinSize(gfx::Size(34, 32));
     choice->SetMaxSize(gfx::Size(34, 32));
@@ -1672,7 +1767,11 @@ void SidebarView::BuildFooter(const gfx::PointF& spaces_offset,
     }
     // Ctrl-1 to Ctrl-8 select those Spaces and Ctrl-9 the last one, in the
     // footer's order. The agent Space takes no number.
-    FooterTooltip::Content tooltip = {agent ? u"Agent Space" : space_name, {}};
+    FooterTooltip::Content tooltip = {
+        controlled ? control_client_ + u" is controlling the Agent Space"
+        : agent    ? u"Agent Space"
+                   : space_name,
+        {}};
     if (!agent && position < 8) {
       tooltip.keys = {u"\u2303", base::NumberToString16(position + 1)};
     } else if (!agent && position + 1 == keyboard_spaces) {
@@ -1680,7 +1779,13 @@ void SidebarView::BuildFooter(const gfx::PointF& spaces_offset,
     }
     choice->SetFooterTooltip(footer_tooltip_->GetWeakPtr(), std::move(tooltip));
     choice->GetViewAccessibility().SetName(
-        (agent ? u"Agent Space: " : u"Space: ") + space_name);
+        (agent ? u"Agent Space: " : u"Space: ") + space_name +
+        (controlled ? u", " + control_client_ + u" is controlling it" : u""));
+    if (controlled) {
+      // Right-click offers Stop; a click still selects the Space.
+      choice->set_context_menu_controller(this);
+      choice->GetViewAccessibility().SetHasPopup(ax::mojom::HasPopup::kMenu);
+    }
     choice->GetViewAccessibility().SetRole(ax::mojom::Role::kToggleButton);
     choice->GetViewAccessibility().SetCheckedState(
         current ? ax::mojom::CheckedState::kTrue
@@ -2098,11 +2203,14 @@ void SidebarView::UpdateFills() {
       }
       const auto first =
           std::ranges::find(spaces_, false, &SpaceEntry::agent);
+      ui::ImageModel glyph =
+          SpaceGlyph(space == first, space->icon,
+                     target.id == footer_space_id_, fills, space->agent);
+      if (space->agent && !footer_control_client_.empty()) {
+        glyph = ActiveGlyph(glyph, GetColorProvider());
+      }
       static_cast<views::MdTextButton*>(target.view.get())
-          ->SetImageModel(views::Button::STATE_NORMAL,
-                          SpaceGlyph(space == first, space->icon,
-                                     target.id == footer_space_id_, fills,
-                                     space->agent));
+          ->SetImageModel(views::Button::STATE_NORMAL, glyph);
     }
   }
   SetCreateMenuOpen(create_menu_open_);

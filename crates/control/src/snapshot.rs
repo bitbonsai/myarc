@@ -473,7 +473,7 @@ pub fn quote(text: &str, cut: bool) -> String {
 /// (Cf) character in Unicode 16: bidirectional marks, embeddings, overrides
 /// and isolates, zero-width spaces and joiners, invisible operators and the
 /// tag characters that can carry hidden ASCII.
-fn needs_escape(c: char) -> bool {
+pub(crate) fn needs_escape(c: char) -> bool {
     c.is_control()
         || matches!(
             c,

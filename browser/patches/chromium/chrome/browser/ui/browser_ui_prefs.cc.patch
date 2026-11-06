@@ -1,25 +1,28 @@
 diff --git a/chrome/browser/ui/browser_ui_prefs.cc b/chrome/browser/ui/browser_ui_prefs.cc
-index d2264ce903105d12d76e111befbc55e8ce4428c9..abc1e726c9d186d2e42cf25104eab0a7a289da42 100644
+index d2264ce903105d12d76e111befbc55e8ce4428c9..9275a97abaed09edfa0ca17a97f0069402032728 100644
 --- a/chrome/browser/ui/browser_ui_prefs.cc
 +++ b/chrome/browser/ui/browser_ui_prefs.cc
-@@ -22,6 +22,7 @@
+@@ -22,6 +22,8 @@
  #include "components/prefs/scoped_user_pref_update.h"
  #include "components/translate/core/browser/translate_pref_names.h"
  #include "media/media_buildflags.h"
++#include "myarc/control_prefs.h"
 +#include "myarc/spaces_index.h"
  #include "third_party/blink/public/common/peerconnection/webrtc_ip_handling_policy.h"
  
  #if BUILDFLAG(IS_WIN) && BUILDFLAG(GOOGLE_CHROME_BRANDING)
-@@ -34,6 +35,8 @@
+@@ -34,6 +36,10 @@
  
  void RegisterBrowserPrefs(PrefRegistrySimple* registry) {
    registry->RegisterBooleanPref(prefs::kAllowFileSelectionDialogs, true);
 +  // myArc: every Profile's Spaces, so each window's sidebar can list them.
 +  myarc::RegisterSpacesIndexPref(*registry);
++  // myArc: the Settings switch that allows browser control.
++  myarc::RegisterControlPrefs(*registry);
  
  #if !BUILDFLAG(IS_ANDROID)
    registry->RegisterIntegerPref(prefs::kRelaunchNotification, 0);
-@@ -164,7 +167,9 @@ void RegisterBrowserUserPrefs(user_prefs::PrefRegistrySyncable* registry) {
+@@ -164,7 +170,9 @@ void RegisterBrowserUserPrefs(user_prefs::PrefRegistrySyncable* registry) {
    registry->RegisterStringPref(prefs::kWebRTCUDPPortRange, std::string());
    registry->RegisterBooleanPref(prefs::kWebRtcEventLogCollectionAllowed, false);
    registry->RegisterListPref(prefs::kWebRtcLocalIpsAllowedUrls);

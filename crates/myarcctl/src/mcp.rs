@@ -55,18 +55,31 @@ impl Backend {
         {
             *connection = None;
         }
-        let (client, used) = match connection {
-            Some(open) => open,
-            None => connection.insert((crate::connect()?, Instant::now())),
-        };
-        match crate::call(client, request) {
-            Ok(response) => {
-                *used = Instant::now();
-                Ok(response)
-            }
-            Err(response) => {
-                *connection = None;
-                Ok(response)
+        let mut reconnected = connection.is_none();
+        loop {
+            let (client, used) = match connection {
+                Some(open) => open,
+                None => connection.insert((crate::connect()?, Instant::now())),
+            };
+            match client.call(request.clone()) {
+                Ok(response) => {
+                    *used = Instant::now();
+                    return Ok(response);
+                }
+                // The request never left, such as after myArc stopped this
+                // client, so a fresh connection may send it once.
+                Err(error) if error.kind() == io::ErrorKind::NotConnected && !reconnected => {
+                    *connection = None;
+                    reconnected = true;
+                }
+                Err(error) => {
+                    *connection = None;
+                    return Ok(crate::failed_call(
+                        request.id.clone(),
+                        request.command.clone(),
+                        &error,
+                    ));
+                }
             }
         }
     }

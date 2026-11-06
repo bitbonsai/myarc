@@ -9,6 +9,7 @@
 #include <utility>
 #include <vector>
 
+#include "base/functional/callback.h"
 #include "base/memory/raw_ptr.h"
 #include "base/memory/raw_ref.h"
 #include "base/memory/weak_ptr.h"
@@ -208,6 +209,11 @@ class SidebarView final : public views::View,
   // Other Profiles' Spaces, grouped by Profile in the order to show. Takes
   // effect with the next SetModel.
   void SetOtherSpaces(std::vector<OtherSpaceEntry> spaces);
+  // The browser control client using this Profile's agent Space, or empty.
+  // While set, the agent Space's footer glyph carries a dot, and its context
+  // menu and a Stop button in its title run `stop`. Takes effect with the
+  // next SetModel.
+  void SetControlClient(std::u16string client, base::RepeatingClosure stop);
   // Drops mutation controls while loading or after a read/snapshot failure.
   // Parent supplies only a retry supported by its current storage state.
   void SetUnavailable(const std::u16string& reason,
@@ -322,6 +328,8 @@ class SidebarView final : public views::View,
   // Runs the creation menu's choice once its handlers have unwound.
   void ChooseCreateItem(int item);
   void ExecuteCommand(int command_id, int event_flags) override;
+  // Runs the Stop of the active control client after the caller unwinds.
+  void StopControl();
   // Builds the footer for spaces_ and current_space_id_, tracking its
   // controls' focus.
   void BuildFooter(const gfx::PointF& spaces_offset, bool space_changed);
@@ -348,6 +356,9 @@ class SidebarView final : public views::View,
   std::vector<SpaceEntry> footer_spaces_;
   std::vector<OtherSpaceEntry> footer_other_spaces_;
   uint64_t footer_space_id_ = 0;
+  std::u16string footer_control_client_;
+  std::u16string control_client_;
+  base::RepeatingClosure stop_control_;
   raw_ptr<views::ScrollView> spaces_scroll_ = nullptr;
   raw_ptr<views::MdTextButton> new_tab_ = nullptr;
   // The current Space's title and rows, which slide on a Space switch.

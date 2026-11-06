@@ -15,7 +15,13 @@
 //!
 //! A browser that runs commands on its own UI thread hosts a [`Host`] instead
 //! of calling [`Server::serve`] itself. The host serves on its own thread and
-//! hands each request over through [`Host::next`].
+//! hands each request over through [`Host::next`]. A host started with
+//! [`Host::start_gated`] also hands over each hello through
+//! [`Host::next_incoming`] and sends the welcome only once the browser
+//! approves the client, so the user can approve or decline it before any of
+//! its requests run. The client's name comes from its own hello, so any
+//! process holding the token can claim any name: approval is consent, and the
+//! token stays the authentication.
 //!
 //! The token never appears in logs, errors or `Debug` output.
 
@@ -54,8 +60,21 @@ pub const MAX_CONNECTIONS: usize = 16;
 /// answers `timeout` itself.
 pub const REPLY_TIMEOUT: Duration = Duration::from_secs(10);
 
+/// How long a gated [`Host`] holds a hello for the user's answer before it
+/// refuses the connection with `denied`. The client waits for the welcome
+/// that long and a little more; [`REPLY_TIMEOUT`] starts only with each
+/// request after the welcome.
+pub const APPROVAL_TIMEOUT: Duration = Duration::from_secs(60);
+/// An approved client counts as active while connected and this long after
+/// its latest request.
+pub const ACTIVE_WINDOW: Duration = Duration::from_secs(30);
+/// Longest client label [`client_label`] returns, in characters.
+pub const MAX_LABEL_CHARS: usize = 40;
+
 /// Time a new connection has to send its hello.
 const HELLO_TIMEOUT: Duration = Duration::from_secs(5);
+/// How long a client waits for the welcome, which may wait for the user.
+const CLIENT_WELCOME_TIMEOUT: Duration = Duration::from_secs(APPROVAL_TIMEOUT.as_secs() + 10);
 /// How often blocked server reads and accepts check the stop flag.
 const POLL_INTERVAL: Duration = Duration::from_millis(50);
 const WRITE_TIMEOUT: Duration = Duration::from_secs(5);
@@ -154,6 +173,69 @@ const TOKEN_REJECTED: &str = "token_rejected";
 const PROTOCOL_MISMATCH: &str = "protocol_mismatch";
 const FRAME_TOO_LARGE: &str = "frame_too_large";
 const BUSY: &str = "busy";
+const DENIED: &str = "denied";
+
+/// Reasons a gated host refuses a connection.
+pub const DECLINED: &str = "the user declined";
+pub const APPROVAL_TIMED_OUT: &str = "waiting for approval timed out";
+const APPROVAL_CLOSED: &str = "myArc closed the approval prompt";
+const HOST_STOPPED: &str = "myArc stopped serving browser control";
+
+/// `text` as the browser may show it: control and invisible format
+/// characters dropped, whitespace runs joined into one space, and cut to
+/// [`MAX_LABEL_CHARS`] characters with an ellipsis. Client names and versions
+/// come from the client's hello and are untrusted.
+pub fn client_label(text: &str) -> String {
+    let mut words = Vec::new();
+    for word in text.split(|c: char| c.is_whitespace()) {
+        let kept: String = word
+            .chars()
+            .filter(|&c| !crate::snapshot::needs_escape(c))
+            .collect();
+        if !kept.is_empty() {
+            words.push(kept);
+        }
+    }
+    let joined = words.join(" ");
+    if joined.chars().count() <= MAX_LABEL_CHARS {
+        return joined;
+    }
+    let mut cut: String = joined.chars().take(MAX_LABEL_CHARS - 1).collect();
+    cut.truncate(cut.trim_end().len());
+    cut.push('\u{2026}');
+    cut
+}
+
+/// One accepted connection, as the host tracks it.
+#[derive(Debug)]
+struct Session {
+    /// The name from the client's hello, at most 64 bytes.
+    name: String,
+    /// Set by [`Host::revoke`]: the connection's waiting request answers
+    /// `cancelled` and the connection closes.
+    revoked: AtomicBool,
+}
+
+/// What a server does with each connection. [`Server::serve`] admits every
+/// client; a [`Host`] may ask the browser first.
+trait Gate: Sync {
+    /// Runs after a good hello and before the welcome. `Err` refuses the
+    /// connection with `denied` and that reason.
+    fn admit(&self, _session: &Arc<Session>, _version: &str) -> Result<(), String> {
+        Ok(())
+    }
+    fn handle(&self, session: &Arc<Session>, request: Request) -> Response;
+    /// The admitted connection ended.
+    fn closed(&self, _session: &Arc<Session>) {}
+}
+
+struct Plain<F>(F);
+
+impl<F: Fn(Request) -> Response + Sync> Gate for Plain<F> {
+    fn handle(&self, _session: &Arc<Session>, request: Request) -> Response {
+        (self.0)(request)
+    }
+}
 
 /// Control endpoint hosted by the browser. Bind it, then call [`Server::serve`]
 /// on a thread the browser owns. Dropping it removes the socket and
@@ -222,23 +304,21 @@ impl Server {
         F: FnMut(Request) -> Response + Send,
     {
         let handler = Mutex::new(handler);
-        self.serve_shared(
-            |request| {
+        self.serve_gated(
+            &Plain(|request| {
                 let mut handler = handler.lock().unwrap_or_else(PoisonError::into_inner);
                 (*handler)(request)
-            },
+            }),
             stop,
         )
     }
 
-    /// Like [`Server::serve`], but `handler` runs on each connection's thread
-    /// at the same time, with no lock around it.
-    fn serve_shared<F>(self, handler: F, stop: &AtomicBool) -> io::Result<()>
-    where
-        F: Fn(Request) -> Response + Sync,
-    {
+    /// Like [`Server::serve`], but `gate` admits each client and handles its
+    /// requests on each connection's thread at the same time, with no lock
+    /// around it.
+    fn serve_gated(self, gate: &dyn Gate, stop: &AtomicBool) -> io::Result<()> {
         let shared = Shared {
-            handler,
+            gate,
             token: &self.token,
             stop,
             idle_timeout: self.idle_timeout,
@@ -324,13 +404,22 @@ impl Drop for Server {
 /// Serves an endpoint on a thread of its own and hands each request to the
 /// browser through [`Host::next`], so the browser can run it on its UI thread.
 /// A request the browser doesn't answer within the reply timeout gets
-/// `timeout`, and one still waiting when the host stops gets `cancelled`.
-/// Dropping the host stops it.
+/// `timeout`, and one still waiting when the host stops or the browser
+/// revokes its client gets `cancelled`. Dropping the host stops it.
 #[derive(Debug)]
 pub struct Host {
     stop: Arc<AtomicBool>,
-    queue: Mutex<mpsc::Receiver<Pending>>,
+    queue: Mutex<mpsc::Receiver<Incoming>>,
     serve: Mutex<Option<thread::JoinHandle<()>>>,
+    clients: Arc<Clients>,
+}
+
+/// What [`Host::next_incoming`] hands the browser.
+#[derive(Debug)]
+pub enum Incoming {
+    Request(Pending),
+    /// Only from a host started with [`Host::start_gated`].
+    Hello(Approval),
 }
 
 /// A request waiting for the browser's answer.
@@ -358,14 +447,163 @@ impl Pending {
     }
 }
 
+/// A client's hello waiting for the user's answer. Dropping it refuses the
+/// connection.
+#[derive(Debug)]
+pub struct Approval {
+    name: String,
+    version: String,
+    decide: mpsc::Sender<Result<(), String>>,
+    abandoned: Arc<AtomicBool>,
+}
+
+impl Approval {
+    /// The name from the hello, at most 64 bytes. Untrusted: show it through
+    /// [`client_label`].
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+
+    /// The version from the hello, at most 64 bytes. Untrusted too.
+    pub fn version(&self) -> &str {
+        &self.version
+    }
+
+    /// True once the connection was refused because the wait ran out or the
+    /// host stopped.
+    pub fn abandoned(&self) -> bool {
+        self.abandoned.load(Ordering::Acquire)
+    }
+
+    /// Welcomes the client, or refuses it with `denied: the user declined`.
+    pub fn decide(self, allow: bool) {
+        let _ = self.decide.send(if allow {
+            Ok(())
+        } else {
+            Err(DECLINED.to_owned())
+        });
+    }
+
+    /// Refuses the client with `denied` and `reason`, such as when no window
+    /// can show the prompt.
+    pub fn refuse(self, reason: &str) {
+        let _ = self.decide.send(Err(bounded(reason).to_owned()));
+    }
+}
+
+/// The admitted connections of a host, kept while open and for
+/// [`ACTIVE_WINDOW`] after their latest request.
+#[derive(Debug, Default)]
+struct Clients(Mutex<Vec<Live>>);
+
+#[derive(Debug)]
+struct Live {
+    session: Arc<Session>,
+    open: bool,
+    last: Instant,
+}
+
+impl Clients {
+    fn list(&self) -> std::sync::MutexGuard<'_, Vec<Live>> {
+        self.0.lock().unwrap_or_else(PoisonError::into_inner)
+    }
+
+    fn update(&self, session: &Arc<Session>, open: bool) {
+        let mut list = self.list();
+        let now = Instant::now();
+        match list
+            .iter_mut()
+            .find(|live| Arc::ptr_eq(&live.session, session))
+        {
+            Some(live) => {
+                live.open = open;
+                if open {
+                    live.last = now;
+                }
+            }
+            None if open && !session.revoked.load(Ordering::Acquire) => list.push(Live {
+                session: Arc::clone(session),
+                open,
+                last: now,
+            }),
+            None => {}
+        }
+        list.retain(|live| live.open || now.duration_since(live.last) < ACTIVE_WINDOW);
+    }
+}
+
+/// How a [`Host`] admits clients and relays their requests.
+struct HostGate {
+    queue: mpsc::Sender<Incoming>,
+    reply_timeout: Duration,
+    approval_timeout: Option<Duration>,
+    stop: Arc<AtomicBool>,
+    clients: Arc<Clients>,
+}
+
+impl Gate for HostGate {
+    fn admit(&self, session: &Arc<Session>, version: &str) -> Result<(), String> {
+        if let Some(timeout) = self.approval_timeout {
+            ask(&self.queue, session, version, timeout, &self.stop)?;
+        }
+        self.clients.update(session, true);
+        Ok(())
+    }
+
+    fn handle(&self, session: &Arc<Session>, request: Request) -> Response {
+        // Both ends of a request count as activity, so a long one does too.
+        self.clients.update(session, true);
+        let response = relay(
+            &self.queue,
+            request,
+            self.reply_timeout,
+            &self.stop,
+            Some(&session.revoked),
+        );
+        self.clients.update(session, true);
+        response
+    }
+
+    fn closed(&self, session: &Arc<Session>) {
+        self.clients.update(session, false);
+    }
+}
+
 impl Host {
     /// Binds a [`Server`] in `dir`, as [`Server::bind`] does, and starts
-    /// serving it on a new thread.
+    /// serving it on a new thread. Every client with the token is admitted.
     pub fn start(dir: &Path, reply_timeout: Duration) -> io::Result<Host> {
+        Self::start_with(dir, reply_timeout, None)
+    }
+
+    /// Like [`Host::start`], but each hello waits as an [`Incoming::Hello`]
+    /// until the browser decides, and is refused with `denied` after
+    /// `approval_timeout`. The welcome, and with it the client's first
+    /// request, follows only an approval.
+    pub fn start_gated(
+        dir: &Path,
+        reply_timeout: Duration,
+        approval_timeout: Duration,
+    ) -> io::Result<Host> {
+        Self::start_with(dir, reply_timeout, Some(approval_timeout))
+    }
+
+    fn start_with(
+        dir: &Path,
+        reply_timeout: Duration,
+        approval_timeout: Option<Duration>,
+    ) -> io::Result<Host> {
         let server = Server::bind(dir)?;
         let stop = Arc::new(AtomicBool::new(false));
-        let (sender, queue) = mpsc::channel();
-        let flag = Arc::clone(&stop);
+        let clients = Arc::new(Clients::default());
+        let (queue, receiver) = mpsc::channel();
+        let gate = HostGate {
+            queue,
+            reply_timeout,
+            approval_timeout,
+            stop: Arc::clone(&stop),
+            clients: Arc::clone(&clients),
+        };
         let serve = thread::Builder::new()
             .name(String::from("myarc-control-host"))
             .spawn(move || {
@@ -373,31 +611,71 @@ impl Host {
                 // on its own thread. The browser takes requests one at a time
                 // in arrival order, so a slow page call on one connection
                 // never holds a lock another connection needs.
-                let _ = server.serve_shared(
-                    |request| relay(&sender, request, reply_timeout, &flag),
-                    &flag,
-                );
+                let stop = Arc::clone(&gate.stop);
+                let _ = server.serve_gated(&gate, &stop);
             })?;
         Ok(Host {
             stop,
-            queue: Mutex::new(queue),
+            queue: Mutex::new(receiver),
             serve: Mutex::new(Some(serve)),
+            clients,
         })
     }
 
     /// Blocks until a request arrives. `None` once the host has stopped.
+    /// Hellos that arrive meanwhile are refused.
     pub fn next(&self) -> Option<Pending> {
+        loop {
+            match self.next_incoming()? {
+                Incoming::Request(pending) => return Some(pending),
+                Incoming::Hello(_) => {}
+            }
+        }
+    }
+
+    /// Blocks until a request or a hello arrives. `None` once the host has
+    /// stopped.
+    pub fn next_incoming(&self) -> Option<Incoming> {
         let queue = self.queue.lock().unwrap_or_else(PoisonError::into_inner);
         loop {
             if self.stop.load(Ordering::Acquire) {
                 return None;
             }
             match queue.recv_timeout(POLL_INTERVAL) {
-                Ok(pending) => return Some(pending),
+                Ok(incoming) => return Some(incoming),
                 Err(RecvTimeoutError::Timeout) => {}
                 Err(RecvTimeoutError::Disconnected) => return None,
             }
         }
+    }
+
+    /// The name of the admitted client that is connected or sent a request
+    /// within [`ACTIVE_WINDOW`], the most recent one when there are several.
+    pub fn active_client(&self) -> Option<String> {
+        let now = Instant::now();
+        let list = self.clients.list();
+        list.iter()
+            .filter(|live| live.open || now.duration_since(live.last) < ACTIVE_WINDOW)
+            .max_by_key(|live| live.last)
+            .map(|live| live.session.name.clone())
+    }
+
+    /// Disconnects every connection of the client called `name`. A request
+    /// of theirs still waiting answers `cancelled`, the browser sees it as
+    /// abandoned, and the client no longer counts as active. Returns how many
+    /// connections it closed.
+    pub fn revoke(&self, name: &str) -> usize {
+        let mut list = self.clients.list();
+        let mut closed = 0;
+        list.retain(|live| {
+            if live.session.name != name {
+                return true;
+            }
+            live.session.revoked.store(true, Ordering::Release);
+            closed += usize::from(live.open);
+            false
+        });
+        closed
     }
 
     /// Stops serving, answers waiting requests with `cancelled` and returns
@@ -421,12 +699,52 @@ impl Drop for Host {
     }
 }
 
+/// Queues the hello of `session` for [`Host::next_incoming`] and waits for
+/// the browser's decision.
+fn ask(
+    queue: &mpsc::Sender<Incoming>,
+    session: &Session,
+    version: &str,
+    timeout: Duration,
+    stop: &AtomicBool,
+) -> Result<(), String> {
+    let (decide, decisions) = mpsc::channel();
+    let abandoned = Arc::new(AtomicBool::new(false));
+    let approval = Approval {
+        name: session.name.clone(),
+        version: version.to_owned(),
+        decide,
+        abandoned: Arc::clone(&abandoned),
+    };
+    if queue.send(Incoming::Hello(approval)).is_err() {
+        return Err(String::from(HOST_STOPPED));
+    }
+    let deadline = Instant::now() + timeout;
+    loop {
+        if stop.load(Ordering::Acquire) {
+            abandoned.store(true, Ordering::Release);
+            return Err(String::from(HOST_STOPPED));
+        }
+        let left = deadline.saturating_duration_since(Instant::now());
+        if left.is_zero() {
+            abandoned.store(true, Ordering::Release);
+            return Err(String::from(APPROVAL_TIMED_OUT));
+        }
+        match decisions.recv_timeout(left.min(POLL_INTERVAL)) {
+            Ok(decision) => return decision,
+            Err(RecvTimeoutError::Timeout) => {}
+            Err(RecvTimeoutError::Disconnected) => return Err(String::from(APPROVAL_CLOSED)),
+        }
+    }
+}
+
 /// Queues `request` for [`Host::next`] and waits for its answer.
 fn relay(
-    queue: &mpsc::Sender<Pending>,
+    queue: &mpsc::Sender<Incoming>,
     request: Request,
     timeout: Duration,
     stop: &AtomicBool,
+    revoked: Option<&AtomicBool>,
 ) -> Response {
     let id = if request.id.len() > MAX_REQUEST_ID_BYTES {
         String::new()
@@ -439,6 +757,10 @@ fn relay(
         command: command.clone(),
         outcome,
     };
+    let is_revoked = || revoked.is_some_and(|revoked| revoked.load(Ordering::Acquire));
+    if is_revoked() {
+        return answer(Outcome::Cancelled);
+    }
     let (reply, answers) = mpsc::channel();
     let abandoned = Arc::new(AtomicBool::new(false));
     let pending = Pending {
@@ -446,12 +768,12 @@ fn relay(
         reply,
         abandoned: Arc::clone(&abandoned),
     };
-    if queue.send(pending).is_err() {
+    if queue.send(Incoming::Request(pending)).is_err() {
         return answer(Outcome::Cancelled);
     }
     let deadline = Instant::now() + timeout;
     loop {
-        if stop.load(Ordering::Acquire) {
+        if stop.load(Ordering::Acquire) || is_revoked() {
             abandoned.store(true, Ordering::Release);
             return answer(Outcome::Cancelled);
         }
@@ -567,8 +889,8 @@ impl Drop for Slot<'_> {
     }
 }
 
-struct Shared<'a, F> {
-    handler: F,
+struct Shared<'a> {
+    gate: &'a dyn Gate,
     token: &'a Token,
     stop: &'a AtomicBool,
     idle_timeout: Duration,
@@ -576,7 +898,19 @@ struct Shared<'a, F> {
     sessions: AtomicU64,
 }
 
-impl<F: Fn(Request) -> Response> Shared<'_, F> {
+/// Tells the gate when an admitted connection ends, however it ends.
+struct Admitted<'a> {
+    gate: &'a dyn Gate,
+    session: Arc<Session>,
+}
+
+impl Drop for Admitted<'_> {
+    fn drop(&mut self) {
+        self.gate.closed(&self.session);
+    }
+}
+
+impl Shared<'_> {
     fn connection(&self, stream: UnixStream) {
         // Accepted sockets inherit the listener's non-blocking mode on macOS.
         let ready = stream
@@ -590,6 +924,7 @@ impl<F: Fn(Request) -> Response> Shared<'_, F> {
         let mut reader = PollingReader {
             stream: &stream,
             stop: self.stop,
+            revoked: None,
             idle_timeout: self.idle_timeout,
             last_progress: now,
             deadline: Some(now + HELLO_TIMEOUT),
@@ -603,23 +938,41 @@ impl<F: Fn(Request) -> Response> Shared<'_, F> {
             }
             Ok(Frame::Closed) | Err(_) => return,
         };
-        if let Err((code, message, version)) = self.check_hello(&hello) {
-            let reply = ServerMessage::Error {
-                code: code.to_owned(),
-                message,
-                protocol_version: version,
-            };
-            let _ = write_json(&mut writer, &reply);
+        let client = match self.check_hello(&hello) {
+            Ok(client) => client,
+            Err((code, message, version)) => {
+                let reply = ServerMessage::Error {
+                    code: code.to_owned(),
+                    message,
+                    protocol_version: version,
+                };
+                let _ = write_json(&mut writer, &reply);
+                return;
+            }
+        };
+        let session = Arc::new(Session {
+            name: client.name,
+            revoked: AtomicBool::new(false),
+        });
+        // A gated host may wait here for the user.
+        if let Err(reason) = self.gate.admit(&session, &client.version) {
+            reply_error(&mut writer, DENIED, &reason);
             return;
         }
-        let session = self.sessions.fetch_add(1, Ordering::AcqRel) + 1;
+        let admitted = Admitted {
+            gate: self.gate,
+            session,
+        };
+        let id = self.sessions.fetch_add(1, Ordering::AcqRel) + 1;
         let welcome = ServerMessage::Welcome {
-            session_id: session.to_string(),
+            session_id: id.to_string(),
         };
         if write_json(&mut writer, &welcome).is_err() {
             return;
         }
         reader.deadline = None;
+        reader.revoked = Some(&admitted.session.revoked);
+        reader.last_progress = Instant::now();
         loop {
             let bytes = match read_frame(&mut reader) {
                 Ok(Frame::Message(bytes)) => bytes,
@@ -630,7 +983,7 @@ impl<F: Fn(Request) -> Response> Shared<'_, F> {
                 Ok(Frame::Closed) | Err(_) => return,
             };
             let response = match serde_json::from_slice::<Request>(&bytes) {
-                Ok(request) => self.dispatch(request),
+                Ok(request) => self.dispatch(&admitted.session, request),
                 Err(error) => Response {
                     id: String::new(),
                     command: String::new(),
@@ -642,13 +995,18 @@ impl<F: Fn(Request) -> Response> Shared<'_, F> {
                     },
                 },
             };
-            if write_json(&mut writer, &response).is_err() {
+            if write_json(&mut writer, &response).is_err()
+                || admitted.session.revoked.load(Ordering::Acquire)
+            {
                 return;
             }
         }
     }
 
-    fn check_hello(&self, bytes: &[u8]) -> Result<(), (&'static str, String, Option<String>)> {
+    fn check_hello(
+        &self,
+        bytes: &[u8],
+    ) -> Result<ClientInfo, (&'static str, String, Option<String>)> {
         let Ok(ClientMessage::Hello {
             token,
             client,
@@ -689,13 +1047,13 @@ impl<F: Fn(Request) -> Response> Shared<'_, F> {
                 Some(PROTOCOL_VERSION.to_owned()),
             ));
         }
-        Ok(())
+        Ok(client)
     }
 
-    fn dispatch(&self, request: Request) -> Response {
+    fn dispatch(&self, session: &Arc<Session>, request: Request) -> Response {
         let id = bounded(&request.id).to_owned();
         let command = bounded(&request.command).to_owned();
-        panic::catch_unwind(AssertUnwindSafe(|| (self.handler)(request))).unwrap_or_else(|_| Response {
+        panic::catch_unwind(AssertUnwindSafe(|| self.gate.handle(session, request))).unwrap_or_else(|_| Response {
             id,
             command,
             outcome: Outcome::OutcomeUnknown {
@@ -710,10 +1068,11 @@ impl<F: Fn(Request) -> Response> Shared<'_, F> {
 
 /// Reads from a stream whose read timeout is [`POLL_INTERVAL`], retrying
 /// timeouts until the server stops, the connection idles past its limit or the
-/// hello deadline passes.
+/// hello deadline passes, or the host revokes the connection.
 struct PollingReader<'a> {
     stream: &'a UnixStream,
     stop: &'a AtomicBool,
+    revoked: Option<&'a AtomicBool>,
     idle_timeout: Duration,
     last_progress: Instant,
     deadline: Option<Instant>,
@@ -738,6 +1097,15 @@ impl Read for PollingReader<'_> {
                         return Err(io::Error::new(
                             ErrorKind::ConnectionAborted,
                             "the control server is stopping",
+                        ));
+                    }
+                    if self
+                        .revoked
+                        .is_some_and(|revoked| revoked.load(Ordering::Acquire))
+                    {
+                        return Err(io::Error::new(
+                            ErrorKind::ConnectionAborted,
+                            "myArc stopped this client",
                         ));
                     }
                     let now = Instant::now();
@@ -952,6 +1320,11 @@ pub enum ConnectError {
         server: String,
         client: String,
     },
+    /// The browser refused this client: the user declined it, didn't answer
+    /// in time, or browser control stopped meanwhile.
+    Denied {
+        reason: String,
+    },
     /// Any other I/O or handshake failure.
     Failed {
         path: PathBuf,
@@ -964,7 +1337,7 @@ impl fmt::Display for ConnectError {
         match self {
             Self::NotRunning { endpoint } => write!(
                 f,
-                "myArc isn't running (no control endpoint at {}); start myArc and try again",
+                "myArc isn't running or browser control is off (no control endpoint at {}); start myArc, turn on Allow agents to control myArc in Settings > Advanced and try again",
                 endpoint.display()
             ),
             Self::Stale { endpoint, pid } => write!(
@@ -986,6 +1359,7 @@ impl fmt::Display for ConnectError {
                 f,
                 "protocol version mismatch: myArc speaks control protocol {server} and this client speaks {client}; use a client from the same myArc build"
             ),
+            Self::Denied { reason } => write!(f, "denied: {reason}"),
             Self::Failed { path, detail } => write!(
                 f,
                 "could not connect to myArc at {}: {detail}",
@@ -1080,8 +1454,9 @@ impl Client {
             }
             Err(error) => return Err(failed(error.to_string())),
         };
+        // The welcome may wait for the user to approve this client.
         stream
-            .set_read_timeout(Some(CLIENT_READ_TIMEOUT))
+            .set_read_timeout(Some(CLIENT_WELCOME_TIMEOUT))
             .and_then(|()| stream.set_write_timeout(Some(WRITE_TIMEOUT)))
             .map_err(|error| failed(error.to_string()))?;
         let hello = ClientMessage::Hello {
@@ -1109,10 +1484,20 @@ impl Client {
             Err(error) => return Err(failed(error.to_string())),
         };
         match reply {
-            ServerMessage::Welcome { session_id } => Ok(Client {
-                stream,
-                session_id: bounded(&session_id).to_owned(),
-            }),
+            ServerMessage::Welcome { session_id } => {
+                stream
+                    .set_read_timeout(Some(CLIENT_READ_TIMEOUT))
+                    .map_err(|error| failed(error.to_string()))?;
+                Ok(Client {
+                    stream,
+                    session_id: bounded(&session_id).to_owned(),
+                })
+            }
+            ServerMessage::Error { code, message, .. } if code == DENIED => {
+                Err(ConnectError::Denied {
+                    reason: bounded(&message).to_owned(),
+                })
+            }
             ServerMessage::Error { code, .. } if code == TOKEN_REJECTED => {
                 Err(ConnectError::TokenRejected {
                     endpoint: endpoint_path,
@@ -1138,7 +1523,8 @@ impl Client {
     }
 
     /// Sends one request and waits for its response. A request too large for
-    /// a frame fails with `InvalidInput` before anything is sent. Any other
+    /// a frame fails with `InvalidInput` before anything is sent, and one the
+    /// closed connection couldn't take fails with `NotConnected`. Any other
     /// error closes the connection, and the request may or may not have run.
     pub fn call(&mut self, request: Request) -> io::Result<Response> {
         let body = serde_json::to_vec(&request).map_err(io::Error::other)?;
@@ -1156,7 +1542,15 @@ impl Client {
     }
 
     fn exchange(&mut self, body: &[u8]) -> io::Result<Response> {
-        write_frame(&mut self.stream, body)?;
+        write_frame(&mut self.stream, body).map_err(|error| {
+            // Nothing reached myArc, for example after it stopped this client.
+            io::Error::new(
+                ErrorKind::NotConnected,
+                format!(
+                    "myArc closed the control connection before this request was sent ({error})"
+                ),
+            )
+        })?;
         let bytes = match read_frame(&mut self.stream)? {
             Frame::Message(bytes) => bytes,
             Frame::TooLarge(len) => {
@@ -1769,5 +2163,136 @@ mod tests {
         held.reply(ControlService::new().handle(request("space.list", Value::Null)));
         let finished = slow_call.join().unwrap().unwrap();
         assert!(matches!(finished.outcome, Outcome::Success { .. }));
+    }
+
+    fn hello_of(host: &Host) -> Approval {
+        match host.next_incoming().unwrap() {
+            Incoming::Hello(approval) => approval,
+            Incoming::Request(pending) => panic!("expected a hello: {:?}", pending.request()),
+        }
+    }
+
+    fn request_of(host: &Host) -> Pending {
+        match host.next_incoming().unwrap() {
+            Incoming::Request(pending) => pending,
+            Incoming::Hello(approval) => panic!("expected a request from {}", approval.name()),
+        }
+    }
+
+    #[test]
+    fn a_gated_host_welcomes_only_after_approval() {
+        let dir = TempDir::new();
+        let host = Host::start_gated(&dir.0, REPLY_TIMEOUT, APPROVAL_TIMEOUT).unwrap();
+        let path = dir.0.clone();
+        let connecting = thread::spawn(move || {
+            let mut client = Client::connect_as(&path, "Claude Code", "2.1").unwrap();
+            client.call(request("space.list", Value::Null))
+        });
+        let approval = hello_of(&host);
+        assert_eq!(approval.name(), "Claude Code");
+        assert_eq!(approval.version(), "2.1");
+        assert!(host.active_client().is_none());
+        thread::sleep(Duration::from_millis(200));
+        assert!(!connecting.is_finished(), "the client ran before approval");
+        approval.decide(true);
+        let pending = request_of(&host);
+        assert_eq!(host.active_client().as_deref(), Some("Claude Code"));
+        pending.reply(ControlService::new().handle(request("space.list", Value::Null)));
+        let answered = connecting.join().unwrap().unwrap();
+        assert!(matches!(answered.outcome, Outcome::Success { .. }));
+        // Disconnected, but its request was just now.
+        assert_eq!(host.active_client().as_deref(), Some("Claude Code"));
+    }
+
+    #[test]
+    fn a_declined_or_unanswered_hello_is_denied() {
+        let dir = TempDir::new();
+        let host = Host::start_gated(&dir.0, REPLY_TIMEOUT, Duration::from_millis(300)).unwrap();
+        let path = dir.0.clone();
+        let declined = thread::spawn(move || Client::connect_as(&path, "tool", "1").err());
+        hello_of(&host).decide(false);
+        let error = declined.join().unwrap().unwrap();
+        assert!(
+            matches!(&error, ConnectError::Denied { reason } if reason == DECLINED),
+            "{error:?}"
+        );
+        assert_eq!(error.to_string(), "denied: the user declined");
+
+        let path = dir.0.clone();
+        let waiting = thread::spawn(move || Client::connect_as(&path, "tool", "1").err());
+        let approval = hello_of(&host);
+        let error = waiting.join().unwrap().unwrap();
+        assert!(
+            matches!(&error, ConnectError::Denied { reason } if reason == APPROVAL_TIMED_OUT),
+            "{error:?}"
+        );
+        assert!(approval.abandoned());
+        assert!(host.active_client().is_none());
+
+        let path = dir.0.clone();
+        let refused = thread::spawn(move || Client::connect_as(&path, "tool", "1").err());
+        hello_of(&host).refuse("No myArc window is open; open one and retry");
+        assert_eq!(
+            refused.join().unwrap().unwrap().to_string(),
+            "denied: No myArc window is open; open one and retry"
+        );
+    }
+
+    #[test]
+    fn revoke_cancels_the_waiting_request_and_closes_the_connection() {
+        let dir = TempDir::new();
+        let host = Arc::new(Host::start_gated(&dir.0, REPLY_TIMEOUT, APPROVAL_TIMEOUT).unwrap());
+        let path = dir.0.clone();
+        let calling = thread::spawn(move || {
+            let mut client = Client::connect_as(&path, "agent", "1").unwrap();
+            let first = client.call(request("space.list", Value::Null));
+            let second = client.call(request("space.list", Value::Null));
+            (first, second)
+        });
+        hello_of(&host).decide(true);
+        let held = request_of(&host);
+        assert_eq!(host.revoke("someone else"), 0);
+        assert_eq!(host.revoke("agent"), 1);
+        let (first, second) = calling.join().unwrap();
+        assert_eq!(first.unwrap().outcome, Outcome::Cancelled);
+        assert!(second.is_err(), "the connection stayed open: {second:?}");
+        assert!(held.abandoned());
+        assert!(host.active_client().is_none());
+
+        // The next connection asks again.
+        let path = dir.0.clone();
+        let again = thread::spawn(move || Client::connect_as(&path, "agent", "1").err());
+        hello_of(&host).decide(false);
+        assert!(matches!(
+            again.join().unwrap(),
+            Some(ConnectError::Denied { .. })
+        ));
+    }
+
+    #[test]
+    fn an_ungated_host_admits_without_asking() {
+        let dir = TempDir::new();
+        let host = Host::start(&dir.0, REPLY_TIMEOUT).unwrap();
+        let mut client = Client::connect_as(&dir.0, "plain", "1").unwrap();
+        let calling = thread::spawn(move || client.call(request("space.list", Value::Null)));
+        let pending = host.next().unwrap();
+        assert_eq!(host.active_client().as_deref(), Some("plain"));
+        pending.reply(ControlService::new().handle(request("space.list", Value::Null)));
+        assert!(calling.join().unwrap().is_ok());
+    }
+
+    #[test]
+    fn client_labels_drop_invisible_characters_and_stay_short() {
+        assert_eq!(client_label("Claude Code"), "Claude Code");
+        assert_eq!(client_label("  two \n\t words "), "two words");
+        assert_eq!(client_label("evil\u{202e}txt.exe"), "eviltxt.exe");
+        assert_eq!(client_label("a\u{200b}b\u{e0041}c\u{7}"), "abc");
+        assert_eq!(client_label("\u{2066}\u{2069}"), "");
+        let long = "x".repeat(64);
+        let cut = client_label(&long);
+        assert_eq!(cut.chars().count(), MAX_LABEL_CHARS);
+        assert!(cut.ends_with('\u{2026}'));
+        // Characters, not bytes: 64 bytes of é stay whole.
+        assert_eq!(client_label(&"é".repeat(32)), "é".repeat(32));
     }
 }

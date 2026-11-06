@@ -7,8 +7,9 @@ use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 
 pub struct Workspace(workspace::Workspace);
 
-// One request from a control client, or none once the host has stopped.
-// An interaction command also carries its checked action and, once the
+// One request or hello from a control client, or none once the host has
+// stopped. A hello waits in `approval` for the user's answer. An interaction
+// command also carries its checked action and, once the
 // browser began it, the snapshot references it took. `profile` is the tag of
 // the Profile it runs in, which its tab handles carry.
 //
@@ -17,6 +18,7 @@ pub struct Workspace(workspace::Workspace);
 // unwraps, indexes or slices on request or page data.
 pub struct ControlReply {
     pending: Option<control::ipc::Pending>,
+    approval: Option<control::ipc::Approval>,
     action: Option<control::actions::PageAction>,
     taken: Option<control::snapshot::Taken>,
     profile: String,
@@ -462,15 +464,38 @@ mod ffi {
         // stale.
         fn enable_control_host() -> u64;
         // Background thread: binds the endpoint in $MYARC_CONTROL_DIR or the
-        // default directory and starts serving. Empty on success or when
-        // `epoch` is stale, else the reason it could not start.
+        // default directory and starts serving. Each client's hello waits
+        // for decide_control_hello before its requests come. Empty on success
+        // or when `epoch` is stale, else the reason it could not start.
         fn start_control_host(epoch: u64) -> String;
-        // Background thread: blocks until a request arrives. The reply holds
-        // no request once the host stopped or `epoch` is stale.
+        // Background thread: blocks until a request or a hello arrives. The
+        // reply holds neither once the host stopped or `epoch` is stale.
         fn next_control_request(epoch: u64) -> Box<ControlReply>;
         fn has_control_request(reply: &ControlReply) -> bool;
-        // False when the client already got timeout or cancelled; drop it.
+        // False when the client already got timeout or cancelled, or its
+        // hello was refused; drop it.
         fn control_request_live(reply: &ControlReply) -> bool;
+        // True when `reply` holds a hello rather than a request.
+        fn is_control_hello(reply: &ControlReply) -> bool;
+        // The hello's client name and version, untrusted and at most 64
+        // bytes each. Show them through control_client_label.
+        fn control_hello_name(reply: &ControlReply) -> String;
+        fn control_hello_version(reply: &ControlReply) -> String;
+        // UI thread: welcomes the hello's client, or refuses it with
+        // "denied: the user declined".
+        fn decide_control_hello(reply: &mut ControlReply, allow: bool);
+        // Milliseconds a hello waits for decide_control_hello before the
+        // client gets "denied: waiting for approval timed out".
+        fn control_approval_timeout_ms() -> u64;
+        // Untrusted client text as the browser may show it: invisible and
+        // control characters dropped, at most 40 characters.
+        fn control_client_label(text: &str) -> String;
+        // The approved client connected now or within the last 30 seconds,
+        // the latest one if several; empty when none or no host serves.
+        fn active_control_client() -> String;
+        // Disconnects the client called `name`, answering its waiting
+        // request with cancelled.
+        fn revoke_control_client(name: &str);
         // UI thread: runs the request against `workspace` as seen from
         // `window_id`, in the Profile whose directory is `profile`, such as
         // "Default" or "Profile 1". A Space command is answered at once and leaves `reply`
@@ -539,7 +564,8 @@ mod ffi {
         fn control_action_limits() -> ActionLimits;
         // Most accessibility nodes to ask each frame for.
         fn control_snapshot_max_nodes() -> usize;
-        // Answers denied without running the request.
+        // Answers denied without running the request, or refuses a hello
+        // with denied and `reason`.
         fn refuse_control_request(reply: &mut ControlReply, reason: &str);
         // UI thread: stops serving and removes the endpoint before returning.
         fn stop_control_host();
@@ -1232,7 +1258,11 @@ pub fn start_control_host(epoch: u64) -> String {
             control::ipc::DIR_ENV
         );
     };
-    match control::ipc::Host::start(&dir, control::ipc::REPLY_TIMEOUT) {
+    match control::ipc::Host::start_gated(
+        &dir,
+        control::ipc::REPLY_TIMEOUT,
+        control::ipc::APPROVAL_TIMEOUT,
+    ) {
         Ok(host) => {
             slot.host = Some(Arc::new(host));
             String::new()
@@ -1250,8 +1280,14 @@ pub fn next_control_request(epoch: u64) -> Box<ControlReply> {
             None
         }
     };
+    let (pending, approval) = match host.and_then(|host| host.next_incoming()) {
+        Some(control::ipc::Incoming::Request(pending)) => (Some(pending), None),
+        Some(control::ipc::Incoming::Hello(approval)) => (None, Some(approval)),
+        None => (None, None),
+    };
     Box::new(ControlReply {
-        pending: host.and_then(|host| host.next()),
+        pending,
+        approval,
         action: None,
         taken: None,
         profile: String::new(),
@@ -1259,14 +1295,67 @@ pub fn next_control_request(epoch: u64) -> Box<ControlReply> {
 }
 
 pub fn has_control_request(reply: &ControlReply) -> bool {
-    reply.pending.is_some()
+    reply.pending.is_some() || reply.approval.is_some()
 }
 
 pub fn control_request_live(reply: &ControlReply) -> bool {
+    if let Some(approval) = &reply.approval {
+        return !approval.abandoned();
+    }
     reply
         .pending
         .as_ref()
         .is_some_and(|pending| !pending.abandoned())
+}
+
+pub fn is_control_hello(reply: &ControlReply) -> bool {
+    reply.approval.is_some()
+}
+
+pub fn control_hello_name(reply: &ControlReply) -> String {
+    reply
+        .approval
+        .as_ref()
+        .map(|approval| approval.name().to_owned())
+        .unwrap_or_default()
+}
+
+pub fn control_hello_version(reply: &ControlReply) -> String {
+    reply
+        .approval
+        .as_ref()
+        .map(|approval| approval.version().to_owned())
+        .unwrap_or_default()
+}
+
+pub fn decide_control_hello(reply: &mut ControlReply, allow: bool) {
+    if let Some(approval) = reply.approval.take() {
+        approval.decide(allow);
+    }
+}
+
+pub fn control_approval_timeout_ms() -> u64 {
+    u64::try_from(control::ipc::APPROVAL_TIMEOUT.as_millis()).unwrap_or(u64::MAX)
+}
+
+pub fn control_client_label(text: &str) -> String {
+    control::ipc::client_label(text)
+}
+
+fn control_host() -> Option<Arc<control::ipc::Host>> {
+    control_slot().host.clone()
+}
+
+pub fn active_control_client() -> String {
+    control_host()
+        .and_then(|host| host.active_client())
+        .unwrap_or_default()
+}
+
+pub fn revoke_control_client(name: &str) {
+    if let Some(host) = control_host() {
+        host.revoke(name);
+    }
 }
 
 pub fn answer_control_request(
@@ -1618,6 +1707,9 @@ pub fn control_snapshot_max_nodes() -> usize {
 }
 
 pub fn refuse_control_request(reply: &mut ControlReply, reason: &str) {
+    if let Some(approval) = reply.approval.take() {
+        approval.refuse(reason);
+    }
     if let Some(pending) = reply.pending.take() {
         let response = control::deny(pending.request(), reason);
         pending.reply(response);

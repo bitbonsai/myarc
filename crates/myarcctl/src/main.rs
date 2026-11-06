@@ -29,6 +29,8 @@ const MAX_PARAMS_BYTES: usize = mcp::MAX_LINE_BYTES;
 
 /// Exit code when `run` can't reach myArc.
 const EXIT_NOT_CONNECTED: u8 = 3;
+/// Exit code when myArc refused this client, such as when the user declined.
+const EXIT_DENIED: u8 = 4;
 
 const HELP: &str = "\
 myarcctl: drive myArc's agent Space and run browser control commands
@@ -80,8 +82,12 @@ Development stub:
       endpoint in <dir> or the default directory, so run and mcp can connect
       without myArc. Stop it with Ctrl-C.
 
+The first time a tool connects in a browser session, myArc asks the user to
+allow it. The command waits up to 60 seconds for that answer.
+
 Exit codes: 0 success, 1 the command returned an error, 2 usage error,
-3 myArc couldn't be reached.
+3 myArc couldn't be reached, 4 myArc refused control, for example because
+the user declined.
 ";
 
 enum Cli {
@@ -327,10 +333,7 @@ fn run(command: String, params: Value, json: bool, local: bool) -> ExitCode {
     } else {
         match connect() {
             Ok(mut client) => call(&mut client, request).unwrap_or_else(|response| response),
-            Err(message) => {
-                write_line(&mut io::stderr(), &format!("myarcctl: {message}"));
-                return ExitCode::from(EXIT_NOT_CONNECTED);
-            }
+            Err(failure) => return failure.report(),
         }
     };
     let success = matches!(response.outcome, Outcome::Success { .. });
@@ -351,20 +354,61 @@ fn run(command: String, params: Value, json: bool, local: bool) -> ExitCode {
     }
 }
 
+/// Why [`connect`] failed, with the exit code to report it with.
+struct NotConnected {
+    message: String,
+    code: u8,
+}
+
+impl NotConnected {
+    fn report(self) -> ExitCode {
+        write_line(&mut io::stderr(), &format!("myarcctl: {}", self.message));
+        ExitCode::from(self.code)
+    }
+}
+
+impl From<NotConnected> for String {
+    fn from(failure: NotConnected) -> String {
+        failure.message
+    }
+}
+
 /// Connects to the running myArc through the default control directory.
-fn connect() -> Result<Client, String> {
+fn connect() -> Result<Client, NotConnected> {
+    let unreachable = |message| NotConnected {
+        message,
+        code: EXIT_NOT_CONNECTED,
+    };
     let Some(dir) = ipc::default_dir() else {
-        return Err(format!(
+        return Err(unreachable(format!(
             "can't find the control endpoint; set {} or HOME",
             ipc::DIR_ENV
-        ));
+        )));
     };
     Client::connect_as(&dir, "myarcctl", VERSION).map_err(|error| match error {
-        ConnectError::NotRunning { .. } | ConnectError::Stale { .. } => {
-            format!("{error}, or pass --local to use an in-memory workspace")
-        }
-        other => other.to_string(),
+        ConnectError::NotRunning { .. } | ConnectError::Stale { .. } => unreachable(format!(
+            "{error}, or pass --local to use an in-memory workspace"
+        )),
+        ConnectError::Denied { reason } => NotConnected {
+            message: denied_message(&reason),
+            code: EXIT_DENIED,
+        },
+        other => unreachable(other.to_string()),
     })
+}
+
+/// What to tell the user when myArc refused this client.
+fn denied_message(reason: &str) -> String {
+    let advice = if reason == ipc::DECLINED {
+        "myArc didn't allow myarcctl to control the Agent Space. Ask the user \
+         before trying again; the next attempt asks them again"
+    } else if reason == ipc::APPROVAL_TIMED_OUT {
+        "nobody answered myArc's prompt to allow myarcctl. Ask the user to \
+         look for it in their myArc window and try again"
+    } else {
+        "try again"
+    };
+    format!("denied: {reason}; {advice}")
 }
 
 /// Sends one request. `Err` carries a response describing a lost connection,
@@ -372,25 +416,30 @@ fn connect() -> Result<Client, String> {
 fn call(client: &mut Client, request: Request) -> Result<Response, Response> {
     let id = request.id.clone();
     let command = request.command.clone();
-    client.call(request).map_err(|error| {
-        let outcome = if error.kind() == ErrorKind::InvalidInput {
-            Outcome::Invalid {
-                reason: error.to_string(),
-            }
-        } else {
-            Outcome::OutcomeUnknown {
-                reason: format!(
-                    "lost the connection to myArc ({error}); check the result before retrying"
-                ),
-                data: None,
-            }
-        };
-        Response {
-            id,
-            command,
-            outcome,
-        }
-    })
+    client
+        .call(request)
+        .map_err(|error| failed_call(id, command, &error))
+}
+
+/// The response for a request whose call failed with `error`.
+fn failed_call(id: String, command: String, error: &io::Error) -> Response {
+    let outcome = match error.kind() {
+        ErrorKind::InvalidInput => Outcome::Invalid {
+            reason: error.to_string(),
+        },
+        ErrorKind::NotConnected => Outcome::Cancelled,
+        _ => Outcome::OutcomeUnknown {
+            reason: format!(
+                "lost the connection to myArc ({error}); check the result before retrying"
+            ),
+            data: None,
+        },
+    };
+    Response {
+        id,
+        command,
+        outcome,
+    }
 }
 
 fn serve_local(dir: Option<PathBuf>) -> ExitCode {
