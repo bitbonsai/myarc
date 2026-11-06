@@ -695,6 +695,21 @@ foundation::MutationResult WorkspaceService::CreateFirstSpace(
       rust::Str(icon.data(), icon.size()), theme));
 }
 
+void WorkspaceService::AnswerControlRequest(
+    uint64_t window,
+    rust::Box<foundation::ControlReply> reply) {
+  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
+  if (!CanMutate()) {
+    foundation::refuse_control_request(
+        std::move(reply), "Workspace is not loaded yet; retry shortly");
+    return;
+  }
+  if (foundation::answer_control_request(std::move(reply), *workspace_,
+                                         window)) {
+    SpacesChanged(foundation::MutationResult{true, 0, {}});
+  }
+}
+
 foundation::MutationResult WorkspaceService::EnsureAgentSpace() {
   if (!CanMutate())
     return Failure("Workspace is not loaded. Check storage state.");

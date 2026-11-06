@@ -4,8 +4,9 @@
 //! MCP server translate requests into `Request` values and print `Response`
 //! values; both use the one command registry below.
 //!
-//! This is a core stub. It owns an in-memory workspace and runs the Space
-//! commands against it. Commands that need a live browser are listed in the
+//! [`dispatch`] runs the Space commands against a workspace the caller owns,
+//! such as the browser's. [`ControlService`] wraps it around an in-memory
+//! workspace for `myarcctl --local` and `serve-local`. Commands that need a live browser are listed in the
 //! registry with `implemented: false` and answer `Unsupported`. Requests are
 //! untrusted: strings are bounded, unknown parameters are rejected and no input
 //! panics.
@@ -112,7 +113,8 @@ pub fn registry() -> &'static [CommandSpec] {
     REGISTRY.get_or_init(build_registry)
 }
 
-/// Runs registry commands against an in-memory workspace for one window.
+/// Runs registry commands against an in-memory workspace for one window. The
+/// browser keeps its own workspace and calls [`dispatch`] instead.
 #[derive(Debug)]
 pub struct ControlService {
     workspace: Workspace,
@@ -136,52 +138,89 @@ impl ControlService {
     }
 
     pub fn handle(&mut self, req: Request) -> Response {
-        let Request {
-            id,
-            command,
-            params,
-        } = req;
-        if id.len() > MAX_REQUEST_ID_BYTES {
-            return Response {
-                id: String::new(),
-                command: bounded(&command).to_owned(),
-                outcome: invalid(format!(
-                    "Request ID exceeds {MAX_REQUEST_ID_BYTES} bytes; use a shorter ID"
-                )),
-            };
-        }
-        if command.len() > MAX_COMMAND_BYTES {
-            return Response {
-                id,
-                command: String::new(),
-                outcome: invalid(format!(
-                    "Command exceeds {MAX_COMMAND_BYTES} bytes; use an ID from the registry"
-                )),
-            };
-        }
-        let outcome = match registry().iter().find(|spec| spec.id == command) {
-            None => invalid(format!(
-                "Unknown command {:?}; use an ID from the registry, such as space.list",
-                command
+        dispatch(&mut self.workspace, self.window_id, req)
+    }
+}
+
+/// Runs one request against a workspace the caller owns. `window_id` is the
+/// window `space.select` changes and `selected` describes. Commands act on
+/// the workspace's own Profile, Profile 1. The caller saves and refreshes its
+/// UI after a change.
+pub fn dispatch(workspace: &mut Workspace, window_id: WindowId, req: Request) -> Response {
+    let Request {
+        id,
+        command,
+        params,
+    } = req;
+    if id.len() > MAX_REQUEST_ID_BYTES {
+        return Response {
+            id: String::new(),
+            command: bounded(&command).to_owned(),
+            outcome: invalid(format!(
+                "Request ID exceeds {MAX_REQUEST_ID_BYTES} bytes; use a shorter ID"
             )),
-            Some(spec) if !spec.implemented => Outcome::Unsupported {
-                command: command.clone(),
-                reason: format!(
-                    "{command} needs live browser attachment (MA-011), which this core stub does not have"
-                ),
-            },
-            Some(_) => match self.run(&command, &params) {
+        };
+    }
+    if command.len() > MAX_COMMAND_BYTES {
+        return Response {
+            id,
+            command: String::new(),
+            outcome: invalid(format!(
+                "Command exceeds {MAX_COMMAND_BYTES} bytes; use an ID from the registry"
+            )),
+        };
+    }
+    let outcome = match registry().iter().find(|spec| spec.id == command) {
+        None => invalid(format!(
+            "Unknown command {:?}; use an ID from the registry, such as space.list",
+            command
+        )),
+        Some(spec) if !spec.implemented => Outcome::Unsupported {
+            command: command.clone(),
+            reason: format!(
+                "{command} needs live browser attachment (MA-011), which this core stub does not have"
+            ),
+        },
+        Some(_) => {
+            let mut context = Context {
+                workspace,
+                window_id,
+            };
+            match context.run(&command, &params) {
                 Ok(data) => Outcome::Success { data },
                 Err(reason) => invalid(reason),
-            },
-        };
-        Response {
-            id,
-            command,
-            outcome,
+            }
         }
+    };
+    Response {
+        id,
+        command,
+        outcome,
     }
+}
 
+/// Answers `req` with `denied` without running it, for a host that can't run
+/// commands right now, such as a browser whose workspace is still loading.
+pub fn deny(req: &Request, reason: &str) -> Response {
+    Response {
+        id: if req.id.len() > MAX_REQUEST_ID_BYTES {
+            String::new()
+        } else {
+            req.id.clone()
+        },
+        command: bounded(&req.command).to_owned(),
+        outcome: Outcome::Denied {
+            reason: reason.to_owned(),
+        },
+    }
+}
+
+struct Context<'a> {
+    workspace: &'a mut Workspace,
+    window_id: WindowId,
+}
+
+impl Context<'_> {
     fn run(&mut self, command: &str, params: &Value) -> Result<Value, String> {
         match command {
             "space.list" => {
@@ -217,6 +256,14 @@ impl ControlService {
                     })?;
                 Ok(json!({ "space": self.space_json(id) }))
             }
+            "space.ensure_agent" => {
+                Params::parse(params, &[])?;
+                let id = self
+                    .workspace
+                    .ensure_agent_space(DEFAULT_PROFILE_ID)
+                    .map_err(workspace_error)?;
+                Ok(json!({ "space": self.space_json(id) }))
+            }
             other => Err(format!(
                 "{other} is registered as implemented but has no handler"
             )),
@@ -242,6 +289,7 @@ impl ControlService {
                     "id": space.id,
                     "name": space.name,
                     "selected": Some(space.id) == selected,
+                    "agent": space.agent,
                 })
             })
             .collect();
@@ -253,6 +301,7 @@ impl ControlService {
             "id": id,
             "name": self.workspace.space_name_of(id).unwrap_or_default(),
             "selected": self.selected_space() == Some(id),
+            "agent": self.workspace.agent_space_of(DEFAULT_PROFILE_ID) == Some(id),
         })
     }
 }
@@ -620,6 +669,13 @@ fn build_registry() -> Vec<CommandSpec> {
                 }),
                 &["space_id", "name"],
             ),
+            true,
+        ),
+        spec(
+            "space.ensure_agent",
+            Workspace,
+            "Create the Profile's agent Space if it has none, without changing the selected Space",
+            no_params(),
             true,
         ),
         spec(

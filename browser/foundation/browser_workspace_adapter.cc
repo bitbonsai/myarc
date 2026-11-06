@@ -45,6 +45,7 @@
 #include "content/public/browser/web_contents_observer.h"
 #include "content/public/common/page_type.h"
 #include "content/public/common/url_constants.h"
+#include "myarc/control_host.h"
 #include "myarc/test_buildflags.h"
 #include "myarc/workspace_lifecycle.h"
 #include "url/origin.h"
@@ -541,6 +542,8 @@ BrowserWorkspaceAdapter::BrowserWorkspaceAdapter(
       },
       base::Unretained(this)));
   OnServiceChanged();
+  if (!browser_shutdown::IsTryingToQuit())
+    MaybeStartControlHost();
 }
 
 BrowserWorkspaceAdapter::~BrowserWorkspaceAdapter() {
@@ -983,6 +986,7 @@ void BrowserWorkspaceAdapter::AutoArchive(Profile& profile) {
 }
 
 void BrowserWorkspaceAdapter::BeginShutdown(Profile& profile) {
+  StopControlHost();
   ForProfile(profile).shutting_down = true;
   WorkspaceService::ForProfile(profile).FlushForShutdown();
   for (const auto& adapter : ForProfile(profile).adapters)
@@ -998,6 +1002,7 @@ BrowserWorkspaceAdapter::ResumeAfterCancelledShutdown(Profile& profile) {
   if (!runtime.shutting_down)
     return Ok();
   runtime.shutting_down = false;
+  MaybeStartControlHost();
   // Pages may have closed while quit was pending. Gate commands until the
   // surviving projections reconcile, including after a metadata-load retry.
   runtime.complete = false;
@@ -1710,6 +1715,19 @@ foundation::MutationResult BrowserWorkspaceAdapter::SelectSpace(
   if (result.ok)
     ShowSelected();
   return Remember(std::move(result));
+}
+void BrowserWorkspaceAdapter::AnswerControlRequest(
+    rust::Box<foundation::ControlReply> reply) {
+  if (!ready()) {
+    foundation::refuse_control_request(std::move(reply), error());
+    return;
+  }
+  const auto before = Sidebar();
+  service_->AnswerControlRequest(window_id_, std::move(reply));
+  const auto after = Sidebar();
+  if (before.ok && after.ok &&
+      before.current_space.id != after.current_space.id)
+    ShowSelected();
 }
 foundation::MutationResult BrowserWorkspaceAdapter::Save(
     uint64_t item,

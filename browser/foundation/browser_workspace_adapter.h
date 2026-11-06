@@ -150,6 +150,9 @@ class BrowserWorkspaceAdapter final : public TabStripModelObserver {
       uint64_t space,
       const foundation::SpaceThemeRecord& theme);
   foundation::MutationResult SelectSpace(uint64_t space);
+  // Runs a browser control request against this window's workspace, and
+  // shows the newly selected Space when the request changed it.
+  void AnswerControlRequest(rust::Box<foundation::ControlReply> reply);
   foundation::MutationResult Pin(uint64_t item);
   foundation::MutationResult Favorite(uint64_t item);
   foundation::MutationResult Unsave(uint64_t item);

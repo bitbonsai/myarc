@@ -1,8 +1,14 @@
 chromium::import! {
+    "//myarc:control";
     "//myarc:workspace";
 }
 
+use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
+
 pub struct Workspace(workspace::Workspace);
+
+// One request from a control client, or none once the host has stopped.
+pub struct ControlReply(Option<control::ipc::Pending>);
 
 // All records own their buffers. Calls are synchronous on the browser UI sequence;
 // only exported records, never Workspace or native runtime IDs, cross to storage.
@@ -287,6 +293,37 @@ mod ffi {
         fn sidebar_snapshot(workspace: &Workspace, window_id: u64) -> SidebarResult;
         fn export_snapshot(workspace: &Workspace) -> StateSnapshot;
         fn restore_snapshot(workspace: &mut Workspace, snapshot: StateSnapshot) -> MutationResult;
+
+        // Browser control (MA-011). The host serves the control endpoint on
+        // a thread of its own; a background thread takes each request with
+        // next_control_request and the UI thread answers it.
+        type ControlReply;
+        // UI thread: allows one start and returns its epoch, or 0 while a
+        // host is already serving. A later stop or enable makes that epoch
+        // stale.
+        fn enable_control_host() -> u64;
+        // Background thread: binds the endpoint in $MYARC_CONTROL_DIR or the
+        // default directory and starts serving. Empty on success or when
+        // `epoch` is stale, else the reason it could not start.
+        fn start_control_host(epoch: u64) -> String;
+        // Background thread: blocks until a request arrives. The reply holds
+        // no request once the host stopped or `epoch` is stale.
+        fn next_control_request(epoch: u64) -> Box<ControlReply>;
+        fn has_control_request(reply: &ControlReply) -> bool;
+        // False when the client already got timeout or cancelled; drop it.
+        fn control_request_live(reply: &ControlReply) -> bool;
+        // UI thread: runs the request against `workspace` as seen from
+        // `window_id` and sends the answer. True when the workspace changed,
+        // so the caller saves and notifies.
+        fn answer_control_request(
+            reply: Box<ControlReply>,
+            workspace: &mut Workspace,
+            window_id: u64,
+        ) -> bool;
+        // Answers denied without running the request.
+        fn refuse_control_request(reply: Box<ControlReply>, reason: &str);
+        // UI thread: stops serving and removes the endpoint before returning.
+        fn stop_control_host();
     }
 }
 
@@ -927,4 +964,100 @@ pub fn restore_snapshot(
             })
             .map(|()| 0),
     )
+}
+
+struct ControlSlot {
+    epoch: u64,
+    host: Option<Arc<control::ipc::Host>>,
+}
+
+static CONTROL: Mutex<ControlSlot> = Mutex::new(ControlSlot {
+    epoch: 0,
+    host: None,
+});
+
+fn control_slot() -> MutexGuard<'static, ControlSlot> {
+    CONTROL.lock().unwrap_or_else(PoisonError::into_inner)
+}
+
+pub fn enable_control_host() -> u64 {
+    let mut slot = control_slot();
+    if slot.host.is_some() {
+        return 0;
+    }
+    slot.epoch = slot.epoch.wrapping_add(1).max(1);
+    slot.epoch
+}
+
+pub fn start_control_host(epoch: u64) -> String {
+    let mut slot = control_slot();
+    if slot.epoch != epoch || slot.host.is_some() {
+        return String::new();
+    }
+    let Some(dir) = control::ipc::default_dir() else {
+        return format!(
+            "set HOME or {} to choose the control directory",
+            control::ipc::DIR_ENV
+        );
+    };
+    match control::ipc::Host::start(&dir, control::ipc::REPLY_TIMEOUT) {
+        Ok(host) => {
+            slot.host = Some(Arc::new(host));
+            String::new()
+        }
+        Err(error) => format!("could not serve in {}: {error}", dir.display()),
+    }
+}
+
+pub fn next_control_request(epoch: u64) -> Box<ControlReply> {
+    let host = {
+        let slot = control_slot();
+        if slot.epoch == epoch {
+            slot.host.clone()
+        } else {
+            None
+        }
+    };
+    Box::new(ControlReply(host.and_then(|host| host.next())))
+}
+
+pub fn has_control_request(reply: &ControlReply) -> bool {
+    reply.0.is_some()
+}
+
+pub fn control_request_live(reply: &ControlReply) -> bool {
+    reply.0.as_ref().is_some_and(|pending| !pending.abandoned())
+}
+
+pub fn answer_control_request(
+    reply: Box<ControlReply>,
+    workspace: &mut Workspace,
+    window_id: u64,
+) -> bool {
+    let Some(pending) = reply.0 else {
+        return false;
+    };
+    let before = workspace.0.snapshot();
+    let response = control::dispatch(&mut workspace.0, window_id, pending.request().clone());
+    let changed = workspace.0.snapshot() != before;
+    pending.reply(response);
+    changed
+}
+
+pub fn refuse_control_request(reply: Box<ControlReply>, reason: &str) {
+    if let Some(pending) = reply.0 {
+        let response = control::deny(pending.request(), reason);
+        pending.reply(response);
+    }
+}
+
+pub fn stop_control_host() {
+    let host = {
+        let mut slot = control_slot();
+        slot.epoch = slot.epoch.wrapping_add(1);
+        slot.host.take()
+    };
+    if let Some(host) = host {
+        host.stop();
+    }
 }

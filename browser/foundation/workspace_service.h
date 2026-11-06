@@ -174,6 +174,11 @@ class WorkspaceService final : public base::SupportsUserData::Data {
   std::optional<foundation::StateSnapshot> ExportSnapshot() const;
   foundation::MutationResult RestoreSnapshot(
       foundation::StateSnapshot snapshot);
+  // Runs a browser control request as seen from `window`, saving and
+  // notifying like the UI commands when it changes the workspace. Refused
+  // while the workspace is not loaded.
+  void AnswerControlRequest(uint64_t window,
+                            rust::Box<foundation::ControlReply> reply);
 
  private:
   explicit WorkspaceService(Profile& profile);

@@ -2,8 +2,9 @@ use std::collections::BTreeSet;
 
 use myarc_control::{
     Area, ControlService, MAX_STRING_PARAM_BYTES, Outcome, PROTOCOL_VERSION, Request, Response,
-    registry,
+    dispatch, registry,
 };
+use myarc_workspace::{AGENT_SPACE_NAME, DEFAULT_PROFILE_ID, DEFAULT_WINDOW_ID, Workspace};
 use serde_json::{Value, json};
 
 fn request(command: &str, params: Value) -> Request {
@@ -62,7 +63,7 @@ fn registry_ids_are_unique_and_match_the_spec_table() {
     let unique: BTreeSet<String> = ids.iter().map(|id| (*id).to_owned()).collect();
     assert_eq!(unique.len(), ids.len(), "duplicate IDs in {ids:?}");
     let spec = spec_command_ids();
-    assert_eq!(spec.len(), 31);
+    assert_eq!(spec.len(), 32);
     assert_eq!(unique, spec);
 }
 
@@ -81,7 +82,13 @@ fn registry_schemas_are_objects_and_only_space_commands_are_implemented() {
         .collect();
     assert_eq!(
         implemented,
-        ["space.list", "space.create", "space.select", "space.rename"]
+        [
+            "space.list",
+            "space.create",
+            "space.select",
+            "space.rename",
+            "space.ensure_agent"
+        ]
     );
     let area = |id: &str| {
         registry()
@@ -104,7 +111,7 @@ fn space_list_starts_with_one_selected_space() {
     assert_eq!(
         list,
         json!({
-            "spaces": [{ "id": 1, "name": "Everyday", "selected": true }],
+            "spaces": [{ "id": 1, "name": "Everyday", "selected": true, "agent": false }],
             "selected_space_id": 1,
         })
     );
@@ -117,7 +124,7 @@ fn space_create_adds_a_space() {
     let created = data(&mut service, "space.create", json!({ "name": "Work" }));
     assert_eq!(
         created,
-        json!({ "space": { "id": 2, "name": "Work", "selected": false } })
+        json!({ "space": { "id": 2, "name": "Work", "selected": false, "agent": false } })
     );
     let list = data(&mut service, "space.list", Value::Null);
     assert_eq!(list["spaces"][1]["name"], "Work");
@@ -145,7 +152,7 @@ fn space_rename_changes_the_name() {
     );
     assert_eq!(
         renamed,
-        json!({ "space": { "id": 1, "name": "Home", "selected": true } })
+        json!({ "space": { "id": 1, "name": "Home", "selected": true, "agent": false } })
     );
     assert_eq!(
         data(&mut service, "space.list", Value::Null)["spaces"][0]["name"],
@@ -308,7 +315,7 @@ fn response_json_has_a_status_tag_and_flattened_fields() {
             "id": "r1",
             "command": "space.create",
             "status": "success",
-            "data": { "space": { "id": 2, "name": "Work", "selected": false } },
+            "data": { "space": { "id": 2, "name": "Work", "selected": false, "agent": false } },
         })
     );
     let unsupported = service.handle(request("tabs.list", Value::Null));
@@ -359,4 +366,99 @@ fn requests_parse_from_json_without_params() {
     assert_eq!(request.params, Value::Null);
     let response = ControlService::new().handle(request);
     assert!(matches!(response.outcome, Outcome::Success { .. }));
+}
+
+#[test]
+fn space_ensure_agent_creates_the_agent_space_once_without_selecting_it() {
+    let mut service = ControlService::new();
+    let created = data(&mut service, "space.ensure_agent", Value::Null);
+    assert_eq!(
+        created,
+        json!({ "space": { "id": 2, "name": AGENT_SPACE_NAME, "selected": false, "agent": true } })
+    );
+    assert_eq!(data(&mut service, "space.ensure_agent", json!({})), created);
+    let list = data(&mut service, "space.list", Value::Null);
+    assert_eq!(list["selected_space_id"], 1);
+    assert_eq!(list["spaces"].as_array().map(Vec::len), Some(2));
+    assert_eq!(list["spaces"][0]["agent"], false);
+    assert_eq!(list["spaces"][1]["agent"], true);
+    let reason = invalid_reason(&mut service, "space.ensure_agent", json!({ "name": "x" }));
+    assert!(reason.contains("takes no parameters"), "{reason}");
+}
+
+#[test]
+fn renaming_the_agent_space_keeps_it_the_agent_space() {
+    let mut service = ControlService::new();
+    data(&mut service, "space.ensure_agent", Value::Null);
+    let renamed = data(
+        &mut service,
+        "space.rename",
+        json!({ "space_id": 2, "name": "Bots" }),
+    );
+    assert_eq!(renamed["space"]["agent"], true);
+    assert_eq!(
+        data(&mut service, "space.ensure_agent", Value::Null)["space"]["name"],
+        "Bots"
+    );
+}
+
+#[test]
+fn dispatch_changes_the_callers_workspace() {
+    let mut workspace = Workspace::default();
+    let created = dispatch(
+        &mut workspace,
+        DEFAULT_WINDOW_ID,
+        request("space.create", json!({ "name": "CLI" })),
+    );
+    assert!(
+        matches!(created.outcome, Outcome::Success { .. }),
+        "{created:?}"
+    );
+    let agent = dispatch(
+        &mut workspace,
+        DEFAULT_WINDOW_ID,
+        request("space.ensure_agent", Value::Null),
+    );
+    assert!(
+        matches!(agent.outcome, Outcome::Success { .. }),
+        "{agent:?}"
+    );
+    let names: Vec<String> = workspace
+        .snapshot()
+        .spaces
+        .into_iter()
+        .map(|space| space.name)
+        .collect();
+    assert_eq!(names, ["Everyday", "CLI", AGENT_SPACE_NAME]);
+    assert_eq!(workspace.agent_space_of(DEFAULT_PROFILE_ID), Some(3));
+}
+
+#[test]
+fn dispatch_selects_in_the_given_window() {
+    let mut workspace = Workspace::default();
+    let work = workspace
+        .create_space(DEFAULT_PROFILE_ID, "Work")
+        .expect("create Work");
+    let second = workspace.create_window(1).expect("second window");
+    let response = dispatch(
+        &mut workspace,
+        second,
+        request("space.select", json!({ "space_id": work })),
+    );
+    assert!(
+        matches!(response.outcome, Outcome::Success { .. }),
+        "{response:?}"
+    );
+    let in_second = dispatch(&mut workspace, second, request("space.list", Value::Null));
+    let in_first = dispatch(
+        &mut workspace,
+        DEFAULT_WINDOW_ID,
+        request("space.list", Value::Null),
+    );
+    let selected = |response: Response| match response.outcome {
+        Outcome::Success { data } => data["selected_space_id"].clone(),
+        other => panic!("space.list failed: {other:?}"),
+    };
+    assert_eq!(selected(in_second), json!(work));
+    assert_eq!(selected(in_first), json!(1));
 }

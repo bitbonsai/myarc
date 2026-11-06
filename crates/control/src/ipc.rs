@@ -13,6 +13,10 @@
 //! closes on error. After a welcome the client sends [`Request`] frames and gets
 //! one [`Response`] frame back for each.
 //!
+//! A browser that runs commands on its own UI thread hosts a [`Host`] instead
+//! of calling [`Server::serve`] itself. The host serves on its own thread and
+//! hands each request over through [`Host::next`].
+//!
 //! The token never appears in logs, errors or `Debug` output.
 
 use std::fmt;
@@ -24,13 +28,14 @@ use std::os::unix::net::{UnixListener, UnixStream};
 use std::panic::{self, AssertUnwindSafe};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
-use std::sync::{Mutex, OnceLock, PoisonError};
+use std::sync::mpsc::{self, RecvTimeoutError};
+use std::sync::{Arc, Mutex, OnceLock, PoisonError};
 use std::thread;
 use std::time::{Duration, Instant};
 
 use serde::{Deserialize, Serialize};
 
-use crate::{Outcome, PROTOCOL_VERSION, Request, Response, bounded};
+use crate::{MAX_REQUEST_ID_BYTES, Outcome, PROTOCOL_VERSION, Request, Response, bounded};
 
 /// Environment variable that overrides the default control directory.
 pub const DIR_ENV: &str = "MYARC_CONTROL_DIR";
@@ -44,6 +49,10 @@ pub const MAX_FRAME_BYTES: usize = 1024 * 1024;
 pub const IDLE_TIMEOUT: Duration = Duration::from_secs(60);
 /// Most connections a server serves at once; more get a busy error.
 pub const MAX_CONNECTIONS: usize = 16;
+
+/// How long a [`Host`] waits for the browser to answer a request before it
+/// answers `timeout` itself.
+pub const REPLY_TIMEOUT: Duration = Duration::from_secs(10);
 
 /// Time a new connection has to send its hello.
 const HELLO_TIMEOUT: Duration = Duration::from_secs(5);
@@ -303,6 +312,150 @@ impl Drop for Server {
         if ours {
             let _ = fs::remove_file(&self.endpoint);
             let _ = fs::remove_file(&self.socket);
+        }
+    }
+}
+
+/// Serves an endpoint on a thread of its own and hands each request to the
+/// browser through [`Host::next`], so the browser can run it on its UI thread.
+/// A request the browser doesn't answer within the reply timeout gets
+/// `timeout`, and one still waiting when the host stops gets `cancelled`.
+/// Dropping the host stops it.
+#[derive(Debug)]
+pub struct Host {
+    stop: Arc<AtomicBool>,
+    queue: Mutex<mpsc::Receiver<Pending>>,
+    serve: Mutex<Option<thread::JoinHandle<()>>>,
+}
+
+/// A request waiting for the browser's answer.
+#[derive(Debug)]
+pub struct Pending {
+    request: Request,
+    reply: mpsc::Sender<Response>,
+    abandoned: Arc<AtomicBool>,
+}
+
+impl Pending {
+    pub fn request(&self) -> &Request {
+        &self.request
+    }
+
+    /// True once the client got `timeout` or `cancelled` for this request.
+    /// Skip running it then.
+    pub fn abandoned(&self) -> bool {
+        self.abandoned.load(Ordering::Acquire)
+    }
+
+    /// Sends the answer. It is dropped when the client already gave up.
+    pub fn reply(self, response: Response) {
+        let _ = self.reply.send(response);
+    }
+}
+
+impl Host {
+    /// Binds a [`Server`] in `dir`, as [`Server::bind`] does, and starts
+    /// serving it on a new thread.
+    pub fn start(dir: &Path, reply_timeout: Duration) -> io::Result<Host> {
+        let server = Server::bind(dir)?;
+        let stop = Arc::new(AtomicBool::new(false));
+        let (sender, queue) = mpsc::channel();
+        let flag = Arc::clone(&stop);
+        let serve = thread::Builder::new()
+            .name(String::from("myarc-control-host"))
+            .spawn(move || {
+                let _ = server.serve(
+                    |request| relay(&sender, request, reply_timeout, &flag),
+                    &flag,
+                );
+            })?;
+        Ok(Host {
+            stop,
+            queue: Mutex::new(queue),
+            serve: Mutex::new(Some(serve)),
+        })
+    }
+
+    /// Blocks until a request arrives. `None` once the host has stopped.
+    pub fn next(&self) -> Option<Pending> {
+        let queue = self.queue.lock().unwrap_or_else(PoisonError::into_inner);
+        loop {
+            if self.stop.load(Ordering::Acquire) {
+                return None;
+            }
+            match queue.recv_timeout(POLL_INTERVAL) {
+                Ok(pending) => return Some(pending),
+                Err(RecvTimeoutError::Timeout) => {}
+                Err(RecvTimeoutError::Disconnected) => return None,
+            }
+        }
+    }
+
+    /// Stops serving, answers waiting requests with `cancelled` and returns
+    /// once the socket and `control.json` are gone. Safe to call again.
+    pub fn stop(&self) {
+        self.stop.store(true, Ordering::Release);
+        let serve = self
+            .serve
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .take();
+        if let Some(serve) = serve {
+            let _ = serve.join();
+        }
+    }
+}
+
+impl Drop for Host {
+    fn drop(&mut self) {
+        self.stop();
+    }
+}
+
+/// Queues `request` for [`Host::next`] and waits for its answer.
+fn relay(
+    queue: &mpsc::Sender<Pending>,
+    request: Request,
+    timeout: Duration,
+    stop: &AtomicBool,
+) -> Response {
+    let id = if request.id.len() > MAX_REQUEST_ID_BYTES {
+        String::new()
+    } else {
+        request.id.clone()
+    };
+    let command = bounded(&request.command).to_owned();
+    let answer = |outcome| Response {
+        id: id.clone(),
+        command: command.clone(),
+        outcome,
+    };
+    let (reply, answers) = mpsc::channel();
+    let abandoned = Arc::new(AtomicBool::new(false));
+    let pending = Pending {
+        request,
+        reply,
+        abandoned: Arc::clone(&abandoned),
+    };
+    if queue.send(pending).is_err() {
+        return answer(Outcome::Cancelled);
+    }
+    let deadline = Instant::now() + timeout;
+    loop {
+        if stop.load(Ordering::Acquire) {
+            abandoned.store(true, Ordering::Release);
+            return answer(Outcome::Cancelled);
+        }
+        let left = deadline.saturating_duration_since(Instant::now());
+        if left.is_zero() {
+            abandoned.store(true, Ordering::Release);
+            return answer(Outcome::Timeout);
+        }
+        match answers.recv_timeout(left.min(POLL_INTERVAL)) {
+            Ok(response) => return response,
+            Err(RecvTimeoutError::Timeout) => {}
+            // The browser dropped the request without running it.
+            Err(RecvTimeoutError::Disconnected) => return answer(Outcome::Cancelled),
         }
     }
 }
@@ -1409,5 +1562,93 @@ mod tests {
         assert!(matches!(response.outcome, Outcome::OutcomeUnknown { .. }));
         assert!(client.call(request("space.list", Value::Null)).is_ok());
         running.stop();
+    }
+
+    /// Answers each request from `host` on another thread, as the browser's
+    /// UI thread does, against one workspace.
+    fn pump(host: Arc<Host>) -> JoinHandle<()> {
+        thread::spawn(move || {
+            let mut workspace = myarc_workspace::Workspace::default();
+            while let Some(pending) = host.next() {
+                let response = crate::dispatch(
+                    &mut workspace,
+                    myarc_workspace::DEFAULT_WINDOW_ID,
+                    pending.request().clone(),
+                );
+                pending.reply(response);
+            }
+        })
+    }
+
+    #[test]
+    fn host_relays_requests_to_the_pump_and_stop_removes_the_endpoint() {
+        let dir = TempDir::new();
+        let host = Arc::new(Host::start(&dir.0, REPLY_TIMEOUT).unwrap());
+        let pumping = pump(Arc::clone(&host));
+        let mut client = Client::connect(&dir.0).unwrap();
+        let created = client
+            .call(request("space.create", json!({ "name": "CLI" })))
+            .unwrap();
+        assert!(
+            matches!(created.outcome, Outcome::Success { .. }),
+            "{created:?}"
+        );
+        let agent = client
+            .call(request("space.ensure_agent", Value::Null))
+            .unwrap();
+        let Outcome::Success { data } = agent.outcome else {
+            panic!("space.ensure_agent failed: {agent:?}");
+        };
+        assert_eq!(data["space"]["agent"], true);
+        let listed = client.call(request("space.list", Value::Null)).unwrap();
+        let Outcome::Success { data } = listed.outcome else {
+            panic!("space.list failed: {listed:?}");
+        };
+        assert_eq!(data["spaces"].as_array().map(Vec::len), Some(3));
+        host.stop();
+        pumping.join().unwrap();
+        assert!(!dir.0.join(ENDPOINT_FILE).exists());
+        assert!(!dir.0.join(SOCKET_FILE).exists());
+        host.stop();
+    }
+
+    #[test]
+    fn host_answers_timeout_when_nobody_replies_and_marks_it_abandoned() {
+        let dir = TempDir::new();
+        let host = Host::start(&dir.0, Duration::from_millis(200)).unwrap();
+        let mut client = Client::connect(&dir.0).unwrap();
+        let caller = thread::spawn(move || client.call(request("space.list", Value::Null)));
+        let pending = host.next().unwrap();
+        assert_eq!(pending.request().command, "space.list");
+        let response = caller.join().unwrap().unwrap();
+        assert_eq!(response.outcome, Outcome::Timeout);
+        assert_eq!(response.id, "t");
+        assert!(pending.abandoned());
+        pending.reply(ControlService::new().handle(request("space.list", Value::Null)));
+    }
+
+    #[test]
+    fn host_cancels_a_dropped_request_and_one_waiting_at_stop() {
+        let dir = TempDir::new();
+        let host = Arc::new(Host::start(&dir.0, REPLY_TIMEOUT).unwrap());
+        let mut client = Client::connect(&dir.0).unwrap();
+        let caller = thread::spawn(move || {
+            let dropped = client.call(request("space.list", Value::Null));
+            let waiting = client.call(request("space.list", Value::Null));
+            (dropped, waiting)
+        });
+        drop(host.next().unwrap());
+        let waiting = host.next().unwrap();
+        let stopper = {
+            let host = Arc::clone(&host);
+            thread::spawn(move || host.stop())
+        };
+        let (dropped, at_stop) = caller.join().unwrap();
+        assert_eq!(dropped.unwrap().outcome, Outcome::Cancelled);
+        assert_eq!(at_stop.unwrap().outcome, Outcome::Cancelled);
+        stopper.join().unwrap();
+        assert!(waiting.abandoned());
+        assert!(host.next().is_none());
+        assert!(!dir.0.join(ENDPOINT_FILE).exists());
     }
 }

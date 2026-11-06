@@ -1,6 +1,6 @@
 # Browser control: CLI and MCP
 
-Status: specified. A core stub in [crates/control](../crates/control/src/lib.rs) holds the command registry and runs the Space commands. Its [ipc module](../crates/control/src/ipc.rs) carries requests from a client to a running browser over an authenticated same-user Unix socket. The `myarcctl` CLI and its MCP server in [crates/myarcctl](../crates/myarcctl/src/main.rs) connect through that socket by default. The browser doesn't host the socket yet, so `myarcctl serve-local` stands in for it. **Both interfaces are P0 browser launch requirements**, not just developer test tooling or a later paid AI feature. MA-011 delivers them. An external agent can control explicitly granted browser context while built-in AI remains off; the control interface itself requires no myarc account, subscription, model download or provider key.
+Status: specified. A core stub in [crates/control](../crates/control/src/lib.rs) holds the command registry and runs the Space commands. Its [ipc module](../crates/control/src/ipc.rs) carries requests from a client to a running browser over an authenticated same-user Unix socket. The `myarcctl` CLI and its MCP server in [crates/myarcctl](../crates/myarcctl/src/main.rs) connect through that socket by default. The browser hosts the socket when started with `--myarc-enable-control` (see Browser host below), and `myarcctl serve-local` stands in for it in development. **Both interfaces are P0 browser launch requirements**, not just developer test tooling or a later paid AI feature. MA-011 delivers them. An external agent can control explicitly granted browser context while built-in AI remains off; the control interface itself requires no myarc account, subscription, model download or provider key.
 
 ## One control layer, two public interfaces
 
@@ -10,7 +10,7 @@ Status: specified. A core stub in [crates/control](../crates/control/src/lib.rs)
 | MCP server launched by `myarcctl` | AI clients supporting the implemented transport/protocol | Discoverable typed tools and structured results; translates requests into the same operations |
 | Shared control service | UI, CLI, MCP and future built-in agents | Validate scope/parameters, dispatch workspace commands or browser adapters, serialize conflicting actions and honor cancellation |
 
-`myarcctl` and `myarcctl mcp` run today against the stub (see Try the stub below). Browser UI and command bar share underlying operations, but their authorization context differs from an external agent's grant. Do not expose every internal command automatically through MCP.
+`myarcctl` and `myarcctl mcp` run today against the browser or the stub (see Try the stub and Browser host below). Browser UI and command bar share underlying operations, but their authorization context differs from an external agent's grant. Do not expose every internal command automatically through MCP.
 
 ## Required control surface
 
@@ -22,7 +22,7 @@ Names below are proposed command/tool IDs. Keep one versioned registry/schema ra
 | Tabs | `tabs.list`, `tab.open`, `tab.activate`, `tab.close`, `tab.navigate`, `tab.back`, `tab.forward`, `tab.reload` | Stable handles and resulting URL/title/navigation state within the grant |
 | Observation | `page.snapshot`, `page.screenshot` | Bounded semantic accessibility/DOM view with element references, URL, document revision and loading state; screenshot of granted context |
 | Interaction | `page.click`, `page.fill`, `page.select`, `page.press`, `page.scroll`, `page.wait` | Act on a current scoped reference and report resulting state or explicit uncertainty |
-| Workspace | `space.list`, `space.create`, `space.select`, `space.rename`, `node.move`, `tab.pin`, `tab.archive`, `tab.restore` | Validated changes through the same core used by the UI |
+| Workspace | `space.list`, `space.create`, `space.select`, `space.rename`, `space.ensure_agent`, `node.move`, `tab.pin`, `tab.archive`, `tab.restore` | Validated changes through the same core used by the UI |
 | Preservation | `import.preview`, `import.commit`, `import.rollback`, `workspace.export` | Supported local conversion/transaction; file destinations require a grant |
 | Human control | Browser indicator and Stop control action | Shows controller/scope; revokes further access and cancels pending requests |
 
@@ -58,7 +58,7 @@ References: [MCP transports](https://modelcontextprotocol.io/specification/2026-
 
 `run` and `mcp` connect to the running browser by default. The browser publishes its control endpoint in `~/Library/Application Support/myarc/control/`, or in `$MYARC_CONTROL_DIR` when that is set. The directory holds `control.json` with the socket path, a token that changes each time the server starts, the server's pid and its protocol version. Clients refuse the endpoint unless the directory (mode 700), the file and the socket (mode 600) belong to the current user and are closed to group and others. Each connection opens with a hello that carries the token, and every message after it is a length-prefixed JSON frame of at most 1 MiB.
 
-The browser doesn't host the endpoint yet. Until it does, `myarcctl serve-local` is a development stub that serves an in-memory workspace in its place. Only the Space commands work, and every other command answers `unsupported`. The workspace lasts as long as `serve-local` runs, so a Space created by one `run` shows up in the next.
+Only the Space commands work, and every other command answers `unsupported`. `myarcctl serve-local` is a development stub that serves an in-memory workspace in place of the browser. That workspace lasts as long as `serve-local` runs, so a Space created by one `run` shows up in the next.
 
 ```sh
 cargo build -p myarcctl
@@ -78,6 +78,14 @@ target/debug/myarcctl run space.list --json
 ```json
 {"command": "myarcctl", "args": ["mcp"]}
 ```
+
+## Browser host
+
+The browser serves the endpoint only when launched with `--myarc-enable-control`. Without the switch it writes nothing to the control directory. The switch is a stand-in: a Settings toggle and the grant UI described above replace it later, and until then every same-user process that can read `control.json` gets full control of the Space commands.
+
+The first browser window starts the host after its Profile's workspace service exists. A dedicated background thread binds the endpoint in `$MYARC_CONTROL_DIR` or the default directory, and `myarc_control::ipc::Host` serves it. Each request goes to the UI thread, which runs `myarc_control::dispatch` against the browser's own workspace and then saves and notifies through the same path the sidebar's commands use, so the footer updates at once and the change survives a restart. A request with no answer after 10 seconds gets `timeout`, and the UI thread skips it if it hasn't started it yet. Quitting stops the host before the workspace's final save and removes `control.json` and the socket. A cancelled quit starts it again.
+
+Each Profile has its own workspace. A request runs in the most recently active normal window that isn't private, against that window's Profile, and `space.select` and `selected` refer to that window. With no such window open, or while its workspace is still loading, the request gets `denied` with the reason.
 
 ## Launch evidence
 
