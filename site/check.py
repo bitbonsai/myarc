@@ -75,7 +75,8 @@ def check(html):
     for size in re.findall(r'font-size\s*:\s*([^;}]+)', css):
         size = size.strip()
         assert size == '100%' or re.fullmatch(r'\d*\.?\d+rem', size), f'Use rem: {size}'
-        assert size == '100%' or float(size[:-3]) >= 0.875, f'Tiny font: {size}'
+        # .625rem is only for the version under the download button, which repeats the download page.
+        assert size == '100%' or float(size[:-3]) >= 0.875 or size == '.625rem', f'Tiny font: {size}'
     assert '@view-transition { navigation: auto }' in css, 'Cross-page transitions missing'
     assert re.search(r'@media\s*\(prefers-reduced-motion:\s*reduce\)\s*\{\s*@view-transition\s*\{\s*navigation:\s*none\s*\}', css), 'Reduced-motion navigation opt-out missing'
     assert '@import' not in css
