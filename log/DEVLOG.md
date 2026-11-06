@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-11-06: Short myarcctl commands for agents
+
+- `myarcctl` gained `open`, `snapshot [-i]`, `click`, `fill`, `select`, `press`, `back`, `forward`, `reload`, `close`, `tabs` and `use`, modeled on agent-browser. Each sends registry commands through the same `ipc::Client` as `run`. The new `crates/myarcctl/src/short.rs` keeps the current tab and the last printed revision in `cli-state.json` (mode 600) next to the control directory, and never fetches a newer revision, so the browser's stale check still applies. `--tab` and `--rev` replace them for one call.
+- Plain output is a status line, the changed refs and the new outline. `snapshot -i` keeps ref lines and their ancestors. Focus-only changes are dropped by comparing each changed line, without its ref and `[focused]`, against hashes of the previous outline's ref lines stored in the state file, since `changes` carries only the new line. The skill now teaches the short commands, and `run` stays as the fallback.
+- Verification: `cargo fmt --check`, `cargo clippy -D warnings`, `cargo test` (11 new unit tests, 5 new tests against `serve-local` through a hidden `MYARCCTL_ECHO_REQUESTS` request echo) and `check_docs.py` pass. Nothing ran against a live myArc. Found, not fixed: an `unsupported` answer can't cross the socket, because `Outcome::Unsupported` and `Response` both serialize `command`, so the client reads a duplicate key and reports `outcome_unknown`.
+
 ## 2026-11-06: A Claude Code skill for driving myArc
 
 - New top-level `skills/myarc-browser/SKILL.md` teaches an agent to drive myArc through `myarcctl`. It covers the prerequisite and exit code 3, the open, snapshot, act loop, exact `myarcctl run` calls with param names taken from the registry in `crates/control/src/lib.rs`, how to read the outline, and what `stale`, `outcome_unknown` and `denied` mean. The README links it from the docs list.

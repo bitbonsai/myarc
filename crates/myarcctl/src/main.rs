@@ -11,6 +11,7 @@
 compile_error!("myarcctl needs a Unix platform for its control IPC");
 
 mod mcp;
+mod short;
 
 use std::io::{self, ErrorKind, Write};
 use std::path::PathBuf;
@@ -30,7 +31,27 @@ const MAX_PARAMS_BYTES: usize = mcp::MAX_LINE_BYTES;
 const EXIT_NOT_CONNECTED: u8 = 3;
 
 const HELP: &str = "\
-myarcctl: run myarc browser control commands
+myarcctl: drive myArc's agent Space and run browser control commands
+
+Short commands act on the current tab with the last outline's refs:
+  myarcctl open <url>            Open a tab, make it current, print its outline
+  myarcctl snapshot [-i]         Print the outline; -i keeps ref lines and
+                                 the lines they sit under
+  myarcctl click <ref>           Click a ref such as @e4 or e4
+  myarcctl fill <ref> <text>     Replace a text field's value
+  myarcctl select <ref> <value>  Pick an option by value or visible text
+  myarcctl press <key> [<ref>]   Send Enter, Tab, Escape or another key
+  myarcctl back | forward | reload
+                                 Navigate, then print the new outline
+  myarcctl close                 Close the current tab
+  myarcctl tabs                  List agent Space tabs; * marks the current one
+  myarcctl use <tab>             Make a tab such as t12 current
+
+  Actions print a status line, then the changed refs and the new outline.
+  --tab <tab> and --rev <revision> replace the current tab and the last
+  revision for one call. --json prints each raw response as one line. The
+  current tab and revision live in cli-state.json next to the control
+  directory. Use -- before text that starts with a dash.
 
 Usage:
   myarcctl commands [--json]
@@ -44,11 +65,11 @@ Usage:
   myarcctl --version
   myarcctl --help
 
-run and mcp connect to the running myArc through the control endpoint in
-$MYARC_CONTROL_DIR, or else ~/Library/Application Support/myarc/control.
-With --local they use a fresh in-memory workspace instead, so changes are
-gone when the command exits. An mcp session keeps one workspace until the
-client disconnects.
+The short commands, run and mcp connect to the running myArc through the
+control endpoint in $MYARC_CONTROL_DIR, or else
+~/Library/Application Support/myarc/control. With --local, run and mcp use
+a fresh in-memory workspace instead, so changes are gone when the command
+exits. An mcp session keeps one workspace until the client disconnects.
 
 Development stub:
   myarcctl serve-local [--dir <dir>]
@@ -77,6 +98,11 @@ enum Cli {
     },
     ServeLocal {
         dir: Option<PathBuf>,
+    },
+    Short {
+        command: short::Short,
+        overrides: short::Overrides,
+        json: bool,
     },
 }
 
@@ -115,6 +141,11 @@ fn main() -> ExitCode {
             }
         }
         Ok(Cli::ServeLocal { dir }) => serve_local(dir),
+        Ok(Cli::Short {
+            command,
+            overrides,
+            json,
+        }) => short::run(command, overrides, json),
         Err(message) => usage_error(&message),
     }
 }
@@ -123,6 +154,7 @@ fn parse(args: &[String]) -> Result<Cli, String> {
     let mut json = false;
     let mut local = false;
     let mut dir = None;
+    let mut overrides = short::Overrides::default();
     let mut help = false;
     let mut version = false;
     let mut positional = Vec::new();
@@ -135,6 +167,21 @@ fn parse(args: &[String]) -> Result<Cli, String> {
                 Some(path) => dir = Some(PathBuf::from(path)),
                 None => return Err(String::from("--dir needs a directory")),
             },
+            "--tab" => match args.next() {
+                Some(tab) => overrides.tab = Some(short::parse_tab(tab)?),
+                None => return Err(String::from("--tab needs a tab handle such as t12")),
+            },
+            "--rev" => match args.next() {
+                Some(revision) => {
+                    myarc_control::actions::check_revision(revision)?;
+                    overrides.revision = Some(revision.clone());
+                }
+                None => return Err(String::from("--rev needs a revision such as 1.2")),
+            },
+            "--" => {
+                positional.extend(args.by_ref().map(String::as_str));
+                break;
+            }
             "-h" | "--help" => help = true,
             "-V" | "--version" => version = true,
             flag if flag.starts_with("--") => {
@@ -147,7 +194,12 @@ fn parse(args: &[String]) -> Result<Cli, String> {
         return Ok(Cli::Help);
     }
     if version {
-        return if positional.is_empty() && !json && !local && dir.is_none() {
+        return if positional.is_empty()
+            && !json
+            && !local
+            && dir.is_none()
+            && overrides == short::Overrides::default()
+        {
             Ok(Cli::Version)
         } else {
             Err(String::from("--version takes no other arguments"))
@@ -159,6 +211,18 @@ fn parse(args: &[String]) -> Result<Cli, String> {
     }
     if dir.is_some() && subcommand != Some("serve-local") {
         return Err(String::from("--dir only applies to serve-local"));
+    }
+    if let Some(command) = short::parse(&positional) {
+        return command.map(|command| Cli::Short {
+            command,
+            overrides,
+            json,
+        });
+    }
+    if overrides != short::Overrides::default() {
+        return Err(String::from(
+            "--tab and --rev only apply to the short commands",
+        ));
     }
     match positional.as_slice() {
         [] => Err(String::from("missing subcommand")),
