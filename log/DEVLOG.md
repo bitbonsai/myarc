@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-11-06: Agent Space polish in the footer, title and shortcuts
+
+- The other-Profiles pill was clipped because the footer's Space glyphs kept Arc's 34 DIP pitch, so three own Spaces and two other Profiles needed about 180 DIP in a strip of about 139. A new `SpaceStrip` lays the glyphs out itself and closes the pitch down to 20 DIP to fit the viewport. `ProfileGroup` splits its width among its glyphs. When even 20 DIP doesn't fit, the strip scrolls and only the viewport edge clips the pill.
+- The agent Space's title drops the "Agent" pill. The bot or the user's icon marks it, with the tooltip "Agent Space: <name>". Ctrl-1 to Ctrl-9 and Option-Cmd-Left/Right now skip the agent Space in `SelectSpaceAt` and `StepSpace`, so only a click or the command bar selects it. Footer tooltips number the other Spaces to match.
+- Verification: `chrome` builds under the lock, and `export_patches.py --check` and `check_docs.py` pass. Background captures in `/tmp/myarc-polish/` (`footers.png`, `header.png`, `overflow.png`, outside the repo) show the whole pill in dark and light with Everyday, Work and the agent Space plus one other Profile, three own Spaces and the agent Space plus two other Profiles, and one own Space and the agent Space plus two other Profiles. They also show a single "Agent" in the selected title. The shortcuts were checked by reading the code, not run.
+
 ## 2026-11-06: An agent Space in the core and the sidebar
 
 - A Space can carry the `agent` mark, at most one per Profile, saved in the workspace file as `"agent": true` only when set. `Workspace::ensure_agent_space(profile)` returns the Profile's agent Space, or creates one named "Agent" with the `bot` icon after the other Spaces, and leaves every window's Space and selection alone. `agent_space_of(profile)` finds it. Renaming it or changing its icon keeps the mark, deleting it drops the mark, and a file that marks two Spaces keeps the first. The bridge, `WorkspaceService` and the adapter expose `EnsureAgentSpace`. The test-hook switch `--myarc-test-agent-space[=select]` (`AGENT_SPACE=1` or `select` in `tools/capture_native.sh`) creates it; no user-facing control does yet.

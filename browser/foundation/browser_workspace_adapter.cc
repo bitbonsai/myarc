@@ -1843,34 +1843,44 @@ int ResolveRow(int count, int current, int index, int delta) {
   return ((current + delta) % count + count) % count;
 }
 
+// The Spaces that Ctrl-number and Space cycling reach: all but the agent
+// Space, which only a click or the command bar selects.
+std::vector<uint64_t> KeyboardSpaces(const foundation::SidebarResult& sidebar) {
+  std::vector<uint64_t> ids;
+  for (const auto& space : sidebar.spaces) {
+    if (!space.agent) {
+      ids.push_back(space.id);
+    }
+  }
+  return ids;
+}
+
 }  // namespace
 
 foundation::MutationResult BrowserWorkspaceAdapter::SelectSpaceAt(int index) {
   const auto sidebar = Sidebar();
   if (!sidebar.ok)
     return Fail(std::string(sidebar.error));
-  const int row =
-      ResolveRow(static_cast<int>(sidebar.spaces.size()), -1, index, 0);
-  if (row < 0 || sidebar.spaces[row].id == sidebar.current_space.id)
+  const auto spaces = KeyboardSpaces(sidebar);
+  const int row = ResolveRow(static_cast<int>(spaces.size()), -1, index, 0);
+  if (row < 0 || spaces[row] == sidebar.current_space.id)
     return Ok(sidebar.current_space.id);
-  return SelectSpace(sidebar.spaces[row].id);
+  return SelectSpace(spaces[row]);
 }
 
 foundation::MutationResult BrowserWorkspaceAdapter::StepSpace(int delta) {
   const auto sidebar = Sidebar();
   if (!sidebar.ok)
     return Fail(std::string(sidebar.error));
-  const auto it =
-      std::ranges::find(sidebar.spaces, sidebar.current_space.id,
-                        [](const auto& space) { return space.id; });
-  const int current = it == sidebar.spaces.end()
-                          ? -1
-                          : static_cast<int>(it - sidebar.spaces.begin());
+  const auto spaces = KeyboardSpaces(sidebar);
+  const auto it = std::ranges::find(spaces, sidebar.current_space.id);
+  const int current =
+      it == spaces.end() ? -1 : static_cast<int>(it - spaces.begin());
   const int row =
-      ResolveRow(static_cast<int>(sidebar.spaces.size()), current, 0, delta);
+      ResolveRow(static_cast<int>(spaces.size()), current, 0, delta);
   if (row < 0 || row == current)
     return Ok(sidebar.current_space.id);
-  return SelectSpace(sidebar.spaces[row].id);
+  return SelectSpace(spaces[row]);
 }
 
 foundation::MutationResult BrowserWorkspaceAdapter::ActivateSidebarItemAt(

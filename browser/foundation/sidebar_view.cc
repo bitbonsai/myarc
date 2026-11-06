@@ -60,8 +60,6 @@
 #include "ui/views/controls/separator.h"
 #include "ui/views/focus/focus_manager.h"
 #include "ui/views/layout/box_layout.h"
-#include "ui/views/layout/flex_layout.h"
-#include "ui/views/layout/flex_layout_types.h"
 #include "ui/views/style/typography.h"
 #include "ui/views/view_class_properties.h"
 #include "ui/views/view_utils.h"
@@ -261,41 +259,22 @@ ui::ImageModel SpaceGlyph(bool first,
                : ui::ImageModel::FromVectorIcon(kDotIcon, color, 8);
 }
 
-// Marks the agent Space's title: "Agent" in a small pill of the title's
-// color, filled like the footer's other-Profiles pill.
-class AgentBadge final : public views::Label {
-  METADATA_HEADER(AgentBadge, views::Label)
-
- public:
-  AgentBadge() : views::Label(u"Agent") {
-    SetFontList(font_list().DeriveWithSizeDelta(-2).DeriveWithWeight(
-        gfx::Font::Weight::MEDIUM));
-    SetBorder(views::CreateEmptyBorder(gfx::Insets::VH(1, 6)));
-    SetSubpixelRenderingEnabled(false);
-    SetProperty(views::kMarginsKey, gfx::Insets::TLBR(0, 2, 0, 8));
-  }
-
-  void OnThemeChanged() override {
-    views::Label::OnThemeChanged();
-    const Fills fills = GetFills(GetColorProvider());
-    SetEnabledColor(fills.title);
-    // Radii past half the height clamp, so the ends stay round.
-    SetBackground(views::CreateRoundedRectBackground(
-        SkColorSetA(fills.space_dot, SkColorGetA(fills.space_dot) / 4), 16));
-  }
-};
-
-BEGIN_METADATA(AgentBadge)
-END_METADATA
-
 // Arc packs the Space glyphs left, 6 DIP after the Library button: the
 // footer's 4 DIP spacing and 2 more.
 constexpr int kSpacesLead = 2;
+// Arc spaces its Space glyphs 34 DIP apart. A short strip closes them up to
+// 20 DIP before they scroll.
+constexpr int kSpacesPitch = 34;
+constexpr int kSpacesMinPitch = 20;
+// The other-Profiles group's gap after the glyph before it, and its inset on
+// each side.
+constexpr int kGroupGap = 4;
+constexpr int kGroupInset = 2;
 
-// A light capsule behind the other Profiles' Space glyphs, 4 DIP after the
-// glyph before it. It hugs the glyph row with 4 DIP to spare on each side and
-// fills with the other Spaces' glyph color at a quarter of its alpha. Its
-// padding shows the Profiles' names as a footer tooltip.
+// A light capsule behind the other Profiles' Space glyphs. It hugs the glyph
+// row with 4 DIP to spare on each side and fills with the other Spaces' glyph
+// color at a quarter of its alpha. Its padding shows the Profiles' names as a
+// footer tooltip.
 class ProfileGroup final : public views::View {
   METADATA_HEADER(ProfileGroup, views::View)
 
@@ -304,13 +283,21 @@ class ProfileGroup final : public views::View {
                std::u16string name,
                std::u16string names)
       : tooltip_(std::move(tooltip)), names_(std::move(names)) {
-    auto* layout = SetLayoutManager(std::make_unique<views::BoxLayout>(
-        Orientation::kHorizontal, gfx::Insets::VH(0, 2)));
-    layout->set_cross_axis_alignment(
-        views::BoxLayout::CrossAxisAlignment::kCenter);
-    SetProperty(views::kMarginsKey, gfx::Insets::TLBR(0, 4, 0, 0));
     GetViewAccessibility().SetRole(ax::mojom::Role::kGroup);
     GetViewAccessibility().SetName(std::move(name));
+  }
+
+  // The strip sizes the group; its glyph buttons split the inner width.
+  void Layout(PassKey) override {
+    if (children().empty()) {
+      return;
+    }
+    const int pitch =
+        (width() - 2 * kGroupInset) / static_cast<int>(children().size());
+    for (size_t index = 0; index < children().size(); ++index) {
+      children()[index]->SetBounds(
+          kGroupInset + static_cast<int>(index) * pitch, 0, pitch, height());
+    }
   }
 
   void OnPaint(gfx::Canvas* canvas) override {
@@ -359,6 +346,71 @@ class ProfileGroup final : public views::View {
 };
 
 BEGIN_METADATA(ProfileGroup)
+END_METADATA
+
+// The footer's Space glyphs, packed left after kSpacesLead with the
+// other-Profiles group last. When the strip is too short for them at Arc's
+// pitch, the pitch closes up so the group still shows whole; only below
+// kSpacesMinPitch do the glyphs overflow and scroll.
+class SpaceStrip final : public views::View {
+  METADATA_HEADER(SpaceStrip, views::View)
+
+ public:
+  gfx::Size CalculatePreferredSize(
+      const views::SizeBounds& available_size) const override {
+    return gfx::Size(WidthAt(PitchFor(available_size.width())), 32);
+  }
+
+  void Layout(PassKey) override {
+    // The ScrollView stretches this view to at least its viewport, so the
+    // pitch follows the viewport's width.
+    const int pitch = PitchFor(parent() ? views::SizeBound(parent()->width())
+                                        : views::SizeBound());
+    int x = kSpacesLead;
+    for (views::View* child : children()) {
+      if (views::IsViewClass<ProfileGroup>(child)) {
+        x += kGroupGap;
+        const int glyphs = static_cast<int>(child->children().size());
+        child->SetBounds(x, 0, 2 * kGroupInset + glyphs * pitch, height());
+      } else {
+        child->SetBounds(x, 0, pitch, height());
+      }
+      x = child->bounds().right();
+    }
+  }
+
+ private:
+  // The glyph count and the width the strip needs besides the glyphs.
+  std::pair<int, int> Measure() const {
+    int glyphs = 0;
+    int fixed = kSpacesLead;
+    for (const views::View* child : children()) {
+      if (views::IsViewClass<ProfileGroup>(child)) {
+        glyphs += static_cast<int>(child->children().size());
+        fixed += kGroupGap + 2 * kGroupInset;
+      } else {
+        ++glyphs;
+      }
+    }
+    return {glyphs, fixed};
+  }
+
+  int PitchFor(views::SizeBound width) const {
+    const auto [glyphs, fixed] = Measure();
+    if (!width.is_bounded() || glyphs == 0) {
+      return kSpacesPitch;
+    }
+    return std::clamp((width.value() - fixed) / glyphs, kSpacesMinPitch,
+                      kSpacesPitch);
+  }
+
+  int WidthAt(int pitch) const {
+    const auto [glyphs, fixed] = Measure();
+    return fixed + glyphs * pitch;
+  }
+};
+
+BEGIN_METADATA(SpaceStrip)
 END_METADATA
 
 enum ItemCommand { kPin = 1, kFavorite, kUnsave, kClose };
@@ -1394,30 +1446,16 @@ void SidebarView::SetModel(const foundation::SidebarResult& model,
       SpaceIcon(SpaceIconOf(model.current_space), fills.title, agent));
   AlignRowContents(*heading, kSpaceIconSize);
   heading->SetEnabledTextColors(fills.title);
-  heading->SetTooltipText(u"Rename Space: " + name);
-  heading->GetViewAccessibility().SetName(u"Rename Space: " + name);
-  TrackFocus(heading.get(), FocusAction::kRename, model.current_space.id);
-  views::View* title = nullptr;
-  if (agent) {
-    // The agent Space's title keeps its natural width, eliding when long,
-    // with the Agent badge right after it.
-    auto row = std::make_unique<views::View>();
-    row->SetLayoutManager(std::make_unique<views::FlexLayout>())
-        ->SetOrientation(views::LayoutOrientation::kHorizontal)
-        .SetCrossAxisAlignment(views::LayoutAlignment::kCenter);
-    heading->SetProperty(
-        views::kFlexBehaviorKey,
-        views::FlexSpecification(views::MinimumFlexSizeRule::kScaleToMinimum,
-                                 views::MaximumFlexSizeRule::kPreferred));
-    row->AddChildView(std::move(heading));
-    row->AddChildView(std::make_unique<AgentBadge>());
-    title = rows->AddChildView(std::move(row));
-  } else {
-    title = rows->AddChildView(std::move(heading));
-  }
   if (!tile_items.empty()) {
-    title->SetProperty(views::kMarginsKey, gfx::Insets::TLBR(6, 0, 0, 0));
+    heading->SetProperty(views::kMarginsKey, gfx::Insets::TLBR(6, 0, 0, 0));
   }
+  // The bot, or the user's icon, and this tooltip mark the agent Space.
+  heading->SetTooltipText((agent ? u"Agent Space: " : u"Rename Space: ") +
+                          name);
+  heading->GetViewAccessibility().SetName(
+      (agent ? u"Rename Agent Space: " : u"Rename Space: ") + name);
+  TrackFocus(heading.get(), FocusAction::kRename, model.current_space.id);
+  rows->AddChildView(std::move(heading));
 
   // Arc divides the Space title from Today only while Today has tabs, and
   // puts Clear at the divider's right end.
@@ -1587,13 +1625,7 @@ void SidebarView::BuildFooter(const gfx::PointF& spaces_offset,
   // scrolling and the current-Space reveal callback.
   spaces_scroll_->SetPreferredSize(gfx::Size(0, 32));
   // Like Arc, Space glyphs follow the Library and Create sits at the right.
-  auto* spaces = spaces_scroll_->SetContents(Box(Orientation::kHorizontal, 0));
-  auto* spaces_layout =
-      static_cast<views::BoxLayout*>(spaces->GetLayoutManager());
-  spaces_layout->set_cross_axis_alignment(
-      views::BoxLayout::CrossAxisAlignment::kCenter);
-  spaces_layout->set_inside_border_insets(
-      gfx::Insets::TLBR(0, kSpacesLead, 0, 0));
+  auto* spaces = spaces_scroll_->SetContents(std::make_unique<SpaceStrip>());
   spaces->GetViewAccessibility().SetRole(ax::mojom::Role::kGroup);
   spaces->GetViewAccessibility().SetName(u"Spaces");
   std::optional<size_t> current_space_index;
@@ -1613,6 +1645,8 @@ void SidebarView::BuildFooter(const gfx::PointF& spaces_offset,
       order.push_back(index);
     }
   }
+  const size_t keyboard_spaces =
+      std::ranges::count(spaces_, false, &SpaceEntry::agent);
   for (size_t position = 0; show_spaces && position < order.size();
        ++position) {
     const size_t index = order[position];
@@ -1637,11 +1671,11 @@ void SidebarView::BuildFooter(const gfx::PointF& spaces_offset,
       current_space_index = spaces->children().size();
     }
     // Ctrl-1 to Ctrl-8 select those Spaces and Ctrl-9 the last one, in the
-    // Spaces' order.
+    // footer's order. The agent Space takes no number.
     FooterTooltip::Content tooltip = {agent ? u"Agent Space" : space_name, {}};
-    if (index < 8) {
-      tooltip.keys = {u"\u2303", base::NumberToString16(index + 1)};
-    } else if (index + 1 == spaces_.size()) {
+    if (!agent && position < 8) {
+      tooltip.keys = {u"\u2303", base::NumberToString16(position + 1)};
+    } else if (!agent && position + 1 == keyboard_spaces) {
       tooltip.keys = {u"\u2303", u"9"};
     }
     choice->SetFooterTooltip(footer_tooltip_->GetWeakPtr(), std::move(tooltip));
