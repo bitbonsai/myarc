@@ -236,9 +236,9 @@ void SetWeight(views::LabelButton& button, gfx::Font::Weight weight) {
 }
 
 // A Space's footer glyph, brighter for the current Space: its emoji or icon,
-// else Arc's default planet for the first Space and a dot for the rest.
-// Other Spaces' emoji fade to half.
-ui::ImageModel SpaceGlyph(size_t index,
+// else Arc's default planet for the footer's first Space and a dot for the
+// rest. Other Spaces' emoji fade to half.
+ui::ImageModel SpaceGlyph(bool first,
                           const SpaceIconChoice& icon,
                           bool current,
                           const Fills& fills) {
@@ -248,42 +248,64 @@ ui::ImageModel SpaceGlyph(size_t index,
   if (!image.IsEmpty()) {
     return image;
   }
-  return index == 0 ? ui::ImageModel::FromVectorIcon(kSaturnIcon, color, 16)
-                    : ui::ImageModel::FromVectorIcon(kDotIcon, color, 8);
+  return first ? ui::ImageModel::FromVectorIcon(kSaturnIcon, color, 16)
+               : ui::ImageModel::FromVectorIcon(kDotIcon, color, 8);
 }
 
 // Arc packs the Space glyphs left, 6 DIP after the Library button: the
 // footer's 4 DIP spacing and 2 more.
 constexpr int kSpacesLead = 2;
 
-// The footer's line between this Profile's Spaces and other Profiles', one
-// device pixel wide and 14 DIP tall, in the other Spaces' glyph color.
-class ProfileDivider final : public views::View {
-  METADATA_HEADER(ProfileDivider, views::View)
+// A soft pill behind another Profile's Space glyphs, 4 DIP after the glyph
+// before it, in the other Spaces' glyph color at half its alpha. Its padding
+// shows the Profile's name as a footer tooltip.
+class ProfileGroup final : public views::View {
+  METADATA_HEADER(ProfileGroup, views::View)
 
  public:
-  ProfileDivider() {
-    SetPreferredSize(gfx::Size(9, 32));
-    GetViewAccessibility().SetRole(ax::mojom::Role::kSplitter);
+  ProfileGroup(base::WeakPtr<FooterTooltip> tooltip, std::u16string name)
+      : tooltip_(std::move(tooltip)), name_(std::move(name)) {
+    auto* layout = SetLayoutManager(std::make_unique<views::BoxLayout>(
+        Orientation::kHorizontal, gfx::Insets::VH(0, 2)));
+    layout->set_cross_axis_alignment(
+        views::BoxLayout::CrossAxisAlignment::kCenter);
+    SetProperty(views::kMarginsKey, gfx::Insets::TLBR(0, 4, 0, 0));
+    GetViewAccessibility().SetRole(ax::mojom::Role::kGroup);
+    GetViewAccessibility().SetName(name_);
   }
 
   void OnPaint(gfx::Canvas* canvas) override {
-    gfx::ScopedCanvas scoped_canvas(canvas);
-    const float dsf = canvas->UndoDeviceScaleFactor();
-    const gfx::Rect bounds = GetContentsBounds();
-    const int x = std::floor(bounds.CenterPoint().x() * dsf);
-    const int top = std::round((bounds.CenterPoint().y() - 7) * dsf);
-    canvas->FillRect(gfx::Rect(x, top, 1, std::round(14 * dsf)),
-                     GetFills(GetColorProvider()).space_dot);
+    const SkColor dot = GetFills(GetColorProvider()).space_dot;
+    cc::PaintFlags flags;
+    flags.setAntiAlias(true);
+    flags.setColor(SkColorSetA(dot, SkColorGetA(dot) / 2));
+    const gfx::RectF bounds(GetLocalBounds());
+    canvas->DrawRoundRect(bounds, bounds.height() / 2, flags);
   }
 
   void OnThemeChanged() override {
     views::View::OnThemeChanged();
     SchedulePaint();
   }
+
+  void OnMouseEntered(const ui::MouseEvent& event) override {
+    if (tooltip_) {
+      tooltip_->Hover(*this, {name_, {}});
+    }
+  }
+
+  void OnMouseExited(const ui::MouseEvent& event) override {
+    if (tooltip_) {
+      tooltip_->Unhover(*this);
+    }
+  }
+
+ private:
+  base::WeakPtr<FooterTooltip> tooltip_;
+  std::u16string name_;
 };
 
-BEGIN_METADATA(ProfileDivider)
+BEGIN_METADATA(ProfileGroup)
 END_METADATA
 
 enum ItemCommand { kPin = 1, kFavorite, kUnsave, kClose };
@@ -1519,7 +1541,7 @@ void SidebarView::BuildFooter(const gfx::PointF& spaces_offset,
                             base::Unretained(&delegate_.get()), space_id),
         nullptr);
     choice->SetImageModel(views::Button::STATE_NORMAL,
-                          SpaceGlyph(index, spaces_[index].icon, current,
+                          SpaceGlyph(index == 0, spaces_[index].icon, current,
                                      GetFills(GetColorProvider())));
     // Arc spaces its Space dots 34 DIP apart.
     choice->SetMinSize(gfx::Size(34, 32));
@@ -1544,20 +1566,24 @@ void SidebarView::BuildFooter(const gfx::PointF& spaces_offset,
     TrackFocus(choice.get(), FocusAction::kSpaces, space_id);
     spaces->AddChildView(std::move(choice));
   }
-  // Then other Profiles' Spaces, after a divider. They aren't numbered.
-  if (!other_spaces_.empty()) {
-    spaces->AddChildView(std::make_unique<ProfileDivider>());
-  }
+  // Then other Profiles' Spaces, each Profile's in its own pill. They aren't
+  // numbered.
+  ProfileGroup* group = nullptr;
   for (size_t index = 0; index < other_spaces_.size(); ++index) {
     const OtherSpaceEntry& other = other_spaces_[index];
+    if (index == 0 ||
+        other.profile_dir != other_spaces_[index - 1].profile_dir) {
+      group = spaces->AddChildView(std::make_unique<ProfileGroup>(
+          footer_tooltip_->GetWeakPtr(), other.profile_name));
+    }
     auto choice = IconButton<FooterButton>(
         base::BindRepeating(&Delegate::SwitchToSpaceInProfile,
                             base::Unretained(&delegate_.get()),
                             other.profile_dir, other.space_id),
         nullptr);
-    choice->SetImageModel(views::Button::STATE_NORMAL,
-                          SpaceGlyph(other.order, other.icon, false,
-                                     GetFills(GetColorProvider())));
+    choice->SetImageModel(
+        views::Button::STATE_NORMAL,
+        SpaceGlyph(false, other.icon, false, GetFills(GetColorProvider())));
     choice->SetMinSize(gfx::Size(34, 32));
     choice->SetMaxSize(gfx::Size(34, 32));
     choice->SetPreferredSize(gfx::Size(34, 32));
@@ -1567,7 +1593,7 @@ void SidebarView::BuildFooter(const gfx::PointF& spaces_offset,
     choice->GetViewAccessibility().SetName(u"Space: " + other.name +
                                            u", Profile: " + other.profile_name);
     TrackFocus(choice.get(), FocusAction::kOtherSpace, index);
-    spaces->AddChildView(std::move(choice));
+    group->AddChildView(std::move(choice));
   }
   // Non-layer ScrollViews need an explicit contents size too.
   spaces->SizeToPreferredSize();
@@ -1934,7 +1960,7 @@ void SidebarView::UpdateFills() {
       const OtherSpaceEntry& other = footer_other_spaces_[target.id];
       static_cast<views::MdTextButton*>(target.view.get())
           ->SetImageModel(views::Button::STATE_NORMAL,
-                          SpaceGlyph(other.order, other.icon, false, fills));
+                          SpaceGlyph(false, other.icon, false, fills));
     }
     if (target.action == FocusAction::kSpaces) {
       const auto space = std::ranges::find(spaces_, target.id, &SpaceEntry::id);
@@ -1942,10 +1968,9 @@ void SidebarView::UpdateFills() {
         continue;
       }
       static_cast<views::MdTextButton*>(target.view.get())
-          ->SetImageModel(
-              views::Button::STATE_NORMAL,
-              SpaceGlyph(static_cast<size_t>(space - spaces_.begin()),
-                         space->icon, target.id == footer_space_id_, fills));
+          ->SetImageModel(views::Button::STATE_NORMAL,
+                          SpaceGlyph(space == spaces_.begin(), space->icon,
+                                     target.id == footer_space_id_, fills));
     }
   }
   SetCreateMenuOpen(create_menu_open_);

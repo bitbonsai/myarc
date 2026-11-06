@@ -23,6 +23,8 @@
 #   Chromium can't show download and seed the stack.
 #   WORKSPACE=<file> seeds the profile's myarc-workspace-v1.json, for example
 #   with Archived Tabs.
+#   LOCAL_STATE=<file> seeds the user-data dir's Local State, for example
+#   with other Profiles and their Spaces index.
 #   ACTIVATE=<item ID> opens that seeded row once the workspace loads, via
 #   --myarc-capture-activate; pair it with URL=none.
 #   SETTINGS=1 (or general/profiles/advanced/more) opens the native Settings window via
@@ -59,6 +61,7 @@ if [ "${1:-}" = "--inner" ]; then
   touch "$PROFILE/.myarc-m0-test-profile"
   printf '{"vertical_tabs":{"enabled":true,"collapsed_state":false,"enabled_first_time":true},"download":{"default_directory":"%s","prompt_for_download":false}}\n' "$PROFILE/Downloads" > "$PROFILE/Default/Preferences"
   [ -n "${WORKSPACE:-}" ] && cp "$WORKSPACE" "$PROFILE/Default/myarc-workspace-v1.json"
+  [ -n "${LOCAL_STATE:-}" ] && cp "$LOCAL_STATE" "$PROFILE/Local State"
   URLS=()
   [ "$URL" = none ] || read -r -a URLS <<< "$URL"
   EXTRA=()

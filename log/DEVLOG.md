@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-11-06: One footer planet and Profile pills
+
+- Only the footer's first Space falls back to the planet; other Profiles' Spaces without an icon show dots, and chosen emoji and icons still win. `SpaceGlyph` takes a `first` flag instead of the Space's index. The 1px `ProfileDivider` is gone. Each other Profile's Space glyphs now sit in a `ProfileGroup` pill, 4 DIP after the glyph before it, with 2 DIP side padding, full corner radius and the other Spaces' glyph color at half its alpha. The pill is an accessibility group named after the Profile, and its padding shows the Profile's name as a footer tooltip. `tools/capture_native.sh` takes `LOCAL_STATE=<file>` to seed other Profiles and their Spaces index.
+- Verification: `chrome` builds under the lock and `export_patches.py --check` passes. Background captures with seeded Work and Side Project Profiles (`/tmp/myarc-footer-pill/footers.png`, outside the repo) show one planet and the other Profiles' Spaces in visible pills in dark, light, and pink-tinted dark and light.
+- Still open. The pill tooltip and hover over its padding were checked by code, not captured. Light mode came from the `-NSRequiresAquaSystemAppearance YES` launch argument, which also opens a stray "yes" tab. `OtherSpaceEntry::order` no longer feeds the footer.
+
 ## 2026-11-06: myarcctl CLI and MCP server over the control stub
 
 - New crate `myarcctl` (`crates/myarcctl`) puts the `myarc-control` stub behind two interfaces. The CLI has `commands`, `run <command> [params-json]` and `--json`, and exits 0, 1 or 2 for success, an error outcome or a usage error. `myarcctl mcp` speaks newline-delimited JSON-RPC 2.0 on stdio with `initialize`, `ping`, `tools/list` and `tools/call`, publishes one tool per registry entry with its params schema, and keeps one `ControlService` for the session. Both call `ControlService::handle`. The JSON-RPC handling is written by hand with only `serde_json`, and input lines over 1 MiB get an error reply.
