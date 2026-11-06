@@ -1251,7 +1251,10 @@ pub fn has_control_request(reply: &ControlReply) -> bool {
 }
 
 pub fn control_request_live(reply: &ControlReply) -> bool {
-    reply.pending.as_ref().is_some_and(|pending| !pending.abandoned())
+    reply
+        .pending
+        .as_ref()
+        .is_some_and(|pending| !pending.abandoned())
 }
 
 pub fn answer_control_request(
