@@ -32,7 +32,7 @@ Wrap builds and browser launches in `/usr/bin/lockf -k /tmp/myarc-build.lock`. L
 
 ## Commands
 
-`python3 tools/check_docs.py`, `cargo fmt --all -- --check`, `cargo clippy --workspace --all-targets --locked -- -D warnings`, `cargo test --workspace --locked`, `python3 tools/export_patches.py --check`, `node --test design/onboarding/state.test.mjs`. Native runtime checks and evidence rules: [docs/VERIFY.md](docs/VERIFY.md).
+`python3 tools/check_docs.py`, `cargo fmt --all -- --check`, `rustfmt --check --edition 2024 browser/foundation/bridge.rs` (cargo fmt skips it), `cargo clippy --workspace --all-targets --locked -- -D warnings`, `cargo test --workspace --locked`, `python3 tools/export_patches.py --check`, `node --test design/onboarding/state.test.mjs`. Native runtime checks and evidence rules: [docs/VERIFY.md](docs/VERIFY.md).
 
 ## Hygiene
 
