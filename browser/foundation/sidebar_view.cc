@@ -256,31 +256,48 @@ ui::ImageModel SpaceGlyph(bool first,
 // footer's 4 DIP spacing and 2 more.
 constexpr int kSpacesLead = 2;
 
-// A soft pill behind another Profile's Space glyphs, 4 DIP after the glyph
-// before it, in the other Spaces' glyph color at half its alpha. Its padding
-// shows the Profile's name as a footer tooltip.
+// A light capsule behind the other Profiles' Space glyphs, 4 DIP after the
+// glyph before it. It hugs the glyph row with 4 DIP to spare on each side and
+// fills with the other Spaces' glyph color at a quarter of its alpha. Its
+// padding shows the Profiles' names as a footer tooltip.
 class ProfileGroup final : public views::View {
   METADATA_HEADER(ProfileGroup, views::View)
 
  public:
-  ProfileGroup(base::WeakPtr<FooterTooltip> tooltip, std::u16string name)
-      : tooltip_(std::move(tooltip)), name_(std::move(name)) {
+  ProfileGroup(base::WeakPtr<FooterTooltip> tooltip,
+               std::u16string name,
+               std::u16string names)
+      : tooltip_(std::move(tooltip)), names_(std::move(names)) {
     auto* layout = SetLayoutManager(std::make_unique<views::BoxLayout>(
         Orientation::kHorizontal, gfx::Insets::VH(0, 2)));
     layout->set_cross_axis_alignment(
         views::BoxLayout::CrossAxisAlignment::kCenter);
     SetProperty(views::kMarginsKey, gfx::Insets::TLBR(0, 4, 0, 0));
     GetViewAccessibility().SetRole(ax::mojom::Role::kGroup);
-    GetViewAccessibility().SetName(name_);
+    GetViewAccessibility().SetName(std::move(name));
   }
 
   void OnPaint(gfx::Canvas* canvas) override {
+    // Each glyph sits centered in its button.
+    gfx::RectF glyphs;
+    for (const views::View* child : children()) {
+      const auto* button = views::AsViewClass<views::LabelButton>(child);
+      if (!button) {
+        continue;
+      }
+      gfx::Rect image(button->GetImage(views::Button::STATE_NORMAL).size());
+      image.Offset(button->bounds().CenterPoint() - image.CenterPoint());
+      glyphs.Union(gfx::RectF(image));
+    }
+    if (glyphs.IsEmpty()) {
+      return;
+    }
+    glyphs.Outset(4);
     const SkColor dot = GetFills(GetColorProvider()).space_dot;
     cc::PaintFlags flags;
     flags.setAntiAlias(true);
-    flags.setColor(SkColorSetA(dot, SkColorGetA(dot) / 2));
-    const gfx::RectF bounds(GetLocalBounds());
-    canvas->DrawRoundRect(bounds, bounds.height() / 2, flags);
+    flags.setColor(SkColorSetA(dot, SkColorGetA(dot) / 4));
+    canvas->DrawRoundRect(glyphs, glyphs.height() / 2, flags);
   }
 
   void OnThemeChanged() override {
@@ -290,7 +307,7 @@ class ProfileGroup final : public views::View {
 
   void OnMouseEntered(const ui::MouseEvent& event) override {
     if (tooltip_) {
-      tooltip_->Hover(*this, {name_, {}});
+      tooltip_->Hover(*this, {names_, {}});
     }
   }
 
@@ -302,7 +319,7 @@ class ProfileGroup final : public views::View {
 
  private:
   base::WeakPtr<FooterTooltip> tooltip_;
-  std::u16string name_;
+  std::u16string names_;
 };
 
 BEGIN_METADATA(ProfileGroup)
@@ -746,11 +763,6 @@ void SidebarView::OpenCreateSpace(std::vector<ProfileChoice> profiles,
     DropRows();
     current_space_id_ = space_id;
     BuildFooter(gfx::PointF(), /*space_changed=*/false);
-    // Built while the Library's width animates away, the Spaces strip keeps a
-    // stale overflow hairline at its right edge. The indicator stays off
-    // until the Spaces or the current one change and SetModel rebuilds the
-    // footer.
-    spaces_scroll_->SetDrawOverflowIndicator(false);
     footer_targets_ = focus_targets_;
     UpdateFills();
   }
@@ -1514,6 +1526,8 @@ void SidebarView::BuildFooter(const gfx::PointF& spaces_offset,
       views::ScrollView::ScrollBarMode::kHiddenButEnabled);
   spaces_scroll_->SetTreatAllScrollEventsAsHorizontal(true);
   spaces_scroll_->SetUseContentsPreferredSize(true);
+  // Arc draws no hairline where the Spaces overflow the strip.
+  spaces_scroll_->SetDrawOverflowIndicator(false);
   // Keep all footer controls on one 32-DIP line while retaining wheel/focus
   // scrolling and the current-Space reveal callback.
   spaces_scroll_->SetPreferredSize(gfx::Size(0, 32));
@@ -1566,16 +1580,23 @@ void SidebarView::BuildFooter(const gfx::PointF& spaces_offset,
     TrackFocus(choice.get(), FocusAction::kSpaces, space_id);
     spaces->AddChildView(std::move(choice));
   }
-  // Then other Profiles' Spaces, each Profile's in its own pill. They aren't
-  // numbered.
+  // Then other Profiles' Spaces, all in one pill. They aren't numbered.
   ProfileGroup* group = nullptr;
+  if (!other_spaces_.empty()) {
+    std::u16string names;
+    size_t profiles = 0;
+    for (size_t index = 0; index < other_spaces_.size(); ++index) {
+      if (index == 0 || other_spaces_[index].profile_dir !=
+                            other_spaces_[index - 1].profile_dir) {
+        names += (profiles++ ? u", " : u"") + other_spaces_[index].profile_name;
+      }
+    }
+    group = spaces->AddChildView(std::make_unique<ProfileGroup>(
+        footer_tooltip_->GetWeakPtr(),
+        profiles == 1 ? names : u"Other Profiles' Spaces", names));
+  }
   for (size_t index = 0; index < other_spaces_.size(); ++index) {
     const OtherSpaceEntry& other = other_spaces_[index];
-    if (index == 0 ||
-        other.profile_dir != other_spaces_[index - 1].profile_dir) {
-      group = spaces->AddChildView(std::make_unique<ProfileGroup>(
-          footer_tooltip_->GetWeakPtr(), other.profile_name));
-    }
     auto choice = IconButton<FooterButton>(
         base::BindRepeating(&Delegate::SwitchToSpaceInProfile,
                             base::Unretained(&delegate_.get()),

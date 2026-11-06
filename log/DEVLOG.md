@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-11-06: One Profile pill that hugs its glyphs
+
+- All other Profiles' Spaces now share one `ProfileGroup` pill in their existing order. Its accessible name is "Other Profiles' Spaces", or the Profile's name when only one other Profile exists, and its padding's tooltip lists the Profile names. The pill paints around the glyph images, not the 34 DIP buttons, with 4 DIP to spare on each side, full corner radius and a quarter of the other Spaces' glyph alpha. Glyph size and spacing are unchanged.
+- The stray line was the Spaces `ScrollView`'s own right overflow indicator, a 1 DIP `Separator` in the separator color that Chromium draws when contents overflow. `BuildFooter` now turns it off, so the matching special case in `OpenCreateSpace` is gone. Verification: `chrome` builds under the lock, `export_patches.py --check` passes, and background captures (`/tmp/myarc-footer-pill2/footers.png`, outside the repo) show one tight, lighter pill, no clipping or line and one planet in dark, light and pink-tinted dark and light, with one other Profile of 3 Spaces and with two other Profiles of 1 Space each.
+- Still open. With 3 other Spaces the strip still overflows by a few DIP of empty button space past the pill, so it scrolls slightly. The pill tooltip only covers its 2 DIP side padding and was checked by code, not captured.
+
 ## 2026-11-06: One footer planet and Profile pills
 
 - Only the footer's first Space falls back to the planet; other Profiles' Spaces without an icon show dots, and chosen emoji and icons still win. `SpaceGlyph` takes a `first` flag instead of the Space's index. The 1px `ProfileDivider` is gone. Each other Profile's Space glyphs now sit in a `ProfileGroup` pill, 4 DIP after the glyph before it, with 2 DIP side padding, full corner radius and the other Spaces' glyph color at half its alpha. The pill is an accessibility group named after the Profile, and its padding shows the Profile's name as a footer tooltip. `tools/capture_native.sh` takes `LOCAL_STATE=<file>` to seed other Profiles and their Spaces index.
