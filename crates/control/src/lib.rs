@@ -97,7 +97,6 @@ pub enum Outcome {
         reason: String,
     },
     Unsupported {
-        command: String,
         reason: String,
     },
     Stale {
@@ -174,7 +173,6 @@ pub fn dispatch(workspace: &mut Workspace, window_id: WindowId, req: Request) ->
         Routed::Tab(_) => answer(
             &req,
             Outcome::Unsupported {
-                command: bounded(&req.command).to_owned(),
                 reason: no_pages(&req.command),
             },
         ),
@@ -273,13 +271,11 @@ fn run(workspace: &mut Workspace, window_id: WindowId, req: &Request, live: bool
             command
         )),
         Some(spec) if !spec.implemented => Outcome::Unsupported {
-            command: command.clone(),
             reason: format!(
                 "{command} needs live browser attachment (MA-011), which this core stub does not have"
             ),
         },
         Some(spec) if on_pages(spec.area) && !live => Outcome::Unsupported {
-            command: command.clone(),
             reason: no_pages(command),
         },
         Some(spec) if on_pages(spec.area) => match tab_action(workspace, command, params) {

@@ -108,6 +108,11 @@ fn separate_runs_share_the_served_workspace() {
 
     let unsupported = stub.run(&["tab.open", r#"{"url":"https://example.com"}"#]);
     assert_eq!(unsupported.status.code(), Some(1));
+    let stderr = String::from_utf8_lossy(&unsupported.stderr);
+    assert!(
+        stderr.contains("unsupported") && !stderr.contains("outcome_unknown"),
+        "an unsupported answer must cross the socket intact: {stderr}"
+    );
 }
 
 #[test]

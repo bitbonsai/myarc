@@ -289,8 +289,7 @@ fn unimplemented_commands_are_unsupported() {
         assert_eq!(response.id, "r1");
         assert_eq!(response.command, spec.id);
         match response.outcome {
-            Outcome::Unsupported { command, reason } => {
-                assert_eq!(command, spec.id);
+            Outcome::Unsupported { reason } => {
                 assert!(reason.contains("MA-011"), "{reason}");
             }
             other => panic!("{} should be unsupported: {other:?}", spec.id),

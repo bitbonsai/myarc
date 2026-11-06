@@ -63,8 +63,7 @@ fn tab_commands_are_implemented_but_unsupported_without_a_browser() {
             json!({ "url": "https://example.test/", "tab": "t1" }),
         ));
         match response.outcome {
-            Outcome::Unsupported { command, reason } => {
-                assert_eq!(command, spec.id);
+            Outcome::Unsupported { reason } => {
                 assert!(reason.contains("running myArc browser"), "{reason}");
             }
             other => panic!("{} should be unsupported: {other:?}", spec.id),
