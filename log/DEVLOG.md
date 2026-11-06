@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-11-06: Control layer stub for CLI and MCP
+
+- New crate `myarc-control` (`crates/control`) holds the shared control layer for MA-011. `registry()` lists the 31 command IDs from the spec's control surface table, each with an area, a summary, a JSON Schema for its parameters and an `implemented` flag. `ControlService::handle` takes a `Request` and returns a `Response` whose `status` tag is success, denied, unsupported, stale, cancelled, timeout, outcome_unknown or invalid. `space.list`, `space.create`, `space.select` and `space.rename` run on an in-memory `Workspace`; every other command answers unsupported until a browser is attached.
+- Verification: `cargo fmt --check`, `cargo clippy -D warnings` and `cargo test` pass across the workspace, with 13 new tests covering registry coverage against the spec table, each Space command, workspace errors, bad and oversized parameters, unknown commands and the JSON shape of a response. `check_docs.py` passes.
+- Still open. No `myarcctl` CLI, MCP server, grants, cancellation or browser attachment yet, and the workspace isn't persisted.
+
 ## 2026-11-05: Profile window group review fixes
 
 - A restored ordered-out window whose group restored no shown window comes on screen when session restore ends (`ShowOrphanedMyarcGroupWindows`, run from a `SessionRestoreObserver`). Closing a group's shown window now closes each ordered-out window with its own beforeunload and downloads warnings, and one that warns comes on screen; when Chromium closes the shown window to delete its Profile or for "Close all windows", which both shut the Profile's session service down first, an ordered-out window takes its place. Each group's swap requests carry a generation, so an older swap drops out. `create_first_space` replaces an untouched default Space (named Everyday, no items, archive, icon or theme, no Space ever created) in one Rust call, and the create-in-other-Profile path holds a `ScopedProfileKeepAlive` across the workspace load. The Spaces index drops Profiles missing from `ProfileAttributesStorage` or marked for deletion on every write and on removal. The Create a Space panel keeps the window's own Profile as a choice and falls back to it. The title hook builds only with the new GN arg `myarc_test_hooks`, skips off-the-record tabs and reads only `http://127.0.0.1:8766`.

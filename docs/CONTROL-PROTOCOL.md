@@ -1,6 +1,6 @@
 # Browser control: CLI and MCP
 
-Status: specified, not implemented. **Both interfaces are P0 browser launch requirements**, not just developer test tooling or a later paid AI feature. MA-011 delivers them. An external agent can control explicitly granted browser context while built-in AI remains off; the control interface itself requires no myarc account, subscription, model download or provider key.
+Status: specified. A core stub in [crates/control](../crates/control/src/lib.rs) holds the command registry and runs the Space commands, but the CLI, MCP server and browser attachment don't exist yet. **Both interfaces are P0 browser launch requirements**, not just developer test tooling or a later paid AI feature. MA-011 delivers them. An external agent can control explicitly granted browser context while built-in AI remains off; the control interface itself requires no myarc account, subscription, model download or provider key.
 
 ## One control layer, two public interfaces
 
