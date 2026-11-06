@@ -1,0 +1,46 @@
+diff --git a/ui/accessibility/ax_tree_combiner.cc b/ui/accessibility/ax_tree_combiner.cc
+index ba39675a7f6b7031d9176c687f0dfec5c8859d0a..a3997ab43293b379b2f5e0ca33a5131791210ae2 100644
+--- a/ui/accessibility/ax_tree_combiner.cc
++++ b/ui/accessibility/ax_tree_combiner.cc
+@@ -4,6 +4,9 @@
+ 
+ #include "ui/accessibility/ax_tree_combiner.h"
+ 
++#include <limits>
++#include <set>
++
+ #include "base/logging.h"
+ #include "ui/accessibility/ax_enums.mojom.h"
+ #include "ui/accessibility/ax_tree.h"
+@@ -57,6 +60,21 @@ bool AXTreeCombiner::Combine() {
+     return false;
+   }
+ 
++  if (keep_unique_ids_) {
++    std::set<AXNodeID> seen;
++    keep_ids_ = true;
++    for (const auto& tree : trees_) {
++      for (const auto& node : tree.nodes) {
++        if (!seen.insert(node.id).second) {
++          keep_ids_ = false;
++        }
++      }
++    }
++    if (!keep_ids_) {
++      next_id_ = std::numeric_limits<AXNodeID>::min() + 1;
++    }
++  }
++
+   // Process the nodes recursively, starting with the root tree.
+   AXTreeUpdate* root = tree_id_map.find(root_tree_id_)->second;
+   ProcessTree(root, tree_id_map);
+@@ -95,6 +113,9 @@ bool AXTreeCombiner::Combine() {
+ }
+ 
+ AXNodeID AXTreeCombiner::MapId(AXTreeID tree_id, AXNodeID node_id) {
++  if (keep_ids_) {
++    return node_id;
++  }
+   auto tree_id_node_id = std::make_pair(tree_id, node_id);
+   if (tree_id_node_id_map_[tree_id_node_id] == 0)
+     tree_id_node_id_map_[tree_id_node_id] = next_id_++;

@@ -8,7 +8,13 @@ use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 pub struct Workspace(workspace::Workspace);
 
 // One request from a control client, or none once the host has stopped.
-pub struct ControlReply(Option<control::ipc::Pending>);
+// An interaction command also carries its checked action and, once the
+// browser began it, the snapshot references it took.
+pub struct ControlReply {
+    pending: Option<control::ipc::Pending>,
+    action: Option<control::actions::PageAction>,
+    taken: Option<control::snapshot::Taken>,
+}
 
 // All records own their buffers. Calls are synchronous on the browser UI sequence;
 // only exported records, never Workspace or native runtime IDs, cross to storage.
@@ -158,6 +164,9 @@ mod ffi {
         Reload,
         // page.snapshot: answer with answer_snapshot_request.
         Snapshot,
+        // page.click, page.fill, page.select or page.press: begin with
+        // begin_page_action and answer with answer_action_request.
+        Act,
     }
 
     // Every item is a tab in the agent Space. `url` is set for Open and
@@ -213,6 +222,69 @@ mod ffi {
         selected: bool,
         required: bool,
         is_protected: bool,
+        editable: bool,
+        read_only: bool,
+    }
+
+    enum PageActKind {
+        Click,
+        Fill,
+        Select,
+        Press,
+    }
+
+    // A key press on a US layout. `key` and `code` are DOM key and code
+    // strings, `code` empty for a character without a key of its own;
+    // `text` is the keypress character or 0, `key_code` the Windows key code.
+    struct KeyRecord {
+        key: String,
+        code: String,
+        text: u16,
+        shift: bool,
+        key_code: u16,
+    }
+
+    // An interaction command the core accepted against the latest snapshot.
+    // `node` is the element's DOMNodeId, or 0 for page.press without ref.
+    // `text` is set for Fill, `value` for Select and `key` for Press. With
+    // `focus_first`, page.press clicks the text field before the key.
+    struct ActionStart {
+        ok: bool,
+        kind: PageActKind,
+        node: i32,
+        focus_first: bool,
+        text: String,
+        value: String,
+        key: KeyRecord,
+    }
+
+    struct SelectOptionRecord {
+        value: String,
+        text: String,
+        disabled: bool,
+    }
+
+    struct ChoiceResult {
+        ok: bool,
+        value: String,
+    }
+
+    enum ActionStatus {
+        // The action ran; the nodes are the snapshot after it.
+        Done,
+        // The page refused it before acting, such as a hidden element.
+        Refused,
+        // The tab closed or navigated before the action began.
+        Stale,
+        // It may or may not have happened.
+        Unknown,
+    }
+
+    struct ActionLimits {
+        action_wait_ms: u64,
+        settle_cap_ms: u64,
+        snapshot_timeout_ms: u64,
+        max_select_options: usize,
     }
 
     extern "Rust" {
@@ -427,6 +499,33 @@ mod ffi {
         );
         // Milliseconds to wait for a snapshot before answering timeout.
         fn control_snapshot_timeout_ms() -> u64;
+        // Checks an Act request against the latest snapshot of `document`,
+        // the tab's main document now, and takes its references. When `ok`
+        // is false the request is answered already.
+        fn begin_page_action(reply: &mut ControlReply, document: u64) -> ActionStart;
+        // page.select: the value of the option the request names among the
+        // select's `options`. When `ok` is false the request is answered.
+        fn choose_select_option(
+            reply: &mut ControlReply,
+            options: Vec<SelectOptionRecord>,
+        ) -> ChoiceResult;
+        // Answers an Act request begun with begin_page_action. With Done,
+        // formats the snapshot taken after the action like
+        // answer_snapshot_request does.
+        fn answer_action_request(
+            reply: &mut ControlReply,
+            status: ActionStatus,
+            reason: &str,
+            tab: TabStateRecord,
+            navigated: bool,
+            settled: bool,
+            document: u64,
+            root: i32,
+            focus: i32,
+            source_truncated: bool,
+            nodes: Vec<AxNodeRecord>,
+        );
+        fn control_action_limits() -> ActionLimits;
         // Most accessibility nodes to ask each frame for.
         fn control_snapshot_max_nodes() -> usize;
         // Answers denied without running the request.
@@ -1140,15 +1239,19 @@ pub fn next_control_request(epoch: u64) -> Box<ControlReply> {
             None
         }
     };
-    Box::new(ControlReply(host.and_then(|host| host.next())))
+    Box::new(ControlReply {
+        pending: host.and_then(|host| host.next()),
+        action: None,
+        taken: None,
+    })
 }
 
 pub fn has_control_request(reply: &ControlReply) -> bool {
-    reply.0.is_some()
+    reply.pending.is_some()
 }
 
 pub fn control_request_live(reply: &ControlReply) -> bool {
-    reply.0.as_ref().is_some_and(|pending| !pending.abandoned())
+    reply.pending.as_ref().is_some_and(|pending| !pending.abandoned())
 }
 
 pub fn answer_control_request(
@@ -1166,7 +1269,7 @@ pub fn answer_control_request(
         url: String::new(),
         items: Vec::new(),
     };
-    let Some(pending) = reply.0.take() else {
+    let Some(pending) = reply.pending.take() else {
         return plan;
     };
     let before = workspace.0.snapshot();
@@ -1179,7 +1282,7 @@ pub fn answer_control_request(
         }
         control::Routed::Tab(action) => action,
     };
-    reply.0 = Some(pending);
+    reply.pending = Some(pending);
     (plan.action, plan.item) = match action {
         TabAction::List { items } => {
             plan.items = items;
@@ -1199,6 +1302,11 @@ pub fn answer_control_request(
         TabAction::Forward { item } => (Kind::Forward, item),
         TabAction::Reload { item } => (Kind::Reload, item),
         TabAction::Snapshot { item } => (Kind::Snapshot, item),
+        TabAction::Act(action) => {
+            let item = action.item;
+            reply.action = Some(action);
+            (Kind::Act, item)
+        }
     };
     plan
 }
@@ -1210,7 +1318,7 @@ pub fn answer_tab_request(
     tabs: Vec<ffi::TabStateRecord>,
 ) {
     use ffi::TabStatus as Status;
-    let Some(pending) = reply.0.take() else {
+    let Some(pending) = reply.pending.take() else {
         return;
     };
     let tabs: Vec<control::TabState> = tabs.into_iter().map(tab_state).collect();
@@ -1265,41 +1373,12 @@ pub fn answer_snapshot_request(
     source_truncated: bool,
     nodes: Vec<ffi::AxNodeRecord>,
 ) {
-    use control::snapshot::{AxNode, Checked, SnapshotPage, SnapshotResult};
-    let Some(pending) = reply.0.take() else {
+    use control::snapshot::{SnapshotPage, SnapshotResult};
+    let Some(pending) = reply.pending.take() else {
         return;
     };
     let result = if status == ffi::TabStatus::Done {
-        let nodes = nodes
-            .into_iter()
-            .map(|node| AxNode {
-                id: node.id,
-                role: node.role,
-                name: node.name,
-                value: node.value,
-                url: node.url,
-                children: node.children,
-                level: node.level,
-                focusable: node.focusable,
-                clickable: node.clickable,
-                invisible: node.invisible,
-                ignored: node.ignored,
-                checked: match node.checked {
-                    1 => Checked::Yes,
-                    2 => Checked::Mixed,
-                    _ => Checked::No,
-                },
-                expanded: match node.expanded {
-                    1 => Some(true),
-                    2 => Some(false),
-                    _ => None,
-                },
-                disabled: node.disabled,
-                selected: node.selected,
-                required: node.required,
-                protected: node.is_protected,
-            })
-            .collect();
+        let nodes = nodes.into_iter().map(ax_node).collect();
         SnapshotResult::Done(SnapshotPage {
             tab: tab_state(tab),
             document,
@@ -1317,6 +1396,193 @@ pub fn answer_snapshot_request(
     pending.reply(response);
 }
 
+fn ax_node(node: ffi::AxNodeRecord) -> control::snapshot::AxNode {
+    use control::snapshot::{AxNode, Checked};
+    AxNode {
+        id: node.id,
+        role: node.role,
+        name: node.name,
+        value: node.value,
+        url: node.url,
+        children: node.children,
+        level: node.level,
+        focusable: node.focusable,
+        clickable: node.clickable,
+        invisible: node.invisible,
+        ignored: node.ignored,
+        checked: match node.checked {
+            1 => Checked::Yes,
+            2 => Checked::Mixed,
+            _ => Checked::No,
+        },
+        expanded: match node.expanded {
+            1 => Some(true),
+            2 => Some(false),
+            _ => None,
+        },
+        disabled: node.disabled,
+        selected: node.selected,
+        required: node.required,
+        protected: node.is_protected,
+        editable: node.editable,
+        read_only: node.read_only,
+    }
+}
+
+fn key_record(key: control::actions::KeySpec) -> ffi::KeyRecord {
+    ffi::KeyRecord {
+        key: key.key,
+        code: key.code,
+        text: key.text,
+        shift: key.shift,
+        key_code: key.key_code,
+    }
+}
+
+pub fn begin_page_action(reply: &mut ControlReply, document: u64) -> ffi::ActionStart {
+    use control::actions::ActKind;
+    let mut start = ffi::ActionStart {
+        ok: false,
+        kind: ffi::PageActKind::Click,
+        node: 0,
+        focus_first: false,
+        text: String::new(),
+        value: String::new(),
+        key: key_record(control::actions::KeySpec::default()),
+    };
+    if reply.pending.is_none() || reply.action.is_none() {
+        refuse_control_request(reply, "No page action to begin");
+        return start;
+    }
+    let (Some(pending), Some(action)) = (reply.pending.as_ref(), reply.action.as_ref()) else {
+        return start;
+    };
+    let mut store = SNAPSHOTS.lock().unwrap_or_else(PoisonError::into_inner);
+    match control::actions::prepare(&mut store, document, action) {
+        Ok(prepared) => {
+            start.ok = true;
+            start.node = prepared.node;
+            start.focus_first = prepared.focus_first;
+            reply.taken = Some(prepared.taken);
+            start.kind = match &action.kind {
+                ActKind::Click => ffi::PageActKind::Click,
+                ActKind::Fill { text } => {
+                    start.text = text.clone();
+                    ffi::PageActKind::Fill
+                }
+                ActKind::Select { value } => {
+                    start.value = value.clone();
+                    ffi::PageActKind::Select
+                }
+                ActKind::Press { key } => {
+                    start.key = key_record(key.clone());
+                    ffi::PageActKind::Press
+                }
+            };
+        }
+        Err(outcome) => {
+            drop(store);
+            let response = control::answer_outcome(pending.request(), outcome);
+            if let Some(pending) = reply.pending.take() {
+                pending.reply(response);
+            }
+        }
+    }
+    start
+}
+
+pub fn choose_select_option(
+    reply: &mut ControlReply,
+    options: Vec<ffi::SelectOptionRecord>,
+) -> ffi::ChoiceResult {
+    use control::actions::{ActKind, SelectOption};
+    let wanted = match reply.action.as_ref().map(|action| &action.kind) {
+        Some(ActKind::Select { value }) => value.clone(),
+        _ => String::new(),
+    };
+    let options: Vec<SelectOption> = options
+        .into_iter()
+        .map(|option| SelectOption {
+            value: option.value,
+            text: option.text,
+            disabled: option.disabled,
+        })
+        .collect();
+    match control::actions::choose_option(&options, &wanted) {
+        Ok(value) => ffi::ChoiceResult { ok: true, value },
+        Err(outcome) => {
+            finish_action(reply, control::actions::ActionResult::Refused(outcome));
+            ffi::ChoiceResult {
+                ok: false,
+                value: String::new(),
+            }
+        }
+    }
+}
+
+fn finish_action(reply: &mut ControlReply, result: control::actions::ActionResult) {
+    reply.action = None;
+    let Some(pending) = reply.pending.take() else {
+        return;
+    };
+    let taken = reply.taken.take().unwrap_or_default();
+    let mut store = SNAPSHOTS.lock().unwrap_or_else(PoisonError::into_inner);
+    let response = control::actions::action_response(pending.request(), result, taken, &mut store);
+    drop(store);
+    pending.reply(response);
+}
+
+#[allow(clippy::too_many_arguments)]
+pub fn answer_action_request(
+    reply: &mut ControlReply,
+    status: ffi::ActionStatus,
+    reason: &str,
+    tab: ffi::TabStateRecord,
+    navigated: bool,
+    settled: bool,
+    document: u64,
+    root: i32,
+    focus: i32,
+    source_truncated: bool,
+    nodes: Vec<ffi::AxNodeRecord>,
+) {
+    use control::actions::ActionResult;
+    use ffi::ActionStatus as Status;
+    let reason = reason.to_owned();
+    let result = match status {
+        Status::Done => ActionResult::Done {
+            page: control::snapshot::SnapshotPage {
+                tab: tab_state(tab),
+                document,
+                root,
+                focus,
+                source_truncated,
+                nodes: nodes.into_iter().map(ax_node).collect(),
+            },
+            navigated,
+            settled,
+        },
+        Status::Refused => ActionResult::Refused(control::Outcome::Invalid { reason }),
+        Status::Stale => ActionResult::Refused(control::Outcome::Stale { reason }),
+        _ => ActionResult::Unknown {
+            reason,
+            tab: tab_state(tab),
+            navigated,
+        },
+    };
+    finish_action(reply, result);
+}
+
+pub fn control_action_limits() -> ffi::ActionLimits {
+    use control::actions as limits;
+    ffi::ActionLimits {
+        action_wait_ms: limits::ACTION_WAIT_MS,
+        settle_cap_ms: limits::SETTLE_CAP_MS,
+        snapshot_timeout_ms: limits::ACTION_SNAPSHOT_TIMEOUT_MS,
+        max_select_options: limits::MAX_SELECT_OPTIONS,
+    }
+}
+
 pub fn control_snapshot_timeout_ms() -> u64 {
     control::snapshot::SNAPSHOT_TIMEOUT_MS
 }
@@ -1326,7 +1592,7 @@ pub fn control_snapshot_max_nodes() -> usize {
 }
 
 pub fn refuse_control_request(reply: &mut ControlReply, reason: &str) {
-    if let Some(pending) = reply.0.take() {
+    if let Some(pending) = reply.pending.take() {
         let response = control::deny(pending.request(), reason);
         pending.reply(response);
     }

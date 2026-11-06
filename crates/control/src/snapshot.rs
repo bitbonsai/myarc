@@ -25,7 +25,7 @@
 
 use std::collections::{HashMap, HashSet, VecDeque};
 
-use serde_json::json;
+use serde_json::{Value, json};
 
 use crate::{Outcome, Request, Response, TabState, answer, tab_handle, truncate};
 use myarc_workspace::MAX_TITLE_BYTES;
@@ -85,6 +85,9 @@ pub struct AxNode {
     pub required: bool,
     /// A password field; its value is never shown.
     pub protected: bool,
+    /// Text can be typed into it, as into a text field or an editable root.
+    pub editable: bool,
+    pub read_only: bool,
 }
 
 /// Bounds for one outline. [`Limits::default`] uses the constants above.
@@ -110,13 +113,46 @@ impl Default for Limits {
 }
 
 /// An outline and the node behind each reference: `refs[0]` is the node of
-/// `e1`. `cut` says what was left out or shortened, empty when nothing was.
+/// `e1`, and `targets[0]` what the interaction commands need to know about
+/// it. `cut` says what was left out or shortened, empty when nothing was.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Outline {
     pub text: String,
     pub refs: Vec<i32>,
+    pub targets: Vec<RefTarget>,
     pub lines: usize,
     pub cut: Vec<String>,
+}
+
+/// A referenced node as a snapshot showed it. `node` is its accessibility
+/// ID, which is the page's DOM node ID when positive. `head` is its line up
+/// to the reference and `tail` the rest, so lines compare across snapshots
+/// whatever their reference numbers.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct RefTarget {
+    pub node: i32,
+    /// Chromium's role name, such as `textField`.
+    pub role: String,
+    pub head: String,
+    pub tail: String,
+    pub editable: bool,
+    pub read_only: bool,
+    pub disabled: bool,
+    pub focused: bool,
+}
+
+impl RefTarget {
+    pub(crate) fn bare(node: i32) -> Self {
+        Self {
+            node,
+            ..Self::default()
+        }
+    }
+
+    /// The line as printed with reference `number`.
+    pub fn line(&self, number: usize) -> String {
+        format!("{} [ref=e{number}]{}", self.head, self.tail)
+    }
 }
 
 impl Outline {
@@ -389,6 +425,7 @@ struct Walk<'a> {
     text: String,
     lines: usize,
     refs: Vec<i32>,
+    targets: Vec<RefTarget>,
     /// Text waiting to print, with its depth, so neighbors can join it.
     pending: Option<(usize, String, bool)>,
     full: bool,
@@ -545,7 +582,7 @@ impl Walk<'_> {
             Some(printed) => printed.to_owned(),
             None => fallback_role(&node.role),
         };
-        let mut line = role.clone();
+        let mut head = role.clone();
         // A row's name repeats its cells.
         let (name, name_cut) = if role == "row" {
             (String::new(), false)
@@ -553,24 +590,22 @@ impl Walk<'_> {
             (name, name_cut)
         };
         if !name.is_empty() {
-            line.push(' ');
-            line.push_str(&quote(&name, name_cut));
+            head.push(' ');
+            head.push_str(&quote(&name, name_cut));
         }
         let reference = interactive.then(|| self.refs.len() + 1);
-        if let Some(number) = reference {
-            line.push_str(&format!(" [ref=e{number}]"));
-        }
+        let mut tail = String::new();
         if role == "heading" && node.level > 0 {
-            line.push_str(&format!(" [level={}]", node.level.min(9)));
+            tail.push_str(&format!(" [level={}]", node.level.min(9)));
         }
         match node.checked {
-            Checked::Yes => line.push_str(" [checked]"),
-            Checked::Mixed => line.push_str(" [checked=mixed]"),
+            Checked::Yes => tail.push_str(" [checked]"),
+            Checked::Mixed => tail.push_str(" [checked=mixed]"),
             Checked::No => {}
         }
         match node.expanded {
-            Some(true) => line.push_str(" [expanded]"),
-            Some(false) => line.push_str(" [collapsed]"),
+            Some(true) => tail.push_str(" [expanded]"),
+            Some(false) => tail.push_str(" [collapsed]"),
             None => {}
         }
         for (on, state) in [
@@ -580,29 +615,43 @@ impl Walk<'_> {
             (node.id == self.focus, " [focused]"),
         ] {
             if on {
-                line.push_str(state);
+                tail.push_str(state);
             }
         }
         let mut value_cut = false;
         if shows_value(&role) && !node.protected {
             let (value, cut) = collapse(&node.value, self.limits.max_name_chars);
             if !value.is_empty() || role == "textbox" || role == "searchbox" {
-                line.push_str(" value=");
-                line.push_str(&quote(&value, cut));
+                tail.push_str(" value=");
+                tail.push_str(&quote(&value, cut));
                 value_cut = cut;
             }
         }
         let mut url_cut = false;
         if role == "link" && !node.url.is_empty() {
             let (target, cut) = link_target(&node.url, self.page_url);
-            line.push_str(" -> ");
-            line.push_str(&target);
+            tail.push_str(" -> ");
+            tail.push_str(&target);
             url_cut = cut;
         }
+        let line = match reference {
+            Some(number) => format!("{head} [ref=e{number}]{tail}"),
+            None => format!("{head}{tail}"),
+        };
         if self.emit(depth, &line) {
             if let Some(number) = reference {
                 debug_assert_eq!(number, self.refs.len() + 1);
                 self.refs.push(node.id);
+                self.targets.push(RefTarget {
+                    node: node.id,
+                    role: node.role.clone(),
+                    head,
+                    tail,
+                    editable: node.editable,
+                    read_only: node.read_only,
+                    disabled: node.disabled,
+                    focused: node.id == self.focus,
+                });
             }
             self.names_cut += usize::from(name_cut) + usize::from(value_cut) + usize::from(url_cut);
         }
@@ -660,6 +709,7 @@ pub fn outline(
         text: String::new(),
         lines: 0,
         refs: Vec::new(),
+        targets: Vec::new(),
         pending: None,
         full: false,
         hidden: 0,
@@ -699,6 +749,7 @@ pub fn outline(
     Outline {
         text: walk.text,
         refs: walk.refs,
+        targets: walk.targets,
         lines: walk.lines,
         cut,
     }
@@ -713,7 +764,7 @@ fn revision(document: u64, count: u64) -> String {
 struct Stored {
     document: u64,
     count: u64,
-    refs: Vec<i32>,
+    refs: Vec<RefTarget>,
 }
 
 /// The references of the latest snapshot of each recent document. The
@@ -725,6 +776,16 @@ pub struct SnapshotStore {
     entries: VecDeque<Stored>,
 }
 
+/// The references an action took from the store, so its answer can compare
+/// them with the next snapshot, or [`SnapshotStore::put_back`] can restore
+/// them when the action never ran.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct Taken {
+    pub document: u64,
+    count: u64,
+    pub refs: Vec<RefTarget>,
+}
+
 impl SnapshotStore {
     pub const fn new() -> Self {
         Self {
@@ -733,8 +794,14 @@ impl SnapshotStore {
     }
 
     /// Keeps `refs` as the latest snapshot of `document` and returns its
-    /// revision, which differs from every earlier one.
+    /// revision, which differs from every earlier one. The targets carry
+    /// only the node IDs; see [`SnapshotStore::record_targets`].
     pub fn record(&mut self, document: u64, refs: Vec<i32>) -> String {
+        self.record_targets(document, refs.into_iter().map(RefTarget::bare).collect())
+    }
+
+    /// Like [`SnapshotStore::record`], with what each reference showed.
+    pub fn record_targets(&mut self, document: u64, refs: Vec<RefTarget>) -> String {
         let count = match self.entries.iter().position(|e| e.document == document) {
             Some(position) => self
                 .entries
@@ -753,6 +820,25 @@ impl SnapshotStore {
         revision(document, count)
     }
 
+    /// The latest snapshot of `document`, or `stale` when `revision_text`
+    /// is not its revision.
+    fn latest(&self, document: u64, revision_text: &str) -> Result<&Stored, Outcome> {
+        let Some(entry) = self.entries.iter().find(|e| e.document == document) else {
+            return Err(Outcome::Stale {
+                reason: format!("The page changed since that snapshot; {AGAIN}"),
+            });
+        };
+        if revision(entry.document, entry.count) != revision_text {
+            return Err(Outcome::Stale {
+                reason: format!(
+                    "Revision {:?} is not the latest snapshot of this page; {AGAIN}",
+                    crate::bounded(revision_text)
+                ),
+            });
+        }
+        Ok(entry)
+    }
+
     /// The node behind `element`, such as `e4`, in the latest snapshot of
     /// `document`. `stale` when `revision` is not that snapshot's, for
     /// example after a navigation or a newer snapshot.
@@ -762,38 +848,79 @@ impl SnapshotStore {
         revision_text: &str,
         element: &str,
     ) -> Result<i32, Outcome> {
-        let again = "run page.snapshot again and use its references";
-        let Some(entry) = self.entries.iter().find(|e| e.document == document) else {
-            return Err(Outcome::Stale {
-                reason: format!("The page changed since that snapshot; {again}"),
-            });
-        };
-        if revision(entry.document, entry.count) != revision_text {
-            return Err(Outcome::Stale {
-                reason: format!(
-                    "Revision {:?} is not the latest snapshot of this page; {again}",
-                    crate::bounded(revision_text)
-                ),
-            });
-        }
-        let number = element
-            .strip_prefix('e')
-            .filter(|digits| {
-                !digits.is_empty()
-                    && digits.len() <= 9
-                    && !digits.starts_with('0')
-                    && digits.bytes().all(|byte| byte.is_ascii_digit())
-            })
-            .and_then(|digits| digits.parse::<usize>().ok());
-        number
-            .and_then(|number| entry.refs.get(number - 1).copied())
+        self.target(document, revision_text, element)
+            .map(|target| target.node)
+    }
+
+    /// Like [`SnapshotStore::resolve`], with what the snapshot showed.
+    pub fn target(
+        &self,
+        document: u64,
+        revision_text: &str,
+        element: &str,
+    ) -> Result<&RefTarget, Outcome> {
+        let entry = self.latest(document, revision_text)?;
+        parse_ref(element)
+            .and_then(|number| entry.refs.get(number - 1))
             .ok_or_else(|| Outcome::Invalid {
                 reason: format!(
-                    "Reference {:?} is not in snapshot {revision_text}; use a [ref=eN] from it",
-                    crate::bounded(element)
+                    "Reference {:?} is not in snapshot {}; use a [ref=eN] from it",
+                    crate::bounded(element),
+                    crate::bounded(revision_text)
                 ),
             })
     }
+
+    /// Takes the references of `revision_text`, the latest snapshot of
+    /// `document`, so that revision turns stale: once an action starts, the
+    /// page may differ from what it showed.
+    pub fn take(&mut self, document: u64, revision_text: &str) -> Result<Taken, Outcome> {
+        self.latest(document, revision_text)?;
+        let entry = self
+            .entries
+            .iter_mut()
+            .find(|e| e.document == document)
+            .ok_or_else(|| Outcome::Stale {
+                reason: format!("The page changed since that snapshot; {AGAIN}"),
+            })?;
+        let taken = Taken {
+            document,
+            count: entry.count,
+            refs: std::mem::take(&mut entry.refs),
+        };
+        entry.count = entry.count.saturating_add(1);
+        Ok(taken)
+    }
+
+    /// Restores references taken by an action that never ran, unless a
+    /// newer snapshot of the document came in since.
+    pub fn put_back(&mut self, taken: Taken) {
+        if let Some(entry) = self
+            .entries
+            .iter_mut()
+            .find(|e| e.document == taken.document)
+            && entry.count == taken.count.saturating_add(1)
+            && entry.refs.is_empty()
+        {
+            entry.count = taken.count;
+            entry.refs = taken.refs;
+        }
+    }
+}
+
+const AGAIN: &str = "run page.snapshot again and use its references";
+
+/// The number in a reference such as `e4`.
+pub(crate) fn parse_ref(element: &str) -> Option<usize> {
+    element
+        .strip_prefix('e')
+        .filter(|digits| {
+            !digits.is_empty()
+                && digits.len() <= 9
+                && !digits.starts_with('0')
+                && digits.bytes().all(|byte| byte.is_ascii_digit())
+        })
+        .and_then(|digits| digits.parse::<usize>().ok())
 }
 
 /// A page the browser snapshotted. `document` numbers its main document;
@@ -827,6 +954,16 @@ pub fn snapshot_response(
         SnapshotResult::Done(page) => page,
         SnapshotResult::Failed(outcome) => return answer(req, outcome),
     };
+    let (data, _) = record_page(&page, store);
+    answer(req, Outcome::Success { data })
+}
+
+/// Formats `page`, records its references in `store` and returns the
+/// `page.snapshot` data with the new references.
+pub(crate) fn record_page(
+    page: &SnapshotPage,
+    store: &mut SnapshotStore,
+) -> (Value, Vec<RefTarget>) {
     let outline = outline(
         &page.nodes,
         page.root,
@@ -843,7 +980,8 @@ pub fn snapshot_response(
             ),
         );
     }
-    let revision = store.record(page.document, outline.refs);
+    let targets = outline.targets;
+    let revision = store.record_targets(page.document, targets.clone());
     let mut data = json!({
         "tab": tab_handle(page.tab.item),
         "url": truncate(&page.tab.url, crate::MAX_URL_LENGTH),
@@ -856,5 +994,5 @@ pub fn snapshot_response(
     if !cut.is_empty() {
         data["cut"] = json!(cut.join("; "));
     }
-    answer(req, Outcome::Success { data })
+    (data, targets)
 }

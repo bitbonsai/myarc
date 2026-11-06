@@ -1,0 +1,25 @@
+diff --git a/content/browser/web_contents/web_contents_impl.cc b/content/browser/web_contents/web_contents_impl.cc
+index 788df9dce10886c92e95491f34e54ad874d15b1f..a00d98c6bcefb4c76170f09f04af4e46de6cc0c7 100644
+--- a/content/browser/web_contents/web_contents_impl.cc
++++ b/content/browser/web_contents/web_contents_impl.cc
+@@ -2387,6 +2387,10 @@ class AXTreeSnapshotCombiner : public base::RefCounted<AXTreeSnapshotCombiner> {
+     combiner_.AddTree(snapshot, is_root);
+   }
+ 
++  // The frames all share one renderer process, so their node IDs, which are
++  // DOMNodeIds, stay unique and can be kept.
++  void KeepUniqueIds() { combiner_.set_keep_unique_ids(true); }
++
+   void AXTreeSnapshotOnFrame(RenderFrameHostImpl* rfhi) {
+     OPTIONAL_TRACE_EVENT0("content",
+                           "AXTreeSnapshotCombiner::AXTreeSnapshotOnFrame");
+@@ -2434,6 +2438,9 @@ void WebContentsImpl::RequestAXTreeSnapshot(AXTreeSnapshotCallback callback,
+ 
+   auto combiner = base::MakeRefCounted<AXTreeSnapshotCombiner>(
+       std::move(callback), std::move(params));
++  if (policy == AXTreeSnapshotPolicy::kSameOriginDirectDescendants) {
++    combiner->KeepUniqueIds();
++  }
+   GetPrimaryMainFrame()->ForEachRenderFrameHostImplWithAction(
+       [this, &combiner, policy](RenderFrameHostImpl* rfh) {
+         switch (policy) {

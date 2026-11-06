@@ -13,7 +13,10 @@ class BrowserWorkspaceAdapter;
 // forward and reload answer once the tab's navigation commits, or with
 // outcome_unknown and the latest state when it ends without committing or
 // the wait runs out. Snapshot answers once the page's accessibility
-// snapshot arrives, or with timeout. Waiting never blocks the UI thread.
+// snapshot arrives, or with timeout. Act runs page.click, page.fill,
+// page.select or page.press on the element the latest snapshot showed and
+// answers with the snapshot after the page settles. Waiting never blocks the
+// UI thread.
 void RunTabAction(BrowserWorkspaceAdapter& target,
                   rust::Box<foundation::ControlReply> reply,
                   const foundation::ControlPlan& plan);

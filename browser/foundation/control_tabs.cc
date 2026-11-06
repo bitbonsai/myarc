@@ -4,28 +4,49 @@
 #include <string>
 #include <string_view>
 #include <utility>
+#include <vector>
 
 #include "base/functional/bind.h"
 #include "base/location.h"
 #include "base/memory/weak_ptr.h"
+#include "base/process/kill.h"
+#include "base/strings/strcat.h"
+#include "base/strings/to_string.h"
 #include "base/strings/utf_string_conversions.h"
 #include "base/task/single_thread_task_runner.h"
 #include "base/time/time.h"
 #include "base/timer/timer.h"
+#include "chrome/common/actor.mojom.h"
+#include "chrome/common/chrome_render_frame.mojom.h"
+#include "components/actor/core/task_id.h"
+#include "components/actor/public/mojom/actor_types.mojom.h"
+#include "components/input/native_web_keyboard_event.h"
+#include "components/page_content_annotations/content/mojom/page_stability.mojom.h"
 #include "content/public/browser/browser_thread.h"
 #include "content/public/browser/document_user_data.h"
 #include "content/public/browser/navigation_controller.h"
 #include "content/public/browser/navigation_handle.h"
 #include "content/public/browser/reload_type.h"
 #include "content/public/browser/render_frame_host.h"
+#include "content/public/browser/render_widget_host.h"
 #include "content/public/browser/web_contents.h"
 #include "content/public/browser/web_contents_observer.h"
+#include "mojo/public/cpp/bindings/associated_remote.h"
+#include "mojo/public/cpp/bindings/remote.h"
 #include "myarc/browser_workspace_adapter.h"
+#include "services/service_manager/public/cpp/interface_provider.h"
+#include "third_party/blink/public/common/associated_interfaces/associated_interface_provider.h"
+#include "third_party/blink/public/common/input/web_input_event.h"
+#include "third_party/blink/public/mojom/content_extraction/ai_page_content.mojom.h"
 #include "ui/accessibility/ax_enum_util.h"
 #include "ui/accessibility/ax_mode.h"
 #include "ui/accessibility/ax_node_data.h"
 #include "ui/accessibility/ax_tree_update.h"
 #include "ui/base/page_transition_types.h"
+#include "ui/events/base_event_utils.h"
+#include "ui/events/keycodes/dom/dom_code.h"
+#include "ui/events/keycodes/dom/dom_key.h"
+#include "ui/events/keycodes/dom/keycode_converter.h"
 #include "url/gurl.h"
 
 namespace myarc {
@@ -242,38 +263,54 @@ foundation::AxNodeRecord RecordOf(const ui::AXNodeData& node) {
   record.selected = node.GetBoolAttribute(BoolAttribute::kSelected);
   record.required = node.HasState(State::kRequired);
   record.is_protected = node.HasState(State::kProtected);
+  record.editable = node.HasState(State::kEditable);
+  record.read_only =
+      node.GetRestriction() == ax::mojom::Restriction::kReadOnly;
   return record;
 }
 
-// Takes one accessibility snapshot of a tab's page through
-// WebContents::RequestAXTreeSnapshot and answers page.snapshot with it, or
-// with timeout or stale. The snapshot runs in the renderer without turning
-// on accessibility for the page, opening a debugging port or running page
-// script. Owns itself and deletes itself after answering, in a task of its
-// own.
-class SnapshotWait final : public content::WebContentsObserver {
- public:
-  SnapshotWait(content::WebContents& page,
-               uint64_t item,
-               rust::Box<foundation::ControlReply> reply)
-      : content::WebContentsObserver(&page),
-        item_(item),
-        document_(DocumentOf(page)),
-        reply_(std::move(reply)) {}
+// What one accessibility snapshot of a tab's page collected.
+struct Collected {
+  TabStatus status = TabStatus::Done;
+  std::string reason;
+  // The main document the snapshot is of.
+  uint64_t document = 0;
+  int32_t root = 0;
+  int32_t focus = 0;
+  bool source_truncated = false;
+  rust::Vec<foundation::AxNodeRecord> nodes;
+};
 
-  void Start() {
-    const auto timeout =
-        base::Milliseconds(foundation::control_snapshot_timeout_ms());
+using CollectedCallback = base::OnceCallback<void(Collected)>;
+
+// Takes one accessibility snapshot of a tab's page through
+// WebContents::RequestAXTreeSnapshot and runs `done` with it, or with
+// timeout or stale. The snapshot runs in the renderer without turning on
+// accessibility for the page, opening a debugging port or running page
+// script. Owns itself and deletes itself after `done` ran, in a task of its
+// own.
+//
+// Same-origin frames only: a cross-origin frame's content is another site's,
+// and the agent's scope is this tab's page. Those frames share the page's
+// renderer process, so the combined tree keeps their node IDs, which are
+// DOMNodeIds the interaction commands can act on.
+class SnapshotTaker final : public content::WebContentsObserver {
+ public:
+  SnapshotTaker(content::WebContents& page, CollectedCallback done)
+      : content::WebContentsObserver(&page), done_callback_(std::move(done)) {
+    collected_.document = DocumentOf(page);
+  }
+
+  void Start(base::TimeDelta timeout) {
     timer_.Start(FROM_HERE, timeout,
-                 base::BindOnce(&SnapshotWait::Finish, base::Unretained(this),
+                 base::BindOnce(&SnapshotTaker::Finish, base::Unretained(this),
                                 TabStatus::TimedOut,
                                 "The page did not answer within the snapshot "
                                 "time limit"));
-    // Same-origin frames only: a cross-origin frame's content is another
-    // site's, and the agent's scope is this tab's page. The renderer gets
-    // most of the time limit, so a slow page still answers with what it had.
+    // The renderer gets most of the time limit, so a slow page still answers
+    // with what it had.
     web_contents()->RequestAXTreeSnapshot(
-        base::BindOnce(&SnapshotWait::Received, weak_factory_.GetWeakPtr()),
+        base::BindOnce(&SnapshotTaker::Received, weak_factory_.GetWeakPtr()),
         ui::kAXModeWebContentsOnly, foundation::control_snapshot_max_nodes(),
         timeout * 3 / 4,
         content::WebContents::AXTreeSnapshotPolicy::
@@ -285,18 +322,18 @@ class SnapshotWait final : public content::WebContentsObserver {
     if (done_ || !web_contents()) {
       return;
     }
-    if (DocumentOf(*web_contents()) != document_) {
+    if (DocumentOf(*web_contents()) != collected_.document) {
       Finish(TabStatus::Stale,
              "The page navigated during the snapshot; run page.snapshot "
              "again");
       return;
     }
-    root_ = update.root_id;
-    focus_ = update.has_tree_data ? update.tree_data.focus_id : 0;
-    source_truncated_ =
+    collected_.root = update.root_id;
+    collected_.focus = update.has_tree_data ? update.tree_data.focus_id : 0;
+    collected_.source_truncated =
         update.nodes.size() >= foundation::control_snapshot_max_nodes();
     for (const ui::AXNodeData& node : update.nodes) {
-      nodes_.push_back(RecordOf(node));
+      collected_.nodes.push_back(RecordOf(node));
     }
     Finish(TabStatus::Done, {});
   }
@@ -307,39 +344,501 @@ class SnapshotWait final : public content::WebContentsObserver {
     }
     done_ = true;
     timer_.Stop();
+    collected_.status = status;
+    collected_.reason = std::move(reason);
     base::SingleThreadTaskRunner::GetCurrentDefault()->PostTask(
-        FROM_HERE,
-        base::BindOnce(&SnapshotWait::AnswerAndDelete,
-                       weak_factory_.GetWeakPtr(), status, std::move(reason)));
+        FROM_HERE, base::BindOnce(&SnapshotTaker::RunAndDelete,
+                                  weak_factory_.GetWeakPtr()));
   }
 
   void WebContentsDestroyed() override {
     Finish(TabStatus::Stale, "The tab closed during the snapshot");
   }
 
-  void AnswerAndDelete(TabStatus status, std::string reason) {
+  void RunAndDelete() {
+    CollectedCallback done = std::move(done_callback_);
+    Collected collected = std::move(collected_);
+    delete this;
+    std::move(done).Run(std::move(collected));
+  }
+
+  CollectedCallback done_callback_;
+  Collected collected_;
+  bool done_ = false;
+  base::OneShotTimer timer_;
+  base::WeakPtrFactory<SnapshotTaker> weak_factory_{this};
+};
+
+void TakeSnapshot(content::WebContents& page,
+                  base::TimeDelta timeout,
+                  CollectedCallback done) {
+  (new SnapshotTaker(page, std::move(done)))->Start(timeout);
+}
+
+// Answers page.snapshot with what `TakeSnapshot` collected for `page`.
+void AnswerSnapshot(base::WeakPtr<content::WebContents> page,
+                    uint64_t item,
+                    rust::Box<foundation::ControlReply> reply,
+                    Collected collected) {
+  foundation::TabStateRecord tab{};
+  tab.item = item;
+  if (page) {
+    tab = StateOf(item, *page);
+  }
+  foundation::answer_snapshot_request(
+      *reply, collected.status,
+      rust::Str(collected.reason.data(), collected.reason.size()),
+      std::move(tab), collected.document, collected.root, collected.focus,
+      collected.source_truncated, std::move(collected.nodes));
+}
+
+// One key press on the page's focused element, as raw key down, an
+// optional character and key up, the way a keyboard delivers it.
+void PressKey(content::RenderWidgetHost& widget,
+              const foundation::KeyRecord& key) {
+  const ui::DomCode code =
+      ui::KeycodeConverter::CodeStringToDomCode(std::string(key.code));
+  const bool named = key.text == 0 || std::string(key.key) == "Enter";
+  const ui::DomKey dom_key =
+      named ? ui::KeycodeConverter::KeyStringToDomKey(std::string(key.key))
+            : ui::DomKey::FromCharacter(key.text);
+  const int modifiers = key.shift ? blink::WebInputEvent::kShiftKey : 0;
+  auto event_of = [&](blink::WebInputEvent::Type type) {
+    input::NativeWebKeyboardEvent event(type, modifiers,
+                                        ui::EventTimeForNow());
+    event.windows_key_code = key.key_code;
+    event.native_key_code = ui::KeycodeConverter::DomCodeToNativeKeycode(code);
+    event.dom_code = static_cast<int>(code);
+    event.dom_key = static_cast<uint32_t>(dom_key);
+    if (key.text) {
+      event.text[0] = key.text;
+      event.unmodified_text[0] = key.text;
+    }
+    return event;
+  };
+  widget.ForwardKeyboardEvent(
+      event_of(blink::WebInputEvent::Type::kRawKeyDown));
+  if (key.text) {
+    widget.ForwardKeyboardEvent(event_of(blink::WebInputEvent::Type::kChar));
+  }
+  widget.ForwardKeyboardEvent(event_of(blink::WebInputEvent::Type::kKeyUp));
+}
+
+std::string Describe(const actor::mojom::ActionResult& result) {
+  std::string text = base::ToString(result.code);
+  if (!result.message.empty()) {
+    base::StrAppend(&text, {": ", result.message});
+  }
+  // Page-influenced; keep it short.
+  if (text.size() > 300) {
+    text.resize(300);
+  }
+  return text;
+}
+
+// The options of the select whose DOMNodeId is `node` in `content`, or
+// false when it isn't there.
+bool SelectOptionsOf(const blink::mojom::AIPageContent& content,
+                     int32_t node,
+                     size_t max_options,
+                     rust::Vec<foundation::SelectOptionRecord>& out) {
+  std::vector<const blink::mojom::AIPageContentNode*> stack = {
+      content.root_node.get()};
+  size_t visited = 0;
+  while (!stack.empty() && ++visited < 1'000'000) {
+    const auto* current = stack.back();
+    stack.pop_back();
+    if (!current) {
+      continue;
+    }
+    const auto& attributes = current->content_attributes;
+    if (attributes && attributes->dom_node_id == node) {
+      if (!attributes->form_control_data) {
+        return false;
+      }
+      for (const auto& option :
+           attributes->form_control_data->select_options) {
+        if (out.size() >= max_options) {
+          break;
+        }
+        foundation::SelectOptionRecord record;
+        record.value = rust::String::lossy(option->value.value_or(""));
+        record.text = rust::String::lossy(option->text.value_or(""));
+        record.disabled = option->disabled;
+        out.push_back(std::move(record));
+      }
+      return true;
+    }
+    for (const auto& child : current->children_nodes) {
+      stack.push_back(child.get());
+    }
+  }
+  return false;
+}
+
+// Runs page.click, page.fill, page.select or page.press on an element of the
+// latest snapshot, then waits for the page to settle and answers with a new
+// snapshot. The element is the DOM node the snapshot showed, acted on
+// through the renderer's actor tools (chrome/renderer/actor) on the page's
+// main frame: they scroll the element into view, check it is still there,
+// enabled and not covered, and send real input events. Owns itself and
+// deletes itself after answering.
+class ActionRun final : public content::WebContentsObserver {
+ public:
+  ActionRun(content::WebContents& page,
+            uint64_t item,
+            rust::Box<foundation::ControlReply> reply,
+            foundation::ActionStart start)
+      : content::WebContentsObserver(&page),
+        item_(item),
+        reply_(std::move(reply)),
+        start_(std::move(start)),
+        limits_(foundation::control_action_limits()),
+        task_id_(actor::TaskId(++last_task_id_)) {}
+
+  void Start() {
+    content::RenderFrameHost* frame = web_contents()->GetPrimaryMainFrame();
+    if (!frame->IsRenderFrameLive()) {
+      Finish(foundation::ActionStatus::Refused,
+             "The page is not running; reload it with tab.reload first");
+      return;
+    }
+    frame->GetRemoteAssociatedInterfaces()->GetInterface(&frame_);
+    frame_.set_disconnect_handler(base::BindOnce(&ActionRun::OnFrameGone,
+                                                 base::Unretained(this)));
+    // Before acting, so it sees the requests the action starts.
+    frame_->CreatePageStabilityMonitor(monitor_.BindNewPipeAndPassReceiver(),
+                                       task_id_,
+                                       /*supports_paint_stability=*/false);
+    timer_.Start(FROM_HERE, base::Milliseconds(limits_.action_wait_ms),
+                 base::BindOnce(&ActionRun::OnActionTimeout,
+                                base::Unretained(this)));
+    using Kind = foundation::PageActKind;
+    switch (start_.kind) {
+      case Kind::Click:
+        Initialize(Click());
+        return;
+      case Kind::Fill: {
+        auto type = actor::mojom::TypeAction::New();
+        type->mode = actor::mojom::TypeAction::Mode::kDeleteExisting;
+        type->text = std::string(start_.text);
+        type->follow_by_enter = false;
+        Initialize(actor::mojom::ToolAction::NewType(std::move(type)));
+        return;
+      }
+      case Kind::Select:
+        ReadSelectOptions(*frame);
+        return;
+      case Kind::Press:
+        if (start_.focus_first) {
+          Initialize(Click());
+        } else {
+          Acted();
+        }
+        return;
+      default:
+        Finish(foundation::ActionStatus::Refused, "Unknown page action");
+        return;
+    }
+  }
+
+ private:
+  enum class Phase { kActing, kSettling, kSnapshot };
+
+  static actor::mojom::ToolActionPtr Click() {
+    auto click = actor::mojom::ClickAction::New();
+    click->type = actor::mojom::ClickType::kLeft;
+    click->count = actor::mojom::ClickCount::kSingle;
+    return actor::mojom::ToolAction::NewClick(std::move(click));
+  }
+
+  // Checks the target and scrolls it into view, then runs the action.
+  void Initialize(actor::mojom::ToolActionPtr action) {
+    auto invocation = actor::mojom::ToolInvocation::New();
+    invocation->task_id = task_id_;
+    invocation->action = std::move(action);
+    invocation->target =
+        actor::mojom::ToolTarget::NewDomNodeId(start_.node);
+    frame_->InitializeTool(std::move(invocation),
+                           base::BindOnce(&ActionRun::OnInitialized,
+                                          weak_factory_.GetWeakPtr()));
+  }
+
+  void OnInitialized(actor::mojom::InitializeToolResultPtr result) {
+    if (phase_ != Phase::kActing || done_) {
+      return;
+    }
+    if (result->is_error_result()) {
+      Finish(foundation::ActionStatus::Refused,
+             base::StrCat({"The page refused the action (",
+                           Describe(*result->get_error_result()),
+                           "); take a new page.snapshot"}));
+      return;
+    }
+    frame_->ExecuteTool(task_id_, base::BindOnce(&ActionRun::OnExecuted,
+                                                 weak_factory_.GetWeakPtr()));
+  }
+
+  void OnExecuted(actor::mojom::ActionResultPtr result) {
+    if (phase_ != Phase::kActing || done_) {
+      return;
+    }
+    if (result->code != actor::mojom::ActionResultCode::kOk) {
+      Finish(foundation::ActionStatus::Unknown,
+             base::StrCat({"The action stopped partway (", Describe(*result),
+                           "); take page.snapshot before retrying"}));
+      return;
+    }
+    Acted();
+  }
+
+  // The element action is done; press the key, if any, and settle.
+  void Acted() {
+    if (start_.kind == foundation::PageActKind::Press) {
+      content::RenderWidgetHost* widget =
+          web_contents()->GetPrimaryMainFrame()->GetRenderWidgetHost();
+      if (!widget) {
+        Finish(foundation::ActionStatus::Unknown,
+               "The page went away before the key press");
+        return;
+      }
+      PressKey(*widget, start_.key);
+    }
+    Settle();
+  }
+
+  void ReadSelectOptions(content::RenderFrameHost& frame) {
+    frame.GetRemoteInterfaces()->GetInterface(
+        agent_.BindNewPipeAndPassReceiver());
+    agent_.set_disconnect_handler(
+        base::BindOnce(&ActionRun::Finish, base::Unretained(this),
+                       foundation::ActionStatus::Refused,
+                       "The page did not report the select's options; take "
+                       "a new page.snapshot"));
+    auto options = blink::mojom::AIPageContentOptions::New();
+    options->mode = blink::mojom::AIPageContentMode::kDefault;
+    options->on_critical_path = true;
+    agent_->GetAIPageContent(std::move(options),
+                             base::BindOnce(&ActionRun::OnPageContent,
+                                            weak_factory_.GetWeakPtr()));
+  }
+
+  void OnPageContent(blink::mojom::AIPageContentPtr content) {
+    agent_.reset();
+    if (done_) {
+      return;
+    }
+    rust::Vec<foundation::SelectOptionRecord> options;
+    if (!content || !SelectOptionsOf(*content, start_.node,
+                                     limits_.max_select_options, options)) {
+      Finish(foundation::ActionStatus::Refused,
+             "The select is no longer on the page; take a new page.snapshot");
+      return;
+    }
+    const foundation::ChoiceResult choice =
+        foundation::choose_select_option(*reply_, std::move(options));
+    if (!choice.ok) {
+      // Answered already.
+      done_ = true;
+      base::SingleThreadTaskRunner::GetCurrentDefault()->DeleteSoon(FROM_HERE,
+                                                                    this);
+      return;
+    }
+    auto select = actor::mojom::SelectAction::New();
+    select->value = std::string(choice.value);
+    Initialize(actor::mojom::ToolAction::NewSelect(std::move(select)));
+  }
+
+  void OnActionTimeout() {
+    if (frame_.is_bound()) {
+      frame_->CancelTool(task_id_);
+    }
+    Finish(foundation::ActionStatus::Unknown,
+           "The page did not finish the action in time; take page.snapshot "
+           "before retrying");
+  }
+
+  void OnFrameGone() {
+    frame_.reset();
+    if (phase_ != Phase::kActing) {
+      return;
+    }
+    // A link the click followed replaces the frame.
+    if (navigating_ || navigated_) {
+      Settle();
+      return;
+    }
+    Finish(foundation::ActionStatus::Unknown,
+           "The page went away during the action; take page.snapshot");
+  }
+
+  // Waits for the page to settle: for a started navigation to finish and
+  // the new page to load, or else for the renderer's page stability monitor
+  // to see the network and main thread idle. Gives up after the cap and
+  // snapshots what is there.
+  void Settle() {
+    if (phase_ != Phase::kActing || done_) {
+      return;
+    }
+    phase_ = Phase::kSettling;
+    timer_.Start(FROM_HERE, base::Milliseconds(limits_.settle_cap_ms),
+                 base::BindOnce(&ActionRun::OnSettleTimeout,
+                                base::Unretained(this)));
+    if (monitor_.is_bound() && monitor_.is_connected()) {
+      monitor_.set_disconnect_handler(base::BindOnce(
+          &ActionRun::OnStable, base::Unretained(this)));
+      monitor_->NotifyWhenStable(
+          base::TimeDelta(),
+          base::BindOnce(&ActionRun::OnStable, weak_factory_.GetWeakPtr()));
+    } else {
+      stable_ = true;
+    }
+    MaybeSnapshot();
+  }
+
+  void OnStable() {
+    stable_ = true;
+    monitor_.reset();
+    MaybeSnapshot();
+  }
+
+  void OnSettleTimeout() {
+    settled_ = false;
+    Snapshot();
+  }
+
+  void MaybeSnapshot() {
+    if (phase_ != Phase::kSettling || done_ || navigating_) {
+      return;
+    }
+    if (new_document_ ? loaded_ : stable_) {
+      Snapshot();
+    }
+  }
+
+  void Snapshot() {
+    if (phase_ != Phase::kSettling || done_) {
+      return;
+    }
+    phase_ = Phase::kSnapshot;
+    timer_.Stop();
+    monitor_.reset();
+    if (web_contents()->IsCrashed()) {
+      Finish(foundation::ActionStatus::Unknown,
+             "The page crashed after the action; reload it and take "
+             "page.snapshot");
+      return;
+    }
+    TakeSnapshot(*web_contents(),
+                 base::Milliseconds(limits_.snapshot_timeout_ms),
+                 base::BindOnce(&ActionRun::OnSnapshot,
+                                weak_factory_.GetWeakPtr()));
+  }
+
+  void OnSnapshot(Collected collected) {
+    if (done_) {
+      return;
+    }
+    if (collected.status != TabStatus::Done || !web_contents()) {
+      Finish(foundation::ActionStatus::Unknown,
+             base::StrCat({"The action ran, but the snapshot after it failed (",
+                           collected.reason, "); take page.snapshot"}));
+      return;
+    }
+    done_ = true;
+    foundation::answer_action_request(
+        *reply_, foundation::ActionStatus::Done, {},
+        StateOf(item_, *web_contents()), navigated_, settled_,
+        collected.document, collected.root, collected.focus,
+        collected.source_truncated, std::move(collected.nodes));
+    delete this;
+  }
+
+  void DidStartNavigation(content::NavigationHandle* handle) override {
+    if (handle->IsInPrimaryMainFrame() && !handle->IsSameDocument()) {
+      navigating_ = true;
+    }
+  }
+
+  void DidFinishNavigation(content::NavigationHandle* handle) override {
+    if (!handle->IsInPrimaryMainFrame()) {
+      return;
+    }
+    if (handle->HasCommitted()) {
+      navigated_ = true;
+      if (!handle->IsSameDocument()) {
+        new_document_ = true;
+        loaded_ = !web_contents()->IsLoading();
+      }
+    }
+    if (!handle->IsSameDocument()) {
+      navigating_ = false;
+    }
+    MaybeSnapshot();
+  }
+
+  void DidStopLoading() override {
+    loaded_ = true;
+    MaybeSnapshot();
+  }
+
+  void PrimaryMainFrameRenderProcessGone(
+      base::TerminationStatus status) override {
+    Finish(foundation::ActionStatus::Unknown,
+           "The page crashed during the action; reload it and take "
+           "page.snapshot");
+  }
+
+  void WebContentsDestroyed() override {
+    Finish(foundation::ActionStatus::Unknown,
+           "The tab closed during the action");
+  }
+
+  void Finish(foundation::ActionStatus status, std::string reason) {
+    if (done_) {
+      return;
+    }
+    done_ = true;
+    timer_.Stop();
+    base::SingleThreadTaskRunner::GetCurrentDefault()->PostTask(
+        FROM_HERE,
+        base::BindOnce(&ActionRun::AnswerAndDelete, weak_factory_.GetWeakPtr(),
+                       status, std::move(reason)));
+  }
+
+  void AnswerAndDelete(foundation::ActionStatus status, std::string reason) {
     foundation::TabStateRecord tab{};
     tab.item = item_;
     if (auto* page = web_contents()) {
       tab = StateOf(item_, *page);
     }
-    foundation::answer_snapshot_request(
+    foundation::answer_action_request(
         *reply_, status, rust::Str(reason.data(), reason.size()),
-        std::move(tab), document_, root_, focus_, source_truncated_,
-        std::move(nodes_));
+        std::move(tab), navigated_, settled_, 0, 0, 0, false, {});
     delete this;
   }
 
+  static inline int32_t last_task_id_ = 0;
+
   const uint64_t item_;
-  const uint64_t document_;
   rust::Box<foundation::ControlReply> reply_;
-  int32_t root_ = 0;
-  int32_t focus_ = 0;
-  bool source_truncated_ = false;
-  rust::Vec<foundation::AxNodeRecord> nodes_;
+  const foundation::ActionStart start_;
+  const foundation::ActionLimits limits_;
+  const actor::TaskId task_id_;
+  mojo::AssociatedRemote<chrome::mojom::ChromeRenderFrame> frame_;
+  mojo::Remote<page_content_annotations::mojom::PageStabilityMonitor>
+      monitor_;
+  mojo::Remote<blink::mojom::AIPageContentAgent> agent_;
+  Phase phase_ = Phase::kActing;
+  bool navigating_ = false;
+  bool navigated_ = false;
+  bool new_document_ = false;
+  bool loaded_ = false;
+  bool stable_ = false;
+  bool settled_ = true;
   bool done_ = false;
   base::OneShotTimer timer_;
-  base::WeakPtrFactory<SnapshotWait> weak_factory_{this};
+  base::WeakPtrFactory<ActionRun> weak_factory_{this};
 };
 
 }  // namespace
@@ -446,8 +945,22 @@ void RunTabAction(BrowserWorkspaceAdapter& target,
                "The page crashed; reload it with tab.reload first");
         return;
       }
-      (new SnapshotWait(*page, plan.item, std::move(reply)))->Start();
+      TakeSnapshot(
+          *page,
+          base::Milliseconds(foundation::control_snapshot_timeout_ms()),
+          base::BindOnce(&AnswerSnapshot, page->GetWeakPtr(), plan.item,
+                         std::move(reply)));
       return;
+    case TabActionKind::Act: {
+      foundation::ActionStart start =
+          foundation::begin_page_action(*reply, DocumentOf(*page));
+      if (!start.ok) {
+        return;
+      }
+      (new ActionRun(*page, plan.item, std::move(reply), std::move(start)))
+          ->Start();
+      return;
+    }
     case TabActionKind::Navigate: {
       const GURL url{std::string(plan.url)};
       if (const std::string refusal = Refusal(url); !refusal.empty()) {

@@ -58,7 +58,7 @@ References: [MCP transports](https://modelcontextprotocol.io/specification/2026-
 
 `run` and `mcp` connect to the running browser by default. The browser publishes its control endpoint in `~/Library/Application Support/myarc/control/`, or in `$MYARC_CONTROL_DIR` when that is set. The directory holds `control.json` with the socket path, a token that changes each time the server starts, the server's pid and its protocol version. Clients refuse the endpoint unless the directory (mode 700), the file and the socket (mode 600) belong to the current user and are closed to group and others. Each connection opens with a hello that carries the token, and every message after it is a length-prefixed JSON frame of at most 1 MiB.
 
-The Space commands work everywhere. The tab commands and `page.snapshot` work only in the browser, and `--local` and `serve-local` answer them with `unsupported` because they have no pages. Every other command answers `unsupported`. `myarcctl serve-local` is a development stub that serves an in-memory workspace in place of the browser. That workspace lasts as long as `serve-local` runs, so a Space created by one `run` shows up in the next.
+The Space commands work everywhere. The tab commands, `page.snapshot` and the interaction commands work only in the browser, and `--local` and `serve-local` answer them with `unsupported` because they have no pages. Every other command answers `unsupported`. `myarcctl serve-local` is a development stub that serves an in-memory workspace in place of the browser. That workspace lasts as long as `serve-local` runs, so a Space created by one `run` shows up in the next.
 
 ```sh
 cargo build -p myarcctl
@@ -117,7 +117,20 @@ Links, buttons, form controls and anything focusable or clickable get `[ref=eN]`
 
 Page text is untrusted. Every name, value and text sits inside double quotes, with `"`, `\`, newlines, control characters and bidirectional formatting characters escaped, so a page can't start a line or forge a reference. The outline stops at 2000 lines or 64 KiB, cuts names at 200 characters, clamps indentation at 24 levels and leaves out subtrees deeper than 256. When it cuts anything, `truncated` is true and `cut` says what went.
 
-`revision`, such as `1.2`, changes on every snapshot and whenever the tab's main document changes. The browser keeps the references of the latest revision per document for the interaction commands, which will refuse an older revision as `stale`. The snapshot comes from Chromium's `WebContents::RequestAXTreeSnapshot`, which asks the renderer for a one-time tree of the page and its same-origin frames, at most 5000 nodes per frame, without turning on accessibility, running page script or opening a debugging port. With no answer after 5 seconds the result is `timeout`.
+`revision`, such as `1.2`, changes on every snapshot and whenever the tab's main document changes. The browser keeps the references of the latest revision per document for the interaction commands below. The snapshot comes from Chromium's `WebContents::RequestAXTreeSnapshot`, which asks the renderer for a one-time tree of the page and its same-origin frames, at most 5000 nodes per frame, without turning on accessibility, running page script or opening a debugging port. With no answer after 5 seconds the result is `timeout`.
+
+### Page interaction
+
+`page.click {tab, revision, ref}`, `page.fill {tab, revision, ref, text}`, `page.select {tab, revision, ref, value}` and `page.press {tab, revision, key, ref?}` act on an element of the tab's latest snapshot. `revision` must be that snapshot's and the tab must still show the same document, else the answer is `stale` with "run page.snapshot again". A `ref` the snapshot doesn't hold, such as one written in page text, is `invalid`. The browser never picks a replacement element.
+
+- `click` scrolls the element into view and clicks it with real mouse events, which also focuses it.
+- `fill` replaces the value of an enabled, writable text field. `text` is at most 64 KiB, and newline and tab are its only allowed control characters.
+- `select` picks an option of a native select by value, or else by visible text. An unknown, ambiguous or disabled option is `invalid`.
+- `press` sends one key to the focused element: Enter, Tab, Escape, Backspace, the four arrows, PageUp, PageDown, Home, End, Space or one printable character. With `ref`, the element must be focused already or be a text field, which a click focuses first.
+
+Each snapshot node keeps its DOM node ID, because a same-origin snapshot keeps the renderer's IDs (a small patch to Chromium's tree combiner). The browser acts on that node through Chromium's renderer actor tools on the page's main frame. Those tools check the element is still attached, enabled and not covered before they send input events. Elements in cross-origin frames never get a usable reference.
+
+After the action the browser waits until a started navigation commits and the new page loads, or until the renderer's page stability monitor sees the network and main thread idle, at most 3 seconds. Then it snapshots again and answers `{tab, url, revision, navigated, settled, changes, snapshot}`. `snapshot` has the shape of a `page.snapshot` answer and its revision replaces the old one. `settled` is false when the wait ran out. `changes` lists the references added, removed or changed since the snapshot the action used, unless the tab navigated. A page that refuses the action before anything happened, such as for a hidden element, answers `invalid` and the old revision stays usable. An action that times out, crashes the page or stops partway answers `outcome_unknown`, and nothing retries it.
 
 ## Launch evidence
 

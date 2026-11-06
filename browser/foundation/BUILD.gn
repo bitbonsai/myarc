@@ -20,6 +20,7 @@ rust_static_library("workspace") {
 rust_static_library("control") {
   crate_root = "control/src/lib.rs"
   sources = [
+    "control/src/actions.rs",
     "control/src/ipc.rs",
     "control/src/lib.rs",
     "control/src/snapshot.rs",
@@ -133,17 +134,28 @@ source_set("browser_workspace_adapter") {
     "//chrome/browser/ui/browser_window",
     "//chrome/browser/ui/navigator",
     "//chrome/browser/ui/tabs:tab_strip",
+    "//chrome/common:mojo_bindings",
+    "//components/actor/core:task_id",
+    "//components/actor/public/mojom:mojo_bindings",
     "//components/favicon/core",
     "//components/favicon_base",
     "//components/history/core/browser",
     "//components/history/core/common",
+    "//components/input",
     "//components/keyed_service/core",
+    "//components/page_content_annotations/content/mojom",
     "//components/prefs",
     "//components/sessions",
     "//components/tabs:public",
     "//content/public/browser",
+    "//mojo/public/cpp/bindings",
+    "//services/service_manager/public/cpp",
+    "//third_party/blink/public/common",
+    "//third_party/blink/public/mojom:mojom_platform_headers",
     "//ui/accessibility",
     "//ui/base",
+    "//ui/events:dom_keycode_converter",
+    "//ui/events:events_base",
   ]
 }
 

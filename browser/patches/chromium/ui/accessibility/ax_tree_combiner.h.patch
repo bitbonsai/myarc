@@ -1,0 +1,26 @@
+diff --git a/ui/accessibility/ax_tree_combiner.h b/ui/accessibility/ax_tree_combiner.h
+index 515a9e4405afa3cc435b926a21cafcb36600090d..b495926f4f993e3620c7865e1478f486f2a5832e 100644
+--- a/ui/accessibility/ax_tree_combiner.h
++++ b/ui/accessibility/ax_tree_combiner.h
+@@ -31,6 +31,12 @@ class AX_EXPORT AXTreeCombiner {
+   void AddTree(AXTreeUpdate& tree, bool is_root);
+   bool Combine();
+ 
++  // Keeps the trees' node IDs when no ID repeats across them, as for trees
++  // from one renderer process, whose node IDs are its DOMNodeIds. Otherwise
++  // gives every node a negative ID, which no DOM node has, so a caller can
++  // tell kept IDs from new ones. Call before Combine().
++  void set_keep_unique_ids(bool keep) { keep_unique_ids_ = keep; }
++
+   std::optional<AXTreeUpdate>& combined() { return combined_; }
+   const std::optional<AXTreeUpdate>& combined() const { return combined_; }
+ 
+@@ -43,6 +49,8 @@ class AX_EXPORT AXTreeCombiner {
+   std::vector<AXTreeUpdate> trees_;
+   AXTreeID root_tree_id_;
+   AXNodeID next_id_ = 1;
++  bool keep_unique_ids_ = false;
++  bool keep_ids_ = false;
+   std::map<std::pair<AXTreeID, AXNodeID>, AXNodeID> tree_id_node_id_map_;
+   std::optional<AXTreeUpdate> combined_;
+ };

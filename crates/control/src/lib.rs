@@ -12,7 +12,10 @@
 //! command into a [`TabAction`] scoped to the agent Space, which the browser
 //! runs and answers later with [`tab_response`]. `page.snapshot` becomes
 //! [`TabAction::Snapshot`] the same way, and [`snapshot`] formats the page's
-//! accessibility tree into the answer. Commands not built yet are
+//! accessibility tree into the answer. `page.click`, `page.fill`,
+//! `page.select` and `page.press` become [`TabAction::Act`], which
+//! [`actions`] checks against the latest snapshot and answers with a new
+//! one. Commands not built yet are
 //! listed in the registry with `implemented: false` and answer `Unsupported`.
 //! Requests are untrusted: strings are bounded, unknown parameters are
 //! rejected and no input panics.
@@ -22,6 +25,7 @@
 
 use std::sync::OnceLock;
 
+pub mod actions;
 #[cfg(unix)]
 pub mod ipc;
 pub mod snapshot;
@@ -226,6 +230,9 @@ pub enum TabAction {
     Snapshot {
         item: ItemId,
     },
+    /// Act on an element of the latest snapshot and answer with
+    /// [`actions::action_response`].
+    Act(actions::PageAction),
 }
 
 /// Like [`dispatch`] for a host with live pages, such as the browser. Space
@@ -299,7 +306,7 @@ fn run(workspace: &mut Workspace, window_id: WindowId, req: &Request, live: bool
 
 /// Areas whose commands act on live pages.
 fn on_pages(area: Area) -> bool {
-    matches!(area, Area::Tabs | Area::Observation)
+    matches!(area, Area::Tabs | Area::Observation | Area::Interaction)
 }
 
 fn no_pages(command: &str) -> String {
@@ -399,6 +406,9 @@ fn tab_action(
                 .map_err(|error| invalid(workspace_error(error)))?;
             Ok(TabAction::Open { space_id, url })
         }
+        "page.click" | "page.fill" | "page.select" | "page.press" => {
+            page_action(workspace, command, params).map(TabAction::Act)
+        }
         "tab.navigate" => {
             let params = Params::parse(params, &["tab", "url"]).map_err(invalid)?;
             let item = agent_tab(workspace, &params)?;
@@ -421,6 +431,57 @@ fn tab_action(
             }
         }
     }
+}
+
+/// Checks the parameters of an interaction command.
+fn page_action(
+    workspace: &Workspace,
+    command: &str,
+    params: &Value,
+) -> Result<actions::PageAction, Outcome> {
+    use actions::ActKind;
+    let extra: &[&str] = match command {
+        "page.fill" => &["tab", "revision", "ref", "text"],
+        "page.select" => &["tab", "revision", "ref", "value"],
+        "page.press" => &["tab", "revision", "ref", "key"],
+        _ => &["tab", "revision", "ref"],
+    };
+    let params = Params::parse(params, extra).map_err(invalid)?;
+    let item = agent_tab(workspace, &params)?;
+    let revision = params.text("revision", MAX_QUOTED_BYTES).map_err(invalid)?;
+    actions::check_revision(revision).map_err(invalid)?;
+    let element = if command == "page.press" && params.get("ref").is_err() {
+        None
+    } else {
+        let element = params.text("ref", MAX_QUOTED_BYTES).map_err(invalid)?;
+        actions::check_ref(element).map_err(invalid)?;
+        Some(element.to_owned())
+    };
+    let kind = match command {
+        "page.fill" => {
+            let text = params
+                .text("text", actions::MAX_FILL_BYTES)
+                .map_err(invalid)?;
+            actions::check_fill_text(text).map_err(invalid)?;
+            ActKind::Fill {
+                text: text.to_owned(),
+            }
+        }
+        "page.select" => ActKind::Select {
+            value: params.string("value").map_err(invalid)?.to_owned(),
+        },
+        "page.press" => ActKind::Press {
+            key: actions::parse_key(params.text("key", MAX_QUOTED_BYTES).map_err(invalid)?)
+                .map_err(invalid)?,
+        },
+        _ => ActKind::Click,
+    };
+    Ok(actions::PageAction {
+        item,
+        revision: revision.to_owned(),
+        element,
+        kind,
+    })
 }
 
 fn space_of(placement: Placement) -> Option<SpaceId> {
@@ -526,6 +587,11 @@ fn answer(req: &Request, outcome: Outcome) -> Response {
         command: bounded(&req.command).to_owned(),
         outcome,
     }
+}
+
+/// Answers `req` with `outcome`, for a host that finished a request itself.
+pub fn answer_outcome(req: &Request, outcome: Outcome) -> Response {
+    answer(req, outcome)
 }
 
 /// Answers `req` with `denied` without running it, for a host that can't run
@@ -895,57 +961,57 @@ fn build_registry() -> Vec<CommandSpec> {
         spec(
             "page.click",
             Interaction,
-            "Click an element from the current snapshot",
+            "Click an element of the latest page.snapshot after scrolling it into view, wait for the page to settle and answer with a new snapshot",
             schema(
                 json!({ "tab": tab_param(), "revision": revision(), "ref": element_ref() }),
                 &["tab", "revision", "ref"],
             ),
-            false,
+            true,
         ),
         spec(
             "page.fill",
             Interaction,
-            "Fill a text field from the current snapshot",
+            "Replace the value of a text field of the latest page.snapshot and answer with a new snapshot",
             schema(
                 json!({
                     "tab": tab_param(),
                     "revision": revision(),
                     "ref": element_ref(),
-                    "value": text("Text to enter", MAX_STRING_PARAM_BYTES),
+                    "text": text("Text to type, replacing the field's value", actions::MAX_FILL_BYTES),
                 }),
-                &["tab", "revision", "ref", "value"],
+                &["tab", "revision", "ref", "text"],
             ),
-            false,
+            true,
         ),
         spec(
             "page.select",
             Interaction,
-            "Choose an option in a select element from the current snapshot",
+            "Choose an option of a select element of the latest page.snapshot and answer with a new snapshot",
             schema(
                 json!({
                     "tab": tab_param(),
                     "revision": revision(),
                     "ref": element_ref(),
-                    "value": text("Option value to choose", MAX_STRING_PARAM_BYTES),
+                    "value": text("The option's value or visible text", MAX_STRING_PARAM_BYTES),
                 }),
                 &["tab", "revision", "ref", "value"],
             ),
-            false,
+            true,
         ),
         spec(
             "page.press",
             Interaction,
-            "Press a key, optionally on an element from the current snapshot",
+            "Press a key in the focused element, or in a text field of the latest page.snapshot after focusing it, and answer with a new snapshot",
             schema(
                 json!({
                     "tab": tab_param(),
                     "revision": revision(),
                     "ref": element_ref(),
-                    "key": text("Key name, such as Enter or Tab", MAX_QUOTED_BYTES),
+                    "key": text("Enter, Tab, Escape, Backspace, ArrowUp, ArrowDown, ArrowLeft, ArrowRight, PageUp, PageDown, Home, End, Space or one printable character", MAX_QUOTED_BYTES),
                 }),
                 &["tab", "revision", "key"],
             ),
-            false,
+            true,
         ),
         spec(
             "page.scroll",
