@@ -1701,6 +1701,30 @@ foundation::MutationResult BrowserWorkspaceAdapter::Open(const GURL& url,
   return Remember(Ok(item));
 }
 
+uint64_t BrowserWorkspaceAdapter::AgentSpaceOf(
+    content::WebContents& page) const {
+  const uint64_t item = ItemIdForContents(page);
+  if (!item || !ready() || page.GetBrowserContext() != profile_)
+    return 0;
+  const auto state = service_->ExportSnapshot();
+  const auto* row = state ? FindItem(*state, item) : nullptr;
+  if (!row || row->placement == foundation::PlacementKind::Favorite)
+    return 0;
+  const bool agent =
+      std::ranges::any_of(state->spaces, [row](const auto& space) {
+        return space.agent && space.id == row->owner_id;
+      });
+  return agent ? row->owner_id : 0;
+}
+
+void BrowserWorkspaceAdapter::AdoptAgentTab(content::WebContents& contents,
+                                            uint64_t space) {
+  if (!space || contents.GetBrowserContext() != profile_ ||
+      Binding::Get(contents))
+    return;
+  Remember(Binding::Set(contents, 0, space));
+}
+
 foundation::MutationResult BrowserWorkspaceAdapter::CloseItem(uint64_t item) {
   if (!ready())
     return Fail(error());

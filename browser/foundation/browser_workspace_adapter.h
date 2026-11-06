@@ -135,6 +135,13 @@ class BrowserWorkspaceAdapter final : public TabStripModelObserver {
   // selects `space`.
   foundation::MutationResult OpenWithoutSwitching(const GURL& url,
                                                   uint64_t space);
+  // The agent Space whose tab `page` is, or 0. Navigate opens the tabs and
+  // popups such a page opens as background tabs there.
+  uint64_t AgentSpaceOf(content::WebContents& page) const;
+  // Binds `contents`, a tab an agent Space page opened, to that Space before
+  // it is inserted, so binding gives it an item there rather than in the
+  // Space the window shows.
+  void AdoptAgentTab(content::WebContents& contents, uint64_t space);
   foundation::MutationResult ActivateItem(uint64_t item);
   // ActivateItem when this window shows the item's Space; otherwise makes
   // it the item the window shows when it next selects that Space.

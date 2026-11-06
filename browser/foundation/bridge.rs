@@ -9,11 +9,17 @@ pub struct Workspace(workspace::Workspace);
 
 // One request from a control client, or none once the host has stopped.
 // An interaction command also carries its checked action and, once the
-// browser began it, the snapshot references it took.
+// browser began it, the snapshot references it took. `profile` is the tag of
+// the Profile it runs in, which its tab handles carry.
+//
+// Chromium builds Rust with panic=abort, so a panic here would end the
+// browser and catch_unwind can't stop it. Request handling therefore never
+// unwraps, indexes or slices on request or page data.
 pub struct ControlReply {
     pending: Option<control::ipc::Pending>,
     action: Option<control::actions::PageAction>,
     taken: Option<control::snapshot::Taken>,
+    profile: String,
 }
 
 // All records own their buffers. Calls are synchronous on the browser UI sequence;
@@ -278,6 +284,9 @@ mod ffi {
         Stale,
         // It may or may not have happened.
         Unknown,
+        // Nothing ran before the time limit, such as while reading a
+        // select's options.
+        TimedOut,
     }
 
     struct ActionLimits {
@@ -463,7 +472,8 @@ mod ffi {
         // False when the client already got timeout or cancelled; drop it.
         fn control_request_live(reply: &ControlReply) -> bool;
         // UI thread: runs the request against `workspace` as seen from
-        // `window_id`. A Space command is answered at once and leaves `reply`
+        // `window_id`, in the Profile whose directory is `profile`, such as
+        // "Default" or "Profile 1". A Space command is answered at once and leaves `reply`
         // empty. A tab command that passed its checks keeps the request in
         // `reply` and names the action; the caller runs it and answers with
         // answer_tab_request, now or later.
@@ -471,6 +481,7 @@ mod ffi {
             reply: &mut ControlReply,
             workspace: &mut Workspace,
             window_id: u64,
+            profile: &str,
         ) -> ControlPlan;
         // Answers a tab command kept by answer_control_request. `tabs` holds
         // the tab afterwards, or each live tab for List.
@@ -1243,6 +1254,7 @@ pub fn next_control_request(epoch: u64) -> Box<ControlReply> {
         pending: host.and_then(|host| host.next()),
         action: None,
         taken: None,
+        profile: String::new(),
     })
 }
 
@@ -1261,6 +1273,7 @@ pub fn answer_control_request(
     reply: &mut ControlReply,
     workspace: &mut Workspace,
     window_id: u64,
+    profile: &str,
 ) -> ffi::ControlPlan {
     use control::TabAction;
     use ffi::TabActionKind as Kind;
@@ -1275,8 +1288,11 @@ pub fn answer_control_request(
     let Some(pending) = reply.pending.take() else {
         return plan;
     };
+    reply.profile = control::profile_tag(profile);
     let before = workspace.0.snapshot();
-    let routed = control::route(&mut workspace.0, window_id, pending.request());
+    let routed = control::in_profile(&reply.profile, || {
+        control::route(&mut workspace.0, window_id, pending.request())
+    });
     plan.changed = workspace.0.snapshot() != before;
     let action = match routed {
         control::Routed::Answered(response) => {
@@ -1331,7 +1347,9 @@ pub fn answer_tab_request(
         Status::NotCommitted => control::TabResult::Unknown { reason, tabs },
         other => control::TabResult::Failed(failure(other, reason)),
     };
-    let response = control::tab_response(pending.request(), result);
+    let response = control::in_profile(&reply.profile, || {
+        control::tab_response(pending.request(), result)
+    });
     pending.reply(response);
 }
 
@@ -1394,7 +1412,9 @@ pub fn answer_snapshot_request(
         SnapshotResult::Failed(failure(status, reason.to_owned()))
     };
     let mut store = SNAPSHOTS.lock().unwrap_or_else(PoisonError::into_inner);
-    let response = control::snapshot::snapshot_response(pending.request(), result, &mut store);
+    let response = control::in_profile(&reply.profile, || {
+        control::snapshot::snapshot_response(pending.request(), result, &mut store)
+    });
     drop(store);
     pending.reply(response);
 }
@@ -1530,7 +1550,9 @@ fn finish_action(reply: &mut ControlReply, result: control::actions::ActionResul
     };
     let taken = reply.taken.take().unwrap_or_default();
     let mut store = SNAPSHOTS.lock().unwrap_or_else(PoisonError::into_inner);
-    let response = control::actions::action_response(pending.request(), result, taken, &mut store);
+    let response = control::in_profile(&reply.profile, || {
+        control::actions::action_response(pending.request(), result, taken, &mut store)
+    });
     drop(store);
     pending.reply(response);
 }
@@ -1567,6 +1589,7 @@ pub fn answer_action_request(
         },
         Status::Refused => ActionResult::Refused(control::Outcome::Invalid { reason }),
         Status::Stale => ActionResult::Refused(control::Outcome::Stale { reason }),
+        Status::TimedOut => ActionResult::Refused(control::Outcome::Timeout),
         _ => ActionResult::Unknown {
             reason,
             tab: tab_state(tab),

@@ -1,8 +1,36 @@
 diff --git a/chrome/browser/ui/navigator/browser_navigator.cc b/chrome/browser/ui/navigator/browser_navigator.cc
-index d5d5691f0b7dfdb1a8cc5671537826262c96addd..62ab5d02e84ed1ebf89419e2c0a9360493361621 100644
+index d5d5691f0b7dfdb1a8cc5671537826262c96addd..b41c100b5080ce43f4b96444969743cc2d154ec3 100644
 --- a/chrome/browser/ui/navigator/browser_navigator.cc
 +++ b/chrome/browser/ui/navigator/browser_navigator.cc
-@@ -806,8 +806,19 @@ base::WeakPtr<content::NavigationHandle> NavigateImpl(
+@@ -781,6 +781,27 @@ base::WeakPtr<content::NavigationHandle> NavigateImpl(
+   }
+ #endif
+ 
++  // A myArc agent Space page opens its new tabs and popups as background
++  // tabs of its own window, bound to the agent Space, so they never take
++  // focus or switch the user's Space.
++  BrowserWindow* myarc_window =
++      source_browser ? BrowserWindow::FromBrowser(source_browser) : nullptr;
++  uint64_t myarc_agent_space = 0;
++  if (myarc_window && params->source_contents &&
++      (params->disposition == WindowOpenDisposition::kNewForegroundTab ||
++       params->disposition == WindowOpenDisposition::kNewBackgroundTab ||
++       params->disposition == WindowOpenDisposition::kNewPopup ||
++       params->disposition == WindowOpenDisposition::kNewWindow)) {
++    myarc_agent_space =
++        myarc_window->GetMyarcAgentSpaceOf(*params->source_contents);
++  }
++  if (myarc_agent_space) {
++    params->disposition = WindowOpenDisposition::kNewBackgroundTab;
++    params->window_action = NavigateParams::WindowAction::kNoAction;
++    params->tabstrip_add_types &= ~(AddTabTypes::ADD_ACTIVE |
++                                    AddTabTypes::ADD_INHERIT_OPENER);
++  }
++
+   if (!AdjustNavigateParamsForURL(params)) {
+     return nullptr;
+   }
+@@ -806,8 +827,19 @@ base::WeakPtr<content::NavigationHandle> NavigateImpl(
    // has a chance to replace |params->browser| with another one, but after the
    // above check that relies on the original source_contents value.
    if (!params->source_contents && params->browser) {
@@ -24,7 +52,7 @@ index d5d5691f0b7dfdb1a8cc5671537826262c96addd..62ab5d02e84ed1ebf89419e2c0a93604
    }
  
    WebContents* contents_to_navigate_or_insert =
-@@ -1087,7 +1098,8 @@ base::WeakPtr<content::NavigationHandle> NavigateImpl(
+@@ -1087,10 +1119,16 @@ base::WeakPtr<content::NavigationHandle> NavigateImpl(
      DCHECK(tab_to_insert);
      std::optional<tab_groups::TabGroupId> group = params->group;
      if (!(params->tabstrip_add_types & AddTabTypes::ADD_PINNED)) {
@@ -34,3 +62,11 @@ index d5d5691f0b7dfdb1a8cc5671537826262c96addd..62ab5d02e84ed1ebf89419e2c0a93604
          group = params->browser->GetTabStripModel()->GetFocusedGroup();
        }
      }
++    if (myarc_agent_space && params->browser == source_browser &&
++        contents_to_navigate_or_insert) {
++      myarc_window->AdoptMyarcAgentTab(*contents_to_navigate_or_insert,
++                                       myarc_agent_space);
++    }
+     // The navigation should insert a new tab into the target Browser.
+     params->browser->GetTabStripModel()->AddTab(
+         std::move(tab_to_insert), params->tabstrip_index, params->transition,

@@ -1,5 +1,5 @@
 diff --git a/chrome/browser/ui/views/frame/browser_view.cc b/chrome/browser/ui/views/frame/browser_view.cc
-index 7b568f6de760af21d6e9d2aa44415a7cef617c51..4e781bf5deb9ee4ab3e38ff22f1bc83581553f81 100644
+index 7b568f6de760af21d6e9d2aa44415a7cef617c51..c755975398b3c97493cdb2cdc1f20f991b892c55 100644
 --- a/chrome/browser/ui/views/frame/browser_view.cc
 +++ b/chrome/browser/ui/views/frame/browser_view.cc
 @@ -22,6 +22,7 @@
@@ -1550,7 +1550,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..4e781bf5deb9ee4ab3e38ff22f1bc835
  
      if (dialog_anchor_) {
        rect.Offset(0, -kAdditionalDialogToolbarOverlap);
-@@ -5197,75 +6391,2356 @@ void BrowserView::AddedToWidget() {
+@@ -5197,75 +6391,2369 @@ void BrowserView::AddedToWidget() {
        kFallbackPopupAnchorElementId, *this);
  
    initialized_ = true;
@@ -2038,6 +2038,19 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..4e781bf5deb9ee4ab3e38ff22f1bc835
 +bool BrowserView::IsMyarcWorkspaceBlank() const {
 +  return myarc_workspace_adapter_ && myarc_workspace_adapter_->ready() &&
 +         !myarc_workspace_adapter_->DisplayedContents();
++}
++
++uint64_t BrowserView::GetMyarcAgentSpaceOf(content::WebContents& source) {
++  return myarc_workspace_adapter_
++             ? myarc_workspace_adapter_->AgentSpaceOf(source)
++             : 0;
++}
++
++void BrowserView::AdoptMyarcAgentTab(content::WebContents& contents,
++                                     uint64_t space) {
++  if (myarc_workspace_adapter_) {
++    myarc_workspace_adapter_->AdoptAgentTab(contents, space);
++  }
 +}
 +
 +void BrowserView::RevealMyarcActiveTab() {
@@ -3948,7 +3961,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..4e781bf5deb9ee4ab3e38ff22f1bc835
  
  bool BrowserView::AcceleratorPressed(const ui::Accelerator& accelerator) {
  #if BUILDFLAG(IS_MAC)
-@@ -5342,7 +8817,8 @@ void BrowserView::LoadingAnimationCallback(base::TimeTicks timestamp) {
+@@ -5342,7 +8830,8 @@ void BrowserView::LoadingAnimationCallback(base::TimeTicks timestamp) {
      // GetActiveWebContents can return null for example under Purify when
      // the animations are running slowly and this function is called on a timer
      // through LoadingAnimationCallback.
@@ -3958,7 +3971,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..4e781bf5deb9ee4ab3e38ff22f1bc835
    }
  }
  
-@@ -5471,6 +8947,10 @@ bool BrowserView::MaybeUpdateDevtools(content::WebContents* contents) {
+@@ -5471,6 +8960,10 @@ bool BrowserView::MaybeUpdateDevtools(content::WebContents* contents) {
  
  void BrowserView::UpdateUIForContents(WebContents* contents,
                                        bool should_layout_immediately) {
@@ -3969,7 +3982,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..4e781bf5deb9ee4ab3e38ff22f1bc835
    TRACE_EVENT0("ui", "BrowserView::UpdateUIForContents");
    bool needs_layout = MaybeShowBookmarkBar(contents);
  
-@@ -5706,6 +9186,26 @@ void BrowserView::LoadAccelerators() {
+@@ -5706,6 +9199,26 @@ void BrowserView::LoadAccelerators() {
    }
  
  #if BUILDFLAG(IS_MAC)

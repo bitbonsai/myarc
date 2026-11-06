@@ -23,6 +23,7 @@
 //! On Unix, `ipc` carries requests from a client process to the service hosted
 //! by a running browser over an authenticated same-user socket.
 
+use std::cell::RefCell;
 use std::sync::OnceLock;
 
 pub mod actions;
@@ -312,15 +313,76 @@ fn no_pages(command: &str) -> String {
     )
 }
 
-/// Stable handle of a tab, valid while its item lives.
-pub fn tab_handle(item: ItemId) -> String {
-    format!("t{item}")
+thread_local! {
+    /// Tag of the Profile the current request runs in; see [`in_profile`].
+    static PROFILE: RefCell<String> = const { RefCell::new(String::new()) };
 }
 
-/// The item a handle from [`tab_handle`] names, or `None` when `handle` is
-/// not one.
+/// Short tag of a Chromium Profile directory for tab handles: empty for
+/// `Default`, `p<n>` for `Profile <n>`, and `x` with 16 hex digits of a
+/// stable hash for any other name.
+pub fn profile_tag(directory: &str) -> String {
+    if directory == "Default" {
+        return String::new();
+    }
+    if let Some(digits) = directory.strip_prefix("Profile ")
+        && let Ok(number) = digits.parse::<u32>()
+        && number.to_string() == digits
+    {
+        return format!("p{number}");
+    }
+    // FNV-1a: the same on every run and platform.
+    let hash = directory
+        .bytes()
+        .fold(0xcbf2_9ce4_8422_2325_u64, |hash, byte| {
+            (hash ^ u64::from(byte)).wrapping_mul(0x0100_0000_01b3)
+        });
+    format!("x{hash:016x}")
+}
+
+/// Runs `f` for the Profile whose [`profile_tag`] is `tag`. Handles that
+/// [`tab_handle`] prints inside `f` carry the tag, and the tab commands
+/// [`route`] checks inside `f` take only handles with that tag. A browser
+/// with several Profiles runs each request this way, so a handle never
+/// reaches a tab of another Profile.
+pub fn in_profile<R>(tag: &str, f: impl FnOnce() -> R) -> R {
+    struct Restore(String);
+    impl Drop for Restore {
+        fn drop(&mut self) {
+            PROFILE.with(|current| *current.borrow_mut() = std::mem::take(&mut self.0));
+        }
+    }
+    let _restore = Restore(PROFILE.with(|current| current.replace(tag.to_owned())));
+    f()
+}
+
+/// Stable handle of a tab, valid while its item lives: `t12` in the
+/// `Default` Profile and `t12-p1` in `Profile 1`; see [`in_profile`].
+pub fn tab_handle(item: ItemId) -> String {
+    PROFILE.with(|tag| {
+        let tag = tag.borrow();
+        if tag.is_empty() {
+            format!("t{item}")
+        } else {
+            format!("t{item}-{tag}")
+        }
+    })
+}
+
+/// The item a handle from [`tab_handle`] names, in any Profile, or `None`
+/// when `handle` is not one.
 pub fn parse_tab_handle(handle: &str) -> Option<ItemId> {
-    let digits = handle.strip_prefix('t')?;
+    split_tab_handle(handle).map(|(item, _)| item)
+}
+
+/// The item and Profile tag of a handle from [`tab_handle`].
+fn split_tab_handle(handle: &str) -> Option<(ItemId, &str)> {
+    let rest = handle.strip_prefix('t')?;
+    let (digits, tag) = match rest.split_once('-') {
+        Some((_, tag)) if !is_profile_tag(tag) => return None,
+        Some(split) => split,
+        None => (rest, ""),
+    };
     if digits.is_empty()
         || digits.len() > 20
         || digits.starts_with('0')
@@ -328,7 +390,22 @@ pub fn parse_tab_handle(handle: &str) -> Option<ItemId> {
     {
         return None;
     }
-    digits.parse().ok()
+    Some((digits.parse().ok()?, tag))
+}
+
+/// Whether `tag` is a non-empty tag [`profile_tag`] can give.
+fn is_profile_tag(tag: &str) -> bool {
+    if let Some(digits) = tag.strip_prefix('p') {
+        return digits
+            .parse::<u32>()
+            .is_ok_and(|number| number.to_string() == digits);
+    }
+    tag.strip_prefix('x').is_some_and(|hex| {
+        hex.len() == 16
+            && hex
+                .bytes()
+                .all(|byte| matches!(byte, b'0'..=b'9' | b'a'..=b'f'))
+    })
 }
 
 /// Checks a URL an agent asked to load. It must be at most
@@ -491,12 +568,19 @@ fn space_of(placement: Placement) -> Option<SpaceId> {
 /// `denied` when it is not in the agent Space.
 fn agent_tab(workspace: &Workspace, params: &Params) -> Result<ItemId, Outcome> {
     let handle = params.string("tab").map_err(invalid)?;
-    let Some(item) = parse_tab_handle(handle) else {
+    let Some((item, tag)) = split_tab_handle(handle) else {
         return Err(invalid(format!(
             "Tab handle {:?} is not a handle from tabs.list, such as t12",
             bounded(handle)
         )));
     };
+    if !PROFILE.with(|current| *current.borrow() == tag) {
+        return Err(Outcome::Denied {
+            reason: format!(
+                "Tab {handle} belongs to another Profile than the one browser control uses; run tabs.list for this Profile's handles"
+            ),
+        });
+    }
     let Some(found) = workspace.items().iter().find(|found| found.id == item) else {
         return Err(Outcome::Stale {
             reason: format!("Tab {handle} is closed or unknown; run tabs.list for current handles"),

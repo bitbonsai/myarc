@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-11-06: Browser control review fixes
+
+- Tab handles now name their Profile (`t12` in Default, `t12-p1` in Profile 1), the host stays in the Profile of its first request, and a handle from another Profile answers `denied`. Pages in the agent Space open `window.open` and `target=_blank` tabs as background agent tabs through a new `Navigate` hook. `page.press` refuses keys while focus sits in a frame the snapshot leaves out, a `select` whose options never arrive answers `timeout` with its revision intact, and crash answers carry the renderer's termination status and exit code.
+- Chromium builds Rust with `-Cpanic=abort`, so `catch_unwind` at the cxx boundary can't help. I checked the request paths in `bridge.rs` and the control crate for unwraps, indexing and slicing on untrusted data and found none that can panic. The dogfood crash reproduced once in three rounds of fill, 12 s idle, click, as `status=crashed, exit=6`: the renderer got SIGABRT, and no crash report was written, so the cause is still open.
+- Verification: a live background run (`/tmp/myarc-review-fixes/transcript.md`, outside the repo) showed three popups listed as agent tabs while the user's Space stayed selected, a press into a cross-origin frame on a second port answering `invalid`, the select timeout followed by a working select on the same revision, and a Profile 1 handle denied after a Profile 1 window opened. `chrome` and `bridge_check` build, and `bridge_check`, `cargo fmt --check`, `rustfmt --check` on `bridge.rs`, `cargo clippy -D warnings`, `cargo test` (292 tests), `export_patches.py --check` and `check_docs.py` pass.
+
 ## 2026-11-06: Review fixes for the control socket, CLI state and outline escaping
 
 - `cli-state.json` now lives inside the control directory, which must be the user's with mode 700, so `MYARC_CONTROL_DIR=/tmp/myarc-control` no longer puts it in `/tmp`. It is written through a `create_new` file with a random name and mode 600, then renamed, and a symlinked or foreign state file reads as empty with a warning. `Server::bind` creates a missing directory with mode 700 but refuses an existing one open to group or others instead of changing it.

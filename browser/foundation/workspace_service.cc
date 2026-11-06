@@ -704,7 +704,8 @@ foundation::ControlPlan WorkspaceService::AnswerControlRequest(
         reply, "Workspace is not loaded yet; retry shortly");
     return {};
   }
-  auto plan = foundation::answer_control_request(reply, *workspace_, window);
+  auto plan = foundation::answer_control_request(reply, *workspace_, window,
+                                                 profile_dir_);
   if (plan.changed)
     SpacesChanged(foundation::MutationResult{true, 0, {}});
   return plan;

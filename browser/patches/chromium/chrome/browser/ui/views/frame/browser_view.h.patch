@@ -1,5 +1,5 @@
 diff --git a/chrome/browser/ui/views/frame/browser_view.h b/chrome/browser/ui/views/frame/browser_view.h
-index 750e46c97b64dccccf4268e912df5dbdb6516b3c..94326ec9fa66a44ecb189620cd2a7f383b7ade8f 100644
+index 750e46c97b64dccccf4268e912df5dbdb6516b3c..c2151a2185c3580350819530f6e80b5227a63dcd 100644
 --- a/chrome/browser/ui/views/frame/browser_view.h
 +++ b/chrome/browser/ui/views/frame/browser_view.h
 @@ -8,11 +8,13 @@
@@ -80,7 +80,7 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..94326ec9fa66a44ecb189620cd2a7f38
    std::optional<int> theme_background_y_offset() const {
      return theme_background_y_offset_;
    }
-@@ -311,6 +332,34 @@ class BrowserView : public BrowserWindow,
+@@ -311,6 +332,37 @@ class BrowserView : public BrowserWindow,
  
    ScrimView* window_scrim_view() { return window_scrim_view_; }
  
@@ -104,6 +104,9 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..94326ec9fa66a44ecb189620cd2a7f38
 +  bool SetMyarcTabsSaved(const std::vector<int>& indices, bool saved) override;
 +  bool ShowMyarcCopiedUrlToast() override;
 +  bool ShowMyarcSettings() override;
++  uint64_t GetMyarcAgentSpaceOf(content::WebContents& source) override;
++  void AdoptMyarcAgentTab(content::WebContents& contents,
++                          uint64_t space) override;
 +  // Opens chrome://settings in this window, for myArc Settings.
 +  void OpenChromiumSettings();
 +  // Opens https://myarc.dev in a new foreground tab here, for myArc Settings.
@@ -115,7 +118,7 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..94326ec9fa66a44ecb189620cd2a7f38
    base::WeakPtr<BrowserView> GetAsWeakPtr() {
      return weak_ptr_factory_.GetWeakPtr();
    }
-@@ -1253,12 +1302,197 @@ class BrowserView : public BrowserWindow,
+@@ -1253,12 +1305,197 @@ class BrowserView : public BrowserWindow,
  
    // Anchor point for help bubbles and other dialogs that want to reliably
    // anchor outside the content area of the window.
@@ -313,7 +316,7 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..94326ec9fa66a44ecb189620cd2a7f38
  
    // A mapping between accelerators and command IDs.
    std::map<ui::Accelerator, int> accelerator_table_;
-@@ -1411,6 +1645,7 @@ class BrowserView : public BrowserWindow,
+@@ -1411,6 +1648,7 @@ class BrowserView : public BrowserWindow,
    base::EnumSet<TabStripAndWebAppViewsReparentedState>
        tab_strip_web_apps_reparented_state_;
  

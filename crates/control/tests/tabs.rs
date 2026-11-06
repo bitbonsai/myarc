@@ -1,6 +1,7 @@
 use myarc_control::{
     Area, ControlService, MAX_URL_LENGTH, Outcome, Request, Routed, TabAction, TabResult, TabState,
-    check_url, parse_tab_handle, registry, route, tab_handle, tab_response,
+    check_url, in_profile, parse_tab_handle, profile_tag, registry, route, tab_handle,
+    tab_response,
 };
 use myarc_workspace::{DEFAULT_PROFILE_ID, DEFAULT_SPACE_ID, DEFAULT_WINDOW_ID, Workspace};
 use serde_json::{Value, json};
@@ -155,6 +156,83 @@ fn handles_round_trip_and_reject_lookalikes() {
         assert_eq!(parse_tab_handle(handle), None, "{handle:?}");
     }
     assert_eq!(parse_tab_handle("t99999999999999999999"), None);
+}
+
+#[test]
+fn handles_name_their_profile() {
+    assert_eq!(profile_tag("Default"), "");
+    assert_eq!(profile_tag("Profile 1"), "p1");
+    assert_eq!(profile_tag("Profile 12"), "p12");
+    let odd = profile_tag("Profile 01");
+    assert!(odd.starts_with('x') && odd.len() == 17, "{odd}");
+    let custom = profile_tag("Work");
+    assert!(custom.starts_with('x') && custom.len() == 17, "{custom}");
+    assert_eq!(profile_tag("Work"), custom);
+    assert_ne!(profile_tag("Work 2"), custom);
+
+    assert_eq!(in_profile("p1", || tab_handle(12)), "t12-p1");
+    assert_eq!(tab_handle(12), "t12", "the tag ends with in_profile");
+    assert_eq!(parse_tab_handle("t12-p1"), Some(12));
+    assert_eq!(parse_tab_handle(&format!("t12-{custom}")), Some(12));
+    for handle in [
+        "t12-",
+        "t12-p",
+        "t12-p01",
+        "t12-q1",
+        "t12-xABC",
+        "t12-p1-p2",
+        "t-p1",
+    ] {
+        assert_eq!(parse_tab_handle(handle), None, "{handle:?}");
+    }
+}
+
+#[test]
+fn a_handle_from_another_profile_is_denied() {
+    let (mut workspace, agent_tab, _) = seeded();
+    let default_handle = tab_handle(agent_tab);
+    let p1_handle = in_profile("p1", || tab_handle(agent_tab));
+    let p2_handle = in_profile("p2", || tab_handle(agent_tab));
+    // Both Profiles number their items from 1, so only the tag tells them apart.
+    for (profile, handle) in [
+        ("p1", &default_handle),
+        ("p1", &p2_handle),
+        ("", &p1_handle),
+    ] {
+        for command in ["tab.close", "tab.navigate", "page.snapshot"] {
+            let params = json!({ "tab": handle, "url": "https://example.test/" });
+            let params = if command == "tab.navigate" {
+                params
+            } else {
+                json!({ "tab": handle })
+            };
+            match in_profile(profile, || refused(&mut workspace, command, params)) {
+                Outcome::Denied { reason } => {
+                    assert!(reason.contains("another Profile"), "{reason}")
+                }
+                other => panic!("{command} {handle} in {profile:?} should be denied: {other:?}"),
+            }
+        }
+    }
+    assert_eq!(
+        in_profile("p1", || action(
+            &mut workspace,
+            "tab.close",
+            json!({ "tab": p1_handle })
+        )),
+        TabAction::Close { item: agent_tab }
+    );
+    let tab = TabState {
+        item: agent_tab,
+        ..TabState::default()
+    };
+    let response = in_profile("p1", || {
+        tab_response(&request("tabs.list", json!({})), TabResult::Done(vec![tab]))
+    });
+    match response.outcome {
+        Outcome::Success { data } => assert_eq!(data["tabs"][0]["handle"], p1_handle),
+        other => panic!("tabs.list should succeed: {other:?}"),
+    }
 }
 
 #[test]

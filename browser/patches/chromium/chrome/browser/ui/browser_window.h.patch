@@ -1,8 +1,16 @@
 diff --git a/chrome/browser/ui/browser_window.h b/chrome/browser/ui/browser_window.h
-index 3b0e66f8a95dc0518c74122eec1baab5717c3028..486ddd6f8a7e154cbc7fe6b8f9e9a6279dec9959 100644
+index 3b0e66f8a95dc0518c74122eec1baab5717c3028..75958b202ebc02d4c9b4582d81d1cb10305c7e2d 100644
 --- a/chrome/browser/ui/browser_window.h
 +++ b/chrome/browser/ui/browser_window.h
-@@ -112,6 +112,29 @@ class BrowserWindow : public ui::BaseWindow {
+@@ -5,6 +5,7 @@
+ #ifndef CHROME_BROWSER_UI_BROWSER_WINDOW_H_
+ #define CHROME_BROWSER_UI_BROWSER_WINDOW_H_
+ 
++#include <cstdint>
+ #include <memory>
+ #include <optional>
+ #include <string>
+@@ -112,6 +113,35 @@ class BrowserWindow : public ui::BaseWindow {
   public:
    virtual ~BrowserWindow() = default;
  
@@ -28,11 +36,17 @@ index 3b0e66f8a95dc0518c74122eec1baab5717c3028..486ddd6f8a7e154cbc7fe6b8f9e9a627
 +  virtual bool ShowMyarcCopiedUrlToast();
 +  // True when myArc opened its native Settings window instead of Chromium's.
 +  virtual bool ShowMyarcSettings();
++  // The myArc agent Space `source` is a tab of, or 0. Navigate opens the tabs
++  // and popups such a page opens as background tabs of that Space.
++  virtual uint64_t GetMyarcAgentSpaceOf(content::WebContents& source);
++  // Binds `contents`, about to be inserted, to the agent Space `space`.
++  virtual void AdoptMyarcAgentTab(content::WebContents& contents,
++                                  uint64_t space);
 +
    //////////////////////////////////////////////////////////////////////////////
    // ui::BaseWindow interface notes:
  
-@@ -508,4 +531,32 @@ class BrowserWindow : public ui::BaseWindow {
+@@ -508,4 +538,40 @@ class BrowserWindow : public ui::BaseWindow {
    virtual void DeleteBrowserWindow() = 0;
  };
  
@@ -63,5 +77,13 @@ index 3b0e66f8a95dc0518c74122eec1baab5717c3028..486ddd6f8a7e154cbc7fe6b8f9e9a627
 +inline bool BrowserWindow::ShowMyarcSettings() {
 +  return false;
 +}
++
++inline uint64_t BrowserWindow::GetMyarcAgentSpaceOf(
++    content::WebContents& source) {
++  return 0;
++}
++
++inline void BrowserWindow::AdoptMyarcAgentTab(content::WebContents& contents,
++                                              uint64_t space) {}
 +
  #endif  // CHROME_BROWSER_UI_BROWSER_WINDOW_H_

@@ -11,9 +11,11 @@
 #include "base/functional/bind.h"
 #include "base/functional/callback_helpers.h"
 #include "base/location.h"
+#include "base/logging.h"
 #include "base/memory/weak_ptr.h"
 #include "base/process/kill.h"
 #include "base/strings/strcat.h"
+#include "base/strings/string_number_conversions.h"
 #include "base/strings/to_string.h"
 #include "base/strings/utf_string_conversions.h"
 #include "base/task/single_thread_task_runner.h"
@@ -451,6 +453,58 @@ void PressKey(content::RenderWidgetHost& widget,
   widget.ForwardKeyboardEvent(event_of(blink::WebInputEvent::Type::kKeyUp));
 }
 
+// Whether page.snapshot shows `frame`: the main frame, or a frame whose
+// chain up to it stays in the main frame's site instance and origin outside
+// fenced frames, the frames kSameOriginDirectDescendants collects.
+bool SnapshotShows(content::RenderFrameHost& frame,
+                   content::RenderFrameHost& main) {
+  for (content::RenderFrameHost* current = &frame; current;
+       current = current->GetParent()) {
+    if (current == &main) {
+      return true;
+    }
+    if (current->GetSiteInstance() != main.GetSiteInstance() ||
+        current->IsFencedFrameRoot() ||
+        !main.GetLastCommittedOrigin().IsSameOriginWith(
+            current->GetLastCommittedOrigin())) {
+      return false;
+    }
+  }
+  return false;
+}
+
+// How the page's renderer ended, such as "status=killed, exit=9", for
+// answers about a crashed page.
+std::string CrashDetail(content::WebContents& page) {
+  const char* status = "other";
+  switch (page.GetCrashedStatus()) {
+    case base::TERMINATION_STATUS_NORMAL_TERMINATION:
+      status = "normal";
+      break;
+    case base::TERMINATION_STATUS_ABNORMAL_TERMINATION:
+      status = "abnormal";
+      break;
+    case base::TERMINATION_STATUS_PROCESS_WAS_KILLED:
+      status = "killed";
+      break;
+    case base::TERMINATION_STATUS_PROCESS_CRASHED:
+      status = "crashed";
+      break;
+    case base::TERMINATION_STATUS_LAUNCH_FAILED:
+      status = "launch_failed";
+      break;
+    case base::TERMINATION_STATUS_OOM:
+      status = "oom";
+      break;
+    default:
+      break;
+  }
+  return base::StrCat(
+      {"status=", status, ", code=",
+       base::NumberToString(static_cast<int>(page.GetCrashedStatus())),
+       ", exit=", base::NumberToString(page.GetCrashedErrorCode())});
+}
+
 std::string Describe(const actor::mojom::ActionResult& result) {
   std::string text = base::ToString(result.code);
   if (!result.message.empty()) {
@@ -622,11 +676,20 @@ class ActionRun final : public content::WebContentsObserver {
     Acted();
   }
 
-  // The element action is done; press the key, if any, and settle.
+  // The element action is done; press the key, if any, and settle. The key
+  // goes to the focused frame, so it must be one the snapshot shows; a
+  // cross-origin frame gets no keys from the agent.
   void Acted() {
     if (start_.kind == foundation::PageActKind::Press) {
-      content::RenderWidgetHost* widget =
-          web_contents()->GetPrimaryMainFrame()->GetRenderWidgetHost();
+      content::RenderFrameHost* main = web_contents()->GetPrimaryMainFrame();
+      content::RenderFrameHost* focused = web_contents()->GetFocusedFrame();
+      if (focused && !SnapshotShows(*focused, *main)) {
+        Finish(start_.focus_first ? foundation::ActionStatus::Unknown
+                                  : foundation::ActionStatus::Refused,
+               "Focus is in a frame the agent can't see; click a ref first");
+        return;
+      }
+      content::RenderWidgetHost* widget = main->GetRenderWidgetHost();
       if (!widget) {
         Finish(foundation::ActionStatus::Unknown,
                "The page went away before the key press");
@@ -638,6 +701,7 @@ class ActionRun final : public content::WebContentsObserver {
   }
 
   void ReadSelectOptions(content::RenderFrameHost& frame) {
+    reading_options_ = true;
     frame.GetRemoteInterfaces()->GetInterface(
         agent_.BindNewPipeAndPassReceiver());
     agent_.set_disconnect_handler(
@@ -655,6 +719,7 @@ class ActionRun final : public content::WebContentsObserver {
 
   void OnPageContent(blink::mojom::AIPageContentPtr content) {
     agent_.reset();
+    reading_options_ = false;
     if (done_) {
       return;
     }
@@ -680,6 +745,11 @@ class ActionRun final : public content::WebContentsObserver {
   }
 
   void OnActionTimeout() {
+    if (reading_options_) {
+      // Nothing ran yet, so the snapshot's references stay usable.
+      Finish(foundation::ActionStatus::TimedOut, {});
+      return;
+    }
     if (frame_.is_bound()) {
       frame_->CancelTool(task_id_);
     }
@@ -782,8 +852,9 @@ class ActionRun final : public content::WebContentsObserver {
     quiet_timer_.Stop();
     if (web_contents()->IsCrashed()) {
       Finish(foundation::ActionStatus::Unknown,
-             "The page crashed after the action; reload it and take "
-             "page.snapshot");
+             base::StrCat({"The page crashed after the action (",
+                           CrashDetail(*web_contents()),
+                           "); reload it and take page.snapshot"}));
       return;
     }
     TakeSnapshot(*web_contents(),
@@ -841,9 +912,11 @@ class ActionRun final : public content::WebContentsObserver {
 
   void PrimaryMainFrameRenderProcessGone(
       base::TerminationStatus status) override {
+    const std::string detail = CrashDetail(*web_contents());
+    LOG(WARNING) << "Control action page crashed: " << detail;
     Finish(foundation::ActionStatus::Unknown,
-           "The page crashed during the action; reload it and take "
-           "page.snapshot");
+           base::StrCat({"The page crashed during the action (", detail,
+                         "); reload it and take page.snapshot"}));
   }
 
   void WebContentsDestroyed() override {
@@ -894,6 +967,8 @@ class ActionRun final : public content::WebContentsObserver {
   bool settled_ = true;
   bool done_ = false;
   bool probing_ = false;
+  // page.select is reading the select's options; nothing ran yet.
+  bool reading_options_ = false;
   // The latest quiet-window snapshot.
   std::optional<Collected> probe_;
   base::OneShotTimer timer_;
@@ -1002,7 +1077,8 @@ void RunTabAction(BrowserWorkspaceAdapter& target,
     case TabActionKind::Snapshot:
       if (page->IsCrashed()) {
         Answer(*reply, TabStatus::Invalid,
-               "The page crashed; reload it with tab.reload first");
+               base::StrCat({"The page crashed (", CrashDetail(*page),
+                             "); reload it with tab.reload first"}));
         return;
       }
       TakeSnapshot(
