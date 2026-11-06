@@ -52,7 +52,7 @@ Short commands act on the current tab with the last outline's refs:
   Refs keep their numbers while the page stays loaded.
   --tab <tab> and --rev <revision> replace the current tab and the last
   revision for one call. --json prints each raw response as one line. The
-  current tab and revision live in cli-state.json next to the control
+  current tab and revision live in cli-state.json inside the control
   directory. Use -- before text that starts with a dash.
 
 Usage:

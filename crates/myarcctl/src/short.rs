@@ -7,9 +7,9 @@
 //! Setting `MYARCCTL_ECHO_REQUESTS` to a non-empty value writes each outgoing
 //! request to stderr as `request: <json>`. Tests use it; it isn't in `--help`.
 
-use std::fs::{self, DirBuilder, OpenOptions};
+use std::fs::{self, OpenOptions};
 use std::io::{self, Read, Write};
-use std::os::unix::fs::{DirBuilderExt, OpenOptionsExt, PermissionsExt};
+use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
@@ -147,8 +147,22 @@ pub struct State {
 
 impl State {
     /// Reads the state file. A missing, oversized or malformed file reads as
-    /// an empty state.
+    /// an empty state. So does one that is a symlink or someone else's, or
+    /// one in a directory open to group or others; those print a warning.
     pub fn load(path: &Path) -> Self {
+        let checked = path
+            .parent()
+            .filter(|dir| !dir.as_os_str().is_empty())
+            .map_or(Ok(()), ipc::check_private_dir)
+            .and_then(|()| ipc::check_own_file(path));
+        match checked {
+            Ok(()) => {}
+            Err(error) if error.kind() == io::ErrorKind::NotFound => return Self::default(),
+            Err(error) => {
+                warn(&format!("ignoring the saved current tab: {error}"));
+                return Self::default();
+            }
+        }
         let mut text = String::new();
         let read = fs::File::open(path)
             .and_then(|file| file.take(MAX_STATE_BYTES + 1).read_to_string(&mut text));
@@ -170,25 +184,33 @@ impl State {
         }
     }
 
-    /// Writes the state file with mode 0600 through a temporary file and a
-    /// rename, creating its directory with mode 0700 when missing.
+    /// Writes the state file with mode 0600 through a new temporary file with
+    /// a random name and a rename. Its directory must be this user's with mode
+    /// 0700; a missing one is created that way. A symlink at the state path
+    /// is replaced, never followed.
     pub fn save(&self, path: &Path) -> io::Result<()> {
-        if let Some(dir) = path.parent().filter(|dir| !dir.as_os_str().is_empty()) {
-            DirBuilder::new().recursive(true).mode(0o700).create(dir)?;
+        let dir = path
+            .parent()
+            .filter(|dir| !dir.as_os_str().is_empty())
+            .unwrap_or(Path::new("."));
+        ipc::ensure_private_dir(dir)?;
+        if let Err(error) = ipc::check_own_file(path)
+            && error.kind() != io::ErrorKind::NotFound
+        {
+            warn(&format!("replacing the saved current tab: {error}"));
         }
         let value = json!({
             "tab": self.tab,
             "revision": self.revision,
         });
-        let temp = path.with_extension(format!("tmp-{}", std::process::id()));
+        let temp = dir.join(format!(".{STATE_FILE}.{}.tmp", random_suffix()?));
         let written = (|| {
             let mut file = OpenOptions::new()
                 .write(true)
-                .create(true)
-                .truncate(true)
+                .create_new(true)
                 .mode(0o600)
                 .open(&temp)?;
-            fs::set_permissions(&temp, fs::Permissions::from_mode(0o600))?;
+            file.set_permissions(fs::Permissions::from_mode(0o600))?;
             file.write_all(value.to_string().as_bytes())?;
             file.sync_all()?;
             fs::rename(&temp, path)
@@ -269,10 +291,23 @@ impl State {
     }
 }
 
-/// Where the state lives: `cli-state.json` next to the control directory.
+/// Where the state lives: `cli-state.json` inside the control directory,
+/// which only this user can enter. The parent of `MYARC_CONTROL_DIR` may be
+/// a shared directory such as `/tmp`, so the state never goes there.
 pub fn state_path() -> Option<PathBuf> {
-    let dir = ipc::default_dir()?;
-    Some(dir.parent().unwrap_or(Path::new("")).join(STATE_FILE))
+    Some(ipc::default_dir()?.join(STATE_FILE))
+}
+
+/// Sixteen random hex digits, so another process can't guess a temporary
+/// file's name and plant something there first.
+fn random_suffix() -> io::Result<String> {
+    let mut bytes = [0u8; 8];
+    fs::File::open("/dev/urandom")?.read_exact(&mut bytes)?;
+    Ok(bytes.iter().map(|byte| format!("{byte:02x}")).collect())
+}
+
+fn warn(message: &str) {
+    write_line(&mut io::stderr(), &format!("myarcctl: {message}"));
 }
 
 /// Splits a line into runs outside and inside double quotes. A quoted run
@@ -966,7 +1001,24 @@ link \"Help\" [ref=e7]"
         assert!(!has_ref("text \"button [ref=e4]\""));
         assert!(!has_ref("text \"a \\\" [ref=e4]\""));
         assert!(!has_ref("link \"x\" -> /a[ref=e1]"));
+        assert!(!has_ref("link \"x\" -> \"/a?[ref=e1]\""));
+        assert!(has_ref("link \"x\" [ref=e2] -> \"/a?[ref=e1]\""));
         assert!(!has_ref("heading \"x\" [level=1]"));
+    }
+
+    #[test]
+    fn interactive_handles_quoted_link_targets() {
+        let outline = "\
+link \"Cancel\" [ref=e1] -> \"/cancel?[ref=e9]\"
+link \"More\" [ref=e2] -> \"/a b\"
+link \"More\" [ref=e3] -> \"/c[d]\"";
+        assert_eq!(
+            interactive(outline),
+            "\
+link \"Cancel\" [ref=e1]
+link \"More\" [ref=e2] -> \"/a b\"
+link \"More\" [ref=e3] -> \"/c[d]\""
+        );
     }
 
     #[test]
@@ -1128,6 +1180,62 @@ form
         fs::write(&path, "not json").unwrap();
         assert_eq!(State::load(&path), State::default());
         let _ = fs::remove_dir_all(path.parent().unwrap().parent().unwrap());
+    }
+
+    #[test]
+    fn state_file_never_follows_a_planted_symlink() {
+        let path = temp_path("symlink");
+        let dir = path.parent().unwrap().to_owned();
+        let base = dir.parent().unwrap().to_owned();
+        fs::create_dir_all(&dir).unwrap();
+        fs::set_permissions(&dir, fs::Permissions::from_mode(0o700)).unwrap();
+        let victim = base.join("victim");
+        fs::write(&victim, r#"{"tab":"t9","revision":"9.9"}"#).unwrap();
+        fs::set_permissions(&victim, fs::Permissions::from_mode(0o644)).unwrap();
+        std::os::unix::fs::symlink(&victim, &path).unwrap();
+        // The temporary names the old code used, planted as well.
+        let pid = std::process::id();
+        std::os::unix::fs::symlink(&victim, path.with_extension(format!("tmp-{pid}"))).unwrap();
+
+        assert_eq!(State::load(&path), State::default());
+        let state = State {
+            tab: Some(String::from("t1")),
+            revision: None,
+        };
+        state.save(&path).unwrap();
+        assert_eq!(
+            fs::read_to_string(&victim).unwrap(),
+            r#"{"tab":"t9","revision":"9.9"}"#
+        );
+        let mode = fs::metadata(&victim).unwrap().permissions().mode() & 0o777;
+        assert_eq!(mode, 0o644);
+        assert!(fs::symlink_metadata(&path).unwrap().file_type().is_file());
+        assert_eq!(State::load(&path), state);
+        let _ = fs::remove_dir_all(&base);
+    }
+
+    #[test]
+    fn state_file_refuses_a_directory_others_can_enter() {
+        let path = temp_path("shared");
+        let dir = path.parent().unwrap().to_owned();
+        fs::create_dir_all(&dir).unwrap();
+        fs::set_permissions(&dir, fs::Permissions::from_mode(0o777)).unwrap();
+        fs::write(&path, r#"{"tab":"t9","revision":null}"#).unwrap();
+        assert_eq!(State::load(&path), State::default());
+        let state = State {
+            tab: Some(String::from("t1")),
+            revision: None,
+        };
+        let error = state.save(&path).unwrap_err();
+        assert_eq!(error.kind(), io::ErrorKind::PermissionDenied);
+        assert_eq!(
+            fs::read_to_string(&path).unwrap(),
+            r#"{"tab":"t9","revision":null}"#
+        );
+        // The directory keeps the mode it had.
+        let mode = fs::metadata(&dir).unwrap().permissions().mode() & 0o777;
+        assert_eq!(mode, 0o777);
+        let _ = fs::remove_dir_all(dir.parent().unwrap());
     }
 
     #[test]

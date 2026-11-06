@@ -12,7 +12,7 @@ use std::sync::atomic::{AtomicU32, Ordering};
 use serde_json::{Value, json};
 
 /// A `serve-local` process whose control directory sits alone in a temp
-/// directory, so the state file next to it is the test's own.
+/// directory, so the state file inside it is the test's own.
 struct Stub {
     child: Child,
     base: PathBuf,
@@ -43,7 +43,7 @@ impl Stub {
     }
 
     fn state_path(&self) -> PathBuf {
-        self.base.join("cli-state.json")
+        self.base.join("control").join("cli-state.json")
     }
 
     fn write_state(&self, state: Value) {
@@ -245,4 +245,26 @@ fn short_commands_without_a_browser_exit_3() {
         assert!(stderr(&output).starts_with("myarcctl: myArc isn't running"));
     }
     assert!(!base.exists());
+}
+
+#[test]
+fn a_planted_state_symlink_leaves_its_target_alone() {
+    let stub = Stub::start();
+    let victim = stub.base.join("victim");
+    std::fs::write(&victim, "precious").unwrap();
+    std::fs::set_permissions(&victim, std::fs::Permissions::from_mode(0o644)).unwrap();
+    std::os::unix::fs::symlink(&victim, stub.state_path()).unwrap();
+    let output = stub.myarcctl(&["use", "t1"]);
+    assert_eq!(output.status.code(), Some(0), "{}", stderr(&output));
+    assert!(
+        stderr(&output).contains("is a symlink"),
+        "{}",
+        stderr(&output)
+    );
+    assert_eq!(std::fs::read_to_string(&victim).unwrap(), "precious");
+    let mode = std::fs::metadata(&victim).unwrap().permissions().mode();
+    assert_eq!(mode & 0o777, 0o644);
+    let meta = std::fs::symlink_metadata(stub.state_path()).unwrap();
+    assert!(meta.file_type().is_file());
+    assert_eq!(stub.state()["tab"], "t1");
 }

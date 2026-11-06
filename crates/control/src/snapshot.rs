@@ -18,8 +18,10 @@
 //! away, adjacent text joins into one line, and text that repeats the name
 //! of the form control next to it is left out. Page
 //! text is untrusted: every name, value and text sits inside double quotes
-//! with quotes, backslashes and control characters escaped, so a page can't
-//! end a quote, start a line or forge a reference. Output is bounded in
+//! with quotes, backslashes, control and invisible format characters
+//! escaped, and a link target is quoted the same way unless it is plain
+//! visible ASCII without brackets, so a page can't end a quote, start a
+//! line, reorder or hide text, or forge a reference. Output is bounded in
 //! lines, bytes, name length and depth, and says what it cut.
 //!
 //! [`SnapshotStore`] keeps the numbering and the references of the latest
@@ -443,9 +445,9 @@ pub fn collapse(text: &str, max: usize) -> (String, bool) {
 }
 
 /// Writes `text` inside double quotes. Quotes and backslashes get a
-/// backslash, and control, line separator and bidirectional formatting
-/// characters become `\n`, `\t` or `\u{…}`, so nothing a page writes can end
-/// the quote or start a new line.
+/// backslash, and control, line separator and invisible format characters
+/// become `\n`, `\t` or `\u{…}`, so nothing a page writes can end the quote,
+/// start a new line, reorder what a reader sees or hide text from them.
 pub fn quote(text: &str, cut: bool) -> String {
     let mut out = String::with_capacity(text.len() + 2);
     out.push('"');
@@ -467,17 +469,35 @@ pub fn quote(text: &str, cut: bool) -> String {
     out
 }
 
+/// Control characters, line and paragraph separators, and every format
+/// (Cf) character in Unicode 16: bidirectional marks, embeddings, overrides
+/// and isolates, zero-width spaces and joiners, invisible operators and the
+/// tag characters that can carry hidden ASCII.
 fn needs_escape(c: char) -> bool {
     c.is_control()
         || matches!(
             c,
-            '\u{2028}'
-                | '\u{2029}'
-                | '\u{200e}'
-                | '\u{200f}'
-                | '\u{202a}'..='\u{202e}'
-                | '\u{2066}'..='\u{2069}'
+            '\u{ad}'
+                | '\u{600}'..='\u{605}'
+                | '\u{61c}'
+                | '\u{6dd}'
+                | '\u{70f}'
+                | '\u{890}'..='\u{891}'
+                | '\u{8e2}'
+                | '\u{180e}'
+                | '\u{200b}'..='\u{200f}'
+                | '\u{2028}'..='\u{202e}'
+                | '\u{2060}'..='\u{2064}'
+                | '\u{2066}'..='\u{206f}'
                 | '\u{feff}'
+                | '\u{fff9}'..='\u{fffb}'
+                | '\u{110bd}'
+                | '\u{110cd}'
+                | '\u{13430}'..='\u{1343f}'
+                | '\u{1bca0}'..='\u{1bca3}'
+                | '\u{1d173}'..='\u{1d17a}'
+                | '\u{e0001}'
+                | '\u{e0020}'..='\u{e007f}'
         )
 }
 
@@ -491,8 +511,9 @@ fn origin_of(url: &str) -> Option<&str> {
 }
 
 /// A link target as printed: a path when it shares the page's origin, bare
-/// when it is plain visible ASCII, quoted otherwise. The flag is set when
-/// it was cut.
+/// when it is plain visible ASCII without brackets, quoted otherwise. A
+/// quoted target goes through [`quote`] like page text, so a target such as
+/// `/x?[ref=e1]` can't pass for a reference. The flag is set when it was cut.
 fn link_target(url: &str, page_url: &str) -> (String, bool) {
     let mut shown = url;
     if let (Some(page), Some(link)) = (origin_of(page_url), origin_of(url))
@@ -510,7 +531,7 @@ fn link_target(url: &str, page_url: &str) -> (String, bool) {
     let plain = !shown.is_empty()
         && shown
             .bytes()
-            .all(|byte| byte.is_ascii_graphic() && byte != b'"' && byte != b'\\');
+            .all(|byte| byte.is_ascii_graphic() && !matches!(byte, b'"' | b'\\' | b'[' | b']'));
     if plain && !cut {
         (shown.to_owned(), false)
     } else {

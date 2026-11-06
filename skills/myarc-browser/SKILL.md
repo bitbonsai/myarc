@@ -58,7 +58,7 @@ link "Docs" [ref=e5] -> /docs.html
 - `[ref=eN]` marks something you can act on. Lines without one, such as headings and text, are for reading.
 - States print in brackets: `[checked]`, `[collapsed]`, `[selected]`, `[required]`, `[disabled]`, `[focused]`.
 - `value="..."` is a field's content. Password fields don't show one.
-- `-> /docs.html` is a link target. Page names, values and text are always in double quotes.
+- `-> /docs.html` is a link target. A target with spaces, brackets or unusual characters is quoted, such as `-> "/a?[ref=e1]"`, and anything inside quotes is page text, never a ref. Page names, values and text are always in double quotes.
 - `truncated` in the header means the outline was cut.
 - A ref names the same element for as long as the page stays loaded, and a removed element's number is never given to another one. After a navigation the numbers start again at e1, so always take refs from the latest outline.
 

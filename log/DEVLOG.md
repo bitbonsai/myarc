@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-11-06: Review fixes for the control socket, CLI state and outline escaping
+
+- `cli-state.json` now lives inside the control directory, which must be the user's with mode 700, so `MYARC_CONTROL_DIR=/tmp/myarc-control` no longer puts it in `/tmp`. It is written through a `create_new` file with a random name and mode 600, then renamed, and a symlinked or foreign state file reads as empty with a warning. `Server::bind` creates a missing directory with mode 700 but refuses an existing one open to group or others instead of changing it.
+- Link targets with `[` or `]` are now quoted like page text, so `/cancel?[ref=e1]` prints as `-> "/cancel?[ref=e1]"`, and every Unicode format character (bidi marks and overrides, zero-width characters, tag characters) prints as `\u{…}` in names, values, targets and text. `Host` relays each connection's request on its own thread without the handler lock, so a slow page call no longer stalls `tabs.list` on another connection; the browser may now have several requests in flight on its UI thread.
+- Verification: `cargo fmt --check`, the `bridge.rs` rustfmt check, `cargo clippy -D warnings`, `cargo test` (new tests for the planted-symlink attack in the unit and `serve-local` suites, a shared state directory, bind refusing a loose directory, a slow request beside a fast one, forged href refs, bidi and zero-width escapes, and `-i` with quoted targets) and `check_docs.py` pass. The browser wasn't built or run.
+
 ## 2026-11-06: Page actions settle in about 250 ms on a quiet page
 
 - Root cause: the settle wait used the renderer's `PageStabilityMonitor`, which waits at least 1 s (`actor-page-stability-min-wait`) and then for a renderer idle task. The agent's tab is a background tab, so its renderer is hidden, and Blink stops idle periods 10 s after a renderer is hidden (`kEndIdleWhenHiddenDelayMillis`). Once the agent paused that long, the idle task never ran and every action waited out the 3 s cap and answered `not settled`. Hidden pages also batch timers, so a `setTimeout` of 200 ms ran after 366 to 615 ms.

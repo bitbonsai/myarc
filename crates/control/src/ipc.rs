@@ -173,22 +173,11 @@ impl Server {
     /// by a server that is gone, listens on `dir/control.sock` (mode 0600) and
     /// writes `dir/control.json` (mode 0600) with a fresh token. Fails with
     /// `AddrInUse` when another server is live in `dir`, and with
-    /// `PermissionDenied` when `dir` isn't a directory owned by this user.
+    /// `PermissionDenied` when `dir` isn't a directory owned by this user or
+    /// already exists open to group or others. It never changes the mode of a
+    /// directory it didn't create.
     pub fn bind(dir: &Path) -> io::Result<Server> {
-        DirBuilder::new().recursive(true).mode(0o700).create(dir)?;
-        let meta = fs::symlink_metadata(dir)?;
-        if !meta.is_dir() || meta.uid() != current_uid()? {
-            return Err(io::Error::new(
-                ErrorKind::PermissionDenied,
-                format!(
-                    "{} must be a directory owned by you to hold the control endpoint",
-                    dir.display()
-                ),
-            ));
-        }
-        if meta.mode() & 0o777 != 0o700 {
-            fs::set_permissions(dir, Permissions::from_mode(0o700))?;
-        }
+        ensure_private_dir(dir)?;
         let socket = dir.join(SOCKET_FILE);
         let endpoint = dir.join(ENDPOINT_FILE);
         clear_stale(&socket, &endpoint)?;
@@ -232,8 +221,24 @@ impl Server {
     where
         F: FnMut(Request) -> Response + Send,
     {
+        let handler = Mutex::new(handler);
+        self.serve_shared(
+            |request| {
+                let mut handler = handler.lock().unwrap_or_else(PoisonError::into_inner);
+                (*handler)(request)
+            },
+            stop,
+        )
+    }
+
+    /// Like [`Server::serve`], but `handler` runs on each connection's thread
+    /// at the same time, with no lock around it.
+    fn serve_shared<F>(self, handler: F, stop: &AtomicBool) -> io::Result<()>
+    where
+        F: Fn(Request) -> Response + Sync,
+    {
         let shared = Shared {
-            handler: Mutex::new(handler),
+            handler,
             token: &self.token,
             stop,
             idle_timeout: self.idle_timeout,
@@ -364,7 +369,11 @@ impl Host {
         let serve = thread::Builder::new()
             .name(String::from("myarc-control-host"))
             .spawn(move || {
-                let _ = server.serve(
+                // Each connection queues its request and waits for the answer
+                // on its own thread. The browser takes requests one at a time
+                // in arrival order, so a slow page call on one connection
+                // never holds a lock another connection needs.
+                let _ = server.serve_shared(
                     |request| relay(&sender, request, reply_timeout, &flag),
                     &flag,
                 );
@@ -460,6 +469,75 @@ fn relay(
     }
 }
 
+/// Makes sure `dir` is a directory, not a symlink, owned by this user and
+/// closed to group and others. A missing `dir` is created with mode 0700, and
+/// so are missing parents. An existing one is never changed: one with looser
+/// permissions is refused, so pointing the control directory at a shared
+/// directory such as `$HOME` fails instead of quietly locking it down.
+pub fn ensure_private_dir(dir: &Path) -> io::Result<()> {
+    if let Some(parent) = dir.parent().filter(|parent| !parent.as_os_str().is_empty()) {
+        DirBuilder::new()
+            .recursive(true)
+            .mode(0o700)
+            .create(parent)?;
+    }
+    match DirBuilder::new().mode(0o700).create(dir) {
+        // The umask can only clear bits, so this only restores ones it took.
+        Ok(()) => fs::set_permissions(dir, Permissions::from_mode(0o700))?,
+        Err(error) if error.kind() == ErrorKind::AlreadyExists => {}
+        Err(error) => return Err(error),
+    }
+    check_private_dir(dir)
+}
+
+/// Checks that `dir` is a directory, not a symlink, owned by this user and
+/// closed to group and others. Fails with `NotFound` when it is missing and
+/// `PermissionDenied`, saying how to fix it, when it is unsafe.
+pub fn check_private_dir(dir: &Path) -> io::Result<()> {
+    check_private(dir, Kind::Dir).map_err(|problem| match problem {
+        PathProblem::Missing => io::Error::new(
+            ErrorKind::NotFound,
+            format!("{} does not exist", dir.display()),
+        ),
+        PathProblem::Unsafe(detail) => io::Error::new(
+            ErrorKind::PermissionDenied,
+            format!(
+                "{} {detail}; the control directory must be yours with mode 700, so run chmod 700 on it or set {DIR_ENV} to a new path",
+                dir.display()
+            ),
+        ),
+        PathProblem::Io(error) => error,
+    })
+}
+
+/// Checks that `path` is a regular file owned by this user. A symlink never
+/// passes, whatever it points at. Fails with `NotFound` when it is missing and
+/// `PermissionDenied` when it is a symlink, another kind of file or someone
+/// else's.
+pub fn check_own_file(path: &Path) -> io::Result<()> {
+    let meta = fs::symlink_metadata(path)?;
+    let unsafe_file = |detail: String| {
+        Err(io::Error::new(
+            ErrorKind::PermissionDenied,
+            format!("{} {detail}", path.display()),
+        ))
+    };
+    if meta.file_type().is_symlink() {
+        return unsafe_file(String::from("is a symlink"));
+    }
+    if !meta.file_type().is_file() {
+        return unsafe_file(String::from("is not a regular file"));
+    }
+    let uid = current_uid()?;
+    if meta.uid() != uid {
+        return unsafe_file(format!(
+            "is owned by uid {}, not by you (uid {uid})",
+            meta.uid()
+        ));
+    }
+    Ok(())
+}
+
 /// Removes a socket nothing listens on, and the endpoint file with it.
 fn clear_stale(socket: &Path, endpoint: &Path) -> io::Result<()> {
     if fs::symlink_metadata(socket).is_ok() {
@@ -490,7 +568,7 @@ impl Drop for Slot<'_> {
 }
 
 struct Shared<'a, F> {
-    handler: Mutex<F>,
+    handler: F,
     token: &'a Token,
     stop: &'a AtomicBool,
     idle_timeout: Duration,
@@ -498,7 +576,7 @@ struct Shared<'a, F> {
     sessions: AtomicU64,
 }
 
-impl<F: FnMut(Request) -> Response> Shared<'_, F> {
+impl<F: Fn(Request) -> Response> Shared<'_, F> {
     fn connection(&self, stream: UnixStream) {
         // Accepted sockets inherit the listener's non-blocking mode on macOS.
         let ready = stream
@@ -617,8 +695,7 @@ impl<F: FnMut(Request) -> Response> Shared<'_, F> {
     fn dispatch(&self, request: Request) -> Response {
         let id = bounded(&request.id).to_owned();
         let command = bounded(&request.command).to_owned();
-        let mut handler = self.handler.lock().unwrap_or_else(PoisonError::into_inner);
-        panic::catch_unwind(AssertUnwindSafe(|| (*handler)(request))).unwrap_or_else(|_| Response {
+        panic::catch_unwind(AssertUnwindSafe(|| (self.handler)(request))).unwrap_or_else(|_| Response {
             id,
             command,
             outcome: Outcome::OutcomeUnknown {
@@ -1290,6 +1367,23 @@ mod tests {
     }
 
     #[test]
+    fn bind_refuses_an_existing_directory_others_can_enter() {
+        let dir = TempDir::new();
+        fs::create_dir(&dir.0).unwrap();
+        fs::set_permissions(&dir.0, Permissions::from_mode(0o755)).unwrap();
+        let error = Server::bind(&dir.0).unwrap_err();
+        assert_eq!(error.kind(), ErrorKind::PermissionDenied);
+        assert!(error.to_string().contains("chmod 700"), "{error}");
+        assert_eq!(fs::metadata(&dir.0).unwrap().mode() & 0o777, 0o755);
+        assert!(!dir.0.join(ENDPOINT_FILE).exists());
+        assert!(!dir.0.join(SOCKET_FILE).exists());
+
+        // An existing directory that is already private is used as it is.
+        fs::set_permissions(&dir.0, Permissions::from_mode(0o700)).unwrap();
+        drop(Server::bind(&dir.0).unwrap());
+    }
+
+    #[test]
     fn each_bind_gets_a_fresh_token() {
         let dir = TempDir::new();
         let first = endpoint(Server::bind(&dir.0).unwrap().dir()).token;
@@ -1651,5 +1745,29 @@ mod tests {
         assert!(waiting.abandoned());
         assert!(host.next().is_none());
         assert!(!dir.0.join(ENDPOINT_FILE).exists());
+    }
+
+    #[test]
+    fn a_slow_request_does_not_hold_up_another_connection() {
+        let dir = TempDir::new();
+        let host = Host::start(&dir.0, REPLY_TIMEOUT).unwrap();
+        let mut slow = Client::connect(&dir.0).unwrap();
+        let mut fast = Client::connect(&dir.0).unwrap();
+        let slow_call = thread::spawn(move || slow.call(request("space.list", Value::Null)));
+        // The browser is still working on this one.
+        let held = host.next().unwrap();
+        let fast_call = thread::spawn(move || fast.call(request("space.list", Value::Null)));
+        let quick = host.next().unwrap();
+        quick.reply(ControlService::new().handle(request("space.list", Value::Null)));
+        let answered = fast_call.join().unwrap().unwrap();
+        assert!(
+            matches!(answered.outcome, Outcome::Success { .. }),
+            "{answered:?}"
+        );
+        assert!(!held.abandoned(), "the fast call waited for the slow one");
+        assert!(!slow_call.is_finished());
+        held.reply(ControlService::new().handle(request("space.list", Value::Null)));
+        let finished = slow_call.join().unwrap().unwrap();
+        assert!(matches!(finished.outcome, Outcome::Success { .. }));
     }
 }
