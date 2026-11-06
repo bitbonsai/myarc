@@ -1,6 +1,6 @@
 # Browser control: CLI and MCP
 
-Status: specified. A core stub in [crates/control](../crates/control/src/lib.rs) holds the command registry and runs the Space commands. The `myarcctl` CLI and its MCP server in [crates/myarcctl](../crates/myarcctl/src/main.rs) expose that stub, but browser attachment doesn't exist yet. **Both interfaces are P0 browser launch requirements**, not just developer test tooling or a later paid AI feature. MA-011 delivers them. An external agent can control explicitly granted browser context while built-in AI remains off; the control interface itself requires no myarc account, subscription, model download or provider key.
+Status: specified. A core stub in [crates/control](../crates/control/src/lib.rs) holds the command registry and runs the Space commands. Its [ipc module](../crates/control/src/ipc.rs) carries requests from a client to a running browser over an authenticated same-user Unix socket. The `myarcctl` CLI and its MCP server in [crates/myarcctl](../crates/myarcctl/src/main.rs) connect through that socket by default. The browser doesn't host the socket yet, so `myarcctl serve-local` stands in for it. **Both interfaces are P0 browser launch requirements**, not just developer test tooling or a later paid AI feature. MA-011 delivers them. An external agent can control explicitly granted browser context while built-in AI remains off; the control interface itself requires no myarc account, subscription, model download or provider key.
 
 ## One control layer, two public interfaces
 
@@ -56,18 +56,24 @@ References: [MCP transports](https://modelcontextprotocol.io/specification/2026-
 
 ## Try the stub
 
-`myarcctl` runs against an in-memory workspace with no browser attached. Only the Space commands work; every other command answers `unsupported`. Each CLI invocation starts from a fresh workspace, so a Space created by one `run` is gone by the next.
+`run` and `mcp` connect to the running browser by default. The browser publishes its control endpoint in `~/Library/Application Support/myarc/control/`, or in `$MYARC_CONTROL_DIR` when that is set. The directory holds `control.json` with the socket path, a token that changes each time the server starts, the server's pid and its protocol version. Clients refuse the endpoint unless the directory (mode 700), the file and the socket (mode 600) belong to the current user and are closed to group and others. Each connection opens with a hello that carries the token, and every message after it is a length-prefixed JSON frame of at most 1 MiB.
+
+The browser doesn't host the endpoint yet. Until it does, `myarcctl serve-local` is a development stub that serves an in-memory workspace in its place. Only the Space commands work, and every other command answers `unsupported`. The workspace lasts as long as `serve-local` runs, so a Space created by one `run` shows up in the next.
 
 ```sh
 cargo build -p myarcctl
+target/debug/myarcctl serve-local --dir /tmp/myarc-control &
+export MYARC_CONTROL_DIR=/tmp/myarc-control
 target/debug/myarcctl commands
 target/debug/myarcctl run space.create '{"name":"Work"}'
-target/debug/myarcctl run space.rename '{"space_id":1,"name":"Home"}' --json
+target/debug/myarcctl run space.list --json
 ```
 
-`run` exits 0 on success, 1 when the command returns an error and 2 on a usage error. `--json` prints the full response.
+`--local` skips the endpoint and runs the command against a fresh in-memory workspace, so a Space created by one `run --local` is gone by the next. `commands` always reads the registry locally.
 
-`myarcctl mcp` serves the same registry as MCP tools over stdio, with dots in command IDs replaced by underscores (`space.create` becomes `space_create`). One MCP session keeps its workspace until the client disconnects. To add it to an MCP client, put the built binary on your `PATH` and use this server entry:
+`run` exits 0 on success, 1 when the command returns an error, 2 on a usage error and 3 when it can't reach myArc. On exit 3 the message names the cause, such as a missing endpoint, a stale one left by a process that has exited, a permission or ownership problem, a rejected token or a protocol version mismatch. `--json` prints the full response.
+
+`myarcctl mcp` serves the same registry as MCP tools over stdio, with dots in command IDs replaced by underscores (`space.create` becomes `space_create`). Tool calls reach the endpoint over one connection, which opens on the first call and reopens after it drops or sits idle. With no endpoint, each call returns a tool error that says why. `myarcctl mcp --local` keeps one in-memory workspace until the client disconnects instead. To add it to an MCP client, put the built binary on your `PATH` and use this server entry:
 
 ```json
 {"command": "myarcctl", "args": ["mcp"]}

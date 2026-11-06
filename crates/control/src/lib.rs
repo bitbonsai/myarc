@@ -9,8 +9,14 @@
 //! registry with `implemented: false` and answer `Unsupported`. Requests are
 //! untrusted: strings are bounded, unknown parameters are rejected and no input
 //! panics.
+//!
+//! On Unix, `ipc` carries requests from a client process to the service hosted
+//! by a running browser over an authenticated same-user socket.
 
 use std::sync::OnceLock;
+
+#[cfg(unix)]
+pub mod ipc;
 
 use myarc_workspace::{
     DEFAULT_PROFILE_ID, DEFAULT_WINDOW_ID, RenameError, SpaceId, WindowId, Workspace,

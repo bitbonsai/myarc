@@ -3,9 +3,13 @@ use std::process::{Command, Output};
 use myarc_control::{PROTOCOL_VERSION, registry};
 use serde_json::Value;
 
+/// Runs myarcctl with a control directory that doesn't exist, so a test can
+/// never reach a real browser.
 fn myarcctl(args: &[&str]) -> Output {
+    let missing = std::env::temp_dir().join(format!("myarcctl-none-{}", std::process::id()));
     Command::new(env!("CARGO_BIN_EXE_myarcctl"))
         .args(args)
+        .env("MYARC_CONTROL_DIR", missing)
         .output()
         .expect("myarcctl should start")
 }
@@ -72,7 +76,7 @@ fn commands_json_has_id_area_implemented_and_summary() {
 
 #[test]
 fn run_space_create_prints_one_line_and_exits_0() {
-    let output = myarcctl(&["run", "space.create", r#"{"name":"Work"}"#]);
+    let output = myarcctl(&["run", "space.create", r#"{"name":"Work"}"#, "--local"]);
     assert_eq!(output.status.code(), Some(0), "{}", stderr(&output));
     let text = stdout(&output);
     assert_eq!(text.lines().count(), 1, "{text}");
@@ -87,6 +91,7 @@ fn run_json_prints_the_response() {
         "space.rename",
         r#"{"space_id":1,"name":"Work"}"#,
         "--json",
+        "--local",
     ]);
     assert_eq!(output.status.code(), Some(0), "{}", stderr(&output));
     let response = json_stdout(&output);
@@ -99,14 +104,19 @@ fn run_json_prints_the_response() {
 
 #[test]
 fn each_run_starts_from_a_fresh_workspace() {
-    myarcctl(&["run", "space.create", r#"{"name":"Work"}"#]);
-    let response = json_stdout(&myarcctl(&["run", "space.list", "--json"]));
+    myarcctl(&["run", "space.create", r#"{"name":"Work"}"#, "--local"]);
+    let response = json_stdout(&myarcctl(&["run", "space.list", "--json", "--local"]));
     assert_eq!(response["data"]["spaces"].as_array().unwrap().len(), 1);
 }
 
 #[test]
 fn unsupported_command_exits_1() {
-    let output = myarcctl(&["run", "tab.open", r#"{"url":"https://example.com"}"#]);
+    let output = myarcctl(&[
+        "--local",
+        "run",
+        "tab.open",
+        r#"{"url":"https://example.com"}"#,
+    ]);
     assert_eq!(output.status.code(), Some(1));
     assert!(stdout(&output).is_empty());
     assert!(
@@ -115,7 +125,7 @@ fn unsupported_command_exits_1() {
         stderr(&output)
     );
 
-    let output = myarcctl(&["run", "tab.open", "--json"]);
+    let output = myarcctl(&["run", "tab.open", "--json", "--local"]);
     assert_eq!(output.status.code(), Some(1));
     let response = json_stdout(&output);
     assert_eq!(response["status"], "unsupported");
@@ -124,11 +134,16 @@ fn unsupported_command_exits_1() {
 
 #[test]
 fn invalid_params_and_unknown_commands_exit_1() {
-    let output = myarcctl(&["run", "space.rename", r#"{"space_id":99,"name":"x"}"#]);
+    let output = myarcctl(&[
+        "run",
+        "space.rename",
+        r#"{"space_id":99,"name":"x"}"#,
+        "--local",
+    ]);
     assert_eq!(output.status.code(), Some(1));
     assert!(stderr(&output).contains("invalid: Space 99 does not exist"));
 
-    let output = myarcctl(&["run", "space.explode"]);
+    let output = myarcctl(&["run", "space.explode", "--local"]);
     assert_eq!(output.status.code(), Some(1));
     assert!(stderr(&output).contains("Unknown command"));
 }
@@ -151,6 +166,10 @@ fn usage_errors_exit_2() {
         &["run", "space.list", "{}", "extra"][..],
         &["commands", "--verbose"][..],
         &["mcp", "now"][..],
+        &["commands", "--local"][..],
+        &["run", "space.list", "--dir", "/tmp"][..],
+        &["serve-local", "--dir"][..],
+        &["serve-local", "now"][..],
     ] {
         let output = myarcctl(args);
         assert_eq!(output.status.code(), Some(2), "{args:?}");
@@ -160,10 +179,29 @@ fn usage_errors_exit_2() {
 }
 
 #[test]
-fn help_mentions_the_fresh_workspace() {
+fn help_mentions_local_and_the_dev_stub() {
     let output = myarcctl(&["--help"]);
     assert_eq!(output.status.code(), Some(0));
-    assert!(stdout(&output).contains("fresh in-memory"));
+    let text = stdout(&output);
+    assert!(text.contains("fresh in-memory"), "{text}");
+    assert!(text.contains("serve-local"), "{text}");
+    assert!(text.contains("Development stub"), "{text}");
+}
+
+#[test]
+fn run_without_a_browser_exits_3() {
+    for args in [
+        &["run", "space.list"][..],
+        &["run", "space.list", "--json"][..],
+    ] {
+        let output = myarcctl(args);
+        assert_eq!(output.status.code(), Some(3), "{args:?}");
+        assert!(stdout(&output).is_empty(), "{args:?}");
+        let text = stderr(&output);
+        assert!(text.starts_with("myarcctl: myArc isn't running"), "{text}");
+        assert!(text.contains("myarcctl-none-"), "{text}");
+        assert!(text.contains("--local"), "{text}");
+    }
 }
 
 #[test]

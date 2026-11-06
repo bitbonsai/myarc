@@ -9,7 +9,7 @@ use serde_json::{Value, json};
 /// Runs `myarcctl mcp` with `input` on stdin, then closes stdin.
 fn session(input: Vec<u8>) -> Output {
     let mut child = Command::new(env!("CARGO_BIN_EXE_myarcctl"))
-        .arg("mcp")
+        .args(["mcp", "--local"])
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())

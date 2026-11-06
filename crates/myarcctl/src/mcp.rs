@@ -1,11 +1,14 @@
 //! MCP server over stdio. Messages are newline-delimited JSON-RPC 2.0: one per
 //! line on stdin, replies one per line on stdout, diagnostics on stderr. Tools
-//! come from `registry()` and calls go through one `ControlService` that lives
-//! for the whole session.
+//! come from `registry()`. Calls go to the running myArc over one control
+//! connection, opened on the first call and reopened when it was lost or idle,
+//! or with `--local` to one `ControlService` that lives for the whole session.
 
 use std::io::{self, BufRead, Read, Write};
+use std::time::Instant;
 
-use myarc_control::{ControlService, Outcome, Request, registry};
+use myarc_control::ipc::{self, Client};
+use myarc_control::{ControlService, Outcome, Request, Response, registry};
 use serde_json::{Map, Value, json};
 
 use crate::VERSION;
@@ -26,9 +29,52 @@ const INTERNAL_ERROR: i64 = -32603;
 
 type RpcError = (i64, String);
 
+/// Where tool calls run.
+pub enum Backend {
+    Local(ControlService),
+    /// The running myArc, with the open connection and when it last answered.
+    Remote(Option<(Client, Instant)>),
+}
+
+impl Backend {
+    pub fn remote() -> Self {
+        Self::Remote(None)
+    }
+
+    /// `Err` means the request was never sent, with the reason why.
+    fn handle(&mut self, request: Request) -> Result<Response, String> {
+        let connection = match self {
+            Self::Local(service) => return Ok(service.handle(request)),
+            Self::Remote(connection) => connection,
+        };
+        // The server closes connections idle for IDLE_TIMEOUT. Reconnect well
+        // before that instead of sending into a connection about to close.
+        if connection
+            .as_ref()
+            .is_some_and(|(_, used)| used.elapsed() >= ipc::IDLE_TIMEOUT / 2)
+        {
+            *connection = None;
+        }
+        let (client, used) = match connection {
+            Some(open) => open,
+            None => connection.insert((crate::connect()?, Instant::now())),
+        };
+        match crate::call(client, request) {
+            Ok(response) => {
+                *used = Instant::now();
+                Ok(response)
+            }
+            Err(response) => {
+                *connection = None;
+                Ok(response)
+            }
+        }
+    }
+}
+
 /// Reads messages until EOF and writes one reply per request.
-pub fn serve(mut input: impl BufRead, mut output: impl Write) -> io::Result<()> {
-    let mut server = Server::default();
+pub fn serve(mut input: impl BufRead, mut output: impl Write, backend: Backend) -> io::Result<()> {
+    let mut server = Server { backend, calls: 0 };
     let mut line = Vec::new();
     loop {
         let reply = match read_line(&mut input, &mut line)? {
@@ -102,9 +148,8 @@ fn read_line(input: &mut impl BufRead, buf: &mut Vec<u8>) -> io::Result<Line> {
     Ok(Line::TooLong)
 }
 
-#[derive(Default)]
 struct Server {
-    service: ControlService,
+    backend: Backend,
     calls: u64,
 }
 
@@ -191,11 +236,19 @@ impl Server {
             Some(_) => return Err(invalid_params("Tool arguments must be an object")),
         };
         self.calls += 1;
-        let response = self.service.handle(Request {
+        let response = match self.backend.handle(Request {
             id: format!("mcp-{}", self.calls),
             command: spec.id.to_owned(),
             params: arguments,
-        });
+        }) {
+            Ok(response) => response,
+            Err(message) => {
+                return Ok(json!({
+                    "content": [{ "type": "text", "text": message }],
+                    "isError": true,
+                }));
+            }
+        };
         let is_error = !matches!(response.outcome, Outcome::Success { .. });
         let structured = serde_json::to_value(&response).map_err(|error| {
             (
