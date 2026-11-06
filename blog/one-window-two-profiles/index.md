@@ -18,7 +18,7 @@ myArc had Spaces but only ever one Profile, so everything shared a single cookie
 
 Creating a Space now happens in the sidebar, the way it does in Arc. You give it a name, pick an emoji or an icon, choose which Profile it belongs to, and give it a color.
 
-[![The Create a Space panel with the Profile menu open, listing Default and work, then New Profile](https://myarc.dev/blog/one-window-two-profiles/profile-menu.190e5833cfac.webp)](https://myarc.dev/blog/one-window-two-profiles/profile-menu.190e5833cfac.webp)
+[![The Create a Space panel with the Profile menu open, listing Default and work, then New Profile](https://myarc.dev/blog/one-window-two-profiles/profile-menu.0660f821c781.webp)](https://myarc.dev/blog/one-window-two-profiles/profile-menu.0660f821c781.webp)
 
 The Profile menu lists every Profile, and New Profile… makes a new one right there.
 
