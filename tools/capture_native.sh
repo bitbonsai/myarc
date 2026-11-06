@@ -27,6 +27,8 @@
 #   with other Profiles and their Spaces index.
 #   ACTIVATE=<item ID> opens that seeded row once the workspace loads, via
 #   --myarc-capture-activate; pair it with URL=none.
+#   AGENT_SPACE=1 creates the agent Space via --myarc-test-agent-space, and
+#   AGENT_SPACE=select also shows it. Needs a build with myarc_test_hooks.
 #   SETTINGS=1 (or general/profiles/advanced/more) opens the native Settings window via
 #   --myarc-capture-open-settings and captures only that window; "more" presses
 #   More Settings… and captures the browser window instead.
@@ -82,6 +84,11 @@ if [ "${1:-}" = "--inner" ]; then
     *) EXTRA+=(--myarc-capture-create-space) ;;
   esac
   [ -n "${ACTIVATE:-}" ] && EXTRA+=(--myarc-capture-activate="$ACTIVATE")
+  case "${AGENT_SPACE:-}" in
+    '') ;;
+    select) EXTRA+=(--myarc-test-agent-space=select) ;;
+    *) EXTRA+=(--myarc-test-agent-space) ;;
+  esac
   SHOT_TITLE=()
   case "${SETTINGS:-}" in
     "") ;;

@@ -89,6 +89,9 @@ class WorkspaceService final : public base::SupportsUserData::Data {
       foundation::SpaceIconKind icon_kind,
       std::string_view icon,
       const foundation::SpaceThemeRecord& theme);
+  // The agent Space's ID, created when missing. Leaves every window's
+  // selected Space alone.
+  foundation::MutationResult EnsureAgentSpace();
   foundation::MutationResult RenameSpace(uint64_t space, std::string_view name);
   // `id` is 1 when the icon changed, else 0. Unset restores the default glyph.
   foundation::MutationResult SetSpaceIcon(uint64_t space,

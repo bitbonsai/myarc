@@ -96,6 +96,7 @@ source_set("browser_workspace_adapter") {
     "//url",
   ]
   deps = [
+    ":test_buildflags",
     ":workspace_lifecycle",
     "//chrome/browser/favicon",
     "//chrome/browser/history",

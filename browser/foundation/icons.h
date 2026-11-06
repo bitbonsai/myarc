@@ -64,6 +64,21 @@ inline constexpr gfx::VectorIcon kArrowDownIcon(kArrowDownRep,
                                                 std::size(kArrowDownRep),
                                                 "myarc_arrow_down");
 
+// "bot" for the agent Space, where external agents open their tabs: its
+// footer glyph and title icon until the user picks another.
+inline constexpr gfx::PathElement kBotPath[] = {
+    gfx::CANVAS_DIMENSIONS, 24, gfx::STROKE, 2,
+    gfx::MOVE_TO, 12, 8, gfx::V_LINE_TO, 4, gfx::H_LINE_TO, 8,
+    gfx::ROUND_RECT, 4, 8, 16, 12, 2,
+    gfx::MOVE_TO, 2, 14, gfx::H_LINE_TO, 4,
+    gfx::MOVE_TO, 20, 14, gfx::H_LINE_TO, 22,
+    gfx::MOVE_TO, 15, 13, gfx::V_LINE_TO, 15,
+    gfx::MOVE_TO, 9, 13, gfx::V_LINE_TO, 15};
+inline constexpr gfx::VectorIconRep kBotRep[] = {{kBotPath}};
+inline constexpr gfx::VectorIcon kBotIcon(kBotRep,
+                                          std::size(kBotRep),
+                                          "myarc_bot");
+
 inline constexpr gfx::PathElement kPlusPath[] = {
     gfx::CANVAS_DIMENSIONS, 24, gfx::STROKE, 2, gfx::MOVE_TO, 5, 12,
     gfx::H_LINE_TO, 19, gfx::MOVE_TO, 12, 5, gfx::V_LINE_TO, 19};

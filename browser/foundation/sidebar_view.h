@@ -109,6 +109,8 @@ class SidebarView final : public views::View,
     uint64_t id = 0;
     std::u16string name;
     SpaceIconChoice icon;
+    // The Profile's agent Space, shown after the others in the footer.
+    bool agent = false;
     bool operator==(const SpaceEntry&) const = default;
   };
 

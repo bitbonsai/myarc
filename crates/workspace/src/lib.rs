@@ -54,6 +54,11 @@ pub const DEFAULT_SPACE_ID: u64 = 1;
 pub const TEST_SPACE_ID: u64 = DEFAULT_SPACE_ID;
 pub const DEFAULT_PROFILE_ID: u64 = 1;
 pub const DEFAULT_WINDOW_ID: u64 = 1;
+/// Name `ensure_agent_space` gives a new agent Space. Users can rename it.
+pub const AGENT_SPACE_NAME: &str = "Agent";
+/// Bundled icon `ensure_agent_space` gives a new agent Space. Users can
+/// change it.
+pub const AGENT_SPACE_ICON: &str = "bot";
 
 // IDs have separate namespaces. Item IDs are never native tab/session identifiers.
 pub type SpaceId = u64;
@@ -183,6 +188,10 @@ pub struct Space {
     /// `None` keeps the default sidebar tint. Snapshots from before themes
     /// have none.
     pub theme: Option<SpaceTheme>,
+    /// Marks the Profile's agent Space, where external agents open their
+    /// tabs. At most one Space per Profile carries it. Renaming the Space or
+    /// changing its icon keeps it; deleting the Space drops it.
+    pub agent: bool,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -317,6 +326,7 @@ impl Default for Workspace {
                     name: String::from("Everyday"),
                     icon: None,
                     theme: None,
+                    agent: false,
                 }],
                 items: Vec::new(),
                 windows: vec![WindowState {
@@ -411,8 +421,39 @@ impl Workspace {
             name: name.to_owned(),
             icon,
             theme,
+            agent: false,
         });
         self.state.next_space_id = next;
+        Ok(id)
+    }
+
+    /// The Profile's agent Space, if it has one.
+    pub fn agent_space_of(&self, profile_id: ProfileId) -> Option<SpaceId> {
+        self.state
+            .spaces
+            .iter()
+            .find(|space| space.agent && space.profile_id == profile_id)
+            .map(|space| space.id)
+    }
+
+    /// The Profile's agent Space, created when it has none: a Space named
+    /// `AGENT_SPACE_NAME` with the `AGENT_SPACE_ICON` icon, after the
+    /// Profile's other Spaces. Idempotent. It never changes a window's
+    /// selected Space or item, so agents can work without moving the user.
+    pub fn ensure_agent_space(&mut self, profile_id: ProfileId) -> Result<SpaceId, WorkspaceError> {
+        validate_profile(profile_id)?;
+        if let Some(id) = self.agent_space_of(profile_id) {
+            return Ok(id);
+        }
+        let id = self.create_styled_space(
+            profile_id,
+            AGENT_SPACE_NAME,
+            Some(SpaceIcon::Named(AGENT_SPACE_ICON.to_owned())),
+            None,
+        )?;
+        if let Some(space) = self.state.spaces.iter_mut().find(|space| space.id == id) {
+            space.agent = true;
+        }
         Ok(id)
     }
 
@@ -439,6 +480,7 @@ impl Workspace {
                     && space.name == "Everyday"
                     && space.icon.is_none()
                     && space.theme.is_none()
+                    && !space.agent
             );
         if !untouched {
             return self.create_styled_space(profile_id, name, icon, theme);
@@ -1036,6 +1078,7 @@ impl Workspace {
         };
         workspace.sanitize_archive();
         workspace.sanitize_icons();
+        workspace.sanitize_agent_spaces();
         workspace.validate()?;
         Ok(workspace)
     }
@@ -1059,6 +1102,18 @@ impl Workspace {
             }
             if validate_theme(space.theme).is_err() {
                 space.theme = None;
+            }
+        }
+    }
+
+    /// A Profile keeps only its first marked agent Space. A second mark can
+    /// only come from a damaged or hand-edited file, so the extra Spaces load
+    /// as ordinary ones instead of failing the snapshot.
+    fn sanitize_agent_spaces(&mut self) {
+        let mut marked = BTreeSet::new();
+        for space in &mut self.state.spaces {
+            if space.agent && !marked.insert(space.profile_id) {
+                space.agent = false;
             }
         }
     }
@@ -1645,6 +1700,7 @@ mod tests {
             name: "Work".into(),
             icon: None,
             theme: None,
+            agent: false,
         });
         legacy.next_space_id = 3;
         let workspace = Workspace::from_snapshot(legacy.clone()).unwrap();
@@ -1792,6 +1848,7 @@ mod tests {
             name: "Work".into(),
             icon: emoji("☕"),
             theme: None,
+            agent: false,
         });
         legacy.next_space_id = 3;
         let workspace = Workspace::from_snapshot(legacy.clone()).unwrap();

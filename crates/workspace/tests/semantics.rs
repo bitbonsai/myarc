@@ -1117,6 +1117,7 @@ fn old_snapshot_with_space_one_loads_unchanged() {
                 name: "Everyday".into(),
                 icon: None,
                 theme: None,
+                agent: false,
             },
             Space {
                 id: 2,
@@ -1124,6 +1125,7 @@ fn old_snapshot_with_space_one_loads_unchanged() {
                 name: "Work".into(),
                 icon: None,
                 theme: None,
+                agent: false,
             },
         ],
         items: vec![Item {
@@ -1453,4 +1455,131 @@ fn move_space_before_rejects_unknown_ids_without_mutation() {
     );
     workspace.move_space_before(S1, None).unwrap();
     assert_eq!(space_order(&workspace), [s2, S1]);
+}
+
+fn agent_space(workspace: &Workspace, id: SpaceId) -> Space {
+    workspace
+        .snapshot()
+        .spaces
+        .into_iter()
+        .find(|space| space.id == id)
+        .unwrap()
+}
+
+#[test]
+fn ensure_agent_space_is_idempotent_and_leaves_windows_alone() {
+    let mut workspace = Workspace::default();
+    let work = workspace.create_space(P1, "Work").unwrap();
+    let saved = pin(&mut workspace, S1);
+    workspace.select_item(W1, saved).unwrap();
+    let window = workspace.create_window(work).unwrap();
+    assert_eq!(workspace.agent_space_of(P1), None);
+    let windows = workspace.snapshot().windows;
+
+    let agent = workspace.ensure_agent_space(P1).unwrap();
+    let space = agent_space(&workspace, agent);
+    assert_eq!(space.name, AGENT_SPACE_NAME);
+    assert_eq!(space.icon, Some(SpaceIcon::Named(AGENT_SPACE_ICON.into())));
+    assert!(space.agent);
+    assert_eq!(workspace.snapshot().spaces.last().unwrap().id, agent);
+    assert_eq!(workspace.agent_space_of(P1), Some(agent));
+    assert_eq!(workspace.snapshot().windows, windows);
+
+    let before = workspace.snapshot();
+    assert_eq!(workspace.ensure_agent_space(P1), Ok(agent));
+    assert_eq!(workspace.snapshot(), before);
+    assert_eq!(
+        workspace.sidebar_snapshot(window).unwrap().current_space.id,
+        work
+    );
+    assert_eq!(
+        workspace.sidebar_snapshot(W1).unwrap().selected_item_id,
+        Some(saved)
+    );
+    unchanged(
+        &mut workspace,
+        |workspace| workspace.ensure_agent_space(2),
+        WorkspaceError::UnknownProfile(2),
+    );
+}
+
+#[test]
+fn agent_space_round_trips_through_snapshot() {
+    let mut workspace = Workspace::default();
+    let agent = workspace.ensure_agent_space(P1).unwrap();
+    let snapshot = workspace.snapshot();
+    let restored = Workspace::from_snapshot(snapshot.clone()).unwrap();
+    assert_eq!(restored.snapshot(), snapshot);
+    assert_eq!(restored.agent_space_of(P1), Some(agent));
+}
+
+#[test]
+fn renaming_or_restyling_the_agent_space_keeps_the_mark() {
+    let mut workspace = Workspace::default();
+    let agent = workspace.ensure_agent_space(P1).unwrap();
+    workspace.rename_space(agent, "Robots").unwrap();
+    workspace
+        .set_space_icon(agent, Some(SpaceIcon::Named("rocket".into())))
+        .unwrap();
+    assert_eq!(workspace.agent_space_of(P1), Some(agent));
+    assert_eq!(workspace.ensure_agent_space(P1), Ok(agent));
+    let space = agent_space(&workspace, agent);
+    assert_eq!(space.name, "Robots");
+    assert_eq!(space.icon, Some(SpaceIcon::Named("rocket".into())));
+    workspace.set_space_icon(agent, None).unwrap();
+    assert_eq!(workspace.agent_space_of(P1), Some(agent));
+}
+
+#[test]
+fn deleting_the_agent_space_clears_the_mark() {
+    let mut workspace = Workspace::default();
+    let agent = workspace.ensure_agent_space(P1).unwrap();
+    workspace.select_space(W1, agent).unwrap();
+    let deletion = workspace.delete_space(agent).unwrap();
+    assert_eq!(deletion.fallback_space, S1);
+    assert_eq!(workspace.agent_space_of(P1), None);
+    assert!(workspace.snapshot().spaces.iter().all(|space| !space.agent));
+
+    // The next ensure makes a fresh Space with a new ID.
+    let again = workspace.ensure_agent_space(P1).unwrap();
+    assert_ne!(again, agent);
+    assert_eq!(workspace.agent_space_of(P1), Some(again));
+}
+
+#[test]
+fn a_profile_keeps_one_agent_space() {
+    let mut workspace = Workspace::default();
+    let work = workspace.create_space(P1, "Work").unwrap();
+    let agent = workspace.ensure_agent_space(P1).unwrap();
+    assert_eq!(workspace.ensure_agent_space(P1), Ok(agent));
+    let marked = |workspace: &Workspace| {
+        workspace
+            .snapshot()
+            .spaces
+            .iter()
+            .filter(|space| space.agent)
+            .count()
+    };
+    assert_eq!(marked(&workspace), 1);
+
+    // A file that marks two Spaces keeps the first mark only.
+    let mut snapshot = workspace.snapshot();
+    for space in &mut snapshot.spaces {
+        space.agent = space.id == work || space.id == agent;
+    }
+    let restored = Workspace::from_snapshot(snapshot).unwrap();
+    assert_eq!(restored.agent_space_of(P1), Some(work));
+    assert_eq!(marked(&restored), 1);
+}
+
+#[test]
+fn agent_space_does_not_count_as_an_untouched_default() {
+    let mut snapshot = Workspace::default().snapshot();
+    snapshot.spaces[0].agent = true;
+    let mut workspace = Workspace::from_snapshot(snapshot).unwrap();
+    let created = workspace
+        .create_first_space(P1, "Home", None, None)
+        .unwrap();
+    assert_ne!(created, S1);
+    assert_eq!(workspace.agent_space_of(P1), Some(S1));
 }

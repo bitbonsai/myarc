@@ -52,6 +52,9 @@ mod ffi {
         icon_kind: SpaceIconKind,
         icon: String,
         theme: SpaceThemeRecord,
+        // The Profile's agent Space, where external agents open tabs. At most
+        // one Space carries it.
+        agent: bool,
     }
 
     struct ItemRecord {
@@ -161,6 +164,9 @@ mod ffi {
             icon: &str,
             theme: SpaceThemeRecord,
         ) -> MutationResult;
+        // The agent Space's ID, creating it named "Agent" with the "bot" icon
+        // when the Profile has none. Never changes a window's Space.
+        fn ensure_agent_space(workspace: &mut Workspace) -> MutationResult;
         // Unset restores the default glyph. `id` is 1 when the icon changed,
         // else 0.
         fn set_space_icon(
@@ -399,6 +405,14 @@ pub fn create_first_space(
         )),
         Err(error) => reject(error),
     }
+}
+
+pub fn ensure_agent_space(workspace: &mut Workspace) -> ffi::MutationResult {
+    outcome(
+        workspace
+            .0
+            .ensure_agent_space(workspace::DEFAULT_PROFILE_ID),
+    )
 }
 
 pub fn set_space_theme(
@@ -732,6 +746,7 @@ fn space_record(space: workspace::Space) -> ffi::SpaceRecord {
         icon_kind,
         icon,
         theme: theme_record(space.theme),
+        agent: space.agent,
     }
 }
 
@@ -777,6 +792,7 @@ pub fn sidebar_snapshot(workspace: &Workspace, window_id: u64) -> ffi::SidebarRe
                 icon_kind: ffi::SpaceIconKind::Unset,
                 icon: String::new(),
                 theme: theme_record(None),
+                agent: false,
             },
             selected_item_id: 0,
             spaces: Vec::new(),
@@ -870,6 +886,8 @@ pub fn restore_snapshot(
                         },
                         // The core drops a bad theme on restore.
                         theme: space_theme(&space.theme),
+                        // The core keeps one mark per Profile on restore.
+                        agent: space.agent,
                         name: space.name,
                     })
                     .collect(),

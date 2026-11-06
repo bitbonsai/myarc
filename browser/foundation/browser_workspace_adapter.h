@@ -139,6 +139,9 @@ class BrowserWorkspaceAdapter final : public TabStripModelObserver {
       foundation::SpaceIconKind icon_kind,
       std::string_view icon,
       const foundation::SpaceThemeRecord& theme);
+  // The agent Space's ID, created when missing. The window stays in its
+  // Space.
+  foundation::MutationResult EnsureAgentSpace();
   foundation::MutationResult RenameSpace(uint64_t space, std::string_view name);
   foundation::MutationResult SetSpaceIcon(uint64_t space,
                                           foundation::SpaceIconKind icon_kind,

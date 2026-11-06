@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "base/auto_reset.h"
+#include "base/command_line.h"
 #include "base/functional/bind.h"
 #include "base/functional/callback_helpers.h"
 #include "base/location.h"
@@ -44,6 +45,7 @@
 #include "content/public/browser/web_contents_observer.h"
 #include "content/public/common/page_type.h"
 #include "content/public/common/url_constants.h"
+#include "myarc/test_buildflags.h"
 #include "myarc/workspace_lifecycle.h"
 #include "url/origin.h"
 
@@ -80,6 +82,14 @@ class WorkspaceLifecycleBridge final : public WorkspaceLifecycle {
 };
 
 namespace {
+
+#if BUILDFLAG(MYARC_TEST_HOOKS)
+// Creates the agent Space once the first window's workspace is ready, for
+// tests and captures; "select" also shows it in that window. No user-facing
+// UI creates it yet.
+constexpr char kMyarcTestAgentSpace[] = "myarc-test-agent-space";
+bool g_agent_space_hook_done = false;
+#endif  // BUILDFLAG(MYARC_TEST_HOOKS)
 
 const char kRuntimeKey = 0;
 const char kBindingKey = 0;
@@ -1381,6 +1391,27 @@ void BrowserWorkspaceAdapter::Refresh() {
     if (sidebar.ok)
       RequestSavedIcons(sidebar);
   }
+#if BUILDFLAG(MYARC_TEST_HOOKS)
+  const auto* command_line = base::CommandLine::ForCurrentProcess();
+  if (ready() && !g_agent_space_hook_done &&
+      command_line->HasSwitch(kMyarcTestAgentSpace)) {
+    g_agent_space_hook_done = true;
+    const bool select =
+        command_line->GetSwitchValueASCII(kMyarcTestAgentSpace) == "select";
+    // Mutating mid-refresh would skip this pass's notification; run after it.
+    base::SingleThreadTaskRunner::GetCurrentDefault()->PostTask(
+        FROM_HERE, base::BindOnce(
+                       [](base::WeakPtr<BrowserWorkspaceAdapter> adapter,
+                          bool select) {
+                         if (!adapter)
+                           return;
+                         auto result = adapter->EnsureAgentSpace();
+                         if (result.ok && select)
+                           adapter->SelectSpace(result.id);
+                       },
+                       weak_factory_.GetWeakPtr(), select));
+  }
+#endif  // BUILDFLAG(MYARC_TEST_HOOKS)
   changed_.Notify();
 }
 
@@ -1649,6 +1680,9 @@ foundation::MutationResult BrowserWorkspaceAdapter::CreateSpace(
     const foundation::SpaceThemeRecord& theme) {
   return Remember(ready() ? service_->CreateSpace(name, icon_kind, icon, theme)
                           : Fail(error()));
+}
+foundation::MutationResult BrowserWorkspaceAdapter::EnsureAgentSpace() {
+  return Remember(ready() ? service_->EnsureAgentSpace() : Fail(error()));
 }
 foundation::MutationResult BrowserWorkspaceAdapter::RenameSpace(
     uint64_t space,

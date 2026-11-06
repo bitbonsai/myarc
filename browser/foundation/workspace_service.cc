@@ -205,6 +205,10 @@ std::optional<std::string> EncodeWorkspaceMetadata(
       record.Set("theme_color", static_cast<int>(space.theme.color));
       record.Set("theme_opacity", static_cast<int>(space.theme.opacity));
     }
+    // And for the agent Space's mark.
+    if (space.agent) {
+      record.Set("agent", true);
+    }
     spaces.Append(std::move(record));
   }
   root.Set("spaces", std::move(spaces));
@@ -345,6 +349,9 @@ MetadataResult DecodeWorkspaceMetadata(std::string_view json) {
                      .color = static_cast<uint32_t>(*theme_color),
                      .opacity = static_cast<uint8_t>(*theme_opacity)};
     }
+    // Files written before the agent Space have no "agent" key. Rust restore
+    // keeps the first mark per Profile.
+    space.agent = record->FindBool("agent").value_or(false);
     snapshot.spaces.push_back(std::move(space));
   }
   for (const auto& value : *items) {
@@ -686,6 +693,12 @@ foundation::MutationResult WorkspaceService::CreateFirstSpace(
   return SpacesChanged(foundation::create_first_space(
       *workspace_, rust::Str(name.data(), name.size()), icon_kind,
       rust::Str(icon.data(), icon.size()), theme));
+}
+
+foundation::MutationResult WorkspaceService::EnsureAgentSpace() {
+  if (!CanMutate())
+    return Failure("Workspace is not loaded. Check storage state.");
+  return SpacesChanged(foundation::ensure_agent_space(*workspace_));
 }
 
 foundation::MutationResult WorkspaceService::RenameSpace(

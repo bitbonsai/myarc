@@ -1,5 +1,6 @@
 #include <iostream>
 #include <limits>
+#include <optional>
 #include <string>
 #include <tuple>
 #include <utility>
@@ -390,6 +391,59 @@ bool CheckSpaceIcons() {
   }
   const auto cleared = EncodeWorkspaceMetadata(export_snapshot(*restored));
   return cleared && cleared->find("icon_kind") == std::string::npos;
+}
+
+// The agent Space is created once with the bot icon, leaves the window's
+// Space alone, and keeps its mark through the metadata file and restore.
+// Files without the key load with no agent Space.
+bool CheckAgentSpace() {
+  using namespace myarc::foundation;
+  using myarc::internal::DecodeWorkspaceMetadata;
+  using myarc::internal::EncodeWorkspaceMetadata;
+  const auto agent_of = [](const Workspace& model) {
+    std::optional<SpaceRecord> found;
+    for (auto& space : sidebar_snapshot(model, 1).spaces) {
+      if (space.agent) {
+        found = std::move(space);
+      }
+    }
+    return found;
+  };
+  auto model = new_workspace();
+  const auto plain = EncodeWorkspaceMetadata(export_snapshot(*model));
+  auto agent = ensure_agent_space(*model);
+  auto again = ensure_agent_space(*model);
+  auto space = agent_of(*model);
+  if (!plain || plain->find("\"agent\"") != std::string::npos || !agent.ok ||
+      !again.ok || again.id != agent.id || !space || space->id != agent.id ||
+      std::string(space->name) != "Agent" ||
+      space->icon_kind != SpaceIconKind::Named ||
+      std::string(space->icon) != "bot" ||
+      sidebar_snapshot(*model, 1).current_space.id != 1) {
+    return false;
+  }
+  if (!rename_space(*model, agent.id, "Robots").ok) {
+    return false;
+  }
+  const auto encoded = EncodeWorkspaceMetadata(export_snapshot(*model));
+  if (!encoded) {
+    return false;
+  }
+  auto decoded = DecodeWorkspaceMetadata(*encoded);
+  auto restored = new_workspace();
+  if (!decoded.snapshot ||
+      !restore_snapshot(*restored, std::move(*decoded.snapshot)).ok ||
+      !(space = agent_of(*restored)) || space->id != agent.id ||
+      std::string(space->name) != "Robots" ||
+      ensure_agent_space(*restored).id != agent.id) {
+    std::cerr << "Agent Space round trip failed: " << decoded.error << '\n';
+    return false;
+  }
+  decoded = DecodeWorkspaceMetadata(*plain);
+  restored = new_workspace();
+  return decoded.snapshot &&
+         restore_snapshot(*restored, std::move(*decoded.snapshot)).ok &&
+         !agent_of(*restored);
 }
 
 // A Space's theme survives the bridge, the metadata file and restore. A bad
@@ -1129,13 +1183,17 @@ int main() {
     std::cerr << "Spaces index checks failed\n";
     return 21;
   }
+  if (!CheckAgentSpace()) {
+    std::cerr << "Agent Space checks failed\n";
+    return 24;
+  }
   std::cout
       << "7 legacy C++/Rust checks passed, including 1000 ownership "
          "round trips; workspace transitions, Space 1 deletion and "
          "metadata codec, saved title, Archived Tabs, Auto Archive, "
          "archive timer, Clear Archive, downloads stack, dormant "
          "temporary item, Space reorder, Space icon, Space theme, first "
-         "Space and Spaces index checks "
+         "Space, Spaces index and agent Space checks "
          "passed\n";
   return 0;
 }
