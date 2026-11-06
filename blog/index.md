@@ -4,6 +4,12 @@ HTML: https://myarc.dev/blog/
 
 November 2026
 
+## [One window, two profiles](https://myarc.dev/blog/one-window-two-profiles/)
+
+November 06, 2026
+
+myArc now has real Profiles, so Work and Personal keep their own cookies and logins. Getting them to live in one window, the way Arc did, took more than I expected.
+
 ## [Taking a few patches from ungoogled-chromium](https://myarc.dev/blog/ungoogled-chromium/)
 
 November 04, 2026
