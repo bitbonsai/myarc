@@ -283,7 +283,9 @@ fn put_back_loses_to_a_newer_snapshot() {
     let newer = store.record(7, vec![99]);
     store.put_back(prepared.taken);
     assert!(is_stale(store.resolve(7, &revision, "e1")));
-    assert_eq!(store.resolve(7, &newer, "e1"), Ok(99));
+    // Node 99 is new to the document, so it takes the next number.
+    assert_eq!(store.resolve(7, &newer, "e7"), Ok(99));
+    assert!(is_stale(store.resolve(7, &newer, "e1")));
 }
 
 #[test]
@@ -312,7 +314,9 @@ fn done_answers_with_a_new_snapshot_and_changes() {
     assert_eq!(data["navigated"], false);
     assert_eq!(data["settled"], true);
     let new_revision = data["revision"].as_str().unwrap();
-    assert_ne!(new_revision, revision);
+    // One step per action: the snapshot was 7.1.
+    assert_eq!(revision, "7.1");
+    assert_eq!(new_revision, "7.2");
     assert_eq!(data["snapshot"]["revision"], new_revision);
     assert!(
         data["snapshot"]["text"]
@@ -320,20 +324,23 @@ fn done_answers_with_a_new_snapshot_and_changes() {
             .unwrap()
             .contains("checkbox \"News\" [ref=e2] [checked]")
     );
+    // Refs keep their numbers: the new button takes e7, never the link's e6.
     assert_eq!(
-        data["changes"]["changed"],
-        json!(["checkbox \"News\" [ref=e2] [checked]"])
+        data["changes"],
+        json!({ "added": ["e7"], "removed": ["e6"], "changed": ["e2 checked"] })
     );
-    assert_eq!(
-        data["changes"]["added"],
-        json!(["button \"Undo\" [ref=e6]"])
+    assert!(
+        data["snapshot"]["text"]
+            .as_str()
+            .unwrap()
+            .contains("button \"Undo\" [ref=e7]")
     );
-    assert_eq!(
-        data["changes"]["removed"],
-        json!(["link \"Docs\" -> /docs.html (was e6)"])
-    );
-    // The new revision resolves; the old one is stale.
-    assert_eq!(store.resolve(7, new_revision, "e6"), Ok(16));
+    // The new revision resolves; the old one is stale, and so is the ref of
+    // the link that left the page.
+    assert_eq!(store.resolve(7, new_revision, "e7"), Ok(16));
+    assert_eq!(store.resolve(7, new_revision, "e1"), Ok(10));
+    assert!(is_stale(store.resolve(7, new_revision, "e6")));
+    assert!(is_invalid(store.resolve(7, new_revision, "e8")));
     assert!(is_stale(store.resolve(7, &revision, "e1")));
 }
 
@@ -402,6 +409,8 @@ fn unknown_outcomes_keep_the_revision_stale() {
 fn changes_are_bounded_and_skip_nodes_without_dom_ids() {
     let target = |node: i32, name: &str| myarc_control::snapshot::RefTarget {
         node,
+        number: node.unsigned_abs(),
+        name: name.to_owned(),
         head: format!("button \"{name}\""),
         ..Default::default()
     };
@@ -409,11 +418,63 @@ fn changes_are_bounded_and_skip_nodes_without_dom_ids() {
         .map(|n| target(n, &n.to_string()))
         .chain([target(-4, "generated")])
         .collect();
-    let out = changes(&[target(-4, "generated")], &after);
+    let out = changes(&[target(-4, "generated")], &after, 1_000);
     assert_eq!(out["added"].as_array().unwrap().len(), MAX_CHANGES);
+    assert_eq!(out["added"][0], "e1");
     assert_eq!(out["more"], 10);
     assert!(out.get("removed").is_none());
-    assert_eq!(changes(&after, &after), json!({}));
+    assert_eq!(changes(&after, &after, 1_000), json!({}));
+}
+
+#[test]
+fn changes_name_what_changed_skip_focus_and_give_way_to_the_outline() {
+    use myarc_control::snapshot::RefTarget;
+    let field = |value: &str, focused: bool| {
+        let mut state = vec![("required", String::from(" [required]"))];
+        if focused {
+            state.push(("focused", String::from(" [focused]")));
+        }
+        state.push(("value", format!(" value=\"{value}\"")));
+        RefTarget {
+            node: 10,
+            number: 1,
+            role: String::from("textField"),
+            name: String::from("Username"),
+            state,
+            ..RefTarget::default()
+        }
+    };
+    let button = RefTarget {
+        node: 11,
+        number: 2,
+        name: String::from("Sign in"),
+        ..RefTarget::default()
+    };
+    // Focus alone is no change.
+    let before = [field("", false), button.clone()];
+    assert_eq!(
+        changes(&before, &[field("", true), button.clone()], 5),
+        json!({})
+    );
+    // A value that came with focus reports only the value.
+    assert_eq!(
+        changes(&before, &[field("dana", true), button.clone()], 5),
+        json!({ "changed": ["e1 value"] })
+    );
+    let mut renamed = button.clone();
+    renamed.name = String::from("Signing in");
+    renamed.state = vec![("disabled", String::from(" [disabled]"))];
+    assert_eq!(
+        changes(&before, &[field("", false), renamed], 5),
+        json!({ "changed": ["e2 name disabled"] })
+    );
+    // More changes than half the outline's lines: the outline says it better.
+    let link = RefTarget {
+        node: 12,
+        number: 3,
+        ..RefTarget::default()
+    };
+    assert_eq!(changes(&before, &[link], 3), json!({ "many": true }));
 }
 
 #[test]

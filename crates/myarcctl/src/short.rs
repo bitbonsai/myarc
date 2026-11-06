@@ -21,9 +21,8 @@ use crate::{EXIT_NOT_CONNECTED, call, connect, request_id, write_line};
 
 const ECHO_ENV: &str = "MYARCCTL_ECHO_REQUESTS";
 const STATE_FILE: &str = "cli-state.json";
-/// Largest state file the CLI reads back. A full outline's hashes take
-/// about 40 KiB.
-const MAX_STATE_BYTES: u64 = 256 * 1024;
+/// Largest state file the CLI reads back.
+const MAX_STATE_BYTES: u64 = 64 * 1024;
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Short {
@@ -138,14 +137,12 @@ pub fn parse_tab(text: &str) -> Result<String, String> {
     }
 }
 
-/// What the CLI remembers between calls: the current tab, the revision it
-/// last printed for that tab, and hashes of that outline's ref lines without
-/// their ref and focus markers, which tell focus-only changes apart.
+/// What the CLI remembers between calls: the current tab and the revision
+/// it last printed for that tab.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct State {
     pub tab: Option<String>,
     pub revision: Option<String>,
-    pub seen: Vec<u64>,
 }
 
 impl State {
@@ -167,19 +164,9 @@ impl State {
         let revision = value["revision"]
             .as_str()
             .filter(|revision| tab.is_some() && actions::check_revision(revision).is_ok());
-        let mut seen: Vec<u64> = value["seen"]
-            .as_array()
-            .map(|list| {
-                list.iter()
-                    .filter_map(|hash| u64::from_str_radix(hash.as_str()?, 16).ok())
-                    .collect()
-            })
-            .unwrap_or_default();
-        seen.sort_unstable();
         Self {
             tab: tab.map(str::to_owned),
             revision: revision.map(str::to_owned),
-            seen,
         }
     }
 
@@ -192,7 +179,6 @@ impl State {
         let value = json!({
             "tab": self.tab,
             "revision": self.revision,
-            "seen": self.seen.iter().map(|hash| format!("{hash:x}")).collect::<Vec<_>>(),
         });
         let temp = path.with_extension(format!("tmp-{}", std::process::id()));
         let written = (|| {
@@ -280,9 +266,6 @@ impl State {
         if let Some(revision) = data["revision"].as_str() {
             self.revision = Some(revision.to_owned());
         }
-        if let Some(text) = data["snapshot"]["text"].as_str().or(data["text"].as_str()) {
-            self.seen = ref_hashes(text);
-        }
     }
 }
 
@@ -347,81 +330,105 @@ pub fn has_ref(line: &str) -> bool {
     false
 }
 
-/// Keeps the lines with a ref and the ancestor lines they sit under, for
-/// `snapshot -i`.
+/// A link line's quoted name and the byte offset of its ` -> ` target, or
+/// `None` for other lines.
+fn link_parts(line: &str) -> Option<(&str, Option<usize>)> {
+    let trimmed = line.trim_start();
+    if !trimmed.starts_with("link \"") {
+        return None;
+    }
+    let indent = line.len() - trimmed.len();
+    let parts = segments(trimmed);
+    let name = parts.iter().find(|(quoted, _)| *quoted)?.1;
+    let mut offset = indent;
+    for (quoted, run) in &parts {
+        if !quoted && let Some(at) = run.find(" -> ") {
+            return Some((name, Some(offset + at)));
+        }
+        offset += run.len();
+    }
+    Some((name, None))
+}
+
+fn starts_with_kind(line: &str, kind: &str) -> bool {
+    line.trim_start()
+        .strip_prefix(kind)
+        .is_some_and(|rest| rest.starts_with(" \""))
+}
+
+/// The outline for `snapshot -i`: lines with a ref, the ancestor lines they
+/// sit under, the nearest heading before each and the text line right
+/// before it, such as the item a "Details" link belongs to. A link keeps its
+/// target only when another kept link shares its name.
 pub fn interactive(text: &str) -> String {
-    let mut out = Vec::new();
-    // Open ancestors: indentation, line, already printed.
-    let mut stack: Vec<(usize, &str, bool)> = Vec::new();
-    for line in text.lines() {
+    let lines: Vec<&str> = text.lines().collect();
+    let mut keep = vec![false; lines.len()];
+    // Open ancestors by indentation, the latest heading, and the latest
+    // text since the previous ref line.
+    let mut stack: Vec<(usize, usize)> = Vec::new();
+    let mut heading = None;
+    let mut last_text = None;
+    for (index, line) in lines.iter().enumerate() {
         let depth = line.len() - line.trim_start_matches(' ').len();
-        while stack.last().is_some_and(|(open, ..)| *open >= depth) {
+        while stack.last().is_some_and(|(open, _)| *open >= depth) {
             stack.pop();
         }
-        let wanted = has_ref(line);
-        if wanted {
-            for (_, ancestor, printed) in stack.iter_mut().filter(|entry| !entry.2) {
-                out.push(*ancestor);
-                *printed = true;
+        if has_ref(line) {
+            for (_, ancestor) in &stack {
+                keep[*ancestor] = true;
             }
-            out.push(line);
+            for extra in [heading, last_text.take()].into_iter().flatten() {
+                keep[extra] = true;
+            }
+            keep[index] = true;
+        } else if starts_with_kind(line, "heading") {
+            heading = Some(index);
+            last_text = None;
+        } else if starts_with_kind(line, "text") {
+            last_text = Some(index);
         }
-        stack.push((depth, line, wanted));
+        stack.push((depth, index));
+    }
+    let mut names: std::collections::HashMap<&str, usize> = std::collections::HashMap::new();
+    for (index, line) in lines.iter().enumerate() {
+        if keep[index]
+            && has_ref(line)
+            && let Some((name, _)) = link_parts(line)
+        {
+            *names.entry(name).or_default() += 1;
+        }
+    }
+    let mut out = Vec::new();
+    for (index, line) in lines.iter().enumerate() {
+        if !keep[index] {
+            continue;
+        }
+        match link_parts(line) {
+            Some((name, Some(at))) if has_ref(line) && names.get(name) == Some(&1) => {
+                out.push(&line[..at]);
+            }
+            _ => out.push(line),
+        }
     }
     out.join("\n")
 }
 
-/// A ref line without indentation, its `[ref=eN]` and its `[focused]`,
-/// leaving quoted page text alone.
-fn unmarked(line: &str) -> String {
-    let mut out = String::with_capacity(line.len());
-    for (quoted, run) in segments(line.trim_start()) {
-        if quoted {
-            out.push_str(run);
-            continue;
-        }
-        let mut rest = run.replace(" [focused]", "");
-        while let Some(start) = rest.find(" [ref=e") {
-            let end = rest[start..]
-                .find(']')
-                .map_or(rest.len(), |end| start + end + 1);
-            rest.replace_range(start..end, "");
-        }
-        out.push_str(&rest);
+/// The `changes` of an action as short lines, such as `changed e1 value`,
+/// or `changes: many (see outline)` when the outline says more.
+pub fn change_lines(changes: &Value) -> Vec<String> {
+    if changes["many"] == true {
+        return vec![String::from("changes: many (see outline)")];
     }
-    out
-}
-
-/// FNV-1a, stable across builds so the state file survives an update.
-fn hash(text: &str) -> u64 {
-    text.bytes().fold(0xcbf2_9ce4_8422_2325, |hash, byte| {
-        (hash ^ u64::from(byte)).wrapping_mul(0x0100_0000_01b3)
-    })
-}
-
-/// Sorted hashes of an outline's ref lines without their markers.
-pub fn ref_hashes(text: &str) -> Vec<u64> {
-    let mut hashes: Vec<u64> = text
-        .lines()
-        .filter(|line| has_ref(line))
-        .map(|line| hash(&unmarked(line)))
-        .collect();
-    hashes.sort_unstable();
-    hashes.dedup();
-    hashes
-}
-
-/// The `changes` of an action as lines, leaving out `changed` entries that
-/// differ from a line of the previous outline (`seen`) only in `[focused]`.
-pub fn change_lines(changes: &Value, seen: &[u64]) -> Vec<String> {
     let mut lines = Vec::new();
     for key in ["added", "removed", "changed"] {
-        for line in changes[key].as_array().into_iter().flatten() {
-            let Some(line) = line.as_str() else { continue };
-            if key == "changed" && seen.binary_search(&hash(&unmarked(line))).is_ok() {
-                continue;
-            }
-            lines.push(format!("{key}: {line}"));
+        let list: Vec<&str> = changes[key]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .filter_map(Value::as_str)
+            .collect();
+        if !list.is_empty() {
+            lines.push(format!("{key} {}", list.join(", ")));
         }
     }
     if let Some(more) = changes["more"].as_u64() {
@@ -466,7 +473,7 @@ pub fn render_snapshot(data: &Value, interactive_only: bool) -> String {
 
 /// An action's answer: `ok click e4 · rev 1.5 · navigated`, the changes, then
 /// the new outline.
-pub fn render_action(label: &str, data: &Value, seen: &[u64]) -> String {
+pub fn render_action(label: &str, data: &Value) -> String {
     let snapshot = &data["snapshot"];
     let mut status = vec![
         format!("ok {label}"),
@@ -483,7 +490,7 @@ pub fn render_action(label: &str, data: &Value, seen: &[u64]) -> String {
         status.push(String::from("truncated"));
     }
     let mut lines = vec![status.join(" · ")];
-    lines.extend(change_lines(&data["changes"], seen));
+    lines.extend(change_lines(&data["changes"]));
     lines.push(snapshot["text"].as_str().unwrap_or_default().to_owned());
     join_nonempty(&lines)
 }
@@ -650,7 +657,6 @@ pub fn run(short: Short, overrides: Overrides, json_output: bool) -> ExitCode {
             return ExitCode::from(EXIT_NOT_CONNECTED);
         }
     };
-    let seen = state.seen.clone();
     let first = send(&mut client, command, params);
     state.apply(&first);
     let mut out = Output::new(json_output);
@@ -697,7 +703,7 @@ pub fn run(short: Short, overrides: Overrides, json_output: bool) -> ExitCode {
                     "ok close {}",
                     data["tab"]["handle"].as_str().unwrap_or_default()
                 ),
-                _ => render_action(&label(&short), data, &seen),
+                _ => render_action(&label(&short), data),
             };
             out.text(&text);
             true
@@ -823,11 +829,8 @@ footer
             "navigated": false,
             "settled": true,
             "changes": {
-                "added": ["text \"Thanks\" [ref=e6]"],
-                "changed": [
-                    "button \"Send\" [ref=e4]",
-                    "textbox \"Email\" [ref=e1] [focused] [required] value=\"me@example.test\"",
-                ],
+                "added": ["e6"],
+                "changed": ["e1 value"],
             },
             "snapshot": {
                 "tab": "t12",
@@ -883,20 +886,69 @@ footer
     }
 
     #[test]
-    fn interactive_keeps_ref_lines_and_their_ancestors() {
+    fn interactive_keeps_ref_lines_their_ancestors_heading_and_text() {
         assert_eq!(
             interactive(OUTLINE),
             "\
 main
+  heading \"Agent page one\" [level=1]
   form
     textbox \"Email\" [ref=e1] [required] value=\"\"
     checkbox \"Send me news\" [ref=e2]
     group \"Plan\"
+      text \"Pick one\"
       combobox \"Plan\" [ref=e3] [collapsed] value=\"Pro\"
     button \"Send\" [ref=e4] [focused]
-  link \"Docs\" [ref=e5] -> /docs.html"
+  text \"Fake button \\\"x\\\" [ref=e9]\"
+  link \"Docs\" [ref=e5]"
         );
         assert_eq!(interactive("heading \"x\"\ntext \"[ref=e1]\""), "");
+    }
+
+    /// The list page of the 2026-11-06 dogfood: five "Details" links that
+    /// differ only by target.
+    const LIST: &str = "\
+heading \"Lanterns\" [level=1]
+searchbox \"Search\" [ref=e1] value=\"\"
+text \"Item 1: Copper storm lantern\"
+link \"Details\" [ref=e2] -> /details.html?id=1
+text \"Item 2: Paper festival lantern\"
+link \"Details\" [ref=e3] -> /details.html?id=2
+text \"Item 3: Brass ship lantern\"
+link \"Details\" [ref=e4] -> /details.html?id=3
+text \"5 lanterns\"
+link \"Help\" [ref=e7] -> /help.html
+heading \"Footer\" [level=2]
+text \"Made with care\"";
+
+    #[test]
+    fn interactive_keeps_list_items_and_targets_only_where_names_repeat() {
+        assert_eq!(
+            interactive(LIST),
+            "\
+heading \"Lanterns\" [level=1]
+searchbox \"Search\" [ref=e1] value=\"\"
+text \"Item 1: Copper storm lantern\"
+link \"Details\" [ref=e2] -> /details.html?id=1
+text \"Item 2: Paper festival lantern\"
+link \"Details\" [ref=e3] -> /details.html?id=2
+text \"Item 3: Brass ship lantern\"
+link \"Details\" [ref=e4] -> /details.html?id=3
+text \"5 lanterns\"
+link \"Help\" [ref=e7]"
+        );
+        // The details page: the heading names the item above its button.
+        assert_eq!(
+            interactive(
+                "heading \"Item 3: Brass ship lantern\" [level=1]\ntext \"Stock 12, shelf B3\"\nbutton \"Delete\" [ref=e1]\nlink \"Back to list\" [ref=e2] -> /list.html"
+            ),
+            "heading \"Item 3: Brass ship lantern\" [level=1]\ntext \"Stock 12, shelf B3\"\nbutton \"Delete\" [ref=e1]\nlink \"Back to list\" [ref=e2]"
+        );
+        // A quoted " -> " in a link's name is page text, not its target.
+        assert_eq!(
+            interactive("link \"a -> b\" [ref=e1] -> /x"),
+            "link \"a -> b\" [ref=e1]"
+        );
     }
 
     #[test]
@@ -909,48 +961,37 @@ main
     }
 
     #[test]
-    fn focus_only_changes_are_dropped() {
-        let seen = ref_hashes(OUTLINE);
+    fn changes_print_short_or_give_way_to_the_outline() {
         let changes = json!({
-            "added": ["button \"Undo\" [ref=e6]"],
-            "removed": ["link \"Docs\" -> /docs.html (was e5)"],
-            "changed": [
-                // Gained focus only.
-                "textbox \"Email\" [ref=e1] [required] [focused] value=\"\"",
-                // Lost focus only.
-                "button \"Send\" [ref=e4]",
-                // Gained focus and a value: a real change.
-                "textbox \"Email\" [ref=e1] [focused] [required] value=\"a\"",
-                // A name that only mentions focus in page text.
-                "checkbox \"Send me news [focused]\" [ref=e2]",
-            ],
+            "added": ["e6", "e7"],
+            "removed": ["e5"],
+            "changed": ["e1 value", "e3 name checked"],
             "more": 2,
         });
         assert_eq!(
-            change_lines(&changes, &seen),
+            change_lines(&changes),
             vec![
-                "added: button \"Undo\" [ref=e6]",
-                "removed: link \"Docs\" -> /docs.html (was e5)",
-                "changed: textbox \"Email\" [ref=e1] [focused] [required] value=\"a\"",
-                "changed: checkbox \"Send me news [focused]\" [ref=e2]",
+                "added e6, e7",
+                "removed e5",
+                "changed e1 value, e3 name checked",
                 "(2 more changes)",
             ]
         );
-        // Without a previous outline nothing counts as focus-only.
-        assert_eq!(change_lines(&changes, &[]).len(), 7);
+        assert_eq!(
+            change_lines(&json!({ "many": true })),
+            vec!["changes: many (see outline)"]
+        );
+        assert!(change_lines(&json!({})).is_empty());
     }
 
     #[test]
     fn action_output_has_status_changes_and_outline() {
-        let seen = ref_hashes(
-            "form\n  textbox \"Email\" [ref=e1] [required] value=\"\"\n  button \"Send\" [ref=e4] [focused]",
-        );
         assert_eq!(
-            render_action("click e4", &action_data(), &seen),
+            render_action("click e4", &action_data()),
             "\
 ok click e4 · rev 1.5
-added: text \"Thanks\" [ref=e6]
-changed: textbox \"Email\" [ref=e1] [focused] [required] value=\"me@example.test\"
+added e6
+changed e1 value
 form
   textbox \"Email\" [ref=e1] [focused] [required] value=\"me@example.test\"
   button \"Send\" [ref=e4]"
@@ -959,7 +1000,7 @@ form
         data["navigated"] = json!(true);
         data["settled"] = json!(false);
         data.as_object_mut().unwrap().remove("changes");
-        let text = render_action("press Enter", &data, &seen);
+        let text = render_action("press Enter", &data);
         assert!(
             text.starts_with(
                 "ok press Enter · rev 1.5 · navigated · https://example.test/ · not settled\nform"
@@ -977,7 +1018,7 @@ form
         let text = render_snapshot(&data, true);
         assert!(
             text.starts_with(
-                "t12 · rev 1.2 · \"Two\\nlines\" · https://example.test/ · loading\nmain\n  form\n"
+                "t12 · rev 1.2 · \"Two\\nlines\" · https://example.test/ · loading\nmain\n  heading "
             ),
             "{text}"
         );
@@ -1037,7 +1078,6 @@ form
         let state = State {
             tab: Some(String::from("t12")),
             revision: Some(String::from("1.5")),
-            seen: ref_hashes(OUTLINE),
         };
         state.save(&path).unwrap();
         let mode = |path: &Path| fs::metadata(path).unwrap().permissions().mode() & 0o777;
@@ -1051,7 +1091,7 @@ form
         assert_eq!(mode(&path), 0o600);
 
         // Bad values read as missing.
-        fs::write(&path, r#"{"tab":"tab 1","revision":"1.5","seen":["zz"]}"#).unwrap();
+        fs::write(&path, r#"{"tab":"tab 1","revision":"1.5"}"#).unwrap();
         assert_eq!(State::load(&path), State::default());
         fs::write(&path, "not json").unwrap();
         assert_eq!(State::load(&path), State::default());
@@ -1073,11 +1113,9 @@ form
             json!({ "tab": "t12", "revision": "1.1", "text": OUTLINE }),
         ));
         assert_eq!(state.revision.as_deref(), Some("1.1"));
-        assert_eq!(state.seen, ref_hashes(OUTLINE));
 
         state.apply(&success("page.click", action_data()));
         assert_eq!(state.revision.as_deref(), Some("1.5"));
-        assert_ne!(state.seen, ref_hashes(OUTLINE));
 
         // A failed action keeps the revision; the browser decides if it's stale.
         state.apply(&response(
@@ -1111,7 +1149,6 @@ form
         let state = State {
             tab: Some(String::from("t12")),
             revision: Some(String::from("1.5")),
-            seen: Vec::new(),
         };
         let none = Overrides::default();
         let click = Short::Click {

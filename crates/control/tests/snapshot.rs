@@ -575,7 +575,16 @@ fn store_revisions_change_per_snapshot_and_document() {
     assert_ne!(first, second);
     let other = store.record(8, vec![60]);
     assert_ne!(other, second);
-    assert_eq!(store.resolve(7, &second, "e1"), Ok(50));
+    // Node 50 is new to document 7, so it takes e3; e1 and e2 left.
+    assert_eq!(store.resolve(7, &second, "e3"), Ok(50));
+    for gone in ["e1", "e2"] {
+        assert!(matches!(
+            store.resolve(7, &second, gone),
+            Err(Outcome::Stale { .. })
+        ));
+    }
+    // Another document numbers from e1.
+    assert_eq!(store.resolve(8, &other, "e1"), Ok(60));
     assert!(matches!(
         store.resolve(7, &first, "e1"),
         Err(Outcome::Stale { .. })
@@ -585,7 +594,7 @@ fn store_revisions_change_per_snapshot_and_document() {
         store.resolve(9, &second, "e1"),
         Err(Outcome::Stale { .. })
     ));
-    for bad in ["e2", "e0", "e01", "x1", "e", "e99999999999", ""] {
+    for bad in ["e4", "e0", "e01", "x1", "e", "e99999999999", ""] {
         assert!(
             matches!(store.resolve(7, &second, bad), Err(Outcome::Invalid { .. })),
             "{bad}"
@@ -660,7 +669,7 @@ fn response_carries_the_documented_fields() {
         &mut store,
     );
     let again = serde_json::to_value(&again).unwrap();
-    assert_ne!(again["data"]["revision"], Value::from(revision));
+    assert_ne!(again["data"]["revision"], Value::from(revision.clone()));
     assert_eq!(again["data"]["truncated"], true);
     assert!(
         again["data"]["cut"]
@@ -680,4 +689,144 @@ fn failures_pass_through() {
     );
     assert_eq!(response.outcome, Outcome::Timeout);
     assert_eq!(response.id, "r1");
+}
+
+#[test]
+fn refs_keep_their_numbers_for_the_life_of_a_document() {
+    let mut store = SnapshotStore::new();
+    let first = store.record(7, vec![40, 41, 42]);
+    assert_eq!(first, "7.1");
+    // The same refs again: same outline, same revision.
+    assert_eq!(store.record(7, vec![40, 41, 42]), "7.1");
+    // 41 left and 43 came: 40 and 42 keep e1 and e3, 43 takes e4, and e2
+    // is never handed out again.
+    let second = store.record(7, vec![40, 42, 43]);
+    assert_eq!(second, "7.2");
+    assert_eq!(store.resolve(7, &second, "e1"), Ok(40));
+    assert_eq!(store.resolve(7, &second, "e3"), Ok(42));
+    assert_eq!(store.resolve(7, &second, "e4"), Ok(43));
+    assert!(matches!(
+        store.resolve(7, &second, "e2"),
+        Err(Outcome::Stale { .. })
+    ));
+    // 41 comes back under its old number.
+    let third = store.record(7, vec![41]);
+    assert_eq!(store.resolve(7, &third, "e2"), Ok(41));
+    // A navigation: the new document starts at e1 again.
+    let other = store.record(8, vec![42]);
+    assert_eq!(other, "8.1");
+    assert_eq!(store.resolve(8, &other, "e1"), Ok(42));
+}
+
+#[test]
+fn a_full_numbering_starts_a_new_epoch_and_old_refs_turn_stale() {
+    use myarc_control::snapshot::MAX_NUMBERED_NODES;
+    let mut store = SnapshotStore::new();
+    let count = i32::try_from(MAX_NUMBERED_NODES).unwrap();
+    let full = store.record(7, (1..=count).collect());
+    assert_eq!(store.resolve(7, &full, "e1"), Ok(1));
+    // One more node does not fit: numbering goes on in a new epoch.
+    let next = store.record(7, vec![1, count + 1]);
+    let first_new = MAX_NUMBERED_NODES + 1;
+    assert_eq!(
+        store.resolve(7, &next, &format!("e{first_new}")),
+        Ok(1),
+        "node 1 has a new number"
+    );
+    assert_eq!(
+        store.resolve(7, &next, &format!("e{}", first_new + 1)),
+        Ok(count + 1)
+    );
+    match store.resolve(7, &next, "e1") {
+        Err(Outcome::Stale { reason }) => assert!(reason.contains("renumbered"), "{reason}"),
+        other => panic!("expected stale, got {other:?}"),
+    }
+}
+
+#[test]
+fn repeated_snapshots_keep_the_revision_until_the_page_changes() {
+    let mut store = SnapshotStore::new();
+    let page = |focus: i32| SnapshotPage {
+        tab: TabState {
+            item: 3,
+            url: PAGE.to_owned(),
+            title: String::from("Form"),
+            ..TabState::default()
+        },
+        document: 11,
+        root: 1,
+        focus,
+        source_truncated: false,
+        nodes: sample_form(),
+    };
+    let revision = |store: &mut SnapshotStore, focus: i32| {
+        let response = snapshot_response(&request(), SnapshotResult::Done(page(focus)), store);
+        serde_json::to_value(&response).unwrap()["data"]["revision"]
+            .as_str()
+            .unwrap()
+            .to_owned()
+    };
+    assert_eq!(revision(&mut store, 0), "11.1");
+    assert_eq!(revision(&mut store, 0), "11.1");
+    // Focus shows in the outline, so it is a change.
+    assert_eq!(revision(&mut store, 4), "11.2");
+    assert_eq!(revision(&mut store, 4), "11.2");
+}
+
+#[test]
+fn label_text_that_repeats_a_form_control_name_is_dropped() {
+    use myarc_control::snapshot::repeats_label;
+    assert!(repeats_label("Search", Some(("searchbox", "Search"))));
+    assert!(repeats_label(
+        "Remember me",
+        Some(("checkbox", "Remember me"))
+    ));
+    assert!(!repeats_label("Search", Some(("searchbox", "Find"))));
+    assert!(!repeats_label("Details", Some(("link", "Details"))));
+    assert!(!repeats_label("Search", None));
+    assert!(!repeats_label("", Some(("textbox", ""))));
+
+    // <label>Search <input type=search></label> once the field has a value:
+    // the label's text no longer equals the field's name, since the value
+    // sits inside the field.
+    let mut search = named(4, "searchBox", "Search");
+    search.focusable = true;
+    search.value = String::from("item 3");
+    search.children = vec![6];
+    let nodes = page(
+        vec![with_children(named(2, "labelText", ""), &[3, 4])],
+        vec![
+            text(3, "Search"),
+            search,
+            with_children(node(6, "genericContainer"), &[7]),
+            text(7, "item 3"),
+        ],
+    );
+    assert_eq!(
+        lines(&render(&nodes)),
+        [r#"searchbox "Search" [ref=e1] value="item 3""#]
+    );
+
+    // Text after a checkbox, and text before a field it doesn't label.
+    let mut remember = named(3, "checkBox", "Remember me");
+    remember.focusable = true;
+    let mut email = named(5, "textField", "Email");
+    email.focusable = true;
+    let nodes = page(
+        vec![
+            remember,
+            text(4, "Remember me"),
+            with_children(node(6, "paragraph"), &[7]),
+            email,
+        ],
+        vec![text(7, "Your address")],
+    );
+    assert_eq!(
+        lines(&render(&nodes)),
+        [
+            r#"checkbox "Remember me" [ref=e1]"#,
+            r#"text "Your address""#,
+            r#"textbox "Email" [ref=e2] value="""#,
+        ]
+    );
 }

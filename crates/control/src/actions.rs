@@ -421,8 +421,8 @@ pub enum ActionResult {
 /// The answer to an interaction command: `{tab, url, revision, navigated,
 /// settled, snapshot, changes}`, where `snapshot` has the shape of
 /// `page.snapshot`'s answer and `changes` lists the references added,
-/// removed or changed since the snapshot the action used. The new revision
-/// replaces the old one.
+/// removed or changed since the snapshot the action used; see [`changes`].
+/// The new revision replaces the old one, one step after it.
 pub fn action_response(
     req: &Request,
     result: ActionResult,
@@ -444,7 +444,10 @@ pub fn action_response(
                 "settled": settled,
             });
             if !navigated && page.document == taken.document {
-                data["changes"] = changes(&taken.refs, &targets);
+                let lines = snapshot["text"]
+                    .as_str()
+                    .map_or(0, |text| text.lines().count());
+                data["changes"] = changes(&taken.refs, &targets, lines);
             }
             data["snapshot"] = snapshot;
             answer(req, Outcome::Success { data })
@@ -472,11 +475,14 @@ pub fn action_response(
 }
 
 /// References added, removed or changed between two snapshots of one
-/// document, matched by DOM node ID: `{added, removed, changed}`, each at
-/// most [`MAX_CHANGES`] lines, with `more` counting what was left out.
-/// Added and changed lines carry the new references; removed ones say
-/// which reference they had.
-pub fn changes(before: &[RefTarget], after: &[RefTarget]) -> Value {
+/// document, matched by DOM node ID: `{added, removed, changed}`. Added and
+/// removed entries are references such as `e7`; changed ones add what
+/// changed, such as `e1 value` or `e3 name checked`. Focus alone doesn't
+/// count. Each list holds at most [`MAX_CHANGES`] entries, with `more`
+/// counting what was left out. When the changes outnumber half of the
+/// `lines` the outline has, the answer is `{many: true}` instead, since the
+/// outline says more.
+pub fn changes(before: &[RefTarget], after: &[RefTarget], lines: usize) -> Value {
     use std::collections::HashMap;
     let index = |refs: &[RefTarget]| -> HashMap<i32, usize> {
         refs.iter()
@@ -487,28 +493,25 @@ pub fn changes(before: &[RefTarget], after: &[RefTarget]) -> Value {
     };
     let (old, new) = (index(before), index(after));
     let mut lists: [Vec<String>; 3] = Default::default();
-    for (position, target) in after.iter().enumerate() {
-        if target.node <= 0 {
-            continue;
-        }
-        let line = target.line(position + 1);
+    for target in after.iter().filter(|target| target.node > 0) {
         match old.get(&target.node).map(|&old| &before[old]) {
-            None => lists[0].push(line),
-            Some(was) if was.head != target.head || was.tail != target.tail => {
-                lists[2].push(line);
+            None => lists[0].push(format!("e{}", target.number)),
+            Some(was) => {
+                let what = what_changed(was, target);
+                if !what.is_empty() {
+                    lists[2].push(format!("e{} {}", target.number, what.join(" ")));
+                }
             }
-            Some(_) => {}
         }
     }
-    for (position, target) in before.iter().enumerate() {
+    for target in before {
         if target.node > 0 && !new.contains_key(&target.node) {
-            lists[1].push(format!(
-                "{}{} (was e{})",
-                target.head,
-                target.tail,
-                position + 1
-            ));
+            lists[1].push(format!("e{}", target.number));
         }
+    }
+    let total: usize = lists.iter().map(Vec::len).sum();
+    if total > 0 && total * 2 > lines {
+        return json!({ "many": true });
     }
     let mut out = json!({});
     let mut more = 0;
@@ -523,4 +526,30 @@ pub fn changes(before: &[RefTarget], after: &[RefTarget]) -> Value {
         out["more"] = json!(more);
     }
     out
+}
+
+/// What differs between two snapshots of one referenced node, such as
+/// `["value"]`, leaving out focus and the reference number.
+fn what_changed(was: &RefTarget, now: &RefTarget) -> Vec<&'static str> {
+    let mut what = Vec::new();
+    if was.role != now.role {
+        what.push("role");
+    }
+    if was.name != now.name {
+        what.push("name");
+    }
+    let part = |target: &RefTarget, kind: &str| {
+        target
+            .state
+            .iter()
+            .find(|(k, _)| *k == kind)
+            .map(|(_, part)| part.clone())
+    };
+    let kinds = was.state.iter().chain(&now.state).map(|(kind, _)| *kind);
+    for kind in kinds {
+        if kind != "focused" && !what.contains(&kind) && part(was, kind) != part(now, kind) {
+            what.push(kind);
+        }
+    }
+    what
 }

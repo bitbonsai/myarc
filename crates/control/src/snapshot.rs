@@ -12,18 +12,23 @@
 //! link "Docs" [ref=e5] -> /docs
 //! ```
 //!
-//! Interactive nodes get a reference such as `e4`, numbered in output order.
-//! Generic containers fold away and adjacent text joins into one line. Page
+//! Interactive nodes get a reference such as `e4`. A node keeps its number
+//! for the life of its document, and new nodes take the next unused number,
+//! so `e4` always means the same node on one page. Generic containers fold
+//! away, adjacent text joins into one line, and text that repeats the name
+//! of the form control next to it is left out. Page
 //! text is untrusted: every name, value and text sits inside double quotes
 //! with quotes, backslashes and control characters escaped, so a page can't
 //! end a quote, start a line or forge a reference. Output is bounded in
 //! lines, bytes, name length and depth, and says what it cut.
 //!
-//! [`SnapshotStore`] keeps the references of the latest snapshot of each
-//! document, so later commands can resolve `e4` against the revision they
-//! name and refuse an old one.
+//! [`SnapshotStore`] keeps the numbering and the references of the latest
+//! snapshot of each document, so later commands can resolve `e4` against
+//! the revision they name and refuse an old one. A snapshot that shows the
+//! same outline as the one before keeps its revision.
 
 use std::collections::{HashMap, HashSet, VecDeque};
+use std::hash::{DefaultHasher, Hash, Hasher};
 
 use serde_json::{Value, json};
 
@@ -51,6 +56,12 @@ pub const MAX_INDENT: usize = 24;
 pub const MAX_TREE_DEPTH: usize = 256;
 /// Documents whose latest references [`SnapshotStore`] keeps.
 pub const MAX_STORED_DOCUMENTS: usize = 64;
+/// Most nodes one document's numbering remembers. Past it the numbering
+/// starts a new epoch: numbers go on from where they were, and references
+/// from before turn stale.
+pub const MAX_NUMBERED_NODES: usize = 50_000;
+/// Largest reference number, the most a `[ref=eN]` can carry.
+pub const MAX_REF_NUMBER: u32 = 999_999_999;
 
 /// Check state of a node.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -112,9 +123,10 @@ impl Default for Limits {
     }
 }
 
-/// An outline and the node behind each reference: `refs[0]` is the node of
-/// `e1`, and `targets[0]` what the interaction commands need to know about
-/// it. `cut` says what was left out or shortened, empty when nothing was.
+/// An outline and the node behind each reference, in output order: `refs`
+/// holds the node IDs and `targets` what the interaction commands need to
+/// know about each, including its number. `cut` says what was left out or
+/// shortened, empty when nothing was.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Outline {
     pub text: String,
@@ -125,16 +137,20 @@ pub struct Outline {
 }
 
 /// A referenced node as a snapshot showed it. `node` is its accessibility
-/// ID, which is the page's DOM node ID when positive. `head` is its line up
-/// to the reference and `tail` the rest, so lines compare across snapshots
-/// whatever their reference numbers.
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
+/// ID, which is the page's DOM node ID when positive, and `number` its
+/// reference, 4 for `e4`. `head` is its line up to the reference and `tail`
+/// the rest. `name` is the printed name and `state` each part of the tail
+/// by kind, such as `("value", "\"a\"")`, so changes can say what changed.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
 pub struct RefTarget {
     pub node: i32,
+    pub number: u32,
     /// Chromium's role name, such as `textField`.
     pub role: String,
     pub head: String,
     pub tail: String,
+    pub name: String,
+    pub state: Vec<(&'static str, String)>,
     pub editable: bool,
     pub read_only: bool,
     pub disabled: bool,
@@ -142,17 +158,106 @@ pub struct RefTarget {
 }
 
 impl RefTarget {
-    pub(crate) fn bare(node: i32) -> Self {
+    /// The line as printed.
+    pub fn line(&self) -> String {
+        format!("{} [ref=e{}]{}", self.head, self.number, self.tail)
+    }
+}
+
+/// Reference numbers of one document: each node keeps its number, and new
+/// nodes take the next one. Numbers are never handed out twice, so a number
+/// below `next` belongs to a node seen before. Remembers at most
+/// [`MAX_NUMBERED_NODES`] nodes; see [`RefNumbers::make_room`].
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct RefNumbers {
+    numbers: HashMap<i32, u32>,
+    next: u32,
+    /// The first number of the current epoch. Lower numbers are stale.
+    epoch_start: u32,
+}
+
+impl Default for RefNumbers {
+    fn default() -> Self {
         Self {
-            node,
-            ..Self::default()
+            numbers: HashMap::new(),
+            next: 1,
+            epoch_start: 1,
+        }
+    }
+}
+
+impl RefNumbers {
+    /// The number `node` has, or would get next.
+    fn peek(&self, node: i32) -> u32 {
+        self.numbers.get(&node).copied().unwrap_or(self.next)
+    }
+
+    /// The number of `node`, giving it the next one when it has none.
+    fn assign(&mut self, node: i32) -> u32 {
+        let next = &mut self.next;
+        *self.numbers.entry(node).or_insert_with(|| {
+            let number = *next;
+            *next = next.saturating_add(1);
+            number
+        })
+    }
+
+    /// Makes room for `count` new nodes. When the map would grow past
+    /// [`MAX_NUMBERED_NODES`], starts a new epoch: nodes get new numbers
+    /// above every earlier one, and earlier references turn stale. Only if
+    /// the numbers themselves would run out does numbering restart at 1.
+    pub fn make_room(&mut self, count: usize) {
+        let count_u32 = u32::try_from(count).unwrap_or(u32::MAX);
+        if self.next.saturating_add(count_u32) > MAX_REF_NUMBER {
+            *self = Self::default();
+        } else if self.numbers.len().saturating_add(count) > MAX_NUMBERED_NODES {
+            self.numbers.clear();
+            self.epoch_start = self.next;
         }
     }
 
-    /// The line as printed with reference `number`.
-    pub fn line(&self, number: usize) -> String {
-        format!("{} [ref=e{number}]{}", self.head, self.tail)
+    /// Whether `number` was handed out in this epoch.
+    fn known(&self, number: u32) -> bool {
+        number >= self.epoch_start && number < self.next
     }
+
+    /// Whether `number` comes from an epoch before this one.
+    fn old_epoch(&self, number: u32) -> bool {
+        number < self.epoch_start
+    }
+
+    /// How many nodes the numbering remembers.
+    pub fn len(&self) -> usize {
+        self.numbers.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.numbers.is_empty()
+    }
+}
+
+/// Roles whose label text an outline drops when it repeats their name.
+fn is_form_control(name: &str) -> bool {
+    matches!(
+        name,
+        "textbox"
+            | "searchbox"
+            | "combobox"
+            | "checkbox"
+            | "radio"
+            | "switch"
+            | "slider"
+            | "spinbutton"
+            | "listbox"
+    )
+}
+
+/// Whether a text line repeats the label of the form control printed right
+/// before or after it, or around it, such as `text "Search"` next to
+/// `searchbox "Search"` when `<label>Search <input></label>` wraps the
+/// field. `control` is the control's printed role and name.
+pub fn repeats_label(text: &str, control: Option<(&str, &str)>) -> bool {
+    control.is_some_and(|(role, name)| is_form_control(role) && !name.is_empty() && text == name)
 }
 
 impl Outline {
@@ -426,8 +531,11 @@ struct Walk<'a> {
     lines: usize,
     refs: Vec<i32>,
     targets: Vec<RefTarget>,
+    numbers: &'a mut RefNumbers,
     /// Text waiting to print, with its depth, so neighbors can join it.
     pending: Option<(usize, String, bool)>,
+    /// Role and name of the last line, when it was a control.
+    last_control: Option<(String, String)>,
     full: bool,
     hidden: usize,
     names_cut: usize,
@@ -456,11 +564,25 @@ impl Walk<'_> {
         self.text.push_str(line);
         self.text.push('\n');
         self.lines += 1;
+        self.last_control = None;
         true
     }
 
     fn flush(&mut self) {
+        self.flush_before(None);
+    }
+
+    /// Prints the waiting text, unless it repeats the label of the control
+    /// printed just before or of `next`, the control about to print.
+    fn flush_before(&mut self, next: Option<(&str, &str)>) {
         if let Some((depth, text, cut)) = self.pending.take() {
+            let before = self
+                .last_control
+                .as_ref()
+                .map(|(role, name)| (role.as_str(), name.as_str()));
+            if !cut && (repeats_label(&text, before) || repeats_label(&text, next)) {
+                return;
+            }
             if cut {
                 self.names_cut += 1;
             }
@@ -577,11 +699,11 @@ impl Walk<'_> {
             }
             return;
         }
-        self.flush();
         let role = match printed {
             Some(printed) => printed.to_owned(),
             None => fallback_role(&node.role),
         };
+        self.flush_before(Some((&role, &name)));
         let mut head = role.clone();
         // A row's name repeats its cells.
         let (name, name_cut) = if role == "row" {
@@ -593,65 +715,70 @@ impl Walk<'_> {
             head.push(' ');
             head.push_str(&quote(&name, name_cut));
         }
-        let reference = interactive.then(|| self.refs.len() + 1);
-        let mut tail = String::new();
+        let reference = interactive.then(|| self.numbers.peek(node.id));
+        let mut state: Vec<(&'static str, String)> = Vec::new();
         if role == "heading" && node.level > 0 {
-            tail.push_str(&format!(" [level={}]", node.level.min(9)));
+            state.push(("level", format!(" [level={}]", node.level.min(9))));
         }
         match node.checked {
-            Checked::Yes => tail.push_str(" [checked]"),
-            Checked::Mixed => tail.push_str(" [checked=mixed]"),
+            Checked::Yes => state.push(("checked", String::from(" [checked]"))),
+            Checked::Mixed => state.push(("checked", String::from(" [checked=mixed]"))),
             Checked::No => {}
         }
         match node.expanded {
-            Some(true) => tail.push_str(" [expanded]"),
-            Some(false) => tail.push_str(" [collapsed]"),
+            Some(true) => state.push(("expanded", String::from(" [expanded]"))),
+            Some(false) => state.push(("expanded", String::from(" [collapsed]"))),
             None => {}
         }
-        for (on, state) in [
-            (node.selected, " [selected]"),
-            (node.required, " [required]"),
-            (node.disabled, " [disabled]"),
-            (node.id == self.focus, " [focused]"),
+        for (on, kind) in [
+            (node.selected, "selected"),
+            (node.required, "required"),
+            (node.disabled, "disabled"),
+            (node.id == self.focus, "focused"),
         ] {
             if on {
-                tail.push_str(state);
+                state.push((kind, format!(" [{kind}]")));
             }
         }
         let mut value_cut = false;
         if shows_value(&role) && !node.protected {
             let (value, cut) = collapse(&node.value, self.limits.max_name_chars);
             if !value.is_empty() || role == "textbox" || role == "searchbox" {
-                tail.push_str(" value=");
-                tail.push_str(&quote(&value, cut));
+                state.push(("value", format!(" value={}", quote(&value, cut))));
                 value_cut = cut;
             }
         }
         let mut url_cut = false;
         if role == "link" && !node.url.is_empty() {
             let (target, cut) = link_target(&node.url, self.page_url);
-            tail.push_str(" -> ");
-            tail.push_str(&target);
+            state.push(("href", format!(" -> {target}")));
             url_cut = cut;
         }
+        let tail: String = state.iter().map(|(_, part)| part.as_str()).collect();
         let line = match reference {
             Some(number) => format!("{head} [ref=e{number}]{tail}"),
             None => format!("{head}{tail}"),
         };
         if self.emit(depth, &line) {
-            if let Some(number) = reference {
-                debug_assert_eq!(number, self.refs.len() + 1);
+            if reference.is_some() {
+                let number = self.numbers.assign(node.id);
                 self.refs.push(node.id);
                 self.targets.push(RefTarget {
                     node: node.id,
+                    number,
                     role: node.role.clone(),
                     head,
                     tail,
+                    name: name.clone(),
+                    state,
                     editable: node.editable,
                     read_only: node.read_only,
                     disabled: node.disabled,
                     focused: node.id == self.focus,
                 });
+            }
+            if is_form_control(&role) {
+                self.last_control = Some((role.clone(), name.clone()));
             }
             self.names_cut += usize::from(name_cut) + usize::from(value_cut) + usize::from(url_cut);
         }
@@ -676,9 +803,10 @@ impl Walk<'_> {
     }
 }
 
-/// Writes the outline of the tree under `root`. `focus` is the focused node,
-/// and `page_url` turns same-origin link targets into paths. Never panics on
-/// malformed input: unknown children, repeated IDs and cycles are skipped.
+/// Writes the outline of the tree under `root`, numbering references from
+/// e1 in output order. `focus` is the focused node, and `page_url` turns
+/// same-origin link targets into paths. Never panics on malformed input:
+/// unknown children, repeated IDs and cycles are skipped.
 pub fn outline(
     nodes: &[AxNode],
     root: i32,
@@ -686,6 +814,27 @@ pub fn outline(
     page_url: &str,
     limits: &Limits,
 ) -> Outline {
+    outline_numbered(
+        nodes,
+        root,
+        focus,
+        page_url,
+        limits,
+        &mut RefNumbers::default(),
+    )
+}
+
+/// Like [`outline`], with reference numbers from `numbers`, the numbering
+/// of the page's document, which learns the nodes that are new.
+pub fn outline_numbered(
+    nodes: &[AxNode],
+    root: i32,
+    focus: i32,
+    page_url: &str,
+    limits: &Limits,
+    numbers: &mut RefNumbers,
+) -> Outline {
+    numbers.make_room(limits.max_lines);
     let ignored = nodes.len().saturating_sub(MAX_INPUT_NODES);
     let nodes = &nodes[..nodes.len().min(MAX_INPUT_NODES)];
     let mut index = HashMap::with_capacity(nodes.len());
@@ -710,7 +859,9 @@ pub fn outline(
         lines: 0,
         refs: Vec::new(),
         targets: Vec::new(),
+        numbers,
         pending: None,
+        last_control: None,
         full: false,
         hidden: 0,
         names_cut: 0,
@@ -755,7 +906,7 @@ pub fn outline(
     }
 }
 
-/// The revision string of the `count`th snapshot of `document`.
+/// The revision string of the `count`th distinct snapshot of `document`.
 fn revision(document: u64, count: u64) -> String {
     format!("{document}.{count}")
 }
@@ -764,12 +915,19 @@ fn revision(document: u64, count: u64) -> String {
 struct Stored {
     document: u64,
     count: u64,
+    /// Hash of what the latest snapshot showed; an equal one keeps `count`.
+    hash: u64,
+    /// An action took the references, so the revision is stale until the
+    /// next snapshot or [`SnapshotStore::put_back`].
+    taken: bool,
     refs: Vec<RefTarget>,
+    numbers: RefNumbers,
 }
 
-/// The references of the latest snapshot of each recent document. The
-/// browser numbers each main document it snapshots, so a navigation starts
-/// a new entry and the old revision can't resolve on the new page. Keeps
+/// The numbering and the references of the latest snapshot of each recent
+/// document. The browser numbers each main document it snapshots, so a
+/// navigation starts a new entry, its references start again at e1 and the
+/// old revision can't resolve on the new page. Keeps
 /// [`MAX_STORED_DOCUMENTS`], dropping the oldest.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct SnapshotStore {
@@ -786,6 +944,12 @@ pub struct Taken {
     pub refs: Vec<RefTarget>,
 }
 
+fn hash_of(value: &impl Hash) -> u64 {
+    let mut hasher = DefaultHasher::new();
+    value.hash(&mut hasher);
+    hasher.finish()
+}
+
 impl SnapshotStore {
     pub const fn new() -> Self {
         Self {
@@ -793,26 +957,64 @@ impl SnapshotStore {
         }
     }
 
-    /// Keeps `refs` as the latest snapshot of `document` and returns its
-    /// revision, which differs from every earlier one. The targets carry
-    /// only the node IDs; see [`SnapshotStore::record_targets`].
+    /// Numbers the nodes `refs` in that order with the numbering of
+    /// `document`, keeps them as its latest snapshot and returns the
+    /// revision. Each target carries only its node ID and number.
     pub fn record(&mut self, document: u64, refs: Vec<i32>) -> String {
-        self.record_targets(document, refs.into_iter().map(RefTarget::bare).collect())
+        let mut numbers = self.numbers(document);
+        numbers.make_room(refs.len());
+        let targets: Vec<RefTarget> = refs
+            .into_iter()
+            .map(|node| RefTarget {
+                node,
+                number: numbers.assign(node),
+                ..RefTarget::default()
+            })
+            .collect();
+        let hash = hash_of(&targets);
+        self.record_numbered(document, numbers, targets, hash)
     }
 
-    /// Like [`SnapshotStore::record`], with what each reference showed.
-    pub fn record_targets(&mut self, document: u64, refs: Vec<RefTarget>) -> String {
+    /// The numbering of `document` so far, taken out of the store until
+    /// [`SnapshotStore::record_numbered`] puts it back. A new document
+    /// starts at e1.
+    pub fn numbers(&mut self, document: u64) -> RefNumbers {
+        self.entries
+            .iter_mut()
+            .find(|e| e.document == document)
+            .map(|entry| std::mem::take(&mut entry.numbers))
+            .unwrap_or_default()
+    }
+
+    /// Keeps `refs`, numbered by `numbers`, as the latest snapshot of
+    /// `document` and returns its revision. The revision stays the same
+    /// when `hash`, a hash of what the snapshot shows, equals the latest
+    /// one's and no action took its references since; else it moves on by
+    /// one.
+    pub fn record_numbered(
+        &mut self,
+        document: u64,
+        numbers: RefNumbers,
+        refs: Vec<RefTarget>,
+        hash: u64,
+    ) -> String {
         let count = match self.entries.iter().position(|e| e.document == document) {
-            Some(position) => self
-                .entries
-                .remove(position)
-                .map_or(1, |old| old.count.saturating_add(1)),
+            Some(position) => self.entries.remove(position).map_or(1, |old| {
+                if old.taken || old.hash != hash {
+                    old.count.saturating_add(1)
+                } else {
+                    old.count
+                }
+            }),
             None => 1,
         };
         self.entries.push_back(Stored {
             document,
             count,
+            hash,
+            taken: false,
             refs,
+            numbers,
         });
         while self.entries.len() > MAX_STORED_DOCUMENTS {
             self.entries.pop_front();
@@ -821,14 +1023,14 @@ impl SnapshotStore {
     }
 
     /// The latest snapshot of `document`, or `stale` when `revision_text`
-    /// is not its revision.
+    /// is not its revision or an action took its references.
     fn latest(&self, document: u64, revision_text: &str) -> Result<&Stored, Outcome> {
         let Some(entry) = self.entries.iter().find(|e| e.document == document) else {
             return Err(Outcome::Stale {
                 reason: format!("The page changed since that snapshot; {AGAIN}"),
             });
         };
-        if revision(entry.document, entry.count) != revision_text {
+        if entry.taken || revision(entry.document, entry.count) != revision_text {
             return Err(Outcome::Stale {
                 reason: format!(
                     "Revision {:?} is not the latest snapshot of this page; {AGAIN}",
@@ -841,7 +1043,8 @@ impl SnapshotStore {
 
     /// The node behind `element`, such as `e4`, in the latest snapshot of
     /// `document`. `stale` when `revision` is not that snapshot's, for
-    /// example after a navigation or a newer snapshot.
+    /// example after a navigation or a newer snapshot, and when the node
+    /// behind `element` left the page.
     pub fn resolve(
         &self,
         document: u64,
@@ -860,20 +1063,34 @@ impl SnapshotStore {
         element: &str,
     ) -> Result<&RefTarget, Outcome> {
         let entry = self.latest(document, revision_text)?;
-        parse_ref(element)
-            .and_then(|number| entry.refs.get(number - 1))
-            .ok_or_else(|| Outcome::Invalid {
+        let number = parse_ref(element).and_then(|number| u32::try_from(number).ok());
+        if let Some(target) =
+            number.and_then(|number| entry.refs.iter().find(|target| target.number == number))
+        {
+            return Ok(target);
+        }
+        let element = crate::bounded(element);
+        match number {
+            Some(number) if entry.numbers.known(number) => Err(Outcome::Stale {
+                reason: format!("Element {element} is no longer on the page; {AGAIN}"),
+            }),
+            Some(number) if entry.numbers.old_epoch(number) => Err(Outcome::Stale {
                 reason: format!(
-                    "Reference {:?} is not in snapshot {}; use a [ref=eN] from it",
-                    crate::bounded(element),
+                    "Reference {element:?} is from before this page renumbered its elements; {AGAIN}"
+                ),
+            }),
+            _ => Err(Outcome::Invalid {
+                reason: format!(
+                    "Reference {element:?} is not in snapshot {}; use a [ref=eN] from it",
                     crate::bounded(revision_text)
                 ),
-            })
+            }),
+        }
     }
 
     /// Takes the references of `revision_text`, the latest snapshot of
     /// `document`, so that revision turns stale: once an action starts, the
-    /// page may differ from what it showed.
+    /// page may differ from what it showed. The numbering stays.
     pub fn take(&mut self, document: u64, revision_text: &str) -> Result<Taken, Outcome> {
         self.latest(document, revision_text)?;
         let entry = self
@@ -883,13 +1100,12 @@ impl SnapshotStore {
             .ok_or_else(|| Outcome::Stale {
                 reason: format!("The page changed since that snapshot; {AGAIN}"),
             })?;
-        let taken = Taken {
+        entry.taken = true;
+        Ok(Taken {
             document,
             count: entry.count,
             refs: std::mem::take(&mut entry.refs),
-        };
-        entry.count = entry.count.saturating_add(1);
-        Ok(taken)
+        })
     }
 
     /// Restores references taken by an action that never ran, unless a
@@ -899,10 +1115,10 @@ impl SnapshotStore {
             .entries
             .iter_mut()
             .find(|e| e.document == taken.document)
-            && entry.count == taken.count.saturating_add(1)
-            && entry.refs.is_empty()
+            && entry.taken
+            && entry.count == taken.count
         {
-            entry.count = taken.count;
+            entry.taken = false;
             entry.refs = taken.refs;
         }
     }
@@ -945,7 +1161,8 @@ pub enum SnapshotResult {
 
 /// The answer to `page.snapshot`: `{tab, url, title, revision, loading,
 /// truncated, text}`, plus `cut` naming what was left out when `truncated`.
-/// Records the references in `store` under the new revision.
+/// Records the references in `store`; the revision moves on only when the
+/// outline changed.
 pub fn snapshot_response(
     req: &Request,
     result: SnapshotResult,
@@ -959,18 +1176,20 @@ pub fn snapshot_response(
     answer(req, Outcome::Success { data })
 }
 
-/// Formats `page`, records its references in `store` and returns the
-/// `page.snapshot` data with the new references.
+/// Formats `page` with its document's numbering, records its references in
+/// `store` and returns the `page.snapshot` data with the new references.
 pub(crate) fn record_page(
     page: &SnapshotPage,
     store: &mut SnapshotStore,
 ) -> (Value, Vec<RefTarget>) {
-    let outline = outline(
+    let mut numbers = store.numbers(page.document);
+    let outline = outline_numbered(
         &page.nodes,
         page.root,
         page.focus,
         &page.tab.url,
         &Limits::default(),
+        &mut numbers,
     );
     let mut cut = outline.cut;
     if page.source_truncated {
@@ -982,11 +1201,14 @@ pub(crate) fn record_page(
         );
     }
     let targets = outline.targets;
-    let revision = store.record_targets(page.document, targets.clone());
+    let url = truncate(&page.tab.url, crate::MAX_URL_LENGTH);
+    let title = truncate(&page.tab.title, MAX_TITLE_BYTES);
+    let hash = hash_of(&(&outline.text, &targets, &cut, &url, &title));
+    let revision = store.record_numbered(page.document, numbers, targets.clone(), hash);
     let mut data = json!({
         "tab": tab_handle(page.tab.item),
-        "url": truncate(&page.tab.url, crate::MAX_URL_LENGTH),
-        "title": truncate(&page.tab.title, MAX_TITLE_BYTES),
+        "url": url,
+        "title": title,
         "revision": revision,
         "loading": page.tab.loading,
         "truncated": !cut.is_empty(),

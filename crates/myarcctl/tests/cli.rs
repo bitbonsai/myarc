@@ -27,8 +27,21 @@ fn json_stdout(output: &Output) -> Value {
 }
 
 #[test]
-fn commands_lists_every_registry_entry() {
+fn commands_lists_implemented_entries_unless_all() {
     let output = myarcctl(&["commands"]);
+    assert_eq!(output.status.code(), Some(0));
+    let text = stdout(&output);
+    let implemented: Vec<_> = registry().iter().filter(|spec| spec.implemented).collect();
+    assert_eq!(text.lines().count(), implemented.len() + 1);
+    assert!(!text.contains("IMPLEMENTED"), "{text}");
+    for spec in registry() {
+        let listed = text
+            .lines()
+            .any(|line| line.split_whitespace().next() == Some(spec.id));
+        assert_eq!(listed, spec.implemented, "{}", spec.id);
+    }
+
+    let output = myarcctl(&["commands", "--all"]);
     assert_eq!(output.status.code(), Some(0));
     let text = stdout(&output);
     assert_eq!(text.lines().count(), registry().len() + 1);
@@ -52,6 +65,16 @@ fn commands_lists_every_registry_entry() {
 #[test]
 fn commands_json_has_id_area_implemented_and_summary() {
     let output = myarcctl(&["commands", "--json"]);
+    assert_eq!(output.status.code(), Some(0));
+    let implemented = json_stdout(&output);
+    assert!(
+        implemented
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|entry| entry["implemented"] == true)
+    );
+    let output = myarcctl(&["commands", "--all", "--json"]);
     assert_eq!(output.status.code(), Some(0));
     let list = json_stdout(&output);
     let list = list.as_array().expect("an array");
@@ -167,6 +190,7 @@ fn usage_errors_exit_2() {
         &["commands", "--verbose"][..],
         &["mcp", "now"][..],
         &["commands", "--local"][..],
+        &["run", "space.list", "--all"][..],
         &["run", "space.list", "--dir", "/tmp"][..],
         &["serve-local", "--dir"][..],
         &["serve-local", "now"][..],

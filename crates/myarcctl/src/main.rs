@@ -35,8 +35,9 @@ myarcctl: drive myArc's agent Space and run browser control commands
 
 Short commands act on the current tab with the last outline's refs:
   myarcctl open <url>            Open a tab, make it current, print its outline
-  myarcctl snapshot [-i]         Print the outline; -i keeps ref lines and
-                                 the lines they sit under
+  myarcctl snapshot [-i]         Print the outline; -i keeps ref lines, the
+                                 lines they sit under and the heading and
+                                 text just before them
   myarcctl click <ref>           Click a ref such as @e4 or e4
   myarcctl fill <ref> <text>     Replace a text field's value
   myarcctl select <ref> <value>  Pick an option by value or visible text
@@ -48,14 +49,16 @@ Short commands act on the current tab with the last outline's refs:
   myarcctl use <tab>             Make a tab such as t12 current
 
   Actions print a status line, then the changed refs and the new outline.
+  Refs keep their numbers while the page stays loaded.
   --tab <tab> and --rev <revision> replace the current tab and the last
   revision for one call. --json prints each raw response as one line. The
   current tab and revision live in cli-state.json next to the control
   directory. Use -- before text that starts with a dash.
 
 Usage:
-  myarcctl commands [--json]
-      List the command registry: ID, area, whether it runs, summary.
+  myarcctl commands [--all] [--json]
+      List the commands that run: ID, area, summary. --all lists the whole
+      registry, with a column saying whether each one runs.
   myarcctl run <command> [params-json] [--json] [--local]
       Run one command in the running myArc, for example
       myarcctl run space.rename '{\"space_id\":1,\"name\":\"Work\"}'
@@ -86,6 +89,7 @@ enum Cli {
     Version,
     Commands {
         json: bool,
+        all: bool,
     },
     Run {
         command: String,
@@ -119,7 +123,7 @@ fn main() -> ExitCode {
         Ok(Cli::Version) => print(&format!(
             "myarcctl {VERSION} (control protocol {PROTOCOL_VERSION})"
         )),
-        Ok(Cli::Commands { json }) => print(&commands(json)),
+        Ok(Cli::Commands { json, all }) => print(&commands(json, all)),
         Ok(Cli::Run {
             command,
             params,
@@ -152,6 +156,7 @@ fn main() -> ExitCode {
 
 fn parse(args: &[String]) -> Result<Cli, String> {
     let mut json = false;
+    let mut all = false;
     let mut local = false;
     let mut dir = None;
     let mut overrides = short::Overrides::default();
@@ -162,6 +167,7 @@ fn parse(args: &[String]) -> Result<Cli, String> {
     while let Some(arg) = args.next() {
         match arg.as_str() {
             "--json" => json = true,
+            "--all" => all = true,
             "--local" => local = true,
             "--dir" => match args.next() {
                 Some(path) => dir = Some(PathBuf::from(path)),
@@ -196,6 +202,7 @@ fn parse(args: &[String]) -> Result<Cli, String> {
     if version {
         return if positional.is_empty()
             && !json
+            && !all
             && !local
             && dir.is_none()
             && overrides == short::Overrides::default()
@@ -206,6 +213,9 @@ fn parse(args: &[String]) -> Result<Cli, String> {
         };
     }
     let subcommand = positional.first().copied();
+    if all && subcommand != Some("commands") {
+        return Err(String::from("--all only applies to commands"));
+    }
     if local && !matches!(subcommand, Some("run" | "mcp")) {
         return Err(String::from("--local only applies to run and mcp"));
     }
@@ -226,7 +236,7 @@ fn parse(args: &[String]) -> Result<Cli, String> {
     }
     match positional.as_slice() {
         [] => Err(String::from("missing subcommand")),
-        ["commands"] => Ok(Cli::Commands { json }),
+        ["commands"] => Ok(Cli::Commands { json, all }),
         ["commands", ..] => Err(String::from("commands takes no arguments")),
         ["run"] => Err(String::from(
             "run needs a command ID; myarcctl commands lists them",
@@ -261,9 +271,13 @@ fn parse_params(text: &str) -> Result<Value, String> {
     serde_json::from_str(text).map_err(|error| format!("params are not valid JSON: {error}"))
 }
 
-fn commands(json: bool) -> String {
+fn commands(json: bool, all: bool) -> String {
+    let specs: Vec<_> = registry()
+        .iter()
+        .filter(|spec| all || spec.implemented)
+        .collect();
     if json {
-        let list: Vec<Value> = registry()
+        let list: Vec<Value> = specs
             .iter()
             .map(|spec| {
                 json!({
@@ -276,24 +290,28 @@ fn commands(json: bool) -> String {
             .collect();
         return Value::Array(list).to_string();
     }
-    let width = registry()
-        .iter()
-        .map(|spec| spec.id.len())
-        .max()
-        .unwrap_or(0);
-    let mut lines = vec![format!(
-        "{:<width$}  {:<12}  {:<11}  SUMMARY",
-        "ID", "AREA", "IMPLEMENTED"
-    )];
-    for spec in registry() {
+    let width = specs.iter().map(|spec| spec.id.len()).max().unwrap_or(0);
+    let mut lines = vec![if all {
+        format!(
+            "{:<width$}  {:<12}  {:<11}  SUMMARY",
+            "ID", "AREA", "IMPLEMENTED"
+        )
+    } else {
+        format!("{:<width$}  {:<12}  SUMMARY", "ID", "AREA")
+    }];
+    for spec in specs {
         let area = json!(spec.area);
-        lines.push(format!(
-            "{:<width$}  {:<12}  {:<11}  {}",
-            spec.id,
-            area.as_str().unwrap_or_default(),
-            if spec.implemented { "yes" } else { "no" },
-            spec.summary,
-        ));
+        let area = area.as_str().unwrap_or_default();
+        lines.push(if all {
+            format!(
+                "{:<width$}  {area:<12}  {:<11}  {}",
+                spec.id,
+                if spec.implemented { "yes" } else { "no" },
+                spec.summary,
+            )
+        } else {
+            format!("{:<width$}  {area:<12}  {}", spec.id, spec.summary)
+        });
     }
     lines.join("\n")
 }

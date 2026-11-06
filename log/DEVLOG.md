@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-11-06: Stable refs and quieter changes from the skill dogfood
+
+- Refs now keep their numbers for the life of a document. `SnapshotStore` holds a `RefNumbers` map per document from node ID to number, new nodes take the next unused number, and a navigation starts again at e1. A ref whose node left the page answers `stale`, as do refs from before an epoch reset, which happens once a document's map would pass 50,000 nodes. Taking refs for an action now marks the entry busy instead of bumping the count, so an action moves the revision one step, and a snapshot whose outline hash is unchanged keeps its revision. The FFI and the functions `bridge.rs` calls are unchanged.
+- `changes` is compact and computed in the core: `added e7`, `removed e4`, `changed e1 value`, focus alone is no change, and `{"many": true}` replaces the lists when they outnumber half the outline's lines. The CLI's focus hash workaround and the `seen` field in `cli-state.json` are gone. The formatter drops a text line that repeats the name of the form control next to it (`repeats_label`), which removes `text "Search"` above a filled `searchbox "Search"`. `snapshot -i` keeps the nearest heading and the text line before each ref and shows link targets only where names repeat. `myarcctl commands` lists implemented commands unless given `--all`.
+- Verification: `cargo fmt --check`, `cargo clippy -D warnings`, `cargo test` (a new `tests/dogfood.rs` replays the sign-in and list steps on synthetic trees, plus store, label, changes and `-i` tests) and `check_docs.py` pass. Nothing ran against a live myArc, and the browser wasn't rebuilt.
+
 ## 2026-11-06: Short myarcctl commands for agents
 
 - `myarcctl` gained `open`, `snapshot [-i]`, `click`, `fill`, `select`, `press`, `back`, `forward`, `reload`, `close`, `tabs` and `use`, modeled on agent-browser. Each sends registry commands through the same `ipc::Client` as `run`. The new `crates/myarcctl/src/short.rs` keeps the current tab and the last printed revision in `cli-state.json` (mode 600) next to the control directory, and never fetches a newer revision, so the browser's stale check still applies. `--tab` and `--rev` replace them for one call.
