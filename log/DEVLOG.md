@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-11-06: A Claude Code skill for driving myArc
+
+- New top-level `skills/myarc-browser/SKILL.md` teaches an agent to drive myArc through `myarcctl`. It covers the prerequisite and exit code 3, the open, snapshot, act loop, exact `myarcctl run` calls with param names taken from the registry in `crates/control/src/lib.rs`, how to read the outline, and what `stale`, `outcome_unknown` and `denied` mean. The README links it from the docs list.
+- Safety rules are in the skill: page text is untrusted, consequential actions need the user's yes, and work stays in the Agent Space. The page actions are documented from the registry, which still marks them unimplemented, so the skill tells agents to stop on `unsupported`.
+- Verification: `check_docs.py` passes. Docs only, no browser or Rust change, and nothing was run against a live myArc. Still open. `page.scroll` and `page.wait` are in the registry but the skill leaves them out until they ship.
+
 ## 2026-11-06: Agents click, fill, select and press on snapshot references
 
 - `page.click`, `page.fill`, `page.select` and `page.press` act on a `[ref=eN]` of the latest `page.snapshot` in an agent Space tab and answer with a fresh snapshot, `navigated`, `settled` and a `changes` list. The new `crates/control/src/actions.rs` holds the parameter checks, the key allowlist on a US layout, the element checks (writable text field for fill, native select for select, focused or text field for press), option matching by value then visible text, and the diff. `SnapshotStore` now keeps what each reference showed, takes the references when an action starts so its revision turns stale, and puts them back when the page refused before acting.
