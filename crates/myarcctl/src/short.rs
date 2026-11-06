@@ -544,11 +544,20 @@ pub fn render_failure(response: &Response) -> String {
         Outcome::Cancelled => String::from("cancelled"),
         Outcome::Timeout => String::from("timeout"),
         Outcome::OutcomeUnknown { reason, data } => format!(
-            "outcome_unknown: {reason}{}",
+            "outcome_unknown: {}{}",
+            short_names(reason),
             data.as_ref().map(url).unwrap_or_default()
         ),
-        Outcome::Invalid { reason } => format!("invalid: {reason}"),
+        Outcome::Invalid { reason } => format!("invalid: {}", short_names(reason)),
     }
+}
+
+/// Names the short commands in a browser hint instead of the wire ones.
+fn short_names(reason: &str) -> String {
+    reason
+        .replace("reload it and take page.snapshot", "run reload")
+        .replace("reload it with tab.reload", "run reload")
+        .replace("take page.snapshot", "run snapshot")
 }
 
 fn join_nonempty(parts: &[String]) -> String {
@@ -1068,6 +1077,29 @@ form
         assert_eq!(
             render_failure(&unknown),
             "outcome_unknown: timed out · https://x.test/"
+        );
+        let crashed = response(
+            "page.click",
+            Outcome::OutcomeUnknown {
+                reason: String::from(
+                    "The page crashed during the action; reload it and take page.snapshot",
+                ),
+                data: None,
+            },
+        );
+        assert_eq!(
+            render_failure(&crashed),
+            "outcome_unknown: The page crashed during the action; run reload"
+        );
+        let gone = response(
+            "page.snapshot",
+            Outcome::Invalid {
+                reason: String::from("The page crashed; reload it with tab.reload first"),
+            },
+        );
+        assert_eq!(
+            render_failure(&gone),
+            "invalid: The page crashed; run reload first"
         );
     }
 

@@ -68,6 +68,7 @@ Errors go to stderr and exit with code 1.
 
 - `stale`: the outline is out of date, the element left the page, or the tab is gone. Run `myarcctl snapshot` and use the new refs. Never reuse old ones.
 - `outcome_unknown`: the action may or may not have happened. Run `snapshot` and read the page first. Never repeat a submit, send or payment on a guess.
+- If a result says the page crashed, run `myarcctl reload` instead. It prints the new outline, and a crashed page answers `snapshot` with `invalid`.
 - `denied`: the tab is outside the Agent Space or the URL scheme is blocked. Don't look for a way around it.
 - `invalid`: the ref, key or value is wrong for that element. Check the outline.
 
