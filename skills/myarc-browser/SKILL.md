@@ -38,12 +38,14 @@ myarcctl use t12               # switch the current tab
 
 - `--tab t12` and `--rev 1.2` replace the current tab and revision for one call. `--json` prints the raw response.
 - Put `--` before text that starts with a dash: `myarcctl fill @e1 -- "-5"`.
-- URLs must be http or https. Navigation answers once it commits, so the outline header may say `loading`.
+- URLs must be http or https. Navigation answers once it commits, so the outline header may say `loading`. There is no wait command yet, so run `snapshot` again if the page is still loading.
+- `snapshot -i` drops headings and text. Use plain `snapshot` when you need them to tell similar refs apart, such as several "Details" links.
+- There is no scroll command yet. `click` scrolls its target into view first.
 - For a command without a short form, use `myarcctl run <command> '<json>'`. `myarcctl commands` lists them.
 
 ## Reading the output
 
-An action prints a status line such as `ok click e4 · rev 1.5 · navigated`, then the refs that were `added:`, `removed:` or `changed:`, then the new outline. `snapshot` and `open` start with `t12 · rev 1.2 · "Title" · URL`.
+An action prints a status line such as `ok click e4 · rev 1.5 · navigated`, then the refs that were `added:`, `removed:` or `changed:`, then the new outline. `not settled` in the status line means the wait for the page to go quiet ran out. The outline is still the latest one, so only run `snapshot` if what you need is missing. `snapshot` starts with `t12 · rev 1.2 · "Title" · URL`, and `open` prints the same line after `ok open`.
 
 ```text
 form

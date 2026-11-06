@@ -529,6 +529,8 @@ pub fn render_failure(response: &Response) -> String {
         Outcome::Denied { reason } => format!("denied: {reason}"),
         Outcome::Unsupported { reason, .. } => format!("unsupported: {reason}"),
         Outcome::Stale { reason } if response.command.starts_with("page.") => {
+            let again = format!("; {}", myarc_control::snapshot::AGAIN);
+            let reason = reason.strip_suffix(&again).unwrap_or(reason);
             format!("stale: take a new snapshot ({reason})")
         }
         Outcome::Stale { reason } => format!("stale: {reason}"),
@@ -1003,6 +1005,16 @@ form
         );
         assert_eq!(
             render_failure(&stale),
+            "stale: take a new snapshot (revision 1.2 is old)"
+        );
+        let wire = response(
+            "page.click",
+            Outcome::Stale {
+                reason: format!("revision 1.2 is old; {}", myarc_control::snapshot::AGAIN),
+            },
+        );
+        assert_eq!(
+            render_failure(&wire),
             "stale: take a new snapshot (revision 1.2 is old)"
         );
         let unknown = response(

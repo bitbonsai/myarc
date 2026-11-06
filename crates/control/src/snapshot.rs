@@ -908,7 +908,8 @@ impl SnapshotStore {
     }
 }
 
-const AGAIN: &str = "run page.snapshot again and use its references";
+/// How stale snapshot reasons end, so clients can swap in their own wording.
+pub const AGAIN: &str = "run page.snapshot again and use its references";
 
 /// The number in a reference such as `e4`.
 pub(crate) fn parse_ref(element: &str) -> Option<usize> {
