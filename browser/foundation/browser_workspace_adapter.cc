@@ -47,6 +47,7 @@
 #include "content/public/common/url_constants.h"
 #include "myarc/control_host.h"
 #include "myarc/control_tabs.h"
+#include "myarc/site_icon_fetcher.h"
 #include "myarc/test_buildflags.h"
 #include "myarc/workspace_lifecycle.h"
 #include "url/origin.h"
@@ -536,6 +537,10 @@ BrowserWorkspaceAdapter::BrowserWorkspaceAdapter(
     BeginShutdown(*profile_);
   }
   tabs_->AddObserver(this);
+  if (auto* fetcher = SiteIconFetcher::ForProfile(*profile_)) {
+    site_icon_subscription_ = fetcher->AddStoredCallback(base::BindRepeating(
+        &BrowserWorkspaceAdapter::OnSiteIconStored, base::Unretained(this)));
+  }
   service_subscription_ = service_->Subscribe(base::BindRepeating(
       [](BrowserWorkspaceAdapter* adapter) {
         adapter->bindings_dirty_ = true;
@@ -1430,7 +1435,8 @@ favicon::FaviconService* BrowserWorkspaceAdapter::Favicons() const {
 }
 
 void BrowserWorkspaceAdapter::RequestIcon(favicon::FaviconService& favicons,
-                                          std::string_view url) {
+                                          std::string_view url,
+                                          bool fetch) {
   if (saved_icons_.contains(url))
     return;
   saved_icons_.emplace(url, gfx::Image());
@@ -1438,7 +1444,7 @@ void BrowserWorkspaceAdapter::RequestIcon(favicon::FaviconService& favicons,
   favicons.GetFaviconImageForPageURL(
       GURL(url),
       base::BindOnce(&BrowserWorkspaceAdapter::OnSavedIcon,
-                     weak_factory_.GetWeakPtr(), std::string(url)),
+                     weak_factory_.GetWeakPtr(), std::string(url), fetch),
       &icon_tracker_);
 }
 
@@ -1449,6 +1455,8 @@ void BrowserWorkspaceAdapter::RequestSavedIcons(
     return;
   for (const auto* rows :
        {&sidebar.favorites, &sidebar.pins, &sidebar.temporary}) {
+    // Only saved rows fetch a missing icon from their site.
+    const bool fetch = rows != &sidebar.temporary;
     for (const auto& row : *rows) {
       if (!row.has_url)
         continue;
@@ -1461,7 +1469,7 @@ void BrowserWorkspaceAdapter::RequestSavedIcons(
           saved_icons_.erase(cached);
         continue;
       }
-      RequestIcon(*favicons, url);
+      RequestIcon(*favicons, url, fetch);
     }
   }
 }
@@ -1472,17 +1480,27 @@ void BrowserWorkspaceAdapter::RequestArchivedIcons(
   if (!favicons)
     return;
   for (const auto& tab : tabs)
-    RequestIcon(*favicons, std::string_view(tab.url.data(), tab.url.size()));
+    RequestIcon(*favicons, std::string_view(tab.url.data(), tab.url.size()),
+                /*fetch=*/false);
 }
 
 void BrowserWorkspaceAdapter::OnSavedIcon(
     const std::string& url,
+    bool fetch,
     const favicon_base::FaviconImageResult& result) {
   DCHECK_GT(pending_icons_, 0u);
   --pending_icons_;
   if (!result.image.IsEmpty()) {
     saved_icons_[url] = result.image;
     icons_found_ = true;
+    // Postpones eviction of an icon fetched for a page never visited.
+    if (fetch && result.icon_url.is_valid()) {
+      if (auto* favicons = Favicons())
+        favicons->TouchOnDemandFavicon(result.icon_url);
+    }
+  } else if (fetch) {
+    if (auto* fetcher = SiteIconFetcher::ForProfile(*profile_))
+      fetcher->Fetch(url);
   }
   // One sidebar rebuild per batch. Refresh notifies the sidebar, which asks
   // SavedIcon again.
@@ -1490,6 +1508,15 @@ void BrowserWorkspaceAdapter::OnSavedIcon(
     icons_found_ = false;
     OnServiceChanged();
   }
+}
+
+void BrowserWorkspaceAdapter::OnSiteIconStored(const std::string& url) {
+  auto cached = saved_icons_.find(url);
+  if (cached == saved_icons_.end() || !cached->second.IsEmpty())
+    return;
+  saved_icons_.erase(cached);
+  if (auto* favicons = Favicons())
+    RequestIcon(*favicons, url, /*fetch=*/false);
 }
 
 gfx::Image BrowserWorkspaceAdapter::SavedIcon(

@@ -218,12 +218,18 @@ class BrowserWorkspaceAdapter final : public TabStripModelObserver {
   void Refresh();
   // Null for off-the-record Profiles.
   favicon::FaviconService* Favicons() const;
-  // Looks `url` up once; later calls answer from the cache.
-  void RequestIcon(favicon::FaviconService& favicons, std::string_view url);
+  // Looks `url` up once; later calls answer from the cache. With `fetch`, a
+  // miss asks SiteIconFetcher for the site's own icon.
+  void RequestIcon(favicon::FaviconService& favicons,
+                   std::string_view url,
+                   bool fetch);
   // Starts favicon lookups for dormant saved rows not looked up yet.
   void RequestSavedIcons(const foundation::SidebarResult& sidebar);
   void OnSavedIcon(const std::string& url,
+                   bool fetch,
                    const favicon_base::FaviconImageResult& result);
+  // Looks a fetched page up again if its row still shows no icon.
+  void OnSiteIconStored(const std::string& url);
   foundation::MutationResult Remember(foundation::MutationResult result);
   foundation::MutationResult StepOrSelectItem(int index, int delta);
   void OnTabStripModelChanged(
@@ -260,6 +266,7 @@ class BrowserWorkspaceAdapter final : public TabStripModelObserver {
   std::string binding_warning_;
   base::RepeatingClosureList changed_;
   base::CallbackListSubscription service_subscription_;
+  base::CallbackListSubscription site_icon_subscription_;
   // By saved or archived canonical URL spec. An empty image marks a pending
   // lookup or a cache miss.
   std::map<std::string, gfx::Image, std::less<>> saved_icons_;

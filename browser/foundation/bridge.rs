@@ -569,7 +569,21 @@ mod ffi {
         fn refuse_control_request(reply: &mut ControlReply, reason: &str);
         // UI thread: stops serving and removes the endpoint before returning.
         fn stop_control_host();
+
+        // The href of the best non-SVG `<link rel="icon">` in the head of
+        // untrusted `html`, unresolved, or empty. Reads at most
+        // `site_icon_scan_bytes()` bytes.
+        fn declared_site_icon(html: &[u8]) -> String;
+        fn site_icon_scan_bytes() -> usize;
     }
+}
+
+pub fn declared_site_icon(html: &[u8]) -> String {
+    workspace::site_icon::declared_icon(html).unwrap_or_default()
+}
+
+pub fn site_icon_scan_bytes() -> usize {
+    workspace::site_icon::MAX_SCAN_BYTES
 }
 
 pub fn new_workspace() -> Box<Workspace> {

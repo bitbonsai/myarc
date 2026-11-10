@@ -33,7 +33,7 @@ Prefer a user-selected directory/file and OS-native access prompts. Never crawl 
 
 `select → read snapshot → detect format/version → validate → normalize → preview → confirm → commit → report`
 
-The preview shows counts, hierarchy, profile mapping, warnings, duplicates, and unsupported categories. It does not fetch imported URLs or remote favicons. Give users control over what to include. Reject malformed structures and unsupported future versions; bound depth, counts, sizes, and processing time.
+The preview shows counts, hierarchy, profile mapping, warnings, duplicates, and unsupported categories. It does not fetch imported URLs or remote favicons. After the commit, the sidebar asks each saved site for its missing icon, as [the security plan](SECURITY-PLAN.md#network-requests-myarc-adds) describes. Give users control over what to include. Reject malformed structures and unsupported future versions; bound depth, counts, sizes, and processing time.
 
 Write into a new target workspace generation with an import receipt, source fingerprint, and idempotency key. Either publish the complete validated generation or leave the prior workspace unchanged. Cancellation, disk-full, process termination, and validation failure cannot produce a half-imported visible workspace. Never modify the source.
 

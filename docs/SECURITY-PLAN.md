@@ -14,6 +14,12 @@ This document defines work required before supporting daily browsing. It is not 
 | Release/update → installed application | Supply-chain compromise, unsigned update, unsafe downgrade | Isolated signing, reviewed dependencies, signed metadata/artifacts, verification and recovery |
 | Automation → browsing session | A control endpoint exceeding the context the user granted | Opt-in controller grants; dedicated Profile by default or deliberately selected normal tabs; authenticated local IPC; scope/expiry/revocation, indicator and Stop control; no unauthenticated listener |
 
+## Network requests myArc adds
+
+Chromium's own requests stay as upstream configures them. myArc adds one kind.
+
+When the sidebar shows a saved Favorite or Pin and the Profile's favicon database has no icon for its page, the browser asks that site for its icon. It reads the start of the site's home page (at most 256 KiB) for a `<link rel="icon">`, then fetches that icon or `/favicon.ico`. Requests go only to the saved URL's registrable domain and follow at most 3 redirects within it. They carry no cookies or credentials and never send the saved page's path. They use the Profile's network context, so proxy settings apply, and time out after 10 seconds. Each origin gets one attempt per browser session, failed or not, and at most 2 sites load at once. Images decode in Chromium's sandboxed data decoder, and the HTML scan runs in the Rust core. The icon is stored as an on-demand favicon, which the page's own favicon replaces on a visit. Off-the-record Profiles, temporary tabs and Archived Tabs never fetch. No Google favicon server or other third party is involved.
+
 ## Maintenance is product scope
 
 M0 must name the person responsible for upstream security triage, primary and backup build access, signing/update recovery, and responding when coverage is unavailable. Fund build machines, artifact hosting, notarization/signing, and review. Estimated costs remain unknown until measured.

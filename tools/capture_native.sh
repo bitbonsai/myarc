@@ -27,6 +27,10 @@
 #   with Archived Tabs.
 #   LOCAL_STATE=<file> seeds the user-data dir's Local State, for example
 #   with other Profiles and their Spaces index.
+#   PROFILE_DIR=<dir> uses and keeps that user-data dir, so a later run can
+#   relaunch the same profile; it seeds Preferences only the first time.
+#   ARGS="--switch …" passes extra command-line switches, for example
+#   --proxy-server=127.0.0.1:9 to make every site unreachable.
 #   ACTIVATE=<item ID> opens that seeded row once the workspace loads, via
 #   --myarc-capture-activate; pair it with URL=none.
 #   AGENT_SPACE=1 creates the agent Space via --myarc-test-agent-space, and
@@ -56,7 +60,8 @@ KEYS=${KEYS:-}; KEY_SETTLE=${KEY_SETTLE:-2}
 if [ "${1:-}" = "--inner" ]; then
   OUT=$2
   [ -x "$BIN" ] || { echo "native binary missing: $BIN" >&2; exit 1; }
-  PROFILE=$(mktemp -d "${TMPDIR:-/tmp}/myarc-native.XXXXXX")
+  KEEP=${PROFILE_DIR:+1}
+  PROFILE=${PROFILE_DIR:-$(mktemp -d "${TMPDIR:-/tmp}/myarc-native.XXXXXX")}
   PID=""
   cleanup() {
     if [ -n "$PID" ] && kill -0 "$PID" 2>/dev/null; then
@@ -64,13 +69,14 @@ if [ "${1:-}" = "--inner" ]; then
       for _ in $(seq 1 50); do kill -0 "$PID" 2>/dev/null || break; sleep 0.2; done
       kill -0 "$PID" 2>/dev/null && kill -KILL "$PID" 2>/dev/null || true
     fi
-    # Only delete a profile carrying our marker.
-    [ -f "$PROFILE/.myarc-m0-test-profile" ] && rm -rf "$PROFILE"
+    # Only delete a profile carrying our marker, and never a kept one.
+    [ -z "$KEEP" ] && [ -f "$PROFILE/.myarc-m0-test-profile" ] && rm -rf "$PROFILE"
+    true
   }
   trap cleanup EXIT
   mkdir -p "$PROFILE/Default"
   touch "$PROFILE/.myarc-m0-test-profile"
-  printf '{"vertical_tabs":{"enabled":true,"collapsed_state":false,"enabled_first_time":true},"download":{"default_directory":"%s","prompt_for_download":false}}\n' "$PROFILE/Downloads" > "$PROFILE/Default/Preferences"
+  [ -f "$PROFILE/Default/Preferences" ] || printf '{"vertical_tabs":{"enabled":true,"collapsed_state":false,"enabled_first_time":true},"download":{"default_directory":"%s","prompt_for_download":false}}\n' "$PROFILE/Downloads" > "$PROFILE/Default/Preferences"
   [ -n "${WORKSPACE:-}" ] && cp "$WORKSPACE" "$PROFILE/Default/myarc-workspace-v1.json"
   [ -n "${LOCAL_STATE:-}" ] && cp "$LOCAL_STATE" "$PROFILE/Local State"
   URLS=()
@@ -99,6 +105,7 @@ if [ "${1:-}" = "--inner" ]; then
     select) EXTRA+=(--myarc-test-agent-space=select) ;;
     *) EXTRA+=(--myarc-test-agent-space) ;;
   esac
+  [ -n "${ARGS:-}" ] && read -r -a MORE <<< "$ARGS" && EXTRA+=("${MORE[@]}")
   OPEN_ENV=()
   if [ -n "${CONTROL:-}" ]; then
     [ "${CONTROL_SWITCH:-1}" = 0 ] || EXTRA+=(--myarc-enable-control)

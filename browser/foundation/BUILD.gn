@@ -12,6 +12,7 @@ rust_static_library("workspace") {
     "workspace/src/archive.rs",
     "workspace/src/lib.rs",
     "workspace/src/peek.rs",
+    "workspace/src/site_icon.rs",
     "workspace/src/tab_ops.rs",
   ]
   build_native_rust_unit_tests = true
@@ -116,6 +117,8 @@ source_set("browser_workspace_adapter") {
     "control_host.h",
     "control_tabs.cc",
     "control_tabs.h",
+    "site_icon_fetcher.cc",
+    "site_icon_fetcher.h",
   ]
   public_deps = [
     ":control_prefs",
@@ -151,7 +154,13 @@ source_set("browser_workspace_adapter") {
     "//components/tabs:public",
     "//content/public/browser",
     "//mojo/public/cpp/bindings",
+    "//net",
+    "//net/traffic_annotation",
+    "//services/data_decoder/public/cpp",
+    "//services/network/public/cpp",
+    "//services/network/public/mojom",
     "//services/service_manager/public/cpp",
+    "//skia",
     "//third_party/blink/public/common",
     "//third_party/blink/public/mojom:mojom_platform_headers",
     "//ui/accessibility",
