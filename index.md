@@ -32,13 +32,13 @@ An open-source browser bringing back Arc, with no account required and optional 
 
 - ### Works now
 
-  Spaces, pinned tabs and Favorites, the Library, and tabs that survive a restart.
+  Spaces, pinned tabs and Favorites, the Library, tabs that survive a restart, and AI agents that browse in a Space of their own.
 - ### Next, for alpha
 
   Split view, Little Arc, Arc import, ad and tracker blocking on by default, and onboarding.
 - ### After alpha
 
-  Control from the terminal and AI agents, and builds for Windows and Linux.
+  Builds for Windows and Linux.
 
 [Download the 2026.11.10 nightly →](https://myarc.dev/download/) [Full alpha checklist →](https://github.com/bitbonsai/myarc/blob/main/docs/ALPHA.md)
 
@@ -58,7 +58,7 @@ An open-source browser bringing back Arc, with no account required and optional 
   Provider choices, privacy rules and how a hosted option would be paid for.
 - [CLI and MCP control](https://github.com/bitbonsai/myarc/blob/main/docs/CONTROL-PROTOCOL.md)
 
-  How the terminal and AI agents will drive the browser, and what you let them do.
+  How the terminal and AI agents drive the browser, and what you let them do.
 - [Contributing](https://github.com/bitbonsai/myarc/blob/main/CONTRIBUTING.md)
 
   How to help without drifting from the product.

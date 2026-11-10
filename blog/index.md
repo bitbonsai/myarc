@@ -4,6 +4,12 @@ HTML: https://myarc.dev/blog/
 
 November 2026
 
+## [Letting agents use myArc](https://myarc.dev/blog/agents-use-myarc/)
+
+November 10, 2026
+
+AI agents like Claude Code can now browse in myArc, in a Space of their own and only after you say yes. Also a Chromium crash, and the first step toward importing from Arc.
+
 ## [One window, two profiles](https://myarc.dev/blog/one-window-two-profiles/)
 
 November 06, 2026
