@@ -240,6 +240,7 @@ source_set("sidebar_view") {
     "//components/vector_icons",
     "//skia",
     "//ui/accessibility",
+    "//ui/base/clipboard",
     "//ui/color",
     "//ui/compositor",
     "//ui/display",

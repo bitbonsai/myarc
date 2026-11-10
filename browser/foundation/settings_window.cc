@@ -763,6 +763,9 @@ class AdvancedPage : public views::View {
     control_panel_ =
         AddRowPanel(this, u"Allow agents to control myArc",
                     /*multi_line=*/false, std::move(control_switch));
+    // Line the switch row up with the Chromium Settings card above it.
+    static_cast<views::BoxLayout*>(control_panel_->GetLayoutManager())
+        ->set_inside_border_insets(gfx::Insets::VH(0, kBannerPad));
     control_help_ = AddLabel(
         this,
         u"Lets tools like Claude Code use the myarcctl command to open and "
@@ -784,13 +787,13 @@ class AdvancedPage : public views::View {
     const int panel_width = width() - 2 * kSideMargin;
     card_->SetBounds(kSideMargin, kContentTop, panel_width, kRowHeight);
     const int title_height = control_title_->GetPreferredSize().height();
-    control_title_->SetBounds(kSideMargin + kGeneralRowPad,
+    control_title_->SetBounds(kSideMargin + kBannerPad,
                               card_->bounds().bottom() + 24,
-                              panel_width - kGeneralRowPad, title_height);
+                              panel_width - kBannerPad, title_height);
     control_panel_->SetBounds(kSideMargin, control_title_->bounds().bottom() + 8,
                               panel_width, kSwitchRowHeight);
-    const int help_width = panel_width - 2 * kGeneralRowPad;
-    control_help_->SetBounds(kSideMargin + kGeneralRowPad,
+    const int help_width = panel_width - 2 * kBannerPad;
+    control_help_->SetBounds(kSideMargin + kBannerPad,
                              control_panel_->bounds().bottom() + 8, help_width,
                              control_help_->GetHeightForWidth(help_width));
   }

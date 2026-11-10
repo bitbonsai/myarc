@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-11-10: Tile menus follow Arc's order, and the approval layer lines up
+
+- Tile and row context menus now open with Copy Link, which writes the saved URL to the clipboard, then the Pin and Favorite moves and Close, with removal last behind its own separator. A Favorite's removal reads "Remove Favorite", as in Arc's menu. Arc's Share, Change Icon, Rename, Mute, Customize Page, Edit Pinned Page, Open in Split View, Duplicate and Move to stay out, since myArc has no action for them yet. `ITEM_MENU=1` in `tools/capture_native.sh` opens the first tile's menu through the new `--myarc-capture-item-menu`, and reopens it while the user's input elsewhere closes it.
+- The agent Space's Stop button now uses Clear's 11pt semibold on a 24 DIP pill with its right edge on Clear's. The title row keeps its 32 DIP height and the fill ends 7 DIP above the divider, where it used to reach it. In Settings > Advanced the Browser control title, switch row and help text now start 16 DIP in, as the Chromium Settings card does, instead of 10, and the switch's right edge lines up with More Settings….
+- Verification: same-size background captures before and after in `/tmp/myarc-parity/` (outside the repo), with a crop next to Arc's Favorite menu reference in `menu-side-by-side.png`. Copy Link wasn't pressed live, because that would have overwritten the user's clipboard. Keyboard focus, Reduce Transparency and light mode weren't run; the menu is the system's own and the Stop pill keeps the default focus ring. `chrome` and `bridge_check` build, and `bridge_check`, `cargo fmt --check`, the `bridge.rs` rustfmt check, `cargo clippy -D warnings`, `cargo test` (307 tests), `export_patches.py --check` and `check_docs.py` pass.
+
 ## 2026-11-10: Reading Arc's Markdown export into a report
 
 - New crate `crates/import` (`myarc-import`, no dependencies) with `arc_markdown::parse`. It reads `# ` Space labels, `## ` groups and `- ` URL items into a `Report` with line numbers, keeps labels, URLs and repeats as written, and treats `Favorites` as a plain label. Every other line lands in `unrecognized` with a reason: indented, deeper heading, not a URL, too long, control characters, or out of place.

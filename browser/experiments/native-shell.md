@@ -43,7 +43,7 @@ The next keyboard/command-bar slice is specified in [native interactions](native
 
 ## Remaining differences and limits
 
-The sidebar still uses upstream tab rows and a restyled native New Tab button. Arc's Favorites/Spaces arrangement and centered command bar remain unimplemented. Icon geometry, typography and interaction details need comparison; 1:1 parity has not been accepted.
+The sidebar draws its own Favorite and Pin tiles, Today rows, Space title and footer, and the command bar opens centered. Tile and row context menus use the native macOS menu in Arc's order, with Copy Link first and Remove Favorite last. Arc's Share, Change Icon, Rename, Mute, Customize Page, Edit Pinned Page, Open in Split View, Duplicate and Move to are still missing, because myArc has no action behind them yet. Icon geometry, typography and interaction details need comparison; 1:1 parity has not been accepted.
 
 The dark palette and expanded layout cover the first reference state only. Light mode, Reduce Transparency, collapsed/hover/fullscreen behavior, complete keyboard/VoiceOver behavior and extension/permission popup anchoring remain unverified. Several stock toolbar controls are omitted from this preview. It is unsuitable for daily-use acceptance. Existing foundation security/distribution gates remain open; import work and broader test expansion are deferred.
 

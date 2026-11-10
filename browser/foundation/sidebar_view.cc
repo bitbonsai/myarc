@@ -27,6 +27,7 @@
 #include "myarc/sidebar_tint.h"
 #include "myarc/space_icon_catalog.h"
 #include "third_party/skia/include/core/SkColor.h"
+#include "ui/base/clipboard/scoped_clipboard_writer.h"
 #include "ui/base/metadata/metadata_impl_macros.h"
 #include "ui/base/mojom/menu_source_type.mojom.h"
 #include "ui/color/color_id.h"
@@ -414,7 +415,14 @@ class SpaceStrip final : public views::View {
 BEGIN_METADATA(SpaceStrip)
 END_METADATA
 
-enum ItemCommand { kPin = 1, kFavorite, kUnsave, kClose, kStopControl };
+enum ItemCommand {
+  kPin = 1,
+  kFavorite,
+  kUnsave,
+  kClose,
+  kStopControl,
+  kCopyLink
+};
 
 // Browser control's accent: a small dot on the agent Space's footer glyph
 // while a client is active.
@@ -453,6 +461,8 @@ ui::ImageModel ActiveGlyph(const ui::ImageModel& glyph,
 constexpr char kCaptureCreateMenu[] = "myarc-capture-create-menu";
 // Opens one seeded row once the workspace loads, for background captures.
 constexpr char kCaptureActivate[] = "myarc-capture-activate";
+// Opens the first tile's context menu once, for background captures.
+constexpr char kCaptureItemMenu[] = "myarc-capture-item-menu";
 
 // The creation menu floats 17 DIP above the Create button, its notch tip 12
 // DIP above it and 4 DIP left of its center, and its right edge 5 DIP inside
@@ -766,6 +776,12 @@ void SidebarView::ShowContextMenuForViewImpl(
   menu_state_ = *target->item_menu;
   menu_runner_.reset();
   menu_model_ = std::make_unique<ui::SimpleMenuModel>(this);
+  // Arc's order: Copy Link first, the page's own actions next, and removal
+  // last behind its own separator.
+  if (!menu_state_.url.empty()) {
+    menu_model_->AddItem(kCopyLink, u"Copy Link");
+    menu_model_->AddSeparator(ui::NORMAL_SEPARATOR);
+  }
   if (!menu_state_.is_pin) {
     menu_model_->AddItem(kPin, menu_state_.is_favorite ? u"Move to Space Pins"
                                                        : u"Pin to Space");
@@ -775,17 +791,16 @@ void SidebarView::ShowContextMenuForViewImpl(
                                         ? u"Move to Profile Favorites"
                                         : u"Add to Profile Favorites");
   }
-  if (menu_state_.is_pin || menu_state_.is_favorite) {
-    menu_model_->AddItem(kUnsave, menu_state_.is_pin
-                                      ? u"Unpin from Space"
-                                      : u"Remove from Profile Favorites");
-  }
   if (menu_state_.is_live) {
-    menu_model_->AddSeparator(ui::NORMAL_SEPARATOR);
     menu_model_->AddItem(
         kClose, menu_state_.is_pin        ? u"Close live page (keep Space Pin)"
                 : menu_state_.is_favorite ? u"Close live page (keep Favorite)"
                                           : u"Close live page");
+  }
+  if (menu_state_.is_pin || menu_state_.is_favorite) {
+    menu_model_->AddSeparator(ui::NORMAL_SEPARATOR);
+    menu_model_->AddItem(kUnsave, menu_state_.is_pin ? u"Unpin from Space"
+                                                     : u"Remove Favorite");
   }
   menu_runner_ = std::make_unique<views::MenuRunner>(
       menu_model_.get(), views::MenuRunner::CONTEXT_MENU);
@@ -1106,6 +1121,24 @@ void SidebarView::ChooseCreateItem(int item) {
                      weak_factory_.GetWeakPtr(), item));
 }
 
+void SidebarView::OpenCaptureItemMenu(int tries) {
+  if (tiles_.empty() || tries <= 0) {
+    return;
+  }
+  // A background app's native menu closes on the user's input elsewhere, so
+  // reopen it until the capture has had its chance.
+  if (!menu_runner_ || !menu_runner_->IsRunning()) {
+    views::View* tile = tiles_.front().first;
+    tile->ShowContextMenu(tile->GetBoundsInScreen().CenterPoint(),
+                          ui::mojom::MenuSourceType::kMouse);
+  }
+  base::SequencedTaskRunner::GetCurrentDefault()->PostDelayedTask(
+      FROM_HERE,
+      base::BindOnce(&SidebarView::OpenCaptureItemMenu,
+                     weak_factory_.GetWeakPtr(), tries - 1),
+      base::Milliseconds(300));
+}
+
 void SidebarView::SetControlClient(std::u16string client,
                                    base::RepeatingClosure stop) {
   control_client_ = std::move(client);
@@ -1124,6 +1157,12 @@ void SidebarView::ExecuteCommand(int command_id, int event_flags) {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
   if (command_id == kStopControl) {
     StopControl();
+    return;
+  }
+  if (command_id == kCopyLink) {
+    menu_item_id_ = 0;
+    ui::ScopedClipboardWriter(ui::ClipboardBuffer::kCopyPaste)
+        .WriteText(menu_state_.url);
     return;
   }
   const uint64_t id = std::exchange(menu_item_id_, 0);
@@ -1204,7 +1243,9 @@ std::unique_ptr<views::View> SidebarView::MakeItem(
   const ItemMenuState menu_state = {
       item.placement == foundation::PlacementKind::Pin,
       item.placement == foundation::PlacementKind::Favorite,
-      presentation.is_live};
+      presentation.is_live,
+      item.has_url ? base::UTF8ToUTF16(std::string(item.canonical_url))
+                   : std::u16string()};
   TrackFocus(activate.get(), FocusAction::kActivate, item.id, menu_state);
   if (tile) {
     activate->SetHorizontalAlignment(gfx::ALIGN_CENTER);
@@ -1528,15 +1569,29 @@ void SidebarView::SetModel(const foundation::SidebarResult& model,
     auto* layout = static_cast<views::BoxLayout*>(header->GetLayoutManager());
     layout->set_cross_axis_alignment(
         views::BoxLayout::CrossAxisAlignment::kCenter);
-    header->SetProperty(views::kMarginsKey,
-                        heading->GetProperty(views::kMarginsKey)
-                            ? *heading->GetProperty(views::kMarginsKey)
-                            : gfx::Insets());
+    // Stop's right edge lines up with Clear's below it.
+    header->SetProperty(
+        views::kMarginsKey,
+        (heading->GetProperty(views::kMarginsKey)
+             ? *heading->GetProperty(views::kMarginsKey)
+             : gfx::Insets()) +
+            gfx::Insets::TLBR(0, 0, 0, 6));
     heading->ClearProperty(views::kMarginsKey);
     layout->SetFlexForView(header->AddChildView(std::move(heading)), 1);
     auto stop = Button(base::BindRepeating(&SidebarView::StopControl,
                                            base::Unretained(this)),
                        u"Stop");
+    // Clear's 11pt semibold on a 24 DIP pill, so the title row keeps its
+    // height and the fill stays clear of the divider.
+    for (views::View* child : stop->children()) {
+      if (auto* label = views::AsViewClass<views::Label>(child)) {
+        label->SetFontList(
+            label->font_list().DeriveWithSizeDelta(-2).DeriveWithWeight(
+                gfx::Font::Weight::SEMIBOLD));
+      }
+    }
+    stop->SetMinSize(gfx::Size());
+    stop->SetCustomPadding(gfx::Insets::VH(4, 8));
     stop->SetEnabledTextColors(fills.title);
     stop->SetBgColorOverrideDeprecated(fills.tile);
     stop->SetCornerRadius(6);
@@ -1608,6 +1663,15 @@ void SidebarView::SetModel(const foundation::SidebarResult& model,
                            focus_targets_.end());
   }
   UpdateFills();
+  if (!capture_item_menu_scheduled_ && !tiles_.empty() &&
+      base::CommandLine::ForCurrentProcess()->HasSwitch(kCaptureItemMenu)) {
+    capture_item_menu_scheduled_ = true;
+    base::SequencedTaskRunner::GetCurrentDefault()->PostDelayedTask(
+        FROM_HERE,
+        base::BindOnce(&SidebarView::OpenCaptureItemMenu,
+                       weak_factory_.GetWeakPtr(), 30),
+        base::Milliseconds(2000));
+  }
   if (!capture_activate_scheduled_ &&
       base::CommandLine::ForCurrentProcess()->HasSwitch(kCaptureActivate)) {
     capture_activate_scheduled_ = true;

@@ -278,6 +278,8 @@ class SidebarView final : public views::View,
     bool is_pin;
     bool is_favorite;
     bool is_live;
+    // The saved or current URL Copy Link writes; empty without one.
+    std::u16string url;
     bool operator==(const ItemMenuState&) const = default;
   };
   struct FocusTarget {
@@ -330,6 +332,9 @@ class SidebarView final : public views::View,
   void ExecuteCommand(int command_id, int event_flags) override;
   // Runs the Stop of the active control client after the caller unwinds.
   void StopControl();
+  // --myarc-capture-item-menu: opens the first tile's context menu, then
+  // reopens it whenever it closed, `tries` more times.
+  void OpenCaptureItemMenu(int tries);
   // Builds the footer for spaces_ and current_space_id_, tracking its
   // controls' focus.
   void BuildFooter(const gfx::PointF& spaces_offset, bool space_changed);
@@ -388,6 +393,8 @@ class SidebarView final : public views::View,
   bool capture_menu_scheduled_ = false;
   // --myarc-capture-activate=<item ID> opens a seeded row once, for captures.
   bool capture_activate_scheduled_ = false;
+  // --myarc-capture-item-menu opens the first tile's context menu once.
+  bool capture_item_menu_scheduled_ = false;
   // Shared with the Library, so a press there keeps the tooltip quiet here.
   std::unique_ptr<FooterTooltip> footer_tooltip_;
   // The next footer's Library button starts glowing and settles.

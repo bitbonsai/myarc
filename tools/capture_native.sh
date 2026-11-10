@@ -13,6 +13,8 @@
 #   --myarc-capture-footer-tooltip and keeps it up.
 #   MENU=1 opens the sidebar's "+" creation menu via
 #   --myarc-capture-create-menu and keeps it up.
+#   ITEM_MENU=1 opens the first tile's context menu via
+#   --myarc-capture-item-menu; seed a Favorite with WORKSPACE.
 #   CREATE_SPACE=1 opens the Create a Space panel via
 #   --myarc-capture-create-space. CREATE_SPACE=emoji or CREATE_SPACE=icon also
 #   opens its icon picker on that tab and keeps it up; CREATE_SPACE=profile
@@ -85,6 +87,7 @@ if [ "${1:-}" = "--inner" ]; then
   [ -n "${TOOLTIP:-}" ] && EXTRA+=(--myarc-capture-footer-tooltip="$TOOLTIP")
   [ -n "${STACK:-}" ] && EXTRA+=(--myarc-capture-downloads-stack)
   [ -n "${MENU:-}" ] && EXTRA+=(--myarc-capture-create-menu)
+  [ -n "${ITEM_MENU:-}" ] && EXTRA+=(--myarc-capture-item-menu)
   case "${CREATE_SPACE:-}" in
     '') ;;
     emoji | icon | profile | profile-new | theme) EXTRA+=(--myarc-capture-create-space="$CREATE_SPACE") ;;
