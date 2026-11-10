@@ -57,7 +57,15 @@ Arc can export your Spaces as a file, under Settings > Advanced > Export Data. m
 
 It doesn't create anything in the browser yet, and there's no button for it.
 
+## Pins with real icons
+
+Until now a pin only showed its site's icon once you had opened that page in myArc. Everything else got a gray globe, and after an import that would have meant a sidebar full of globes. Now a pin without an icon asks its own site for one in the background and keeps it. The request carries no cookies and asks for the site's home page, not the page you pinned. It goes straight to that site, with no Google or other icon service in between.
+
+[[ICONS]]
+
 ## Where it's going
+
+Everything above is in today's nightly, including `myarcctl` inside the app. Browser control stays off until you switch it on.
 
 Along the way the sidebar footer got a redesign. Your Spaces sit there as icons, and those from your other Profiles share a soft pill, so you can tell at a glance which Profile they belong to. The bot moved in right next to them.
 
