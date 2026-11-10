@@ -33,13 +33,17 @@ All of this stays off until you turn it on in Settings.
 
 The first time a tool connects, a card in your myArc window names it and asks whether it may control your Agent Space, with Allow and Don't allow. Allow holds until you quit myArc.
 
+![A myArc window with six Favorite tiles in the sidebar and a card at the top right reading "myarcctl 0.1.0 wants to control your Agent Space", with Don't allow and Allow buttons][prompt]
+
+*The card says what the tool can do and that it can't see your other Spaces.*
+
 I want to be honest about what that card proves. Each tool names itself when it connects, so another program running on your account could claim to be `myarcctl`. The card records your consent and shows who says they're acting, but it doesn't check anyone's ID.
 
 While an agent is working, a small blue dot sits on the bot icon and a Stop button appears next to the Agent Space's name. Stop cuts the agent off right away, and the next time it tries to connect, myArc asks you again.
 
 ![The top of the Agent Space in the sidebar, with a Stop button beside the Agent name and two Example Domain tabs below][stop]
 
-*Stop stays next to the Agent Space's name while a tool is connected.*
+*The Agent Space while a tool is working.*
 
 ![The sidebar footer with three Space icons, where the bot icon on the right carries a small blue dot][dot]
 
@@ -47,7 +51,7 @@ While an agent is working, a small blue dot sits on the bot icon and a Stop butt
 
 ## A crash that wasn't ours
 
-While the agents were dogfooding all this, a click in a background agent tab would now and then kill the page. It seemed to need the agent to sit idle for a bit before clicking, and for a while it looked like no crash report was being written at all. Then it turned out Chromium had been saving them the whole time, all pointing at the same place in the code.
+While the agents were testing all this on themselves, a click in a background agent tab would now and then kill the page. It seemed to need the agent to sit idle for a bit before clicking, and for a while it looked like no crash report was being written at all. Then it turned out Chromium had been saving them the whole time, all pointing at the same place in the code.
 
 The bug was in Chromium itself. Before a click, the browser asks where the element sits so it can scroll it into view, and that lookup read the page's layout without bringing it up to date. A tab you're looking at refreshes layout every frame, so nobody notices. A background tab draws no frames, so its layout goes stale, and one of Chromium's own safety checks caught the stale read and stopped the page. The fix is a single line that updates the layout before reading it, which the function right next to it already did. After that, the same test clicked through every round without a crash.
 
@@ -61,11 +65,13 @@ It doesn't create anything in the browser yet, and there's no button for it.
 
 Until now a pin only showed its site's icon once you had opened that page in myArc. Everything else got a gray globe, and after an import that would have meant a sidebar full of globes. Now a pin without an icon asks its own site for one in the background and keeps it. The request carries no cookies and asks for the site's home page, not the page you pinned. It goes straight to that site, with no Google or other icon service in between.
 
-[[ICONS]]
+![Six Favorite tiles in the sidebar showing the GitHub, Wikipedia, MDN, Hacker News, Rust and Python icons][icons]
+
+*None of these sites was ever opened in this profile.*
 
 ## Where it's going
 
-Everything above is in today's nightly, including `myarcctl` inside the app. Browser control stays off until you switch it on.
+Agent control and pin icons are both in today's nightly, with `myarcctl` tucked inside the app.
 
 Along the way the sidebar footer got a redesign. Your Spaces sit there as icons, and those from your other Profiles share a soft pill, so you can tell at a glance which Profile they belong to. The bot moved in right next to them.
 
@@ -75,3 +81,5 @@ Next up is turning an Arc import into real Spaces and pins, and more work on mak
 [setting]: browser-control-setting.png
 [stop]: agent-space-stop.png
 [dot]: agent-space-dot.png
+[prompt]: connect-prompt.png
+[icons]: pin-icons.png
