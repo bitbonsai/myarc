@@ -25,4 +25,27 @@ Tab titles, stable item IDs, canonical-versus-current URL distinctions and expli
 
 The synthetic counterpart has four first-level headings, five second-level groups, 19 URL occurrences and ten distinct URLs. Its first `Favorites` group has one extra URL, preserving an ownership ambiguity worth testing. The other groups share three URL strings. This proves textual repetition, not actual Profile relationships.
 
-No production parser, conversion or round trip has been implemented or tested. The next evidence needed is a known top-level pin versus favorite case and a nested-folder sample. Producing-build binding remains contextual rather than embedded in the file.
+The [reader tests](../../../crates/import/tests/arc_markdown.rs) parse this fixture and check those counts. Conversion into a workspace and round trips are still untested. The next evidence needed is a known top-level pin versus favorite case and a nested-folder sample. Producing-build binding remains contextual rather than embedded in the file.
+
+## Reader
+
+MA-003.b added `myarc_import::arc_markdown::parse` in [crates/import](../../../crates/import/src/arc_markdown.rs). It turns export bytes into a report and writes nothing. It opens no tabs and fetches no URLs. Mapping into the workspace model is MA-006.
+
+| Export line | Report field |
+| --- | --- |
+| `# Label` | `Space { label, line }`, in document order |
+| `## Label` | `Group { label, line }` inside the latest Space; may be empty |
+| `- scheme:rest` | `Entry { url, scheme, line }` inside the latest group, in order |
+| Blank line | Skipped |
+| Anything else | `Unrecognized { line, reason, excerpt }` |
+
+Labels and URLs keep their exact text. `Favorites` is an ordinary group label. Repeated Spaces, groups and URLs all stay as separate records; counts of entries and distinct URL strings are available for a preview. The report has no Profile or title fields because the export has none.
+
+Limits:
+
+- Input over 8 MiB, or input that isn't UTF-8, fails as a whole with the size or the line of the first bad byte. A leading byte order mark and CRLF line endings are accepted.
+- An entry must be one token shaped `scheme:rest` with no whitespace or control characters, at most 8192 bytes. The scheme is classified as `http`, `https` or another lowercased name. Host syntax is not checked, so the write path must still validate URLs with browser machinery.
+- Labels must be non-empty, at most 1024 bytes and free of control characters.
+- Indented lines, `###` and deeper headings, `*`, `+` and numbered lists, Markdown links and stray prose are reported with a reason instead of placed. Nesting is unobserved, so the reader does not guess at folders.
+- Groups before any Space and entries before any group are reported, not attached elsewhere.
+- Unrecognized excerpts keep at most 256 bytes of the line.

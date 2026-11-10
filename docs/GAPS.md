@@ -1,6 +1,6 @@
 # Ranked work and blockers
 
-Updated: 2026-10-26. Browser release blockers remain open. Synthetic onboarding and the opt-in Rust/native browser experiment supply bounded evidence.
+Updated: 2026-11-10. Browser release blockers remain open. Synthetic onboarding and the opt-in Rust/native browser experiment supply bounded evidence.
 
 Current implementation priority is [MA-007.a, native visual parity](../.plans/EXECUTION.md#ma-007a-native-visual-parity-first-state). Match the empty/new-tab window before expanding export investigation or the foundation test matrix. The ranking below retains release blockers; it does not override that current visible slice or permit unsafe browsing claims. The [alpha checklist](ALPHA.md) says which of this work alpha needs.
 
@@ -9,7 +9,7 @@ Current implementation priority is [MA-007.a, native visual parity](../.plans/EX
 | Rank | Gap | Why it leads | Completion evidence |
 | --- | --- | --- | --- |
 | 1 | Foundation acceptance and maintenance capacity unresolved | Build/native interoperation passed; extension lifecycle, runtime boundaries and ownership remain unverified | MA-002 extension/recovery evidence, complete notices and accepted upkeep/signing/budget plan |
-| 2 | Arc export semantic coverage incomplete | Built-in Markdown export action confirmed; version binding, Favorites scope and nested-folder behavior remain unverified | MA-003 field mapping, controlled cases and expanded synthetic corpus |
+| 2 | Arc export semantic coverage incomplete | Built-in Markdown export action confirmed and its observed shape parses; version binding, Favorites scope and nested-folder behavior remain unverified | MA-003 field mapping, controlled cases and expanded synthetic corpus |
 | 3 | Native animated onboarding remains unverified | First-run quality is an explicit product requirement; [web study](../design/onboarding/README.md) now runs with synthetic fixtures | Review study; integrate shared state and gather native motion, accessibility, performance and user-task evidence |
 | 4 | Full workspace semantics and crash durability unaccepted | Import, sidebar, onboarding and recovery share this contract | MA-004/005 model, commands, round trip and interruption checks |
 | 5 | No safe import transaction or preservation utility | Users need a usable escape hatch before the complete browser | MA-006 dry run, omissions report, rollback/source-integrity proof |

@@ -54,6 +54,10 @@ Done: source/version matrix, field mapping, sample-independent synthetic fixture
 
 Observed one privately supplied export and created an [independent structural fixture](../tests/fixtures/arc-markdown/README.md). First-level Space labels, named second-level groups and ordered URL lists are present. Producer/version markers, Profile identities and tab titles are absent. The `Favorites` label does not establish ownership or distinguish favorite/pin types. Stop at observed structure and an invented counterpart; production parsing, nested-folder coverage and semantic mapping remain open. The user confirmed the built-in export action with a settings screenshot. This establishes the route, while compatibility across builds and richer cases remains unverified.
 
+### MA-003.b: read the observed Markdown shape
+
+Added the dependency-free `myarc-import` crate with a reader for the observed export structure. It reports Spaces, groups and ordered entries with line numbers, and lists every other line as unrecognized with a reason. Input over 8 MiB or not UTF-8 is rejected whole. Sixteen tests cover the fixture counts, empty groups, indentation, non-URL items, duplicates, CRLF, size and UTF-8 rejection and a seeded no-panic run over arbitrary bytes. [Field mapping and limits](../tests/fixtures/arc-markdown/README.md#reader) live with the fixture. Stop at the report; workspace mapping, preview and write are MA-006, and `Favorites` scope, nesting and version binding still need real samples.
+
 ## MA-004 — Implement the Rust workspace and commands
 
 Dependencies: agreed workspace behavior contract; MA-003 findings for supported Arc field mappings. MA-002 is required for native browser integration only. The standalone Rust model, commands and preservation path must not wait for a Chromium build or depend on browser/UI libraries.

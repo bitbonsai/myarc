@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-11-10: Reading Arc's Markdown export into a report
+
+- New crate `crates/import` (`myarc-import`, no dependencies) with `arc_markdown::parse`. It reads `# ` Space labels, `## ` groups and `- ` URL items into a `Report` with line numbers, keeps labels, URLs and repeats as written, and treats `Favorites` as a plain label. Every other line lands in `unrecognized` with a reason: indented, deeper heading, not a URL, too long, control characters, or out of place.
+- Input over 8 MiB or not UTF-8 fails whole; CRLF and a byte order mark are accepted. URLs are classified by scheme and never fetched or canonicalized. Nothing writes into a workspace; MA-006 owns mapping and preview. Field mapping and limits are in the fixture README.
+- Verification: `cargo fmt --check`, the bridge `rustfmt` check, `cargo clippy -D warnings`, `cargo test` (16 new tests on synthetic input, including a seeded no-panic run over arbitrary bytes), `check_docs.py` and the `myarc-workspace` zero-dependency check pass. No real export was read.
+
 ## 2026-11-06: Ask the user before an agent controls the Agent Space
 
 - Browser control now follows a Local State switch, "Allow agents to control myArc" under Settings > Advanced, off by default, and the host starts and stops as it flips. `--myarc-enable-control` stays as a developer override. A gated `ipc::Host` holds each hello until the browser decides, so the 10 s reply timeout never runs during the wait. The first hello of a client name shows a card in the last active window of the host's Profile, Allow covers that name until the browser quits, Don't allow answers `denied: the user declined` (`myarcctl` exit 4), and no answer in 60 s gives `denied: waiting for approval timed out`. Names come from the client's own hello, so this is consent, not authentication.
