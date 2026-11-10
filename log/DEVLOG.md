@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-11-10: Pre-alpha nightly 2026.11.10 ships myarcctl
+
+- Rebuilt `out/MyarcNightly` from Chromium `6ddd300a57` and main `f2f41d7` (incremental, 4m 44s), so this nightly carries browser control with the Allow prompt, the blue dot and Stop, site icons for saved tiles, Arc's tile menu order and the renderer crash fix. `tools/package_nightly.sh` now builds `myarcctl` in release mode for arm64, copies it to `Contents/Helpers/myarcctl`, checks it for build-tree references and signs it with the app's identity before the deep sign. `docs/CONTROL-PROTOCOL.md` gains Install from the nightly (PATH link, `claude mcp add`, quarantine), the skill names the bundled path, and the download page lists agent control as working.
+- Published prerelease `nightly-2026.11.10`: `myArc-Nightly-2026.11.10-arm64.dmg`, 234,381,179 bytes, SHA-256 `0768cd08055029c49f73d78e7ee644ae7b666f4edd8f167b781dc60b4e92f155`, matched on re-download. myarc.dev/download links it. Installed into `/Applications`: `codesign --verify --deep --strict` passes, `MyarcVersion` reads 2026.11.10 and the bundled `myarcctl --help` exits 0.
+- Blog captures in `/tmp/myarc-blog-shots/` (outside the repo) came from `out/MyarcM0`, since the nightly has no test hooks, with a disposable profile, six public sites as Favorites and https://example.com/ as the agent page, driven by the installed bundle's `myarcctl`. Site checks pass; the first `check_browser.py` run failed once on the lightbox reveal timing and passed on rerun. The packaged nightly wasn't launched with control on.
+
 ## 2026-11-10: Saved tiles fetch their site's own icon
 
 - A saved Favorite or Pin with no favicon in the Profile now gets one from its site. `SiteIconFetcher` (per Profile, never off the record) reads up to 256 KiB of the site's home page, the new Rust `site_icon::declared_icon` picks the best non-SVG `<link rel="icon">`, and the browser fetches it or `/favicon.ico`, decodes it in the data decoder service and stores it with `SetOnDemandFavicons`, so a later visit replaces it. Requests stay on the saved URL's registrable domain, omit cookies and credentials, follow at most 3 redirects, time out after 10 s, run 2 at a time and happen once per origin per session. Temporary tabs, Archived Tabs and live pages don't fetch. The privacy note is in `docs/SECURITY-PLAN.md`.

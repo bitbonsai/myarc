@@ -54,6 +54,22 @@ Local stdio does not imply compatibility with every MCP host or ChatGPT on the w
 
 References: [MCP transports](https://modelcontextprotocol.io/specification/2026-07-28/basic/transports) and [MCP tools](https://modelcontextprotocol.io/specification/2026-07-28/server/tools). These inform design, not a claim that interfaces have shipped.
 
+## Install from the nightly
+
+From 2026.11.10 on, the nightly carries `myarcctl` at `/Applications/myArc Nightly.app/Contents/Helpers/myarcctl`, signed with the app. Link it into your `PATH`:
+
+```sh
+sudo mkdir -p /usr/local/bin && sudo ln -sf "/Applications/myArc Nightly.app/Contents/Helpers/myarcctl" /usr/local/bin/myarcctl
+```
+
+If macOS refuses to run it, clear the download's quarantine flag with `xattr -dr com.apple.quarantine "/Applications/myArc Nightly.app"`. To give Claude Code the MCP server in every project, run:
+
+```sh
+claude mcp add --scope user myarc -- "/Applications/myArc Nightly.app/Contents/Helpers/myarcctl" mcp
+```
+
+For the [skill](../skills/myarc-browser/SKILL.md), copy the `skills/myarc-browser` folder from this repository into `~/.claude/skills/`. The skill runs `myarcctl` through the link above. The CLI, the MCP server and the skill need "Allow agents to control myArc" turned on under Settings > Advanced, and the first command asks you in the myArc window to allow it (see Approval and Stop below).
+
 ## Try the stub
 
 `run` and `mcp` connect to the running browser by default. The browser publishes its control endpoint in `~/Library/Application Support/myarc/control/`, or in `$MYARC_CONTROL_DIR` when that is set. The directory holds `control.json` with the socket path, a token that changes each time the server starts, the server's pid and its protocol version. Clients refuse the endpoint unless the directory (mode 700), the file and the socket (mode 600) belong to the current user and are closed to group and others. The browser creates a missing directory with mode 700 and refuses an existing one that group or others can enter, so it never changes the mode of a directory such as `$HOME`. Each connection opens with a hello that carries the token, and every message after it is a length-prefixed JSON frame of at most 1 MiB.
@@ -75,7 +91,7 @@ Agents use the short commands, which send the same registry commands through the
 
 `run` exits 0 on success, 1 when the command returns an error, 2 on a usage error, 3 when it can't reach myArc and 4 when myArc refused control, for example because the user declined. On exit 3 the message names the cause, such as a missing endpoint (myArc isn't running or browser control is off), a stale one left by a process that has exited, a permission or ownership problem, a rejected token or a protocol version mismatch. On exit 4 it gives the reason and what to tell the user. The short commands use the same codes. `--json` prints the full response.
 
-`myarcctl mcp` serves the same registry as MCP tools over stdio, with dots in command IDs replaced by underscores (`space.create` becomes `space_create`). Tool calls reach the endpoint over one connection, which opens on the first call and reopens after it drops or sits idle. With no endpoint, each call returns a tool error that says why. `myarcctl mcp --local` keeps one in-memory workspace until the client disconnects instead. To add it to an MCP client, put the built binary on your `PATH` and use this server entry:
+`myarcctl mcp` serves the same registry as MCP tools over stdio, with dots in command IDs replaced by underscores (`space.create` becomes `space_create`). Tool calls reach the endpoint over one connection, which opens on the first call and reopens after it drops or sits idle. With no endpoint, each call returns a tool error that says why. `myarcctl mcp --local` keeps one in-memory workspace until the client disconnects instead. To add it to an MCP client, link the binary into your `PATH` as in Install from the nightly, or put a built one there, and use this server entry:
 
 ```json
 {"command": "myarcctl", "args": ["mcp"]}

@@ -9,7 +9,8 @@ description: Drive the myArc browser through the myarcctl CLI. Use when the user
 
 ## Before you start
 
-- myArc must be running with browser control on, and `myarcctl` must be on PATH. The user turns control on in myArc under Settings > Advanced > "Allow agents to control myArc".
+- myArc must be running with browser control on. The user turns control on in myArc under Settings > Advanced > "Allow agents to control myArc".
+- The nightly ships `myarcctl` at `/Applications/myArc Nightly.app/Contents/Helpers/myarcctl`. If `myarcctl` isn't on PATH, run it by that full path, or ask the user to link it with `sudo ln -sf "/Applications/myArc Nightly.app/Contents/Helpers/myarcctl" /usr/local/bin/myarcctl`.
 - The first command in a browser session waits, up to a minute, while myArc asks the user to allow `myarcctl`. Tell the user to look for the prompt in their myArc window.
 - Exit code 3 means myArc can't be reached or browser control is off. Don't retry. Tell the user to start myArc and turn on the switch, and pass on the cause from stderr.
 - Exit code 4 means myArc refused control. After `denied: the user declined`, stop and ask the user before trying again, because the next try shows them the prompt again. After `denied: waiting for approval timed out`, nobody answered: ask the user to watch for the prompt, then retry once.
