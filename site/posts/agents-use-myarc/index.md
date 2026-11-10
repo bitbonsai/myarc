@@ -61,7 +61,7 @@ It doesn't create anything in the browser yet, and there's no button for it.
 
 Along the way the sidebar footer got a redesign. Your Spaces sit there as icons, and those from your other Profiles share a soft pill, so you can tell at a glance which Profile they belong to. The bot moved in right next to them.
 
-Next up is turning an Arc import into real Spaces and pins, letting pins fetch their own icons, and more work on making myArc look like Arc. I've been using Arc since 2023, so there are a lot of Spaces waiting on that import.
+Next up is turning an Arc import into real Spaces and pins, and more work on making myArc look like Arc. The import is the part I'm waiting for most. I've used Arc since 2023, and I'd rather not rebuild those Spaces by hand.
 
 [session]: agent-session.png
 [setting]: browser-control-setting.png
