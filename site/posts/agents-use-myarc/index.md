@@ -2,7 +2,7 @@
 title: "Letting agents use myArc"
 summary: "AI agents like Claude Code can now browse in myArc, in a Space of their own and only after you say yes. Also a Chromium crash, and the first step toward importing from Arc."
 date: 2026-11-10
-draft: true
+draft: false
 ---
 
 myArc is built by agents. I lead a group of them that write and review the code, and this round they built something for agents that aren't on the team. An AI agent like Claude Code can now open pages in myArc, read them and click through them.
