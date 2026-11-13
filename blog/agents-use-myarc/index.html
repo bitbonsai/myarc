@@ -16,8 +16,8 @@
   <meta property="og:description" content="The agents that build myArc can now use it, in a Space of their own and only after you say yes. Getting there turned up a bug in Chromium and a sidebar full of gray globes.">
   <meta property="og:url" content="https://myarc.dev/blog/agents-use-myarc/">
   <meta name="robots" content="index, follow, max-image-preview:large">
-  <meta property="og:image" content="https://myarc.dev/blog/agents-use-myarc/agent-session.4f9cdde935fc.webp">
-  <meta property="og:image:secure_url" content="https://myarc.dev/blog/agents-use-myarc/agent-session.4f9cdde935fc.webp">
+  <meta property="og:image" content="https://myarc.dev/blog/agents-use-myarc/agent-session.5a113358ee40.webp">
+  <meta property="og:image:secure_url" content="https://myarc.dev/blog/agents-use-myarc/agent-session.5a113358ee40.webp">
   <meta property="og:image:type" content="image/webp">
   <meta property="og:image:width" content="1338">
   <meta property="og:image:height" content="1068">
@@ -25,9 +25,9 @@
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="Letting agents use myArc">
   <meta name="twitter:description" content="The agents that build myArc can now use it, in a Space of their own and only after you say yes. Getting there turned up a bug in Chromium and a sidebar full of gray globes.">
-  <meta name="twitter:image" content="https://myarc.dev/blog/agents-use-myarc/agent-session.4f9cdde935fc.webp">
+  <meta name="twitter:image" content="https://myarc.dev/blog/agents-use-myarc/agent-session.5a113358ee40.webp">
   <meta name="twitter:image:alt" content="A terminal running three myarc commands. open prints a Sign up page outline with an Email textbox marked ref e1 and a Send button marked ref e2. fill e1 prints the same outline with the email filled in. click e2 reports that the tab navigated and prints a Thanks heading.">
-  <script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "BlogPosting", "name": "Letting agents use myArc", "description": "The agents that build myArc can now use it, in a Space of their own and only after you say yes. Getting there turned up a bug in Chromium and a sidebar full of gray globes.", "url": "https://myarc.dev/blog/agents-use-myarc/", "inLanguage": "en", "publisher": {"@type": "Person", "name": "Mauricio Wolff", "url": "https://github.com/bitbonsai"}, "headline": "Letting agents use myArc", "datePublished": "2026-11-10", "author": {"@type": "Person", "name": "Mauricio Wolff", "url": "https://github.com/bitbonsai"}, "mainEntityOfPage": "https://myarc.dev/blog/agents-use-myarc/", "isPartOf": {"@type": "Blog", "name": "myArc Blog", "url": "https://myarc.dev/blog/"}, "image": "https://myarc.dev/blog/agents-use-myarc/agent-session.4f9cdde935fc.webp"}, {"@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "myArc", "item": "https://myarc.dev/"}, {"@type": "ListItem", "position": 2, "name": "Blog", "item": "https://myarc.dev/blog/"}, {"@type": "ListItem", "position": 3, "name": "Letting agents use myArc", "item": "https://myarc.dev/blog/agents-use-myarc/"}]}]}</script>
+  <script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "BlogPosting", "name": "Letting agents use myArc", "description": "The agents that build myArc can now use it, in a Space of their own and only after you say yes. Getting there turned up a bug in Chromium and a sidebar full of gray globes.", "url": "https://myarc.dev/blog/agents-use-myarc/", "inLanguage": "en", "publisher": {"@type": "Person", "name": "Mauricio Wolff", "url": "https://github.com/bitbonsai"}, "headline": "Letting agents use myArc", "datePublished": "2026-11-10", "author": {"@type": "Person", "name": "Mauricio Wolff", "url": "https://github.com/bitbonsai"}, "mainEntityOfPage": "https://myarc.dev/blog/agents-use-myarc/", "isPartOf": {"@type": "Blog", "name": "myArc Blog", "url": "https://myarc.dev/blog/"}, "image": "https://myarc.dev/blog/agents-use-myarc/agent-session.5a113358ee40.webp"}, {"@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "myArc", "item": "https://myarc.dev/"}, {"@type": "ListItem", "position": 2, "name": "Blog", "item": "https://myarc.dev/blog/"}, {"@type": "ListItem", "position": 3, "name": "Letting agents use myArc", "item": "https://myarc.dev/blog/agents-use-myarc/"}]}]}</script>
   <style>
     @font-face {
       font-family: Outfit;
@@ -489,7 +489,7 @@
 <link rel="alternate" type="text/plain" href="https://myarc.dev/llms.txt" title="Site context">
 <meta name="author" content="Mauricio Wolff">
 <meta property="article:published_time" content="2026-11-10">
-<link rel="preload" as="image" href="agent-session.4f9cdde935fc.webp" fetchpriority="low">
+<link rel="preload" as="image" href="agent-session.5a113358ee40.webp" fetchpriority="low">
 <link rel="preload" as="image" href="browser-control-setting.d013fb5f9fcd.webp" fetchpriority="low">
 <link rel="preload" as="image" href="connect-prompt.d469733f9bcf.webp" fetchpriority="low">
 <link rel="preload" as="image" href="agent-space-stop.f7ac8431e496.webp" fetchpriority="low">
@@ -533,7 +533,7 @@
 <h2>Reading a page without looking at it</h2>
 <p>Most AI tools that use a computer work from screenshots. The model gets a picture of the screen, guesses where the button is and clicks at those coordinates. It works, but every step sends a whole image, and if the guess is a few pixels off, the click hits something else.</p>
 <p>myArc borrows agent-browser's approach and hands the agent a short text outline of the page instead, one heading, link, field or button per line, and gives everything it can act on a number. To sign up on a form, the agent fills <code>e1</code> with an email address and clicks <code>e2</code>. After each action it gets a fresh outline back, so it sees what changed without asking.</p>
-<figure><a href="agent-session.4f9cdde935fc.webp"><img alt="A terminal running three myarc commands. open prints a Sign up page outline with an Email textbox marked ref e1 and a Send button marked ref e2. fill e1 prints the same outline with the email filled in. click e2 reports that the tab navigated and prints a Thanks heading." decoding="async" fetchpriority="high" height="1068" loading="eager" sizes="(max-width: 48rem) calc(100vw - 3rem), 50rem" src="agent-session.4f9cdde935fc.webp" srcset="agent-session.4f9cdde935fc.960.webp 960w, agent-session.4f9cdde935fc.webp 1338w" width="1338"/></a><figcaption>A sample session on a test page, drawn in the tool's real output format.</figcaption></figure>
+<figure><a href="agent-session.5a113358ee40.webp"><img alt="A terminal running three myarc commands. open prints a Sign up page outline with an Email textbox marked ref e1 and a Send button marked ref e2. fill e1 prints the same outline with the email filled in. click e2 reports that the tab navigated and prints a Thanks heading." decoding="async" fetchpriority="high" height="1068" loading="eager" sizes="(max-width: 48rem) calc(100vw - 3rem), 50rem" src="agent-session.5a113358ee40.webp" srcset="agent-session.5a113358ee40.960.webp 960w, agent-session.5a113358ee40.webp 1338w" width="1338"/></a><figcaption>A sample session on a test page, drawn in the tool's real output format.</figcaption></figure>
 
 <p>In the agents' test runs an outline came to a couple hundred characters per step. Each number stays tied to one element, so if the page changed under the agent, myArc refuses and the agent reads it again rather than clicking whatever now sits in that spot. Page text can't pass itself off as a button either, because whatever a page says comes back in quotes.</p>
 <p>The agent gets in through <code>myarc</code>, a small command-line tool that also runs as an MCP server, the common way AI apps plug in outside tools. It works in its own Agent Space, the bot icon in the sidebar footer, and its pages load in the background while you keep browsing. Your other Spaces and Profiles stay out of its reach.</p>

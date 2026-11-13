@@ -217,7 +217,7 @@ Most AI tools that use a computer work from screenshots. The model gets a pictur
 
 myArc borrows agent-browser's approach and hands the agent a short text outline of the page instead, one heading, link, field or button per line, and gives everything it can act on a number. To sign up on a form, the agent fills `e1` with an email address and clicks `e2`. After each action it gets a fresh outline back, so it sees what changed without asking.
 
-[![A terminal running three myarc commands. open prints a Sign up page outline with an Email textbox marked ref e1 and a Send button marked ref e2. fill e1 prints the same outline with the email filled in. click e2 reports that the tab navigated and prints a Thanks heading.](https://myarc.dev/blog/agents-use-myarc/agent-session.4f9cdde935fc.webp)](https://myarc.dev/blog/agents-use-myarc/agent-session.4f9cdde935fc.webp)
+[![A terminal running three myarc commands. open prints a Sign up page outline with an Email textbox marked ref e1 and a Send button marked ref e2. fill e1 prints the same outline with the email filled in. click e2 reports that the tab navigated and prints a Thanks heading.](https://myarc.dev/blog/agents-use-myarc/agent-session.5a113358ee40.webp)](https://myarc.dev/blog/agents-use-myarc/agent-session.5a113358ee40.webp)
 
 A sample session on a test page, drawn in the tool's real output format.
 
