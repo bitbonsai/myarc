@@ -23,8 +23,8 @@ myArc is a pre-alpha. Use it to try the Arc-style sidebar, and keep daily and se
 
 ## What doesn't work yet
 
-- Arc folders and Favorites don't survive an import as such. The export doesn't mark them, so they arrive as pinned tabs.
-- Folders in the sidebar, and dragging a tab up to pin it.
+- Arc Favorites arrive as pinned tabs in their Space, because the export doesn't mark them.
+- Folders inside folders, and dragging a tab up to pin it or into a folder.
 - Peek, Split View and Little Arc.
 - Boosts and the Mini Player.
 - The animated onboarding.

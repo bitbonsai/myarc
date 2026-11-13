@@ -22,8 +22,8 @@ The preview counts the Spaces and pinned tabs the import adds and the pinned tab
 ## What comes over
 
 - Each Space in the export becomes a Space with the same name, in Arc's order. If a Space with that name already exists, its links go there.
-- Every link under a Space becomes a pinned tab in that Space, in the export's order.
-- Arc Favorites and folders become pinned tabs too. The export doesn't mark which links were Favorites, and myArc has no folders yet, so folder names are dropped.
+- Each folder in a Space becomes a folder with the same name, and its links become pinned tabs inside it, in the export's order.
+- Arc Favorites become pinned tabs at the top of that Space. The export doesn't say which links were Favorites, so myArc can't make them Profile Favorites.
 - Only http and https links come over. Anything else shows up under the links left out.
 
 The export holds only Space names and links. Tab titles, Profiles, temporary tabs, archived tabs, themes, history, passwords, cookies, extensions and Boosts aren't in it, so they don't come over. Imported Spaces join the Profile you're using. [Spaces and Profiles](../spaces-and-profiles/) explains the difference.
@@ -32,6 +32,6 @@ myArc refuses files over 8 MB.
 
 ## Import again
 
-Importing the same file a second time adds nothing. myArc reuses Spaces by name and keeps the pinned tabs a Space already has. If you export from Arc again later, the next import adds only the new Spaces and links.
+Importing the same file a second time adds nothing. myArc reuses Spaces and folders by name and keeps the pinned tabs they already have. Pinned tabs from an import made before myArc had folders move into their folder. If you export from Arc again later, the next import adds only the new Spaces and links.
 
 An import never removes anything. If it fails partway, nothing changes, because myArc tries every import on a copy of your workspace before it writes.

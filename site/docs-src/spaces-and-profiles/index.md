@@ -34,6 +34,10 @@ Right-click a tab in the sidebar to pin it to the Space or add it to the Profile
 
 Closing a pinned tab or a Favorite keeps its tile. The page closes, and clicking the tile opens it again.
 
+## Folders
+
+A folder groups pinned tabs inside a Space. To make one, right-click the Space name at the top of the sidebar and choose New Folder. Right-click a folder to rename or delete it, and click it to open or close it. To file a tab, right-click it and choose Move to Folder. Remove from Folder takes it out again. Folders don't nest.
+
 ## Temporary tabs
 
 Every other tab is a temporary tab. Temporary tabs sit in a list below the Space name and the New Tab row. They come back after you quit and reopen myArc.
@@ -42,4 +46,4 @@ When you close a temporary tab, it moves to Archived Tabs in the Library. Open t
 
 ## Not in myArc yet
 
-Folders, dragging a tab up to pin it, Peek and Split View don't work yet. [Known limitations](../known-limitations/) has the full list.
+Folders inside folders, dragging a tab up to pin it or into a folder, Peek and Split View don't work yet. [Known limitations](../known-limitations/) has the full list.
