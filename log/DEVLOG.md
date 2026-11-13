@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-11-13: Pre-alpha nightly 2026.11.13 ships the CLI as myarc
+
+- Rebuilt `out/MyarcNightly` from Chromium `6ddd300a57` and main `71c3491` (incremental, 68 s), so the Settings help line names `myarc`, then ran `tools/package_nightly.sh`. Its first run stopped at `hdiutil create -quiet` with no message, and the rerun went through. `Contents/Helpers/myarc` is the CLI and `Contents/Helpers/myarcctl` links to it.
+- Published prerelease `nightly-2026.11.13`: `myArc-Nightly-2026.11.13-arm64.dmg`, 234,815,047 bytes, SHA-256 `40f51323b612b312e6a69a07dfd36c2dd3909b77abb0c9ef99018d9eb066603a`, matched on re-download. The notes cover the rename and the alias. myarc.dev/download links it.
+- Installed into `/Applications` after a clean quit: `codesign --verify --deep --strict` passes, `MyarcVersion` reads 2026.11.13 and matches the latest release, `myarc --help` exits 0 and the `myarcctl` link answers `--version` and `--help`. The packaged nightly wasn't launched with control on.
+
 ## 2026-11-13: The agent CLI is now called myarc
 
 - `myarcctl` is now `myarc`, so agents type `myarc open`, `myarc snapshot -i` and `myarc mcp`. The crate moved to `crates/myarc-cli` (package `myarc-cli`, binary `myarc`), the hello and the MCP `serverInfo` send `myarc`, so the approval card reads "myarc 0.1.0 wants to control your Agent Space", and the debug variable is now `MYARC_ECHO_REQUESTS`. Help text, error hints, the Settings help line, the control docs, the skill, the README and the download page use the new name. The control directory and `cli-state.json` keep their names, since neither mentioned `myarcctl`.
