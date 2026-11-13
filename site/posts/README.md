@@ -61,3 +61,16 @@ python3 site/publish.py
 ```
 
 The generated `site/blog/` folder is replaced during builds. Edit `site/posts/`, never generated pages. Removing a post or changing it back to a draft removes it from the next deployment. The homepage, blog and posts share branding, system light/dark preference and accessible focus behavior.
+
+## Copying posts to mauriciowolff.com
+
+Every published post also appears in the myArc series on [mauriciowolff.com/blog](https://mauriciowolff.com/blog), with a canonical link back here. After `publish.py` ships a post, or ships an edit to one, refresh the copies from the personal blog checkout and deploy it:
+
+```sh
+cd ~/bit/mauriciowolff.com
+bun scripts/sync-myarc.ts /path/to/this/checkout
+bun run check && bun run test
+bun ship
+```
+
+The script copies every post with `draft: false`, numbers the parts by date, converts referenced images to WebP and removes copies of posts that are no longer published.
