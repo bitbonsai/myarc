@@ -35,7 +35,7 @@ An open-source browser bringing back Arc, with no account required and optional 
   Spaces, pinned tabs and Favorites, the Library, tabs that survive a restart, and AI agents that browse in a Space of their own.
 - ### Next, for alpha
 
-  Split view, Little Arc, Arc import, ad and tracker blocking on by default, and onboarding.
+  Split view, Little Arc, Arc folders, ad and tracker blocking on by default, and onboarding.
 - ### After alpha
 
   Builds for Windows and Linux.

@@ -2,7 +2,7 @@
 
 > A pre-release open-source browser project inspired by Arc, built on Chromium with a Rust-owned workspace core.
 
-A complete myArc browser and importer remain unimplemented. Native integration is experimental. Arc reference screenshots illustrate the target appearance. Local ownership and optional AI are product requirements, not evidence of a finished release.
+A complete myArc browser remains unimplemented, and the Arc importer brings over only Spaces and pinned tabs. Native integration is experimental. Arc reference screenshots illustrate the target appearance. Local ownership and optional AI are product requirements, not evidence of a finished release.
 
 ## Project
 
