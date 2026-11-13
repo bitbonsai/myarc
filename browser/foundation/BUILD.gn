@@ -39,6 +39,19 @@ rust_static_library("control") {
   ]
 }
 
+rust_static_library("import") {
+  crate_root = "import/src/lib.rs"
+  sources = [
+    "import/src/arc_markdown.rs",
+    "import/src/arc_workspace.rs",
+    "import/src/lib.rs",
+  ]
+  aliased_deps = {
+    myarc_workspace = ":workspace"
+  }
+  deps = [ ":workspace" ]
+}
+
 rust_static_library("bridge") {
   crate_root = "bridge.rs"
   sources = [ crate_root ]
@@ -46,6 +59,7 @@ rust_static_library("bridge") {
   allow_unsafe = true  # Cxx-generated interoperation only; core forbids unsafe.
   deps = [
     ":control",
+    ":import",
     ":workspace",
   ]
 }
@@ -79,6 +93,26 @@ source_set("workspace_service") {
     "//components/prefs",
     "//content/public/browser",
     "//url",
+  ]
+}
+
+source_set("arc_import") {
+  sources = [
+    "arc_import.cc",
+    "arc_import.h",
+  ]
+  public_deps = [
+    "//base",
+    "//ui/gfx",
+  ]
+  deps = [
+    ":workspace_service",
+    "//chrome/browser/profiles:profile",
+    "//chrome/browser/ui/select_file_policy",
+    "//components/constrained_window",
+    "//ui/base",
+    "//ui/shell_dialogs",
+    "//ui/views",
   ]
 }
 
@@ -128,6 +162,7 @@ source_set("browser_workspace_adapter") {
     "//url",
   ]
   deps = [
+    ":arc_import",
     ":control_prompt",
     ":test_buildflags",
     ":workspace_lifecycle",
@@ -304,6 +339,7 @@ source_set("settings_window") {
   ]
   public_deps = [ "//base" ]
   deps = [
+    ":arc_import",
     ":control_prefs",
     "//cc/paint",
     "//chrome/browser:shell_integration",

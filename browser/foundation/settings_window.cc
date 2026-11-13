@@ -23,6 +23,7 @@
 #include "chrome/common/pref_names.h"
 #include "components/prefs/pref_change_registrar.h"
 #include "components/prefs/pref_service.h"
+#include "myarc/arc_import.h"
 #include "myarc/control_prefs.h"
 #include "third_party/skia/include/core/SkColor.h"
 #include "third_party/skia/include/core/SkPoint.h"
@@ -728,14 +729,16 @@ class GeneralPage : public views::View {
 BEGIN_METADATA(GeneralPage)
 END_METADATA
 
-// Advanced: the way out to Chromium's full settings page, then the Browser
-// control switch that lets tools such as Claude Code drive the Agent Space
-// through myarc.
+// Advanced: the way out to Chromium's full settings page, Import from Arc,
+// then the Browser control switch that lets tools such as Claude Code drive
+// the Agent Space through myarc.
 class AdvancedPage : public views::View {
   METADATA_HEADER(AdvancedPage, views::View)
 
  public:
-  AdvancedPage(PrefService* local_state, base::RepeatingClosure more_settings)
+  AdvancedPage(PrefService* local_state,
+               base::RepeatingClosure more_settings,
+               base::RepeatingClosure import_arc)
       : local_state_(local_state) {
     card_ = AddChildView(
         std::make_unique<Panel>(kCardFill, kCardStroke, kCardRadius));
@@ -751,6 +754,16 @@ class AdvancedPage : public views::View {
     card_->AddChildView(std::make_unique<PillButton>(
         base::BindRepeating(std::move(more_settings)), u"More Settings…",
         kGrayButton, kButtonText, gfx::Font::Weight::NORMAL, nullptr));
+
+    import_panel_ = AddRowPanel(
+        this, u"Spaces and pinned tabs from an Arc export",
+        /*multi_line=*/false,
+        std::make_unique<PillButton>(std::move(import_arc),
+                                     u"Import from Arc…", kGrayButton,
+                                     kButtonText, gfx::Font::Weight::NORMAL,
+                                     nullptr));
+    static_cast<views::BoxLayout*>(import_panel_->GetLayoutManager())
+        ->set_inside_border_insets(gfx::Insets::VH(0, kBannerPad));
 
     control_title_ = AddLabel(this, u"Browser control", 13,
                               gfx::Font::Weight::SEMIBOLD, kCardText);
@@ -786,9 +799,11 @@ class AdvancedPage : public views::View {
   void Layout(PassKey) override {
     const int panel_width = width() - 2 * kSideMargin;
     card_->SetBounds(kSideMargin, kContentTop, panel_width, kRowHeight);
+    import_panel_->SetBounds(kSideMargin, card_->bounds().bottom() + 8,
+                             panel_width, kRowHeight);
     const int title_height = control_title_->GetPreferredSize().height();
     control_title_->SetBounds(kSideMargin + kBannerPad,
-                              card_->bounds().bottom() + 24,
+                              import_panel_->bounds().bottom() + 24,
                               panel_width - kBannerPad, title_height);
     control_panel_->SetBounds(kSideMargin, control_title_->bounds().bottom() + 8,
                               panel_width, kSwitchRowHeight);
@@ -817,6 +832,7 @@ class AdvancedPage : public views::View {
   const raw_ptr<PrefService> local_state_;
   PrefChangeRegistrar registrar_;
   raw_ptr<Panel> card_ = nullptr;
+  raw_ptr<Panel> import_panel_ = nullptr;
   raw_ptr<views::Label> control_title_ = nullptr;
   raw_ptr<Panel> control_panel_ = nullptr;
   raw_ptr<Switch> control_switch_ = nullptr;
@@ -971,6 +987,7 @@ class SettingsView : public views::View {
   SettingsView(PrefService* local_state,
                base::RepeatingClosure more_settings,
                base::RepeatingClosure open_site,
+               base::RepeatingClosure import_arc,
                SettingsWindow::ArchiveTimer archive_timer,
                base::RepeatingClosure close)
       : close_(std::move(close)) {
@@ -997,7 +1014,8 @@ class SettingsView : public views::View {
     profiles_ =
         AddChildView(std::make_unique<ProfilesPage>(std::move(archive_timer)));
     advanced_ = AddChildView(
-        std::make_unique<AdvancedPage>(local_state, more_settings));
+        std::make_unique<AdvancedPage>(local_state, more_settings,
+                                       std::move(import_arc)));
     AddAccelerator(ui::Accelerator(ui::VKEY_ESCAPE, ui::EF_NONE));
     AddAccelerator(ui::Accelerator(ui::VKEY_W, ui::EF_PLATFORM_ACCELERATOR));
     GetViewAccessibility().SetRole(ax::mojom::Role::kTabList);
@@ -1092,7 +1110,7 @@ SettingsWindow* g_open = nullptr;
 
 }  // namespace
 
-SettingsWindow::SettingsWindow(const Profile* profile,
+SettingsWindow::SettingsWindow(Profile* profile,
                                PrefService* local_state,
                                base::RepeatingClosure open_more_settings,
                                base::RepeatingClosure open_site,
@@ -1146,6 +1164,8 @@ void SettingsWindow::Show(Section section, bool inactive) {
         base::BindRepeating(&SettingsWindow::OpenMoreSettings,
                             weak_factory_.GetWeakPtr()),
         base::BindRepeating(&SettingsWindow::OpenSite,
+                            weak_factory_.GetWeakPtr()),
+        base::BindRepeating(&SettingsWindow::ImportFromArc,
                             weak_factory_.GetWeakPtr()),
         archive_timer_,
         base::BindRepeating(&SettingsWindow::Close,
@@ -1222,6 +1242,13 @@ void SettingsWindow::OpenMoreSettings() {
 void SettingsWindow::OpenSite() {
   open_site_.Run();
   Close();
+}
+
+void SettingsWindow::ImportFromArc() {
+  // The picker and preview sit over Settings, which stays open.
+  if (widget_) {
+    myarc::ImportFromArc(*profile_, widget_->GetNativeWindow());
+  }
 }
 
 }  // namespace myarc

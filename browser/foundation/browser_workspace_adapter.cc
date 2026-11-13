@@ -45,11 +45,13 @@
 #include "content/public/browser/web_contents_observer.h"
 #include "content/public/common/page_type.h"
 #include "content/public/common/url_constants.h"
+#include "myarc/arc_import.h"
 #include "myarc/control_host.h"
 #include "myarc/control_tabs.h"
 #include "myarc/site_icon_fetcher.h"
 #include "myarc/test_buildflags.h"
 #include "myarc/workspace_lifecycle.h"
+#include "ui/base/base_window.h"
 #include "url/origin.h"
 
 namespace myarc {
@@ -92,6 +94,13 @@ namespace {
 // UI creates it yet.
 constexpr char kMyarcTestAgentSpace[] = "myarc-test-agent-space";
 bool g_agent_space_hook_done = false;
+// Previews the Arc export at this path once the first window's workspace is
+// ready, as Settings' Import from Arc… does after the file picker. With
+// --myarc-test-import-arc-confirm it then presses Import and shows the
+// export's first Space in that window.
+constexpr char kMyarcTestImportArc[] = "myarc-test-import-arc";
+constexpr char kMyarcTestImportArcConfirm[] = "myarc-test-import-arc-confirm";
+bool g_import_arc_hook_done = false;
 #endif  // BUILDFLAG(MYARC_TEST_HOOKS)
 
 const char kRuntimeKey = 0;
@@ -1421,6 +1430,22 @@ void BrowserWorkspaceAdapter::Refresh() {
                            adapter->SelectSpace(result.id);
                        },
                        weak_factory_.GetWeakPtr(), select));
+  }
+  if (ready() && !g_import_arc_hook_done &&
+      command_line->HasSwitch(kMyarcTestImportArc)) {
+    g_import_arc_hook_done = true;
+    base::OnceCallback<void(uint64_t)> confirmed;
+    if (command_line->HasSwitch(kMyarcTestImportArcConfirm)) {
+      confirmed = base::BindOnce(
+          [](base::WeakPtr<BrowserWorkspaceAdapter> adapter, uint64_t space) {
+            if (adapter && space)
+              adapter->SelectSpace(space);
+          },
+          weak_factory_.GetWeakPtr());
+    }
+    ImportArcFileForCapture(*profile_, browser_->GetWindow()->GetNativeWindow(),
+                            command_line->GetSwitchValuePath(kMyarcTestImportArc),
+                            std::move(confirmed));
   }
 #endif  // BUILDFLAG(MYARC_TEST_HOOKS)
   changed_.Notify();

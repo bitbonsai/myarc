@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-11-13: Import from Arc creates Spaces and pinned tabs
+
+- Settings > Advanced > Import from Arc… picks an Arc Markdown export, reads it on a worker (8 MiB cap) and previews what it adds, what's already there, links left out and lines it couldn't read. Import writes through `WorkspaceService::ApplyArcImport` into the Rust workspace; Cancel writes nothing. `myarc_import::arc_workspace` maps each Space to a Space and each URL to a Pin in Arc's order, flattens groups (no folders yet) and keeps `Favorites` as Space Pins because the export doesn't mark Profile favorites. A re-import reuses Spaces by name and adds only missing Pins, and every import is rehearsed on a copy, so a failure changes nothing. No tab opens and nothing is fetched while importing.
+- Evidence: `out/MyarcM0` built from Chromium `6ddd300a57`, then background captures in `research-private/captures/arc-import-20261113T112822Z/` with the synthetic fixture through the test-hook switches `--myarc-test-import-arc=<file>` and `--myarc-test-import-arc-confirm`. `preview.png` shows 4 Spaces and 19 pinned tabs, `imported.png` shows Desk's 10 Pins and five Space dots, and `reimport.png`, after relaunching the same profile, reads "Everything in this file is already in myArc." with 5 Spaces and 19 Pins on disk. `settings.png` shows the button. The real file picker wasn't clicked, since that needs a focused window.
+- Verification: 15 new `myarc-import` mapping and idempotency tests, `cargo fmt --check`, the `bridge.rs` rustfmt check, `cargo clippy -D warnings`, `cargo test`, `export_patches.py --check` and `check_docs.py` pass.
+
 ## 2026-11-13: myarc reports the nightly label as its version
 
 - `myarc --version`, the hello and the MCP `serverInfo` now send `MYARC_VERSION` from build time, or else the crate version with `-dev` (`0.1.0-dev`). `tools/package_nightly.sh` builds with `MYARC_VERSION=$VERSION` and stops if the binary reports anything else, so the next nightly's approval card reads "myarc 2026.11.13 wants to control your Agent Space" with its own label. The 2026.11.13 nightly still says `0.1.0`. A new test covers the fallback.

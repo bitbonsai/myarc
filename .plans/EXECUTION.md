@@ -82,6 +82,17 @@ Read selected supported Arc data, normalize it, show a preview/report, write por
 
 Done: end-to-end local use, source integrity hashes, explicit omitted fields, cancelled/failed import recovery, deterministic synthetic-corpus outputs, and accurate public limitations. This is a preservation utility, not a browser replacement.
 
+### MA-006.a: Arc Markdown import into the browser
+
+First end-to-end slice, shipped 2026-11-13. Settings > Advanced > Import from Arc… picks an Arc Markdown export, reads it off the UI sequence and shows a preview: Spaces and pinned tabs it adds, pinned tabs already present, links left out and lines it couldn't read, each with line numbers. Import writes into the Profile's Rust workspace; Cancel writes nothing. `myarc_import::arc_workspace` owns the mapping and its tests.
+
+- Each `#` Space becomes a Space and each URL a Pin of that Space, in document order. The browser canonicalizes URLs first and leaves out the ones it rejects.
+- Groups flatten into Pins because the workspace has no folders yet. `Favorites` stays a Space Pin group, since the export doesn't distinguish Profile favorites from Space pins.
+- A re-import reuses Spaces by name (never the Agent Space) and keeps Pins the Space already has, counted per URL. Nothing is added twice.
+- Every import is rehearsed on a copy first, so a failure such as the 64-Space or 1,024-item limit changes nothing. No tab opens and nothing is fetched; saved-tile icons load later as they already do.
+
+Still open for MA-006: folders, source integrity hashes, an import receipt, the bookmark HTML export, and a separate preservation CLI.
+
 ## MA-007 — Complete one real browsing journey
 
 Dependencies: MA-002/004/005/006.

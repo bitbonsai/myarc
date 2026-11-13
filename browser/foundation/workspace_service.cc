@@ -1033,4 +1033,43 @@ foundation::MutationResult WorkspaceService::RestoreSnapshot(
   return SpacesChanged(std::move(result));
 }
 
+// static
+rust::Box<foundation::ArcExport> WorkspaceService::ParseArcExport(
+    base::span<const uint8_t> bytes) {
+  auto export_data =
+      foundation::parse_arc_export(rust::Slice<const uint8_t>(bytes.data(),
+                                                              bytes.size()));
+  rust::Vec<rust::String> canonical;
+  for (const auto& url : foundation::arc_export_urls(*export_data)) {
+    const auto spec = CanonicalUrl(std::string_view(url.data(), url.size()));
+    // about:blank passes the saved-URL gate but is no Arc tab.
+    canonical.push_back(spec && *spec != "about:blank"
+                            ? rust::String(*spec)
+                            : rust::String());
+  }
+  foundation::set_arc_export_canonical_urls(*export_data, std::move(canonical));
+  return export_data;
+}
+
+foundation::ArcImportPreview WorkspaceService::PreviewArcImport(
+    const foundation::ArcExport& export_data) const {
+  if (!CanMutate()) {
+    auto preview = foundation::preview_arc_import(*workspace_, export_data);
+    preview.ok = false;
+    preview.error = "Workspace is not loaded. Check storage state.";
+    return preview;
+  }
+  return foundation::preview_arc_import(*workspace_, export_data);
+}
+
+foundation::ArcImportPreview WorkspaceService::ApplyArcImport(
+    const foundation::ArcExport& export_data) {
+  if (!CanMutate())
+    return PreviewArcImport(export_data);
+  auto result = foundation::apply_arc_import(*workspace_, export_data);
+  if (result.ok && (result.new_spaces || result.new_pins))
+    SpacesChanged({true, 0, rust::String()});
+  return result;
+}
+
 }  // namespace myarc

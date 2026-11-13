@@ -1,11 +1,20 @@
 chromium::import! {
     "//myarc:control";
+    "//myarc:import";
     "//myarc:workspace";
 }
 
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 
 pub struct Workspace(workspace::Workspace);
+
+// A parsed Arc Markdown export, plus one browser-canonicalized URL per entry
+// once `set_arc_export_canonical_urls` ran (`None` for a rejected URL).
+pub struct ArcExport {
+    report: import::arc_markdown::Report,
+    error: String,
+    canonical: Vec<Option<String>>,
+}
 
 // One request or hello from a control client, or none once the host has
 // stopped. A hello waits in `approval` for the user's answer. An interaction
@@ -298,6 +307,29 @@ mod ffi {
         max_select_options: usize,
     }
 
+    // What importing an Arc export would change, or did change. Lists hold at
+    // most `arc_import_list_limit()` lines; the counts cover everything.
+    struct ArcImportPreview {
+        ok: bool,
+        error: String,
+        // Spaces in the export, with equal names counted once.
+        spaces: usize,
+        new_spaces: usize,
+        new_pins: usize,
+        // Entries already pinned in their Space, left alone.
+        kept_pins: usize,
+        // Groups whose label is dropped, since Pins have no folders yet.
+        flattened_groups: usize,
+        skipped_count: usize,
+        // "Line 12: file:///…" for entries that are not imported.
+        skipped: Vec<String>,
+        unrecognized_count: usize,
+        // "Line 4, indented: …" for lines the reader did not understand.
+        unrecognized: Vec<String>,
+        // After an apply, the export's first Space; otherwise 0.
+        first_space: u64,
+    }
+
     extern "Rust" {
         type Workspace;
         fn new_workspace() -> Box<Workspace>;
@@ -575,7 +607,150 @@ mod ffi {
         // `site_icon_scan_bytes()` bytes.
         fn declared_site_icon(html: &[u8]) -> String;
         fn site_icon_scan_bytes() -> usize;
+
+        type ArcExport;
+        // Largest export accepted, in bytes.
+        fn arc_export_max_bytes() -> usize;
+        fn arc_import_list_limit() -> usize;
+        // Parses untrusted bytes. Never fails; a file it can't read carries an
+        // error that previews report.
+        fn parse_arc_export(bytes: &[u8]) -> Box<ArcExport>;
+        // Every entry's URL as written, for the browser to canonicalize.
+        fn arc_export_urls(arc: &ArcExport) -> Vec<String>;
+        // One URL per `arc_export_urls` entry, canonicalized; empty rejects it.
+        fn set_arc_export_canonical_urls(arc: &mut ArcExport, urls: Vec<String>);
+        // What `apply_arc_import` would do now, without changing anything.
+        fn preview_arc_import(workspace: &Workspace, arc: &ArcExport) -> ArcImportPreview;
+        // Adds the export's Spaces and Pins that are missing, all or nothing.
+        fn apply_arc_import(workspace: &mut Workspace, arc: &ArcExport) -> ArcImportPreview;
     }
+}
+
+pub fn arc_export_max_bytes() -> usize {
+    import::arc_markdown::MAX_INPUT_BYTES
+}
+
+const ARC_IMPORT_LIST_LIMIT: usize = 50;
+
+pub fn arc_import_list_limit() -> usize {
+    ARC_IMPORT_LIST_LIMIT
+}
+
+pub fn parse_arc_export(bytes: &[u8]) -> Box<ArcExport> {
+    let (report, error) = match import::arc_markdown::parse(bytes) {
+        Ok(report) => (report, String::new()),
+        Err(error) => (Default::default(), error.to_string()),
+    };
+    Box::new(ArcExport {
+        report,
+        error,
+        canonical: Vec::new(),
+    })
+}
+
+pub fn arc_export_urls(export: &ArcExport) -> Vec<String> {
+    import::arc_workspace::entry_urls(&export.report)
+        .into_iter()
+        .map(str::to_owned)
+        .collect()
+}
+
+pub fn set_arc_export_canonical_urls(export: &mut ArcExport, urls: Vec<String>) {
+    export.canonical = urls
+        .into_iter()
+        .map(|url| (!url.is_empty()).then_some(url))
+        .collect();
+}
+
+pub fn preview_arc_import(workspace: &Workspace, export: &ArcExport) -> ffi::ArcImportPreview {
+    arc_import_result(
+        export,
+        import::arc_workspace::preview(&export.report, &export.canonical, &workspace.0),
+    )
+}
+
+pub fn apply_arc_import(workspace: &mut Workspace, export: &ArcExport) -> ffi::ArcImportPreview {
+    let result = import::arc_workspace::apply(&export.report, &export.canonical, &mut workspace.0);
+    let first = result
+        .as_ref()
+        .ok()
+        .and_then(|plan| plan.spaces.first())
+        .and_then(|first| {
+            first.existing.or_else(|| {
+                let state = workspace.0.snapshot();
+                state
+                    .spaces
+                    .iter()
+                    .rev()
+                    .find(|space| space.name == first.name && !space.agent)
+                    .map(|space| space.id)
+            })
+        });
+    let mut preview = arc_import_result(export, result);
+    preview.first_space = first.unwrap_or(0);
+    preview
+}
+
+fn arc_import_result(
+    export: &ArcExport,
+    result: Result<import::arc_workspace::Preview, import::arc_workspace::ImportError>,
+) -> ffi::ArcImportPreview {
+    use import::arc_markdown::Reason;
+    let unrecognized = &export.report.unrecognized;
+    let mut preview = ffi::ArcImportPreview {
+        ok: false,
+        error: export.error.clone(),
+        spaces: 0,
+        new_spaces: 0,
+        new_pins: 0,
+        kept_pins: 0,
+        flattened_groups: 0,
+        skipped_count: 0,
+        skipped: Vec::new(),
+        unrecognized_count: unrecognized.len(),
+        first_space: 0,
+        unrecognized: unrecognized
+            .iter()
+            .take(ARC_IMPORT_LIST_LIMIT)
+            .map(|line| {
+                let reason = match line.reason {
+                    Reason::Indented => "indented",
+                    Reason::DeeperHeading => "nested heading",
+                    Reason::EmptyLabel => "heading without a name",
+                    Reason::LabelTooLong => "name too long",
+                    Reason::ControlCharacter => "control character",
+                    Reason::GroupOutsideSpace => "group before any Space",
+                    Reason::EntryOutsideGroup => "link before any group",
+                    Reason::NotUrl => "not a link",
+                    Reason::UrlTooLong => "link too long",
+                    Reason::Other => "unknown text",
+                };
+                format!("Line {}, {reason}: {}", line.line, line.excerpt)
+            })
+            .collect(),
+    };
+    if !export.error.is_empty() {
+        return preview;
+    }
+    match result {
+        Ok(plan) => {
+            preview.ok = true;
+            preview.spaces = plan.spaces.len();
+            preview.new_spaces = plan.new_space_count();
+            preview.new_pins = plan.new_pin_count();
+            preview.kept_pins = plan.kept_pin_count();
+            preview.flattened_groups = plan.flattened_groups;
+            preview.skipped_count = plan.skipped.len();
+            preview.skipped = plan
+                .skipped
+                .iter()
+                .take(ARC_IMPORT_LIST_LIMIT)
+                .map(|entry| format!("Line {}: {}", entry.line, entry.url))
+                .collect();
+        }
+        Err(error) => preview.error = error.to_string(),
+    }
+    preview
 }
 
 pub fn declared_site_icon(html: &[u8]) -> String {

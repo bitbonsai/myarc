@@ -38,11 +38,12 @@ class SettingsWindow {
     base::RepeatingCallback<void(uint64_t)> set;
   };
 
-  // `profile` is the original (never off-the-record) Profile the window edits;
+  // `profile` is the original (never off-the-record) Profile the window edits,
+  // including Advanced > Import from Arc…;
   // it and `local_state` must outlive this object. `open_more_settings` opens
   // chrome://settings and `open_site` opens myarc.dev, both in the owning
   // browser window.
-  SettingsWindow(const Profile* profile,
+  SettingsWindow(Profile* profile,
                  PrefService* local_state,
                  base::RepeatingClosure open_more_settings,
                  base::RepeatingClosure open_site,
@@ -69,8 +70,9 @@ class SettingsWindow {
  private:
   void OpenMoreSettings();
   void OpenSite();
+  void ImportFromArc();
 
-  const raw_ptr<const Profile> profile_;
+  const raw_ptr<Profile> profile_;
   const raw_ptr<PrefService> local_state_;
   base::RepeatingClosure open_more_settings_;
   base::RepeatingClosure open_site_;
