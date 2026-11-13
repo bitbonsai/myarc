@@ -46,4 +46,4 @@ When you close a temporary tab, it moves to Archived Tabs in the Library. Open t
 
 ## Not in myArc yet
 
-Folders inside folders, dragging a tab up to pin it or into a folder, Peek and Split View don't work yet. [Known limitations](../known-limitations/) has the full list.
+Folders inside folders and dragging a tab up to pin it don't work yet. [Known limitations](../known-limitations/) has the full list.

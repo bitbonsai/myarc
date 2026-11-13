@@ -28,6 +28,7 @@ WORKS = [
     'Importing an Arc export from Settings > Advanced > Import from Arc. A preview shows what it will add, then each Space arrives with its folders and pinned tabs, in Arc\'s order. Importing the same file again adds nothing.',
     'Folders for a Space\'s pinned tabs. Create, rename and delete them from the right-click menu, and open or close them. Drag tabs in and out, and rename a pinned tab from its menu.',
     'Split View for two tabs side by side. Use Open in Split View in a tab\'s menu or Ctrl+Shift+=, and Ctrl+Shift+- to separate them. The split shows as one sidebar row and comes back after a restart.',
+    'Peek: a link from a pinned tab or Favorite to another site opens in a card over the page. Cmd+W or Esc closes it, and Cmd+O turns it into a tab.',
     'Agents can drive tabs in the Agent Space through the bundled myarc CLI and MCP server. It is off by default. Turn it on in Settings > Advanced, and myArc asks before each new agent connects.',
 ]
 
