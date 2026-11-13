@@ -276,6 +276,18 @@ std::optional<std::string> EncodeWorkspaceMetadata(
     root.Set("folders", std::move(folders));
     root.Set("next_folder_id", base::NumberToString(snapshot.next_folder_id));
   }
+  // Older builds ignore splits, which then show their tabs as normal rows;
+  // write the key only when there are splits.
+  if (!snapshot.splits.empty()) {
+    base::ListValue splits;
+    for (const auto& split : snapshot.splits) {
+      base::DictValue record;
+      record.Set("left", base::NumberToString(split.left));
+      record.Set("right", base::NumberToString(split.right));
+      splits.Append(std::move(record));
+    }
+    root.Set("splits", std::move(splits));
+  }
   // Builds without Auto Archive reject the key, so write it only when set.
   if (snapshot.open_secs)
     root.Set("open_secs", base::NumberToString(snapshot.open_secs));
@@ -476,6 +488,20 @@ MetadataResult DecodeWorkspaceMetadata(std::string_view json) {
           folder.items.push_back(item);
       }
       snapshot.folders.push_back(std::move(folder));
+    }
+  }
+  // Files written before Split View have none. A bad split is dropped and its
+  // tabs show as normal rows; Rust restore drops what this misses.
+  if (const auto* splits = root->FindList("splits")) {
+    for (const auto& value : *splits) {
+      if (snapshot.splits.size() >= limits.splits)
+        break;
+      const auto* record = value.GetIfDict();
+      foundation::SplitRecord split;
+      if (record && ReadId(*record, "left", split.left) &&
+          ReadId(*record, "right", split.right)) {
+        snapshot.splits.push_back(split);
+      }
     }
   }
   if (!CanonicalizeUrls(snapshot))
@@ -1132,6 +1158,21 @@ foundation::MutationResult WorkspaceService::DeleteFolder(uint64_t folder,
   // Private browsing keeps no history, so it archives nothing.
   return Changed(foundation::delete_folder(*workspace_, folder,
                                            archive && !ephemeral_, NowSecs()));
+}
+
+foundation::MutationResult WorkspaceService::CreateSplit(uint64_t left,
+                                                         uint64_t right) {
+  if (!CanMutate())
+    return Failure("Workspace is not loaded. Check storage state.");
+  auto result = foundation::create_split(*workspace_, left, right);
+  return result.ok && !result.id ? result : Changed(std::move(result));
+}
+
+foundation::MutationResult WorkspaceService::SeparateSplit(uint64_t item) {
+  if (!CanMutate())
+    return Failure("Workspace is not loaded. Check storage state.");
+  auto result = foundation::separate_split(*workspace_, item);
+  return result.ok && !result.id ? result : Changed(std::move(result));
 }
 
 foundation::MutationResult WorkspaceService::MoveSpaceBefore(uint64_t space,

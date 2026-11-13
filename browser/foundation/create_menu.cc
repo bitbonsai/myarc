@@ -130,10 +130,8 @@ struct RowSpec {
   int y;
 };
 
-// myArc's own shortcuts: Cmd+T opens the New Tab palette and Chromium binds
-// Option+Cmd+N to split view. New Split stays disabled because myArc's
-// workspace has no split model yet (docs/GAPS.md, item 10): a split would not
-// persist or show as one sidebar row.
+// myArc's own shortcuts: Cmd+T opens the New Tab palette and Ctrl+Shift+=
+// adds a split pane, as Arc's Add Split View does.
 constexpr auto kRows = std::to_array<RowSpec>({
     {CreateMenu::Item::kNewSpace, u"New Space", &kNewSpaceIcon, 24, {},
      nullptr, true, nullptr, kPad},
@@ -141,10 +139,10 @@ constexpr auto kRows = std::to_array<RowSpec>({
      u"New Split",
      &kNewSplitIcon,
      18,
-     {u"⌥", u"⌘", u"N"},
-     "Alt+Meta+N",
-     false,
-     u"Split view isn't available in myArc yet",
+     {u"⌃", u"⇧", u"="},
+     "Control+Shift+=",
+     true,
+     nullptr,
      kPad + kRowHeight + kSeparatorBand},
     {CreateMenu::Item::kNewTab,
      u"New Tab",

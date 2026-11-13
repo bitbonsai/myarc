@@ -1,5 +1,5 @@
 diff --git a/chrome/browser/ui/browser_command_controller.cc b/chrome/browser/ui/browser_command_controller.cc
-index afc3f64a97c6a8676a656fca1a3ede18eb23b1fb..f218b137de6640096dd5877c6abf15a3c3783d1d 100644
+index afc3f64a97c6a8676a656fca1a3ede18eb23b1fb..1193f7785ce0336ddd3f9184acf77fabad756f43 100644
 --- a/chrome/browser/ui/browser_command_controller.cc
 +++ b/chrome/browser/ui/browser_command_controller.cc
 @@ -60,6 +60,7 @@
@@ -19,7 +19,7 @@ index afc3f64a97c6a8676a656fca1a3ede18eb23b1fb..f218b137de6640096dd5877c6abf15a3
  #include "printing/buildflags/buildflags.h"
  #include "third_party/omnibox_proto/chrome_aim_entry_point.pb.h"
  #include "ui/accessibility/accessibility_features.h"
-@@ -284,6 +287,100 @@ actions::ActionItem* FindAction(actions::ActionId action_id,
+@@ -284,6 +287,110 @@ actions::ActionItem* FindAction(actions::ActionId action_id,
    return actions::ActionManager::Get().FindAction(action_id, root_action_item);
  }
  
@@ -91,6 +91,16 @@ index afc3f64a97c6a8676a656fca1a3ede18eb23b1fb..f218b137de6640096dd5877c6abf15a3
 +    case IDC_MYARC_SELECT_PREVIOUS_SPACE:
 +      adapter->StepSpace(-1);
 +      return true;
++    case IDC_MYARC_SEPARATE_SPLIT:
++      if (auto* page = browser->GetTabStripModel()->GetActiveWebContents()) {
++        adapter->SeparateSplit(
++            myarc::BrowserWorkspaceAdapter::ItemIdForContents(*page));
++      }
++      return true;
++    case IDC_MYARC_FOCUS_SPLIT_PANE_0:
++    case IDC_MYARC_FOCUS_SPLIT_PANE_1:
++      adapter->FocusSplitPane(id - IDC_MYARC_FOCUS_SPLIT_PANE_0);
++      return true;
 +    // Hidden tabs from other Spaces stay in the native strip, so numbered and
 +    // next/previous tab commands follow the sidebar instead.
 +    case IDC_SELECT_TAB_0:
@@ -120,7 +130,7 @@ index afc3f64a97c6a8676a656fca1a3ede18eb23b1fb..f218b137de6640096dd5877c6abf15a3
  #if BUILDFLAG(IS_CHROMEOS)
  bool IsLockedForOnTask(BrowserWindowInterface* browser) {
    if (features::IsUseUnifiedLockedStateControllerEnabled()) {
-@@ -651,7 +748,8 @@ bool BrowserCommandController::SupportsCommand(int id) const {
+@@ -651,7 +758,8 @@ bool BrowserCommandController::SupportsCommand(int id) const {
  }
  
  bool BrowserCommandController::IsCommandEnabled(int id) const {
@@ -130,7 +140,7 @@ index afc3f64a97c6a8676a656fca1a3ede18eb23b1fb..f218b137de6640096dd5877c6abf15a3
  }
  
  bool BrowserCommandController::ExecuteCommandWithDispositionAndContext(
-@@ -659,6 +757,12 @@ bool BrowserCommandController::ExecuteCommandWithDispositionAndContext(
+@@ -659,6 +767,12 @@ bool BrowserCommandController::ExecuteCommandWithDispositionAndContext(
      WindowOpenDisposition disposition,
      std::optional<actions::ActionInvocationContext> context,
      base::TimeTicks time_stamp) {
@@ -143,7 +153,7 @@ index afc3f64a97c6a8676a656fca1a3ede18eb23b1fb..f218b137de6640096dd5877c6abf15a3
    if (!SupportsCommand(id) || !IsCommandEnabled(id)) {
      return false;
    }
-@@ -684,6 +788,9 @@ void BrowserCommandController::HandleCommandWithDisposition(
+@@ -684,6 +798,9 @@ void BrowserCommandController::HandleCommandWithDisposition(
      int id,
      WindowOpenDisposition disposition,
      base::TimeTicks time_stamp) {
@@ -153,7 +163,7 @@ index afc3f64a97c6a8676a656fca1a3ede18eb23b1fb..f218b137de6640096dd5877c6abf15a3
    DCHECK(IsCommandEnabled(id)) << "Invalid/disabled command " << id;
  
    // LINT.IfChange
-@@ -783,7 +890,7 @@ void BrowserCommandController::HandleCommandWithDisposition(
+@@ -783,7 +900,7 @@ void BrowserCommandController::HandleCommandWithDisposition(
        CloseWindow(browser_);
        break;
      case IDC_NEW_TAB: {
@@ -162,7 +172,7 @@ index afc3f64a97c6a8676a656fca1a3ede18eb23b1fb..f218b137de6640096dd5877c6abf15a3
        break;
      }
      case IDC_NEW_TAB_TO_RIGHT: {
-@@ -1347,6 +1454,10 @@ void BrowserCommandController::HandleCommandWithDisposition(
+@@ -1347,6 +1464,10 @@ void BrowserCommandController::HandleCommandWithDisposition(
                            chrome::kPerformanceSubPage);
        break;
      case IDC_OPTIONS:
@@ -173,7 +183,7 @@ index afc3f64a97c6a8676a656fca1a3ede18eb23b1fb..f218b137de6640096dd5877c6abf15a3
        ShowSettings(webui::GetBrowserForOpeningWebUi(browser_));
        break;
      case IDC_EDIT_SEARCH_ENGINES:
-@@ -2234,6 +2345,51 @@ void BrowserCommandController::UpdateCommandsForExtensionsMenu() {
+@@ -2234,6 +2355,51 @@ void BrowserCommandController::UpdateCommandsForExtensionsMenu() {
                                           /*state=*/true);
  }
  
@@ -225,7 +235,7 @@ index afc3f64a97c6a8676a656fca1a3ede18eb23b1fb..f218b137de6640096dd5877c6abf15a3
  void BrowserCommandController::UpdateCommandsForTabState() {
    // Keep commands disabled when in locked fullscreen so users cannot exit this
    // mode. Only update navigation ones when the webapp is locked for OnTask
-@@ -2974,8 +3130,10 @@ void BrowserCommandController::UpdateActionsForSharingHubPolicy() {
+@@ -2974,8 +3140,10 @@ void BrowserCommandController::UpdateActionsForSharingHubPolicy() {
  }
  
  void BrowserCommandController::UpdateQRCodeGeneratorActionEnabledState() {
@@ -238,7 +248,7 @@ index afc3f64a97c6a8676a656fca1a3ede18eb23b1fb..f218b137de6640096dd5877c6abf15a3
    if (auto* qr_code_action_item =
            FindAction(kActionQrCodeGenerator, browser_)) {
      qr_code_action_item->SetEnabled(qr_code_generator_enabled);
-@@ -2989,7 +3147,8 @@ void BrowserCommandController::UpdateCommandAndActionEnabled(
+@@ -2989,7 +3157,8 @@ void BrowserCommandController::UpdateCommandAndActionEnabled(
    command_updater_->UpdateCommandEnabled(command_id, enabled);
    if (!features::ShouldUseActionsForBrowserCommands()) {
      if (auto* const action = FindAction(action_id, browser_)) {
@@ -248,7 +258,7 @@ index afc3f64a97c6a8676a656fca1a3ede18eb23b1fb..f218b137de6640096dd5877c6abf15a3
      }
    }
  }
-@@ -3010,10 +3169,12 @@ bool BrowserCommandController::IsInLockedFullscreenMode(
+@@ -3010,10 +3179,12 @@ bool BrowserCommandController::IsInLockedFullscreenMode(
  std::unique_ptr<CommandUpdater>
  BrowserCommandController::CreateCommandUpdater() {
    if (features::ShouldUseActionsForBrowserCommands()) {

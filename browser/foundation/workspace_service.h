@@ -203,6 +203,11 @@ class WorkspaceService final : public base::SupportsUserData::Data {
   // this Profile is off the record. `id` is how many were archived. The
   // caller confirms first and closes the Pins' live pages.
   foundation::MutationResult DeleteFolder(uint64_t folder, bool archive);
+  // Split View pairs of Today tabs. Create's `id` is 1 when the split
+  // changed; Separate's is the other pane, or 0 when the item was in no
+  // split. Neither saves when nothing changed.
+  foundation::MutationResult CreateSplit(uint64_t left, uint64_t right);
+  foundation::MutationResult SeparateSplit(uint64_t item);
   foundation::SidebarResult Sidebar(uint64_t window) const;
   std::optional<foundation::StateSnapshot> ExportSnapshot() const;
   foundation::MutationResult RestoreSnapshot(

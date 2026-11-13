@@ -34,9 +34,11 @@ use std::fmt;
 pub mod archive;
 pub mod drag;
 pub mod folder;
+pub mod split;
 
 pub use drag::DropTarget;
 pub use folder::{Folder, FolderDeletion, FolderId, MAX_FOLDER_NAME_BYTES, MAX_FOLDERS};
+pub use split::{MAX_SPLITS, Split};
 
 pub const MAX_SPACE_NAME_BYTES: usize = 128;
 /// Bound for either kind of Space icon. Long emoji ZWJ sequences with skin
@@ -126,6 +128,12 @@ pub enum WorkspaceError {
     NotDraggable(ItemId),
     DuplicateLiveItem(ItemId),
     ItemNotVisible(ItemId),
+    /// Split View holds Today tabs only.
+    SplitNeedsTemporary(ItemId),
+    /// A split's tabs share one Space, and so one Profile.
+    SplitAcrossSpaces(ItemId),
+    AlreadySplit(ItemId),
+    SplitWithItself(ItemId),
     LimitExceeded(&'static str),
     IdExhausted(&'static str),
     UnsupportedSnapshotVersion(u32),
@@ -164,6 +172,10 @@ impl fmt::Display for WorkspaceError {
             Self::NotDraggable(id) => write!(formatter, "Item {id} is not a Pin or Today tab of this window's Space"),
             Self::DuplicateLiveItem(id) => write!(formatter, "Live item {id} is listed more than once"),
             Self::ItemNotVisible(id) => write!(formatter, "Item {id} does not belong to this window's selected Space or Profile"),
+            Self::SplitNeedsTemporary(id) => write!(formatter, "Item {id} is pinned or a Favorite; Split View holds Today tabs"),
+            Self::SplitAcrossSpaces(id) => write!(formatter, "Item {id} belongs to another Space or Profile; a split holds tabs of one Space"),
+            Self::AlreadySplit(id) => write!(formatter, "Item {id} is already in a split; separate it first"),
+            Self::SplitWithItself(id) => write!(formatter, "Item {id} can't be split with itself; pick another tab"),
             Self::LimitExceeded(kind) => write!(formatter, "Workspace {kind} limit reached"),
             Self::IdExhausted(kind) => write!(formatter, "Workspace {kind} IDs exhausted"),
             Self::UnsupportedSnapshotVersion(version) => write!(formatter, "Workspace snapshot version {version} is unsupported; expected {SNAPSHOT_VERSION}"),
@@ -292,6 +304,9 @@ pub struct WorkspaceSnapshot {
     /// Folders of Pins, in display order within each Space. Snapshots from
     /// before folders have none.
     pub folders: Vec<Folder>,
+    /// Pairs of Today tabs shown side by side. Snapshots from before Split
+    /// View have none.
+    pub splits: Vec<Split>,
     pub next_space_id: SpaceId,
     pub next_item_id: ItemId,
     pub next_window_id: WindowId,
@@ -325,6 +340,9 @@ pub struct SidebarSnapshot {
     /// The current Space's folders in order. Their Pins are also in `pins`;
     /// the rest of `pins` is ungrouped.
     pub folders: Vec<Folder>,
+    /// The current Space's splits. Their items are in `temporary` too; the
+    /// sidebar draws each split as one row where its left tab sits.
+    pub splits: Vec<Split>,
 }
 
 #[derive(Debug)]
@@ -368,6 +386,7 @@ impl Default for Workspace {
                 open_secs: 0,
                 archive_interval: archive::ArchiveInterval::Hours12,
                 folders: Vec::new(),
+                splits: Vec::new(),
                 next_space_id: 2,
                 next_item_id: 1,
                 next_window_id: 2,
@@ -1146,6 +1165,7 @@ impl Workspace {
                 .filter(|folder| folder.space_id == window.space_id)
                 .cloned()
                 .collect(),
+            splits: Vec::new(),
         };
         for item in &self.state.items {
             if matches!(item.placement, Placement::Pin { .. }) {
@@ -1160,6 +1180,13 @@ impl Workspace {
                 Placement::Temporary { .. } => sidebar.temporary.push(item.clone()),
             }
         }
+        sidebar.splits = self
+            .state
+            .splits
+            .iter()
+            .filter(|split| sidebar.temporary.iter().any(|item| item.id == split.left))
+            .copied()
+            .collect();
         Ok(sidebar)
     }
 
@@ -1179,6 +1206,7 @@ impl Workspace {
         workspace.validate()?;
         // After validation, so folders only see a consistent set of Spaces and items.
         workspace.sanitize_folders();
+        workspace.sanitize_splits();
         Ok(workspace)
     }
 
@@ -1272,7 +1300,10 @@ impl Workspace {
         self.clear_hidden_selections();
     }
 
+    /// Every mutation that moves or removes items ends here, so it also ends
+    /// splits those changes broke.
     fn clear_hidden_selections(&mut self) {
+        self.prune_splits();
         for window in &mut self.state.windows {
             if let Some(id) = window.selected_item_id {
                 let retained = self

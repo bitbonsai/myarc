@@ -925,6 +925,68 @@ bool CheckFolders() {
          archived_tabs(*restored, 100).size() == 2;
 }
 
+// A split survives the JSON codec and a restore. Files from before splits,
+// and a damaged split, load with both tabs as normal rows, and a split of a
+// Pin is refused.
+bool CheckSplits() {
+  using namespace myarc::foundation;
+  using myarc::internal::DecodeWorkspaceMetadata;
+  using myarc::internal::EncodeWorkspaceMetadata;
+  auto model = new_workspace();
+  auto left = add_temporary_item(*model, 1);
+  auto right = add_temporary_item(*model, 1);
+  const auto plain = EncodeWorkspaceMetadata(export_snapshot(*model));
+  auto plain_root = plain ? base::JSONReader::ReadDict(*plain,
+                                                       base::JSON_PARSE_RFC)
+                          : std::nullopt;
+  if (!left.ok || !right.ok || !plain_root || plain_root->contains("splits"))
+    return false;
+  if (create_split(*model, left.id, right.id).id != 1 ||
+      create_split(*model, left.id, right.id).id != 0) {
+    return false;
+  }
+  const auto encoded = EncodeWorkspaceMetadata(export_snapshot(*model));
+  auto decoded = encoded ? DecodeWorkspaceMetadata(*encoded)
+                         : myarc::internal::MetadataResult{};
+  auto restored = new_workspace();
+  if (!decoded.snapshot ||
+      !restore_snapshot(*restored, std::move(*decoded.snapshot)).ok) {
+    return false;
+  }
+  auto sidebar = sidebar_snapshot(*restored, 1);
+  if (!sidebar.ok || sidebar.splits.size() != 1 ||
+      sidebar.splits[0].left != left.id ||
+      sidebar.splits[0].right != right.id || sidebar.temporary.size() != 2) {
+    return false;
+  }
+  // A damaged split is dropped and its tabs load as normal rows.
+  auto root = base::JSONReader::ReadDict(*encoded, base::JSON_PARSE_RFC);
+  auto* splits = root ? root->FindList("splits") : nullptr;
+  if (!splits || splits->size() != 1)
+    return false;
+  (*splits)[0].GetDict().Set("right", "x");
+  const auto bad = base::WriteJson(*root);
+  auto lenient =
+      bad ? DecodeWorkspaceMetadata(*bad) : myarc::internal::MetadataResult{};
+  auto fallback = new_workspace();
+  if (!lenient.snapshot || !lenient.snapshot->splits.empty() ||
+      !restore_snapshot(*fallback, std::move(*lenient.snapshot)).ok ||
+      sidebar_snapshot(*fallback, 1).temporary.size() != 2) {
+    return false;
+  }
+  // Separating keeps both tabs; a Pin can't join a split.
+  auto separated = separate_split(*restored, right.id);
+  if (!separated.ok || separated.id != left.id ||
+      !sidebar_snapshot(*restored, 1).splits.empty() ||
+      !set_placement(*restored, right.id, PlacementKind::Pin, 1, true,
+                     "https://a.test/")
+           .ok) {
+    return false;
+  }
+  return !create_split(*restored, left.id, right.id).ok &&
+         sidebar_snapshot(*restored, 1).splits.empty();
+}
+
 // A Pin's name survives the JSON codec and a restore, files without one load
 // with none, and a bad stored name reads as none. A drop into a folder pins a
 // Today tab there, and a rejected drop changes nothing.
@@ -1339,12 +1401,16 @@ int main() {
     std::cerr << "Rename and drop checks failed\n";
     return 26;
   }
+  if (!CheckSplits()) {
+    std::cerr << "Split checks failed\n";
+    return 27;
+  }
   std::cout << "7 legacy C++/Rust checks passed, including 1000 ownership "
                "round trips; workspace transitions, Space 1 deletion and "
                "metadata codec, saved title, Archived Tabs, Auto Archive, "
                "archive timer, Clear Archive, downloads stack, dormant "
                "temporary item, Space reorder, Space icon, Space theme, first "
-               "Space, Spaces index, agent Space, folder, rename and drop "
-               "checks passed\n";
+               "Space, Spaces index, agent Space, folder, rename and drop, and "
+               "split checks passed\n";
   return 0;
 }

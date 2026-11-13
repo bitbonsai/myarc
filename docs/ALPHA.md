@@ -31,10 +31,10 @@ Alpha means early users can use myArc as their daily browser on macOS Apple Sili
 
 Alpha covers two panels. [VIEW-01](PARITY.md) and the [roadmap](../ROADMAP.md) call it two-pane, and more panels are under nice to have.
 
-- [ ] **Create a split** (missing). Done when New Split in the "+" menu is enabled and puts two tabs side by side, and a tab from another Profile is refused. Maps to [VIEW-01](PARITY.md) and [GAPS 10](GAPS.md).
-- [ ] **One sidebar row, restored after a restart** (missing). Done when the pair shows as one row and the same layout returns after a restart. Maps to [VIEW-01](PARITY.md).
-- [ ] **Focus and the address bar inside a split** (missing). Done when clicking a panel focuses it, Ctrl+Shift+1 and Ctrl+Shift+2 move focus, Cmd+L edits that panel's address and closing one panel leaves the other. Maps to [VIEW-01](PARITY.md).
-- [ ] **Leave a split** (missing). Done when Separate All Tabs or Ctrl+Shift+minus gives each tab its own row and none is lost. Maps to [VIEW-01](PARITY.md).
+- [ ] **Create a split** (partial). Done when New Split in the "+" menu is enabled and puts two tabs side by side, and a tab from another Profile is refused. myArc builds on Chromium 158's own split tabs. New Split is enabled and opens a pane beside the current tab, and Open in Split View in a Today tab's menu splits that tab with the current one. Rust refuses a Pin, a Favorite or a tab of another Space, and each Space has one Profile, so another Profile's tab is refused too. A background capture split two tabs through the Open in Split View path; nobody has clicked New Split or used Ctrl+Shift+= in a live run yet. Maps to [VIEW-01](PARITY.md) and [GAPS 10](GAPS.md).
+- [ ] **One sidebar row, restored after a restart** (partial). Done when the pair shows as one row and the same layout returns after a restart. The pair shows as one Today row with both favicons and titles and a thin line between them, and a relaunch of the same profile brings back the split and its row. Split rows don't drag yet. Maps to [VIEW-01](PARITY.md).
+- [ ] **Focus and the address bar inside a split** (partial). Done when clicking a panel focuses it, Ctrl+Shift+1 and Ctrl+Shift+2 move focus, Cmd+L edits that panel's address and closing one panel leaves the other. Chromium's split moves focus and the address bar to the clicked panel, Ctrl+Shift+1 and Ctrl+Shift+2 are bound, and the divider drags to resize. Closing a panel leaves the other as a normal tab, which a Rust test covers. Clicks, the keys and Cmd+L haven't been checked in a live run. Maps to [VIEW-01](PARITY.md).
+- [ ] **Leave a split** (partial). Done when Separate All Tabs or Ctrl+Shift+minus gives each tab its own row and none is lost. Separate All Tabs in a split tab's menu gives each tab its own row, as a background capture shows, and Ctrl+Shift+minus runs the same command but hasn't been pressed in a live run. Maps to [VIEW-01](PARITY.md).
 
 ### Little Arc
 

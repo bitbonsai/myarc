@@ -1,5 +1,5 @@
 diff --git a/chrome/browser/ui/views/frame/browser_view.cc b/chrome/browser/ui/views/frame/browser_view.cc
-index 7b568f6de760af21d6e9d2aa44415a7cef617c51..18e4141aef2dcb4ccc119ded73066f782eb58a10 100644
+index 7b568f6de760af21d6e9d2aa44415a7cef617c51..89c80e06d109aa6934000277fed344c2df404881 100644
 --- a/chrome/browser/ui/views/frame/browser_view.cc
 +++ b/chrome/browser/ui/views/frame/browser_view.cc
 @@ -22,6 +22,7 @@
@@ -1553,7 +1553,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..18e4141aef2dcb4ccc119ded73066f78
  
      if (dialog_anchor_) {
        rect.Offset(0, -kAdditionalDialogToolbarOverlap);
-@@ -5197,75 +6394,2533 @@ void BrowserView::AddedToWidget() {
+@@ -5197,75 +6394,2554 @@ void BrowserView::AddedToWidget() {
        kFallbackPopupAnchorElementId, *this);
  
    initialized_ = true;
@@ -2432,6 +2432,27 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..18e4141aef2dcb4ccc119ded73066f78
 +  if (sidebar.ok) {
 +    ShowMyarcSpaceDialog(sidebar.current_space.id, 0, item);
 +  }
++}
++
++void BrowserView::OpenInSplitView(uint64_t item) {
++  // The current tab gets a new pane beside it, as New Split does.
++  auto* active = browser_->tab_strip_model()->GetActiveWebContents();
++  if (active &&
++      myarc::BrowserWorkspaceAdapter::ItemIdForContents(*active) == item) {
++    NewSplit();
++    return;
++  }
++  MyarcWorkspaceResult(myarc_workspace_adapter_->OpenInSplitView(item));
++}
++
++void BrowserView::NewSplit() {
++  // Chromium opens its split New Tab page beside the current tab, and the
++  // workspace adapter adopts the pair once the new page is bound.
++  chrome::ExecuteCommand(browser_.get(), IDC_NEW_SPLIT_TAB);
++}
++
++void BrowserView::SeparateSplit(uint64_t item) {
++  MyarcWorkspaceResult(myarc_workspace_adapter_->SeparateSplit(item));
 +}
 +
 +void BrowserView::SelectSpace(uint64_t space) {
@@ -4128,7 +4149,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..18e4141aef2dcb4ccc119ded73066f78
  
  bool BrowserView::AcceleratorPressed(const ui::Accelerator& accelerator) {
  #if BUILDFLAG(IS_MAC)
-@@ -5342,7 +8997,8 @@ void BrowserView::LoadingAnimationCallback(base::TimeTicks timestamp) {
+@@ -5342,7 +9018,8 @@ void BrowserView::LoadingAnimationCallback(base::TimeTicks timestamp) {
      // GetActiveWebContents can return null for example under Purify when
      // the animations are running slowly and this function is called on a timer
      // through LoadingAnimationCallback.
@@ -4138,7 +4159,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..18e4141aef2dcb4ccc119ded73066f78
    }
  }
  
-@@ -5471,6 +9127,10 @@ bool BrowserView::MaybeUpdateDevtools(content::WebContents* contents) {
+@@ -5471,6 +9148,10 @@ bool BrowserView::MaybeUpdateDevtools(content::WebContents* contents) {
  
  void BrowserView::UpdateUIForContents(WebContents* contents,
                                        bool should_layout_immediately) {
@@ -4149,7 +4170,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..18e4141aef2dcb4ccc119ded73066f78
    TRACE_EVENT0("ui", "BrowserView::UpdateUIForContents");
    bool needs_layout = MaybeShowBookmarkBar(contents);
  
-@@ -5706,6 +9366,26 @@ void BrowserView::LoadAccelerators() {
+@@ -5706,6 +9387,26 @@ void BrowserView::LoadAccelerators() {
    }
  
  #if BUILDFLAG(IS_MAC)

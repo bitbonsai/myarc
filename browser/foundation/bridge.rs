@@ -120,6 +120,13 @@ mod ffi {
         items: Vec<u64>,
     }
 
+    // Two Today tabs of one Space shown side by side; `left` is the left
+    // pane.
+    struct SplitRecord {
+        left: u64,
+        right: u64,
+    }
+
     struct WindowRecord {
         id: u64,
         space_id: u64,
@@ -164,6 +171,9 @@ mod ffi {
         // folder or entry rather than failing; its Pins show ungrouped.
         folders: Vec<FolderRecord>,
         next_folder_id: u64,
+        // Restore drops a bad split rather than failing; its tabs show as
+        // normal rows.
+        splits: Vec<SplitRecord>,
     }
 
     struct SidebarResult {
@@ -181,6 +191,9 @@ mod ffi {
         // The current Space's folders in order. Their Pins are in `pins` too;
         // the rest of `pins` is ungrouped.
         folders: Vec<FolderRecord>,
+        // The current Space's splits. Their items are in `temporary` too; the
+        // sidebar draws each as one row where its left tab sits.
+        splits: Vec<SplitRecord>,
         // Rows in the order the sidebar shows them, which next and previous
         // tab step through. A closed folder's Pins are left out, except the
         // selected one.
@@ -198,6 +211,7 @@ mod ffi {
         url_bytes: usize,
         title_bytes: usize,
         folders: usize,
+        splits: usize,
     }
 
     // What the browser does for a control request once the core checked it.
@@ -566,6 +580,12 @@ mod ffi {
             archive: bool,
             now_secs: u64,
         ) -> MutationResult;
+        // Shows two Today tabs of one Space side by side. `id` is 1 when the
+        // split changed, else 0.
+        fn create_split(workspace: &mut Workspace, left: u64, right: u64) -> MutationResult;
+        // Ends the split holding the item, keeping both tabs. `id` is the
+        // other pane, or 0 when the item was in no split.
+        fn separate_split(workspace: &mut Workspace, item_id: u64) -> MutationResult;
         fn sidebar_snapshot(workspace: &Workspace, window_id: u64) -> SidebarResult;
         fn export_snapshot(workspace: &Workspace) -> StateSnapshot;
         fn restore_snapshot(workspace: &mut Workspace, snapshot: StateSnapshot) -> MutationResult;
@@ -892,6 +912,7 @@ pub fn bridge_limits() -> ffi::BridgeLimits {
         url_bytes: workspace::MAX_URL_BYTES,
         title_bytes: workspace::MAX_TITLE_BYTES,
         folders: workspace::MAX_FOLDERS,
+        splits: workspace::MAX_SPLITS,
     }
 }
 
@@ -1411,6 +1432,26 @@ pub fn delete_folder(
     )
 }
 
+pub fn create_split(workspace: &mut Workspace, left: u64, right: u64) -> ffi::MutationResult {
+    outcome(workspace.0.create_split(left, right).map(u64::from))
+}
+
+pub fn separate_split(workspace: &mut Workspace, item_id: u64) -> ffi::MutationResult {
+    outcome(
+        workspace
+            .0
+            .separate_split(item_id)
+            .map(|split| split.map_or(0, |split| split.partner(item_id))),
+    )
+}
+
+fn split_record(split: workspace::Split) -> ffi::SplitRecord {
+    ffi::SplitRecord {
+        left: split.left,
+        right: split.right,
+    }
+}
+
 fn folder_record(folder: workspace::Folder) -> ffi::FolderRecord {
     ffi::FolderRecord {
         id: folder.id,
@@ -1471,6 +1512,7 @@ pub fn sidebar_snapshot(workspace: &Workspace, window_id: u64) -> ffi::SidebarRe
             temporary: sidebar.temporary.into_iter().map(item_record).collect(),
             space_pins: sidebar.space_pins.into_iter().map(item_record).collect(),
             folders: sidebar.folders.into_iter().map(folder_record).collect(),
+            splits: sidebar.splits.into_iter().map(split_record).collect(),
         },
         Err(error) => ffi::SidebarResult {
             ok: false,
@@ -1492,6 +1534,7 @@ pub fn sidebar_snapshot(workspace: &Workspace, window_id: u64) -> ffi::SidebarRe
             temporary: Vec::new(),
             space_pins: Vec::new(),
             folders: Vec::new(),
+            splits: Vec::new(),
             row_order: Vec::new(),
         },
     }
@@ -1521,6 +1564,7 @@ pub fn export_snapshot(workspace: &Workspace) -> ffi::StateSnapshot {
         archive_interval_secs: state.archive_interval.seconds(),
         folders: state.folders.into_iter().map(folder_record).collect(),
         next_folder_id: state.next_folder_id,
+        splits: state.splits.into_iter().map(split_record).collect(),
     }
 }
 
@@ -1643,6 +1687,16 @@ pub fn restore_snapshot(
                     })
                     .collect(),
                 next_folder_id: snapshot.next_folder_id,
+                // The core drops bad splits on restore.
+                splits: snapshot
+                    .splits
+                    .into_iter()
+                    .take(workspace::MAX_SPLITS)
+                    .map(|split| workspace::Split {
+                        left: split.left,
+                        right: split.right,
+                    })
+                    .collect(),
             })
             .map(|()| 0),
     )

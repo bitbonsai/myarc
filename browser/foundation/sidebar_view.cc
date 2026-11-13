@@ -5,6 +5,7 @@
 #include <limits>
 #include <memory>
 #include <optional>
+#include <map>
 #include <set>
 #include <utility>
 
@@ -437,6 +438,8 @@ enum ItemCommand {
   kRemoveFromFolder,
   kMoveToFolder,
   kRenameItem,
+  kOpenInSplitView,
+  kSeparateSplit,
   // Move to Folder's entries: this plus the folder's index in folders_.
   kMoveToFolderFirst = 1000
 };
@@ -583,6 +586,59 @@ class ItemRow final : public views::View, public views::FocusChangeListener {
 };
 
 BEGIN_METADATA(ItemRow)
+END_METADATA
+
+// The thin line between a split's panes: 1 DIP wide and 16 DIP tall,
+// centred, in the Space dots' colour.
+class SplitDivider final : public views::View {
+  METADATA_HEADER(SplitDivider, views::View)
+
+ public:
+  SplitDivider() { SetPreferredSize(gfx::Size(1, 16)); }
+
+  void OnPaint(gfx::Canvas* canvas) override {
+    canvas->FillRect(gfx::Rect(0, (height() - 16) / 2, 1, 16),
+                     GetFills(GetColorProvider()).space_dot);
+  }
+};
+
+BEGIN_METADATA(SplitDivider)
+END_METADATA
+
+// A split's row holds its two panes' rows side by side with the divider
+// between them, as Arc draws a split in the sidebar. While either pane shows,
+// the row takes the resting tile fill and the focused pane its own highlight.
+class SplitRow final : public views::View {
+  METADATA_HEADER(SplitRow, views::View)
+
+ public:
+  SplitRow(std::unique_ptr<views::View> left,
+           std::unique_ptr<views::View> right,
+           bool selected)
+      : selected_(selected) {
+    auto* layout = SetLayoutManager(std::make_unique<views::BoxLayout>(
+        Orientation::kHorizontal, gfx::Insets(), 0));
+    layout->set_cross_axis_alignment(
+        views::BoxLayout::CrossAxisAlignment::kStretch);
+    layout->SetFlexForView(AddChildView(std::move(left)), 1);
+    AddChildView(std::make_unique<SplitDivider>());
+    layout->SetFlexForView(AddChildView(std::move(right)), 1);
+    GetViewAccessibility().SetRole(ax::mojom::Role::kGroup);
+    GetViewAccessibility().SetName(u"Split View");
+  }
+
+  void OnThemeChanged() override {
+    views::View::OnThemeChanged();
+    SetBackground(selected_ ? views::CreateRoundedRectBackground(
+                                  GetFills(GetColorProvider()).tile, 10)
+                            : nullptr);
+  }
+
+ private:
+  const bool selected_;
+};
+
+BEGIN_METADATA(SplitRow)
 END_METADATA
 
 // A folder's row: its button fills the row and opens or closes it, and the
@@ -988,6 +1044,13 @@ void SidebarView::ShowContextMenuForViewImpl(
       menu_model_->AddItem(kRemoveFromFolder, u"Remove from Folder");
     }
   }
+  // Arc offers Open in Split View on a tab's menu.
+  if (menu_state_.can_split) {
+    menu_model_->AddItem(kOpenInSplitView, u"Open in Split View");
+  }
+  if (menu_state_.in_split) {
+    menu_model_->AddItem(kSeparateSplit, u"Separate All Tabs");
+  }
   if (menu_state_.is_live) {
     menu_model_->AddItem(
         kClose, menu_state_.is_pin        ? u"Close live page (keep Space Pin)"
@@ -1321,6 +1384,7 @@ void SidebarView::ChooseCreateItem(int item) {
                            sidebar->delegate_->NewTab();
                            return;
                          case CreateMenu::Item::kNewSplit:
+                           sidebar->delegate_->NewSplit();
                            return;
                        }
                      },
@@ -1413,6 +1477,12 @@ void SidebarView::ExecuteCommand(int command_id, int event_flags) {
       return;
     case kRenameItem:
       delegate_->RenameItem(id);
+      return;
+    case kOpenInSplitView:
+      delegate_->OpenInSplitView(id);
+      return;
+    case kSeparateSplit:
+      delegate_->SeparateSplit(id);
       return;
   }
   const size_t index = static_cast<size_t>(command_id - kMoveToFolderFirst);
@@ -1660,7 +1730,8 @@ std::unique_ptr<views::View> SidebarView::MakeItem(
     const foundation::ItemRecord& item,
     bool tile,
     bool selected,
-    uint64_t folder) {
+    uint64_t folder,
+    bool in_split) {
   ItemPresentation presentation = Present(item);
   const auto foreground = ui::kColorSysOnSurface;
   auto activate_callback = base::BindRepeating(
@@ -1689,7 +1760,10 @@ std::unique_ptr<views::View> SidebarView::MakeItem(
       presentation.is_live,
       item.has_url ? base::UTF8ToUTF16(std::string(item.canonical_url))
                    : std::u16string(),
-      folder};
+      folder,
+      item.placement == foundation::PlacementKind::Temporary &&
+          presentation.is_live && !in_split,
+      in_split};
   TrackFocus(activate.get(), FocusAction::kActivate, item.id, menu_state);
   if (tile) {
     activate->SetHorizontalAlignment(gfx::ALIGN_CENTER);
@@ -1720,6 +1794,16 @@ std::unique_ptr<views::View> SidebarView::MakeItem(
   TrackFocus(close.get(), FocusAction::kClose, item.id, menu_state);
   return std::make_unique<ItemRow>(std::move(activate), std::move(close),
                                    selected);
+}
+
+std::unique_ptr<views::View> SidebarView::MakeSplit(
+    const foundation::ItemRecord& left,
+    const foundation::ItemRecord& right,
+    uint64_t selected) {
+  return std::make_unique<SplitRow>(
+      MakeItem(left, false, left.id == selected, 0, /*in_split=*/true),
+      MakeItem(right, false, right.id == selected, 0, /*in_split=*/true),
+      left.id == selected || right.id == selected);
 }
 
 std::unique_ptr<views::View> SidebarView::MakeFolder(
@@ -2185,8 +2269,28 @@ void SidebarView::SetModel(const foundation::SidebarResult& model,
       {.view = new_tab_.get(),
        .kind = foundation::DropTargetKind::Today,
        .next = model.temporary.empty() ? 0 : model.temporary.front().id});
+  // A split shows as one row where its left tab sits; its right tab has no
+  // row of its own. Split rows don't drag yet.
+  std::map<uint64_t, uint64_t> split_right;
+  std::set<uint64_t> split_rights;
+  for (const auto& split : model.splits) {
+    split_right[split.left] = split.right;
+    split_rights.insert(split.right);
+  }
   for (size_t i = 0; i < model.temporary.size(); ++i) {
     const auto& item = model.temporary[i];
+    if (split_rights.contains(item.id)) {
+      continue;
+    }
+    if (const auto pair = split_right.find(item.id);
+        pair != split_right.end()) {
+      const auto right = std::ranges::find(model.temporary, pair->second,
+                                           &foundation::ItemRecord::id);
+      if (right != model.temporary.end()) {
+        rows->AddChildView(MakeSplit(item, *right, model.selected_item_id));
+        continue;
+      }
+    }
     drop_zones_.push_back({.view = rows->AddChildView(MakeItem(
                                item, false, item.id == model.selected_item_id)),
                            .kind = foundation::DropTargetKind::Today,

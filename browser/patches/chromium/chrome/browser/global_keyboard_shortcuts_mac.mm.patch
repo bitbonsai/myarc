@@ -1,5 +1,5 @@
 diff --git a/chrome/browser/global_keyboard_shortcuts_mac.mm b/chrome/browser/global_keyboard_shortcuts_mac.mm
-index 4e41528d09564f6b11c0d691565568c36aa25dc3..93a9c41389e033a8b16654241b8a86c9aa3c56c1 100644
+index 4e41528d09564f6b11c0d691565568c36aa25dc3..6fb6bb9a4891285406750cc31c000be369ea4a56 100644
 --- a/chrome/browser/global_keyboard_shortcuts_mac.mm
 +++ b/chrome/browser/global_keyboard_shortcuts_mac.mm
 @@ -9,6 +9,7 @@
@@ -76,7 +76,7 @@ index 4e41528d09564f6b11c0d691565568c36aa25dc3..93a9c41389e033a8b16654241b8a86c9
        {true,  false, false, true,  kVK_ANSI_C,            IDC_DEV_TOOLS_INSPECT},
        {true,  false, false, true,  kVK_DownArrow,         IDC_FOCUS_NEXT_PANE},
        {true,  false, false, true,  kVK_UpArrow,           IDC_FOCUS_PREVIOUS_PANE},
-@@ -165,6 +186,38 @@ const std::vector<KeyboardShortcutData>& GetShortcutsNotPresentInMainMenu() {
+@@ -165,6 +186,48 @@ const std::vector<KeyboardShortcutData>& GetShortcutsNotPresentInMainMenu() {
      keys.push_back(
          {true, false, true, false, kVK_ANSI_Z, IDC_FOCUS_PREV_TAB_GROUP});
  
@@ -110,6 +110,16 @@ index 4e41528d09564f6b11c0d691565568c36aa25dc3..93a9c41389e033a8b16654241b8a86c9
 +      // Bookmark This Tab key equivalent in this mode.
 +      keys.push_back({true, false, false, false, kVK_ANSI_D,
 +                      IDC_MYARC_TOGGLE_PIN});
++      // Arc's Split View keys: Ctrl-Shift-= adds a split pane, Ctrl-Shift--
++      // separates the split, and Ctrl-Shift-1 and 2 focus its panes.
++      keys.push_back(
++          {false, true, true, false, kVK_ANSI_Equal, IDC_NEW_SPLIT_TAB});
++      keys.push_back(
++          {false, true, true, false, kVK_ANSI_Minus, IDC_MYARC_SEPARATE_SPLIT});
++      keys.push_back(
++          {false, true, true, false, kVK_ANSI_1, IDC_MYARC_FOCUS_SPLIT_PANE_0});
++      keys.push_back(
++          {false, true, true, false, kVK_ANSI_2, IDC_MYARC_FOCUS_SPLIT_PANE_1});
 +    }
 +
      if (base::FeatureList::IsEnabled(features::kUIDebugTools)) {

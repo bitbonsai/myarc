@@ -15,6 +15,7 @@ rust_static_library("workspace") {
     "workspace/src/lib.rs",
     "workspace/src/peek.rs",
     "workspace/src/site_icon.rs",
+    "workspace/src/split.rs",
     "workspace/src/tab_ops.rs",
     "workspace/src/url_label.rs",
   ]
@@ -177,6 +178,7 @@ source_set("browser_workspace_adapter") {
     "//chrome/browser/sessions",
     "//chrome/browser/ui/browser_window",
     "//chrome/browser/ui/navigator",
+    "//chrome/browser/ui/tabs",
     "//chrome/browser/ui/tabs:tab_strip",
     "//chrome/common:mojo_bindings",
     "//components/actor/core:task_id",
@@ -189,6 +191,7 @@ source_set("browser_workspace_adapter") {
     "//components/keyed_service/core",
     "//components/prefs",
     "//components/sessions",
+    "//components/split_tabs",
     "//components/tabs:public",
     "//content/public/browser",
     "//mojo/public/cpp/bindings",

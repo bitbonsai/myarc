@@ -171,6 +171,13 @@ class SidebarView final : public views::View,
     // Rename… on a Pin: the parent asks for its name, and an empty one goes
     // back to the page title.
     virtual void RenameItem(uint64_t item_id) = 0;
+    // Split View. Open in Split View splits the item with the current tab,
+    // or, for the current tab itself, opens a new pane beside it as New
+    // Split does. Separate All Tabs ends the item's split and keeps both
+    // tabs. The parent validates through Rust and reports errors.
+    virtual void OpenInSplitView(uint64_t item_id) = 0;
+    virtual void NewSplit() = 0;
+    virtual void SeparateSplit(uint64_t item_id) = 0;
     virtual void SelectSpace(uint64_t space_id) = 0;
     // A footer glyph of another Profile's Space was pressed.
     virtual void SwitchToSpaceInProfile(const std::string& profile_dir,
@@ -310,6 +317,9 @@ class SidebarView final : public views::View,
     std::u16string url;
     // The folder holding the Pin, or 0.
     uint64_t folder = 0;
+    // A live Today tab can open in Split View; a split's tab can leave it.
+    bool can_split = false;
+    bool in_split = false;
     bool operator==(const ItemMenuState&) const = default;
   };
   struct FocusTarget {
@@ -417,7 +427,13 @@ class SidebarView final : public views::View,
   std::unique_ptr<views::View> MakeItem(const foundation::ItemRecord& item,
                                         bool tile,
                                         bool selected,
-                                        uint64_t folder = 0);
+                                        uint64_t folder = 0,
+                                        bool in_split = false);
+  // A split's one row: both panes' favicons and titles side by side, each
+  // activating and closing its own tab.
+  std::unique_ptr<views::View> MakeSplit(const foundation::ItemRecord& left,
+                                         const foundation::ItemRecord& right,
+                                         uint64_t selected);
   // A folder's row, which opens or closes it.
   std::unique_ptr<views::View> MakeFolder(const foundation::FolderRecord& folder);
   // Runs the menu built in `menu_model_` at `point`.

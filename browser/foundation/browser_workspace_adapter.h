@@ -201,6 +201,18 @@ class BrowserWorkspaceAdapter final : public TabStripModelObserver {
   // its row. `id` is how many Pins were archived.
   foundation::MutationResult DeleteFolder(uint64_t folder);
 
+  // Split View (VIEW-01). Chromium's TabStripModel owns the panes, their
+  // sizes and focus, and session restore brings them back; Rust owns which
+  // Today tabs form a split. Arc's Open in Split View: splits the active tab
+  // with `item`'s page. For the active tab itself the parent runs Chromium's
+  // New Split command instead, which opens a pane beside it.
+  foundation::MutationResult OpenInSplitView(uint64_t item);
+  // Arc's Separate All Tabs: ends the split holding `item`, keeping both
+  // tabs open as normal rows.
+  foundation::MutationResult SeparateSplit(uint64_t item);
+  // Ctrl+Shift+1 and Ctrl+Shift+2 focus the active split's panes.
+  foundation::MutationResult FocusSplitPane(int index);
+
   // Keyboard commands over the rows the sidebar shows, in Rust's row order:
   // Favorites, ungrouped Pins, open folders' Pins, then temporary items, and
   // Spaces in footer order. A closed folder's Pins are skipped, except the
@@ -235,6 +247,9 @@ class BrowserWorkspaceAdapter final : public TabStripModelObserver {
       uint64_t window_space);
   void PersistBindings(bool force = false);
   void SyncNativePins();
+  // Adopts native splits into Rust, unsplitting a pair Rust refuses, and
+  // splits live pairs Rust remembers that the window shows apart.
+  void SyncSplits();
   void ShowSelected();
   void OnServiceChanged();
   void Refresh();
@@ -261,6 +276,7 @@ class BrowserWorkspaceAdapter final : public TabStripModelObserver {
   void OnTabChangedAt(tabs::TabInterface* tab, TabChangeType type) override;
   void OnTabPinnedStateChanged(tabs::TabInterface* tab, int index) override;
   void OnTabStripModelDestroyed(TabStripModel* model) override;
+  void OnSplitTabChanged(const SplitTabChange& change) override;
 
   const raw_ptr<BrowserWindowInterface> browser_;
   const raw_ptr<Profile> profile_;

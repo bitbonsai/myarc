@@ -27,7 +27,10 @@
 #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
 #include "chrome/browser/ui/navigator/browser_navigator.h"
 #include "chrome/browser/ui/navigator/browser_navigator_params.h"
+#include "chrome/browser/ui/tabs/split_tab_metrics.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
+#include "components/split_tabs/split_tab_visual_data.h"
+#include "components/tabs/public/split_tab_data.h"
 #include "components/favicon/core/favicon_service.h"
 #include "components/favicon_base/favicon_types.h"
 #include "components/history/core/browser/history_service.h"
@@ -111,6 +114,13 @@ bool g_close_folders_hook_done = false;
 // menu. An empty name clears it, for captures of a rename surviving a relaunch.
 constexpr char kMyarcTestRenameItem[] = "myarc-test-rename-item";
 bool g_rename_item_hook_done = false;
+// --myarc-test-split splits the first window's first two Today tabs once its
+// workspace is ready, through the same path as Open in Split View in the
+// second one's menu. A value of a ratio between 0 and 1 then sets the left
+// pane's share, as dragging the divider does; "separate" then separates the
+// split, as Separate All Tabs does.
+constexpr char kMyarcTestSplit[] = "myarc-test-split";
+bool g_split_hook_done = false;
 #endif  // BUILDFLAG(MYARC_TEST_HOOKS)
 
 const char kRuntimeKey = 0;
@@ -1313,6 +1323,74 @@ void BrowserWorkspaceAdapter::SyncNativePins() {
   }
 }
 
+void BrowserWorkspaceAdapter::SyncSplits() {
+  if (!ready() || changing_ || !tabs_ || tabs_->closing_all())
+    return;
+  base::AutoReset<bool> changing(&changing_, true);
+  // Splits Chromium made, from its own menus, Option-Cmd-N or session
+  // restore, join the workspace once both tabs are bound. A pair the
+  // workspace refuses, such as a Favorite or a tab of another Space, is
+  // unsplit, so no split crosses Spaces or Profiles.
+  for (const split_tabs::SplitTabId& id : tabs_->ListSplits()) {
+    const auto* data = tabs_->GetSplitData(id);
+    const auto panes = data ? data->ListTabs()
+                            : std::vector<tabs::TabInterface*>();
+    uint64_t left = 0;
+    uint64_t right = 0;
+    if (panes.size() == 2) {
+      left = ItemIdForContents(*panes[0]->GetContents());
+      right = ItemIdForContents(*panes[1]->GetContents());
+    }
+    if (panes.size() == 2 && (!left || !right))
+      continue;
+    auto state = service_->ExportSnapshot();
+    if (!state)
+      return;
+    // A pane that moved into this split leaves the split Rust remembers.
+    for (const auto& split : state->splits) {
+      const bool has_left = split.left == left || split.right == left;
+      const bool has_right = split.left == right || split.right == right;
+      if (has_left != has_right) {
+        Remember(service_->SeparateSplit(has_left ? left : right));
+      }
+    }
+    auto result = panes.size() == 2
+                      ? service_->CreateSplit(left, right)
+                      : Fail("Split View holds two tabs in myArc.");
+    if (!result.ok) {
+      tabs_->RemoveSplit(id);
+      Remember(std::move(result));
+    }
+  }
+  // Pairs the workspace remembers, such as dormant rows that reopened, come
+  // back side by side once both pages are open in this window.
+  auto state = service_->ExportSnapshot();
+  if (!state)
+    return;
+  for (const auto& split : state->splits) {
+    auto* left = LocalPage(*tabs_, split.left);
+    auto* right = LocalPage(*tabs_, split.right);
+    if (!left || !right)
+      continue;
+    const int left_index = tabs_->GetIndexOfWebContents(left);
+    const int right_index = tabs_->GetIndexOfWebContents(right);
+    const auto left_split = tabs_->GetSplitForTab(left_index);
+    if (left_split && left_split == tabs_->GetSplitForTab(right_index))
+      continue;
+    if (left_split || tabs_->GetSplitForTab(right_index))
+      continue;
+    const auto id = tabs_->AddToNewSplit(
+        {left_index, right_index},
+        split_tabs::SplitTabVisualData(split_tabs::SplitTabLayout::kSideBySide),
+        split_tabs::SplitTabCreatedSource::kTabContextMenu);
+    const auto* data = tabs_->GetSplitData(id);
+    const auto panes = data ? data->ListTabs()
+                            : std::vector<tabs::TabInterface*>();
+    if (panes.size() == 2 && panes[0]->GetContents() != left)
+      tabs_->ReverseTabsInSplit(id);
+  }
+}
+
 void BrowserWorkspaceAdapter::ShowSelected() {
   if (!ready() || changing_)
     return;
@@ -1415,6 +1493,7 @@ void BrowserWorkspaceAdapter::Refresh() {
     }
   }
   SyncNativePins();
+  SyncSplits();
   ShowSelected();
   if (ready()) {
     const auto sidebar = Sidebar();
@@ -1492,6 +1571,41 @@ void BrowserWorkspaceAdapter::Refresh() {
                 }
               },
               weak_factory_.GetWeakPtr(), item, value.substr(colon + 1)));
+    }
+  }
+  if (ready() && !g_split_hook_done &&
+      command_line->HasSwitch(kMyarcTestSplit)) {
+    const auto sidebar = Sidebar();
+    if (sidebar.ok && sidebar.temporary.size() >= 2 &&
+        LocalPage(*tabs_, sidebar.temporary[0].id) &&
+        LocalPage(*tabs_, sidebar.temporary[1].id)) {
+      g_split_hook_done = true;
+      base::SingleThreadTaskRunner::GetCurrentDefault()->PostTask(
+          FROM_HERE,
+          base::BindOnce(
+              [](base::WeakPtr<BrowserWorkspaceAdapter> adapter,
+                 uint64_t first, uint64_t second, std::string value) {
+                if (!adapter || !adapter->ready())
+                  return;
+                auto result = adapter->ActivateItem(first);
+                if (result.ok)
+                  result = adapter->OpenInSplitView(second);
+                double ratio = 0;
+                if (result.ok && value == "separate") {
+                  result = adapter->SeparateSplit(second);
+                } else if (result.ok && base::StringToDouble(value, &ratio) &&
+                           ratio > 0 && ratio < 1) {
+                  auto& tabs = *adapter->tabs_;
+                  const int index = tabs.active_index();
+                  if (const auto split = tabs.GetSplitForTab(index))
+                    tabs.UpdateSplitRatio(*split, ratio);
+                }
+                LOG_IF(ERROR, !result.ok)
+                    << "Test split failed: " << std::string(result.error);
+              },
+              weak_factory_.GetWeakPtr(), sidebar.temporary[0].id,
+              sidebar.temporary[1].id,
+              command_line->GetSwitchValueASCII(kMyarcTestSplit)));
     }
   }
 #endif  // BUILDFLAG(MYARC_TEST_HOOKS)
@@ -2085,6 +2199,81 @@ foundation::MutationResult BrowserWorkspaceAdapter::DeleteFolder(
   return Remember(service_->DeleteFolder(folder, archive));
 }
 
+foundation::MutationResult BrowserWorkspaceAdapter::OpenInSplitView(
+    uint64_t item) {
+  if (!ready())
+    return Fail(error());
+  auto* active = tabs_->GetActiveWebContents();
+  const uint64_t active_item = active ? ItemIdForContents(*active) : 0;
+  if (!active_item)
+    return Fail("Open a tab first, then split it.");
+  if (tabs_->GetActiveTab()->IsSplit())
+    return Remember(Fail(
+        "This tab is already in a split. Separate it first; myArc splits "
+        "two tabs."));
+  // The parent runs New Split for the active tab itself.
+  if (item == active_item)
+    return Remember(Fail("Pick another tab to split this one with."));
+  auto* page = LocalPage(*tabs_, item);
+  if (!page)
+    return Remember(Fail("Open that tab first, then split it."));
+  if (page->GetBrowserContext() != active->GetBrowserContext())
+    return Remember(Fail("Tabs of different Profiles can't share a split."));
+  const int index = tabs_->GetIndexOfWebContents(page);
+  if (tabs_->GetSplitForTab(index))
+    return Remember(Fail("That tab is already in a split. Separate it first."));
+  // Rust validates first: both Today tabs of this Space, neither split.
+  auto result = service_->CreateSplit(active_item, item);
+  if (!result.ok)
+    return Remember(std::move(result));
+  {
+    base::AutoReset<bool> changing(&changing_, true);
+    const auto id = tabs_->AddToNewSplit(
+        {tabs_->active_index(), index},
+        split_tabs::SplitTabVisualData(split_tabs::SplitTabLayout::kSideBySide),
+        split_tabs::SplitTabCreatedSource::kTabContextMenu);
+    const auto* data = tabs_->GetSplitData(id);
+    const auto panes = data ? data->ListTabs()
+                            : std::vector<tabs::TabInterface*>();
+    if (panes.size() == 2 && panes[0]->GetContents() != active)
+      tabs_->ReverseTabsInSplit(id);
+  }
+  OnServiceChanged();
+  return Remember(Ok(item));
+}
+
+foundation::MutationResult BrowserWorkspaceAdapter::SeparateSplit(
+    uint64_t item) {
+  if (!ready())
+    return Fail(error());
+  if (auto* page = LocalPage(*tabs_, item)) {
+    const int index = tabs_->GetIndexOfWebContents(page);
+    if (const auto split = tabs_->GetSplitForTab(index)) {
+      // OnSplitTabChanged separates the pair in Rust too.
+      tabs_->RemoveSplit(*split);
+    }
+  }
+  return Remember(service_->SeparateSplit(item));
+}
+
+foundation::MutationResult BrowserWorkspaceAdapter::FocusSplitPane(int index) {
+  if (!ready())
+    return Fail(error());
+  auto* tab = tabs_->GetActiveTab();
+  const auto split = tab ? tab->GetSplit() : std::nullopt;
+  const auto* data = split ? tabs_->GetSplitData(*split) : nullptr;
+  if (!data)
+    return Fail("The current tab is not in a split.");
+  const auto panes = data->ListTabs();
+  if (index < 0 || index >= static_cast<int>(panes.size()))
+    return Fail("This split has no such pane.");
+  const int target = tabs_->GetIndexOfTab(panes[index]);
+  if (target != tabs_->active_index())
+    tabs_->ActivateTabAt(target);
+  panes[index]->GetContents()->Focus();
+  return Ok(ItemIdForContents(*panes[index]->GetContents()));
+}
+
 BrowserWorkspaceAdapter* BrowserWorkspaceAdapter::ForBrowser(
     BrowserWindowInterface& browser) {
   // Never create Profile runtime state for windows without myArc adapters.
@@ -2293,6 +2482,25 @@ void BrowserWorkspaceAdapter::OnTabChangedAt(tabs::TabInterface*,
                                              TabChangeType) {
   for (const auto& adapter : ForProfile(*profile_).adapters)
     adapter->OnServiceChanged();
+}
+
+void BrowserWorkspaceAdapter::OnSplitTabChanged(const SplitTabChange& change) {
+  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
+  // A closing window keeps its splits for session restore, and so does the
+  // workspace.
+  if (change.type == SplitTabChange::Type::kRemoved && ready() && tabs_ &&
+      !tabs_->closing_all() && !browser_->IsDeleteScheduled() &&
+      !ForProfile(*profile_).shutting_down &&
+      !browser_shutdown::IsTryingToQuit()) {
+    for (const auto& [tab, index] : change.GetRemovedChange()->tabs()) {
+      if (const uint64_t item =
+              tab ? ItemIdForContents(*tab->GetContents()) : 0) {
+        Remember(service_->SeparateSplit(item));
+      }
+    }
+  }
+  bindings_dirty_ = true;
+  OnServiceChanged();
 }
 
 void BrowserWorkspaceAdapter::OnTabStripModelDestroyed(TabStripModel*) {
