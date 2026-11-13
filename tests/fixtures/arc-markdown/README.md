@@ -25,7 +25,7 @@ Tab titles, stable item IDs, canonical-versus-current URL distinctions and expli
 
 The synthetic counterpart has four first-level headings, five second-level groups, 19 URL occurrences and ten distinct URLs. Its first `Favorites` group has one extra URL, preserving an ownership ambiguity worth testing. The other groups share three URL strings. This proves textual repetition, not actual Profile relationships.
 
-The [reader tests](../../../crates/import/tests/arc_markdown.rs) parse this fixture and check those counts. The [mapping tests](../../../crates/import/tests/arc_workspace.rs) import it into a workspace, check every Space and Pin in order, and import it again to show nothing is added twice. Round trips back to Arc are untested. The next evidence needed is a known top-level pin versus favorite case and a nested-folder sample. Producing-build binding remains contextual rather than embedded in the file.
+The [reader tests](../../../crates/import/tests/arc_markdown.rs) parse this fixture and check those counts. The [mapping tests](../../../crates/import/tests/arc_workspace.rs) import it into a workspace, check every Space, folder and Pin in order, and import it again to show nothing is added twice. Round trips back to Arc are untested. The next evidence needed is a known top-level pin versus favorite case and a nested-folder sample. Producing-build binding remains contextual rather than embedded in the file.
 
 ## Reader
 

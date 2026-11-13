@@ -1,7 +1,9 @@
 use myarc_import::arc_markdown::{Report, parse};
-use myarc_import::arc_workspace::{ImportError, Skipped, apply, as_written, entry_urls, preview};
+use myarc_import::arc_workspace::{
+    FolderAddition, ImportError, Skipped, apply, as_written, entry_urls, preview,
+};
 use myarc_workspace::{
-    DEFAULT_PROFILE_ID, MAX_ITEMS, MAX_SPACES, Placement, Workspace, WorkspaceError,
+    DEFAULT_PROFILE_ID, MAX_FOLDERS, MAX_ITEMS, MAX_SPACES, Placement, Workspace, WorkspaceError,
 };
 
 const FIXTURE: &str = include_str!("../../../tests/fixtures/arc-markdown/workspace.md");
@@ -15,7 +17,51 @@ fn import(text: &str, workspace: &mut Workspace) -> Result<(), ImportError> {
     apply(&report, &as_written(&report), workspace).map(|_| ())
 }
 
-/// Space names in order, each with its Pin URLs in sidebar order.
+/// Each Space's folders in order, with their Pin URLs in folder order.
+fn folders(workspace: &Workspace) -> Vec<(String, String, Vec<String>)> {
+    let state = workspace.snapshot();
+    state
+        .folders
+        .iter()
+        .map(|folder| {
+            let space = state
+                .spaces
+                .iter()
+                .find(|space| space.id == folder.space_id)
+                .unwrap();
+            let urls = folder
+                .items
+                .iter()
+                .map(|id| {
+                    let item = state.items.iter().find(|item| item.id == *id).unwrap();
+                    item.canonical_url.clone().unwrap()
+                })
+                .collect();
+            (space.name.clone(), folder.name.clone(), urls)
+        })
+        .collect()
+}
+
+/// Space names in order, each with its ungrouped Pin URLs in sidebar order.
+fn ungrouped(workspace: &Workspace) -> Vec<(String, Vec<String>)> {
+    let state = workspace.snapshot();
+    state
+        .spaces
+        .iter()
+        .map(|space| {
+            let pins = state
+                .items
+                .iter()
+                .filter(|item| item.placement == Placement::Pin { space_id: space.id })
+                .filter(|item| workspace.folder_of(item.id).is_none())
+                .map(|item| item.canonical_url.clone().unwrap_or_default())
+                .collect();
+            (space.name.clone(), pins)
+        })
+        .collect()
+}
+
+/// Space names in order, each with all its Pin URLs in workspace order.
 fn layout(workspace: &Workspace) -> Vec<(String, Vec<String>)> {
     let state = workspace.snapshot();
     state
@@ -38,14 +84,15 @@ fn strings(urls: &[&str]) -> Vec<String> {
 }
 
 #[test]
-fn fixture_becomes_spaces_and_pins_in_arc_order() {
+fn fixture_becomes_spaces_folders_and_pins_in_arc_order() {
     let mut workspace = Workspace::default();
     let report = report(FIXTURE);
     let applied = apply(&report, &as_written(&report), &mut workspace).unwrap();
     assert_eq!(applied.new_space_count(), 4);
+    assert_eq!(applied.new_folder_count(), 1);
     assert_eq!(applied.new_pin_count(), 19);
+    assert_eq!(applied.moved_pin_count(), 0);
     assert_eq!(applied.kept_pin_count(), 0);
-    assert_eq!(applied.flattened_groups, 5);
     assert!(applied.skipped.is_empty());
 
     let favorites = [
@@ -55,16 +102,9 @@ fn fixture_becomes_spaces_and_pins_in_arc_order() {
     ];
     let mut desk = strings(&favorites);
     desk.push("https://example.test/space-only".into());
-    desk.extend(strings(&[
-        "https://docs.example.test/",
-        "https://docs.example.test/start",
-        "https://docs.example.test/keyboard",
-        "https://video.example.test/",
-        "https://notes.example.test/",
-        "https://news.example.test/",
-    ]));
+    // Favorites stay ungrouped Pins, the sidebar's tiles.
     assert_eq!(
-        layout(&workspace),
+        ungrouped(&workspace),
         [
             ("Everyday".to_owned(), vec![]),
             ("Desk".to_owned(), desk),
@@ -73,13 +113,67 @@ fn fixture_becomes_spaces_and_pins_in_arc_order() {
             ("Quiet".to_owned(), strings(&favorites)),
         ]
     );
-    // Favorites stay Space Pins: the export does not mark Profile favorites.
+    assert_eq!(
+        folders(&workspace),
+        [(
+            "Desk".to_owned(),
+            "Reference".to_owned(),
+            strings(&[
+                "https://docs.example.test/",
+                "https://docs.example.test/start",
+                "https://docs.example.test/keyboard",
+                "https://video.example.test/",
+                "https://notes.example.test/",
+                "https://news.example.test/",
+            ])
+        )]
+    );
+    assert!(workspace.folders()[0].open);
+    // The export does not mark Profile favorites, so none are made.
     let state = workspace.snapshot();
     assert!(
         !state
             .items
             .iter()
             .any(|item| matches!(item.placement, Placement::Favorite { .. }))
+    );
+}
+
+#[test]
+fn groups_become_folders_in_export_order_and_empty_ones_stay() {
+    let text = "# Desk\n## Work\n- https://w.test/\n## Empty\n## Play\n- https://p.test/\n- https://q.test/\n";
+    let mut workspace = Workspace::default();
+    import(text, &mut workspace).unwrap();
+    assert_eq!(
+        folders(&workspace),
+        [
+            ("Desk".into(), "Work".into(), strings(&["https://w.test/"])),
+            ("Desk".into(), "Empty".into(), vec![]),
+            (
+                "Desk".into(),
+                "Play".into(),
+                strings(&["https://p.test/", "https://q.test/"])
+            ),
+        ]
+    );
+    assert_eq!(ungrouped(&workspace)[1].1, Vec::<String>::new());
+}
+
+#[test]
+fn groups_sharing_a_name_in_a_space_fill_one_folder() {
+    let text = "# Desk\n## A\n- https://a.test/\n# Desk\n## A\n- https://b.test/\n# Other\n## A\n- https://c.test/\n";
+    let mut workspace = Workspace::default();
+    import(text, &mut workspace).unwrap();
+    assert_eq!(
+        folders(&workspace),
+        [
+            (
+                "Desk".into(),
+                "A".into(),
+                strings(&["https://a.test/", "https://b.test/"])
+            ),
+            ("Other".into(), "A".into(), strings(&["https://c.test/"])),
+        ]
     );
 }
 
@@ -310,4 +404,151 @@ fn empty_export_is_a_noop() {
     let applied = apply(&report, &[], &mut workspace).unwrap();
     assert!(applied.is_noop());
     assert_eq!(workspace.snapshot(), before);
+}
+
+#[test]
+fn reimport_matches_folders_by_name_and_adds_only_missing_pins() {
+    let mut workspace = Workspace::default();
+    import(
+        "# Desk\n## Work\n- https://a.test/\n- https://b.test/\n",
+        &mut workspace,
+    )
+    .unwrap();
+    let work = workspace.folders()[0].id;
+    workspace.set_folder_open(work, false).unwrap();
+    let text = "# Desk\n## Work\n- https://a.test/\n- https://c.test/\n- https://b.test/\n## New\n- https://d.test/\n";
+    let report = report(text);
+    let plan = preview(&report, &as_written(&report), &workspace).unwrap();
+    assert_eq!(plan.new_space_count(), 0);
+    assert_eq!(plan.new_folder_count(), 1);
+    assert_eq!(plan.new_pin_count(), 2);
+    assert_eq!(plan.kept_pin_count(), 2);
+    assert_eq!(plan.spaces[0].folders[0].existing, Some(work));
+    apply(&report, &as_written(&report), &mut workspace).unwrap();
+    // Missing Pins go at the folder's end; the folder keeps its closed state.
+    assert_eq!(
+        folders(&workspace),
+        [
+            (
+                "Desk".into(),
+                "Work".into(),
+                strings(&["https://a.test/", "https://b.test/", "https://c.test/"])
+            ),
+            ("Desk".into(), "New".into(), strings(&["https://d.test/"])),
+        ]
+    );
+    assert!(!workspace.folders()[0].open);
+    let again = preview(&report, &as_written(&report), &workspace).unwrap();
+    assert!(again.is_noop());
+    assert_eq!(again.kept_pin_count(), 4);
+}
+
+#[test]
+fn fixture_reimport_with_folders_is_a_noop() {
+    let mut workspace = Workspace::default();
+    import(FIXTURE, &mut workspace).unwrap();
+    let once = workspace.snapshot();
+    import(FIXTURE, &mut workspace).unwrap();
+    assert_eq!(workspace.snapshot(), once);
+}
+
+#[test]
+fn reimport_moves_pins_of_a_flattened_import_into_their_folder() {
+    // An import from before folders left every URL as an ungrouped Pin.
+    let mut workspace = Workspace::default();
+    let desk = workspace.create_space(DEFAULT_PROFILE_ID, "Desk").unwrap();
+    let mut ids = Vec::new();
+    for url in ["https://fav.test/", "https://a.test/", "https://b.test/"] {
+        let item = workspace.add_temporary_item(desk).unwrap();
+        workspace
+            .set_placement(item, Placement::Pin { space_id: desk }, Some(url))
+            .unwrap();
+        ids.push(item);
+    }
+    let text = "# Desk\n## Favorites\n- https://fav.test/\n## Work\n- https://b.test/\n- https://a.test/\n";
+    let report = report(text);
+    let plan = preview(&report, &as_written(&report), &workspace).unwrap();
+    assert_eq!(plan.new_pin_count(), 0);
+    assert_eq!(plan.moved_pin_count(), 2);
+    assert_eq!(plan.kept_pin_count(), 1);
+    assert_eq!(
+        plan.spaces[0].folders[0].additions,
+        [FolderAddition::Move(ids[2]), FolderAddition::Move(ids[1])]
+    );
+    apply(&report, &as_written(&report), &mut workspace).unwrap();
+    assert_eq!(
+        folders(&workspace),
+        [(
+            "Desk".into(),
+            "Work".into(),
+            strings(&["https://b.test/", "https://a.test/"])
+        )]
+    );
+    assert_eq!(
+        ungrouped(&workspace)[1],
+        ("Desk".into(), strings(&["https://fav.test/"]))
+    );
+    assert_eq!(workspace.items().len(), 3);
+    assert!(
+        preview(&report, &as_written(&report), &workspace)
+            .unwrap()
+            .is_noop()
+    );
+}
+
+#[test]
+fn a_renamed_folder_no_longer_matches() {
+    let mut workspace = Workspace::default();
+    let text = "# Desk\n## Work\n- https://a.test/\n";
+    import(text, &mut workspace).unwrap();
+    let work = workspace.folders()[0].id;
+    workspace.rename_folder(work, "Job").unwrap();
+    import(text, &mut workspace).unwrap();
+    // Folders match by name only, so "Work" comes back beside "Job".
+    assert_eq!(
+        folders(&workspace),
+        [
+            ("Desk".into(), "Job".into(), strings(&["https://a.test/"])),
+            ("Desk".into(), "Work".into(), strings(&["https://a.test/"])),
+        ]
+    );
+}
+
+#[test]
+fn a_pin_the_user_moved_out_of_its_folder_moves_back_in() {
+    let mut workspace = Workspace::default();
+    let text = "# Desk\n## Work\n- https://a.test/\n";
+    import(text, &mut workspace).unwrap();
+    let item = workspace.folders()[0].items[0];
+    workspace.move_pin_to_folder(item, None, None).unwrap();
+    import(text, &mut workspace).unwrap();
+    assert_eq!(workspace.folder_of(item), Some(workspace.folders()[0].id));
+    assert_eq!(workspace.items().len(), 1);
+}
+
+#[test]
+fn too_many_folders_fails_and_changes_nothing() {
+    let mut text = String::from("# Desk\n");
+    for i in 0..=MAX_FOLDERS {
+        text.push_str(&format!("## F{i}\n"));
+    }
+    let mut workspace = Workspace::default();
+    let before = workspace.snapshot();
+    let error = import(&text, &mut workspace).unwrap_err();
+    assert_eq!(
+        error,
+        ImportError::Workspace(WorkspaceError::LimitExceeded("folders"))
+    );
+    assert_eq!(workspace.snapshot(), before);
+}
+
+#[test]
+fn long_group_labels_are_cut_to_the_folder_name_limit() {
+    let label = "é".repeat(100);
+    let text = format!("# Desk\n## {label}\n- https://a.test/\n");
+    let mut workspace = Workspace::default();
+    import(&text, &mut workspace).unwrap();
+    import(&text, &mut workspace).unwrap();
+    assert_eq!(workspace.folders().len(), 1);
+    assert_eq!(workspace.folders()[0].name, "é".repeat(64));
 }
