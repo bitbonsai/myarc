@@ -142,6 +142,46 @@ inline constexpr gfx::VectorIcon kChevronDownIcon(kChevronDownRep,
                                                   std::size(kChevronDownRep),
                                                   "myarc_chevron_down");
 
+// Sidebar folder rows: "folder" while closed, "folder-open" while open, and
+// "chevron-right" beside "chevron-down" as the disclosure arrow.
+inline constexpr gfx::PathElement kFolderClosedPath[] = {
+    gfx::CANVAS_DIMENSIONS, 24, gfx::STROKE, 2,
+    gfx::MOVE_TO, 20, 20, gfx::ARC_TO, 2, 2, 0, 0, 0, 22, 18,
+    gfx::LINE_TO, 22, 8, gfx::ARC_TO, 2, 2, 0, 0, 0, 20, 6,
+    gfx::LINE_TO, 12.1f, 6, gfx::ARC_TO, 2, 2, 0, 0, 1, 10.41f, 5.1f,
+    gfx::LINE_TO, 9.6f, 3.9f, gfx::ARC_TO, 2, 2, 0, 0, 0, 7.93f, 3,
+    gfx::LINE_TO, 4, 3, gfx::ARC_TO, 2, 2, 0, 0, 0, 2, 5,
+    gfx::LINE_TO, 2, 18, gfx::ARC_TO, 2, 2, 0, 0, 0, 4, 20,
+    gfx::CLOSE};
+inline constexpr gfx::VectorIconRep kFolderClosedRep[] = {{kFolderClosedPath}};
+inline constexpr gfx::VectorIcon kFolderClosedIcon(kFolderClosedRep,
+                                                   std::size(kFolderClosedRep),
+                                                   "myarc_folder");
+
+inline constexpr gfx::PathElement kFolderOpenPath[] = {
+    gfx::CANVAS_DIMENSIONS, 24, gfx::STROKE, 2,
+    gfx::MOVE_TO, 6, 14, gfx::LINE_TO, 7.5f, 11.1f,
+    gfx::ARC_TO, 2, 2, 0, 0, 1, 9.24f, 10, gfx::LINE_TO, 20, 10,
+    gfx::ARC_TO, 2, 2, 0, 0, 1, 21.94f, 12.5f, gfx::LINE_TO, 20.4f, 18.5f,
+    gfx::ARC_TO, 2, 2, 0, 0, 1, 18.45f, 20, gfx::LINE_TO, 4, 20,
+    gfx::ARC_TO, 2, 2, 0, 0, 1, 2, 18, gfx::LINE_TO, 2, 5,
+    gfx::ARC_TO, 2, 2, 0, 0, 1, 4, 3, gfx::LINE_TO, 7.9f, 3,
+    gfx::ARC_TO, 2, 2, 0, 0, 1, 9.59f, 3.9f, gfx::LINE_TO, 10.4f, 5.1f,
+    gfx::ARC_TO, 2, 2, 0, 0, 0, 12.07f, 6, gfx::LINE_TO, 18, 6,
+    gfx::ARC_TO, 2, 2, 0, 0, 1, 20, 8, gfx::LINE_TO, 20, 10};
+inline constexpr gfx::VectorIconRep kFolderOpenRep[] = {{kFolderOpenPath}};
+inline constexpr gfx::VectorIcon kFolderOpenIcon(kFolderOpenRep,
+                                                 std::size(kFolderOpenRep),
+                                                 "myarc_folder_open");
+
+inline constexpr gfx::PathElement kChevronRightPath[] = {
+    gfx::CANVAS_DIMENSIONS, 24, gfx::STROKE, 2, gfx::MOVE_TO, 9, 18,
+    gfx::LINE_TO, 15, 12, gfx::LINE_TO, 9, 6};
+inline constexpr gfx::VectorIconRep kChevronRightRep[] = {{kChevronRightPath}};
+inline constexpr gfx::VectorIcon kChevronRightIcon(kChevronRightRep,
+                                                   std::size(kChevronRightRep),
+                                                   "myarc_chevron_right");
+
 inline constexpr gfx::PathElement kBrushPath[] = {
     gfx::CANVAS_DIMENSIONS, 24, gfx::STROKE, 2,
     gfx::MOVE_TO, 11, 10, gfx::R_LINE_TO, 3, 3,

@@ -87,11 +87,15 @@ Done: end-to-end local use, source integrity hashes, explicit omitted fields, ca
 First end-to-end slice, shipped 2026-11-13. Settings > Advanced > Import from Arc… picks an Arc Markdown export, reads it off the UI sequence and shows a preview: Spaces and pinned tabs it adds, pinned tabs already present, links left out and lines it couldn't read, each with line numbers. Import writes into the Profile's Rust workspace; Cancel writes nothing. `myarc_import::arc_workspace` owns the mapping and its tests.
 
 - Each `#` Space becomes a Space and each URL a Pin of that Space, in document order. The browser canonicalizes URLs first and leaves out the ones it rejects.
-- Groups flatten into Pins because the workspace has no folders yet. `Favorites` stays a Space Pin group, since the export doesn't distinguish Profile favorites from Space pins.
-- A re-import reuses Spaces by name (never the Agent Space) and keeps Pins the Space already has, counted per URL. Nothing is added twice.
+- Each `##` group becomes a folder of its Space's Pins, named after the group, in Arc's order (MA-006.b). `Favorites` groups stay ungrouped Pins, which the sidebar draws as tiles, since the export doesn't distinguish Profile favorites from Space pins.
+- A re-import reuses Spaces by name (never the Agent Space) and folders by name within the Space, and keeps Pins already in place, counted per URL. A group's URL that the Space pins outside any folder moves into the folder, which tidies up an import made before folders. Nothing is added twice.
 - Every import is rehearsed on a copy first, so a failure such as the 64-Space or 1,024-item limit changes nothing. No tab opens and nothing is fetched; saved-tile icons load later as they already do.
 
-Still open for MA-006: folders, source integrity hashes, an import receipt, the bookmark HTML export, and a separate preservation CLI.
+### MA-006.b: Folders
+
+Shipped 2026-11-13. `myarc_workspace::folder` adds folders to a Space's Pins: create, rename, reorder, delete, move a Pin in or out, and an open or closed state saved with the workspace. Deleting a folder deletes its Pins, as Arc does, and archives the ones with no open page; a Pin with an open page stays open as a Today tab. The sidebar draws each folder as a row with a folder icon and a disclosure arrow under the Space title, with its Pins as rows beneath while it's open. The Space title's menu has New Folder, a folder row's menu has Rename Folder…, New Folder and Delete Folder…, and a Pin or Today tab's menu has Move to Folder and Remove from Folder.
+
+Still open for MA-006: nested folders, Favorites told apart from Space pins, source integrity hashes, an import receipt, the bookmark HTML export, and a separate preservation CLI.
 
 ## MA-007 — Complete one real browsing journey
 

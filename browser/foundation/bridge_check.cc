@@ -857,6 +857,74 @@ bool CheckAutoArchive() {
          lenient.snapshot->items[0].last_viewed_secs == 0;
 }
 
+// Folders, their Pins' order and their closed state survive the JSON codec
+// and a restore. Files from before folders, and a damaged folder, load with
+// the Pins ungrouped.
+bool CheckFolders() {
+  using namespace myarc::foundation;
+  using myarc::internal::DecodeWorkspaceMetadata;
+  using myarc::internal::EncodeWorkspaceMetadata;
+  auto model = new_workspace();
+  const auto plain = EncodeWorkspaceMetadata(export_snapshot(*model));
+  auto plain_root = plain ? base::JSONReader::ReadDict(*plain,
+                                                       base::JSON_PARSE_RFC)
+                          : std::nullopt;
+  if (!plain_root || plain_root->contains("folders"))
+    return false;
+  auto folder = create_folder(*model, 1, "Reading");
+  std::vector<uint64_t> pins;
+  for (const char* url : {"https://a.test/", "https://b.test/"}) {
+    auto item = add_temporary_item(*model, 1);
+    if (!item.ok ||
+        !set_placement(*model, item.id, PlacementKind::Pin, 1, true, url).ok ||
+        !move_pin_to_folder(*model, item.id, folder.id, pins.empty() ? 0 : pins[0])
+             .ok) {
+      return false;
+    }
+    pins.push_back(item.id);
+  }
+  if (!folder.ok || set_folder_open(*model, folder.id, false).id != 1 ||
+      set_folder_open(*model, folder.id, false).id != 0) {
+    return false;
+  }
+  const auto encoded = EncodeWorkspaceMetadata(export_snapshot(*model));
+  auto decoded = encoded ? DecodeWorkspaceMetadata(*encoded)
+                         : myarc::internal::MetadataResult{};
+  auto restored = new_workspace();
+  if (!decoded.snapshot ||
+      !restore_snapshot(*restored, std::move(*decoded.snapshot)).ok) {
+    return false;
+  }
+  auto sidebar = sidebar_snapshot(*restored, 1);
+  if (!sidebar.ok || sidebar.folders.size() != 1 ||
+      sidebar.folders[0].name != "Reading" || sidebar.folders[0].open ||
+      sidebar.folders[0].items.size() != 2 ||
+      sidebar.folders[0].items[0] != pins[1] ||
+      sidebar.folders[0].items[1] != pins[0] || sidebar.pins.size() != 2) {
+    return false;
+  }
+  // A damaged folder is dropped and its Pins load ungrouped.
+  auto root = base::JSONReader::ReadDict(*encoded, base::JSON_PARSE_RFC);
+  auto* folders = root ? root->FindList("folders") : nullptr;
+  if (!folders || folders->size() != 1)
+    return false;
+  (*folders)[0].GetDict().Set("space_id", "x");
+  const auto bad = base::WriteJson(*root);
+  auto lenient = bad ? DecodeWorkspaceMetadata(*bad)
+                     : myarc::internal::MetadataResult{};
+  auto fallback = new_workspace();
+  if (!lenient.snapshot || !lenient.snapshot->folders.empty() ||
+      !restore_snapshot(*fallback, std::move(*lenient.snapshot)).ok ||
+      sidebar_snapshot(*fallback, 1).pins.size() != 2) {
+    return false;
+  }
+  // Deleting the folder deletes and archives its Pins.
+  auto deleted = delete_folder(*restored, folder.id, true, 100);
+  return deleted.ok && deleted.id == 2 &&
+         sidebar_snapshot(*restored, 1).pins.empty() &&
+         archived_tabs(*restored, 100).size() == 2;
+}
+
 // The "Archive tabs after" choice survives the JSON codec, the 12-hour default
 // stays unwritten, a bad value reads as the default, and the pass uses the
 // choice. Clear Archive empties the archive and the empty archive persists.
@@ -1187,13 +1255,17 @@ int main() {
     std::cerr << "Agent Space checks failed\n";
     return 24;
   }
+  if (!CheckFolders()) {
+    std::cerr << "Folder checks failed\n";
+    return 25;
+  }
   std::cout
       << "7 legacy C++/Rust checks passed, including 1000 ownership "
          "round trips; workspace transitions, Space 1 deletion and "
          "metadata codec, saved title, Archived Tabs, Auto Archive, "
          "archive timer, Clear Archive, downloads stack, dormant "
          "temporary item, Space reorder, Space icon, Space theme, first "
-         "Space, Spaces index and agent Space checks "
+         "Space, Spaces index, agent Space and folder checks "
          "passed\n";
   return 0;
 }

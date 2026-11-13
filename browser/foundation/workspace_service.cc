@@ -253,6 +253,26 @@ std::optional<std::string> EncodeWorkspaceMetadata(
     }
     root.Set("archived", std::move(archived));
   }
+  // Older builds ignore folders, which then show their Pins ungrouped; write
+  // the keys only when there are folders.
+  if (!snapshot.folders.empty()) {
+    base::ListValue folders;
+    for (const auto& folder : snapshot.folders) {
+      base::DictValue record;
+      record.Set("id", base::NumberToString(folder.id));
+      record.Set("space_id", base::NumberToString(folder.space_id));
+      record.Set("name", std::string(folder.name));
+      record.Set("open", folder.open);
+      base::ListValue pins;
+      for (const uint64_t item : folder.items) {
+        pins.Append(base::NumberToString(item));
+      }
+      record.Set("items", std::move(pins));
+      folders.Append(std::move(record));
+    }
+    root.Set("folders", std::move(folders));
+    root.Set("next_folder_id", base::NumberToString(snapshot.next_folder_id));
+  }
   // Builds without Auto Archive reject the key, so write it only when set.
   if (snapshot.open_secs)
     root.Set("open_secs", base::NumberToString(snapshot.open_secs));
@@ -417,6 +437,37 @@ MetadataResult DecodeWorkspaceMetadata(std::string_view json) {
       tab.url = *url;
       tab.title = *title;
       snapshot.archived.push_back(std::move(tab));
+    }
+  }
+  // Files written before folders have none. A bad folder or entry is dropped
+  // rather than failing the file, and its Pins show ungrouped; Rust restore
+  // drops what this misses.
+  snapshot.next_folder_id = 1;
+  if (const auto* folders = root->FindList("folders")) {
+    if (!ReadId(*root, "next_folder_id", snapshot.next_folder_id))
+      snapshot.next_folder_id = 1;
+    for (const auto& value : *folders) {
+      if (snapshot.folders.size() >= limits.folders)
+        break;
+      const auto* record = value.GetIfDict();
+      const auto* name = record ? record->FindString("name") : nullptr;
+      const auto* entries = record ? record->FindList("items") : nullptr;
+      foundation::FolderRecord folder;
+      if (!record || !name || !BoundedText(*name, limits.name_bytes) ||
+          !entries || entries->size() > limits.items ||
+          !ReadId(*record, "id", folder.id) ||
+          !ReadId(*record, "space_id", folder.space_id)) {
+        continue;
+      }
+      folder.name = *name;
+      folder.open = record->FindBool("open").value_or(true);
+      for (const auto& entry : *entries) {
+        uint64_t item = 0;
+        const auto* text = entry.GetIfString();
+        if (text && base::StringToUint64(*text, &item) && item)
+          folder.items.push_back(item);
+      }
+      snapshot.folders.push_back(std::move(folder));
     }
   }
   if (!CanonicalizeUrls(snapshot))
@@ -987,6 +1038,61 @@ foundation::MutationResult WorkspaceService::MoveItemBefore(uint64_t item,
   return Changed(foundation::move_item_before(*workspace_, item, before));
 }
 
+foundation::MutationResult WorkspaceService::CreateFolder(
+    uint64_t space,
+    std::string_view name) {
+  if (!CanMutate())
+    return Failure("Workspace is not loaded. Check storage state.");
+  if (!BoundedText(name, foundation::bridge_limits().name_bytes))
+    return Failure("Invalid UTF-8 or oversized folder name.");
+  return Changed(foundation::create_folder(
+      *workspace_, space, rust::Str(name.data(), name.size())));
+}
+
+foundation::MutationResult WorkspaceService::RenameFolder(
+    uint64_t folder,
+    std::string_view name) {
+  if (!CanMutate())
+    return Failure("Workspace is not loaded. Check storage state.");
+  if (!BoundedText(name, foundation::bridge_limits().name_bytes))
+    return Failure("Invalid UTF-8 or oversized folder name.");
+  return Changed(foundation::rename_folder(
+      *workspace_, folder, rust::Str(name.data(), name.size())));
+}
+
+foundation::MutationResult WorkspaceService::SetFolderOpen(uint64_t folder,
+                                                           bool open) {
+  if (!CanMutate())
+    return Failure("Workspace is not loaded. Check storage state.");
+  auto result = foundation::set_folder_open(*workspace_, folder, open);
+  return result.ok && !result.id ? result : Changed(std::move(result));
+}
+
+foundation::MutationResult WorkspaceService::MoveFolderBefore(uint64_t folder,
+                                                              uint64_t before) {
+  if (!CanMutate())
+    return Failure("Workspace is not loaded. Check storage state.");
+  return Changed(foundation::move_folder_before(*workspace_, folder, before));
+}
+
+foundation::MutationResult WorkspaceService::MovePinToFolder(uint64_t item,
+                                                             uint64_t folder,
+                                                             uint64_t before) {
+  if (!CanMutate())
+    return Failure("Workspace is not loaded. Check storage state.");
+  return Changed(
+      foundation::move_pin_to_folder(*workspace_, item, folder, before));
+}
+
+foundation::MutationResult WorkspaceService::DeleteFolder(uint64_t folder,
+                                                          bool archive) {
+  if (!CanMutate())
+    return Failure("Workspace is not loaded. Check storage state.");
+  // Private browsing keeps no history, so it archives nothing.
+  return Changed(foundation::delete_folder(*workspace_, folder,
+                                           archive && !ephemeral_, NowSecs()));
+}
+
 foundation::MutationResult WorkspaceService::MoveSpaceBefore(uint64_t space,
                                                              uint64_t before) {
   if (!CanMutate()) {
@@ -1067,8 +1173,10 @@ foundation::ArcImportPreview WorkspaceService::ApplyArcImport(
   if (!CanMutate())
     return PreviewArcImport(export_data);
   auto result = foundation::apply_arc_import(*workspace_, export_data);
-  if (result.ok && (result.new_spaces || result.new_pins))
+  if (result.ok && (result.new_spaces || result.new_pins ||
+                    result.new_folders || result.moved_pins)) {
     SpacesChanged({true, 0, rust::String()});
+  }
   return result;
 }
 

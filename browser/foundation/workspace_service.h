@@ -174,6 +174,23 @@ class WorkspaceService final : public base::SupportsUserData::Data {
   foundation::MutationResult MoveSpaceBefore(uint64_t space, uint64_t before);
   foundation::MutationResult ReconcileLiveItems(
       base::span<const uint64_t> live);
+  // Folders of a Space's Pins. Create returns the folder's ID and opens it.
+  foundation::MutationResult CreateFolder(uint64_t space, std::string_view name);
+  foundation::MutationResult RenameFolder(uint64_t folder,
+                                          std::string_view name);
+  // `id` is 1 when the state changed, else 0. Saved like any change, so the
+  // state survives a relaunch.
+  foundation::MutationResult SetFolderOpen(uint64_t folder, bool open);
+  // Zero before moves the folder to the end of its Space's folders.
+  foundation::MutationResult MoveFolderBefore(uint64_t folder, uint64_t before);
+  // Zero folder takes the Pin out of its folder; zero before appends.
+  foundation::MutationResult MovePinToFolder(uint64_t item,
+                                             uint64_t folder,
+                                             uint64_t before);
+  // Deletes the folder and its Pins, archiving them with `archive` unless
+  // this Profile is off the record. `id` is how many were archived. The
+  // caller confirms first and closes the Pins' live pages.
+  foundation::MutationResult DeleteFolder(uint64_t folder, bool archive);
   foundation::SidebarResult Sidebar(uint64_t window) const;
   std::optional<foundation::StateSnapshot> ExportSnapshot() const;
   foundation::MutationResult RestoreSnapshot(

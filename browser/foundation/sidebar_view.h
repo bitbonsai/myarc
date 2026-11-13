@@ -37,6 +37,7 @@ class ScrollView;
 }  // namespace views
 
 namespace myarc::foundation {
+struct FolderRecord;
 struct ItemRecord;
 struct SidebarResult;
 }  // namespace myarc::foundation
@@ -145,6 +146,15 @@ class SidebarView final : public views::View,
     // Returns false when the workspace rejected the change.
     virtual bool DropFavorite(uint64_t item_id, uint64_t before_id) = 0;
     virtual void UnsaveItem(uint64_t item_id) = 0;
+    // Folders of the current Space's Pins. The parent names a new folder
+    // and lets the user rename it, confirms a delete, and reports errors.
+    virtual void CreateFolder() = 0;
+    virtual void RenameFolder(uint64_t folder_id) = 0;
+    virtual void DeleteFolder(uint64_t folder_id) = 0;
+    virtual void SetFolderOpen(uint64_t folder_id, bool open) = 0;
+    // Pins `item_id` first if needed. Zero `folder_id` takes it out of its
+    // folder.
+    virtual void MovePinToFolder(uint64_t item_id, uint64_t folder_id) = 0;
     virtual void SelectSpace(uint64_t space_id) = 0;
     // A footer glyph of another Profile's Space was pressed.
     virtual void SwitchToSpaceInProfile(const std::string& profile_dir,
@@ -263,6 +273,8 @@ class SidebarView final : public views::View,
     kActivate,
     kClose,
     kRename,
+    // A folder row; the id is the folder.
+    kFolder,
     kNewTab,
     kClearToday,
     kSpaces,
@@ -280,6 +292,8 @@ class SidebarView final : public views::View,
     bool is_live;
     // The saved or current URL Copy Link writes; empty without one.
     std::u16string url;
+    // The folder holding the Pin, or 0.
+    uint64_t folder = 0;
     bool operator==(const ItemMenuState&) const = default;
   };
   struct FocusTarget {
@@ -344,7 +358,12 @@ class SidebarView final : public views::View,
   ItemPresentation Present(const foundation::ItemRecord& item) const;
   std::unique_ptr<views::View> MakeItem(const foundation::ItemRecord& item,
                                         bool tile,
-                                        bool selected);
+                                        bool selected,
+                                        uint64_t folder = 0);
+  // A folder's row, which opens or closes it.
+  std::unique_ptr<views::View> MakeFolder(const foundation::FolderRecord& folder);
+  // Runs the menu built in `menu_model_` at `point`.
+  void RunMenu(const gfx::Point& point, ui::mojom::MenuSourceType source_type);
   // The divider above Today, with Clear closing `today`.
   std::unique_ptr<views::View> MakeTodayDivider(std::vector<uint64_t> today);
 
@@ -377,6 +396,14 @@ class SidebarView final : public views::View,
   std::optional<SpaceTheme> space_theme_;
   uint64_t menu_space_id_ = 0;
   uint64_t menu_item_id_ = 0;
+  // The folder whose row menu is open, or 0.
+  uint64_t menu_folder_id_ = 0;
+  // The current Space's folders, for the Move to Folder menu.
+  struct FolderEntry {
+    uint64_t id = 0;
+    std::u16string name;
+  };
+  std::vector<FolderEntry> folders_;
   std::vector<SpaceEntry> spaces_;
   std::vector<OtherSpaceEntry> other_spaces_;
   // The same Spaces with their Pins, for the Library's cards.
@@ -386,6 +413,10 @@ class SidebarView final : public views::View,
   ItemMenuState menu_state_ = {};
   // Stable sidebar owns both; no menu callback or anchor retains a child row.
   // Runner must be destroyed before its model and before children.
+  // Move to Folder's submenu of `menu_model_`, which outlives it, and the
+  // folder each of its entries names.
+  std::unique_ptr<ui::SimpleMenuModel> folder_menu_model_;
+  std::vector<uint64_t> menu_folder_ids_;
   std::unique_ptr<ui::SimpleMenuModel> menu_model_;
   std::unique_ptr<views::MenuRunner> menu_runner_;
   bool create_menu_open_ = false;

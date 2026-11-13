@@ -180,6 +180,18 @@ class BrowserWorkspaceAdapter final : public TabStripModelObserver {
   foundation::MutationResult Unsave(uint64_t item);
   foundation::MutationResult MoveItemBefore(uint64_t item, uint64_t before);
   foundation::MutationResult MoveSpaceBefore(uint64_t space, uint64_t before);
+  // Folders of this window's current Space. `id` is the new folder.
+  foundation::MutationResult CreateFolder(std::string_view name);
+  foundation::MutationResult RenameFolder(uint64_t folder,
+                                          std::string_view name);
+  foundation::MutationResult SetFolderOpen(uint64_t folder, bool open);
+  // Pins a temporary item here first. Zero folder takes a Pin out of its
+  // folder.
+  foundation::MutationResult MovePinToFolder(uint64_t item, uint64_t folder);
+  // Deletes the folder and archives its dormant Pins. A Pin with a live page
+  // keeps it open as a temporary tab of its Space instead, so no page loses
+  // its row. `id` is how many Pins were archived.
+  foundation::MutationResult DeleteFolder(uint64_t folder);
 
   // Keyboard commands over Rust's sidebar order: Favorites, Pins, then
   // temporary items, and Spaces in footer order. Index -1 means the last row;

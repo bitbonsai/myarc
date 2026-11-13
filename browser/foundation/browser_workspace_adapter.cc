@@ -101,6 +101,11 @@ bool g_agent_space_hook_done = false;
 constexpr char kMyarcTestImportArc[] = "myarc-test-import-arc";
 constexpr char kMyarcTestImportArcConfirm[] = "myarc-test-import-arc-confirm";
 bool g_import_arc_hook_done = false;
+// Closes every folder of the first window's Space once its workspace is
+// ready, through the same path as pressing each folder row, for captures of
+// the closed state and of it surviving a relaunch.
+constexpr char kMyarcTestCloseFolders[] = "myarc-test-close-folders";
+bool g_close_folders_hook_done = false;
 #endif  // BUILDFLAG(MYARC_TEST_HOOKS)
 
 const char kRuntimeKey = 0;
@@ -1447,6 +1452,20 @@ void BrowserWorkspaceAdapter::Refresh() {
                             command_line->GetSwitchValuePath(kMyarcTestImportArc),
                             std::move(confirmed));
   }
+  if (ready() && !g_close_folders_hook_done &&
+      command_line->HasSwitch(kMyarcTestCloseFolders)) {
+    g_close_folders_hook_done = true;
+    base::SingleThreadTaskRunner::GetCurrentDefault()->PostTask(
+        FROM_HERE, base::BindOnce(
+                       [](base::WeakPtr<BrowserWorkspaceAdapter> adapter) {
+                         if (!adapter || !adapter->ready())
+                           return;
+                         const auto sidebar = adapter->Sidebar();
+                         for (const auto& folder : sidebar.folders)
+                           adapter->SetFolderOpen(folder.id, false);
+                       },
+                       weak_factory_.GetWeakPtr()));
+  }
 #endif  // BUILDFLAG(MYARC_TEST_HOOKS)
   changed_.Notify();
 }
@@ -1943,6 +1962,68 @@ foundation::MutationResult BrowserWorkspaceAdapter::MoveSpaceBefore(
     uint64_t before) {
   return Remember(ready() ? service_->MoveSpaceBefore(space, before)
                           : Fail(error()));
+}
+
+foundation::MutationResult BrowserWorkspaceAdapter::CreateFolder(
+    std::string_view name) {
+  if (!ready())
+    return Fail(error());
+  const auto sidebar = Sidebar();
+  if (!sidebar.ok)
+    return Fail("Workspace window is not ready.");
+  return Remember(service_->CreateFolder(sidebar.current_space.id, name));
+}
+foundation::MutationResult BrowserWorkspaceAdapter::RenameFolder(
+    uint64_t folder,
+    std::string_view name) {
+  return Remember(ready() ? service_->RenameFolder(folder, name)
+                          : Fail(error()));
+}
+foundation::MutationResult BrowserWorkspaceAdapter::SetFolderOpen(
+    uint64_t folder,
+    bool open) {
+  return Remember(ready() ? service_->SetFolderOpen(folder, open)
+                          : Fail(error()));
+}
+foundation::MutationResult BrowserWorkspaceAdapter::MovePinToFolder(
+    uint64_t item,
+    uint64_t folder) {
+  if (!ready())
+    return Fail(error());
+  auto state = service_->ExportSnapshot();
+  const auto* row = state ? FindItem(*state, item) : nullptr;
+  if (!row)
+    return Fail("Workspace item does not exist.");
+  if (folder && row->placement != foundation::PlacementKind::Pin) {
+    auto pinned = Pin(item);
+    if (!pinned.ok)
+      return pinned;
+  }
+  return Remember(service_->MovePinToFolder(item, folder, 0));
+}
+foundation::MutationResult BrowserWorkspaceAdapter::DeleteFolder(
+    uint64_t folder) {
+  if (!ready())
+    return Fail(error());
+  // Unpinning a live Pin keeps its page as a temporary tab, which also takes
+  // it out of the folder.
+  auto state = service_->ExportSnapshot();
+  if (!state)
+    return Fail(error());
+  const auto record = std::ranges::find(state->folders, folder,
+                                        &foundation::FolderRecord::id);
+  if (record == state->folders.end())
+    return Fail("Folder does not exist.");
+  for (const uint64_t item : record->items) {
+    if (Count(*profile_, item)) {
+      auto result = Unsave(item);
+      if (!result.ok)
+        return result;
+    }
+  }
+  const bool archive =
+      !profile_->GetPrefs()->GetBoolean(prefs::kSavingBrowserHistoryDisabled);
+  return Remember(service_->DeleteFolder(folder, archive));
 }
 
 BrowserWorkspaceAdapter* BrowserWorkspaceAdapter::ForBrowser(

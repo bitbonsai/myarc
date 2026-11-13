@@ -99,6 +99,16 @@ mod ffi {
         last_viewed_secs: u64,
     }
 
+    // A folder of a Space's Pins. `items` are Pins of `space_id` in folder
+    // order; a closed folder shows only its row.
+    struct FolderRecord {
+        id: u64,
+        space_id: u64,
+        name: String,
+        open: bool,
+        items: Vec<u64>,
+    }
+
     struct WindowRecord {
         id: u64,
         space_id: u64,
@@ -139,6 +149,10 @@ mod ffi {
         // "Archive tabs after" in seconds. Restore reads anything but the
         // four choices as the 12-hour default.
         archive_interval_secs: u64,
+        // Folders in display order within each Space. Restore drops a bad
+        // folder or entry rather than failing; its Pins show ungrouped.
+        folders: Vec<FolderRecord>,
+        next_folder_id: u64,
     }
 
     struct SidebarResult {
@@ -153,6 +167,9 @@ mod ffi {
         temporary: Vec<ItemRecord>,
         // Every Space's Pins in workspace order; `owner_id` is the Space.
         space_pins: Vec<ItemRecord>,
+        // The current Space's folders in order. Their Pins are in `pins` too;
+        // the rest of `pins` is ungrouped.
+        folders: Vec<FolderRecord>,
     }
 
     struct BridgeLimits {
@@ -165,6 +182,7 @@ mod ffi {
         icon_bytes: usize,
         url_bytes: usize,
         title_bytes: usize,
+        folders: usize,
     }
 
     // What the browser does for a control request once the core checked it.
@@ -316,10 +334,14 @@ mod ffi {
         spaces: usize,
         new_spaces: usize,
         new_pins: usize,
-        // Entries already pinned in their Space, left alone.
+        // Entries already pinned in their place, left alone.
         kept_pins: usize,
-        // Groups whose label is dropped, since Pins have no folders yet.
-        flattened_groups: usize,
+        // Folders the import creates, one per new group name in a Space.
+        new_folders: usize,
+        // Folders it adds to that already exist.
+        kept_folders: usize,
+        // Ungrouped Pins it moves into the folder their group names.
+        moved_pins: usize,
         skipped_count: usize,
         // "Line 12: file:///…" for entries that are not imported.
         skipped: Vec<String>,
@@ -483,6 +505,35 @@ mod ffi {
             before: u64,
         ) -> MutationResult;
         fn reconcile_live_items(workspace: &mut Workspace, live: &[u64]) -> MutationResult;
+        // A new open folder after the Space's others; `id` is the folder.
+        fn create_folder(workspace: &mut Workspace, space_id: u64, name: &str) -> MutationResult;
+        fn rename_folder(workspace: &mut Workspace, folder_id: u64, name: &str) -> MutationResult;
+        // `id` is 1 when the state changed, else 0.
+        fn set_folder_open(workspace: &mut Workspace, folder_id: u64, open: bool)
+        -> MutationResult;
+        // Zero before means the end of the Space's folders.
+        fn move_folder_before(
+            workspace: &mut Workspace,
+            folder_id: u64,
+            before: u64,
+        ) -> MutationResult;
+        // Zero folder takes the Pin out of its folder; zero before appends.
+        fn move_pin_to_folder(
+            workspace: &mut Workspace,
+            item_id: u64,
+            folder_id: u64,
+            before: u64,
+        ) -> MutationResult;
+        // Deletes the folder and its Pins. With `archive`, each Pin goes to
+        // Archived Tabs at `now_secs`; never for off-the-record Profiles or
+        // when the Profile saves no history. `id` is how many were archived.
+        // The caller confirms first and closes the Pins' live pages.
+        fn delete_folder(
+            workspace: &mut Workspace,
+            folder_id: u64,
+            archive: bool,
+            now_secs: u64,
+        ) -> MutationResult;
         fn sidebar_snapshot(workspace: &Workspace, window_id: u64) -> SidebarResult;
         fn export_snapshot(workspace: &Workspace) -> StateSnapshot;
         fn restore_snapshot(workspace: &mut Workspace, snapshot: StateSnapshot) -> MutationResult;
@@ -704,7 +755,9 @@ fn arc_import_result(
         new_spaces: 0,
         new_pins: 0,
         kept_pins: 0,
-        flattened_groups: 0,
+        new_folders: 0,
+        kept_folders: 0,
+        moved_pins: 0,
         skipped_count: 0,
         skipped: Vec::new(),
         unrecognized_count: unrecognized.len(),
@@ -739,7 +792,14 @@ fn arc_import_result(
             preview.new_spaces = plan.new_space_count();
             preview.new_pins = plan.new_pin_count();
             preview.kept_pins = plan.kept_pin_count();
-            preview.flattened_groups = plan.flattened_groups;
+            preview.new_folders = plan.new_folder_count();
+            preview.kept_folders = plan
+                .spaces
+                .iter()
+                .flat_map(|space| &space.folders)
+                .filter(|folder| folder.existing.is_some())
+                .count();
+            preview.moved_pins = plan.moved_pin_count();
             preview.skipped_count = plan.skipped.len();
             preview.skipped = plan
                 .skipped
@@ -792,6 +852,7 @@ pub fn bridge_limits() -> ffi::BridgeLimits {
         icon_bytes: workspace::MAX_SPACE_ICON_BYTES,
         url_bytes: workspace::MAX_URL_BYTES,
         title_bytes: workspace::MAX_TITLE_BYTES,
+        folders: workspace::MAX_FOLDERS,
     }
 }
 
@@ -1217,6 +1278,77 @@ pub fn reconcile_live_items(workspace: &mut Workspace, live: &[u64]) -> ffi::Mut
     outcome(workspace.0.reconcile_live_items(live).map(|()| 0))
 }
 
+pub fn create_folder(workspace: &mut Workspace, space_id: u64, name: &str) -> ffi::MutationResult {
+    outcome(workspace.0.create_folder(space_id, name))
+}
+
+pub fn rename_folder(workspace: &mut Workspace, folder_id: u64, name: &str) -> ffi::MutationResult {
+    outcome(workspace.0.rename_folder(folder_id, name).map(|()| 0))
+}
+
+pub fn set_folder_open(
+    workspace: &mut Workspace,
+    folder_id: u64,
+    open: bool,
+) -> ffi::MutationResult {
+    outcome(workspace.0.set_folder_open(folder_id, open).map(u64::from))
+}
+
+pub fn move_folder_before(
+    workspace: &mut Workspace,
+    folder_id: u64,
+    before: u64,
+) -> ffi::MutationResult {
+    outcome(
+        workspace
+            .0
+            .move_folder_before(folder_id, (before != 0).then_some(before))
+            .map(|()| 0),
+    )
+}
+
+pub fn move_pin_to_folder(
+    workspace: &mut Workspace,
+    item_id: u64,
+    folder_id: u64,
+    before: u64,
+) -> ffi::MutationResult {
+    outcome(
+        workspace
+            .0
+            .move_pin_to_folder(
+                item_id,
+                (folder_id != 0).then_some(folder_id),
+                (before != 0).then_some(before),
+            )
+            .map(|()| 0),
+    )
+}
+
+pub fn delete_folder(
+    workspace: &mut Workspace,
+    folder_id: u64,
+    archive: bool,
+    now_secs: u64,
+) -> ffi::MutationResult {
+    outcome(
+        workspace
+            .0
+            .delete_folder(folder_id, archive.then_some(now_secs))
+            .map(|deletion| deletion.archived as u64),
+    )
+}
+
+fn folder_record(folder: workspace::Folder) -> ffi::FolderRecord {
+    ffi::FolderRecord {
+        id: folder.id,
+        space_id: folder.space_id,
+        name: folder.name,
+        open: folder.open,
+        items: folder.items,
+    }
+}
+
 fn space_record(space: workspace::Space) -> ffi::SpaceRecord {
     let (icon_kind, icon) = match space.icon {
         None => (ffi::SpaceIconKind::Unset, String::new()),
@@ -1264,6 +1396,7 @@ pub fn sidebar_snapshot(workspace: &Workspace, window_id: u64) -> ffi::SidebarRe
             pins: sidebar.pins.into_iter().map(item_record).collect(),
             temporary: sidebar.temporary.into_iter().map(item_record).collect(),
             space_pins: sidebar.space_pins.into_iter().map(item_record).collect(),
+            folders: sidebar.folders.into_iter().map(folder_record).collect(),
         },
         Err(error) => ffi::SidebarResult {
             ok: false,
@@ -1284,6 +1417,7 @@ pub fn sidebar_snapshot(workspace: &Workspace, window_id: u64) -> ffi::SidebarRe
             pins: Vec::new(),
             temporary: Vec::new(),
             space_pins: Vec::new(),
+            folders: Vec::new(),
         },
     }
 }
@@ -1310,6 +1444,8 @@ pub fn export_snapshot(workspace: &Workspace) -> ffi::StateSnapshot {
         archived: state.archived.into_iter().map(archived_record).collect(),
         open_secs: state.open_secs,
         archive_interval_secs: state.archive_interval.seconds(),
+        folders: state.folders.into_iter().map(folder_record).collect(),
+        next_folder_id: state.next_folder_id,
     }
 }
 
@@ -1408,6 +1544,24 @@ pub fn restore_snapshot(
                     snapshot.archive_interval_secs,
                 )
                 .unwrap_or_default(),
+                // The core drops bad folders and entries on restore.
+                folders: snapshot
+                    .folders
+                    .into_iter()
+                    .take(workspace::MAX_FOLDERS)
+                    .filter(|folder| {
+                        folder.name.len() <= workspace::MAX_FOLDER_NAME_BYTES
+                            && folder.items.len() <= workspace::MAX_ITEMS
+                    })
+                    .map(|folder| workspace::Folder {
+                        id: folder.id,
+                        space_id: folder.space_id,
+                        name: folder.name,
+                        open: folder.open,
+                        items: folder.items,
+                    })
+                    .collect(),
+                next_folder_id: snapshot.next_folder_id,
             })
             .map(|()| 0),
     )

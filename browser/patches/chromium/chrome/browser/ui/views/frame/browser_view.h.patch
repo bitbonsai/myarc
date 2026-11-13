@@ -1,5 +1,5 @@
 diff --git a/chrome/browser/ui/views/frame/browser_view.h b/chrome/browser/ui/views/frame/browser_view.h
-index 750e46c97b64dccccf4268e912df5dbdb6516b3c..c2151a2185c3580350819530f6e80b5227a63dcd 100644
+index 750e46c97b64dccccf4268e912df5dbdb6516b3c..8575c96ed67fc928c90b4bf5e19277fc38c88a03 100644
 --- a/chrome/browser/ui/views/frame/browser_view.h
 +++ b/chrome/browser/ui/views/frame/browser_view.h
 @@ -8,11 +8,13 @@
@@ -118,7 +118,7 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..c2151a2185c3580350819530f6e80b52
    base::WeakPtr<BrowserView> GetAsWeakPtr() {
      return weak_ptr_factory_.GetWeakPtr();
    }
-@@ -1253,12 +1305,197 @@ class BrowserView : public BrowserWindow,
+@@ -1253,12 +1305,205 @@ class BrowserView : public BrowserWindow,
  
    // Anchor point for help bubbles and other dialogs that want to reliably
    // anchor outside the content area of the window.
@@ -130,6 +130,11 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..c2151a2185c3580350819530f6e80b52
 +  void FavoriteItem(uint64_t item) override;
 +  bool DropFavorite(uint64_t item, uint64_t before) override;
 +  void UnsaveItem(uint64_t item) override;
++  void CreateFolder() override;
++  void RenameFolder(uint64_t folder) override;
++  void DeleteFolder(uint64_t folder) override;
++  void SetFolderOpen(uint64_t folder, bool open) override;
++  void MovePinToFolder(uint64_t item, uint64_t folder) override;
 +  void SelectSpace(uint64_t space) override;
 +  void SwitchToSpaceInProfile(const std::string& profile_dir,
 +                              uint64_t space_id) override;
@@ -234,8 +239,11 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..c2151a2185c3580350819530f6e80b52
 +  // Hides the sidebar's URL pill while the Create a Space panel shows.
 +  void UpdateMyarcUrlPill();
 +  void UpdateMyarcTabStripMode();
-+  void ShowMyarcSpaceDialog(uint64_t space);
-+  bool AcceptMyarcSpaceDialog(uint64_t space);
++  // Renames the Space, or with `folder` that folder of it.
++  void ShowMyarcSpaceDialog(uint64_t space, uint64_t folder = 0);
++  bool AcceptMyarcSpaceDialog(uint64_t space, uint64_t folder);
++  // Asks before deleting a folder and its Pins, in the same dialog slot.
++  void ShowMyarcDeleteFolderDialog(uint64_t folder);
 +  void CloseMyarcSpaceDialog();
 +
 +  // Explicit teardown: subscription, dialog, SidebarView (including menu
@@ -316,7 +324,7 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..c2151a2185c3580350819530f6e80b52
  
    // A mapping between accelerators and command IDs.
    std::map<ui::Accelerator, int> accelerator_table_;
-@@ -1411,6 +1648,7 @@ class BrowserView : public BrowserWindow,
+@@ -1411,6 +1656,7 @@ class BrowserView : public BrowserWindow,
    base::EnumSet<TabStripAndWebAppViewsReparentedState>
        tab_strip_web_apps_reparented_state_;
  

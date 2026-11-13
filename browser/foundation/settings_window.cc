@@ -756,7 +756,7 @@ class AdvancedPage : public views::View {
         kGrayButton, kButtonText, gfx::Font::Weight::NORMAL, nullptr));
 
     import_panel_ = AddRowPanel(
-        this, u"Spaces and pinned tabs from an Arc export",
+        this, u"Spaces, folders and pinned tabs from an Arc export",
         /*multi_line=*/false,
         std::make_unique<PillButton>(std::move(import_arc),
                                      u"Import from Arc…", kGrayButton,

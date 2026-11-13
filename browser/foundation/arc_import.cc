@@ -72,6 +72,18 @@ std::u16string Count(size_t count,
       {base::NumberToString16(count), u" ", count == 1 ? one : many});
 }
 
+// "a", "a and b" or "a, b and c".
+std::u16string Join(const std::vector<std::u16string>& parts) {
+  std::u16string text;
+  for (size_t i = 0; i < parts.size(); ++i) {
+    if (i) {
+      text += i + 1 == parts.size() ? u" and " : u", ";
+    }
+    text += parts[i];
+  }
+  return text;
+}
+
 std::u16string List(const rust::Vec<rust::String>& lines, size_t total) {
   std::u16string text;
   for (size_t i = 0; i < lines.size() && i < kShownLines; ++i) {
@@ -158,7 +170,9 @@ void ShowPreview(base::WeakPtr<Profile> profile,
       WorkspaceService::ForProfile(*profile).PreviewArcImport(*export_data);
   ui::DialogModel::Builder builder;
   builder.SetTitle(kTitle);
-  const bool noop = preview.ok && !preview.new_spaces && !preview.new_pins;
+  const bool noop = preview.ok && !preview.new_spaces &&
+                    !preview.new_folders && !preview.new_pins &&
+                    !preview.moved_pins;
   if (!preview.ok) {
     builder.AddParagraph(ui::DialogModelLabel(
         base::StrCat({u"This file can't be imported. ",
@@ -167,18 +181,37 @@ void ShowPreview(base::WeakPtr<Profile> profile,
     builder.AddParagraph(
         ui::DialogModelLabel(u"Everything in this file is already in myArc."));
   } else {
-    builder.AddParagraph(ui::DialogModelLabel(base::StrCat(
-        {u"Adds ", Count(preview.new_spaces, u"Space", u"Spaces"), u" and ",
-         Count(preview.new_pins, u"pinned tab", u"pinned tabs"), u"."})));
+    std::vector<std::u16string> adds;
+    if (preview.new_spaces) {
+      adds.push_back(Count(preview.new_spaces, u"Space", u"Spaces"));
+    }
+    if (preview.new_folders) {
+      adds.push_back(Count(preview.new_folders, u"folder", u"folders"));
+    }
+    if (preview.new_pins) {
+      adds.push_back(Count(preview.new_pins, u"pinned tab", u"pinned tabs"));
+    }
+    if (!adds.empty()) {
+      builder.AddParagraph(ui::DialogModelLabel(
+          base::StrCat({u"Adds ", Join(adds), u"."})));
+    }
+    if (preview.moved_pins) {
+      builder.AddParagraph(ui::DialogModelLabel(base::StrCat(
+          {u"Moves ",
+           Count(preview.moved_pins, u"pinned tab", u"pinned tabs"),
+           u" you already have into the folder Arc keeps ",
+           preview.moved_pins == 1 ? u"it" : u"them", u" in."})));
+    }
     if (preview.kept_pins) {
       builder.AddParagraph(ui::DialogModelLabel(base::StrCat(
           {Count(preview.kept_pins, u"pinned tab is", u"pinned tabs are"),
            u" already in myArc and stay as they are."})));
     }
     builder.AddParagraph(
-        ui::DialogModelLabel(u"Favorites and folders from Arc become pinned "
-                             u"tabs in their Space. Nothing opens until you "
-                             u"click it.")
+        ui::DialogModelLabel(u"Each Arc folder becomes a folder in its "
+                             u"Space. Favorites become pinned tabs there, "
+                             u"because the export doesn't mark them apart. "
+                             u"Nothing opens until you click it.")
             .set_is_secondary());
   }
   if (preview.skipped_count) {

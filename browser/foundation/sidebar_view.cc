@@ -5,6 +5,7 @@
 #include <limits>
 #include <memory>
 #include <optional>
+#include <set>
 #include <utility>
 
 #include "base/command_line.h"
@@ -44,6 +45,7 @@
 #include "ui/gfx/geometry/transform.h"
 #include "ui/gfx/image/canvas_image_source.h"
 #include "ui/gfx/image/image_skia_operations.h"
+#include "ui/gfx/paint_vector_icon.h"
 #include "ui/gfx/scoped_canvas.h"
 #include "ui/gfx/vector_icon_types.h"
 #include "ui/native_theme/native_theme.h"
@@ -421,8 +423,21 @@ enum ItemCommand {
   kUnsave,
   kClose,
   kStopControl,
-  kCopyLink
+  kCopyLink,
+  kNewFolder,
+  kRenameFolder,
+  kDeleteFolder,
+  kRemoveFromFolder,
+  kMoveToFolder,
+  // Move to Folder's entries: this plus the folder's index in folders_.
+  kMoveToFolderFirst = 1000
 };
+
+// Arc indents a folder's tabs under its name.
+constexpr int kFolderIndent = 14;
+// The disclosure arrow at a folder row's right end.
+constexpr int kChevronSize = 12;
+constexpr int kChevronInset = 10;
 
 // Browser control's accent: a small dot on the agent Space's footer glyph
 // while a client is active.
@@ -490,8 +505,11 @@ class ItemRow final : public views::View, public views::FocusChangeListener {
     layout->set_cross_axis_alignment(
         views::BoxLayout::CrossAxisAlignment::kCenter);
     layout->SetFlexForView(AddChildView(std::move(activate)), 1);
-    close_ = AddChildView(std::move(close));
-    close_->SetVisible(false);
+    // Dormant Pins have no live page to close.
+    if (close) {
+      close_ = AddChildView(std::move(close));
+      close_->SetVisible(false);
+    }
     SetNotifyEnterExitOnChild(true);
   }
 
@@ -541,7 +559,9 @@ class ItemRow final : public views::View, public views::FocusChangeListener {
                       ? views::CreateRoundedRectBackground(
                             selected_ ? fills.new_tab : fills.tile, 10)
                       : nullptr);
-    close_->SetVisible(reveal);
+    if (close_) {
+      close_->SetVisible(reveal);
+    }
   }
 
   raw_ptr<views::MdTextButton> close_ = nullptr;
@@ -552,6 +572,62 @@ class ItemRow final : public views::View, public views::FocusChangeListener {
 };
 
 BEGIN_METADATA(ItemRow)
+END_METADATA
+
+// A folder's row: its button fills the row and opens or closes it, and the
+// row paints the hover fill and the disclosure arrow at its right end.
+class FolderRow final : public views::View {
+  METADATA_HEADER(FolderRow, views::View)
+
+ public:
+  FolderRow(std::unique_ptr<views::MdTextButton> toggle, bool open)
+      : open_(open) {
+    views::InkDrop::Get(toggle.get())
+        ->SetMode(views::InkDropHost::InkDropMode::OFF);
+    SetLayoutManager(std::make_unique<views::BoxLayout>(
+        Orientation::kHorizontal, gfx::Insets(), 0));
+    static_cast<views::BoxLayout*>(GetLayoutManager())
+        ->SetFlexForView(AddChildView(std::move(toggle)), 1);
+    SetNotifyEnterExitOnChild(true);
+  }
+
+  void OnMouseEntered(const ui::MouseEvent& event) override {
+    hovered_ = true;
+    UpdateFill();
+  }
+
+  void OnMouseExited(const ui::MouseEvent& event) override {
+    hovered_ = false;
+    UpdateFill();
+  }
+
+  void OnThemeChanged() override {
+    views::View::OnThemeChanged();
+    UpdateFill();
+  }
+
+  // The button above is transparent, so the arrow shows through it.
+  void OnPaint(gfx::Canvas* canvas) override {
+    views::View::OnPaint(canvas);
+    const gfx::ImageSkia chevron = gfx::CreateVectorIcon(
+        open_ ? kChevronDownIcon : kChevronRightIcon, kChevronSize,
+        GetFills(GetColorProvider()).title);
+    canvas->DrawImageInt(chevron, width() - kChevronInset - kChevronSize,
+                         (height() - kChevronSize) / 2);
+  }
+
+ private:
+  void UpdateFill() {
+    SetBackground(hovered_ ? views::CreateRoundedRectBackground(
+                                 GetFills(GetColorProvider()).tile, 10)
+                           : nullptr);
+  }
+
+  const bool open_;
+  bool hovered_ = false;
+};
+
+BEGIN_METADATA(FolderRow)
 END_METADATA
 
 std::unique_ptr<views::View> Box(Orientation orientation, int spacing) {
@@ -759,23 +835,46 @@ void SidebarView::ShowContextMenuForViewImpl(
       target->action == FocusAction::kSpaces && agent != spaces_.end() &&
       target->id == agent->id && !control_client_.empty()) {
     menu_item_id_ = 0;
+    menu_folder_id_ = 0;
     menu_runner_.reset();
     menu_model_ = std::make_unique<ui::SimpleMenuModel>(this);
+    folder_menu_model_.reset();
     menu_model_->AddItem(kStopControl, u"Stop " + control_client_);
-    menu_runner_ = std::make_unique<views::MenuRunner>(
-        menu_model_.get(), views::MenuRunner::CONTEXT_MENU);
-    menu_runner_->RunMenuAt(GetWidget(), nullptr, gfx::Rect(point, gfx::Size()),
-                            views::MenuAnchorPosition::kTopLeft, source_type);
+    RunMenu(point, source_type);
+    return;
+  }
+  if (target != focus_targets_.end() &&
+      (target->action == FocusAction::kRename ||
+       target->action == FocusAction::kFolder)) {
+    // The Space title and folder rows offer Arc's folder commands.
+    menu_item_id_ = 0;
+    menu_folder_id_ = target->action == FocusAction::kFolder ? target->id : 0;
+    menu_space_id_ = current_space_id_;
+    menu_runner_.reset();
+    menu_model_ = std::make_unique<ui::SimpleMenuModel>(this);
+    folder_menu_model_.reset();
+    if (menu_folder_id_) {
+      menu_model_->AddItem(kRenameFolder, u"Rename Folder\u2026");
+      menu_model_->AddItem(kNewFolder, u"New Folder");
+      menu_model_->AddSeparator(ui::NORMAL_SEPARATOR);
+      menu_model_->AddItem(kDeleteFolder, u"Delete Folder\u2026");
+    } else {
+      menu_model_->AddItem(kNewFolder, u"New Folder");
+    }
+    RunMenu(point, source_type);
     return;
   }
   if (target == focus_targets_.end() || !target->item_menu) {
     return;
   }
   menu_item_id_ = target->id;
+  menu_folder_id_ = 0;
   menu_space_id_ = current_space_id_;
   menu_state_ = *target->item_menu;
   menu_runner_.reset();
   menu_model_ = std::make_unique<ui::SimpleMenuModel>(this);
+  folder_menu_model_.reset();
+  menu_folder_ids_.clear();
   // Arc's order: Copy Link first, the page's own actions next, and removal
   // last behind its own separator.
   if (!menu_state_.url.empty()) {
@@ -791,6 +890,25 @@ void SidebarView::ShowContextMenuForViewImpl(
                                         ? u"Move to Profile Favorites"
                                         : u"Add to Profile Favorites");
   }
+  // Pins, and tabs pinned on the way, file into the Space's folders.
+  if (!menu_state_.is_favorite) {
+    folder_menu_model_ = std::make_unique<ui::SimpleMenuModel>(this);
+    for (const FolderEntry& folder : folders_) {
+      if (folder.id != menu_state_.folder) {
+        folder_menu_model_->AddItem(
+            kMoveToFolderFirst + static_cast<int>(menu_folder_ids_.size()),
+            folder.name);
+        menu_folder_ids_.push_back(folder.id);
+      }
+    }
+    if (!menu_folder_ids_.empty()) {
+      menu_model_->AddSubMenu(kMoveToFolder, u"Move to Folder",
+                              folder_menu_model_.get());
+    }
+    if (menu_state_.folder) {
+      menu_model_->AddItem(kRemoveFromFolder, u"Remove from Folder");
+    }
+  }
   if (menu_state_.is_live) {
     menu_model_->AddItem(
         kClose, menu_state_.is_pin        ? u"Close live page (keep Space Pin)"
@@ -802,6 +920,11 @@ void SidebarView::ShowContextMenuForViewImpl(
     menu_model_->AddItem(kUnsave, menu_state_.is_pin ? u"Unpin from Space"
                                                      : u"Remove Favorite");
   }
+  RunMenu(point, source_type);
+}
+
+void SidebarView::RunMenu(const gfx::Point& point,
+                          ui::mojom::MenuSourceType source_type) {
   menu_runner_ = std::make_unique<views::MenuRunner>(
       menu_model_.get(), views::MenuRunner::CONTEXT_MENU);
   // Use the stable widget, never the replaceable row or its button controller.
@@ -1159,6 +1282,24 @@ void SidebarView::ExecuteCommand(int command_id, int event_flags) {
     StopControl();
     return;
   }
+  if (command_id == kNewFolder) {
+    menu_item_id_ = 0;
+    menu_folder_id_ = 0;
+    delegate_->CreateFolder();
+    return;
+  }
+  if (command_id == kRenameFolder || command_id == kDeleteFolder) {
+    const uint64_t folder = std::exchange(menu_folder_id_, 0);
+    if (!folder) {
+      return;
+    }
+    if (command_id == kRenameFolder) {
+      delegate_->RenameFolder(folder);
+    } else {
+      delegate_->DeleteFolder(folder);
+    }
+    return;
+  }
   if (command_id == kCopyLink) {
     menu_item_id_ = 0;
     ui::ScopedClipboardWriter(ui::ClipboardBuffer::kCopyPaste)
@@ -1184,6 +1325,13 @@ void SidebarView::ExecuteCommand(int command_id, int event_flags) {
     case kClose:
       delegate_->CloseLiveItem(id);
       return;
+    case kRemoveFromFolder:
+      delegate_->MovePinToFolder(id, 0);
+      return;
+  }
+  const size_t index = static_cast<size_t>(command_id - kMoveToFolderFirst);
+  if (command_id >= kMoveToFolderFirst && index < menu_folder_ids_.size()) {
+    delegate_->MovePinToFolder(id, menu_folder_ids_[index]);
   }
 }
 
@@ -1217,7 +1365,8 @@ SidebarView::ItemPresentation SidebarView::Present(
 std::unique_ptr<views::View> SidebarView::MakeItem(
     const foundation::ItemRecord& item,
     bool tile,
-    bool selected) {
+    bool selected,
+    uint64_t folder) {
   ItemPresentation presentation = Present(item);
   const auto foreground = ui::kColorSysOnSurface;
   auto activate_callback = base::BindRepeating(
@@ -1245,7 +1394,8 @@ std::unique_ptr<views::View> SidebarView::MakeItem(
       item.placement == foundation::PlacementKind::Favorite,
       presentation.is_live,
       item.has_url ? base::UTF8ToUTF16(std::string(item.canonical_url))
-                   : std::u16string()};
+                   : std::u16string(),
+      folder};
   TrackFocus(activate.get(), FocusAction::kActivate, item.id, menu_state);
   if (tile) {
     activate->SetHorizontalAlignment(gfx::ALIGN_CENTER);
@@ -1257,7 +1407,12 @@ std::unique_ptr<views::View> SidebarView::MakeItem(
   activate->SetMinSize(gfx::Size(0, kRowHeight));
   AlignRowContents(*activate, presentation.icon.Size().width());
 
-  // Only Today tabs are rows, and a dormant one closes too.
+  // Today tabs close even while dormant. A folder's Pin only closes its live
+  // page.
+  if (item.placement != foundation::PlacementKind::Temporary &&
+      !presentation.is_live) {
+    return std::make_unique<ItemRow>(std::move(activate), nullptr, selected);
+  }
   auto close = IconButton(
       base::BindRepeating(&Delegate::CloseLiveItem,
                           base::Unretained(&delegate_.get()), item.id),
@@ -1271,6 +1426,36 @@ std::unique_ptr<views::View> SidebarView::MakeItem(
   TrackFocus(close.get(), FocusAction::kClose, item.id, menu_state);
   return std::make_unique<ItemRow>(std::move(activate), std::move(close),
                                    selected);
+}
+
+std::unique_ptr<views::View> SidebarView::MakeFolder(
+    const foundation::FolderRecord& folder) {
+  const std::u16string name = base::UTF8ToUTF16(std::string(folder.name));
+  auto toggle = Button(base::BindRepeating(&Delegate::SetFolderOpen,
+                                           base::Unretained(&delegate_.get()),
+                                           folder.id, !folder.open),
+                       name);
+  toggle->SetImageModel(
+      views::Button::STATE_NORMAL,
+      ui::ImageModel::FromVectorIcon(
+          folder.open ? kFolderOpenIcon : kFolderClosedIcon,
+          ui::kColorSysOnSurface, 16));
+  toggle->SetMinSize(gfx::Size(0, kRowHeight));
+  AlignRowContents(*toggle, 16);
+  // The title stops short of the disclosure arrow.
+  toggle->SetCustomPadding(gfx::Insets::TLBR(
+      6, kRowIconCenter - 8, 6, kChevronInset + kChevronSize + 6));
+  toggle->SetTooltipText(name);
+  toggle->GetViewAccessibility().SetName(u"Folder: " + name);
+  if (folder.open) {
+    toggle->GetViewAccessibility().SetIsExpanded();
+  } else {
+    toggle->GetViewAccessibility().SetIsCollapsed();
+  }
+  TrackFocus(toggle.get(), FocusAction::kFolder, folder.id);
+  toggle->set_context_menu_controller(this);
+  toggle->GetViewAccessibility().SetHasPopup(ax::mojom::HasPopup::kMenu);
+  return std::make_unique<FolderRow>(std::move(toggle), folder.open);
 }
 
 std::unique_ptr<views::View> SidebarView::MakeTodayDivider(
@@ -1508,12 +1693,22 @@ void SidebarView::SetModel(const foundation::SidebarResult& model,
 
   // The Profile's Favorites, then the current Space's Pins, share one grid
   // of favicon tiles, as Arc draws both.
+  // Pins in folders show as rows under their folder instead.
+  std::set<uint64_t> foldered;
+  folders_.clear();
+  for (const auto& folder : model.folders) {
+    folders_.push_back(
+        {folder.id, base::UTF8ToUTF16(std::string(folder.name))});
+    foldered.insert(folder.items.begin(), folder.items.end());
+  }
   std::vector<const foundation::ItemRecord*> tile_items;
   for (const auto& item : model.favorites) {
     tile_items.push_back(&item);
   }
   for (const auto& item : model.pins) {
-    tile_items.push_back(&item);
+    if (!foldered.contains(item.id)) {
+      tile_items.push_back(&item);
+    }
   }
   views::View* tiles_row = nullptr;
   const size_t columns = std::min(tile_items.size(), kTileColumns);
@@ -1563,6 +1758,8 @@ void SidebarView::SetModel(const foundation::SidebarResult& model,
   heading->GetViewAccessibility().SetName(
       (agent ? u"Rename Agent Space: " : u"Rename Space: ") + name);
   TrackFocus(heading.get(), FocusAction::kRename, model.current_space.id);
+  // Its menu makes a folder.
+  heading->set_context_menu_controller(this);
   if (agent && !control_client_.empty()) {
     // While a control client is active, a Stop button follows the title.
     auto header = Box(Orientation::kHorizontal, 4);
@@ -1601,6 +1798,25 @@ void SidebarView::SetModel(const foundation::SidebarResult& model,
     rows->AddChildView(std::move(header));
   } else {
     rows->AddChildView(std::move(heading));
+  }
+
+  // The Space's folders follow its title, each with its Pins beneath it
+  // while open. A closed folder still shows its selected Pin, so the page
+  // on screen keeps its row.
+  for (const auto& folder : model.folders) {
+    rows->AddChildView(MakeFolder(folder));
+    for (const uint64_t id : folder.items) {
+      const auto item = std::ranges::find(model.pins, id,
+                                          &foundation::ItemRecord::id);
+      const bool selected = id == model.selected_item_id;
+      if (item == model.pins.end() || (!folder.open && !selected)) {
+        continue;
+      }
+      auto row = MakeItem(*item, false, selected, folder.id);
+      row->SetProperty(views::kMarginsKey,
+                       gfx::Insets::TLBR(0, kFolderIndent, 0, 0));
+      rows->AddChildView(std::move(row));
+    }
   }
 
   // Arc divides the Space title from Today only while Today has tabs, and
@@ -1650,6 +1866,14 @@ void SidebarView::SetModel(const foundation::SidebarResult& model,
          return target.id == menu_item_id_ && target.item_menu == menu_state_;
        }))) {
     menu_item_id_ = 0;
+    menu_runner_->Cancel();
+  }
+  if (menu_folder_id_ && menu_runner_ && menu_runner_->IsRunning() &&
+      (menu_space_id_ != current_space_id_ ||
+       !std::ranges::any_of(folders_, [this](const FolderEntry& folder) {
+         return folder.id == menu_folder_id_;
+       }))) {
+    menu_folder_id_ = 0;
     menu_runner_->Cancel();
   }
 
