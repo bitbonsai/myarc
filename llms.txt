@@ -11,6 +11,17 @@ A complete myArc browser remains unimplemented, and the Arc importer brings over
 - [Download](https://myarc.dev/download/index.md): Pre-alpha nightly status, requirements and known limitations.
 - [Repository](https://github.com/bitbonsai/myarc): Public source and plans.
 
+## Docs
+
+- [Docs index](https://myarc.dev/docs/index.md): User guides for people moving from Arc.
+- [Install myArc](https://myarc.dev/docs/install/index.md): What your Mac needs, how to get past the first-launch warning, and how to move to a newer nightly.
+- [Import from Arc](https://myarc.dev/docs/import-from-arc/index.md): Export your Spaces from Arc, preview what myArc will add, and import them as pinned tabs. Importing the same file twice adds nothing.
+- [Spaces and Profiles](https://myarc.dev/docs/spaces-and-profiles/index.md): How Spaces, Profiles, pinned tabs, Favorites and temporary tabs fit together in the myArc sidebar.
+- [Keyboard shortcuts](https://myarc.dev/docs/shortcuts/index.md): The shortcuts that work in myArc today, and the Arc shortcuts that are still missing.
+- [Your data](https://myarc.dev/docs/your-data/index.md): Where myArc keeps your workspace on disk, how to back it up, and what it sends over the network. There is no account.
+- [CLI and MCP](https://myarc.dev/docs/cli-and-mcp/index.md): Drive myArc from a script or an AI agent with the bundled myarc command and its MCP server. It's off by default, and tab commands reach only the Agent Space.
+- [Known limitations](https://myarc.dev/docs/known-limitations/index.md): What the pre-alpha nightly can't do yet, and what to do after a crash or when something breaks.
+
 ## Posts
 
 - [Letting agents use myArc](https://myarc.dev/blog/agents-use-myarc/index.md): The agents that build myArc can now use it, in a Space of their own and only after you say yes. Getting there turned up a bug in Chromium and a sidebar full of gray globes.
@@ -22,5 +33,5 @@ A complete myArc browser remains unimplemented, and the Arc importer brings over
 
 ## Optional
 
-- [Complete published text](https://myarc.dev/llms-full.txt): Homepage, journal index and approved posts, generated from their HTML.
+- [Complete published text](https://myarc.dev/llms-full.txt): Homepage, docs, journal index and approved posts, generated from their HTML.
 - [Sitemap](https://myarc.dev/sitemap.xml): Canonical HTML routes.

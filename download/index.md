@@ -41,33 +41,20 @@ Each item was seen working in a native run or experiment note. None of it has ha
 - Closing a pinned tab keeps the pin.
 - A command bar: Cmd\+L opens it on the current address, arrows, Enter and Escape work, and new windows open it centered.
 - Shortcuts: Cmd\+S hides the sidebar, Cmd\+Shift\+T reopens a closed tab, Cmd\+Shift\+C copies the address and shows a Copied Current URL toast, Cmd\+Shift\+N opens a private window and Ctrl\+Cmd\+N a blank one.
-- Cmd\+, opens a native Settings window. General shows the default-browser banner and Advanced links to the full Chromium settings. Profiles, Links and Shortcuts are not available yet.
+- Cmd\+, opens a native Settings window. General shows the default-browser banner, Profiles sets when tabs are archived, and Advanced holds Import from Arc and a link to the full Chromium settings. Links and Shortcuts are not available yet.
 - Quitting with Cmd\+Q needs no confirmation by default, with a setting to turn the warning on.
 - Importing an Arc export from Settings \> Advanced \> Import from Arc. A preview shows what it will add, then each Space arrives with its folders and pinned tabs, in Arc's order. Importing the same file again adds nothing.
 - Folders for a Space's pinned tabs. Create, rename and delete them from the right-click menu, and open or close them. Moving a tab into a folder is menu-only for now.
 - Agents can drive tabs in the Agent Space through the bundled myarc CLI and MCP server. It is off by default. Turn it on in Settings \> Advanced, and myArc asks before each new agent connects.
 
-## What does not work yet
+## Known limitations
 
-- Arc Favorites in an import. The export does not mark them, so they arrive as pinned tabs.
-- Cmd\+D to pin a tab (Cmd\+D still bookmarks), nested folders, Auto Archive, the Archive and drag-to-pin.
-- Peek, Split View and Little Arc. The Peek routing rule exists, but there is no overlay.
-- Boosts, the Library, download progress in the sidebar and the Mini Player.
-- The animated onboarding.
-- Light mode, Reduce Transparency and fullscreen layouts are not verified.
-
-## Known limitations and safety
-
-- Built from a Chromium 158 development revision, not a stable release.
 - No automatic updates and no security updates. Install each new nightly by hand.
-- From 2026.11.03 on, nightlies are signed with an Apple Developer ID that later nightlies keep. macOS asks once more for your login password so it can read the saved-data key; choose Always Allow, and newer nightlies stop asking.
-- The app is signed with a Developer ID but not yet notarized by Apple.
+- Not yet notarized by Apple, so macOS blocks the first launch until you allow it.
 - Recent tabs and navigation can be lost after a crash or force quit.
-- Private window, Profile, cookie and credential guarantees are not verified.
-- RAR downloads are not scanned by Safe Browsing, because the UnRAR license conflicts with GPL-3.0.
-- No Widevine, so Netflix, Spotify and Disney\+ will not play.
 - H.264 and AAC are included, so most other web video plays.
-- myArc is an independent project, not affiliated with Arc or The Browser Company.
+
+[Known limitations](https://myarc.dev/docs/known-limitations/) lists the rest, with what does not work yet and what to do after a crash.
 
 ## Other ways to get it
 

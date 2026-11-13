@@ -158,33 +158,20 @@ Each item was seen working in a native run or experiment note. None of it has ha
 - Closing a pinned tab keeps the pin.
 - A command bar: Cmd\+L opens it on the current address, arrows, Enter and Escape work, and new windows open it centered.
 - Shortcuts: Cmd\+S hides the sidebar, Cmd\+Shift\+T reopens a closed tab, Cmd\+Shift\+C copies the address and shows a Copied Current URL toast, Cmd\+Shift\+N opens a private window and Ctrl\+Cmd\+N a blank one.
-- Cmd\+, opens a native Settings window. General shows the default-browser banner and Advanced links to the full Chromium settings. Profiles, Links and Shortcuts are not available yet.
+- Cmd\+, opens a native Settings window. General shows the default-browser banner, Profiles sets when tabs are archived, and Advanced holds Import from Arc and a link to the full Chromium settings. Links and Shortcuts are not available yet.
 - Quitting with Cmd\+Q needs no confirmation by default, with a setting to turn the warning on.
 - Importing an Arc export from Settings \> Advanced \> Import from Arc. A preview shows what it will add, then each Space arrives with its folders and pinned tabs, in Arc's order. Importing the same file again adds nothing.
 - Folders for a Space's pinned tabs. Create, rename and delete them from the right-click menu, and open or close them. Moving a tab into a folder is menu-only for now.
 - Agents can drive tabs in the Agent Space through the bundled myarc CLI and MCP server. It is off by default. Turn it on in Settings \> Advanced, and myArc asks before each new agent connects.
 
-## What does not work yet
+## Known limitations
 
-- Arc Favorites in an import. The export does not mark them, so they arrive as pinned tabs.
-- Cmd\+D to pin a tab (Cmd\+D still bookmarks), nested folders, Auto Archive, the Archive and drag-to-pin.
-- Peek, Split View and Little Arc. The Peek routing rule exists, but there is no overlay.
-- Boosts, the Library, download progress in the sidebar and the Mini Player.
-- The animated onboarding.
-- Light mode, Reduce Transparency and fullscreen layouts are not verified.
-
-## Known limitations and safety
-
-- Built from a Chromium 158 development revision, not a stable release.
 - No automatic updates and no security updates. Install each new nightly by hand.
-- From 2026.11.03 on, nightlies are signed with an Apple Developer ID that later nightlies keep. macOS asks once more for your login password so it can read the saved-data key; choose Always Allow, and newer nightlies stop asking.
-- The app is signed with a Developer ID but not yet notarized by Apple.
+- Not yet notarized by Apple, so macOS blocks the first launch until you allow it.
 - Recent tabs and navigation can be lost after a crash or force quit.
-- Private window, Profile, cookie and credential guarantees are not verified.
-- RAR downloads are not scanned by Safe Browsing, because the UnRAR license conflicts with GPL-3.0.
-- No Widevine, so Netflix, Spotify and Disney\+ will not play.
 - H.264 and AAC are included, so most other web video plays.
-- myArc is an independent project, not affiliated with Arc or The Browser Company.
+
+[Known limitations](https://myarc.dev/docs/known-limitations/) lists the rest, with what does not work yet and what to do after a crash.
 
 ## Other ways to get it
 
@@ -195,6 +182,463 @@ Each item was seen working in a native run or experiment note. None of it has ha
 ## License and notices
 
 myArc is licensed under GPL-3.0, see [LICENSE](https://github.com/bitbonsai/myarc/blob/main/LICENSE). Chromium and other bundled components keep their own licenses. [ATTRIBUTION.md](https://github.com/bitbonsai/myarc/blob/main/ATTRIBUTION.md) records what is known, and the [dependency license inventory](https://github.com/bitbonsai/myarc/blob/main/browser/evidence/dependency-licenses.json) is not yet complete.
+
+
+---
+
+HTML: https://myarc.dev/docs/
+
+# Docs
+
+How to move from Arc to myArc: install the nightly, import your Spaces, learn the shortcuts, find your data, script the browser and work around known limitations.
+
+## Getting started
+
+- [Install myArc](https://myarc.dev/docs/install/)
+
+  What your Mac needs, how to get past the first-launch warning, and how to move to a newer nightly.
+- [Import from Arc](https://myarc.dev/docs/import-from-arc/)
+
+  Export your Spaces from Arc, preview what myArc will add, and import them as pinned tabs. Importing the same file twice adds nothing.
+
+## Your workspace
+
+- [Spaces and Profiles](https://myarc.dev/docs/spaces-and-profiles/)
+
+  How Spaces, Profiles, pinned tabs, Favorites and temporary tabs fit together in the myArc sidebar.
+- [Keyboard shortcuts](https://myarc.dev/docs/shortcuts/)
+
+  The shortcuts that work in myArc today, and the Arc shortcuts that are still missing.
+- [Your data](https://myarc.dev/docs/your-data/)
+
+  Where myArc keeps your workspace on disk, how to back it up, and what it sends over the network. There is no account.
+
+## Control
+
+- [CLI and MCP](https://myarc.dev/docs/cli-and-mcp/)
+
+  Drive myArc from a script or an AI agent with the bundled myarc command and its MCP server. It's off by default, and tab commands reach only the Agent Space.
+
+## Help
+
+- [Known limitations](https://myarc.dev/docs/known-limitations/)
+
+  What the pre-alpha nightly can't do yet, and what to do after a crash or when something breaks.
+
+## Contributing
+
+Plans, the alpha checklist and contributor docs live in the [myArc repository](https://github.com/bitbonsai/myarc) on GitHub.
+
+
+---
+
+HTML: https://myarc.dev/docs/install/
+
+[All docs](https://myarc.dev/docs/)
+
+# Install myArc
+
+myArc ships as a pre-alpha nightly, a build made from the latest code and published without release testing. Each nightly is a disk image (DMG) on the [download page](https://myarc.dev/download/).
+
+## What you need
+
+- A Mac with Apple silicon. Intel Macs aren't supported.
+- macOS 26 or later. The glass window frame needs macOS 26, and the nightly has only been tested on macOS 26.7.
+
+## Install the app
+
+1. Download the DMG from the download page.
+2. Check the file against the SHA-256 checksum listed next to the download button. Run this in Terminal and compare the two values. They must match. If you kept older nightlies in Downloads, it prints one line per file.
+
+   ```
+   shasum -a 256 ~/Downloads/myArc-Nightly-*.dmg
+   ```
+3. Open the DMG and drag myArc Nightly to Applications.
+
+## First launch
+
+The app is signed with an Apple Developer ID but isn't notarized yet. Notarized means Apple has scanned the build. Without it, Gatekeeper, the part of macOS that checks downloaded apps, blocks the first launch.
+
+To open it anyway, right-click myArc Nightly in Applications, choose Open, then choose Open again. On macOS 15 and later the warning usually offers only Done or Move to Trash. In that case open System Settings \> Privacy \& Security, scroll to the message about myArc Nightly and choose Open Anyway.
+
+You can also remove the quarantine flag in Terminal and then open the app as usual:
+
+```
+xattr -dr com.apple.quarantine "/Applications/myArc Nightly.app"
+```
+
+macOS may then ask for your login password so myArc can read the key that protects its saved data. Choose Always Allow. Nightlies from 2026.11.03 on are signed with the same Developer ID, so later nightlies stop asking.
+
+## Update to a newer nightly
+
+myArc doesn't update itself, and it gets no security updates between nightlies. To move to a newer one:
+
+1. Quit myArc with Cmd\+Q.
+2. Download the new DMG and drag myArc Nightly to Applications, replacing the old copy.
+3. Open it. The new download goes through the first-launch step again.
+
+Your Spaces, tabs and settings live in your user folder, outside the app, so replacing the app keeps them. [Your data](https://myarc.dev/docs/your-data/) shows where.
+
+The [GitHub releases page](https://github.com/bitbonsai/myarc/releases) lists every nightly.
+
+
+---
+
+HTML: https://myarc.dev/docs/import-from-arc/
+
+[All docs](https://myarc.dev/docs/)
+
+# Import from Arc
+
+myArc reads the file Arc exports and adds your Spaces and their links to the sidebar. Arc stays untouched, and so does the export file.
+
+## Export from Arc
+
+In Arc, open Settings, go to Advanced and choose Export Data. Arc saves a Markdown file that lists each Space by name, with the links under it.
+
+## Import into myArc
+
+1. Press Cmd\+, to open Settings and go to the Advanced tab.
+2. Click Import from Arc and pick the exported file.
+3. Read the preview, then click Import. Cancel closes the preview and writes nothing.
+
+The preview counts the Spaces and pinned tabs the import adds and the pinned tabs already in myArc. It also lists links it leaves out and lines it couldn't read. Nothing loads while you import, and each pinned tab opens its page the first time you click it.
+
+## What comes over
+
+- Each Space in the export becomes a Space with the same name, in Arc's order. If a Space with that name already exists, its links go there.
+- Each folder in a Space becomes a folder with the same name, and its links become pinned tabs inside it, in the export's order.
+- Arc Favorites become pinned tabs at the top of that Space. The export doesn't say which links were Favorites, so myArc can't make them Profile Favorites.
+- Only http and https links come over. Anything else shows up under the links left out.
+
+The export holds only Space names and links. Tab titles, Profiles, temporary tabs, archived tabs, themes, history, passwords, cookies, extensions and Boosts aren't in it, so they don't come over. Imported Spaces join the Profile you're using. [Spaces and Profiles](https://myarc.dev/docs/spaces-and-profiles/) explains the difference.
+
+myArc refuses files over 8 MB.
+
+## Import again
+
+Importing the same file a second time adds nothing. myArc reuses Spaces and folders by name and keeps the pinned tabs they already have. Pinned tabs from an import made before myArc had folders move into their folder. If you export from Arc again later, the next import adds only the new Spaces and links.
+
+An import never removes anything. If it fails partway, nothing changes, because myArc tries every import on a copy of your workspace before it writes.
+
+
+---
+
+HTML: https://myarc.dev/docs/spaces-and-profiles/
+
+[All docs](https://myarc.dev/docs/)
+
+# Spaces and Profiles
+
+myArc keeps Arc's model. A Space sorts your tabs by topic, and a Profile keeps your logins apart. They are separate things, and several Spaces can share one Profile.
+
+## Spaces
+
+A Space is a set of tabs for one part of your life, such as Work, Reading or Travel. Each Space has its own pinned tabs and temporary tabs, and a name, an icon and a color.
+
+- To create a Space, click \+ at the bottom of the sidebar. Give it a name, pick an emoji or icon, choose its Profile and pick a theme color.
+- To switch Spaces, click the Space's dot at the bottom of the sidebar.
+- To rename the current Space, click its name at the top of the sidebar.
+
+## Profiles
+
+A Profile holds your cookies, logins, history and extensions. Spaces that share a Profile share all of that, plus the Profile's Favorites. A Work Profile and a Personal Profile let you stay signed in to two accounts on the same site.
+
+Each myArc Profile is a full Chromium Profile, so the separation is the same one Chrome gives you. To make a new Profile, open the Profile menu while you create a Space and choose New Profile.
+
+Switching to a Space in another Profile brings in that Profile's window at the same position and size, so it still feels like one window.
+
+## Pinned tabs and Favorites
+
+Pinned tabs and Favorites both appear as favicon tiles at the top of the sidebar, the Favorites first.
+
+- A pinned tab belongs to one Space and shows only there.
+- A Favorite belongs to the Profile and shows in every Space of that Profile.
+
+Right-click a tab in the sidebar to pin it to the Space or add it to the Profile's Favorites. The same menu moves a tile between the two, and Unpin from Space or Remove Favorite takes it away.
+
+Closing a pinned tab or a Favorite keeps its tile. The page closes, and clicking the tile opens it again.
+
+## Folders
+
+A folder groups pinned tabs inside a Space. To make one, right-click the Space name at the top of the sidebar and choose New Folder. Right-click a folder to rename or delete it, and click it to open or close it. To file a tab, right-click it and choose Move to Folder. Remove from Folder takes it out again. Folders don't nest.
+
+## Temporary tabs
+
+Every other tab is a temporary tab. Temporary tabs sit in a list below the Space name and the New Tab row. They come back after you quit and reopen myArc.
+
+When you close a temporary tab, it moves to Archived Tabs in the Library. Open the Library with the archive icon at the bottom left of the sidebar. It also lists your Spaces and recent downloads.
+
+## Not in myArc yet
+
+Folders inside folders, dragging a tab up to pin it or into a folder, Peek and Split View don't work yet. [Known limitations](https://myarc.dev/docs/known-limitations/) has the full list.
+
+
+---
+
+HTML: https://myarc.dev/docs/shortcuts/
+
+[All docs](https://myarc.dev/docs/)
+
+# Keyboard shortcuts
+
+These shortcuts work in the current nightly. Standard Chromium shortcuts, such as Cmd\+W to close a tab and Cmd\+R to reload, work as they do in Chrome.
+
+| Shortcut | What it does | Compared with Arc |
+| --- | --- | --- |
+| Cmd\+T | Opens the command bar for a new tab | Same |
+| Cmd\+L | Opens the command bar on the current address | Same |
+| Cmd\+S | Hides or shows the sidebar | Same |
+| Cmd\+Shift\+C | Copies the current address and shows a Copied Current URL message | Same |
+| Cmd\+Shift\+T | Reopens the last closed tab | Same |
+| Cmd\+Shift\+N | Opens a private window | Same |
+| Ctrl\+Cmd\+N | Opens a blank window | Same |
+| Cmd\+, | Opens Settings | Same |
+| Cmd\+Q | Quits without asking. Settings \> General has a switch to turn on a warning | Same key |
+
+The command bar is the box for addresses and searches. Inside it, the arrow keys move through suggestions, Enter opens the selected one and Escape closes the bar.
+
+Cmd\+Shift\+C opens the element inspector in Chrome. myArc follows Arc and copies the address instead.
+
+## Arc shortcuts that don't work yet
+
+These belong to features myArc doesn't have yet.
+
+| Shortcut | What it does in Arc |
+| --- | --- |
+| Cmd\+Option\+N | Opens Little Arc, a small window for a quick page |
+| Ctrl\+Shift\+1, Ctrl\+Shift\+2 | Moves focus between the panes of a Split View |
+| Cmd\+O | Turns a Peek preview into a tab |
+
+You can't change shortcuts yet. The Shortcuts tab in Settings is greyed out until it's built.
+
+
+---
+
+HTML: https://myarc.dev/docs/your-data/
+
+[All docs](https://myarc.dev/docs/)
+
+# Your data
+
+myArc has no account and nothing to sign in to. Everything it saves stays on your Mac.
+
+## Where it lives
+
+myArc keeps its data in this folder:
+
+```
+~/Library/Application Support/myArc Nightly/
+```
+
+Inside it, each Profile has its own folder. The first is called `Default`, later ones `Profile 1`, `Profile 2` and so on. A Profile folder holds Chromium's usual data, such as history, cookies and extensions, plus one myArc file, `myarc-workspace-v1.json`. That file is your workspace, meaning the Spaces of that Profile with their names, icons and colors, your pinned tabs and Favorites, your temporary tabs and Archived Tabs. It's plain JSON you can open in a text editor.
+
+When myArc saves the workspace, it writes a new file and swaps it in, so a save that gets interrupted leaves the previous version in place.
+
+Saved passwords and cookies stay in Chromium's own stores. Chromium encrypts them with a key it keeps in your macOS Keychain, under the name myArc Nightly Safe Storage.
+
+## Back it up
+
+There is no export command yet. To back up everything, quit myArc and copy the whole `myArc Nightly` folder somewhere safe. Quitting first means nothing is halfway through a save while you copy.
+
+## What goes over the network
+
+myArc adds no analytics and no usage tracking. It makes one kind of request of its own. When a pinned tab or Favorite has no icon yet, myArc asks that site for its icon. The request goes only to that site's domain, carries no cookies and never sends the path of the page you saved. No Google icon service or other third party is involved.
+
+Every other request comes from Chromium itself. myArc turns off a few of the ones that go to Google:
+
+- Chromium no longer asks Google's servers for the current time.
+- Domain Reliability reports, which Chromium sends Google when a connection to one of its sites fails, are off.
+- WebRTC text logs, which video calls can upload for debugging, are off by default.
+
+Crash report uploads are off too. Crash reports stay on your Mac. [Known limitations](https://myarc.dev/docs/known-limitations/) says where to find them.
+
+## Agent control
+
+Agents and scripts can't touch myArc until you turn on Allow agents to control myArc in Settings \> Advanced. Until then myArc writes nothing to its control folder. [CLI and MCP](https://myarc.dev/docs/cli-and-mcp/) covers how it works.
+
+
+---
+
+HTML: https://myarc.dev/docs/cli-and-mcp/
+
+[All docs](https://myarc.dev/docs/)
+
+# CLI and MCP
+
+myArc comes with a command-line tool, `myarc`, that drives tabs in the browser. The same tool runs an MCP server, so AI agents such as Claude Code can use the browser too. MCP, the Model Context Protocol, is the standard way AI tools discover and call outside tools.
+
+Agents work in the Agent Space, a Space myArc keeps for them, with a bot icon. They can't see or touch tabs in your other Spaces.
+
+## Turn it on
+
+Browser control is off by default. Press Cmd\+, to open Settings, go to Advanced and turn on Allow agents to control myArc. The switch covers every Profile. Turning it off disconnects every tool at once.
+
+## Install the command
+
+The nightly carries `myarc` inside the app. Link it into your `PATH`:
+
+```
+sudo mkdir -p /usr/local/bin
+sudo ln -sf "/Applications/myArc Nightly.app/Contents/Helpers/myarc" /usr/local/bin/myarc
+```
+
+The link points into the app, so it keeps working after you replace the app with a newer nightly.
+
+## Approve each tool
+
+The first time a tool connects, a card at the top right of your myArc window names the tool and asks whether it may control your Agent Space. Choose Allow or Don't allow. The command waits up to 60 seconds for your answer. Allow lasts until you quit myArc.
+
+While a tool is working, the bot icon at the bottom of the sidebar shows a small blue dot. To take back control, right-click the bot and stop the tool from its menu, or click Stop next to the Agent Space's name. Stop disconnects the tool, and its next command asks you again.
+
+## Short commands
+
+An outline is a text version of the page, one element per line. Anything you can act on carries a reference such as `[ref=e4]`:
+
+```
+form
+  textbox "Email" [ref=e1] [required] value=""
+  button "Send" [ref=e4]
+link "Docs" [ref=e5] -> /docs.html
+```
+
+The short commands act on the current tab and use the element references from the last outline they printed.
+
+```
+myarc open <url>             # open a tab in the Agent Space and print its outline
+myarc snapshot [-i]          # print the outline; -i keeps only lines you can act on, with context
+myarc click @e4              # click an element
+myarc fill @e1 "text"        # replace a text field's value
+myarc select @e3 "Pro"       # pick an option by value or visible text
+myarc press Enter [@e1]      # send Enter, Tab, Escape, an arrow or one character
+myarc back | forward | reload
+myarc close                  # close the current tab
+myarc tabs                   # list Agent Space tabs; * marks the current one
+myarc use t12                # make another tab current
+```
+
+Every action prints a status line, what changed and the new outline, so you rarely need `snapshot` after a step. After a page navigates, references start again at `e1`, so always take them from the latest outline.
+
+Options that work with every short command:
+
+- `--tab t12` and `--rev 1.2` act on another tab or outline revision for one call.
+- `--json` prints the raw response.
+- Put `--` before text that starts with a dash, as in `myarc fill @e1 -- "-5"`.
+
+Only http and https pages open. There is no scroll or wait command yet. `click` scrolls its target into view first, and if a page is still loading, run `snapshot` again.
+
+## Exit codes
+
+| Code | Meaning |
+| --- | --- |
+| 0 | Success |
+| 1 | The command returned an error, such as `stale` for an outdated reference |
+| 2 | The command line was wrong |
+| 3 | myArc isn't running, or browser control is off |
+| 4 | myArc refused control, for example because you chose Don't allow |
+
+Errors go to stderr. On `stale`, run `myarc snapshot` and use the new references. On `outcome_unknown`, the action may or may not have happened, so read the page before you try again.
+
+## Run any command
+
+`myarc commands` lists every command that works. `myarc run` sends one of them with JSON parameters:
+
+```
+myarc run space.list
+myarc run space.create '{"name":"Work"}'
+myarc run space.rename '{"space_id":1,"name":"Home"}'
+```
+
+These commands work today:
+
+- Spaces: `space.list`, `space.create`, `space.select`, `space.rename` and `space.ensure_agent`, which creates the Agent Space if it's missing.
+- Tabs in the Agent Space: `tabs.list`, `tab.open`, `tab.activate`, `tab.close`, `tab.navigate`, `tab.back`, `tab.forward` and `tab.reload`.
+- Pages: `page.snapshot`, `page.click`, `page.fill`, `page.select` and `page.press`.
+
+The Space commands reach all your Spaces in that Profile, so `space.rename` can rename one of yours. The first command runs in the window you used last. Later commands stay in that window's Profile until you turn control off or quit myArc.
+
+## Use it from an MCP client
+
+`myarc mcp` starts the MCP server. It has one tool per command, named with an underscore in place of each dot, so `space.create` is called `space_create` there. To add it to Claude Code for every project, run:
+
+```
+claude mcp add --scope user myarc -- "/Applications/myArc Nightly.app/Contents/Helpers/myarc" mcp
+```
+
+For other MCP clients, use this server entry once `myarc` is on your `PATH`:
+
+```
+{"command": "myarc", "args": ["mcp"]}
+```
+
+## Claude Code skill
+
+The repository has a [Claude Code skill](https://github.com/bitbonsai/myarc/tree/main/skills/myarc-browser) that teaches Claude Code to drive myArc through the short commands. Copy the `skills/myarc-browser` folder into `~/.claude/skills/`.
+
+## How tools connect
+
+While control is on, myArc publishes its connection details in `~/Library/Application Support/myarc/control/`. Only your user account can read that folder. Tools connect over a local socket with a token that changes each time myArc starts. Nothing listens on the network.
+
+
+---
+
+HTML: https://myarc.dev/docs/known-limitations/
+
+[All docs](https://myarc.dev/docs/)
+
+# Known limitations
+
+myArc is a pre-alpha. Use it to try the Arc-style sidebar, and keep daily and sensitive browsing in another browser for now.
+
+## Safety and updates
+
+- Each nightly is built from a Chromium 158 development revision, before Chromium ships it as a stable release.
+- There are no automatic updates and no security updates. Install each new nightly by hand, as [Install myArc](https://myarc.dev/docs/install/) describes.
+- The app is signed with an Apple Developer ID but not yet notarized by Apple, so macOS blocks the first launch until you allow it.
+- The protections around private windows, Profile separation, cookies and saved passwords aren't verified yet.
+- Safe Browsing doesn't scan RAR downloads, because the UnRAR license conflicts with GPL-3.0, the license myArc uses.
+- myArc is an independent project with no ties to Arc or The Browser Company.
+
+## Video and media
+
+- There is no Widevine, the copy protection that Netflix, Spotify and Disney\+ need, so those services won't play.
+- H.264 and AAC are included, so most other web video plays.
+
+## What doesn't work yet
+
+- Arc Favorites arrive as pinned tabs in their Space, because the export doesn't mark them.
+- Folders inside folders, and dragging a tab up to pin it or into a folder.
+- Peek, Split View and Little Arc.
+- Boosts and the Mini Player.
+- The animated onboarding.
+- The Links and Shortcuts tabs in Settings.
+- Only the dark appearance has been compared with Arc. Light mode, Reduce Transparency and full-screen layouts haven't been checked.
+
+## After a crash
+
+Recent tabs and navigation can be lost after a crash or a force quit. Pinned tabs, Favorites and Spaces are saved in your workspace file, which [Your data](https://myarc.dev/docs/your-data/) describes, but whether every change survives a force quit isn't fully tested yet.
+
+If a single page crashes, reload it with Cmd\+R. The rest of the browser keeps running.
+
+Crash report uploads are off. Chromium keeps crash reports on your Mac, in `~/Library/Application Support/myArc Nightly/Crashpad/`. They can hold pieces of the pages you had open, so don't attach them to a public issue.
+
+## Troubleshooting
+
+### macOS won't open myArc
+
+Each new download is blocked on its first launch. Follow the first-launch steps in [Install myArc](https://myarc.dev/docs/install/).
+
+### macOS keeps asking for your password
+
+myArc needs it to read the key that protects its saved data. Choose Always Allow. Nightlies before 2026.11.03 used a different signature, so moving from one of those asks once more.
+
+### An agent says myArc can't be reached
+
+The `myarc` command exits with code 3 when myArc isn't running or browser control is off. Start myArc and turn on Allow agents to control myArc in Settings \> Advanced. [CLI and MCP](https://myarc.dev/docs/cli-and-mcp/) has the details.
+
+## Report a problem
+
+Open an issue on [GitHub](https://github.com/bitbonsai/myarc/issues). Include the myArc version, shown at the top of the app menu next to the Apple menu, your macOS version and the steps that cause the problem. Leave out private pages.
 
 
 ---
