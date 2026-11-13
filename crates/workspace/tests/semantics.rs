@@ -1145,7 +1145,9 @@ fn old_snapshot_with_space_one_loads_unchanged() {
         archived: Vec::new(),
         open_secs: 0,
         archive_interval: Default::default(),
+        folders: Vec::new(),
         next_window_id: 2,
+        next_folder_id: 1,
     };
     let workspace = Workspace::from_snapshot(snapshot.clone()).unwrap();
     assert_eq!(workspace.snapshot(), snapshot);

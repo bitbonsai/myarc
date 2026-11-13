@@ -32,6 +32,9 @@ use std::collections::BTreeSet;
 use std::fmt;
 
 pub mod archive;
+pub mod folder;
+
+pub use folder::{Folder, FolderDeletion, FolderId, MAX_FOLDER_NAME_BYTES, MAX_FOLDERS};
 
 pub const MAX_SPACE_NAME_BYTES: usize = 128;
 /// Bound for either kind of Space icon. Long emoji ZWJ sequences with skin
@@ -97,7 +100,9 @@ pub enum WorkspaceError {
     UnknownItem(ItemId),
     UnknownWindow(WindowId),
     UnknownArchivedTab(ItemId),
+    UnknownFolder(FolderId),
     InvalidName(RenameError),
+    InvalidFolderName(RenameError),
     InvalidIcon,
     InvalidTheme,
     InvalidUrl,
@@ -110,6 +115,10 @@ pub enum WorkspaceError {
     LastSpaceInProfile(SpaceId),
     ExplicitUnsaveRequired(ItemId),
     DifferentSection(ItemId),
+    /// The folder belongs to another Space than the Pin or folder it was paired with.
+    DifferentFolderSpace(FolderId),
+    /// Only Pins go in folders.
+    NotPinned(ItemId),
     DuplicateLiveItem(ItemId),
     ItemNotVisible(ItemId),
     LimitExceeded(&'static str),
@@ -126,7 +135,9 @@ impl fmt::Display for WorkspaceError {
             Self::UnknownItem(id) => write!(formatter, "Item {id} does not exist"),
             Self::UnknownWindow(id) => write!(formatter, "Window {id} does not exist; create it first"),
             Self::UnknownArchivedTab(id) => write!(formatter, "Archived tab {id} does not exist"),
+            Self::UnknownFolder(id) => write!(formatter, "Folder {id} does not exist"),
             Self::InvalidName(error) => error.fmt(formatter),
+            Self::InvalidFolderName(error) => formatter.write_str(error.folder_message()),
             Self::InvalidIcon => formatter.write_str(
                 "Use an emoji or an icon name of lowercase letters, digits and hyphens, at most 64 bytes",
             ),
@@ -143,6 +154,8 @@ impl fmt::Display for WorkspaceError {
             Self::LastSpaceInProfile(id) => write!(formatter, "Space {id} is the last Space in its Profile; create another Space before deleting it"),
             Self::ExplicitUnsaveRequired(id) => write!(formatter, "Item {id} is saved; use unsave_item with its live-page destination"),
             Self::DifferentSection(id) => write!(formatter, "Item {id} belongs to a different placement or owner section"),
+            Self::DifferentFolderSpace(id) => write!(formatter, "Folder {id} belongs to a different Space"),
+            Self::NotPinned(id) => write!(formatter, "Item {id} is not a Space Pin; pin it before putting it in a folder"),
             Self::DuplicateLiveItem(id) => write!(formatter, "Live item {id} is listed more than once"),
             Self::ItemNotVisible(id) => write!(formatter, "Item {id} does not belong to this window's selected Space or Profile"),
             Self::LimitExceeded(kind) => write!(formatter, "Workspace {kind} limit reached"),
@@ -267,9 +280,13 @@ pub struct WorkspaceSnapshot {
     pub open_secs: u64,
     /// This Profile's Auto Archive interval ("Archive tabs after").
     pub archive_interval: archive::ArchiveInterval,
+    /// Folders of Pins, in display order within each Space. Snapshots from
+    /// before folders have none.
+    pub folders: Vec<Folder>,
     pub next_space_id: SpaceId,
     pub next_item_id: ItemId,
     pub next_window_id: WindowId,
+    pub next_folder_id: FolderId,
 }
 
 /// What `Workspace::delete_space` changed, so adapters can close live pages and
@@ -296,6 +313,9 @@ pub struct SidebarSnapshot {
     pub temporary: Vec<Item>,
     /// Every Space's Pins in workspace order, for the Library's Space cards.
     pub space_pins: Vec<Item>,
+    /// The current Space's folders in order. Their Pins are also in `pins`;
+    /// the rest of `pins` is ungrouped.
+    pub folders: Vec<Folder>,
 }
 
 #[derive(Debug)]
@@ -338,9 +358,11 @@ impl Default for Workspace {
                 archived: Vec::new(),
                 open_secs: 0,
                 archive_interval: archive::ArchiveInterval::Hours12,
+                folders: Vec::new(),
                 next_space_id: 2,
                 next_item_id: 1,
                 next_window_id: 2,
+                next_folder_id: 1,
             },
             space_selections: Vec::new(),
         }
@@ -479,6 +501,7 @@ impl Workspace {
         let untouched = self.state.next_space_id == DEFAULT_SPACE_ID + 1
             && self.state.items.is_empty()
             && self.state.archived.is_empty()
+            && self.state.folders.is_empty()
             && matches!(
                 self.state.spaces.as_slice(),
                 [space] if space.id == DEFAULT_SPACE_ID
@@ -597,6 +620,7 @@ impl Workspace {
         }
         self.state.items.retain(|item| !owned(item.placement));
         self.state.spaces.retain(|space| space.id != space_id);
+        self.prune_folders();
         self.space_selections
             .retain(|&(_, space, _)| space != space_id);
         self.clear_hidden_selections();
@@ -787,6 +811,7 @@ impl Workspace {
                 break;
             }
         }
+        self.prune_folders();
         self.clear_hidden_selections();
         Ok(())
     }
@@ -948,6 +973,7 @@ impl Workspace {
                     break;
                 }
             }
+            self.prune_folders();
             self.clear_hidden_selections();
         } else {
             self.remove_item(item_id);
@@ -1078,6 +1104,13 @@ impl Workspace {
             pins: Vec::new(),
             temporary: Vec::new(),
             space_pins: Vec::new(),
+            folders: self
+                .state
+                .folders
+                .iter()
+                .filter(|folder| folder.space_id == window.space_id)
+                .cloned()
+                .collect(),
         };
         for item in &self.state.items {
             if matches!(item.placement, Placement::Pin { .. }) {
@@ -1108,6 +1141,8 @@ impl Workspace {
         workspace.sanitize_icons();
         workspace.sanitize_agent_spaces();
         workspace.validate()?;
+        // After validation, so folders only see a consistent set of Spaces and items.
+        workspace.sanitize_folders();
         Ok(workspace)
     }
 
@@ -1182,6 +1217,7 @@ impl Workspace {
 
     fn remove_item(&mut self, item_id: ItemId) {
         self.state.items.retain(|item| item.id != item_id);
+        self.prune_folders();
         self.clear_hidden_selections();
     }
 
