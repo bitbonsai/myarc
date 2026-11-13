@@ -59,6 +59,65 @@ class DocsTests(unittest.TestCase):
         self.assertIn('[Help page](https://myarc.dev/docs/help-page/index.md): Help summary', llms)
         self.assertTrue((self.root / 'docs/help-page/index.md').read_text().startswith('HTML: https://myarc.dev/docs/help-page/'))
 
+    def test_side_nav_groups_by_area_then_order_and_marks_the_current_page(self):
+        write(self.root, 'troubles', 'title: Troubles\nsummary: S\narea: Help\norder: 1')
+        write(self.root, 'control', 'title: Control page\nsummary: S\narea: Control\norder: 1')
+        write(self.root, 'second', 'title: Second\nsummary: S\narea: Getting started\norder: 2')
+        write(self.root, 'first', 'title: First\nsummary: S\narea: Getting started\norder: 1')
+        write(self.root, 'space', 'title: Space\nsummary: S\narea: Your workspace\norder: 5')
+        self.build()
+        page = BeautifulSoup((self.root / 'docs/second/index.html').read_text(), 'html.parser')
+        for selector in ('.docs-nav-list', '.docs-nav-menu'):
+            nav = page.select_one(selector)
+            self.assertEqual(['Getting started', 'Your workspace', 'Control', 'Help'], [label.get_text() for label in nav.select('.docs-label')])
+            self.assertEqual(['../first/', '../second/', '../space/', '../control/', '../troubles/'], [a['href'] for a in nav.select('a')])
+            self.assertEqual(['../second/'], [a['href'] for a in nav.select('a[aria-current="page"]')])
+        self.assertEqual('All docs', page.select_one('.docs-nav-menu > summary').get_text())
+        self.assertIsNone(page.select_one('.docs-pill[aria-current]'))
+        self.assertEqual('Getting started / Second', page.select_one('.docs-eyebrow').get_text())
+        self.assertEqual('S', page.select_one('.docs-lede').get_text())
+        self.assertIn('Pre-alpha nightly', page.select_one('main .docs-banner').get_text())
+        self.assertIsNone(page.select_one('.top nav'))
+        index = BeautifulSoup((self.root / 'docs/index.html').read_text(), 'html.parser')
+        self.assertEqual('page', index.select_one('.docs-pill')['aria-current'])
+        self.assertIsNone(index.select_one('.docs-nav a[aria-current]'))
+        self.assertIsNone(index.select_one('.docs-toc'))
+        self.assertEqual(['first/', 'second/', 'space/', 'control/', 'troubles/'], [a['href'] for a in index.select('.docs-nav-list a')])
+
+    def test_on_this_page_lists_h2_and_indented_h3_with_stable_ids(self):
+        write(self.root, 'page', 'title: T\nsummary: S\narea: Help\norder: 1',
+              "Intro.\n\n## Don't panic\n\n### The `myarc` command\n\nText.\n\n#### Too deep\n\n## Don't panic\n\nMore.\n")
+        write(self.root, 'plain', 'title: Plain\nsummary: S\narea: Help\norder: 2', 'No headings.\n')
+        self.build()
+        page = BeautifulSoup((self.root / 'docs/page/index.html').read_text(), 'html.parser')
+        toc = page.select('.docs-toc li')
+        self.assertEqual([['toc-h2'], ['toc-h3'], ['toc-h2']], [item['class'] for item in toc])
+        self.assertEqual(['#dont-panic', '#the-myarc-command', '#dont-panic-2'], [item.a['href'] for item in toc])
+        self.assertEqual(["Don't panic", 'The myarc command', "Don't panic"], [item.a.get_text() for item in toc])
+        self.assertEqual(['dont-panic', 'the-myarc-command', 'dont-panic-2'], [heading.get('id') for heading in page.select('.post-body h2, .post-body h3')])
+        self.assertIsNone(page.select_one('.post-body h4').get('id'))
+        script = page.select_one('script[src^="../_assets/docs-toc."]')['src']
+        self.assertTrue((self.root / 'docs/page' / script).resolve().is_file())
+        self.assertNotIn('no-toc', page.select_one('.docs-layout')['class'])
+        plain = BeautifulSoup((self.root / 'docs/plain/index.html').read_text(), 'html.parser')
+        self.assertIsNone(plain.select_one('.docs-toc'))
+        self.assertIsNone(plain.select_one('script[src*="docs-toc"]'))
+        self.assertIn('no-toc', plain.select_one('.docs-layout')['class'])
+
+    def test_next_link_follows_area_then_order_and_stops_at_the_last_page(self):
+        write(self.root, 'help-page', 'title: Help page\nsummary: S\narea: Help\norder: 1')
+        write(self.root, 'install', 'title: Install\nsummary: S\narea: Getting started\norder: 1')
+        write(self.root, 'workspace', 'title: Workspace\nsummary: S\narea: Your workspace\norder: 1')
+        write(self.root, 'import', 'title: Import\nsummary: S\narea: Getting started\norder: 2')
+        self.build()
+        expected = {'install': ('../import/', 'Next: Import →'), 'import': ('../workspace/', 'Next: Workspace →'),
+                    'workspace': ('../help-page/', 'Next: Help page →'), 'help-page': None}
+        for slug, link in expected.items():
+            page = BeautifulSoup((self.root / 'docs' / slug / 'index.html').read_text(), 'html.parser')
+            found = page.select_one('main .docs-next a')
+            self.assertEqual(link, (found['href'], found.get_text()) if found else None, slug)
+        self.assertIsNone(BeautifulSoup((self.root / 'docs/index.html').read_text(), 'html.parser').select_one('.docs-next'))
+
     def test_rejects_bad_metadata_headings_and_images(self):
         for meta, body in (('title: T\nsummary: S\narea: Elsewhere\norder: 1', 'Body'),
                            ('title: T\nsummary: S\narea: Help\norder: first', 'Body'),

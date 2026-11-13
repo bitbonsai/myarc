@@ -1,6 +1,6 @@
 ---
 title: Import from Arc
-summary: "Export your Spaces from Arc, preview what myArc will add, and import them as pinned tabs. Importing the same file twice adds nothing."
+summary: "Export your Spaces from Arc, preview what myArc will add, and import them with their folders and pinned tabs. Importing the same file twice adds nothing."
 area: Getting started
 order: 2
 ---

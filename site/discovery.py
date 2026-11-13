@@ -10,7 +10,7 @@ def markdown_page(html, url):
     main = soup.find('main')
     if main is None:
         raise ValueError(f'Missing main content: {url}')
-    for element in main.select('[aria-hidden="true"], .mark'):
+    for element in main.select('[aria-hidden="true"], .mark, .docs-banner, .docs-eyebrow'):
         element.decompose()
     for image in list(main.find_all('img')):
         if not image.get('alt') or image.get('src', '').startswith('data:'):

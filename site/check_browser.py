@@ -418,6 +418,81 @@ try:
                 browser('mouse', 'down', 'left')
                 browser('mouse', 'up', 'left')
                 browser(expression="!document.querySelector('#image-lightbox').open ? true : (() => {throw new Error('Backdrop close failed')})()")
+    browser('close')
+    SESSION = 'myarc-docs'
+    for page in [ROOT / 'docs/index.html', *sorted((ROOT / 'docs').glob('*/index.html'))]:
+        browser('open', page.as_uri())
+        for theme in ('light', 'dark'):
+            browser('set', 'media', theme)
+            for width in (1440, 1024, 768, 390, 320):
+                browser('set', 'viewport', str(width), '1000')
+                result = browser(expression="""(async () => {
+                  await document.fonts.ready
+                  if (!Array.from(document.fonts).some(font => font.family === 'Outfit' && font.status === 'loaded')) throw new Error('Docs Outfit not loaded')
+                  if (document.querySelectorAll('h1').length !== 1) throw new Error('Docs heading structure')
+                  if (document.documentElement.scrollWidth > innerWidth) throw new Error('Docs horizontal overflow')
+                  if (performance.getEntriesByType('resource').some(r => /^https?:/.test(r.name))) throw new Error('Docs remote resource request')
+                  const shown = el => el && el.getClientRects().length > 0
+                  const box = el => el.getBoundingClientRect()
+                  if (!shown(document.querySelector('.top .docs-pill')) || document.querySelector('.top nav')) throw new Error('Docs header should hold the logo, Docs pill and Download only')
+                  const main = document.querySelector('main')
+                  const list = document.querySelector('.docs-nav-list')
+                  const menu = document.querySelector('.docs-nav-menu')
+                  const toc = document.querySelector('.docs-toc')
+                  let columns
+                  if (innerWidth <= 768) {
+                    if (shown(list) || !shown(menu) || menu.open) throw new Error('Phone nav is not a collapsed All docs list')
+                    if (box(main).top < box(menu).bottom) throw new Error('Phone nav not above content')
+                    if (toc && shown(toc)) throw new Error('On this page shown on phone')
+                    columns = 1
+                  } else {
+                    if (!shown(list) || shown(menu)) throw new Error('Desktop nav list missing')
+                    if (box(list).right > box(main).left) throw new Error('Nav overlaps content')
+                    if (toc && innerWidth > 1100) {
+                      if (!shown(toc) || box(main).right > box(toc).left) throw new Error('On this page column missing or overlapping')
+                      columns = 3
+                    } else {
+                      if (toc && shown(toc)) throw new Error('On this page shown under 1100px')
+                      columns = 2
+                    }
+                  }
+                  const current = (innerWidth <= 768 ? menu : list).querySelectorAll('a[aria-current="page"]')
+                  if (current.length !== (document.querySelector('.docs-eyebrow') ? 1 : 0)) throw new Error('Current page marker')
+                  for (const el of document.querySelectorAll('main h1,main h2,main h3,main p,main li,main td,main :not(pre) > code,.docs-nav a,.docs-toc a,.docs-label')) {
+                    if (!shown(el) || el.closest('details:not([open])')) continue
+                    const style = getComputedStyle(el)
+                    const floor = el.matches('.docs-label,.docs-eyebrow') ? 14 : 16
+                    if (parseFloat(style.fontSize) < floor || !style.fontFamily.includes('Outfit')) throw new Error('Docs typography regression')
+                    const rect = box(el)
+                    if (rect.left < -1 || rect.right > innerWidth + 1) throw new Error('Docs content clipped: ' + el.textContent.slice(0, 60))
+                  }
+                  return {width: innerWidth, title: document.title, columns}
+                })()""")
+                print('Docs:', theme, result)
+    page = ROOT / 'docs/import-from-arc/index.html'
+    browser('open', page.as_uri())
+    browser('set', 'media', 'light')
+    browser('set', 'viewport', '1440', '1000')
+    print('Docs section highlight:', browser(expression="""(async () => {
+      const frames = () => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))
+      await frames()
+      const links = [...document.querySelectorAll('.docs-toc a')]
+      const active = () => links.findIndex(link => link.classList.contains('is-active'))
+      if (active() !== 0) throw new Error('First section not highlighted at the top')
+      document.getElementById(links[2].hash.slice(1)).scrollIntoView({behavior: 'instant'})
+      await frames()
+      if (active() !== 2) throw new Error('Section in view not highlighted')
+      if (getComputedStyle(links[2]).backgroundColor === 'rgba(0, 0, 0, 0)') throw new Error('Highlight pill missing')
+      scrollTo({top: 0, behavior: 'instant'})
+      await frames()
+      return {sections: links.length, highlight: 'follows scroll'}
+    })()"""))
+    browser('set', 'media', 'light', 'reduced-motion')
+    browser(expression="getComputedStyle(document.documentElement).scrollBehavior === 'auto' ? true : (() => {throw new Error('Docs smooth scroll under reduced motion')})()")
+    for name, theme, width in (('desktop-light', 'light', 1440), ('desktop-dark', 'dark', 1440), ('1000-light', 'light', 1000), ('phone-light', 'light', 390)):
+        browser('set', 'media', theme)
+        browser('set', 'viewport', str(width), '1000')
+        browser('screenshot', '/tmp/myarc-docs-' + name + '.png')
     with ThreadingHTTPServer(('127.0.0.1', 0), partial(SimpleHTTPRequestHandler, directory=str(ROOT))) as server:
         Thread(target=server.serve_forever, daemon=True).start()
         try:
