@@ -142,6 +142,9 @@
     .block { padding: 6rem 0 }
     .block h2 + .grid { margin-top: 3rem }
 
+    /* Ethos band. A full-bleed wash that fades in under the hero, peaks behind the statement and fades out before the principles. */
+    .why { position: relative; isolation: isolate }
+    .why::before { content: ''; position: absolute; z-index: -1; top: -4rem; bottom: -4rem; left: 50%; width: 100vw; transform: translateX(-50%); pointer-events: none; background: linear-gradient(180deg, transparent, rgb(var(--link-rgb) / .18) 45%, rgb(var(--link-rgb) / .18) 55%, transparent) }
     .ethos { font-weight: 600; letter-spacing: -.035em; line-height: 1.18; max-width: 26ch }
     .ethos + p { margin-top: 2rem; max-width: 44rem; font-size: 1.25rem; line-height: 1.5; color: var(--quiet) }
 
@@ -465,7 +468,7 @@
         </div>
       </section>
 
-      <section class="block" aria-labelledby="why">
+      <section class="block why" aria-labelledby="why">
         <h2 class="ethos" id="why">How you browse is part of how you work. It should outlast the company behind your browser.</h2>
         <p><a href="https://arc.net/">Arc is being sunsetted</a>, and its code was never open, so nobody can keep it going. <strong>myArc is open source</strong>, so anyone can.</p>
       </section>
