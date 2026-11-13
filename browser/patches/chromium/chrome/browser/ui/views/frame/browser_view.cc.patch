@@ -1,5 +1,5 @@
 diff --git a/chrome/browser/ui/views/frame/browser_view.cc b/chrome/browser/ui/views/frame/browser_view.cc
-index 7b568f6de760af21d6e9d2aa44415a7cef617c51..d9d7656b68c5dd93b8caeec3f66a05b36dcb52bc 100644
+index 7b568f6de760af21d6e9d2aa44415a7cef617c51..34aa50df0617ea40e9881fa75ae2d7780afcdc55 100644
 --- a/chrome/browser/ui/views/frame/browser_view.cc
 +++ b/chrome/browser/ui/views/frame/browser_view.cc
 @@ -22,6 +22,7 @@
@@ -1553,7 +1553,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..d9d7656b68c5dd93b8caeec3f66a05b3
  
      if (dialog_anchor_) {
        rect.Offset(0, -kAdditionalDialogToolbarOverlap);
-@@ -5197,75 +6394,2475 @@ void BrowserView::AddedToWidget() {
+@@ -5197,75 +6394,2476 @@ void BrowserView::AddedToWidget() {
        kFallbackPopupAnchorElementId, *this);
  
    initialized_ = true;
@@ -2279,7 +2279,8 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..d9d7656b68c5dd93b8caeec3f66a05b3
 +        result.title = base::UTF8ToUTF16(std::string(item.title));
 +      }
 +      if (result.title.empty() && item.has_url) {
-+        result.title = base::UTF8ToUTF16(std::string(item.canonical_url));
++        result.title = base::UTF8ToUTF16(
++            std::string(myarc::foundation::url_label(item.canonical_url)));
 +      }
 +      result.title += u" (loading)";
 +    }
@@ -4070,7 +4071,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..d9d7656b68c5dd93b8caeec3f66a05b3
  
  bool BrowserView::AcceleratorPressed(const ui::Accelerator& accelerator) {
  #if BUILDFLAG(IS_MAC)
-@@ -5342,7 +8939,8 @@ void BrowserView::LoadingAnimationCallback(base::TimeTicks timestamp) {
+@@ -5342,7 +8940,8 @@ void BrowserView::LoadingAnimationCallback(base::TimeTicks timestamp) {
      // GetActiveWebContents can return null for example under Purify when
      // the animations are running slowly and this function is called on a timer
      // through LoadingAnimationCallback.
@@ -4080,7 +4081,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..d9d7656b68c5dd93b8caeec3f66a05b3
    }
  }
  
-@@ -5471,6 +9069,10 @@ bool BrowserView::MaybeUpdateDevtools(content::WebContents* contents) {
+@@ -5471,6 +9070,10 @@ bool BrowserView::MaybeUpdateDevtools(content::WebContents* contents) {
  
  void BrowserView::UpdateUIForContents(WebContents* contents,
                                        bool should_layout_immediately) {
@@ -4091,7 +4092,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..d9d7656b68c5dd93b8caeec3f66a05b3
    TRACE_EVENT0("ui", "BrowserView::UpdateUIForContents");
    bool needs_layout = MaybeShowBookmarkBar(contents);
  
-@@ -5706,6 +9308,26 @@ void BrowserView::LoadAccelerators() {
+@@ -5706,6 +9309,26 @@ void BrowserView::LoadAccelerators() {
    }
  
  #if BUILDFLAG(IS_MAC)

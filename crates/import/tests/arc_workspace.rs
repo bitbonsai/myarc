@@ -453,6 +453,35 @@ fn fixture_reimport_with_folders_is_a_noop() {
 }
 
 #[test]
+fn a_folder_pins_title_survives_restart_and_reimport() {
+    // The export has no titles. Opening a Pin stores its page title the way
+    // any Pin's does, and a later import keeps it.
+    let mut workspace = Workspace::default();
+    import(FIXTURE, &mut workspace).unwrap();
+    let pin = workspace.folders()[0].items[1];
+    let item = workspace
+        .items()
+        .iter()
+        .find(|item| item.id == pin)
+        .unwrap();
+    assert_eq!(
+        item.canonical_url.as_deref(),
+        Some("https://docs.example.test/start")
+    );
+    assert!(item.title.is_empty());
+
+    assert_eq!(workspace.set_title(pin, "Getting started"), Ok(true));
+    let mut restored = Workspace::from_snapshot(workspace.snapshot()).unwrap();
+    import(FIXTURE, &mut restored).unwrap();
+    let title = |workspace: &Workspace| {
+        let item = workspace.items().iter().find(|item| item.id == pin);
+        item.unwrap().title.clone()
+    };
+    assert_eq!(title(&restored), "Getting started");
+    assert_eq!(restored.snapshot(), workspace.snapshot());
+}
+
+#[test]
 fn reimport_moves_pins_of_a_flattened_import_into_their_folder() {
     // An import from before folders left every URL as an ungrouped Pin.
     let mut workspace = Workspace::default();

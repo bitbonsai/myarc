@@ -658,6 +658,9 @@ mod ffi {
         // `site_icon_scan_bytes()` bytes.
         fn declared_site_icon(html: &[u8]) -> String;
         fn site_icon_scan_bytes() -> usize;
+        // Row label for a saved URL whose page has no title yet: host plus
+        // path, without scheme, `www.` or trailing slash.
+        fn url_label(url: &str) -> String;
 
         type ArcExport;
         // Largest export accepted, in bytes.
@@ -819,6 +822,10 @@ pub fn declared_site_icon(html: &[u8]) -> String {
 
 pub fn site_icon_scan_bytes() -> usize {
     workspace::site_icon::MAX_SCAN_BYTES
+}
+
+pub fn url_label(url: &str) -> String {
+    workspace::url_label::url_label(url)
 }
 
 pub fn new_workspace() -> Box<Workspace> {

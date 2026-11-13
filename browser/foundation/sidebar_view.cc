@@ -1350,13 +1350,14 @@ SidebarView::ItemPresentation SidebarView::Present(
     const foundation::ItemRecord& item) const {
   ItemPresentation presentation = delegate_->GetItemPresentation(item);
   // Dormant saved rows show the last title their page had, as Arc does, and
-  // fall back to the saved URL until a page has loaded once.
+  // fall back to a short label of the saved URL until a page has loaded once.
   if (presentation.title.empty() && !item.title.empty()) {
     presentation.title = base::UTF8ToUTF16(std::string(item.title));
   }
   if (presentation.title.empty()) {
     presentation.title =
-        item.has_url ? base::UTF8ToUTF16(std::string(item.canonical_url))
+        item.has_url ? base::UTF8ToUTF16(std::string(
+                           foundation::url_label(item.canonical_url)))
                      : u"Untitled tab";
   }
   return presentation;

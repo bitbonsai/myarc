@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-11-13: Imported Pins show a short URL until they have a title
+
+- Arc's Markdown export carries no page titles, so imported Pins showed whole URLs cut off at `https://docs.example.t…`. A row with no title now shows `myarc_workspace::url_label`, host plus path without the scheme, credentials, a leading `www.`, the query, the fragment or a trailing slash, e.g. `docs.example.test/start`. Loading rows use it too. Opening a Pin already stores its page title through `set_title`, imported Pins included, so the title replaces the label and survives a restart. Nothing is fetched to learn titles. Pins have no user rename yet, so there's no rename to put first.
+- Evidence: `out/MyarcM0` built from Chromium `affa74e170`, then a background capture of the synthetic fixture import, `research-private/captures/arc-url-labels-20261113/imported-open.png`, shows the Reference folder's Pins as `docs.example.test`, `docs.example.test/start`, `video.example.test` and so on.
+- Verification: `cargo fmt --check`, the `bridge.rs` rustfmt check, `cargo clippy -D warnings` and `cargo test` (375 tests, 5 new label tests and 1 import test for a folder Pin's title across restart and re-import) pass, as do `export_patches.py --check` and `check_docs.py`.
+
 ## 2026-11-13: Arc folders import as folders
 
 - The workspace has folders of a Space's Pins, with an open or closed state saved in `myarc-workspace-v1.json`. Import from Arc turns each `##` group into a folder in Arc's order and keeps `Favorites` as ungrouped Pins. A re-import matches folders by name, adds only missing Pins and moves Pins from an earlier flattened import into their folder. The sidebar shows each folder as a row with a disclosure arrow and its Pins beneath, and the row's menu renames or deletes it. Deleting archives the folder's dormant Pins, as Arc does, and keeps open pages in Today. The package script no longer adds the `myarcctl` link.

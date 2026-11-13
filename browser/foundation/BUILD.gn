@@ -15,6 +15,7 @@ rust_static_library("workspace") {
     "workspace/src/peek.rs",
     "workspace/src/site_icon.rs",
     "workspace/src/tab_ops.rs",
+    "workspace/src/url_label.rs",
   ]
   build_native_rust_unit_tests = true
 }
