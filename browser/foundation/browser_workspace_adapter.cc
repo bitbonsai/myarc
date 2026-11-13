@@ -24,6 +24,7 @@
 #include "chrome/browser/sessions/session_restore.h"
 #include "chrome/browser/sessions/session_service.h"
 #include "chrome/browser/sessions/session_service_factory.h"
+#include "chrome/browser/ui/browser_commands.h"
 #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
 #include "chrome/browser/ui/navigator/browser_navigator.h"
 #include "chrome/browser/ui/navigator/browser_navigator_params.h"
@@ -118,7 +119,10 @@ bool g_rename_item_hook_done = false;
 // workspace is ready, through the same path as Open in Split View in the
 // second one's menu. A value of a ratio between 0 and 1 then sets the left
 // pane's share, as dragging the divider does; "separate" then separates the
-// split, as Separate All Tabs does.
+// split, as Separate All Tabs does. "left" and "right" focus that pane, as
+// Ctrl+Shift+1 and 2 do. "close" focuses the right pane and closes it as
+// Cmd+W does, and "close-row" closes the left one as Close in its sidebar
+// menu does.
 constexpr char kMyarcTestSplit[] = "myarc-test-split";
 bool g_split_hook_done = false;
 #endif  // BUILDFLAG(MYARC_TEST_HOOKS)
@@ -1593,6 +1597,14 @@ void BrowserWorkspaceAdapter::Refresh() {
                 double ratio = 0;
                 if (result.ok && value == "separate") {
                   result = adapter->SeparateSplit(second);
+                } else if (result.ok && (value == "left" || value == "right")) {
+                  result = adapter->FocusSplitPane(value == "left" ? 0 : 1);
+                } else if (result.ok && value == "close") {
+                  result = adapter->FocusSplitPane(1);
+                  if (result.ok)
+                    chrome::CloseTab(adapter->browser_);
+                } else if (result.ok && value == "close-row") {
+                  result = adapter->CloseItem(first);
                 } else if (result.ok && base::StringToDouble(value, &ratio) &&
                            ratio > 0 && ratio < 1) {
                   auto& tabs = *adapter->tabs_;

@@ -1,0 +1,143 @@
+diff --git a/chrome/browser/ui/views/frame/multi_contents_view.cc b/chrome/browser/ui/views/frame/multi_contents_view.cc
+index a756f076ffce50efa86bb84421b4ff8a77e8c581..cf05b3348979e3220ebb24d5bcf5f2aadf397c1c 100644
+--- a/chrome/browser/ui/views/frame/multi_contents_view.cc
++++ b/chrome/browser/ui/views/frame/multi_contents_view.cc
+@@ -8,6 +8,7 @@
+ #include <cstdlib>
+ 
+ #include "base/check_deref.h"
++#include "base/command_line.h"
+ #include "base/notreached.h"
+ #include "chrome/browser/actor/ui/actor_overlay_web_view.h"
+ #include "chrome/browser/browser_process.h"
+@@ -43,7 +44,10 @@
+ #include "content/public/common/url_constants.h"
+ #include "ui/base/metadata/metadata_impl_macros.h"
+ #include "ui/base/ozone_buildflags.h"
++#include "ui/color/color_provider.h"
+ #include "ui/compositor/layer.h"
++#include "ui/gfx/canvas.h"
++#include "ui/gfx/color_utils.h"
+ #include "ui/gfx/geometry/outsets.h"
+ #include "ui/gfx/geometry/rect.h"
+ #include "ui/gfx/geometry/rounded_corners_f.h"
+@@ -54,7 +58,12 @@
+ 
+ namespace {
+ constexpr int kSnapDistance = 15;
++
++bool IsMyarcVisualParity() {
++  return base::CommandLine::ForCurrentProcess()->HasSwitch(
++      "myarc-visual-parity");
+ }
++}  // namespace
+ 
+ void MultiContentsView::ContentsSeparators::Reset() {
+   top_separator = nullptr;
+@@ -231,6 +240,11 @@ void MultiContentsView::SetBackgroundRadii(const gfx::RoundedCornersF& radii) {
+     GetActiveContentsContainerView()->SetRoundedCorners(radii);
+     GetInactiveContentsContainerView()->SetRoundedCorners(
+         gfx::RoundedCornersF());
++  } else if (IsMyarcVisualParity()) {
++    for (auto& contents_container_view : contents_container_views_) {
++      contents_container_view->SetRoundedCorners(radii);
++    }
++    SchedulePaint();
+   }
+ }
+ 
+@@ -441,6 +455,27 @@ void MultiContentsView::OnThemeChanged() {
+   UpdateContentsBorderAndOverlay();
+ }
+ 
++void MultiContentsView::OnPaint(gfx::Canvas* canvas) {
++  views::View::OnPaint(canvas);
++  if (!IsMyarcVisualParity() || !IsInSplitView()) {
++    return;
++  }
++  // Arc rings the active pane's card in a thin light line just outside it.
++  const bool dark = color_utils::IsDark(
++      GetColorProvider()->GetColor(ui::kColorSysSurface));
++  cc::PaintFlags flags;
++  flags.setAntiAlias(true);
++  flags.setStyle(cc::PaintFlags::kStroke_Style);
++  flags.setStrokeWidth(kMyarcActiveRing);
++  flags.setColor(dark ? SkColorSetARGB(0x66, 0xff, 0xff, 0xff)
++                      : SkColorSetARGB(0x40, 0x00, 0x00, 0x00));
++  gfx::RectF ring(GetActiveContentsContainerView()->bounds());
++  ring.Outset(kMyarcActiveRing / 2.f);
++  const float radius =
++      GetBackgroundRadii().upper_left() + kMyarcActiveRing / 2.f;
++  canvas->DrawRoundRect(ring, radius, flags);
++}
++
+ int MultiContentsView::GetInactiveIndex() const {
+   return active_index_ == 0 ? 1 : 0;
+ }
+@@ -508,7 +543,8 @@ views::ProposedLayout MultiContentsView::CalculateProposedLayout(
+   gfx::Rect available_space = gfx::Rect(width, height);
+ 
+   const bool show_background =
+-      drop_target_view_->GetVisible() || IsInSplitView();
++      drop_target_view_->GetVisible() ||
++      (IsInSplitView() && !IsMyarcVisualParity());
+   layouts.child_layouts.emplace_back(background_view_.get(), show_background,
+                                      available_space);
+ 
+@@ -559,6 +595,10 @@ views::ProposedLayout MultiContentsView::CalculateProposedLayout(
+ }
+ 
+ void MultiContentsView::BeforeApplyLayout(const views::ProposedLayout& layout) {
++  if (IsMyarcVisualParity() && IsInSplitView()) {
++    // The active pane's ring follows the panes as they move.
++    SchedulePaint();
++  }
+   if (!target_content_bounds_) {
+     for (auto& contents : contents_container_views_) {
+       contents->SetTargetContentBounds(std::nullopt);
+@@ -581,8 +621,11 @@ void MultiContentsView::BeforeApplyLayout(const views::ProposedLayout& layout) {
+   {
+     // Need to temporarily override the split view insets.
+     const auto split_view_insets =
+-        gfx::Insets::TLBR(split_view_insets_.top(), kSplitViewContentInset,
+-                          kSplitViewContentInset, kSplitViewContentInset);
++        IsMyarcVisualParity()
++            ? split_view_insets_
++            : gfx::Insets::TLBR(split_view_insets_.top(),
++                                kSplitViewContentInset, kSplitViewContentInset,
++                                kSplitViewContentInset);
+     base::AutoReset inset_override(&split_view_insets_, split_view_insets);
+     target_layout = CalculateProposedLayout(
+         views::SizeBounds(target_content_bounds_->actual_size));
+@@ -744,6 +787,9 @@ MultiContentsView::ViewSizes MultiContentsView::GetViewSizes(
+     sizes.resize = GetSplitLayout() == split_tabs::SplitTabLayout::kSideBySide
+                        ? resize_area_->GetPreferredSize().width()
+                        : resize_area_->GetPreferredSize().height();
++    if (IsMyarcVisualParity()) {
++      sizes.resize = kMyarcPaneGap;
++    }
+     sizes.start = std::round(visual_data_.split_ratio() *
+                              (available_size - sizes.resize));
+     sizes.end = available_size - sizes.start - sizes.resize;
+@@ -799,13 +845,18 @@ void MultiContentsView::UpdateContentsBorderAndOverlay() {
+   for (auto& contents_container_view : contents_container_views_) {
+     const bool is_active =
+         contents_container_view->contents_view() == GetActiveContentsView();
++    // myArc's split panes keep the single page card's corners.
+     contents_container_view->SetRoundedCorners(
+-        is_in_split
+-            ? kSplitViewContentRoundedCorners
+-            : (is_active ? GetBackgroundRadii() : gfx::RoundedCornersF()));
++        is_in_split ? (IsMyarcVisualParity() ? GetBackgroundRadii()
++                                             : kSplitViewContentRoundedCorners)
++                    : (is_active ? GetBackgroundRadii()
++                                 : gfx::RoundedCornersF()));
+     contents_container_view->UpdateBorderAndOverlay(
+         is_in_split, is_active, is_active && active_contents_view_highlighted_);
+   }
++  if (IsMyarcVisualParity()) {
++    SchedulePaint();
++  }
+ }
+ 
+ MultiContentsViewDropTargetController&

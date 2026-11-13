@@ -1,0 +1,24 @@
+diff --git a/chrome/browser/ui/views/frame/multi_contents_view.h b/chrome/browser/ui/views/frame/multi_contents_view.h
+index e39f000c2a9df3a6bc7b65f33a0d6f100840939a..b1928e22329ed0000368825be60e3edcdaaf7edb 100644
+--- a/chrome/browser/ui/views/frame/multi_contents_view.h
++++ b/chrome/browser/ui/views/frame/multi_contents_view.h
+@@ -68,6 +68,11 @@ class MultiContentsView
+   static constexpr float kSplitViewContentCornerRadius = 6;
+   static constexpr gfx::RoundedCornersF kSplitViewContentRoundedCorners{
+       kSplitViewContentCornerRadius};
++  // With --myarc-visual-parity, split panes are page cards this far apart,
++  // the same as the card's inset from the window, and the active pane has a
++  // ring this wide around it, as in Arc.
++  static constexpr int kMyarcPaneGap = 10;
++  static constexpr int kMyarcActiveRing = 2;
+ 
+   MultiContentsView(BrowserView* browser_view,
+                     std::unique_ptr<MultiContentsViewDelegate> delegate);
+@@ -174,6 +179,7 @@ class MultiContentsView
+ 
+   // views::View:
+   void OnThemeChanged() override;
++  void OnPaint(gfx::Canvas* canvas) override;
+ 
+   const std::vector<raw_ptr<ContentsContainerView, DanglingUntriaged>>&
+   contents_container_views() const {

@@ -1,5 +1,5 @@
 diff --git a/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl.cc b/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl.cc
-index b1ea4a69f42333b238abbf67b0278467ea41bb28..64e90364545f45138d26fc920ae0f1dac35c3972 100644
+index b1ea4a69f42333b238abbf67b0278467ea41bb28..3b12845134cd3d9eadbebb7064700cc8b8892969 100644
 --- a/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl.cc
 +++ b/chrome/browser/ui/views/frame/layout/browser_view_tabbed_layout_impl.cc
 @@ -9,6 +9,7 @@
@@ -162,7 +162,7 @@ index b1ea4a69f42333b238abbf67b0278467ea41bb28..64e90364545f45138d26fc920ae0f1da
      if (bottom_corner_visible) {
        auto preferred =
            views().vertical_tab_strip_bottom_corner->GetPreferredSize();
-@@ -1195,6 +1224,15 @@ BrowserViewTabbedLayoutImpl::CalculateProposedLayout(
+@@ -1195,6 +1224,21 @@ BrowserViewTabbedLayoutImpl::CalculateProposedLayout(
      params.SetTop(top_container_layout.bounds.bottom());
    }
  
@@ -171,14 +171,20 @@ index b1ea4a69f42333b238abbf67b0278467ea41bb28..64e90364545f45138d26fc920ae0f1da
 +    const int leading_inset = base::ClampRound(
 +        kMyarcPageCardInset *
 +        (1.0 - vertical_tab_strip_animation.tab_strip_width));
-+    params.Inset(gfx::Insets::TLBR(kMyarcPageCardInset, leading_inset,
-+                                   kMyarcPageCardInset, kMyarcPageCardInset));
++    // A split keeps room inside its bounds for the active pane's ring, so
++    // the panes' cards line up with the single card's edges.
++    const int ring = horizontal_layout.is_split_view
++                         ? MultiContentsView::kMyarcActiveRing
++                         : 0;
++    params.Inset(gfx::Insets::TLBR(
++        kMyarcPageCardInset - ring, std::max(0, leading_inset - ring),
++        kMyarcPageCardInset - ring, kMyarcPageCardInset - ring));
 +  }
 +
    // Lay out infobar container.
    const bool infobar_visible = delegate().IsInfobarVisible();
    if (IsParentedTo(views().infobar_container, views().browser_view)) {
-@@ -1227,6 +1265,8 @@ BrowserViewTabbedLayoutImpl::CalculateProposedLayout(
+@@ -1227,6 +1271,8 @@ BrowserViewTabbedLayoutImpl::CalculateProposedLayout(
    // the required top padding.
    const auto& separator_info = layout_data_->separator_info;
    views().multi_contents_view->SetShouldShowTopSeparator(
@@ -187,7 +193,20 @@ index b1ea4a69f42333b238abbf67b0278467ea41bb28..64e90364545f45138d26fc920ae0f1da
        separator_info.multi_contents_separator);
  
    // Updating the top, left and right insets for contents container view when
-@@ -1602,6 +1642,16 @@ void BrowserViewTabbedLayoutImpl::DoPostLayoutVisualAdjustments(
+@@ -1250,7 +1296,11 @@ BrowserViewTabbedLayoutImpl::CalculateProposedLayout(
+         include_leading_inset ? default_inset : panel_side_inset, default_inset,
+         include_trailing_inset ? default_inset : panel_side_inset);
+ 
+-    views().multi_contents_view->SetSplitViewInsets(contents_insets);
++    views().multi_contents_view->SetSplitViewInsets(
++        visual_parity &&
++                layout_data_->tab_strip_type == TabStripType::kVertical
++            ? gfx::Insets(MultiContentsView::kMyarcActiveRing)
++            : contents_insets);
+   }
+ 
+   // Update the multi-contents view about if we will be animating content
+@@ -1602,6 +1652,16 @@ void BrowserViewTabbedLayoutImpl::DoPostLayoutVisualAdjustments(
          content_corners.set_lower_left(radius);
        }
      }
@@ -204,7 +223,7 @@ index b1ea4a69f42333b238abbf67b0278467ea41bb28..64e90364545f45138d26fc920ae0f1da
      views().multi_contents_view->SetBackgroundRadii(content_corners);
    }
  
-@@ -1612,9 +1662,13 @@ void BrowserViewTabbedLayoutImpl::DoPostLayoutVisualAdjustments(
+@@ -1612,9 +1672,13 @@ void BrowserViewTabbedLayoutImpl::DoPostLayoutVisualAdjustments(
    CustomCornersBackground::Cutouts tab_strip_cutout_views;
    int side_panel_start = layout_data_->revised_params.visual_client_area.x();
  
@@ -220,7 +239,7 @@ index b1ea4a69f42333b238abbf67b0278467ea41bb28..64e90364545f45138d26fc920ae0f1da
  
    // Set vertical tabstrip corners.
    CustomCorners::ColorChoiceWithAlpha frame_color(CustomCorners::FrameTheme(),
-@@ -1633,6 +1687,17 @@ void BrowserViewTabbedLayoutImpl::DoPostLayoutVisualAdjustments(
+@@ -1633,6 +1697,17 @@ void BrowserViewTabbedLayoutImpl::DoPostLayoutVisualAdjustments(
      CHECK(vertical_tabs_background)
          << "Expected vertical tab strip to have a CustomCornersBackground.";
  
@@ -238,7 +257,7 @@ index b1ea4a69f42333b238abbf67b0278467ea41bb28..64e90364545f45138d26fc920ae0f1da
      if (in_glass_mode()) {
        if (!is_fullscreen(layout_data_->window_state)) {
          frame_color.opacity = 0.0f;
-@@ -1646,9 +1711,10 @@ void BrowserViewTabbedLayoutImpl::DoPostLayoutVisualAdjustments(
+@@ -1646,9 +1721,10 @@ void BrowserViewTabbedLayoutImpl::DoPostLayoutVisualAdjustments(
        vertical_tabs_background_color.opacity = static_cast<float>(
            (1.0 - flyover_background_base_opacity) * frame_color.opacity +
            flyover_background_base_opacity * flyover_panel_opacity);
@@ -251,7 +270,7 @@ index b1ea4a69f42333b238abbf67b0278467ea41bb28..64e90364545f45138d26fc920ae0f1da
      }
  
      // Ensure that corners of the window remain rounded.
-@@ -1691,12 +1757,23 @@ void BrowserViewTabbedLayoutImpl::DoPostLayoutVisualAdjustments(
+@@ -1691,12 +1767,23 @@ void BrowserViewTabbedLayoutImpl::DoPostLayoutVisualAdjustments(
            vertical_tabs_bottom_corner_size;
      }
  
@@ -277,7 +296,7 @@ index b1ea4a69f42333b238abbf67b0278467ea41bb28..64e90364545f45138d26fc920ae0f1da
        shadow_frame->SetShadowCornerRadius(vertical_tabs_bottom_corner_size);
        shadow_frame->SetShadowOpacity(vertical_tabs_bottom_corner_amount);
        shadow_frame->SetShadowVisible(true);
-@@ -1726,19 +1803,37 @@ void BrowserViewTabbedLayoutImpl::DoPostLayoutVisualAdjustments(
+@@ -1726,19 +1813,37 @@ void BrowserViewTabbedLayoutImpl::DoPostLayoutVisualAdjustments(
      if (animation.expand_on_hover_width > 0.0) {
        vertical_tabs_outline.bottom = true;
      }
