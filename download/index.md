@@ -4,12 +4,12 @@ HTML: https://myarc.dev/download/
 
 Pre-alpha nightly, for trying the Arc-like shell. Not for daily or sensitive browsing.
 
-[Download for macOS (Apple silicon)](https://github.com/bitbonsai/myarc/releases/download/nightly-2026.11.13.1/myArc-Nightly-2026.11.13.1-arm64.dmg)
+[Download for macOS (Apple silicon)](https://github.com/bitbonsai/myarc/releases/download/nightly-2026.11.13.2/myArc-Nightly-2026.11.13.2-arm64.dmg)
 
-- **Version:** 2026.11.13.1
+- **Version:** 2026.11.13.2
 - **Date:** November 13, 2026
-- **Size:** 234.0 MB
-- **SHA-256:** `4f86c86b481192ba64048efb531225a675accbbc1dfa90095d1114fc2014b8eb`
+- **Size:** 234.6 MB
+- **SHA-256:** `875c4a98e1131f29c6369dd6de68d4c6319dd5bf57dac71339eb11ef31977b28`
 
 ## System requirements
 
@@ -21,7 +21,7 @@ Pre-alpha nightly, for trying the Arc-like shell. Not for daily or sensitive bro
 1. Check the download against the SHA-256 listed with it. The two values must match.
 
    ```
-   shasum -a 256 ~/Downloads/myArc-Nightly-2026.11.13.1-arm64.dmg
+   shasum -a 256 ~/Downloads/myArc-Nightly-2026.11.13.2-arm64.dmg
    ```
 2. Open the DMG and drag myArc Nightly to Applications.
 3. macOS blocks the first launch because the app is not notarized. Right-click myArc Nightly, choose Open, then Open again. If macOS only offers Done or Move to Trash, which macOS 15 and later usually does, open System Settings \> Privacy \& Security, scroll to the myArc Nightly message and choose Open Anyway.
@@ -43,13 +43,14 @@ Each item was seen working in a native run or experiment note. None of it has ha
 - Shortcuts: Cmd\+S hides the sidebar, Cmd\+Shift\+T reopens a closed tab, Cmd\+Shift\+C copies the address and shows a Copied Current URL toast, Cmd\+Shift\+N opens a private window and Ctrl\+Cmd\+N a blank one.
 - Cmd\+, opens a native Settings window. General shows the default-browser banner and Advanced links to the full Chromium settings. Profiles, Links and Shortcuts are not available yet.
 - Quitting with Cmd\+Q needs no confirmation by default, with a setting to turn the warning on.
-- Importing an Arc export from Settings \> Advanced \> Import from Arc. A preview shows what it will add, then each Space arrives with its links as pinned tabs, in Arc's order. Importing the same file again adds nothing.
+- Importing an Arc export from Settings \> Advanced \> Import from Arc. A preview shows what it will add, then each Space arrives with its folders and pinned tabs, in Arc's order. Importing the same file again adds nothing.
+- Folders for a Space's pinned tabs. Create, rename and delete them from the right-click menu, and open or close them. Moving a tab into a folder is menu-only for now.
 - Agents can drive tabs in the Agent Space through the bundled myarc CLI and MCP server. It is off by default. Turn it on in Settings \> Advanced, and myArc asks before each new agent connects.
 
 ## What does not work yet
 
-- Arc folders and Favorites in an import. The export does not mark them, so they arrive as pinned tabs.
-- Cmd\+D to pin a tab (Cmd\+D still bookmarks), folders, Auto Archive, the Archive and drag-to-pin.
+- Arc Favorites in an import. The export does not mark them, so they arrive as pinned tabs.
+- Cmd\+D to pin a tab (Cmd\+D still bookmarks), nested folders, Auto Archive, the Archive and drag-to-pin.
 - Peek, Split View and Little Arc. The Peek routing rule exists, but there is no overlay.
 - Boosts, the Library, download progress in the sidebar and the Mini Player.
 - The animated onboarding.
@@ -70,7 +71,7 @@ Each item was seen working in a native run or experiment note. None of it has ha
 
 ## Other ways to get it
 
-- [GitHub releases](https://github.com/bitbonsai/myarc/releases/tag/nightly-2026.11.13.1) lists every nightly.
+- [GitHub releases](https://github.com/bitbonsai/myarc/releases/tag/nightly-2026.11.13.2) lists every nightly.
 - [Source on GitHub](https://github.com/bitbonsai/myarc), with instructions to [build it from source](https://github.com/bitbonsai/myarc/blob/main/browser/README.md).
 - [GitHub issues](https://github.com/bitbonsai/myarc/issues) take bug reports. Include the version, your macOS version and the steps that trigger the problem, and leave out private pages.
 
