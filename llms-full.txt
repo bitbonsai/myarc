@@ -227,9 +227,9 @@ The agent gets in through `myarc`, a small command-line tool that also runs as a
 
 ## The click that crashed
 
-The agents started testing it right away, and soon one of their clicks killed the page. It didn't happen every time. It seemed to follow a pause, with the agent sitting idle for a bit before clicking, and for a while it looked like nothing was writing a crash report. Then it turned out Chromium had saved every one, all pointing at the same spot in its code.
+The agents started testing right away, and soon one of their clicks crashed the page. It only happened sometimes, after the agent had sat idle for a bit.
 
-The bug was in Chromium. Before a click, the browser checks where the element sits so it can scroll it into view, and that check read the page layout without bringing it up to date. In a tab you're looking at, layout refreshes every frame, so nobody notices. The agent's tab sits in the background and draws no frames, so its layout goes stale, and one of Chromium's safety checks caught the stale read and stopped the page. The fix is one line that updates the layout first, which the function right next to it already did. After that the same test clicked through every round.
+The cause was in Chromium itself. Before a click, it checks where the element sits so it can scroll it into view, and that check read the page layout without updating it. A tab you're looking at redraws every frame, which keeps its layout fresh. The agent's tab sits in the background and doesn't draw, so its layout went stale, and a Chromium safety check stopped the page. The fix is one line that updates the layout first, as the function next to it already did. After that, the clicks stopped crashing.
 
 ## Who gets to drive
 
@@ -269,9 +269,9 @@ None of these sites was ever opened in this profile.
 
 ## Getting ready to leave Arc
 
-That import is the next big piece. Arc can export your Spaces to a file, under Settings \> Advanced \> Export Data, and myArc can now read that file into a list of Spaces, their groups and their links, in Arc's order. Anything it doesn't understand gets flagged with its line number, so nothing goes missing quietly. It doesn't create anything in the browser yet. Turning that list into real Spaces and pins comes next, and it's the part I'm waiting for. I've used Arc since 2023, and I'd rather not rebuild those Spaces by hand.
+That import is the next big piece. Arc can export your Spaces to a file, under `Settings > Advanced > Export Data`, and myArc can now read that file into a list of Spaces, their groups and their links, in Arc's order. Anything it doesn't understand gets flagged with its line number, so nothing goes missing quietly. It doesn't create anything in the browser yet. Turning that list into real Spaces and pins comes next, and it's the part I'm waiting for. I've used Arc since 2023, and I'd rather not rebuild those Spaces by hand.
 
-Agent control and pin icons are in the nightly. One more change came from reading this post. The command was called `myarcctl` until I tripped over it here, and now it's `myarc`.
+The agents that build myArc don't need a separate Chrome anymore. They browse in a Space next to mine, inside the browser they're building. Agent control and pin icons are in the nightly, if you'd like to give your own agent a Space too.
 
 
 ---
