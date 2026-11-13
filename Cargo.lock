@@ -34,6 +34,9 @@ dependencies = [
 [[package]]
 name = "myarc-import"
 version = "0.1.0"
+dependencies = [
+ "myarc-workspace",
+]
 
 [[package]]
 name = "myarc-workspace"
