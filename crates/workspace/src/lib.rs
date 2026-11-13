@@ -134,6 +134,8 @@ pub enum WorkspaceError {
     SplitAcrossSpaces(ItemId),
     AlreadySplit(ItemId),
     SplitWithItself(ItemId),
+    /// A split row drags within Today only; pinning a split is a later step.
+    SplitNotPinnable(ItemId),
     LimitExceeded(&'static str),
     IdExhausted(&'static str),
     UnsupportedSnapshotVersion(u32),
@@ -176,6 +178,7 @@ impl fmt::Display for WorkspaceError {
             Self::SplitAcrossSpaces(id) => write!(formatter, "Item {id} belongs to another Space or Profile; a split holds tabs of one Space"),
             Self::AlreadySplit(id) => write!(formatter, "Item {id} is already in a split; separate it first"),
             Self::SplitWithItself(id) => write!(formatter, "Item {id} can't be split with itself; pick another tab"),
+            Self::SplitNotPinnable(id) => write!(formatter, "Item {id} is in a split, which can't be pinned yet; separate it first"),
             Self::LimitExceeded(kind) => write!(formatter, "Workspace {kind} limit reached"),
             Self::IdExhausted(kind) => write!(formatter, "Workspace {kind} IDs exhausted"),
             Self::UnsupportedSnapshotVersion(version) => write!(formatter, "Workspace snapshot version {version} is unsupported; expected {SNAPSHOT_VERSION}"),

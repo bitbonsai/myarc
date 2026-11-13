@@ -24,6 +24,7 @@
 #include "chrome/browser/sessions/session_restore.h"
 #include "chrome/browser/sessions/session_service.h"
 #include "chrome/browser/sessions/session_service_factory.h"
+#include "chrome/app/chrome_command_ids.h"
 #include "chrome/browser/ui/browser_commands.h"
 #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
 #include "chrome/browser/ui/navigator/browser_navigator.h"
@@ -122,7 +123,9 @@ bool g_rename_item_hook_done = false;
 // split, as Separate All Tabs does. "left" and "right" focus that pane, as
 // Ctrl+Shift+1 and 2 do. "close" focuses the right pane and closes it as
 // Cmd+W does, and "close-row" closes the left one as Close in its sidebar
-// menu does.
+// menu does. "new" instead runs New Split on the first tab, as Ctrl+Shift+=
+// does; "new-pick" then picks the command bar's first tab and "new-esc"
+// dismisses it.
 constexpr char kMyarcTestSplit[] = "myarc-test-split";
 bool g_split_hook_done = false;
 #endif  // BUILDFLAG(MYARC_TEST_HOOKS)
@@ -1331,7 +1334,7 @@ void BrowserWorkspaceAdapter::SyncSplits() {
   if (!ready() || changing_ || !tabs_ || tabs_->closing_all())
     return;
   base::AutoReset<bool> changing(&changing_, true);
-  // Splits Chromium made, from its own menus, Option-Cmd-N or session
+  // Splits Chromium made, from its own menus, New Split or session
   // restore, join the workspace once both tabs are bound. A pair the
   // workspace refuses, such as a Favorite or a tab of another Space, is
   // unsplit, so no split crosses Spaces or Profiles.
@@ -1592,6 +1595,21 @@ void BrowserWorkspaceAdapter::Refresh() {
                 if (!adapter || !adapter->ready())
                   return;
                 auto result = adapter->ActivateItem(first);
+                if (result.ok && value.starts_with("new")) {
+                  // Once the other tabs' pages have committed, so the
+                  // command bar can list them.
+                  auto new_split =
+                      [](base::WeakPtr<BrowserWorkspaceAdapter> adapter) {
+                        if (adapter && adapter->ready())
+                          chrome::ExecuteCommand(adapter->browser_,
+                                                 IDC_NEW_SPLIT_TAB);
+                      };
+                  base::SingleThreadTaskRunner::GetCurrentDefault()
+                      ->PostDelayedTask(FROM_HERE,
+                                        base::BindOnce(new_split, adapter),
+                                        base::Seconds(3));
+                  return;
+                }
                 if (result.ok)
                   result = adapter->OpenInSplitView(second);
                 double ratio = 0;
@@ -2171,10 +2189,13 @@ foundation::MutationResult BrowserWorkspaceAdapter::DropItem(
   const auto* row = state ? FindItem(*state, item) : nullptr;
   if (!row)
     return Fail("Workspace item does not exist.");
-  // As in Save: a live Today tab pins the page it shows now.
-  auto* page = tabs_ && row->placement == foundation::PlacementKind::Temporary
-                   ? LocalPage(*tabs_, item)
-                   : nullptr;
+  // As in Save: a live Today tab pins the page it shows now. A drop within
+  // Today pins nothing, so any page, such as a file:// one, can reorder.
+  const bool pins = target != foundation::DropTargetKind::Today;
+  auto* page =
+      tabs_ && pins && row->placement == foundation::PlacementKind::Temporary
+          ? LocalPage(*tabs_, item)
+          : nullptr;
   std::string url;
   if (page)
     url = page->GetLastCommittedURL().spec();
@@ -2266,6 +2287,27 @@ foundation::MutationResult BrowserWorkspaceAdapter::SeparateSplit(
     }
   }
   return Remember(service_->SeparateSplit(item));
+}
+
+std::set<uint64_t> BrowserWorkspaceAdapter::SplitCandidates() const {
+  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
+  std::set<uint64_t> items;
+  // Not ready(): New Split's own pane is waiting for its binding, and the
+  // other tabs are bound already.
+  if (!tabs_ || !IsReady(*service_))
+    return items;
+  const auto sidebar = service_->Sidebar(window_id_);
+  if (!sidebar.ok)
+    return items;
+  for (const auto& row : sidebar.temporary) {
+    if (LocalPage(*tabs_, row.id))
+      items.insert(row.id);
+  }
+  for (const auto& split : sidebar.splits) {
+    items.erase(split.left);
+    items.erase(split.right);
+  }
+  return items;
 }
 
 foundation::MutationResult BrowserWorkspaceAdapter::FocusSplitPane(int index) {

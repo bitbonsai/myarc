@@ -4,7 +4,8 @@
 //! A split pairs two temporary items of the same Space, so both belong to the
 //! same Profile. `left` is the pane on the left and the row shows it first.
 //! An item sits in at most one split. Pins and Favorites can't join a split
-//! yet; pinning a split is a later step.
+//! yet; pinning a split is a later step. The split's row drags within Today as
+//! one item (see `drag.rs`).
 //!
 //! The browser owns the panes, their sizes and focus. This model keeps which
 //! items form a split so the sidebar can draw one row and a restart brings the
@@ -89,17 +90,45 @@ impl Workspace {
         }
         // Distinct items keep this below the item limit; the check only bounds it.
         crate::check_limit(self.state.splits.len(), MAX_SPLITS, "splits")?;
+        self.place_right_after_left(wanted);
+        self.state.splits.push(wanted);
+        Ok(true)
+    }
+
+    /// The item a split's row stands for, its left tab, or `item_id` itself
+    /// when it isn't in a split.
+    pub(crate) fn split_row(&self, item_id: ItemId) -> ItemId {
+        self.split_of(item_id).map_or(item_id, |split| split.left)
+    }
+
+    /// Moves a split's row before `before`, a split row or Today tab of its
+    /// Space, or to the end of Today. Both tabs move together, left then right,
+    /// as Arc moves a split as one item.
+    pub(crate) fn move_split_before(
+        &mut self,
+        split: Split,
+        before: Option<ItemId>,
+    ) -> Result<(), WorkspaceError> {
+        if before == Some(split.left) {
+            return Ok(());
+        }
+        self.move_item_before(split.left, before)?;
+        self.place_right_after_left(split);
+        Ok(())
+    }
+
+    /// Puts `split.right` just after `split.left` in workspace order, where the
+    /// split's row shows.
+    fn place_right_after_left(&mut self, split: Split) {
         let items = &mut self.state.items;
-        if let Some(from) = items.iter().position(|item| item.id == right) {
+        if let Some(from) = items.iter().position(|item| item.id == split.right) {
             let item = items.remove(from);
             let to = items
                 .iter()
-                .position(|item| item.id == left)
+                .position(|item| item.id == split.left)
                 .map_or(items.len(), |at| at + 1);
             items.insert(to, item);
         }
-        self.state.splits.push(wanted);
-        Ok(true)
     }
 
     /// Ends the split holding `item_id`, as Arc's Separate All Tabs does. Both
@@ -160,7 +189,7 @@ impl Workspace {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{DEFAULT_PROFILE_ID, DEFAULT_SPACE_ID, DEFAULT_WINDOW_ID};
+    use crate::{DEFAULT_PROFILE_ID, DEFAULT_SPACE_ID, DEFAULT_WINDOW_ID, DropTarget};
 
     const URL: &str = "https://example.test/";
 
@@ -305,6 +334,78 @@ mod tests {
             .set_placement(ids[5], Placement::Temporary { space_id: other }, None)
             .unwrap();
         assert!(workspace.splits().is_empty());
+    }
+
+    fn drop_today(workspace: &mut Workspace, item: ItemId, before: Option<ItemId>) {
+        workspace
+            .drop_item(DEFAULT_WINDOW_ID, item, DropTarget::Today { before }, None)
+            .unwrap();
+    }
+
+    #[test]
+    fn a_dragged_split_row_moves_both_tabs_together_within_today() {
+        let mut workspace = Workspace::default();
+        let ids = today(&mut workspace, 4);
+        workspace.create_split(ids[0], ids[1]).unwrap();
+        let split = workspace.split_of(ids[0]).unwrap();
+
+        drop_today(&mut workspace, ids[0], Some(ids[3]));
+        assert_eq!(order(&workspace), vec![ids[2], ids[0], ids[1], ids[3]]);
+        drop_today(&mut workspace, ids[0], None);
+        assert_eq!(order(&workspace), vec![ids[2], ids[3], ids[0], ids[1]]);
+        drop_today(&mut workspace, ids[0], Some(ids[2]));
+        assert_eq!(order(&workspace), vec![ids[0], ids[1], ids[2], ids[3]]);
+        // Dropping the row on itself, from either pane, changes nothing.
+        drop_today(&mut workspace, ids[1], Some(ids[1]));
+        drop_today(&mut workspace, ids[0], Some(ids[0]));
+        assert_eq!(order(&workspace), ids);
+        assert_eq!(workspace.splits(), &[split]);
+    }
+
+    #[test]
+    fn a_tab_dropped_on_a_split_lands_above_its_row() {
+        let mut workspace = Workspace::default();
+        let ids = today(&mut workspace, 3);
+        workspace.create_split(ids[0], ids[1]).unwrap();
+        drop_today(&mut workspace, ids[2], Some(ids[1]));
+        assert_eq!(order(&workspace), vec![ids[2], ids[0], ids[1]]);
+        assert_eq!(workspace.splits().len(), 1);
+    }
+
+    #[test]
+    fn a_split_row_refuses_pins_and_folders() {
+        let mut workspace = Workspace::default();
+        let ids = today(&mut workspace, 3);
+        workspace
+            .set_placement(
+                ids[2],
+                Placement::Pin {
+                    space_id: DEFAULT_SPACE_ID,
+                },
+                Some(URL),
+            )
+            .unwrap();
+        let folder = workspace
+            .create_folder(DEFAULT_SPACE_ID, "Reading")
+            .unwrap();
+        workspace.create_split(ids[0], ids[1]).unwrap();
+        let before = workspace.snapshot();
+        for target in [
+            DropTarget::Pins { before: None },
+            DropTarget::Pins {
+                before: Some(ids[2]),
+            },
+            DropTarget::Folder {
+                folder,
+                before: None,
+            },
+        ] {
+            assert_eq!(
+                workspace.drop_item(DEFAULT_WINDOW_ID, ids[1], target, Some(URL)),
+                Err(WorkspaceError::SplitNotPinnable(ids[1]))
+            );
+        }
+        assert_eq!(workspace.snapshot(), before);
     }
 
     #[test]

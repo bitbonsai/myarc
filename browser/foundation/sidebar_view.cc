@@ -1523,8 +1523,10 @@ void SidebarView::OnRowDragEvent(ui::Event& event) {
       // Rows with an item drag: Pin tiles, folders' Pins and Today tabs.
       for (const DropZone& zone : drop_zones_) {
         if (zone.item && zone.view->Contains(target)) {
-          row_drag_ =
-              RowDrag{.item = zone.item, .source = zone.view, .press = point};
+          row_drag_ = RowDrag{.item = zone.item,
+                              .split = zone.split,
+                              .source = zone.view,
+                              .press = point};
           break;
         }
       }
@@ -1577,6 +1579,11 @@ std::optional<SidebarView::Drop> SidebarView::DropAt(
         zone.view, this, zone.view->GetLocalBounds());
     if (!bounds.Contains(point)) {
       continue;
+    }
+    // A split's row moves within Today only, until a split can be pinned.
+    if (row_drag_ && row_drag_->split &&
+        zone.kind != foundation::DropTargetKind::Today) {
+      return std::nullopt;
     }
     Drop drop = {.kind = zone.kind, .folder = zone.folder};
     if (!zone.item) {
@@ -1656,22 +1663,31 @@ void SidebarView::EndRowDrag(bool commit) {
   }
 }
 
-void SidebarView::RunCaptureDrag(uint64_t item, uint64_t folder, bool hold) {
+void SidebarView::RunCaptureDrag(uint64_t item,
+                                 uint64_t folder,
+                                 uint64_t row,
+                                 bool hold) {
   const auto source = std::ranges::find(drop_zones_, item, &DropZone::item);
   const auto target =
-      std::ranges::find_if(drop_zones_, [folder](const DropZone& zone) {
-        return zone.kind == foundation::DropTargetKind::Folder &&
-               zone.folder == folder && !zone.item;
+      std::ranges::find_if(drop_zones_, [folder, row](const DropZone& zone) {
+        return row ? zone.item == row
+                   : zone.kind == foundation::DropTargetKind::Folder &&
+                         zone.folder == folder && !zone.item;
       });
   if (!GetWidget() || source == drop_zones_.end() ||
       target == drop_zones_.end()) {
-    LOG(ERROR) << "Capture drag found no row " << item << " or folder "
-               << folder;
+    LOG(ERROR) << "Capture drag found no row " << item << ", folder "
+               << folder << " or target row " << row;
     return;
   }
   gfx::Point from = source->view->GetLocalBounds().CenterPoint();
   views::View::ConvertPointToWidget(source->view, &from);
-  gfx::Point to = target->view->GetLocalBounds().CenterPoint();
+  // A row target takes the drop above it, a folder in its middle.
+  const gfx::Rect target_bounds = target->view->GetLocalBounds();
+  gfx::Point to = target_bounds.CenterPoint();
+  if (row) {
+    to.set_y(target_bounds.y() + target_bounds.height() / 4);
+  }
   views::View::ConvertPointToWidget(target->view, &to);
   // Through the root view, as the window would send them, but without the
   // pointer, so the capture never takes focus or moves the mouse.
@@ -2270,7 +2286,7 @@ void SidebarView::SetModel(const foundation::SidebarResult& model,
        .kind = foundation::DropTargetKind::Today,
        .next = model.temporary.empty() ? 0 : model.temporary.front().id});
   // A split shows as one row where its left tab sits; its right tab has no
-  // row of its own. Split rows don't drag yet.
+  // row of its own. The row drags as one item and stands for its left tab.
   std::map<uint64_t, uint64_t> split_right;
   std::set<uint64_t> split_rights;
   for (const auto& split : model.splits) {
@@ -2287,7 +2303,14 @@ void SidebarView::SetModel(const foundation::SidebarResult& model,
       const auto right = std::ranges::find(model.temporary, pair->second,
                                            &foundation::ItemRecord::id);
       if (right != model.temporary.end()) {
-        rows->AddChildView(MakeSplit(item, *right, model.selected_item_id));
+        const auto after = std::max(model.temporary.begin() + i, right) + 1;
+        drop_zones_.push_back(
+            {.view = rows->AddChildView(
+                 MakeSplit(item, *right, model.selected_item_id)),
+             .kind = foundation::DropTargetKind::Today,
+             .item = item.id,
+             .next = after != model.temporary.end() ? after->id : 0,
+             .split = true});
         continue;
       }
     }
@@ -2355,12 +2378,16 @@ void SidebarView::SetModel(const foundation::SidebarResult& model,
         ":", base::TRIM_WHITESPACE, base::SPLIT_WANT_NONEMPTY);
     uint64_t item = 0;
     uint64_t folder = 0;
+    uint64_t row = 0;
+    // "r<item ID>" drops above that row instead of on a folder.
+    const bool to_row = parts.size() >= 2 && parts[1].starts_with('r') &&
+                        base::StringToUint64(parts[1].substr(1), &row);
     if (parts.size() >= 2 && base::StringToUint64(parts[0], &item) &&
-        base::StringToUint64(parts[1], &folder)) {
+        (to_row || base::StringToUint64(parts[1], &folder))) {
       base::SequencedTaskRunner::GetCurrentDefault()->PostDelayedTask(
           FROM_HERE,
           base::BindOnce(&SidebarView::RunCaptureDrag,
-                         weak_factory_.GetWeakPtr(), item, folder,
+                         weak_factory_.GetWeakPtr(), item, folder, row,
                          parts.size() > 2 && parts[2] == "hold"),
           base::Milliseconds(2000));
     }

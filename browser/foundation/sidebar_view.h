@@ -340,6 +340,8 @@ class SidebarView final : public views::View,
     uint64_t next = 0;
     // A favicon tile, laid out left to right.
     bool tile = false;
+    // A split's row, which stands for its left tab and lands in Today only.
+    bool split = false;
   };
   // Where a drag would land now, and the line or outline that shows it, in
   // this view's coordinates.
@@ -354,6 +356,7 @@ class SidebarView final : public views::View,
   };
   struct RowDrag {
     uint64_t item = 0;
+    bool split = false;
     raw_ptr<views::View> source;
     gfx::Point press;
     bool lifted = false;
@@ -394,7 +397,8 @@ class SidebarView final : public views::View,
   void EndRowDrag(bool commit);
   // --myarc-capture-drag=<item ID>:<folder ID>[:hold]: drags the row onto
   // the folder row with synthetic mouse events, holding it there with hold.
-  void RunCaptureDrag(uint64_t item, uint64_t folder, bool hold);
+  // r<item ID> in place of the folder drops it above that row (`row`).
+  void RunCaptureDrag(uint64_t item, uint64_t folder, uint64_t row, bool hold);
   // Drops the Library view without notifying the parent.
   void ResetLibrary();
   // The Create a Space panel's callbacks.

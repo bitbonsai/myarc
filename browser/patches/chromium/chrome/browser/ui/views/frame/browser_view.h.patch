@@ -1,5 +1,5 @@
 diff --git a/chrome/browser/ui/views/frame/browser_view.h b/chrome/browser/ui/views/frame/browser_view.h
-index 750e46c97b64dccccf4268e912df5dbdb6516b3c..9453b8b31633cdd716d288e294e3b650c2c9461a 100644
+index 750e46c97b64dccccf4268e912df5dbdb6516b3c..46e8949da47305ee74a03b393a2fc37f90d1a83f 100644
 --- a/chrome/browser/ui/views/frame/browser_view.h
 +++ b/chrome/browser/ui/views/frame/browser_view.h
 @@ -8,11 +8,13 @@
@@ -80,11 +80,17 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..9453b8b31633cdd716d288e294e3b650
    std::optional<int> theme_background_y_offset() const {
      return theme_background_y_offset_;
    }
-@@ -311,6 +332,37 @@ class BrowserView : public BrowserWindow,
+@@ -311,6 +332,43 @@ class BrowserView : public BrowserWindow,
  
    ScrimView* window_scrim_view() { return window_scrim_view_; }
  
-+  bool ShowMyarcCommandPalette(bool new_tab = true);
++  // With `split_pane`, New Split's blank pane, the pick goes to that pane:
++  // a URL or search loads in it, and a Today tab of this Space replaces it.
++  bool ShowMyarcCommandPalette(bool new_tab = true,
++                               content::WebContents* split_pane = nullptr);
++  // Replaces New Split's blank `pane`, if still open, with `page` beside the
++  // pane's partner.
++  void MyarcSplitWith(content::WebContents* pane, content::WebContents& page);
 +
 +  // Nullable outside the separate workspace-sidebar + visual-parity opt-in.
 +  // Parent owns session binding/restore barriers and shutdown/resume hooks.
@@ -118,7 +124,7 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..9453b8b31633cdd716d288e294e3b650
    base::WeakPtr<BrowserView> GetAsWeakPtr() {
      return weak_ptr_factory_.GetWeakPtr();
    }
-@@ -1253,12 +1305,216 @@ class BrowserView : public BrowserWindow,
+@@ -1253,12 +1311,218 @@ class BrowserView : public BrowserWindow,
  
    // Anchor point for help bubbles and other dialogs that want to reliably
    // anchor outside the content area of the window.
@@ -276,6 +282,8 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..9453b8b31633cdd716d288e294e3b650
 +  raw_ptr<views::Label> myarc_space_error_ = nullptr;
 +
 +  void OnMyarcCommandPaletteClosed(views::BubbleDialogDelegate* delegate);
++  // Unsplits and closes New Split's blank pane, showing its partner.
++  void DropMyarcSplitPane(content::WebContents& pane);
 +  std::unique_ptr<views::BubbleDialogDelegate> myarc_command_palette_delegate_;
 +  std::unique_ptr<views::Widget> myarc_command_palette_widget_;
 +  // --myarc-capture-open-palette opens the palette once per window.
@@ -335,7 +343,7 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..9453b8b31633cdd716d288e294e3b650
  
    // A mapping between accelerators and command IDs.
    std::map<ui::Accelerator, int> accelerator_table_;
-@@ -1411,6 +1667,7 @@ class BrowserView : public BrowserWindow,
+@@ -1411,6 +1675,7 @@ class BrowserView : public BrowserWindow,
    base::EnumSet<TabStripAndWebAppViewsReparentedState>
        tab_strip_web_apps_reparented_state_;
  

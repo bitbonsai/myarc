@@ -7,6 +7,10 @@
 //! it. Dragging within a section reorders it. Favorites don't take part: they
 //! are Profile-wide, and their tiles have their own drop rules.
 //!
+//! A split's row drags as one item, as in Arc: both tabs move together within
+//! Today, left then right, and a row dropped on a split lands above it. Pins
+//! and folders refuse a split until a split can be pinned.
+//!
 //! A Pin dragged to Today keeps its identity, its saved URL as the page its
 //! dormant row reopens and its page title, so a dormant Pin's row survives the
 //! move. Its name goes, since temporary items have none. A drop either applies
@@ -56,6 +60,12 @@ impl Workspace {
             Placement::Temporary { space_id: owner } if owner == space_id => false,
             _ => return Err(WorkspaceError::NotDraggable(item_id)),
         };
+        if !pinned
+            && self.split_of(item_id).is_some()
+            && !matches!(target, DropTarget::Today { .. })
+        {
+            return Err(WorkspaceError::SplitNotPinnable(item_id));
+        }
         self.check_drop_target(space_id, target)?;
         let saved = self.state.clone();
         let result = self.apply_drop(space_id, item_id, pinned, target, page_url);
@@ -134,7 +144,12 @@ impl Workspace {
                 if pinned {
                     self.unpin_to_today(item_id, space_id);
                 }
-                self.move_item_before(item_id, before)
+                // A row never lands between a split's two tabs.
+                let before = before.map(|id| self.split_row(id));
+                match self.split_of(item_id) {
+                    Some(split) => self.move_split_before(split, before),
+                    None => self.move_item_before(item_id, before),
+                }
             }
         }
     }

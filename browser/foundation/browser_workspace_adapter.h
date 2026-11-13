@@ -5,6 +5,7 @@
 #include <functional>
 #include <map>
 #include <optional>
+#include <set>
 #include <string>
 #include <string_view>
 
@@ -212,6 +213,9 @@ class BrowserWorkspaceAdapter final : public TabStripModelObserver {
   foundation::MutationResult SeparateSplit(uint64_t item);
   // Ctrl+Shift+1 and Ctrl+Shift+2 focus the active split's panes.
   foundation::MutationResult FocusSplitPane(int index);
+  // Today tabs of this window's Space, open here and in no split, which New
+  // Split's blank pane can take, as Rust allows.
+  std::set<uint64_t> SplitCandidates() const;
 
   // Keyboard commands over the rows the sidebar shows, in Rust's row order:
   // Favorites, ungrouped Pins, open folders' Pins, then temporary items, and
