@@ -8,7 +8,7 @@ November 2026
 
 November 10, 2026
 
-AI agents like Claude Code can now browse in myArc, in a Space of their own and only after you say yes. Also a Chromium crash, and the first step toward importing from Arc.
+The agents that build myArc can now use it, in a Space of their own and only after you say yes. Getting there turned up a bug in Chromium and a sidebar full of gray globes.
 
 ## [One window, two profiles](https://myarc.dev/blog/one-window-two-profiles/)
 

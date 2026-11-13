@@ -13,7 +13,7 @@ A complete myArc browser and importer remain unimplemented. Native integration i
 
 ## Posts
 
-- [Letting agents use myArc](https://myarc.dev/blog/agents-use-myarc/index.md): AI agents like Claude Code can now browse in myArc, in a Space of their own and only after you say yes. Also a Chromium crash, and the first step toward importing from Arc.
+- [Letting agents use myArc](https://myarc.dev/blog/agents-use-myarc/index.md): The agents that build myArc can now use it, in a Space of their own and only after you say yes. Getting there turned up a bug in Chromium and a sidebar full of gray globes.
 - [One window, two profiles](https://myarc.dev/blog/one-window-two-profiles/index.md): myArc now has real Profiles, so Work and Personal keep their own cookies and logins. Getting them to live in one window, the way Arc did, took more than I expected.
 - [Taking a few patches from ungoogled-chromium](https://myarc.dev/blog/ungoogled-chromium/index.md): myArc now borrows four build flags and five patches from ungoogled-chromium. I left out the patches that would cost myArc more than they give, like the ones that break the Chrome Web Store.
 - [Chasing Arc's details](https://myarc.dev/blog/closer-to-arc/index.md): Side-by-side recordings showed what myArc's sidebar was missing, and a quit bug was emptying every Space. Next up is an alpha checklist.
