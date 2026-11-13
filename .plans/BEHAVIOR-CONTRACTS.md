@@ -58,7 +58,7 @@ Parent: MA-011/007. Evidence: project requirement and proposed [control contract
 
 ## BC-005: Peek routing
 
-Parent: MA-007. Evidence: documented, Arc's Peek article ([source](https://resources.arc.net/hc/en-us/articles/19335302900887-Peek-Preview-Sites-From-Pinned-Tabs), Internet Archive copy 2024, see the [backlog](2026-10-26-arc-clone-backlog.md) Peek & Split View section) and the [Pinned Tabs article](https://resources.arc.net/hc/en-us/articles/19231060187159-Pinned-Tabs-Tabs-you-want-to-stick-around). Rule implemented and tested in `crates/workspace/src/peek.rs`; the overlay UI does not exist.
+Parent: MA-007. Evidence: documented, Arc's Peek article ([source](https://resources.arc.net/hc/en-us/articles/19335302900887-Peek-Preview-Sites-From-Pinned-Tabs), Internet Archive copy 2024, see the [backlog](2026-10-26-arc-clone-backlog.md) Peek & Split View section) and the [Pinned Tabs article](https://resources.arc.net/hc/en-us/articles/19231060187159-Pinned-Tabs-Tabs-you-want-to-stick-around). Rule implemented and tested in `crates/workspace/src/peek.rs`; the card over the page is `browser/foundation/peek.cc`.
 
 - Initial state: a synthetic pinned or favorite item showing a page on site A; Peek enabled.
 - Action: a link to site B is activated. The caller passes scheme and registrable domain for source and target.

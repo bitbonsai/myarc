@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <functional>
 #include <map>
+#include <memory>
 #include <optional>
 #include <set>
 #include <string>
@@ -216,6 +217,16 @@ class BrowserWorkspaceAdapter final : public TabStripModelObserver {
   // Today tabs of this window's Space, open here and in no split, which New
   // Split's blank pane can take, as Rust allows.
   std::set<uint64_t> SplitCandidates() const;
+
+  // Peek (BC-005). The sidebar section of `page`, a tab of this window, or
+  // nullopt when it has no row.
+  std::optional<foundation::PlacementKind> PlacementOf(
+      content::WebContents& page) const;
+  // Peek's Open in New Tab: `page`, which is in no tab strip, becomes one new
+  // Today tab of this window's Space with its history, and the window shows
+  // it.
+  foundation::MutationResult AdoptAsTodayTab(
+      std::unique_ptr<content::WebContents> page);
 
   // Keyboard commands over the rows the sidebar shows, in Rust's row order:
   // Favorites, ungrouped Pins, open folders' Pins, then temporary items, and

@@ -1,0 +1,26 @@
+diff --git a/chrome/browser/chrome_content_browser_client_navigation_throttles.cc b/chrome/browser/chrome_content_browser_client_navigation_throttles.cc
+index 1dc3fdf54fb9acdbba0450b349e3de3eb0ed3225..e18a7a8ff405adea7b35c6f0adcbaf7a8ac1042d 100644
+--- a/chrome/browser/chrome_content_browser_client_navigation_throttles.cc
++++ b/chrome/browser/chrome_content_browser_client_navigation_throttles.cc
+@@ -130,6 +130,10 @@
+ #include "chrome/browser/ui/web_applications/app_browser_controller.h"
+ #endif  // !BUILDFLAG(IS_ANDROID)
+ 
++#if !BUILDFLAG(IS_ANDROID)
++#include "myarc/peek_hook.h"
++#endif  // !BUILDFLAG(IS_ANDROID)
++
+ #if BUILDFLAG(ENABLE_DEVTOOLS_FRONTEND)
+ #include "chrome/browser/devtools/devtools_window.h"
+ #endif  // BUILDFLAG(ENABLE_DEVTOOLS_FRONTEND)
+@@ -308,6 +312,10 @@ void CreateAndAddChromeThrottlesForNavigation(
+ 
+ #if BUILDFLAG(IS_ANDROID)
+     CrossDeviceSigninFlowNavigationThrottle::MaybeCreateAndAdd(registry);
++#else
++    // myArc's Peek: a link from a pinned tab or Favorite to another site
++    // opens in a card over the page instead of replacing it.
++    myarc::MaybeAddPeekThrottle(registry);
+ #endif  // BUILDFLAG(IS_ANDROID)
+   }
+ 

@@ -1,5 +1,5 @@
 diff --git a/chrome/browser/ui/views/frame/browser_view.h b/chrome/browser/ui/views/frame/browser_view.h
-index 750e46c97b64dccccf4268e912df5dbdb6516b3c..46e8949da47305ee74a03b393a2fc37f90d1a83f 100644
+index 750e46c97b64dccccf4268e912df5dbdb6516b3c..ab0f403c5caaef1b1d9a4c8a10356e0651948723 100644
 --- a/chrome/browser/ui/views/frame/browser_view.h
 +++ b/chrome/browser/ui/views/frame/browser_view.h
 @@ -8,11 +8,13 @@
@@ -32,13 +32,14 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..46e8949da47305ee74a03b393a2fc37f
  class ScrimView;
  class SidePanel;
  class SidePanelAnimationContentView;
-@@ -104,6 +108,16 @@ class TopControlsSlideControllerTest;
+@@ -104,6 +108,17 @@ class TopControlsSlideControllerTest;
  class VerticalTabStripRegionView;
  class WebAppFrameToolbarView;
  
 +namespace myarc {
 +class BrowserWorkspaceAdapter;
 +class CopiedUrlToast;
++class PeekController;
 +class ProfileSwapCover;
 +class SettingsWindow;
 +namespace foundation {
@@ -49,7 +50,7 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..46e8949da47305ee74a03b393a2fc37f
  namespace gfx {
  class AnimationRunner;
  }  // namespace gfx
-@@ -121,7 +135,11 @@ enum class Channel;
+@@ -121,7 +136,11 @@ enum class Channel;
  }
  
  namespace views {
@@ -61,7 +62,7 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..46e8949da47305ee74a03b393a2fc37f
  class NativeViewHost;
  class WebView;
  }  // namespace views
-@@ -143,7 +161,8 @@ class BrowserView : public BrowserWindow,
+@@ -143,7 +162,8 @@ class BrowserView : public BrowserWindow,
                      public ImmersiveModeController::Observer,
                      public GlobalErrorObserver,
                      public views::FocusChangeListener,
@@ -71,7 +72,7 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..46e8949da47305ee74a03b393a2fc37f
    METADATA_HEADER(BrowserView, views::ClientView)
  
   public:
-@@ -234,6 +253,8 @@ class BrowserView : public BrowserWindow,
+@@ -234,6 +254,8 @@ class BrowserView : public BrowserWindow,
    // Container for the tabstrip, toolbar, etc.
    TopContainerView* top_container() { return top_container_; }
  
@@ -80,7 +81,7 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..46e8949da47305ee74a03b393a2fc37f
    std::optional<int> theme_background_y_offset() const {
      return theme_background_y_offset_;
    }
-@@ -311,6 +332,43 @@ class BrowserView : public BrowserWindow,
+@@ -311,6 +333,43 @@ class BrowserView : public BrowserWindow,
  
    ScrimView* window_scrim_view() { return window_scrim_view_; }
  
@@ -124,7 +125,7 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..46e8949da47305ee74a03b393a2fc37f
    base::WeakPtr<BrowserView> GetAsWeakPtr() {
      return weak_ptr_factory_.GetWeakPtr();
    }
-@@ -1253,12 +1311,218 @@ class BrowserView : public BrowserWindow,
+@@ -1253,12 +1312,226 @@ class BrowserView : public BrowserWindow,
  
    // Anchor point for help bubbles and other dialogs that want to reliably
    // anchor outside the content area of the window.
@@ -215,6 +216,10 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..46e8949da47305ee74a03b393a2fc37f
 +  // After session restore: shows one ordered-out window of each group that
 +  // has no shown window.
 +  static void ShowOrphanedMyarcGroupWindows();
++  // --myarc-capture-peek=open|close|expand clicks the active page's first
++  // link, then keeps the Peek, closes it with Cmd+W's command or expands it
++  // with Cmd+O's.
++  void MaybeScheduleMyarcCapturePeek();
 +  // --myarc-capture-profile-swap: creates Profile "work" with Space "Client",
 +  // then swaps back and forth, logging every window at each step.
 +  static void MyarcProfileSwapCaptureStep(int step);
@@ -267,6 +272,10 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..46e8949da47305ee74a03b393a2fc37f
 +  // runner), then adapter. BrowserView is the delegate and outlives all of
 +  // them.
 +  std::unique_ptr<myarc::BrowserWorkspaceAdapter> myarc_workspace_adapter_;
++  // Peek's card over the page area. Destroyed before the adapter.
++  std::unique_ptr<myarc::PeekController> myarc_peek_;
++  // --myarc-capture-peek clicks the active page's first link once.
++  bool myarc_capture_peek_scheduled_ = false;
 +  base::CallbackListSubscription myarc_workspace_subscription_;
 +  raw_ptr<myarc::SidebarView> myarc_workspace_sidebar_ = nullptr;
 +  // Refreshes the sidebar when any Profile's Spaces change.
@@ -343,7 +352,7 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..46e8949da47305ee74a03b393a2fc37f
  
    // A mapping between accelerators and command IDs.
    std::map<ui::Accelerator, int> accelerator_table_;
-@@ -1411,6 +1675,7 @@ class BrowserView : public BrowserWindow,
+@@ -1411,6 +1684,7 @@ class BrowserView : public BrowserWindow,
    base::EnumSet<TabStripAndWebAppViewsReparentedState>
        tab_strip_web_apps_reparented_state_;
  

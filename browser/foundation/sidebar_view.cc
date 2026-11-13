@@ -2268,7 +2268,7 @@ void SidebarView::SetModel(const foundation::SidebarResult& model,
 
   auto new_tab = Button(base::BindRepeating(&Delegate::NewTab,
                                             base::Unretained(&delegate_.get())),
-                        u"New Tab");
+                        kNewTabLabel);
   new_tab->SetImageModel(
       views::Button::STATE_NORMAL,
       ui::ImageModel::FromVectorIcon(vector_icons::kAdd2Icon,

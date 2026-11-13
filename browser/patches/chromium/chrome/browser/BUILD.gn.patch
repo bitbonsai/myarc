@@ -1,8 +1,16 @@
 diff --git a/chrome/browser/BUILD.gn b/chrome/browser/BUILD.gn
-index 1075a4d691e2f861adc1e4f1abac7e689bd12867..b73f65c36b6e80c54fa8f56fb3e28d5d6b1d0a47 100644
+index 1075a4d691e2f861adc1e4f1abac7e689bd12867..9f53b5d88ecd8b03c5fc9fda71d93bf0f4da61f2 100644
 --- a/chrome/browser/BUILD.gn
 +++ b/chrome/browser/BUILD.gn
-@@ -1855,6 +1855,7 @@ source_set("core") {
+@@ -1438,6 +1438,7 @@ source_set("core") {
+     "//media/capture:capture_switches",
+     "//media/midi",
+     "//media/webrtc",
++    "//myarc:peek_hook",
+     "//pdf:features",
+     "//services/device/public/cpp:device_features",
+     "//services/device/public/cpp/geolocation",
+@@ -1855,6 +1856,7 @@ source_set("core") {
        "//services/video_capture/public/mojom:constants",
        "//third_party/crashpad/crashpad/client",
      ]
@@ -10,7 +18,7 @@ index 1075a4d691e2f861adc1e4f1abac7e689bd12867..b73f65c36b6e80c54fa8f56fb3e28d5d
  
      frameworks = [
        "Accelerate.framework",
-@@ -5146,6 +5147,7 @@ source_set("core_unit_tests") {
+@@ -5146,6 +5148,7 @@ source_set("core_unit_tests") {
        "//chrome/browser/profiles:profile",
        "//chrome/common:channel_info",
        "//components/version_info:channel",

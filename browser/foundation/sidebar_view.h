@@ -50,6 +50,9 @@ struct SidebarResult;
 
 namespace myarc {
 
+// The New Tab row's label, which an empty page's row shows too.
+inline constexpr char16_t kNewTabLabel[] = u"New Tab";
+
 class CreateButton;
 class CreateMenu;
 class DownloadsStack;

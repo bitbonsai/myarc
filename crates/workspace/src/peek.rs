@@ -92,9 +92,9 @@ pub fn route_navigation(request: &NavigationRequest<'_>, settings: &PeekSettings
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum PeekAction {
-    /// Cmd+O: expand the Peek page into a real tab.
+    /// Expand the Peek page into a real tab.
     OpenInTab,
-    /// Outside click, X button or Cmd+W.
+    /// Dismiss the Peek page.
     Close,
 }
 
@@ -104,6 +104,29 @@ pub enum PeekOutcome {
     PromoteToTemporary { space_id: SpaceId },
     /// Dismiss the overlay and reselect the item Peek was opened from.
     ReturnToSource { source_item: ItemId },
+}
+
+/// What the user did on an open Peek. Arc's Peek article names the expand arrows
+/// and Cmd+O for opening it as a tab, and a click outside, the X button and Cmd+W
+/// for closing it. Esc closes it too, like other overlays.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum PeekTrigger {
+    ExpandButton,
+    CommandO,
+    CloseButton,
+    CommandW,
+    Escape,
+    OutsideClick,
+}
+
+pub fn peek_action(trigger: PeekTrigger) -> PeekAction {
+    match trigger {
+        PeekTrigger::ExpandButton | PeekTrigger::CommandO => PeekAction::OpenInTab,
+        PeekTrigger::CloseButton
+        | PeekTrigger::CommandW
+        | PeekTrigger::Escape
+        | PeekTrigger::OutsideClick => PeekAction::Close,
+    }
 }
 
 pub fn resolve_peek_action(
@@ -347,6 +370,25 @@ mod tests {
             resolve_peek_action(PeekAction::OpenInTab, 7, 3),
             PeekOutcome::PromoteToTemporary { space_id: 3 }
         );
+    }
+
+    #[test]
+    fn expand_arrows_and_command_o_open_in_tab() {
+        for trigger in [PeekTrigger::ExpandButton, PeekTrigger::CommandO] {
+            assert_eq!(peek_action(trigger), PeekAction::OpenInTab, "{trigger:?}");
+        }
+    }
+
+    #[test]
+    fn close_button_command_w_escape_and_outside_click_close() {
+        for trigger in [
+            PeekTrigger::CloseButton,
+            PeekTrigger::CommandW,
+            PeekTrigger::Escape,
+            PeekTrigger::OutsideClick,
+        ] {
+            assert_eq!(peek_action(trigger), PeekAction::Close, "{trigger:?}");
+        }
     }
 
     #[test]

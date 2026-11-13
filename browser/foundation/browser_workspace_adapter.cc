@@ -1944,6 +1944,56 @@ foundation::MutationResult BrowserWorkspaceAdapter::Open(const GURL& url,
   return Remember(Ok(item));
 }
 
+std::optional<foundation::PlacementKind> BrowserWorkspaceAdapter::PlacementOf(
+    content::WebContents& page) const {
+  const uint64_t item = ItemIdForContents(page);
+  if (!item || !ready() || tabs_->GetIndexOfWebContents(&page) < 0)
+    return std::nullopt;
+  const auto state = service_->ExportSnapshot();
+  const auto* row = state ? FindItem(*state, item) : nullptr;
+  if (!row)
+    return std::nullopt;
+  return row->placement;
+}
+
+foundation::MutationResult BrowserWorkspaceAdapter::AdoptAsTodayTab(
+    std::unique_ptr<content::WebContents> page) {
+  if (!ready())
+    return Fail(error());
+  if (!page || page->GetBrowserContext() != profile_)
+    return Fail("Peek's page belongs to another Profile.");
+  auto sidebar = Sidebar();
+  if (!sidebar.ok)
+    return Fail("Workspace window is not ready.");
+  const uint64_t space = sidebar.current_space.id;
+  base::AutoReset<bool> changing(&changing_, true);
+  base::ScopedClosureRunner refresh_on_exit(base::BindOnce(
+      &BrowserWorkspaceAdapter::OnServiceChanged, base::Unretained(this)));
+  auto result = service_->AddTemporaryItem(space);
+  if (!result.ok)
+    return result;
+  const uint64_t item = result.id;
+  result = Binding::Set(*page, item, space);
+  if (!result.ok) {
+    Remember(service_->LiveTabClosed(item));
+    return result;
+  }
+  content::WebContents* contents = page.get();
+  tabs_->InsertWebContentsAt(tabs_->count(), std::move(page), ADD_NONE);
+  if (tabs_->GetIndexOfWebContents(contents) < 0)
+    return Fail("Peek's page could not open as a tab.");
+  // The page loaded in Peek, so no later load saves its row's page.
+  SaveTitle(*profile_, *contents, item);
+  result = service_->SelectItem(window_id_, item);
+  if (!result.ok)
+    return result;
+  tabs_->ActivateTabAt(tabs_->GetIndexOfWebContents(contents));
+  contents->Focus();
+  PersistBindings();
+  OnServiceChanged();
+  return Remember(Ok(item));
+}
+
 uint64_t BrowserWorkspaceAdapter::AgentSpaceOf(
     content::WebContents& page) const {
   const uint64_t item = ItemIdForContents(page);

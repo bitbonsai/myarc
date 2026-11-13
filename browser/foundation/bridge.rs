@@ -55,6 +55,30 @@ mod ffi {
         Favorite,
     }
 
+    // Where a link click from a sidebar item's page opens (BC-005).
+    enum PeekRoute {
+        Peek,
+        CurrentTab,
+        NewTab,
+    }
+
+    // What the user did on an open Peek.
+    enum PeekTrigger {
+        ExpandButton,
+        CommandO,
+        CloseButton,
+        CommandW,
+        Escape,
+        OutsideClick,
+    }
+
+    // OpenInTab turns the Peek page into a Today tab of the current Space;
+    // Close dismisses it and leaves the workspace as it was.
+    enum PeekActionKind {
+        OpenInTab,
+        Close,
+    }
+
     // Where a dragged sidebar row lands.
     enum DropTargetKind {
         // The ungrouped Pins.
@@ -713,6 +737,20 @@ mod ffi {
         // Row label for a saved URL whose page has no title yet: host plus
         // path, without scheme, `www.` or trailing slash.
         fn url_label(url: &str) -> String;
+        // Where a link from a `source` item's page on site `from_site` to
+        // `to_site` opens. Sites are registrable domains (or the host when
+        // there is none); empty means unknown and never Peeks. `new_tab` is
+        // an explicit Cmd-click.
+        fn route_peek_navigation(
+            source: PlacementKind,
+            from_scheme: &str,
+            from_site: &str,
+            to_scheme: &str,
+            to_site: &str,
+            new_tab: bool,
+            peek_enabled: bool,
+        ) -> PeekRoute;
+        fn peek_action(trigger: PeekTrigger) -> PeekActionKind;
 
         type ArcExport;
         // Largest export accepted, in bytes.
@@ -878,6 +916,63 @@ pub fn site_icon_scan_bytes() -> usize {
 
 pub fn url_label(url: &str) -> String {
     workspace::url_label::url_label(url)
+}
+
+pub fn route_peek_navigation(
+    source: ffi::PlacementKind,
+    from_scheme: &str,
+    from_site: &str,
+    to_scheme: &str,
+    to_site: &str,
+    new_tab: bool,
+    peek_enabled: bool,
+) -> ffi::PeekRoute {
+    use workspace::peek::{
+        ClickModifier, Disposition, NavigationRequest, PeekSettings, SiteRef, SourceKind,
+    };
+    let source = match source {
+        ffi::PlacementKind::Pin => SourceKind::Pinned,
+        ffi::PlacementKind::Favorite => SourceKind::Favorite,
+        _ => SourceKind::Temporary,
+    };
+    let request = NavigationRequest {
+        source,
+        from: SiteRef {
+            scheme: from_scheme,
+            site: from_site,
+        },
+        to: SiteRef {
+            scheme: to_scheme,
+            site: to_site,
+        },
+        modifier: if new_tab {
+            ClickModifier::NewTab
+        } else {
+            ClickModifier::None
+        },
+    };
+    match workspace::peek::route_navigation(&request, &PeekSettings { peek_enabled }) {
+        Disposition::Peek => ffi::PeekRoute::Peek,
+        Disposition::CurrentTab => ffi::PeekRoute::CurrentTab,
+        Disposition::NewTab => ffi::PeekRoute::NewTab,
+    }
+}
+
+pub fn peek_action(trigger: ffi::PeekTrigger) -> ffi::PeekActionKind {
+    use workspace::peek::{PeekAction, PeekTrigger};
+    let trigger = match trigger {
+        ffi::PeekTrigger::ExpandButton => PeekTrigger::ExpandButton,
+        ffi::PeekTrigger::CommandO => PeekTrigger::CommandO,
+        ffi::PeekTrigger::CloseButton => PeekTrigger::CloseButton,
+        ffi::PeekTrigger::CommandW => PeekTrigger::CommandW,
+        ffi::PeekTrigger::OutsideClick => PeekTrigger::OutsideClick,
+        // Escape, and any value C++ should never send, closes.
+        _ => PeekTrigger::Escape,
+    };
+    match workspace::peek::peek_action(trigger) {
+        PeekAction::OpenInTab => ffi::PeekActionKind::OpenInTab,
+        PeekAction::Close => ffi::PeekActionKind::Close,
+    }
 }
 
 pub fn new_workspace() -> Box<Workspace> {
