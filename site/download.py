@@ -26,7 +26,7 @@ WORKS = [
     'Cmd+, opens a native Settings window. General shows the default-browser banner, Profiles sets when tabs are archived, and Advanced holds Import from Arc and a link to the full Chromium settings. Links and Shortcuts are not available yet.',
     'Quitting with Cmd+Q needs no confirmation by default, with a setting to turn the warning on.',
     'Importing an Arc export from Settings > Advanced > Import from Arc. A preview shows what it will add, then each Space arrives with its folders and pinned tabs, in Arc\'s order. Importing the same file again adds nothing.',
-    'Folders for a Space\'s pinned tabs. Create, rename and delete them from the right-click menu, and open or close them. Moving a tab into a folder is menu-only for now.',
+    'Folders for a Space\'s pinned tabs. Create, rename and delete them from the right-click menu, and open or close them. Drag tabs in and out, and rename a pinned tab from its menu.',
     'Agents can drive tabs in the Agent Space through the bundled myarc CLI and MCP server. It is off by default. Turn it on in Settings > Advanced, and myArc asks before each new agent connects.',
 ]
 
