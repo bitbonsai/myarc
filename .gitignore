@@ -27,6 +27,7 @@ __pycache__/
 .wrangler/
 site/blog/
 site/download/
+site/docs/
 site/.publish-receipt.json
 site/index.md
 site/og-image.webp

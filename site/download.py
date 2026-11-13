@@ -23,19 +23,11 @@ WORKS = [
     'Closing a pinned tab keeps the pin.',
     'A command bar: Cmd+L opens it on the current address, arrows, Enter and Escape work, and new windows open it centered.',
     'Shortcuts: Cmd+S hides the sidebar, Cmd+Shift+T reopens a closed tab, Cmd+Shift+C copies the address and shows a Copied Current URL toast, Cmd+Shift+N opens a private window and Ctrl+Cmd+N a blank one.',
-    'Cmd+, opens a native Settings window. General shows the default-browser banner and Advanced links to the full Chromium settings. Profiles, Links and Shortcuts are not available yet.',
+    'Cmd+, opens a native Settings window. General shows the default-browser banner, Profiles sets when tabs are archived, and Advanced holds Import from Arc and a link to the full Chromium settings. Links and Shortcuts are not available yet.',
     'Quitting with Cmd+Q needs no confirmation by default, with a setting to turn the warning on.',
     'Importing an Arc export from Settings > Advanced > Import from Arc. A preview shows what it will add, then each Space arrives with its folders and pinned tabs, in Arc\'s order. Importing the same file again adds nothing.',
     'Folders for a Space\'s pinned tabs. Create, rename and delete them from the right-click menu, and open or close them. Moving a tab into a folder is menu-only for now.',
     'Agents can drive tabs in the Agent Space through the bundled myarc CLI and MCP server. It is off by default. Turn it on in Settings > Advanced, and myArc asks before each new agent connects.',
-]
-MISSING = [
-    'Arc Favorites in an import. The export does not mark them, so they arrive as pinned tabs.',
-    'Cmd+D to pin a tab (Cmd+D still bookmarks), nested folders, Auto Archive, the Archive and drag-to-pin.',
-    'Peek, Split View and Little Arc. The Peek routing rule exists, but there is no overlay.',
-    'Boosts, the Library, download progress in the sidebar and the Mini Player.',
-    'The animated onboarding.',
-    'Light mode, Reduce Transparency and fullscreen layouts are not verified.',
 ]
 
 
@@ -91,8 +83,13 @@ def requirements(release):
             f'macOS {minimum} or later. The glass frame requires macOS 26. It has been tested only on macOS 26.7.']
 
 
+def codecs(release):
+    if (release or DEFAULTS)['proprietary_codecs']:
+        return 'H.264 and AAC are included, so most other web video plays.'
+    return 'H.264 and AAC are not included, so some web video will not play.'
+
+
 def limitations(release):
-    codecs = (release or DEFAULTS)['proprietary_codecs']
     return ['Built from a Chromium 158 development revision, not a stable release.',
             'No automatic updates and no security updates. Install each new nightly by hand.',
             'From 2026.11.03 on, nightlies are signed with an Apple Developer ID that later nightlies keep. macOS asks once more for your login password so it can read the saved-data key; choose Always Allow, and newer nightlies stop asking.',
@@ -101,7 +98,7 @@ def limitations(release):
             'Private window, Profile, cookie and credential guarantees are not verified.',
             'RAR downloads are not scanned by Safe Browsing, because the UnRAR license conflicts with GPL-3.0.',
             'No Widevine, so Netflix, Spotify and Disney+ will not play.',
-            'H.264 and AAC are included, so most other web video plays.' if codecs else 'H.264 and AAC are not included, so some web video will not play.',
+            codecs(release),
             'myArc is an independent project, not affiliated with Arc or The Browser Company.']
 
 
@@ -148,8 +145,12 @@ def content(release):
             steps += f'<li>{escape(text)}' + (f'<pre><code>{escape(code)}</code></pre>' if code else '') + '</li>'
         html += f'<h2>First launch</h2><ol>{steps}</ol>'
     html += '<h2>What works today</h2><p>Each item was seen working in a native run or experiment note. None of it has had release testing.</p>' + item_list(WORKS)
-    html += '<h2>What does not work yet</h2>' + item_list(MISSING)
-    html += '<h2>Known limitations and safety</h2>' + item_list(limitations(release))
+    html += ('<h2>Known limitations</h2>'
+             + item_list(['No automatic updates and no security updates. Install each new nightly by hand.',
+                          'Not yet notarized by Apple, so macOS blocks the first launch until you allow it.',
+                          'Recent tabs and navigation can be lost after a crash or force quit.',
+                          codecs(release)])
+             + '<p><a href="/docs/known-limitations/">Known limitations</a> lists the rest, with what does not work yet and what to do after a crash.</p>')
     shown = (release or DEFAULTS)['release_url']
     html += ('<h2>Other ways to get it</h2><ul>'
              f'<li><a href="{escape(shown, quote=True)}">GitHub releases</a> lists every nightly.</li>'

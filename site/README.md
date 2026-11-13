@@ -4,19 +4,17 @@ Public website and Markdown progress journal for myArc. [Live site](https://myar
 
 ## Build
 
-`index.template.html` supplies the shared layout and theme. `build.py` embeds Outfit, wordmarks, ribbon artwork, grain and license notices, then builds the homepage, blog index and approved posts. Install build dependencies in an isolated environment:
+`index.template.html` supplies the shared layout and theme. `build.py` embeds Outfit, wordmarks, ribbon artwork, grain and license notices, then builds the homepage, blog index and approved posts. Build and check the site with [mise](https://mise.jdx.dev), which installs Python and keeps the dependencies in a `.venv` folder at the repo root:
 
 ```sh
-python3 -m venv .venv
-. .venv/bin/activate
-python3 -m pip install -r site/requirements.txt
-python3 site/build.py
-python3 -m unittest discover -s site -p '*_test.py'
-node --test site/gallery.test.mjs
-python3 site/check.py
-python3 site/check_seo.py
-python3 site/check_browser.py
+mise trust
+mise run site-check
+python site/check_browser.py
 ```
+
+`site-check` installs `site/requirements.txt`, builds the site, then runs the unit tests, the gallery test, `check.py`, `check_seo.py` and `tools/check_docs.py`. `check_browser.py` stays separate because it drives agent-browser with Chrome.
+
+User docs live in `docs-src/slug/index.md`, with `title`, `summary`, `area` (Getting started, Your workspace, Control or Help) and `order` front matter. `docs.py` renders them into the ignored `docs/` folder at `/docs/slug/`, with an index grouped by area. Docs take no images, and links between them are relative, such as `../install/`, so they work on the site and in the repository.
 
 Build dependencies: Python 3.9+, Pillow, fontTools, Brotli, PyYAML and markdown-it-py. The Markdown parser runs only during builds, with raw HTML disabled. Markdownify/Beautiful Soup export the same rendered main content to Markdown, omitting decorative branding. Generated pages have no client-side runtime service dependency. Image-bearing articles load a small content-hashed first-party script for native-dialog lightboxes. Image links remain usable when JavaScript or dialog support is unavailable; homepage/index browsing and theme selection need no JavaScript. The homepage remains a standalone HTML file; blog pages use content-hashed first-party assets in their generated `_assets/` folder. Font timestamps are preserved for deterministic builds.
 

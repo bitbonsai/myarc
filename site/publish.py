@@ -11,6 +11,8 @@ import urllib.request
 ROOT = Path(__file__).resolve().parent
 REPO = 'bitbonsai/myarc'
 BRANCH = 'gh-pages'
+# Generated subtrees replaced whole on each publish, so removed pages disappear.
+OWNED = ('blog', 'docs')
 IDENTITY = {'name': 'bitbonsai', 'email': '44185+bitbonsai@users.noreply.github.com'}
 
 
@@ -18,9 +20,10 @@ def artifacts(root):
     names = ('index.html', 'og-image.png', 'og-image.webp', 'product-window-light.webp', 'product-window-dark.webp', 'favicon.png', 'favicon.ico', 'robots.txt', 'sitemap.xml', 'index.md', 'download/index.html', 'download/index.md', 'llms.txt', 'llms-full.txt')
     files = {'.nojekyll': b'', 'CNAME': b'myarc.dev\n'}
     paths = [root / name for name in names]
-    if not (root / 'blog/index.html').is_file():
-        raise ValueError('Build the blog before publication')
-    paths.extend(path for path in (root / 'blog').rglob('*') if path.is_file() or path.is_symlink())
+    for folder in OWNED:
+        if not (root / folder / 'index.html').is_file():
+            raise ValueError(f'Build the {folder} pages before publication')
+        paths.extend(path for path in (root / folder).rglob('*') if path.is_file() or path.is_symlink())
     if len(paths) > 5000:
         raise ValueError('Website exceeds the 5,000-file deployment limit')
     for path in paths:
@@ -74,19 +77,21 @@ def main():
         raise ValueError('Remote artifact tree is truncated; publication stopped')
     known = {entry['path']: entry['sha'] for entry in previous['tree'] if entry['type'] == 'blob'}
     entries = []
-    blog = []
+    owned = {folder: [] for folder in OWNED}
     for name, data in sorted(files.items()):
         sha = blob_sha(data)
         if known.get(name) != sha:
             sha = api(f'repos/{REPO}/git/blobs', 'POST', {'content': base64.b64encode(data).decode('ascii'), 'encoding': 'base64'})['sha']
         entry = {'path': name, 'mode': '100644', 'type': 'blob', 'sha': sha}
-        if name.startswith('blog/'):
-            blog.append(dict(entry, path=name[5:]))
+        folder, _, rest = name.partition('/')
+        if folder in owned and rest:
+            owned[folder].append(dict(entry, path=rest))
         else:
             entries.append(entry)
-    # Replace this owned subtree so unpublished posts and removed screenshots disappear.
-    blog_tree = api(f'repos/{REPO}/git/trees', 'POST', {'tree': blog})['sha']
-    entries.append({'path': 'blog', 'mode': '040000', 'type': 'tree', 'sha': blog_tree})
+    # Replace the owned subtrees so unpublished posts, removed docs and removed screenshots disappear.
+    for folder, tree in owned.items():
+        sha = api(f'repos/{REPO}/git/trees', 'POST', {'tree': tree})['sha']
+        entries.append({'path': folder, 'mode': '040000', 'type': 'tree', 'sha': sha})
     tree = api(f'repos/{REPO}/git/trees', 'POST', {'base_tree': base, 'tree': entries})['sha']
     if tree == base:
         print('Website artifacts already match the deployment branch')

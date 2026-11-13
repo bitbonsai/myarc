@@ -1,0 +1,17 @@
+[tools]
+python = "3.13"
+
+[env]
+_.python.venv = { path = ".venv", create = true, uv_create_args = ["--seed"] }
+
+[tasks.site-check]
+description = "Build the site and run its checks"
+run = """
+pip install -q -r site/requirements.txt
+python site/build.py
+python -m unittest discover -s site -p '*_test.py'
+node --test site/gallery.test.mjs
+python site/check.py
+python site/check_seo.py
+python tools/check_docs.py
+"""

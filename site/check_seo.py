@@ -33,7 +33,8 @@ def check():
     titles = set()
     articles = sorted((ROOT / 'blog').glob('*/index.html'))
     redirects = [path for path in articles if is_redirect(path)]
-    pages = [ROOT / 'index.html', ROOT / 'blog/index.html', ROOT / 'download/index.html', *(path for path in articles if path not in redirects)]
+    docs = [ROOT / 'docs/index.html', *sorted((ROOT / 'docs').glob('*/index.html'))]
+    pages = [ROOT / 'index.html', ROOT / 'blog/index.html', ROOT / 'download/index.html', *docs, *(path for path in articles if path not in redirects)]
     for path in pages:
         soup = BeautifulSoup(path.read_text(), 'html.parser')
         expected = 'https://myarc.dev/' + path.relative_to(ROOT).as_posix().removesuffix('index.html')
