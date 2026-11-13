@@ -65,13 +65,13 @@ Now a pin without an icon asks its own site for one in the background and keeps 
 
 That import is the part I've been waiting for. I've used Arc since 2023, and I'd rather not rebuild those Spaces by hand.
 
-Arc can export your Spaces to a file, under `Settings > Advanced > Export Data`. In myArc, `Settings > Advanced > Import from Arc…` reads that file and shows what it will add before it writes anything, along with the line number of anything it couldn't read. Each Space comes over with its links as pinned tabs, in Arc's order. Import the same file twice and the second time adds nothing.
+Arc can export your Spaces to a file, under `Settings > Advanced > Export Data`. In myArc, `Settings > Advanced > Import from Arc…` reads that file and shows what it will add before it writes anything, along with the line number of anything it couldn't read. Each Space comes over with its folders and pinned tabs, in Arc's order. Import the same file twice and the second time adds nothing.
 
-![A dialog titled Import from Arc that reads "Adds 4 Spaces and 19 pinned tabs", with a note that Favorites and folders become pinned tabs and nothing opens until you click it, and Cancel and Import buttons][import]
+![A dialog titled Import from Arc that reads "Adds 4 Spaces, 1 folder and 19 pinned tabs", with a note that each Arc folder becomes a folder in its Space, Favorites become pinned tabs and nothing opens until you click it, and Cancel and Import buttons][import]
 
 *The preview from a test export. Cancel leaves your Spaces as they were.*
 
-Some of Arc doesn't make it across yet. The export doesn't say which links are Favorites, so they land as pinned tabs in each Space. Folders get flattened too, because myArc has no folders of its own.
+One thing doesn't make it across yet. The export doesn't say which links are Favorites, so they land as pinned tabs in each Space.
 
 The agents that build myArc don't need a separate Chrome anymore. They browse in a Space next to mine, inside the browser they're building. All of this is in the nightly, if you'd like to give your own agent a Space too.
 
