@@ -56,7 +56,7 @@ References: [MCP transports](https://modelcontextprotocol.io/specification/2026-
 
 ## Install from the nightly
 
-From 2026.11.13 on, the nightly carries `myarc` at `/Applications/myArc Nightly.app/Contents/Helpers/myarc`, signed with the app. Earlier nightlies called it `myarcctl`, and 2026.11.13 still ships `Helpers/myarcctl` as a link to `myarc` so old setups keep working. That alias goes away in the next release. Link it into your `PATH`:
+From 2026.11.13 on, the nightly carries `myarc` at `/Applications/myArc Nightly.app/Contents/Helpers/myarc`, signed with the app. Earlier nightlies called it `myarcctl`, and 2026.11.13 also shipped `Helpers/myarcctl` as a link to `myarc`. Later nightlies drop that link, so point any old `myarcctl` link or MCP config at `Helpers/myarc`. Link it into your `PATH`:
 
 ```sh
 sudo mkdir -p /usr/local/bin && sudo ln -sf "/Applications/myArc Nightly.app/Contents/Helpers/myarc" /usr/local/bin/myarc
