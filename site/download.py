@@ -25,7 +25,7 @@ WORKS = [
     'Shortcuts: Cmd+S hides the sidebar, Cmd+Shift+T reopens a closed tab, Cmd+Shift+C copies the address and shows a Copied Current URL toast, Cmd+Shift+N opens a private window and Ctrl+Cmd+N a blank one.',
     'Cmd+, opens a native Settings window. General shows the default-browser banner and Advanced links to the full Chromium settings. Profiles, Links and Shortcuts are not available yet.',
     'Quitting with Cmd+Q needs no confirmation by default, with a setting to turn the warning on.',
-    'Agents can drive tabs in the Agent Space through the bundled myarcctl CLI and MCP server. It is off by default. Turn it on in Settings > Advanced, and myArc asks before each new agent connects.',
+    'Agents can drive tabs in the Agent Space through the bundled myarc CLI and MCP server. It is off by default. Turn it on in Settings > Advanced, and myArc asks before each new agent connects.',
 ]
 MISSING = [
     'Importing from Arc. The importer is not implemented.',

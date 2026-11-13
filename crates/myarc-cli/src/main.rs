@@ -1,6 +1,6 @@
 #![forbid(unsafe_code)]
 
-//! `myarcctl` runs myarc control commands from a shell (`commands`, `run`) or
+//! `myarc` runs myarc control commands from a shell (`commands`, `run`) or
 //! serves them to MCP clients over stdio (`mcp`). `run` and `mcp` send requests
 //! to the running browser through `myarc_control::ipc::Client`, or with
 //! `--local` to an in-memory `myarc_control::ControlService`. `commands` and
@@ -8,7 +8,7 @@
 //! development stub that hosts an in-memory service behind an `ipc::Server`.
 
 #[cfg(not(unix))]
-compile_error!("myarcctl needs a Unix platform for its control IPC");
+compile_error!("myarc needs a Unix platform for its control IPC");
 
 mod mcp;
 mod short;
@@ -33,22 +33,22 @@ const EXIT_NOT_CONNECTED: u8 = 3;
 const EXIT_DENIED: u8 = 4;
 
 const HELP: &str = "\
-myarcctl: drive myArc's agent Space and run browser control commands
+myarc: drive myArc's agent Space and run browser control commands
 
 Short commands act on the current tab with the last outline's refs:
-  myarcctl open <url>            Open a tab, make it current, print its outline
-  myarcctl snapshot [-i]         Print the outline; -i keeps ref lines, the
-                                 lines they sit under and the heading and
-                                 text just before them
-  myarcctl click <ref>           Click a ref such as @e4 or e4
-  myarcctl fill <ref> <text>     Replace a text field's value
-  myarcctl select <ref> <value>  Pick an option by value or visible text
-  myarcctl press <key> [<ref>]   Send Enter, Tab, Escape or another key
-  myarcctl back | forward | reload
-                                 Navigate, then print the new outline
-  myarcctl close                 Close the current tab
-  myarcctl tabs                  List agent Space tabs; * marks the current one
-  myarcctl use <tab>             Make a tab such as t12 current
+  myarc open <url>            Open a tab, make it current, print its outline
+  myarc snapshot [-i]         Print the outline; -i keeps ref lines, the
+                              lines they sit under and the heading and
+                              text just before them
+  myarc click <ref>           Click a ref such as @e4 or e4
+  myarc fill <ref> <text>     Replace a text field's value
+  myarc select <ref> <value>  Pick an option by value or visible text
+  myarc press <key> [<ref>]   Send Enter, Tab, Escape or another key
+  myarc back | forward | reload
+                              Navigate, then print the new outline
+  myarc close                 Close the current tab
+  myarc tabs                  List agent Space tabs; * marks the current one
+  myarc use <tab>             Make a tab such as t12 current
 
   Actions print a status line, then the changed refs and the new outline.
   Refs keep their numbers while the page stays loaded.
@@ -58,17 +58,17 @@ Short commands act on the current tab with the last outline's refs:
   directory. Use -- before text that starts with a dash.
 
 Usage:
-  myarcctl commands [--all] [--json]
+  myarc commands [--all] [--json]
       List the commands that run: ID, area, summary. --all lists the whole
       registry, with a column saying whether each one runs.
-  myarcctl run <command> [params-json] [--json] [--local]
+  myarc run <command> [params-json] [--json] [--local]
       Run one command in the running myArc, for example
-      myarcctl run space.rename '{\"space_id\":1,\"name\":\"Work\"}'
+      myarc run space.rename '{\"space_id\":1,\"name\":\"Work\"}'
       Prints one line, or the full response as JSON with --json.
-  myarcctl mcp [--local]
+  myarc mcp [--local]
       Serve the commands as MCP tools over stdio.
-  myarcctl --version
-  myarcctl --help
+  myarc --version
+  myarc --help
 
 The short commands, run and mcp connect to the running myArc through the
 control endpoint in $MYARC_CONTROL_DIR, or else
@@ -77,7 +77,7 @@ a fresh in-memory workspace instead, so changes are gone when the command
 exits. An mcp session keeps one workspace until the client disconnects.
 
 Development stub:
-  myarcctl serve-local [--dir <dir>]
+  myarc serve-local [--dir <dir>]
       Stand in for the browser: serve an in-memory workspace at the control
       endpoint in <dir> or the default directory, so run and mcp can connect
       without myArc. Stop it with Ctrl-C.
@@ -127,7 +127,7 @@ fn main() -> ExitCode {
     match parse(&args) {
         Ok(Cli::Help) => print(HELP.trim_end()),
         Ok(Cli::Version) => print(&format!(
-            "myarcctl {VERSION} (control protocol {PROTOCOL_VERSION})"
+            "myarc {VERSION} (control protocol {PROTOCOL_VERSION})"
         )),
         Ok(Cli::Commands { json, all }) => print(&commands(json, all)),
         Ok(Cli::Run {
@@ -245,7 +245,7 @@ fn parse(args: &[String]) -> Result<Cli, String> {
         ["commands"] => Ok(Cli::Commands { json, all }),
         ["commands", ..] => Err(String::from("commands takes no arguments")),
         ["run"] => Err(String::from(
-            "run needs a command ID; myarcctl commands lists them",
+            "run needs a command ID; myarc commands lists them",
         )),
         ["run", command] => Ok(Cli::Run {
             command: (*command).to_owned(),
@@ -340,7 +340,7 @@ fn run(command: String, params: Value, json: bool, local: bool) -> ExitCode {
     let printed = if json {
         match serde_json::to_string(&response) {
             Ok(text) => write_line(&mut io::stdout(), &text),
-            Err(error) => write_line(&mut io::stderr(), &format!("myarcctl: {error}")),
+            Err(error) => write_line(&mut io::stderr(), &format!("myarc: {error}")),
         }
     } else if success {
         write_line(&mut io::stdout(), &readable(&response))
@@ -362,7 +362,7 @@ struct NotConnected {
 
 impl NotConnected {
     fn report(self) -> ExitCode {
-        write_line(&mut io::stderr(), &format!("myarcctl: {}", self.message));
+        write_line(&mut io::stderr(), &format!("myarc: {}", self.message));
         ExitCode::from(self.code)
     }
 }
@@ -385,7 +385,7 @@ fn connect() -> Result<Client, NotConnected> {
             ipc::DIR_ENV
         )));
     };
-    Client::connect_as(&dir, "myarcctl", VERSION).map_err(|error| match error {
+    Client::connect_as(&dir, "myarc", VERSION).map_err(|error| match error {
         ConnectError::NotRunning { .. } | ConnectError::Stale { .. } => unreachable(format!(
             "{error}, or pass --local to use an in-memory workspace"
         )),
@@ -400,10 +400,10 @@ fn connect() -> Result<Client, NotConnected> {
 /// What to tell the user when myArc refused this client.
 fn denied_message(reason: &str) -> String {
     let advice = if reason == ipc::DECLINED {
-        "myArc didn't allow myarcctl to control the Agent Space. Ask the user \
+        "myArc didn't allow myarc to control the Agent Space. Ask the user \
          before trying again; the next attempt asks them again"
     } else if reason == ipc::APPROVAL_TIMED_OUT {
-        "nobody answered myArc's prompt to allow myarcctl. Ask the user to \
+        "nobody answered myArc's prompt to allow myarc. Ask the user to \
          look for it in their myArc window and try again"
     } else {
         "try again"
@@ -455,7 +455,7 @@ fn serve_local(dir: Option<PathBuf>) -> ExitCode {
             write_line(
                 &mut io::stderr(),
                 &format!(
-                    "myarcctl serve-local: can't serve at {}: {error}",
+                    "myarc serve-local: can't serve at {}: {error}",
                     dir.display()
                 ),
             );
@@ -464,7 +464,7 @@ fn serve_local(dir: Option<PathBuf>) -> ExitCode {
     };
     // This line tells scripts the endpoint is ready.
     print(&format!(
-        "myarcctl serve-local: serving an in-memory workspace at {}",
+        "myarc serve-local: serving an in-memory workspace at {}",
         dir.display()
     ));
     let mut service = ControlService::new();
@@ -474,7 +474,7 @@ fn serve_local(dir: Option<PathBuf>) -> ExitCode {
         Err(error) => {
             write_line(
                 &mut io::stderr(),
-                &format!("myarcctl serve-local: stopped: {error}"),
+                &format!("myarc serve-local: stopped: {error}"),
             );
             ExitCode::FAILURE
         }
@@ -517,7 +517,7 @@ fn print(text: &str) -> ExitCode {
 fn usage_error(message: &str) -> ExitCode {
     write_line(
         &mut io::stderr(),
-        &format!("myarcctl: {message}\n\n{}", HELP.trim_end()),
+        &format!("myarc: {message}\n\n{}", HELP.trim_end()),
     );
     ExitCode::from(2)
 }

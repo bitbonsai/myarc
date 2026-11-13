@@ -1,4 +1,4 @@
-//! Runs `myarcctl serve-local` as a stand-in browser and checks that separate
+//! Runs `myarc serve-local` as a stand-in browser and checks that separate
 //! `run` and `mcp` processes reach it over the control socket.
 
 use std::io::{BufRead, BufReader, Write};
@@ -22,7 +22,7 @@ impl Stub {
         let n = NEXT.fetch_add(1, Ordering::Relaxed);
         let dir = std::env::temp_dir().join(format!("mct-{}-{n}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
-        let mut child = Command::new(env!("CARGO_BIN_EXE_myarcctl"))
+        let mut child = Command::new(env!("CARGO_BIN_EXE_myarc"))
             .arg("serve-local")
             .arg("--dir")
             .arg(&dir)
@@ -41,7 +41,7 @@ impl Stub {
     }
 
     fn command(&self) -> Command {
-        let mut command = Command::new(env!("CARGO_BIN_EXE_myarcctl"));
+        let mut command = Command::new(env!("CARGO_BIN_EXE_myarc"));
         command.env("MYARC_CONTROL_DIR", &self.dir);
         command
     }
@@ -51,7 +51,7 @@ impl Stub {
             .arg("run")
             .args(args)
             .output()
-            .expect("myarcctl run should start")
+            .expect("myarc run should start")
     }
 
     fn dir(&self) -> &Path {
@@ -143,7 +143,7 @@ fn run_reports_a_stale_endpoint_with_exit_3() {
     let _ = std::fs::remove_dir_all(&dir);
     assert_eq!(output.status.code(), Some(3));
     let text = String::from_utf8_lossy(&output.stderr);
-    assert!(text.starts_with("myarcctl: endpoint is stale"), "{text}");
+    assert!(text.starts_with("myarc: endpoint is stale"), "{text}");
 }
 
 #[test]
@@ -156,7 +156,7 @@ fn mcp_session_goes_over_ipc() {
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
-        .expect("myarcctl mcp should start");
+        .expect("myarc mcp should start");
     let mut input = Vec::new();
     for message in [
         json!({ "jsonrpc": "2.0", "id": 1, "method": "tools/call",
@@ -190,7 +190,7 @@ fn mcp_session_goes_over_ipc() {
 #[test]
 fn mcp_without_a_browser_answers_tool_errors() {
     let missing = std::env::temp_dir().join(format!("mct-none-{}", std::process::id()));
-    let mut child = Command::new(env!("CARGO_BIN_EXE_myarcctl"))
+    let mut child = Command::new(env!("CARGO_BIN_EXE_myarc"))
         .arg("mcp")
         .env("MYARC_CONTROL_DIR", &missing)
         .stdin(Stdio::piped())

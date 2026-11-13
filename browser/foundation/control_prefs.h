@@ -8,7 +8,7 @@ namespace myarc {
 
 // Local State pref behind Settings > Advanced > "Allow agents to control
 // myArc". Off by default; the browser serves the control endpoint for
-// `myarcctl` and its MCP server only while it is on.
+// `myarc` and its MCP server only while it is on.
 inline constexpr char kControlEnabledPref[] = "myarc.control.enabled";
 
 // Developer override: turns browser control on for this run whatever the

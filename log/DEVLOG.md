@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-11-13: The agent CLI is now called myarc
+
+- `myarcctl` is now `myarc`, so agents type `myarc open`, `myarc snapshot -i` and `myarc mcp`. The crate moved to `crates/myarc-cli` (package `myarc-cli`, binary `myarc`), the hello and the MCP `serverInfo` send `myarc`, so the approval card reads "myarc 0.1.0 wants to control your Agent Space", and the debug variable is now `MYARC_ECHO_REQUESTS`. Help text, error hints, the Settings help line, the control docs, the skill, the README and the download page use the new name. The control directory and `cli-state.json` keep their names, since neither mentioned `myarcctl`.
+- `tools/package_nightly.sh` builds `-p myarc-cli`, copies the binary to `Contents/Helpers/myarc`, adds `Helpers/myarcctl` as a relative link to it and runs both before signing. The link keeps 2026.11.10 setups working for one release, and `docs/CONTROL-PROTOCOL.md` says so once.
+- Verification: `cargo fmt --check`, the `bridge.rs` rustfmt check, `cargo clippy -D warnings`, `cargo test`, `export_patches.py --check`, `check_docs.py` and the `myarc-workspace` zero-dependency check pass, and `out/MyarcM0` builds with the new Settings text.
+
 ## 2026-11-10: Pre-alpha nightly 2026.11.10 ships myarcctl
 
 - Rebuilt `out/MyarcNightly` from Chromium `6ddd300a57` and main `f2f41d7` (incremental, 4m 44s), so this nightly carries browser control with the Allow prompt, the blue dot and Stop, site icons for saved tiles, Arc's tile menu order and the renderer crash fix. `tools/package_nightly.sh` now builds `myarcctl` in release mode for arm64, copies it to `Contents/Helpers/myarcctl`, checks it for build-tree references and signs it with the app's identity before the deep sign. `docs/CONTROL-PROTOCOL.md` gains Install from the nightly (PATH link, `claude mcp add`, quarantine), the skill names the bundled path, and the download page lists agent control as working.

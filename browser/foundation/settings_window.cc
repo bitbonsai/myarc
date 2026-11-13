@@ -730,7 +730,7 @@ END_METADATA
 
 // Advanced: the way out to Chromium's full settings page, then the Browser
 // control switch that lets tools such as Claude Code drive the Agent Space
-// through myarcctl.
+// through myarc.
 class AdvancedPage : public views::View {
   METADATA_HEADER(AdvancedPage, views::View)
 
@@ -768,7 +768,7 @@ class AdvancedPage : public views::View {
         ->set_inside_border_insets(gfx::Insets::VH(0, kBannerPad));
     control_help_ = AddLabel(
         this,
-        u"Lets tools like Claude Code use the myarcctl command to open and "
+        u"Lets tools like Claude Code use the myarc command to open and "
         u"use tabs in your Agent Space. You approve each tool the first time "
         u"it connects.",
         12, gfx::Font::Weight::NORMAL, kTabText);

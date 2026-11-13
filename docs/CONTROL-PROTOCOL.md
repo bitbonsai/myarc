@@ -1,16 +1,16 @@
 # Browser control: CLI and MCP
 
-Status: specified. A core stub in [crates/control](../crates/control/src/lib.rs) holds the command registry, runs the Space commands and checks the tab commands. Its [ipc module](../crates/control/src/ipc.rs) carries requests from a client to a running browser over an authenticated same-user Unix socket. The `myarcctl` CLI and its MCP server in [crates/myarcctl](../crates/myarcctl/src/main.rs) connect through that socket by default. The browser hosts the socket while the user has turned on browser control in Settings and asks the user to approve each client (see Browser host below), and `myarcctl serve-local` stands in for it in development. **Both interfaces are P0 browser launch requirements**, not just developer test tooling or a later paid AI feature. MA-011 delivers them. An external agent can control explicitly granted browser context while built-in AI remains off; the control interface itself requires no myarc account, subscription, model download or provider key.
+Status: specified. A core stub in [crates/control](../crates/control/src/lib.rs) holds the command registry, runs the Space commands and checks the tab commands. Its [ipc module](../crates/control/src/ipc.rs) carries requests from a client to a running browser over an authenticated same-user Unix socket. The `myarc` CLI and its MCP server in [crates/myarc-cli](../crates/myarc-cli/src/main.rs) connect through that socket by default. The browser hosts the socket while the user has turned on browser control in Settings and asks the user to approve each client (see Browser host below), and `myarc serve-local` stands in for it in development. **Both interfaces are P0 browser launch requirements**, not just developer test tooling or a later paid AI feature. MA-011 delivers them. An external agent can control explicitly granted browser context while built-in AI remains off; the control interface itself requires no myarc account, subscription, model download or provider key.
 
 ## One control layer, two public interfaces
 
 | Interface | User | Responsibility |
 | --- | --- | --- |
-| `myarcctl` CLI | People, scripts, debugging and reproducible tests | Human-readable output and explicit machine JSON; standalone workspace operations; authorized attachment for live page operations |
-| MCP server launched by `myarcctl` | AI clients supporting the implemented transport/protocol | Discoverable typed tools and structured results; translates requests into the same operations |
+| `myarc` CLI | People, scripts, debugging and reproducible tests | Human-readable output and explicit machine JSON; standalone workspace operations; authorized attachment for live page operations |
+| MCP server launched by `myarc` | AI clients supporting the implemented transport/protocol | Discoverable typed tools and structured results; translates requests into the same operations |
 | Shared control service | UI, CLI, MCP and future built-in agents | Validate scope/parameters, dispatch workspace commands or browser adapters, serialize conflicting actions and honor cancellation |
 
-`myarcctl` and `myarcctl mcp` run today against the browser or the stub (see Try the stub and Browser host below). Browser UI and command bar share underlying operations, but their authorization context differs from an external agent's grant. Do not expose every internal command automatically through MCP.
+`myarc` and `myarc mcp` run today against the browser or the stub (see Try the stub and Browser host below). Browser UI and command bar share underlying operations, but their authorization context differs from an external agent's grant. Do not expose every internal command automatically through MCP.
 
 ## Required control surface
 
@@ -56,33 +56,33 @@ References: [MCP transports](https://modelcontextprotocol.io/specification/2026-
 
 ## Install from the nightly
 
-From 2026.11.10 on, the nightly carries `myarcctl` at `/Applications/myArc Nightly.app/Contents/Helpers/myarcctl`, signed with the app. Link it into your `PATH`:
+From 2026.11.13 on, the nightly carries `myarc` at `/Applications/myArc Nightly.app/Contents/Helpers/myarc`, signed with the app. Earlier nightlies called it `myarcctl`, and 2026.11.13 still ships `Helpers/myarcctl` as a link to `myarc` so old setups keep working. That alias goes away in the next release. Link it into your `PATH`:
 
 ```sh
-sudo mkdir -p /usr/local/bin && sudo ln -sf "/Applications/myArc Nightly.app/Contents/Helpers/myarcctl" /usr/local/bin/myarcctl
+sudo mkdir -p /usr/local/bin && sudo ln -sf "/Applications/myArc Nightly.app/Contents/Helpers/myarc" /usr/local/bin/myarc
 ```
 
 If macOS refuses to run it, clear the download's quarantine flag with `xattr -dr com.apple.quarantine "/Applications/myArc Nightly.app"`. To give Claude Code the MCP server in every project, run:
 
 ```sh
-claude mcp add --scope user myarc -- "/Applications/myArc Nightly.app/Contents/Helpers/myarcctl" mcp
+claude mcp add --scope user myarc -- "/Applications/myArc Nightly.app/Contents/Helpers/myarc" mcp
 ```
 
-For the [skill](../skills/myarc-browser/SKILL.md), copy the `skills/myarc-browser` folder from this repository into `~/.claude/skills/`. The skill runs `myarcctl` through the link above. The CLI, the MCP server and the skill need "Allow agents to control myArc" turned on under Settings > Advanced, and the first command asks you in the myArc window to allow it (see Approval and Stop below).
+For the [skill](../skills/myarc-browser/SKILL.md), copy the `skills/myarc-browser` folder from this repository into `~/.claude/skills/`. The skill runs `myarc` through the link above. The CLI, the MCP server and the skill need "Allow agents to control myArc" turned on under Settings > Advanced, and the first command asks you in the myArc window to allow it (see Approval and Stop below).
 
 ## Try the stub
 
 `run` and `mcp` connect to the running browser by default. The browser publishes its control endpoint in `~/Library/Application Support/myarc/control/`, or in `$MYARC_CONTROL_DIR` when that is set. The directory holds `control.json` with the socket path, a token that changes each time the server starts, the server's pid and its protocol version. Clients refuse the endpoint unless the directory (mode 700), the file and the socket (mode 600) belong to the current user and are closed to group and others. The browser creates a missing directory with mode 700 and refuses an existing one that group or others can enter, so it never changes the mode of a directory such as `$HOME`. Each connection opens with a hello that carries the token, and every message after it is a length-prefixed JSON frame of at most 1 MiB.
 
-The Space commands work everywhere. The tab commands, `page.snapshot` and the interaction commands work only in the browser, and `--local` and `serve-local` answer them with `unsupported` because they have no pages. Every other command answers `unsupported`. `myarcctl serve-local` is a development stub that serves an in-memory workspace in place of the browser. That workspace lasts as long as `serve-local` runs, so a Space created by one `run` shows up in the next.
+The Space commands work everywhere. The tab commands, `page.snapshot` and the interaction commands work only in the browser, and `--local` and `serve-local` answer them with `unsupported` because they have no pages. Every other command answers `unsupported`. `myarc serve-local` is a development stub that serves an in-memory workspace in place of the browser. That workspace lasts as long as `serve-local` runs, so a Space created by one `run` shows up in the next.
 
 ```sh
-cargo build -p myarcctl
-target/debug/myarcctl serve-local --dir /tmp/myarc-control &
+cargo build -p myarc-cli
+target/debug/myarc serve-local --dir /tmp/myarc-control &
 export MYARC_CONTROL_DIR=/tmp/myarc-control
-target/debug/myarcctl commands
-target/debug/myarcctl run space.create '{"name":"Work"}'
-target/debug/myarcctl run space.list --json
+target/debug/myarc commands
+target/debug/myarc run space.create '{"name":"Work"}'
+target/debug/myarc run space.list --json
 ```
 
 `--local` skips the endpoint and runs the command against a fresh in-memory workspace, so a Space created by one `run --local` is gone by the next. `commands` always reads the registry locally.
@@ -91,10 +91,10 @@ Agents use the short commands, which send the same registry commands through the
 
 `run` exits 0 on success, 1 when the command returns an error, 2 on a usage error, 3 when it can't reach myArc and 4 when myArc refused control, for example because the user declined. On exit 3 the message names the cause, such as a missing endpoint (myArc isn't running or browser control is off), a stale one left by a process that has exited, a permission or ownership problem, a rejected token or a protocol version mismatch. On exit 4 it gives the reason and what to tell the user. The short commands use the same codes. `--json` prints the full response.
 
-`myarcctl mcp` serves the same registry as MCP tools over stdio, with dots in command IDs replaced by underscores (`space.create` becomes `space_create`). Tool calls reach the endpoint over one connection, which opens on the first call and reopens after it drops or sits idle. With no endpoint, each call returns a tool error that says why. `myarcctl mcp --local` keeps one in-memory workspace until the client disconnects instead. To add it to an MCP client, link the binary into your `PATH` as in Install from the nightly, or put a built one there, and use this server entry:
+`myarc mcp` serves the same registry as MCP tools over stdio, with dots in command IDs replaced by underscores (`space.create` becomes `space_create`). Tool calls reach the endpoint over one connection, which opens on the first call and reopens after it drops or sits idle. With no endpoint, each call returns a tool error that says why. `myarc mcp --local` keeps one in-memory workspace until the client disconnects instead. To add it to an MCP client, link the binary into your `PATH` as in Install from the nightly, or put a built one there, and use this server entry:
 
 ```json
-{"command": "myarcctl", "args": ["mcp"]}
+{"command": "myarc", "args": ["mcp"]}
 ```
 
 ## Browser host
@@ -107,13 +107,13 @@ Each Profile has its own workspace, and each numbers its tabs from 1. The host's
 
 ### Approval and Stop
 
-Each connection's hello waits for the user before the browser sends its welcome. The first time a client name connects in a browser session, the last active normal window of the host's Profile shows a card at its top right that reads "myarcctl 0.1.0 wants to control your Agent Space", with Allow and Don't allow. Name and version come from the hello, at most 64 bytes each. The card shows them without control or invisible format characters and cut to 40 characters. Allow welcomes every waiting connection of that name, lets later connections of that name in without asking until the browser quits, and pins the host to that window's Profile. Don't allow refuses the connection with `denied: the user declined`. With no answer after 60 seconds the connection gets `denied: waiting for approval timed out`, and with no window to ask in it gets `denied` and the reason. A restart or turning the switch off forgets every approval.
+Each connection's hello waits for the user before the browser sends its welcome. The first time a client name connects in a browser session, the last active normal window of the host's Profile shows a card at its top right that reads "myarc 0.1.0 wants to control your Agent Space", with Allow and Don't allow. Name and version come from the hello, at most 64 bytes each. The card shows them without control or invisible format characters and cut to 40 characters. Allow welcomes every waiting connection of that name, lets later connections of that name in without asking until the browser quits, and pins the host to that window's Profile. Don't allow refuses the connection with `denied: the user declined`. With no answer after 60 seconds the connection gets `denied: waiting for approval timed out`, and with no window to ask in it gets `denied` and the reason. A restart or turning the switch off forgets every approval.
 
-The wait happens before the welcome, so the 10 second reply timeout never runs during it. That timeout starts only with each request after the welcome. Clients wait up to 70 seconds for the welcome and 60 for each answer after it. `myarcctl` reports a refused hello with exit code 4, and `myarcctl mcp` as a tool error with the same text.
+The wait happens before the welcome, so the 10 second reply timeout never runs during it. That timeout starts only with each request after the welcome. Clients wait up to 70 seconds for the welcome and 60 for each answer after it. `myarc` reports a refused hello with exit code 4, and `myarc mcp` as a tool error with the same text.
 
 Each client names itself in its hello, so any process of the same user that can read `control.json` can claim to be any client. The prompt records consent and shows who is acting; it doesn't authenticate anyone. The token in `control.json` stays the authentication.
 
-While an approved client is connected, or has sent a request in the last 30 seconds, the agent Space's bot in the footer carries a small blue dot and its tooltip reads "myarcctl is controlling the Agent Space". Clicking it still selects the agent Space. Right-clicking it offers "Stop myarcctl", and while the agent Space shows, a Stop button next to its title does the same. Stop closes that client's connections, answers a request still waiting with `cancelled` and forgets the approval, so the next connection asks again. `myarcctl mcp` reconnects once when its connection closed before a request went out, so its first call after a Stop asks the user again instead of answering `outcome_unknown`.
+While an approved client is connected, or has sent a request in the last 30 seconds, the agent Space's bot in the footer carries a small blue dot and its tooltip reads "myarc is controlling the Agent Space". Clicking it still selects the agent Space. Right-clicking it offers "Stop myarc", and while the agent Space shows, a Stop button next to its title does the same. Stop closes that client's connections, answers a request still waiting with `cancelled` and forgets the approval, so the next connection asks again. `myarc mcp` reconnects once when its connection closed before a request went out, so its first call after a Stop asks the user again instead of answering `outcome_unknown`.
 
 Builds with the GN arg `myarc_test_hooks` read one word from `test-hook` in `$MYARC_CONTROL_DIR`: `allow` and `decline` press the card's buttons, `stop` stops the active client, and `control-on` and `control-off` flip the switch. `tools/capture_native.sh` with `CONTROL_SWITCH=0` sets the directory without the override. Nightly builds have no test hooks.
 

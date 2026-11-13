@@ -1,12 +1,12 @@
 #![forbid(unsafe_code)]
 
-//! Shared control layer for MA-011 browser control. The `myarcctl` CLI and its
+//! Shared control layer for MA-011 browser control. The `myarc` CLI and its
 //! MCP server translate requests into `Request` values and print `Response`
 //! values; both use the one command registry below.
 //!
 //! [`dispatch`] runs the Space commands against a workspace the caller owns.
 //! [`ControlService`] wraps it around an in-memory workspace for
-//! `myarcctl --local` and `serve-local`, where the tab commands answer
+//! `myarc --local` and `serve-local`, where the tab commands answer
 //! `Unsupported` because there are no pages. A browser calls [`route`]
 //! instead: it answers the Space commands the same way and turns each tab
 //! command into a [`TabAction`] scoped to the agent Space, which the browser

@@ -1,10 +1,10 @@
-//! Short commands such as `myarcctl open <url>` and `myarcctl click @e4`.
+//! Short commands such as `myarc open <url>` and `myarc click @e4`.
 //! Each one sends registry commands through the same `ipc::Client` that
 //! `run` uses. A small per-user state file remembers the current tab and the
 //! revision this CLI last printed, so the browser's stale check still
 //! protects the agent: the CLI never fetches a newer revision on its own.
 //!
-//! Setting `MYARCCTL_ECHO_REQUESTS` to a non-empty value writes each outgoing
+//! Setting `MYARC_ECHO_REQUESTS` to a non-empty value writes each outgoing
 //! request to stderr as `request: <json>`. Tests use it; it isn't in `--help`.
 
 use std::fs::{self, OpenOptions};
@@ -19,7 +19,7 @@ use serde_json::{Value, json};
 
 use crate::{EXIT_NOT_CONNECTED, call, connect, request_id, write_line};
 
-const ECHO_ENV: &str = "MYARCCTL_ECHO_REQUESTS";
+const ECHO_ENV: &str = "MYARC_ECHO_REQUESTS";
 const STATE_FILE: &str = "cli-state.json";
 /// Largest state file the CLI reads back.
 const MAX_STATE_BYTES: u64 = 64 * 1024;
@@ -131,7 +131,7 @@ pub fn parse_tab(text: &str) -> Result<String, String> {
     match parse_tab_handle(text) {
         Some(_) => Ok(text.to_owned()),
         None => Err(format!(
-            "{:?} is not a tab handle, such as t12; myarcctl tabs lists them",
+            "{:?} is not a tab handle, such as t12; myarc tabs lists them",
             crate::mcp::bounded(text)
         )),
     }
@@ -227,9 +227,7 @@ impl State {
             .tab
             .clone()
             .or_else(|| self.tab.clone())
-            .ok_or_else(|| {
-                String::from("no current tab; run myarcctl open <url> or myarcctl use <tab>")
-            })
+            .ok_or_else(|| String::from("no current tab; run myarc open <url> or myarc use <tab>"))
     }
 
     /// The revision a call on `tab` uses: `--rev`, else the revision last
@@ -240,9 +238,7 @@ impl State {
         }
         match &self.revision {
             Some(revision) if self.tab.as_deref() == Some(tab) => Ok(revision.clone()),
-            _ => Err(format!(
-                "no revision for {tab}; run myarcctl snapshot first"
-            )),
+            _ => Err(format!("no revision for {tab}; run myarc snapshot first")),
         }
     }
 
@@ -307,7 +303,7 @@ fn random_suffix() -> io::Result<String> {
 }
 
 fn warn(message: &str) {
-    write_line(&mut io::stderr(), &format!("myarcctl: {message}"));
+    write_line(&mut io::stderr(), &format!("myarc: {message}"));
 }
 
 /// Splits a line into runs outside and inside double quotes. A quoted run
@@ -671,7 +667,7 @@ pub fn run(short: Short, overrides: Overrides, json_output: bool) -> ExitCode {
         write_line(
             &mut io::stderr(),
             &format!(
-                "myarcctl: can't find the control endpoint; set {} or HOME",
+                "myarc: can't find the control endpoint; set {} or HOME",
                 ipc::DIR_ENV
             ),
         );
@@ -761,7 +757,7 @@ fn finish(state: &State, path: &Path, ok: bool) -> ExitCode {
     if let Err(error) = state.save(path) {
         write_line(
             &mut io::stderr(),
-            &format!("myarcctl: can't save {}: {error}", path.display()),
+            &format!("myarc: can't save {}: {error}", path.display()),
         );
         return ExitCode::FAILURE;
     }
@@ -806,7 +802,7 @@ impl Output {
         }
         let printed = match serde_json::to_string(response) {
             Ok(text) => write_line(&mut io::stdout(), &text),
-            Err(error) => write_line(&mut io::stderr(), &format!("myarcctl: {error}")),
+            Err(error) => write_line(&mut io::stderr(), &format!("myarc: {error}")),
         };
         self.printed &= printed;
     }
@@ -857,7 +853,7 @@ footer
     }
 
     fn temp_path(name: &str) -> PathBuf {
-        let dir = std::env::temp_dir().join(format!("myarcctl-unit-{}-{name}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("myarc-unit-{}-{name}", std::process::id()));
         let _ = fs::remove_dir_all(&dir);
         dir.join("nested").join(STATE_FILE)
     }

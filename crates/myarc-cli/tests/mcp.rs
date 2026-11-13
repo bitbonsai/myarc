@@ -6,18 +6,18 @@ use std::thread;
 use myarc_control::registry;
 use serde_json::{Value, json};
 
-/// Runs `myarcctl mcp` with `input` on stdin, then closes stdin.
+/// Runs `myarc mcp` with `input` on stdin, then closes stdin.
 fn session(input: Vec<u8>) -> Output {
-    let mut child = Command::new(env!("CARGO_BIN_EXE_myarcctl"))
+    let mut child = Command::new(env!("CARGO_BIN_EXE_myarc"))
         .args(["mcp", "--local"])
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
-        .expect("myarcctl mcp should start");
+        .expect("myarc mcp should start");
     let mut stdin = child.stdin.take().expect("stdin");
     let writer = thread::spawn(move || stdin.write_all(&input));
-    let output = child.wait_with_output().expect("myarcctl mcp should exit");
+    let output = child.wait_with_output().expect("myarc mcp should exit");
     writer.join().unwrap().expect("stdin write");
     output
 }
@@ -95,7 +95,7 @@ fn scripted_session() {
     assert_eq!(init["id"], 1);
     assert_eq!(init["result"]["protocolVersion"], "2025-06-18");
     assert_eq!(init["result"]["capabilities"], json!({ "tools": {} }));
-    assert_eq!(init["result"]["serverInfo"]["name"], "myarcctl");
+    assert_eq!(init["result"]["serverInfo"]["name"], "myarc");
     assert_eq!(
         init["result"]["serverInfo"]["version"],
         env!("CARGO_PKG_VERSION")

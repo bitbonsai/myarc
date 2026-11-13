@@ -2,7 +2,8 @@
 # Package the nightly build as a locally signed DMG outside the repository.
 # Signs with a Developer ID or Apple Development identity when the keychain has one, then
 # "myArc Local Signing", then ad-hoc. SIGN_ID overrides the choice.
-# Builds myarcctl in release mode and bundles it as Contents/Helpers/myarcctl.
+# Builds the myarc CLI in release mode and bundles it as Contents/Helpers/myarc,
+# with a myarcctl symlink to it as a deprecated alias for one release.
 # Usage: tools/package_nightly.sh
 #   env: APP_SRC=<built myArc.app> DATE=YYYY-MM-DD VERSION=<label> TAG=<release tag>
 #        OUT=<output dir, default ~/.cache/myarc-m0/release/DATE>
@@ -30,11 +31,13 @@ ditto "$APP_SRC" "$APP"
 xattr -cr "$APP"
 
 # The CLI and MCP server ships inside the bundle and gets the app's signature.
-cargo build --manifest-path "$ROOT/Cargo.toml" --release --locked -p myarcctl --target aarch64-apple-darwin
-CTL="$APP/Contents/Helpers/myarcctl"
+cargo build --manifest-path "$ROOT/Cargo.toml" --release --locked -p myarc-cli --target aarch64-apple-darwin
+CTL="$APP/Contents/Helpers/myarc"
 mkdir -p "$APP/Contents/Helpers"
-cp "$ROOT/target/aarch64-apple-darwin/release/myarcctl" "$CTL"
+cp "$ROOT/target/aarch64-apple-darwin/release/myarc" "$CTL"
+ln -sf myarc "$APP/Contents/Helpers/myarcctl"
 "$CTL" --help >/dev/null
+"$APP/Contents/Helpers/myarcctl" --version >/dev/null
 
 # The app menu shows this label above About. Chromium's own version stays.
 PLIST="$APP/Contents/Info.plist"
@@ -49,7 +52,7 @@ FRAMEWORK=$(find "$APP/Contents/Frameworks/myArc Framework.framework/Versions" -
 if otool -XL "$BIN" "$FRAMEWORK" "$CTL" | grep -E '/out/|/Users/' ; then
   echo "binary references the build tree" >&2; exit 1
 fi
-echo "otool: no build-tree references in $(basename "$BIN"), $(basename "$FRAMEWORK") or myarcctl"
+echo "otool: no build-tree references in $(basename "$BIN"), $(basename "$FRAMEWORK") or myarc"
 
 # The Keychain pins Safe Storage access to the signer's Team ID when the cert
 # has one, so an Apple Development cert keeps Always Allow across builds. A
@@ -67,7 +70,7 @@ codesign --force --sign "$SIGN_ID" "$CTL"
 codesign --force --deep --sign "$SIGN_ID" "$APP"
 codesign --verify --deep --strict --verbose=2 "$APP"
 codesign --verify --strict "$CTL"
-echo "myarcctl: $(codesign -dvv "$CTL" 2>&1 | sed -n 's/^Authority=//p' | head -1)"
+echo "myarc: $(codesign -dvv "$CTL" 2>&1 | sed -n 's/^Authority=//p' | head -1)"
 
 ln -s /Applications "$STAGE/Applications"
 rm -f "$OUT/$NAME"

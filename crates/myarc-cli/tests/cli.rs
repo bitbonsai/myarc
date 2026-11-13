@@ -3,15 +3,15 @@ use std::process::{Command, Output};
 use myarc_control::{PROTOCOL_VERSION, registry};
 use serde_json::Value;
 
-/// Runs myarcctl with a control directory that doesn't exist, so a test can
+/// Runs myarc with a control directory that doesn't exist, so a test can
 /// never reach a real browser.
-fn myarcctl(args: &[&str]) -> Output {
-    let missing = std::env::temp_dir().join(format!("myarcctl-none-{}", std::process::id()));
-    Command::new(env!("CARGO_BIN_EXE_myarcctl"))
+fn myarc(args: &[&str]) -> Output {
+    let missing = std::env::temp_dir().join(format!("myarc-none-{}", std::process::id()));
+    Command::new(env!("CARGO_BIN_EXE_myarc"))
         .args(args)
         .env("MYARC_CONTROL_DIR", missing)
         .output()
-        .expect("myarcctl should start")
+        .expect("myarc should start")
 }
 
 fn stdout(output: &Output) -> String {
@@ -28,7 +28,7 @@ fn json_stdout(output: &Output) -> Value {
 
 #[test]
 fn commands_lists_implemented_entries_unless_all() {
-    let output = myarcctl(&["commands"]);
+    let output = myarc(&["commands"]);
     assert_eq!(output.status.code(), Some(0));
     let text = stdout(&output);
     let implemented: Vec<_> = registry().iter().filter(|spec| spec.implemented).collect();
@@ -41,7 +41,7 @@ fn commands_lists_implemented_entries_unless_all() {
         assert_eq!(listed, spec.implemented, "{}", spec.id);
     }
 
-    let output = myarcctl(&["commands", "--all"]);
+    let output = myarc(&["commands", "--all"]);
     assert_eq!(output.status.code(), Some(0));
     let text = stdout(&output);
     assert_eq!(text.lines().count(), registry().len() + 1);
@@ -64,7 +64,7 @@ fn commands_lists_implemented_entries_unless_all() {
 
 #[test]
 fn commands_json_has_id_area_implemented_and_summary() {
-    let output = myarcctl(&["commands", "--json"]);
+    let output = myarc(&["commands", "--json"]);
     assert_eq!(output.status.code(), Some(0));
     let implemented = json_stdout(&output);
     assert!(
@@ -74,7 +74,7 @@ fn commands_json_has_id_area_implemented_and_summary() {
             .iter()
             .all(|entry| entry["implemented"] == true)
     );
-    let output = myarcctl(&["commands", "--all", "--json"]);
+    let output = myarc(&["commands", "--all", "--json"]);
     assert_eq!(output.status.code(), Some(0));
     let list = json_stdout(&output);
     let list = list.as_array().expect("an array");
@@ -99,7 +99,7 @@ fn commands_json_has_id_area_implemented_and_summary() {
 
 #[test]
 fn run_space_create_prints_one_line_and_exits_0() {
-    let output = myarcctl(&["run", "space.create", r#"{"name":"Work"}"#, "--local"]);
+    let output = myarc(&["run", "space.create", r#"{"name":"Work"}"#, "--local"]);
     assert_eq!(output.status.code(), Some(0), "{}", stderr(&output));
     let text = stdout(&output);
     assert_eq!(text.lines().count(), 1, "{text}");
@@ -109,7 +109,7 @@ fn run_space_create_prints_one_line_and_exits_0() {
 
 #[test]
 fn run_json_prints_the_response() {
-    let output = myarcctl(&[
+    let output = myarc(&[
         "run",
         "space.rename",
         r#"{"space_id":1,"name":"Work"}"#,
@@ -127,14 +127,14 @@ fn run_json_prints_the_response() {
 
 #[test]
 fn each_run_starts_from_a_fresh_workspace() {
-    myarcctl(&["run", "space.create", r#"{"name":"Work"}"#, "--local"]);
-    let response = json_stdout(&myarcctl(&["run", "space.list", "--json", "--local"]));
+    myarc(&["run", "space.create", r#"{"name":"Work"}"#, "--local"]);
+    let response = json_stdout(&myarc(&["run", "space.list", "--json", "--local"]));
     assert_eq!(response["data"]["spaces"].as_array().unwrap().len(), 1);
 }
 
 #[test]
 fn unsupported_command_exits_1() {
-    let output = myarcctl(&[
+    let output = myarc(&[
         "--local",
         "run",
         "tab.open",
@@ -148,7 +148,7 @@ fn unsupported_command_exits_1() {
         stderr(&output)
     );
 
-    let output = myarcctl(&["run", "tab.open", "--json", "--local"]);
+    let output = myarc(&["run", "tab.open", "--json", "--local"]);
     assert_eq!(output.status.code(), Some(1));
     let response = json_stdout(&output);
     assert_eq!(response["status"], "unsupported");
@@ -157,7 +157,7 @@ fn unsupported_command_exits_1() {
 
 #[test]
 fn invalid_params_and_unknown_commands_exit_1() {
-    let output = myarcctl(&[
+    let output = myarc(&[
         "run",
         "space.rename",
         r#"{"space_id":99,"name":"x"}"#,
@@ -166,14 +166,14 @@ fn invalid_params_and_unknown_commands_exit_1() {
     assert_eq!(output.status.code(), Some(1));
     assert!(stderr(&output).contains("invalid: Space 99 does not exist"));
 
-    let output = myarcctl(&["run", "space.explode", "--local"]);
+    let output = myarc(&["run", "space.explode", "--local"]);
     assert_eq!(output.status.code(), Some(1));
     assert!(stderr(&output).contains("Unknown command"));
 }
 
 #[test]
 fn bad_json_params_exit_2() {
-    let output = myarcctl(&["run", "space.create", "{name"]);
+    let output = myarc(&["run", "space.create", "{name"]);
     assert_eq!(output.status.code(), Some(2));
     assert!(stdout(&output).is_empty());
     assert!(stderr(&output).contains("params are not valid JSON"));
@@ -195,7 +195,7 @@ fn usage_errors_exit_2() {
         &["serve-local", "--dir"][..],
         &["serve-local", "now"][..],
     ] {
-        let output = myarcctl(args);
+        let output = myarc(args);
         assert_eq!(output.status.code(), Some(2), "{args:?}");
         assert!(stdout(&output).is_empty(), "{args:?}");
         assert!(stderr(&output).contains("Usage:"), "{args:?}");
@@ -204,7 +204,7 @@ fn usage_errors_exit_2() {
 
 #[test]
 fn help_mentions_local_and_the_dev_stub() {
-    let output = myarcctl(&["--help"]);
+    let output = myarc(&["--help"]);
     assert_eq!(output.status.code(), Some(0));
     let text = stdout(&output);
     assert!(text.contains("fresh in-memory"), "{text}");
@@ -218,24 +218,24 @@ fn run_without_a_browser_exits_3() {
         &["run", "space.list"][..],
         &["run", "space.list", "--json"][..],
     ] {
-        let output = myarcctl(args);
+        let output = myarc(args);
         assert_eq!(output.status.code(), Some(3), "{args:?}");
         assert!(stdout(&output).is_empty(), "{args:?}");
         let text = stderr(&output);
-        assert!(text.starts_with("myarcctl: myArc isn't running"), "{text}");
-        assert!(text.contains("myarcctl-none-"), "{text}");
+        assert!(text.starts_with("myarc: myArc isn't running"), "{text}");
+        assert!(text.contains("myarc-none-"), "{text}");
         assert!(text.contains("--local"), "{text}");
     }
 }
 
 #[test]
 fn version_prints_crate_and_protocol_versions() {
-    let output = myarcctl(&["--version"]);
+    let output = myarc(&["--version"]);
     assert_eq!(output.status.code(), Some(0));
     assert_eq!(
         stdout(&output).trim(),
         format!(
-            "myarcctl {} (control protocol {PROTOCOL_VERSION})",
+            "myarc {} (control protocol {PROTOCOL_VERSION})",
             env!("CARGO_PKG_VERSION")
         )
     );
@@ -244,19 +244,19 @@ fn version_prints_crate_and_protocol_versions() {
 #[test]
 fn a_declined_client_exits_4_and_says_what_to_do() {
     use myarc_control::ipc::{APPROVAL_TIMEOUT, Host, Incoming, REPLY_TIMEOUT};
-    let dir = std::env::temp_dir().join(format!("myarcctl-deny-{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("myarc-deny-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
     let host = Host::start_gated(&dir, REPLY_TIMEOUT, APPROVAL_TIMEOUT).unwrap();
-    let child = Command::new(env!("CARGO_BIN_EXE_myarcctl"))
+    let child = Command::new(env!("CARGO_BIN_EXE_myarc"))
         .args(["run", "space.list"])
         .env("MYARC_CONTROL_DIR", &dir)
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped())
         .spawn()
-        .expect("myarcctl should start");
+        .expect("myarc should start");
     match host.next_incoming() {
         Some(Incoming::Hello(approval)) => {
-            assert_eq!(approval.name(), "myarcctl");
+            assert_eq!(approval.name(), "myarc");
             approval.decide(false);
         }
         other => panic!("expected a hello, got {other:?}"),
@@ -267,7 +267,7 @@ fn a_declined_client_exits_4_and_says_what_to_do() {
     assert_eq!(output.status.code(), Some(4));
     let text = stderr(&output);
     assert!(
-        text.starts_with("myarcctl: denied: the user declined; "),
+        text.starts_with("myarc: denied: the user declined; "),
         "{text}"
     );
     assert!(text.contains("Ask the user"), "{text}");

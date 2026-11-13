@@ -1,5 +1,5 @@
-//! Runs the short commands against `myarcctl serve-local`, which has no pages
-//! and answers the tab and page commands with an error. `MYARCCTL_ECHO_REQUESTS`
+//! Runs the short commands against `myarc serve-local`, which has no pages
+//! and answers the tab and page commands with an error. `MYARC_ECHO_REQUESTS`
 //! makes each command write the request it sends, so these tests check that
 //! the short commands build the right requests from the state file and flags.
 
@@ -25,7 +25,7 @@ impl Stub {
         let base = std::env::temp_dir().join(format!("mcs-{}-{n}", std::process::id()));
         let _ = std::fs::remove_dir_all(&base);
         std::fs::create_dir_all(&base).unwrap();
-        let mut child = Command::new(env!("CARGO_BIN_EXE_myarcctl"))
+        let mut child = Command::new(env!("CARGO_BIN_EXE_myarc"))
             .arg("serve-local")
             .arg("--dir")
             .arg(base.join("control"))
@@ -54,13 +54,13 @@ impl Stub {
         serde_json::from_slice(&std::fs::read(self.state_path()).unwrap()).unwrap()
     }
 
-    fn myarcctl(&self, args: &[&str]) -> Output {
-        Command::new(env!("CARGO_BIN_EXE_myarcctl"))
+    fn myarc(&self, args: &[&str]) -> Output {
+        Command::new(env!("CARGO_BIN_EXE_myarc"))
             .args(args)
             .env("MYARC_CONTROL_DIR", self.base.join("control"))
-            .env("MYARCCTL_ECHO_REQUESTS", "1")
+            .env("MYARC_ECHO_REQUESTS", "1")
             .output()
-            .expect("myarcctl should start")
+            .expect("myarc should start")
     }
 }
 
@@ -91,7 +91,7 @@ fn requests(output: &Output) -> Vec<Value> {
 
 /// Runs a command the stub answers with an error and returns its request.
 fn sent(stub: &Stub, args: &[&str]) -> Value {
-    let output = stub.myarcctl(args);
+    let output = stub.myarc(args);
     assert_eq!(
         output.status.code(),
         Some(1),
@@ -177,7 +177,7 @@ fn short_commands_build_registry_requests() {
 #[test]
 fn use_sets_the_tab_and_actions_need_a_revision() {
     let stub = Stub::start();
-    let output = stub.myarcctl(&["use", "t7"]);
+    let output = stub.myarc(&["use", "t7"]);
     assert_eq!(output.status.code(), Some(0), "{}", stderr(&output));
     assert_eq!(String::from_utf8_lossy(&output.stdout), "current tab t7\n");
     assert!(requests(&output).is_empty());
@@ -193,9 +193,9 @@ fn use_sets_the_tab_and_actions_need_a_revision() {
         sent(&stub, &["snapshot"]),
         json!({ "command": "page.snapshot", "params": { "tab": "t7" } })
     );
-    let output = stub.myarcctl(&["click", "@e4"]);
+    let output = stub.myarc(&["click", "@e4"]);
     assert_eq!(output.status.code(), Some(2));
-    assert!(stderr(&output).contains("no revision for t7; run myarcctl snapshot"));
+    assert!(stderr(&output).contains("no revision for t7; run myarc snapshot"));
     assert!(requests(&output).is_empty());
 }
 
@@ -213,19 +213,19 @@ fn usage_errors_send_nothing() {
         &["run", "space.list", "--tab", "t1"][..],
         &["open", "https://example.test/", "--local"][..],
     ] {
-        let output = stub.myarcctl(args);
+        let output = stub.myarc(args);
         assert_eq!(output.status.code(), Some(2), "{args:?}");
         assert!(stderr(&output).contains("Usage:"), "{args:?}");
         assert!(requests(&output).is_empty(), "{args:?}");
     }
-    let output = stub.myarcctl(&["click", "@e4"]);
+    let output = stub.myarc(&["click", "@e4"]);
     assert!(stderr(&output).contains("no current tab"));
 }
 
 #[test]
 fn json_prints_the_raw_response() {
     let stub = Stub::start();
-    let output = stub.myarcctl(&["open", "https://example.test/", "--json"]);
+    let output = stub.myarc(&["open", "https://example.test/", "--json"]);
     assert_eq!(output.status.code(), Some(1));
     let response: Value = serde_json::from_slice(&output.stdout).unwrap();
     assert_eq!(response["command"], "tab.open");
@@ -236,13 +236,13 @@ fn json_prints_the_raw_response() {
 fn short_commands_without_a_browser_exit_3() {
     let base = std::env::temp_dir().join(format!("mcs-none-{}", std::process::id()));
     for args in [&["open", "https://example.test/"][..], &["tabs"][..]] {
-        let output = Command::new(env!("CARGO_BIN_EXE_myarcctl"))
+        let output = Command::new(env!("CARGO_BIN_EXE_myarc"))
             .args(args)
             .env("MYARC_CONTROL_DIR", base.join("control"))
             .output()
             .unwrap();
         assert_eq!(output.status.code(), Some(3), "{args:?}");
-        assert!(stderr(&output).starts_with("myarcctl: myArc isn't running"));
+        assert!(stderr(&output).starts_with("myarc: myArc isn't running"));
     }
     assert!(!base.exists());
 }
@@ -254,7 +254,7 @@ fn a_planted_state_symlink_leaves_its_target_alone() {
     std::fs::write(&victim, "precious").unwrap();
     std::fs::set_permissions(&victim, std::fs::Permissions::from_mode(0o644)).unwrap();
     std::os::unix::fs::symlink(&victim, stub.state_path()).unwrap();
-    let output = stub.myarcctl(&["use", "t1"]);
+    let output = stub.myarc(&["use", "t1"]);
     assert_eq!(output.status.code(), Some(0), "{}", stderr(&output));
     assert!(
         stderr(&output).contains("is a symlink"),

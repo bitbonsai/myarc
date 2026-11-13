@@ -113,7 +113,7 @@ pub fn serve(mut input: impl BufRead, mut output: impl Write, backend: Backend) 
 /// Writes to stderr, ignoring failures so a closed stderr can't stop the
 /// server.
 pub fn diagnostic(message: &str) {
-    let _ = writeln!(io::stderr(), "myarcctl mcp: {message}");
+    let _ = writeln!(io::stderr(), "myarc mcp: {message}");
 }
 
 /// Prefix of untrusted text short enough to quote in an error.
@@ -289,7 +289,7 @@ fn initialize(params: &Map<String, Value>) -> Result<Value, RpcError> {
     Ok(json!({
         "protocolVersion": version,
         "capabilities": { "tools": {} },
-        "serverInfo": { "name": "myarcctl", "version": VERSION },
+        "serverInfo": { "name": "myarc", "version": VERSION },
     }))
 }
 

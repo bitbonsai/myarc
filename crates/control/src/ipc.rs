@@ -1,5 +1,5 @@
 //! Authenticated same-user local IPC between control clients such as
-//! `myarcctl` and a running browser's control service.
+//! `myarc` and a running browser's control service.
 //!
 //! The browser hosts a [`Server`] in a private directory. Binding writes
 //! `control.json` there with the Unix socket path, a fresh random token, the

@@ -39,11 +39,11 @@
 #   --myarc-capture-open-settings and captures only that window; "more" presses
 #   More Settings… and captures the browser window instead.
 #   CONTROL=<dir> passes --myarc-enable-control and serves the control
-#   endpoint in <dir> (MYARC_CONTROL_DIR) for myarcctl. CONTROL_SWITCH=0 sets
+#   endpoint in <dir> (MYARC_CONTROL_DIR) for myarc. CONTROL_SWITCH=0 sets
 #   only the directory, so the Settings switch decides; test-hook builds then
 #   take "control-on", "allow", "decline" or "stop" written to <dir>/test-hook.
 #   SCRIPT=<file> runs that bash script once the window settles, before the
-#   capture, with PID and MYARC_CONTROL_DIR set; it can drive myarcctl and
+#   capture, with PID and MYARC_CONTROL_DIR set; it can drive myarc and
 #   take its own shots with bgcapture.swift.
 #   Every capture downloads into the disposable profile's Downloads folder
 #   without asking.
