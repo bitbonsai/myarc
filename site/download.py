@@ -25,10 +25,11 @@ WORKS = [
     'Shortcuts: Cmd+S hides the sidebar, Cmd+Shift+T reopens a closed tab, Cmd+Shift+C copies the address and shows a Copied Current URL toast, Cmd+Shift+N opens a private window and Ctrl+Cmd+N a blank one.',
     'Cmd+, opens a native Settings window. General shows the default-browser banner and Advanced links to the full Chromium settings. Profiles, Links and Shortcuts are not available yet.',
     'Quitting with Cmd+Q needs no confirmation by default, with a setting to turn the warning on.',
+    'Importing an Arc export from Settings > Advanced > Import from Arc. A preview shows what it will add, then each Space arrives with its links as pinned tabs, in Arc\'s order. Importing the same file again adds nothing.',
     'Agents can drive tabs in the Agent Space through the bundled myarc CLI and MCP server. It is off by default. Turn it on in Settings > Advanced, and myArc asks before each new agent connects.',
 ]
 MISSING = [
-    'Importing from Arc. The importer is not implemented.',
+    'Arc folders and Favorites in an import. The export does not mark them, so they arrive as pinned tabs.',
     'Cmd+D to pin a tab (Cmd+D still bookmarks), folders, Auto Archive, the Archive and drag-to-pin.',
     'Peek, Split View and Little Arc. The Peek routing rule exists, but there is no overlay.',
     'Boosts, the Library, download progress in the sidebar and the Mini Player.',

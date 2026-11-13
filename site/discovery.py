@@ -43,7 +43,7 @@ def build_discovery(root, homepage, posts):
         target.write_text(markdown)
         full.append(markdown)
     index = '# myArc\n\n> A pre-release open-source browser project inspired by Arc, built on Chromium with a Rust-owned workspace core.\n\n'
-    index += 'A complete myArc browser and importer remain unimplemented. Native integration is experimental. Arc reference screenshots illustrate the target appearance. Local ownership and optional AI are product requirements, not evidence of a finished release.\n\n'
+    index += 'A complete myArc browser remains unimplemented, and the Arc importer brings over only Spaces and pinned tabs. Native integration is experimental. Arc reference screenshots illustrate the target appearance. Local ownership and optional AI are product requirements, not evidence of a finished release.\n\n'
     index += '## Project\n\n- [Overview](https://myarc.dev/index.md): Markdown equivalent of the homepage.\n- [Progress journal](https://myarc.dev/blog/index.md): Published development updates.\n- [Download](https://myarc.dev/download/index.md): Pre-alpha nightly status, requirements and known limitations.\n- [Repository](https://github.com/bitbonsai/myarc): Public source and plans.\n\n## Posts\n\n'
     for post in posts:
         index += f'- [{post.title}]({post.url}index.md): {post.summary}\n'
