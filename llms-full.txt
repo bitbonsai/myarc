@@ -241,7 +241,7 @@ The switch starts off, and nothing can connect until you flip it.
 
 The first time a tool connects, a card names it and asks whether it may control your Agent Space. Allow lasts until you quit myArc.
 
-[![A myArc window with six Favorite tiles in the sidebar and a card at the top right reading "myarc 2026.11.13 wants to control your Agent Space", with Don't allow and Allow buttons](https://myarc.dev/blog/agents-use-myarc/connect-prompt.d469733f9bcf.webp)](https://myarc.dev/blog/agents-use-myarc/connect-prompt.d469733f9bcf.webp)
+[![A myArc window with six Favorite tiles in the sidebar and a card at the top right reading "myarc 2026.11.13 wants to control your Agent Space", with Don't allow and Allow buttons](https://myarc.dev/blog/agents-use-myarc/connect-prompt.ebca1da71152.webp)](https://myarc.dev/blog/agents-use-myarc/connect-prompt.ebca1da71152.webp)
 
 The card says what the tool can do and that it can't see your other Spaces.
 
