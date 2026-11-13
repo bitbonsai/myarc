@@ -32,8 +32,10 @@ use std::collections::BTreeSet;
 use std::fmt;
 
 pub mod archive;
+pub mod drag;
 pub mod folder;
 
+pub use drag::DropTarget;
 pub use folder::{Folder, FolderDeletion, FolderId, MAX_FOLDER_NAME_BYTES, MAX_FOLDERS};
 
 pub const MAX_SPACE_NAME_BYTES: usize = 128;
@@ -120,6 +122,8 @@ pub enum WorkspaceError {
     DifferentFolderSpace(FolderId),
     /// Only Pins go in folders.
     NotPinned(ItemId),
+    /// Only the window's Pins and Today tabs can be dragged.
+    NotDraggable(ItemId),
     DuplicateLiveItem(ItemId),
     ItemNotVisible(ItemId),
     LimitExceeded(&'static str),
@@ -157,6 +161,7 @@ impl fmt::Display for WorkspaceError {
             Self::DifferentSection(id) => write!(formatter, "Item {id} belongs to a different placement or owner section"),
             Self::DifferentFolderSpace(id) => write!(formatter, "Folder {id} belongs to a different Space"),
             Self::NotPinned(id) => write!(formatter, "Item {id} is not a Space Pin; pin it before putting it in a folder"),
+            Self::NotDraggable(id) => write!(formatter, "Item {id} is not a Pin or Today tab of this window's Space"),
             Self::DuplicateLiveItem(id) => write!(formatter, "Live item {id} is listed more than once"),
             Self::ItemNotVisible(id) => write!(formatter, "Item {id} does not belong to this window's selected Space or Profile"),
             Self::LimitExceeded(kind) => write!(formatter, "Workspace {kind} limit reached"),
@@ -226,6 +231,9 @@ pub struct Item {
     pub canonical_url: Option<String>,
     /// Last known page title, shown while the item is dormant. Empty when unknown.
     pub title: String,
+    /// The user's name for a saved item, from Rename. It shows instead of the
+    /// page title. Empty when the item has none. Temporary items never have one.
+    pub name: String,
     /// Reading of the browser-open clock (`WorkspaceSnapshot::open_secs`) when a
     /// temporary item was last seen, for Auto Archive. Zero means not recorded
     /// yet; saving or unsaving resets it.
@@ -763,6 +771,7 @@ impl Workspace {
             placement: Placement::Temporary { space_id },
             canonical_url: None,
             title: String::new(),
+            name: String::new(),
             last_viewed_secs: 0,
         });
         self.state.next_item_id = next;
@@ -855,6 +864,30 @@ impl Workspace {
             return Ok(false);
         }
         item.title = clean;
+        Ok(true)
+    }
+
+    /// Rename a saved item, as Arc's Rename does for a pinned tab. The name shows
+    /// instead of the page title until cleared. Control characters become
+    /// spaces, the name is trimmed and cut to `MAX_TITLE_BYTES` on a character
+    /// boundary, and an empty name clears it, so the row shows the page title
+    /// again. Returns whether the stored name changed, so adapters can skip
+    /// writes. Temporary items reject with `NotSaved`.
+    pub fn rename_item(&mut self, item_id: ItemId, name: &str) -> Result<bool, WorkspaceError> {
+        if matches!(self.item(item_id)?.placement, Placement::Temporary { .. }) {
+            return Err(WorkspaceError::NotSaved(item_id));
+        }
+        let clean = clean_title(name).trim().to_owned();
+        let item = self
+            .state
+            .items
+            .iter_mut()
+            .find(|item| item.id == item_id)
+            .ok_or(WorkspaceError::UnknownItem(item_id))?;
+        if item.name == clean {
+            return Ok(false);
+        }
+        item.name = clean;
         Ok(true)
     }
 
@@ -970,6 +1003,7 @@ impl Workspace {
                     item.placement = Placement::Temporary { space_id };
                     item.canonical_url = None;
                     item.title.clear();
+                    item.name.clear();
                     item.last_viewed_secs = 0;
                     break;
                 }
@@ -1140,6 +1174,7 @@ impl Workspace {
         };
         workspace.sanitize_archive();
         workspace.sanitize_icons();
+        workspace.sanitize_names();
         workspace.sanitize_agent_spaces();
         workspace.validate()?;
         // After validation, so folders only see a consistent set of Spaces and items.
@@ -1166,6 +1201,21 @@ impl Workspace {
             }
             if validate_theme(space.theme).is_err() {
                 space.theme = None;
+            }
+        }
+    }
+
+    /// A name is cosmetic, so a bad one is dropped instead of failing the
+    /// snapshot: oversized, with control characters or untrimmed, or on a
+    /// temporary item, which never has one.
+    fn sanitize_names(&mut self) {
+        for item in &mut self.state.items {
+            if matches!(item.placement, Placement::Temporary { .. })
+                || item.name.len() > MAX_TITLE_BYTES
+                || item.name.chars().any(char::is_control)
+                || item.name.trim() != item.name
+            {
+                item.name.clear();
             }
         }
     }

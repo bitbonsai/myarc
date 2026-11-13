@@ -1133,6 +1133,7 @@ fn old_snapshot_with_space_one_loads_unchanged() {
             placement: Placement::Pin { space_id: S1 },
             canonical_url: Some(URL.into()),
             title: String::new(),
+            name: String::new(),
             last_viewed_secs: 0,
         }],
         windows: vec![WindowState {
