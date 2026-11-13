@@ -4,12 +4,12 @@ HTML: https://myarc.dev/download/
 
 Pre-alpha nightly, for trying the Arc-like shell. Not for daily or sensitive browsing.
 
-[Download for macOS (Apple silicon)](https://github.com/bitbonsai/myarc/releases/download/nightly-2026.11.13/myArc-Nightly-2026.11.13-arm64.dmg)
+[Download for macOS (Apple silicon)](https://github.com/bitbonsai/myarc/releases/download/nightly-2026.11.13.1/myArc-Nightly-2026.11.13.1-arm64.dmg)
 
-- **Version:** 2026.11.13
+- **Version:** 2026.11.13.1
 - **Date:** November 13, 2026
-- **Size:** 234.8 MB
-- **SHA-256:** `40f51323b612b312e6a69a07dfd36c2dd3909b77abb0c9ef99018d9eb066603a`
+- **Size:** 234.0 MB
+- **SHA-256:** `4f86c86b481192ba64048efb531225a675accbbc1dfa90095d1114fc2014b8eb`
 
 ## System requirements
 
@@ -21,7 +21,7 @@ Pre-alpha nightly, for trying the Arc-like shell. Not for daily or sensitive bro
 1. Check the download against the SHA-256 listed with it. The two values must match.
 
    ```
-   shasum -a 256 ~/Downloads/myArc-Nightly-2026.11.13-arm64.dmg
+   shasum -a 256 ~/Downloads/myArc-Nightly-2026.11.13.1-arm64.dmg
    ```
 2. Open the DMG and drag myArc Nightly to Applications.
 3. macOS blocks the first launch because the app is not notarized. Right-click myArc Nightly, choose Open, then Open again. If macOS only offers Done or Move to Trash, which macOS 15 and later usually does, open System Settings \> Privacy \& Security, scroll to the myArc Nightly message and choose Open Anyway.
@@ -69,7 +69,7 @@ Each item was seen working in a native run or experiment note. None of it has ha
 
 ## Other ways to get it
 
-- [GitHub releases](https://github.com/bitbonsai/myarc/releases/tag/nightly-2026.11.13) lists every nightly.
+- [GitHub releases](https://github.com/bitbonsai/myarc/releases/tag/nightly-2026.11.13.1) lists every nightly.
 - [Source on GitHub](https://github.com/bitbonsai/myarc), with instructions to [build it from source](https://github.com/bitbonsai/myarc/blob/main/browser/README.md).
 - [GitHub issues](https://github.com/bitbonsai/myarc/issues) take bug reports. Include the version, your macOS version and the steps that trigger the problem, and leave out private pages.
 

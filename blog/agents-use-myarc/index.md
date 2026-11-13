@@ -64,8 +64,16 @@ Now a pin without an icon asks its own site for one in the background and keeps 
 
 None of these sites was ever opened in this profile.
 
-## Getting ready to leave Arc
+## Leaving Arc
 
-That import is the next big piece. Arc can export your Spaces to a file, under `Settings > Advanced > Export Data`, and myArc can now read that file into a list of Spaces, their groups and their links, in Arc's order. Anything it doesn't understand gets flagged with its line number, so nothing goes missing quietly. It doesn't create anything in the browser yet. Turning that list into real Spaces and pins comes next, and it's the part I'm waiting for. I've used Arc since 2023, and I'd rather not rebuild those Spaces by hand.
+That import is the part I've been waiting for. I've used Arc since 2023, and I'd rather not rebuild those Spaces by hand.
 
-The agents that build myArc don't need a separate Chrome anymore. They browse in a Space next to mine, inside the browser they're building. Agent control and pin icons are in the nightly, if you'd like to give your own agent a Space too.
+Arc can export your Spaces to a file, under `Settings > Advanced > Export Data`. In myArc, `Settings > Advanced > Import from Arc…` reads that file and shows what it will add before it writes anything, along with the line number of anything it couldn't read. Each Space comes over with its links as pinned tabs, in Arc's order. Import the same file twice and the second time adds nothing.
+
+[![A dialog titled Import from Arc that reads "Adds 4 Spaces and 19 pinned tabs", with a note that Favorites and folders become pinned tabs and nothing opens until you click it, and Cancel and Import buttons](https://myarc.dev/blog/agents-use-myarc/arc-import-preview.05b3b035ff00.webp)](https://myarc.dev/blog/agents-use-myarc/arc-import-preview.05b3b035ff00.webp)
+
+The preview from a test export. Cancel leaves your Spaces as they were.
+
+Some of Arc doesn't make it across yet. The export doesn't say which links are Favorites, so they land as pinned tabs in each Space. Folders get flattened too, because myArc has no folders of its own.
+
+The agents that build myArc don't need a separate Chrome anymore. They browse in a Space next to mine, inside the browser they're building. All of this is in the nightly, if you'd like to give your own agent a Space too.
