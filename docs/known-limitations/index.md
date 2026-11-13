@@ -23,8 +23,10 @@ myArc is a pre-alpha. Use it to try the Arc-style sidebar, and keep daily and se
 ## What doesn't work yet
 
 - Arc Favorites arrive as pinned tabs in their Space, because the export doesn't mark them.
-- Folders inside folders, and dragging a tab up to pin it or into a folder.
-- Peek, Split View and Little Arc.
+- Folders inside folders, and dragging a tab up to pin it.
+- Split View holds two tabs at most, and a split can't be pinned or put in a folder.
+- Peek can't open into a split, and a closed Peek can't be reopened.
+- Little Arc.
 - Boosts and the Mini Player.
 - The animated onboarding.
 - The Links and Shortcuts tabs in Settings.

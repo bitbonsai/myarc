@@ -4,12 +4,12 @@ HTML: https://myarc.dev/download/
 
 Pre-alpha nightly, for trying the Arc-like shell. Not for daily or sensitive browsing.
 
-[Download for macOS (Apple silicon)](https://github.com/bitbonsai/myarc/releases/download/nightly-2026.11.13.4/myArc-Nightly-2026.11.13.4-arm64.dmg)
+[Download for macOS (Apple silicon)](https://github.com/bitbonsai/myarc/releases/download/nightly-2026.11.13.5/myArc-Nightly-2026.11.13.5-arm64.dmg)
 
-- **Version:** 2026.11.13.4
+- **Version:** 2026.11.13.5
 - **Date:** November 13, 2026
-- **Size:** 234.2 MB
-- **SHA-256:** `0831dab2b8f90a432d84690f459776180a3db48cd124ef18d1d82b8d878cdfd6`
+- **Size:** 234.6 MB
+- **SHA-256:** `038a2d7cdaddb031f94ab8bd9286c655fdcd3739f39ce2e8184ee6973f50084e`
 
 ## System requirements
 
@@ -21,7 +21,7 @@ Pre-alpha nightly, for trying the Arc-like shell. Not for daily or sensitive bro
 1. Check the download against the SHA-256 listed with it. The two values must match.
 
    ```
-   shasum -a 256 ~/Downloads/myArc-Nightly-2026.11.13.4-arm64.dmg
+   shasum -a 256 ~/Downloads/myArc-Nightly-2026.11.13.5-arm64.dmg
    ```
 2. Open the DMG and drag myArc Nightly to Applications.
 3. macOS blocks the first launch because the app is not notarized. Right-click myArc Nightly, choose Open, then Open again. If macOS only offers Done or Move to Trash, which macOS 15 and later usually does, open System Settings \> Privacy \& Security, scroll to the myArc Nightly message and choose Open Anyway.
@@ -46,6 +46,7 @@ Each item was seen working in a native run or experiment note. None of it has ha
 - Importing an Arc export from Settings \> Advanced \> Import from Arc. A preview shows what it will add, then each Space arrives with its folders and pinned tabs, in Arc's order. Importing the same file again adds nothing.
 - Folders for a Space's pinned tabs. Create, rename and delete them from the right-click menu, and open or close them. Drag tabs in and out, and rename a pinned tab from its menu.
 - Split View for two tabs side by side. Use Open in Split View in a tab's menu or Ctrl\+Shift\+\=, and Ctrl\+Shift\+- to separate them. The split shows as one sidebar row and comes back after a restart.
+- Peek: a link from a pinned tab or Favorite to another site opens in a card over the page. Cmd\+W or Esc closes it, and Cmd\+O turns it into a tab.
 - Agents can drive tabs in the Agent Space through the bundled myarc CLI and MCP server. It is off by default. Turn it on in Settings \> Advanced, and myArc asks before each new agent connects.
 
 ## Known limitations
@@ -59,7 +60,7 @@ Each item was seen working in a native run or experiment note. None of it has ha
 
 ## Other ways to get it
 
-- [GitHub releases](https://github.com/bitbonsai/myarc/releases/tag/nightly-2026.11.13.4) lists every nightly.
+- [GitHub releases](https://github.com/bitbonsai/myarc/releases/tag/nightly-2026.11.13.5) lists every nightly.
 - [Source on GitHub](https://github.com/bitbonsai/myarc), with instructions to [build it from source](https://github.com/bitbonsai/myarc/blob/main/browser/README.md).
 - [GitHub issues](https://github.com/bitbonsai/myarc/issues) take bug reports. Include the version, your macOS version and the steps that trigger the problem, and leave out private pages.
 
