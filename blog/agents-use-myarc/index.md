@@ -14,9 +14,9 @@ I wanted the same thing inside myArc, so this round I asked them to build it. An
 
 ## Reading a page without looking at it
 
-Most AI tools that use a computer work from screenshots. The model gets a picture of the screen, guesses where the button is and clicks at those coordinates. It works, but every step sends a whole image, and if the guess is a few pixels off, the click hits something else.
+Many AI tools that use a computer work from screenshots. The model gets a picture of the screen, guesses where the button is and clicks at those coordinates. It works, but every step sends a whole image, and if the guess is a few pixels off, the click hits something else.
 
-myArc borrows agent-browser's approach and hands the agent a short text outline of the page instead, one heading, link, field or button per line, and gives everything it can act on a number. To sign up on a form, the agent fills `e1` with an email address and clicks `e2`. After each action it gets a fresh outline back, so it sees what changed without asking.
+myArc borrows agent-browser's approach and hands the agent a short text outline of the page instead, with one heading, link, field or button per line. Everything the agent can act on gets a number. To sign up on a form, the agent fills `e1` with an email address and clicks `e2`. After each action it gets a fresh outline back, so it sees what changed without asking.
 
 [![A terminal running three myarc commands. open prints a Sign up page outline with an Email textbox marked ref e1 and a Send button marked ref e2. fill e1 prints the same outline with the email filled in. click e2 reports that the tab navigated and prints a Thanks heading.](https://myarc.dev/blog/agents-use-myarc/agent-session.5a113358ee40.webp)](https://myarc.dev/blog/agents-use-myarc/agent-session.5a113358ee40.webp)
 
@@ -28,9 +28,9 @@ The agent gets in through `myarc`, a small command-line tool that also runs as a
 
 ## The click that crashed
 
-The agents started testing right away, and soon one of their clicks crashed the page. It only happened sometimes, after the agent had sat idle for a bit.
+The agents started testing right away, and soon one of their clicks crashed the page. It only happened sometimes, after the agent had sat idle for a bit. For a while it looked like nothing was writing a crash report, until it turned out Chromium had saved every one, all pointing at the same spot in its code.
 
-The cause was in Chromium itself. Before a click, it checks where the element sits so it can scroll it into view, and that check read the page layout without updating it. A tab you're looking at redraws every frame, which keeps its layout fresh. The agent's tab sits in the background and doesn't draw, so its layout went stale, and a Chromium safety check stopped the page. The fix is one line that updates the layout first, as the function next to it already did. After that, the clicks stopped crashing.
+The bug was Chromium's own. Before a click, the browser checks where the element sits so it can scroll it into view, and that check read the page layout without updating it. A tab you're looking at redraws every frame, which keeps its layout fresh. The agent's tab sits in the background and doesn't draw, so its layout went stale, and a safety check stopped the page. The fix is one line that updates the layout first, as the function next to it already did. After that, the same test clicked through every round.
 
 ## Who gets to drive
 
@@ -53,10 +53,6 @@ While an agent works, a blue dot sits on the bot icon and a Stop button appears 
 [![The top of the Agent Space in the sidebar, with a Stop button beside the Agent name and two Example Domain tabs below](https://myarc.dev/blog/agents-use-myarc/agent-space-stop.f7ac8431e496.webp)](https://myarc.dev/blog/agents-use-myarc/agent-space-stop.f7ac8431e496.webp)
 
 The Agent Space while a tool is working.
-
-[![The sidebar footer with three Space icons, where the bot icon on the right carries a small blue dot](https://myarc.dev/blog/agents-use-myarc/agent-space-dot.71a71d36f0b8.webp)](https://myarc.dev/blog/agents-use-myarc/agent-space-dot.71a71d36f0b8.webp)
-
-The blue dot on the bot means an agent is at work.
 
 ## A sidebar full of globes
 
