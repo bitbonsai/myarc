@@ -4,12 +4,12 @@ HTML: https://myarc.dev/download/
 
 Pre-alpha nightly, for trying the Arc-like shell. Not for daily or sensitive browsing.
 
-[Download for macOS (Apple silicon)](https://github.com/bitbonsai/myarc/releases/download/nightly-2026.11.10/myArc-Nightly-2026.11.10-arm64.dmg)
+[Download for macOS (Apple silicon)](https://github.com/bitbonsai/myarc/releases/download/nightly-2026.11.13/myArc-Nightly-2026.11.13-arm64.dmg)
 
-- **Version:** 2026.11.10
-- **Date:** November 10, 2026
-- **Size:** 234.4 MB
-- **SHA-256:** `0768cd08055029c49f73d78e7ee644ae7b666f4edd8f167b781dc60b4e92f155`
+- **Version:** 2026.11.13
+- **Date:** November 13, 2026
+- **Size:** 234.8 MB
+- **SHA-256:** `40f51323b612b312e6a69a07dfd36c2dd3909b77abb0c9ef99018d9eb066603a`
 
 ## System requirements
 
@@ -21,7 +21,7 @@ Pre-alpha nightly, for trying the Arc-like shell. Not for daily or sensitive bro
 1. Check the download against the SHA-256 listed with it. The two values must match.
 
    ```
-   shasum -a 256 ~/Downloads/myArc-Nightly-2026.11.10-arm64.dmg
+   shasum -a 256 ~/Downloads/myArc-Nightly-2026.11.13-arm64.dmg
    ```
 2. Open the DMG and drag myArc Nightly to Applications.
 3. macOS blocks the first launch because the app is not notarized. Right-click myArc Nightly, choose Open, then Open again. If macOS only offers Done or Move to Trash, which macOS 15 and later usually does, open System Settings \> Privacy \& Security, scroll to the myArc Nightly message and choose Open Anyway.
@@ -43,7 +43,7 @@ Each item was seen working in a native run or experiment note. None of it has ha
 - Shortcuts: Cmd\+S hides the sidebar, Cmd\+Shift\+T reopens a closed tab, Cmd\+Shift\+C copies the address and shows a Copied Current URL toast, Cmd\+Shift\+N opens a private window and Ctrl\+Cmd\+N a blank one.
 - Cmd\+, opens a native Settings window. General shows the default-browser banner and Advanced links to the full Chromium settings. Profiles, Links and Shortcuts are not available yet.
 - Quitting with Cmd\+Q needs no confirmation by default, with a setting to turn the warning on.
-- Agents can drive tabs in the Agent Space through the bundled myarcctl CLI and MCP server. It is off by default. Turn it on in Settings \> Advanced, and myArc asks before each new agent connects.
+- Agents can drive tabs in the Agent Space through the bundled myarc CLI and MCP server. It is off by default. Turn it on in Settings \> Advanced, and myArc asks before each new agent connects.
 
 ## What does not work yet
 
@@ -69,7 +69,7 @@ Each item was seen working in a native run or experiment note. None of it has ha
 
 ## Other ways to get it
 
-- [GitHub releases](https://github.com/bitbonsai/myarc/releases/tag/nightly-2026.11.10) lists every nightly.
+- [GitHub releases](https://github.com/bitbonsai/myarc/releases/tag/nightly-2026.11.13) lists every nightly.
 - [Source on GitHub](https://github.com/bitbonsai/myarc), with instructions to [build it from source](https://github.com/bitbonsai/myarc/blob/main/browser/README.md).
 - [GitHub issues](https://github.com/bitbonsai/myarc/issues) take bug reports. Include the version, your macOS version and the steps that trigger the problem, and leave out private pages.
 
