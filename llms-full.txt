@@ -207,15 +207,15 @@ November 10, 2026
 
 [Mauricio Wolff](https://github.com/bitbonsai)5 min read
 
-myArc is built by agents. I lead a group of them that write the code, review it and test it. They could launch myArc and take screenshots of it, but they couldn't click anything in it. Whenever one of them needed to browse, it got a separate automated Chrome with nothing in it. They were building a browser they couldn't use.
+myArc is built by agents. I lead a group of them that write the code, review it and test it. They could launch myArc and take screenshots of it, but they couldn't click anything in it. When they needed to browse, they used [agent-browser](https://github.com/vercel-labs/agent-browser), Vercel's browser tool for agents. I work with it and I like it, but it drives its own copy of Chrome, empty and off to the side. They were building a browser they couldn't use.
 
-So this round I asked them to build a way in. An agent like Claude Code can now open pages in myArc, read them and click through them, in a Space of its own.
+I wanted the same thing inside myArc, so this round I asked them to build it. An agent like Claude Code can now open pages in myArc, read them and click through them, in a Space of its own.
 
 ## Reading a page without looking at it
 
 Most AI tools that use a computer work from screenshots. The model gets a picture of the screen, guesses where the button is and clicks at those coordinates. It works, but every step sends a whole image, and if the guess is a few pixels off, the click hits something else.
 
-myArc hands the agent a short text outline of the page instead, one heading, link, field or button per line, and gives everything it can act on a number. To sign up on a form, the agent fills `e1` with an email address and clicks `e2`. After each action it gets a fresh outline back, so it sees what changed without asking.
+myArc borrows agent-browser's approach and hands the agent a short text outline of the page instead, one heading, link, field or button per line, and gives everything it can act on a number. To sign up on a form, the agent fills `e1` with an email address and clicks `e2`. After each action it gets a fresh outline back, so it sees what changed without asking.
 
 [![A terminal running three myarc commands. open prints a Sign up page outline with an Email textbox marked ref e1 and a Send button marked ref e2. fill e1 prints the same outline with the email filled in. click e2 reports that the tab navigated and prints a Thanks heading.](https://myarc.dev/blog/agents-use-myarc/agent-session.4f9cdde935fc.webp)](https://myarc.dev/blog/agents-use-myarc/agent-session.4f9cdde935fc.webp)
 
