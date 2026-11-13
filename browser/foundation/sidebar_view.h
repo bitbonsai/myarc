@@ -30,6 +30,11 @@
 #include "ui/views/view.h"
 #include "ui/views/view_tracker.h"
 
+namespace ui {
+class Event;
+class EventHandler;
+}  // namespace ui
+
 namespace views {
 class MdTextButton;
 class MenuRunner;
@@ -37,6 +42,7 @@ class ScrollView;
 }  // namespace views
 
 namespace myarc::foundation {
+enum class DropTargetKind : std::uint8_t;
 struct FolderRecord;
 struct ItemRecord;
 struct SidebarResult;
@@ -155,6 +161,16 @@ class SidebarView final : public views::View,
     // Pins `item_id` first if needed. Zero `folder_id` takes it out of its
     // folder.
     virtual void MovePinToFolder(uint64_t item_id, uint64_t folder_id) = 0;
+    // A dragged Pin or Today tab landed on `target`: a folder (`folder_id`),
+    // the ungrouped Pins or Today, above `before_id` or at the end with 0.
+    // Returns false when the workspace rejected it; the parent reports why.
+    virtual bool DropItem(uint64_t item_id,
+                          foundation::DropTargetKind target,
+                          uint64_t folder_id,
+                          uint64_t before_id) = 0;
+    // Rename… on a Pin: the parent asks for its name, and an empty one goes
+    // back to the page title.
+    virtual void RenameItem(uint64_t item_id) = 0;
     virtual void SelectSpace(uint64_t space_id) = 0;
     // A footer glyph of another Profile's Space was pressed.
     virtual void SwitchToSpaceInProfile(const std::string& profile_dir,
@@ -302,6 +318,37 @@ class SidebarView final : public views::View,
     raw_ptr<views::View> view;
     std::optional<ItemMenuState> item_menu;
   };
+  // A part of the rows a dragged row can land on, in row order.
+  struct DropZone {
+    raw_ptr<views::View> view;
+    foundation::DropTargetKind kind;
+    uint64_t folder = 0;
+    // The row's item, or 0 for the Space title, a folder row or Today's
+    // divider and New Tab row, which drop at `next`.
+    uint64_t item = 0;
+    // The row after it in its section, or 0 at the section's end.
+    uint64_t next = 0;
+    // A favicon tile, laid out left to right.
+    bool tile = false;
+  };
+  // Where a drag would land now, and the line or outline that shows it, in
+  // this view's coordinates.
+  struct Drop {
+    foundation::DropTargetKind kind;
+    uint64_t folder = 0;
+    uint64_t before = 0;
+    gfx::Rect mark;
+    // `mark` outlines a folder row rather than drawing a line.
+    bool outline = false;
+    bool operator==(const Drop&) const = default;
+  };
+  struct RowDrag {
+    uint64_t item = 0;
+    raw_ptr<views::View> source;
+    gfx::Point press;
+    bool lifted = false;
+    std::optional<Drop> drop;
+  };
 
   views::View* AddStorageRetry(views::View& parent, StorageRetry retry);
   void TrackFocus(views::View* view,
@@ -327,6 +374,17 @@ class SidebarView final : public views::View,
       ui::mojom::MenuSourceType source_type) override;
   // Removes every child and forgets the rows', footer's and panel's views.
   void DropRows();
+  // Row drags, fed every mouse event under this view before its target.
+  void OnRowDragEvent(ui::Event& event);
+  // Where a row dragged to `point` would land, or nothing outside the rows.
+  std::optional<Drop> DropAt(const gfx::Point& point) const;
+  void ShowDrop(const std::optional<Drop>& drop);
+  // Ends the drag and, with `commit`, drops the row where it shows. Can
+  // delete this view.
+  void EndRowDrag(bool commit);
+  // --myarc-capture-drag=<item ID>:<folder ID>[:hold]: drags the row onto
+  // the folder row with synthetic mouse events, holding it there with hold.
+  void RunCaptureDrag(uint64_t item, uint64_t folder, bool hold);
   // Drops the Library view without notifying the parent.
   void ResetLibrary();
   // The Create a Space panel's callbacks.
@@ -370,6 +428,17 @@ class SidebarView final : public views::View,
   const raw_ref<Delegate> delegate_;
   // Every control's target, the footer's included.
   std::vector<FocusTarget> focus_targets_;
+  std::vector<DropZone> drop_zones_;
+  // Sees every mouse event under this view before its target, for row drags.
+  std::unique_ptr<ui::EventHandler> row_drag_handler_;
+  std::optional<RowDrag> row_drag_;
+  // The drop's line or outline, above the rows while a drag shows one.
+  raw_ptr<views::View> drop_indicator_ = nullptr;
+  // A model that arrived mid-drag, applied when the drag ends without a drop.
+  std::unique_ptr<foundation::SidebarResult> deferred_model_;
+  std::u16string deferred_status_;
+  StorageRetry deferred_retry_ = StorageRetry::kNone;
+  bool capture_drag_scheduled_ = false;
   // The footer kept across row rebuilds, and the Spaces it shows.
   raw_ptr<views::View> footer_ = nullptr;
   // Float above the footer, outside the layout, and go with it.

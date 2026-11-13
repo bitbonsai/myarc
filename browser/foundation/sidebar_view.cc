@@ -11,9 +11,11 @@
 #include "base/command_line.h"
 #include "base/functional/bind.h"
 #include "base/location.h"
+#include "base/logging.h"
 #include "base/numerics/safe_conversions.h"
 #include "base/scoped_observation.h"
 #include "base/strings/string_number_conversions.h"
+#include "base/strings/string_split.h"
 #include "base/strings/utf_string_conversions.h"
 #include "base/task/sequenced_task_runner.h"
 #include "cc/paint/paint_flags.h"
@@ -34,6 +36,10 @@
 #include "ui/color/color_id.h"
 #include "ui/color/color_provider.h"
 #include "ui/compositor/layer.h"
+#include "ui/events/event.h"
+#include "ui/events/event_handler.h"
+#include "ui/events/event_utils.h"
+#include "ui/events/keycodes/keyboard_codes.h"
 #include "ui/gfx/animation/tween.h"
 #include "ui/gfx/canvas.h"
 #include "ui/gfx/color_analysis.h"
@@ -54,6 +60,7 @@
 #include "ui/views/animation/ink_drop_host.h"
 #include "ui/views/background.h"
 #include "ui/views/border.h"
+#include "ui/views/controls/button/button.h"
 #include "ui/views/controls/button/label_button.h"
 #include "ui/views/controls/button/md_text_button.h"
 #include "ui/views/controls/highlight_path_generator.h"
@@ -429,6 +436,7 @@ enum ItemCommand {
   kDeleteFolder,
   kRemoveFromFolder,
   kMoveToFolder,
+  kRenameItem,
   // Move to Folder's entries: this plus the folder's index in folders_.
   kMoveToFolderFirst = 1000
 };
@@ -478,6 +486,9 @@ constexpr char kCaptureCreateMenu[] = "myarc-capture-create-menu";
 constexpr char kCaptureActivate[] = "myarc-capture-activate";
 // Opens the first tile's context menu once, for background captures.
 constexpr char kCaptureItemMenu[] = "myarc-capture-item-menu";
+// Drags a row onto a folder row once, for background captures:
+// <item ID>:<folder ID>, and :hold to keep it over the folder.
+constexpr char kCaptureDrag[] = "myarc-capture-drag";
 
 // The creation menu floats 17 DIP above the Create button, its notch tip 12
 // DIP above it and 4 DIP left of its center, and its right edge 5 DIP inside
@@ -629,6 +640,66 @@ class FolderRow final : public views::View {
 
 BEGIN_METADATA(FolderRow)
 END_METADATA
+
+// Hands every event under the sidebar to its row drag before the target sees
+// it, so a press on a row's button can turn into a drag.
+class RowDragHandler final : public ui::EventHandler {
+ public:
+  explicit RowDragHandler(base::RepeatingCallback<void(ui::Event&)> on_event)
+      : on_event_(std::move(on_event)) {}
+
+  void OnEvent(ui::Event* event) override { on_event_.Run(*event); }
+
+ private:
+  base::RepeatingCallback<void(ui::Event&)> on_event_;
+};
+
+// Where a dragged row will land: a 2 DIP line between rows or tiles, or an
+// outline around the folder row it will go into, in the title's colour.
+class DropIndicator final : public views::View {
+  METADATA_HEADER(DropIndicator, views::View)
+
+ public:
+  DropIndicator() {
+    SetPaintToLayer();
+    layer()->SetFillsBoundsOpaquely(false);
+    SetCanProcessEventsWithinSubtree(false);
+    SetProperty(views::kViewIgnoredByLayoutKey, true);
+  }
+
+  void Show(const gfx::Rect& mark, bool outline) {
+    outline_ = outline;
+    SetBoundsRect(mark);
+    SchedulePaint();
+  }
+
+  void OnPaint(gfx::Canvas* canvas) override {
+    cc::PaintFlags flags;
+    flags.setAntiAlias(true);
+    flags.setColor(GetFills(GetColorProvider()).title);
+    gfx::RectF bounds(GetLocalBounds());
+    if (outline_) {
+      flags.setStyle(cc::PaintFlags::kStroke_Style);
+      flags.setStrokeWidth(kStroke);
+      bounds.Inset(kStroke / 2);
+      canvas->DrawRoundRect(bounds, 10 - kStroke / 2, flags);
+      return;
+    }
+    canvas->DrawRoundRect(bounds, 1, flags);
+  }
+
+ private:
+  static constexpr float kStroke = 1.5f;
+  bool outline_ = false;
+};
+
+BEGIN_METADATA(DropIndicator)
+END_METADATA
+
+// A row's drop line is this thick and centred on the edge it marks.
+constexpr int kDropLine = 2;
+// A dragged row fades to this while it is lifted.
+constexpr float kLiftedOpacity = 0.4f;
 
 std::unique_ptr<views::View> Box(Orientation orientation, int spacing) {
   auto view = std::make_unique<views::View>();
@@ -811,6 +882,9 @@ SidebarView::SidebarView(Delegate& delegate)
                                                       kSidebarInsets, 8));
   GetViewAccessibility().SetRole(ax::mojom::Role::kGroup);
   GetViewAccessibility().SetName(u"Workspace sidebar");
+  row_drag_handler_ = std::make_unique<RowDragHandler>(base::BindRepeating(
+      &SidebarView::OnRowDragEvent, base::Unretained(this)));
+  AddPreTargetHandler(row_drag_handler_.get());
   SetUnavailable(u"Loading workspace\u2026");
 }
 
@@ -818,6 +892,7 @@ SidebarView::~SidebarView() {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
   weak_factory_.InvalidateWeakPtrs();
   menu_runner_.reset();
+  RemovePreTargetHandler(row_drag_handler_.get());
 }
 
 void SidebarView::ShowContextMenuForViewImpl(
@@ -880,6 +955,10 @@ void SidebarView::ShowContextMenuForViewImpl(
   if (!menu_state_.url.empty()) {
     menu_model_->AddItem(kCopyLink, u"Copy Link");
     menu_model_->AddSeparator(ui::NORMAL_SEPARATOR);
+  }
+  // Arc renames a pinned tab from its menu.
+  if (menu_state_.is_pin) {
+    menu_model_->AddItem(kRenameItem, u"Rename\u2026");
   }
   if (!menu_state_.is_pin) {
     menu_model_->AddItem(kPin, menu_state_.is_favorite ? u"Move to Space Pins"
@@ -989,6 +1068,10 @@ void SidebarView::OpenLibrary(LibrarySection section) {
 }
 
 void SidebarView::DropRows() {
+  row_drag_.reset();
+  deferred_model_.reset();
+  drop_indicator_ = nullptr;
+  drop_zones_.clear();
   focus_targets_.clear();
   footer_targets_.clear();
   footer_ = nullptr;
@@ -1328,10 +1411,215 @@ void SidebarView::ExecuteCommand(int command_id, int event_flags) {
     case kRemoveFromFolder:
       delegate_->MovePinToFolder(id, 0);
       return;
+    case kRenameItem:
+      delegate_->RenameItem(id);
+      return;
   }
   const size_t index = static_cast<size_t>(command_id - kMoveToFolderFirst);
   if (command_id >= kMoveToFolderFirst && index < menu_folder_ids_.size()) {
     delegate_->MovePinToFolder(id, menu_folder_ids_[index]);
+  }
+}
+
+void SidebarView::OnRowDragEvent(ui::Event& event) {
+  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
+  if (event.IsKeyEvent()) {
+    // Esc drops a lifted row back where it was.
+    if (row_drag_ && row_drag_->lifted &&
+        event.type() == ui::EventType::kKeyPressed &&
+        event.AsKeyEvent()->key_code() == ui::VKEY_ESCAPE) {
+      event.StopPropagation();
+      EndRowDrag(/*commit=*/false);
+    }
+    return;
+  }
+  if (!event.IsMouseEvent()) {
+    return;
+  }
+  auto* target = static_cast<views::View*>(event.target());
+  const ui::MouseEvent& mouse = *event.AsMouseEvent();
+  gfx::Point point = mouse.location();
+  views::View::ConvertPointToTarget(target, this, &point);
+  switch (mouse.type()) {
+    case ui::EventType::kMousePressed:
+      if (row_drag_ && row_drag_->lifted) {
+        EndRowDrag(/*commit=*/false);
+        return;
+      }
+      row_drag_.reset();
+      if (!mouse.IsOnlyLeftMouseButton()) {
+        return;
+      }
+      // Rows with an item drag: Pin tiles, folders' Pins and Today tabs.
+      for (const DropZone& zone : drop_zones_) {
+        if (zone.item && zone.view->Contains(target)) {
+          row_drag_ =
+              RowDrag{.item = zone.item, .source = zone.view, .press = point};
+          break;
+        }
+      }
+      return;
+    case ui::EventType::kMouseDragged:
+      if (!row_drag_) {
+        return;
+      }
+      if (!row_drag_->lifted) {
+        if (!views::View::ExceededDragThreshold(point - row_drag_->press)) {
+          return;
+        }
+        row_drag_->lifted = true;
+        // The press won't end in a click, so the button lets go of it.
+        if (auto* button = views::Button::AsButton(target)) {
+          button->SetState(views::Button::STATE_NORMAL);
+        }
+        views::View& source = *row_drag_->source;
+        source.SetPaintToLayer();
+        source.layer()->SetFillsBoundsOpaquely(false);
+        source.layer()->SetOpacity(kLiftedOpacity);
+      }
+      event.StopPropagation();
+      ShowDrop(DropAt(point));
+      return;
+    case ui::EventType::kMouseReleased:
+      if (!row_drag_) {
+        return;
+      }
+      if (!row_drag_->lifted) {
+        row_drag_.reset();
+        return;
+      }
+      event.StopPropagation();
+      ShowDrop(DropAt(point));
+      EndRowDrag(/*commit=*/true);
+      return;
+    default:
+      return;
+  }
+}
+
+std::optional<SidebarView::Drop> SidebarView::DropAt(
+    const gfx::Point& point) const {
+  if (point.x() < 0 || point.x() >= width()) {
+    return std::nullopt;
+  }
+  for (const DropZone& zone : drop_zones_) {
+    const gfx::Rect bounds = views::View::ConvertRectToTarget(
+        zone.view, this, zone.view->GetLocalBounds());
+    if (!bounds.Contains(point)) {
+      continue;
+    }
+    Drop drop = {.kind = zone.kind, .folder = zone.folder};
+    if (!zone.item) {
+      drop.before = zone.next;
+      if (zone.kind == foundation::DropTargetKind::Folder) {
+        drop.mark = bounds;
+        drop.outline = true;
+      } else {
+        // Above the Space title, or below Today's divider and New Tab.
+        const int y = zone.kind == foundation::DropTargetKind::Pins
+                          ? bounds.y()
+                          : bounds.bottom();
+        drop.mark =
+            gfx::Rect(bounds.x(), y - kDropLine / 2, bounds.width(), kDropLine);
+      }
+      return drop;
+    }
+    const bool before_row = zone.tile ? point.x() < bounds.CenterPoint().x()
+                                      : point.y() < bounds.CenterPoint().y();
+    drop.before = before_row ? zone.item : zone.next;
+    if (zone.tile) {
+      // In the middle of the 8 DIP gap beside the tile.
+      const int x = before_row ? bounds.x() - 4 : bounds.right() + 4;
+      drop.mark =
+          gfx::Rect(x - kDropLine / 2, bounds.y(), kDropLine, bounds.height());
+    } else {
+      const int y = before_row ? bounds.y() : bounds.bottom();
+      drop.mark =
+          gfx::Rect(bounds.x(), y - kDropLine / 2, bounds.width(), kDropLine);
+    }
+    return drop;
+  }
+  // Gaps between rows keep the last drop, so the line doesn't flicker.
+  return row_drag_ ? row_drag_->drop : std::nullopt;
+}
+
+void SidebarView::ShowDrop(const std::optional<Drop>& drop) {
+  if (row_drag_) {
+    row_drag_->drop = drop;
+  }
+  if (!drop) {
+    if (drop_indicator_) {
+      RemoveChildViewT(drop_indicator_.ExtractAsDangling());
+    }
+    return;
+  }
+  if (!drop_indicator_) {
+    drop_indicator_ = AddChildView(std::make_unique<DropIndicator>());
+  }
+  static_cast<DropIndicator*>(drop_indicator_.get())
+      ->Show(drop->mark, drop->outline);
+}
+
+void SidebarView::EndRowDrag(bool commit) {
+  if (!row_drag_) {
+    return;
+  }
+  const RowDrag drag = *std::exchange(row_drag_, std::nullopt);
+  ShowDrop(std::nullopt);
+  if (drag.lifted && drag.source->layer()) {
+    drag.source->DestroyLayer();
+  }
+  std::unique_ptr<foundation::SidebarResult> deferred =
+      std::move(deferred_model_);
+  if (commit && drag.lifted && drag.drop) {
+    // The drop's own model replaces any that arrived mid-drag. Dropping can
+    // rebuild or delete this view.
+    auto weak = weak_factory_.GetWeakPtr();
+    const bool dropped = delegate_->DropItem(
+        drag.item, drag.drop->kind, drag.drop->folder, drag.drop->before);
+    if (!weak || dropped) {
+      return;
+    }
+  }
+  if (deferred) {
+    SetModel(*deferred, deferred_status_, deferred_retry_);
+  }
+}
+
+void SidebarView::RunCaptureDrag(uint64_t item, uint64_t folder, bool hold) {
+  const auto source = std::ranges::find(drop_zones_, item, &DropZone::item);
+  const auto target =
+      std::ranges::find_if(drop_zones_, [folder](const DropZone& zone) {
+        return zone.kind == foundation::DropTargetKind::Folder &&
+               zone.folder == folder && !zone.item;
+      });
+  if (!GetWidget() || source == drop_zones_.end() ||
+      target == drop_zones_.end()) {
+    LOG(ERROR) << "Capture drag found no row " << item << " or folder "
+               << folder;
+    return;
+  }
+  gfx::Point from = source->view->GetLocalBounds().CenterPoint();
+  views::View::ConvertPointToWidget(source->view, &from);
+  gfx::Point to = target->view->GetLocalBounds().CenterPoint();
+  views::View::ConvertPointToWidget(target->view, &to);
+  // Through the root view, as the window would send them, but without the
+  // pointer, so the capture never takes focus or moves the mouse.
+  views::View* root = GetWidget()->GetRootView();
+  auto weak = weak_factory_.GetWeakPtr();
+  const auto event = [](ui::EventType type, const gfx::Point& at) {
+    return ui::MouseEvent(type, at, at, ui::EventTimeForNow(),
+                          ui::EF_LEFT_MOUSE_BUTTON, ui::EF_LEFT_MOUSE_BUTTON);
+  };
+  root->OnMousePressed(event(ui::EventType::kMousePressed, from));
+  constexpr int kSteps = 8;
+  for (int step = 1; step <= kSteps && weak; ++step) {
+    const gfx::Point at(from.x() + (to.x() - from.x()) * step / kSteps,
+                        from.y() + (to.y() - from.y()) * step / kSteps);
+    root->OnMouseDragged(event(ui::EventType::kMouseDragged, at));
+  }
+  if (weak && !hold) {
+    root->OnMouseReleased(event(ui::EventType::kMouseReleased, to));
   }
 }
 
@@ -1349,6 +1637,11 @@ void SidebarView::TrackFocus(views::View* view,
 SidebarView::ItemPresentation SidebarView::Present(
     const foundation::ItemRecord& item) const {
   ItemPresentation presentation = delegate_->GetItemPresentation(item);
+  // The user's name for a Pin wins over its page's title, live or stored, as
+  // in Arc, until it is cleared.
+  if (!item.name.empty()) {
+    presentation.title = base::UTF8ToUTF16(std::string(item.name));
+  }
   // Dormant saved rows show the last title their page had, as Arc does, and
   // fall back to a short label of the saved URL until a page has loaded once.
   if (presentation.title.empty() && !item.title.empty()) {
@@ -1560,6 +1853,18 @@ void SidebarView::SetModel(const foundation::SidebarResult& model,
                            const std::u16string& status,
                            StorageRetry retry) {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
+  // Rebuilding would drop the row under the pointer; the drag's end applies
+  // the latest model.
+  if (row_drag_ && row_drag_->lifted) {
+    deferred_model_ = std::make_unique<foundation::SidebarResult>(model);
+    deferred_status_ = status;
+    deferred_retry_ = retry;
+    return;
+  }
+  row_drag_.reset();
+  if (drop_indicator_) {
+    RemoveChildViewT(drop_indicator_.ExtractAsDangling());
+  }
   if (!model.ok) {
     SetUnavailable(u"Workspace unavailable: " +
                    base::UTF8ToUTF16(std::string(model.error)));
@@ -1651,6 +1956,7 @@ void SidebarView::SetModel(const foundation::SidebarResult& model,
   space_rows_ = nullptr;
   current_space_id_ = model.current_space.id;
   focus_targets_.clear();
+  drop_zones_.clear();
   new_tab_ = nullptr;
   tiles_.clear();
   // Loading and title ticks rebuild only the rows. The footer stays, with its
@@ -1721,6 +2027,18 @@ void SidebarView::SetModel(const foundation::SidebarResult& model,
         *tile_items[i], true, tile_items[i]->id == model.selected_item_id));
     static_cast<views::BoxLayout*>(tiles_row->GetLayoutManager())
         ->SetFlexForView(tile, 1);
+    // Pin tiles drag and take drops; Favorites stay put.
+    if (tile_items[i]->placement == foundation::PlacementKind::Pin) {
+      const auto next = std::find_if(
+          tile_items.begin() + i + 1, tile_items.end(), [](const auto* item) {
+            return item->placement == foundation::PlacementKind::Pin;
+          });
+      drop_zones_.push_back({.view = tile,
+                             .kind = foundation::DropTargetKind::Pins,
+                             .item = tile_items[i]->id,
+                             .next = next == tile_items.end() ? 0 : (*next)->id,
+                             .tile = true});
+    }
   }
   // Empty layout cells keep a short final row on the grid; never controls.
   for (size_t i = tile_items.size(); tiles_row && i % columns != 0; ++i) {
@@ -1759,6 +2077,10 @@ void SidebarView::SetModel(const foundation::SidebarResult& model,
   heading->GetViewAccessibility().SetName(
       (agent ? u"Rename Agent Space: " : u"Rename Space: ") + name);
   TrackFocus(heading.get(), FocusAction::kRename, model.current_space.id);
+  // Dropping on the title adds the row to the end of the ungrouped Pins,
+  // which is how a Pin leaves a folder when no Pin tiles show.
+  drop_zones_.push_back(
+      {.view = heading.get(), .kind = foundation::DropTargetKind::Pins});
   // Its menu makes a folder.
   heading->set_context_menu_controller(this);
   if (agent && !control_client_.empty()) {
@@ -1805,8 +2127,12 @@ void SidebarView::SetModel(const foundation::SidebarResult& model,
   // while open. A closed folder still shows its selected Pin, so the page
   // on screen keeps its row.
   for (const auto& folder : model.folders) {
-    rows->AddChildView(MakeFolder(folder));
-    for (const uint64_t id : folder.items) {
+    // A row dropped on the folder's own row goes in at its end.
+    drop_zones_.push_back({.view = rows->AddChildView(MakeFolder(folder)),
+                           .kind = foundation::DropTargetKind::Folder,
+                           .folder = folder.id});
+    for (size_t i = 0; i < folder.items.size(); ++i) {
+      const uint64_t id = folder.items[i];
       const auto item = std::ranges::find(model.pins, id,
                                           &foundation::ItemRecord::id);
       const bool selected = id == model.selected_item_id;
@@ -1816,7 +2142,12 @@ void SidebarView::SetModel(const foundation::SidebarResult& model,
       auto row = MakeItem(*item, false, selected, folder.id);
       row->SetProperty(views::kMarginsKey,
                        gfx::Insets::TLBR(0, kFolderIndent, 0, 0));
-      rows->AddChildView(std::move(row));
+      drop_zones_.push_back(
+          {.view = rows->AddChildView(std::move(row)),
+           .kind = foundation::DropTargetKind::Folder,
+           .folder = folder.id,
+           .item = id,
+           .next = i + 1 < folder.items.size() ? folder.items[i + 1] : 0});
     }
   }
 
@@ -1828,7 +2159,11 @@ void SidebarView::SetModel(const foundation::SidebarResult& model,
     for (const auto& item : model.temporary) {
       today.push_back(item.id);
     }
-    rows->AddChildView(MakeTodayDivider(std::move(today)));
+    // Today's divider and New Tab row take drops at Today's top.
+    drop_zones_.push_back(
+        {.view = rows->AddChildView(MakeTodayDivider(std::move(today))),
+         .kind = foundation::DropTargetKind::Today,
+         .next = model.temporary.front().id});
   }
 
   auto new_tab = Button(base::BindRepeating(&Delegate::NewTab,
@@ -1846,9 +2181,19 @@ void SidebarView::SetModel(const foundation::SidebarResult& model,
   new_tab->SetProperty(views::kMarginsKey,
                        gfx::Insets::TLBR(divider ? 0 : 3, 0, 1, 0));
   new_tab_ = rows->AddChildView(std::move(new_tab));
-  for (const auto& item : model.temporary) {
-    rows->AddChildView(
-        MakeItem(item, false, item.id == model.selected_item_id));
+  drop_zones_.push_back(
+      {.view = new_tab_.get(),
+       .kind = foundation::DropTargetKind::Today,
+       .next = model.temporary.empty() ? 0 : model.temporary.front().id});
+  for (size_t i = 0; i < model.temporary.size(); ++i) {
+    const auto& item = model.temporary[i];
+    drop_zones_.push_back({.view = rows->AddChildView(MakeItem(
+                               item, false, item.id == model.selected_item_id)),
+                           .kind = foundation::DropTargetKind::Today,
+                           .item = item.id,
+                           .next = i + 1 < model.temporary.size()
+                                       ? model.temporary[i + 1].id
+                                       : 0});
   }
   if (outgoing) {
     outgoing->TakeOutgoing();
@@ -1896,6 +2241,25 @@ void SidebarView::SetModel(const foundation::SidebarResult& model,
         base::BindOnce(&SidebarView::OpenCaptureItemMenu,
                        weak_factory_.GetWeakPtr(), 30),
         base::Milliseconds(2000));
+  }
+  if (!capture_drag_scheduled_ &&
+      base::CommandLine::ForCurrentProcess()->HasSwitch(kCaptureDrag)) {
+    capture_drag_scheduled_ = true;
+    const std::vector<std::string> parts = base::SplitString(
+        base::CommandLine::ForCurrentProcess()->GetSwitchValueASCII(
+            kCaptureDrag),
+        ":", base::TRIM_WHITESPACE, base::SPLIT_WANT_NONEMPTY);
+    uint64_t item = 0;
+    uint64_t folder = 0;
+    if (parts.size() >= 2 && base::StringToUint64(parts[0], &item) &&
+        base::StringToUint64(parts[1], &folder)) {
+      base::SequencedTaskRunner::GetCurrentDefault()->PostDelayedTask(
+          FROM_HERE,
+          base::BindOnce(&SidebarView::RunCaptureDrag,
+                         weak_factory_.GetWeakPtr(), item, folder,
+                         parts.size() > 2 && parts[2] == "hold"),
+          base::Milliseconds(2000));
+    }
   }
   if (!capture_activate_scheduled_ &&
       base::CommandLine::ForCurrentProcess()->HasSwitch(kCaptureActivate)) {

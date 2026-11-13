@@ -188,13 +188,23 @@ class BrowserWorkspaceAdapter final : public TabStripModelObserver {
   // Pins a temporary item here first. Zero folder takes a Pin out of its
   // folder.
   foundation::MutationResult MovePinToFolder(uint64_t item, uint64_t folder);
+  // A Pin's own name, shown instead of its page title; empty clears it.
+  foundation::MutationResult RenameItem(uint64_t item, std::string_view name);
+  // A sidebar drag's drop in this window's Space; see WorkspaceService. A
+  // live Today tab pins the page it shows now.
+  foundation::MutationResult DropItem(uint64_t item,
+                                      foundation::DropTargetKind target,
+                                      uint64_t folder,
+                                      uint64_t before);
   // Deletes the folder and archives its dormant Pins. A Pin with a live page
   // keeps it open as a temporary tab of its Space instead, so no page loses
   // its row. `id` is how many Pins were archived.
   foundation::MutationResult DeleteFolder(uint64_t folder);
 
-  // Keyboard commands over Rust's sidebar order: Favorites, Pins, then
-  // temporary items, and Spaces in footer order. Index -1 means the last row;
+  // Keyboard commands over the rows the sidebar shows, in Rust's row order:
+  // Favorites, ungrouped Pins, open folders' Pins, then temporary items, and
+  // Spaces in footer order. A closed folder's Pins are skipped, except the
+  // selected one. Index -1 means the last row;
   // an index past the end does nothing. Steps wrap around.
   static BrowserWorkspaceAdapter* ForBrowser(BrowserWindowInterface& browser);
   // Pins the selected temporary item or unpins the selected Space Pin.

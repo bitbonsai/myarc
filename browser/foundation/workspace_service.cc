@@ -223,6 +223,9 @@ std::optional<std::string> EncodeWorkspaceMetadata(
     // Builds without saved titles reject the key, so write it only when set.
     if (!item.title.empty())
       record.Set("title", std::string(item.title));
+    // Builds without renames reject the key too.
+    if (!item.name.empty())
+      record.Set("name", std::string(item.name));
     // Builds without Auto Archive reject the key; saved items never carry it.
     if (item.last_viewed_secs)
       record.Set("viewed_secs", base::NumberToString(item.last_viewed_secs));
@@ -404,6 +407,11 @@ MetadataResult DecodeWorkspaceMetadata(std::string_view json) {
     item.canonical_url = *url;
     if (title)
       item.title = *title;
+    // A name is cosmetic: a bad one reads as none, as Rust restore does.
+    if (const auto* name = record->FindString("name");
+        name && BoundedText(*name, limits.title_bytes)) {
+      item.name = *name;
+    }
     snapshot.items.push_back(std::move(item));
   }
   for (const auto& value : *windows) {
@@ -966,6 +974,39 @@ foundation::MutationResult WorkspaceService::SetTitle(uint64_t item,
   if (result.ok && result.id && !ephemeral_)
     dirty_ = true;
   return result;
+}
+
+foundation::MutationResult WorkspaceService::RenameItem(uint64_t item,
+                                                        std::string_view name) {
+  if (!CanMutate())
+    return Failure("Workspace is not loaded. Check storage state.");
+  if (!base::IsStringUTF8(name))
+    return Failure("Invalid UTF-8 tab name.");
+  return Changed(foundation::rename_item(*workspace_, item,
+                                         rust::Str(name.data(), name.size())));
+}
+
+foundation::MutationResult WorkspaceService::DropItem(
+    uint64_t window,
+    uint64_t item,
+    foundation::DropTargetKind target,
+    uint64_t folder,
+    uint64_t before,
+    std::optional<std::string_view> page_url) {
+  if (!CanMutate())
+    return Failure("Workspace is not loaded. Check storage state.");
+  std::optional<std::string> url;
+  if (page_url) {
+    url = CanonicalUrl(*page_url);
+    if (!url)
+      return Failure(
+          "Pin a page with a valid HTTP(S) URL without credentials, or "
+          "about:blank.");
+  }
+  const std::string_view text = url ? std::string_view(*url) : "";
+  return Changed(foundation::drop_item(*workspace_, window, item, target,
+                                       folder, before, url.has_value(),
+                                       rust::Str(text.data(), text.size())));
 }
 
 foundation::MutationResult WorkspaceService::SetTemporaryPage(

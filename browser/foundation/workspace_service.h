@@ -150,6 +150,18 @@ class WorkspaceService final : public base::SupportsUserData::Data {
   // Rust bounds it. Never notifies or writes by itself: a changed title is
   // saved with the next metadata write or the shutdown flush.
   foundation::MutationResult SetTitle(uint64_t item, std::string_view title);
+  // Saved items only: the name the row shows instead of the page title. An
+  // empty name clears it.
+  foundation::MutationResult RenameItem(uint64_t item, std::string_view name);
+  // Drops a Pin or Today tab of `window`'s Space on a folder (`folder`), the
+  // ungrouped Pins or Today, above `before` or at the end with zero. Pinning a
+  // live Today tab saves `page_url`. Nothing changes on failure.
+  foundation::MutationResult DropItem(uint64_t window,
+                                      uint64_t item,
+                                      foundation::DropTargetKind target,
+                                      uint64_t folder,
+                                      uint64_t before,
+                                      std::optional<std::string_view> page_url);
   // Temporary items only. Remembers the page a dormant row reopens when its tab
   // is not restored, with its full URL; URLs outside the saved-URL gate are
   // ignored. Writes when the URL changes, without a notify. Callers skip it

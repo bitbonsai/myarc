@@ -925,6 +925,82 @@ bool CheckFolders() {
          archived_tabs(*restored, 100).size() == 2;
 }
 
+// A Pin's name survives the JSON codec and a restore, files without one load
+// with none, and a bad stored name reads as none. A drop into a folder pins a
+// Today tab there, and a rejected drop changes nothing.
+bool CheckRenameAndDrop() {
+  using namespace myarc::foundation;
+  using myarc::internal::DecodeWorkspaceMetadata;
+  using myarc::internal::EncodeWorkspaceMetadata;
+  auto model = new_workspace();
+  auto pin = add_temporary_item(*model, 1);
+  if (!pin.ok || !set_placement(*model, pin.id, PlacementKind::Pin, 1, true,
+                                "https://a.test/")
+                      .ok) {
+    return false;
+  }
+  // Items carry no "name" key until renamed, so older builds still read
+  // the file.
+  const auto plain = EncodeWorkspaceMetadata(export_snapshot(*model));
+  auto plain_root =
+      plain ? base::JSONReader::ReadDict(*plain, base::JSON_PARSE_RFC)
+            : std::nullopt;
+  auto* plain_items = plain_root ? plain_root->FindList("items") : nullptr;
+  if (!plain_items || plain_items->size() != 1 ||
+      (*plain_items)[0].GetDict().contains("name")) {
+    return false;
+  }
+  if (rename_item(*model, pin.id, " Team docs ").id != 1 ||
+      rename_item(*model, pin.id, "Team docs").id != 0) {
+    return false;
+  }
+  const auto encoded = EncodeWorkspaceMetadata(export_snapshot(*model));
+  auto decoded = encoded ? DecodeWorkspaceMetadata(*encoded)
+                         : myarc::internal::MetadataResult{};
+  auto restored = new_workspace();
+  if (!decoded.snapshot ||
+      !restore_snapshot(*restored, std::move(*decoded.snapshot)).ok) {
+    return false;
+  }
+  auto sidebar = sidebar_snapshot(*restored, 1);
+  if (!sidebar.ok || sidebar.pins.size() != 1 ||
+      sidebar.pins[0].name != "Team docs") {
+    return false;
+  }
+  auto root = base::JSONReader::ReadDict(*encoded, base::JSON_PARSE_RFC);
+  auto* items = root ? root->FindList("items") : nullptr;
+  if (!items || items->size() != 1)
+    return false;
+  (*items)[0].GetDict().Set("name", 7);
+  const auto bad = base::WriteJson(*root);
+  auto lenient =
+      bad ? DecodeWorkspaceMetadata(*bad) : myarc::internal::MetadataResult{};
+  if (!lenient.snapshot || lenient.snapshot->items.size() != 1 ||
+      !lenient.snapshot->items[0].name.empty()) {
+    return false;
+  }
+  // A Today tab dropped on a folder is pinned into it.
+  auto folder = create_folder(*restored, 1, "Reading");
+  auto tab = add_temporary_item(*restored, 1);
+  if (!folder.ok || !tab.ok ||
+      drop_item(*restored, 1, tab.id, DropTargetKind::Folder, folder.id, 0,
+                true, "https://b.test/")
+              .ok == false) {
+    return false;
+  }
+  sidebar = sidebar_snapshot(*restored, 1);
+  if (sidebar.folders.size() != 1 || sidebar.folders[0].items.size() != 1 ||
+      sidebar.folders[0].items[0] != tab.id || !sidebar.temporary.empty() ||
+      sidebar.row_order.size() != 2) {
+    return false;
+  }
+  const auto before = EncodeWorkspaceMetadata(export_snapshot(*restored));
+  return !drop_item(*restored, 1, tab.id, DropTargetKind::Folder, 99, 0, false,
+                    "")
+              .ok &&
+         EncodeWorkspaceMetadata(export_snapshot(*restored)) == before;
+}
+
 // The "Archive tabs after" choice survives the JSON codec, the 12-hour default
 // stays unwritten, a bad value reads as the default, and the pass uses the
 // choice. Clear Archive empties the archive and the empty archive persists.
@@ -1259,13 +1335,16 @@ int main() {
     std::cerr << "Folder checks failed\n";
     return 25;
   }
-  std::cout
-      << "7 legacy C++/Rust checks passed, including 1000 ownership "
-         "round trips; workspace transitions, Space 1 deletion and "
-         "metadata codec, saved title, Archived Tabs, Auto Archive, "
-         "archive timer, Clear Archive, downloads stack, dormant "
-         "temporary item, Space reorder, Space icon, Space theme, first "
-         "Space, Spaces index, agent Space and folder checks "
-         "passed\n";
+  if (!CheckRenameAndDrop()) {
+    std::cerr << "Rename and drop checks failed\n";
+    return 26;
+  }
+  std::cout << "7 legacy C++/Rust checks passed, including 1000 ownership "
+               "round trips; workspace transitions, Space 1 deletion and "
+               "metadata codec, saved title, Archived Tabs, Auto Archive, "
+               "archive timer, Clear Archive, downloads stack, dormant "
+               "temporary item, Space reorder, Space icon, Space theme, first "
+               "Space, Spaces index, agent Space, folder, rename and drop "
+               "checks passed\n";
   return 0;
 }

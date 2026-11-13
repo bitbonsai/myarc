@@ -1,5 +1,5 @@
 diff --git a/chrome/browser/ui/views/frame/browser_view.cc b/chrome/browser/ui/views/frame/browser_view.cc
-index 7b568f6de760af21d6e9d2aa44415a7cef617c51..34aa50df0617ea40e9881fa75ae2d7780afcdc55 100644
+index 7b568f6de760af21d6e9d2aa44415a7cef617c51..18e4141aef2dcb4ccc119ded73066f782eb58a10 100644
 --- a/chrome/browser/ui/views/frame/browser_view.cc
 +++ b/chrome/browser/ui/views/frame/browser_view.cc
 @@ -22,6 +22,7 @@
@@ -1553,7 +1553,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..34aa50df0617ea40e9881fa75ae2d778
  
      if (dialog_anchor_) {
        rect.Offset(0, -kAdditionalDialogToolbarOverlap);
-@@ -5197,75 +6394,2476 @@ void BrowserView::AddedToWidget() {
+@@ -5197,75 +6394,2533 @@ void BrowserView::AddedToWidget() {
        kFallbackPopupAnchorElementId, *this);
  
    initialized_ = true;
@@ -2416,6 +2416,24 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..34aa50df0617ea40e9881fa75ae2d778
 +      myarc_workspace_adapter_->MovePinToFolder(item, folder));
 +}
 +
++bool BrowserView::DropItem(uint64_t item,
++                           myarc::foundation::DropTargetKind target,
++                           uint64_t folder,
++                           uint64_t before) {
++  auto result =
++      myarc_workspace_adapter_->DropItem(item, target, folder, before);
++  const bool ok = result.ok;
++  MyarcWorkspaceResult(std::move(result));
++  return ok;
++}
++
++void BrowserView::RenameItem(uint64_t item) {
++  const auto sidebar = myarc_workspace_adapter_->Sidebar();
++  if (sidebar.ok) {
++    ShowMyarcSpaceDialog(sidebar.current_space.id, 0, item);
++  }
++}
++
 +void BrowserView::SelectSpace(uint64_t space) {
 +  MyarcWorkspaceResult(myarc_workspace_adapter_->SelectSpace(space));
 +}
@@ -2817,8 +2835,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..34aa50df0617ea40e9881fa75ae2d778
 +                                             myarc_swapped_out_);
 +  }
 +}
- 
--  focus_manager_observation_.Reset();
++
 +namespace {
 +
 +// Chromium closes every window of a Profile when it deletes the Profile or
@@ -2828,15 +2845,11 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..34aa50df0617ea40e9881fa75ae2d778
 +  return IsProfileDirectoryMarkedForDeletion(profile.GetPath()) ||
 +         (!profile.IsOffTheRecord() &&
 +          !SessionServiceFactory::GetForProfileIfExisting(&profile));
- }
- 
--void BrowserView::PaintChildren(const views::PaintInfo& paint_info) {
--  if (GetWidget()) {
--    GetWidget()->GetCompositor()->RequestSuccessfulPresentationTimeForNextFrame(
--        base::BindOnce(&BrowserView::OnFirstPresentation,
--                       weak_ptr_factory_.GetWeakPtr()));
-+}  // namespace
++}
 +
++}  // namespace
+ 
+-  focus_manager_observation_.Reset();
 +void BrowserView::CloseMyarcWindowGroup() {
 +  // Quitting closes every window and saves the session with the group.
 +  if (myarc_swapped_out_ || browser_shutdown::IsTryingToQuit()) {
@@ -2853,7 +2866,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..34aa50df0617ea40e9881fa75ae2d778
 +  }
 +  if (hidden.empty()) {
 +    return;
-   }
++  }
 +  if (IsMyarcProfileClosing(*GetProfile())) {
 +    // The user didn't close the group, so another Profile's window takes
 +    // this one's place, once this one has hidden.
@@ -2889,13 +2902,17 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..34aa50df0617ea40e9881fa75ae2d778
 +      view->Close();
 +    }
 +  }
-+}
+ }
  
--  views::ClientView::PaintChildren(paint_info);
+-void BrowserView::PaintChildren(const views::PaintInfo& paint_info) {
+-  if (GetWidget()) {
+-    GetWidget()->GetCompositor()->RequestSuccessfulPresentationTimeForNextFrame(
+-        base::BindOnce(&BrowserView::OnFirstPresentation,
+-                       weak_ptr_factory_.GetWeakPtr()));
 +void BrowserView::ShowMyarcWindowForCloseWarning() {
 +  if (!myarc_swapped_out_) {
 +    return;
-+  }
+   }
 +  // Posted: the group's closing window hides first, so this one shows in
 +  // its place instead of ordering it out.
 +  base::SingleThreadTaskRunner::GetCurrentDefault()->PostTask(
@@ -2925,11 +2942,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..34aa50df0617ea40e9881fa75ae2d778
 +          myarc_workspace_weak_factory_.GetWeakPtr()));
 +}
  
--  static bool did_first_paint = false;
--  if (!did_first_paint) {
--    did_first_paint = true;
--    startup_metric_utils::GetBrowser().RecordBrowserWindowFirstPaint(
--        base::TimeTicks::Now());
+-  views::ClientView::PaintChildren(paint_info);
 +void BrowserView::ShowOrphanedMyarcGroupWindows() {
 +  // The last restore's notification runs this again.
 +  if (SessionRestore::IsAnySessionCurrentlyRestoring()) {
@@ -2957,12 +2970,14 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..34aa50df0617ea40e9881fa75ae2d778
 +                   << view->GetProfile()->GetBaseName().AsUTF8Unsafe();
 +      view->ShowMyarcGroupWindow(myarc::IsAppActive());
 +    }
-   }
- }
++  }
++}
  
--void BrowserView::OnThemeChanged() {
--  views::ClientView::OnThemeChanged();
--  if (!initialized_) {
+-  static bool did_first_paint = false;
+-  if (!did_first_paint) {
+-    did_first_paint = true;
+-    startup_metric_utils::GetBrowser().RecordBrowserWindowFirstPaint(
+-        base::TimeTicks::Now());
 +// static
 +int BrowserView::NextMyarcWindowGroup() {
 +  static int next = 0;
@@ -2976,13 +2991,15 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..34aa50df0617ea40e9881fa75ae2d778
 +  if (myarc_workspace_adapter_->ready()) {
 +    myarc_pending_space_ = 0;
 +    SelectSpace(space);
-     return;
++    return;
    }
 +  // RefreshMyarcWorkspaceSidebar selects it once the adapter is ready.
 +  myarc_pending_space_ = space;
-+}
+ }
  
--  FrameColorsChanged();
+-void BrowserView::OnThemeChanged() {
+-  views::ClientView::OnThemeChanged();
+-  if (!initialized_) {
 +// static
 +void BrowserView::MyarcProfileSwapCaptureStep(int step) {
 +  if (base::CommandLine::ForCurrentProcess()->GetSwitchValueASCII(
@@ -3031,8 +3048,8 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..34aa50df0617ea40e9881fa75ae2d778
 +          ->GetSwitchValueASCII(kMyarcCaptureProfileSwap)
 +          .starts_with("restore");
 +  if (!shown || step > (restore ? 1 : 4)) {
-+    return;
-+  }
+     return;
+   }
 +  // Acts 2 seconds after logging, so a capture sees the logged state.
 +  base::SingleThreadTaskRunner::GetCurrentDefault()->PostDelayedTask(
 +      FROM_HERE,
@@ -3044,12 +3061,9 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..34aa50df0617ea40e9881fa75ae2d778
 +      FROM_HERE,
 +      base::BindOnce(&BrowserView::MyarcProfileSwapCaptureStep, step + 1),
 +      base::Milliseconds(7000));
- }
++}
  
--bool BrowserView::GetDropFormats(
--    int* formats,
--    std::set<ui::ClipboardFormatType>* format_types) {
--  return views::ClientView::GetDropFormats(formats, format_types);
+-  FrameColorsChanged();
 +// static
 +void BrowserView::MyarcProfileSwapCaptureAction(base::WeakPtr<BrowserView> view,
 +                                                int step) {
@@ -3130,8 +3144,10 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..34aa50df0617ea40e9881fa75ae2d778
 +  }
  }
  
--bool BrowserView::AreDropTypesRequired() {
--  return true;
+-bool BrowserView::GetDropFormats(
+-    int* formats,
+-    std::set<ui::ClipboardFormatType>* format_types) {
+-  return views::ClientView::GetDropFormats(formats, format_types);
 +#if BUILDFLAG(MYARC_TEST_HOOKS)
 +// static
 +void BrowserView::MyarcProfileSwapTestPoll() {
@@ -3239,8 +3255,8 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..34aa50df0617ea40e9881fa75ae2d778
 +      base::Milliseconds(250));
  }
  
--bool BrowserView::CanDrop(const ui::OSExchangeData& data) {
--  return false;
+-bool BrowserView::AreDropTypesRequired() {
+-  return true;
 +void BrowserView::MyarcPaletteTestQuery(int request,
 +                                        const std::u16string& text) {
 +  // The palette's own view runs the query off screen, so nothing shows or
@@ -3278,9 +3294,8 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..34aa50df0617ea40e9881fa75ae2d778
 +  }
  }
  
--void BrowserView::OnDragEntered(const ui::DropTargetEvent& event) {
--  // TODO(421465978): Investigate if these drag related methods are necessary
--  // without WebUITabStrip.
+-bool BrowserView::CanDrop(const ui::OSExchangeData& data) {
+-  return false;
 +namespace {
 +
 +myarc::foundation::SpaceThemeRecord MyarcThemeRecord(
@@ -3293,9 +3308,9 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..34aa50df0617ea40e9881fa75ae2d778
 +          .opacity = static_cast<uint8_t>(std::clamp(theme->opacity, 0, 100))};
  }
  
--views::View* BrowserView::GetViewByElementId(ui::ElementIdentifier element_id) {
--  NOTREACHED()
--      << "Use BrowserElements isntead when searching the entire browser";
+-void BrowserView::OnDragEntered(const ui::DropTargetEvent& event) {
+-  // TODO(421465978): Investigate if these drag related methods are necessary
+-  // without WebUITabStrip.
 +}  // namespace
 +
 +std::u16string BrowserView::CreateNamedSpace(
@@ -3572,8 +3587,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..34aa50df0617ea40e9881fa75ae2d778
 +  return result;
  }
  
--const views::View* BrowserView::GetViewByElementId(
--    ui::ElementIdentifier element_id) const {
+-views::View* BrowserView::GetViewByElementId(ui::ElementIdentifier element_id) {
 -  NOTREACHED()
 -      << "Use BrowserElements isntead when searching the entire browser";
 +float BrowserView::MyarcIconScale() const {
@@ -3583,8 +3597,10 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..34aa50df0617ea40e9881fa75ae2d778
 +             : 1.f;
  }
  
--///////////////////////////////////////////////////////////////////////////////
--// BrowserView, ui::AcceleratorTarget overrides:
+-const views::View* BrowserView::GetViewByElementId(
+-    ui::ElementIdentifier element_id) const {
+-  NOTREACHED()
+-      << "Use BrowserElements isntead when searching the entire browser";
 +void BrowserView::DragDownload(uint32_t download_id) {
 +  content::DownloadManager* manager =
 +      browser_->GetProfile()->GetDownloadManager();
@@ -3600,8 +3616,10 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..34aa50df0617ea40e9881fa75ae2d778
 +                                       IconLoader::NORMAL, MyarcIconScale())
 +                                 : nullptr;
 +  DragDownloadItem(item, icon, GetWidget()->GetNativeView());
-+}
-+
+ }
+ 
+-///////////////////////////////////////////////////////////////////////////////
+-// BrowserView, ui::AcceleratorTarget overrides:
 +void BrowserView::SetDownloadsStackShown(bool shown) {
 +  myarc_stack_download_watcher_.reset();
 +  content::DownloadManager* manager =
@@ -3742,7 +3760,9 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..34aa50df0617ea40e9881fa75ae2d778
 +  }
 +}
 +
-+void BrowserView::ShowMyarcSpaceDialog(uint64_t space, uint64_t folder) {
++void BrowserView::ShowMyarcSpaceDialog(uint64_t space,
++                                       uint64_t folder,
++                                       uint64_t item) {
 +  if (!space || !myarc_workspace_adapter_ ||
 +      !myarc_workspace_adapter_->ready() || !GetWidget()) {
 +    return;
@@ -3752,7 +3772,9 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..34aa50df0617ea40e9881fa75ae2d778
 +  auto* dialog = myarc_space_dialog_delegate_.get();
 +  dialog->SetOwnershipOfNewWidget(
 +      views::Widget::InitParams::CLIENT_OWNS_WIDGET);
-+  dialog->SetTitle(folder ? u"Rename Folder" : u"Rename Space");
++  dialog->SetTitle(item     ? u"Rename Tab"
++                   : folder ? u"Rename Folder"
++                            : u"Rename Space");
 +  dialog->SetModalType(ui::mojom::ModalType::kWindow);
 +  dialog->SetButtonLabel(ui::mojom::DialogButton::kOk, u"Rename");
 +  auto body = std::make_unique<views::BoxLayoutView>();
@@ -3761,16 +3783,32 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..34aa50df0617ea40e9881fa75ae2d778
 +  body->SetBetweenChildSpacing(12);
 +  body->SetPreferredSize(gfx::Size(360, 180));
 +  myarc_space_name_ = body->AddChildView(std::make_unique<views::Textfield>());
-+  myarc_space_name_->GetViewAccessibility().SetName(folder ? u"Folder name"
-+                                                           : u"Space name");
++  myarc_space_name_->GetViewAccessibility().SetName(item     ? u"Tab name"
++                                                    : folder ? u"Folder name"
++                                                             : u"Space name");
 +  auto model = myarc_workspace_adapter_->Sidebar();
 +  if (!model.ok) {
 +    myarc_space_name_ = nullptr;
 +    myarc_space_dialog_delegate_.reset();
 +    return;
 +  }
++  for (const auto& record : model.pins) {
++    if (item && record.id == item) {
++      // Starts from the name the row shows, so a small edit stays small.
++      std::u16string shown = base::UTF8ToUTF16(std::string(record.name));
++      if (shown.empty()) {
++        shown = GetItemPresentation(record).title;
++      }
++      if (shown.empty()) {
++        shown = base::UTF8ToUTF16(std::string(record.title));
++      }
++      myarc_space_name_->SetText(shown);
++      myarc_space_name_->SelectAll(false);
++      break;
++    }
++  }
 +  for (const auto& record : model.spaces) {
-+    if (!folder && record.id == space) {
++    if (!folder && !item && record.id == space) {
 +      myarc_space_name_->SetText(base::UTF8ToUTF16(std::string(record.name)));
 +      myarc_space_name_->SelectAll(false);
 +      break;
@@ -3784,17 +3822,19 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..34aa50df0617ea40e9881fa75ae2d778
 +    }
 +  }
 +  myarc_space_error_ = body->AddChildView(std::make_unique<views::Label>(
-+      folder ? u"Folder names allow up to 128 UTF-8 bytes."
-+             : u"Space names allow up to 128 UTF-8 bytes."));
++      item     ? u"Leave it empty to show the page title again."
++      : folder ? u"Folder names allow up to 128 UTF-8 bytes."
++               : u"Space names allow up to 128 UTF-8 bytes."));
 +  myarc_space_error_->SetMultiLine(true);
 +  myarc_space_error_->SetHorizontalAlignment(gfx::ALIGN_LEFT);
 +  dialog->SetContentsView(std::move(body));
 +  dialog->SetInitiallyFocusedView(myarc_space_name_);
 +  dialog->SetAcceptCallbackWithClose(base::BindRepeating(
-+      [](base::WeakPtr<BrowserView> view, uint64_t space, uint64_t folder) {
-+        return view && view->AcceptMyarcSpaceDialog(space, folder);
++      [](base::WeakPtr<BrowserView> view, uint64_t space, uint64_t folder,
++         uint64_t item) {
++        return view && view->AcceptMyarcSpaceDialog(space, folder, item);
 +      },
-+      myarc_workspace_weak_factory_.GetWeakPtr(), space, folder));
++      myarc_workspace_weak_factory_.GetWeakPtr(), space, folder, item));
 +  myarc_space_dialog_widget_.reset(views::DialogDelegate::CreateDialogWidget(
 +      dialog, GetNativeWindow(), GetWidget()->GetNativeView()));
 +  myarc_space_dialog_widget_->MakeCloseSynchronous(
@@ -3804,9 +3844,26 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..34aa50df0617ea40e9881fa75ae2d778
 +  myarc_space_dialog_widget_->Show();
 +}
 +
-+bool BrowserView::AcceptMyarcSpaceDialog(uint64_t space, uint64_t folder) {
++bool BrowserView::AcceptMyarcSpaceDialog(uint64_t space,
++                                         uint64_t folder,
++                                         uint64_t item) {
 +  if (!myarc_workspace_adapter_ || !myarc_space_name_ || !myarc_space_error_) {
 +    return false;
++  }
++  if (item) {
++    // Rust trims the name and cuts it to its byte bound; an empty one clears
++    // it. Bound UTF-16 first, as for titles.
++    std::u16string name(myarc_space_name_->GetText());
++    name.resize(std::min<size_t>(name.size(), 1024));
++    auto result =
++        myarc_workspace_adapter_->RenameItem(item, base::UTF16ToUTF8(name));
++    const bool ok = result.ok;
++    if (!ok) {
++      myarc_space_name_->SetInvalid(true);
++      myarc_space_error_->SetText(base::UTF8ToUTF16(std::string(result.error)));
++    }
++    MyarcWorkspaceResult(std::move(result));
++    return ok;
 +  }
 +  // Bound UTF-16 before converting. Rust owns the UTF-8 length/name rules.
 +  if (myarc_space_name_->GetText().size() > 128) {
@@ -4071,7 +4128,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..34aa50df0617ea40e9881fa75ae2d778
  
  bool BrowserView::AcceleratorPressed(const ui::Accelerator& accelerator) {
  #if BUILDFLAG(IS_MAC)
-@@ -5342,7 +8940,8 @@ void BrowserView::LoadingAnimationCallback(base::TimeTicks timestamp) {
+@@ -5342,7 +8997,8 @@ void BrowserView::LoadingAnimationCallback(base::TimeTicks timestamp) {
      // GetActiveWebContents can return null for example under Purify when
      // the animations are running slowly and this function is called on a timer
      // through LoadingAnimationCallback.
@@ -4081,7 +4138,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..34aa50df0617ea40e9881fa75ae2d778
    }
  }
  
-@@ -5471,6 +9070,10 @@ bool BrowserView::MaybeUpdateDevtools(content::WebContents* contents) {
+@@ -5471,6 +9127,10 @@ bool BrowserView::MaybeUpdateDevtools(content::WebContents* contents) {
  
  void BrowserView::UpdateUIForContents(WebContents* contents,
                                        bool should_layout_immediately) {
@@ -4092,7 +4149,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..34aa50df0617ea40e9881fa75ae2d778
    TRACE_EVENT0("ui", "BrowserView::UpdateUIForContents");
    bool needs_layout = MaybeShowBookmarkBar(contents);
  
-@@ -5706,6 +9309,26 @@ void BrowserView::LoadAccelerators() {
+@@ -5706,6 +9366,26 @@ void BrowserView::LoadAccelerators() {
    }
  
  #if BUILDFLAG(IS_MAC)

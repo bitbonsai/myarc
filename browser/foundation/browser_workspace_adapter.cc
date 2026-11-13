@@ -106,6 +106,11 @@ bool g_import_arc_hook_done = false;
 // the closed state and of it surviving a relaunch.
 constexpr char kMyarcTestCloseFolders[] = "myarc-test-close-folders";
 bool g_close_folders_hook_done = false;
+// --myarc-test-rename-item=<item ID>:<name> renames that saved item once the
+// first window's workspace is ready, through the same path as Rename… in its
+// menu. An empty name clears it, for captures of a rename surviving a relaunch.
+constexpr char kMyarcTestRenameItem[] = "myarc-test-rename-item";
+bool g_rename_item_hook_done = false;
 #endif  // BUILDFLAG(MYARC_TEST_HOOKS)
 
 const char kRuntimeKey = 0;
@@ -1466,6 +1471,29 @@ void BrowserWorkspaceAdapter::Refresh() {
                        },
                        weak_factory_.GetWeakPtr()));
   }
+  if (ready() && !g_rename_item_hook_done &&
+      command_line->HasSwitch(kMyarcTestRenameItem)) {
+    g_rename_item_hook_done = true;
+    const std::string value =
+        command_line->GetSwitchValueASCII(kMyarcTestRenameItem);
+    const size_t colon = value.find(':');
+    uint64_t item = 0;
+    if (colon != std::string::npos &&
+        base::StringToUint64(value.substr(0, colon), &item)) {
+      base::SingleThreadTaskRunner::GetCurrentDefault()->PostTask(
+          FROM_HERE,
+          base::BindOnce(
+              [](base::WeakPtr<BrowserWorkspaceAdapter> adapter, uint64_t item,
+                 std::string name) {
+                if (adapter && adapter->ready()) {
+                  auto result = adapter->RenameItem(item, name);
+                  LOG_IF(ERROR, !result.ok)
+                      << "Test rename failed: " << std::string(result.error);
+                }
+              },
+              weak_factory_.GetWeakPtr(), item, value.substr(colon + 1)));
+    }
+  }
 #endif  // BUILDFLAG(MYARC_TEST_HOOKS)
   changed_.Notify();
 }
@@ -2001,6 +2029,37 @@ foundation::MutationResult BrowserWorkspaceAdapter::MovePinToFolder(
   }
   return Remember(service_->MovePinToFolder(item, folder, 0));
 }
+foundation::MutationResult BrowserWorkspaceAdapter::RenameItem(
+    uint64_t item,
+    std::string_view name) {
+  return Remember(ready() ? service_->RenameItem(item, name) : Fail(error()));
+}
+foundation::MutationResult BrowserWorkspaceAdapter::DropItem(
+    uint64_t item,
+    foundation::DropTargetKind target,
+    uint64_t folder,
+    uint64_t before) {
+  if (!ready())
+    return Fail(error());
+  auto state = service_->ExportSnapshot();
+  const auto* row = state ? FindItem(*state, item) : nullptr;
+  if (!row)
+    return Fail("Workspace item does not exist.");
+  // As in Save: a live Today tab pins the page it shows now.
+  auto* page = tabs_ && row->placement == foundation::PlacementKind::Temporary
+                   ? LocalPage(*tabs_, item)
+                   : nullptr;
+  std::string url;
+  if (page)
+    url = page->GetLastCommittedURL().spec();
+  auto result = service_->DropItem(
+      window_id_, item, target, folder, before,
+      page ? std::optional<std::string_view>(url) : std::nullopt);
+  // A page pinned after it loaded has no later DidStopLoading.
+  if (result.ok && page && target != foundation::DropTargetKind::Today)
+    SaveTitle(*profile_, *page, item);
+  return Remember(std::move(result));
+}
 foundation::MutationResult BrowserWorkspaceAdapter::DeleteFolder(
     uint64_t folder) {
   if (!ready())
@@ -2129,12 +2188,7 @@ foundation::MutationResult BrowserWorkspaceAdapter::StepOrSelectItem(
   const auto sidebar = Sidebar();
   if (!sidebar.ok)
     return Fail(std::string(sidebar.error));
-  std::vector<uint64_t> order;
-  for (const auto* rows : {&sidebar.favorites, &sidebar.pins,
-                           &sidebar.temporary}) {
-    for (const auto& row : *rows)
-      order.push_back(row.id);
-  }
+  const auto& order = sidebar.row_order;
   const auto it = std::ranges::find(order, sidebar.selected_item_id);
   const int current =
       it == order.end() ? -1 : static_cast<int>(it - order.begin());

@@ -10,6 +10,7 @@ rust_static_library("workspace") {
   crate_root = "workspace/src/lib.rs"
   sources = [
     "workspace/src/archive.rs",
+    "workspace/src/drag.rs",
     "workspace/src/folder.rs",
     "workspace/src/lib.rs",
     "workspace/src/peek.rs",

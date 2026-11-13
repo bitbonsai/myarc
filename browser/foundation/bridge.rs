@@ -55,6 +55,14 @@ mod ffi {
         Favorite,
     }
 
+    // Where a dragged sidebar row lands.
+    enum DropTargetKind {
+        // The ungrouped Pins.
+        Pins,
+        Folder,
+        Today,
+    }
+
     enum SpaceIconKind {
         // The default glyph; `icon` is empty.
         Unset,
@@ -94,6 +102,9 @@ mod ffi {
         canonical_url: String,
         // Last known page title of a saved item; empty when unknown.
         title: String,
+        // The user's name for a saved item, which shows instead of its title;
+        // empty when it has none.
+        name: String,
         // Browser-open clock reading when a temporary item was last seen;
         // zero when not recorded yet.
         last_viewed_secs: u64,
@@ -170,6 +181,10 @@ mod ffi {
         // The current Space's folders in order. Their Pins are in `pins` too;
         // the rest of `pins` is ungrouped.
         folders: Vec<FolderRecord>,
+        // Rows in the order the sidebar shows them, which next and previous
+        // tab step through. A closed folder's Pins are left out, except the
+        // selected one.
+        row_order: Vec<u64>,
     }
 
     struct BridgeLimits {
@@ -461,6 +476,23 @@ mod ffi {
         fn set_canonical_url(workspace: &mut Workspace, item_id: u64, url: &str) -> MutationResult;
         // Saved items only. `id` is 1 when the stored title changed, else 0.
         fn set_title(workspace: &mut Workspace, item_id: u64, title: &str) -> MutationResult;
+        // Saved items only. An empty name clears it. `id` is 1 when the
+        // stored name changed, else 0.
+        fn rename_item(workspace: &mut Workspace, item_id: u64, name: &str) -> MutationResult;
+        // Drops a Pin or Today tab of the window's Space on `target`: zero
+        // `folder_id` unless it is a folder, zero `before` for the end. With
+        // `has_url`, pinning a Today tab saves `page_url`, its live page.
+        // Nothing changes on failure.
+        fn drop_item(
+            workspace: &mut Workspace,
+            window_id: u64,
+            item_id: u64,
+            target: DropTargetKind,
+            folder_id: u64,
+            before: u64,
+            has_url: bool,
+            page_url: &str,
+        ) -> MutationResult;
         // Temporary items only: the page a dormant row reopens. `id` is 1 when
         // the stored URL or title changed, else 0.
         fn set_temporary_page(
@@ -1314,6 +1346,39 @@ pub fn move_folder_before(
     )
 }
 
+pub fn rename_item(workspace: &mut Workspace, item_id: u64, name: &str) -> ffi::MutationResult {
+    outcome(workspace.0.rename_item(item_id, name).map(u64::from))
+}
+
+#[allow(clippy::too_many_arguments)]
+pub fn drop_item(
+    workspace: &mut Workspace,
+    window_id: u64,
+    item_id: u64,
+    target: ffi::DropTargetKind,
+    folder_id: u64,
+    before: u64,
+    has_url: bool,
+    page_url: &str,
+) -> ffi::MutationResult {
+    let before = (before != 0).then_some(before);
+    let target = match target {
+        ffi::DropTargetKind::Pins => workspace::DropTarget::Pins { before },
+        ffi::DropTargetKind::Folder => workspace::DropTarget::Folder {
+            folder: folder_id,
+            before,
+        },
+        ffi::DropTargetKind::Today => workspace::DropTarget::Today { before },
+        _ => return reject("Unknown drop target"),
+    };
+    outcome(
+        workspace
+            .0
+            .drop_item(window_id, item_id, target, has_url.then_some(page_url))
+            .map(|()| 0),
+    )
+}
+
 pub fn move_pin_to_folder(
     workspace: &mut Workspace,
     item_id: u64,
@@ -1386,6 +1451,7 @@ fn item_record(item: workspace::Item) -> ffi::ItemRecord {
         has_url: item.canonical_url.is_some(),
         canonical_url: item.canonical_url.unwrap_or_default(),
         title: item.title,
+        name: item.name,
         last_viewed_secs: item.last_viewed_secs,
     }
 }
@@ -1393,6 +1459,7 @@ fn item_record(item: workspace::Item) -> ffi::ItemRecord {
 pub fn sidebar_snapshot(workspace: &Workspace, window_id: u64) -> ffi::SidebarResult {
     match workspace.0.sidebar_snapshot(window_id) {
         Ok(sidebar) => ffi::SidebarResult {
+            row_order: sidebar.row_order(),
             ok: true,
             error: String::new(),
             window_id: sidebar.window_id,
@@ -1425,6 +1492,7 @@ pub fn sidebar_snapshot(workspace: &Workspace, window_id: u64) -> ffi::SidebarRe
             temporary: Vec::new(),
             space_pins: Vec::new(),
             folders: Vec::new(),
+            row_order: Vec::new(),
         },
     }
 }
@@ -1486,6 +1554,12 @@ pub fn restore_snapshot(
             placement,
             canonical_url: item.has_url.then_some(item.canonical_url),
             title: item.title,
+            // The core drops a bad name on restore; this only bounds it.
+            name: if item.name.len() <= workspace::MAX_TITLE_BYTES {
+                item.name
+            } else {
+                String::new()
+            },
             last_viewed_secs: item.last_viewed_secs,
         });
     }
