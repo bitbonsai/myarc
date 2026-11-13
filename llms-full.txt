@@ -199,7 +199,7 @@ How to move from Arc to myArc: install the nightly, import your Spaces, learn th
   What your Mac needs, how to get past the first-launch warning, and how to move to a newer nightly.
 - [Import from Arc](https://myarc.dev/docs/import-from-arc/)
 
-  Export your Spaces from Arc, preview what myArc will add, and import them as pinned tabs. Importing the same file twice adds nothing.
+  Export your Spaces from Arc, preview what myArc will add, and import them with their folders and pinned tabs. Importing the same file twice adds nothing.
 
 ## Your workspace
 
@@ -234,9 +234,9 @@ Plans, the alpha checklist and contributor docs live in the [myArc repository](h
 
 HTML: https://myarc.dev/docs/install/
 
-[All docs](https://myarc.dev/docs/)
-
 # Install myArc
+
+What your Mac needs, how to get past the first-launch warning, and how to move to a newer nightly.
 
 myArc ships as a pre-alpha nightly, a build made from the latest code and published without release testing. Each nightly is a disk image (DMG) on the [download page](https://myarc.dev/download/).
 
@@ -281,14 +281,16 @@ Your Spaces, tabs and settings live in your user folder, outside the app, so rep
 
 The [GitHub releases page](https://github.com/bitbonsai/myarc/releases) lists every nightly.
 
+[Next: Import from Arc →](https://myarc.dev/docs/import-from-arc/)
+
 
 ---
 
 HTML: https://myarc.dev/docs/import-from-arc/
 
-[All docs](https://myarc.dev/docs/)
-
 # Import from Arc
+
+Export your Spaces from Arc, preview what myArc will add, and import them with their folders and pinned tabs. Importing the same file twice adds nothing.
 
 myArc reads the file Arc exports and adds your Spaces and their links to the sidebar. Arc stays untouched, and so does the export file.
 
@@ -321,14 +323,16 @@ Importing the same file a second time adds nothing. myArc reuses Spaces and fold
 
 An import never removes anything. If it fails partway, nothing changes, because myArc tries every import on a copy of your workspace before it writes.
 
+[Next: Spaces and Profiles →](https://myarc.dev/docs/spaces-and-profiles/)
+
 
 ---
 
 HTML: https://myarc.dev/docs/spaces-and-profiles/
 
-[All docs](https://myarc.dev/docs/)
-
 # Spaces and Profiles
+
+How Spaces, Profiles, pinned tabs, Favorites and temporary tabs fit together in the myArc sidebar.
 
 myArc keeps Arc's model. A Space sorts your tabs by topic, and a Profile keeps your logins apart. They are separate things, and several Spaces can share one Profile.
 
@@ -373,14 +377,16 @@ When you close a temporary tab, it moves to Archived Tabs in the Library. Open t
 
 Folders inside folders, dragging a tab up to pin it or into a folder, Peek and Split View don't work yet. [Known limitations](https://myarc.dev/docs/known-limitations/) has the full list.
 
+[Next: Keyboard shortcuts →](https://myarc.dev/docs/shortcuts/)
+
 
 ---
 
 HTML: https://myarc.dev/docs/shortcuts/
 
-[All docs](https://myarc.dev/docs/)
-
 # Keyboard shortcuts
+
+The shortcuts that work in myArc today, and the Arc shortcuts that are still missing.
 
 These shortcuts work in the current nightly. Standard Chromium shortcuts, such as Cmd\+W to close a tab and Cmd\+R to reload, work as they do in Chrome.
 
@@ -412,14 +418,16 @@ These belong to features myArc doesn't have yet.
 
 You can't change shortcuts yet. The Shortcuts tab in Settings is greyed out until it's built.
 
+[Next: Your data →](https://myarc.dev/docs/your-data/)
+
 
 ---
 
 HTML: https://myarc.dev/docs/your-data/
 
-[All docs](https://myarc.dev/docs/)
-
 # Your data
+
+Where myArc keeps your workspace on disk, how to back it up, and what it sends over the network. There is no account.
 
 myArc has no account and nothing to sign in to. Everything it saves stays on your Mac.
 
@@ -457,14 +465,16 @@ Crash report uploads are off too. Crash reports stay on your Mac. [Known limitat
 
 Agents and scripts can't touch myArc until you turn on Allow agents to control myArc in Settings \> Advanced. Until then myArc writes nothing to its control folder. [CLI and MCP](https://myarc.dev/docs/cli-and-mcp/) covers how it works.
 
+[Next: CLI and MCP →](https://myarc.dev/docs/cli-and-mcp/)
+
 
 ---
 
 HTML: https://myarc.dev/docs/cli-and-mcp/
 
-[All docs](https://myarc.dev/docs/)
-
 # CLI and MCP
+
+Drive myArc from a script or an AI agent with the bundled myarc command and its MCP server. It's off by default, and tab commands reach only the Agent Space.
 
 myArc comes with a command-line tool, `myarc`, that drives tabs in the browser. The same tool runs an MCP server, so AI agents such as Claude Code can use the browser too. MCP, the Model Context Protocol, is the standard way AI tools discover and call outside tools.
 
@@ -579,14 +589,16 @@ The repository has a [Claude Code skill](https://github.com/bitbonsai/myarc/tree
 
 While control is on, myArc publishes its connection details in `~/Library/Application Support/myarc/control/`. Only your user account can read that folder. Tools connect over a local socket with a token that changes each time myArc starts. Nothing listens on the network.
 
+[Next: Known limitations →](https://myarc.dev/docs/known-limitations/)
+
 
 ---
 
 HTML: https://myarc.dev/docs/known-limitations/
 
-[All docs](https://myarc.dev/docs/)
-
 # Known limitations
+
+What the pre-alpha nightly can't do yet, and what to do after a crash or when something breaks.
 
 myArc is a pre-alpha. Use it to try the Arc-style sidebar, and keep daily and sensitive browsing in another browser for now.
 

@@ -488,60 +488,70 @@
     }
 
   
-    .docs-intro { margin-top: 1rem; color: var(--quiet) }
+    .docs-brand { display: flex; align-items: center; gap: .75rem }
+    .docs-pill { padding: .125rem .5rem; border-radius: 999rem; box-shadow: inset 0 0 0 .0625rem rgb(var(--link-rgb) / .45); color: var(--link-solid); font-size: .875rem; font-weight: 600; letter-spacing: .08em; line-height: 1.4; text-transform: uppercase; text-decoration: none }
+    .docs-pill:hover, .docs-pill:focus-visible { background: rgb(var(--link-rgb) / .08) }
+    .docs-top .download-link { margin-left: auto }
+    .docs-layout { display: grid; grid-template-columns: 13rem minmax(0, 1fr) 13rem; gap: 3rem; align-items: start; padding: 2.5rem 0 5rem }
+    .docs-layout.no-toc { grid-template-columns: 13rem minmax(0, 1fr) }
+    .journal.docs-main { max-width: 68ch; min-width: 0; margin: 0; padding: 0 }
+    .docs-side { position: sticky; top: 2rem; max-height: calc(100dvh - 4rem); overflow-y: auto; font-size: 1rem; line-height: 1.4 }
+    .docs-label { margin: 1.75rem 0 .5rem .75rem; color: var(--quiet); font-size: .875rem; font-weight: 600; letter-spacing: .08em; text-transform: uppercase }
+    .docs-nav-list > .docs-label:first-child, .docs-toc > .docs-label { margin-top: 0 }
+    .docs-nav li + li { margin-top: .125rem }
+    .docs-nav a { display: block; padding: .5rem .75rem; border-radius: .75rem; color: var(--text); font-weight: 500; text-decoration: none }
+    .docs-nav a:hover, .docs-nav a:focus-visible { background: rgb(var(--link-rgb) / .06); color: var(--link-solid) }
+    .docs-nav a[aria-current] { background: rgb(var(--link-rgb) / .12); color: var(--link-solid); font-weight: 600 }
+    .docs-nav-menu { display: none }
+    .docs-toc ul { padding-left: .5rem; border-left: .0625rem solid color-mix(in srgb, currentColor 14%, transparent) }
+    .docs-toc a { display: block; padding: .375rem .625rem; border-radius: .625rem; color: var(--quiet); text-decoration: none }
+    .docs-toc .toc-h3 a { padding-left: 1.5rem }
+    .docs-toc a:hover, .docs-toc a:focus-visible { color: var(--link-solid) }
+    .docs-toc a.is-active { background: rgb(var(--link-rgb) / .12); color: var(--link-solid) }
+    .docs-banner { padding: 1rem 1.25rem; border-radius: 1rem; background: color-mix(in srgb, currentColor 6%, transparent); font-size: 1rem }
+    .docs-main .post-header { margin-top: 2rem }
+    .docs-eyebrow { color: var(--quiet); font-size: .875rem; font-weight: 600; letter-spacing: .08em; text-transform: uppercase }
+    .docs-main h1 { margin-top: .5rem }
+    .docs-lede { margin-top: 1rem; color: var(--quiet); font-size: 1.25rem; line-height: 1.5 }
+    .docs-main .post-body :is(h2, h3) { scroll-margin-top: 1.5rem }
+    .docs-next { margin-top: 4rem; font-size: 1.25rem; font-weight: 600 }
     .docs-index ul { list-style: none; padding-left: 0 }
     .docs-index li + li { margin-top: 1rem }
     .docs-index li p { margin-top: .25rem; color: var(--quiet) }
     .post-body table { width: 100%; border-collapse: collapse; font-size: 1rem }
     .post-body th, .post-body td { padding: .5rem .75rem .5rem 0; border-bottom: 1px solid color-mix(in srgb, currentColor 18%, transparent); text-align: left; vertical-align: top }
+    @media (max-width: 68.75rem) {
+      .docs-layout { grid-template-columns: 13rem minmax(0, 1fr) }
+      .docs-toc { display: none }
+    }
+    @media (max-width: 48rem) {
+      .docs-top { flex-wrap: wrap; row-gap: .5rem }
+      .docs-top .button { padding: .5rem .875rem; font-size: 1rem }
+      .docs-layout, .docs-layout.no-toc { grid-template-columns: minmax(0, 1fr); gap: 1.5rem; padding: 1rem 0 4rem }
+      .docs-side { position: static; max-height: none; overflow: visible }
+      .docs-nav-list { display: none }
+      .docs-nav-menu { display: block }
+      .docs-nav-menu summary { min-height: 2.75rem; padding: .625rem 1rem; border-radius: .75rem; background: rgb(var(--link-rgb) / .08); font-weight: 600; cursor: pointer }
+      .docs-nav-menu[open] summary { margin-bottom: .5rem }
+      .docs-main .post-header { margin-top: 1.5rem }
+      .docs-lede { font-size: 1.125rem }
+    }
   </style>
 <link rel="alternate" type="text/markdown" href="https://myarc.dev/docs/your-data/index.md" title="Markdown">
 <link rel="alternate" type="text/plain" href="https://myarc.dev/llms.txt" title="Site context">
 <script type="application/json" id="asset-notices">{"Outfit": "Copyright 2021 The Outfit Project Authors (https://github.com/Outfitio/Outfit-Fonts)\n\nThis Font Software is licensed under the SIL Open Font License, Version 1.1.\nThis license is copied below, and is also available with a FAQ at:\nhttps://scripts.sil.org/OFL\n\n\n-----------------------------------------------------------\nSIL OPEN FONT LICENSE Version 1.1 - 26 February 2007\n-----------------------------------------------------------\n\nPREAMBLE\nThe goals of the Open Font License (OFL) are to stimulate worldwide\ndevelopment of collaborative font projects, to support the font creation\nefforts of academic and linguistic communities, and to provide a free and\nopen framework in which fonts may be shared and improved in partnership\nwith others.\n\nThe OFL allows the licensed fonts to be used, studied, modified and\nredistributed freely as long as they are not sold by themselves. The\nfonts, including any derivative works, can be bundled, embedded,\nredistributed and/or sold with any software provided that any reserved\nnames are not used by derivative works. The fonts and derivatives,\nhowever, cannot be released under any other type of license. The\nrequirement for fonts to remain under this license does not apply\nto any document created using the fonts or their derivatives.\n\nDEFINITIONS\n\"Font Software\" refers to the set of files released by the Copyright\nHolder(s) under this license and clearly marked as such. This may\ninclude source files, build scripts and documentation.\n\n\"Reserved Font Name\" refers to any names specified as such after the\ncopyright statement(s).\n\n\"Original Version\" refers to the collection of Font Software components as\ndistributed by the Copyright Holder(s).\n\n\"Modified Version\" refers to any derivative made by adding to, deleting,\nor substituting -- in part or in whole -- any of the components of the\nOriginal Version, by changing formats or by porting the Font Software to a\nnew environment.\n\n\"Author\" refers to any designer, engineer, programmer, technical\nwriter or other person who contributed to the Font Software.\n\nPERMISSION & CONDITIONS\nPermission is hereby granted, free of charge, to any person obtaining\na copy of the Font Software, to use, study, copy, merge, embed, modify,\nredistribute, and sell modified and unmodified copies of the Font\nSoftware, subject to the following conditions:\n\n1) Neither the Font Software nor any of its individual components,\nin Original or Modified Versions, may be sold by itself.\n\n2) Original or Modified Versions of the Font Software may be bundled,\nredistributed and/or sold with any software, provided that each copy\ncontains the above copyright notice and this license. These can be\nincluded either as stand-alone text files, human-readable headers or\nin the appropriate machine-readable metadata fields within text or\nbinary files as long as those fields can be easily viewed by the user.\n\n3) No Modified Version of the Font Software may use the Reserved Font\nName(s) unless explicit written permission is granted by the corresponding\nCopyright Holder. This restriction only applies to the primary font name as\npresented to the users.\n\n4) The name(s) of the Copyright Holder(s) or the Author(s) of the Font\nSoftware shall not be used to promote, endorse or advertise any\nModified Version, except to acknowledge the contribution(s) of the\nCopyright Holder(s) and the Author(s) or with their explicit written\npermission.\n\n5) The Font Software, modified or unmodified, in part or in whole,\nmust be distributed entirely under this license, and must not be\ndistributed under any other license. The requirement for fonts to\nremain under this license does not apply to any document created\nusing the Font Software.\n\nTERMINATION\nThis license becomes null and void if any of the above conditions are\nnot met.\n\nDISCLAIMER\nTHE FONT SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND,\nEXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO ANY WARRANTIES OF\nMERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT\nOF COPYRIGHT, PATENT, TRADEMARK, OR OTHER RIGHT. IN NO EVENT SHALL THE\nCOPYRIGHT HOLDER BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,\nINCLUDING ANY GENERAL, SPECIAL, INDIRECT, INCIDENTAL, OR CONSEQUENTIAL\nDAMAGES, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING\nFROM, OUT OF THE USE OR INABILITY TO USE THE FONT SOFTWARE OR FROM\nOTHER DEALINGS IN THE FONT SOFTWARE.\n", "Lucide": "ISC License\n\nCopyright (c) 2026 Lucide Icons and Contributors\n\nPermission to use, copy, modify, and/or distribute this software for any\npurpose with or without fee is hereby granted, provided that the above\ncopyright notice and this permission notice appear in all copies.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\" AND THE AUTHOR DISCLAIMS ALL WARRANTIES\nWITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF\nMERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR\nANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES\nWHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN\nACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF\nOR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.\n\n---\n\nThe following Lucide icons are derived from the Feather project:\n\nairplay, alert-circle, alert-octagon, alert-triangle, aperture, arrow-down-circle, arrow-down-left, arrow-down-right, arrow-down, arrow-left-circle, arrow-left, arrow-right-circle, arrow-right, arrow-up-circle, arrow-up-left, arrow-up-right, arrow-up, at-sign, calendar, cast, check, chevron-down, chevron-left, chevron-right, chevron-up, chevrons-down, chevrons-left, chevrons-right, chevrons-up, circle, clipboard, clock, code, columns, command, compass, corner-down-left, corner-down-right, corner-left-down, corner-left-up, corner-right-down, corner-right-up, corner-up-left, corner-up-right, crosshair, database, divide-circle, divide-square, dollar-sign, download, external-link, feather, frown, hash, headphones, help-circle, info, italic, key, layout, life-buoy, link-2, link, loader, lock, log-in, log-out, maximize, meh, minimize, minimize-2, minus-circle, minus-square, minus, monitor, moon, more-horizontal, more-vertical, move, music, navigation-2, navigation, octagon, pause-circle, percent, plus-circle, plus-square, plus, power, radio, rss, search, server, share, shopping-bag, sidebar, smartphone, smile, square, table-2, tablet, target, terminal, trash-2, trash, triangle, tv, type, upload, x-circle, x-octagon, x-square, x, zoom-in, zoom-out\n\nThe MIT License (MIT) (for the icons listed above)\n\nCopyright (c) 2013-present Cole Bemis\n\nPermission is hereby granted, free of charge, to any person obtaining a copy\nof this software and associated documentation files (the \"Software\"), to deal\nin the Software without restriction, including without limitation the rights\nto use, copy, modify, merge, publish, distribute, sublicense, and/or sell\ncopies of the Software, and to permit persons to whom the Software is\nfurnished to do so, subject to the following conditions:\n\nThe above copyright notice and this permission notice shall be included in all\ncopies or substantial portions of the Software.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR\nIMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,\nFITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE\nAUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER\nLIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,\nOUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE\nSOFTWARE.\n", "artwork": "User-supplied ribbon logos. Original grain and custom wordmark generated for myArc. See repository ATTRIBUTION.md for provenance and rights limitations."}</script>
 </head>
-<body><a class="skip" href="#main">Skip to content</a><div class="wrap"><header class="top">
-      <button class="menu-toggle" type="button" popovertarget="site-menu" aria-controls="site-menu" aria-label="Menu"><svg class="icon-open" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M4 5h16"/><path d="M4 12h16"/><path d="M4 19h16"/></svg><svg class="icon-close" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
-      <a class="mark plain" href="/" aria-label="myArc home"><img class="ribbon" src="../../blog/_assets/logo-matte.adbb3c7ddc14.webp" alt="" width="1254" height="1254"><picture><source media="(prefers-color-scheme: dark)" srcset="../../blog/_assets/wordmark-ivory.3a99cf025832.svg"><img class="wordmark" src="../../blog/_assets/wordmark-ink.18b9e7ae3785.svg" alt="myArc" width="3056" height="1049"></picture></a>
-      <div class="quick">
-        <a class="quick-blog" href="/blog/">Blog</a>
-        <a class="quick-icon" href="https://github.com/bitbonsai/myarc" aria-label="Follow development"><svg class="github-icon" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false"><path fill-rule="evenodd" clip-rule="evenodd" d="M8 0C3.58 0 0 3.58 0 8C0 11.54 2.29 14.53 5.47 15.59C5.87 15.66 6.02 15.42 6.02 15.21C6.02 15.02 6.01 14.39 6.01 13.72C4 14.09 3.48 13.23 3.32 12.78C3.23 12.55 2.84 11.84 2.5 11.65C2.22 11.5 1.82 11.13 2.49 11.12C3.12 11.11 3.57 11.7 3.72 11.94C4.44 13.15 5.59 12.81 6.05 12.6C6.12 12.08 6.33 11.73 6.56 11.53C4.78 11.33 2.92 10.64 2.92 7.58C2.92 6.71 3.23 5.99 3.74 5.43C3.66 5.23 3.38 4.41 3.82 3.31C3.82 3.31 4.49 3.1 6.02 4.13C6.66 3.95 7.34 3.86 8.02 3.86C8.7 3.86 9.38 3.95 10.02 4.13C11.55 3.09 12.22 3.31 12.22 3.31C12.66 4.41 12.38 5.23 12.3 5.43C12.81 5.99 13.12 6.7 13.12 7.58C13.12 10.65 11.25 11.33 9.47 11.53C9.76 11.78 10.01 12.26 10.01 13.01C10.01 14.08 10 14.94 10 15.21C10 15.42 10.15 15.67 10.55 15.59C13.71 14.53 16 11.53 16 8C16 3.58 12.42 0 8 0Z" transform="scale(64)" fill="currentColor"/></svg></a>
-      </div>
-      <nav id="site-menu" aria-label="Page" popover>
-        <a href="/#principles">Principles</a>
-        <a href="/#building">Progress</a>
-        <a class="docs-link" aria-current="page" href="/docs/">Docs</a>
-        <a class="blog-link" href="/blog/">Blog</a>
-        <a class="nav-github" href="https://github.com/bitbonsai/myarc" aria-label="myArc on GitHub"><svg class="github-icon" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false"><path fill-rule="evenodd" clip-rule="evenodd" d="M8 0C3.58 0 0 3.58 0 8C0 11.54 2.29 14.53 5.47 15.59C5.87 15.66 6.02 15.42 6.02 15.21C6.02 15.02 6.01 14.39 6.01 13.72C4 14.09 3.48 13.23 3.32 12.78C3.23 12.55 2.84 11.84 2.5 11.65C2.22 11.5 1.82 11.13 2.49 11.12C3.12 11.11 3.57 11.7 3.72 11.94C4.44 13.15 5.59 12.81 6.05 12.6C6.12 12.08 6.33 11.73 6.56 11.53C4.78 11.33 2.92 10.64 2.92 7.58C2.92 6.71 3.23 5.99 3.74 5.43C3.66 5.23 3.38 4.41 3.82 3.31C3.82 3.31 4.49 3.1 6.02 4.13C6.66 3.95 7.34 3.86 8.02 3.86C8.7 3.86 9.38 3.95 10.02 4.13C11.55 3.09 12.22 3.31 12.22 3.31C12.66 4.41 12.38 5.23 12.3 5.43C12.81 5.99 13.12 6.7 13.12 7.58C13.12 10.65 11.25 11.33 9.47 11.53C9.76 11.78 10.01 12.26 10.01 13.01C10.01 14.08 10 14.94 10 15.21C10 15.42 10.15 15.67 10.55 15.59C13.71 14.53 16 11.53 16 8C16 3.58 12.42 0 8 0Z" transform="scale(64)" fill="currentColor"/></svg></a>
-        <a class="button download-link" href="/download/">Download pre-alpha</a>
-        <button class="menu-close" type="button" popovertarget="site-menu" popovertargetaction="hide" aria-label="Close menu"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
-      </nav>
-      <script>
-        (() => {
-          const menu = document.querySelector('#site-menu')
-          const toggle = document.querySelector('.menu-toggle')
-          if (!menu || !toggle || typeof menu.showPopover !== 'function') return
-          const open = () => menu.matches(':popover-open')
-          toggle.setAttribute('aria-expanded', 'false')
-          menu.addEventListener('toggle', () => toggle.setAttribute('aria-expanded', String(open())))
-          menu.addEventListener('click', event => {
-            if (event.target.closest('a') && open()) menu.hidePopover()
-          })
-          matchMedia('(min-width: 48.0625rem)').addEventListener('change', event => {
-            if (event.matches && open()) menu.hidePopover()
-          })
-        })()
-      </script>
-    </header><main id="main" class="journal"><a class="post-back" href="/docs/">All docs</a><header class="post-header"><h1>Your data</h1></header><article class="post-body"><p>myArc has no account and nothing to sign in to. Everything it saves stays on your Mac.</p>
-<h2>Where it lives</h2>
+<body><a class="skip" href="#main">Skip to content</a><div class="wrap"><header class="top docs-top"><div class="docs-brand"><a class="mark plain" href="/" aria-label="myArc home"><img class="ribbon" src="../../blog/_assets/logo-matte.adbb3c7ddc14.webp" alt="" width="1254" height="1254"><picture><source media="(prefers-color-scheme: dark)" srcset="../../blog/_assets/wordmark-ivory.3a99cf025832.svg"><img class="wordmark" src="../../blog/_assets/wordmark-ink.18b9e7ae3785.svg" alt="myArc" width="3056" height="1049"></picture></a><a class="docs-link docs-pill" href="/docs/">Docs</a></div><a class="button download-link" href="/download/">Download pre-alpha</a></header><div class="docs-layout"><nav class="docs-side docs-nav" aria-label="Docs"><details class="docs-nav-menu"><summary>All docs</summary><p class="docs-label">Getting started</p><ul><li><a href="../install/">Install myArc</a></li><li><a href="../import-from-arc/">Import from Arc</a></li></ul><p class="docs-label">Your workspace</p><ul><li><a href="../spaces-and-profiles/">Spaces and Profiles</a></li><li><a href="../shortcuts/">Keyboard shortcuts</a></li><li><a href="../your-data/" aria-current="page">Your data</a></li></ul><p class="docs-label">Control</p><ul><li><a href="../cli-and-mcp/">CLI and MCP</a></li></ul><p class="docs-label">Help</p><ul><li><a href="../known-limitations/">Known limitations</a></li></ul></details><div class="docs-nav-list"><p class="docs-label">Getting started</p><ul><li><a href="../install/">Install myArc</a></li><li><a href="../import-from-arc/">Import from Arc</a></li></ul><p class="docs-label">Your workspace</p><ul><li><a href="../spaces-and-profiles/">Spaces and Profiles</a></li><li><a href="../shortcuts/">Keyboard shortcuts</a></li><li><a href="../your-data/" aria-current="page">Your data</a></li></ul><p class="docs-label">Control</p><ul><li><a href="../cli-and-mcp/">CLI and MCP</a></li></ul><p class="docs-label">Help</p><ul><li><a href="../known-limitations/">Known limitations</a></li></ul></div></nav><main id="main" class="journal docs-main"><p class="docs-banner">Pre-alpha nightly, for trying the Arc-like shell. Not for daily or sensitive browsing.</p><header class="post-header"><p class="docs-eyebrow">Your workspace / Your data</p><h1>Your data</h1><p class="docs-lede">Where myArc keeps your workspace on disk, how to back it up, and what it sends over the network. There is no account.</p></header><article class="post-body"><p>myArc has no account and nothing to sign in to. Everything it saves stays on your Mac.</p>
+<h2 id="where-it-lives">Where it lives</h2>
 <p>myArc keeps its data in this folder:</p>
 <pre><code class="language-text">~/Library/Application Support/myArc Nightly/
 </code></pre>
 <p>Inside it, each Profile has its own folder. The first is called <code>Default</code>, later ones <code>Profile 1</code>, <code>Profile 2</code> and so on. A Profile folder holds Chromium's usual data, such as history, cookies and extensions, plus one myArc file, <code>myarc-workspace-v1.json</code>. That file is your workspace, meaning the Spaces of that Profile with their names, icons and colors, your pinned tabs and Favorites, your temporary tabs and Archived Tabs. It's plain JSON you can open in a text editor.</p>
 <p>When myArc saves the workspace, it writes a new file and swaps it in, so a save that gets interrupted leaves the previous version in place.</p>
 <p>Saved passwords and cookies stay in Chromium's own stores. Chromium encrypts them with a key it keeps in your macOS Keychain, under the name myArc Nightly Safe Storage.</p>
-<h2>Back it up</h2>
+<h2 id="back-it-up">Back it up</h2>
 <p>There is no export command yet. To back up everything, quit myArc and copy the whole <code>myArc Nightly</code> folder somewhere safe. Quitting first means nothing is halfway through a save while you copy.</p>
-<h2>What goes over the network</h2>
+<h2 id="what-goes-over-the-network">What goes over the network</h2>
 <p>myArc adds no analytics and no usage tracking. It makes one kind of request of its own. When a pinned tab or Favorite has no icon yet, myArc asks that site for its icon. The request goes only to that site's domain, carries no cookies and never sends the path of the page you saved. No Google icon service or other third party is involved.</p>
 <p>Every other request comes from Chromium itself. myArc turns off a few of the ones that go to Google:</p>
 <ul>
@@ -550,9 +560,9 @@
 <li>WebRTC text logs, which video calls can upload for debugging, are off by default.</li>
 </ul>
 <p>Crash report uploads are off too. Crash reports stay on your Mac. <a href="../known-limitations/">Known limitations</a> says where to find them.</p>
-<h2>Agent control</h2>
+<h2 id="agent-control">Agent control</h2>
 <p>Agents and scripts can't touch myArc until you turn on Allow agents to control myArc in Settings &gt; Advanced. Until then myArc writes nothing to its control folder. <a href="../cli-and-mcp/">CLI and MCP</a> covers how it works.</p>
-</article></main><footer class="end">
+</article><p class="docs-next"><a href="../cli-and-mcp/" rel="next">Next: CLI and MCP &rarr;</a></p></main><nav class="docs-side docs-toc" aria-labelledby="toc-title"><p class="docs-label" id="toc-title">On this page</p><ul><li class="toc-h2"><a href="#where-it-lives">Where it lives</a></li><li class="toc-h2"><a href="#back-it-up">Back it up</a></li><li class="toc-h2"><a href="#what-goes-over-the-network">What goes over the network</a></li><li class="toc-h2"><a href="#agent-control">Agent control</a></li></ul></nav></div><footer class="end">
       <a class="mark plain" href="#main" aria-label="Back to top"><img class="ribbon" src="../../blog/_assets/logo-matte.adbb3c7ddc14.webp" alt="" width="1254" height="1254"><picture><source media="(prefers-color-scheme: dark)" srcset="../../blog/_assets/wordmark-ivory.3a99cf025832.svg"><img class="wordmark" src="../../blog/_assets/wordmark-ink.18b9e7ae3785.svg" alt="myArc" width="3056" height="1049"></picture></a>
       <div class="end-copy">
         <p>Made with <svg class="heart" role="img" aria-label="love" focusable="false"
@@ -570,4 +580,4 @@
 </svg>
  by <a href="https://github.com/bitbonsai">@bitbonsai</a> for Arc enthusiasts.</p>
       </div>
-    </footer></div></body></html>
+    </footer></div><script defer src="../_assets/docs-toc.97285890df78.js"></script></body></html>

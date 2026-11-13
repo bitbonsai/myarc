@@ -1,8 +1,8 @@
 HTML: https://myarc.dev/docs/your-data/
 
-[All docs](https://myarc.dev/docs/)
-
 # Your data
+
+Where myArc keeps your workspace on disk, how to back it up, and what it sends over the network. There is no account.
 
 myArc has no account and nothing to sign in to. Everything it saves stays on your Mac.
 
@@ -39,3 +39,5 @@ Crash report uploads are off too. Crash reports stay on your Mac. [Known limitat
 ## Agent control
 
 Agents and scripts can't touch myArc until you turn on Allow agents to control myArc in Settings \> Advanced. Until then myArc writes nothing to its control folder. [CLI and MCP](https://myarc.dev/docs/cli-and-mcp/) covers how it works.
+
+[Next: CLI and MCP →](https://myarc.dev/docs/cli-and-mcp/)

@@ -1,8 +1,8 @@
 HTML: https://myarc.dev/docs/known-limitations/
 
-[All docs](https://myarc.dev/docs/)
-
 # Known limitations
+
+What the pre-alpha nightly can't do yet, and what to do after a crash or when something breaks.
 
 myArc is a pre-alpha. Use it to try the Arc-style sidebar, and keep daily and sensitive browsing in another browser for now.
 

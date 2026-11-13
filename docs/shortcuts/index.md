@@ -1,8 +1,8 @@
 HTML: https://myarc.dev/docs/shortcuts/
 
-[All docs](https://myarc.dev/docs/)
-
 # Keyboard shortcuts
+
+The shortcuts that work in myArc today, and the Arc shortcuts that are still missing.
 
 These shortcuts work in the current nightly. Standard Chromium shortcuts, such as Cmd\+W to close a tab and Cmd\+R to reload, work as they do in Chrome.
 
@@ -33,3 +33,5 @@ These belong to features myArc doesn't have yet.
 | Cmd\+O | Turns a Peek preview into a tab |
 
 You can't change shortcuts yet. The Shortcuts tab in Settings is greyed out until it's built.
+
+[Next: Your data →](https://myarc.dev/docs/your-data/)

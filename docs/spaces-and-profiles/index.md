@@ -1,8 +1,8 @@
 HTML: https://myarc.dev/docs/spaces-and-profiles/
 
-[All docs](https://myarc.dev/docs/)
-
 # Spaces and Profiles
+
+How Spaces, Profiles, pinned tabs, Favorites and temporary tabs fit together in the myArc sidebar.
 
 myArc keeps Arc's model. A Space sorts your tabs by topic, and a Profile keeps your logins apart. They are separate things, and several Spaces can share one Profile.
 
@@ -46,3 +46,5 @@ When you close a temporary tab, it moves to Archived Tabs in the Library. Open t
 ## Not in myArc yet
 
 Folders inside folders, dragging a tab up to pin it or into a folder, Peek and Split View don't work yet. [Known limitations](https://myarc.dev/docs/known-limitations/) has the full list.
+
+[Next: Keyboard shortcuts →](https://myarc.dev/docs/shortcuts/)

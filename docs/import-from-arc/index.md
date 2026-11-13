@@ -1,8 +1,8 @@
 HTML: https://myarc.dev/docs/import-from-arc/
 
-[All docs](https://myarc.dev/docs/)
-
 # Import from Arc
+
+Export your Spaces from Arc, preview what myArc will add, and import them with their folders and pinned tabs. Importing the same file twice adds nothing.
 
 myArc reads the file Arc exports and adds your Spaces and their links to the sidebar. Arc stays untouched, and so does the export file.
 
@@ -34,3 +34,5 @@ myArc refuses files over 8 MB.
 Importing the same file a second time adds nothing. myArc reuses Spaces and folders by name and keeps the pinned tabs they already have. Pinned tabs from an import made before myArc had folders move into their folder. If you export from Arc again later, the next import adds only the new Spaces and links.
 
 An import never removes anything. If it fails partway, nothing changes, because myArc tries every import on a copy of your workspace before it writes.
+
+[Next: Spaces and Profiles →](https://myarc.dev/docs/spaces-and-profiles/)

@@ -1,8 +1,8 @@
 HTML: https://myarc.dev/docs/install/
 
-[All docs](https://myarc.dev/docs/)
-
 # Install myArc
+
+What your Mac needs, how to get past the first-launch warning, and how to move to a newer nightly.
 
 myArc ships as a pre-alpha nightly, a build made from the latest code and published without release testing. Each nightly is a disk image (DMG) on the [download page](https://myarc.dev/download/).
 
@@ -46,3 +46,5 @@ myArc doesn't update itself, and it gets no security updates between nightlies. 
 Your Spaces, tabs and settings live in your user folder, outside the app, so replacing the app keeps them. [Your data](https://myarc.dev/docs/your-data/) shows where.
 
 The [GitHub releases page](https://github.com/bitbonsai/myarc/releases) lists every nightly.
+
+[Next: Import from Arc →](https://myarc.dev/docs/import-from-arc/)

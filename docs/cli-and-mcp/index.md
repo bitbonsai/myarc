@@ -1,8 +1,8 @@
 HTML: https://myarc.dev/docs/cli-and-mcp/
 
-[All docs](https://myarc.dev/docs/)
-
 # CLI and MCP
+
+Drive myArc from a script or an AI agent with the bundled myarc command and its MCP server. It's off by default, and tab commands reach only the Agent Space.
 
 myArc comes with a command-line tool, `myarc`, that drives tabs in the browser. The same tool runs an MCP server, so AI agents such as Claude Code can use the browser too. MCP, the Model Context Protocol, is the standard way AI tools discover and call outside tools.
 
@@ -116,3 +116,5 @@ The repository has a [Claude Code skill](https://github.com/bitbonsai/myarc/tree
 ## How tools connect
 
 While control is on, myArc publishes its connection details in `~/Library/Application Support/myarc/control/`. Only your user account can read that folder. Tools connect over a local socket with a token that changes each time myArc starts. Nothing listens on the network.
+
+[Next: Known limitations →](https://myarc.dev/docs/known-limitations/)
