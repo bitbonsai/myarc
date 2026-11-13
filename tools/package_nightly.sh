@@ -3,7 +3,8 @@
 # Signs with a Developer ID or Apple Development identity when the keychain has one, then
 # "myArc Local Signing", then ad-hoc. SIGN_ID overrides the choice.
 # Builds the myarc CLI in release mode and bundles it as Contents/Helpers/myarc,
-# with a myarcctl symlink to it as a deprecated alias for one release.
+# with a myarcctl symlink to it as a deprecated alias for one release. It reports
+# VERSION through MYARC_VERSION, so the approval card shows the nightly label.
 # Usage: tools/package_nightly.sh
 #   env: APP_SRC=<built myArc.app> DATE=YYYY-MM-DD VERSION=<label> TAG=<release tag>
 #        OUT=<output dir, default ~/.cache/myarc-m0/release/DATE>
@@ -31,12 +32,13 @@ ditto "$APP_SRC" "$APP"
 xattr -cr "$APP"
 
 # The CLI and MCP server ships inside the bundle and gets the app's signature.
-cargo build --manifest-path "$ROOT/Cargo.toml" --release --locked -p myarc-cli --target aarch64-apple-darwin
+MYARC_VERSION="$VERSION" cargo build --manifest-path "$ROOT/Cargo.toml" --release --locked -p myarc-cli --target aarch64-apple-darwin
 CTL="$APP/Contents/Helpers/myarc"
 mkdir -p "$APP/Contents/Helpers"
 cp "$ROOT/target/aarch64-apple-darwin/release/myarc" "$CTL"
 ln -sf myarc "$APP/Contents/Helpers/myarcctl"
 "$CTL" --help >/dev/null
+case "$("$CTL" --version)" in "myarc $VERSION "*) ;; *) echo "myarc does not report $VERSION" >&2; exit 1;; esac
 "$APP/Contents/Helpers/myarcctl" --version >/dev/null
 
 # The app menu shows this label above About. Chromium's own version stays.

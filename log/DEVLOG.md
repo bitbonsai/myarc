@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-11-13: myarc reports the nightly label as its version
+
+- `myarc --version`, the hello and the MCP `serverInfo` now send `MYARC_VERSION` from build time, or else the crate version with `-dev` (`0.1.0-dev`). `tools/package_nightly.sh` builds with `MYARC_VERSION=$VERSION` and stops if the binary reports anything else, so the next nightly's approval card reads "myarc 2026.11.13 wants to control your Agent Space" with its own label. The 2026.11.13 nightly still says `0.1.0`. A new test covers the fallback.
+- The agents post's `connect-prompt.png` now shows `myarc 2026.11.13`. It is a fresh background capture of `out/MyarcM0` with a disposable profile in `/tmp/myarc-blog-1113/` (outside the repo), the same six Favorites with fetched icons and a `myarc` built with `MYARC_VERSION=2026.11.13`, cropped to the old file's top 806 rows.
+- Verification: `cargo fmt --check`, `cargo clippy -D warnings` and `cargo test` pass with and without `MYARC_VERSION` set, and `check_docs.py` passes.
+
 ## 2026-11-13: Pre-alpha nightly 2026.11.13 ships the CLI as myarc
 
 - Rebuilt `out/MyarcNightly` from Chromium `6ddd300a57` and main `71c3491` (incremental, 68 s), so the Settings help line names `myarc`, then ran `tools/package_nightly.sh`. Its first run stopped at `hdiutil create -quiet` with no message, and the rerun went through. `Contents/Helpers/myarc` is the CLI and `Contents/Helpers/myarcctl` links to it.

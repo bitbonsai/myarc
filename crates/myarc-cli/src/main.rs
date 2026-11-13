@@ -23,7 +23,14 @@ use myarc_control::ipc::{self, Client, ConnectError, Server};
 use myarc_control::{ControlService, Outcome, PROTOCOL_VERSION, Request, Response, registry};
 use serde_json::{Value, json};
 
-pub const VERSION: &str = env!("CARGO_PKG_VERSION");
+/// The version this build reports in `--version`, the hello and MCP
+/// `serverInfo`. Nightly builds set `MYARC_VERSION` to the nightly's date
+/// label, so the approval card reads "myarc 2026.11.13". Other builds report
+/// the crate version with a `-dev` suffix.
+pub const VERSION: &str = match option_env!("MYARC_VERSION") {
+    Some(version) => version,
+    None => concat!(env!("CARGO_PKG_VERSION"), "-dev"),
+};
 /// Longest params argument `run` accepts, the same bound as one MCP message.
 const MAX_PARAMS_BYTES: usize = mcp::MAX_LINE_BYTES;
 

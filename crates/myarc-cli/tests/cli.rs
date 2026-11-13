@@ -3,6 +3,13 @@ use std::process::{Command, Output};
 use myarc_control::{PROTOCOL_VERSION, registry};
 use serde_json::Value;
 
+/// What the binary reports: the build's `MYARC_VERSION`, else the crate
+/// version marked `-dev`, the same rule as `VERSION` in main.rs.
+const EXPECTED_VERSION: &str = match option_env!("MYARC_VERSION") {
+    Some(version) => version,
+    None => concat!(env!("CARGO_PKG_VERSION"), "-dev"),
+};
+
 /// Runs myarc with a control directory that doesn't exist, so a test can
 /// never reach a real browser.
 fn myarc(args: &[&str]) -> Output {
@@ -229,13 +236,28 @@ fn run_without_a_browser_exits_3() {
 }
 
 #[test]
-fn version_prints_crate_and_protocol_versions() {
+fn version_prints_build_and_protocol_versions() {
     let output = myarc(&["--version"]);
     assert_eq!(output.status.code(), Some(0));
     assert_eq!(
         stdout(&output).trim(),
         format!(
             "myarc {} (control protocol {PROTOCOL_VERSION})",
+            EXPECTED_VERSION
+        )
+    );
+}
+
+#[test]
+fn version_without_myarc_version_is_the_crate_version_marked_dev() {
+    if option_env!("MYARC_VERSION").is_some() {
+        return;
+    }
+    let output = myarc(&["--version"]);
+    assert_eq!(
+        stdout(&output).trim(),
+        format!(
+            "myarc {}-dev (control protocol {PROTOCOL_VERSION})",
             env!("CARGO_PKG_VERSION")
         )
     );

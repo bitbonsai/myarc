@@ -6,6 +6,13 @@ use std::thread;
 use myarc_control::registry;
 use serde_json::{Value, json};
 
+/// What the binary reports: the build's `MYARC_VERSION`, else the crate
+/// version marked `-dev`, the same rule as `VERSION` in main.rs.
+const EXPECTED_VERSION: &str = match option_env!("MYARC_VERSION") {
+    Some(version) => version,
+    None => concat!(env!("CARGO_PKG_VERSION"), "-dev"),
+};
+
 /// Runs `myarc mcp` with `input` on stdin, then closes stdin.
 fn session(input: Vec<u8>) -> Output {
     let mut child = Command::new(env!("CARGO_BIN_EXE_myarc"))
@@ -96,10 +103,7 @@ fn scripted_session() {
     assert_eq!(init["result"]["protocolVersion"], "2025-06-18");
     assert_eq!(init["result"]["capabilities"], json!({ "tools": {} }));
     assert_eq!(init["result"]["serverInfo"]["name"], "myarc");
-    assert_eq!(
-        init["result"]["serverInfo"]["version"],
-        env!("CARGO_PKG_VERSION")
-    );
+    assert_eq!(init["result"]["serverInfo"]["version"], EXPECTED_VERSION);
 
     let list = &replies[1];
     assert_eq!(list["id"], 2);
