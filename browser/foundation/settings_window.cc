@@ -1016,6 +1016,11 @@ class SettingsView : public views::View {
     advanced_ = AddChildView(
         std::make_unique<AdvancedPage>(local_state, more_settings,
                                        std::move(import_arc)));
+    // The pages fill the whole view, so the tabs go above them or the shown
+    // page takes their clicks.
+    for (SectionTab* tab : tabs_) {
+      ReorderChildView(tab, children().size());
+    }
     AddAccelerator(ui::Accelerator(ui::VKEY_ESCAPE, ui::EF_NONE));
     AddAccelerator(ui::Accelerator(ui::VKEY_W, ui::EF_PLATFORM_ACCELERATOR));
     GetViewAccessibility().SetRole(ax::mojom::Role::kTabList);
