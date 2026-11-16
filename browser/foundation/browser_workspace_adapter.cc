@@ -2350,7 +2350,9 @@ std::set<uint64_t> BrowserWorkspaceAdapter::SplitCandidates() const {
   if (!sidebar.ok)
     return items;
   for (const auto& row : sidebar.temporary) {
-    if (LocalPage(*tabs_, row.id))
+    // The sidebar hides an untouched New Tab page, so it can't be a pane.
+    auto* page = LocalPage(*tabs_, row.id);
+    if (page && !IsUntouchedNewTabPage(*page))
       items.insert(row.id);
   }
   for (const auto& split : sidebar.splits) {
