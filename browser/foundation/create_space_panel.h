@@ -13,6 +13,7 @@
 #include "myarc/space_icon_catalog.h"
 #include "ui/base/metadata/metadata_header_macros.h"
 #include "ui/menus/simple_menu_model.h"
+#include "ui/views/bubble/bubble_border.h"
 #include "ui/views/controls/textfield/textfield_controller.h"
 #include "ui/views/view.h"
 
@@ -31,6 +32,22 @@ namespace myarc {
 
 class SpaceIconPickerView;
 class SpaceThemePickerView;
+
+// Arc's picker popover, shared by the Create a Space panel and the sidebar's
+// Edit Theme… and Change Icon…: no title, buttons or margins, and 14 DIP
+// corners on Arc's dark navy or white. `hold` keeps it open in an inactive
+// window, for background captures.
+std::unique_ptr<views::BubbleDialogDelegate> MakeSpacePickerPopover(
+    views::View* anchor,
+    views::BubbleBorder::Arrow arrow,
+    const std::u16string& title,
+    bool dark,
+    bool hold);
+void ShowSpacePickerPopover(views::Widget& widget, bool hold);
+// The widget is mid-close; frees it and its delegate once that unwinds.
+void ReleaseSpacePickerPopover(
+    std::unique_ptr<views::Widget>& widget,
+    std::unique_ptr<views::BubbleDialogDelegate>& delegate);
 
 // A Profile the new Space can use. `id` is the caller's; the panel only hands
 // it back.

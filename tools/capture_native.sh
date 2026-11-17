@@ -23,6 +23,10 @@
 #   SPACE=menu (or footer-menu) opens the current Space's menu from its title
 #   (or footer icon) via --myarc-capture-space; SPACE=delete asks to delete the
 #   current Space, and SPACE=delete-now deletes it and opens Archived Tabs.
+#   SPACE=theme (or icon) holds Edit Theme…'s (or Change Icon…'s) popover open,
+#   theme with pink at 60%; theme-save closes it, saving the theme, and
+#   icon-save sets the rocket icon. SPACE=theme-other opens the Library, then
+#   Edit Theme… of another Space.
 #   STACK=1 shows the downloads stack above the Library button via
 #   --myarc-capture-downloads-stack and keeps it up. file:// URLs of files
 #   Chromium can't show download and seed the stack.

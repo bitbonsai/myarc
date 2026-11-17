@@ -36,6 +36,7 @@ class EventHandler;
 }  // namespace ui
 
 namespace views {
+class BubbleDialogDelegate;
 class MdTextButton;
 class MenuRunner;
 class ScrollView;
@@ -205,6 +206,16 @@ class SidebarView final : public views::View,
     // of this Profile, closes its pages and reports errors. The last Space
     // stays.
     virtual void DeleteSpace(uint64_t space_id) = 0;
+    // Edit Theme… and Change Icon…: the parent shows the Space, closing the
+    // Library, then calls OpenSpacePicker.
+    virtual void EditSpaceTheme(uint64_t space_id) = 0;
+    virtual void ChangeSpaceIcon(uint64_t space_id) = 0;
+    // A picker's choice for an existing Space; the parent saves it and
+    // reports errors. A null theme restores the default tint.
+    virtual void SetSpaceTheme(uint64_t space_id,
+                               const std::optional<SpaceTheme>& theme) = 0;
+    virtual void SetSpaceIcon(uint64_t space_id,
+                              const SpaceIconChoice& icon) = 0;
     // Places `space_id` before `before_id` (0 = last) in the Space order
     // the footer, Ctrl+1..9 and the Library share. The parent reports errors.
     virtual void MoveSpace(uint64_t space_id, uint64_t before_id) = 0;
@@ -291,6 +302,16 @@ class SidebarView final : public views::View,
   // Shows the footer tooltip of "library", "space" (the current one) or
   // "create" without hover and keeps it up, for background captures.
   void ShowFooterTooltipForCapture(std::string_view target);
+  enum class SpacePicker { kTheme, kIcon };
+  // Opens Arc's theme or icon popover beside `space`'s title, the same
+  // pickers the Create a Space panel uses. When `space` isn't shown yet, or
+  // the Library is open or leaving, it opens once the rows show `space`. Theme
+  // chips tint the sidebar as a preview, and closing the popover saves the last
+  // one; an icon saves when picked. `hold` keeps it open in an inactive window,
+  // with a pink theme at 60% picked, for background captures.
+  void OpenSpacePicker(uint64_t space, SpacePicker picker, bool hold = false);
+  // Closes that popover, which saves a picked theme.
+  void CloseSpacePicker();
   // Opens the current Space's menu from its title, or with `footer` from its
   // footer icon, and reopens it for `tries` beats of 300 ms, for background
   // captures.
@@ -453,6 +474,9 @@ class SidebarView final : public views::View,
   std::unique_ptr<views::View> MakeFolder(const foundation::FolderRecord& folder);
   // The Space menu of menu_space_id_, with New Folder on the Space title.
   void AddSpaceCommands(bool folder);
+  void PickSpaceTheme(SpaceTheme theme);
+  void PickSpaceIcon(SpaceIconChoice icon);
+  void OnSpacePickerClosed();
   // Runs the menu built in `menu_model_` at `point`.
   void RunMenu(const gfx::Point& point, ui::mojom::MenuSourceType source_type);
   // The divider above Today, with Clear closing `today`.
@@ -522,6 +546,19 @@ class SidebarView final : public views::View,
   std::unique_ptr<ui::SimpleMenuModel> menu_model_;
   std::unique_ptr<views::MenuRunner> menu_runner_;
   bool create_menu_open_ = false;
+  // The open Edit Theme… or Change Icon… popover, its Space and the theme
+  // picked so far. The delegate outlives its widget.
+  std::unique_ptr<views::BubbleDialogDelegate> space_picker_delegate_;
+  std::unique_ptr<views::Widget> space_picker_widget_;
+  uint64_t space_picker_space_ = 0;
+  std::optional<SpaceTheme> space_picker_theme_;
+  bool space_picker_theme_changed_ = false;
+  struct PendingSpacePicker {
+    uint64_t space = 0;
+    SpacePicker picker = SpacePicker::kTheme;
+    bool hold = false;
+  };
+  std::optional<PendingSpacePicker> pending_space_picker_;
   // --myarc-capture-create-menu opens the menu once, for captures.
   bool capture_menu_scheduled_ = false;
   // --myarc-capture-activate=<item ID> opens a seeded row once, for captures.

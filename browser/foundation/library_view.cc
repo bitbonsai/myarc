@@ -80,6 +80,8 @@ enum Command {
   kMoveSpaceLeft,
   kMoveSpaceRight,
   kDeleteSpace,
+  kEditTheme,
+  kChangeIcon,
 };
 
 // The other cards slide aside this fast while a card is dragged.
@@ -1283,13 +1285,16 @@ void LibraryView::ShowSpaceMenu(uint64_t space,
   if (!anchor || !GetWidget() || (menu_runner_ && menu_runner_->IsRunning())) {
     return;
   }
-  // Rename, switching and Delete are the Space actions the sidebar has too.
+  // Theme, icon, rename, switching and Delete are the Space actions the
+  // sidebar has too.
   menu_space_ = space;
   menu_runner_.reset();
   menu_model_ = std::make_unique<ui::SimpleMenuModel>(this);
   if (space != current_space_) {
     menu_model_->AddItem(kSwitchSpace, u"Switch to Space");
   }
+  menu_model_->AddItem(kEditTheme, u"Edit Theme\u2026");
+  menu_model_->AddItem(kChangeIcon, u"Change Icon\u2026");
   menu_model_->AddItem(kRenameSpace, u"Rename Space\u2026");
   // The handle's drag, for the keyboard.
   const auto it =
@@ -1350,6 +1355,15 @@ void LibraryView::ExecuteCommand(int command_id, int event_flags) {
       PostAction(base::BindOnce(&SidebarView::Delegate::RenameSpace,
                                 base::Unretained(&delegate_.get()),
                                 menu_space_));
+      break;
+    case kEditTheme:
+    case kChangeIcon:
+      // The parent shows the Space in the sidebar, closing the Library, and
+      // opens the picker beside its title.
+      PostAction(base::BindOnce(
+          command_id == kEditTheme ? &SidebarView::Delegate::EditSpaceTheme
+                                   : &SidebarView::Delegate::ChangeSpaceIcon,
+          base::Unretained(&delegate_.get()), menu_space_));
       break;
     case kDeleteSpace:
       // The confirmation runs first; the Library stays open and rebuilds

@@ -185,9 +185,9 @@ class PopupButton : public views::Button {
 BEGIN_METADATA(PopupButton)
 END_METADATA
 
-// Arc's popover: no title, buttons or margins, and 14 DIP corners. `hold`
-// keeps it open in an inactive window, for background captures.
-std::unique_ptr<views::BubbleDialogDelegate> MakePopover(
+}  // namespace
+
+std::unique_ptr<views::BubbleDialogDelegate> MakeSpacePickerPopover(
     views::View* anchor,
     views::BubbleBorder::Arrow arrow,
     const std::u16string& title,
@@ -205,9 +205,9 @@ std::unique_ptr<views::BubbleDialogDelegate> MakePopover(
   return delegate;
 }
 
-// The widget is mid-close; free it and its delegate once that unwinds.
-void ReleasePopover(std::unique_ptr<views::Widget>& widget,
-                    std::unique_ptr<views::BubbleDialogDelegate>& delegate) {
+void ReleaseSpacePickerPopover(
+    std::unique_ptr<views::Widget>& widget,
+    std::unique_ptr<views::BubbleDialogDelegate>& delegate) {
   if (delegate) {
     delegate->SetAnchorView(nullptr);
   }
@@ -221,15 +221,13 @@ void ReleasePopover(std::unique_ptr<views::Widget>& widget,
   }
 }
 
-void ShowPopover(views::Widget& widget, bool hold) {
+void ShowSpacePickerPopover(views::Widget& widget, bool hold) {
   if (hold) {
     widget.ShowInactive();
   } else {
     widget.Show();
   }
 }
-
-}  // namespace
 
 CreateSpacePanel::CreateSpacePanel(std::vector<ProfileChoice> profiles,
                                    ProfileChoice own_profile,
@@ -447,9 +445,9 @@ void CreateSpacePanel::OpenIconPicker(SpaceIconChoice::Kind tab, bool hold) {
   }
   // Arc hangs the popover under the whole name field, its left edge on the
   // field's.
-  picker_delegate_ =
-      MakePopover(name_row_.get(), views::BubbleBorder::TOP_LEFT, u"Space icon",
-                  GetColors(GetColorProvider()).dark, hold);
+  picker_delegate_ = MakeSpacePickerPopover(
+      name_row_.get(), views::BubbleBorder::TOP_LEFT, u"Space icon",
+      GetColors(GetColorProvider()).dark, hold);
   auto* delegate = picker_delegate_.get();
   SpaceIconChoice current = icon_;
   current.kind = tab;
@@ -464,7 +462,7 @@ void CreateSpacePanel::OpenIconPicker(SpaceIconChoice::Kind tab, bool hold) {
   // Arc points a caret at the icon button. macOS bubbles use the OS shadow,
   // which can't be combined with views' visible arrow, so the popover has
   // none.
-  ShowPopover(*picker_widget_, hold);
+  ShowSpacePickerPopover(*picker_widget_, hold);
 }
 
 void CreateSpacePanel::OpenThemePicker(bool hold) {
@@ -480,9 +478,9 @@ void CreateSpacePanel::OpenThemePicker(bool hold) {
   }
   // Arc opens the popover to the right of the row. As with the icon picker,
   // macOS leaves out the caret.
-  theme_picker_delegate_ =
-      MakePopover(theme_row_.get(), views::BubbleBorder::LEFT_CENTER,
-                  u"Space theme", GetColors(GetColorProvider()).dark, hold);
+  theme_picker_delegate_ = MakeSpacePickerPopover(
+      theme_row_.get(), views::BubbleBorder::LEFT_CENTER, u"Space theme",
+      GetColors(GetColorProvider()).dark, hold);
   auto* picker = theme_picker_delegate_->SetContentsView(
       std::make_unique<SpaceThemePickerView>(
           theme_, base::BindRepeating(&CreateSpacePanel::PickTheme,
@@ -491,7 +489,7 @@ void CreateSpacePanel::OpenThemePicker(bool hold) {
       theme_picker_delegate_.get(),
       base::IgnoreArgs<views::Widget::ClosedReason>(base::BindOnce(
           &CreateSpacePanel::OnThemePickerClosed, weak_factory_.GetWeakPtr())));
-  ShowPopover(*theme_picker_widget_, hold);
+  ShowSpacePickerPopover(*theme_picker_widget_, hold);
   if (hold) {
     picker->Select(1, 60);
   }
@@ -508,7 +506,7 @@ void CreateSpacePanel::PickTheme(SpaceTheme theme) {
 }
 
 void CreateSpacePanel::OnThemePickerClosed() {
-  ReleasePopover(theme_picker_widget_, theme_picker_delegate_);
+  ReleaseSpacePickerPopover(theme_picker_widget_, theme_picker_delegate_);
 }
 
 void CreateSpacePanel::UpdateThemeIcon() {
@@ -534,7 +532,7 @@ void CreateSpacePanel::PickIcon(SpaceIconChoice icon) {
 
 void CreateSpacePanel::OnIconPickerClosed() {
   picker_ = nullptr;
-  ReleasePopover(picker_widget_, picker_delegate_);
+  ReleaseSpacePickerPopover(picker_widget_, picker_delegate_);
 }
 
 void CreateSpacePanel::UpdateIconButton() {

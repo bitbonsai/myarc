@@ -3,14 +3,15 @@
 #include <algorithm>
 #include <cmath>
 #include <limits>
+#include <map>
 #include <memory>
 #include <optional>
-#include <map>
 #include <set>
 #include <utility>
 
 #include "base/command_line.h"
 #include "base/functional/bind.h"
+#include "base/functional/callback_helpers.h"
 #include "base/location.h"
 #include "base/logging.h"
 #include "base/numerics/safe_conversions.h"
@@ -30,6 +31,8 @@
 #include "myarc/library_view.h"
 #include "myarc/sidebar_tint.h"
 #include "myarc/space_icon_catalog.h"
+#include "myarc/space_icon_picker.h"
+#include "myarc/space_theme_picker.h"
 #include "third_party/skia/include/core/SkColor.h"
 #include "ui/base/clipboard/scoped_clipboard_writer.h"
 #include "ui/base/metadata/metadata_impl_macros.h"
@@ -61,6 +64,7 @@
 #include "ui/views/animation/ink_drop_host.h"
 #include "ui/views/background.h"
 #include "ui/views/border.h"
+#include "ui/views/bubble/bubble_dialog_delegate_view.h"
 #include "ui/views/controls/button/button.h"
 #include "ui/views/controls/button/label_button.h"
 #include "ui/views/controls/button/md_text_button.h"
@@ -70,6 +74,7 @@
 #include "ui/views/controls/menu/menu_runner.h"
 #include "ui/views/controls/scroll_view.h"
 #include "ui/views/controls/separator.h"
+#include "ui/views/controls/textfield/textfield.h"
 #include "ui/views/focus/focus_manager.h"
 #include "ui/views/layout/box_layout.h"
 #include "ui/views/style/typography.h"
@@ -442,6 +447,8 @@ enum ItemCommand {
   kSeparateSplit,
   kRenameSpace,
   kDeleteSpace,
+  kEditTheme,
+  kChangeIcon,
   // Move to Folder's entries: this plus the folder's index in folders_.
   kMoveToFolderFirst = 1000
 };
@@ -950,6 +957,7 @@ SidebarView::~SidebarView() {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
   weak_factory_.InvalidateWeakPtrs();
   menu_runner_.reset();
+  space_picker_widget_.reset();
   RemovePreTargetHandler(row_drag_handler_.get());
 }
 
@@ -1075,8 +1083,11 @@ void SidebarView::ShowContextMenuForViewImpl(
 }
 
 void SidebarView::AddSpaceCommands(bool folder) {
-  // Arc's Space menu: renaming first, removal last behind a separator. The
-  // last Space of the Profile can't go, so its Delete is disabled.
+  // Arc's Space menu: its look and name first, removal last behind a
+  // separator. The last Space of the Profile can't go, so its Delete is
+  // disabled.
+  menu_model_->AddItem(kEditTheme, u"Edit Theme\u2026");
+  menu_model_->AddItem(kChangeIcon, u"Change Icon\u2026");
   menu_model_->AddItem(kRenameSpace, u"Rename Space\u2026");
   if (folder) {
     menu_model_->AddSeparator(ui::NORMAL_SEPARATOR);
@@ -1452,15 +1463,25 @@ void SidebarView::ExecuteCommand(int command_id, int event_flags) {
     StopControl();
     return;
   }
-  if (command_id == kRenameSpace || command_id == kDeleteSpace) {
+  if (command_id == kRenameSpace || command_id == kDeleteSpace ||
+      command_id == kEditTheme || command_id == kChangeIcon) {
     const uint64_t space = std::exchange(menu_space_id_, 0);
     if (!space) {
       return;
     }
-    if (command_id == kRenameSpace) {
-      delegate_->RenameSpace(space);
-    } else {
-      delegate_->DeleteSpace(space);
+    switch (command_id) {
+      case kRenameSpace:
+        delegate_->RenameSpace(space);
+        return;
+      case kDeleteSpace:
+        delegate_->DeleteSpace(space);
+        return;
+      case kEditTheme:
+        delegate_->EditSpaceTheme(space);
+        return;
+      case kChangeIcon:
+        delegate_->ChangeSpaceIcon(space);
+        return;
     }
     return;
   }
@@ -2395,6 +2416,19 @@ void SidebarView::SetModel(const foundation::SidebarResult& model,
                            focus_targets_.end());
   }
   UpdateFills();
+  if (pending_space_picker_ && !library_ &&
+      pending_space_picker_->space == current_space_id_) {
+    base::SequencedTaskRunner::GetCurrentDefault()->PostTask(
+        FROM_HERE,
+        base::BindOnce(
+            [](base::WeakPtr<SidebarView> sidebar, PendingSpacePicker pending) {
+              if (sidebar && sidebar->pending_space_picker_) {
+                sidebar->OpenSpacePicker(pending.space, pending.picker,
+                                         pending.hold);
+              }
+            },
+            weak_factory_.GetWeakPtr(), *pending_space_picker_));
+  }
   if (!capture_item_menu_scheduled_ && !tiles_.empty() &&
       base::CommandLine::ForCurrentProcess()->HasSwitch(kCaptureItemMenu)) {
     capture_item_menu_scheduled_ = true;
@@ -2715,6 +2749,125 @@ std::u16string SidebarView::GetCreateTooltipForTesting() const {
              : static_cast<FooterButton*>(target->view.get())
                    ->footer_tooltip()
                    .label;
+}
+
+void SidebarView::OpenSpacePicker(uint64_t space_id,
+                                  SpacePicker picker,
+                                  bool hold) {
+  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
+  pending_space_picker_.reset();
+  if (space_picker_widget_ && !space_picker_widget_->IsClosed()) {
+    space_picker_widget_->Close();
+  }
+  if (space_picker_widget_) {
+    OnSpacePickerClosed();
+  }
+  if (!GetWidget() || create_panel_) {
+    return;
+  }
+  const auto heading =
+      std::ranges::find_if(focus_targets_, [this](const FocusTarget& focus) {
+        return focus.action == FocusAction::kRename &&
+               focus.id == current_space_id_ && focus.view;
+      });
+  if (library_ || space_id != current_space_id_ ||
+      heading == focus_targets_.end()) {
+    // SetModel opens it once the rows show the Space.
+    pending_space_picker_ = {.space = space_id, .picker = picker, .hold = hold};
+    return;
+  }
+  const auto space =
+      std::ranges::find(spaces_, current_space_id_, &SpaceEntry::id);
+  if (space == spaces_.end()) {
+    return;
+  }
+  space_picker_space_ = current_space_id_;
+  space_picker_theme_ = space_theme_;
+  space_picker_theme_changed_ = false;
+  const bool dark =
+      !GetColorProvider() ||
+      color_utils::IsDark(GetColorProvider()->GetColor(ui::kColorSysSurface));
+  // Arc opens both popovers beside the sidebar. The title is the anchor;
+  // when a refresh rebuilds it, the popover stays where it is.
+  const bool theme = picker == SpacePicker::kTheme;
+  space_picker_delegate_ = MakeSpacePickerPopover(
+      heading->view.get(),
+      theme ? views::BubbleBorder::LEFT_CENTER : views::BubbleBorder::TOP_LEFT,
+      theme ? u"Space theme" : u"Space icon", dark, hold);
+  SpaceThemePickerView* theme_view = nullptr;
+  if (theme) {
+    theme_view = space_picker_delegate_->SetContentsView(
+        std::make_unique<SpaceThemePickerView>(
+            space_theme_, base::BindRepeating(&SidebarView::PickSpaceTheme,
+                                              weak_factory_.GetWeakPtr())));
+  } else {
+    auto* view = space_picker_delegate_->SetContentsView(
+        std::make_unique<SpaceIconPickerView>(
+            space->icon, base::BindOnce(&SidebarView::PickSpaceIcon,
+                                        weak_factory_.GetWeakPtr())));
+    space_picker_delegate_->SetInitiallyFocusedView(view->search());
+  }
+  space_picker_widget_ = views::BubbleDialogDelegate::CreateBubble(
+      space_picker_delegate_.get(),
+      base::IgnoreArgs<views::Widget::ClosedReason>(base::BindOnce(
+          &SidebarView::OnSpacePickerClosed, weak_factory_.GetWeakPtr())));
+  ShowSpacePickerPopover(*space_picker_widget_, hold);
+  if (hold && theme_view) {
+    theme_view->Select(1, 60);
+  }
+}
+
+void SidebarView::CloseSpacePicker() {
+  if (space_picker_widget_ && !space_picker_widget_->IsClosed()) {
+    space_picker_widget_->Close();
+  }
+}
+
+void SidebarView::PickSpaceTheme(SpaceTheme theme) {
+  space_picker_theme_ = theme;
+  space_picker_theme_changed_ = true;
+  if (GetWidget()) {
+    SetSidebarTheme(*GetWidget(), space_picker_theme_, /*fade=*/false);
+  }
+}
+
+void SidebarView::PickSpaceIcon(SpaceIconChoice icon) {
+  if (space_picker_widget_) {
+    space_picker_widget_->Close();
+  }
+  if (IsBundledSpaceIcon(icon) && space_picker_space_) {
+    // Saving rebuilds the rows; the popover is already closing.
+    base::SequencedTaskRunner::GetCurrentDefault()->PostTask(
+        FROM_HERE,
+        base::BindOnce(
+            [](base::WeakPtr<SidebarView> sidebar, uint64_t space,
+               SpaceIconChoice icon) {
+              if (sidebar) {
+                sidebar->delegate_->SetSpaceIcon(space, icon);
+              }
+            },
+            weak_factory_.GetWeakPtr(), space_picker_space_, std::move(icon)));
+  }
+}
+
+void SidebarView::OnSpacePickerClosed() {
+  ReleaseSpacePickerPopover(space_picker_widget_, space_picker_delegate_);
+  const uint64_t space = std::exchange(space_picker_space_, 0);
+  if (!space_picker_theme_changed_ || !space) {
+    return;
+  }
+  space_picker_theme_changed_ = false;
+  // The last chip and opacity picked become the Space's theme; the refresh
+  // that follows tints the sidebar with it.
+  base::SequencedTaskRunner::GetCurrentDefault()->PostTask(
+      FROM_HERE, base::BindOnce(
+                     [](base::WeakPtr<SidebarView> sidebar, uint64_t space,
+                        std::optional<SpaceTheme> theme) {
+                       if (sidebar) {
+                         sidebar->delegate_->SetSpaceTheme(space, theme);
+                       }
+                     },
+                     weak_factory_.GetWeakPtr(), space, space_picker_theme_));
 }
 
 void SidebarView::OpenSpaceMenuForCapture(bool footer, int tries) {

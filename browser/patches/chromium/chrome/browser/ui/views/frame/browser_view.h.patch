@@ -1,5 +1,5 @@
 diff --git a/chrome/browser/ui/views/frame/browser_view.h b/chrome/browser/ui/views/frame/browser_view.h
-index 750e46c97b64dccccf4268e912df5dbdb6516b3c..e2c4fff96139bdb83d7584483e1c635d3f291128 100644
+index 750e46c97b64dccccf4268e912df5dbdb6516b3c..0281dd5acd91812265c299e9f4a7fdbe1257c6d7 100644
 --- a/chrome/browser/ui/views/frame/browser_view.h
 +++ b/chrome/browser/ui/views/frame/browser_view.h
 @@ -8,11 +8,13 @@
@@ -126,7 +126,7 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..e2c4fff96139bdb83d7584483e1c635d
    base::WeakPtr<BrowserView> GetAsWeakPtr() {
      return weak_ptr_factory_.GetWeakPtr();
    }
-@@ -1253,12 +1313,242 @@ class BrowserView : public BrowserWindow,
+@@ -1253,12 +1313,253 @@ class BrowserView : public BrowserWindow,
  
    // Anchor point for help bubbles and other dialogs that want to reliably
    // anchor outside the content area of the window.
@@ -237,6 +237,17 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..e2c4fff96139bdb83d7584483e1c635d
 +  void MyarcPaletteTestQuery(int request, const std::u16string& text);
 +  void RenameSpace(uint64_t space) override;
 +  void DeleteSpace(uint64_t space) override;
++  void EditSpaceTheme(uint64_t space) override;
++  void ChangeSpaceIcon(uint64_t space) override;
++  void SetSpaceTheme(uint64_t space,
++                     const std::optional<myarc::SpaceTheme>& theme) override;
++  void SetSpaceIcon(uint64_t space,
++                    const myarc::SpaceIconChoice& icon) override;
++  // Shows `space` in the sidebar, closing the Library, and opens `picker`
++  // beside its title.
++  void OpenMyarcSpacePicker(uint64_t space,
++                            myarc::SidebarView::SpacePicker picker,
++                            bool hold = false);
 +  void MoveSpace(uint64_t space, uint64_t before) override;
 +  void NewTab() override;
 +  void RetryWorkspaceStorage(myarc::SidebarView::StorageRetry retry) override;
@@ -369,7 +380,7 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..e2c4fff96139bdb83d7584483e1c635d
  
    // A mapping between accelerators and command IDs.
    std::map<ui::Accelerator, int> accelerator_table_;
-@@ -1411,6 +1701,7 @@ class BrowserView : public BrowserWindow,
+@@ -1411,6 +1712,7 @@ class BrowserView : public BrowserWindow,
    base::EnumSet<TabStripAndWebAppViewsReparentedState>
        tab_strip_web_apps_reparented_state_;
  
