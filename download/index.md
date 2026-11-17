@@ -4,12 +4,12 @@ HTML: https://myarc.dev/download/
 
 Pre-alpha nightly, for trying the Arc-like shell. Not for daily or sensitive browsing.
 
-[Download for macOS (Apple silicon)](https://github.com/bitbonsai/myarc/releases/download/nightly-2026.11.16/myArc-Nightly-2026.11.16-arm64.dmg)
+[Download for macOS (Apple silicon)](https://github.com/bitbonsai/myarc/releases/download/nightly-2026.11.17/myArc-Nightly-2026.11.17-arm64.dmg)
 
-- **Version:** 2026.11.16
-- **Date:** November 16, 2026
-- **Size:** 234.6 MB
-- **SHA-256:** `37323cd7d11833aebb56c6456f4d50df93c44135ed5188560984fd64492ee225`
+- **Version:** 2026.11.17
+- **Date:** November 17, 2026
+- **Size:** 243.5 MB
+- **SHA-256:** `d36745f58f8d6bdaaeaf121bf9de71ff238f1e8ec1614674e9cc05a20c8b1f27`
 
 ## System requirements
 
@@ -21,7 +21,7 @@ Pre-alpha nightly, for trying the Arc-like shell. Not for daily or sensitive bro
 1. Check the download against the SHA-256 listed with it. The two values must match.
 
    ```
-   shasum -a 256 ~/Downloads/myArc-Nightly-2026.11.16-arm64.dmg
+   shasum -a 256 ~/Downloads/myArc-Nightly-2026.11.17-arm64.dmg
    ```
 2. Open the DMG and drag myArc Nightly to Applications.
 3. macOS blocks the first launch because the app is not notarized. Right-click myArc Nightly, choose Open, then Open again. If macOS only offers Done or Move to Trash, which macOS 15 and later usually does, open System Settings \> Privacy \& Security, scroll to the myArc Nightly message and choose Open Anyway.
@@ -47,6 +47,8 @@ Each item was seen working in a native run or experiment note. None of it has ha
 - Folders for a Space's pinned tabs. Create, rename and delete them from the right-click menu, and open or close them. Drag tabs in and out, and rename a pinned tab from its menu.
 - Split View for two tabs side by side. Use Open in Split View in a tab's menu or Ctrl\+Shift\+\=, and Ctrl\+Shift\+- to separate them. The split shows as one sidebar row and comes back after a restart.
 - Peek: a link from a pinned tab or Favorite to another site opens in a card over the page. Cmd\+W or Esc closes it, and Cmd\+O turns it into a tab.
+- Ad and tracker blocking, on by default, with uBlock Origin Lite built in. Window \> Ad Blocking for This Site… turns it off for one site. Private windows block only after you allow the extension there.
+- Ctrl\+Tab switches to your last tab, and holding Ctrl goes further back through the five most recent.
 - Agents can drive tabs in the Agent Space through the bundled myarc CLI and MCP server. It is off by default. Turn it on in Settings \> Advanced, and myArc asks before each new agent connects.
 
 ## Known limitations
@@ -60,7 +62,7 @@ Each item was seen working in a native run or experiment note. None of it has ha
 
 ## Other ways to get it
 
-- [GitHub releases](https://github.com/bitbonsai/myarc/releases/tag/nightly-2026.11.16) lists every nightly.
+- [GitHub releases](https://github.com/bitbonsai/myarc/releases/tag/nightly-2026.11.17) lists every nightly.
 - [Source on GitHub](https://github.com/bitbonsai/myarc), with instructions to [build it from source](https://github.com/bitbonsai/myarc/blob/main/browser/README.md).
 - [GitHub issues](https://github.com/bitbonsai/myarc/issues) take bug reports. Include the version, your macOS version and the steps that trigger the problem, and leave out private pages.
 

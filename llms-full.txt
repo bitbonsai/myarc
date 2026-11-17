@@ -6,7 +6,7 @@ HTML: https://myarc.dev/
 
 An open-source browser bringing back Arc, with no account required and optional AI.
 
-[Download pre-alphaNightly v2026.11.16](https://myarc.dev/download/)
+[Download pre-alphaNightly v2026.11.17](https://myarc.dev/download/)
 [See what works](https://github.com/bitbonsai/myarc#try-it)
 
 ## How you browse is part of how you work. It should outlast the company behind your browser.
@@ -37,12 +37,12 @@ An open-source browser bringing back Arc, with no account required and optional 
   Spaces, pinned tabs and Favorites, the Library, tabs that survive a restart, and AI agents that browse in a Space of their own.
 - ### Next, for alpha
 
-  Split view, Little Arc, ad and tracker blocking on by default, and onboarding.
+  Split view, Little Arc and onboarding.
 - ### After alpha
 
   Builds for Windows and Linux.
 
-[Download the 2026.11.16 nightly →](https://myarc.dev/download/) [Full alpha checklist →](https://github.com/bitbonsai/myarc/blob/main/docs/ALPHA.md)
+[Download the 2026.11.17 nightly →](https://myarc.dev/download/) [Full alpha checklist →](https://github.com/bitbonsai/myarc/blob/main/docs/ALPHA.md)
 
 ## Read along
 
@@ -121,12 +121,12 @@ HTML: https://myarc.dev/download/
 
 Pre-alpha nightly, for trying the Arc-like shell. Not for daily or sensitive browsing.
 
-[Download for macOS (Apple silicon)](https://github.com/bitbonsai/myarc/releases/download/nightly-2026.11.16/myArc-Nightly-2026.11.16-arm64.dmg)
+[Download for macOS (Apple silicon)](https://github.com/bitbonsai/myarc/releases/download/nightly-2026.11.17/myArc-Nightly-2026.11.17-arm64.dmg)
 
-- **Version:** 2026.11.16
-- **Date:** November 16, 2026
-- **Size:** 234.6 MB
-- **SHA-256:** `37323cd7d11833aebb56c6456f4d50df93c44135ed5188560984fd64492ee225`
+- **Version:** 2026.11.17
+- **Date:** November 17, 2026
+- **Size:** 243.5 MB
+- **SHA-256:** `d36745f58f8d6bdaaeaf121bf9de71ff238f1e8ec1614674e9cc05a20c8b1f27`
 
 ## System requirements
 
@@ -138,7 +138,7 @@ Pre-alpha nightly, for trying the Arc-like shell. Not for daily or sensitive bro
 1. Check the download against the SHA-256 listed with it. The two values must match.
 
    ```
-   shasum -a 256 ~/Downloads/myArc-Nightly-2026.11.16-arm64.dmg
+   shasum -a 256 ~/Downloads/myArc-Nightly-2026.11.17-arm64.dmg
    ```
 2. Open the DMG and drag myArc Nightly to Applications.
 3. macOS blocks the first launch because the app is not notarized. Right-click myArc Nightly, choose Open, then Open again. If macOS only offers Done or Move to Trash, which macOS 15 and later usually does, open System Settings \> Privacy \& Security, scroll to the myArc Nightly message and choose Open Anyway.
@@ -164,6 +164,8 @@ Each item was seen working in a native run or experiment note. None of it has ha
 - Folders for a Space's pinned tabs. Create, rename and delete them from the right-click menu, and open or close them. Drag tabs in and out, and rename a pinned tab from its menu.
 - Split View for two tabs side by side. Use Open in Split View in a tab's menu or Ctrl\+Shift\+\=, and Ctrl\+Shift\+- to separate them. The split shows as one sidebar row and comes back after a restart.
 - Peek: a link from a pinned tab or Favorite to another site opens in a card over the page. Cmd\+W or Esc closes it, and Cmd\+O turns it into a tab.
+- Ad and tracker blocking, on by default, with uBlock Origin Lite built in. Window \> Ad Blocking for This Site… turns it off for one site. Private windows block only after you allow the extension there.
+- Ctrl\+Tab switches to your last tab, and holding Ctrl goes further back through the five most recent.
 - Agents can drive tabs in the Agent Space through the bundled myarc CLI and MCP server. It is off by default. Turn it on in Settings \> Advanced, and myArc asks before each new agent connects.
 
 ## Known limitations
@@ -177,7 +179,7 @@ Each item was seen working in a native run or experiment note. None of it has ha
 
 ## Other ways to get it
 
-- [GitHub releases](https://github.com/bitbonsai/myarc/releases/tag/nightly-2026.11.16) lists every nightly.
+- [GitHub releases](https://github.com/bitbonsai/myarc/releases/tag/nightly-2026.11.17) lists every nightly.
 - [Source on GitHub](https://github.com/bitbonsai/myarc), with instructions to [build it from source](https://github.com/bitbonsai/myarc/blob/main/browser/README.md).
 - [GitHub issues](https://github.com/bitbonsai/myarc/issues) take bug reports. Include the version, your macOS version and the steps that trigger the problem, and leave out private pages.
 
@@ -306,7 +308,7 @@ In Arc, open Settings, go to Advanced and choose Export Data. Arc saves a Markdo
 2. Click Import from Arc and pick the exported file.
 3. Read the preview, then click Import. Cancel closes the preview and writes nothing.
 
-The preview counts the Spaces and pinned tabs the import adds and the pinned tabs already in myArc. It also lists links it leaves out and lines it couldn't read. Nothing loads while you import, and each pinned tab opens its page the first time you click it.
+The preview counts the Spaces and pinned tabs the import adds and the pinned tabs already in myArc. It also lists links it leaves out and lines it couldn't read. Nothing loads while you import, and each pinned tab opens its page the first time you click it. When the import finishes, a report counts what was added and each kind of thing it left out or changed.
 
 ## What comes over
 
@@ -403,6 +405,11 @@ These shortcuts work in the current nightly. Standard Chromium shortcuts, such a
 | Ctrl\+Cmd\+N | Opens a blank window | Same |
 | Cmd\+, | Opens Settings | Same |
 | Cmd\+Q | Quits without asking. Settings \> General has a switch to turn on a warning | Same key |
+| Ctrl\+Tab | Switches to your last tab. Hold Ctrl and press Tab again to go further back through the five most recent, and add Shift to go the other way | Same |
+| Ctrl\+Shift\+\= | Opens a Split View next to the current tab | Same |
+| Ctrl\+Shift\+- | Separates a Split View and keeps both tabs | Arc closes the current pane instead |
+| Ctrl\+Shift\+1, Ctrl\+Shift\+2 | Moves focus between the two panes of a Split View | Same |
+| Cmd\+O | Turns a Peek card into a tab | Same |
 
 The command bar is the box for addresses and searches. Inside it, the arrow keys move through suggestions, Enter opens the selected one and Escape closes the bar.
 
@@ -415,8 +422,6 @@ These belong to features myArc doesn't have yet.
 | Shortcut | What it does in Arc |
 | --- | --- |
 | Cmd\+Option\+N | Opens Little Arc, a small window for a quick page |
-| Ctrl\+Shift\+1, Ctrl\+Shift\+2 | Moves focus between the panes of a Split View |
-| Cmd\+O | Turns a Peek preview into a tab |
 
 You can't change shortcuts yet. The Shortcuts tab in Settings is greyed out until it's built.
 
