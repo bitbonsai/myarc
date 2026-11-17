@@ -101,6 +101,11 @@ class WorkspaceService final : public base::SupportsUserData::Data {
   foundation::MutationResult SetSpaceTheme(
       uint64_t space,
       const foundation::SpaceThemeRecord& theme);
+  // Deletes the Space with its Pins and Today tabs; the last Space of the
+  // Profile stays. With `archive`, their pages go to Archived Tabs first.
+  // `id` is the Space its windows show now. The caller confirms first and
+  // closes the deleted items' pages.
+  foundation::MutationResult DeleteSpace(uint64_t space, bool archive);
   foundation::MutationResult CreateWindow(uint64_t space);
   foundation::MutationResult CloseWindow(uint64_t window);
   foundation::MutationResult SelectSpace(uint64_t window, uint64_t space);

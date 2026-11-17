@@ -1,5 +1,5 @@
 diff --git a/chrome/browser/ui/views/frame/browser_view.h b/chrome/browser/ui/views/frame/browser_view.h
-index 750e46c97b64dccccf4268e912df5dbdb6516b3c..773c9b88648a67447e7ef2fbbd522a1269730cc4 100644
+index 750e46c97b64dccccf4268e912df5dbdb6516b3c..e2c4fff96139bdb83d7584483e1c635d3f291128 100644
 --- a/chrome/browser/ui/views/frame/browser_view.h
 +++ b/chrome/browser/ui/views/frame/browser_view.h
 @@ -8,11 +8,13 @@
@@ -126,7 +126,7 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..773c9b88648a67447e7ef2fbbd522a12
    base::WeakPtr<BrowserView> GetAsWeakPtr() {
      return weak_ptr_factory_.GetWeakPtr();
    }
-@@ -1253,12 +1313,237 @@ class BrowserView : public BrowserWindow,
+@@ -1253,12 +1313,242 @@ class BrowserView : public BrowserWindow,
  
    // Anchor point for help bubbles and other dialogs that want to reliably
    // anchor outside the content area of the window.
@@ -236,6 +236,7 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..773c9b88648a67447e7ef2fbbd522a12
 +  static void MyarcProfileSwapTestPoll();
 +  void MyarcPaletteTestQuery(int request, const std::u16string& text);
 +  void RenameSpace(uint64_t space) override;
++  void DeleteSpace(uint64_t space) override;
 +  void MoveSpace(uint64_t space, uint64_t before) override;
 +  void NewTab() override;
 +  void RetryWorkspaceStorage(myarc::SidebarView::StorageRetry retry) override;
@@ -267,6 +268,8 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..773c9b88648a67447e7ef2fbbd522a12
 +  bool AcceptMyarcSpaceDialog(uint64_t space, uint64_t folder, uint64_t item);
 +  // Asks before deleting a folder and its Pins, in the same dialog slot.
 +  void ShowMyarcDeleteFolderDialog(uint64_t folder);
++  // Asks before deleting a Space with its tabs, in the same dialog slot.
++  void ShowMyarcDeleteSpaceDialog(uint64_t space);
 +  void CloseMyarcSpaceDialog();
 +
 +  // Explicit teardown: subscription, dialog, SidebarView (including menu
@@ -319,6 +322,8 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..773c9b88648a67447e7ef2fbbd522a12
 +  bool myarc_capture_library_scheduled_ = false;
 +  // --myarc-capture-create-space opens the Create a Space panel once.
 +  bool myarc_capture_create_space_scheduled_ = false;
++  // --myarc-capture-space runs one Space menu capture once per window.
++  bool myarc_capture_space_scheduled_ = false;
 +  // --myarc-capture-footer-tooltip shows a footer tooltip once per window.
 +  bool myarc_capture_tooltip_scheduled_ = false;
 +  // --myarc-capture-downloads-stack shows the downloads stack once per window.
@@ -364,7 +369,7 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..773c9b88648a67447e7ef2fbbd522a12
  
    // A mapping between accelerators and command IDs.
    std::map<ui::Accelerator, int> accelerator_table_;
-@@ -1411,6 +1696,7 @@ class BrowserView : public BrowserWindow,
+@@ -1411,6 +1701,7 @@ class BrowserView : public BrowserWindow,
    base::EnumSet<TabStripAndWebAppViewsReparentedState>
        tab_strip_web_apps_reparented_state_;
  

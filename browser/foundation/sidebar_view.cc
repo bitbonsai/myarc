@@ -440,6 +440,8 @@ enum ItemCommand {
   kRenameItem,
   kOpenInSplitView,
   kSeparateSplit,
+  kRenameSpace,
+  kDeleteSpace,
   // Move to Folder's entries: this plus the folder's index in folders_.
   kMoveToFolderFirst = 1000
 };
@@ -963,14 +965,21 @@ void SidebarView::ShowContextMenuForViewImpl(
       std::ranges::find(focus_targets_, source, &FocusTarget::view);
   const auto agent = std::ranges::find(spaces_, true, &SpaceEntry::agent);
   if (target != focus_targets_.end() &&
-      target->action == FocusAction::kSpaces && agent != spaces_.end() &&
-      target->id == agent->id && !control_client_.empty()) {
+      target->action == FocusAction::kSpaces) {
+    // A footer Space icon offers the Space's own commands, after Stop while
+    // a control client drives the agent Space.
     menu_item_id_ = 0;
     menu_folder_id_ = 0;
+    menu_space_id_ = target->id;
     menu_runner_.reset();
     menu_model_ = std::make_unique<ui::SimpleMenuModel>(this);
     folder_menu_model_.reset();
-    menu_model_->AddItem(kStopControl, u"Stop " + control_client_);
+    if (agent != spaces_.end() && target->id == agent->id &&
+        !control_client_.empty()) {
+      menu_model_->AddItem(kStopControl, u"Stop " + control_client_);
+      menu_model_->AddSeparator(ui::NORMAL_SEPARATOR);
+    }
+    AddSpaceCommands(/*folder=*/false);
     RunMenu(point, source_type);
     return;
   }
@@ -990,7 +999,7 @@ void SidebarView::ShowContextMenuForViewImpl(
       menu_model_->AddSeparator(ui::NORMAL_SEPARATOR);
       menu_model_->AddItem(kDeleteFolder, u"Delete Folder\u2026");
     } else {
-      menu_model_->AddItem(kNewFolder, u"New Folder");
+      AddSpaceCommands(/*folder=*/true);
     }
     RunMenu(point, source_type);
     return;
@@ -1063,6 +1072,20 @@ void SidebarView::ShowContextMenuForViewImpl(
                                                      : u"Remove Favorite");
   }
   RunMenu(point, source_type);
+}
+
+void SidebarView::AddSpaceCommands(bool folder) {
+  // Arc's Space menu: renaming first, removal last behind a separator. The
+  // last Space of the Profile can't go, so its Delete is disabled.
+  menu_model_->AddItem(kRenameSpace, u"Rename Space\u2026");
+  if (folder) {
+    menu_model_->AddSeparator(ui::NORMAL_SEPARATOR);
+    menu_model_->AddItem(kNewFolder, u"New Folder");
+  }
+  menu_model_->AddSeparator(ui::NORMAL_SEPARATOR);
+  menu_model_->AddItem(kDeleteSpace, u"Delete Space\u2026");
+  menu_model_->SetEnabledAt(menu_model_->GetItemCount() - 1,
+                            spaces_.size() > 1);
 }
 
 void SidebarView::RunMenu(const gfx::Point& point,
@@ -1427,6 +1450,18 @@ void SidebarView::ExecuteCommand(int command_id, int event_flags) {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
   if (command_id == kStopControl) {
     StopControl();
+    return;
+  }
+  if (command_id == kRenameSpace || command_id == kDeleteSpace) {
+    const uint64_t space = std::exchange(menu_space_id_, 0);
+    if (!space) {
+      return;
+    }
+    if (command_id == kRenameSpace) {
+      delegate_->RenameSpace(space);
+    } else {
+      delegate_->DeleteSpace(space);
+    }
     return;
   }
   if (command_id == kNewFolder) {
@@ -2181,7 +2216,7 @@ void SidebarView::SetModel(const foundation::SidebarResult& model,
   // which is how a Pin leaves a folder when no Pin tiles show.
   drop_zones_.push_back(
       {.view = heading.get(), .kind = foundation::DropTargetKind::Pins});
-  // Its menu makes a folder.
+  // Its menu holds the Space's commands and makes a folder.
   heading->set_context_menu_controller(this);
   if (agent && !control_client_.empty()) {
     // While a control client is active, a Stop button follows the title.
@@ -2565,11 +2600,10 @@ void SidebarView::BuildFooter(const gfx::PointF& spaces_offset,
     choice->GetViewAccessibility().SetName(
         (agent ? u"Agent Space: " : u"Space: ") + space_name +
         (controlled ? u", " + control_client_ + u" is controlling it" : u""));
-    if (controlled) {
-      // Right-click offers Stop; a click still selects the Space.
-      choice->set_context_menu_controller(this);
-      choice->GetViewAccessibility().SetHasPopup(ax::mojom::HasPopup::kMenu);
-    }
+    // Right-click offers the Space menu, and Stop while it is controlled; a
+    // click still selects the Space.
+    choice->set_context_menu_controller(this);
+    choice->GetViewAccessibility().SetHasPopup(ax::mojom::HasPopup::kMenu);
     choice->GetViewAccessibility().SetRole(ax::mojom::Role::kToggleButton);
     choice->GetViewAccessibility().SetCheckedState(
         current ? ax::mojom::CheckedState::kTrue
@@ -2681,6 +2715,33 @@ std::u16string SidebarView::GetCreateTooltipForTesting() const {
              : static_cast<FooterButton*>(target->view.get())
                    ->footer_tooltip()
                    .label;
+}
+
+void SidebarView::OpenSpaceMenuForCapture(bool footer, int tries) {
+  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
+  if (tries <= 0) {
+    return;
+  }
+  // As with the item menu, a background app's menu closes on input
+  // elsewhere, so reopen it until the capture has had its chance.
+  if (!menu_runner_ || !menu_runner_->IsRunning()) {
+    const FocusAction action =
+        footer ? FocusAction::kSpaces : FocusAction::kRename;
+    for (const auto& focus : focus_targets_) {
+      if (focus.action == action && focus.id == current_space_id_ &&
+          focus.view) {
+        focus.view->ShowContextMenu(
+            focus.view->GetBoundsInScreen().CenterPoint(),
+            ui::mojom::MenuSourceType::kMouse);
+        break;
+      }
+    }
+  }
+  base::SequencedTaskRunner::GetCurrentDefault()->PostDelayedTask(
+      FROM_HERE,
+      base::BindOnce(&SidebarView::OpenSpaceMenuForCapture,
+                     weak_factory_.GetWeakPtr(), footer, tries - 1),
+      base::Milliseconds(300));
 }
 
 void SidebarView::ShowFooterTooltipForCapture(std::string_view target) {

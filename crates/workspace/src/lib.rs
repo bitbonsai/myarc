@@ -325,6 +325,8 @@ pub struct SpaceDeletion {
     pub fallback_space: SpaceId,
     /// Temporary and Pin items the deleted Space owned, in vector order.
     pub removed_items: Vec<ItemId>,
+    /// How many of them went to Archived Tabs.
+    pub archived: usize,
     /// Windows moved to `fallback_space`, in vector order.
     pub moved_windows: Vec<WindowId>,
 }
@@ -607,9 +609,16 @@ impl Workspace {
     /// can go except the last of its Profile. Favorites are Profile-scoped and
     /// stay. Windows showing it move to the previous Space in vector order, or the
     /// next one when it was first; a selection hidden by the move is cleared.
+    /// With `archive_at`, the caller's wall-clock seconds, each removed item with
+    /// a page to reopen goes to Archived Tabs first, as a deleted folder's Pins
+    /// do; pass `None` for Profiles that save no history.
     /// Atomic: every check runs before mutation. The caller confirms with the user
     /// first and closes live pages for `removed_items`. IDs are never reused.
-    pub fn delete_space(&mut self, space_id: SpaceId) -> Result<SpaceDeletion, WorkspaceError> {
+    pub fn delete_space(
+        &mut self,
+        space_id: SpaceId,
+        archive_at: Option<u64>,
+    ) -> Result<SpaceDeletion, WorkspaceError> {
         let profile_id = self.space(space_id)?.profile_id;
         let siblings: Vec<SpaceId> = self
             .state
@@ -636,13 +645,16 @@ impl Workspace {
                     if owner == space_id
             )
         };
-        let removed_items = self
+        let removed_items: Vec<ItemId> = self
             .state
             .items
             .iter()
             .filter(|item| owned(item.placement))
             .map(|item| item.id)
             .collect();
+        let archived = archive_at.map_or(0, |now_secs| {
+            self.archive_item_pages(&removed_items, space_id, now_secs)
+        });
         let mut moved_windows = Vec::new();
         for window in &mut self.state.windows {
             if window.space_id == space_id {
@@ -659,6 +671,7 @@ impl Workspace {
         Ok(SpaceDeletion {
             fallback_space,
             removed_items,
+            archived,
             moved_windows,
         })
     }
@@ -1526,7 +1539,7 @@ mod tests {
         workspace.rename_space(second, "Study").unwrap();
         assert_eq!(workspace.space_name_of(second), Some("Study"));
         assert_eq!(workspace.space_name(), "Everyday");
-        workspace.delete_space(TEST_SPACE_ID).unwrap();
+        workspace.delete_space(TEST_SPACE_ID, None).unwrap();
         workspace.rename_space(second, "Work").unwrap();
         assert_eq!(workspace.space_name_of(second), Some("Work"));
         assert_eq!(workspace.space_name_of(TEST_SPACE_ID), None);
@@ -1716,7 +1729,7 @@ mod tests {
         let owned_pin = pin(&mut workspace, s2);
         let owned_temporary = workspace.add_temporary_item(s2).unwrap();
         let other = pin(&mut workspace, s3);
-        let deletion = workspace.delete_space(s2).unwrap();
+        let deletion = workspace.delete_space(s2, None).unwrap();
         assert_eq!(deletion.removed_items, vec![owned_pin, owned_temporary]);
         assert_eq!(deletion.fallback_space, DEFAULT_SPACE_ID);
         let state = workspace.snapshot();
@@ -1731,13 +1744,59 @@ mod tests {
     }
 
     #[test]
+    fn delete_space_archives_its_pages_when_asked() {
+        let mut workspace = Workspace::default();
+        let s2 = workspace.create_space(DEFAULT_PROFILE_ID, "Two").unwrap();
+        let owned_pin = pin(&mut workspace, s2);
+        let visited = workspace.add_temporary_item(s2).unwrap();
+        workspace
+            .set_temporary_page(visited, URL_B, "Visited")
+            .unwrap();
+        let blank = workspace.add_temporary_item(s2).unwrap();
+        let kept = pin(&mut workspace, DEFAULT_SPACE_ID);
+        let deletion = workspace.delete_space(s2, Some(100)).unwrap();
+        assert_eq!(deletion.removed_items, vec![owned_pin, visited, blank]);
+        assert_eq!(deletion.archived, 2);
+        let archived = workspace.archived_tabs(100);
+        let pages: Vec<(ItemId, SpaceId, &str)> = archived
+            .iter()
+            .map(|tab| (tab.id, tab.space_id, tab.url.as_str()))
+            .collect();
+        assert_eq!(pages, vec![(visited, s2, URL_B), (owned_pin, s2, URL_A)]);
+        assert_eq!(archived[0].title, "Visited");
+        let ids: Vec<ItemId> = workspace
+            .snapshot()
+            .items
+            .iter()
+            .map(|item| item.id)
+            .collect();
+        assert_eq!(ids, vec![kept]);
+    }
+
+    #[test]
+    fn delete_space_without_archive_or_on_failure_archives_nothing() {
+        let mut workspace = Workspace::default();
+        let s2 = workspace.create_space(DEFAULT_PROFILE_ID, "Two").unwrap();
+        pin(&mut workspace, s2);
+        let only = pin(&mut workspace, DEFAULT_SPACE_ID);
+        assert_eq!(workspace.delete_space(s2, None).unwrap().archived, 0);
+        assert!(workspace.archived_tabs(100).is_empty());
+        assert_eq!(
+            workspace.delete_space(DEFAULT_SPACE_ID, Some(100)),
+            Err(WorkspaceError::LastSpaceInProfile(DEFAULT_SPACE_ID))
+        );
+        assert!(workspace.archived_tabs(100).is_empty());
+        assert!(workspace.item(only).is_ok());
+    }
+
+    #[test]
     fn delete_space_picks_previous_then_next_neighbor() {
         let mut workspace = Workspace::default();
         let s2 = workspace.create_space(DEFAULT_PROFILE_ID, "Two").unwrap();
         let s3 = workspace.create_space(DEFAULT_PROFILE_ID, "Three").unwrap();
-        assert_eq!(workspace.delete_space(s3).unwrap().fallback_space, s2);
+        assert_eq!(workspace.delete_space(s3, None).unwrap().fallback_space, s2);
         assert_eq!(
-            workspace.delete_space(s2).unwrap().fallback_space,
+            workspace.delete_space(s2, None).unwrap().fallback_space,
             DEFAULT_SPACE_ID
         );
     }
@@ -1746,7 +1805,7 @@ mod tests {
     fn delete_space_one_when_others_exist_renames_legacy_view() {
         let mut workspace = Workspace::default();
         let s2 = workspace.create_space(DEFAULT_PROFILE_ID, "Two").unwrap();
-        let deletion = workspace.delete_space(DEFAULT_SPACE_ID).unwrap();
+        let deletion = workspace.delete_space(DEFAULT_SPACE_ID, None).unwrap();
         assert_eq!(deletion.fallback_space, s2);
         assert_eq!(workspace.space_name(), "Two");
         assert_eq!(
@@ -1941,7 +2000,7 @@ mod tests {
         };
         let created_and_deleted = |workspace: &mut Workspace| {
             let extra = workspace.create_space(DEFAULT_PROFILE_ID, "Extra").unwrap();
-            workspace.delete_space(extra).unwrap();
+            workspace.delete_space(extra, None).unwrap();
         };
         let touches: [&dyn Fn(&mut Workspace); 5] =
             [&renamed, &iconed, &themed, &with_item, &created_and_deleted];
@@ -2017,14 +2076,14 @@ mod tests {
     fn delete_space_rejects_without_mutation() {
         let mut workspace = Workspace::default();
         assert_eq!(
-            workspace.delete_space(DEFAULT_SPACE_ID),
+            workspace.delete_space(DEFAULT_SPACE_ID, None),
             Err(WorkspaceError::LastSpaceInProfile(DEFAULT_SPACE_ID))
         );
         let s2 = workspace.create_space(DEFAULT_PROFILE_ID, "Two").unwrap();
         pin(&mut workspace, s2);
         let before = workspace.snapshot();
         assert_eq!(
-            workspace.delete_space(99),
+            workspace.delete_space(99, None),
             Err(WorkspaceError::UnknownSpace(99))
         );
         assert_eq!(workspace.snapshot(), before);

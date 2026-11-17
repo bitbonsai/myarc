@@ -552,7 +552,7 @@ bool CheckDeleteFirstSpace() {
       !select_item(*model, 1, item.id).ok) {
     return false;
   }
-  auto deleted = delete_space(*model, 1);
+  auto deleted = delete_space(*model, 1, false, 0);
   auto sidebar = sidebar_snapshot(*model, 1);
   if (!deleted.ok || deleted.id != space.id || !sidebar.ok ||
       sidebar.current_space.id != space.id || sidebar.spaces.size() != 1 ||
@@ -567,7 +567,7 @@ bool CheckDeleteFirstSpace() {
       rename_space(*model, 1, "Gone").ok) {
     return false;
   }
-  auto last = delete_space(*model, space.id);
+  auto last = delete_space(*model, space.id, false, 0);
   return !last.ok && !last.error.empty() &&
          sidebar_snapshot(*model, 1).current_space.id == space.id;
 }

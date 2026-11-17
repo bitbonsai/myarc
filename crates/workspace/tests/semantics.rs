@@ -1288,7 +1288,7 @@ fn delete_space_moves_windows_keeps_favorites_and_round_trips() {
     workspace.select_item(w3, doomed).unwrap();
     workspace.select_item(w4, doomed_temporary).unwrap_err();
 
-    let deletion = workspace.delete_space(s2).unwrap();
+    let deletion = workspace.delete_space(s2, None).unwrap();
     assert_eq!(deletion.fallback_space, S1);
     assert_eq!(deletion.removed_items, vec![doomed, doomed_temporary]);
     assert_eq!(deletion.moved_windows, vec![w2, w3]);
@@ -1333,20 +1333,20 @@ fn delete_space_rejects_unknown_and_last_without_mutation() {
     let mut workspace = Workspace::default();
     unchanged(
         &mut workspace,
-        |w| w.delete_space(S1),
+        |w| w.delete_space(S1, None),
         WorkspaceError::LastSpaceInProfile(S1),
     );
     let s2 = workspace.create_space(P1, "Two").unwrap();
     pin(&mut workspace, s2);
     unchanged(
         &mut workspace,
-        |w| w.delete_space(999),
+        |w| w.delete_space(999, None),
         WorkspaceError::UnknownSpace(999),
     );
-    workspace.delete_space(s2).unwrap();
+    workspace.delete_space(s2, None).unwrap();
     unchanged(
         &mut workspace,
-        |w| w.delete_space(S1),
+        |w| w.delete_space(S1, None),
         WorkspaceError::LastSpaceInProfile(S1),
     );
 }
@@ -1365,7 +1365,7 @@ fn delete_space_one_when_others_exist_then_last_is_protected() {
     let w2 = workspace.create_window(s3).unwrap();
     workspace.select_item(W1, doomed).unwrap();
 
-    let deletion = workspace.delete_space(S1).unwrap();
+    let deletion = workspace.delete_space(S1, None).unwrap();
     assert_eq!(deletion.fallback_space, s2);
     assert_eq!(deletion.removed_items, vec![doomed]);
     assert_eq!(deletion.moved_windows, vec![W1]);
@@ -1381,10 +1381,10 @@ fn delete_space_one_when_others_exist_then_last_is_protected() {
         workspace
     );
 
-    workspace.delete_space(s2).unwrap();
+    workspace.delete_space(s2, None).unwrap();
     unchanged(
         &mut workspace,
-        |w| w.delete_space(s3),
+        |w| w.delete_space(s3, None),
         WorkspaceError::LastSpaceInProfile(s3),
     );
     assert_eq!(workspace.create_space(P1, "Four"), Ok(s3 + 1));
@@ -1395,7 +1395,7 @@ fn delete_space_with_zero_windows_still_works() {
     let mut workspace = Workspace::default();
     let s2 = workspace.create_space(P1, "Two").unwrap();
     workspace.close_window(W1).unwrap();
-    let deletion = workspace.delete_space(s2).unwrap();
+    let deletion = workspace.delete_space(s2, None).unwrap();
     assert!(deletion.moved_windows.is_empty());
     assert!(Workspace::from_snapshot(workspace.snapshot()).is_ok());
 }
@@ -1539,7 +1539,7 @@ fn deleting_the_agent_space_clears_the_mark() {
     let mut workspace = Workspace::default();
     let agent = workspace.ensure_agent_space(P1).unwrap();
     workspace.select_space(W1, agent).unwrap();
-    let deletion = workspace.delete_space(agent).unwrap();
+    let deletion = workspace.delete_space(agent, None).unwrap();
     assert_eq!(deletion.fallback_space, S1);
     assert_eq!(workspace.agent_space_of(P1), None);
     assert!(workspace.snapshot().spaces.iter().all(|space| !space.agent));

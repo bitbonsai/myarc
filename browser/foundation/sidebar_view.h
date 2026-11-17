@@ -201,6 +201,10 @@ class SidebarView final : public views::View,
     // The panel closed; the parent supplies the rows' model with SetModel.
     virtual void CreateSpacePanelClosed() = 0;
     virtual void RenameSpace(uint64_t space_id) = 0;
+    // Delete Space…: the parent asks for confirmation, then deletes the Space
+    // of this Profile, closes its pages and reports errors. The last Space
+    // stays.
+    virtual void DeleteSpace(uint64_t space_id) = 0;
     // Places `space_id` before `before_id` (0 = last) in the Space order
     // the footer, Ctrl+1..9 and the Library share. The parent reports errors.
     virtual void MoveSpace(uint64_t space_id, uint64_t before_id) = 0;
@@ -287,6 +291,10 @@ class SidebarView final : public views::View,
   // Shows the footer tooltip of "library", "space" (the current one) or
   // "create" without hover and keeps it up, for background captures.
   void ShowFooterTooltipForCapture(std::string_view target);
+  // Opens the current Space's menu from its title, or with `footer` from its
+  // footer icon, and reopens it for `tries` beats of 300 ms, for background
+  // captures.
+  void OpenSpaceMenuForCapture(bool footer, int tries);
   // Reloads the downloads stack above the Library button while it shows.
   void RefreshDownloadsStack();
   // Shows the downloads stack without hover and keeps it up, for captures.
@@ -443,6 +451,8 @@ class SidebarView final : public views::View,
                                          uint64_t selected);
   // A folder's row, which opens or closes it.
   std::unique_ptr<views::View> MakeFolder(const foundation::FolderRecord& folder);
+  // The Space menu of menu_space_id_, with New Folder on the Space title.
+  void AddSpaceCommands(bool folder);
   // Runs the menu built in `menu_model_` at `point`.
   void RunMenu(const gfx::Point& point, ui::mojom::MenuSourceType source_type);
   // The divider above Today, with Clear closing `today`.

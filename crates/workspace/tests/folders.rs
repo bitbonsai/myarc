@@ -208,7 +208,7 @@ fn deleting_a_space_deletes_its_folders() {
     let work = workspace.create_space(P1, "Work").unwrap();
     let gone = workspace.create_folder(work, "Gone").unwrap();
     let stays = workspace.create_folder(S1, "Stays").unwrap();
-    workspace.delete_space(work).unwrap();
+    workspace.delete_space(work, None).unwrap();
     assert_eq!(workspace.folders().len(), 1);
     assert_eq!(workspace.folders()[0].id, stays);
     assert_eq!(

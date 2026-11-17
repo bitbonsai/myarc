@@ -20,6 +20,9 @@
 #   opens its icon picker on that tab and keeps it up; CREATE_SPACE=profile
 #   opens the Profile menu, CREATE_SPACE=profile-new the Profile name field
 #   and CREATE_SPACE=theme the theme popover with pink picked at 60%.
+#   SPACE=menu (or footer-menu) opens the current Space's menu from its title
+#   (or footer icon) via --myarc-capture-space; SPACE=delete asks to delete the
+#   current Space, and SPACE=delete-now deletes it and opens Archived Tabs.
 #   STACK=1 shows the downloads stack above the Library button via
 #   --myarc-capture-downloads-stack and keeps it up. file:// URLs of files
 #   Chromium can't show download and seed the stack.
@@ -98,6 +101,7 @@ if [ "${1:-}" = "--inner" ]; then
   [ -n "${STACK:-}" ] && EXTRA+=(--myarc-capture-downloads-stack)
   [ -n "${MENU:-}" ] && EXTRA+=(--myarc-capture-create-menu)
   [ -n "${ITEM_MENU:-}" ] && EXTRA+=(--myarc-capture-item-menu)
+  [ -n "${SPACE:-}" ] && EXTRA+=(--myarc-capture-space="$SPACE")
   case "${CREATE_SPACE:-}" in
     '') ;;
     emoji | icon | profile | profile-new | theme) EXTRA+=(--myarc-capture-create-space="$CREATE_SPACE") ;;

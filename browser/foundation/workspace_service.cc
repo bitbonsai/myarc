@@ -1151,6 +1151,15 @@ foundation::MutationResult WorkspaceService::MovePinToFolder(uint64_t item,
       foundation::move_pin_to_folder(*workspace_, item, folder, before));
 }
 
+foundation::MutationResult WorkspaceService::DeleteSpace(uint64_t space,
+                                                         bool archive) {
+  if (!CanMutate())
+    return Failure("Workspace is not loaded. Check storage state.");
+  // Private browsing keeps no history, so it archives nothing.
+  return SpacesChanged(foundation::delete_space(
+      *workspace_, space, archive && !ephemeral_, NowSecs()));
+}
+
 foundation::MutationResult WorkspaceService::DeleteFolder(uint64_t folder,
                                                           bool archive) {
   if (!CanMutate())

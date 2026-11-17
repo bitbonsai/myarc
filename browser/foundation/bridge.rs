@@ -578,8 +578,14 @@ mod ffi {
             current_url: &str,
         ) -> MutationResult;
         // `id` is the Space that windows showing the deleted one now show. The caller
-        // confirms first and closes live pages of the deleted Space's items.
-        fn delete_space(workspace: &mut Workspace, space_id: u64) -> MutationResult;
+        // confirms first and closes live pages of the deleted Space's items. With
+        // `archive`, its pages go to Archived Tabs at `now_secs` first.
+        fn delete_space(
+            workspace: &mut Workspace,
+            space_id: u64,
+            archive: bool,
+            now_secs: u64,
+        ) -> MutationResult;
         fn reveal_item(workspace: &mut Workspace, window_id: u64, item_id: u64) -> MutationResult;
         // Selects the item now when the window shows its Space, else when the
         // window next selects that Space.
@@ -1468,11 +1474,16 @@ pub fn differs_from_canonical(
     )
 }
 
-pub fn delete_space(workspace: &mut Workspace, space_id: u64) -> ffi::MutationResult {
+pub fn delete_space(
+    workspace: &mut Workspace,
+    space_id: u64,
+    archive: bool,
+    now_secs: u64,
+) -> ffi::MutationResult {
     outcome(
         workspace
             .0
-            .delete_space(space_id)
+            .delete_space(space_id, archive.then_some(now_secs))
             .map(|deletion| deletion.fallback_space),
     )
 }

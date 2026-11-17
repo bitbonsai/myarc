@@ -79,6 +79,7 @@ enum Command {
   kRenameSpace,
   kMoveSpaceLeft,
   kMoveSpaceRight,
+  kDeleteSpace,
 };
 
 // The other cards slide aside this fast while a card is dragged.
@@ -1282,7 +1283,7 @@ void LibraryView::ShowSpaceMenu(uint64_t space,
   if (!anchor || !GetWidget() || (menu_runner_ && menu_runner_->IsRunning())) {
     return;
   }
-  // Rename and switching are the Space actions the sidebar has too.
+  // Rename, switching and Delete are the Space actions the sidebar has too.
   menu_space_ = space;
   menu_runner_.reset();
   menu_model_ = std::make_unique<ui::SimpleMenuModel>(this);
@@ -1299,6 +1300,11 @@ void LibraryView::ShowSpaceMenu(uint64_t space,
   if (it != spaces_.end() && std::next(it) != spaces_.end()) {
     menu_model_->AddItem(kMoveSpaceRight, u"Move Right");
   }
+  // As in the sidebar, the last Space can't be deleted.
+  menu_model_->AddSeparator(ui::NORMAL_SEPARATOR);
+  menu_model_->AddItem(kDeleteSpace, u"Delete Space\u2026");
+  menu_model_->SetEnabledAt(menu_model_->GetItemCount() - 1,
+                            spaces_.size() > 1);
   menu_runner_ =
       std::make_unique<views::MenuRunner>(menu_model_.get(), /*run_types=*/0);
   menu_runner_->RunMenuAt(GetWidget(), nullptr, anchor->GetBoundsInScreen(),
@@ -1342,6 +1348,13 @@ void LibraryView::ExecuteCommand(int command_id, int event_flags) {
       break;
     case kRenameSpace:
       PostAction(base::BindOnce(&SidebarView::Delegate::RenameSpace,
+                                base::Unretained(&delegate_.get()),
+                                menu_space_));
+      break;
+    case kDeleteSpace:
+      // The confirmation runs first; the Library stays open and rebuilds
+      // its cards once the Space is gone.
+      PostAction(base::BindOnce(&SidebarView::Delegate::DeleteSpace,
                                 base::Unretained(&delegate_.get()),
                                 menu_space_));
       break;

@@ -279,6 +279,41 @@ impl Workspace {
         Ok(true)
     }
 
+    /// Puts the remembered page of each of `items` in Archived Tabs at
+    /// `now_secs`, under `space_id`, before a deletion takes the items. Items
+    /// without an HTTP(S) page, and unknown IDs, are skipped. Returns how many
+    /// went in. The oldest entries make room past `MAX_ARCHIVED_TABS`.
+    pub(crate) fn archive_item_pages(
+        &mut self,
+        items: &[ItemId],
+        space_id: crate::SpaceId,
+        now_secs: u64,
+    ) -> usize {
+        self.prune_archived_tabs(now_secs);
+        let mut archived = 0;
+        for &item_id in items {
+            let Ok(item) = self.item(item_id) else {
+                continue;
+            };
+            let Some(url) = item.canonical_url.clone().filter(|url| archivable(url)) else {
+                continue;
+            };
+            let title = item.title.clone();
+            if self.state.archived.len() >= MAX_ARCHIVED_TABS {
+                self.state.archived.remove(0);
+            }
+            self.state.archived.push(ArchivedTab {
+                id: item_id,
+                space_id,
+                url,
+                title,
+                archived_secs: now_secs,
+            });
+            archived += 1;
+        }
+        archived
+    }
+
     /// Unexpired Archived Tabs at `now_secs`, newest first by close time. Ties,
     /// and entries from a clock that moved backwards, keep the newest-added first.
     pub fn archived_tabs(&self, now_secs: u64) -> Vec<ArchivedTab> {

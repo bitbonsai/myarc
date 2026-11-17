@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cstdlib>
 #include <memory>
+#include <ranges>
 #include <set>
 #include <utility>
 #include <vector>
@@ -273,6 +274,11 @@ class Binding final : public base::SupportsUserData::Data,
   void Adopted() { legacy_ = false; }
   // Arc archives tabs closed one by one, not the tabs of a closing window.
   void SkipArchive() { archive_ = false; }
+  // The item is gone from the workspace, so closing the page records nothing.
+  void Forget() {
+    item_ = 0;
+    ForProfile(*profile_).pages.erase(web_contents());
+  }
   void DidStopLoading() override;
   void WebContentsDestroyed() override {
     auto& runtime = ForProfile(*profile_);
@@ -2154,6 +2160,73 @@ foundation::MutationResult BrowserWorkspaceAdapter::SetSpaceTheme(
   return Remember(ready() ? service_->SetSpaceTheme(space, theme)
                           : Fail(error()));
 }
+foundation::MutationResult BrowserWorkspaceAdapter::DeleteSpace(
+    uint64_t space) {
+  if (!ready())
+    return Fail(error());
+  auto state = service_->ExportSnapshot();
+  if (!state)
+    return Fail(error());
+  std::set<uint64_t> owned;
+  for (const auto& row : state->items) {
+    if (row.owner_id == space &&
+        row.placement != foundation::PlacementKind::Favorite) {
+      owned.insert(row.id);
+    }
+  }
+  const bool archive =
+      !profile_->GetPrefs()->GetBoolean(prefs::kSavingBrowserHistoryDisabled);
+  auto result = Remember(service_->DeleteSpace(space, archive));
+  if (!result.ok)
+    return result;
+  // Rust archived the pages it remembers, so the pages close without
+  // archiving again or adding to the recently closed list.
+  auto& runtime = ForProfile(*profile_);
+  std::vector<base::WeakPtr<content::WebContents>> pages;
+  std::set<content::WebContents*> doomed;
+  for (const auto& [page, item] : runtime.pages) {
+    if (owned.contains(item)) {
+      pages.push_back(page->GetWeakPtr());
+      doomed.insert(page);
+    }
+  }
+  // A window whose every tab closes would close too. It now shows the
+  // neighbor Space, so it opens that Space's selected or first row first,
+  // or a new tab when the Space is empty.
+  for (const auto& adapter : runtime.adapters) {
+    if (!adapter->tabs_ || !adapter->ready() ||
+        std::ranges::any_of(
+            std::views::iota(0, adapter->tabs_->count()), [&](int i) {
+              return !doomed.contains(adapter->tabs_->GetWebContentsAt(i));
+            })) {
+      continue;
+    }
+    const auto sidebar = adapter->Sidebar();
+    uint64_t row = sidebar.ok ? sidebar.selected_item_id : 0;
+    for (const auto* section :
+         {&sidebar.pins, &sidebar.temporary, &sidebar.favorites}) {
+      if (!row && !section->empty())
+        row = section->front().id;
+    }
+    if (!row || !adapter->ActivateItem(row).ok)
+      adapter->OpenInCurrentSpace(GURL("chrome://newtab/"));
+  }
+  for (const auto& page : pages) {
+    if (!page)
+      continue;
+    if (auto* binding = Binding::Get(*page))
+      binding->Forget();
+    for (const auto& adapter : runtime.adapters) {
+      if (adapter->tabs_ &&
+          adapter->tabs_->GetIndexOfWebContents(page.get()) >= 0) {
+        adapter->tabs_->CloseWebContents(page.get(), CLOSE_NONE);
+        break;
+      }
+    }
+  }
+  return result;
+}
+
 foundation::MutationResult BrowserWorkspaceAdapter::SelectSpace(
     uint64_t space) {
   if (!ready())

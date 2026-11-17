@@ -174,6 +174,10 @@ class BrowserWorkspaceAdapter final : public TabStripModelObserver {
       uint64_t space,
       const foundation::SpaceThemeRecord& theme);
   foundation::MutationResult SelectSpace(uint64_t space);
+  // Deletes a Space of this Profile and closes its pages in every window.
+  // Its Pins and Today tabs go to Archived Tabs unless the Profile saves no
+  // history. Windows showing it move to a neighbor; the last Space stays.
+  foundation::MutationResult DeleteSpace(uint64_t space);
   // Runs a browser control request against this window's workspace, and
   // shows the newly selected Space when the request changed it. Tab commands
   // run in this window and may answer later.

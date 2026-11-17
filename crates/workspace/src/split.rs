@@ -415,7 +415,7 @@ mod tests {
         let left = workspace.add_temporary_item(other).unwrap();
         let right = workspace.add_temporary_item(other).unwrap();
         workspace.create_split(left, right).unwrap();
-        workspace.delete_space(other).unwrap();
+        workspace.delete_space(other, None).unwrap();
         assert!(workspace.splits().is_empty());
     }
 
