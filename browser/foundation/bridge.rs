@@ -98,6 +98,47 @@ mod ffi {
         workspace_ready: bool,
     }
 
+    // A command bar action (command_bar.rs). SwitchSpace carries the Space.
+    enum CommandActionKind {
+        PinTab,
+        UnpinTab,
+        NewSpace,
+        ArchiveTab,
+        CopyUrl,
+        SplitView,
+        SwitchSpace,
+        ResetTab,
+        ReplacePinnedUrl,
+    }
+
+    // What the window's selected row is when the bar opens.
+    enum CommandSelected {
+        Nothing,
+        Today,
+        Pin,
+        Favorite,
+    }
+
+    struct CommandBarContext {
+        selected: CommandSelected,
+        has_page: bool,
+        in_split: bool,
+        navigated_away: bool,
+        current_space: u64,
+    }
+
+    // A Space of the window's Profile, in footer order.
+    struct CommandBarSpace {
+        id: u64,
+        name: String,
+    }
+
+    struct CommandOffer {
+        kind: CommandActionKind,
+        space: u64,
+        title: String,
+    }
+
     // Where a dragged sidebar row lands.
     enum DropTargetKind {
         // The ungrouped Pins.
@@ -781,6 +822,13 @@ mod ffi {
             peek_enabled: bool,
         ) -> PeekRoute;
         fn peek_action(trigger: PeekTrigger) -> PeekActionKind;
+        // The actions the command bar offers for `query`, closest first.
+        // A leading "/" lists every action that applies.
+        fn command_bar_offers(
+            query: &str,
+            context: &CommandBarContext,
+            spaces: &[CommandBarSpace],
+        ) -> Vec<CommandOffer>;
         // Where a link another app opened goes. `url` is the canonical spec
         // and `open_little_arcs` what each Little Arc shows, most recently
         // used first.
@@ -1119,6 +1167,51 @@ pub fn bridge_limits() -> ffi::BridgeLimits {
         folders: workspace::MAX_FOLDERS,
         splits: workspace::MAX_SPLITS,
     }
+}
+
+pub fn command_bar_offers(
+    query: &str,
+    context: &ffi::CommandBarContext,
+    spaces: &[ffi::CommandBarSpace],
+) -> Vec<ffi::CommandOffer> {
+    use workspace::command_bar::{Action, Context, Selected};
+    let selected = match context.selected {
+        ffi::CommandSelected::Today => Selected::Today,
+        ffi::CommandSelected::Pin => Selected::Pin,
+        ffi::CommandSelected::Favorite => Selected::Favorite,
+        _ => Selected::Nothing,
+    };
+    let context_rule = Context {
+        selected,
+        has_page: context.has_page,
+        in_split: context.in_split,
+        navigated_away: context.navigated_away,
+    };
+    let names: Vec<(u64, &str)> = spaces
+        .iter()
+        .map(|space| (space.id, space.name.as_str()))
+        .collect();
+    workspace::command_bar::offers(query, &context_rule, &names, context.current_space)
+        .into_iter()
+        .map(|offer| {
+            let (kind, space) = match offer.action {
+                Action::PinTab => (ffi::CommandActionKind::PinTab, 0),
+                Action::UnpinTab => (ffi::CommandActionKind::UnpinTab, 0),
+                Action::NewSpace => (ffi::CommandActionKind::NewSpace, 0),
+                Action::ArchiveTab => (ffi::CommandActionKind::ArchiveTab, 0),
+                Action::CopyUrl => (ffi::CommandActionKind::CopyUrl, 0),
+                Action::SplitView => (ffi::CommandActionKind::SplitView, 0),
+                Action::SwitchSpace(id) => (ffi::CommandActionKind::SwitchSpace, id),
+                Action::ResetTab => (ffi::CommandActionKind::ResetTab, 0),
+                Action::ReplacePinnedUrl => (ffi::CommandActionKind::ReplacePinnedUrl, 0),
+            };
+            ffi::CommandOffer {
+                kind,
+                space,
+                title: offer.title,
+            }
+        })
+        .collect()
 }
 
 fn outcome<E: std::fmt::Display>(result: Result<u64, E>) -> ffi::MutationResult {

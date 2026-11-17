@@ -1,5 +1,5 @@
 diff --git a/chrome/browser/ui/views/frame/browser_view.h b/chrome/browser/ui/views/frame/browser_view.h
-index 750e46c97b64dccccf4268e912df5dbdb6516b3c..62338e93978c82b7fb8cd8f75365974bcbfe098d 100644
+index 750e46c97b64dccccf4268e912df5dbdb6516b3c..9c40a52b8375440ae6d0fde08e6dde2d62a47f51 100644
 --- a/chrome/browser/ui/views/frame/browser_view.h
 +++ b/chrome/browser/ui/views/frame/browser_view.h
 @@ -8,11 +8,13 @@
@@ -32,7 +32,7 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..62338e93978c82b7fb8cd8f75365974b
  class ScrimView;
  class SidePanel;
  class SidePanelAnimationContentView;
-@@ -104,6 +108,18 @@ class TopControlsSlideControllerTest;
+@@ -104,6 +108,19 @@ class TopControlsSlideControllerTest;
  class VerticalTabStripRegionView;
  class WebAppFrameToolbarView;
  
@@ -45,13 +45,14 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..62338e93978c82b7fb8cd8f75365974b
 +class SettingsWindow;
 +namespace foundation {
 +struct MutationResult;
++enum class CommandActionKind : std::uint8_t;
 +}
 +}  // namespace myarc
 +
  namespace gfx {
  class AnimationRunner;
  }  // namespace gfx
-@@ -121,7 +137,11 @@ enum class Channel;
+@@ -121,7 +138,11 @@ enum class Channel;
  }
  
  namespace views {
@@ -63,7 +64,7 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..62338e93978c82b7fb8cd8f75365974b
  class NativeViewHost;
  class WebView;
  }  // namespace views
-@@ -143,7 +163,8 @@ class BrowserView : public BrowserWindow,
+@@ -143,7 +164,8 @@ class BrowserView : public BrowserWindow,
                      public ImmersiveModeController::Observer,
                      public GlobalErrorObserver,
                      public views::FocusChangeListener,
@@ -73,7 +74,7 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..62338e93978c82b7fb8cd8f75365974b
    METADATA_HEADER(BrowserView, views::ClientView)
  
   public:
-@@ -234,6 +255,8 @@ class BrowserView : public BrowserWindow,
+@@ -234,6 +256,8 @@ class BrowserView : public BrowserWindow,
    // Container for the tabstrip, toolbar, etc.
    TopContainerView* top_container() { return top_container_; }
  
@@ -82,7 +83,7 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..62338e93978c82b7fb8cd8f75365974b
    std::optional<int> theme_background_y_offset() const {
      return theme_background_y_offset_;
    }
-@@ -311,6 +334,43 @@ class BrowserView : public BrowserWindow,
+@@ -311,6 +335,47 @@ class BrowserView : public BrowserWindow,
  
    ScrimView* window_scrim_view() { return window_scrim_view_; }
  
@@ -93,6 +94,10 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..62338e93978c82b7fb8cd8f75365974b
 +  // Replaces New Split's blank `pane`, if still open, with `page` beside the
 +  // pane's partner.
 +  void MyarcSplitWith(content::WebContents* pane, content::WebContents& page);
++  // Runs an action the command bar offered (command_bar.rs) through the same
++  // command or sidebar call its menu item runs. `space` is SwitchSpace's.
++  void RunMyarcCommandAction(myarc::foundation::CommandActionKind kind,
++                             uint64_t space);
 +
 +  // Nullable outside the separate workspace-sidebar + visual-parity opt-in.
 +  // Parent owns session binding/restore barriers and shutdown/resume hooks.
@@ -126,7 +131,7 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..62338e93978c82b7fb8cd8f75365974b
    base::WeakPtr<BrowserView> GetAsWeakPtr() {
      return weak_ptr_factory_.GetWeakPtr();
    }
-@@ -1253,12 +1313,255 @@ class BrowserView : public BrowserWindow,
+@@ -1253,12 +1318,257 @@ class BrowserView : public BrowserWindow,
  
    // Anchor point for help bubbles and other dialogs that want to reliably
    // anchor outside the content area of the window.
@@ -325,6 +330,8 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..62338e93978c82b7fb8cd8f75365974b
 +  std::unique_ptr<views::Widget> myarc_command_palette_widget_;
 +  // --myarc-capture-open-palette opens the palette once per window.
 +  bool myarc_capture_palette_scheduled_ = false;
++  // --myarc-test-command runs its command once per window.
++  bool myarc_test_command_scheduled_ = false;
 +  std::unique_ptr<myarc::CopiedUrlToast> myarc_copied_url_toast_;
 +  // --myarc-capture-copy-url copies the URL once per window.
 +  bool myarc_capture_copy_url_scheduled_ = false;
@@ -382,7 +389,7 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..62338e93978c82b7fb8cd8f75365974b
  
    // A mapping between accelerators and command IDs.
    std::map<ui::Accelerator, int> accelerator_table_;
-@@ -1411,6 +1714,7 @@ class BrowserView : public BrowserWindow,
+@@ -1411,6 +1721,7 @@ class BrowserView : public BrowserWindow,
    base::EnumSet<TabStripAndWebAppViewsReparentedState>
        tab_strip_web_apps_reparented_state_;
  
