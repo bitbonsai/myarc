@@ -109,6 +109,10 @@ mod ffi {
         SwitchSpace,
         ResetTab,
         ReplacePinnedUrl,
+        ClearCookies,
+        ClearCache,
+        TogglePinsCollapsed,
+        ExpandSplit,
     }
 
     // What the window's selected row is when the bar opens.
@@ -124,6 +128,7 @@ mod ffi {
         has_page: bool,
         in_split: bool,
         navigated_away: bool,
+        pins_collapsed: bool,
         current_space: u64,
     }
 
@@ -280,8 +285,12 @@ mod ffi {
         splits: Vec<SplitRecord>,
         // Rows in the order the sidebar shows them, which next and previous
         // tab step through. A closed folder's Pins are left out, except the
-        // selected one.
+        // selected one, and every Pin but the selected one while Pins are
+        // collapsed.
         row_order: Vec<u64>,
+        // Collapse Pinned Tabs is on in this window: the sidebar shows only
+        // the selected Pin.
+        pins_collapsed: bool,
     }
 
     struct BridgeLimits {
@@ -681,6 +690,12 @@ mod ffi {
         // Ends the split holding the item, keeping both tabs. `id` is the
         // other pane, or 0 when the item was in no split.
         fn separate_split(workspace: &mut Workspace, item_id: u64) -> MutationResult;
+        // Collapse Pinned Tabs, or expand them, in one window. Runtime only.
+        fn set_pins_collapsed(
+            workspace: &mut Workspace,
+            window_id: u64,
+            collapsed: bool,
+        ) -> MutationResult;
         fn sidebar_snapshot(workspace: &Workspace, window_id: u64) -> SidebarResult;
         fn export_snapshot(workspace: &Workspace) -> StateSnapshot;
         fn restore_snapshot(workspace: &mut Workspace, snapshot: StateSnapshot) -> MutationResult;
@@ -825,6 +840,9 @@ mod ffi {
         // How far a sidebar drag at `pointer_y` scrolls rows shown from 0 to
         // `height` per tick: negative up, 0 in the middle.
         fn drag_autoscroll_step(pointer_y: i32, height: i32) -> i32;
+        // Expand Current Split: the first pane's share after expanding pane
+        // `focused` (0 or 1) of a split at `ratio`.
+        fn expand_split_ratio(ratio: f64, focused: usize) -> f64;
         // The actions the command bar offers for `query`, closest first.
         // A leading "/" lists every action that applies.
         fn command_bar_offers(
@@ -1172,6 +1190,23 @@ pub fn bridge_limits() -> ffi::BridgeLimits {
     }
 }
 
+pub fn expand_split_ratio(ratio: f64, focused: usize) -> f64 {
+    workspace::split::expand_ratio(ratio, focused)
+}
+
+pub fn set_pins_collapsed(
+    workspace: &mut Workspace,
+    window_id: u64,
+    collapsed: bool,
+) -> ffi::MutationResult {
+    outcome(
+        workspace
+            .0
+            .set_pins_collapsed(window_id, collapsed)
+            .map(|()| window_id),
+    )
+}
+
 pub fn drag_autoscroll_step(pointer_y: i32, height: i32) -> i32 {
     workspace::drag::autoscroll_step(pointer_y, height)
 }
@@ -1193,6 +1228,7 @@ pub fn command_bar_offers(
         has_page: context.has_page,
         in_split: context.in_split,
         navigated_away: context.navigated_away,
+        pins_collapsed: context.pins_collapsed,
     };
     let names: Vec<(u64, &str)> = spaces
         .iter()
@@ -1211,6 +1247,10 @@ pub fn command_bar_offers(
                 Action::SwitchSpace(id) => (ffi::CommandActionKind::SwitchSpace, id),
                 Action::ResetTab => (ffi::CommandActionKind::ResetTab, 0),
                 Action::ReplacePinnedUrl => (ffi::CommandActionKind::ReplacePinnedUrl, 0),
+                Action::ClearCookies => (ffi::CommandActionKind::ClearCookies, 0),
+                Action::ClearCache => (ffi::CommandActionKind::ClearCache, 0),
+                Action::TogglePinsCollapsed => (ffi::CommandActionKind::TogglePinsCollapsed, 0),
+                Action::ExpandSplit => (ffi::CommandActionKind::ExpandSplit, 0),
             };
             ffi::CommandOffer {
                 kind,
@@ -1811,6 +1851,7 @@ pub fn sidebar_snapshot(workspace: &Workspace, window_id: u64) -> ffi::SidebarRe
     match workspace.0.sidebar_snapshot(window_id) {
         Ok(sidebar) => ffi::SidebarResult {
             row_order: sidebar.row_order(),
+            pins_collapsed: sidebar.pins_collapsed,
             ok: true,
             error: String::new(),
             window_id: sidebar.window_id,
@@ -1846,6 +1887,7 @@ pub fn sidebar_snapshot(workspace: &Workspace, window_id: u64) -> ffi::SidebarRe
             folders: Vec::new(),
             splits: Vec::new(),
             row_order: Vec::new(),
+            pins_collapsed: false,
         },
     }
 }

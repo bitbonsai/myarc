@@ -145,7 +145,7 @@ fn main() -> ExitCode {
         }) => run(command, params, json, local),
         Ok(Cli::Mcp { local }) => {
             let backend = if local {
-                mcp::Backend::Local(ControlService::new())
+                mcp::Backend::Local(Box::new(ControlService::new()))
             } else {
                 mcp::Backend::remote()
             };

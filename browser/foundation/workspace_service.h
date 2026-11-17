@@ -162,6 +162,9 @@ class WorkspaceService final : public base::SupportsUserData::Data {
   // the live page's, as the item's saved URL. Only URLs a Pin can save pass.
   foundation::MutationResult SetCanonicalUrl(uint64_t item,
                                              std::string_view url);
+  // Collapse Pinned Tabs in `window`, or expand them. Runtime only, so it
+  // notifies without a write.
+  foundation::MutationResult SetPinsCollapsed(uint64_t window, bool collapsed);
   // Whether a saved item's live page at `url` is away from its saved URL,
   // which shows Arc's slash and back control. False for Today tabs and while
   // the workspace isn't loaded.

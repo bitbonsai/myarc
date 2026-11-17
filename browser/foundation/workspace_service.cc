@@ -1026,6 +1026,17 @@ foundation::MutationResult WorkspaceService::SetCanonicalUrl(
       *workspace_, item, rust::Str(canonical->data(), canonical->size())));
 }
 
+foundation::MutationResult WorkspaceService::SetPinsCollapsed(uint64_t window,
+                                                              bool collapsed) {
+  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
+  if (!CanMutate())
+    return Failure("Workspace is not loaded. Check storage state.");
+  auto result = foundation::set_pins_collapsed(*workspace_, window, collapsed);
+  if (result.ok)
+    changed_.Notify();
+  return result;
+}
+
 bool WorkspaceService::DiffersFromCanonical(uint64_t item,
                                             std::string_view url) const {
   if (!CanMutate() || url.size() > foundation::bridge_limits().url_bytes)

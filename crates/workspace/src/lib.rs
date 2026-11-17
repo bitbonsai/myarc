@@ -350,6 +350,9 @@ pub struct SidebarSnapshot {
     /// The current Space's splits. Their items are in `temporary` too; the
     /// sidebar draws each split as one row where its left tab sits.
     pub splits: Vec<Split>,
+    /// Arc's Collapse Pinned Tabs is on in this window: the sidebar shows
+    /// only the selected Pin, in its folder if it has one.
+    pub pins_collapsed: bool,
 }
 
 #[derive(Debug)]
@@ -359,6 +362,8 @@ pub struct Workspace {
     /// Space. In memory only: not part of the snapshot, so it is not persisted
     /// and does not take part in equality.
     space_selections: Vec<(WindowId, SpaceId, ItemId)>,
+    /// Windows whose Pins are collapsed. Runtime only, like the selections.
+    collapsed_pins: BTreeSet<WindowId>,
 }
 
 impl PartialEq for Workspace {
@@ -400,6 +405,7 @@ impl Default for Workspace {
                 next_folder_id: 1,
             },
             space_selections: Vec::new(),
+            collapsed_pins: BTreeSet::new(),
         }
     }
 }
@@ -696,6 +702,26 @@ impl Workspace {
         self.state.windows.retain(|window| window.id != window_id);
         self.space_selections
             .retain(|&(window, _, _)| window != window_id);
+        self.collapsed_pins.remove(&window_id);
+        Ok(())
+    }
+
+    /// Arc's Collapse Pinned Tabs, and Expand Pinned Tabs to undo it, for one
+    /// window: its sidebar and next and previous tab skip the Space's Pins,
+    /// except the selected one, until expanded. Favorites and Today stay. The
+    /// state holds across Space switches and ends with the window or a
+    /// restart, since Arc's persistence of it is unknown.
+    pub fn set_pins_collapsed(
+        &mut self,
+        window_id: WindowId,
+        collapsed: bool,
+    ) -> Result<(), WorkspaceError> {
+        self.window(window_id)?;
+        if collapsed {
+            self.collapsed_pins.insert(window_id);
+        } else {
+            self.collapsed_pins.remove(&window_id);
+        }
         Ok(())
     }
 
@@ -1184,6 +1210,7 @@ impl Workspace {
                 .cloned()
                 .collect(),
             splits: Vec::new(),
+            pins_collapsed: self.collapsed_pins.contains(&window_id),
         };
         for item in &self.state.items {
             if matches!(item.placement, Placement::Pin { .. }) {
@@ -1216,6 +1243,7 @@ impl Workspace {
         let mut workspace = Self {
             state: snapshot,
             space_selections: Vec::new(),
+            collapsed_pins: BTreeSet::new(),
         };
         workspace.sanitize_archive();
         workspace.sanitize_icons();
@@ -1760,6 +1788,63 @@ mod tests {
                 Some(URL_B)
             );
         }
+    }
+
+    #[test]
+    fn collapsed_pins_leave_only_the_selected_pin_in_row_order() {
+        let mut workspace = Workspace::default();
+        let favorite = pin(&mut workspace, DEFAULT_SPACE_ID);
+        workspace
+            .set_placement(
+                favorite,
+                Placement::Favorite {
+                    profile_id: DEFAULT_PROFILE_ID,
+                },
+                None,
+            )
+            .unwrap();
+        let first = pin(&mut workspace, DEFAULT_SPACE_ID);
+        let second = pin(&mut workspace, DEFAULT_SPACE_ID);
+        let today = workspace.add_temporary_item(DEFAULT_SPACE_ID).unwrap();
+        workspace.select_item(DEFAULT_WINDOW_ID, today).unwrap();
+        let rows = |workspace: &Workspace| {
+            workspace
+                .sidebar_snapshot(DEFAULT_WINDOW_ID)
+                .unwrap()
+                .row_order()
+        };
+        assert_eq!(rows(&workspace), [favorite, first, second, today]);
+        assert_eq!(
+            workspace.set_pins_collapsed(DEFAULT_WINDOW_ID, true),
+            Ok(())
+        );
+        let sidebar = workspace.sidebar_snapshot(DEFAULT_WINDOW_ID).unwrap();
+        assert!(sidebar.pins_collapsed);
+        // The Pins stay in the snapshot; only the rows shown change.
+        assert_eq!(sidebar.pins.len(), 2);
+        assert_eq!(rows(&workspace), [favorite, today]);
+        workspace.select_item(DEFAULT_WINDOW_ID, second).unwrap();
+        assert_eq!(rows(&workspace), [favorite, second, today]);
+        assert_eq!(
+            workspace.set_pins_collapsed(DEFAULT_WINDOW_ID, false),
+            Ok(())
+        );
+        assert_eq!(rows(&workspace), [favorite, first, second, today]);
+        assert_eq!(
+            workspace.set_pins_collapsed(99, true),
+            Err(WorkspaceError::UnknownWindow(99))
+        );
+        // Runtime only: a restored workspace shows its Pins.
+        workspace
+            .set_pins_collapsed(DEFAULT_WINDOW_ID, true)
+            .unwrap();
+        let restored = Workspace::from_snapshot(workspace.snapshot()).unwrap();
+        assert!(
+            !restored
+                .sidebar_snapshot(DEFAULT_WINDOW_ID)
+                .unwrap()
+                .pins_collapsed
+        );
     }
 
     #[test]

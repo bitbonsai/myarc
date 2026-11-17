@@ -31,7 +31,7 @@ type RpcError = (i64, String);
 
 /// Where tool calls run.
 pub enum Backend {
-    Local(ControlService),
+    Local(Box<ControlService>),
     /// The running myArc, with the open connection and when it last answered.
     Remote(Option<(Client, Instant)>),
 }

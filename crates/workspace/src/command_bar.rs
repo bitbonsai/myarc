@@ -26,6 +26,14 @@ pub enum Action {
     /// Back to the selected Pin's or Favorite's saved URL (BC-003).
     ResetTab,
     ReplacePinnedUrl,
+    /// Arc's View menu: clear the current site's cookies, or its cache, and
+    /// reload the page.
+    ClearCookies,
+    ClearCache,
+    /// Collapse Pinned Tabs, or Expand Pinned Tabs while they are collapsed.
+    TogglePinsCollapsed,
+    /// Expand Current Split: the focused pane takes most of the window.
+    ExpandSplit,
 }
 
 /// What the selected row is.
@@ -48,6 +56,8 @@ pub struct Context {
     pub in_split: bool,
     /// The selected Pin's or Favorite's page left its saved URL.
     pub navigated_away: bool,
+    /// The window's Pins are collapsed.
+    pub pins_collapsed: bool,
 }
 
 /// One offered action and the title its row shows.
@@ -111,6 +121,39 @@ fn entries(context: &Context, spaces: &[(SpaceId, &str)], current: SpaceId) -> V
         "Add Split View",
         &["split"],
     );
+    add(
+        page && context.in_split,
+        Action::ExpandSplit,
+        "Expand Current Split",
+        &["maximize", "focus"],
+    );
+    add(
+        page,
+        Action::ClearCookies,
+        "Clear Cookies and Refresh",
+        &["site", "data", "reload"],
+    );
+    add(
+        page,
+        Action::ClearCache,
+        "Clear Cache and Refresh",
+        &["site", "reload"],
+    );
+    if context.pins_collapsed {
+        add(
+            true,
+            Action::TogglePinsCollapsed,
+            "Expand Pinned Tabs",
+            &["show", "pins"],
+        );
+    } else {
+        add(
+            true,
+            Action::TogglePinsCollapsed,
+            "Collapse Pinned Tabs",
+            &["hide", "pins"],
+        );
+    }
     add(true, Action::NewSpace, "New Space", &["create", "add"]);
     for &(id, name) in spaces {
         if id != current {
@@ -206,6 +249,7 @@ mod tests {
         has_page: true,
         in_split: false,
         navigated_away: false,
+        pins_collapsed: false,
     };
     const SPACES: &[(SpaceId, &str)] = &[(1, "Work"), (2, "Reading"), (3, "Home")];
 
@@ -225,6 +269,9 @@ mod tests {
                 "Archive Tab",
                 "Copy URL",
                 "Add Split View",
+                "Clear Cookies and Refresh",
+                "Clear Cache and Refresh",
+                "Collapse Pinned Tabs",
                 "New Space",
                 "Switch to Reading",
                 "Switch to Home",
@@ -251,7 +298,7 @@ mod tests {
 
     #[test]
     fn typed_names_offer_actions() {
-        assert_eq!(titles("pin", &TODAY), ["Pin Tab"]);
+        assert_eq!(titles("pin", &TODAY), ["Pin Tab", "Collapse Pinned Tabs"]);
         assert_eq!(titles("new space", &TODAY), ["New Space"]);
         assert_eq!(titles("archive", &TODAY), ["Archive Tab"]);
         assert_eq!(titles("close", &TODAY), ["Archive Tab"]);
@@ -289,28 +336,34 @@ mod tests {
             selected: Selected::Pin,
             ..TODAY
         };
-        assert_eq!(titles("pin", &pin), ["Unpin Tab"]);
+        assert_eq!(titles("pin", &pin), ["Unpin Tab", "Collapse Pinned Tabs"]);
         assert!(titles("split", &pin).is_empty());
         let favorite = Context {
             selected: Selected::Favorite,
             ..TODAY
         };
         assert!(titles("unpin", &favorite).is_empty());
-        assert!(titles("pin tab", &favorite).is_empty());
+        assert_eq!(titles("pin tab", &favorite), ["Collapse Pinned Tabs"]);
         let split = Context {
             in_split: true,
             ..TODAY
         };
-        assert!(titles("split", &split).is_empty());
+        assert_eq!(titles("split", &split), ["Expand Current Split"]);
         let empty = Context {
             selected: Selected::Nothing,
             has_page: false,
             in_split: false,
             navigated_away: false,
+            pins_collapsed: false,
         };
         assert_eq!(
             titles("/", &empty),
-            ["New Space", "Switch to Reading", "Switch to Home"]
+            [
+                "Collapse Pinned Tabs",
+                "New Space",
+                "Switch to Reading",
+                "Switch to Home"
+            ]
         );
     }
 
@@ -341,6 +394,35 @@ mod tests {
             ..TODAY
         };
         assert!(titles("reset", &today).is_empty());
+    }
+
+    #[test]
+    fn page_menu_extras_follow_the_page_and_window() {
+        assert_eq!(
+            titles("clear", &TODAY),
+            ["Clear Cookies and Refresh", "Clear Cache and Refresh"]
+        );
+        assert_eq!(titles("cookies", &TODAY), ["Clear Cookies and Refresh"]);
+        assert_eq!(titles("cache", &TODAY), ["Clear Cache and Refresh"]);
+        assert_eq!(titles("collapse", &TODAY), ["Collapse Pinned Tabs"]);
+        let collapsed = Context {
+            pins_collapsed: true,
+            ..TODAY
+        };
+        assert_eq!(titles("expand", &collapsed), ["Expand Pinned Tabs"]);
+        assert!(titles("collapse", &collapsed).is_empty());
+        // No split, no Expand Current Split; no page, nothing to clear.
+        assert!(titles("expand current", &TODAY).is_empty());
+        let blank = Context {
+            has_page: false,
+            ..TODAY
+        };
+        assert!(titles("clear", &blank).is_empty());
+        let split = Context {
+            in_split: true,
+            ..TODAY
+        };
+        assert_eq!(titles("expand", &split), ["Expand Current Split"]);
     }
 
     #[test]

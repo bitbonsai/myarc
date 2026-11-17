@@ -204,6 +204,16 @@ class BrowserWorkspaceAdapter final : public TabStripModelObserver {
   // Replace Pinned URL with Current: the page the item shows now becomes its
   // saved URL.
   foundation::MutationResult ReplaceSavedUrl(uint64_t item);
+  // Arc's View menu. Collapse Pinned Tabs, or Expand Pinned Tabs while
+  // they are collapsed, in this window.
+  foundation::MutationResult TogglePinsCollapsed();
+  // Expand Current Split: the focused pane of the active split takes most of
+  // the window, and a second run goes back to halves.
+  foundation::MutationResult ExpandCurrentSplit();
+  // Clear Cookies and Refresh, or Clear Cache and Refresh: clears the active
+  // page's site, its registrable domain or its host for an IP address, then
+  // reloads the page once the data is gone. Only http(s) pages have a site.
+  foundation::MutationResult ClearSiteDataAndReload(bool cookies);
   // A Pin's own name, shown instead of its page title; empty clears it.
   foundation::MutationResult RenameItem(uint64_t item, std::string_view name);
   // A sidebar drag's drop in this window's Space; see WorkspaceService. A

@@ -21,6 +21,34 @@ use crate::{ItemId, MAX_ITEMS, Placement, SpaceId, Workspace, WorkspaceError};
 /// Each split holds two items, so this many fit every item.
 pub const MAX_SPLITS: usize = MAX_ITEMS / 2;
 
+/// The share of the window Arc's Expand Current Split gives the focused pane.
+pub const EXPANDED_SHARE: f64 = 0.8;
+
+/// The split ratio, the first pane's share of the width, after Expand Current
+/// Split with pane `focused` (0 first, 1 second) in front: the focused pane
+/// takes `EXPANDED_SHARE`, and a second Expand of the same pane goes back to
+/// even halves. A ratio that isn't a share between 0 and 1 counts as halves.
+pub fn expand_ratio(ratio: f64, focused: usize) -> f64 {
+    let ratio = if ratio.is_finite() && ratio > 0.0 && ratio < 1.0 {
+        ratio
+    } else {
+        0.5
+    };
+    let target = if focused == 0 {
+        EXPANDED_SHARE
+    } else {
+        1.0 - EXPANDED_SHARE
+    };
+    // The browser may clamp the panes to their minimum width, so anything at
+    // or past the target in its direction counts as expanded.
+    let expanded = if focused == 0 {
+        ratio >= target - 0.01
+    } else {
+        ratio <= target + 0.01
+    };
+    if expanded { 0.5 } else { target }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Split {
     pub left: ItemId,
@@ -183,6 +211,33 @@ impl Workspace {
             split.left != split.right && placed.insert(split.left) && placed.insert(split.right)
         });
         self.prune_splits();
+    }
+}
+
+#[cfg(test)]
+mod expand_tests {
+    use super::{EXPANDED_SHARE, expand_ratio};
+
+    #[test]
+    fn expand_gives_the_focused_pane_most_of_the_window_then_halves() {
+        assert_eq!(expand_ratio(0.5, 0), EXPANDED_SHARE);
+        assert_eq!(expand_ratio(0.5, 1), 1.0 - EXPANDED_SHARE);
+        assert_eq!(expand_ratio(EXPANDED_SHARE, 0), 0.5);
+        assert_eq!(expand_ratio(1.0 - EXPANDED_SHARE, 1), 0.5);
+        // The other pane expanded: this one takes over.
+        assert_eq!(expand_ratio(EXPANDED_SHARE, 1), 1.0 - EXPANDED_SHARE);
+        // A dragged divider counts as not expanded until past the target.
+        assert_eq!(expand_ratio(0.65, 0), EXPANDED_SHARE);
+        assert_eq!(expand_ratio(0.9, 0), 0.5);
+        assert_eq!(expand_ratio(0.795, 0), 0.5);
+    }
+
+    #[test]
+    fn odd_ratios_count_as_halves() {
+        for ratio in [f64::NAN, f64::INFINITY, -1.0, 0.0, 1.0, 3.0] {
+            assert_eq!(expand_ratio(ratio, 0), EXPANDED_SHARE);
+            assert_eq!(expand_ratio(ratio, 1), 1.0 - EXPANDED_SHARE);
+        }
     }
 }
 

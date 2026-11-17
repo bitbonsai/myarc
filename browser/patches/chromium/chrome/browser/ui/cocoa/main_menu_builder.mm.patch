@@ -1,5 +1,5 @@
 diff --git a/chrome/browser/ui/cocoa/main_menu_builder.mm b/chrome/browser/ui/cocoa/main_menu_builder.mm
-index 047674248727a122fb3aee712981eefd0a4c3049..9786e6b26461ae515aad97e1d64ff3c9699db23e 100644
+index 047674248727a122fb3aee712981eefd0a4c3049..cad9d733162b75e2e20764154f1309dab816ac66 100644
 --- a/chrome/browser/ui/cocoa/main_menu_builder.mm
 +++ b/chrome/browser/ui/cocoa/main_menu_builder.mm
 @@ -6,6 +6,9 @@
@@ -65,7 +65,7 @@ index 047674248727a122fb3aee712981eefd0a4c3049..9786e6b26461ae515aad97e1d64ff3c9
    return item;
  }
  
-@@ -361,6 +396,24 @@ NSMenuItem* BuildViewMenu(NSApplication* nsapp,
+@@ -361,6 +396,46 @@ NSMenuItem* BuildViewMenu(NSApplication* nsapp,
          })
          .Build();
    // clang-format on
@@ -86,11 +86,33 @@ index 047674248727a122fb3aee712981eefd0a4c3049..9786e6b26461ae515aad97e1d64ff3c9
 +    }
 +    [item.submenu insertItem:[NSMenuItem separatorItem] atIndex:0];
 +    [item.submenu insertItem:little_arc_item atIndex:0];
++    // Arc's View menu: Collapse Pinned Tabs after the sidebar toggle, then
++    // Clear Cookies and Refresh, Clear Cache and Refresh and Expand Current
++    // Split after the reloads. None has a shortcut in Arc.
++    const auto add_after = [&item](int after, NSString* title, int command) {
++      NSMenuItem* extra =
++          [[NSMenuItem alloc] initWithTitle:title
++                                     action:@selector(commandDispatch:)
++                              keyEquivalent:@""];
++      extra.tag = command;
++      NSInteger index = [item.submenu indexOfItemWithTag:after];
++      [item.submenu
++          insertItem:extra
++             atIndex:index < 0 ? item.submenu.numberOfItems : index + 1];
++    };
++    add_after(IDC_TOGGLE_VERTICAL_TABS_COLLAPSE, @"Collapse Pinned Tabs",
++              IDC_MYARC_TOGGLE_PINS_COLLAPSED);
++    add_after(IDC_RELOAD_BYPASSING_CACHE, @"Clear Cookies and Refresh",
++              IDC_MYARC_CLEAR_COOKIES_RELOAD);
++    add_after(IDC_MYARC_CLEAR_COOKIES_RELOAD, @"Clear Cache and Refresh",
++              IDC_MYARC_CLEAR_CACHE_RELOAD);
++    add_after(IDC_MYARC_CLEAR_CACHE_RELOAD, @"Expand Current Split",
++              IDC_MYARC_EXPAND_SPLIT);
 +  }
    return item;
  }
  
-@@ -500,6 +553,18 @@ NSMenuItem* BuildWindowMenu(NSApplication* nsapp,
+@@ -500,6 +575,18 @@ NSMenuItem* BuildWindowMenu(NSApplication* nsapp,
            })
            .Build();
    // clang-format on

@@ -44,10 +44,14 @@
 #include "components/keyed_service/core/service_access_type.h"
 #include "components/prefs/pref_service.h"
 #include "components/sessions/content/session_tab_helper.h"
+#include "content/public/browser/browser_context.h"
 #include "content/public/browser/browser_thread.h"
+#include "content/public/browser/browsing_data_filter_builder.h"
+#include "content/public/browser/browsing_data_remover.h"
 #include "content/public/browser/favicon_status.h"
 #include "content/public/browser/navigation_controller.h"
 #include "content/public/browser/navigation_entry.h"
+#include "content/public/browser/reload_type.h"
 #include "content/public/browser/web_contents.h"
 #include "content/public/browser/web_contents_observer.h"
 #include "content/public/common/page_type.h"
@@ -59,6 +63,7 @@
 #include "myarc/site_icon_fetcher.h"
 #include "myarc/test_buildflags.h"
 #include "myarc/workspace_lifecycle.h"
+#include "net/base/registry_controlled_domains/registry_controlled_domain.h"
 #include "ui/base/base_window.h"
 #include "url/origin.h"
 
@@ -2409,6 +2414,91 @@ foundation::MutationResult BrowserWorkspaceAdapter::ReplaceSavedUrl(
     return Remember(Fail("Open the page first, then replace its saved URL."));
   return Remember(
       service_->SetCanonicalUrl(item, metadata->current_url.spec()));
+}
+
+foundation::MutationResult BrowserWorkspaceAdapter::TogglePinsCollapsed() {
+  if (!ready())
+    return Fail(error());
+  const auto sidebar = Sidebar();
+  if (!sidebar.ok)
+    return Fail(std::string(sidebar.error));
+  return Remember(
+      service_->SetPinsCollapsed(window_id_, !sidebar.pins_collapsed));
+}
+
+foundation::MutationResult BrowserWorkspaceAdapter::ExpandCurrentSplit() {
+  tabs::TabInterface* tab = tabs_ ? tabs_->GetActiveTab() : nullptr;
+  const auto split = tab ? tab->GetSplit() : std::nullopt;
+  split_tabs::SplitTabData* data = split ? tabs_->GetSplitData(*split) : nullptr;
+  if (!data)
+    return Remember(Fail("Open a split first."));
+  const std::vector<tabs::TabInterface*> panes = data->ListTabs();
+  const size_t focused = !panes.empty() && panes.front() == tab ? 0 : 1;
+  tabs_->UpdateSplitRatio(
+      *split,
+      foundation::expand_split_ratio(data->visual_data()->split_ratio(),
+                                     focused));
+  return Ok();
+}
+
+namespace {
+
+// Reloads `page` once BrowsingDataRemover is done, then deletes itself.
+class ClearSiteDataReloader final
+    : public content::BrowsingDataRemover::Observer {
+ public:
+  ClearSiteDataReloader(content::BrowsingDataRemover& remover,
+                        content::WebContents& page)
+      : page_(page.GetWeakPtr()) {
+    observation_.Observe(&remover);
+  }
+
+  void OnBrowsingDataRemoverDone(uint64_t failed_data_types) override {
+    LOG(WARNING) << "myarc-clear-site-data done failed=" << failed_data_types;
+    if (page_) {
+      page_->GetController().Reload(content::ReloadType::NORMAL,
+                                    /*check_for_repost=*/true);
+    }
+    delete this;
+  }
+
+ private:
+  base::WeakPtr<content::WebContents> page_;
+  base::ScopedObservation<content::BrowsingDataRemover,
+                          content::BrowsingDataRemover::Observer>
+      observation_{this};
+};
+
+}  // namespace
+
+foundation::MutationResult BrowserWorkspaceAdapter::ClearSiteDataAndReload(
+    bool cookies) {
+  content::WebContents* page = tabs_ ? tabs_->GetActiveWebContents() : nullptr;
+  const GURL url = page ? page->GetLastCommittedURL() : GURL();
+  if (!url.SchemeIsHTTPOrHTTPS() || url.host().empty())
+    return Remember(Fail("Only a web page's site has cookies and a cache."));
+  // Arc clears the current site only: its registrable domain, which covers
+  // its subdomains, or the host itself for an IP address or a bare name.
+  std::string site = net::registry_controlled_domains::GetDomainAndRegistry(
+      url, net::registry_controlled_domains::INCLUDE_PRIVATE_REGISTRIES);
+  if (site.empty())
+    site = url.host();
+  auto filter = content::BrowsingDataFilterBuilder::Create(
+      content::BrowsingDataFilterBuilder::Mode::kDelete);
+  filter->AddRegisterableDomain(site);
+  content::BrowsingDataRemover* remover =
+      page->GetBrowserContext()->GetBrowsingDataRemover();
+  LOG(WARNING) << "myarc-clear-site-data " << (cookies ? "cookies" : "cache")
+               << " " << site;
+  // The reloader owns itself until the removal reports back.
+  auto* reloader = new ClearSiteDataReloader(*remover, *page);
+  remover->RemoveWithFilterAndReply(
+      base::Time(), base::Time::Max(),
+      cookies ? content::BrowsingDataRemover::DATA_TYPE_COOKIES
+              : content::BrowsingDataRemover::DATA_TYPE_CACHE,
+      content::BrowsingDataRemover::ORIGIN_TYPE_UNPROTECTED_WEB,
+      std::move(filter), reloader);
+  return Ok();
 }
 
 foundation::MutationResult BrowserWorkspaceAdapter::RenameItem(

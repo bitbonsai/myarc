@@ -198,19 +198,22 @@ impl Workspace {
 
 impl SidebarSnapshot {
     /// The rows next and previous tab step through, in the order the sidebar
-    /// shows them. A closed folder's Pins are left out, except the selected one.
+    /// shows them. A closed folder's Pins are left out, except the selected one,
+    /// and so is every Pin but the selected one while Pins are collapsed.
     pub fn row_order(&self) -> Vec<ItemId> {
         let foldered = |id: ItemId| self.folders.iter().any(|folder| folder.items.contains(&id));
+        let shown = |id: ItemId| !self.pins_collapsed || self.selected_item_id == Some(id);
         let mut order: Vec<ItemId> = self.favorites.iter().map(|item| item.id).collect();
         order.extend(
             self.pins
                 .iter()
                 .map(|item| item.id)
-                .filter(|&id| !foldered(id)),
+                .filter(|&id| !foldered(id) && shown(id)),
         );
         for folder in &self.folders {
             order.extend(folder.items.iter().copied().filter(|&id| {
                 (folder.open || self.selected_item_id == Some(id))
+                    && shown(id)
                     && self.pins.iter().any(|item| item.id == id)
             }));
         }

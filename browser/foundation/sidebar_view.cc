@@ -2377,8 +2377,13 @@ void SidebarView::SetModel(const foundation::SidebarResult& model,
   for (const auto& item : model.favorites) {
     tile_items.push_back(&item);
   }
+  // Collapse Pinned Tabs leaves only the selected Pin, in its folder if it
+  // has one, as Rust's row order does.
+  const auto pin_shown = [&model](uint64_t id) {
+    return !model.pins_collapsed || id == model.selected_item_id;
+  };
   for (const auto& item : model.pins) {
-    if (!foldered.contains(item.id)) {
+    if (!foldered.contains(item.id) && pin_shown(item.id)) {
       tile_items.push_back(&item);
     }
   }
@@ -2505,6 +2510,11 @@ void SidebarView::SetModel(const foundation::SidebarResult& model,
   // while open. A closed folder still shows its selected Pin, so the page
   // on screen keeps its row.
   for (const auto& folder : model.folders) {
+    if (model.pins_collapsed &&
+        std::ranges::find(folder.items, model.selected_item_id) ==
+            folder.items.end()) {
+      continue;
+    }
     // A row dropped on the folder's own row goes in at its end.
     drop_zones_.push_back({.view = rows->AddChildView(MakeFolder(folder)),
                            .kind = foundation::DropTargetKind::Folder,
@@ -2514,7 +2524,8 @@ void SidebarView::SetModel(const foundation::SidebarResult& model,
       const auto item = std::ranges::find(model.pins, id,
                                           &foundation::ItemRecord::id);
       const bool selected = id == model.selected_item_id;
-      if (item == model.pins.end() || (!folder.open && !selected)) {
+      if (item == model.pins.end() || (!folder.open && !selected) ||
+          !pin_shown(id)) {
         continue;
       }
       auto row = MakeItem(*item, false, selected, folder.id);
