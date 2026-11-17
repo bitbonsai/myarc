@@ -53,7 +53,7 @@ set -euo pipefail
 
 BASE="$(cd "$(dirname "$0")/.." && pwd)/research-private/captures"
 APP="${APP:-$HOME/.cache/myarc-m0/chromium/src/out/MyarcM0/Chromium.app}"
-BIN="$APP/Contents/MacOS/Chromium"
+BIN="$APP/Contents/MacOS/$(/usr/libexec/PlistBuddy -c "Print :CFBundleExecutable" "$APP/Contents/Info.plist" 2>/dev/null || echo Chromium)"
 W=${W:-1440}; H=${H:-900}; URL=${URL:-about:blank}; SETTLE=${SETTLE:-5}
 KEYS=${KEYS:-}; KEY_SETTLE=${KEY_SETTLE:-2}
 

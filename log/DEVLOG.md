@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-11-17: Blocker check against the packaged nightly
+
+- `tools/capture_native.sh` read the binary as `Contents/MacOS/Chromium`, so `APP=` pointed at a packaged nightly (whose binary is `myArc`) failed before launch. It now reads the name from `CFBundleExecutable`.
+- Evidence: `APP="/Applications/myArc Nightly.app" tools/check_blocker.sh` on installed 2026.11.17 passes every step. The first load reads `tracker: blocked` with 0 requests at the server, No filtering loads it (1 request), Optimal blocks it again, and a second Profile blocks it on first load.
+- Limits: none new. The menu item still wasn't clicked live.
+
 ## 2026-11-17: Ad and tracker blocking on by default
 
 - Engine (PRV-01): bundled uBlock Origin Lite 2026.1116.1650, the Manifest V3 sibling of the uBlock Origin that Arc shipped, GPL-3.0 like myArc. Its rules run in Chromium's own declarativeNetRequest engine, its popup already has a per-site switch, and it fetches nothing at first run. Chromium's subresource filter was the other built-in route, but it only blocks by URL, needs a ruleset converter Chromium doesn't build, and turns on per site through Safe Browsing lists. Brave's adblock-rust would have meant writing the network hook, cosmetic filtering, exception UI and a GN crate import here. The release zip, its source at uBlock `9510a0b38c` with both submodules, the license and hashes are in `browser/foundation/blocker/`. `blocker.cc` installs the zip into each Profile once, through Chromium's installer as a regular removable extension with a fixed ID, and a Profile pref keeps a removed blocker removed. A throttle holds main-frame page loads, up to 10 seconds, until the blocker's rules are live; the install must not use `WAS_INSTALLED_BY_DEFAULT`, which runs the unpacker at best-effort priority and so waits for startup to finish, deadlocking with that throttle. The extension updater skips the blocker's ID, so nothing asks the Web Store about it. Window > Ad Blocking for This Site… opens the blocker's popup under the address field, falling back to the Extensions page when it can't.
