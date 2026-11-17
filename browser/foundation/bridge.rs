@@ -20,7 +20,8 @@ pub struct ArcExport {
 // stopped. A hello waits in `approval` for the user's answer. An interaction
 // command also carries its checked action and, once the
 // browser began it, the snapshot references it took. `profile` is the tag of
-// the Profile it runs in, which its tab handles carry.
+// the Profile it runs in, which its tab handles carry. A Space command that
+// changed the workspace waits in `answered` until the change is saved.
 //
 // Chromium builds Rust with panic=abort, so a panic here would end the
 // browser and catch_unwind can't stop it. Request handling therefore never
@@ -31,6 +32,7 @@ pub struct ControlReply {
     action: Option<control::actions::PageAction>,
     taken: Option<control::snapshot::Taken>,
     profile: String,
+    answered: Option<(control::ipc::Pending, control::Response)>,
 }
 
 // All records own their buffers. Calls are synchronous on the browser UI sequence;
@@ -485,6 +487,19 @@ mod ffi {
         fn current_name(workspace: &Workspace) -> String;
         fn rename_space(workspace: &mut Workspace, id: u64, name: &str) -> RenameResult;
         fn bridge_limits() -> BridgeLimits;
+        // The workspace file (crates/workspace/src/store.rs). Each returns an
+        // error, or an empty string on success. Writing replaces the file at
+        // `path` atomically and keeps the one before as the backup; it is
+        // fast enough for the UI thread and survives a process kill once it
+        // returns. Syncing flushes the file and its directory to the disk and
+        // is slow, so it runs off the UI thread.
+        fn write_workspace_file(path: &str, bytes: &[u8]) -> String;
+        fn sync_workspace_file(path: &str) -> String;
+        // Where write_workspace_file keeps the generation before the current.
+        fn workspace_backup_path(path: &str) -> String;
+        // Moves a file that failed to decode out of the way and returns where
+        // it went, or an empty string when it could not.
+        fn set_aside_workspace_file(path: &str) -> String;
         fn create_space(workspace: &mut Workspace, name: &str) -> MutationResult;
         // Create a Space panel: like create_space, with an icon unless
         // `icon_kind` is Unset, in which case `icon` must be empty, and a
@@ -744,7 +759,9 @@ mod ffi {
         // UI thread: runs the request against `workspace` as seen from
         // `window_id`, in the Profile whose directory is `profile`, such as
         // "Default" or "Profile 1". A Space command is answered at once and leaves `reply`
-        // empty. A tab command that passed its checks keeps the request in
+        // empty, unless it changed the workspace: then the answer waits for
+        // send_control_answer, which the caller runs once the change is saved,
+        // so a client never hears of a change a crash can lose. A tab command that passed its checks keeps the request in
         // `reply` and names the action; the caller runs it and answers with
         // answer_tab_request, now or later.
         fn answer_control_request(
@@ -753,6 +770,8 @@ mod ffi {
             window_id: u64,
             profile: &str,
         ) -> ControlPlan;
+        // Sends the answer answer_control_request kept, if any.
+        fn send_control_answer(reply: &mut ControlReply);
         // Answers a tab command kept by answer_control_request. `tabs` holds
         // the tab afterwards, or each live tab for List.
         fn answer_tab_request(
@@ -1172,6 +1191,30 @@ pub fn rename_space(workspace: &mut Workspace, id: u64, name: &str) -> ffi::Rena
             .map(|error| error.to_string())
             .unwrap_or_default(),
     }
+}
+
+pub fn write_workspace_file(path: &str, bytes: &[u8]) -> String {
+    workspace::store::write(std::path::Path::new(path), bytes)
+        .err()
+        .map_or_else(String::new, |error| error.to_string())
+}
+
+pub fn sync_workspace_file(path: &str) -> String {
+    workspace::store::sync(std::path::Path::new(path))
+        .err()
+        .map_or_else(String::new, |error| error.to_string())
+}
+
+pub fn workspace_backup_path(path: &str) -> String {
+    workspace::store::backup_path(std::path::Path::new(path))
+        .to_string_lossy()
+        .into_owned()
+}
+
+pub fn set_aside_workspace_file(path: &str) -> String {
+    workspace::store::set_aside(std::path::Path::new(path))
+        .map(|aside| aside.to_string_lossy().into_owned())
+        .unwrap_or_default()
 }
 
 pub fn bridge_limits() -> ffi::BridgeLimits {
@@ -2121,6 +2164,7 @@ pub fn next_control_request(epoch: u64) -> Box<ControlReply> {
         action: None,
         taken: None,
         profile: String::new(),
+        answered: None,
     })
 }
 
@@ -2215,7 +2259,11 @@ pub fn answer_control_request(
     plan.changed = workspace.0.snapshot() != before;
     let action = match routed {
         control::Routed::Answered(response) => {
-            pending.reply(response);
+            if plan.changed {
+                reply.answered = Some((pending, response));
+            } else {
+                pending.reply(response);
+            }
             return plan;
         }
         control::Routed::Tab(action) => action,
@@ -2247,6 +2295,12 @@ pub fn answer_control_request(
         }
     };
     plan
+}
+
+pub fn send_control_answer(reply: &mut ControlReply) {
+    if let Some((pending, response)) = reply.answered.take() {
+        pending.reply(response);
+    }
 }
 
 pub fn answer_tab_request(

@@ -1,5 +1,8 @@
 #include "myarc/browser_workspace_adapter.h"
 
+#include <signal.h>
+#include <unistd.h>
+
 #include <algorithm>
 #include <cstdlib>
 #include <memory>
@@ -17,6 +20,7 @@
 #include "base/scoped_observation.h"
 #include "base/strings/utf_string_conversions.h"
 #include "base/strings/string_number_conversions.h"
+#include "base/strings/string_split.h"
 #include "base/task/single_thread_task_runner.h"
 #include "base/timer/timer.h"
 #include "chrome/browser/favicon/favicon_service_factory.h"
@@ -143,6 +147,21 @@ bool g_split_hook_done = false;
 // the cycle when it finds Ctrl up.
 constexpr char kMyarcTestCtrlTab[] = "myarc-test-ctrl-tab";
 bool g_ctrl_tab_hook_done = false;
+// --myarc-test-durability=<change>:<ID>[:<value>] makes one change once the
+// first window's workspace is ready, through the same path as the UI, then
+// kills the browser with SIGKILL --myarc-test-kill-after-ms later (0, the
+// default, kills it in the same task, as soon as the change returns). The
+// change is "pin" (a Today tab), "rename" (a saved item, to <value>), "move"
+// (an item, before item <value> or 0 for the end) or "delete-space". For
+// tools/check_durability.sh.
+constexpr char kMyarcTestDurability[] = "myarc-test-durability";
+constexpr char kMyarcTestKillAfterMs[] = "myarc-test-kill-after-ms";
+bool g_durability_hook_done = false;
+
+void KillForTesting() {
+  LOG(WARNING) << "Test durability: SIGKILL";
+  kill(getpid(), SIGKILL);
+}
 #endif  // BUILDFLAG(MYARC_TEST_HOOKS)
 
 const char kRuntimeKey = 0;
@@ -1657,6 +1676,63 @@ void BrowserWorkspaceAdapter::Refresh() {
               sidebar.temporary[1].id,
               command_line->GetSwitchValueASCII(kMyarcTestSplit)));
     }
+  }
+  if (ready() && !g_durability_hook_done &&
+      command_line->HasSwitch(kMyarcTestDurability)) {
+    g_durability_hook_done = true;
+    int kill_after_ms = 0;
+    if (command_line->HasSwitch(kMyarcTestKillAfterMs) &&
+        !base::StringToInt(
+            command_line->GetSwitchValueASCII(kMyarcTestKillAfterMs),
+            &kill_after_ms)) {
+      kill_after_ms = -1;
+    }
+    // Mutating mid-refresh would skip this pass's notification; run after it.
+    base::SingleThreadTaskRunner::GetCurrentDefault()->PostTask(
+        FROM_HERE,
+        base::BindOnce(
+            [](base::WeakPtr<BrowserWorkspaceAdapter> adapter,
+               std::string value, int kill_after_ms) {
+              if (!adapter || !adapter->ready())
+                return;
+              const auto parts = base::SplitString(
+                  value, ":", base::KEEP_WHITESPACE, base::SPLIT_WANT_ALL);
+              uint64_t id = 0;
+              uint64_t other = 0;
+              const std::string change =
+                  kill_after_ms >= 0 && parts.size() >= 2 &&
+                          base::StringToUint64(parts[1], &id)
+                      ? parts[0]
+                      : std::string();
+              foundation::MutationResult result{false, 0,
+                                                "Unknown durability change."};
+              if (change == "pin") {
+                result = adapter->Pin(id);
+              } else if (change == "rename" && parts.size() == 3) {
+                result = adapter->RenameItem(id, parts[2]);
+              } else if (change == "move" && parts.size() == 3 &&
+                         base::StringToUint64(parts[2], &other)) {
+                result = adapter->MoveItemBefore(id, other);
+              } else if (change == "delete-space") {
+                result = adapter->DeleteSpace(id);
+              }
+              if (!result.ok) {
+                // The browser stays up, which the check reports.
+                LOG(ERROR) << "Test durability change failed: "
+                           << std::string(result.error);
+                return;
+              }
+              LOG(WARNING) << "Test durability: " << value << " returned";
+              if (!kill_after_ms) {
+                KillForTesting();
+              }
+              base::SingleThreadTaskRunner::GetCurrentDefault()
+                  ->PostDelayedTask(FROM_HERE, base::BindOnce(&KillForTesting),
+                                    base::Milliseconds(kill_after_ms));
+            },
+            weak_factory_.GetWeakPtr(),
+            command_line->GetSwitchValueASCII(kMyarcTestDurability),
+            kill_after_ms));
   }
   if (ready() && !g_ctrl_tab_hook_done &&
       command_line->HasSwitch(kMyarcTestCtrlTab)) {

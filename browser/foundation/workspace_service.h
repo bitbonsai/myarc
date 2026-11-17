@@ -32,10 +32,19 @@ namespace internal {
 struct MetadataResult {
   std::optional<foundation::StateSnapshot> snapshot;
   std::string error;
+  // The file failed to decode, as a torn or hand-damaged one does. A file
+  // from a newer build is not damaged, only unsupported.
+  bool damaged = false;
+  // The snapshot came from the backup because the file was damaged or gone.
+  bool from_backup = false;
 };
 std::optional<std::string> EncodeWorkspaceMetadata(
     const foundation::StateSnapshot& snapshot);
 MetadataResult DecodeWorkspaceMetadata(std::string_view json);
+// Blocking. Reads and decodes the workspace file at `path`. When it is damaged
+// or gone and its backup decodes, sets the damaged file aside, logs that, and
+// returns the backup's snapshot. Otherwise the file is left untouched.
+MetadataResult ReadWorkspaceMetadata(const base::FilePath& path);
 bool CanonicalizeUrls(foundation::StateSnapshot& snapshot);
 }  // namespace internal
 
@@ -51,9 +60,12 @@ class WorkspaceService final : public base::SupportsUserData::Data {
     kLoading,
     kLoadError,  // Read-only until RetryLoad succeeds; file is left untouched.
     kReady,
+    // Not entered since saves write synchronously; kept for callers' switches.
     kWritePending,
     kWriteError,
-    kWritten,  // Atomic write returned success, NOT OS-crash durable evidence.
+    // In the file: survives a process kill. The flush to the disk follows off
+    // the UI thread, so a power loss can still lose it.
+    kWritten,
     kEphemeral,
   };
   static WorkspaceService& ForProfile(Profile& profile);
@@ -67,11 +79,11 @@ class WorkspaceService final : public base::SupportsUserData::Data {
   void WhenLoaded(base::OnceClosure done);
   void RetryLoad();
   void RetrySave();
-  // Queue an owned latest dirty snapshot before ThreadPool shutdown. Leaves
-  // normal write replies/retry state intact if quit is cancelled.
+  // Saves a change not saved yet, such as one a write error held back.
   void FlushForShutdown();
 
-  // ok means applied in memory only. Observe storage_state separately. All IDs
+  // A successful mutation is saved to the file before it returns, unless
+  // saving failed; observe storage_state for that. All IDs
   // here are Rust model IDs. Profile 1 is local to each service, not a native
   // ID.
   foundation::MutationResult CreateSpace(std::string_view name);
@@ -256,8 +268,11 @@ class WorkspaceService final : public base::SupportsUserData::Data {
   void UpdateSpacesIndex();
   void StartLoad();
   void OnLoaded(internal::MetadataResult result);
-  void ScheduleWrite();
-  void OnWritten(bool ok);
+  // Writes the workspace file now, on the UI thread, so nothing shows a change
+  // a process kill could lose, then flushes it to the disk off the UI thread.
+  void Save();
+  void Sync();
+  void OnSynced();
 
   // Copies only, destructor/background work never dereference the dead Profile.
   const bool ephemeral_;
@@ -269,14 +284,16 @@ class WorkspaceService final : public base::SupportsUserData::Data {
   StorageState storage_state_;
   std::string storage_error_;
   bool dirty_ = false;
-  bool write_in_flight_ = false;
+  // A flush to the disk runs; another follows it when a save came meanwhile.
+  bool sync_in_flight_ = false;
+  bool sync_again_ = false;
   // When the last Auto Archive pass advanced the clock; null before the first.
   base::TimeTicks last_pass_;
   base::RepeatingClosureList changed_;
   std::vector<base::OnceClosure> when_loaded_;
   SEQUENCE_CHECKER(sequence_checker_);
-  // Invalidates replies on destruction. Queued writes own their path/records
-  // and block normal shutdown. Ephemeral Profiles queue none.
+  // Invalidates replies on destruction. Queued loads and flushes own their
+  // path and block normal shutdown. Ephemeral Profiles queue none.
   base::WeakPtrFactory<WorkspaceService> weak_factory_{this};
 };
 

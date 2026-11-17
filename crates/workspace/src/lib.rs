@@ -2,7 +2,8 @@
 
 //! Dependency-free workspace decisions. Browser services own page lifetimes and URL
 //! canonicalization; this crate owns organization and stable identities, never live tabs.
-//! Successful mutations are in-memory only. Storage adapters must persist separately.
+//! Successful mutations are in-memory only. Storage adapters must persist separately;
+//! `store` writes the file they encode so a crash never leaves a partial one.
 //!
 //! Default state is Space 1 (Everyday), Profile 1 and Window 1. Space 1 is only the
 //! starting Space of a new Profile and can be deleted like any other; restore needs
@@ -36,6 +37,7 @@ pub mod command_bar;
 pub mod drag;
 pub mod folder;
 pub mod split;
+pub mod store;
 
 pub use drag::DropTarget;
 pub use folder::{Folder, FolderDeletion, FolderId, MAX_FOLDER_NAME_BYTES, MAX_FOLDERS};

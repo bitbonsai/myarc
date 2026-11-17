@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "profile_id": "1",
+  "next_space_id": "3",
+  "next_item_id": "6",
+  "next_window_id": "2",
+  "spaces": [
+    {"id": "1", "profile_id": "1", "name": "Everyday"},
+    {"id": "2", "profile_id": "1", "name": "Doomed"}
+  ],
+  "items": [
+    {"id": "1", "placement": 1, "owner_id": "1", "has_url": true, "canonical_url": "http://127.0.0.1:9/pin-one", "title": "Pin one"},
+    {"id": "2", "placement": 1, "owner_id": "1", "has_url": true, "canonical_url": "http://127.0.0.1:9/pin-two", "title": "Pin two"},
+    {"id": "3", "placement": 1, "owner_id": "1", "has_url": true, "canonical_url": "http://127.0.0.1:9/pin-three", "title": "Pin three"},
+    {"id": "4", "placement": 1, "owner_id": "2", "has_url": true, "canonical_url": "http://127.0.0.1:9/doomed-pin", "title": "Doomed pin"},
+    {"id": "5", "placement": 0, "owner_id": "1", "has_url": true, "canonical_url": "http://127.0.0.1:9/today", "title": "Today tab"}
+  ],
+  "windows": [
+    {"id": "1", "space_id": "1", "selected_item_id": "0"}
+  ]
+}

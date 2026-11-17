@@ -8,7 +8,6 @@
 
 #include "base/containers/span.h"
 #include "base/files/file.h"
-#include "base/files/important_file_writer.h"
 #include "base/functional/bind.h"
 #include "base/json/json_reader.h"
 #include "base/json/json_writer.h"
@@ -20,6 +19,7 @@
 #include "base/task/thread_pool.h"
 #include "base/threading/sequence_local_storage_slot.h"
 #include "base/time/time.h"
+#include "base/timer/elapsed_timer.h"
 #include "base/values.h"
 #include "chrome/browser/browser_process.h"
 #include "chrome/browser/profiles/profile.h"
@@ -66,13 +66,14 @@ bool ReadId(const base::DictValue& dict, std::string_view key, uint64_t& id) {
          base::NumberToString(id) == *text;
 }
 
-internal::MetadataResult InvalidMetadata() {
+internal::MetadataResult InvalidMetadata(bool damaged = true) {
   return {std::nullopt,
           "Workspace metadata is corrupt, unsupported or exceeds limits. "
-          "File preserved. Recover it or move it aside, then retry loading."};
+          "File preserved. Recover it or move it aside, then retry loading.",
+          damaged};
 }
 
-internal::MetadataResult ReadMetadata(const base::FilePath& path) {
+internal::MetadataResult ReadMetadataFile(const base::FilePath& path) {
   base::File file(path, base::File::FLAG_OPEN | base::File::FLAG_READ);
   if (!file.IsValid()) {
     if (file.error_details() == base::File::FILE_ERROR_NOT_FOUND) {
@@ -97,17 +98,17 @@ internal::MetadataResult ReadMetadata(const base::FilePath& path) {
   return internal::DecodeWorkspaceMetadata(json);
 }
 
-bool WriteMetadata(const base::FilePath& path,
-                   foundation::StateSnapshot snapshot) {
-  const auto json = internal::EncodeWorkspaceMetadata(snapshot);
-  const bool ok =
-      json && base::ImportantFileWriter::WriteFileAtomically(path, *json);
-  // The service may have died or the UI loop stopped before the reply runs.
-  if (!ok) {
-    LOG(ERROR) << "Workspace metadata write failed. Check disk space and "
-                  "profile-directory permissions, then retry saving.";
-  }
-  return ok;
+rust::Str PathStr(const std::string& path) {
+  return rust::Str(path.data(), path.size());
+}
+
+// Blocking: flushes the saved file and its directory to the disk.
+void SyncMetadata(const base::FilePath& path) {
+  const std::string text = path.AsUTF8Unsafe();
+  const rust::String error = foundation::sync_workspace_file(PathStr(text));
+  LOG_IF(ERROR, !error.empty())
+      << "Workspace metadata flush failed: " << std::string(error)
+      << ". The file is saved but a power loss may lose recent changes.";
 }
 
 // GURL is the parser at both untrusted restore and saved-URL mutation
@@ -314,8 +315,14 @@ MetadataResult DecodeWorkspaceMetadata(std::string_view json) {
   // Unknown keys are ignored at every level, so a newer build can add
   // optional fields without breaking older ones. A change an older build must
   // not ignore needs a new version.
-  if (!root || root->FindInt("version") != static_cast<int>(limits.version)) {
+  if (!root) {
     return InvalidMetadata();
+  }
+  // A file a newer build wrote is not damaged; never replace it with the
+  // backup.
+  if (const auto version = root->FindInt("version");
+      version != static_cast<int>(limits.version)) {
+    return InvalidMetadata(/*damaged=*/!version.has_value());
   }
   const auto* spaces = root->FindList("spaces");
   const auto* items = root->FindList("items");
@@ -509,6 +516,40 @@ MetadataResult DecodeWorkspaceMetadata(std::string_view json) {
   return {std::move(snapshot), {}};
 }
 
+MetadataResult ReadWorkspaceMetadata(const base::FilePath& path) {
+  auto result = ReadMetadataFile(path);
+  const bool missing = !result.snapshot && result.error.empty();
+  if (!result.damaged && !missing) {
+    return result;
+  }
+  const std::string text = path.AsUTF8Unsafe();
+  const base::FilePath backup = base::FilePath::FromUTF8Unsafe(
+      std::string(foundation::workspace_backup_path(PathStr(text))));
+  auto from_backup = ReadMetadataFile(backup);
+  if (!from_backup.snapshot) {
+    // First run, or a damaged backup too: either way leave both files alone.
+    return missing ? from_backup : result;
+  }
+  if (missing) {
+    LOG(WARNING) << "Workspace file " << path << " is missing; loaded its "
+                 << "backup " << backup << ".";
+  } else {
+    // A later save would make the damaged file the backup, so move it first.
+    const std::string aside =
+        std::string(foundation::set_aside_workspace_file(PathStr(text)));
+    if (aside.empty()) {
+      LOG(ERROR) << "Workspace file " << path << " is damaged and could not "
+                 << "be moved aside; its backup was not loaded.";
+      return result;
+    }
+    LOG(WARNING) << "Workspace file " << path << " is damaged; loaded the "
+                 << "last good copy " << backup << " and kept the damaged "
+                 << "file as " << aside << ".";
+  }
+  from_backup.from_backup = true;
+  return from_backup;
+}
+
 }  // namespace internal
 
 WorkspaceService& WorkspaceService::ForProfile(Profile& profile) {
@@ -552,15 +593,9 @@ void WorkspaceService::FlushForShutdown() {
   if (ephemeral_ || !CanMutate() || !dirty_) {
     return;
   }
-  // W1 may still be in flight. Queue W2 on the same runner without waiting for
-  // its UI reply, which can be cancelled by destruction or normal shutdown.
-  if (!io_runner_->PostTask(
-          FROM_HERE,
-          base::BindOnce(base::IgnoreResult(&WriteMetadata), metadata_path_,
-                         foundation::export_snapshot(*workspace_)))) {
-    LOG(ERROR) << "Final workspace metadata write could not be scheduled. "
-                  "Keep the profile open and retry saving before closing.";
-  }
+  Save();
+  LOG_IF(ERROR, dirty_) << "Final workspace metadata write failed. Keep the "
+                           "profile open and retry saving before closing.";
 }
 
 WorkspaceService::StorageState WorkspaceService::storage_state() const {
@@ -590,7 +625,8 @@ void WorkspaceService::StartLoad() {
   storage_state_ = StorageState::kLoading;
   storage_error_.clear();
   if (!io_runner_->PostTaskAndReplyWithResult(
-          FROM_HERE, base::BindOnce(&ReadMetadata, metadata_path_),
+          FROM_HERE,
+          base::BindOnce(&internal::ReadWorkspaceMetadata, metadata_path_),
           base::BindOnce(&WorkspaceService::OnLoaded,
                          weak_factory_.GetWeakPtr()))) {
     storage_state_ = StorageState::kLoadError;
@@ -627,12 +663,16 @@ void WorkspaceService::OnLoaded(internal::MetadataResult result) {
       // Entries that expired while the browser was closed leave the file too.
       dirty_ = true;
     }
+    // The backup stood in for a damaged or missing file; write it back now.
+    if (restored.ok && result.from_backup) {
+      dirty_ = true;
+    }
   }
   storage_error_ = std::move(result.error);
   storage_state_ =
       storage_error_.empty() ? StorageState::kReady : StorageState::kLoadError;
   if (storage_state_ == StorageState::kReady) {
-    ScheduleWrite();
+    Save();
     // Brings the index up to date after edits by an older build or by hand.
     UpdateSpacesIndex();
   }
@@ -654,7 +694,7 @@ foundation::MutationResult WorkspaceService::Changed(
     if (!ephemeral_) {
       dirty_ = true;
       if (storage_state_ != StorageState::kWriteError) {
-        ScheduleWrite();
+        Save();
       }
     }
     changed_.Notify();
@@ -691,51 +731,73 @@ void WorkspaceService::UpdateSpacesIndex() {
   WriteIndexedSpaces(*local_state, profile_dir_, spaces);
 }
 
-void WorkspaceService::ScheduleWrite() {
+void WorkspaceService::Save() {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
-  if (ephemeral_ || write_in_flight_ || !dirty_) {
+  if (ephemeral_ || !dirty_) {
     return;
   }
-  dirty_ = false;
-  write_in_flight_ = true;
-  storage_state_ = StorageState::kWritePending;
-  storage_error_.clear();
-  if (!io_runner_->PostTaskAndReplyWithResult(
-          FROM_HERE,
-          base::BindOnce(&WriteMetadata, metadata_path_,
-                         foundation::export_snapshot(*workspace_)),
-          base::BindOnce(&WorkspaceService::OnWritten,
-                         weak_factory_.GetWeakPtr()))) {
-    write_in_flight_ = false;
-    dirty_ = true;
+  // The write goes into the kernel without waiting for the disk: about 5 ms
+  // with encoding for 1,000 Pins (bridge_check), under 1 ms for a few dozen.
+  // A process kill after it keeps the change.
+  const base::ElapsedTimer timer;
+  const auto json =
+      internal::EncodeWorkspaceMetadata(foundation::export_snapshot(*workspace_));
+  const std::string path = metadata_path_.AsUTF8Unsafe();
+  const rust::String error =
+      json ? foundation::write_workspace_file(
+                 PathStr(path),
+                 rust::Slice<const uint8_t>(
+                     reinterpret_cast<const uint8_t*>(json->data()),
+                     json->size()))
+           : rust::String("the workspace exceeds the file size limit");
+  if (!error.empty()) {
+    LOG(ERROR) << "Workspace metadata write failed: " << std::string(error)
+               << ". Check disk space and profile-directory permissions, "
+                  "then retry saving.";
     storage_state_ = StorageState::kWriteError;
-    storage_error_ = "Workspace write could not be scheduled. Retry saving.";
+    storage_error_ =
+        "Workspace metadata write failed. Changes remain in "
+        "memory. Check disk space/permissions and retry saving.";
+    return;
+  }
+  VLOG(1) << "Workspace saved in " << timer.Elapsed().InMicroseconds()
+          << " us, " << json->size() << " bytes";
+  dirty_ = false;
+  storage_state_ = StorageState::kWritten;
+  storage_error_.clear();
+  Sync();
+}
+
+void WorkspaceService::Sync() {
+  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
+  if (sync_in_flight_) {
+    sync_again_ = true;
+    return;
+  }
+  sync_in_flight_ = true;
+  // The flush runs even if this service dies first; only the reply drops.
+  if (!io_runner_->PostTaskAndReply(
+          FROM_HERE, base::BindOnce(&SyncMetadata, metadata_path_),
+          base::BindOnce(&WorkspaceService::OnSynced,
+                         weak_factory_.GetWeakPtr()))) {
+    sync_in_flight_ = false;
+  }
+}
+
+void WorkspaceService::OnSynced() {
+  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
+  sync_in_flight_ = false;
+  if (std::exchange(sync_again_, false)) {
+    Sync();
   }
 }
 
 void WorkspaceService::RetrySave() {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
   if (storage_state_ == StorageState::kWriteError) {
-    ScheduleWrite();
+    Save();
     changed_.Notify();
   }
-}
-
-void WorkspaceService::OnWritten(bool ok) {
-  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
-  write_in_flight_ = false;
-  if (!ok) {
-    dirty_ = true;
-    storage_state_ = StorageState::kWriteError;
-    storage_error_ =
-        "Workspace metadata write failed. Changes remain in "
-        "memory. Check disk space/permissions and retry saving.";
-  } else if (dirty_) {
-    ScheduleWrite();
-  } else {
-    storage_state_ = StorageState::kWritten;
-  }
-  changed_.Notify();
 }
 
 foundation::MutationResult WorkspaceService::CreateSpace(
@@ -793,6 +855,8 @@ foundation::ControlPlan WorkspaceService::AnswerControlRequest(
                                                  profile_dir_);
   if (plan.changed)
     SpacesChanged(foundation::MutationResult{true, 0, {}});
+  // Only now, with the change in the file, does the client hear of it.
+  foundation::send_control_answer(reply);
   return plan;
 }
 
@@ -1086,7 +1150,7 @@ foundation::MutationResult WorkspaceService::SetTemporaryPage(
   if (result.ok && result.id && !ephemeral_) {
     dirty_ = true;
     if (storage_state_ != StorageState::kWriteError)
-      ScheduleWrite();
+      Save();
   }
   return result;
 }

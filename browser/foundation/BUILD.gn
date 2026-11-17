@@ -18,6 +18,7 @@ rust_static_library("workspace") {
     "workspace/src/peek.rs",
     "workspace/src/site_icon.rs",
     "workspace/src/split.rs",
+    "workspace/src/store.rs",
     "workspace/src/tab_ops.rs",
     "workspace/src/url_label.rs",
   ]

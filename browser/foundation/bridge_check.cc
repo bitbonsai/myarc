@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <iostream>
 #include <limits>
 #include <optional>
@@ -6,10 +7,14 @@
 #include <utility>
 #include <vector>
 
+#include "base/files/file_path.h"
+#include "base/files/file_util.h"
+#include "base/files/scoped_temp_dir.h"
 #include "base/json/json_reader.h"
 #include "base/json/json_writer.h"
 #include "base/strings/string_number_conversions.h"
 #include "base/time/time.h"
+#include "base/timer/elapsed_timer.h"
 #include "myarc/bridge.rs.h"
 #include "myarc/library_logic.h"
 #include "myarc/spaces_index.h"
@@ -333,6 +338,114 @@ bool CheckMetadataRecords() {
 // rename follow the remaining Space, and the last Space cannot be deleted.
 // A Space's icon survives the bridge, the metadata file and restore, and a
 // bad icon fails without changing the stored one.
+bool WriteSnapshot(const base::FilePath& path,
+                   const myarc::foundation::StateSnapshot& state) {
+  const auto json = myarc::internal::EncodeWorkspaceMetadata(state);
+  const std::string text = path.AsUTF8Unsafe();
+  return json && myarc::foundation::write_workspace_file(
+                     rust::Str(text.data(), text.size()),
+                     rust::Slice<const uint8_t>(
+                         reinterpret_cast<const uint8_t*>(json->data()),
+                         json->size()))
+                     .empty();
+}
+
+// A damaged or missing file falls back to the backup; a file from a newer
+// build and a damaged file without a good backup stay as they are.
+bool CheckWorkspaceFileFallback() {
+  using namespace myarc::foundation;
+  using myarc::internal::ReadWorkspaceMetadata;
+  base::ScopedTempDir dir;
+  if (!dir.CreateUniqueTempDir())
+    return false;
+  const auto path = dir.GetPath().AppendASCII("myarc-workspace-v1.json");
+  const auto backup = path.AddExtensionASCII("bak");
+  const auto aside = path.AddExtensionASCII("corrupt");
+  auto name = [](const myarc::internal::MetadataResult& result) {
+    return result.snapshot ? std::string(result.snapshot->spaces[0].name)
+                           : std::string();
+  };
+  const auto first_run = ReadWorkspaceMetadata(path);
+  if (first_run.snapshot || !first_run.error.empty())
+    return false;
+  auto model = new_workspace();
+  if (!rename_space(*model, 1, "Good").ok ||
+      !WriteSnapshot(path, export_snapshot(*model)) ||
+      !rename_space(*model, 1, "Newer").ok ||
+      !WriteSnapshot(path, export_snapshot(*model))) {
+    return false;
+  }
+  const auto newest = ReadWorkspaceMetadata(path);
+  if (name(newest) != "Newer" || newest.from_backup)
+    return false;
+  // A torn newest generation: the backup loads, the torn file moves aside.
+  if (!base::WriteFile(path, R"({"version":1,"spa)"))
+    return false;
+  const auto torn = ReadWorkspaceMetadata(path);
+  std::string kept;
+  if (name(torn) != "Good" || !torn.from_backup || base::PathExists(path) ||
+      !base::ReadFileToString(aside, &kept) || kept != R"({"version":1,"spa)") {
+    std::cerr << "Torn file fallback failed: " << torn.error << '\n';
+    return false;
+  }
+  // With the file gone, as after a kill right after that move, the backup
+  // loads again.
+  const auto missing = ReadWorkspaceMetadata(path);
+  if (name(missing) != "Good" || !missing.from_backup)
+    return false;
+  // A newer build's file is not damaged: no fallback, and it stays.
+  if (!base::WriteFile(path, R"({"version":99})"))
+    return false;
+  const auto newer = ReadWorkspaceMetadata(path);
+  if (newer.snapshot || newer.damaged || newer.error.empty() ||
+      !base::PathExists(path)) {
+    return false;
+  }
+  // Damaged with a damaged backup: an error, and both files stay.
+  if (!base::WriteFile(path, "{broken") || !base::WriteFile(backup, "{"))
+    return false;
+  const auto both = ReadWorkspaceMetadata(path);
+  return !both.snapshot && both.damaged && !both.error.empty() &&
+         base::PathExists(path) && base::PathExists(backup);
+}
+
+// Times encoding and writing a workspace near the item limit, as each save
+// does on the UI thread.
+bool MeasureWorkspaceSave() {
+  using namespace myarc::foundation;
+  base::ScopedTempDir dir;
+  if (!dir.CreateUniqueTempDir())
+    return false;
+  const auto path = dir.GetPath().AppendASCII("myarc-workspace-v1.json");
+  auto model = new_workspace();
+  constexpr int kItems = 1000;
+  for (int i = 0; i < kItems; ++i) {
+    const auto item = add_temporary_item(*model, 1);
+    const std::string n = base::NumberToString(i);
+    if (!item.ok ||
+        !set_placement(*model, item.id, PlacementKind::Pin, 1, true,
+                       "https://example.test/synthetic/page/" + n +
+                           "?source=durability-check")
+             .ok ||
+        !set_title(*model, item.id, "Synthetic page number " + n).ok) {
+      return false;
+    }
+  }
+  std::vector<int64_t> micros;
+  for (int i = 0; i < 50; ++i) {
+    const base::ElapsedTimer timer;
+    if (!WriteSnapshot(path, export_snapshot(*model)))
+      return false;
+    micros.push_back(timer.Elapsed().InMicroseconds());
+  }
+  std::sort(micros.begin(), micros.end());
+  std::optional<int64_t> bytes = base::GetFileSize(path);
+  std::cout << "Workspace save of " << kItems << " Pins, " << bytes.value_or(0)
+            << " bytes: median " << micros[micros.size() / 2] << " us, max "
+            << micros.back() << " us\n";
+  return true;
+}
+
 bool CheckSpaceIcons() {
   using namespace myarc::foundation;
   using myarc::internal::DecodeWorkspaceMetadata;
@@ -1324,6 +1437,14 @@ int main() {
     if (!myarc::foundation::rename_space(*temporary, 1, "Owned by Rust").ok) {
       return 7;
     }
+  }
+  if (!CheckWorkspaceFileFallback()) {
+    std::cerr << "Workspace file fallback checks failed\n";
+    return 40;
+  }
+  if (!MeasureWorkspaceSave()) {
+    std::cerr << "Workspace save timing failed\n";
+    return 41;
   }
   if (!CheckWorkspaceRecords()) {
     std::cerr << "Workspace record/transition checks failed\n";
