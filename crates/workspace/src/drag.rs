@@ -40,6 +40,36 @@ pub enum DropTarget {
     Today { before: Option<ItemId> },
 }
 
+/// The band at the top and bottom of the sidebar's visible rows where a
+/// dragged row scrolls them, in DIP.
+pub const AUTOSCROLL_EDGE: i32 = 40;
+/// The most a drag scrolls the rows per tick, in DIP, at the very edge.
+pub const AUTOSCROLL_MAX_STEP: i32 = 16;
+
+/// How far a row dragged to `pointer_y` scrolls rows shown from 0 to
+/// `height`, per tick: negative scrolls up, positive down, and 0 in the
+/// middle. The step grows toward the edge and stays at its most past it, so
+/// a drag held at an edge keeps going. A view shorter than two bands uses a
+/// third of its height for each, and an empty one never scrolls.
+pub fn autoscroll_step(pointer_y: i32, height: i32) -> i32 {
+    if height <= 0 {
+        return 0;
+    }
+    let edge = AUTOSCROLL_EDGE.min(height / 3).max(1);
+    let step = |distance: i32| {
+        let depth = (edge - distance.max(0)).max(0);
+        // Rounds up, so the first pixel inside the band already moves.
+        (AUTOSCROLL_MAX_STEP * depth + edge - 1) / edge
+    };
+    if pointer_y < edge {
+        -step(pointer_y)
+    } else if pointer_y >= height - edge {
+        step(height - 1 - pointer_y)
+    } else {
+        0
+    }
+}
+
 impl Workspace {
     /// Drops `item_id`, a Pin or Today tab of the window's Space, on `target`.
     /// Pinning a Today tab saves `page_url` when the caller has a live page,
@@ -186,5 +216,45 @@ impl SidebarSnapshot {
         }
         order.extend(self.temporary.iter().map(|item| item.id));
         order
+    }
+}
+
+#[cfg(test)]
+mod autoscroll_tests {
+    use super::{AUTOSCROLL_EDGE, AUTOSCROLL_MAX_STEP, autoscroll_step};
+
+    #[test]
+    fn the_middle_does_not_scroll() {
+        assert_eq!(autoscroll_step(300, 600), 0);
+        assert_eq!(autoscroll_step(AUTOSCROLL_EDGE, 600), 0);
+        assert_eq!(autoscroll_step(600 - 1 - AUTOSCROLL_EDGE, 600), 0);
+    }
+
+    #[test]
+    fn edges_scroll_faster_the_closer_the_pointer() {
+        assert_eq!(autoscroll_step(0, 600), -AUTOSCROLL_MAX_STEP);
+        assert_eq!(autoscroll_step(599, 600), AUTOSCROLL_MAX_STEP);
+        let near = autoscroll_step(10, 600);
+        let far = autoscroll_step(30, 600);
+        assert!(near < far && far < 0, "{near} {far}");
+        assert!(autoscroll_step(590, 600) > autoscroll_step(570, 600));
+        assert!(autoscroll_step(600 - AUTOSCROLL_EDGE, 600) > 0);
+        assert!(autoscroll_step(AUTOSCROLL_EDGE - 1, 600) < 0);
+    }
+
+    #[test]
+    fn past_an_edge_keeps_the_fastest_step() {
+        assert_eq!(autoscroll_step(-50, 600), -AUTOSCROLL_MAX_STEP);
+        assert_eq!(autoscroll_step(900, 600), AUTOSCROLL_MAX_STEP);
+    }
+
+    #[test]
+    fn short_views_use_narrower_bands() {
+        assert_eq!(autoscroll_step(0, 0), 0);
+        assert_eq!(autoscroll_step(0, -5), 0);
+        assert_eq!(autoscroll_step(30, 90), 0);
+        assert!(autoscroll_step(10, 90) < 0);
+        assert!(autoscroll_step(80, 90) > 0);
+        assert_eq!(autoscroll_step(0, 1), -AUTOSCROLL_MAX_STEP);
     }
 }

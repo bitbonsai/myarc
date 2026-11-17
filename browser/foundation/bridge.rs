@@ -822,6 +822,9 @@ mod ffi {
             peek_enabled: bool,
         ) -> PeekRoute;
         fn peek_action(trigger: PeekTrigger) -> PeekActionKind;
+        // How far a sidebar drag at `pointer_y` scrolls rows shown from 0 to
+        // `height` per tick: negative up, 0 in the middle.
+        fn drag_autoscroll_step(pointer_y: i32, height: i32) -> i32;
         // The actions the command bar offers for `query`, closest first.
         // A leading "/" lists every action that applies.
         fn command_bar_offers(
@@ -1167,6 +1170,10 @@ pub fn bridge_limits() -> ffi::BridgeLimits {
         folders: workspace::MAX_FOLDERS,
         splits: workspace::MAX_SPLITS,
     }
+}
+
+pub fn drag_autoscroll_step(pointer_y: i32, height: i32) -> i32 {
+    workspace::drag::autoscroll_step(pointer_y, height)
 }
 
 pub fn command_bar_offers(

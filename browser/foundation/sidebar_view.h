@@ -15,6 +15,7 @@
 #include "base/memory/weak_ptr.h"
 #include "base/sequence_checker.h"
 #include "base/time/time.h"
+#include "base/timer/timer.h"
 #include "myarc/create_space_panel.h"
 #include "myarc/space_icon_catalog.h"
 #include "ui/base/metadata/metadata_header_macros.h"
@@ -383,6 +384,9 @@ class SidebarView final : public views::View,
     bool tile = false;
     // A split's row, which stands for its left tab and lands in Today only.
     bool split = false;
+    // A Favorite's tile. Favorites reorder among themselves, and a row
+    // dropped there becomes a Favorite.
+    bool favorite = false;
   };
   // Where a drag would land now, and the line or outline that shows it, in
   // this view's coordinates.
@@ -393,16 +397,24 @@ class SidebarView final : public views::View,
     gfx::Rect mark;
     // `mark` outlines a folder row rather than drawing a line.
     bool outline = false;
+    // Among the Favorites, before `before` or at their end with 0.
+    bool favorite = false;
     bool operator==(const Drop&) const = default;
   };
   struct RowDrag {
     uint64_t item = 0;
     bool split = false;
+    bool favorite = false;
     raw_ptr<views::View> source;
     gfx::Point press;
+    // The pointer's last place, which edge scrolling drops at.
+    gfx::Point point;
     bool lifted = false;
     std::optional<Drop> drop;
   };
+  // While a lifted row sits near the top or bottom of the rows, scrolls
+  // them a step and moves the drop with them.
+  void AutoscrollRowDrag();
 
   views::View* AddStorageRetry(views::View& parent, StorageRetry retry);
   void TrackFocus(views::View* view,
@@ -439,7 +451,11 @@ class SidebarView final : public views::View,
   // --myarc-capture-drag=<item ID>:<folder ID>[:hold]: drags the row onto
   // the folder row with synthetic mouse events, holding it there with hold.
   // r<item ID> in place of the folder drops it above that row (`row`).
-  void RunCaptureDrag(uint64_t item, uint64_t folder, uint64_t row, bool hold);
+  void RunCaptureDrag(uint64_t item,
+                      uint64_t folder,
+                      uint64_t row,
+                      bool hold,
+                      bool edge = false);
   // Drops the Library view without notifying the parent.
   void ResetLibrary();
   // The Create a Space panel's callbacks.
@@ -501,6 +517,9 @@ class SidebarView final : public views::View,
   // Sees every mouse event under this view before its target, for row drags.
   std::unique_ptr<ui::EventHandler> row_drag_handler_;
   std::optional<RowDrag> row_drag_;
+  // The rows' scroll view, which a drag near its edges scrolls.
+  raw_ptr<views::ScrollView> rows_scroll_ = nullptr;
+  base::RepeatingTimer autoscroll_timer_;
   // The drop's line or outline, above the rows while a drag shows one.
   raw_ptr<views::View> drop_indicator_ = nullptr;
   // A model that arrived mid-drag, applied when the drag ends without a drop.

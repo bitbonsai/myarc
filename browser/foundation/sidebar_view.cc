@@ -527,7 +527,9 @@ constexpr char kCaptureActivate[] = "myarc-capture-activate";
 // Opens the first tile's context menu once, for background captures.
 constexpr char kCaptureItemMenu[] = "myarc-capture-item-menu";
 // Drags a row onto a folder row once, for background captures:
-// <item ID>:<folder ID>, and :hold to keep it over the folder.
+// <item ID>:<folder ID>, and :hold to keep it over the folder. <item ID>:r<row
+// ID> drops it before that row or tile, and <item ID>:edge holds it at the
+// rows' bottom edge, which scrolls them.
 constexpr char kCaptureDrag[] = "myarc-capture-drag";
 // <item ID>:hover holds a Pin's or Favorite's tile or row hovered, which shows
 // the back arrow once its page left the saved URL; <item ID>:reset and
@@ -1227,6 +1229,8 @@ void SidebarView::OpenLibrary(LibrarySection section) {
 
 void SidebarView::DropRows() {
   row_drag_.reset();
+  autoscroll_timer_.Stop();
+  rows_scroll_ = nullptr;
   deferred_model_.reset();
   drop_indicator_ = nullptr;
   drop_zones_.clear();
@@ -1682,6 +1686,7 @@ void SidebarView::OnRowDragEvent(ui::Event& event) {
         if (zone.item && zone.view->Contains(target)) {
           row_drag_ = RowDrag{.item = zone.item,
                               .split = zone.split,
+                              .favorite = zone.favorite,
                               .source = zone.view,
                               .press = point};
           break;
@@ -1707,7 +1712,12 @@ void SidebarView::OnRowDragEvent(ui::Event& event) {
         source.layer()->SetOpacity(kLiftedOpacity);
       }
       event.StopPropagation();
+      row_drag_->point = point;
       ShowDrop(DropAt(point));
+      if (!autoscroll_timer_.IsRunning()) {
+        autoscroll_timer_.Start(FROM_HERE, base::Milliseconds(30), this,
+                                &SidebarView::AutoscrollRowDrag);
+      }
       return;
     case ui::EventType::kMouseReleased:
       if (!row_drag_) {
@@ -1739,10 +1749,16 @@ std::optional<SidebarView::Drop> SidebarView::DropAt(
     }
     // A split's row moves within Today only, until a split can be pinned.
     if (row_drag_ && row_drag_->split &&
-        zone.kind != foundation::DropTargetKind::Today) {
+        (zone.kind != foundation::DropTargetKind::Today || zone.favorite)) {
       return std::nullopt;
     }
-    Drop drop = {.kind = zone.kind, .folder = zone.folder};
+    // A Favorite moves among the Favorites only; Move to Space Pins in its
+    // menu takes it out.
+    if (row_drag_ && row_drag_->favorite && !zone.favorite) {
+      return std::nullopt;
+    }
+    Drop drop = {
+        .kind = zone.kind, .folder = zone.folder, .favorite = zone.favorite};
     if (!zone.item) {
       drop.before = zone.next;
       if (zone.kind == foundation::DropTargetKind::Folder) {
@@ -1799,6 +1815,7 @@ void SidebarView::EndRowDrag(bool commit) {
     return;
   }
   const RowDrag drag = *std::exchange(row_drag_, std::nullopt);
+  autoscroll_timer_.Stop();
   ShowDrop(std::nullopt);
   if (drag.lifted && drag.source->layer()) {
     drag.source->DestroyLayer();
@@ -1809,8 +1826,11 @@ void SidebarView::EndRowDrag(bool commit) {
     // The drop's own model replaces any that arrived mid-drag. Dropping can
     // rebuild or delete this view.
     auto weak = weak_factory_.GetWeakPtr();
-    const bool dropped = delegate_->DropItem(
-        drag.item, drag.drop->kind, drag.drop->folder, drag.drop->before);
+    const bool dropped =
+        drag.drop->favorite
+            ? delegate_->DropFavorite(drag.item, drag.drop->before)
+            : delegate_->DropItem(drag.item, drag.drop->kind,
+                                  drag.drop->folder, drag.drop->before);
     if (!weak || dropped) {
       return;
     }
@@ -1820,19 +1840,42 @@ void SidebarView::EndRowDrag(bool commit) {
   }
 }
 
+void SidebarView::AutoscrollRowDrag() {
+  if (!row_drag_ || !row_drag_->lifted || !rows_scroll_) {
+    autoscroll_timer_.Stop();
+    return;
+  }
+  const gfx::Rect rows = views::View::ConvertRectToTarget(
+      rows_scroll_, this, rows_scroll_->GetLocalBounds());
+  const int step = foundation::drag_autoscroll_step(
+      row_drag_->point.y() - rows.y(), rows.height());
+  if (!step) {
+    return;
+  }
+  const float before = rows_scroll_->CurrentOffset().y();
+  rows_scroll_->ScrollByOffset(gfx::PointF(0, step));
+  if (rows_scroll_->CurrentOffset().y() != before) {
+    // The rows moved under a still pointer, so the drop moves too.
+    ShowDrop(DropAt(row_drag_->point));
+  }
+}
+
 void SidebarView::RunCaptureDrag(uint64_t item,
                                  uint64_t folder,
                                  uint64_t row,
-                                 bool hold) {
+                                 bool hold,
+                                 bool edge) {
   const auto source = std::ranges::find(drop_zones_, item, &DropZone::item);
-  const auto target =
-      std::ranges::find_if(drop_zones_, [folder, row](const DropZone& zone) {
-        return row ? zone.item == row
-                   : zone.kind == foundation::DropTargetKind::Folder &&
-                         zone.folder == folder && !zone.item;
+  // The edge drag aims at the source itself, then moves to the rows' edge.
+  const auto target = std::ranges::find_if(
+      drop_zones_, [folder, row, edge, item](const DropZone& zone) {
+        return edge  ? zone.item == item
+               : row ? zone.item == row
+                     : zone.kind == foundation::DropTargetKind::Folder &&
+                           zone.folder == folder && !zone.item;
       });
   if (!GetWidget() || source == drop_zones_.end() ||
-      target == drop_zones_.end()) {
+      target == drop_zones_.end() || (edge && !rows_scroll_)) {
     LOG(ERROR) << "Capture drag found no row " << item << ", folder "
                << folder << " or target row " << row;
     return;
@@ -1843,9 +1886,19 @@ void SidebarView::RunCaptureDrag(uint64_t item,
   const gfx::Rect target_bounds = target->view->GetLocalBounds();
   gfx::Point to = target_bounds.CenterPoint();
   if (row) {
-    to.set_y(target_bounds.y() + target_bounds.height() / 4);
+    // Before a row lands in its top half, before a tile in its left half.
+    if (target->tile) {
+      to.set_x(target_bounds.x() + target_bounds.width() / 4);
+    } else {
+      to.set_y(target_bounds.y() + target_bounds.height() / 4);
+    }
   }
   views::View::ConvertPointToWidget(target->view, &to);
+  if (edge) {
+    gfx::Point bottom(rows_scroll_->width() / 2, rows_scroll_->height() - 4);
+    views::View::ConvertPointToWidget(rows_scroll_, &bottom);
+    to = bottom;
+  }
   // Through the root view, as the window would send them, but without the
   // pointer, so the capture never takes focus or moves the mouse.
   views::View* root = GetWidget()->GetRootView();
@@ -2267,6 +2320,7 @@ void SidebarView::SetModel(const foundation::SidebarResult& model,
   current_space_id_ = model.current_space.id;
   focus_targets_.clear();
   drop_zones_.clear();
+  rows_scroll_ = nullptr;
   new_tab_ = nullptr;
   tiles_.clear();
   // Loading and title ticks rebuild only the rows. The footer stays, with its
@@ -2292,6 +2346,7 @@ void SidebarView::SetModel(const foundation::SidebarResult& model,
   }
 
   auto* scroll = AddChildViewAt(std::make_unique<views::ScrollView>(), 0);
+  rows_scroll_ = scroll;
   // Bounded mode sizes contents to viewport width and full preferred height.
   scroll->ClipHeightTo(0, std::numeric_limits<int>::max());
   scroll->SetHorizontalScrollBarMode(
@@ -2337,7 +2392,20 @@ void SidebarView::SetModel(const foundation::SidebarResult& model,
         *tile_items[i], true, tile_items[i]->id == model.selected_item_id));
     static_cast<views::BoxLayout*>(tiles_row->GetLayoutManager())
         ->SetFlexForView(tile, 1);
-    // Pin tiles drag and take drops; Favorites stay put.
+    // Favorites drag among themselves, and a row dropped on them becomes one.
+    if (tile_items[i]->placement == foundation::PlacementKind::Favorite) {
+      const auto next = std::find_if(
+          tile_items.begin() + i + 1, tile_items.end(), [](const auto* item) {
+            return item->placement == foundation::PlacementKind::Favorite;
+          });
+      drop_zones_.push_back({.view = tile,
+                             .kind = foundation::DropTargetKind::Pins,
+                             .item = tile_items[i]->id,
+                             .next = next == tile_items.end() ? 0 : (*next)->id,
+                             .tile = true,
+                             .favorite = true});
+    }
+    // Pin tiles drag and take drops.
     if (tile_items[i]->placement == foundation::PlacementKind::Pin) {
       const auto next = std::find_if(
           tile_items.begin() + i + 1, tile_items.end(), [](const auto* item) {
@@ -2602,16 +2670,19 @@ void SidebarView::SetModel(const foundation::SidebarResult& model,
     uint64_t item = 0;
     uint64_t folder = 0;
     uint64_t row = 0;
-    // "r<item ID>" drops above that row instead of on a folder.
+    // "r<item ID>" drops above that row instead of on a folder, and "edge"
+    // holds the row at the bottom edge of the rows, which scrolls them.
     const bool to_row = parts.size() >= 2 && parts[1].starts_with('r') &&
                         base::StringToUint64(parts[1].substr(1), &row);
+    const bool to_edge = parts.size() >= 2 && parts[1] == "edge";
     if (parts.size() >= 2 && base::StringToUint64(parts[0], &item) &&
-        (to_row || base::StringToUint64(parts[1], &folder))) {
+        (to_row || to_edge || base::StringToUint64(parts[1], &folder))) {
       base::SequencedTaskRunner::GetCurrentDefault()->PostDelayedTask(
           FROM_HERE,
           base::BindOnce(&SidebarView::RunCaptureDrag,
                          weak_factory_.GetWeakPtr(), item, folder, row,
-                         parts.size() > 2 && parts[2] == "hold"),
+                         to_edge || (parts.size() > 2 && parts[2] == "hold"),
+                         to_edge),
           base::Milliseconds(2000));
     }
   }
