@@ -33,6 +33,7 @@ WORKS = [
     'Ctrl+Tab switches to your last tab, and holding Ctrl goes further back through the five most recent.',
     'Little Arc: links from other apps open in a small window, and Option-Cmd-N opens one. Open in <Space> or Cmd+O moves the page into your current Space. Settings > Links turns it off.',
     'The command bar runs actions: type pin, archive, split or a Space\'s name, or / to list them. View has Clear Cookies and Refresh and Clear Cache and Refresh for the current site.',
+    'Pins, folders and Spaces survive a force quit. Each change is saved before the sidebar shows it, and a damaged workspace file falls back to the backup.',
     'Agents can drive tabs in the Agent Space through the bundled myarc CLI and MCP server. It is off by default. Turn it on in Settings > Advanced, and myArc asks before each new agent connects.',
 ]
 
