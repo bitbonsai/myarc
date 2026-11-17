@@ -1012,6 +1012,29 @@ foundation::MutationResult WorkspaceService::RenameItem(uint64_t item,
                                          rust::Str(name.data(), name.size())));
 }
 
+foundation::MutationResult WorkspaceService::SetCanonicalUrl(
+    uint64_t item,
+    std::string_view url) {
+  if (!CanMutate())
+    return Failure("Workspace is not loaded. Check storage state.");
+  const auto canonical = CanonicalUrl(url);
+  if (!canonical)
+    return Failure(
+        "Save a page with a valid HTTP(S) URL without credentials, or "
+        "about:blank.");
+  return Changed(foundation::set_canonical_url(
+      *workspace_, item, rust::Str(canonical->data(), canonical->size())));
+}
+
+bool WorkspaceService::DiffersFromCanonical(uint64_t item,
+                                            std::string_view url) const {
+  if (!CanMutate() || url.size() > foundation::bridge_limits().url_bytes)
+    return false;
+  const auto result = foundation::differs_from_canonical(
+      *workspace_, item, rust::Str(url.data(), url.size()));
+  return result.ok && result.id == 1;
+}
+
 foundation::MutationResult WorkspaceService::DropItem(
     uint64_t window,
     uint64_t item,

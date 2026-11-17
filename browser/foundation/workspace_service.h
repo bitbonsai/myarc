@@ -158,6 +158,14 @@ class WorkspaceService final : public base::SupportsUserData::Data {
   // Saved items only: the name the row shows instead of the page title. An
   // empty name clears it.
   foundation::MutationResult RenameItem(uint64_t item, std::string_view name);
+  // Saved items only (BC-003): Replace Pinned URL with Current saves `url`,
+  // the live page's, as the item's saved URL. Only URLs a Pin can save pass.
+  foundation::MutationResult SetCanonicalUrl(uint64_t item,
+                                             std::string_view url);
+  // Whether a saved item's live page at `url` is away from its saved URL,
+  // which shows Arc's slash and back control. False for Today tabs and while
+  // the workspace isn't loaded.
+  bool DiffersFromCanonical(uint64_t item, std::string_view url) const;
   // Drops a Pin or Today tab of `window`'s Space on a folder (`folder`), the
   // ungrouped Pins or Today, above `before` or at the end with zero. Pinning a
   // live Today tab saves `page_url`. Nothing changes on failure.

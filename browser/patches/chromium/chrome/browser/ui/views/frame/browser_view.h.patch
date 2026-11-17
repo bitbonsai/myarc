@@ -1,5 +1,5 @@
 diff --git a/chrome/browser/ui/views/frame/browser_view.h b/chrome/browser/ui/views/frame/browser_view.h
-index 750e46c97b64dccccf4268e912df5dbdb6516b3c..0281dd5acd91812265c299e9f4a7fdbe1257c6d7 100644
+index 750e46c97b64dccccf4268e912df5dbdb6516b3c..62338e93978c82b7fb8cd8f75365974bcbfe098d 100644
 --- a/chrome/browser/ui/views/frame/browser_view.h
 +++ b/chrome/browser/ui/views/frame/browser_view.h
 @@ -8,11 +8,13 @@
@@ -126,7 +126,7 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..0281dd5acd91812265c299e9f4a7fdbe
    base::WeakPtr<BrowserView> GetAsWeakPtr() {
      return weak_ptr_factory_.GetWeakPtr();
    }
-@@ -1253,12 +1313,253 @@ class BrowserView : public BrowserWindow,
+@@ -1253,12 +1313,255 @@ class BrowserView : public BrowserWindow,
  
    // Anchor point for help bubbles and other dialogs that want to reliably
    // anchor outside the content area of the window.
@@ -148,6 +148,8 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..0281dd5acd91812265c299e9f4a7fdbe
 +                uint64_t folder,
 +                uint64_t before) override;
 +  void RenameItem(uint64_t item) override;
++  void ResetItem(uint64_t item) override;
++  void ReplaceItemUrl(uint64_t item) override;
 +  void OpenInSplitView(uint64_t item) override;
 +  void NewSplit() override;
 +  void SeparateSplit(uint64_t item) override;
@@ -380,7 +382,7 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..0281dd5acd91812265c299e9f4a7fdbe
  
    // A mapping between accelerators and command IDs.
    std::map<ui::Accelerator, int> accelerator_table_;
-@@ -1411,6 +1712,7 @@ class BrowserView : public BrowserWindow,
+@@ -1411,6 +1714,7 @@ class BrowserView : public BrowserWindow,
    base::EnumSet<TabStripAndWebAppViewsReparentedState>
        tab_strip_web_apps_reparented_state_;
  

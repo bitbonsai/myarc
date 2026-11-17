@@ -2373,6 +2373,44 @@ foundation::MutationResult BrowserWorkspaceAdapter::MovePinToFolder(
   }
   return Remember(service_->MovePinToFolder(item, folder, 0));
 }
+bool BrowserWorkspaceAdapter::NavigatedAway(uint64_t item) const {
+  const auto metadata = Metadata(item);
+  return ready() && metadata &&
+         service_->DiffersFromCanonical(item, metadata->current_url.spec());
+}
+
+foundation::MutationResult BrowserWorkspaceAdapter::ResetToSavedUrl(
+    uint64_t item) {
+  if (!ready())
+    return Fail(error());
+  auto state = service_->ExportSnapshot();
+  const auto* row = state ? FindItem(*state, item) : nullptr;
+  if (!row || row->placement == foundation::PlacementKind::Temporary ||
+      !row->has_url)
+    return Remember(Fail("Only a Pin or Favorite goes back to a saved URL."));
+  BrowserWorkspaceAdapter* owner = nullptr;
+  if (auto* page = FindPage(item, &owner);
+      page && owner == this && NavigatedAway(item)) {
+    // Same as a click on a dormant row: the saved URL, as a bookmark opens.
+    content::NavigationController::LoadURLParams params(
+        GURL(std::string(row->canonical_url)));
+    params.transition_type = ui::PAGE_TRANSITION_AUTO_BOOKMARK;
+    page->GetController().LoadURLWithParams(params);
+  }
+  return ActivateItem(item);
+}
+
+foundation::MutationResult BrowserWorkspaceAdapter::ReplaceSavedUrl(
+    uint64_t item) {
+  if (!ready())
+    return Fail(error());
+  const auto metadata = Metadata(item);
+  if (!metadata)
+    return Remember(Fail("Open the page first, then replace its saved URL."));
+  return Remember(
+      service_->SetCanonicalUrl(item, metadata->current_url.spec()));
+}
+
 foundation::MutationResult BrowserWorkspaceAdapter::RenameItem(
     uint64_t item,
     std::string_view name) {

@@ -203,7 +203,30 @@ class ItemTile final : public views::MdTextButton {
     }
   }
 
+  // A Pin or Favorite away from its saved page shows `back` in place of
+  // `icon` under the pointer (BC-003).
+  void SetBackImage(ui::ImageModel icon, ui::ImageModel back) {
+    icon_ = std::move(icon);
+    back_ = std::move(back);
+  }
+
+  void OnMouseEntered(const ui::MouseEvent& event) override {
+    views::MdTextButton::OnMouseEntered(event);
+    ShowBack(true);
+  }
+
+  void OnMouseExited(const ui::MouseEvent& event) override {
+    views::MdTextButton::OnMouseExited(event);
+    ShowBack(false);
+  }
+
  private:
+  void ShowBack(bool show) {
+    if (!back_.IsEmpty()) {
+      SetImageModel(views::Button::STATE_NORMAL, show ? back_ : icon_);
+    }
+  }
+
   // Arc's ring is ~1.5 DIP inside the tile's 10 DIP corners.
   static constexpr float kRingWidth = 1.5f;
   static constexpr float kCornerRadius = 10;
@@ -223,6 +246,8 @@ class ItemTile final : public views::MdTextButton {
   }
 
   std::optional<SkColor> ring_;
+  ui::ImageModel icon_;
+  ui::ImageModel back_;
 };
 
 BEGIN_METADATA(ItemTile)
@@ -449,6 +474,9 @@ enum ItemCommand {
   kDeleteSpace,
   kEditTheme,
   kChangeIcon,
+  kEditPinnedPage,
+  kResetToSaved,
+  kReplaceSavedUrl,
   // Move to Folder's entries: this plus the folder's index in folders_.
   kMoveToFolderFirst = 1000
 };
@@ -501,6 +529,10 @@ constexpr char kCaptureItemMenu[] = "myarc-capture-item-menu";
 // Drags a row onto a folder row once, for background captures:
 // <item ID>:<folder ID>, and :hold to keep it over the folder.
 constexpr char kCaptureDrag[] = "myarc-capture-drag";
+// <item ID>:hover holds a Pin's or Favorite's tile or row hovered, which shows
+// the back arrow once its page left the saved URL; <item ID>:reset and
+// <item ID>:replace run Edit Pinned Page's two commands. Once, for captures.
+constexpr char kCapturePin[] = "myarc-capture-pin";
 
 // The creation menu floats 17 DIP above the Create button, its notch tip 12
 // DIP above it and 4 DIP left of its center, and its right edge 5 DIP inside
@@ -516,10 +548,17 @@ class ItemRow final : public views::View, public views::FocusChangeListener {
   METADATA_HEADER(ItemRow, views::View)
 
  public:
+  // `back`, when set, replaces the icon while the row is hovered or
+  // focused: a Pin away from its saved page (BC-003).
   ItemRow(std::unique_ptr<views::MdTextButton> activate,
           std::unique_ptr<views::MdTextButton> close,
-          bool selected)
-      : selected_(selected) {
+          bool selected,
+          ui::ImageModel back = ui::ImageModel())
+      : selected_(selected), back_(std::move(back)) {
+    if (!back_.IsEmpty()) {
+      icon_ = activate->GetImageModel(views::Button::STATE_NORMAL)
+                  .value_or(ui::ImageModel());
+    }
     // The composite row owns hover paint, including the close target.
     views::InkDrop::Get(activate.get())
         ->SetMode(views::InkDropHost::InkDropMode::OFF);
@@ -527,7 +566,8 @@ class ItemRow final : public views::View, public views::FocusChangeListener {
         Orientation::kHorizontal, gfx::Insets(), 0));
     layout->set_cross_axis_alignment(
         views::BoxLayout::CrossAxisAlignment::kCenter);
-    layout->SetFlexForView(AddChildView(std::move(activate)), 1);
+    activate_ = AddChildView(std::move(activate));
+    layout->SetFlexForView(activate_, 1);
     // Dormant Pins have no live page to close.
     if (close) {
       close_ = AddChildView(std::move(close));
@@ -585,10 +625,17 @@ class ItemRow final : public views::View, public views::FocusChangeListener {
     if (close_) {
       close_->SetVisible(reveal);
     }
+    if (!back_.IsEmpty()) {
+      activate_->SetImageModel(views::Button::STATE_NORMAL,
+                               reveal ? back_ : icon_);
+    }
   }
 
+  raw_ptr<views::MdTextButton> activate_ = nullptr;
   raw_ptr<views::MdTextButton> close_ = nullptr;
   const bool selected_;
+  ui::ImageModel icon_;
+  const ui::ImageModel back_;
   bool hovered_ = false;
   base::ScopedObservation<views::FocusManager, views::FocusChangeListener>
       focus_observation_{this};
@@ -1022,6 +1069,7 @@ void SidebarView::ShowContextMenuForViewImpl(
   menu_runner_.reset();
   menu_model_ = std::make_unique<ui::SimpleMenuModel>(this);
   folder_menu_model_.reset();
+  edit_pin_menu_model_.reset();
   menu_folder_ids_.clear();
   // Arc's order: Copy Link first, the page's own actions next, and removal
   // last behind its own separator.
@@ -1032,6 +1080,19 @@ void SidebarView::ShowContextMenuForViewImpl(
   // Arc renames a pinned tab from its menu.
   if (menu_state_.is_pin) {
     menu_model_->AddItem(kRenameItem, u"Rename\u2026");
+  }
+  // Arc's Edit Pinned Page goes back to the saved URL or saves the page
+  // shown now in its place (BC-003). Both wait for the page to leave it.
+  if (menu_state_.is_pin || menu_state_.is_favorite) {
+    edit_pin_menu_model_ = std::make_unique<ui::SimpleMenuModel>(this);
+    edit_pin_menu_model_->AddItem(kResetToSaved, u"Back to Pinned URL");
+    edit_pin_menu_model_->AddItem(kReplaceSavedUrl,
+                                  u"Replace Pinned URL with Current");
+    for (size_t i = 0; i < edit_pin_menu_model_->GetItemCount(); ++i) {
+      edit_pin_menu_model_->SetEnabledAt(i, menu_state_.navigated_away);
+    }
+    menu_model_->AddSubMenu(kEditPinnedPage, u"Edit Pinned Page",
+                            edit_pin_menu_model_.get());
   }
   if (!menu_state_.is_pin) {
     menu_model_->AddItem(kPin, menu_state_.is_favorite ? u"Move to Space Pins"
@@ -1443,6 +1504,40 @@ void SidebarView::OpenCaptureItemMenu(int tries) {
       base::Milliseconds(300));
 }
 
+void SidebarView::RunCapturePin(uint64_t item, std::string step, int tries) {
+  if (tries <= 0) {
+    return;
+  }
+  if (step == "reset" || step == "replace") {
+    LOG(WARNING) << "myarc-capture-pin " << step << " " << item;
+    if (step == "reset") {
+      delegate_->ResetItem(item);
+    } else {
+      delegate_->ReplaceItemUrl(item);
+    }
+    return;
+  }
+  // Rows rebuild on title and load ticks, so keep the hover on.
+  const auto target =
+      std::ranges::find_if(focus_targets_, [item](const FocusTarget& target) {
+        return target.action == FocusAction::kActivate && target.id == item;
+      });
+  if (target != focus_targets_.end()) {
+    // As the pointer would: the tile itself, or the row around its button.
+    const ui::MouseEvent enter(ui::EventType::kMouseEntered, gfx::Point(),
+                               gfx::Point(), ui::EventTimeForNow(), 0, 0);
+    target->view->OnMouseEntered(enter);
+    if (auto* row = views::AsViewClass<ItemRow>(target->view->parent())) {
+      row->OnMouseEntered(enter);
+    }
+  }
+  base::SequencedTaskRunner::GetCurrentDefault()->PostDelayedTask(
+      FROM_HERE,
+      base::BindOnce(&SidebarView::RunCapturePin, weak_factory_.GetWeakPtr(),
+                     item, std::move(step), tries - 1),
+      base::Milliseconds(200));
+}
+
 void SidebarView::SetControlClient(std::u16string client,
                                    base::RepeatingClosure stop) {
   control_client_ = std::move(client);
@@ -1533,6 +1628,12 @@ void SidebarView::ExecuteCommand(int command_id, int event_flags) {
       return;
     case kRenameItem:
       delegate_->RenameItem(id);
+      return;
+    case kResetToSaved:
+      delegate_->ResetItem(id);
+      return;
+    case kReplaceSavedUrl:
+      delegate_->ReplaceItemUrl(id);
       return;
     case kOpenInSplitView:
       delegate_->OpenInSplitView(id);
@@ -1779,6 +1880,19 @@ void SidebarView::TrackFocus(views::View* view,
 SidebarView::ItemPresentation SidebarView::Present(
     const foundation::ItemRecord& item) const {
   ItemPresentation presentation = delegate_->GetItemPresentation(item);
+  // A Pin that left its saved page reads "saved / current", as Arc's slash
+  // shows (BC-003): its name or stored title, then the live page's title.
+  if (presentation.navigated_away) {
+    std::u16string saved =
+        base::UTF8ToUTF16(std::string(item.name.empty() ? item.title
+                                                         : item.name));
+    if (saved.empty()) {
+      saved =
+          base::UTF8ToUTF16(std::string(foundation::url_label(item.canonical_url)));
+    }
+    presentation.title = saved + u" / " + presentation.title;
+    return presentation;
+  }
   // The user's name for a Pin wins over its page's title, live or stored, as
   // in Arc, until it is cleared.
   if (!item.name.empty()) {
@@ -1806,8 +1920,30 @@ std::unique_ptr<views::View> SidebarView::MakeItem(
     bool in_split) {
   ItemPresentation presentation = Present(item);
   const auto foreground = ui::kColorSysOnSurface;
-  auto activate_callback = base::BindRepeating(
-      &Delegate::ActivateItem, base::Unretained(&delegate_.get()), item.id);
+  // Arc's back control (BC-003): on a Pin or Favorite that left its saved
+  // page, the icon turns into a back arrow on hover, and a click on it goes
+  // back. A tile shows it while selected; a row's icon always offers it.
+  const bool saved = item.placement != foundation::PlacementKind::Temporary;
+  const bool back = saved && presentation.navigated_away && (!tile || selected);
+  auto activate_callback =
+      back ? base::BindRepeating(
+                 [](Delegate* delegate, uint64_t id, bool tile,
+                    const ui::Event& event) {
+                   const bool on_icon =
+                       tile || !event.IsLocatedEvent() ||
+                       event.AsLocatedEvent()->x() < kRowTextStart;
+                   if (on_icon) {
+                     delegate->ResetItem(id);
+                   } else {
+                     delegate->ActivateItem(id);
+                   }
+                 },
+                 base::Unretained(&delegate_.get()), item.id, tile)
+           : base::BindRepeating(
+                 [](Delegate* delegate, uint64_t id, const ui::Event&) {
+                   delegate->ActivateItem(id);
+                 },
+                 base::Unretained(&delegate_.get()), item.id);
   std::unique_ptr<views::MdTextButton> activate =
       tile ? Button<ItemTile>(std::move(activate_callback), {})
            : Button(std::move(activate_callback), presentation.title);
@@ -1816,11 +1952,27 @@ std::unique_ptr<views::View> SidebarView::MakeItem(
         vector_icons::kGlobeIcon, foreground, tile ? 20 : 16);
   }
   activate->SetImageModel(views::Button::STATE_NORMAL, presentation.icon);
+  const ui::ImageModel back_icon =
+      back ? ui::ImageModel::FromVectorIcon(kArrowLeftIcon, foreground,
+                                            presentation.icon.Size().width())
+           : ui::ImageModel();
+  if (tile && back) {
+    static_cast<ItemTile*>(activate.get())
+        ->SetBackImage(presentation.icon, back_icon);
+  }
   activate->SetImageLabelSpacing(8);
-  activate->SetTooltipText(presentation.title);
+  activate->SetTooltipText(
+      back ? presentation.title + (tile ? u"\nClick to go back to the pinned page"
+                                        : u"\nClick the icon to go back to "
+                                          u"the pinned page")
+           : presentation.title);
   activate->GetViewAccessibility().SetName(presentation.title);
   activate->GetViewAccessibility().SetDescription(
-      presentation.is_live ? u"Open tab" : u"Saved site");
+      saved && presentation.navigated_away
+          ? u"Away from its pinned page. Edit Pinned Page in its menu goes "
+            u"back."
+      : presentation.is_live ? u"Open tab"
+                             : u"Saved site");
   activate->GetViewAccessibility().SetIsSelected(selected);
   activate->SetEnabledTextColors(foreground);
   if (tile) {
@@ -1835,7 +1987,8 @@ std::unique_ptr<views::View> SidebarView::MakeItem(
       folder,
       item.placement == foundation::PlacementKind::Temporary &&
           presentation.is_live && !in_split,
-      in_split};
+      in_split,
+      saved && presentation.navigated_away};
   TrackFocus(activate.get(), FocusAction::kActivate, item.id, menu_state);
   if (tile) {
     activate->SetHorizontalAlignment(gfx::ALIGN_CENTER);
@@ -1851,7 +2004,8 @@ std::unique_ptr<views::View> SidebarView::MakeItem(
   // page.
   if (item.placement != foundation::PlacementKind::Temporary &&
       !presentation.is_live) {
-    return std::make_unique<ItemRow>(std::move(activate), nullptr, selected);
+    return std::make_unique<ItemRow>(std::move(activate), nullptr, selected,
+                                     back_icon);
   }
   auto close = IconButton(
       base::BindRepeating(&Delegate::CloseLiveItem,
@@ -1865,7 +2019,7 @@ std::unique_ptr<views::View> SidebarView::MakeItem(
   close->GetViewAccessibility().SetName(close_name);
   TrackFocus(close.get(), FocusAction::kClose, item.id, menu_state);
   return std::make_unique<ItemRow>(std::move(activate), std::move(close),
-                                   selected);
+                                   selected, back_icon);
 }
 
 std::unique_ptr<views::View> SidebarView::MakeSplit(
@@ -2459,6 +2613,23 @@ void SidebarView::SetModel(const foundation::SidebarResult& model,
                          weak_factory_.GetWeakPtr(), item, folder, row,
                          parts.size() > 2 && parts[2] == "hold"),
           base::Milliseconds(2000));
+    }
+  }
+  if (!capture_pin_scheduled_ &&
+      base::CommandLine::ForCurrentProcess()->HasSwitch(kCapturePin)) {
+    capture_pin_scheduled_ = true;
+    const std::vector<std::string> parts = base::SplitString(
+        base::CommandLine::ForCurrentProcess()->GetSwitchValueASCII(
+            kCapturePin),
+        ":", base::TRIM_WHITESPACE, base::SPLIT_WANT_NONEMPTY);
+    uint64_t item = 0;
+    if (parts.size() == 2 && base::StringToUint64(parts[0], &item)) {
+      // After the seeded page has loaded and moved on.
+      base::SequencedTaskRunner::GetCurrentDefault()->PostDelayedTask(
+          FROM_HERE,
+          base::BindOnce(&SidebarView::RunCapturePin,
+                         weak_factory_.GetWeakPtr(), item, parts[1], 150),
+          base::Milliseconds(5000));
     }
   }
   if (!capture_activate_scheduled_ &&

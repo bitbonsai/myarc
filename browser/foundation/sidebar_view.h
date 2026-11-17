@@ -77,6 +77,8 @@ class SidebarView final : public views::View,
     std::u16string title;
     ui::ImageModel icon;  // Parent supplies a favicon, preferably 16 or 20 DIP.
     bool is_live = false;
+    // A Pin's or Favorite's live page has left its saved URL (BC-003).
+    bool navigated_away = false;
   };
 
   // Arc's Library rail, top to bottom.
@@ -175,6 +177,11 @@ class SidebarView final : public views::View,
     // Rename… on a Pin: the parent asks for its name, and an empty one goes
     // back to the page title.
     virtual void RenameItem(uint64_t item_id) = 0;
+    // BC-003. Arc's back control on a Pin or Favorite that left its saved
+    // URL: its page goes back there. Replace Pinned URL with Current saves
+    // the page it shows instead. The parent reports errors.
+    virtual void ResetItem(uint64_t item_id) = 0;
+    virtual void ReplaceItemUrl(uint64_t item_id) = 0;
     // Split View. Open in Split View splits the item with the current tab,
     // or, for the current tab itself, opens a new pane beside it as New
     // Split does. Separate All Tabs ends the item's split and keeps both
@@ -352,6 +359,8 @@ class SidebarView final : public views::View,
     // A live Today tab can open in Split View; a split's tab can leave it.
     bool can_split = false;
     bool in_split = false;
+    // The live page left the saved URL, so Edit Pinned Page can act.
+    bool navigated_away = false;
     bool operator==(const ItemMenuState&) const = default;
   };
   struct FocusTarget {
@@ -453,6 +462,9 @@ class SidebarView final : public views::View,
   // --myarc-capture-item-menu: opens the first tile's context menu, then
   // reopens it whenever it closed, `tries` more times.
   void OpenCaptureItemMenu(int tries);
+  // --myarc-capture-pin: holds `item`'s row or tile hovered, or runs its
+  // reset or replace, for background captures (BC-003).
+  void RunCapturePin(uint64_t item, std::string step, int tries);
   // Builds the footer for spaces_ and current_space_id_, tracking its
   // controls' focus.
   void BuildFooter(const gfx::PointF& spaces_offset, bool space_changed);
@@ -496,6 +508,7 @@ class SidebarView final : public views::View,
   std::u16string deferred_status_;
   StorageRetry deferred_retry_ = StorageRetry::kNone;
   bool capture_drag_scheduled_ = false;
+  bool capture_pin_scheduled_ = false;
   // The footer kept across row rebuilds, and the Spaces it shows.
   raw_ptr<views::View> footer_ = nullptr;
   // Float above the footer, outside the layout, and go with it.
@@ -542,6 +555,7 @@ class SidebarView final : public views::View,
   // Move to Folder's submenu of `menu_model_`, which outlives it, and the
   // folder each of its entries names.
   std::unique_ptr<ui::SimpleMenuModel> folder_menu_model_;
+  std::unique_ptr<ui::SimpleMenuModel> edit_pin_menu_model_;
   std::vector<uint64_t> menu_folder_ids_;
   std::unique_ptr<ui::SimpleMenuModel> menu_model_;
   std::unique_ptr<views::MenuRunner> menu_runner_;

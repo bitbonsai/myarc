@@ -1,5 +1,5 @@
 diff --git a/chrome/browser/ui/views/frame/browser_view.cc b/chrome/browser/ui/views/frame/browser_view.cc
-index 7b568f6de760af21d6e9d2aa44415a7cef617c51..3ab6ddc4c3f4e1ac15a5b96b1f1acad1e3ea887c 100644
+index 7b568f6de760af21d6e9d2aa44415a7cef617c51..4a16bb3bb6cc340d1a01bc854e4ad6aeaf1f0925 100644
 --- a/chrome/browser/ui/views/frame/browser_view.cc
 +++ b/chrome/browser/ui/views/frame/browser_view.cc
 @@ -22,6 +22,7 @@
@@ -2002,7 +2002,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..3ab6ddc4c3f4e1ac15a5b96b1f1acad1
  }
  
  void BrowserView::RemovedFromWidget() {
-@@ -5267,164 +6875,2777 @@ const views::View* BrowserView::GetViewByElementId(
+@@ -5267,164 +6875,2792 @@ const views::View* BrowserView::GetViewByElementId(
  ///////////////////////////////////////////////////////////////////////////////
  // BrowserView, ui::AcceleratorTarget overrides:
  
@@ -2685,6 +2685,9 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..3ab6ddc4c3f4e1ac15a5b96b1f1acad1
 +  // Close applies to this window, not another window's live projection.
 +  result.is_live =
 +      myarc_workspace_live_items_.contains(base::NumberToString(item.id));
++  result.navigated_away =
++      item.placement != myarc::foundation::PlacementKind::Temporary &&
++      myarc_workspace_adapter_->NavigatedAway(item.id);
 +  return result;
 +}
 +
@@ -2822,6 +2825,18 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..3ab6ddc4c3f4e1ac15a5b96b1f1acad1
 +  if (sidebar.ok) {
 +    ShowMyarcSpaceDialog(sidebar.current_space.id, 0, item);
 +  }
++}
++
++void BrowserView::ResetItem(uint64_t item) {
++  auto weak = myarc_workspace_weak_factory_.GetWeakPtr();
++  auto result = myarc_workspace_adapter_->ResetToSavedUrl(item);
++  if (weak) {
++    weak->MyarcWorkspaceResult(std::move(result));
++  }
++}
++
++void BrowserView::ReplaceItemUrl(uint64_t item) {
++  MyarcWorkspaceResult(myarc_workspace_adapter_->ReplaceSavedUrl(item));
 +}
 +
 +void BrowserView::OpenInSplitView(uint64_t item) {
@@ -4901,7 +4916,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..3ab6ddc4c3f4e1ac15a5b96b1f1acad1
        new_tab && new_tab->IsSplit() &&
        !exclusive_access_context_->GetExclusiveAccessManager()
             ->fullscreen_controller()
-@@ -5471,6 +9692,10 @@ bool BrowserView::MaybeUpdateDevtools(content::WebContents* contents) {
+@@ -5471,6 +9707,10 @@ bool BrowserView::MaybeUpdateDevtools(content::WebContents* contents) {
  
  void BrowserView::UpdateUIForContents(WebContents* contents,
                                        bool should_layout_immediately) {
@@ -4912,7 +4927,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..3ab6ddc4c3f4e1ac15a5b96b1f1acad1
    TRACE_EVENT0("ui", "BrowserView::UpdateUIForContents");
    bool needs_layout = MaybeShowBookmarkBar(contents);
  
-@@ -5706,6 +9931,26 @@ void BrowserView::LoadAccelerators() {
+@@ -5706,6 +9946,26 @@ void BrowserView::LoadAccelerators() {
    }
  
  #if BUILDFLAG(IS_MAC)

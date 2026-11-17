@@ -195,6 +195,15 @@ class BrowserWorkspaceAdapter final : public TabStripModelObserver {
   // Pins a temporary item here first. Zero folder takes a Pin out of its
   // folder.
   foundation::MutationResult MovePinToFolder(uint64_t item, uint64_t folder);
+  // BC-003. Whether a Pin's or Favorite's live page has left its saved URL,
+  // which shows Arc's slash and back control.
+  bool NavigatedAway(uint64_t item) const;
+  // Arc's reset: the item's page goes back to its saved URL and shows here.
+  // A dormant item opens at its saved URL, as a click does.
+  foundation::MutationResult ResetToSavedUrl(uint64_t item);
+  // Replace Pinned URL with Current: the page the item shows now becomes its
+  // saved URL.
+  foundation::MutationResult ReplaceSavedUrl(uint64_t item);
   // A Pin's own name, shown instead of its page title; empty clears it.
   foundation::MutationResult RenameItem(uint64_t item, std::string_view name);
   // A sidebar drag's drop in this window's Space; see WorkspaceService. A

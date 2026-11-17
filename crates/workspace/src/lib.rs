@@ -1720,6 +1720,47 @@ mod tests {
         );
     }
 
+    /// BC-003's transition table for Arc's back control and Edit Pinned Page,
+    /// for a Pin and a Favorite: leaving the saved page shows the slash, going
+    /// back clears it without touching the saved URL, and Replace Pinned URL
+    /// with Current makes the page shown the saved one, across a restart.
+    #[test]
+    fn reset_and_replace_follow_the_slash() {
+        let mut workspace = Workspace::default();
+        let pinned = pin(&mut workspace, DEFAULT_SPACE_ID);
+        let favorite = pin(&mut workspace, DEFAULT_SPACE_ID);
+        workspace
+            .set_placement(
+                favorite,
+                Placement::Favorite {
+                    profile_id: DEFAULT_PROFILE_ID,
+                },
+                None,
+            )
+            .unwrap();
+        for id in [pinned, favorite] {
+            let placement = workspace.item(id).unwrap().placement;
+            // Navigated away: the slash and back control show.
+            assert_eq!(workspace.differs_from_canonical(id, URL_B), Ok(true));
+            // Back to Pinned URL loads the saved URL; nothing is saved.
+            let url = workspace.item(id).unwrap().canonical_url.clone().unwrap();
+            assert_eq!(url, URL_A);
+            assert_eq!(workspace.differs_from_canonical(id, &url), Ok(false));
+            // Replace Pinned URL with Current saves the page shown.
+            assert_eq!(workspace.set_canonical_url(id, URL_B), Ok(()));
+            assert_eq!(workspace.differs_from_canonical(id, URL_B), Ok(false));
+            assert_eq!(workspace.differs_from_canonical(id, URL_A), Ok(true));
+            assert_eq!(workspace.item(id).unwrap().placement, placement);
+        }
+        let restored = Workspace::from_snapshot(workspace.snapshot()).unwrap();
+        for id in [pinned, favorite] {
+            assert_eq!(
+                restored.item(id).unwrap().canonical_url.as_deref(),
+                Some(URL_B)
+            );
+        }
+    }
+
     #[test]
     fn delete_space_removes_owned_items_and_keeps_others() {
         let mut workspace = Workspace::default();
