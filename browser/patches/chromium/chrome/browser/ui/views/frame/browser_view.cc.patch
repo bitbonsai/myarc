@@ -1,5 +1,5 @@
 diff --git a/chrome/browser/ui/views/frame/browser_view.cc b/chrome/browser/ui/views/frame/browser_view.cc
-index 7b568f6de760af21d6e9d2aa44415a7cef617c51..e7cffc65e4b0ad5fbb112ae1e0ea75431ba98ae3 100644
+index 7b568f6de760af21d6e9d2aa44415a7cef617c51..3ab6ddc4c3f4e1ac15a5b96b1f1acad1e3ea887c 100644
 --- a/chrome/browser/ui/views/frame/browser_view.cc
 +++ b/chrome/browser/ui/views/frame/browser_view.cc
 @@ -22,6 +22,7 @@
@@ -1779,7 +1779,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..e7cffc65e4b0ad5fbb112ae1e0ea7543
  
      if (dialog_anchor_) {
        rect.Offset(0, -kAdditionalDialogToolbarOverlap);
-@@ -5197,6 +6589,220 @@ void BrowserView::AddedToWidget() {
+@@ -5197,6 +6589,222 @@ void BrowserView::AddedToWidget() {
        kFallbackPopupAnchorElementId, *this);
  
    initialized_ = true;
@@ -1945,6 +1945,8 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..e7cffc65e4b0ad5fbb112ae1e0ea7543
 +    myarc_workspace_sidebar_ = sidebar.get();
 +    vertical_tab_strip_region_view_->SetMyarcWorkspaceSidebar(
 +        std::move(sidebar));
++    // Option-Cmd-N from any app, once the first workspace window exists.
++    myarc::StartLittleArcHotKey();
 +    if (PrefService* local_state = g_browser_process->local_state();
 +        local_state && !myarc_spaces_index_registrar_.prefs()) {
 +      myarc_spaces_index_registrar_.Init(local_state);
@@ -2000,7 +2002,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..e7cffc65e4b0ad5fbb112ae1e0ea7543
  }
  
  void BrowserView::RemovedFromWidget() {
-@@ -5267,164 +6873,2777 @@ const views::View* BrowserView::GetViewByElementId(
+@@ -5267,164 +6875,2777 @@ const views::View* BrowserView::GetViewByElementId(
  ///////////////////////////////////////////////////////////////////////////////
  // BrowserView, ui::AcceleratorTarget overrides:
  
@@ -4899,7 +4901,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..e7cffc65e4b0ad5fbb112ae1e0ea7543
        new_tab && new_tab->IsSplit() &&
        !exclusive_access_context_->GetExclusiveAccessManager()
             ->fullscreen_controller()
-@@ -5471,6 +9690,10 @@ bool BrowserView::MaybeUpdateDevtools(content::WebContents* contents) {
+@@ -5471,6 +9692,10 @@ bool BrowserView::MaybeUpdateDevtools(content::WebContents* contents) {
  
  void BrowserView::UpdateUIForContents(WebContents* contents,
                                        bool should_layout_immediately) {
@@ -4910,7 +4912,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..e7cffc65e4b0ad5fbb112ae1e0ea7543
    TRACE_EVENT0("ui", "BrowserView::UpdateUIForContents");
    bool needs_layout = MaybeShowBookmarkBar(contents);
  
-@@ -5706,6 +9929,26 @@ void BrowserView::LoadAccelerators() {
+@@ -5706,6 +9931,26 @@ void BrowserView::LoadAccelerators() {
    }
  
  #if BUILDFLAG(IS_MAC)

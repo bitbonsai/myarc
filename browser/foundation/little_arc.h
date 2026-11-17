@@ -45,6 +45,15 @@ BrowserWindowInterface* OpenLittleArc(Profile& profile, const GURL& url);
 // already shows it. Returns false when the link should open as a normal tab.
 bool OpenLinkFromOtherApp(Profile& profile, const GURL& url);
 
+// Registers Option-Cmd-N system-wide while Settings > Links' Little Arc
+// switch is on, so the key opens a new Little Arc on the command bar with
+// another app in front. Turning the switch off unregisters it. When another
+// app holds the key, registration fails and is logged, and the key works only
+// with myArc in front. Idempotent; call once a workspace window exists.
+// Test-hook builds take --myarc-test-little-arc-hotkey, which registers
+// Ctrl-Option-Cmd-F19 instead, so a test can post a key no app holds.
+void StartLittleArcHotKey();
+
 // The main window "Open in" moves `little_arc`'s page to: the most recently
 // used one of its Profile with a loaded workspace, or null.
 BrowserWindowInterface* LittleArcMoveTarget(BrowserWindowInterface& little_arc);

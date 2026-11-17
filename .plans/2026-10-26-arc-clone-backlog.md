@@ -142,7 +142,7 @@ Feature lines: 159 total, 25 done, 38 partial, 96 missing. Shortcut table: 44 ro
 ## Little Arc
 
 - [ ] Links opened from other apps open in a small Little Arc window by default. | status: missing | evidence: none (docs/PARITY.md CONV-01) | source: https://resources.arc.net/hc/en-us/articles/19235387524503-Little-Arc-Quick-Lookups-Instant-Triaging
-- [ ] Cmd+Option+N opens an empty Little Arc for a quick search; Cmd+Option-click on a tab opens it there. | status: missing | evidence: none | source: https://resources.arc.net/hc/en-us/articles/19235387524503-Little-Arc-Quick-Lookups-Instant-Triaging
+- [ ] Cmd+Option+N opens an empty Little Arc for a quick search; Cmd+Option-click on a tab opens it there. | status: partial | evidence: browser/foundation/little_arc.cc StartLittleArcHotKey (system-wide; research-private/captures/20261117-little-arc-hotkey); Cmd+Option-click missing | source: https://resources.arc.net/hc/en-us/articles/19235387524503-Little-Arc-Quick-Lookups-Instant-Triaging
 - [ ] Open In moves the link to the last Space (Cmd+O) or a chosen Space (Cmd+Option+O); Cmd+Shift+O organizes Little Arc tabs by keyboard. | status: missing | evidence: none | source: https://resources.arc.net/hc/en-us/articles/19235387524503-Little-Arc-Quick-Lookups-Instant-Triaging
 - [ ] Little Arc windows archive after 6 hours; a dock menu item shows or hides all of them. | status: missing | evidence: none | source: https://resources.arc.net/hc/en-us/articles/19235387524503-Little-Arc-Quick-Lookups-Instant-Triaging
 - [ ] Re-clicking the same external link resurfaces the existing window and remembers the chosen Profile per domain. | status: missing | evidence: none | source: https://resources.arc.net/hc/en-us/articles/20498293324823-Arc-for-macOS-2024-2026-Release-Notes
@@ -220,7 +220,7 @@ From the public shortcuts article ([source](https://resources.arc.net/hc/en-us/a
 | Cmd+N | New window | partial | stock; two-window evidence in log/DEVLOG.md 2026-10-25 |
 | Cmd+Shift+N | New incognito window | done | log/DEVLOG.md 2026-10-25 private workspace |
 | Cmd+W | Close current tab or window | partial | closes live page, keeps saved record; stock for windows |
-| Cmd+Option+N | Open Little Arc | missing | none |
+| Cmd+Option+N | Open Little Arc | partial | browser/foundation/little_arc.cc (system-wide hot key while the Little Arc switch is on) |
 | Ctrl+Cmd+N | Blank window (from Arc Shortcuts settings; not in public docs) | done | browser/experiments/native-blank-window-shortcut.md |
 | Cmd+Shift+T | Reopen last closed tab | done | browser/experiments/native-late-window-restore.md |
 | Cmd+D | Pin / unpin current tab | done | MyarcWorkspaceCommandSafetyTest.PinShortcutTogglesSpacePin; Bookmark This Tab loses Cmd+D in myArc mode |

@@ -9,6 +9,8 @@
 
 #include "base/command_line.h"
 #include "base/functional/bind.h"
+#include "base/logging.h"
+#include "base/no_destructor.h"
 #include "base/strings/utf_string_conversions.h"
 #include "cc/paint/paint_flags.h"
 #include "chrome/browser/browser_process.h"
@@ -21,6 +23,8 @@
 #include "chrome/browser/ui/navigator/browser_navigator.h"
 #include "chrome/browser/ui/navigator/browser_navigator_params.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
+#include "components/prefs/pref_change_registrar.h"
+#include "components/prefs/pref_service.h"
 #include "components/security_state/core/security_state.h"
 #include "components/url_formatter/url_formatter.h"
 #include "content/public/browser/web_contents.h"
@@ -29,7 +33,10 @@
 #include "myarc/icons.h"
 #include "myarc/little_arc_prefs.h"
 #include "myarc/space_icon_catalog.h"
+#include "myarc/test_buildflags.h"
 #include "ui/accessibility/ax_enums.mojom.h"
+#include "ui/base/accelerators/accelerator.h"
+#include "ui/base/accelerators/global_accelerator_listener/global_accelerator_listener.h"
 #include "ui/base/base_window.h"
 #include "ui/base/metadata/metadata_impl_macros.h"
 #include "ui/base/models/image_model.h"
@@ -39,6 +46,8 @@
 #include "ui/color/color_provider.h"
 #include "ui/display/display.h"
 #include "ui/display/screen.h"
+#include "ui/events/event_constants.h"
+#include "ui/events/keycodes/keyboard_codes.h"
 #include "ui/gfx/canvas.h"
 #include "ui/gfx/color_utils.h"
 #include "ui/gfx/font_list.h"
@@ -602,5 +611,96 @@ void LittleArcHeader::Move() {
 
 BEGIN_METADATA(LittleArcHeader)
 END_METADATA
+
+namespace {
+
+// Option-Cmd-N from any app. The listener is Chromium's, the one extension
+// commands use; on macOS it registers a Carbon hot key.
+class LittleArcHotKey final : public ui::GlobalAcceleratorListener::Observer {
+ public:
+  static LittleArcHotKey& Get() {
+    static base::NoDestructor<LittleArcHotKey> hot_key;
+    return *hot_key;
+  }
+
+  void Start() {
+    PrefService* local_state = g_browser_process->local_state();
+    if (started_ || !local_state || !IsLittleArcMode()) {
+      return;
+    }
+    started_ = true;
+    registrar_.Init(local_state);
+    registrar_.Add(
+        kLittleArcLinksPref,
+        base::BindRepeating(&LittleArcHotKey::Update, base::Unretained(this)));
+    Update();
+  }
+
+ private:
+  friend class base::NoDestructor<LittleArcHotKey>;
+  LittleArcHotKey() = default;
+  ~LittleArcHotKey() override = default;
+
+  static ui::Accelerator Key() {
+#if BUILDFLAG(MYARC_TEST_HOOKS)
+    if (base::CommandLine::ForCurrentProcess()->HasSwitch(
+            "myarc-test-little-arc-hotkey")) {
+      return ui::Accelerator(ui::VKEY_F19, ui::EF_CONTROL_DOWN |
+                                               ui::EF_ALT_DOWN |
+                                               ui::EF_COMMAND_DOWN);
+    }
+#endif
+    return ui::Accelerator(ui::VKEY_N, ui::EF_ALT_DOWN | ui::EF_COMMAND_DOWN);
+  }
+
+  void Update() {
+    auto* listener = ui::GlobalAcceleratorListener::GetInstance();
+    if (!listener || listener->IsShortcutHandlingSuspended()) {
+      return;
+    }
+    const bool wanted =
+        IsLittleArcLinksEnabled(g_browser_process->local_state());
+    if (wanted == registered_) {
+      return;
+    }
+    if (!wanted) {
+      listener->UnregisterAccelerator(Key(), this);
+      registered_ = false;
+      LOG(WARNING) << "myarc-little-arc-hotkey unregistered";
+      return;
+    }
+    // Another app holding the key wins; the key then works only with myArc
+    // in front, through the View menu.
+    registered_ = listener->RegisterAccelerator(Key(), this);
+    LOG(WARNING) << "myarc-little-arc-hotkey "
+                 << (registered_ ? "registered " : "taken by another app: ")
+                 << Key().GetShortcutText();
+  }
+
+  // ui::GlobalAcceleratorListener::Observer:
+  void OnKeyPressed(const ui::Accelerator& accelerator) override {
+    // The Little Arc takes the Profile of the window used last.
+    BrowserWindowInterface* last = nullptr;
+    ForEachCurrentBrowserWindowInterfaceOrderedByActivation(
+        [&last](BrowserWindowInterface* browser) {
+          last = browser;
+          return false;
+        });
+    const bool opened = last && OpenLittleArc(*last->GetProfile(), GURL());
+    LOG(WARNING) << "myarc-little-arc-hotkey pressed opened=" << opened;
+  }
+  void ExecuteCommand(const std::string& accelerator_group_id,
+                      const std::string& command_id) override {}
+
+  PrefChangeRegistrar registrar_;
+  bool started_ = false;
+  bool registered_ = false;
+};
+
+}  // namespace
+
+void StartLittleArcHotKey() {
+  LittleArcHotKey::Get().Start();
+}
 
 }  // namespace myarc
