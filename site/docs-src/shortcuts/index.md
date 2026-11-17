@@ -22,18 +22,11 @@ These shortcuts work in the current nightly. Standard Chromium shortcuts, such a
 | Ctrl+Shift+= | Opens a Split View next to the current tab | Same |
 | Ctrl+Shift+- | Separates a Split View and keeps both tabs | Arc closes the current pane instead |
 | Ctrl+Shift+1, Ctrl+Shift+2 | Moves focus between the two panes of a Split View | Same |
-| Cmd+O | Turns a Peek card into a tab | Same |
+| Cmd+O | Turns a Peek card into a tab, or moves a Little Arc page into your current Space | Same |
+| Cmd+Option+N | Opens Little Arc, a small window for a quick page, while myArc is in front | Arc's also works from other apps |
 
 The command bar is the box for addresses and searches. Inside it, the arrow keys move through suggestions, Enter opens the selected one and Escape closes the bar.
 
 Cmd+Shift+C opens the element inspector in Chrome. myArc follows Arc and copies the address instead.
-
-## Arc shortcuts that don't work yet
-
-These belong to features myArc doesn't have yet.
-
-| Shortcut | What it does in Arc |
-| --- | --- |
-| Cmd+Option+N | Opens Little Arc, a small window for a quick page |
 
 You can't change shortcuts yet. The Shortcuts tab in Settings is greyed out until it's built.
