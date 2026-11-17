@@ -1,0 +1,22 @@
+diff --git a/chrome/browser/extensions/chrome_extension_system.cc b/chrome/browser/extensions/chrome_extension_system.cc
+index 53e2ad0e842216fe3cc59387c08b7c0d9d216958..b56583db1a6a0643fb13d7a09073627fb15530af 100644
+--- a/chrome/browser/extensions/chrome_extension_system.cc
++++ b/chrome/browser/extensions/chrome_extension_system.cc
+@@ -66,6 +66,7 @@
+ #include "extensions/common/constants.h"
+ #include "extensions/common/features/feature_channel.h"
+ #include "extensions/common/manifest_handlers/manifest_url_handlers.h"
++#include "myarc/blocker.h"
+ #include "ui/message_center/public/cpp/notifier_id.h"
+ 
+ #if BUILDFLAG(ENABLE_EXTENSIONS)
+@@ -311,6 +312,9 @@ void ChromeExtensionSystem::Shared::Init(bool extensions_enabled) {
+ 
+   extension_service_->Init();
+ 
++  // myArc: every Profile gets the bundled ad and tracker blocker once.
++  myarc::MaybeInstallBlocker(*profile_);
++
+   // Make sure ExtensionSyncService is created.
+   ExtensionSyncService::Get(profile_);
+ 

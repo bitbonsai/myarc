@@ -1,0 +1,25 @@
+diff --git a/chrome/browser/extensions/updater/extension_updater.cc b/chrome/browser/extensions/updater/extension_updater.cc
+index fd6684c9250831d33fbae85a3473255a83b9bbb8..960320ce5c265387f301dc673b9d50de61486cd5 100644
+--- a/chrome/browser/extensions/updater/extension_updater.cc
++++ b/chrome/browser/extensions/updater/extension_updater.cc
+@@ -62,6 +62,7 @@
+ #include "extensions/common/manifest.h"
+ #include "extensions/common/manifest_constants.h"
+ #include "extensions/common/manifest_handlers/manifest_url_handlers.h"
++#include "myarc/blocker.h"
+ 
+ #if BUILDFLAG(IS_CHROMEOS)
+ #include "base/time/time.h"
+@@ -413,6 +414,12 @@ void ExtensionUpdater::EraseUnupdatableIds(std::set<ExtensionId>& ids) const {
+           GetEffectiveUpdateURL(*extension).is_empty()) {
+         return true;
+       }
++      // myArc: the bundled blocker ships with the browser and has no update
++      // URL; don't ask the Web Store about it.
++      if (extension->id() == myarc::kBlockerExtensionId &&
++          GetEffectiveUpdateURL(*extension).is_empty()) {
++        return true;
++      }
+       // Remove external-policy installed extensions if in kiosk mode.
+       if (kiosk_crx_manifest_update_url_ignored &&
+           extension->location() == mojom::ManifestLocation::kExternalPolicy) {

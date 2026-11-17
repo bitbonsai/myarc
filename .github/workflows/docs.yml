@@ -18,3 +18,5 @@ jobs:
           persist-credentials: false
       - name: Validate relative Markdown links
         run: python3 tools/check_docs.py
+      - name: Check the vendored blocker
+        run: python3 tools/test_blocker_vendor.py

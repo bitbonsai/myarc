@@ -450,3 +450,52 @@ source_set("nightly_switches") {
     "//base",
   ]
 }
+
+# uBlock Origin Lite, myArc's default ad and tracker blocker. See
+# blocker/README.md.
+source_set("blocker") {
+  sources = [
+    "blocker.cc",
+    "blocker.h",
+  ]
+  deps = [
+    "//base",
+    "//chrome/browser/profiles:profile",
+    "//chrome/common:constants",
+    "//components/prefs",
+    "//content/public/browser",
+    "//extensions/browser",
+    "//extensions/browser:crx_installer",
+    "//extensions/browser/install",
+    "//extensions/common",
+    "//extensions/common:mojom",
+    "//third_party/zlib/google:zip",
+  ]
+}
+
+source_set("blocker_popup") {
+  sources = [
+    "blocker_popup.cc",
+    "blocker_popup.h",
+  ]
+  deps = [
+    ":blocker",
+    "//base",
+    "//chrome/browser/extensions",
+    "//chrome/browser/profiles:profile",
+    "//chrome/browser/ui:browser_element_identifiers",
+    "//chrome/browser/ui:chrome_pages",
+    "//chrome/browser/ui/browser_window",
+    "//chrome/browser/ui/views/extensions:extension_popup",
+    "//chrome/browser/ui/views/interaction",
+    "//components/sessions",
+    "//components/tabs:public",
+    "//extensions/browser",
+    "//ui/views",
+  ]
+}
+
+bundle_data("blocker_bundle_data") {
+  sources = [ "blocker/uBOLite_2026.1116.1650.chromium.zip" ]
+  outputs = [ "{{bundle_resources_dir}}/ublock_origin_lite.zip" ]
+}

@@ -1,5 +1,5 @@
 diff --git a/chrome/browser/ui/cocoa/main_menu_builder.mm b/chrome/browser/ui/cocoa/main_menu_builder.mm
-index 047674248727a122fb3aee712981eefd0a4c3049..5381c91afaf08fdf94dced3a01810311763e1a8f 100644
+index 047674248727a122fb3aee712981eefd0a4c3049..a7b9c0e12264e6fe1890df5f1a748bf26814e80b 100644
 --- a/chrome/browser/ui/cocoa/main_menu_builder.mm
 +++ b/chrome/browser/ui/cocoa/main_menu_builder.mm
 @@ -6,6 +6,9 @@
@@ -12,7 +12,15 @@ index 047674248727a122fb3aee712981eefd0a4c3049..5381c91afaf08fdf94dced3a01810311
  #include "base/feature_list.h"
  #include "base/i18n/rtl.h"
  #include "base/mac/mac_util.h"
-@@ -34,6 +37,33 @@ namespace {
+@@ -23,6 +26,7 @@
+ #include "chrome/grit/generated_resources.h"
+ #include "components/dom_distiller/core/dom_distiller_features.h"
+ #include "components/strings/grit/components_strings.h"
++#include "myarc/command_ids.h"
+ #include "ui/base/accelerators/platform_accelerator_cocoa.h"
+ #import "ui/base/cocoa/macos27_sdk.h"
+ #include "ui/base/l10n/l10n_util.h"
+@@ -34,6 +38,33 @@ namespace {
  
  using Item = internal::MenuItemBuilder;
  
@@ -46,7 +54,7 @@ index 047674248727a122fb3aee712981eefd0a4c3049..5381c91afaf08fdf94dced3a01810311
  // Capitalization Policy (go/chrome-capitalization):
  // Native macOS system menu bar items follow Apple Human Interface
  // Guidelines (HIG) and must use Title Case (via `_MAC` string variants or
-@@ -107,6 +137,10 @@ NSMenuItem* BuildAppMenu(NSApplication* nsapp,
+@@ -107,6 +138,10 @@ NSMenuItem* BuildAppMenu(NSApplication* nsapp,
  
    nsapp.servicesMenu = services_item.submenu;
  
@@ -57,3 +65,22 @@ index 047674248727a122fb3aee712981eefd0a4c3049..5381c91afaf08fdf94dced3a01810311
    return item;
  }
  
+@@ -500,6 +535,18 @@ NSMenuItem* BuildWindowMenu(NSApplication* nsapp,
+           })
+           .Build();
+   // clang-format on
++  if (UseMyarcAppMenu() && !is_pwa) {
++    // myArc hides the extensions toolbar, so the bundled blocker's popup,
++    // with its per-site switch, opens from here.
++    NSMenuItem* blocker_item =
++        [[NSMenuItem alloc] initWithTitle:@"Ad Blocking for This Site\u2026"
++                                   action:@selector(commandDispatch:)
++                            keyEquivalent:@""];
++    blocker_item.tag = IDC_MYARC_BLOCKER_POPUP;
++    NSInteger extensions_index =
++        [item.submenu indexOfItemWithTag:IDC_MANAGE_EXTENSIONS];
++    [item.submenu insertItem:blocker_item atIndex:extensions_index + 1];
++  }
+   nsapp.windowsMenu = item.submenu;
+   return item;
+ }

@@ -3942,6 +3942,18 @@
       ],
       "Shipped": "yes",
       "dir": "third_party/rust/zune_jpeg/v0_5"
+    },
+    {
+      "Name": "uBlock Origin Lite",
+      "Version": "2026.1116.1650",
+      "Revision": "9510a0b38cdbb95e88f2bd033c0da85bfd4b1b4c",
+      "URL": "https://github.com/uBlockOrigin/uBOL-home",
+      "License": "GPL-3.0",
+      "License File": [
+        "browser/foundation/blocker/LICENSE.txt"
+      ],
+      "Shipped": "yes",
+      "dir": "browser/foundation/blocker"
     }
   ]
 }

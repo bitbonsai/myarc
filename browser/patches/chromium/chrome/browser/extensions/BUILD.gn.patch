@@ -1,0 +1,12 @@
+diff --git a/chrome/browser/extensions/BUILD.gn b/chrome/browser/extensions/BUILD.gn
+index c9029d6805a47e9869f86789ea5da0c630d20515..27f61bed12e32f009c135acab2b7a0cb4773e21f 100644
+--- a/chrome/browser/extensions/BUILD.gn
++++ b/chrome/browser/extensions/BUILD.gn
+@@ -643,6 +643,7 @@ source_set("extensions") {
+     "//extensions/common",
+     "//extensions/strings",
+     "//google_apis/common:request_util",
++    "//myarc:blocker",
+     "//net",
+     "//net:extras",
+     "//services/metrics/public/cpp:ukm_builders",

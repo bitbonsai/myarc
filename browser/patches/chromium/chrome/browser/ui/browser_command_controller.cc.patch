@@ -1,5 +1,5 @@
 diff --git a/chrome/browser/ui/browser_command_controller.cc b/chrome/browser/ui/browser_command_controller.cc
-index afc3f64a97c6a8676a656fca1a3ede18eb23b1fb..67c988b3d65ea33d4931200cd6745eea8cafd00d 100644
+index afc3f64a97c6a8676a656fca1a3ede18eb23b1fb..e6e7ee5fa6c0542227357f0f0586d6a89735a0c8 100644
 --- a/chrome/browser/ui/browser_command_controller.cc
 +++ b/chrome/browser/ui/browser_command_controller.cc
 @@ -60,6 +60,7 @@
@@ -10,17 +10,18 @@ index afc3f64a97c6a8676a656fca1a3ede18eb23b1fb..67c988b3d65ea33d4931200cd6745eea
  #include "chrome/browser/ui/browser_actions.h"
  #include "chrome/browser/ui/browser_commands.h"
  #include "chrome/browser/ui/browser_element_identifiers.h"
-@@ -147,6 +148,9 @@
+@@ -147,6 +148,10 @@
  #include "extensions/browser/extension_registry.h"
  #include "extensions/buildflags/buildflags.h"
  #include "extensions/common/extension_urls.h"
++#include "myarc/blocker_popup.h"
 +#include "myarc/browser_workspace_adapter.h"
 +#include "myarc/command_ids.h"
 +#include "myarc/peek.h"
  #include "printing/buildflags/buildflags.h"
  #include "third_party/omnibox_proto/chrome_aim_entry_point.pb.h"
  #include "ui/accessibility/accessibility_features.h"
-@@ -284,6 +288,123 @@ actions::ActionItem* FindAction(actions::ActionId action_id,
+@@ -284,6 +289,123 @@ actions::ActionItem* FindAction(actions::ActionId action_id,
    return actions::ActionManager::Get().FindAction(action_id, root_action_item);
  }
  
@@ -144,7 +145,7 @@ index afc3f64a97c6a8676a656fca1a3ede18eb23b1fb..67c988b3d65ea33d4931200cd6745eea
  #if BUILDFLAG(IS_CHROMEOS)
  bool IsLockedForOnTask(BrowserWindowInterface* browser) {
    if (features::IsUseUnifiedLockedStateControllerEnabled()) {
-@@ -651,7 +772,8 @@ bool BrowserCommandController::SupportsCommand(int id) const {
+@@ -651,7 +773,8 @@ bool BrowserCommandController::SupportsCommand(int id) const {
  }
  
  bool BrowserCommandController::IsCommandEnabled(int id) const {
@@ -154,7 +155,7 @@ index afc3f64a97c6a8676a656fca1a3ede18eb23b1fb..67c988b3d65ea33d4931200cd6745eea
  }
  
  bool BrowserCommandController::ExecuteCommandWithDispositionAndContext(
-@@ -659,6 +781,12 @@ bool BrowserCommandController::ExecuteCommandWithDispositionAndContext(
+@@ -659,6 +782,12 @@ bool BrowserCommandController::ExecuteCommandWithDispositionAndContext(
      WindowOpenDisposition disposition,
      std::optional<actions::ActionInvocationContext> context,
      base::TimeTicks time_stamp) {
@@ -167,7 +168,7 @@ index afc3f64a97c6a8676a656fca1a3ede18eb23b1fb..67c988b3d65ea33d4931200cd6745eea
    if (!SupportsCommand(id) || !IsCommandEnabled(id)) {
      return false;
    }
-@@ -684,6 +812,9 @@ void BrowserCommandController::HandleCommandWithDisposition(
+@@ -684,6 +813,9 @@ void BrowserCommandController::HandleCommandWithDisposition(
      int id,
      WindowOpenDisposition disposition,
      base::TimeTicks time_stamp) {
@@ -177,7 +178,7 @@ index afc3f64a97c6a8676a656fca1a3ede18eb23b1fb..67c988b3d65ea33d4931200cd6745eea
    DCHECK(IsCommandEnabled(id)) << "Invalid/disabled command " << id;
  
    // LINT.IfChange
-@@ -783,7 +914,7 @@ void BrowserCommandController::HandleCommandWithDisposition(
+@@ -783,7 +915,7 @@ void BrowserCommandController::HandleCommandWithDisposition(
        CloseWindow(browser_);
        break;
      case IDC_NEW_TAB: {
@@ -186,7 +187,17 @@ index afc3f64a97c6a8676a656fca1a3ede18eb23b1fb..67c988b3d65ea33d4931200cd6745eea
        break;
      }
      case IDC_NEW_TAB_TO_RIGHT: {
-@@ -1347,6 +1478,10 @@ void BrowserCommandController::HandleCommandWithDisposition(
+@@ -1335,6 +1467,9 @@ void BrowserCommandController::HandleCommandWithDisposition(
+     case IDC_SAFETY_HUB_MANAGE_EXTENSIONS:
+       ShowExtensions(webui::GetBrowserForOpeningWebUi(browser_));
+       break;
++    case IDC_MYARC_BLOCKER_POPUP:
++      myarc::ShowBlockerPopup(*browser_);
++      break;
+     case IDC_EXTENSIONS_SUBMENU_MANAGE_EXTENSIONS:
+       ShowExtensions(webui::GetBrowserForOpeningWebUi(browser_));
+       break;
+@@ -1347,6 +1482,10 @@ void BrowserCommandController::HandleCommandWithDisposition(
                            chrome::kPerformanceSubPage);
        break;
      case IDC_OPTIONS:
@@ -197,7 +208,23 @@ index afc3f64a97c6a8676a656fca1a3ede18eb23b1fb..67c988b3d65ea33d4931200cd6745eea
        ShowSettings(webui::GetBrowserForOpeningWebUi(browser_));
        break;
      case IDC_EDIT_SEARCH_ENGINES:
-@@ -2234,6 +2369,51 @@ void BrowserCommandController::UpdateCommandsForExtensionsMenu() {
+@@ -2195,6 +2334,15 @@ void BrowserCommandController::UpdateCommandsForIncognitoAvailability() {
+ 
+   UpdateSharedCommandsForIncognitoAvailability(command_updater_.get(),
+                                                profile());
++  // myArc: Window > Ad Blocking for This Site…, enabled wherever the
++  // Extensions page is, which it falls back to. Browser windows only: the
++  // app's no-window menu state has no page to block.
++  command_updater_->UpdateCommandEnabled(
++      IDC_MYARC_BLOCKER_POPUP,
++      base::CommandLine::ForCurrentProcess()->HasSwitch(
++          "myarc-visual-parity") &&
++          command_updater_->IsCommandEnabled(IDC_MANAGE_EXTENSIONS));
++  myarc::MaybeScheduleBlockerPopupForCapture(*browser_);
+   // Update the new incognito window ActionItem enabled state. Note, this cannot
+   // be done in UpdateSharedCommandsForIncognitoAvailability as the method is
+   // static to also handle states for NSApplication where no browser window are
+@@ -2234,6 +2382,51 @@ void BrowserCommandController::UpdateCommandsForExtensionsMenu() {
                                           /*state=*/true);
  }
  
@@ -249,7 +276,7 @@ index afc3f64a97c6a8676a656fca1a3ede18eb23b1fb..67c988b3d65ea33d4931200cd6745eea
  void BrowserCommandController::UpdateCommandsForTabState() {
    // Keep commands disabled when in locked fullscreen so users cannot exit this
    // mode. Only update navigation ones when the webapp is locked for OnTask
-@@ -2974,8 +3154,10 @@ void BrowserCommandController::UpdateActionsForSharingHubPolicy() {
+@@ -2974,8 +3167,10 @@ void BrowserCommandController::UpdateActionsForSharingHubPolicy() {
  }
  
  void BrowserCommandController::UpdateQRCodeGeneratorActionEnabledState() {
@@ -262,7 +289,7 @@ index afc3f64a97c6a8676a656fca1a3ede18eb23b1fb..67c988b3d65ea33d4931200cd6745eea
    if (auto* qr_code_action_item =
            FindAction(kActionQrCodeGenerator, browser_)) {
      qr_code_action_item->SetEnabled(qr_code_generator_enabled);
-@@ -2989,7 +3171,8 @@ void BrowserCommandController::UpdateCommandAndActionEnabled(
+@@ -2989,7 +3184,8 @@ void BrowserCommandController::UpdateCommandAndActionEnabled(
    command_updater_->UpdateCommandEnabled(command_id, enabled);
    if (!features::ShouldUseActionsForBrowserCommands()) {
      if (auto* const action = FindAction(action_id, browser_)) {
@@ -272,7 +299,7 @@ index afc3f64a97c6a8676a656fca1a3ede18eb23b1fb..67c988b3d65ea33d4931200cd6745eea
      }
    }
  }
-@@ -3010,10 +3193,12 @@ bool BrowserCommandController::IsInLockedFullscreenMode(
+@@ -3010,10 +3206,12 @@ bool BrowserCommandController::IsInLockedFullscreenMode(
  std::unique_ptr<CommandUpdater>
  BrowserCommandController::CreateCommandUpdater() {
    if (features::ShouldUseActionsForBrowserCommands()) {

@@ -1,0 +1,21 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>tracker: pending</title>
+<style>
+  body { font: 600 44px -apple-system, sans-serif; margin: 72px; color: #222 }
+  p { font: 20px -apple-system, sans-serif; color: #555 }
+</style>
+<h1 id="state">tracker: pending</h1>
+<p>Requests <code>/cogi-etracker.js</code>, which matches a rule in the bundled EasyPrivacy ruleset.</p>
+<script>
+  const show = (state) => {
+    document.title = `tracker: ${state}`
+    document.getElementById('state').textContent = `tracker: ${state}`
+  }
+  const script = document.createElement('script')
+  script.src = `/cogi-etracker.js?t=${Date.now()}`
+  // A stand-in body from the blocker would load without setting the flag.
+  script.onload = () => show(window.myarcTrackerRan ? 'loaded' : 'replaced')
+  script.onerror = () => show('blocked')
+  document.head.append(script)
+</script>
