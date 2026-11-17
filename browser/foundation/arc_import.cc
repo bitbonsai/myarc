@@ -101,6 +101,21 @@ std::u16string List(const rust::Vec<rust::String>& lines, size_t total) {
   return text;
 }
 
+// "4 Spaces, 1 folder and 13 pinned tabs", or empty when nothing is new.
+std::u16string Additions(const foundation::ArcImportPreview& preview) {
+  std::vector<std::u16string> adds;
+  if (preview.new_spaces) {
+    adds.push_back(Count(preview.new_spaces, u"Space", u"Spaces"));
+  }
+  if (preview.new_folders) {
+    adds.push_back(Count(preview.new_folders, u"folder", u"folders"));
+  }
+  if (preview.new_pins) {
+    adds.push_back(Count(preview.new_pins, u"pinned tab", u"pinned tabs"));
+  }
+  return Join(adds);
+}
+
 views::Widget* Show(std::unique_ptr<ui::DialogModel> model,
                     gfx::NativeWindow parent,
                     bool inactive) {
@@ -128,6 +143,40 @@ void ShowMessage(std::u16string message,
        parent, inactive);
 }
 
+// The done state: what the import added, then every kind of entry it left
+// out or changed, with counts from Rust.
+void ShowReport(const foundation::ArcImportPreview& result,
+                gfx::NativeWindow parent,
+                bool inactive) {
+  ui::DialogModel::Builder builder;
+  builder.SetTitle(kTitle);
+  const std::u16string adds = Additions(result);
+  builder.AddParagraph(ui::DialogModelLabel(
+      adds.empty() ? std::u16string(u"Import finished.")
+                   : base::StrCat({u"Import finished. Added ", adds, u"."})));
+  if (result.moved_pins) {
+    builder.AddParagraph(ui::DialogModelLabel(base::StrCat(
+        {u"Moved ", Count(result.moved_pins, u"pinned tab", u"pinned tabs"),
+         u" into ", result.moved_pins == 1 ? u"its" : u"their",
+         u" Arc folder."})));
+  }
+  if (result.report.empty()) {
+    builder.AddParagraph(
+        ui::DialogModelLabel(u"Nothing in the file was left out or changed."));
+  } else {
+    builder.AddParagraph(
+        ui::DialogModelLabel(List(result.report, result.report.size()))
+            .set_is_secondary(),
+        u"Left out or changed");
+  }
+  builder.AddParagraph(
+      ui::DialogModelLabel(base::UTF8ToUTF16(std::string(result.report_note)))
+          .set_is_secondary());
+  builder.AddOkButton(base::DoNothing(),
+                      ui::DialogModel::Button::Params().SetLabel(u"OK"));
+  Show(builder.Build(), parent, inactive);
+}
+
 void Apply(base::WeakPtr<Profile> profile,
            gfx::NativeWindow parent,
            bool inactive,
@@ -138,8 +187,9 @@ void Apply(base::WeakPtr<Profile> profile,
   }
   auto result =
       WorkspaceService::ForProfile(*profile).ApplyArcImport(*export_data);
+  const uint64_t first_space = result.ok ? result.first_space : 0;
+  // Post: the preview is still closing.
   if (!result.ok) {
-    // Post: the preview is still closing.
     base::SingleThreadTaskRunner::GetCurrentDefault()->PostTask(
         FROM_HERE,
         base::BindOnce(
@@ -147,9 +197,13 @@ void Apply(base::WeakPtr<Profile> profile,
             base::StrCat({u"Nothing was imported. ",
                           base::UTF8ToUTF16(std::string(result.error))}),
             parent, inactive));
+  } else {
+    base::SingleThreadTaskRunner::GetCurrentDefault()->PostTask(
+        FROM_HERE, base::BindOnce(&ShowReport, std::move(result), parent,
+                                  inactive));
   }
   if (confirmed) {
-    std::move(confirmed).Run(result.ok ? result.first_space : 0);
+    std::move(confirmed).Run(first_space);
   }
 }
 
@@ -181,19 +235,10 @@ void ShowPreview(base::WeakPtr<Profile> profile,
     builder.AddParagraph(
         ui::DialogModelLabel(u"Everything in this file is already in myArc."));
   } else {
-    std::vector<std::u16string> adds;
-    if (preview.new_spaces) {
-      adds.push_back(Count(preview.new_spaces, u"Space", u"Spaces"));
-    }
-    if (preview.new_folders) {
-      adds.push_back(Count(preview.new_folders, u"folder", u"folders"));
-    }
-    if (preview.new_pins) {
-      adds.push_back(Count(preview.new_pins, u"pinned tab", u"pinned tabs"));
-    }
+    const std::u16string adds = Additions(preview);
     if (!adds.empty()) {
-      builder.AddParagraph(ui::DialogModelLabel(
-          base::StrCat({u"Adds ", Join(adds), u"."})));
+      builder.AddParagraph(
+          ui::DialogModelLabel(base::StrCat({u"Adds ", adds, u"."})));
     }
     if (preview.moved_pins) {
       builder.AddParagraph(ui::DialogModelLabel(base::StrCat(

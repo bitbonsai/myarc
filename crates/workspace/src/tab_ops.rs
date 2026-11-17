@@ -110,14 +110,29 @@ impl RecentTabs {
     /// press toggles between the two latest. `None` when fewer than two ids are known,
     /// since there is nothing to switch to. A `step` of zero returns the current target.
     pub fn cycle(&mut self, step: i32) -> Option<ItemId> {
-        let window = self.order.len().min(SWITCHER_DEPTH);
+        self.cycle_within(step, |_| true)
+    }
+
+    /// `cycle` over only the ids `shown` accepts, for example the rows of the window's
+    /// current Space. The five most recent accepted ids form the switcher, so ids of
+    /// other Spaces neither count nor block. `shown` must answer the same way for every
+    /// press of one cycle.
+    pub fn cycle_within(&mut self, step: i32, shown: impl Fn(ItemId) -> bool) -> Option<ItemId> {
+        let targets: Vec<ItemId> = self
+            .order
+            .iter()
+            .copied()
+            .filter(|id| shown(*id))
+            .take(SWITCHER_DEPTH)
+            .collect();
+        let window = targets.len();
         if window < 2 {
             return None;
         }
         // `window` is at most five, so the casts cannot overflow.
         let next = (self.cursor as i64 + i64::from(step)).rem_euclid(window as i64);
         self.cursor = next as usize;
-        self.order.get(self.cursor).copied()
+        targets.get(self.cursor).copied()
     }
 }
 
@@ -398,6 +413,25 @@ mod tests {
         tabs.remove(1);
         assert!(tabs.is_empty());
         assert_eq!(tabs.cycle(1), None);
+    }
+
+    #[test]
+    fn cycle_within_skips_ids_it_does_not_show() {
+        // 2 and 4 belong to another Space.
+        let mut tabs = recents(&[1, 2, 3, 4, 5, 6, 7, 8]);
+        let shown = |id: ItemId| id % 2 == 1;
+        let walked: Vec<Option<ItemId>> = (0..5).map(|_| tabs.cycle_within(1, shown)).collect();
+        assert_eq!(walked, vec![Some(3), Some(5), Some(7), Some(1), Some(3)]);
+        tabs.touch(5);
+        assert_eq!(tabs.cycle_within(-1, shown), Some(7));
+    }
+
+    #[test]
+    fn cycle_within_needs_two_shown_ids() {
+        let mut tabs = recents(&[1, 2, 3]);
+        assert_eq!(tabs.cycle_within(1, |id| id == 2), None);
+        assert_eq!(tabs.cycle_within(1, |_| false), None);
+        assert_eq!(tabs.recent(), &[1, 2, 3]);
     }
 
     #[test]

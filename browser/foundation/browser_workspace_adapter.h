@@ -14,6 +14,7 @@
 #include "base/memory/raw_ptr.h"
 #include "base/sequence_checker.h"
 #include "base/task/cancelable_task_tracker.h"
+#include "base/timer/timer.h"
 #include "chrome/browser/ui/tabs/tab_strip_model_observer.h"
 #include "myarc/workspace_service.h"
 #include "ui/gfx/image/image.h"
@@ -240,6 +241,14 @@ class BrowserWorkspaceAdapter final : public TabStripModelObserver {
   foundation::MutationResult StepSpace(int delta);
   foundation::MutationResult ActivateSidebarItemAt(int index);
   foundation::MutationResult StepSidebarItem(int delta);
+  // Arc's Ctrl+Tab (BC-008): shows the row `step` places back in the order
+  // this window showed the rows of its Space, five at most, and -1 goes the
+  // other way. The order holds still until the cycle ends, so each press
+  // while Ctrl stays down goes one further. `watch_release` ends the cycle
+  // when Ctrl comes up; otherwise the caller calls EndRecentTabCycle.
+  foundation::MutationResult CycleRecentTab(int step, bool watch_release);
+  // The row shown now becomes the most recent.
+  void EndRecentTabCycle();
 
  private:
   friend class WorkspaceLifecycleBridge;
@@ -292,6 +301,8 @@ class BrowserWorkspaceAdapter final : public TabStripModelObserver {
   void OnTabPinnedStateChanged(tabs::TabInterface* tab, int index) override;
   void OnTabStripModelDestroyed(TabStripModel* model) override;
   void OnSplitTabChanged(const SplitTabChange& change) override;
+  // Records that this window showed `item`, unless a Ctrl+Tab cycle is on.
+  void TouchRecent(uint64_t item);
 
   const raw_ptr<BrowserWindowInterface> browser_;
   const raw_ptr<Profile> profile_;
@@ -327,6 +338,11 @@ class BrowserWorkspaceAdapter final : public TabStripModelObserver {
   size_t pending_icons_ = 0;
   bool icons_found_ = false;
   base::CancelableTaskTracker icon_tracker_;
+  // Rows newest first, for Ctrl+Tab. Not persisted.
+  rust::Box<foundation::RecentTabs> recent_ = foundation::new_recent_tabs();
+  bool cycling_ = false;
+  // While cycling, checks whether Ctrl is still down.
+  base::RepeatingTimer ctrl_release_timer_;
   SEQUENCE_CHECKER(sequence_checker_);
   base::WeakPtrFactory<BrowserWorkspaceAdapter> weak_factory_{this};
 };

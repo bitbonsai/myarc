@@ -99,7 +99,7 @@ Parent: TAB-02, backlog "Tabs lifecycle" and Next 15 item 7. Evidence: documente
 
 ## BC-008: Recent-tab switcher reaches the five most recent tabs
 
-Parent: TAB-02, backlog "Keyboard shortcut behavior" and Next 15 item 13. Evidence: documented in Arc's [Keyboard Shortcuts article](https://resources.arc.net/hc/en-us/articles/20595231349911-Keyboard-Shortcuts) (Ctrl+Tab toggles between the five most recent tabs). Order, wrapping and bounds are `project requirement`. Rule implemented and tested in `crates/workspace/src/tab_ops.rs`; the switcher UI and shortcut do not exist.
+Parent: TAB-02, backlog "Keyboard shortcut behavior" and Next 15 item 13. Evidence: documented in Arc's [Keyboard Shortcuts article](https://resources.arc.net/hc/en-us/articles/20595231349911-Keyboard-Shortcuts) (Ctrl+Tab toggles between the five most recent tabs). Order, wrapping and bounds are `project requirement`. Rule implemented and tested in `crates/workspace/src/tab_ops.rs`. Ctrl+Tab and Ctrl+Shift+Tab run `BrowserWorkspaceAdapter::CycleRecentTab`, which cycles over the current Space's sidebar rows (`RecentTabs::cycle_within`) and shows each target at once; the switcher overlay does not exist.
 
 - Initial state: one `RecentTabs` per window, filled by `touch(id)` each time the window shows an item.
 - Action: each Ctrl+Tab press calls `cycle(1)`, Ctrl+Shift+Tab calls `cycle(-1)`. Releasing Ctrl selects the target and calls `touch(target)`. Closing or archiving an item calls `remove(id)`.

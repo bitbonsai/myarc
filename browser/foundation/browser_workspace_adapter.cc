@@ -1,6 +1,7 @@
 #include "myarc/browser_workspace_adapter.h"
 
 #include <algorithm>
+#include <cstdlib>
 #include <memory>
 #include <set>
 #include <utility>
@@ -50,6 +51,7 @@
 #include "content/public/browser/web_contents_observer.h"
 #include "content/public/common/page_type.h"
 #include "content/public/common/url_constants.h"
+#include "myarc/app_activation.h"
 #include "myarc/arc_import.h"
 #include "myarc/control_host.h"
 #include "myarc/control_tabs.h"
@@ -128,6 +130,13 @@ bool g_rename_item_hook_done = false;
 // dismisses it.
 constexpr char kMyarcTestSplit[] = "myarc-test-split";
 bool g_split_hook_done = false;
+// --myarc-test-ctrl-tab=<presses> shows the first window's first three Today
+// tabs in turn once they are open, then presses Ctrl+Tab that many times with
+// Ctrl held, or Ctrl+Shift+Tab for a negative count, and lets go. "command"
+// instead runs Ctrl+Tab's browser command once, as the key does, which ends
+// the cycle when it finds Ctrl up.
+constexpr char kMyarcTestCtrlTab[] = "myarc-test-ctrl-tab";
+bool g_ctrl_tab_hook_done = false;
 #endif  // BUILDFLAG(MYARC_TEST_HOOKS)
 
 const char kRuntimeKey = 0;
@@ -1638,6 +1647,71 @@ void BrowserWorkspaceAdapter::Refresh() {
               command_line->GetSwitchValueASCII(kMyarcTestSplit)));
     }
   }
+  if (ready() && !g_ctrl_tab_hook_done &&
+      command_line->HasSwitch(kMyarcTestCtrlTab)) {
+    const auto sidebar = Sidebar();
+    const std::string value =
+        command_line->GetSwitchValueASCII(kMyarcTestCtrlTab);
+    // 0 runs the browser command.
+    int presses = 0;
+    if (sidebar.ok && sidebar.temporary.size() >= 3 &&
+        (value == "command" ||
+         (base::StringToInt(value, &presses) && presses != 0)) &&
+        LocalPage(*tabs_, sidebar.temporary[0].id) &&
+        LocalPage(*tabs_, sidebar.temporary[1].id) &&
+        LocalPage(*tabs_, sidebar.temporary[2].id)) {
+      g_ctrl_tab_hook_done = true;
+      std::vector<uint64_t> rows = {sidebar.temporary[0].id,
+                                    sidebar.temporary[1].id,
+                                    sidebar.temporary[2].id};
+      // Once the pages have titles, so the rows read apart.
+      base::SingleThreadTaskRunner::GetCurrentDefault()->PostDelayedTask(
+          FROM_HERE,
+          base::BindOnce(
+              [](base::WeakPtr<BrowserWorkspaceAdapter> adapter,
+                 std::vector<uint64_t> rows, int presses) {
+                if (!adapter || !adapter->ready())
+                  return;
+                for (uint64_t row : rows) {
+                  auto result = adapter->ActivateItem(row);
+                  LOG_IF(ERROR, !result.ok) << "Test Ctrl+Tab show failed: "
+                                            << std::string(result.error);
+                }
+                auto log = [](base::WeakPtr<BrowserWorkspaceAdapter> adapter) {
+                  if (!adapter || !adapter->ready())
+                    return;
+                  const auto after = adapter->Sidebar();
+                  for (const auto& row : after.temporary) {
+                    if (row.id == after.selected_item_id) {
+                      LOG(WARNING) << "Test Ctrl+Tab shows: "
+                                   << std::string(row.title)
+                                   << (adapter->cycling_ ? " (cycling)" : "");
+                    }
+                  }
+                };
+                if (!presses) {
+                  chrome::ExecuteCommand(adapter->browser_,
+                                         IDC_CYCLE_TO_NEXT_TAB);
+                  // After the release check has run.
+                  base::SingleThreadTaskRunner::GetCurrentDefault()
+                      ->PostDelayedTask(FROM_HERE,
+                                        base::BindOnce(log, adapter),
+                                        base::Milliseconds(500));
+                  return;
+                }
+                for (int i = 0; i < std::abs(presses); ++i) {
+                  auto result =
+                      adapter->CycleRecentTab(presses > 0 ? 1 : -1, false);
+                  LOG_IF(ERROR, !result.ok) << "Test Ctrl+Tab failed: "
+                                            << std::string(result.error);
+                }
+                adapter->EndRecentTabCycle();
+                log(adapter);
+              },
+              weak_factory_.GetWeakPtr(), std::move(rows), presses),
+          base::Seconds(2));
+    }
+  }
 #endif  // BUILDFLAG(MYARC_TEST_HOOKS)
   changed_.Notify();
 }
@@ -1827,6 +1901,7 @@ foundation::MutationResult BrowserWorkspaceAdapter::ActivateItem(
     return result;
   tabs_->ActivateTabAt(tabs_->GetIndexOfWebContents(page));
   page->Focus();
+  TouchRecent(item);
   PersistBindings();
   OnServiceChanged();
   return Remember(Ok(item));
@@ -1939,6 +2014,7 @@ foundation::MutationResult BrowserWorkspaceAdapter::Open(const GURL& url,
     return result;
   tabs_->ActivateTabAt(tabs_->GetIndexOfWebContents(page));
   page->Focus();
+  TouchRecent(item);
   PersistBindings();
   OnServiceChanged();
   return Remember(Ok(item));
@@ -1989,6 +2065,7 @@ foundation::MutationResult BrowserWorkspaceAdapter::AdoptAsTodayTab(
     return result;
   tabs_->ActivateTabAt(tabs_->GetIndexOfWebContents(contents));
   contents->Focus();
+  TouchRecent(item);
   PersistBindings();
   OnServiceChanged();
   return Remember(Ok(item));
@@ -2494,6 +2571,57 @@ foundation::MutationResult BrowserWorkspaceAdapter::StepOrSelectItem(
   return ActivateItem(order[row]);
 }
 
+void BrowserWorkspaceAdapter::TouchRecent(uint64_t item) {
+  if (!cycling_ && item)
+    foundation::touch_recent_tab(*recent_, item);
+}
+
+foundation::MutationResult BrowserWorkspaceAdapter::CycleRecentTab(
+    int step,
+    bool watch_release) {
+  const auto sidebar = Sidebar();
+  if (!sidebar.ok)
+    return Fail(std::string(sidebar.error));
+  // A row can show without a touch, for example after a Space switch, so the
+  // shown one leads a new cycle.
+  TouchRecent(sidebar.selected_item_id);
+  const uint64_t target = foundation::cycle_recent_tab(
+      *recent_,
+      rust::Slice<const uint64_t>(sidebar.row_order.data(),
+                                  sidebar.row_order.size()),
+      step);
+  if (!target)
+    return Ok(sidebar.selected_item_id);
+  cycling_ = true;
+  auto result = ActivateItem(target);
+  if (!result.ok) {
+    EndRecentTabCycle();
+    return result;
+  }
+  if (watch_release && !ctrl_release_timer_.IsRunning()) {
+    // Unretained: the timer is a member, so it stops with this adapter.
+    ctrl_release_timer_.Start(
+        FROM_HERE, base::Milliseconds(30),
+        base::BindRepeating(
+            [](BrowserWorkspaceAdapter* adapter) {
+              if (!IsControlKeyDown())
+                adapter->EndRecentTabCycle();
+            },
+            base::Unretained(this)));
+  }
+  return result;
+}
+
+void BrowserWorkspaceAdapter::EndRecentTabCycle() {
+  ctrl_release_timer_.Stop();
+  if (!cycling_)
+    return;
+  cycling_ = false;
+  const auto sidebar = Sidebar();
+  if (sidebar.ok)
+    TouchRecent(sidebar.selected_item_id);
+}
+
 void BrowserWorkspaceAdapter::OnTabStripModelChanged(
     TabStripModel*,
     const TabStripModelChange& change,
@@ -2535,6 +2663,7 @@ void BrowserWorkspaceAdapter::OnTabStripModelChanged(
         // Activation is a view of the new tab and the end of one of the tab
         // just left: record both now rather than at the next pass.
         if (revealed.ok) {
+          TouchRecent(binding->item());
           std::vector<uint64_t> viewed = {binding->item()};
           if (selection.old_contents) {
             if (const uint64_t left = ItemIdForContents(*selection.old_contents))

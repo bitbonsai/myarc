@@ -403,6 +403,11 @@ mod ffi {
         unrecognized: Vec<String>,
         // After an apply, the export's first Space; otherwise 0.
         first_space: u64,
+        // After an apply, "Links left out, not web pages: 2" for each kind of
+        // entry the import left out or changed; otherwise empty.
+        report: Vec<String>,
+        // After an apply, what Arc's export never carries; otherwise empty.
+        report_note: String,
     }
 
     extern "Rust" {
@@ -767,6 +772,16 @@ mod ffi {
         fn preview_arc_import(workspace: &Workspace, arc: &ArcExport) -> ArcImportPreview;
         // Adds the export's Spaces and Pins that are missing, all or nothing.
         fn apply_arc_import(workspace: &mut Workspace, arc: &ArcExport) -> ArcImportPreview;
+
+        // Arc's Ctrl+Tab over one window's most recently shown items (BC-008).
+        type RecentTabs;
+        fn new_recent_tabs() -> Box<RecentTabs>;
+        // The window showed `item`. Ends a cycle in progress.
+        fn touch_recent_tab(recent: &mut RecentTabs, item: u64);
+        // Steps `step` places through the five most recent of `shown`, newest
+        // first, and returns the target, or 0 when there is none. Ids missing
+        // from `shown` stay in the list for when their Space is shown again.
+        fn cycle_recent_tab(recent: &mut RecentTabs, shown: &[u64], step: i32) -> u64;
     }
 }
 
@@ -830,16 +845,42 @@ pub fn apply_arc_import(workspace: &mut Workspace, export: &ArcExport) -> ffi::A
                     .map(|space| space.id)
             })
         });
+    let report = result.as_ref().ok().map(|plan| {
+        import::arc_report::lines(&export.report, &export.canonical, plan)
+            .iter()
+            .map(import::arc_report::Line::text)
+            .collect()
+    });
     let mut preview = arc_import_result(export, result);
     preview.first_space = first.unwrap_or(0);
+    if let Some(report) = report.filter(|_| preview.ok) {
+        preview.report = report;
+        preview.report_note = import::arc_report::NOT_IN_EXPORT.to_owned();
+    }
     preview
+}
+
+pub struct RecentTabs(workspace::tab_ops::RecentTabs);
+
+pub fn new_recent_tabs() -> Box<RecentTabs> {
+    Box::new(RecentTabs(workspace::tab_ops::RecentTabs::new()))
+}
+
+pub fn touch_recent_tab(recent: &mut RecentTabs, item: u64) {
+    recent.0.touch(item);
+}
+
+pub fn cycle_recent_tab(recent: &mut RecentTabs, shown: &[u64], step: i32) -> u64 {
+    recent
+        .0
+        .cycle_within(step, |id| shown.contains(&id))
+        .unwrap_or(0)
 }
 
 fn arc_import_result(
     export: &ArcExport,
     result: Result<import::arc_workspace::Preview, import::arc_workspace::ImportError>,
 ) -> ffi::ArcImportPreview {
-    use import::arc_markdown::Reason;
     let unrecognized = &export.report.unrecognized;
     let mut preview = ffi::ArcImportPreview {
         ok: false,
@@ -855,23 +896,18 @@ fn arc_import_result(
         skipped: Vec::new(),
         unrecognized_count: unrecognized.len(),
         first_space: 0,
+        report: Vec::new(),
+        report_note: String::new(),
         unrecognized: unrecognized
             .iter()
             .take(ARC_IMPORT_LIST_LIMIT)
             .map(|line| {
-                let reason = match line.reason {
-                    Reason::Indented => "indented",
-                    Reason::DeeperHeading => "nested heading",
-                    Reason::EmptyLabel => "heading without a name",
-                    Reason::LabelTooLong => "name too long",
-                    Reason::ControlCharacter => "control character",
-                    Reason::GroupOutsideSpace => "group before any Space",
-                    Reason::EntryOutsideGroup => "link before any group",
-                    Reason::NotUrl => "not a link",
-                    Reason::UrlTooLong => "link too long",
-                    Reason::Other => "unknown text",
-                };
-                format!("Line {}, {reason}: {}", line.line, line.excerpt)
+                format!(
+                    "Line {}, {}: {}",
+                    line.line,
+                    line.reason.label(),
+                    line.excerpt
+                )
             })
             .collect(),
     };

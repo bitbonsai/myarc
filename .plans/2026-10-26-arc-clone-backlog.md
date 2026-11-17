@@ -231,7 +231,7 @@ From the public shortcuts article ([source](https://resources.arc.net/hc/en-us/a
 | Cmd+Shift+K | Clear unpinned tabs | partial | crates/workspace/src/tab_ops.rs clear_unpinned (rule only, BC-007) |
 | Cmd+1 ... Cmd+8 | Go to sidebar item N (Cmd+9 last or ninth; option to leave Favorites out) | partial | MyarcWorkspaceCommandSafetyTest.ItemShortcutsFollowSidebarOrder (Favorites, Pins, then unpinned; Cmd+9 last); ninth-tab and Favorites-exclusion settings missing |
 | Ctrl+1 ... Ctrl+9 | Focus Space N | done | MyarcWorkspaceCommandSafetyTest.SpaceShortcutsFollowFooterOrder (Ctrl+9 last) |
-| Ctrl+Tab | Toggle between five most recent tabs | partial | crates/workspace/src/tab_ops.rs RecentTabs (rule only, BC-008; stock still cycles tab order) |
+| Ctrl+Tab | Toggle between five most recent tabs | partial | `BrowserWorkspaceAdapter::CycleRecentTab` over `tab_ops::RecentTabs` (BC-008), current Space's rows, switches on each press; no overlay |
 | Option+Cmd+Up / Down | Previous / next tab in sidebar order | done | MyarcWorkspaceCommandSafetyTest.ItemShortcutsFollowSidebarOrder (wraps; replaces stock pane focus) |
 | Option+Cmd+Left / Right | Previous / next Space | done | MyarcWorkspaceCommandSafetyTest.SpaceShortcutsFollowFooterOrder (wraps; replaces stock tab switching) |
 | Cmd+[ or Cmd+Left | Back (public table lists back and forward with swapped arrow labels; standard directions assumed) | partial | stock |

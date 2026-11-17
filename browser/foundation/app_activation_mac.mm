@@ -10,6 +10,10 @@ bool IsAppActive() {
   return NSApp.active;
 }
 
+bool IsControlKeyDown() {
+  return NSEvent.modifierFlags & NSEventModifierFlagControl;
+}
+
 void SetShownInWindowsMenu(gfx::NativeWindow window, bool shown) {
   NSWindow* ns_window = window.GetNativeNSWindow();
   ns_window.excludedFromWindowsMenu = !shown;

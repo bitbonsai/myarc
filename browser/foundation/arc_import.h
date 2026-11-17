@@ -14,7 +14,8 @@ namespace myarc {
 // Settings' "Import from Arc…". Asks for an Arc Markdown export (Arc's
 // Settings > Advanced > Export Data), reads it off the UI sequence, then shows
 // a preview over `parent` with the Spaces and Pins it adds and the lines it
-// could not read. Import writes them into `profile`'s workspace; Cancel
+// could not read. Import writes them into `profile`'s workspace, then shows a
+// report of every kind of entry it left out or changed, with counts; Cancel
 // changes nothing. Opens no tabs and fetches nothing. UI sequence only.
 void ImportFromArc(Profile& profile, gfx::NativeWindow parent);
 

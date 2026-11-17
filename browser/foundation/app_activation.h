@@ -21,6 +21,8 @@ std::string DescribeWindowsMenu();
 // Orders `window` just above `other` without activating either. An app in
 // the background shows a window behind its other ones.
 void OrderWindowAbove(gfx::NativeWindow window, gfx::NativeWindow other);
+// Whether the Control key is held down now, for Ctrl+Tab's cycle.
+bool IsControlKeyDown();
 #else
 inline bool IsAppActive() {
   return true;
@@ -31,6 +33,9 @@ inline std::string DescribeWindowsMenu() {
 }
 inline void OrderWindowAbove(gfx::NativeWindow window,
                              gfx::NativeWindow other) {}
+inline bool IsControlKeyDown() {
+  return false;
+}
 #endif
 
 }  // namespace myarc

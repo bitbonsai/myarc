@@ -90,7 +90,7 @@ pub struct Unrecognized {
     pub excerpt: String,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Reason {
     /// Starts with a space or tab. May be nesting, which is unobserved.
     Indented,
@@ -112,6 +112,24 @@ pub enum Reason {
     UrlTooLong,
     /// Any other text, including other Markdown syntax.
     Other,
+}
+
+impl Reason {
+    /// A few plain words for the user, such as "indented".
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::Indented => "indented",
+            Self::DeeperHeading => "nested heading",
+            Self::EmptyLabel => "heading without a name",
+            Self::LabelTooLong => "name too long",
+            Self::ControlCharacter => "control character",
+            Self::GroupOutsideSpace => "group before any Space",
+            Self::EntryOutsideGroup => "link before any group",
+            Self::NotUrl => "not a link",
+            Self::UrlTooLong => "link too long",
+            Self::Other => "unknown text",
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]

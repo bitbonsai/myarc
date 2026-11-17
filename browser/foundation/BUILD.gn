@@ -47,6 +47,7 @@ rust_static_library("import") {
   crate_root = "import/src/lib.rs"
   sources = [
     "import/src/arc_markdown.rs",
+    "import/src/arc_report.rs",
     "import/src/arc_workspace.rs",
     "import/src/lib.rs",
   ]
@@ -168,6 +169,7 @@ source_set("browser_workspace_adapter") {
   deps = [
     ":arc_import",
     ":control_prompt",
+    ":settings_window",
     ":test_buildflags",
     ":workspace_lifecycle",
     "//chrome/browser:browser_process",

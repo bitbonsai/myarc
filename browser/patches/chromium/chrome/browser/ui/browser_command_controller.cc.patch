@@ -1,5 +1,5 @@
 diff --git a/chrome/browser/ui/browser_command_controller.cc b/chrome/browser/ui/browser_command_controller.cc
-index afc3f64a97c6a8676a656fca1a3ede18eb23b1fb..055be3358c9975174ca07585ddb26b65899c7284 100644
+index afc3f64a97c6a8676a656fca1a3ede18eb23b1fb..67c988b3d65ea33d4931200cd6745eea8cafd00d 100644
 --- a/chrome/browser/ui/browser_command_controller.cc
 +++ b/chrome/browser/ui/browser_command_controller.cc
 @@ -60,6 +60,7 @@
@@ -20,7 +20,7 @@ index afc3f64a97c6a8676a656fca1a3ede18eb23b1fb..055be3358c9975174ca07585ddb26b65
  #include "printing/buildflags/buildflags.h"
  #include "third_party/omnibox_proto/chrome_aim_entry_point.pb.h"
  #include "ui/accessibility/accessibility_features.h"
-@@ -284,6 +288,115 @@ actions::ActionItem* FindAction(actions::ActionId action_id,
+@@ -284,6 +288,123 @@ actions::ActionItem* FindAction(actions::ActionId action_id,
    return actions::ActionManager::Get().FindAction(action_id, root_action_item);
  }
  
@@ -128,6 +128,14 @@ index afc3f64a97c6a8676a656fca1a3ede18eb23b1fb..055be3358c9975174ca07585ddb26b65
 +    case IDC_SELECT_PREVIOUS_TAB:
 +      adapter->StepSidebarItem(-1);
 +      return true;
++    // Arc's Ctrl+Tab walks the recently shown rows of the Space, further
++    // back for each press while Ctrl stays down.
++    case IDC_CYCLE_TO_NEXT_TAB:
++      adapter->CycleRecentTab(1, /*watch_release=*/true);
++      return true;
++    case IDC_CYCLE_TO_PREV_TAB:
++      adapter->CycleRecentTab(-1, /*watch_release=*/true);
++      return true;
 +    default:
 +      return false;
 +  }
@@ -136,7 +144,7 @@ index afc3f64a97c6a8676a656fca1a3ede18eb23b1fb..055be3358c9975174ca07585ddb26b65
  #if BUILDFLAG(IS_CHROMEOS)
  bool IsLockedForOnTask(BrowserWindowInterface* browser) {
    if (features::IsUseUnifiedLockedStateControllerEnabled()) {
-@@ -651,7 +764,8 @@ bool BrowserCommandController::SupportsCommand(int id) const {
+@@ -651,7 +772,8 @@ bool BrowserCommandController::SupportsCommand(int id) const {
  }
  
  bool BrowserCommandController::IsCommandEnabled(int id) const {
@@ -146,7 +154,7 @@ index afc3f64a97c6a8676a656fca1a3ede18eb23b1fb..055be3358c9975174ca07585ddb26b65
  }
  
  bool BrowserCommandController::ExecuteCommandWithDispositionAndContext(
-@@ -659,6 +773,12 @@ bool BrowserCommandController::ExecuteCommandWithDispositionAndContext(
+@@ -659,6 +781,12 @@ bool BrowserCommandController::ExecuteCommandWithDispositionAndContext(
      WindowOpenDisposition disposition,
      std::optional<actions::ActionInvocationContext> context,
      base::TimeTicks time_stamp) {
@@ -159,7 +167,7 @@ index afc3f64a97c6a8676a656fca1a3ede18eb23b1fb..055be3358c9975174ca07585ddb26b65
    if (!SupportsCommand(id) || !IsCommandEnabled(id)) {
      return false;
    }
-@@ -684,6 +804,9 @@ void BrowserCommandController::HandleCommandWithDisposition(
+@@ -684,6 +812,9 @@ void BrowserCommandController::HandleCommandWithDisposition(
      int id,
      WindowOpenDisposition disposition,
      base::TimeTicks time_stamp) {
@@ -169,7 +177,7 @@ index afc3f64a97c6a8676a656fca1a3ede18eb23b1fb..055be3358c9975174ca07585ddb26b65
    DCHECK(IsCommandEnabled(id)) << "Invalid/disabled command " << id;
  
    // LINT.IfChange
-@@ -783,7 +906,7 @@ void BrowserCommandController::HandleCommandWithDisposition(
+@@ -783,7 +914,7 @@ void BrowserCommandController::HandleCommandWithDisposition(
        CloseWindow(browser_);
        break;
      case IDC_NEW_TAB: {
@@ -178,7 +186,7 @@ index afc3f64a97c6a8676a656fca1a3ede18eb23b1fb..055be3358c9975174ca07585ddb26b65
        break;
      }
      case IDC_NEW_TAB_TO_RIGHT: {
-@@ -1347,6 +1470,10 @@ void BrowserCommandController::HandleCommandWithDisposition(
+@@ -1347,6 +1478,10 @@ void BrowserCommandController::HandleCommandWithDisposition(
                            chrome::kPerformanceSubPage);
        break;
      case IDC_OPTIONS:
@@ -189,7 +197,7 @@ index afc3f64a97c6a8676a656fca1a3ede18eb23b1fb..055be3358c9975174ca07585ddb26b65
        ShowSettings(webui::GetBrowserForOpeningWebUi(browser_));
        break;
      case IDC_EDIT_SEARCH_ENGINES:
-@@ -2234,6 +2361,51 @@ void BrowserCommandController::UpdateCommandsForExtensionsMenu() {
+@@ -2234,6 +2369,51 @@ void BrowserCommandController::UpdateCommandsForExtensionsMenu() {
                                           /*state=*/true);
  }
  
@@ -241,7 +249,7 @@ index afc3f64a97c6a8676a656fca1a3ede18eb23b1fb..055be3358c9975174ca07585ddb26b65
  void BrowserCommandController::UpdateCommandsForTabState() {
    // Keep commands disabled when in locked fullscreen so users cannot exit this
    // mode. Only update navigation ones when the webapp is locked for OnTask
-@@ -2974,8 +3146,10 @@ void BrowserCommandController::UpdateActionsForSharingHubPolicy() {
+@@ -2974,8 +3154,10 @@ void BrowserCommandController::UpdateActionsForSharingHubPolicy() {
  }
  
  void BrowserCommandController::UpdateQRCodeGeneratorActionEnabledState() {
@@ -254,7 +262,7 @@ index afc3f64a97c6a8676a656fca1a3ede18eb23b1fb..055be3358c9975174ca07585ddb26b65
    if (auto* qr_code_action_item =
            FindAction(kActionQrCodeGenerator, browser_)) {
      qr_code_action_item->SetEnabled(qr_code_generator_enabled);
-@@ -2989,7 +3163,8 @@ void BrowserCommandController::UpdateCommandAndActionEnabled(
+@@ -2989,7 +3171,8 @@ void BrowserCommandController::UpdateCommandAndActionEnabled(
    command_updater_->UpdateCommandEnabled(command_id, enabled);
    if (!features::ShouldUseActionsForBrowserCommands()) {
      if (auto* const action = FindAction(action_id, browser_)) {
@@ -264,7 +272,7 @@ index afc3f64a97c6a8676a656fca1a3ede18eb23b1fb..055be3358c9975174ca07585ddb26b65
      }
    }
  }
-@@ -3010,10 +3185,12 @@ bool BrowserCommandController::IsInLockedFullscreenMode(
+@@ -3010,10 +3193,12 @@ bool BrowserCommandController::IsInLockedFullscreenMode(
  std::unique_ptr<CommandUpdater>
  BrowserCommandController::CreateCommandUpdater() {
    if (features::ShouldUseActionsForBrowserCommands()) {

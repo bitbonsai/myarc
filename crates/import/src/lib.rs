@@ -6,4 +6,5 @@
 //! or fetches URLs. The only dependency is `myarc-workspace`.
 
 pub mod arc_markdown;
+pub mod arc_report;
 pub mod arc_workspace;
