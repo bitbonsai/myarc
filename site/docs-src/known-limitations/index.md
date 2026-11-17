@@ -35,7 +35,7 @@ myArc is a pre-alpha. Use it to try the Arc-style sidebar, and keep daily and se
 
 ## After a crash
 
-Recent tabs and navigation can be lost after a crash or a force quit. Pinned tabs, Favorites and Spaces are saved in your workspace file, which [Your data](../your-data/) describes, but whether every change survives a force quit isn't fully tested yet.
+Recent tabs and navigation can be lost after a crash or a force quit. Pinned tabs, Favorites, folders and Spaces are saved to your workspace file, which [Your data](../your-data/) describes, before the sidebar shows the change, so a force quit right after keeps it. If that file is ever damaged, myArc opens the copy it kept before the last change and leaves the damaged one beside it as `.corrupt`. A power cut or a full disk hasn't been tested yet.
 
 If a single page crashes, reload it with Cmd+R. The rest of the browser keeps running.
 
