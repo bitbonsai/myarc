@@ -101,7 +101,7 @@ Alpha covers two panels. [VIEW-01](PARITY.md) and the [roadmap](../ROADMAP.md) c
 - [ ] **Private windows** (partial). Done when no title or address from a private window is in the workspace file after exit or a crash. Maps to [CORE-01](PARITY.md) and the Private browsing gate in [the scorecard](SCORECARD.md).
 - [ ] **Permissions, history, find and DevTools** (unknown). Done when a native smoke test covers a permission prompt, history, find in page and opening DevTools. Maps to [CORE-01](PARITY.md).
 - [ ] **No account needed** (unknown). Done when a fresh install with the network off reaches a usable workspace and a request audit shows no myArc service call. Maps to the Account independence gate in [the scorecard](SCORECARD.md).
-- [ ] **No dead controls** (partial). Done when each visible control has an effect or is disabled with an explanation, including the Library's Media and Boosts placeholders. Maps to the Visible controls gate in [the scorecard](SCORECARD.md).
+- [x] **No dead controls** (done). Done when each visible control has an effect or is disabled with an explanation, including the Library's Media and Boosts placeholders. Media and Boosts in the Library rail and Shortcuts in Settings are disabled with the tooltip "Not in myArc yet". Clear Archive is disabled while the archive is empty, and the Library card's brush edits the theme instead of renaming. An audit of the sidebar, Library, Settings and menus code found no other control without an effect; it was a code read plus captures, not a live click through. Maps to the Visible controls gate in [the scorecard](SCORECARD.md).
 
 ### Agent control
 

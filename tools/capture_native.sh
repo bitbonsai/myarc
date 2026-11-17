@@ -7,8 +7,9 @@
 #   command palette via --myarc-capture-open-palette and waits KEY_SETTLE (default 2).
 #   PALETTE_TEXT="claude plans" pre-fills the palette input to show its results.
 #   COPY_URL=1 copies the page URL via --myarc-capture-copy-url and holds the toast.
-#   LIBRARY=1 (or media/downloads/boosts/archive) opens the Library via
-#   --myarc-capture-open-library, on Spaces unless a section is named.
+#   LIBRARY=1 (or downloads/archive) opens the Library via
+#   --myarc-capture-open-library, on Spaces unless a section is named. Media
+#   and Boosts aren't built, so they open on Spaces too.
 #   TOOLTIP=library (or space/create) shows that sidebar footer tooltip via
 #   --myarc-capture-footer-tooltip and keeps it up.
 #   MENU=1 opens the sidebar's "+" creation menu via

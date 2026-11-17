@@ -155,6 +155,14 @@ constexpr auto kSections = std::to_array<SectionInfo>({
      u"Archived Tabs", u"Search Archive..."},
 });
 
+// Media and Boosts aren't built. Their rail items stay in Arc's order but are
+// disabled, with the tooltip Settings gives its unbuilt sections.
+constexpr char16_t kNotYet[] = u"Not in myArc yet";
+
+bool IsBuilt(Section section) {
+  return section != Section::kMedia && section != Section::kBoosts;
+}
+
 const SectionInfo& Info(Section section) {
   for (const auto& info : kSections) {
     if (info.section == section) {
@@ -335,6 +343,7 @@ class LibraryRailItem final : public TileButton {
     const Colors colors = GetColors(GetColorProvider());
     // Arc has no pressed look: a click goes straight to selected.
     const bool hovered = GetState() == STATE_HOVERED;
+    const bool disabled = GetState() == STATE_DISABLED;
     SetBackground(
         selected() || hovered
             ? views::CreateRoundedRectBackground(
@@ -348,10 +357,14 @@ class LibraryRailItem final : public TileButton {
                           // stay visible on the light selected tile.
                           : ui::ImageModel::FromVectorIcon(
                                 *icon_, colors.rail_label_selected, icon_size_))
-                   : ui::ImageModel::FromVectorIcon(*icon_, colors.rail_icon,
-                                                    icon_size_));
+                   : ui::ImageModel::FromVectorIcon(
+                         *icon_,
+                         disabled ? SkColorSetA(colors.rail_icon, 0x59)
+                                  : colors.rail_icon,
+                         icon_size_));
     label_->SetEnabledColor(selected() ? colors.rail_label_selected
                             : hovered  ? colors.rail_label_hover
+                            : disabled ? SkColorSetA(colors.muted, 0x59)
                                        : colors.muted);
   }
 
@@ -538,7 +551,9 @@ LibraryView::LibraryView(SidebarView::Delegate& delegate,
                          base::RepeatingClosure close,
                          Section section,
                          base::WeakPtr<FooterTooltip> tooltip)
-    : delegate_(delegate), close_(std::move(close)), section_(section) {
+    : delegate_(delegate),
+      close_(std::move(close)),
+      section_(IsBuilt(section) ? section : Section::kSpaces) {
   SetLayoutManager(std::make_unique<views::BoxLayout>(Orientation::kHorizontal,
                                                       gfx::Insets(), 0));
   GetViewAccessibility().SetRole(ax::mojom::Role::kGroup);
@@ -567,6 +582,11 @@ LibraryView::LibraryView(SidebarView::Delegate& delegate,
     // Arc clears the archive from the Archived Tabs item's context menu.
     if (info.section == Section::kArchive) {
       rail_items_.back()->set_context_menu_controller(this);
+    }
+    if (!IsBuilt(info.section)) {
+      rail_items_.back()->SetEnabled(false);
+      rail_items_.back()->SetTooltipText(kNotYet);
+      rail_items_.back()->GetViewAccessibility().SetDescription(kNotYet);
     }
   }
   auto* footer =
@@ -616,7 +636,7 @@ void LibraryView::SetSpaces(Spaces spaces, uint64_t current) {
 }
 
 void LibraryView::SelectSection(Section section) {
-  if (section == section_) {
+  if (section == section_ || !IsBuilt(section)) {
     return;
   }
   section_ = section;
@@ -903,16 +923,17 @@ void LibraryView::BuildSpaces(const std::map<uint64_t, gfx::PointF>& offsets) {
     keyed_views_.emplace_back(id, header.get());
     static_cast<views::BoxLayout*>(header_row->GetLayoutManager())
         ->SetFlexForView(header_row->AddChildView(std::move(header)), 1);
-    // Renaming keeps the Library open; the rename rebuilds this card.
+    // Arc's brush customizes the Space: Edit Theme… shows the Space in the
+    // sidebar, closing the Library, with the theme popover beside its title.
     auto edit =
         CardButton(base::BindRepeating(
                        [](LibraryView* view, uint64_t space) {
                          view->PostAction(base::BindOnce(
-                             &SidebarView::Delegate::RenameSpace,
+                             &SidebarView::Delegate::EditSpaceTheme,
                              base::Unretained(&view->delegate_.get()), space));
                        },
                        base::Unretained(this), id),
-                   kSpaceEditIcon, colors, u"Rename Space: " + name);
+                   kSpaceEditIcon, colors, u"Edit Theme: " + name);
     edit->SetProperty(views::kMarginsKey, gfx::Insets::TLBR(0, 4, 0, 2));
     keyed_views_.emplace_back(id | library::kSpaceEditKey, edit.get());
     header_row->AddChildView(std::move(edit));
@@ -1177,13 +1198,7 @@ void LibraryView::UpdateList(bool keep_scroll) {
         }
         break;
       case Section::kMedia:
-        title = u"Not available yet";
-        body = u"Media from your pages will show up here in a later version.";
-        break;
       case Section::kBoosts:
-        title = u"Not available yet";
-        body = u"Boosts are coming in a later version.";
-        break;
       case Section::kSpaces:
         NOTREACHED();
     }
@@ -1326,6 +1341,8 @@ void LibraryView::ShowContextMenuForViewImpl(
   menu_runner_.reset();
   menu_model_ = std::make_unique<ui::SimpleMenuModel>(this);
   menu_model_->AddItem(kClearArchive, u"Clear Archive");
+  // An empty archive has nothing to clear.
+  menu_model_->SetEnabledAt(0, !delegate_->GetArchivedTabs().empty());
   menu_runner_ = std::make_unique<views::MenuRunner>(
       menu_model_.get(), views::MenuRunner::CONTEXT_MENU);
   menu_runner_->RunMenuAt(GetWidget(), nullptr, gfx::Rect(point, gfx::Size()),
