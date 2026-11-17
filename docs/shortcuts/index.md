@@ -22,7 +22,7 @@ These shortcuts work in the current nightly. Standard Chromium shortcuts, such a
 | Ctrl\+Shift\+- | Separates a Split View and keeps both tabs | Arc closes the current pane instead |
 | Ctrl\+Shift\+1, Ctrl\+Shift\+2 | Moves focus between the two panes of a Split View | Same |
 | Cmd\+O | Turns a Peek card into a tab, or moves a Little Arc page into your current Space | Same |
-| Cmd\+Option\+N | Opens Little Arc, a small window for a quick page, while myArc is in front | Arc's also works from other apps |
+| Cmd\+Option\+N | Opens Little Arc, a small window for a quick page, from any app | Same |
 
 The command bar is the box for addresses and searches. Inside it, the arrow keys move through suggestions, Enter opens the selected one and Escape closes the bar.
 

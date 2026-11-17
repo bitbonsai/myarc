@@ -13,6 +13,8 @@ A Space is a set of tabs for one part of your life, such as Work, Reading or Tra
 - To create a Space, click \+ at the bottom of the sidebar. Give it a name, pick an emoji or icon, choose its Profile and pick a theme color.
 - To switch Spaces, click the Space's dot at the bottom of the sidebar.
 - To rename the current Space, click its name at the top of the sidebar.
+- To change a Space's color or icon, right-click its name and choose Edit Theme… or Change Icon….
+- To delete a Space, right-click its name and choose Delete Space…. Its tabs move to Archived Tabs in the Library for 30 days. You can't delete your last Space.
 
 ## Profiles
 
