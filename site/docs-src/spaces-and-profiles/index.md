@@ -34,7 +34,7 @@ Pinned tabs and Favorites both appear as favicon tiles at the top of the sidebar
 
 Right-click a tab in the sidebar to pin it to the Space or add it to the Profile's Favorites. The same menu moves a tile between the two, and Unpin from Space or Remove Favorite takes it away.
 
-Closing a pinned tab or a Favorite keeps its tile. The page closes, and clicking the tile opens it again.
+Closing a pinned tab or a Favorite keeps its tile. The page closes, and clicking the tile opens it again. When one has moved away from its saved page, its row shows both names. Click the back arrow on its icon to return to the saved page, or right-click it and choose Edit Pinned Page > Replace Pinned URL with Current to save the new one. Drag Favorite tiles to reorder them.
 
 ## Folders
 

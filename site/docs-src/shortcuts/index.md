@@ -25,7 +25,7 @@ These shortcuts work in the current nightly. Standard Chromium shortcuts, such a
 | Cmd+O | Turns a Peek card into a tab, or moves a Little Arc page into your current Space | Same |
 | Cmd+Option+N | Opens Little Arc, a small window for a quick page, from any app | Same |
 
-The command bar is the box for addresses and searches. Inside it, the arrow keys move through suggestions, Enter opens the selected one and Escape closes the bar.
+The command bar is the box for addresses and searches. Inside it, the arrow keys move through suggestions, Enter opens the selected one and Escape closes the bar. Type an action, such as pin, archive, split or a Space's name, to run it, or type / to list the actions.
 
 Cmd+Shift+C opens the element inspector in Chrome. myArc follows Arc and copies the address instead.
 

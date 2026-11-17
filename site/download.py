@@ -32,6 +32,7 @@ WORKS = [
     'Ad and tracker blocking, on by default, with uBlock Origin Lite built in. Window > Ad Blocking for This Site… turns it off for one site. Private windows block only after you allow the extension there.',
     'Ctrl+Tab switches to your last tab, and holding Ctrl goes further back through the five most recent.',
     'Little Arc: links from other apps open in a small window, and Option-Cmd-N opens one. Open in <Space> or Cmd+O moves the page into your current Space. Settings > Links turns it off.',
+    'The command bar runs actions: type pin, archive, split or a Space\'s name, or / to list them. View has Clear Cookies and Refresh and Clear Cache and Refresh for the current site.',
     'Agents can drive tabs in the Agent Space through the bundled myarc CLI and MCP server. It is off by default. Turn it on in Settings > Advanced, and myArc asks before each new agent connects.',
 ]
 
