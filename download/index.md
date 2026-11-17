@@ -4,12 +4,12 @@ HTML: https://myarc.dev/download/
 
 Pre-alpha nightly, for trying the Arc-like shell. Not for daily or sensitive browsing.
 
-[Download for macOS (Apple silicon)](https://github.com/bitbonsai/myarc/releases/download/nightly-2026.11.17.2/myArc-Nightly-2026.11.17.2-arm64.dmg)
+[Download for macOS (Apple silicon)](https://github.com/bitbonsai/myarc/releases/download/nightly-2026.11.17.3/myArc-Nightly-2026.11.17.3-arm64.dmg)
 
-- **Version:** 2026.11.17.2
+- **Version:** 2026.11.17.3
 - **Date:** November 17, 2026
-- **Size:** 243.4 MB
-- **SHA-256:** `4b4587a09ad656a1f65ccaffa6de00cadb8f1687995c91052eb62e13514b617b`
+- **Size:** 243.5 MB
+- **SHA-256:** `e47e87b21cc69fd2f27b88790e55cec76326a57b7483eb2cadd0b1888ad65b5a`
 
 ## System requirements
 
@@ -21,7 +21,7 @@ Pre-alpha nightly, for trying the Arc-like shell. Not for daily or sensitive bro
 1. Check the download against the SHA-256 listed with it. The two values must match.
 
    ```
-   shasum -a 256 ~/Downloads/myArc-Nightly-2026.11.17.2-arm64.dmg
+   shasum -a 256 ~/Downloads/myArc-Nightly-2026.11.17.3-arm64.dmg
    ```
 2. Open the DMG and drag myArc Nightly to Applications.
 3. macOS blocks the first launch because the app is not notarized. Right-click myArc Nightly, choose Open, then Open again. If macOS only offers Done or Move to Trash, which macOS 15 and later usually does, open System Settings \> Privacy \& Security, scroll to the myArc Nightly message and choose Open Anyway.
@@ -50,6 +50,7 @@ Each item was seen working in a native run or experiment note. None of it has ha
 - Ad and tracker blocking, on by default, with uBlock Origin Lite built in. Window \> Ad Blocking for This Site… turns it off for one site. Private windows block only after you allow the extension there.
 - Ctrl\+Tab switches to your last tab, and holding Ctrl goes further back through the five most recent.
 - Little Arc: links from other apps open in a small window, and Option-Cmd-N opens one. Open in \<Space\> or Cmd\+O moves the page into your current Space. Settings \> Links turns it off.
+- The command bar runs actions: type pin, archive, split or a Space's name, or / to list them. View has Clear Cookies and Refresh and Clear Cache and Refresh for the current site.
 - Agents can drive tabs in the Agent Space through the bundled myarc CLI and MCP server. It is off by default. Turn it on in Settings \> Advanced, and myArc asks before each new agent connects.
 
 ## Known limitations
@@ -63,7 +64,7 @@ Each item was seen working in a native run or experiment note. None of it has ha
 
 ## Other ways to get it
 
-- [GitHub releases](https://github.com/bitbonsai/myarc/releases/tag/nightly-2026.11.17.2) lists every nightly.
+- [GitHub releases](https://github.com/bitbonsai/myarc/releases/tag/nightly-2026.11.17.3) lists every nightly.
 - [Source on GitHub](https://github.com/bitbonsai/myarc), with instructions to [build it from source](https://github.com/bitbonsai/myarc/blob/main/browser/README.md).
 - [GitHub issues](https://github.com/bitbonsai/myarc/issues) take bug reports. Include the version, your macOS version and the steps that trigger the problem, and leave out private pages.
 
