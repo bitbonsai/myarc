@@ -79,6 +79,25 @@ mod ffi {
         Close,
     }
 
+    // Where a link that another app opened goes (CONV-01). FocusLittleArc
+    // brings the Little Arc at `index` of the list passed in forward.
+    enum LittleArcRouteKind {
+        NewLittleArc,
+        FocusLittleArc,
+        NewTab,
+    }
+
+    struct LittleArcRoute {
+        kind: LittleArcRouteKind,
+        index: usize,
+    }
+
+    // A main window that "Open in" could move a Little Arc page to.
+    struct LittleArcMainWindow {
+        same_profile: bool,
+        workspace_ready: bool,
+    }
+
     // Where a dragged sidebar row lands.
     enum DropTargetKind {
         // The ungrouped Pins.
@@ -756,6 +775,18 @@ mod ffi {
             peek_enabled: bool,
         ) -> PeekRoute;
         fn peek_action(trigger: PeekTrigger) -> PeekActionKind;
+        // Where a link another app opened goes. `url` is the canonical spec
+        // and `open_little_arcs` what each Little Arc shows, most recently
+        // used first.
+        fn route_link_from_other_app(
+            little_arc_enabled: bool,
+            scheme: &str,
+            url: &str,
+            open_little_arcs: Vec<String>,
+        ) -> LittleArcRoute;
+        // The index in `windows`, most recently used first, of the main
+        // window "Open in" moves a Little Arc page to, or -1 for none.
+        fn little_arc_move_target(windows: &[LittleArcMainWindow]) -> i64;
 
         type ArcExport;
         // Largest export accepted, in bytes.
@@ -1009,6 +1040,43 @@ pub fn peek_action(trigger: ffi::PeekTrigger) -> ffi::PeekActionKind {
         PeekAction::OpenInTab => ffi::PeekActionKind::OpenInTab,
         PeekAction::Close => ffi::PeekActionKind::Close,
     }
+}
+
+pub fn route_link_from_other_app(
+    little_arc_enabled: bool,
+    scheme: &str,
+    url: &str,
+    open_little_arcs: Vec<String>,
+) -> ffi::LittleArcRoute {
+    use workspace::little_arc::{ExternalLinkRoute, route_external_link};
+    let open: Vec<&str> = open_little_arcs.iter().map(String::as_str).collect();
+    match route_external_link(little_arc_enabled, scheme, url, &open) {
+        ExternalLinkRoute::NewLittleArc => ffi::LittleArcRoute {
+            kind: ffi::LittleArcRouteKind::NewLittleArc,
+            index: 0,
+        },
+        ExternalLinkRoute::FocusLittleArc(index) => ffi::LittleArcRoute {
+            kind: ffi::LittleArcRouteKind::FocusLittleArc,
+            index,
+        },
+        ExternalLinkRoute::NewTab => ffi::LittleArcRoute {
+            kind: ffi::LittleArcRouteKind::NewTab,
+            index: 0,
+        },
+    }
+}
+
+pub fn little_arc_move_target(windows: &[ffi::LittleArcMainWindow]) -> i64 {
+    let windows: Vec<workspace::little_arc::MainWindow> = windows
+        .iter()
+        .map(|window| workspace::little_arc::MainWindow {
+            same_profile: window.same_profile,
+            workspace_ready: window.workspace_ready,
+        })
+        .collect();
+    workspace::little_arc::move_target(&windows)
+        .and_then(|index| i64::try_from(index).ok())
+        .unwrap_or(-1)
 }
 
 pub fn new_workspace() -> Box<Workspace> {

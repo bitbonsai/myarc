@@ -1,5 +1,5 @@
 diff --git a/chrome/browser/ui/browser_commands.h b/chrome/browser/ui/browser_commands.h
-index cd5696602ed1556fed1d92ef118ce73bb3ff5bba..791c3844d691d9b4698a7936638f67f49d81d81f 100644
+index cd5696602ed1556fed1d92ef118ce73bb3ff5bba..5b55d8119a98138ea4e7fa1b7fe1629832871dd0 100644
 --- a/chrome/browser/ui/browser_commands.h
 +++ b/chrome/browser/ui/browser_commands.h
 @@ -7,6 +7,7 @@
@@ -43,19 +43,22 @@ index cd5696602ed1556fed1d92ef118ce73bb3ff5bba..791c3844d691d9b4698a7936638f67f4
  
  int GetContentRestrictions(const BrowserWindowInterface* browser);
  
-@@ -136,6 +150,11 @@ void NewIncognitoWindow(Profile* profile);
+@@ -136,6 +150,14 @@ void NewIncognitoWindow(Profile* profile);
  void CloseWindow(BrowserWindowInterface* browser);
  content::WebContents& NewTab(BrowserWindowInterface* browser,
                               NewTabTypes context);
 +// Interactive intent is separate so internal callers still create a real tab.
 +void NewTabFromUI(BrowserWindowInterface* browser, NewTabTypes context);
++// myArc: opens a link another app sent in Little Arc, when its Settings
++// switch is on. Returns false when it should open as a normal tab.
++bool OpenMyarcLinkFromOtherApp(Profile* profile, const GURL& url);
 +bool NavigateFromMyarcPalette(BrowserWindowInterface* browser,
 +                              std::u16string_view text,
 +                              bool new_tab = true);
  void NewTabToRight(BrowserWindowInterface* browser);
  void NewTabFromClipboardURL(BrowserWindowInterface* browser);
  void CloseTab(BrowserWindowInterface* browser);
-@@ -300,7 +319,9 @@ void RouteMediaInvokedFromAppMenu(BrowserWindowInterface* browser);
+@@ -300,7 +322,9 @@ void RouteMediaInvokedFromAppMenu(BrowserWindowInterface* browser);
  void Find(BrowserWindowInterface* browser);
  void FindNext(BrowserWindowInterface* browser);
  void FindPrevious(BrowserWindowInterface* browser);
@@ -66,7 +69,7 @@ index cd5696602ed1556fed1d92ef118ce73bb3ff5bba..791c3844d691d9b4698a7936638f67f4
  void ShowTabSearch(BrowserWindowInterface* browser);
  void CloseTabSearch(BrowserWindowInterface* browser);
  void ToggleTabSearchPin(BrowserWindowInterface* browser);
-@@ -389,10 +410,12 @@ std::optional<int> GetKeyboardFocusedTabIndex(
+@@ -389,10 +413,12 @@ std::optional<int> GetKeyboardFocusedTabIndex(
  
  void ShowIncognitoClearBrowsingDataDialog(BrowserWindowInterface* browser);
  void ShowIncognitoHistoryDisclaimerDialog(BrowserWindowInterface* browser);

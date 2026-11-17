@@ -1,5 +1,5 @@
 diff --git a/chrome/browser/ui/views/frame/browser_view.h b/chrome/browser/ui/views/frame/browser_view.h
-index 750e46c97b64dccccf4268e912df5dbdb6516b3c..ab0f403c5caaef1b1d9a4c8a10356e0651948723 100644
+index 750e46c97b64dccccf4268e912df5dbdb6516b3c..773c9b88648a67447e7ef2fbbd522a1269730cc4 100644
 --- a/chrome/browser/ui/views/frame/browser_view.h
 +++ b/chrome/browser/ui/views/frame/browser_view.h
 @@ -8,11 +8,13 @@
@@ -32,13 +32,14 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..ab0f403c5caaef1b1d9a4c8a10356e06
  class ScrimView;
  class SidePanel;
  class SidePanelAnimationContentView;
-@@ -104,6 +108,17 @@ class TopControlsSlideControllerTest;
+@@ -104,6 +108,18 @@ class TopControlsSlideControllerTest;
  class VerticalTabStripRegionView;
  class WebAppFrameToolbarView;
  
 +namespace myarc {
 +class BrowserWorkspaceAdapter;
 +class CopiedUrlToast;
++class LittleArcHeader;
 +class PeekController;
 +class ProfileSwapCover;
 +class SettingsWindow;
@@ -50,7 +51,7 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..ab0f403c5caaef1b1d9a4c8a10356e06
  namespace gfx {
  class AnimationRunner;
  }  // namespace gfx
-@@ -121,7 +136,11 @@ enum class Channel;
+@@ -121,7 +137,11 @@ enum class Channel;
  }
  
  namespace views {
@@ -62,7 +63,7 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..ab0f403c5caaef1b1d9a4c8a10356e06
  class NativeViewHost;
  class WebView;
  }  // namespace views
-@@ -143,7 +162,8 @@ class BrowserView : public BrowserWindow,
+@@ -143,7 +163,8 @@ class BrowserView : public BrowserWindow,
                      public ImmersiveModeController::Observer,
                      public GlobalErrorObserver,
                      public views::FocusChangeListener,
@@ -72,7 +73,7 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..ab0f403c5caaef1b1d9a4c8a10356e06
    METADATA_HEADER(BrowserView, views::ClientView)
  
   public:
-@@ -234,6 +254,8 @@ class BrowserView : public BrowserWindow,
+@@ -234,6 +255,8 @@ class BrowserView : public BrowserWindow,
    // Container for the tabstrip, toolbar, etc.
    TopContainerView* top_container() { return top_container_; }
  
@@ -81,7 +82,7 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..ab0f403c5caaef1b1d9a4c8a10356e06
    std::optional<int> theme_background_y_offset() const {
      return theme_background_y_offset_;
    }
-@@ -311,6 +333,43 @@ class BrowserView : public BrowserWindow,
+@@ -311,6 +334,43 @@ class BrowserView : public BrowserWindow,
  
    ScrimView* window_scrim_view() { return window_scrim_view_; }
  
@@ -125,7 +126,7 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..ab0f403c5caaef1b1d9a4c8a10356e06
    base::WeakPtr<BrowserView> GetAsWeakPtr() {
      return weak_ptr_factory_.GetWeakPtr();
    }
-@@ -1253,12 +1312,226 @@ class BrowserView : public BrowserWindow,
+@@ -1253,12 +1313,237 @@ class BrowserView : public BrowserWindow,
  
    // Anchor point for help bubbles and other dialogs that want to reliably
    // anchor outside the content area of the window.
@@ -274,6 +275,17 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..ab0f403c5caaef1b1d9a4c8a10356e06
 +  std::unique_ptr<myarc::BrowserWorkspaceAdapter> myarc_workspace_adapter_;
 +  // Peek's card over the page area. Destroyed before the adapter.
 +  std::unique_ptr<myarc::PeekController> myarc_peek_;
++  // Little Arc's header, in Little Arc windows only. The page card sits
++  // beneath it, inset from the window edges.
++  raw_ptr<myarc::LittleArcHeader> myarc_little_arc_header_ = nullptr;
++  void InitMyarcLittleArc();
++  void LayoutMyarcLittleArc();
++  void UpdateMyarcLittleArc();
++  // --myarc-capture-little-arc=open|move:<ms>, on a main window: opens a
++  // Little Arc with Cmd+Opt+N's command, or moves every open Little Arc's
++  // page into a Space after <ms>.
++  void MaybeScheduleMyarcCaptureLittleArc();
++  bool myarc_capture_little_arc_scheduled_ = false;
 +  // --myarc-capture-peek clicks the active page's first link once.
 +  bool myarc_capture_peek_scheduled_ = false;
 +  base::CallbackListSubscription myarc_workspace_subscription_;
@@ -352,7 +364,7 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..ab0f403c5caaef1b1d9a4c8a10356e06
  
    // A mapping between accelerators and command IDs.
    std::map<ui::Accelerator, int> accelerator_table_;
-@@ -1411,6 +1684,7 @@ class BrowserView : public BrowserWindow,
+@@ -1411,6 +1696,7 @@ class BrowserView : public BrowserWindow,
    base::EnumSet<TabStripAndWebAppViewsReparentedState>
        tab_strip_web_apps_reparented_state_;
  

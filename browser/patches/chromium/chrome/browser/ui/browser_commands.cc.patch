@@ -1,16 +1,17 @@
 diff --git a/chrome/browser/ui/browser_commands.cc b/chrome/browser/ui/browser_commands.cc
-index c9f9ea0cd97e01a8d964e19268cc5a61531cc451..d4658c73793ae6d2e019f3457f5c33eb68ed6e05 100644
+index c9f9ea0cd97e01a8d964e19268cc5a61531cc451..ec6a73cb6034d4196cdb43eb9eabdcf9a75744aa 100644
 --- a/chrome/browser/ui/browser_commands.cc
 +++ b/chrome/browser/ui/browser_commands.cc
-@@ -207,6 +207,7 @@
+@@ -207,6 +207,8 @@
  #include "content/public/common/url_constants.h"
  #include "content/public/common/url_utils.h"
  #include "extensions/buildflags/buildflags.h"
++#include "myarc/little_arc.h"
 +#include "myarc/workspace_lifecycle.h"
  #include "pdf/buildflags.h"
  #include "printing/buildflags/buildflags.h"
  #include "rlz/buildflags/buildflags.h"
-@@ -235,6 +236,10 @@
+@@ -235,6 +237,10 @@
  #include "extensions/common/extension_set.h"
  #endif
  
@@ -21,7 +22,7 @@ index c9f9ea0cd97e01a8d964e19268cc5a61531cc451..d4658c73793ae6d2e019f3457f5c33eb
  #if BUILDFLAG(ENABLE_PDF)
  #include "chrome/browser/pdf/pdf_extension_util.h"
  #include "pdf/pdf_features.h"
-@@ -721,6 +726,10 @@ tabs::TabInterface* GetTabAndRevertIfNecessary(
+@@ -721,6 +727,10 @@ tabs::TabInterface* GetTabAndRevertIfNecessary(
  void ReloadInternal(BrowserWindowInterface* browser,
                      WindowOpenDisposition disposition,
                      bool bypass_cache) {
@@ -32,7 +33,7 @@ index c9f9ea0cd97e01a8d964e19268cc5a61531cc451..d4658c73793ae6d2e019f3457f5c33eb
    TabStripModel* const tab_strip_model = browser->GetTabStripModel();
    tabs::TabInterface* const active_tab = tab_strip_model->GetActiveTab();
  
-@@ -837,6 +846,132 @@ std::vector<int> GetUngroupedTabIndices(BrowserWindowInterface* browser) {
+@@ -837,6 +847,132 @@ std::vector<int> GetUngroupedTabIndices(BrowserWindowInterface* browser) {
  
  }  // namespace
  
@@ -165,7 +166,7 @@ index c9f9ea0cd97e01a8d964e19268cc5a61531cc451..d4658c73793ae6d2e019f3457f5c33eb
  bool IsCommandEnabled(BrowserWindowInterface* browser, int command) {
    return BrowserCommandController::From(browser)->IsCommandEnabled(command);
  }
-@@ -900,6 +1035,9 @@ void RemoveCommandObserver(BrowserWindowInterface* browser,
+@@ -900,6 +1036,9 @@ void RemoveCommandObserver(BrowserWindowInterface* browser,
  }
  
  int GetContentRestrictions(const BrowserWindowInterface* browser) {
@@ -175,7 +176,7 @@ index c9f9ea0cd97e01a8d964e19268cc5a61531cc451..d4658c73793ae6d2e019f3457f5c33eb
    int content_restrictions = 0;
    WebContents* const current_tab =
        browser->GetTabStripModel()->GetActiveWebContents();
-@@ -990,6 +1128,9 @@ BrowserWindowInterface* OpenEmptyWindow(Profile* profile,
+@@ -990,6 +1129,9 @@ BrowserWindowInterface* OpenEmptyWindow(Profile* profile,
      AddTabAt(browser, GURL(), -1, true);
    }
  
@@ -185,7 +186,7 @@ index c9f9ea0cd97e01a8d964e19268cc5a61531cc451..d4658c73793ae6d2e019f3457f5c33eb
    browser->GetWindow()->Show();
    return browser;
  }
-@@ -1010,6 +1151,10 @@ void OpenURLOffTheRecord(Profile* profile, const GURL& url) {
+@@ -1010,6 +1152,10 @@ void OpenURLOffTheRecord(Profile* profile, const GURL& url) {
  }
  
  bool CanGoBack(const BrowserWindowInterface* browser) {
@@ -196,7 +197,7 @@ index c9f9ea0cd97e01a8d964e19268cc5a61531cc451..d4658c73793ae6d2e019f3457f5c33eb
    return CanGoBack(browser->GetTabStripModel()->GetActiveWebContents());
  }
  
-@@ -1021,6 +1166,10 @@ bool CanGoBack(content::WebContents* web_contents) {
+@@ -1021,6 +1167,10 @@ bool CanGoBack(content::WebContents* web_contents) {
  }
  
  bool ShouldEnableBackButton(const BrowserWindowInterface* browser) {
@@ -207,7 +208,7 @@ index c9f9ea0cd97e01a8d964e19268cc5a61531cc451..d4658c73793ae6d2e019f3457f5c33eb
    content::WebContents* web_contents =
        browser->GetTabStripModel()->GetActiveWebContents();
    if (!web_contents) {
-@@ -1084,6 +1233,10 @@ void MaybeShowFeatureBackNavigationMenuPromo(BrowserWindowInterface* browser,
+@@ -1084,6 +1234,10 @@ void MaybeShowFeatureBackNavigationMenuPromo(BrowserWindowInterface* browser,
  
  void GoBack(BrowserWindowInterface* browser,
              WindowOpenDisposition disposition) {
@@ -218,7 +219,7 @@ index c9f9ea0cd97e01a8d964e19268cc5a61531cc451..d4658c73793ae6d2e019f3457f5c33eb
    tabs::TabInterface* tab = GetTabAndRevertIfNecessary(browser, disposition);
    CHECK(tab);
    GoBack(tab->GetContents());
-@@ -1113,6 +1266,10 @@ void GoBack(content::WebContents* web_contents) {
+@@ -1113,6 +1267,10 @@ void GoBack(content::WebContents* web_contents) {
  }
  
  bool CanGoForward(const BrowserWindowInterface* browser) {
@@ -229,7 +230,7 @@ index c9f9ea0cd97e01a8d964e19268cc5a61531cc451..d4658c73793ae6d2e019f3457f5c33eb
    return browser->GetTabStripModel()
        ->GetActiveWebContents()
        ->GetController()
-@@ -1124,6 +1281,10 @@ bool CanGoForward(content::WebContents* web_contents) {
+@@ -1124,6 +1282,10 @@ bool CanGoForward(content::WebContents* web_contents) {
  }
  
  bool ShouldEnableForwardButton(const BrowserWindowInterface* browser) {
@@ -240,7 +241,7 @@ index c9f9ea0cd97e01a8d964e19268cc5a61531cc451..d4658c73793ae6d2e019f3457f5c33eb
    return browser->GetTabStripModel()
        ->GetActiveWebContents()
        ->GetController()
-@@ -1132,6 +1293,10 @@ bool ShouldEnableForwardButton(const BrowserWindowInterface* browser) {
+@@ -1132,6 +1294,10 @@ bool ShouldEnableForwardButton(const BrowserWindowInterface* browser) {
  
  void GoForward(BrowserWindowInterface* browser,
                 WindowOpenDisposition disposition) {
@@ -251,7 +252,7 @@ index c9f9ea0cd97e01a8d964e19268cc5a61531cc451..d4658c73793ae6d2e019f3457f5c33eb
    base::RecordAction(UserMetricsAction("Forward"));
    if (CanGoForward(browser)) {
      tabs::TabInterface* tab = GetTabAndRevertIfNecessary(browser, disposition);
-@@ -1150,6 +1315,10 @@ void GoForward(content::WebContents* web_contents) {
+@@ -1150,6 +1316,10 @@ void GoForward(content::WebContents* web_contents) {
  void NavigateToIndexWithDisposition(BrowserWindowInterface* browser,
                                      int index,
                                      WindowOpenDisposition disposition) {
@@ -262,7 +263,7 @@ index c9f9ea0cd97e01a8d964e19268cc5a61531cc451..d4658c73793ae6d2e019f3457f5c33eb
    tabs::TabInterface* tab = GetTabAndRevertIfNecessary(browser, disposition);
    CHECK(tab);
    WebContents* web_contents = tab->GetContents();
-@@ -1173,12 +1342,20 @@ void ReloadBypassingCache(BrowserWindowInterface* browser,
+@@ -1173,12 +1343,20 @@ void ReloadBypassingCache(BrowserWindowInterface* browser,
  }
  
  bool CanReload(const BrowserWindowInterface* browser) {
@@ -283,7 +284,7 @@ index c9f9ea0cd97e01a8d964e19268cc5a61531cc451..d4658c73793ae6d2e019f3457f5c33eb
    base::RecordAction(UserMetricsAction("Home"));
  
    std::string extra_headers;
-@@ -1272,6 +1449,13 @@ base::WeakPtr<content::NavigationHandle> OpenCurrentURL(
+@@ -1272,6 +1450,13 @@ base::WeakPtr<content::NavigationHandle> OpenCurrentURL(
    params.url_typed_with_http_scheme =
        location_bar->navigation_params().url_typed_with_http_scheme;
    params.extra_headers = location_bar->navigation_params().extra_headers;
@@ -297,7 +298,7 @@ index c9f9ea0cd97e01a8d964e19268cc5a61531cc451..d4658c73793ae6d2e019f3457f5c33eb
    auto result = Navigate(&params);
  
  #if BUILDFLAG(ENABLE_EXTENSIONS)
-@@ -1294,6 +1478,10 @@ base::WeakPtr<content::NavigationHandle> OpenCurrentURL(
+@@ -1294,6 +1479,10 @@ base::WeakPtr<content::NavigationHandle> OpenCurrentURL(
  }
  
  void Stop(BrowserWindowInterface* browser) {
@@ -308,7 +309,7 @@ index c9f9ea0cd97e01a8d964e19268cc5a61531cc451..d4658c73793ae6d2e019f3457f5c33eb
    base::RecordAction(UserMetricsAction("Stop"));
    browser->GetTabStripModel()->GetActiveWebContents()->Stop();
  }
-@@ -1367,6 +1555,64 @@ void OpenSizeWindow(BrowserWindowInterface* browser) {
+@@ -1367,6 +1556,68 @@ void OpenSizeWindow(BrowserWindowInterface* browser) {
  }
  #endif  // BUILDFLAG(IS_WIN)
  
@@ -325,6 +326,10 @@ index c9f9ea0cd97e01a8d964e19268cc5a61531cc451..d4658c73793ae6d2e019f3457f5c33eb
 +  }
 +#endif
 +  NewTab(browser, context);
++}
++
++bool OpenMyarcLinkFromOtherApp(Profile* profile, const GURL& url) {
++  return profile && myarc::OpenLinkFromOtherApp(*profile, url);
 +}
 +
 +bool NavigateFromMyarcPalette(BrowserWindowInterface* browser,
@@ -373,7 +378,7 @@ index c9f9ea0cd97e01a8d964e19268cc5a61531cc451..d4658c73793ae6d2e019f3457f5c33eb
  content::WebContents& NewTab(BrowserWindowInterface* browser,
                               NewTabTypes context) {
    if (context != NewTabTypes::kNoUserAction) {
-@@ -1412,6 +1658,10 @@ content::WebContents& NewTab(BrowserWindowInterface* browser,
+@@ -1412,6 +1663,10 @@ content::WebContents& NewTab(BrowserWindowInterface* browser,
  }
  
  void NewTabToRight(BrowserWindowInterface* browser) {
@@ -384,7 +389,7 @@ index c9f9ea0cd97e01a8d964e19268cc5a61531cc451..d4658c73793ae6d2e019f3457f5c33eb
    browser->GetTabStripModel()->ExecuteContextMenuCommand(
        browser->GetTabStripModel()->active_index(),
        TabStripModel::CommandNewTabToRight);
-@@ -1455,6 +1705,12 @@ void NewTabFromClipboardURL(BrowserWindowInterface* browser) {
+@@ -1455,6 +1710,12 @@ void NewTabFromClipboardURL(BrowserWindowInterface* browser) {
  }
  
  void CloseTab(BrowserWindowInterface* browser) {
@@ -397,7 +402,7 @@ index c9f9ea0cd97e01a8d964e19268cc5a61531cc451..d4658c73793ae6d2e019f3457f5c33eb
    base::RecordAction(UserMetricsAction("CloseTab_Accelerator"));
  
    tabs::TabInterface* active_tab = browser->GetTabStripModel()->GetActiveTab();
-@@ -1572,11 +1828,19 @@ void CycleToMruTab(BrowserWindowInterface* browser,
+@@ -1572,11 +1833,19 @@ void CycleToMruTab(BrowserWindowInterface* browser,
  }
  
  void MoveTabNext(BrowserWindowInterface* browser) {
@@ -417,7 +422,7 @@ index c9f9ea0cd97e01a8d964e19268cc5a61531cc451..d4658c73793ae6d2e019f3457f5c33eb
    base::RecordAction(UserMetricsAction("MoveTabPrevious"));
    browser->GetTabStripModel()->MoveTabPrevious();
  }
-@@ -1619,16 +1883,28 @@ void SelectLastTab(BrowserWindowInterface* browser,
+@@ -1619,16 +1888,28 @@ void SelectLastTab(BrowserWindowInterface* browser,
  }
  
  void DuplicateTab(BrowserWindowInterface* browser) {
@@ -446,7 +451,7 @@ index c9f9ea0cd97e01a8d964e19268cc5a61531cc451..d4658c73793ae6d2e019f3457f5c33eb
    if (!HasKeyboardFocusedTab(browser)) {
      return false;
    }
-@@ -1636,6 +1912,10 @@ bool CanDuplicateKeyboardFocusedTab(const BrowserWindowInterface* browser) {
+@@ -1636,6 +1917,10 @@ bool CanDuplicateKeyboardFocusedTab(const BrowserWindowInterface* browser) {
  }
  
  bool CanMoveActiveTabToNewWindow(BrowserWindowInterface* browser) {
@@ -457,7 +462,7 @@ index c9f9ea0cd97e01a8d964e19268cc5a61531cc451..d4658c73793ae6d2e019f3457f5c33eb
    const ui::ListSelectionModel::SelectedIndices selection =
        browser->GetTabStripModel()
            ->selection_model()
-@@ -1647,6 +1927,10 @@ bool CanMoveActiveTabToNewWindow(BrowserWindowInterface* browser) {
+@@ -1647,6 +1932,10 @@ bool CanMoveActiveTabToNewWindow(BrowserWindowInterface* browser) {
  
  // TODO(crbug.com/435178910) Remove this usage of ListSelectionModel.
  void MoveActiveTabToNewWindow(BrowserWindowInterface* browser) {
@@ -468,7 +473,7 @@ index c9f9ea0cd97e01a8d964e19268cc5a61531cc451..d4658c73793ae6d2e019f3457f5c33eb
    const ui::ListSelectionModel::SelectedIndices selection =
        browser->GetTabStripModel()
            ->selection_model()
-@@ -1658,6 +1942,10 @@ void MoveActiveTabToNewWindow(BrowserWindowInterface* browser) {
+@@ -1658,6 +1947,10 @@ void MoveActiveTabToNewWindow(BrowserWindowInterface* browser) {
  
  bool CanMoveTabsToNewWindow(BrowserWindowInterface* browser,
                              const std::vector<int>& tab_indices) {
@@ -479,7 +484,7 @@ index c9f9ea0cd97e01a8d964e19268cc5a61531cc451..d4658c73793ae6d2e019f3457f5c33eb
    if (browser->GetType() == BrowserWindowInterface::TYPE_APP) {
      for (int index : tab_indices) {
        if (web_app::IsPinnedHomeTab(browser->GetTabStripModel(), index)) {
-@@ -1671,6 +1959,10 @@ bool CanMoveTabsToNewWindow(BrowserWindowInterface* browser,
+@@ -1671,6 +1964,10 @@ bool CanMoveTabsToNewWindow(BrowserWindowInterface* browser,
  
  void MoveGroupToNewWindow(BrowserWindowInterface* browser,
                            tab_groups::TabGroupId group) {
@@ -490,7 +495,7 @@ index c9f9ea0cd97e01a8d964e19268cc5a61531cc451..d4658c73793ae6d2e019f3457f5c33eb
    BrowserWindowInterface* new_browser;
    if (browser->GetType() == BrowserWindowInterface::Type::TYPE_APP &&
        web_app::AppBrowserController::From(browser)->has_tab_strip()) {
-@@ -1689,6 +1981,10 @@ void MoveGroupToNewWindow(BrowserWindowInterface* browser,
+@@ -1689,6 +1986,10 @@ void MoveGroupToNewWindow(BrowserWindowInterface* browser,
  
  void MoveTabsToNewWindow(BrowserWindowInterface* browser,
                           const std::vector<int>& tab_indices) {
@@ -501,7 +506,7 @@ index c9f9ea0cd97e01a8d964e19268cc5a61531cc451..d4658c73793ae6d2e019f3457f5c33eb
    if (tab_indices.empty()) {
      return;
    }
-@@ -1710,12 +2006,21 @@ void MoveTabsToNewWindow(BrowserWindowInterface* browser,
+@@ -1710,12 +2011,21 @@ void MoveTabsToNewWindow(BrowserWindowInterface* browser,
  }
  
  bool CanCloseTabsToRight(const BrowserWindowInterface* browser) {
@@ -523,7 +528,7 @@ index c9f9ea0cd97e01a8d964e19268cc5a61531cc451..d4658c73793ae6d2e019f3457f5c33eb
    return browser->GetTabStripModel()->IsContextMenuCommandEnabled(
        browser->GetTabStripModel()->active_index(),
        TabStripModel::CommandCloseOtherTabs);
-@@ -1727,6 +2032,10 @@ WebContents* DuplicateTabAt(BrowserWindowInterface* browser, int index) {
+@@ -1727,6 +2037,10 @@ WebContents* DuplicateTabAt(BrowserWindowInterface* browser, int index) {
  
  void DuplicateSplit(BrowserWindowInterface* browser,
                      split_tabs::SplitTabId split) {
@@ -534,7 +539,7 @@ index c9f9ea0cd97e01a8d964e19268cc5a61531cc451..d4658c73793ae6d2e019f3457f5c33eb
    CHECK(WindowFeatureController::From(browser)->CanSupportWindowFeature(
        WindowFeatureController::WindowFeature::kFeatureTabStrip));
  
-@@ -1761,6 +2070,10 @@ void DuplicateSplit(BrowserWindowInterface* browser,
+@@ -1761,6 +2075,10 @@ void DuplicateSplit(BrowserWindowInterface* browser,
  }
  
  bool CanDuplicateTabAt(const BrowserWindowInterface* browser, int index) {
@@ -545,7 +550,7 @@ index c9f9ea0cd97e01a8d964e19268cc5a61531cc451..d4658c73793ae6d2e019f3457f5c33eb
    if (browser->GetType() == BrowserWindowInterface::TYPE_FLOATING ||
        browser->GetType() == BrowserWindowInterface::TYPE_APP_POPUP ||
        browser->GetType() == BrowserWindowInterface::TYPE_DEVTOOLS) {
-@@ -1773,22 +2086,46 @@ bool CanDuplicateTabAt(const BrowserWindowInterface* browser, int index) {
+@@ -1773,22 +2091,46 @@ bool CanDuplicateTabAt(const BrowserWindowInterface* browser, int index) {
  void MoveTabsToExistingWindow(BrowserWindowInterface* source,
                                BrowserWindowInterface* target,
                                const std::vector<int>& tab_indices) {
@@ -592,7 +597,7 @@ index c9f9ea0cd97e01a8d964e19268cc5a61531cc451..d4658c73793ae6d2e019f3457f5c33eb
    browser->GetTabStripModel()->ExecuteContextMenuCommand(
        browser->GetTabStripModel()->active_index(),
        TabStripModel::ContextMenuCommand::CommandToggleGrouped);
-@@ -1797,15 +2134,32 @@ void GroupTab(BrowserWindowInterface* browser) {
+@@ -1797,15 +2139,32 @@ void GroupTab(BrowserWindowInterface* browser) {
  void NewSplitTab(BrowserWindowInterface* browser,
                   split_tabs::SplitTabLayout layout,
                   split_tabs::SplitTabCreatedSource source) {
@@ -626,7 +631,7 @@ index c9f9ea0cd97e01a8d964e19268cc5a61531cc451..d4658c73793ae6d2e019f3457f5c33eb
    tab_strip_model->delegate()->AddTabAt(
        new_tab_url, active_index + 1, true,
        tab_strip_model->GetTabGroupForTab(active_index),
-@@ -1814,9 +2168,19 @@ void NewSplitTab(BrowserWindowInterface* browser,
+@@ -1814,9 +2173,19 @@ void NewSplitTab(BrowserWindowInterface* browser,
        {active_index}, split_tabs::SplitTabVisualData(layout), source);
  
    tab_strip_model->ActivateTabAt(active_index + 1);
@@ -646,7 +651,7 @@ index c9f9ea0cd97e01a8d964e19268cc5a61531cc451..d4658c73793ae6d2e019f3457f5c33eb
    if (!browser->GetTabStripModel()->SupportsTabGroups()) {
      return;
    }
-@@ -1832,6 +2196,10 @@ void AddNewTabToGroup(BrowserWindowInterface* browser) {
+@@ -1832,6 +2201,10 @@ void AddNewTabToGroup(BrowserWindowInterface* browser) {
  }
  
  void CreateNewTabGroup(BrowserWindowInterface* browser) {
@@ -657,7 +662,7 @@ index c9f9ea0cd97e01a8d964e19268cc5a61531cc451..d4658c73793ae6d2e019f3457f5c33eb
    NewTab(browser, NewTabTypes::kNewTabCommand);
    browser->GetTabStripModel()->ExecuteContextMenuCommand(
        browser->GetTabStripModel()->active_index(),
-@@ -1839,6 +2207,10 @@ void CreateNewTabGroup(BrowserWindowInterface* browser) {
+@@ -1839,6 +2212,10 @@ void CreateNewTabGroup(BrowserWindowInterface* browser) {
  }
  
  void CloseTabGroup(BrowserWindowInterface* browser) {
@@ -668,7 +673,7 @@ index c9f9ea0cd97e01a8d964e19268cc5a61531cc451..d4658c73793ae6d2e019f3457f5c33eb
    const int index = browser->GetTabStripModel()->active_index();
    std::optional<tab_groups::TabGroupId> group_id =
        browser->GetTabStripModel()->GetTabGroupForTab(index);
-@@ -1917,6 +2289,10 @@ void FocusPreviousTabGroup(BrowserWindowInterface* browser) {
+@@ -1917,6 +2294,10 @@ void FocusPreviousTabGroup(BrowserWindowInterface* browser) {
  }
  
  bool CanGroupAllUngroupedTabs(BrowserWindowInterface* browser) {
@@ -679,7 +684,7 @@ index c9f9ea0cd97e01a8d964e19268cc5a61531cc451..d4658c73793ae6d2e019f3457f5c33eb
    // Only whether such a tab exists matters here; do not build the list.
    TabStripModel* tab_strip_model = browser->GetTabStripModel();
    if (!tab_strip_model->SupportsTabGroups()) {
-@@ -1928,6 +2304,10 @@ bool CanGroupAllUngroupedTabs(BrowserWindowInterface* browser) {
+@@ -1928,6 +2309,10 @@ bool CanGroupAllUngroupedTabs(BrowserWindowInterface* browser) {
  }
  
  bool GroupAllUngroupedTabs(BrowserWindowInterface* browser) {
@@ -690,7 +695,7 @@ index c9f9ea0cd97e01a8d964e19268cc5a61531cc451..d4658c73793ae6d2e019f3457f5c33eb
    std::vector<int> indices = GetUngroupedTabIndices(browser);
    if (indices.empty()) {
      return false;
-@@ -1940,6 +2320,10 @@ bool GroupAllUngroupedTabs(BrowserWindowInterface* browser) {
+@@ -1940,6 +2325,10 @@ bool GroupAllUngroupedTabs(BrowserWindowInterface* browser) {
  }
  
  void AddNewTabToRecentGroup(BrowserWindowInterface* browser) {
@@ -701,7 +706,7 @@ index c9f9ea0cd97e01a8d964e19268cc5a61531cc451..d4658c73793ae6d2e019f3457f5c33eb
    if (!base::FeatureList::IsEnabled(features::kNewTabButtonContextMenu)) {
      return;
    }
-@@ -1972,12 +2356,20 @@ void ExitFocusMode(BrowserWindowInterface* browser,
+@@ -1972,12 +2361,20 @@ void ExitFocusMode(BrowserWindowInterface* browser,
  }
  
  void MuteSite(BrowserWindowInterface* browser) {
@@ -722,7 +727,7 @@ index c9f9ea0cd97e01a8d964e19268cc5a61531cc451..d4658c73793ae6d2e019f3457f5c33eb
    if (!HasKeyboardFocusedTab(browser)) {
      return;
    }
-@@ -1987,6 +2379,18 @@ void MuteSiteForKeyboardFocusedTab(BrowserWindowInterface* browser) {
+@@ -1987,6 +2384,18 @@ void MuteSiteForKeyboardFocusedTab(BrowserWindowInterface* browser) {
  }
  
  void PinKeyboardFocusedTab(BrowserWindowInterface* browser) {
@@ -741,7 +746,7 @@ index c9f9ea0cd97e01a8d964e19268cc5a61531cc451..d4658c73793ae6d2e019f3457f5c33eb
    if (!HasKeyboardFocusedTab(browser)) {
      return;
    }
-@@ -1996,6 +2400,10 @@ void PinKeyboardFocusedTab(BrowserWindowInterface* browser) {
+@@ -1996,6 +2405,10 @@ void PinKeyboardFocusedTab(BrowserWindowInterface* browser) {
  }
  
  void GroupKeyboardFocusedTab(BrowserWindowInterface* browser) {
@@ -752,7 +757,7 @@ index c9f9ea0cd97e01a8d964e19268cc5a61531cc451..d4658c73793ae6d2e019f3457f5c33eb
    if (!HasKeyboardFocusedTab(browser)) {
      return;
    }
-@@ -2005,6 +2413,10 @@ void GroupKeyboardFocusedTab(BrowserWindowInterface* browser) {
+@@ -2005,6 +2418,10 @@ void GroupKeyboardFocusedTab(BrowserWindowInterface* browser) {
  }
  
  void DuplicateKeyboardFocusedTab(BrowserWindowInterface* browser) {
@@ -763,7 +768,7 @@ index c9f9ea0cd97e01a8d964e19268cc5a61531cc451..d4658c73793ae6d2e019f3457f5c33eb
    if (HasKeyboardFocusedTab(browser)) {
      DuplicateTabAt(browser, *GetKeyboardFocusedTabIndex(browser));
    }
-@@ -2015,6 +2427,10 @@ bool HasKeyboardFocusedTab(const BrowserWindowInterface* browser) {
+@@ -2015,6 +2432,10 @@ bool HasKeyboardFocusedTab(const BrowserWindowInterface* browser) {
  }
  
  void ConvertPopupToTabbedBrowser(BrowserWindowInterface* browser) {
@@ -774,7 +779,7 @@ index c9f9ea0cd97e01a8d964e19268cc5a61531cc451..d4658c73793ae6d2e019f3457f5c33eb
    base::RecordAction(UserMetricsAction("ShowAsTab"));
    TabStripModel* tab_strip = browser->GetTabStripModel();
    // If this popup is the last browser object, removing it from the browser-list
-@@ -2042,12 +2458,21 @@ void ConvertPopupToTabbedBrowser(BrowserWindowInterface* browser) {
+@@ -2042,12 +2463,21 @@ void ConvertPopupToTabbedBrowser(BrowserWindowInterface* browser) {
  }
  
  void CloseTabsToRight(BrowserWindowInterface* browser) {
@@ -796,7 +801,7 @@ index c9f9ea0cd97e01a8d964e19268cc5a61531cc451..d4658c73793ae6d2e019f3457f5c33eb
    browser->GetTabStripModel()->ExecuteContextMenuCommand(
        browser->GetTabStripModel()->active_index(),
        TabStripModel::CommandCloseOtherTabs);
-@@ -2059,6 +2484,10 @@ void Exit() {
+@@ -2059,6 +2489,10 @@ void Exit() {
  }
  
  void BookmarkCurrentTab(BrowserWindowInterface* browser) {
@@ -807,7 +812,7 @@ index c9f9ea0cd97e01a8d964e19268cc5a61531cc451..d4658c73793ae6d2e019f3457f5c33eb
    base::RecordAction(base::UserMetricsAction("Star"));
    BookmarkModel* model =
        BookmarkModelFactory::GetForBrowserContext(browser->GetProfile());
-@@ -2089,6 +2518,10 @@ void BookmarkCurrentTab(BrowserWindowInterface* browser) {
+@@ -2089,6 +2523,10 @@ void BookmarkCurrentTab(BrowserWindowInterface* browser) {
  void BookmarkCurrentTabInFolder(BrowserWindowInterface* browser,
                                  BookmarkModel* model,
                                  int64_t folder_id) {
@@ -818,7 +823,7 @@ index c9f9ea0cd97e01a8d964e19268cc5a61531cc451..d4658c73793ae6d2e019f3457f5c33eb
    GURL url;
    std::u16string title;
    if (!BookmarkCurrentTabHelper(browser, model, &url, &title)) {
-@@ -2107,6 +2540,10 @@ void BookmarkCurrentTabInFolder(BrowserWindowInterface* browser,
+@@ -2107,6 +2545,10 @@ void BookmarkCurrentTabInFolder(BrowserWindowInterface* browser,
  }
  
  bool CanBookmarkCurrentTab(BrowserWindowInterface* browser) {
@@ -829,7 +834,7 @@ index c9f9ea0cd97e01a8d964e19268cc5a61531cc451..d4658c73793ae6d2e019f3457f5c33eb
    BookmarkModel* model =
        BookmarkModelFactory::GetForBrowserContext(browser->GetProfile());
    return browser_defaults::bookmarks_enabled &&
-@@ -2117,17 +2554,29 @@ bool CanBookmarkCurrentTab(BrowserWindowInterface* browser) {
+@@ -2117,17 +2559,29 @@ bool CanBookmarkCurrentTab(BrowserWindowInterface* browser) {
  }
  
  void BookmarkAllTabs(BrowserWindowInterface* browser) {
@@ -859,7 +864,7 @@ index c9f9ea0cd97e01a8d964e19268cc5a61531cc451..d4658c73793ae6d2e019f3457f5c33eb
    GURL url;
    std::u16string title;
    WebContents* web_contents =
-@@ -2138,12 +2587,20 @@ bool CanMoveActiveTabToReadLater(BrowserWindowInterface* browser) {
+@@ -2138,12 +2592,20 @@ bool CanMoveActiveTabToReadLater(BrowserWindowInterface* browser) {
  }
  
  void MoveCurrentTabToReadLater(BrowserWindowInterface* browser) {
@@ -880,7 +885,7 @@ index c9f9ea0cd97e01a8d964e19268cc5a61531cc451..d4658c73793ae6d2e019f3457f5c33eb
    int added_to_read_later = 0;
    for (WebContents* const web_contents : web_contentses) {
      GURL url;
-@@ -2185,6 +2642,10 @@ void MoveTabsToReadLater(BrowserWindowInterface* browser,
+@@ -2185,6 +2647,10 @@ void MoveTabsToReadLater(BrowserWindowInterface* browser,
  }
  
  bool MarkCurrentTabAsReadInReadLater(BrowserWindowInterface* browser) {
@@ -891,7 +896,7 @@ index c9f9ea0cd97e01a8d964e19268cc5a61531cc451..d4658c73793ae6d2e019f3457f5c33eb
    GURL url;
    std::u16string title;
    ReadingListModel* model = GetReadingListModel(browser);
-@@ -2202,6 +2663,10 @@ bool MarkCurrentTabAsReadInReadLater(BrowserWindowInterface* browser) {
+@@ -2202,6 +2668,10 @@ bool MarkCurrentTabAsReadInReadLater(BrowserWindowInterface* browser) {
  }
  
  bool IsCurrentTabUnreadInReadLater(BrowserWindowInterface* browser) {
@@ -902,7 +907,7 @@ index c9f9ea0cd97e01a8d964e19268cc5a61531cc451..d4658c73793ae6d2e019f3457f5c33eb
    GURL url;
    std::u16string title;
    ReadingListModel* model = GetReadingListModel(browser);
-@@ -2215,6 +2680,10 @@ bool IsCurrentTabUnreadInReadLater(BrowserWindowInterface* browser) {
+@@ -2215,6 +2685,10 @@ bool IsCurrentTabUnreadInReadLater(BrowserWindowInterface* browser) {
  }
  
  void ShowOffersAndRewardsForPage(BrowserWindowInterface* browser) {
@@ -913,7 +918,7 @@ index c9f9ea0cd97e01a8d964e19268cc5a61531cc451..d4658c73793ae6d2e019f3457f5c33eb
    WebContents* const web_contents =
        browser->GetTabStripModel()->GetActiveWebContents();
    autofill::OfferNotificationBubbleControllerImpl* controller =
-@@ -2225,6 +2694,10 @@ void ShowOffersAndRewardsForPage(BrowserWindowInterface* browser) {
+@@ -2225,6 +2699,10 @@ void ShowOffersAndRewardsForPage(BrowserWindowInterface* browser) {
  }
  
  void SaveCreditCard(BrowserWindowInterface* browser) {
@@ -924,7 +929,7 @@ index c9f9ea0cd97e01a8d964e19268cc5a61531cc451..d4658c73793ae6d2e019f3457f5c33eb
    WebContents* web_contents =
        browser->GetTabStripModel()->GetActiveWebContents();
    autofill::SaveCardBubbleControllerImpl* controller =
-@@ -2233,6 +2706,10 @@ void SaveCreditCard(BrowserWindowInterface* browser) {
+@@ -2233,6 +2711,10 @@ void SaveCreditCard(BrowserWindowInterface* browser) {
  }
  
  void SaveIban(BrowserWindowInterface* browser) {
@@ -935,7 +940,7 @@ index c9f9ea0cd97e01a8d964e19268cc5a61531cc451..d4658c73793ae6d2e019f3457f5c33eb
    WebContents* web_contents =
        browser->GetTabStripModel()->GetActiveWebContents();
    autofill::IbanBubbleControllerImpl* controller =
-@@ -2241,6 +2718,10 @@ void SaveIban(BrowserWindowInterface* browser) {
+@@ -2241,6 +2723,10 @@ void SaveIban(BrowserWindowInterface* browser) {
  }
  
  void ShowMandatoryReauthOptInPrompt(BrowserWindowInterface* browser) {
@@ -946,7 +951,7 @@ index c9f9ea0cd97e01a8d964e19268cc5a61531cc451..d4658c73793ae6d2e019f3457f5c33eb
    WebContents* web_contents =
        browser->GetTabStripModel()->GetActiveWebContents();
    autofill::MandatoryReauthBubbleControllerImpl* controller =
-@@ -2250,6 +2731,10 @@ void ShowMandatoryReauthOptInPrompt(BrowserWindowInterface* browser) {
+@@ -2250,6 +2736,10 @@ void ShowMandatoryReauthOptInPrompt(BrowserWindowInterface* browser) {
  }
  
  void SaveAutofillAddress(BrowserWindowInterface* browser) {
@@ -957,7 +962,7 @@ index c9f9ea0cd97e01a8d964e19268cc5a61531cc451..d4658c73793ae6d2e019f3457f5c33eb
    WebContents* web_contents =
        browser->GetTabStripModel()->GetActiveWebContents();
    autofill::AddressBubblesController* controller =
-@@ -2258,6 +2743,10 @@ void SaveAutofillAddress(BrowserWindowInterface* browser) {
+@@ -2258,6 +2748,10 @@ void SaveAutofillAddress(BrowserWindowInterface* browser) {
  }
  
  void ShowFilledCardInformationBubble(BrowserWindowInterface* browser) {
@@ -968,7 +973,7 @@ index c9f9ea0cd97e01a8d964e19268cc5a61531cc451..d4658c73793ae6d2e019f3457f5c33eb
    WebContents* web_contents =
        browser->GetTabStripModel()->GetActiveWebContents();
    auto* controller =
-@@ -2269,6 +2758,10 @@ void ShowFilledCardInformationBubble(BrowserWindowInterface* browser) {
+@@ -2269,6 +2763,10 @@ void ShowFilledCardInformationBubble(BrowserWindowInterface* browser) {
  }
  
  void ShowVirtualCardEnrollBubble(BrowserWindowInterface* browser) {
@@ -979,7 +984,7 @@ index c9f9ea0cd97e01a8d964e19268cc5a61531cc451..d4658c73793ae6d2e019f3457f5c33eb
    WebContents* web_contents =
        browser->GetTabStripModel()->GetActiveWebContents();
    autofill::VirtualCardEnrollBubbleControllerImpl* controller =
-@@ -2280,6 +2773,10 @@ void ShowVirtualCardEnrollBubble(BrowserWindowInterface* browser) {
+@@ -2280,6 +2778,10 @@ void ShowVirtualCardEnrollBubble(BrowserWindowInterface* browser) {
  }
  
  void ShowTranslateBubble(BrowserWindowInterface* browser) {
@@ -990,7 +995,7 @@ index c9f9ea0cd97e01a8d964e19268cc5a61531cc451..d4658c73793ae6d2e019f3457f5c33eb
    if (!browser->GetWindow()->IsActive()) {
      return;
    }
-@@ -2325,6 +2822,10 @@ void ShowTranslateBubble(BrowserWindowInterface* browser) {
+@@ -2325,6 +2827,10 @@ void ShowTranslateBubble(BrowserWindowInterface* browser) {
  }
  
  void ManagePasswordsForPage(BrowserWindowInterface* browser) {
@@ -1001,7 +1006,7 @@ index c9f9ea0cd97e01a8d964e19268cc5a61531cc451..d4658c73793ae6d2e019f3457f5c33eb
    auto* const user_education = BrowserUserEducationInterface::From(browser);
    user_education->NotifyFeaturePromoFeatureUsed(
        feature_engagement::kIPHPasswordsManagementBubbleAfterSaveFeature,
-@@ -2344,11 +2845,19 @@ void ManagePasswordsForPage(BrowserWindowInterface* browser) {
+@@ -2344,11 +2850,19 @@ void ManagePasswordsForPage(BrowserWindowInterface* browser) {
  }
  
  bool CanSendTabToSelf(BrowserWindowInterface* browser) {
@@ -1021,7 +1026,7 @@ index c9f9ea0cd97e01a8d964e19268cc5a61531cc451..d4658c73793ae6d2e019f3457f5c33eb
    WebContents* web_contents =
        browser->GetTabStripModel()->GetActiveWebContents();
    send_tab_to_self::ShowBubble(web_contents,
-@@ -2356,6 +2865,10 @@ void SendTabToSelf(BrowserWindowInterface* browser) {
+@@ -2356,6 +2870,10 @@ void SendTabToSelf(BrowserWindowInterface* browser) {
  }
  
  bool CanGenerateQrCode(BrowserWindowInterface* browser) {
@@ -1032,7 +1037,7 @@ index c9f9ea0cd97e01a8d964e19268cc5a61531cc451..d4658c73793ae6d2e019f3457f5c33eb
    return !sharing_hub::SharingIsDisabledByPolicy(browser->GetProfile()) &&
           qrcode_generator::QRCodeGeneratorBubbleController::
               IsGeneratorAvailable(browser->GetTabStripModel()
-@@ -2366,6 +2879,10 @@ bool CanGenerateQrCode(BrowserWindowInterface* browser) {
+@@ -2366,6 +2884,10 @@ bool CanGenerateQrCode(BrowserWindowInterface* browser) {
  }
  
  void GenerateQRCode(BrowserWindowInterface* browser) {
@@ -1043,7 +1048,7 @@ index c9f9ea0cd97e01a8d964e19268cc5a61531cc451..d4658c73793ae6d2e019f3457f5c33eb
    WebContents* web_contents =
        browser->GetTabStripModel()->GetActiveWebContents();
    qrcode_generator::QRCodeGeneratorBubbleController* controller =
-@@ -2376,6 +2893,10 @@ void GenerateQRCode(BrowserWindowInterface* browser) {
+@@ -2376,6 +2898,10 @@ void GenerateQRCode(BrowserWindowInterface* browser) {
  }
  
  void SharingHub(BrowserWindowInterface* browser) {
@@ -1054,7 +1059,7 @@ index c9f9ea0cd97e01a8d964e19268cc5a61531cc451..d4658c73793ae6d2e019f3457f5c33eb
    WebContents* web_contents =
        browser->GetTabStripModel()->GetActiveWebContents();
    sharing_hub::SharingHubBubbleController* controller =
-@@ -2385,6 +2906,10 @@ void SharingHub(BrowserWindowInterface* browser) {
+@@ -2385,6 +2911,10 @@ void SharingHub(BrowserWindowInterface* browser) {
  }
  
  void ScreenshotCapture(BrowserWindowInterface* browser) {
@@ -1065,7 +1070,7 @@ index c9f9ea0cd97e01a8d964e19268cc5a61531cc451..d4658c73793ae6d2e019f3457f5c33eb
    WebContents* web_contents =
        browser->GetTabStripModel()->GetActiveWebContents();
    sharing_hub::ScreenshotCapturedBubbleController* controller =
-@@ -2393,6 +2918,10 @@ void ScreenshotCapture(BrowserWindowInterface* browser) {
+@@ -2393,6 +2923,10 @@ void ScreenshotCapture(BrowserWindowInterface* browser) {
  }
  
  void ShowTtcMenuItem(BrowserWindowInterface* browser) {
@@ -1076,7 +1081,7 @@ index c9f9ea0cd97e01a8d964e19268cc5a61531cc451..d4658c73793ae6d2e019f3457f5c33eb
    if (ttc::EntrypointController* controller =
            ttc::EntrypointController::From(browser)) {
      controller->EntrypointHandler(ttc::EntrypointType::kAppMenu);
-@@ -2400,6 +2929,10 @@ void ShowTtcMenuItem(BrowserWindowInterface* browser) {
+@@ -2400,6 +2934,10 @@ void ShowTtcMenuItem(BrowserWindowInterface* browser) {
  }
  
  void SavePage(BrowserWindowInterface* browser) {
@@ -1087,7 +1092,7 @@ index c9f9ea0cd97e01a8d964e19268cc5a61531cc451..d4658c73793ae6d2e019f3457f5c33eb
    base::RecordAction(UserMetricsAction("SavePage"));
    WebContents* current_tab =
        browser->GetTabStripModel()->GetActiveWebContents();
-@@ -2419,6 +2952,10 @@ void SavePage(BrowserWindowInterface* browser) {
+@@ -2419,6 +2957,10 @@ void SavePage(BrowserWindowInterface* browser) {
  }
  
  bool CanSavePage(const BrowserWindowInterface* browser) {
@@ -1098,7 +1103,7 @@ index c9f9ea0cd97e01a8d964e19268cc5a61531cc451..d4658c73793ae6d2e019f3457f5c33eb
    // LocalState can be NULL in tests.
    if (g_browser_process->local_state() &&
        !g_browser_process->local_state()->GetBoolean(
-@@ -2436,6 +2973,10 @@ bool CanSavePage(const BrowserWindowInterface* browser) {
+@@ -2436,6 +2978,10 @@ bool CanSavePage(const BrowserWindowInterface* browser) {
  }
  
  void Print(BrowserWindowInterface* browser) {
@@ -1109,7 +1114,7 @@ index c9f9ea0cd97e01a8d964e19268cc5a61531cc451..d4658c73793ae6d2e019f3457f5c33eb
  #if BUILDFLAG(ENABLE_PRINTING)
    auto* const web_contents = printing::GetWebContentsToPrint(
        browser->GetTabStripModel()->GetActiveTab());
-@@ -2451,6 +2992,10 @@ void Print(BrowserWindowInterface* browser) {
+@@ -2451,6 +2997,10 @@ void Print(BrowserWindowInterface* browser) {
  }
  
  bool CanPrint(BrowserWindowInterface* browser) {
@@ -1120,7 +1125,7 @@ index c9f9ea0cd97e01a8d964e19268cc5a61531cc451..d4658c73793ae6d2e019f3457f5c33eb
  #if BUILDFLAG(ENABLE_PRINTING)
    // Do not print when printing is disabled via pref or policy.
    // Do not print when a page has crashed.
-@@ -2473,11 +3018,19 @@ bool CanPrint(BrowserWindowInterface* browser) {
+@@ -2473,11 +3023,19 @@ bool CanPrint(BrowserWindowInterface* browser) {
  
  #if BUILDFLAG(ENABLE_PRINTING)
  void BasicPrint(BrowserWindowInterface* browser) {
@@ -1140,7 +1145,7 @@ index c9f9ea0cd97e01a8d964e19268cc5a61531cc451..d4658c73793ae6d2e019f3457f5c33eb
  #if BUILDFLAG(ENABLE_BASIC_PRINT_DIALOG)
    // If printing is not disabled via pref or policy, it is always possible to
    // advanced print when the print preview is visible.
-@@ -2491,6 +3044,10 @@ bool CanBasicPrint(BrowserWindowInterface* browser) {
+@@ -2491,6 +3049,10 @@ bool CanBasicPrint(BrowserWindowInterface* browser) {
  #endif  // BUILDFLAG(ENABLE_PRINTING)
  
  bool CanRouteMedia(BrowserWindowInterface* browser) {
@@ -1151,7 +1156,7 @@ index c9f9ea0cd97e01a8d964e19268cc5a61531cc451..d4658c73793ae6d2e019f3457f5c33eb
    // Do not allow user to open Media Router dialog when there is already an
    // active modal dialog. This avoids overlapping dialogs.
    return media_router::MediaRouterEnabled(browser->GetProfile()) &&
-@@ -2498,6 +3055,10 @@ bool CanRouteMedia(BrowserWindowInterface* browser) {
+@@ -2498,6 +3060,10 @@ bool CanRouteMedia(BrowserWindowInterface* browser) {
  }
  
  void RouteMediaInvokedFromAppMenu(BrowserWindowInterface* browser) {
@@ -1162,7 +1167,7 @@ index c9f9ea0cd97e01a8d964e19268cc5a61531cc451..d4658c73793ae6d2e019f3457f5c33eb
    CHECK(CanRouteMedia(browser), base::NotFatalUntil::M162);
  
    media_router::MediaRouterDialogController* dialog_controller =
-@@ -2512,16 +3073,28 @@ void RouteMediaInvokedFromAppMenu(BrowserWindowInterface* browser) {
+@@ -2512,16 +3078,28 @@ void RouteMediaInvokedFromAppMenu(BrowserWindowInterface* browser) {
  }
  
  void Find(BrowserWindowInterface* browser) {
@@ -1191,7 +1196,7 @@ index c9f9ea0cd97e01a8d964e19268cc5a61531cc451..d4658c73793ae6d2e019f3457f5c33eb
    base::RecordAction(UserMetricsAction("FindPrevious"));
    FindInPage(browser, true, false);
  }
-@@ -2529,6 +3102,10 @@ void FindPrevious(BrowserWindowInterface* browser) {
+@@ -2529,6 +3107,10 @@ void FindPrevious(BrowserWindowInterface* browser) {
  void FindInPage(BrowserWindowInterface* browser,
                  bool find_next,
                  bool forward_direction) {
@@ -1202,7 +1207,7 @@ index c9f9ea0cd97e01a8d964e19268cc5a61531cc451..d4658c73793ae6d2e019f3457f5c33eb
    FindBarController::From(browser)->Show(find_next, forward_direction);
  }
  
-@@ -2635,6 +3212,10 @@ void ToggleCollapseVerticalTabs(BrowserWindowInterface* browser) {
+@@ -2635,6 +3217,10 @@ void ToggleCollapseVerticalTabs(BrowserWindowInterface* browser) {
  }
  
  bool CanCloseFind(BrowserWindowInterface* browser) {
@@ -1213,7 +1218,7 @@ index c9f9ea0cd97e01a8d964e19268cc5a61531cc451..d4658c73793ae6d2e019f3457f5c33eb
    WebContents* current_tab =
        browser->GetTabStripModel()->GetActiveWebContents();
    if (!current_tab) {
-@@ -2647,11 +3228,19 @@ bool CanCloseFind(BrowserWindowInterface* browser) {
+@@ -2647,11 +3233,19 @@ bool CanCloseFind(BrowserWindowInterface* browser) {
  }
  
  void CloseFind(BrowserWindowInterface* browser) {
@@ -1233,7 +1238,7 @@ index c9f9ea0cd97e01a8d964e19268cc5a61531cc451..d4658c73793ae6d2e019f3457f5c33eb
    zoom::PageZoom::Zoom(browser->GetTabStripModel()->GetActiveWebContents(),
                         zoom);
  }
-@@ -2746,6 +3335,10 @@ void FocusPreviousPane(BrowserWindowInterface* browser) {
+@@ -2746,6 +3340,10 @@ void FocusPreviousPane(BrowserWindowInterface* browser) {
  }
  
  void FocusWebContentsPane(BrowserWindowInterface* browser) {
@@ -1244,7 +1249,7 @@ index c9f9ea0cd97e01a8d964e19268cc5a61531cc451..d4658c73793ae6d2e019f3457f5c33eb
    base::RecordAction(UserMetricsAction("FocusWebContentsPane"));
    BrowserFocusController::From(browser)->FocusWebContentsPane();
  }
-@@ -2753,6 +3346,10 @@ void FocusWebContentsPane(BrowserWindowInterface* browser) {
+@@ -2753,6 +3351,10 @@ void FocusWebContentsPane(BrowserWindowInterface* browser) {
  void ToggleDevToolsWindow(BrowserWindowInterface* browser,
                            DevToolsToggleAction action,
                            DevToolsOpenedByAction opened_by) {
@@ -1255,7 +1260,7 @@ index c9f9ea0cd97e01a8d964e19268cc5a61531cc451..d4658c73793ae6d2e019f3457f5c33eb
    if (action.type() == DevToolsToggleAction::kShowConsolePanel) {
      base::RecordAction(UserMetricsAction("DevTools_ToggleConsole"));
    } else {
-@@ -2791,6 +3388,10 @@ void OpenFeedbackDialog(BrowserWindowInterface* browser,
+@@ -2791,6 +3393,10 @@ void OpenFeedbackDialog(BrowserWindowInterface* browser,
  
  #if BUILDFLAG(GOOGLE_CHROME_BRANDING)
  void OpenReportUnsafeSiteDialog(BrowserWindowInterface* browser) {
@@ -1266,7 +1271,7 @@ index c9f9ea0cd97e01a8d964e19268cc5a61531cc451..d4658c73793ae6d2e019f3457f5c33eb
    base::RecordAction(UserMetricsAction("ReportUnsafeSite"));
    feedback::ReportUnsafeSiteDialog::Show(browser);
  }
-@@ -2880,6 +3481,10 @@ bool CanRequestTabletSite(WebContents* current_tab) {
+@@ -2880,6 +3486,10 @@ bool CanRequestTabletSite(WebContents* current_tab) {
  }
  
  bool IsRequestingTabletSite(BrowserWindowInterface* browser) {
@@ -1277,7 +1282,7 @@ index c9f9ea0cd97e01a8d964e19268cc5a61531cc451..d4658c73793ae6d2e019f3457f5c33eb
    WebContents* current_tab =
        browser->GetTabStripModel()->GetActiveWebContents();
    if (!current_tab) {
-@@ -2894,6 +3499,10 @@ bool IsRequestingTabletSite(BrowserWindowInterface* browser) {
+@@ -2894,6 +3504,10 @@ bool IsRequestingTabletSite(BrowserWindowInterface* browser) {
  }
  
  void ToggleRequestTabletSite(BrowserWindowInterface* browser) {
@@ -1288,7 +1293,7 @@ index c9f9ea0cd97e01a8d964e19268cc5a61531cc451..d4658c73793ae6d2e019f3457f5c33eb
    WebContents* current_tab =
        browser->GetTabStripModel()->GetActiveWebContents();
    if (!current_tab) {
-@@ -2941,6 +3550,10 @@ void ToggleFullscreenMode(BrowserWindowInterface* browser,
+@@ -2941,6 +3555,10 @@ void ToggleFullscreenMode(BrowserWindowInterface* browser,
  }
  
  void ClearCache(BrowserWindowInterface* browser) {
@@ -1299,7 +1304,7 @@ index c9f9ea0cd97e01a8d964e19268cc5a61531cc451..d4658c73793ae6d2e019f3457f5c33eb
    content::BrowsingDataRemover* remover =
        browser->GetProfile()->GetBrowsingDataRemover();
    remover->Remove(base::Time(), base::Time::Max(),
-@@ -2950,6 +3563,10 @@ void ClearCache(BrowserWindowInterface* browser) {
+@@ -2950,6 +3568,10 @@ void ClearCache(BrowserWindowInterface* browser) {
  }
  
  bool IsDebuggerAttachedToCurrentTab(BrowserWindowInterface* browser) {
@@ -1310,7 +1315,7 @@ index c9f9ea0cd97e01a8d964e19268cc5a61531cc451..d4658c73793ae6d2e019f3457f5c33eb
    WebContents* contents = browser->GetTabStripModel()->GetActiveWebContents();
    return contents ? content::DevToolsAgentHost::IsDebuggerAttached(contents)
                    : false;
-@@ -2957,10 +3574,19 @@ bool IsDebuggerAttachedToCurrentTab(BrowserWindowInterface* browser) {
+@@ -2957,10 +3579,19 @@ bool IsDebuggerAttachedToCurrentTab(BrowserWindowInterface* browser) {
  
  void CopyURL(BrowserWindowInterface* browser,
               content::WebContents* web_contents) {
@@ -1330,7 +1335,7 @@ index c9f9ea0cd97e01a8d964e19268cc5a61531cc451..d4658c73793ae6d2e019f3457f5c33eb
    if (toast_features::IsEnabled(toast_features::kLinkCopiedToast)) {
      ToastController* const toast_controller = ToastController::From(browser);
      if (toast_controller) {
-@@ -2971,6 +3597,10 @@ void CopyURL(BrowserWindowInterface* browser,
+@@ -2971,6 +3602,10 @@ void CopyURL(BrowserWindowInterface* browser,
  }
  
  bool CanCopyUrl(BrowserWindowInterface* browser) {
@@ -1341,7 +1346,7 @@ index c9f9ea0cd97e01a8d964e19268cc5a61531cc451..d4658c73793ae6d2e019f3457f5c33eb
    return IsWebAppOrCustomTab(browser) ||
           !sharing_hub::SharingIsDisabledByPolicy(browser->GetProfile());
  }
-@@ -3000,6 +3630,10 @@ BrowserWindowInterface* OpenInChrome(
+@@ -3000,6 +3635,10 @@ BrowserWindowInterface* OpenInChrome(
  }
  
  bool CanViewSource(BrowserWindowInterface* browser) {
@@ -1352,7 +1357,7 @@ index c9f9ea0cd97e01a8d964e19268cc5a61531cc451..d4658c73793ae6d2e019f3457f5c33eb
    if (browser->GetType() == BrowserWindowInterface::TYPE_DEVTOOLS) {
      return false;
    }
-@@ -3011,6 +3645,10 @@ bool CanViewSource(BrowserWindowInterface* browser) {
+@@ -3011,6 +3650,10 @@ bool CanViewSource(BrowserWindowInterface* browser) {
  }
  
  bool CanToggleCaretBrowsing(BrowserWindowInterface* browser) {
@@ -1363,7 +1368,7 @@ index c9f9ea0cd97e01a8d964e19268cc5a61531cc451..d4658c73793ae6d2e019f3457f5c33eb
  #if BUILDFLAG(IS_MAC)
    // On Mac, ignore the keyboard shortcut unless web contents is focused,
    // because the keyboard shortcut interferes with a Japenese IME when the
-@@ -3029,6 +3667,10 @@ bool CanToggleCaretBrowsing(BrowserWindowInterface* browser) {
+@@ -3029,6 +3672,10 @@ bool CanToggleCaretBrowsing(BrowserWindowInterface* browser) {
  }
  
  void ToggleCaretBrowsing(BrowserWindowInterface* browser) {
@@ -1374,7 +1379,7 @@ index c9f9ea0cd97e01a8d964e19268cc5a61531cc451..d4658c73793ae6d2e019f3457f5c33eb
    if (!CanToggleCaretBrowsing(browser)) {
      return;
    }
-@@ -3114,6 +3756,10 @@ void ProcessInterceptedChromeURLNavigationInIncognito(
+@@ -3114,6 +3761,10 @@ void ProcessInterceptedChromeURLNavigationInIncognito(
  }
  
  void ExecLensOverlay(BrowserWindowInterface* browser) {
@@ -1385,7 +1390,7 @@ index c9f9ea0cd97e01a8d964e19268cc5a61531cc451..d4658c73793ae6d2e019f3457f5c33eb
    content::WebContents* web_contents =
        browser->GetTabStripModel()->GetActiveWebContents();
    CHECK(web_contents);
-@@ -3131,6 +3777,10 @@ void ExecLensOverlay(BrowserWindowInterface* browser) {
+@@ -3131,6 +3782,10 @@ void ExecLensOverlay(BrowserWindowInterface* browser) {
  }
  
  void ExecLensRegionSearch(BrowserWindowInterface* browser) {
@@ -1396,7 +1401,7 @@ index c9f9ea0cd97e01a8d964e19268cc5a61531cc451..d4658c73793ae6d2e019f3457f5c33eb
  #if BUILDFLAG(ENABLE_LENS_DESKTOP_GOOGLE_BRANDED_FEATURES)
    Profile* profile = browser->GetProfile();
    TemplateURLService* service =
-@@ -3156,6 +3806,10 @@ void ExecAskGoogleAboutThisPage(
+@@ -3156,6 +3811,10 @@ void ExecAskGoogleAboutThisPage(
      BrowserWindowInterface* browser,
      lens::LensOverlayInvocationSource invocation_source,
      omnibox::ChromeAimEntryPoint entry_point) {

@@ -72,6 +72,7 @@ pub type SpaceId = u64;
 pub type ProfileId = u64;
 pub type ItemId = u64;
 pub type WindowId = u64;
+pub mod little_arc;
 pub mod peek;
 pub mod site_icon;
 pub mod tab_ops;

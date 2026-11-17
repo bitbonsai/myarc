@@ -27,7 +27,7 @@ namespace myarc {
 // UI sequence only.
 class SettingsWindow {
  public:
-  enum class Section { kGeneral, kProfiles, kAdvanced };
+  enum class Section { kGeneral, kProfiles, kLinks, kAdvanced };
 
   // The bound Profile's timer, Arc's "Archive tabs after". `get` returns its
   // seconds, or 0 while the workspace is not loaded or the Profile keeps no

@@ -13,6 +13,7 @@ rust_static_library("workspace") {
     "workspace/src/drag.rs",
     "workspace/src/folder.rs",
     "workspace/src/lib.rs",
+    "workspace/src/little_arc.rs",
     "workspace/src/peek.rs",
     "workspace/src/site_icon.rs",
     "workspace/src/split.rs",
@@ -267,6 +268,53 @@ source_set("control_prefs") {
   deps = [ "//components/prefs" ]
 }
 
+source_set("little_arc_prefs") {
+  sources = [
+    "little_arc_prefs.cc",
+    "little_arc_prefs.h",
+  ]
+  deps = [ "//components/prefs" ]
+}
+
+# Little Arc's window rules and header. The window itself is a Chromium popup
+# that BrowserView lays out; see little_arc.h.
+source_set("little_arc") {
+  sources = [
+    "little_arc.cc",
+    "little_arc.h",
+  ]
+  public_deps = [
+    "//base",
+    "//skia",
+    "//ui/base",
+    "//ui/views",
+    "//url",
+  ]
+  deps = [
+    ":bridge",
+    ":browser_workspace_adapter",
+    ":little_arc_prefs",
+    ":sidebar_view",
+    "//cc/paint",
+    "//chrome/browser:browser_process",
+    "//chrome/browser/profiles:profile",
+    "//chrome/browser/ssl",
+    "//chrome/browser/ui:browser_init_state",
+    "//chrome/browser/ui/browser_window",
+    "//chrome/browser/ui/browser_window:create_browser_window",
+    "//chrome/browser/ui/navigator",
+    "//chrome/browser/ui/tabs:tab_strip",
+    "//components/security_state/core",
+    "//components/url_formatter",
+    "//content/public/browser",
+    "//ui/accessibility",
+    "//ui/color",
+    "//ui/display",
+    "//ui/gfx",
+    "//ui/gfx/geometry",
+  ]
+}
+
 source_set("control_prompt") {
   sources = [
     "control_prompt.cc",
@@ -393,6 +441,7 @@ source_set("settings_window") {
   deps = [
     ":arc_import",
     ":control_prefs",
+    ":little_arc_prefs",
     "//cc/paint",
     "//chrome/browser:shell_integration",
     "//chrome/common:constants",

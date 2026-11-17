@@ -1,5 +1,5 @@
 diff --git a/chrome/browser/app_controller_mac.mm b/chrome/browser/app_controller_mac.mm
-index f251259f8293dfda0bae845202d0f4776020a618..9651409676c6a6ae24042409c917a90911387f4a 100644
+index f251259f8293dfda0bae845202d0f4776020a618..97de3b49ade68b98d4f5f7bb1fd01e8e29dff343 100644
 --- a/chrome/browser/app_controller_mac.mm
 +++ b/chrome/browser/app_controller_mac.mm
 @@ -78,6 +78,7 @@
@@ -72,7 +72,16 @@ index f251259f8293dfda0bae845202d0f4776020a618..9651409676c6a6ae24042409c917a909
  void FocusWindowSetOnCurrentSpace(NSSet<NSWindow*>* windows) {
    // This callback runs before AppKit picks its own window to
    // deminiaturize, so we get to pick one from the right set. Limit to
-@@ -1857,6 +1899,13 @@ class AppControllerProfileObserver : public ProfileAttributesStorage::Observer,
+@@ -435,6 +477,8 @@ base::FilePath GetStartupProfilePathMac() {
+ 
+ void OpenStartupTabsInBrowserWithProfile(const StartupTabs& tabs,
+                                          Profile* profile);
++void OpenStartupTabsAsTabsWithProfile(const StartupTabs& tabs,
++                                      Profile* profile);
+ 
+ void OpenStartupTabsInBrowser(StartupTabs tabs) {
+   StartupTabs regular_tabs;
+@@ -1857,6 +1901,13 @@ class AppControllerProfileObserver : public ProfileAttributesStorage::Observer,
    if (browser_shutdown::IsTryingToQuit())
      return NO;
  
@@ -86,7 +95,7 @@ index f251259f8293dfda0bae845202d0f4776020a618..9651409676c6a6ae24042409c917a909
    // Bring all browser windows to the front. Specifically, this brings them in
    // front of any app windows. FocusWindowSet will also unminimize the most
    // recently minimized window if no windows in the set are visible.
-@@ -2099,6 +2148,9 @@ class AppControllerProfileObserver : public ProfileAttributesStorage::Observer,
+@@ -2099,6 +2150,9 @@ class AppControllerProfileObserver : public ProfileAttributesStorage::Observer,
      // Failed to load profile, show Profile Picker instead.
      return;
    }
@@ -96,3 +105,28 @@ index f251259f8293dfda0bae845202d0f4776020a618..9651409676c6a6ae24042409c917a909
    // Re-use an existing browser, or create a new one.
    if (BrowserWindowInterface* browser = ActivateBrowser(profile)) {
      chrome::ShowSettings(browser);
+@@ -2650,6 +2704,24 @@ void OpenStartupTabsInBrowserWithProfile(const StartupTabs& tabs,
+     profile = ProfileManager::MaybeForceOffTheRecordMode(
+         profile->GetOriginalProfile());
+   }
++  // myArc: links from other apps open in Little Arc, as in Arc, unless its
++  // Settings switch is off. The rest, and links that came through a stripped
++  // chromium:// launch, open as tabs below.
++  StartupTabs tab_tabs;
++  for (const StartupTab& tab : tabs) {
++    if (tab.is_untrusted_launch ||
++        !chrome::OpenMyarcLinkFromOtherApp(profile, tab.url)) {
++      tab_tabs.push_back(tab);
++    }
++  }
++  if (tab_tabs.empty()) {
++    return;
++  }
++  OpenStartupTabsAsTabsWithProfile(tab_tabs, profile);
++}
++
++void OpenStartupTabsAsTabsWithProfile(const StartupTabs& tabs,
++                                      Profile* profile) {
+   // Use FindTabbedBrowser() to ensure URLs open in a normal tabbed browser
+   // window, not in PWA/app windows which cannot accept new tabs.
+   BrowserWindowInterface* browser =

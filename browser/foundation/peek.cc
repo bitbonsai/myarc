@@ -536,7 +536,7 @@ void PeekController::Expand() {
   }
   // The page moves into the tab strip with its history, as exactly one new
   // Today tab of this Space.
-  adapter_->AdoptAsTodayTab(std::move(contents));
+  adapter_->AdoptAsTodayTab(contents);
 }
 
 content::WebContents* PeekController::ActiveTab() const {

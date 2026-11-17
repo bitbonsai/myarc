@@ -2033,11 +2033,11 @@ std::optional<foundation::PlacementKind> BrowserWorkspaceAdapter::PlacementOf(
 }
 
 foundation::MutationResult BrowserWorkspaceAdapter::AdoptAsTodayTab(
-    std::unique_ptr<content::WebContents> page) {
+    std::unique_ptr<content::WebContents>& page) {
   if (!ready())
     return Fail(error());
   if (!page || page->GetBrowserContext() != profile_)
-    return Fail("Peek's page belongs to another Profile.");
+    return Fail("The page belongs to another Profile.");
   auto sidebar = Sidebar();
   if (!sidebar.ok)
     return Fail("Workspace window is not ready.");
@@ -2057,7 +2057,7 @@ foundation::MutationResult BrowserWorkspaceAdapter::AdoptAsTodayTab(
   content::WebContents* contents = page.get();
   tabs_->InsertWebContentsAt(tabs_->count(), std::move(page), ADD_NONE);
   if (tabs_->GetIndexOfWebContents(contents) < 0)
-    return Fail("Peek's page could not open as a tab.");
+    return Fail("The page could not open as a tab.");
   // The page loaded in Peek, so no later load saves its row's page.
   SaveTitle(*profile_, *contents, item);
   result = service_->SelectItem(window_id_, item);

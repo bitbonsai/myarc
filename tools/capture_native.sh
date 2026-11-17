@@ -35,7 +35,11 @@
 #   --myarc-capture-activate; pair it with URL=none.
 #   AGENT_SPACE=1 creates the agent Space via --myarc-test-agent-space, and
 #   AGENT_SPACE=select also shows it. Needs a build with myarc_test_hooks.
-#   SETTINGS=1 (or general/profiles/advanced/more) opens the native Settings window via
+#   LITTLE_ARC=open opens a Little Arc with Cmd+Opt+N's command via
+#   --myarc-capture-little-arc; LITTLE_ARC=move:<ms> instead presses Cmd+O in
+#   every open Little Arc <ms> after launch, moving its page into a Space.
+#   Pair it with SCRIPT to capture the Little Arc window by its title.
+#   SETTINGS=1 (or general/profiles/links/advanced/more) opens the native Settings window via
 #   --myarc-capture-open-settings and captures only that window; "more" presses
 #   More Settings… and captures the browser window instead.
 #   CONTROL=<dir> passes --myarc-enable-control and serves the control
@@ -100,6 +104,7 @@ if [ "${1:-}" = "--inner" ]; then
     *) EXTRA+=(--myarc-capture-create-space) ;;
   esac
   [ -n "${ACTIVATE:-}" ] && EXTRA+=(--myarc-capture-activate="$ACTIVATE")
+  [ -n "${LITTLE_ARC:-}" ] && EXTRA+=(--myarc-capture-little-arc="$LITTLE_ARC")
   case "${AGENT_SPACE:-}" in
     '') ;;
     select) EXTRA+=(--myarc-test-agent-space=select) ;;
@@ -116,6 +121,7 @@ if [ "${1:-}" = "--inner" ]; then
     "") ;;
     more) EXTRA+=(--myarc-capture-open-settings=more); KEY_SETTLE=$((KEY_SETTLE + 2)) ;;
     profiles) EXTRA+=(--myarc-capture-open-settings=profiles); SHOT_TITLE=(Profiles) ;;
+    links) EXTRA+=(--myarc-capture-open-settings=links); SHOT_TITLE=(Links) ;;
     advanced) EXTRA+=(--myarc-capture-open-settings=advanced); SHOT_TITLE=(Advanced) ;;
     *) EXTRA+=(--myarc-capture-open-settings); SHOT_TITLE=(General) ;;
   esac

@@ -1,8 +1,8 @@
 diff --git a/chrome/browser/ui/cocoa/accelerators_cocoa.mm b/chrome/browser/ui/cocoa/accelerators_cocoa.mm
-index 7182077016dc6e932a039a6f0fd75f939dca50a9..f0526024c24c858b814663dd934526280783625c 100644
+index 7182077016dc6e932a039a6f0fd75f939dca50a9..1e2b375cba4b41418f7dab1f0276b05277761439 100644
 --- a/chrome/browser/ui/cocoa/accelerators_cocoa.mm
 +++ b/chrome/browser/ui/cocoa/accelerators_cocoa.mm
-@@ -10,6 +10,7 @@
+@@ -10,11 +10,13 @@
  #include <algorithm>
  #include <utility>
  
@@ -10,7 +10,13 @@ index 7182077016dc6e932a039a6f0fd75f939dca50a9..f0526024c24c858b814663dd93452628
  #include "base/i18n/rtl.h"
  #include "base/mac/mac_util.h"
  #include "base/memory/singleton.h"
-@@ -145,6 +146,23 @@ AcceleratorsCocoa::AcceleratorsCocoa() {
+ #include "build/branding_buildflags.h"
+ #include "chrome/app/chrome_command_ids.h"
++#include "myarc/command_ids.h"
+ #include "printing/buildflags/buildflags.h"
+ #import "ui/base/accelerators/platform_accelerator_cocoa.h"
+ #import "ui/events/cocoa/cocoa_event_utils.h"
+@@ -145,6 +147,25 @@ AcceleratorsCocoa::AcceleratorsCocoa() {
      CHECK(result.second, base::NotFatalUntil::M162);
    }
  
@@ -22,12 +28,14 @@ index 7182077016dc6e932a039a6f0fd75f939dca50a9..f0526024c24c858b814663dd93452628
 +        ui::VKEY_C, ui::EF_COMMAND_DOWN | ui::EF_SHIFT_DOWN);
 +    accelerators_.erase(IDC_SAVE_PAGE);
 +    // Cmd+D pins the current tab through a hidden workspace shortcut, and
-+    // Ctrl+Shift+= adds a split pane, as in Arc. Option+Cmd+N is Arc's Little
-+    // Arc key, so it does nothing until myArc has Little Arc.
++    // Ctrl+Shift+= adds a split pane, as in Arc. Option+Cmd+N opens Little
++    // Arc, as in Arc, instead of Chromium's new split.
 +    if (base::CommandLine::ForCurrentProcess()->HasSwitch(
 +            "myarc-workspace-sidebar")) {
 +      accelerators_.erase(IDC_BOOKMARK_THIS_TAB);
 +      accelerators_.erase(IDC_NEW_SPLIT_TAB);
++      accelerators_[IDC_MYARC_NEW_LITTLE_ARC] =
++          ui::Accelerator(ui::VKEY_N, ui::EF_COMMAND_DOWN | ui::EF_ALT_DOWN);
 +    }
 +  }
 +

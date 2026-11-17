@@ -25,6 +25,7 @@
 #include "components/prefs/pref_service.h"
 #include "myarc/arc_import.h"
 #include "myarc/control_prefs.h"
+#include "myarc/little_arc_prefs.h"
 #include "third_party/skia/include/core/SkColor.h"
 #include "third_party/skia/include/core/SkPoint.h"
 #include "third_party/skia/include/core/SkRRect.h"
@@ -842,6 +843,75 @@ class AdvancedPage : public views::View {
 BEGIN_METADATA(AdvancedPage)
 END_METADATA
 
+// Links: Arc's Little Arc section. Its switch decides whether links other
+// apps open go to Little Arc or to a main window as tabs.
+class LinksPage : public views::View {
+  METADATA_HEADER(LinksPage, views::View)
+
+ public:
+  explicit LinksPage(PrefService* local_state) : local_state_(local_state) {
+    intro_ = AddLabel(
+        this,
+        u"Little Arc is a smaller, simpler window for quick lookups and for "
+        u"links from other apps. Press ⌥⌘N to open one, and ⌘O to move its "
+        u"page into a Space.",
+        13, gfx::Font::Weight::NORMAL, kCardText);
+    intro_->SetHorizontalAlignment(gfx::ALIGN_LEFT);
+    intro_->SetMultiLine(true);
+    auto links_switch = std::make_unique<Switch>(
+        base::BindRepeating(&LinksPage::Toggle, base::Unretained(this)),
+        kLinksLabel);
+    switch_ = links_switch.get();
+    panel_ = AddRowPanel(this, kLinksLabel, /*multi_line=*/false,
+                         std::move(links_switch));
+    static_cast<views::BoxLayout*>(panel_->GetLayoutManager())
+        ->set_inside_border_insets(gfx::Insets::VH(0, kBannerPad));
+    if (local_state_) {
+      registrar_.Init(local_state_);
+      registrar_.Add(kLittleArcLinksPref,
+                     base::BindRepeating(&LinksPage::UpdateSwitch,
+                                         base::Unretained(this)));
+    }
+    UpdateSwitch();
+  }
+
+  void Layout(PassKey) override {
+    const int panel_width = width() - 2 * kSideMargin;
+    const int text_width = panel_width - 2 * kBannerPad;
+    intro_->SetBounds(kSideMargin + kBannerPad, kContentTop, text_width,
+                      intro_->GetHeightForWidth(text_width));
+    panel_->SetBounds(kSideMargin, intro_->bounds().bottom() + 16, panel_width,
+                      kSwitchRowHeight);
+  }
+
+ private:
+  static constexpr char16_t kLinksLabel[] =
+      u"Links from other apps open in Little Arc";
+
+  void UpdateSwitch() {
+    switch_->SetOn(IsLittleArcLinksEnabled(local_state_));
+    switch_->SetEnabled(local_state_ != nullptr);
+  }
+
+  void Toggle() {
+    if (!local_state_) {
+      return;
+    }
+    local_state_->SetBoolean(kLittleArcLinksPref,
+                             !IsLittleArcLinksEnabled(local_state_));
+    UpdateSwitch();
+  }
+
+  const raw_ptr<PrefService> local_state_;
+  PrefChangeRegistrar registrar_;
+  raw_ptr<views::Label> intro_ = nullptr;
+  raw_ptr<Panel> panel_ = nullptr;
+  raw_ptr<Switch> switch_ = nullptr;
+};
+
+BEGIN_METADATA(LinksPage)
+END_METADATA
+
 // Arc's "Archive tabs after" choices; Auto Archive can't be turned off.
 struct ArchiveChoice {
   uint64_t secs;
@@ -970,12 +1040,12 @@ struct SectionSpec {
 };
 
 // Arc's tab row minus Account (myArc has no account), Max (AI is off) and
-// Icon (no app icon picker). Links and Shortcuts stay visible but disabled so
-// the row keeps Arc's rhythm.
+// Icon (no app icon picker). Shortcuts stays visible but disabled so the row
+// keeps Arc's rhythm.
 constexpr std::array<SectionSpec, 5> kSections = {{
     {u"General", &kSettingsIcon, SettingsWindow::Section::kGeneral},
     {u"Profiles", &kUserIcon, SettingsWindow::Section::kProfiles},
-    {u"Links", &kAppWindowIcon, std::nullopt},
+    {u"Links", &kAppWindowIcon, SettingsWindow::Section::kLinks},
     {u"Shortcuts", &kKeyboardIcon, std::nullopt},
     {u"Advanced", &kSlidersIcon, SettingsWindow::Section::kAdvanced},
 }};
@@ -1013,6 +1083,7 @@ class SettingsView : public views::View {
         std::move(open_site)));
     profiles_ =
         AddChildView(std::make_unique<ProfilesPage>(std::move(archive_timer)));
+    links_ = AddChildView(std::make_unique<LinksPage>(local_state));
     advanced_ = AddChildView(
         std::make_unique<AdvancedPage>(local_state, more_settings,
                                        std::move(import_arc)));
@@ -1029,6 +1100,7 @@ class SettingsView : public views::View {
   void Select(SettingsWindow::Section section) {
     general_->SetVisible(section == SettingsWindow::Section::kGeneral);
     profiles_->SetVisible(section == SettingsWindow::Section::kProfiles);
+    links_->SetVisible(section == SettingsWindow::Section::kLinks);
     advanced_->SetVisible(section == SettingsWindow::Section::kAdvanced);
     if (section == SettingsWindow::Section::kGeneral) {
       general_->Refresh();
@@ -1077,6 +1149,7 @@ class SettingsView : public views::View {
     }
     general_->SetBoundsRect(GetLocalBounds());
     profiles_->SetBoundsRect(GetLocalBounds());
+    links_->SetBoundsRect(GetLocalBounds());
     advanced_->SetBoundsRect(GetLocalBounds());
   }
 
@@ -1086,6 +1159,7 @@ class SettingsView : public views::View {
   std::vector<raw_ptr<SectionTab>> tabs_;
   raw_ptr<GeneralPage> general_ = nullptr;
   raw_ptr<ProfilesPage> profiles_ = nullptr;
+  raw_ptr<LinksPage> links_ = nullptr;
   raw_ptr<AdvancedPage> advanced_ = nullptr;
 };
 

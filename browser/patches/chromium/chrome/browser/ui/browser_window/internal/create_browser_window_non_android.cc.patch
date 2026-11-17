@@ -1,0 +1,12 @@
+diff --git a/chrome/browser/ui/browser_window/internal/create_browser_window_non_android.cc b/chrome/browser/ui/browser_window/internal/create_browser_window_non_android.cc
+index f10f9855db6db85f315a18a51aeccd5cb083cefd..b6cd534124e4fb75fcbae07d65de1a6eeeb36f90 100644
+--- a/chrome/browser/ui/browser_window/internal/create_browser_window_non_android.cc
++++ b/chrome/browser/ui/browser_window/internal/create_browser_window_non_android.cc
+@@ -26,6 +26,7 @@ BrowserWindowCreateParams BrowserWindowCreateParams::Clone() const {
+   clone.app_name = app_name;
+   clone.initial_show_state = initial_show_state;
+   clone.omit_from_session_restore = omit_from_session_restore;
++  clone.myarc_little_arc = myarc_little_arc;
+   clone.should_trigger_session_restore = should_trigger_session_restore;
+   clone.initial_origin_specified = initial_origin_specified;
+   clone.initial_workspace = initial_workspace;

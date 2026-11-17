@@ -1,5 +1,5 @@
 diff --git a/chrome/browser/ui/views/frame/browser_native_widget_mac.mm b/chrome/browser/ui/views/frame/browser_native_widget_mac.mm
-index fd4cc9a121ef9a7bf20e1269bcb381eabf6fa055..ecee6865a78e55eee55542d4433973f8a1343b0e 100644
+index fd4cc9a121ef9a7bf20e1269bcb381eabf6fa055..a935d291fa1e26996e54f363d5d1cb45a6889aea 100644
 --- a/chrome/browser/ui/views/frame/browser_native_widget_mac.mm
 +++ b/chrome/browser/ui/views/frame/browser_native_widget_mac.mm
 @@ -4,10 +4,14 @@
@@ -17,16 +17,17 @@ index fd4cc9a121ef9a7bf20e1269bcb381eabf6fa055..ecee6865a78e55eee55542d4433973f8
  #include "base/functional/bind.h"
  #include "base/i18n/rtl.h"
  #include "base/memory/raw_ptr.h"
-@@ -65,6 +69,8 @@
+@@ -65,6 +69,9 @@
  #include "components/remote_cocoa/common/native_widget_ns_window_host.mojom.h"
  #include "components/viz/common/frame_timing_details.h"
  #include "components/web_modal/web_contents_modal_dialog_host.h"
++#include "myarc/little_arc.h"
 +#include "myarc/sidebar_tint.h"
 +#include "skia/ext/skia_utils_mac.h"
  #include "ui/accessibility/platform/ax_platform_node.h"
  #include "ui/actions/actions.h"
  #include "ui/base/accelerators/global_accelerator_listener/global_accelerator_listener.h"
-@@ -73,6 +79,7 @@
+@@ -73,6 +80,7 @@
  #include "ui/base/mojom/window_show_state.mojom.h"
  #include "ui/base/ui_base_features.h"
  #include "ui/base/window_open_disposition.h"
@@ -34,7 +35,7 @@ index fd4cc9a121ef9a7bf20e1269bcb381eabf6fa055..ecee6865a78e55eee55542d4433973f8
  #include "ui/compositor/compositor.h"
  #include "ui/gfx/color_utils.h"
  #include "ui/native_theme/native_theme.h"
-@@ -150,6 +157,31 @@ int GetGlassCornerPadding() {
+@@ -150,6 +158,31 @@ int GetGlassCornerPadding() {
    return GetLayoutConstant(LayoutConstant::kToolbarCornerRadius) * 2;
  }
  
@@ -66,7 +67,7 @@ index fd4cc9a121ef9a7bf20e1269bcb381eabf6fa055..ecee6865a78e55eee55542d4433973f8
  }  // namespace
  
  // NSGlassEffectView intercepts hit testing even when added below the
-@@ -165,6 +197,15 @@ API_AVAILABLE(macos(26.0))
+@@ -165,6 +198,15 @@ API_AVAILABLE(macos(26.0))
  }
  @end
  
@@ -82,7 +83,7 @@ index fd4cc9a121ef9a7bf20e1269bcb381eabf6fa055..ecee6865a78e55eee55542d4433973f8
  @interface OpaqueFrameBackgroundView : NSView
  @end
  
-@@ -222,13 +263,22 @@ BrowserNativeWidgetMac::BrowserNativeWidgetMac(BrowserWidget* browser_widget,
+@@ -222,13 +264,22 @@ BrowserNativeWidgetMac::BrowserNativeWidgetMac(BrowserWidget* browser_widget,
      : views::NativeWidgetMac(browser_widget), browser_view_(browser_view) {
    CHECK(browser_widget);
    CHECK(browser_view);
@@ -106,10 +107,14 @@ index fd4cc9a121ef9a7bf20e1269bcb381eabf6fa055..ecee6865a78e55eee55542d4433973f8
      if (auto* vertical_tab_strip_state_controller =
              tabs::VerticalTabStripStateController::From(
                  browser_view_->browser())) {
-@@ -288,6 +338,13 @@ void BrowserNativeWidgetMac::GetWindowFrameTitlebarHeight(
+@@ -288,6 +339,17 @@ void BrowserNativeWidgetMac::GetWindowFrameTitlebarHeight(
      if (!browser_view_->ShouldDrawTabStrip()) {
        *titlebar_height += kWebAppMenuMargin * 2;
      }
++    // Little Arc's lights sit level with its header row.
++    if (myarc::IsLittleArc(*browser_view_->browser())) {
++      *titlebar_height = myarc::LittleArcHeader::kHeight;
++    }
 +    // AppKit centres the traffic lights in the titlebar. Arc's centre on
 +    // y=24, level with the sidebar header row.
 +    if (base::CommandLine::ForCurrentProcess()->HasSwitch(
@@ -120,7 +125,7 @@ index fd4cc9a121ef9a7bf20e1269bcb381eabf6fa055..ecee6865a78e55eee55542d4433973f8
    } else {
      *override_titlebar_height = false;
      *titlebar_height = 0;
-@@ -295,6 +352,10 @@ void BrowserNativeWidgetMac::GetWindowFrameTitlebarHeight(
+@@ -295,6 +357,10 @@ void BrowserNativeWidgetMac::GetWindowFrameTitlebarHeight(
  }
  
  std::optional<int> BrowserNativeWidgetMac::GetGlassFrameHeight() const {
@@ -131,7 +136,7 @@ index fd4cc9a121ef9a7bf20e1269bcb381eabf6fa055..ecee6865a78e55eee55542d4433973f8
    // If vertical tabs are being drawn, the glass effect view is not restricted
    // vertically to top chrome (it spans full height).
    if (!browser_view_ || browser_view_->ShouldDrawVerticalTabStrip()) {
-@@ -318,6 +379,10 @@ std::optional<int> BrowserNativeWidgetMac::GetGlassFrameHeight() const {
+@@ -318,6 +384,10 @@ std::optional<int> BrowserNativeWidgetMac::GetGlassFrameHeight() const {
  }
  
  std::optional<int> BrowserNativeWidgetMac::GetGlassFrameWidth() const {
@@ -142,7 +147,7 @@ index fd4cc9a121ef9a7bf20e1269bcb381eabf6fa055..ecee6865a78e55eee55542d4433973f8
    // If vertical tabs are not being drawn (e.g. horizontal tab strip mode,
    // popup/app windows, or window too narrow to render vertical tabs), the glass
    // effect view spans the full window width without horizontal restriction.
-@@ -364,6 +429,8 @@ void BrowserNativeWidgetMac::OnWindowFullscreenTransitionComplete() {
+@@ -364,6 +434,8 @@ void BrowserNativeWidgetMac::OnWindowFullscreenTransitionComplete() {
    if (browser_view_) {
      browser_view_->FullscreenStateChanged();
    }
@@ -151,7 +156,28 @@ index fd4cc9a121ef9a7bf20e1269bcb381eabf6fa055..ecee6865a78e55eee55542d4433973f8
  }
  
  void BrowserNativeWidgetMac::OnWindowWillStartLiveResize() {
-@@ -788,6 +855,36 @@ void BrowserNativeWidgetMac::OnWindowInitialized() {
+@@ -737,15 +809,17 @@ void BrowserNativeWidgetMac::PopulateCreateWindowParams(
+                          NSWindowStyleMaskTitled | NSWindowStyleMaskResizable;
+     params->window_title_hidden = true;
+   } else if (browser_view_->GetIsNormalType() ||
+-             browser_view_->GetIsWebAppType()) {
++             browser_view_->GetIsWebAppType() ||
++             myarc::IsLittleArc(*browser_view_->browser())) {
+     params->window_class = remote_cocoa::mojom::WindowClass::kBrowser;
+     params->style_mask |= NSWindowStyleMaskFullSizeContentView;
+ 
+     // Ensure tabstrip/profile button are visible.
+     params->titlebar_appears_transparent = true;
+ 
+-    // Hosted apps draw their own window title.
+-    if (browser_view_->GetIsWebAppType()) {
++    // Hosted apps and Little Arc draw their own window title.
++    if (browser_view_->GetIsWebAppType() ||
++        myarc::IsLittleArc(*browser_view_->browser())) {
+       params->window_title_hidden = true;
+     }
+   } else {
+@@ -788,6 +862,36 @@ void BrowserNativeWidgetMac::OnWindowInitialized() {
  
  void BrowserNativeWidgetMac::OnWidgetInitDone() {
    NativeWidgetMac::OnWidgetInitDone();
@@ -188,7 +214,7 @@ index fd4cc9a121ef9a7bf20e1269bcb381eabf6fa055..ecee6865a78e55eee55542d4433973f8
    if (!GetWidget()->HasObserver(this)) {
      GetWidget()->AddObserver(this);
    }
-@@ -978,7 +1075,7 @@ void BrowserNativeWidgetMac::AnnounceTextInInProcessWindow(
+@@ -978,7 +1082,7 @@ void BrowserNativeWidgetMac::AnnounceTextInInProcessWindow(
  void BrowserNativeWidgetMac::OnVerticalTabStripModeChanged(
      tabs::VerticalTabStripStateController* controller) {
    last_theme_color_.reset();
@@ -197,7 +223,7 @@ index fd4cc9a121ef9a7bf20e1269bcb381eabf6fa055..ecee6865a78e55eee55542d4433973f8
    UpdateBackgroundColor();
  }
  
-@@ -1081,17 +1178,38 @@ void BrowserNativeWidgetMac::UpdateGlassEligibility(bool is_glass_eligible) {
+@@ -1081,17 +1185,38 @@ void BrowserNativeWidgetMac::UpdateGlassEligibility(bool is_glass_eligible) {
      if (!glass_background_view_) {
        NSView* const content_view = [ns_window contentView];
  
@@ -241,7 +267,7 @@ index fd4cc9a121ef9a7bf20e1269bcb381eabf6fa055..ecee6865a78e55eee55542d4433973f8
  
        tint_view_ = tint_view;
        [glass_view addSubview:tint_view_];
-@@ -1167,7 +1285,22 @@ void BrowserNativeWidgetMac::UpdateBackgroundGeometry() {
+@@ -1167,7 +1292,22 @@ void BrowserNativeWidgetMac::UpdateBackgroundGeometry() {
      tint_view_.frame = glass_background_view_.bounds;
    }
  
@@ -264,7 +290,7 @@ index fd4cc9a121ef9a7bf20e1269bcb381eabf6fa055..ecee6865a78e55eee55542d4433973f8
      int opaque_x = 0;
      int opaque_y = 0;
      int opaque_width = content_width;
-@@ -1206,6 +1339,22 @@ void BrowserNativeWidgetMac::UpdateBackgroundColor() {
+@@ -1206,6 +1346,22 @@ void BrowserNativeWidgetMac::UpdateBackgroundColor() {
  
    const bool is_vertical_tabs = browser_view_->ShouldDrawVerticalTabStrip();
  
@@ -287,7 +313,7 @@ index fd4cc9a121ef9a7bf20e1269bcb381eabf6fa055..ecee6865a78e55eee55542d4433973f8
    auto* const glass_frame_service = GlassFrameService::GetInstance();
    const bool are_multiple_profiles_open =
        glass_frame_service && glass_frame_service->HasMultipleOpenProfiles();
-@@ -1223,8 +1372,11 @@ void BrowserNativeWidgetMac::UpdateBackgroundColor() {
+@@ -1223,8 +1379,11 @@ void BrowserNativeWidgetMac::UpdateBackgroundColor() {
    has_multiple_profiles_open_ = are_multiple_profiles_open;
  
    const double tint_opacity =

@@ -223,11 +223,12 @@ class BrowserWorkspaceAdapter final : public TabStripModelObserver {
   // nullopt when it has no row.
   std::optional<foundation::PlacementKind> PlacementOf(
       content::WebContents& page) const;
-  // Peek's Open in New Tab: `page`, which is in no tab strip, becomes one new
-  // Today tab of this window's Space with its history, and the window shows
-  // it.
+  // Peek's Open in New Tab and Little Arc's Open in: `page`, which is in no
+  // tab strip, becomes one new Today tab of this window's Space with its
+  // history, and the window shows it. On a failure before the page moves,
+  // `page` stays with the caller.
   foundation::MutationResult AdoptAsTodayTab(
-      std::unique_ptr<content::WebContents> page);
+      std::unique_ptr<content::WebContents>& page);
 
   // Keyboard commands over the rows the sidebar shows, in Rust's row order:
   // Favorites, ungrouped Pins, open folders' Pins, then temporary items, and

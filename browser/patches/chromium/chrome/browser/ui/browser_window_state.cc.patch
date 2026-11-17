@@ -1,0 +1,16 @@
+diff --git a/chrome/browser/ui/browser_window_state.cc b/chrome/browser/ui/browser_window_state.cc
+index f7eec9ad25924bac0c7d0888f163218be4022efb..d70d3b69e61da9ec551e77f62e54547f8c32d050 100644
+--- a/chrome/browser/ui/browser_window_state.cc
++++ b/chrome/browser/ui/browser_window_state.cc
+@@ -161,6 +161,11 @@ void GetSavedWindowBoundsAndShowState(BrowserWindowInterface* browser,
+   *bounds = BrowserInitState::From(browser)->override_bounds();
+   WindowSizer::GetBrowserWindowBoundsAndShowState(*bounds, browser, bounds,
+                                                   show_state);
++  // myArc: --window-size and --window-position size the main windows. Little
++  // Arc keeps its own small size.
++  if (BrowserInitState::From(browser)->create_params().myarc_little_arc) {
++    return;
++  }
+ 
+   const base::CommandLine& parsed_command_line =
+       *base::CommandLine::ForCurrentProcess();
