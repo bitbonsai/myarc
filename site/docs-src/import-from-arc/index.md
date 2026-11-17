@@ -17,7 +17,7 @@ In Arc, open Settings, go to Advanced and choose Export Data. Arc saves a Markdo
 2. Click Import from Arc and pick the exported file.
 3. Read the preview, then click Import. Cancel closes the preview and writes nothing.
 
-The preview counts the Spaces and pinned tabs the import adds and the pinned tabs already in myArc. It also lists links it leaves out and lines it couldn't read. Nothing loads while you import, and each pinned tab opens its page the first time you click it.
+The preview counts the Spaces and pinned tabs the import adds and the pinned tabs already in myArc. It also lists links it leaves out and lines it couldn't read. Nothing loads while you import, and each pinned tab opens its page the first time you click it. When the import finishes, a report counts what was added and each kind of thing it left out or changed.
 
 ## What comes over
 
