@@ -476,9 +476,10 @@ inline constexpr gfx::VectorIcon kBoostsActiveIcon(kBoostsActiveRep,
 #undef MYARC_RAIL_THIN
 #undef MYARC_RAIL_LINE
 #undef MYARC_RAIL_INK
-// Lucide icons for Peek, at stroke 2: "x" and "maximize-2" on its round
-// buttons, as Arc's X and expand arrows, and "arrow-left", "arrow-right",
-// "rotate-cw", "lock" and "triangle-alert" in the card's header.
+// Lucide icons for Peek, at stroke 2: "x", "maximize-2" mirrored to point
+// top left and bottom right, and "columns-2" on its round buttons, as Arc's
+// X, expand arrows and Split View; "lock" and "triangle-alert" also mark
+// Little Arc's address.
 inline constexpr gfx::PathElement kPeekClosePath[] = {
     gfx::CANVAS_DIMENSIONS, 24, gfx::STROKE, 2, gfx::MOVE_TO, 18, 6,
     gfx::LINE_TO, 6, 18, gfx::MOVE_TO, 6, 6, gfx::R_LINE_TO, 12, 12};
@@ -489,42 +490,14 @@ inline constexpr gfx::VectorIcon kPeekCloseIcon(kPeekCloseRep,
 
 inline constexpr gfx::PathElement kPeekExpandPath[] = {
     gfx::CANVAS_DIMENSIONS, 24, gfx::STROKE, 2,
-    gfx::MOVE_TO, 15, 3, gfx::R_H_LINE_TO, 6, gfx::R_V_LINE_TO, 6,
-    gfx::MOVE_TO, 21, 3, gfx::R_LINE_TO, -7, 7,
-    gfx::MOVE_TO, 3, 21, gfx::R_LINE_TO, 7, -7,
-    gfx::MOVE_TO, 9, 21, gfx::H_LINE_TO, 3, gfx::R_V_LINE_TO, -6};
+    gfx::MOVE_TO, 9, 3, gfx::R_H_LINE_TO, -6, gfx::R_V_LINE_TO, 6,
+    gfx::MOVE_TO, 3, 3, gfx::R_LINE_TO, 7, 7,
+    gfx::MOVE_TO, 21, 21, gfx::R_LINE_TO, -7, -7,
+    gfx::MOVE_TO, 15, 21, gfx::H_LINE_TO, 21, gfx::R_V_LINE_TO, -6};
 inline constexpr gfx::VectorIconRep kPeekExpandRep[] = {{kPeekExpandPath}};
 inline constexpr gfx::VectorIcon kPeekExpandIcon(kPeekExpandRep,
                                                  std::size(kPeekExpandRep),
                                                  "myarc_peek_expand");
-
-inline constexpr gfx::PathElement kPeekBackPath[] = {
-    gfx::CANVAS_DIMENSIONS, 24, gfx::STROKE, 2, gfx::MOVE_TO, 12, 19,
-    gfx::R_LINE_TO, -7, -7, gfx::R_LINE_TO, 7, -7, gfx::MOVE_TO, 19, 12,
-    gfx::H_LINE_TO, 5};
-inline constexpr gfx::VectorIconRep kPeekBackRep[] = {{kPeekBackPath}};
-inline constexpr gfx::VectorIcon kPeekBackIcon(kPeekBackRep,
-                                               std::size(kPeekBackRep),
-                                               "myarc_peek_back");
-
-inline constexpr gfx::PathElement kPeekForwardPath[] = {
-    gfx::CANVAS_DIMENSIONS, 24, gfx::STROKE, 2, gfx::MOVE_TO, 5, 12,
-    gfx::R_H_LINE_TO, 14, gfx::MOVE_TO, 12, 5, gfx::R_LINE_TO, 7, 7,
-    gfx::R_LINE_TO, -7, 7};
-inline constexpr gfx::VectorIconRep kPeekForwardRep[] = {{kPeekForwardPath}};
-inline constexpr gfx::VectorIcon kPeekForwardIcon(kPeekForwardRep,
-                                                  std::size(kPeekForwardRep),
-                                                  "myarc_peek_forward");
-
-inline constexpr gfx::PathElement kPeekReloadPath[] = {
-    gfx::CANVAS_DIMENSIONS, 24, gfx::STROKE, 2, gfx::MOVE_TO, 21, 12,
-    gfx::R_ARC_TO, 9, 9, 0, 1, 1, -9, -9,
-    gfx::R_CUBIC_TO, 2.52f, 0, 4.93f, 1, 6.74f, 2.74f, gfx::LINE_TO, 21, 8,
-    gfx::MOVE_TO, 21, 3, gfx::R_V_LINE_TO, 5, gfx::R_H_LINE_TO, -5};
-inline constexpr gfx::VectorIconRep kPeekReloadRep[] = {{kPeekReloadPath}};
-inline constexpr gfx::VectorIcon kPeekReloadIcon(kPeekReloadRep,
-                                                 std::size(kPeekReloadRep),
-                                                 "myarc_peek_reload");
 
 inline constexpr gfx::PathElement kPeekLockPath[] = {
     gfx::CANVAS_DIMENSIONS, 24, gfx::STROKE, 2,
@@ -548,6 +521,15 @@ inline constexpr gfx::VectorIcon kPeekNotSecureIcon(
     kPeekNotSecureRep,
     std::size(kPeekNotSecureRep),
     "myarc_peek_not_secure");
+
+// Lucide "columns-2" for Peek's Open in Split View button.
+inline constexpr gfx::PathElement kPeekSplitPath[] = {
+    gfx::CANVAS_DIMENSIONS, 24, gfx::STROKE, 2, gfx::ROUND_RECT, 3, 3, 18, 18,
+    2, gfx::MOVE_TO, 12, 3, gfx::V_LINE_TO, 21};
+inline constexpr gfx::VectorIconRep kPeekSplitRep[] = {{kPeekSplitPath}};
+inline constexpr gfx::VectorIcon kPeekSplitIcon(kPeekSplitRep,
+                                                std::size(kPeekSplitRep),
+                                                "myarc_peek_split");
 
 #undef MYARC_RAIL_FILL
 

@@ -1,5 +1,5 @@
 diff --git a/chrome/browser/ui/views/frame/browser_view.h b/chrome/browser/ui/views/frame/browser_view.h
-index 750e46c97b64dccccf4268e912df5dbdb6516b3c..9c40a52b8375440ae6d0fde08e6dde2d62a47f51 100644
+index 750e46c97b64dccccf4268e912df5dbdb6516b3c..0388a55f37c740f9490381dac9cda237a65c6dd4 100644
 --- a/chrome/browser/ui/views/frame/browser_view.h
 +++ b/chrome/browser/ui/views/frame/browser_view.h
 @@ -8,11 +8,13 @@
@@ -131,7 +131,7 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..9c40a52b8375440ae6d0fde08e6dde2d
    base::WeakPtr<BrowserView> GetAsWeakPtr() {
      return weak_ptr_factory_.GetWeakPtr();
    }
-@@ -1253,12 +1318,257 @@ class BrowserView : public BrowserWindow,
+@@ -1253,12 +1318,258 @@ class BrowserView : public BrowserWindow,
  
    // Anchor point for help bubbles and other dialogs that want to reliably
    // anchor outside the content area of the window.
@@ -224,9 +224,10 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..9c40a52b8375440ae6d0fde08e6dde2d
 +  // After session restore: shows one ordered-out window of each group that
 +  // has no shown window.
 +  static void ShowOrphanedMyarcGroupWindows();
-+  // --myarc-capture-peek=open|close|expand clicks the active page's first
-+  // link, then keeps the Peek, closes it with Cmd+W's command or expands it
-+  // with Cmd+O's.
++  // --myarc-capture-peek=open|close|expand|split|reopen clicks the active
++  // page's first link, then keeps the Peek, closes it with Cmd+W's command,
++  // expands it with Cmd+O's, presses its Split View button, or closes it and
++  // brings it back with Cmd+Shift+T's.
 +  void MaybeScheduleMyarcCapturePeek();
 +  // --myarc-capture-profile-swap: creates Profile "work" with Space "Client",
 +  // then swaps back and forth, logging every window at each step.
@@ -389,7 +390,7 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..9c40a52b8375440ae6d0fde08e6dde2d
  
    // A mapping between accelerators and command IDs.
    std::map<ui::Accelerator, int> accelerator_table_;
-@@ -1411,6 +1721,7 @@ class BrowserView : public BrowserWindow,
+@@ -1411,6 +1722,7 @@ class BrowserView : public BrowserWindow,
    base::EnumSet<TabStripAndWebAppViewsReparentedState>
        tab_strip_web_apps_reparented_state_;
  

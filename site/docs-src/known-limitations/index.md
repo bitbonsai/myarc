@@ -25,7 +25,7 @@ myArc is a pre-alpha. Use it to try the Arc-style sidebar, and keep daily and se
 - Arc Favorites arrive as pinned tabs in their Space, because the export doesn't mark them.
 - Folders inside folders, and dragging a tab up to pin it.
 - Split View holds two tabs at most, and a split can't be pinned or put in a folder.
-- Peek can't open into a split, and a closed Peek can't be reopened.
+- Peek's split button splits a copy of the pinned page, because a split can't hold a pinned tab yet. Cmd+Z doesn't bring back a closed Peek, so use Cmd+Shift+T.
 - Little Arc windows don't come back after a relaunch. Option-Cmd-N works from any app, unless another app such as Raycast already uses that key.
 - Boosts and the Mini Player.
 - The animated onboarding.

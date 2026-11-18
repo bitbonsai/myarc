@@ -1,5 +1,6 @@
-//! Pure Peek routing. Decides where a link navigation from a sidebar item opens, and
-//! what the Peek overlay's actions do. Holds no state and never touches live pages.
+//! Pure Peek routing. Decides where a link navigation from a sidebar item opens, what
+//! the Peek overlay's actions do, and whether Cmd+Shift+T brings a closed Peek back.
+//! Never touches live pages.
 //!
 //! Callers pass already-validated parts: the scheme and a site key per URL. The site key
 //! is the registrable domain (e.g. `example.com` for `docs.example.com`) computed with
@@ -94,6 +95,8 @@ pub fn route_navigation(request: &NavigationRequest<'_>, settings: &PeekSettings
 pub enum PeekAction {
     /// Expand the Peek page into a real tab.
     OpenInTab,
+    /// Show the Peek page in a Split View beside the page it was opened from.
+    OpenInSplit,
     /// Dismiss the Peek page.
     Close,
 }
@@ -102,17 +105,24 @@ pub enum PeekAction {
 pub enum PeekOutcome {
     /// Create a new Temporary item in this Space for the Peek page, select it and dismiss the overlay.
     PromoteToTemporary { space_id: SpaceId },
+    /// Put the Peek page in a split with a Today copy of the source item's page, in this
+    /// Space. A split holds two Today tabs, so the Pin or Favorite itself stays put.
+    SplitBesideSource {
+        space_id: SpaceId,
+        source_item: ItemId,
+    },
     /// Dismiss the overlay and reselect the item Peek was opened from.
     ReturnToSource { source_item: ItemId },
 }
 
 /// What the user did on an open Peek. Arc's Peek article names the expand arrows
-/// and Cmd+O for opening it as a tab, and a click outside, the X button and Cmd+W
-/// for closing it. Esc closes it too, like other overlays.
+/// and Cmd+O for opening it as a tab, the Split View button, and a click outside,
+/// the X button and Cmd+W for closing it. Esc closes it too, like other overlays.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum PeekTrigger {
     ExpandButton,
     CommandO,
+    SplitButton,
     CloseButton,
     CommandW,
     Escape,
@@ -122,6 +132,7 @@ pub enum PeekTrigger {
 pub fn peek_action(trigger: PeekTrigger) -> PeekAction {
     match trigger {
         PeekTrigger::ExpandButton | PeekTrigger::CommandO => PeekAction::OpenInTab,
+        PeekTrigger::SplitButton => PeekAction::OpenInSplit,
         PeekTrigger::CloseButton
         | PeekTrigger::CommandW
         | PeekTrigger::Escape
@@ -138,7 +149,64 @@ pub fn resolve_peek_action(
         PeekAction::OpenInTab => PeekOutcome::PromoteToTemporary {
             space_id: current_space,
         },
+        PeekAction::OpenInSplit => PeekOutcome::SplitBesideSource {
+            space_id: current_space,
+            source_item,
+        },
         PeekAction::Close => PeekOutcome::ReturnToSource { source_item },
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct ClosedPeek {
+    space_id: SpaceId,
+    source_item: ItemId,
+}
+
+/// The one Peek a window can bring back. Arc's Peek article says a Peek closed by
+/// mistake comes back with Cmd+Shift+T. Only the last close counts, and only a close
+/// the user asked for: the X, Esc, Cmd+W or a click outside. A Peek that ended
+/// because the tab or Space changed, or that moved into a tab or split, can't come
+/// back. A tab closed after the Peek takes Cmd+Shift+T, as the newer close.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct PeekReopen {
+    last: Option<ClosedPeek>,
+}
+
+impl PeekReopen {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// A Peek over `source_item` in `space_id` ended. `trigger` is what the user did,
+    /// or `None` when something else ended it.
+    pub fn closed(&mut self, trigger: Option<PeekTrigger>, space_id: SpaceId, source_item: ItemId) {
+        self.last = match trigger.map(peek_action) {
+            Some(PeekAction::Close) => Some(ClosedPeek {
+                space_id,
+                source_item,
+            }),
+            _ => None,
+        };
+    }
+
+    /// A newer close, of a tab or of the window's Peek page some other way, wins.
+    pub fn forget(&mut self) {
+        self.last = None;
+    }
+
+    pub fn can_reopen(&self) -> bool {
+        self.last.is_some()
+    }
+
+    /// Cmd+Shift+T with `active_item` shown in `space_id`. True means reopen the
+    /// Peek: it was the last thing closed, over this same item. False means
+    /// Cmd+Shift+T reopens a tab as usual. Either way the Peek is used up, so a
+    /// second press reopens the tab closed before it.
+    pub fn take(&mut self, space_id: SpaceId, active_item: ItemId) -> bool {
+        self.last.take().is_some_and(|closed| {
+            closed.space_id == space_id && closed.source_item == active_item && active_item != 0
+        })
     }
 }
 
@@ -370,6 +438,85 @@ mod tests {
             resolve_peek_action(PeekAction::OpenInTab, 7, 3),
             PeekOutcome::PromoteToTemporary { space_id: 3 }
         );
+    }
+
+    #[test]
+    fn split_button_opens_in_split_beside_source() {
+        assert_eq!(
+            peek_action(PeekTrigger::SplitButton),
+            PeekAction::OpenInSplit
+        );
+        assert_eq!(
+            resolve_peek_action(PeekAction::OpenInSplit, 7, 3),
+            PeekOutcome::SplitBesideSource {
+                space_id: 3,
+                source_item: 7
+            }
+        );
+    }
+
+    #[test]
+    fn user_close_can_be_reopened_once_over_the_same_item() {
+        for trigger in [
+            PeekTrigger::CloseButton,
+            PeekTrigger::CommandW,
+            PeekTrigger::Escape,
+            PeekTrigger::OutsideClick,
+        ] {
+            let mut reopen = PeekReopen::new();
+            reopen.closed(Some(trigger), 3, 7);
+            assert!(reopen.can_reopen(), "{trigger:?}");
+            assert!(reopen.take(3, 7), "{trigger:?}");
+            assert!(!reopen.can_reopen());
+            assert!(!reopen.take(3, 7), "second press restores a tab");
+        }
+    }
+
+    #[test]
+    fn expand_split_and_implicit_closes_cannot_be_reopened() {
+        for trigger in [
+            Some(PeekTrigger::ExpandButton),
+            Some(PeekTrigger::CommandO),
+            Some(PeekTrigger::SplitButton),
+            None,
+        ] {
+            let mut reopen = PeekReopen::new();
+            reopen.closed(Some(PeekTrigger::CloseButton), 3, 7);
+            reopen.closed(trigger, 3, 7);
+            assert!(!reopen.can_reopen(), "{trigger:?}");
+            assert!(!reopen.take(3, 7), "{trigger:?}");
+        }
+    }
+
+    #[test]
+    fn a_later_tab_close_wins() {
+        let mut reopen = PeekReopen::new();
+        reopen.closed(Some(PeekTrigger::Escape), 3, 7);
+        reopen.forget();
+        assert!(!reopen.take(3, 7));
+    }
+
+    #[test]
+    fn reopen_needs_the_same_space_and_item_and_is_used_up_otherwise() {
+        let mut reopen = PeekReopen::new();
+        reopen.closed(Some(PeekTrigger::CloseButton), 3, 7);
+        assert!(!reopen.take(3, 8), "another tab shown");
+        assert!(!reopen.take(3, 7), "used up by the miss");
+
+        reopen.closed(Some(PeekTrigger::CloseButton), 3, 7);
+        assert!(!reopen.take(4, 7), "another Space shown");
+
+        reopen.closed(Some(PeekTrigger::CloseButton), 3, 0);
+        assert!(!reopen.take(3, 0), "no item never matches");
+    }
+
+    #[test]
+    fn only_the_last_peek_comes_back() {
+        let mut reopen = PeekReopen::new();
+        reopen.closed(Some(PeekTrigger::CloseButton), 3, 7);
+        reopen.closed(Some(PeekTrigger::CommandW), 3, 9);
+        assert!(!reopen.clone().take(3, 7));
+        assert!(reopen.take(3, 9));
     }
 
     #[test]

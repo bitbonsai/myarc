@@ -68,6 +68,7 @@ mod ffi {
     enum PeekTrigger {
         ExpandButton,
         CommandO,
+        SplitButton,
         CloseButton,
         CommandW,
         Escape,
@@ -75,9 +76,11 @@ mod ffi {
     }
 
     // OpenInTab turns the Peek page into a Today tab of the current Space;
+    // OpenInSplit puts it in a split beside a Today copy of the source page;
     // Close dismisses it and leaves the workspace as it was.
     enum PeekActionKind {
         OpenInTab,
+        OpenInSplit,
         Close,
     }
 
@@ -907,6 +910,26 @@ mod ffi {
         // first, and returns the target, or 0 when there is none. Ids missing
         // from `shown` stay in the list for when their Space is shown again.
         fn cycle_recent_tab(recent: &mut RecentTabs, shown: &[u64], step: i32) -> u64;
+
+        // The one closed Peek a window can bring back with Cmd+Shift+T
+        // (BC-005). See workspace::peek::PeekReopen.
+        type PeekReopen;
+        fn new_peek_reopen() -> Box<PeekReopen>;
+        // A Peek over `item` in `space` ended; `by_user` with the trigger the
+        // user pressed, otherwise something else ended it.
+        fn peek_closed(
+            reopen: &mut PeekReopen,
+            by_user: bool,
+            trigger: PeekTrigger,
+            space: u64,
+            item: u64,
+        );
+        // A tab closed, or the Peek moved, after the last close.
+        fn forget_closed_peek(reopen: &mut PeekReopen);
+        fn can_reopen_peek(reopen: &PeekReopen) -> bool;
+        // Cmd+Shift+T over `item` in `space`: true reopens the Peek, false
+        // restores a tab. Uses the closed Peek up either way.
+        fn take_closed_peek(reopen: &mut PeekReopen, space: u64, item: u64) -> bool;
     }
 }
 
@@ -1119,21 +1142,57 @@ pub fn route_peek_navigation(
     }
 }
 
-pub fn peek_action(trigger: ffi::PeekTrigger) -> ffi::PeekActionKind {
-    use workspace::peek::{PeekAction, PeekTrigger};
-    let trigger = match trigger {
+fn peek_trigger(trigger: ffi::PeekTrigger) -> workspace::peek::PeekTrigger {
+    use workspace::peek::PeekTrigger;
+    match trigger {
         ffi::PeekTrigger::ExpandButton => PeekTrigger::ExpandButton,
         ffi::PeekTrigger::CommandO => PeekTrigger::CommandO,
+        ffi::PeekTrigger::SplitButton => PeekTrigger::SplitButton,
         ffi::PeekTrigger::CloseButton => PeekTrigger::CloseButton,
         ffi::PeekTrigger::CommandW => PeekTrigger::CommandW,
         ffi::PeekTrigger::OutsideClick => PeekTrigger::OutsideClick,
         // Escape, and any value C++ should never send, closes.
         _ => PeekTrigger::Escape,
-    };
-    match workspace::peek::peek_action(trigger) {
+    }
+}
+
+pub fn peek_action(trigger: ffi::PeekTrigger) -> ffi::PeekActionKind {
+    use workspace::peek::PeekAction;
+    match workspace::peek::peek_action(peek_trigger(trigger)) {
         PeekAction::OpenInTab => ffi::PeekActionKind::OpenInTab,
+        PeekAction::OpenInSplit => ffi::PeekActionKind::OpenInSplit,
         PeekAction::Close => ffi::PeekActionKind::Close,
     }
+}
+
+pub struct PeekReopen(workspace::peek::PeekReopen);
+
+pub fn new_peek_reopen() -> Box<PeekReopen> {
+    Box::new(PeekReopen(workspace::peek::PeekReopen::new()))
+}
+
+pub fn peek_closed(
+    reopen: &mut PeekReopen,
+    by_user: bool,
+    trigger: ffi::PeekTrigger,
+    space: u64,
+    item: u64,
+) {
+    reopen
+        .0
+        .closed(by_user.then(|| peek_trigger(trigger)), space, item);
+}
+
+pub fn forget_closed_peek(reopen: &mut PeekReopen) {
+    reopen.0.forget();
+}
+
+pub fn can_reopen_peek(reopen: &PeekReopen) -> bool {
+    reopen.0.can_reopen()
+}
+
+pub fn take_closed_peek(reopen: &mut PeekReopen, space: u64, item: u64) -> bool {
+    reopen.0.take(space, item)
 }
 
 pub fn route_link_from_other_app(

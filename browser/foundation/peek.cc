@@ -8,22 +8,22 @@
 #include "base/functional/bind.h"
 #include "base/location.h"
 #include "base/no_destructor.h"
-#include "base/strings/utf_string_conversions.h"
 #include "base/task/single_thread_task_runner.h"
 #include "cc/paint/paint_flags.h"
 #include "chrome/app/chrome_command_ids.h"
+#include "chrome/browser/browser_process.h"
 #include "chrome/browser/profiles/profile.h"
-#include "chrome/browser/ssl/chrome_security_state_util.h"
 #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
 #include "components/input/native_web_keyboard_event.h"
-#include "components/security_state/core/security_state.h"
 #include "content/public/browser/navigation_controller.h"
 #include "content/public/browser/navigation_handle.h"
 #include "content/public/browser/navigation_throttle.h"
 #include "content/public/browser/navigation_throttle_registry.h"
+#include "content/public/browser/page_navigator.h"
 #include "myarc/browser_workspace_adapter.h"
 #include "myarc/icons.h"
+#include "myarc/little_arc_prefs.h"
 #include "myarc/peek_hook.h"
 #include "net/base/registry_controlled_domains/registry_controlled_domain.h"
 #include "third_party/blink/public/common/input/web_input_event.h"
@@ -31,23 +31,27 @@
 #include "ui/accessibility/ax_enums.mojom.h"
 #include "ui/base/metadata/metadata_header_macros.h"
 #include "ui/base/metadata/metadata_impl_macros.h"
-#include "ui/base/models/image_model.h"
 #include "ui/base/page_transition_types.h"
 #include "ui/compositor/layer.h"
+#include "ui/display/screen.h"
 #include "ui/events/event.h"
 #include "ui/events/keycodes/keyboard_codes.h"
+#include "ui/gfx/animation/animation.h"
+#include "ui/gfx/animation/slide_animation.h"
+#include "ui/gfx/animation/tween.h"
 #include "ui/gfx/canvas.h"
 #include "ui/gfx/geometry/insets.h"
 #include "ui/gfx/geometry/rect.h"
 #include "ui/gfx/geometry/rounded_corners_f.h"
+#include "ui/gfx/geometry/transform.h"
+#include "ui/gfx/image/image_skia.h"
 #include "ui/gfx/paint_vector_icon.h"
 #include "ui/gfx/shadow_value.h"
 #include "ui/gfx/skia_paint_util.h"
 #include "ui/views/accessibility/view_accessibility.h"
+#include "ui/views/animation/animation_delegate_views.h"
 #include "ui/views/background.h"
 #include "ui/views/controls/button/button.h"
-#include "ui/views/controls/image_view.h"
-#include "ui/views/controls/label.h"
 #include "ui/views/controls/native/native_view_host.h"
 #include "ui/views/controls/webview/webview.h"
 #include "ui/views/view.h"
@@ -56,22 +60,31 @@ namespace myarc {
 
 namespace {
 
-// Card geometry, measured on the screenshots in Arc's Peek help article: the
-// card takes about 82% of the page area, inset a little from its top and
-// bottom, with round buttons stacked beside its top right corner.
-constexpr float kCardWidthShare = 0.82f;
-constexpr int kCardInset = 12;
+// Card geometry, measured on Arc 1.x screenshots of a Peek with the sidebar
+// shown and hidden: the card takes 81% of the page area's width, centred,
+// and its full height but for 2 DIP at the top and bottom. It has no header;
+// the page fills it. Round 22 DIP buttons stack 6 DIP apart, 8 DIP right of
+// its top right corner and 5 DIP down from its top.
+constexpr float kCardWidthShare = 0.81f;
+constexpr int kCardInset = 2;
 constexpr int kCardRadius = 10;
-constexpr int kHeaderHeight = 36;
-constexpr int kHeaderButton = 28;
-constexpr int kRoundButton = 28;
-constexpr int kRoundButtonGap = 8;
-constexpr int kRoundButtonMargin = 10;
-constexpr SkColor kScrim = SkColorSetA(SK_ColorBLACK, 0x38);
+constexpr int kRoundButton = 22;
+constexpr int kRoundButtonGap = 6;
+constexpr int kRoundButtonMargin = 8;
+constexpr int kRoundButtonTop = 5;
+constexpr int kRoundButtonIcon = 12;
+// Arc's scrim takes a #f6f3ee page to #68636f: a dark navy at 60%. The
+// sidebar stays as it was.
+constexpr SkColor kScrim = SkColorSetARGB(0x99, 0x09, 0x03, 0x1a);
 constexpr SkColor kCard = SK_ColorWHITE;
-constexpr SkColor kInk = SkColorSetRGB(0x3c, 0x40, 0x43);
-constexpr SkColor kFaintInk = SkColorSetRGB(0xb0, 0xb4, 0xb8);
-constexpr SkColor kWarningInk = SkColorSetRGB(0xc5, 0x22, 0x1f);
+constexpr SkColor kButton = SkColorSetRGB(0x05, 0x06, 0x27);
+constexpr SkColor kButtonHover = SkColorSetRGB(0x1d, 0x1e, 0x44);
+constexpr SkColor kButtonInk = SkColorSetRGB(0xec, 0xed, 0xff);
+// The card grows out of the clicked link and shrinks back into it, quickly,
+// as in Arc. The scale it starts from keeps a hint of a card on screen.
+constexpr base::TimeDelta kOpenDuration = base::Milliseconds(220);
+constexpr base::TimeDelta kCloseDuration = base::Milliseconds(160);
+constexpr float kStartScale = 0.12f;
 
 std::vector<PeekController*>& Controllers() {
   static base::NoDestructor<std::vector<PeekController*>> controllers;
@@ -115,7 +128,29 @@ class PeekThrottle final : public content::NavigationThrottle {
     }
     content::WebContents* tab = handle.GetWebContents();
     for (PeekController* peek : Controllers()) {
-      if (!peek->ShouldPeek(*tab, handle.GetURL())) {
+      const foundation::PeekRoute route = peek->Route(*tab, handle.GetURL());
+      if (route == foundation::PeekRoute::NewTab) {
+        // Peek is off: the link opens in a new tab and the pinned page stays.
+        base::SingleThreadTaskRunner::GetCurrentDefault()->PostTask(
+            FROM_HERE,
+            base::BindOnce(
+                [](base::WeakPtr<content::WebContents> tab, GURL url,
+                   content::Referrer referrer) {
+                  if (tab) {
+                    tab->OpenURL(
+                        content::OpenURLParams(
+                            url, referrer,
+                            WindowOpenDisposition::kNewForegroundTab,
+                            ui::PAGE_TRANSITION_LINK,
+                            /*is_renderer_initiated=*/false),
+                        {});
+                  }
+                },
+                tab->GetWeakPtr(), handle.GetURL(),
+                content::Referrer(handle.GetReferrer())));
+        return CANCEL_AND_IGNORE;
+      }
+      if (route != foundation::PeekRoute::Peek) {
         continue;
       }
       // Not while the throttle runs: opening creates a WebContents.
@@ -138,7 +173,8 @@ class PeekThrottle final : public content::NavigationThrottle {
   const char* GetNameForLogging() override { return "MyarcPeekThrottle"; }
 };
 
-// A white circle with one icon: Arc's X and expand buttons beside the card.
+// A dark navy circle with one white icon: Arc's X, expand and split buttons
+// beside the card.
 class RoundButton final : public views::Button {
   METADATA_HEADER(RoundButton, views::Button)
 
@@ -158,10 +194,11 @@ class RoundButton final : public views::Button {
     cc::PaintFlags flags;
     flags.setAntiAlias(true);
     flags.setColor(GetState() == STATE_HOVERED || GetState() == STATE_PRESSED
-                       ? SkColorSetRGB(0xf1, 0xf3, 0xf4)
-                       : kCard);
-    canvas->DrawCircle(bounds.CenterPoint(), bounds.width() / 2 - 1, flags);
-    const gfx::ImageSkia image = gfx::CreateVectorIcon(*icon_, 14, kInk);
+                       ? kButtonHover
+                       : kButton);
+    canvas->DrawCircle(bounds.CenterPoint(), bounds.width() / 2, flags);
+    const gfx::ImageSkia image =
+        gfx::CreateVectorIcon(*icon_, kRoundButtonIcon, kButtonInk);
     canvas->DrawImageInt(image, (width() - image.width()) / 2,
                          (height() - image.height()) / 2);
   }
@@ -173,48 +210,11 @@ class RoundButton final : public views::Button {
 BEGIN_METADATA(RoundButton)
 END_METADATA
 
-// A flat icon button in the card's header.
-class HeaderButton final : public views::Button {
-  METADATA_HEADER(HeaderButton, views::Button)
-
- public:
-  HeaderButton(PressedCallback callback,
-               const gfx::VectorIcon& icon,
-               std::u16string name)
-      : views::Button(std::move(callback)), icon_(icon) {
-    SetPreferredSize(gfx::Size(kHeaderButton, kHeaderButton));
-    SetTooltipText(name);
-    GetViewAccessibility().SetName(name);
-    SetFocusBehavior(FocusBehavior::ACCESSIBLE_ONLY);
-  }
-
-  void PaintButtonContents(gfx::Canvas* canvas) override {
-    if (GetEnabled() &&
-        (GetState() == STATE_HOVERED || GetState() == STATE_PRESSED)) {
-      cc::PaintFlags flags;
-      flags.setAntiAlias(true);
-      flags.setColor(SkColorSetA(SK_ColorBLACK, 0x0f));
-      canvas->DrawRoundRect(GetLocalBounds(), 6, flags);
-    }
-    const gfx::ImageSkia image =
-        gfx::CreateVectorIcon(*icon_, 16, GetEnabled() ? kInk : kFaintInk);
-    canvas->DrawImageInt(image, (width() - image.width()) / 2,
-                         (height() - image.height()) / 2);
-  }
-
- private:
-  const raw_ref<const gfx::VectorIcon> icon_;
-};
-
-BEGIN_METADATA(HeaderButton)
-END_METADATA
-
 }  // namespace
 
-// The dimmed page area with the card and its buttons. The card's header has
-// back, forward and reload, the page's security state and its host; the page
-// fills the rest.
-class PeekView final : public views::View {
+// The dimmed page area with the card and its buttons. The page fills the
+// card, as in Arc.
+class PeekView final : public views::View, public views::AnimationDelegateViews {
   METADATA_HEADER(PeekView, views::View)
 
  public:
@@ -222,30 +222,17 @@ class PeekView final : public views::View {
       base::RepeatingCallback<void(foundation::PeekTrigger)>;
 
   PeekView(content::BrowserContext* context, TriggerCallback trigger)
-      : trigger_(std::move(trigger)) {
+      : views::AnimationDelegateViews(this), trigger_(std::move(trigger)) {
     SetPaintToLayer();
     layer()->SetFillsBoundsOpaquely(false);
     GetViewAccessibility().SetRole(ax::mojom::Role::kDialog);
     GetViewAccessibility().SetName(u"Peek");
 
     card_ = AddChildView(std::make_unique<views::View>());
+    card_->SetPaintToLayer();
+    card_->layer()->SetFillsBoundsOpaquely(false);
     card_->SetBackground(
         views::CreateRoundedRectBackground(kCard, kCardRadius));
-    back_ = card_->AddChildView(std::make_unique<HeaderButton>(
-        base::BindRepeating(&PeekView::GoBack, base::Unretained(this)),
-        kPeekBackIcon, u"Back"));
-    forward_ = card_->AddChildView(std::make_unique<HeaderButton>(
-        base::BindRepeating(&PeekView::GoForward, base::Unretained(this)),
-        kPeekForwardIcon, u"Forward"));
-    reload_ = card_->AddChildView(std::make_unique<HeaderButton>(
-        base::BindRepeating(&PeekView::Reload, base::Unretained(this)),
-        kPeekReloadIcon, u"Reload"));
-    security_ = card_->AddChildView(std::make_unique<views::ImageView>());
-    host_ = card_->AddChildView(std::make_unique<views::Label>());
-    host_->SetHorizontalAlignment(gfx::ALIGN_LEFT);
-    host_->SetEnabledColor(kInk);
-    host_->SetAutoColorReadabilityEnabled(false);
-    host_->SetElideBehavior(gfx::ELIDE_HEAD);
     web_view_ =
         card_->AddChildView(std::make_unique<views::WebView>(context));
 
@@ -255,58 +242,67 @@ class PeekView final : public views::View {
     expand_ = AddChildView(std::make_unique<RoundButton>(
         base::BindRepeating(trigger_, foundation::PeekTrigger::ExpandButton),
         kPeekExpandIcon, u"Open in New Tab"));
+    split_ = AddChildView(std::make_unique<RoundButton>(
+        base::BindRepeating(trigger_, foundation::PeekTrigger::SplitButton),
+        kPeekSplitIcon, u"Open in Split View"));
+    animation_.SetTweenType(gfx::Tween::FAST_OUT_SLOW_IN);
   }
 
   views::WebView* web_view() { return web_view_; }
 
-  void Update(content::WebContents& contents) {
-    auto& controller = contents.GetController();
-    back_->SetEnabled(controller.CanGoBack());
-    forward_->SetEnabled(controller.CanGoForward());
-    const GURL& url = contents.GetVisibleURL();
-    host_->SetText(base::UTF8ToUTF16(url.has_host() ? std::string(url.host())
-                                                    : url.spec()));
-    const security_state::SecurityLevel level =
-        chrome_security_state::GetSecurityLevel(&contents);
-    const bool secure = level == security_state::SECURE;
-    const bool web = url.SchemeIsHTTPOrHTTPS();
-    security_->SetImage(ui::ImageModel::FromVectorIcon(
-        secure ? kPeekLockIcon : (web ? kPeekNotSecureIcon : kInfoIcon),
-        secure || !web ? kInk : kWarningInk, 14));
-    const std::u16string state =
-        secure ? u"Connection is secure"
-               : (web ? u"Not secure" : u"Browser page");
-    security_->SetTooltipText(state);
-    security_->GetViewAccessibility().SetName(state);
+  // Grows the card out of `from`, a point in this view, or scales it in
+  // from its centre. Reduce Motion shows it at once.
+  void AnimateIn(std::optional<gfx::Point> from) {
+    from_ = from;
+    if (gfx::Animation::PrefersReducedMotion()) {
+      animation_.Reset(1);
+      SetProgress(1);
+      return;
+    }
+    animation_.SetSlideDuration(kOpenDuration);
+    animation_.Reset(0);
+    SetProgress(0);
+    animation_.Show();
+  }
+
+  // Shrinks the card back to where it came from, then runs `done`. Reduce
+  // Motion runs `done` at once.
+  void AnimateOut(base::OnceClosure done) {
+    closing_ = true;
+    done_ = std::move(done);
+    if (gfx::Animation::PrefersReducedMotion()) {
+      std::move(done_).Run();  // Deletes this.
+      return;
+    }
+    animation_.SetSlideDuration(kCloseDuration);
+    SetProgress(animation_.GetCurrentValue());
+    animation_.Hide();
   }
 
   void Layout(PassKey) override {
     card_->SetBoundsRect(CardBounds());
-    const int y = (kHeaderHeight - kHeaderButton) / 2;
-    int x = 6;
-    for (views::View* button : {back_.get(), forward_.get(), reload_.get()}) {
-      button->SetBounds(x, y, kHeaderButton, kHeaderButton);
-      x += kHeaderButton;
-    }
-    x += 8;
-    security_->SetBounds(x, 0, 16, kHeaderHeight);
-    x += 22;
-    host_->SetBounds(x, 0, std::max(0, card_->width() - x - 12),
-                     kHeaderHeight);
-    web_view_->SetBounds(0, kHeaderHeight, card_->width(),
-                         std::max(0, card_->height() - kHeaderHeight));
+    web_view_->SetBoundsRect(card_->GetLocalBounds());
     web_view_->holder()->SetNativeViewCornerRadii(
-        gfx::RoundedCornersF(0, 0, kCardRadius, kCardRadius));
+        gfx::RoundedCornersF(kCardRadius));
 
     const gfx::Rect card = card_->bounds();
     const int buttons_x = card.right() + kRoundButtonMargin;
-    close_->SetBounds(buttons_x, card.y() + 4, kRoundButton, kRoundButton);
+    close_->SetBounds(buttons_x, card.y() + kRoundButtonTop, kRoundButton,
+                      kRoundButton);
     expand_->SetBounds(buttons_x, close_->bounds().bottom() + kRoundButtonGap,
                        kRoundButton, kRoundButton);
+    split_->SetBounds(buttons_x, expand_->bounds().bottom() + kRoundButtonGap,
+                      kRoundButton, kRoundButton);
+    SetProgress(progress_);
   }
 
   void OnPaint(gfx::Canvas* canvas) override {
-    canvas->DrawColor(kScrim);
+    canvas->DrawColor(SkColorSetA(
+        kScrim, static_cast<U8CPU>(SkColorGetA(kScrim) * progress_)));
+    // The card's layer carries it while it moves; its shadow joins it at rest.
+    if (progress_ < 1) {
+      return;
+    }
     cc::PaintFlags shadow;
     shadow.setAntiAlias(true);
     shadow.setColor(kCard);
@@ -314,23 +310,57 @@ class PeekView final : public views::View {
         {gfx::ShadowValue(gfx::Vector2d(0, 6), 28,
                           SkColorSetA(SK_ColorBLACK, 0x45))}));
     canvas->DrawRoundRect(card_->bounds(), kCardRadius, shadow);
-    for (views::View* button : {close_.get(), expand_.get()}) {
-      shadow.setLooper(gfx::CreateShadowDrawLooper(
-          {gfx::ShadowValue(gfx::Vector2d(0, 1), 6,
-                            SkColorSetA(SK_ColorBLACK, 0x40))}));
-      canvas->DrawRoundRect(button->bounds(), kRoundButton / 2, shadow);
-    }
   }
 
   bool OnMousePressed(const ui::MouseEvent& event) override {
-    // Buttons take their own presses; the rest of the card ignores them.
-    if (!card_->bounds().Contains(event.location())) {
+    // Buttons take their own presses; the rest of the card ignores them, and
+    // a closing card ignores everything.
+    if (!closing_ && !card_->bounds().Contains(event.location())) {
       trigger_.Run(foundation::PeekTrigger::OutsideClick);
     }
     return true;
   }
 
  private:
+  // gfx::AnimationDelegate:
+  void AnimationProgressed(const gfx::Animation* animation) override {
+    SetProgress(animation->GetCurrentValue());
+  }
+  void AnimationEnded(const gfx::Animation* animation) override {
+    SetProgress(animation->GetCurrentValue());
+    if (closing_ && done_ && animation->GetCurrentValue() == 0) {
+      // Posted: running it deletes this view and the animation calling here.
+      base::SingleThreadTaskRunner::GetCurrentDefault()->PostTask(
+          FROM_HERE, std::move(done_));
+    }
+  }
+
+  // 0 is a speck at `from_` with no scrim, 1 the card at rest. The page and
+  // the round buttons show only at rest: the page is a native view that
+  // can't scale with the card's layer.
+  void SetProgress(double progress) {
+    progress_ = progress;
+    const gfx::Rect card = CardBounds();
+    const gfx::PointF end = gfx::RectF(card).CenterPoint();
+    const gfx::PointF start =
+        from_ && GetLocalBounds().Contains(*from_) ? gfx::PointF(*from_) : end;
+    const float t = static_cast<float>(progress);
+    const float scale = kStartScale + (1 - kStartScale) * t;
+    gfx::Transform transform;
+    transform.Translate(start.x() + (end.x() - start.x()) * t - card.x(),
+                        start.y() + (end.y() - start.y()) * t - card.y());
+    transform.Scale(scale, scale);
+    transform.Translate(-card.width() / 2.f, -card.height() / 2.f);
+    card_->layer()->SetTransform(transform);
+    card_->layer()->SetOpacity(std::min(1.f, 2 * t));
+    const bool rest = progress >= 1 && !closing_;
+    web_view_->SetVisible(rest);
+    for (views::View* button : {close_.get(), expand_.get(), split_.get()}) {
+      button->SetVisible(rest);
+    }
+    SchedulePaint();
+  }
+
   gfx::Rect CardBounds() const {
     const int room = width() - 2 * (kRoundButton + 2 * kRoundButtonMargin);
     const int card_width =
@@ -340,33 +370,18 @@ class PeekView final : public views::View {
                      std::max(0, height() - 2 * kCardInset));
   }
 
-  content::WebContents* page() { return web_view_->GetWebContents(); }
-  void GoBack() {
-    if (page() && page()->GetController().CanGoBack()) {
-      page()->GetController().GoBack();
-    }
-  }
-  void GoForward() {
-    if (page() && page()->GetController().CanGoForward()) {
-      page()->GetController().GoForward();
-    }
-  }
-  void Reload() {
-    if (page()) {
-      page()->GetController().Reload(content::ReloadType::NORMAL, true);
-    }
-  }
-
   TriggerCallback trigger_;
   raw_ptr<views::View> card_ = nullptr;
-  raw_ptr<views::Button> back_ = nullptr;
-  raw_ptr<views::Button> forward_ = nullptr;
-  raw_ptr<views::Button> reload_ = nullptr;
-  raw_ptr<views::ImageView> security_ = nullptr;
-  raw_ptr<views::Label> host_ = nullptr;
   raw_ptr<views::WebView> web_view_ = nullptr;
   raw_ptr<views::Button> close_ = nullptr;
   raw_ptr<views::Button> expand_ = nullptr;
+  raw_ptr<views::Button> split_ = nullptr;
+  gfx::SlideAnimation animation_{this};
+  double progress_ = 1;
+  std::optional<gfx::Point> from_;
+  // Set while the card shrinks away; `done_` runs once it's gone.
+  bool closing_ = false;
+  base::OnceClosure done_;
 };
 
 BEGIN_METADATA(PeekView)
@@ -386,7 +401,10 @@ PeekController::PeekController(BrowserWindowInterface& browser,
 }
 
 PeekController::~PeekController() {
-  Close();
+  if (contents_) {
+    Detach(/*animate=*/false);
+  }
+  RemoveClosingView();
   std::erase(Controllers(), this);
 }
 
@@ -409,35 +427,57 @@ void PeekController::MaybeAddThrottle(
   }
 }
 
-bool PeekController::ShouldPeek(content::WebContents& tab,
-                                const GURL& to) const {
+bool PeekController::CanReopen() const {
+  return foundation::can_reopen_peek(*reopen_);
+}
+
+foundation::PeekRoute PeekController::Route(content::WebContents& tab,
+                                            const GURL& to) const {
   if (browser_->GetTabStripModel()->GetIndexOfWebContents(&tab) ==
       TabStripModel::kNoTab) {
-    return false;
+    return foundation::PeekRoute::CurrentTab;
   }
   const std::optional<foundation::PlacementKind> placement =
       adapter_->PlacementOf(tab);
   if (!placement) {
-    return false;
+    return foundation::PeekRoute::CurrentTab;
   }
   const GURL& from = tab.GetLastCommittedURL();
-  // A Cmd-click asks for a new tab before it gets here, and the Advanced
-  // setting that turns Peek off doesn't exist yet, so Peek is on.
+  // A Cmd-click asks for a new tab before it gets here.
   return foundation::route_peek_navigation(
-             *placement, std::string(from.scheme()), SiteKey(from),
-             std::string(to.scheme()), SiteKey(to), /*new_tab=*/false,
-             /*peek_enabled=*/true) == foundation::PeekRoute::Peek;
+      *placement, std::string(from.scheme()), SiteKey(from),
+      std::string(to.scheme()), SiteKey(to), /*new_tab=*/false,
+      IsPeekEnabled(g_browser_process->local_state()));
 }
 
 void PeekController::Open(const GURL& url, const content::Referrer& referrer) {
   Close();
+  // A new Peek replaces the one Cmd+Shift+T could bring back.
+  ForgetClosed();
+  content::WebContents::CreateParams params(browser_->GetProfile());
+  std::unique_ptr<content::WebContents> contents =
+      content::WebContents::Create(params);
+  content::NavigationController::LoadURLParams load(url);
+  load.referrer = referrer;
+  load.transition_type = ui::PAGE_TRANSITION_LINK;
+  contents->GetController().LoadURLWithParams(load);
+  // The card grows out of the link the pointer just clicked.
+  gfx::Point cursor = display::Screen::Get()->GetCursorScreenPoint();
+  views::View::ConvertPointFromScreen(host_, &cursor);
+  Show(std::move(contents), cursor);
+}
+
+void PeekController::Show(std::unique_ptr<content::WebContents> contents,
+                          std::optional<gfx::Point> grow_from) {
+  RemoveClosingView();
   auto sidebar = adapter_->Sidebar();
   if (!sidebar.ok || !area_) {
     return;
   }
   space_ = sidebar.current_space.id;
-  content::WebContents::CreateParams params(browser_->GetProfile());
-  contents_ = content::WebContents::Create(params);
+  content::WebContents* tab = ActiveTab();
+  source_item_ = tab ? BrowserWorkspaceAdapter::ItemIdForContents(*tab) : 0;
+  contents_ = std::move(contents);
   contents_->SetDelegate(this);
 
   auto view = std::make_unique<PeekView>(
@@ -447,6 +487,10 @@ void PeekController::Open(const GURL& url, const content::Referrer& referrer) {
   view->web_view()->SetWebContents(contents_.get());
   view_ = host_->AddChildView(std::move(view));
   view_->SetBoundsRect(area_->bounds());
+  if (grow_from) {
+    grow_from->Offset(-area_->x(), -area_->y());
+  }
+  view_->AnimateIn(grow_from);
 
   // The pages beneath, both panes of a split included, take no input while
   // the card is up; pressing on one closes it.
@@ -469,11 +513,8 @@ void PeekController::Open(const GURL& url, const content::Referrer& referrer) {
         weak_factory_.GetWeakPtr())));
   }
 
-  content::NavigationController::LoadURLParams load(url);
-  load.referrer = referrer;
-  load.transition_type = ui::PAGE_TRANSITION_LINK;
-  contents_->GetController().LoadURLWithParams(load);
-  view_->Update(*contents_);
+  // A reopened page loads its last entry again now that it shows.
+  contents_->GetController().LoadIfNecessary();
   view_->web_view()->RequestFocus();
 }
 
@@ -481,17 +522,22 @@ void PeekController::Trigger(foundation::PeekTrigger trigger) {
   if (!is_open()) {
     return;
   }
-  if (foundation::peek_action(trigger) ==
-      foundation::PeekActionKind::OpenInTab) {
-    Expand();
-  } else {
-    Close();
+  switch (foundation::peek_action(trigger)) {
+    case foundation::PeekActionKind::OpenInTab:
+      Expand();
+      break;
+    case foundation::PeekActionKind::OpenInSplit:
+      SplitBesideSource();
+      break;
+    default:
+      Close(trigger);
+      break;
   }
 }
 
 bool PeekController::HandleCommand(int command) {
   if (!is_open()) {
-    return false;
+    return command == IDC_RESTORE_TAB && Reopen();
   }
   switch (command) {
     case IDC_CLOSE_TAB:
@@ -505,38 +551,108 @@ bool PeekController::HandleCommand(int command) {
   }
 }
 
-void PeekController::Close() {
-  if (!contents_) {
-    return;
-  }
+std::unique_ptr<content::WebContents> PeekController::Detach(bool animate) {
   ignored_.clear();
   std::unique_ptr<content::WebContents> contents = std::move(contents_);
   contents->SetDelegate(nullptr);
   if (view_) {
     view_->web_view()->SetWebContents(nullptr);
-    host_->RemoveChildViewT(std::exchange(view_, nullptr));
+    PeekView* view = std::exchange(view_, nullptr);
+    if (animate) {
+      RemoveClosingView();
+      closing_view_ = view;
+      // Runs at once under Reduce Motion.
+      view->AnimateOut(base::BindOnce(&PeekController::RemoveClosingView,
+                                      weak_factory_.GetWeakPtr()));
+    } else {
+      host_->RemoveChildViewT(view);
+    }
   }
-  // The pinned page beneath gets its focus back. The card's WebContents goes
-  // with `contents`, never touching the tab strip or the workspace.
+  return contents;
+}
+
+void PeekController::RemoveClosingView() {
+  if (closing_view_) {
+    host_->RemoveChildViewT(std::exchange(closing_view_, nullptr));
+  }
+}
+
+void PeekController::ForgetClosed() {
+  foundation::forget_closed_peek(*reopen_);
+  closed_.reset();
+}
+
+void PeekController::Close(std::optional<foundation::PeekTrigger> trigger) {
+  if (!contents_) {
+    return;
+  }
+  std::unique_ptr<content::WebContents> contents = Detach(/*animate=*/true);
+  foundation::peek_closed(*reopen_, trigger.has_value(),
+                          trigger.value_or(foundation::PeekTrigger::Escape),
+                          space_, source_item_);
+  // A copy keeps the page's history for Cmd+Shift+T without its renderer;
+  // the page itself goes with `contents`, never touching the tab strip or
+  // the workspace.
+  closed_ = foundation::can_reopen_peek(*reopen_) ? contents->Clone() : nullptr;
+  // The pinned page beneath gets its focus back.
   if (content::WebContents* tab = ActiveTab()) {
     tab->Focus();
   }
+}
+
+bool PeekController::Reopen() {
+  content::WebContents* tab = ActiveTab();
+  auto sidebar = adapter_->Sidebar();
+  const uint64_t item =
+      tab ? BrowserWorkspaceAdapter::ItemIdForContents(*tab) : 0;
+  const bool reopen =
+      sidebar.ok && closed_ &&
+      foundation::take_closed_peek(*reopen_, sidebar.current_space.id, item);
+  std::unique_ptr<content::WebContents> contents = std::move(closed_);
+  if (!reopen) {
+    ForgetClosed();
+    return false;
+  }
+  Show(std::move(contents), std::nullopt);
+  return true;
 }
 
 void PeekController::Expand() {
   if (!contents_) {
     return;
   }
-  ignored_.clear();
-  std::unique_ptr<content::WebContents> contents = std::move(contents_);
-  contents->SetDelegate(nullptr);
-  if (view_) {
-    view_->web_view()->SetWebContents(nullptr);
-    host_->RemoveChildViewT(std::exchange(view_, nullptr));
-  }
+  std::unique_ptr<content::WebContents> contents = Detach(/*animate=*/false);
+  ForgetClosed();
   // The page moves into the tab strip with its history, as exactly one new
   // Today tab of this Space.
   adapter_->AdoptAsTodayTab(contents);
+}
+
+void PeekController::SplitBesideSource() {
+  content::WebContents* source = ActiveTab();
+  if (!contents_ || !source) {
+    return;
+  }
+  // A split holds two Today tabs and the page beneath is a Pin or Favorite,
+  // which stays where it is. A copy of it, with its history, takes the left
+  // pane and the Peek page the right, as one new split row in Today.
+  std::unique_ptr<content::WebContents> left = source->Clone();
+  std::unique_ptr<content::WebContents> right = Detach(/*animate=*/false);
+  ForgetClosed();
+  const foundation::MutationResult peek = adapter_->AdoptAsTodayTab(right);
+  if (!peek.ok) {
+    LOG(ERROR) << "Peek could not open in Split View: "
+               << std::string(peek.error);
+    return;
+  }
+  // Showing the copy leaves the Peek page's row beside it.
+  const foundation::MutationResult copy = adapter_->AdoptAsTodayTab(left);
+  const foundation::MutationResult split =
+      copy.ok ? adapter_->OpenInSplitView(peek.id) : copy;
+  if (!split.ok) {
+    LOG(ERROR) << "Peek could not open in Split View: "
+               << std::string(split.error);
+  }
 }
 
 content::WebContents* PeekController::ActiveTab() const {
@@ -599,34 +715,13 @@ content::WebContents* PeekController::AddNewContents(
       user_gesture, was_blocked);
 }
 
-void PeekController::NavigationStateChanged(
-    content::WebContents* source,
-    content::InvalidateTypes changed_flags) {
-  if (view_ && source == contents_.get()) {
-    view_->Update(*source);
-  }
-}
-
-void PeekController::LoadingStateChanged(content::WebContents* source,
-                                         bool should_show_loading_ui) {
-  if (view_ && source == contents_.get()) {
-    view_->Update(*source);
-  }
-}
-
 void PeekController::CloseContents(content::WebContents* source) {
   if (source == contents_.get()) {
     // window.close() from the card's page; posted, as the page is mid-call.
     base::SingleThreadTaskRunner::GetCurrentDefault()->PostTask(
         FROM_HERE,
-        base::BindOnce(&PeekController::Close, weak_factory_.GetWeakPtr()));
-  }
-}
-
-void PeekController::VisibleSecurityStateChanged(
-    content::WebContents* source) {
-  if (view_ && source == contents_.get()) {
-    view_->Update(*source);
+        base::BindOnce(&PeekController::Close, weak_factory_.GetWeakPtr(),
+                       std::optional<foundation::PeekTrigger>()));
   }
 }
 
@@ -664,6 +759,10 @@ void PeekController::OnTabStripModelChanged(
   if (selection.active_tab_changed()) {
     Close();
   }
+  // A closed tab is newer than the closed Peek, so Cmd+Shift+T restores it.
+  if (change.type() == TabStripModelChange::kRemoved) {
+    ForgetClosed();
+  }
 }
 
 void PeekController::OnViewBoundsChanged(views::View* observed_view) {
@@ -673,7 +772,10 @@ void PeekController::OnViewBoundsChanged(views::View* observed_view) {
 }
 
 void PeekController::OnViewIsDeleting(views::View* observed_view) {
-  Close();
+  if (contents_) {
+    Detach(/*animate=*/false);
+  }
+  ForgetClosed();
   area_observation_.Reset();
   area_ = nullptr;
 }

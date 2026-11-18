@@ -1,5 +1,5 @@
 diff --git a/chrome/browser/ui/views/frame/browser_view.cc b/chrome/browser/ui/views/frame/browser_view.cc
-index 7b568f6de760af21d6e9d2aa44415a7cef617c51..8d0cf00f79fc8bfb0ef5ce48a0b9eee45be2c66b 100644
+index 7b568f6de760af21d6e9d2aa44415a7cef617c51..9134be089c359ac5015b7ce23e19bddeb6f93b1f 100644
 --- a/chrome/browser/ui/views/frame/browser_view.cc
 +++ b/chrome/browser/ui/views/frame/browser_view.cc
 @@ -22,6 +22,7 @@
@@ -2207,7 +2207,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..8d0cf00f79fc8bfb0ef5ce48a0b9eee4
  }
  
  void BrowserView::RemovedFromWidget() {
-@@ -5267,116 +7043,2818 @@ const views::View* BrowserView::GetViewByElementId(
+@@ -5267,116 +7043,2840 @@ const views::View* BrowserView::GetViewByElementId(
  ///////////////////////////////////////////////////////////////////////////////
  // BrowserView, ui::AcceleratorTarget overrides:
  
@@ -3045,19 +3045,41 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..8d0cf00f79fc8bfb0ef5ce48a0b9eee4
 +            page->GetPrimaryMainFrame()->ExecuteJavaScriptWithUserGestureForTests(
 +                u"document.querySelector('a').click()", base::NullCallback(),
 +                content::ISOLATED_WORLD_ID_GLOBAL);
-+            if (step != "close" && step != "expand") {
-+              return;
++            const auto later = [](base::WeakPtr<BrowserView> view,
++                                  int command, int ms) {
++              base::SingleThreadTaskRunner::GetCurrentDefault()
++                  ->PostDelayedTask(
++                      FROM_HERE,
++                      base::BindOnce(
++                          [](base::WeakPtr<BrowserView> view, int command) {
++                            if (!view) {
++                              return;
++                            }
++                            // 0 stands for Peek's Split View button.
++                            if (command == 0) {
++                              if (view->myarc_peek_) {
++                                view->myarc_peek_->Trigger(
++                                    myarc::foundation::PeekTrigger::
++                                        SplitButton);
++                              }
++                              return;
++                            }
++                            chrome::ExecuteCommand(view->browser_.get(),
++                                                   command);
++                          },
++                          view, command),
++                      base::Milliseconds(ms));
++            };
++            if (step == "close") {
++              later(view, IDC_CLOSE_TAB, 3000);
++            } else if (step == "expand") {
++              later(view, IDC_OPEN_FILE, 3000);
++            } else if (step == "split") {
++              later(view, 0, 3000);
++            } else if (step == "reopen") {
++              later(view, IDC_CLOSE_TAB, 3000);
++              later(view, IDC_RESTORE_TAB, 4500);
 +            }
-+            base::SingleThreadTaskRunner::GetCurrentDefault()->PostDelayedTask(
-+                FROM_HERE,
-+                base::BindOnce(
-+                    [](base::WeakPtr<BrowserView> view, int command) {
-+                      if (view) {
-+                        chrome::ExecuteCommand(view->browser_.get(), command);
-+                      }
-+                    },
-+                    view, step == "close" ? IDC_CLOSE_TAB : IDC_OPEN_FILE),
-+                base::Milliseconds(3000));
 +          },
 +          myarc_workspace_weak_factory_.GetWeakPtr(),
 +          command_line->GetSwitchValueASCII("myarc-capture-peek")),
@@ -5107,7 +5129,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..8d0cf00f79fc8bfb0ef5ce48a0b9eee4
      auto controller = factory->CreateBookmarkBarController();
      detached_bookmark_bar_view_ = std::make_unique<BookmarkBarView>(
          browser_.get(), std::move(controller), this);
-@@ -5471,6 +9949,10 @@ bool BrowserView::MaybeUpdateDevtools(content::WebContents* contents) {
+@@ -5471,6 +9971,10 @@ bool BrowserView::MaybeUpdateDevtools(content::WebContents* contents) {
  
  void BrowserView::UpdateUIForContents(WebContents* contents,
                                        bool should_layout_immediately) {
@@ -5118,7 +5140,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..8d0cf00f79fc8bfb0ef5ce48a0b9eee4
    TRACE_EVENT0("ui", "BrowserView::UpdateUIForContents");
    bool needs_layout = MaybeShowBookmarkBar(contents);
  
-@@ -5706,6 +10188,26 @@ void BrowserView::LoadAccelerators() {
+@@ -5706,6 +10210,26 @@ void BrowserView::LoadAccelerators() {
    }
  
  #if BUILDFLAG(IS_MAC)

@@ -3,6 +3,7 @@
 
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <vector>
 
 #include "base/callback_list.h"
@@ -14,6 +15,7 @@
 #include "content/public/browser/web_contents_delegate.h"
 #include "content/public/common/referrer.h"
 #include "myarc/bridge.rs.h"
+#include "ui/gfx/geometry/point.h"
 #include "ui/views/view_observer.h"
 #include "url/gurl.h"
 
@@ -57,19 +59,24 @@ class PeekController final : public TabStripModelObserver,
   static void MaybeAddThrottle(content::NavigationThrottleRegistry& registry);
 
   bool is_open() const { return !!contents_; }
+  // Whether Cmd+Shift+T would bring back the Peek closed last.
+  bool CanReopen() const;
   base::WeakPtr<PeekController> GetWeakPtr() {
     return weak_factory_.GetWeakPtr();
   }
   content::WebContents* contents() const { return contents_.get(); }
-  // Whether Rust routes a link from `tab`, a tab of this window, to `to` into
-  // Peek. Tabs without a sidebar row never Peek.
-  bool ShouldPeek(content::WebContents& tab, const GURL& to) const;
+  // Where Rust routes a link from `tab`, a tab of this window, to `to`:
+  // Peek, or a new tab when Settings > Links turns Peek off. Tabs without
+  // a sidebar row, and tabs of other windows, stay as they are.
+  foundation::PeekRoute Route(content::WebContents& tab, const GURL& to) const;
   // Opens `url` in the card, replacing an open Peek.
   void Open(const GURL& url, const content::Referrer& referrer);
   // Runs what Rust says `trigger` does. Does nothing while closed.
   void Trigger(foundation::PeekTrigger trigger);
   // Cmd+W (IDC_CLOSE_TAB) closes an open Peek and Cmd+O (IDC_OPEN_FILE)
-  // expands it, instead of acting on the tab beneath. True when handled.
+  // expands it, instead of acting on the tab beneath. With no Peek open,
+  // Cmd+Shift+T (IDC_RESTORE_TAB) brings back the Peek closed last when Rust
+  // says it can. True when handled.
   bool HandleCommand(int command);
 
   // content::WebContentsDelegate:
@@ -86,12 +93,7 @@ class PeekController final : public TabStripModelObserver,
       const blink::mojom::WindowFeatures& window_features,
       bool user_gesture,
       bool* was_blocked) override;
-  void NavigationStateChanged(content::WebContents* source,
-                              content::InvalidateTypes changed_flags) override;
-  void LoadingStateChanged(content::WebContents* source,
-                           bool should_show_loading_ui) override;
   void CloseContents(content::WebContents* source) override;
-  void VisibleSecurityStateChanged(content::WebContents* source) override;
   content::KeyboardEventProcessingResult PreHandleKeyboardEvent(
       content::WebContents* source,
       const input::NativeWebKeyboardEvent& event) override;
@@ -99,8 +101,23 @@ class PeekController final : public TabStripModelObserver,
                            const input::NativeWebKeyboardEvent& event) override;
 
  private:
-  void Close();
+  // Ends the Peek. `trigger` is what the user pressed, or nullopt when
+  // something else ended it; only a user's close can be reopened.
+  void Close(std::optional<foundation::PeekTrigger> trigger = std::nullopt);
   void Expand();
+  void SplitBesideSource();
+  bool Reopen();
+  // Shows `contents` in a new card. `grow_from`, in window coordinates, is
+  // where the open animation starts; nullopt scales the card in from its
+  // centre.
+  void Show(std::unique_ptr<content::WebContents> contents,
+            std::optional<gfx::Point> grow_from);
+  // Takes the page out of the card and the card off the window, the card
+  // shrinking away first when `animate`.
+  std::unique_ptr<content::WebContents> Detach(bool animate);
+  void RemoveClosingView();
+  // Drops the closed Peek, in Rust and its kept page.
+  void ForgetClosed();
   // The tab beneath. Its delegate, the Browser, handles the keys and new
   // tabs the card's page passes on.
   content::WebContents* ActiveTab() const;
@@ -122,6 +139,14 @@ class PeekController final : public TabStripModelObserver,
   const raw_ptr<BrowserWorkspaceAdapter> adapter_;
   std::unique_ptr<content::WebContents> contents_;
   raw_ptr<PeekView> view_ = nullptr;
+  // A card shrinking away after its page left; removed when it finishes.
+  raw_ptr<PeekView> closing_view_ = nullptr;
+  // The page of the Peek closed last, with its history but no renderer
+  // running until it comes back.
+  std::unique_ptr<content::WebContents> closed_;
+  rust::Box<foundation::PeekReopen> reopen_ = foundation::new_peek_reopen();
+  // The sidebar item the open Peek came from.
+  uint64_t source_item_ = 0;
   // The Space shown when Peek opened; switching Space closes it.
   uint64_t space_ = 0;
   // Pages beneath ignore input while the card is up; a press on them is a

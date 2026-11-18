@@ -45,6 +45,8 @@
 #include "ui/gfx/geometry/rect.h"
 #include "ui/gfx/geometry/rect_f.h"
 #include "ui/gfx/geometry/size.h"
+#include "ui/gfx/image/image_skia.h"
+#include "ui/gfx/paint_vector_icon.h"
 #include "ui/gfx/scoped_canvas.h"
 #include "ui/gfx/vector_icon_types.h"
 #include "ui/menus/simple_menu_model.h"
@@ -154,6 +156,15 @@ constexpr gfx::PathElement kHeartPath[] = {
     gfx::R_CUBIC_TO, -1.5f, -1.5f, -3, -3.2f, -3, -5.5f,
     gfx::CLOSE};
 
+// Lucide "picture-in-picture-2", a card over a page, for the Peek row.
+constexpr gfx::PathElement kPeekRowPath[] = {
+    gfx::CANVAS_DIMENSIONS, 24, gfx::STROKE, 2,
+    gfx::MOVE_TO, 21, 9, gfx::V_LINE_TO, 6,
+    gfx::ARC_TO, 2, 2, 0, 0, 0, 19, 4, gfx::H_LINE_TO, 4,
+    gfx::ARC_TO, 2, 2, 0, 0, 0, 2, 6, gfx::V_LINE_TO, 16,
+    gfx::ARC_TO, 2, 2, 0, 0, 0, 4, 18, gfx::H_LINE_TO, 8,
+    gfx::NEW_PATH, gfx::STROKE, 2, gfx::ROUND_RECT, 12, 13, 10, 7, 2};
+
 #define MYARC_ICON(name, path)                                   \
   constexpr gfx::VectorIconRep name##Rep[] = {{path}};           \
   constexpr gfx::VectorIcon name(name##Rep, std::size(name##Rep), \
@@ -165,6 +176,7 @@ MYARC_ICON(kKeyboardIcon, kKeyboardPath);
 MYARC_ICON(kSlidersIcon, kSlidersPath);
 MYARC_ICON(kHeartIcon, kHeartPath);
 MYARC_ICON(kChevronsUpDownIcon, kChevronsUpDownPath);
+MYARC_ICON(kPeekRowIcon, kPeekRowPath);
 #undef MYARC_ICON
 
 // Measured from Arc's dark Settings window at 2x (DIP).
@@ -226,6 +238,18 @@ constexpr SkColor kGrayButton = SkColorSetRGB(0x45, 0x45, 0x46);
 constexpr SkColor kButtonText = SkColorSetRGB(0xE3, 0xE3, 0xE3);
 constexpr SkColor kSwitchTrack = SkColorSetRGB(0x37, 0x37, 0x38);
 constexpr SkColor kSwitchKnob = SkColorSetRGB(0xC8, 0xC8, 0xC8);
+// Arc's grouped switch rows: a 20 DIP rounded tile 10 DIP in, the label 8 DIP
+// after it, rows 41 DIP tall, or 50 with a second grey line, and a hairline
+// between rows from the tile's left edge.
+constexpr int kTileSize = 20;
+constexpr float kTileRadius = 5;
+constexpr int kTileIcon = 13;
+constexpr int kGroupPad = 10;
+constexpr int kGroupGap = 8;
+constexpr int kGroupRowHeight = 41;
+constexpr int kGroupTallRowHeight = 50;
+constexpr SkColor kTileBlue = SkColorSetRGB(0x0A, 0x84, 0xFF);
+constexpr SkColor kTileGreen = SkColorSetRGB(0x30, 0xC1, 0x59);
 // myArc brand colors (design.md): ivory name and quiet grays. The card is
 // frosted glass tinted by the ribbon's blue, violet, pink and orange.
 constexpr SkColor kBrandName = SkColorSetRGB(0xF5, 0xF2, 0xEC);
@@ -843,8 +867,119 @@ class AdvancedPage : public views::View {
 BEGIN_METADATA(AdvancedPage)
 END_METADATA
 
-// Links: Arc's Little Arc section. Its switch decides whether links other
-// apps open go to Little Arc or to a main window as tabs.
+// One row of Arc's grouped switch card: a coloured tile with a white symbol,
+// a label with an optional grey line under it, and a switch at the right.
+class SwitchRow : public views::View {
+  METADATA_HEADER(SwitchRow, views::View)
+
+ public:
+  SwitchRow(const gfx::VectorIcon& icon,
+            SkColor tile,
+            std::u16string label,
+            std::u16string detail,
+            views::Button::PressedCallback toggle)
+      : tile_(tile) {
+    icon_ = gfx::CreateVectorIcon(icon, kTileIcon, SK_ColorWHITE);
+    label_ = AddLabel(this, label, 13, gfx::Font::Weight::NORMAL, kCardText);
+    label_->SetHorizontalAlignment(gfx::ALIGN_LEFT);
+    if (!detail.empty()) {
+      detail_ = AddLabel(this, detail, 11, gfx::Font::Weight::NORMAL, kTabText);
+      detail_->SetHorizontalAlignment(gfx::ALIGN_LEFT);
+    }
+    switch_ = AddChildView(std::make_unique<Switch>(std::move(toggle), label));
+  }
+
+  Switch* toggle() { return switch_; }
+  int RowHeight() const {
+    return detail_ ? kGroupTallRowHeight : kGroupRowHeight;
+  }
+
+  void Layout(PassKey) override {
+    const gfx::Size size = switch_->GetPreferredSize();
+    switch_->SetBounds(width() - kGroupPad - size.width(),
+                       (height() - size.height()) / 2, size.width(),
+                       size.height());
+    const int x = kGroupPad + kTileSize + kGroupGap;
+    const int text_width = std::max(0, switch_->x() - kGroupGap - x);
+    const int label_height = label_->GetPreferredSize().height();
+    if (!detail_) {
+      label_->SetBounds(x, (height() - label_height) / 2, text_width,
+                        label_height);
+      return;
+    }
+    const int detail_height = detail_->GetPreferredSize().height();
+    const int top = (height() - label_height - detail_height) / 2;
+    label_->SetBounds(x, top, text_width, label_height);
+    detail_->SetBounds(x, top + label_height, text_width, detail_height);
+  }
+
+  void OnPaint(gfx::Canvas* canvas) override {
+    const gfx::Rect tile(kGroupPad, (height() - kTileSize) / 2, kTileSize,
+                         kTileSize);
+    PaintPanel(canvas, tile, kTileRadius, tile_, std::nullopt);
+    canvas->DrawImageInt(icon_, tile.x() + (kTileSize - icon_.width()) / 2,
+                         tile.y() + (kTileSize - icon_.height()) / 2);
+  }
+
+ private:
+  const SkColor tile_;
+  gfx::ImageSkia icon_;
+  raw_ptr<views::Label> label_ = nullptr;
+  raw_ptr<views::Label> detail_ = nullptr;
+  raw_ptr<Switch> switch_ = nullptr;
+};
+
+BEGIN_METADATA(SwitchRow)
+END_METADATA
+
+// Arc's grouped card: rows stacked in one rounded panel, a hairline between
+// each pair from the rows' tile edge to their right padding.
+class SwitchGroup : public Panel {
+  METADATA_HEADER(SwitchGroup, Panel)
+
+ public:
+  SwitchGroup() : Panel(kCardFill, kCardStroke, kCardRadius) {}
+
+  SwitchRow* AddRow(std::unique_ptr<SwitchRow> row) {
+    rows_.push_back(AddChildView(std::move(row)));
+    return rows_.back();
+  }
+
+  int GroupHeight() const {
+    int height = 0;
+    for (const SwitchRow* row : rows_) {
+      height += row->RowHeight();
+    }
+    return height;
+  }
+
+  void Layout(PassKey) override {
+    int y = 0;
+    for (SwitchRow* row : rows_) {
+      row->SetBounds(0, y, width(), row->RowHeight());
+      y += row->RowHeight();
+    }
+  }
+
+  void OnPaintBackground(gfx::Canvas* canvas) override {
+    Panel::OnPaintBackground(canvas);
+    for (size_t i = 0; i + 1 < rows_.size(); ++i) {
+      canvas->FillRect(gfx::Rect(kGroupPad, rows_[i]->bounds().bottom(),
+                                 width() - 2 * kGroupPad, 1),
+                       kCardStroke);
+    }
+  }
+
+ private:
+  std::vector<raw_ptr<SwitchRow>> rows_;
+};
+
+BEGIN_METADATA(SwitchGroup)
+END_METADATA
+
+// Links: Arc's Little Arc and Peek switches. One decides whether links other
+// apps open go to Little Arc or to a main window as tabs, the other whether
+// links from pinned tabs to other sites open in Peek or in a new tab.
 class LinksPage : public views::View {
   METADATA_HEADER(LinksPage, views::View)
 
@@ -858,21 +993,26 @@ class LinksPage : public views::View {
         13, gfx::Font::Weight::NORMAL, kCardText);
     intro_->SetHorizontalAlignment(gfx::ALIGN_LEFT);
     intro_->SetMultiLine(true);
-    auto links_switch = std::make_unique<Switch>(
-        base::BindRepeating(&LinksPage::Toggle, base::Unretained(this)),
-        kLinksLabel);
-    switch_ = links_switch.get();
-    panel_ = AddRowPanel(this, kLinksLabel, /*multi_line=*/false,
-                         std::move(links_switch));
-    static_cast<views::BoxLayout*>(panel_->GetLayoutManager())
-        ->set_inside_border_insets(gfx::Insets::VH(0, kBannerPad));
+    group_ = AddChildView(std::make_unique<SwitchGroup>());
+    little_arc_ = group_->AddRow(std::make_unique<SwitchRow>(
+        kAppWindowIcon, kTileGreen, u"Links from other apps open in Little Arc",
+        std::u16string(),
+        base::BindRepeating(&LinksPage::ToggleLittleArc,
+                            base::Unretained(this))));
+    // Arc's own Links switch for Peek, with its wording.
+    peek_ = group_->AddRow(std::make_unique<SwitchRow>(
+        kPeekRowIcon, kTileBlue,
+        u"Open a Peek window when clicking on links to other sites",
+        u"Links in pinned tabs and Favorites. Off, they open in a new tab.",
+        base::BindRepeating(&LinksPage::TogglePeek, base::Unretained(this))));
     if (local_state_) {
       registrar_.Init(local_state_);
-      registrar_.Add(kLittleArcLinksPref,
-                     base::BindRepeating(&LinksPage::UpdateSwitch,
-                                         base::Unretained(this)));
+      const auto update = base::BindRepeating(&LinksPage::UpdateSwitches,
+                                              base::Unretained(this));
+      registrar_.Add(kLittleArcLinksPref, update);
+      registrar_.Add(kPeekEnabledPref, update);
     }
-    UpdateSwitch();
+    UpdateSwitches();
   }
 
   void Layout(PassKey) override {
@@ -880,33 +1020,39 @@ class LinksPage : public views::View {
     const int text_width = panel_width - 2 * kBannerPad;
     intro_->SetBounds(kSideMargin + kBannerPad, kContentTop, text_width,
                       intro_->GetHeightForWidth(text_width));
-    panel_->SetBounds(kSideMargin, intro_->bounds().bottom() + 16, panel_width,
-                      kSwitchRowHeight);
+    group_->SetBounds(kSideMargin, intro_->bounds().bottom() + 16, panel_width,
+                      group_->GroupHeight());
   }
 
  private:
-  static constexpr char16_t kLinksLabel[] =
-      u"Links from other apps open in Little Arc";
-
-  void UpdateSwitch() {
-    switch_->SetOn(IsLittleArcLinksEnabled(local_state_));
-    switch_->SetEnabled(local_state_ != nullptr);
+  void UpdateSwitches() {
+    little_arc_->toggle()->SetOn(IsLittleArcLinksEnabled(local_state_));
+    peek_->toggle()->SetOn(IsPeekEnabled(local_state_));
+    little_arc_->toggle()->SetEnabled(local_state_ != nullptr);
+    peek_->toggle()->SetEnabled(local_state_ != nullptr);
   }
 
-  void Toggle() {
-    if (!local_state_) {
-      return;
+  void ToggleLittleArc() {
+    if (local_state_) {
+      local_state_->SetBoolean(kLittleArcLinksPref,
+                               !IsLittleArcLinksEnabled(local_state_));
+      UpdateSwitches();
     }
-    local_state_->SetBoolean(kLittleArcLinksPref,
-                             !IsLittleArcLinksEnabled(local_state_));
-    UpdateSwitch();
+  }
+
+  void TogglePeek() {
+    if (local_state_) {
+      local_state_->SetBoolean(kPeekEnabledPref, !IsPeekEnabled(local_state_));
+      UpdateSwitches();
+    }
   }
 
   const raw_ptr<PrefService> local_state_;
   PrefChangeRegistrar registrar_;
   raw_ptr<views::Label> intro_ = nullptr;
-  raw_ptr<Panel> panel_ = nullptr;
-  raw_ptr<Switch> switch_ = nullptr;
+  raw_ptr<SwitchGroup> group_ = nullptr;
+  raw_ptr<SwitchRow> little_arc_ = nullptr;
+  raw_ptr<SwitchRow> peek_ = nullptr;
 };
 
 BEGIN_METADATA(LinksPage)
