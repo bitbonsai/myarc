@@ -62,7 +62,7 @@ From 2026.11.13 on, the nightly carries `myarc` at `/Applications/myArc Nightly.
 sudo mkdir -p /usr/local/bin && sudo ln -sf "/Applications/myArc Nightly.app/Contents/Helpers/myarc" /usr/local/bin/myarc
 ```
 
-If macOS refuses to run it, clear the download's quarantine flag with `xattr -dr com.apple.quarantine "/Applications/myArc Nightly.app"`. To give Claude Code the MCP server in every project, run:
+To give Claude Code the MCP server in every project, run:
 
 ```sh
 claude mcp add --scope user myarc -- "/Applications/myArc Nightly.app/Contents/Helpers/myarc" mcp
