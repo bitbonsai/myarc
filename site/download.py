@@ -28,7 +28,7 @@ WORKS = [
     'Importing an Arc export from Settings > Advanced > Import from Arc. A preview shows what it will add, then each Space arrives with its folders and pinned tabs, in Arc\'s order. Importing the same file again adds nothing.',
     'Folders for a Space\'s pinned tabs. Create, rename and delete them from the right-click menu, and open or close them. Drag tabs in and out, and rename a pinned tab from its menu.',
     'Split View for two tabs side by side. Use Open in Split View in a tab\'s menu or Ctrl+Shift+=, and Ctrl+Shift+- to separate them. The split shows as one sidebar row and comes back after a restart.',
-    'Peek: a link from a pinned tab or Favorite to another site opens in a card over the page. Cmd+W or Esc closes it, and Cmd+O turns it into a tab.',
+    'Peek: a link from a pinned tab or Favorite to another site opens in a card over the page. Cmd+W or Esc closes it, Cmd+O turns it into a tab, a button splits it beside the pinned page, and Cmd+Shift+T reopens the last one closed. Settings > Links can turn it off.',
     'Ad and tracker blocking, on by default, with uBlock Origin Lite built in. Window > Ad Blocking for This Site… turns it off for one site. Private windows block only after you allow the extension there.',
     'Ctrl+Tab switches to your last tab, and holding Ctrl goes further back through the five most recent.',
     'Little Arc: links from other apps open in a small window, and Option-Cmd-N opens one. Open in <Space> or Cmd+O moves the page into your current Space. Settings > Links turns it off.',
