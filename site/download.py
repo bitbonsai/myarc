@@ -100,7 +100,6 @@ def limitations(release):
     return ['Built from a Chromium 158 development revision, not a stable release.',
             'No automatic updates and no security updates. Install each new nightly by hand.',
             'From 2026.11.03 on, nightlies are signed with an Apple Developer ID that later nightlies keep. macOS asks once more for your login password so it can read the saved-data key; choose Always Allow, and newer nightlies stop asking.',
-            'The app is signed with a Developer ID but not yet notarized by Apple.',
             'Recent tabs and navigation can be lost after a crash or force quit.',
             'Private window, Profile, cookie and credential guarantees are not verified.',
             'RAR downloads are not scanned by Safe Browsing, because the UnRAR license conflicts with GPL-3.0.',
@@ -113,8 +112,7 @@ def first_launch(release):
     name = release['dmg_url'].rsplit('/', 1)[1]
     return [('Check the download against the SHA-256 listed with it. The two values must match.', f'shasum -a 256 ~/Downloads/{name}'),
             ('Open the DMG and drag myArc Nightly to Applications.', None),
-            ('macOS blocks the first launch because the app is not notarized. Right-click myArc Nightly, choose Open, then Open again. If macOS only offers Done or Move to Trash, which macOS 15 and later usually does, open System Settings > Privacy & Security, scroll to the myArc Nightly message and choose Open Anyway.', None),
-            ('Or remove the quarantine flag in Terminal and open the app normally.', f'xattr -dr com.apple.quarantine "{APP}"')]
+            ('Open myArc Nightly. From 2026.11.18 on, Apple has notarized each nightly, so macOS only asks once whether to open an app downloaded from the internet. Choose Open.', None)]
 
 
 def release_notes(release):
@@ -154,7 +152,6 @@ def content(release):
     html += '<h2>What works today</h2><p>Each item was seen working in a native run or experiment note. None of it has had release testing.</p>' + item_list(WORKS)
     html += ('<h2>Known limitations</h2>'
              + item_list(['No automatic updates and no security updates. Install each new nightly by hand.',
-                          'Not yet notarized by Apple, so macOS blocks the first launch until you allow it.',
                           'Recent tabs and navigation can be lost after a crash or force quit.',
                           codecs(release)])
              + '<p><a href="/docs/known-limitations/">Known limitations</a> lists the rest, with what does not work yet and what to do after a crash.</p>')

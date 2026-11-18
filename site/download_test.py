@@ -44,7 +44,7 @@ class DownloadTests(unittest.TestCase):
         html = content(SAMPLE)
         self.assertIn(f'<a class="button" href="{SAMPLE["dmg_url"]}">Download for macOS (Apple silicon)</a>', html)
         for value in ('0.0.0-fake.1', 'January 2, 2099', '123.5 MB', SAMPLE['sha256'], 'shasum -a 256 ~/Downloads/myArc-Fake.dmg',
-                      'xattr -dr com.apple.quarantine &quot;/Applications/myArc Nightly.app&quot;'):
+                      'Apple has notarized each nightly'):
             self.assertIn(value, html)
         self.assertIn('H.264 and AAC are included', html)
         self.assertIn('H.264 and AAC are not included', content({**SAMPLE, 'proprietary_codecs': False}))
@@ -52,7 +52,8 @@ class DownloadTests(unittest.TestCase):
     def test_release_notes_share_the_page_warnings(self):
         notes = release_notes(SAMPLE)
         self.assertIn(SAMPLE['sha256'], notes)
-        self.assertIn('xattr -dr com.apple.quarantine "/Applications/myArc Nightly.app"', notes)
+        self.assertIn('Apple has notarized each nightly', notes)
+        self.assertNotIn('xattr', notes)
         for line in limitations(SAMPLE):
             self.assertIn(line, notes)
 
