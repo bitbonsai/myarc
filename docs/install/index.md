@@ -2,7 +2,7 @@ HTML: https://myarc.dev/docs/install/
 
 # Install myArc
 
-What your Mac needs, how to get past the first-launch warning, and how to move to a newer nightly.
+What your Mac needs, what macOS asks on first launch, and how to move to a newer nightly.
 
 myArc ships as a pre-alpha nightly, a build made from the latest code and published without release testing. Each nightly is a disk image (DMG) on the [download page](https://myarc.dev/download/).
 
@@ -23,15 +23,7 @@ myArc ships as a pre-alpha nightly, a build made from the latest code and publis
 
 ## First launch
 
-The app is signed with an Apple Developer ID but isn't notarized yet. Notarized means Apple has scanned the build. Without it, Gatekeeper, the part of macOS that checks downloaded apps, blocks the first launch.
-
-To open it anyway, right-click myArc Nightly in Applications, choose Open, then choose Open again. On macOS 15 and later the warning usually offers only Done or Move to Trash. In that case open System Settings \> Privacy \& Security, scroll to the message about myArc Nightly and choose Open Anyway.
-
-You can also remove the quarantine flag in Terminal and then open the app as usual:
-
-```
-xattr -dr com.apple.quarantine "/Applications/myArc Nightly.app"
-```
+Open myArc Nightly from Applications. From 2026.11.18 on, each nightly is signed with an Apple Developer ID and notarized, which means Apple has scanned the build. Gatekeeper, the part of macOS that checks downloaded apps, asks once whether to open an app from the internet. Choose Open.
 
 macOS may then ask for your login password so myArc can read the key that protects its saved data. Choose Always Allow. Nightlies from 2026.11.03 on are signed with the same Developer ID, so later nightlies stop asking.
 

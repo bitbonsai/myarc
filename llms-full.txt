@@ -6,7 +6,7 @@ HTML: https://myarc.dev/
 
 An open-source browser bringing back Arc, with no account required and optional AI.
 
-[Download pre-alphaNightly v2026.11.17.4](https://myarc.dev/download/)
+[Download pre-alphaNightly v2026.11.18](https://myarc.dev/download/)
 [See what works](https://github.com/bitbonsai/myarc#try-it)
 
 ## How you browse is part of how you work. It should outlast the company behind your browser.
@@ -42,7 +42,7 @@ An open-source browser bringing back Arc, with no account required and optional 
 
   Builds for Windows and Linux.
 
-[Download the 2026.11.17.4 nightly →](https://myarc.dev/download/) [Full alpha checklist →](https://github.com/bitbonsai/myarc/blob/main/docs/ALPHA.md)
+[Download the 2026.11.18 nightly →](https://myarc.dev/download/) [Full alpha checklist →](https://github.com/bitbonsai/myarc/blob/main/docs/ALPHA.md)
 
 ## Read along
 
@@ -121,12 +121,12 @@ HTML: https://myarc.dev/download/
 
 Pre-alpha nightly, for trying the Arc-like shell. Not for daily or sensitive browsing.
 
-[Download for macOS (Apple silicon)](https://github.com/bitbonsai/myarc/releases/download/nightly-2026.11.17.4/myArc-Nightly-2026.11.17.4-arm64.dmg)
+[Download for macOS (Apple silicon)](https://github.com/bitbonsai/myarc/releases/download/nightly-2026.11.18/myArc-Nightly-2026.11.18-arm64.dmg)
 
-- **Version:** 2026.11.17.4
-- **Date:** November 17, 2026
-- **Size:** 243.5 MB
-- **SHA-256:** `6d985ea1694faa3a26242f02b18ddcb670545a8b60ba6df135d994344f0e77bd`
+- **Version:** 2026.11.18
+- **Date:** November 18, 2026
+- **Size:** 243.4 MB
+- **SHA-256:** `608a9fd6dc3cd0857676b58df2b8f9369065e0d40bfbd6482a296abd18f97d3e`
 
 ## System requirements
 
@@ -138,15 +138,10 @@ Pre-alpha nightly, for trying the Arc-like shell. Not for daily or sensitive bro
 1. Check the download against the SHA-256 listed with it. The two values must match.
 
    ```
-   shasum -a 256 ~/Downloads/myArc-Nightly-2026.11.17.4-arm64.dmg
+   shasum -a 256 ~/Downloads/myArc-Nightly-2026.11.18-arm64.dmg
    ```
 2. Open the DMG and drag myArc Nightly to Applications.
-3. macOS blocks the first launch because the app is not notarized. Right-click myArc Nightly, choose Open, then Open again. If macOS only offers Done or Move to Trash, which macOS 15 and later usually does, open System Settings \> Privacy \& Security, scroll to the myArc Nightly message and choose Open Anyway.
-4. Or remove the quarantine flag in Terminal and open the app normally.
-
-   ```
-   xattr -dr com.apple.quarantine "/Applications/myArc Nightly.app"
-   ```
+3. Open myArc Nightly. From 2026.11.18 on, Apple has notarized each nightly, so macOS only asks once whether to open an app downloaded from the internet. Choose Open.
 
 ## What works today
 
@@ -174,7 +169,6 @@ Each item was seen working in a native run or experiment note. None of it has ha
 ## Known limitations
 
 - No automatic updates and no security updates. Install each new nightly by hand.
-- Not yet notarized by Apple, so macOS blocks the first launch until you allow it.
 - Recent tabs and navigation can be lost after a crash or force quit.
 - H.264 and AAC are included, so most other web video plays.
 
@@ -182,7 +176,7 @@ Each item was seen working in a native run or experiment note. None of it has ha
 
 ## Other ways to get it
 
-- [GitHub releases](https://github.com/bitbonsai/myarc/releases/tag/nightly-2026.11.17.4) lists every nightly.
+- [GitHub releases](https://github.com/bitbonsai/myarc/releases/tag/nightly-2026.11.18) lists every nightly.
 - [Source on GitHub](https://github.com/bitbonsai/myarc), with instructions to [build it from source](https://github.com/bitbonsai/myarc/blob/main/browser/README.md).
 - [GitHub issues](https://github.com/bitbonsai/myarc/issues) take bug reports. Include the version, your macOS version and the steps that trigger the problem, and leave out private pages.
 
@@ -203,7 +197,7 @@ How to move from Arc to myArc: install the nightly, import your Spaces, learn th
 
 - [Install myArc](https://myarc.dev/docs/install/)
 
-  What your Mac needs, how to get past the first-launch warning, and how to move to a newer nightly.
+  What your Mac needs, what macOS asks on first launch, and how to move to a newer nightly.
 - [Import from Arc](https://myarc.dev/docs/import-from-arc/)
 
   Export your Spaces from Arc, preview what myArc will add, and import them with their folders and pinned tabs. Importing the same file twice adds nothing.
@@ -243,7 +237,7 @@ HTML: https://myarc.dev/docs/install/
 
 # Install myArc
 
-What your Mac needs, how to get past the first-launch warning, and how to move to a newer nightly.
+What your Mac needs, what macOS asks on first launch, and how to move to a newer nightly.
 
 myArc ships as a pre-alpha nightly, a build made from the latest code and published without release testing. Each nightly is a disk image (DMG) on the [download page](https://myarc.dev/download/).
 
@@ -264,15 +258,7 @@ myArc ships as a pre-alpha nightly, a build made from the latest code and publis
 
 ## First launch
 
-The app is signed with an Apple Developer ID but isn't notarized yet. Notarized means Apple has scanned the build. Without it, Gatekeeper, the part of macOS that checks downloaded apps, blocks the first launch.
-
-To open it anyway, right-click myArc Nightly in Applications, choose Open, then choose Open again. On macOS 15 and later the warning usually offers only Done or Move to Trash. In that case open System Settings \> Privacy \& Security, scroll to the message about myArc Nightly and choose Open Anyway.
-
-You can also remove the quarantine flag in Terminal and then open the app as usual:
-
-```
-xattr -dr com.apple.quarantine "/Applications/myArc Nightly.app"
-```
+Open myArc Nightly from Applications. From 2026.11.18 on, each nightly is signed with an Apple Developer ID and notarized, which means Apple has scanned the build. Gatekeeper, the part of macOS that checks downloaded apps, asks once whether to open an app from the internet. Choose Open.
 
 macOS may then ask for your login password so myArc can read the key that protects its saved data. Choose Always Allow. Nightlies from 2026.11.03 on are signed with the same Developer ID, so later nightlies stop asking.
 
@@ -611,7 +597,6 @@ myArc is a pre-alpha. Use it to try the Arc-style sidebar, and keep daily and se
 
 - Each nightly is built from a Chromium 158 development revision, before Chromium ships it as a stable release.
 - There are no automatic updates and no security updates. Install each new nightly by hand, as [Install myArc](https://myarc.dev/docs/install/) describes.
-- The app is signed with an Apple Developer ID but not yet notarized by Apple, so macOS blocks the first launch until you allow it.
 - The protections around private windows, Profile separation, cookies and saved passwords aren't verified yet.
 - Safe Browsing doesn't scan RAR downloads, because the UnRAR license conflicts with GPL-3.0, the license myArc uses.
 - myArc is an independent project with no ties to Arc or The Browser Company.

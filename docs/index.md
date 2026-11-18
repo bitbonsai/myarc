@@ -8,7 +8,7 @@ How to move from Arc to myArc: install the nightly, import your Spaces, learn th
 
 - [Install myArc](https://myarc.dev/docs/install/)
 
-  What your Mac needs, how to get past the first-launch warning, and how to move to a newer nightly.
+  What your Mac needs, what macOS asks on first launch, and how to move to a newer nightly.
 - [Import from Arc](https://myarc.dev/docs/import-from-arc/)
 
   Export your Spaces from Arc, preview what myArc will add, and import them with their folders and pinned tabs. Importing the same file twice adds nothing.

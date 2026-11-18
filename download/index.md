@@ -4,12 +4,12 @@ HTML: https://myarc.dev/download/
 
 Pre-alpha nightly, for trying the Arc-like shell. Not for daily or sensitive browsing.
 
-[Download for macOS (Apple silicon)](https://github.com/bitbonsai/myarc/releases/download/nightly-2026.11.17.4/myArc-Nightly-2026.11.17.4-arm64.dmg)
+[Download for macOS (Apple silicon)](https://github.com/bitbonsai/myarc/releases/download/nightly-2026.11.18/myArc-Nightly-2026.11.18-arm64.dmg)
 
-- **Version:** 2026.11.17.4
-- **Date:** November 17, 2026
-- **Size:** 243.5 MB
-- **SHA-256:** `6d985ea1694faa3a26242f02b18ddcb670545a8b60ba6df135d994344f0e77bd`
+- **Version:** 2026.11.18
+- **Date:** November 18, 2026
+- **Size:** 243.4 MB
+- **SHA-256:** `608a9fd6dc3cd0857676b58df2b8f9369065e0d40bfbd6482a296abd18f97d3e`
 
 ## System requirements
 
@@ -21,15 +21,10 @@ Pre-alpha nightly, for trying the Arc-like shell. Not for daily or sensitive bro
 1. Check the download against the SHA-256 listed with it. The two values must match.
 
    ```
-   shasum -a 256 ~/Downloads/myArc-Nightly-2026.11.17.4-arm64.dmg
+   shasum -a 256 ~/Downloads/myArc-Nightly-2026.11.18-arm64.dmg
    ```
 2. Open the DMG and drag myArc Nightly to Applications.
-3. macOS blocks the first launch because the app is not notarized. Right-click myArc Nightly, choose Open, then Open again. If macOS only offers Done or Move to Trash, which macOS 15 and later usually does, open System Settings \> Privacy \& Security, scroll to the myArc Nightly message and choose Open Anyway.
-4. Or remove the quarantine flag in Terminal and open the app normally.
-
-   ```
-   xattr -dr com.apple.quarantine "/Applications/myArc Nightly.app"
-   ```
+3. Open myArc Nightly. From 2026.11.18 on, Apple has notarized each nightly, so macOS only asks once whether to open an app downloaded from the internet. Choose Open.
 
 ## What works today
 
@@ -57,7 +52,6 @@ Each item was seen working in a native run or experiment note. None of it has ha
 ## Known limitations
 
 - No automatic updates and no security updates. Install each new nightly by hand.
-- Not yet notarized by Apple, so macOS blocks the first launch until you allow it.
 - Recent tabs and navigation can be lost after a crash or force quit.
 - H.264 and AAC are included, so most other web video plays.
 
@@ -65,7 +59,7 @@ Each item was seen working in a native run or experiment note. None of it has ha
 
 ## Other ways to get it
 
-- [GitHub releases](https://github.com/bitbonsai/myarc/releases/tag/nightly-2026.11.17.4) lists every nightly.
+- [GitHub releases](https://github.com/bitbonsai/myarc/releases/tag/nightly-2026.11.18) lists every nightly.
 - [Source on GitHub](https://github.com/bitbonsai/myarc), with instructions to [build it from source](https://github.com/bitbonsai/myarc/blob/main/browser/README.md).
 - [GitHub issues](https://github.com/bitbonsai/myarc/issues) take bug reports. Include the version, your macOS version and the steps that trigger the problem, and leave out private pages.
 

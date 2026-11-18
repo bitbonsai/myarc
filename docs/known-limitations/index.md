@@ -10,7 +10,6 @@ myArc is a pre-alpha. Use it to try the Arc-style sidebar, and keep daily and se
 
 - Each nightly is built from a Chromium 158 development revision, before Chromium ships it as a stable release.
 - There are no automatic updates and no security updates. Install each new nightly by hand, as [Install myArc](https://myarc.dev/docs/install/) describes.
-- The app is signed with an Apple Developer ID but not yet notarized by Apple, so macOS blocks the first launch until you allow it.
 - The protections around private windows, Profile separation, cookies and saved passwords aren't verified yet.
 - Safe Browsing doesn't scan RAR downloads, because the UnRAR license conflicts with GPL-3.0, the license myArc uses.
 - myArc is an independent project with no ties to Arc or The Browser Company.
