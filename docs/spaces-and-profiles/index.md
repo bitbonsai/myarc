@@ -49,4 +49,4 @@ When you close a temporary tab, it moves to Archived Tabs in the Library. Open t
 
 Folders inside folders and dragging a tab up to pin it don't work yet. [Known limitations](https://myarc.dev/docs/known-limitations/) has the full list.
 
-[Next: Keyboard shortcuts →](https://myarc.dev/docs/shortcuts/)
+[Next: Peek →](https://myarc.dev/docs/peek/)

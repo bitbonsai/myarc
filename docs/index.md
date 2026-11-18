@@ -18,6 +18,9 @@ How to move from Arc to myArc: install the nightly, import your Spaces, learn th
 - [Spaces and Profiles](https://myarc.dev/docs/spaces-and-profiles/)
 
   How Spaces, Profiles, pinned tabs, Favorites and temporary tabs fit together in the myArc sidebar.
+- [Peek](https://myarc.dev/docs/peek/)
+
+  How links from pinned tabs and Favorites open in a preview over the page, and how to keep, split, reopen or turn off that preview.
 - [Keyboard shortcuts](https://myarc.dev/docs/shortcuts/)
 
   The shortcuts that work in myArc today, and the Arc shortcuts that are still missing.

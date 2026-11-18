@@ -6,7 +6,7 @@ HTML: https://myarc.dev/
 
 An open-source browser bringing back Arc, with no account required and optional AI.
 
-[Download pre-alphaNightly v2026.11.18](https://myarc.dev/download/)
+[Download pre-alphaNightly v2026.11.18.1](https://myarc.dev/download/)
 [See what works](https://github.com/bitbonsai/myarc#try-it)
 
 ## How you browse is part of how you work. It should outlast the company behind your browser.
@@ -42,7 +42,7 @@ An open-source browser bringing back Arc, with no account required and optional 
 
   Builds for Windows and Linux.
 
-[Download the 2026.11.18 nightly →](https://myarc.dev/download/) [Full alpha checklist →](https://github.com/bitbonsai/myarc/blob/main/docs/ALPHA.md)
+[Download the 2026.11.18.1 nightly →](https://myarc.dev/download/) [Full alpha checklist →](https://github.com/bitbonsai/myarc/blob/main/docs/ALPHA.md)
 
 ## Read along
 
@@ -121,12 +121,12 @@ HTML: https://myarc.dev/download/
 
 Pre-alpha nightly, for trying the Arc-like shell. Not for daily or sensitive browsing.
 
-[Download for macOS (Apple silicon)](https://github.com/bitbonsai/myarc/releases/download/nightly-2026.11.18/myArc-Nightly-2026.11.18-arm64.dmg)
+[Download for macOS (Apple silicon)](https://github.com/bitbonsai/myarc/releases/download/nightly-2026.11.18.1/myArc-Nightly-2026.11.18.1-arm64.dmg)
 
-- **Version:** 2026.11.18
+- **Version:** 2026.11.18.1
 - **Date:** November 18, 2026
 - **Size:** 243.4 MB
-- **SHA-256:** `608a9fd6dc3cd0857676b58df2b8f9369065e0d40bfbd6482a296abd18f97d3e`
+- **SHA-256:** `f142d3d637b9633f067e2216393754b2c6e917fd3755597416fc0370b5a15a78`
 
 ## System requirements
 
@@ -138,7 +138,7 @@ Pre-alpha nightly, for trying the Arc-like shell. Not for daily or sensitive bro
 1. Check the download against the SHA-256 listed with it. The two values must match.
 
    ```
-   shasum -a 256 ~/Downloads/myArc-Nightly-2026.11.18-arm64.dmg
+   shasum -a 256 ~/Downloads/myArc-Nightly-2026.11.18.1-arm64.dmg
    ```
 2. Open the DMG and drag myArc Nightly to Applications.
 3. Open myArc Nightly. From 2026.11.18 on, Apple has notarized each nightly, so macOS only asks once whether to open an app downloaded from the internet. Choose Open.
@@ -158,7 +158,7 @@ Each item was seen working in a native run or experiment note. None of it has ha
 - Importing an Arc export from Settings \> Advanced \> Import from Arc. A preview shows what it will add, then each Space arrives with its folders and pinned tabs, in Arc's order. Importing the same file again adds nothing.
 - Folders for a Space's pinned tabs. Create, rename and delete them from the right-click menu, and open or close them. Drag tabs in and out, and rename a pinned tab from its menu.
 - Split View for two tabs side by side. Use Open in Split View in a tab's menu or Ctrl\+Shift\+\=, and Ctrl\+Shift\+- to separate them. The split shows as one sidebar row and comes back after a restart.
-- Peek: a link from a pinned tab or Favorite to another site opens in a card over the page. Cmd\+W or Esc closes it, and Cmd\+O turns it into a tab.
+- Peek: a link from a pinned tab or Favorite to another site opens in a card over the page. Cmd\+W or Esc closes it, Cmd\+O turns it into a tab, a button splits it beside the pinned page, and Cmd\+Shift\+T reopens the last one closed. Settings \> Links can turn it off.
 - Ad and tracker blocking, on by default, with uBlock Origin Lite built in. Window \> Ad Blocking for This Site… turns it off for one site. Private windows block only after you allow the extension there.
 - Ctrl\+Tab switches to your last tab, and holding Ctrl goes further back through the five most recent.
 - Little Arc: links from other apps open in a small window, and Option-Cmd-N opens one. Open in \<Space\> or Cmd\+O moves the page into your current Space. Settings \> Links turns it off.
@@ -176,7 +176,7 @@ Each item was seen working in a native run or experiment note. None of it has ha
 
 ## Other ways to get it
 
-- [GitHub releases](https://github.com/bitbonsai/myarc/releases/tag/nightly-2026.11.18) lists every nightly.
+- [GitHub releases](https://github.com/bitbonsai/myarc/releases/tag/nightly-2026.11.18.1) lists every nightly.
 - [Source on GitHub](https://github.com/bitbonsai/myarc), with instructions to [build it from source](https://github.com/bitbonsai/myarc/blob/main/browser/README.md).
 - [GitHub issues](https://github.com/bitbonsai/myarc/issues) take bug reports. Include the version, your macOS version and the steps that trigger the problem, and leave out private pages.
 
@@ -207,6 +207,9 @@ How to move from Arc to myArc: install the nightly, import your Spaces, learn th
 - [Spaces and Profiles](https://myarc.dev/docs/spaces-and-profiles/)
 
   How Spaces, Profiles, pinned tabs, Favorites and temporary tabs fit together in the myArc sidebar.
+- [Peek](https://myarc.dev/docs/peek/)
+
+  How links from pinned tabs and Favorites open in a preview over the page, and how to keep, split, reopen or turn off that preview.
 - [Keyboard shortcuts](https://myarc.dev/docs/shortcuts/)
 
   The shortcuts that work in myArc today, and the Arc shortcuts that are still missing.
@@ -372,6 +375,37 @@ When you close a temporary tab, it moves to Archived Tabs in the Library. Open t
 
 Folders inside folders and dragging a tab up to pin it don't work yet. [Known limitations](https://myarc.dev/docs/known-limitations/) has the full list.
 
+[Next: Peek →](https://myarc.dev/docs/peek/)
+
+
+---
+
+HTML: https://myarc.dev/docs/peek/
+
+# Peek
+
+How links from pinned tabs and Favorites open in a preview over the page, and how to keep, split, reopen or turn off that preview.
+
+Peek keeps your pinned tabs where you left them. When you click a link in a pinned tab or a Favorite that goes to another site, the page opens in a card over the current one instead of replacing it. The card grows out of the link you clicked and shrinks back when you close it. With Reduce Motion turned on in macOS, it appears and goes without the animation.
+
+Links to the same site still open in the pinned tab, and links from your temporary tabs open as they always do. Cmd-click a link to open it in a new tab instead.
+
+## Using the card
+
+As in Arc, the page fills the card, and the rest of the page area dims behind it. Three round buttons sit beside the card's top right corner:
+
+- The X closes the card. Esc, Cmd\+W or a click outside the card close it too.
+- The arrows turn the page into a new tab in Today, with its history. Cmd\+O does the same.
+- The split button opens the page in a Split View. A copy of your pinned page goes on the left and the Peek page on the right, as one new split in Today, and the pinned tab stays where it was.
+
+## Bringing a Peek back
+
+If you close a Peek by mistake, press Cmd\+Shift\+T while the same tab is showing. Only the last Peek you closed comes back, and only when you closed it yourself. If you closed a tab after it, Cmd\+Shift\+T reopens that tab first.
+
+## Turning Peek off
+
+Open Settings with Cmd\+, go to Links and turn off Open a Peek window when clicking on links to other sites, the same switch Arc has there. Links from pinned tabs and Favorites to other sites then open in a new tab, and the pinned page stays where it was.
+
 [Next: Keyboard shortcuts →](https://myarc.dev/docs/shortcuts/)
 
 
@@ -391,7 +425,7 @@ These shortcuts work in the current nightly. Standard Chromium shortcuts, such a
 | Cmd\+L | Opens the command bar on the current address | Same |
 | Cmd\+S | Hides or shows the sidebar | Same |
 | Cmd\+Shift\+C | Copies the current address and shows a Copied Current URL message | Same |
-| Cmd\+Shift\+T | Reopens the last closed tab | Same |
+| Cmd\+Shift\+T | Reopens the last closed tab, or the [Peek](https://myarc.dev/docs/peek/) you just closed | Same |
 | Cmd\+Shift\+N | Opens a private window | Same |
 | Ctrl\+Cmd\+N | Opens a blank window | Same |
 | Cmd\+, | Opens Settings | Same |
@@ -611,7 +645,7 @@ myArc is a pre-alpha. Use it to try the Arc-style sidebar, and keep daily and se
 - Arc Favorites arrive as pinned tabs in their Space, because the export doesn't mark them.
 - Folders inside folders, and dragging a tab up to pin it.
 - Split View holds two tabs at most, and a split can't be pinned or put in a folder.
-- Peek can't open into a split, and a closed Peek can't be reopened.
+- Peek's split button splits a copy of the pinned page, because a split can't hold a pinned tab yet. Cmd\+Z doesn't bring back a closed Peek, so use Cmd\+Shift\+T.
 - Little Arc windows don't come back after a relaunch. Option-Cmd-N works from any app, unless another app such as Raycast already uses that key.
 - Boosts and the Mini Player.
 - The animated onboarding.

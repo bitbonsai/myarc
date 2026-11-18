@@ -4,12 +4,12 @@ HTML: https://myarc.dev/download/
 
 Pre-alpha nightly, for trying the Arc-like shell. Not for daily or sensitive browsing.
 
-[Download for macOS (Apple silicon)](https://github.com/bitbonsai/myarc/releases/download/nightly-2026.11.18/myArc-Nightly-2026.11.18-arm64.dmg)
+[Download for macOS (Apple silicon)](https://github.com/bitbonsai/myarc/releases/download/nightly-2026.11.18.1/myArc-Nightly-2026.11.18.1-arm64.dmg)
 
-- **Version:** 2026.11.18
+- **Version:** 2026.11.18.1
 - **Date:** November 18, 2026
 - **Size:** 243.4 MB
-- **SHA-256:** `608a9fd6dc3cd0857676b58df2b8f9369065e0d40bfbd6482a296abd18f97d3e`
+- **SHA-256:** `f142d3d637b9633f067e2216393754b2c6e917fd3755597416fc0370b5a15a78`
 
 ## System requirements
 
@@ -21,7 +21,7 @@ Pre-alpha nightly, for trying the Arc-like shell. Not for daily or sensitive bro
 1. Check the download against the SHA-256 listed with it. The two values must match.
 
    ```
-   shasum -a 256 ~/Downloads/myArc-Nightly-2026.11.18-arm64.dmg
+   shasum -a 256 ~/Downloads/myArc-Nightly-2026.11.18.1-arm64.dmg
    ```
 2. Open the DMG and drag myArc Nightly to Applications.
 3. Open myArc Nightly. From 2026.11.18 on, Apple has notarized each nightly, so macOS only asks once whether to open an app downloaded from the internet. Choose Open.
@@ -41,7 +41,7 @@ Each item was seen working in a native run or experiment note. None of it has ha
 - Importing an Arc export from Settings \> Advanced \> Import from Arc. A preview shows what it will add, then each Space arrives with its folders and pinned tabs, in Arc's order. Importing the same file again adds nothing.
 - Folders for a Space's pinned tabs. Create, rename and delete them from the right-click menu, and open or close them. Drag tabs in and out, and rename a pinned tab from its menu.
 - Split View for two tabs side by side. Use Open in Split View in a tab's menu or Ctrl\+Shift\+\=, and Ctrl\+Shift\+- to separate them. The split shows as one sidebar row and comes back after a restart.
-- Peek: a link from a pinned tab or Favorite to another site opens in a card over the page. Cmd\+W or Esc closes it, and Cmd\+O turns it into a tab.
+- Peek: a link from a pinned tab or Favorite to another site opens in a card over the page. Cmd\+W or Esc closes it, Cmd\+O turns it into a tab, a button splits it beside the pinned page, and Cmd\+Shift\+T reopens the last one closed. Settings \> Links can turn it off.
 - Ad and tracker blocking, on by default, with uBlock Origin Lite built in. Window \> Ad Blocking for This Site… turns it off for one site. Private windows block only after you allow the extension there.
 - Ctrl\+Tab switches to your last tab, and holding Ctrl goes further back through the five most recent.
 - Little Arc: links from other apps open in a small window, and Option-Cmd-N opens one. Open in \<Space\> or Cmd\+O moves the page into your current Space. Settings \> Links turns it off.
@@ -59,7 +59,7 @@ Each item was seen working in a native run or experiment note. None of it has ha
 
 ## Other ways to get it
 
-- [GitHub releases](https://github.com/bitbonsai/myarc/releases/tag/nightly-2026.11.18) lists every nightly.
+- [GitHub releases](https://github.com/bitbonsai/myarc/releases/tag/nightly-2026.11.18.1) lists every nightly.
 - [Source on GitHub](https://github.com/bitbonsai/myarc), with instructions to [build it from source](https://github.com/bitbonsai/myarc/blob/main/browser/README.md).
 - [GitHub issues](https://github.com/bitbonsai/myarc/issues) take bug reports. Include the version, your macOS version and the steps that trigger the problem, and leave out private pages.
 

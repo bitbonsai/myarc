@@ -12,7 +12,7 @@ These shortcuts work in the current nightly. Standard Chromium shortcuts, such a
 | Cmd\+L | Opens the command bar on the current address | Same |
 | Cmd\+S | Hides or shows the sidebar | Same |
 | Cmd\+Shift\+C | Copies the current address and shows a Copied Current URL message | Same |
-| Cmd\+Shift\+T | Reopens the last closed tab | Same |
+| Cmd\+Shift\+T | Reopens the last closed tab, or the [Peek](https://myarc.dev/docs/peek/) you just closed | Same |
 | Cmd\+Shift\+N | Opens a private window | Same |
 | Ctrl\+Cmd\+N | Opens a blank window | Same |
 | Cmd\+, | Opens Settings | Same |
