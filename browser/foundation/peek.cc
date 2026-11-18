@@ -63,19 +63,22 @@ namespace {
 // Card geometry, measured on Arc 1.x screenshots of a Peek with the sidebar
 // shown and hidden: the card takes 81% of the page area's width, centred,
 // and its full height but for 2 DIP at the top and bottom. It has no header;
-// the page fills it. Round 22 DIP buttons stack 6 DIP apart, 8 DIP right of
-// its top right corner and 5 DIP down from its top.
+// the page fills it. Round 29 DIP buttons stack 37 DIP centre to centre,
+// 11 DIP right of its top right corner and 7 DIP down from its top, each
+// with a 13 DIP icon.
 constexpr float kCardWidthShare = 0.81f;
 constexpr int kCardInset = 2;
 constexpr int kCardRadius = 10;
-constexpr int kRoundButton = 22;
-constexpr int kRoundButtonGap = 6;
-constexpr int kRoundButtonMargin = 8;
-constexpr int kRoundButtonTop = 5;
-constexpr int kRoundButtonIcon = 12;
-// Arc's scrim takes a #f6f3ee page to #68636f: a dark navy at 60%. The
-// sidebar stays as it was.
+constexpr int kRoundButton = 29;
+constexpr int kRoundButtonGap = 8;
+constexpr int kRoundButtonMargin = 11;
+constexpr int kRoundButtonTop = 7;
+constexpr int kRoundButtonIcon = 13;
+// Arc's scrim takes a #f6f3ee page to #68636f: a dark navy at 60%. The page
+// under it is blurred a little, enough to set the card apart while the page
+// stays recognisable. The sidebar stays as it was.
 constexpr SkColor kScrim = SkColorSetARGB(0x99, 0x09, 0x03, 0x1a);
+constexpr float kScrimBlurSigma = 3;
 constexpr SkColor kCard = SK_ColorWHITE;
 constexpr SkColor kButton = SkColorSetRGB(0x05, 0x06, 0x27);
 constexpr SkColor kButtonHover = SkColorSetRGB(0x1d, 0x1e, 0x44);
@@ -335,9 +338,9 @@ class PeekView final : public views::View, public views::AnimationDelegateViews 
     }
   }
 
-  // 0 is a speck at `from_` with no scrim, 1 the card at rest. The page and
-  // the round buttons show only at rest: the page is a native view that
-  // can't scale with the card's layer.
+  // 0 is a speck at `from_` with no scrim or blur, 1 the card at rest. The
+  // page and the round buttons show only at rest: the page is a native view
+  // that can't scale with the card's layer.
   void SetProgress(double progress) {
     progress_ = progress;
     const gfx::Rect card = CardBounds();
@@ -353,6 +356,7 @@ class PeekView final : public views::View, public views::AnimationDelegateViews 
     transform.Translate(-card.width() / 2.f, -card.height() / 2.f);
     card_->layer()->SetTransform(transform);
     card_->layer()->SetOpacity(std::min(1.f, 2 * t));
+    layer()->SetBackgroundBlur(kScrimBlurSigma * t);
     const bool rest = progress >= 1 && !closing_;
     web_view_->SetVisible(rest);
     for (views::View* button : {close_.get(), expand_.get(), split_.get()}) {
