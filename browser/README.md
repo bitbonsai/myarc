@@ -165,7 +165,7 @@ nice -n 10 autoninja -C out/MyarcNightly -j 14 chrome
 "$REPO/tools/package_nightly.sh"
 ```
 
-The build uses its own output directory, so it does not take `/tmp/myarc-build.lock`. The app is not notarized and has no updater.
+The build uses its own output directory, so it does not take `/tmp/myarc-build.lock`. With a Developer ID and the `myarc-notary` notarytool keychain profile, the script signs with the hardened runtime, has Apple notarize the app and the DMG and staples both; `NOTARIZE=0` skips that. The app has no updater.
 
 ## Runtime regression checks
 
