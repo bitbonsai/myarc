@@ -4,6 +4,12 @@ HTML: https://myarc.dev/blog/
 
 November 2026
 
+## [Keeping Arc's ideas going](https://myarc.dev/blog/keeping-arcs-ideas-going/)
+
+November 19, 2026
+
+Arc shuts down on December 22, and its ideas are worth keeping. This round brought Peek, Split View and Little Arc to myArc, along with ad blocking and nightlies that open on a Mac without a security warning.
+
 ## [Letting agents use myArc](https://myarc.dev/blog/agents-use-myarc/)
 
 November 10, 2026
