@@ -9,6 +9,7 @@
 #include "base/functional/bind.h"
 #include "base/functional/callback_helpers.h"
 #include "base/location.h"
+#include "base/logging.h"
 #include "base/strings/string_number_conversions.h"
 #include "base/task/single_thread_task_runner.h"
 #include "base/time/time.h"
@@ -22,6 +23,8 @@
 #include "myarc/workspace_service.h"
 #include "ui/color/color_id.h"
 #include "ui/color/color_provider.h"
+#include "ui/compositor/compositor.h"
+#include "ui/compositor/compositor_observer.h"
 #include "ui/gfx/animation/animation.h"
 #include "ui/gfx/color_utils.h"
 #include "ui/gfx/geometry/rect.h"
@@ -38,7 +41,12 @@ using EventKind = foundation::OnboardingEventKind;
 // The window showing the welcome, so a second window doesn't show it too.
 OnboardingController* g_welcome_window = nullptr;
 
+// The sidebar's rows start to settle this long into the sheet's exit, once
+// the dim has mostly lifted.
+constexpr base::TimeDelta kRowsDelay = base::Milliseconds(200);
+
 #if BUILDFLAG(MYARC_TEST_HOOKS)
+constexpr char kMyarcTestOnboarding[] = "myarc-test-onboarding";
 constexpr char kMyarcTestOnboardingEvent[] = "myarc-test-onboarding-event";
 constexpr char kMyarcTestOnboardingEventDelay[] =
     "myarc-test-onboarding-event-delay";
@@ -87,16 +95,50 @@ std::optional<SpaceTheme> ThemeOf(Profile& profile, uint64_t space) {
 
 }  // namespace
 
+// The compositor frames the window starts during the reveal, and the longest
+// gap between two of them.
+class RevealFrames : public ui::CompositorObserver {
+ public:
+  explicit RevealFrames(ui::Compositor* compositor) {
+    observation_.Observe(compositor);
+  }
+
+  int frames() const { return frames_; }
+  base::TimeDelta longest_gap() const { return longest_gap_; }
+
+  // ui::CompositorObserver:
+  void OnCompositingStarted(ui::Compositor* compositor,
+                            base::TimeTicks start_time) override {
+    if (!last_.is_null()) {
+      longest_gap_ = std::max(longest_gap_, start_time - last_);
+    }
+    last_ = start_time;
+    ++frames_;
+  }
+  void OnCompositingShuttingDown(ui::Compositor* compositor) override {
+    observation_.Reset();
+  }
+
+ private:
+  int frames_ = 0;
+  base::TimeTicks last_;
+  base::TimeDelta longest_gap_;
+  base::ScopedObservation<ui::Compositor, ui::CompositorObserver> observation_{
+      this};
+};
+
 OnboardingController::OnboardingController(Profile& profile,
                                            views::View& host,
                                            views::View& area,
                                            WelcomeView::RadiusCallback radius,
-                                           base::RepeatingClosure restore_focus)
+                                           base::RepeatingClosure restore_focus,
+                                           SettleRowsCallback settle_rows)
     : profile_(&profile),
       host_(&host),
       area_(&area),
       radius_(std::move(radius)),
-      restore_focus_(std::move(restore_focus)) {
+      restore_focus_(std::move(restore_focus)),
+      settle_rows_(std::move(settle_rows)) {
   area_observation_.Observe(&area);
 }
 
@@ -114,7 +156,8 @@ OnboardingController::~OnboardingController() {
 
 void OnboardingController::Refresh() {
   PrefService* local_state = LocalState();
-  if (importing_ || recolouring_ || !local_state) {
+  if (importing_ || recolouring_ || report_open_ || revealing_ ||
+      !local_state) {
     return;
   }
   const auto tour = ReadOnboardingTour(*local_state);
@@ -128,12 +171,16 @@ void OnboardingController::Refresh() {
     }
     return;
   }
+  if (state == "reveal") {
+    StartReveal();
+    return;
+  }
   // Another window may have ended the tour.
   CloseWelcome();
   if (state == "complete" || state == "importing") {
     return;
   }
-  // Reveal, practice and handoff aren't built yet: end the tour as skipped.
+  // Practice and handoff aren't built yet: end the tour as skipped.
   Run(FeedOnboardingEvent(*local_state, Event(EventKind::SkipTour)));
 }
 
@@ -207,6 +254,9 @@ void OnboardingController::ShowWelcome(bool offers_import) {
 
 void OnboardingController::CloseWelcome() {
   recolouring_ = false;
+  revealing_ = false;
+  reveal_timer_.Stop();
+  reveal_frames_.reset();
   if (g_welcome_window == this) {
     g_welcome_window = nullptr;
   }
@@ -222,9 +272,17 @@ void OnboardingController::CloseWelcome() {
   }
 }
 
+void OnboardingController::ReleaseFocus() {
+  if (sheet_ && sheet_->GetFocusManager() &&
+      sheet_->Contains(sheet_->GetFocusManager()->GetFocusedView()) &&
+      restore_focus_) {
+    restore_focus_.Run();
+  }
+}
+
 void OnboardingController::OnAction(WelcomeView::Action action) {
   PrefService* local_state = LocalState();
-  if (!local_state || !sheet_ || importing_) {
+  if (!local_state || !sheet_ || importing_ || revealing_) {
     return;
   }
   switch (action) {
@@ -257,8 +315,10 @@ void OnboardingController::OnImportDone(const ArcImportOutcome& outcome) {
   // A commit lands here inside the import dialog's press, right after the
   // workspace is saved: save the receipt now, so a kill from here on
   // relaunches past the welcome, and change the screen once the press is
-  // over. Until then a workspace refresh leaves the welcome up.
+  // over. Until then a workspace refresh leaves the welcome up. The reveal
+  // also waits for the report the commit shows to close.
   recolouring_ = outcome.committed;
+  report_open_ = outcome.committed;
   base::SingleThreadTaskRunner::GetCurrentDefault()->PostTask(
       FROM_HERE,
       base::BindOnce(&OnboardingController::Run, weak_factory_.GetWeakPtr(),
@@ -295,6 +355,58 @@ void OnboardingController::ShowImported(uint64_t space) {
           weak_factory_.GetWeakPtr()));
 }
 
+void OnboardingController::OnReportClosed() {
+  if (!report_open_) {
+    return;
+  }
+  report_open_ = false;
+  Refresh();
+}
+
+void OnboardingController::StartReveal() {
+  if (revealing_) {
+    return;
+  }
+  if (!sheet_) {
+    // Nothing to reveal from, for example another window's tour.
+    FinishReveal();
+    return;
+  }
+  revealing_ = true;
+  reveal_start_ = base::TimeTicks::Now();
+#if BUILDFLAG(MYARC_TEST_HOOKS)
+  if (base::CommandLine::ForCurrentProcess()->HasSwitch(kMyarcTestOnboarding) &&
+      host_->GetWidget() && host_->GetWidget()->GetCompositor()) {
+    reveal_frames_ =
+        std::make_unique<RevealFrames>(host_->GetWidget()->GetCompositor());
+  }
+#endif  // BUILDFLAG(MYARC_TEST_HOOKS)
+  // The window keeps the keyboard while the sheet leaves.
+  ReleaseFocus();
+  const base::TimeDelta exit = sheet_->Exit();
+  const base::TimeDelta rows =
+      settle_rows_ ? settle_rows_.Run(kRowsDelay) : base::TimeDelta();
+  reveal_timer_.Start(FROM_HERE, std::max(exit, rows),
+                      base::BindOnce(&OnboardingController::FinishReveal,
+                                     weak_factory_.GetWeakPtr()));
+}
+
+void OnboardingController::FinishReveal() {
+#if BUILDFLAG(MYARC_TEST_HOOKS)
+  if (reveal_frames_) {
+    LOG(WARNING) << "Test onboarding: reveal took "
+                 << (base::TimeTicks::Now() - reveal_start_).InMilliseconds()
+                 << " ms, frames=" << reveal_frames_->frames()
+                 << " longest_gap="
+                 << reveal_frames_->longest_gap().InMilliseconds() << " ms";
+  }
+#endif  // BUILDFLAG(MYARC_TEST_HOOKS)
+  CloseWelcome();
+  if (PrefService* local_state = LocalState()) {
+    Run(FeedOnboardingEvent(*local_state, Event(EventKind::RevealDone)));
+  }
+}
+
 void OnboardingController::OpenImport() {
   if (!host_ || !host_->GetWidget()) {
     return;
@@ -302,6 +414,8 @@ void OnboardingController::OpenImport() {
   importing_ = true;
   auto done = base::BindOnce(&OnboardingController::OnImportDone,
                              weak_factory_.GetWeakPtr());
+  auto report_closed = base::BindOnce(&OnboardingController::OnReportClosed,
+                                      weak_factory_.GetWeakPtr());
 #if BUILDFLAG(MYARC_TEST_HOOKS)
   const base::CommandLine& command_line =
       *base::CommandLine::ForCurrentProcess();
@@ -309,12 +423,12 @@ void OnboardingController::OpenImport() {
     ImportArcFileForCapture(
         *profile_, host_->GetWidget()->GetNativeWindow(),
         command_line.GetSwitchValuePath(kMyarcTestOnboardingImport),
-        base::DoNothing(), std::move(done));
+        base::DoNothing(), std::move(done), std::move(report_closed));
     return;
   }
 #endif  // BUILDFLAG(MYARC_TEST_HOOKS)
   ImportFromArc(*profile_, host_->GetWidget()->GetNativeWindow(),
-                std::move(done));
+                std::move(done), std::move(report_closed));
 }
 
 void OnboardingController::Run(
@@ -332,12 +446,16 @@ void OnboardingController::Run(
     ShowWelcome(transition.tour.offers_import);
     return;
   }
+  if (state == "reveal") {
+    StartReveal();
+    return;
+  }
   CloseWelcome();
   if (state == "complete" || state == "importing") {
     return;
   }
-  // The reveal and the steps after it aren't built yet: end the tour as
-  // skipped. The import receipt stays in the record.
+  // Practice and handoff aren't built yet: end the tour as skipped after
+  // `reveal_done`. The import receipt stays in the record.
   if (PrefService* local_state = LocalState()) {
     Run(FeedOnboardingEvent(*local_state, Event(EventKind::SkipTour)));
   }

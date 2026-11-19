@@ -31,6 +31,7 @@
 #include "ui/gfx/geometry/rect_f.h"
 #include "ui/gfx/geometry/size.h"
 #include "ui/gfx/geometry/transform.h"
+#include "ui/gfx/scoped_canvas.h"
 #include "ui/gfx/skia_paint_util.h"
 #include "ui/views/accessibility/view_accessibility.h"
 #include "ui/views/animation/animation_builder.h"
@@ -76,6 +77,9 @@ constexpr base::TimeDelta kIntro = base::Milliseconds(1000);
 constexpr base::TimeDelta kReducedFade = base::Milliseconds(150);
 // The field's crossfade to an imported Space's theme.
 constexpr base::TimeDelta kThemeFade = base::Milliseconds(350);
+// The reveal's exit: the sheet slides right as it fades.
+constexpr base::TimeDelta kExit = base::Milliseconds(350);
+constexpr float kExitSlide = 64;
 constexpr int kIntroFrameRate = 60;
 struct Phase {
   int start;
@@ -187,7 +191,8 @@ WelcomeView::WelcomeView(bool offers_import,
       intro_(kIntro, kIntroFrameRate, this),
       theme_fade_(reduced_motion_ ? kReducedFade : kThemeFade,
                   kIntroFrameRate,
-                  this) {
+                  this),
+      exit_(kExit, kIntroFrameRate, this) {
   SetPaintToLayer();
   layer()->SetFillsBoundsOpaquely(false);
   SetEventTargeter(std::make_unique<views::ViewTargeter>(this));
@@ -305,6 +310,37 @@ void WelcomeView::CrossfadeTo(SidebarTint tint, base::OnceClosure done) {
   theme_fade_.Start();
 }
 
+base::TimeDelta WelcomeView::Exit() {
+  if (exiting_) {
+    return base::TimeDelta();
+  }
+  FinishIntro();
+  theme_done_.Reset();
+  if (theme_fade_.is_animating()) {
+    theme_fade_.End();
+  }
+  exiting_ = true;
+  SetCanProcessEventsWithinSubtree(false);
+  // Read again: Reduce Motion may have changed since the sheet showed.
+  const base::TimeDelta duration =
+      gfx::Animation::PrefersReducedMotion() ? kReducedFade : kExit;
+  exit_.SetDuration(duration);
+  exit_.Start();
+  return duration;
+}
+
+float WelcomeView::ExitShift() const {
+  return gfx::Animation::PrefersReducedMotion()
+             ? 0.f
+             : kExitSlide * static_cast<float>(gfx::Tween::CalculateValue(
+                                gfx::Tween::EASE_OUT, exit_progress_));
+}
+
+float WelcomeView::ExitOpacity() const {
+  return 1.f - static_cast<float>(gfx::Tween::CalculateValue(
+                   gfx::Tween::EASE_OUT, exit_progress_));
+}
+
 void WelcomeView::StartIntro() {
   if (reduced_motion_) {
     views::AnimationBuilder()
@@ -338,10 +374,21 @@ void WelcomeView::ApplyIntro(double progress) {
 
 bool WelcomeView::DoesIntersectRect(const views::View* target,
                                     const gfx::Rect& rect) const {
-  return sheet_.Intersects(rect);
+  return !exiting_ && sheet_.Intersects(rect);
 }
 
 void WelcomeView::AnimationProgressed(const gfx::Animation* animation) {
+  if (animation == &exit_) {
+    exit_progress_ = animation->GetCurrentValue();
+    // The text and buttons go with the sheet.
+    for (views::View* child : children()) {
+      child->layer()->SetOpacity(ExitOpacity());
+      child->layer()->SetTransform(
+          gfx::Transform::MakeTranslation(ExitShift(), 0));
+    }
+    SchedulePaint();
+    return;
+  }
   if (animation == &theme_fade_) {
     theme_progress_ = animation->GetCurrentValue();
     SchedulePaint();
@@ -353,6 +400,11 @@ void WelcomeView::AnimationProgressed(const gfx::Animation* animation) {
 }
 
 void WelcomeView::AnimationEnded(const gfx::Animation* animation) {
+  if (animation == &exit_) {
+    exit_progress_ = 1;
+    AnimationProgressed(animation);
+    return;
+  }
   if (animation == &theme_fade_) {
     theme_progress_ = 1;
     SchedulePaint();
@@ -397,12 +449,22 @@ void WelcomeView::OnPaint(gfx::Canvas* canvas) {
   const gfx::RectF sheet(sheet_);
   const float radius = radius_ ? radius_.Run() : 0;
 
+  // The reveal lifts the dim, and the sheet slides right as it fades.
+  const float shown = ExitOpacity();
   cc::PaintFlags dim;
-  dim.setColor(
-      SkColorSetA(SK_ColorBLACK,
-                  static_cast<SkAlpha>((dark ? kDimDark : kDimLight) *
-                                       At(t, kDimIn, gfx::Tween::EASE_OUT))));
+  dim.setColor(SkColorSetA(
+      SK_ColorBLACK,
+      static_cast<SkAlpha>((dark ? kDimDark : kDimLight) *
+                           At(t, kDimIn, gfx::Tween::EASE_OUT) * shown)));
   canvas->DrawRect(gfx::RectF(GetLocalBounds()), dim);
+  if (shown <= 0) {
+    return;
+  }
+  gfx::ScopedCanvas exit(canvas);
+  if (shown < 1) {
+    canvas->SaveLayerAlpha(static_cast<uint8_t>(0xFF * shown));
+    canvas->sk_canvas()->translate(ExitShift(), 0);
+  }
 
   // The dots drift in and meet in the middle of the sheet.
   const gfx::PointF center = sheet.CenterPoint();
@@ -501,6 +563,9 @@ void WelcomeView::OnThemeChanged() {
 }
 
 void WelcomeView::Press(Action action) {
+  if (exiting_) {
+    return;
+  }
   FinishIntro();
   // A copy: the action may close the sheet and delete this view.
   auto run = action_;

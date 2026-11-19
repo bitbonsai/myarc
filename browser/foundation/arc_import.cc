@@ -44,10 +44,12 @@ using Confirmed = base::OnceCallback<void(uint64_t)>;
 // else, so the caller can save it before a kill. Otherwise it runs once the
 // last step holding it lets go: the picker, the preview's buttons or the
 // apply. Posted then, since the last release may happen while a dialog
-// closes.
+// closes. Also holds the caller's report_closed until the report takes it,
+// and runs it if no report ever shows.
 class Outcome : public base::RefCounted<Outcome> {
  public:
-  explicit Outcome(ArcImportDone done) : done_(std::move(done)) {}
+  Outcome(ArcImportDone done, base::OnceClosure report_closed)
+      : done_(std::move(done)), report_closed_(std::move(report_closed)) {}
   Outcome(const Outcome&) = delete;
   Outcome& operator=(const Outcome&) = delete;
 
@@ -62,6 +64,8 @@ class Outcome : public base::RefCounted<Outcome> {
     }
   }
 
+  base::OnceClosure TakeReportClosed() { return std::move(report_closed_); }
+
  private:
   friend class base::RefCounted<Outcome>;
   ~Outcome() {
@@ -69,9 +73,14 @@ class Outcome : public base::RefCounted<Outcome> {
       base::SingleThreadTaskRunner::GetCurrentDefault()->PostTask(
           FROM_HERE, base::BindOnce(std::move(done_), std::move(outcome_)));
     }
+    if (report_closed_) {
+      base::SingleThreadTaskRunner::GetCurrentDefault()->PostTask(
+          FROM_HERE, std::move(report_closed_));
+    }
   }
 
   ArcImportDone done_;
+  base::OnceClosure report_closed_;
   ArcImportOutcome outcome_;
 };
 
@@ -183,11 +192,16 @@ void ShowMessage(std::u16string message,
 }
 
 // The done state: what the import added, then every kind of entry it left
-// out or changed, with counts from Rust.
+// out or changed, with counts from Rust. `closed` runs once it closes.
 void ShowReport(const foundation::ArcImportPreview& result,
                 gfx::NativeWindow parent,
-                bool inactive) {
+                bool inactive,
+                base::OnceClosure closed) {
   ui::DialogModel::Builder builder;
+  const bool waited_on = !closed.is_null();
+  if (waited_on) {
+    builder.SetDialogDestroyingCallback(std::move(closed));
+  }
   builder.SetTitle(kTitle);
   const std::u16string adds = Additions(result);
   builder.AddParagraph(ui::DialogModelLabel(
@@ -213,7 +227,20 @@ void ShowReport(const foundation::ArcImportPreview& result,
           .set_is_secondary());
   builder.AddOkButton(base::DoNothing(),
                       ui::DialogModel::Button::Params().SetLabel(u"OK"));
-  Show(builder.Build(), parent, inactive);
+  views::Widget* widget = Show(builder.Build(), parent, inactive);
+  if (inactive && waited_on) {
+    // A capture can't press OK, and its caller waits for the report to close.
+    base::SingleThreadTaskRunner::GetCurrentDefault()->PostDelayedTask(
+        FROM_HERE,
+        base::BindOnce(
+            [](base::WeakPtr<views::Widget> widget) {
+              if (widget) {
+                widget->Close();
+              }
+            },
+            widget->GetWeakPtr()),
+        base::Milliseconds(2000));
+  }
 }
 
 void Apply(base::WeakPtr<Profile> profile,
@@ -244,7 +271,9 @@ void Apply(base::WeakPtr<Profile> profile,
   } else {
     base::SingleThreadTaskRunner::GetCurrentDefault()->PostTask(
         FROM_HERE,
-        base::BindOnce(&ShowReport, std::move(result), parent, inactive));
+        base::BindOnce(
+            &ShowReport, std::move(result), parent, inactive,
+            outcome ? outcome->TakeReportClosed() : base::OnceClosure()));
   }
   if (confirmed) {
     std::move(confirmed).Run(first_space);
@@ -413,9 +442,12 @@ class Picker : public ui::SelectFileDialog::Listener {
 
 void ImportFromArc(Profile& profile,
                    gfx::NativeWindow parent,
-                   ArcImportDone done) {
+                   ArcImportDone done,
+                   base::OnceClosure report_closed) {
   (new Picker(profile, parent,
-              done ? base::MakeRefCounted<Outcome>(std::move(done)) : nullptr))
+              done ? base::MakeRefCounted<Outcome>(std::move(done),
+                                                   std::move(report_closed))
+                   : nullptr))
       ->Start();
 }
 
@@ -423,9 +455,12 @@ void ImportArcFileForCapture(Profile& profile,
                              gfx::NativeWindow parent,
                              const base::FilePath& path,
                              Confirmed confirmed,
-                             ArcImportDone done) {
+                             ArcImportDone done,
+                             base::OnceClosure report_closed) {
   Read(profile.GetWeakPtr(), parent, /*inactive=*/true, path,
-       done ? base::MakeRefCounted<Outcome>(std::move(done)) : nullptr,
+       done ? base::MakeRefCounted<Outcome>(std::move(done),
+                                            std::move(report_closed))
+            : nullptr,
        std::move(confirmed));
 }
 

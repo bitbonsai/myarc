@@ -41,10 +41,12 @@
 #include "ui/color/color_id.h"
 #include "ui/color/color_provider.h"
 #include "ui/compositor/layer.h"
+#include "ui/compositor/layer_animator.h"
 #include "ui/events/event.h"
 #include "ui/events/event_handler.h"
 #include "ui/events/event_utils.h"
 #include "ui/events/keycodes/keyboard_codes.h"
+#include "ui/gfx/animation/animation.h"
 #include "ui/gfx/animation/tween.h"
 #include "ui/gfx/canvas.h"
 #include "ui/gfx/color_analysis.h"
@@ -61,6 +63,7 @@
 #include "ui/gfx/vector_icon_types.h"
 #include "ui/native_theme/native_theme.h"
 #include "ui/views/accessibility/view_accessibility.h"
+#include "ui/views/animation/animation_builder.h"
 #include "ui/views/animation/ink_drop.h"
 #include "ui/views/animation/ink_drop_host.h"
 #include "ui/views/background.h"
@@ -3505,6 +3508,67 @@ void SidebarView::SlideInSpace(const gfx::ImageSkia& outgoing,
   space_rows_->SetOutgoing(std::move(rows), shift);
   space_slide_.Start();
   UpdateSpaceSlide(false);
+}
+
+base::TimeDelta SidebarView::SettleRows(base::TimeDelta delay) {
+  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
+  constexpr size_t kSettleRows = 8;
+  constexpr float kSettleRise = 12;
+  constexpr base::TimeDelta kSettleStagger = base::Milliseconds(35);
+  constexpr base::TimeDelta kSettleDuration = base::Milliseconds(300);
+  EndSettle();
+  if (gfx::Animation::PrefersReducedMotion() || library_ || create_panel_ ||
+      !IsDrawn()) {
+    return base::TimeDelta();
+  }
+  // Only rows that show, so a long Space costs no more than a short one.
+  std::vector<views::View*> rows;
+  for (const auto& [id, row] : selectable_rows_) {
+    if (rows.size() == kSettleRows) {
+      break;
+    }
+    if (row->IsDrawn() && !row->GetVisibleBounds().IsEmpty()) {
+      rows.push_back(row);
+    }
+  }
+  if (rows.empty()) {
+    return base::TimeDelta();
+  }
+  views::AnimationBuilder builder;
+  builder
+      .SetPreemptionStrategy(
+          ui::LayerAnimator::IMMEDIATELY_ANIMATE_TO_NEW_TARGET)
+      .OnEnded(
+          base::BindOnce(&SidebarView::EndSettle, weak_factory_.GetWeakPtr()))
+      .OnAborted(
+          base::BindOnce(&SidebarView::EndSettle, weak_factory_.GetWeakPtr()));
+  views::AnimationSequenceBlock* block = &builder.Once();
+  for (size_t i = 0; i < rows.size(); ++i) {
+    views::View* row = rows[i];
+    if (!row->layer()) {
+      row->SetPaintToLayer();
+      row->layer()->SetFillsBoundsOpaquely(false);
+      settling_rows_.push_back(std::make_unique<views::ViewTracker>(row));
+    }
+    row->layer()->SetOpacity(0);
+    row->layer()->SetTransform(gfx::Transform::MakeTranslation(0, kSettleRise));
+    block = &block->At(delay + kSettleStagger * static_cast<int>(i))
+                 .SetDuration(kSettleDuration)
+                 .SetOpacity(row->layer(), 1.f, gfx::Tween::EASE_OUT)
+                 .SetTransform(row->layer(), gfx::Transform(),
+                               gfx::Tween::EASE_OUT);
+  }
+  return delay + kSettleStagger * static_cast<int>(rows.size() - 1) +
+         kSettleDuration;
+}
+
+void SidebarView::EndSettle() {
+  for (const auto& tracker : std::exchange(settling_rows_, {})) {
+    if (views::View* row = tracker->view(); row && row->layer()) {
+      row->layer()->GetAnimator()->StopAnimating();
+      row->DestroyLayer();
+    }
+  }
 }
 
 void SidebarView::SetNewTabIntent(bool intent) {

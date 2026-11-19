@@ -1,5 +1,5 @@
 diff --git a/chrome/browser/ui/views/frame/browser_view.cc b/chrome/browser/ui/views/frame/browser_view.cc
-index 7b568f6de760af21d6e9d2aa44415a7cef617c51..856c3bc6a3548f16a9ef40c098f7199b95399759 100644
+index 7b568f6de760af21d6e9d2aa44415a7cef617c51..84e589d0294efa3abaef249ebf7d81b2601c34ec 100644
 --- a/chrome/browser/ui/views/frame/browser_view.cc
 +++ b/chrome/browser/ui/views/frame/browser_view.cc
 @@ -22,6 +22,7 @@
@@ -2071,7 +2071,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..856c3bc6a3548f16a9ef40c098f7199b
  
      if (dialog_anchor_) {
        rect.Offset(0, -kAdditionalDialogToolbarOverlap);
-@@ -5197,6 +6835,241 @@ void BrowserView::AddedToWidget() {
+@@ -5197,6 +6835,248 @@ void BrowserView::AddedToWidget() {
        kFallbackPopupAnchorElementId, *this);
  
    initialized_ = true;
@@ -2246,6 +2246,13 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..856c3bc6a3548f16a9ef40c098f7199b
 +                  view->RestoreFocus();
 +                }
 +              },
++              myarc_workspace_weak_factory_.GetWeakPtr()),
++          base::BindRepeating(
++              [](base::WeakPtr<BrowserView> view, base::TimeDelta delay) {
++                return view && view->myarc_workspace_sidebar_
++                           ? view->myarc_workspace_sidebar_->SettleRows(delay)
++                           : base::TimeDelta();
++              },
 +              myarc_workspace_weak_factory_.GetWeakPtr()));
 +    }
 +  }
@@ -2313,7 +2320,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..856c3bc6a3548f16a9ef40c098f7199b
  }
  
  void BrowserView::RemovedFromWidget() {
-@@ -5267,112 +7140,2874 @@ const views::View* BrowserView::GetViewByElementId(
+@@ -5267,112 +7147,2874 @@ const views::View* BrowserView::GetViewByElementId(
  ///////////////////////////////////////////////////////////////////////////////
  // BrowserView, ui::AcceleratorTarget overrides:
  
@@ -5273,7 +5280,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..856c3bc6a3548f16a9ef40c098f7199b
    }
  
    if (!bookmark_bar_view_) {
-@@ -5471,6 +10106,10 @@ bool BrowserView::MaybeUpdateDevtools(content::WebContents* contents) {
+@@ -5471,6 +10113,10 @@ bool BrowserView::MaybeUpdateDevtools(content::WebContents* contents) {
  
  void BrowserView::UpdateUIForContents(WebContents* contents,
                                        bool should_layout_immediately) {
@@ -5284,7 +5291,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..856c3bc6a3548f16a9ef40c098f7199b
    TRACE_EVENT0("ui", "BrowserView::UpdateUIForContents");
    bool needs_layout = MaybeShowBookmarkBar(contents);
  
-@@ -5706,6 +10345,26 @@ void BrowserView::LoadAccelerators() {
+@@ -5706,6 +10352,26 @@ void BrowserView::LoadAccelerators() {
    }
  
  #if BUILDFLAG(IS_MAC)

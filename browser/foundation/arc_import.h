@@ -25,7 +25,9 @@ namespace myarc {
 // cancelled or closed, the file was unreadable, or nothing was new. A commit
 // runs it right after the workspace is saved, inside the Import press and
 // before the report shows, so the caller can save the outcome before a kill
-// and should post any UI change.
+// and should post any UI change. `report_closed`, when given with `done`,
+// runs once the report after a commit closes, or once the import is over
+// when no report shows. In captures the report closes itself after 2 s.
 struct ArcImportOutcome {
   bool committed = false;
   // Lowercase hex SHA-256 of the export file.
@@ -36,7 +38,8 @@ struct ArcImportOutcome {
 using ArcImportDone = base::OnceCallback<void(const ArcImportOutcome&)>;
 void ImportFromArc(Profile& profile,
                    gfx::NativeWindow parent,
-                   ArcImportDone done = ArcImportDone());
+                   ArcImportDone done = ArcImportDone(),
+                   base::OnceClosure report_closed = base::OnceClosure());
 
 // For background captures: skips the file picker, reads `path` and shows the
 // preview without taking focus. A non-null `confirmed` presses Import after a
@@ -47,7 +50,8 @@ void ImportArcFileForCapture(
     gfx::NativeWindow parent,
     const base::FilePath& path,
     base::OnceCallback<void(uint64_t first_space)> confirmed,
-    ArcImportDone done = ArcImportDone());
+    ArcImportDone done = ArcImportDone(),
+    base::OnceClosure report_closed = base::OnceClosure());
 
 }  // namespace myarc
 

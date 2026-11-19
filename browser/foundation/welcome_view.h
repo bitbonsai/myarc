@@ -33,7 +33,8 @@ namespace myarc {
 // a strip splits off to the sidebar's place while the text sharpens in.
 // Under Reduce Motion the finished sheet fades in over 150 ms instead. A
 // press ends either at its final frame first. Once an import commits, the
-// colour field crossfades to the imported Space's theme. UI sequence only.
+// colour field crossfades to the imported Space's theme. The reveal ends it:
+// the sheet slides right as it fades and the dim lifts. UI sequence only.
 class WelcomeView : public views::AccessiblePaneView,
                     public views::ViewTargeterDelegate,
                     public gfx::AnimationDelegate {
@@ -66,6 +67,12 @@ class WelcomeView : public views::AccessiblePaneView,
   // Reduce Motion. Runs `done` once the field holds the new theme.
   void CrossfadeTo(SidebarTint tint, base::OnceClosure done);
 
+  // Starts the reveal's exit: the sheet slides 64 DIP right and fades, and
+  // the dim lifts, in 350 ms, or only fades in 150 ms under Reduce Motion.
+  // From here the sheet takes no events. Returns how long the exit takes;
+  // the caller removes the sheet after it.
+  base::TimeDelta Exit();
+
   // views::AccessiblePaneView:
   bool AcceleratorPressed(const ui::Accelerator& accelerator) override;
   void OnPaint(gfx::Canvas* canvas) override;
@@ -87,6 +94,9 @@ class WelcomeView : public views::AccessiblePaneView,
   void StartIntro();
   // Sets the text and buttons to the intro at `progress`, 0 to 1.
   void ApplyIntro(double progress);
+  // How far the exit has moved the sheet right, and how much of it shows.
+  float ExitShift() const;
+  float ExitOpacity() const;
 
   const RadiusCallback radius_;
   const ActionCallback action_;
@@ -107,6 +117,10 @@ class WelcomeView : public views::AccessiblePaneView,
   double theme_progress_ = 0;
   gfx::LinearAnimation theme_fade_;
   base::OnceClosure theme_done_;
+  // The reveal's exit, and how far it is, 0 to 1.
+  bool exiting_ = false;
+  double exit_progress_ = 0;
+  gfx::LinearAnimation exit_;
   base::WeakPtrFactory<WelcomeView> weak_factory_{this};
 };
 

@@ -1,10 +1,14 @@
 #ifndef MYARC_ONBOARDING_CONTROLLER_H_
 #define MYARC_ONBOARDING_CONTROLLER_H_
 
+#include <memory>
+
 #include "base/functional/callback.h"
 #include "base/memory/raw_ptr.h"
 #include "base/memory/weak_ptr.h"
 #include "base/scoped_observation.h"
+#include "base/time/time.h"
+#include "base/timer/timer.h"
 #include "myarc/bridge.rs.h"
 #include "myarc/welcome_view.h"
 #include "ui/views/view_observer.h"
@@ -15,13 +19,16 @@ class Profile;
 namespace myarc {
 
 struct ArcImportOutcome;
+class RevealFrames;
 
 // The welcome tour in one browser window, owned by BrowserView next to the
 // sidebar and destroyed before it. Feeds the tour's events to Rust through
 // the saved record and runs the effects it returns. Only one window shows
 // the welcome at a time. A committed import crossfades the welcome to the
-// first imported Space's theme. Later steps (reveal, practice, handoff)
-// aren't built yet, so a tour that reaches one of them ends as skipped. UI
+// first imported Space's theme. The reveal follows Start browsing, or a
+// committed import once its report closes: the sheet slides away and the
+// sidebar's rows settle in, then `reveal_done` moves the tour to practice 1.
+// Practice and handoff aren't built yet, so the tour then ends as skipped. UI
 // sequence only.
 //
 // With test hooks, --myarc-test-onboarding-event=skip_tour, start_browsing
@@ -32,17 +39,23 @@ struct ArcImportOutcome;
 // --myarc-test-onboarding-hold keeps the tour at the reveal after the
 // crossfade, so a capture can kill the browser there.
 // --myarc-test-onboarding-show-delay=<ms> holds the sheet back that long, and
-// --myarc-test-reduce-motion plays it as Reduce Motion does.
+// --myarc-test-reduce-motion plays it as Reduce Motion does. With
+// --myarc-test-onboarding, the reveal logs its length and frame gaps.
 class OnboardingController final : public views::ViewObserver {
  public:
   // `host` holds the sheet over `area`, the window's page area; both must
   // outlive this. `radius` gives the page area's corner radius.
   // `restore_focus` gives focus back to the window once the sheet closes.
+  // `settle_rows` runs the sidebar's row settle after the delay it gets and
+  // returns how long until its last row lands.
+  using SettleRowsCallback =
+      base::RepeatingCallback<base::TimeDelta(base::TimeDelta delay)>;
   OnboardingController(Profile& profile,
                        views::View& host,
                        views::View& area,
                        WelcomeView::RadiusCallback radius,
-                       base::RepeatingClosure restore_focus);
+                       base::RepeatingClosure restore_focus,
+                       SettleRowsCallback settle_rows);
   OnboardingController(const OnboardingController&) = delete;
   OnboardingController& operator=(const OnboardingController&) = delete;
   ~OnboardingController() override;
@@ -58,11 +71,18 @@ class OnboardingController final : public views::ViewObserver {
  private:
   void ShowWelcome(bool offers_import);
   void CloseWelcome();
+  // Gives focus back to the window if the sheet holds it.
+  void ReleaseFocus();
   void OnAction(WelcomeView::Action action);
   void OnImportDone(const ArcImportOutcome& outcome);
   // Crossfades the welcome to the theme of `space`, then runs the reveal.
   void ShowImported(uint64_t space);
   void OpenImport();
+  void OnReportClosed();
+  // The sheet slides away while the rows settle, then FinishReveal feeds
+  // `reveal_done`.
+  void StartReveal();
+  void FinishReveal();
   // Runs the effect of a saved transition.
   void Run(const foundation::OnboardingTransition& transition);
   void PressForTest();
@@ -72,10 +92,18 @@ class OnboardingController final : public views::ViewObserver {
   raw_ptr<views::View> area_;
   const WelcomeView::RadiusCallback radius_;
   const base::RepeatingClosure restore_focus_;
+  const SettleRowsCallback settle_rows_;
   raw_ptr<WelcomeView> sheet_ = nullptr;
   bool importing_ = false;
   // The welcome crossfades to the imported theme; the reveal follows.
   bool recolouring_ = false;
+  // The import's report shows; the reveal waits for it to close.
+  bool report_open_ = false;
+  bool revealing_ = false;
+  base::OneShotTimer reveal_timer_;
+  base::TimeTicks reveal_start_;
+  // Counts the reveal's frames for the test log.
+  std::unique_ptr<RevealFrames> reveal_frames_;
   [[maybe_unused]] bool test_event_scheduled_ = false;
   [[maybe_unused]] bool test_show_delayed_ = false;
   base::ScopedObservation<views::View, views::ViewObserver> area_observation_{

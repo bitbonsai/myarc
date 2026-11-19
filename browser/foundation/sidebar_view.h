@@ -291,6 +291,12 @@ class SidebarView final : public views::View,
   void SlideInSpace(const gfx::ImageSkia& outgoing,
                     const gfx::Point& origin,
                     int shift);
+  // The welcome tour's reveal. Hides up to eight of the current Space's rows
+  // that show, then settles them in from 12 DIP below, 35 ms apart, each in
+  // 300 ms, the first after `delay`. Rows past those eight stay as they are.
+  // Returns how long until the last row lands: zero when no row shows, and
+  // under Reduce Motion, which leaves every row in place.
+  base::TimeDelta SettleRows(base::TimeDelta delay);
   // Replaces the sidebar contents with the Library until back or Esc. Needs a
   // usable model.
   void OpenLibrary(LibrarySection section = LibrarySection::kSpaces);
@@ -653,6 +659,9 @@ class SidebarView final : public views::View,
   // new ones enter beside them, with no fade. +1 slides them right.
   gfx::LinearAnimation space_slide_{this};
   int space_slide_shift_ = 0;
+  // Rows SettleRows gave a layer, which drop it once they land.
+  void EndSettle();
+  std::vector<std::unique_ptr<views::ViewTracker>> settling_rows_;
   SEQUENCE_CHECKER(sequence_checker_);
   base::WeakPtrFactory<SidebarView> weak_factory_{this};
 };
