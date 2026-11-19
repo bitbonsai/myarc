@@ -99,6 +99,7 @@ source_set("workspace_service") {
     "//base",
   ]
   deps = [
+    ":onboarding_prefs",
     ":spaces_index",
     "//chrome/browser:browser_process",
     "//chrome/browser/profiles:profile",
@@ -273,6 +274,20 @@ source_set("control_prefs") {
   ]
   public_deps = [ "//base" ]
   deps = [ "//components/prefs" ]
+}
+
+# The welcome tour's Local State record and its first-run decision.
+source_set("onboarding_prefs") {
+  sources = [
+    "onboarding_prefs.cc",
+    "onboarding_prefs.h",
+  ]
+  deps = [
+    ":bridge",
+    ":test_buildflags",
+    "//base",
+    "//components/prefs",
+  ]
 }
 
 source_set("little_arc_prefs") {

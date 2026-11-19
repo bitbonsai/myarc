@@ -118,6 +118,60 @@ mod ffi {
         workspace_ready: bool,
     }
 
+    // A welcome tour event (onboarding.rs). StepDone and SkipStep carry
+    // `step`; ImportCommitted carries the receipt in `content_hash` and
+    // `space_ids`.
+    enum OnboardingEventKind {
+        StartBrowsing,
+        ImportStarted,
+        ImportCommitted,
+        ImportCancelled,
+        ImportFailed,
+        RevealDone,
+        StepDone,
+        SkipStep,
+        Back,
+        SkipTour,
+        Finish,
+        Replay,
+        WindowClosed,
+    }
+
+    struct OnboardingEvent {
+        kind: OnboardingEventKind,
+        step: u8,
+        content_hash: String,
+        space_ids: Vec<u64>,
+    }
+
+    // What the browser runs after it saved the new record. Show shows the
+    // tour's state, animated or not; Handoff fades out a skipped tour once.
+    enum OnboardingEffect {
+        None,
+        Show,
+        OpenImport,
+        Handoff,
+    }
+
+    // A decoded tour record. `state` is "welcome", "importing", "reveal",
+    // "practice", "handoff" or "complete"; `step` is the practice step, 0
+    // outside practice.
+    struct OnboardingTour {
+        state: String,
+        step: u8,
+        done: Vec<u8>,
+        skipped: Vec<u8>,
+        offers_import: bool,
+    }
+
+    // The record to save, before running `effect`, and what it decodes to.
+    struct OnboardingTransition {
+        record: String,
+        tour: OnboardingTour,
+        effect: OnboardingEffect,
+        animate: bool,
+    }
+
     // A command bar action (command_bar.rs). SwitchSpace carries the Space.
     enum CommandActionKind {
         PinTab,
@@ -910,6 +964,18 @@ mod ffi {
         // The index in `windows`, most recently used first, of the main
         // window "Open in" moves a Little Arc page to, or -1 for none.
         fn little_arc_move_target(windows: &[LittleArcMainWindow]) -> i64;
+        // The welcome tour once a Profile's workspace loaded. `record` is the
+        // saved pref, read only when `has_record`; `first_run` means the load
+        // found no workspace file and no backup.
+        fn onboarding_on_load(
+            has_record: bool,
+            record: &str,
+            first_run: bool,
+        ) -> OnboardingTransition;
+        // The tour after `event`, from the saved `record`.
+        fn onboarding_event(record: &str, event: &OnboardingEvent) -> OnboardingTransition;
+        // The saved `record` decoded. An unreadable one reads as complete.
+        fn onboarding_decode(record: &str) -> OnboardingTour;
 
         type ArcExport;
         // Largest export accepted, in bytes.
@@ -1313,6 +1379,83 @@ pub fn route_link_from_other_app(
             index: 0,
         },
     }
+}
+
+fn onboarding_tour(record: &workspace::onboarding::TourRecord) -> ffi::OnboardingTour {
+    use workspace::onboarding::{PRACTICE_STEPS, TourState, state_name};
+    let steps = |of: fn(&workspace::onboarding::TourRecord, u8) -> bool| {
+        (1..=PRACTICE_STEPS)
+            .filter(|step| of(record, *step))
+            .collect()
+    };
+    ffi::OnboardingTour {
+        state: state_name(record.state).to_owned(),
+        step: match record.state {
+            TourState::Practice(step) => step,
+            _ => 0,
+        },
+        done: steps(workspace::onboarding::TourRecord::is_done),
+        skipped: steps(workspace::onboarding::TourRecord::is_skipped),
+        offers_import: record.offers_import(),
+    }
+}
+
+fn onboarding_transition(
+    transition: workspace::onboarding::Transition,
+) -> ffi::OnboardingTransition {
+    use workspace::onboarding::{TourEffect, encode};
+    let (effect, animate) = match transition.effect {
+        TourEffect::None => (ffi::OnboardingEffect::None, false),
+        TourEffect::Show { animate } => (ffi::OnboardingEffect::Show, animate),
+        TourEffect::OpenImport => (ffi::OnboardingEffect::OpenImport, false),
+        TourEffect::Handoff => (ffi::OnboardingEffect::Handoff, true),
+    };
+    ffi::OnboardingTransition {
+        record: encode(&transition.record),
+        tour: onboarding_tour(&transition.record),
+        effect,
+        animate,
+    }
+}
+
+pub fn onboarding_on_load(
+    has_record: bool,
+    record: &str,
+    first_run: bool,
+) -> ffi::OnboardingTransition {
+    onboarding_transition(workspace::onboarding::on_load(
+        has_record.then_some(record),
+        first_run,
+    ))
+}
+
+pub fn onboarding_event(record: &str, event: &ffi::OnboardingEvent) -> ffi::OnboardingTransition {
+    use workspace::onboarding::{ImportReceipt, TourEvent, apply, decode};
+    let event = match event.kind {
+        ffi::OnboardingEventKind::StartBrowsing => TourEvent::StartBrowsing,
+        ffi::OnboardingEventKind::ImportStarted => TourEvent::ImportStarted,
+        ffi::OnboardingEventKind::ImportCommitted => TourEvent::ImportCommitted(ImportReceipt {
+            content_hash: event.content_hash.clone(),
+            space_ids: event.space_ids.clone(),
+        }),
+        ffi::OnboardingEventKind::ImportCancelled => TourEvent::ImportCancelled,
+        ffi::OnboardingEventKind::ImportFailed => TourEvent::ImportFailed,
+        ffi::OnboardingEventKind::RevealDone => TourEvent::RevealDone,
+        ffi::OnboardingEventKind::StepDone => TourEvent::StepDone(event.step),
+        ffi::OnboardingEventKind::SkipStep => TourEvent::SkipStep(event.step),
+        ffi::OnboardingEventKind::Back => TourEvent::Back,
+        ffi::OnboardingEventKind::SkipTour => TourEvent::SkipTour,
+        ffi::OnboardingEventKind::Finish => TourEvent::Finish,
+        ffi::OnboardingEventKind::Replay => TourEvent::Replay,
+        // WindowClosed, and any value C++ should never send, changes at most
+        // an open import back to the welcome.
+        _ => TourEvent::WindowClosed,
+    };
+    onboarding_transition(apply(&decode(record), event))
+}
+
+pub fn onboarding_decode(record: &str) -> ffi::OnboardingTour {
+    onboarding_tour(&workspace::onboarding::decode(record))
 }
 
 pub fn little_arc_move_target(windows: &[ffi::LittleArcMainWindow]) -> i64 {

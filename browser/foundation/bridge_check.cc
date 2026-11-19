@@ -1402,6 +1402,57 @@ bool CheckSpacesIndex() {
          myarc::kMaxIndexedProfiles + 1;
 }
 
+// The welcome tour record round trip across the bridge: a fresh workspace
+// starts at the welcome, an existing one gets a finished tour, an event's
+// record decodes to the same tour, and a damaged record reads as finished.
+bool CheckOnboarding() {
+  using namespace myarc::foundation;
+  auto fresh = onboarding_on_load(false, "", true);
+  if (std::string(fresh.tour.state) != "welcome" ||
+      fresh.effect != OnboardingEffect::Show || !fresh.animate ||
+      !fresh.tour.offers_import) {
+    return false;
+  }
+  auto existing = onboarding_on_load(false, "", false);
+  if (std::string(existing.tour.state) != "complete" ||
+      existing.effect != OnboardingEffect::None) {
+    return false;
+  }
+  OnboardingEvent event;
+  event.kind = OnboardingEventKind::ImportStarted;
+  auto importing = onboarding_event(std::string(fresh.record), event);
+  if (importing.effect != OnboardingEffect::OpenImport) {
+    return false;
+  }
+  event.kind = OnboardingEventKind::ImportCommitted;
+  event.content_hash = "ab12";
+  event.space_ids.push_back(5);
+  auto revealed = onboarding_event(std::string(importing.record), event);
+  if (std::string(revealed.tour.state) != "reveal" ||
+      revealed.tour.offers_import) {
+    return false;
+  }
+  // A relaunch mid-reveal resumes at practice 1, without animation.
+  auto resumed = onboarding_on_load(true, std::string(revealed.record), false);
+  if (std::string(resumed.tour.state) != "practice" ||
+      resumed.tour.step != 1 || resumed.animate) {
+    return false;
+  }
+  OnboardingEvent skip;
+  skip.kind = OnboardingEventKind::SkipStep;
+  skip.step = 1;
+  auto skipped = onboarding_event(std::string(resumed.record), skip);
+  auto decoded = onboarding_decode(std::string(skipped.record));
+  if (decoded.state != skipped.tour.state || decoded.step != 2 ||
+      decoded.skipped.size() != 1 || decoded.skipped[0] != 1 ||
+      !decoded.done.empty() || decoded.offers_import) {
+    return false;
+  }
+  return std::string(onboarding_decode("{broken").state) == "complete" &&
+         std::string(onboarding_on_load(true, "{broken", true).tour.state) ==
+             "complete";
+}
+
 }  // namespace
 
 int main() {
@@ -1526,12 +1577,16 @@ int main() {
     std::cerr << "Split checks failed\n";
     return 27;
   }
+  if (!CheckOnboarding()) {
+    std::cerr << "Onboarding checks failed\n";
+    return 28;
+  }
   std::cout << "7 legacy C++/Rust checks passed, including 1000 ownership "
                "round trips; workspace transitions, Space 1 deletion and "
                "metadata codec, saved title, Archived Tabs, Auto Archive, "
                "archive timer, Clear Archive, downloads stack, dormant "
                "temporary item, Space reorder, Space icon, Space theme, first "
                "Space, Spaces index, agent Space, folder, rename and drop, and "
-               "split checks passed\n";
+               "split and onboarding checks passed\n";
   return 0;
 }

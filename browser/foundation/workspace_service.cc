@@ -24,6 +24,7 @@
 #include "chrome/browser/browser_process.h"
 #include "chrome/browser/profiles/profile.h"
 #include "content/public/browser/browser_thread.h"
+#include "myarc/onboarding_prefs.h"
 #include "myarc/spaces_index.h"
 #include "url/gurl.h"
 
@@ -653,6 +654,8 @@ void WorkspaceService::RetryLoad() {
 
 void WorkspaceService::OnLoaded(internal::MetadataResult result) {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
+  // No workspace file and no backup: a fresh workspace.
+  const bool first_run = !result.snapshot && result.error.empty();
   if (result.snapshot) {
     auto restored =
         foundation::restore_snapshot(*workspace_, std::move(*result.snapshot));
@@ -675,6 +678,9 @@ void WorkspaceService::OnLoaded(internal::MetadataResult result) {
     Save();
     // Brings the index up to date after edits by an older build or by hand.
     UpdateSpacesIndex();
+    DecideOnboardingOnLoad(
+        g_browser_process ? g_browser_process->local_state() : nullptr,
+        first_run, profile_dir_);
   }
   changed_.Notify();
   // A callback may destroy this service, so run them from a local list.

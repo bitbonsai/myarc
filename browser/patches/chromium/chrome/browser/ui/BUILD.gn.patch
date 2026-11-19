@@ -1,5 +1,5 @@
 diff --git a/chrome/browser/ui/BUILD.gn b/chrome/browser/ui/BUILD.gn
-index 0772e0c6b5cd4c0577f9d89ee0820fc7fc8d7c5f..098f0c9ca74ea042185e8808de14b5ca01abe533 100644
+index 0772e0c6b5cd4c0577f9d89ee0820fc7fc8d7c5f..2c7ba59bf1a7ae3842b669833ebff4d7ecaaa89e 100644
 --- a/chrome/browser/ui/BUILD.gn
 +++ b/chrome/browser/ui/BUILD.gn
 @@ -516,6 +516,7 @@ if (!is_android) {
@@ -55,18 +55,19 @@ index 0772e0c6b5cd4c0577f9d89ee0820fc7fc8d7c5f..098f0c9ca74ea042185e8808de14b5ca
        "//pdf:features",
        "//printing/buildflags",
        "//ui/actions",
-@@ -1061,6 +1072,10 @@ source_set("browser_ui_prefs") {
+@@ -1061,6 +1072,11 @@ source_set("browser_ui_prefs") {
      "//components/prefs",
      "//components/sharing_message",
      "//components/translate/core/browser:translate_pref_names",
 +    "//myarc:blocker",
 +    "//myarc:control_prefs",
 +    "//myarc:little_arc_prefs",
++    "//myarc:onboarding_prefs",
 +    "//myarc:spaces_index",
    ]
    if (is_win && is_chrome_branded) {
      deps += [ "//chrome/browser/win/installer_downloader:prefs" ]
-@@ -1834,6 +1849,7 @@ if (!is_android) {
+@@ -1834,6 +1850,7 @@ if (!is_android) {
        "//chrome/browser/resource_coordinator:utils",
        "//chrome/browser/search:test_support",
        "//chrome/browser/tab_group_sync:factories",
@@ -74,7 +75,7 @@ index 0772e0c6b5cd4c0577f9d89ee0820fc7fc8d7c5f..098f0c9ca74ea042185e8808de14b5ca
        "//chrome/browser/ui/actions:actions_util",
        "//chrome/browser/ui/browser_active_state_manager",
        "//chrome/browser/ui/browser_ui_controller",
-@@ -1842,11 +1858,13 @@ if (!is_android) {
+@@ -1842,11 +1859,13 @@ if (!is_android) {
        "//chrome/browser/ui/dialogs:browser_dialogs",
        "//chrome/browser/ui/exclusive_access",
        "//chrome/browser/ui/fullscreen",
@@ -88,7 +89,7 @@ index 0772e0c6b5cd4c0577f9d89ee0820fc7fc8d7c5f..098f0c9ca74ea042185e8808de14b5ca
        "//chrome/browser/ui/views/frame:browser_view_header",
        "//chrome/browser/ui/webui/management",
        "//chrome/browser/ui/window_feature_controller",
-@@ -1861,6 +1879,7 @@ if (!is_android) {
+@@ -1861,6 +1880,7 @@ if (!is_android) {
        "//components/bookmarks/test",
        "//components/breadcrumbs/core",
        "//components/breadcrumbs/core:status",
@@ -96,7 +97,7 @@ index 0772e0c6b5cd4c0577f9d89ee0820fc7fc8d7c5f..098f0c9ca74ea042185e8808de14b5ca
        "//components/commerce/core:pref_names",
        "//components/embedder_support",
        "//components/javascript_dialogs",
-@@ -1872,6 +1891,8 @@ if (!is_android) {
+@@ -1872,6 +1892,8 @@ if (!is_android) {
        "//content/public/browser",
        "//content/public/common",
        "//content/test:test_support",
@@ -105,7 +106,7 @@ index 0772e0c6b5cd4c0577f9d89ee0820fc7fc8d7c5f..098f0c9ca74ea042185e8808de14b5ca
        "//net:test_support",
        "//testing/gmock",
        "//testing/gtest",
-@@ -1879,6 +1900,14 @@ if (!is_android) {
+@@ -1879,6 +1901,14 @@ if (!is_android) {
        "//third_party/fuzztest",
        "//ui/native_window_tracker",
      ]
