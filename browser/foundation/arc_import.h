@@ -22,7 +22,10 @@ namespace myarc {
 //
 // `done`, when given, runs once the import is over: committed when Import
 // wrote something, and not committed when the picker or the preview was
-// cancelled or closed, the file was unreadable, or nothing was new.
+// cancelled or closed, the file was unreadable, or nothing was new. A commit
+// runs it right after the workspace is saved, inside the Import press and
+// before the report shows, so the caller can save the outcome before a kill
+// and should post any UI change.
 struct ArcImportOutcome {
   bool committed = false;
   // Lowercase hex SHA-256 of the export file.
@@ -38,12 +41,13 @@ void ImportFromArc(Profile& profile,
 // For background captures: skips the file picker, reads `path` and shows the
 // preview without taking focus. A non-null `confirmed` presses Import after a
 // short delay and gets the export's first Space, or 0 when nothing was
-// imported.
+// imported. `done` runs as ImportFromArc's does.
 void ImportArcFileForCapture(
     Profile& profile,
     gfx::NativeWindow parent,
     const base::FilePath& path,
-    base::OnceCallback<void(uint64_t first_space)> confirmed);
+    base::OnceCallback<void(uint64_t first_space)> confirmed,
+    ArcImportDone done = ArcImportDone());
 
 }  // namespace myarc
 

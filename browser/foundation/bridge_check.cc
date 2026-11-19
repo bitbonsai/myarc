@@ -1429,7 +1429,8 @@ bool CheckOnboarding() {
   event.space_ids.push_back(5);
   auto revealed = onboarding_event(std::string(importing.record), event);
   if (std::string(revealed.tour.state) != "reveal" ||
-      revealed.tour.offers_import) {
+      revealed.effect != OnboardingEffect::Imported ||
+      revealed.tour.theme_space != 5 || revealed.tour.offers_import) {
     return false;
   }
   // A relaunch mid-reveal resumes at practice 1, without animation.

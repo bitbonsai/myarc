@@ -44,6 +44,8 @@ const char* EffectName(foundation::OnboardingEffect effect) {
       return "open-import";
     case foundation::OnboardingEffect::Handoff:
       return "handoff";
+    case foundation::OnboardingEffect::Imported:
+      return "imported";
     default:
       return "none";
   }
@@ -96,7 +98,9 @@ void DecideOnboardingOnLoad(PrefService* local_state,
 
 std::optional<foundation::OnboardingTour> ReadOnboardingTour(
     PrefService& local_state) {
-  if (!local_state.FindPreference(kOnboardingTourPref) ||
+  // Until this run's first load decides, the saved record is last run's, and
+  // reading it would skip the relaunch rules.
+  if (!g_decided || !local_state.FindPreference(kOnboardingTourPref) ||
       !local_state.HasPrefPath(kOnboardingTourPref)) {
     return std::nullopt;
   }

@@ -33,7 +33,8 @@ void DecideOnboardingOnLoad(PrefService* local_state,
                             bool first_run,
                             const std::string& profile_dir);
 
-// The saved tour, or nothing while no load decided it yet.
+// The saved tour, or nothing while no load in this run decided it yet, so a
+// relaunch always passes through the decision first.
 std::optional<foundation::OnboardingTour> ReadOnboardingTour(
     PrefService& local_state);
 

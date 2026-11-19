@@ -146,11 +146,14 @@ mod ffi {
 
     // What the browser runs after it saved the new record. Show shows the
     // tour's state, animated or not; Handoff fades out a skipped tour once.
+    // Imported crossfades the welcome to the theme of the tour's
+    // `theme_space`, then shows the reveal.
     enum OnboardingEffect {
         None,
         Show,
         OpenImport,
         Handoff,
+        Imported,
     }
 
     // A decoded tour record. `state` is "welcome", "importing", "reveal",
@@ -162,6 +165,8 @@ mod ffi {
         done: Vec<u8>,
         skipped: Vec<u8>,
         offers_import: bool,
+        // The first Space the tour's import committed, or 0.
+        theme_space: u64,
     }
 
     // The record to save, before running `effect`, and what it decodes to.
@@ -1397,6 +1402,7 @@ fn onboarding_tour(record: &workspace::onboarding::TourRecord) -> ffi::Onboardin
         done: steps(workspace::onboarding::TourRecord::is_done),
         skipped: steps(workspace::onboarding::TourRecord::is_skipped),
         offers_import: record.offers_import(),
+        theme_space: record.theme_space().unwrap_or(0),
     }
 }
 
@@ -1409,6 +1415,7 @@ fn onboarding_transition(
         TourEffect::Show { animate } => (ffi::OnboardingEffect::Show, animate),
         TourEffect::OpenImport => (ffi::OnboardingEffect::OpenImport, false),
         TourEffect::Handoff => (ffi::OnboardingEffect::Handoff, true),
+        TourEffect::Imported => (ffi::OnboardingEffect::Imported, true),
     };
     ffi::OnboardingTransition {
         record: encode(&transition.record),

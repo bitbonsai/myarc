@@ -26,6 +26,7 @@
 #include "ui/gfx/color_utils.h"
 #include "ui/gfx/font_list.h"
 #include "ui/gfx/geometry/insets.h"
+#include "ui/gfx/geometry/point_conversions.h"
 #include "ui/gfx/geometry/point_f.h"
 #include "ui/gfx/geometry/rect_f.h"
 #include "ui/gfx/geometry/size.h"
@@ -73,6 +74,8 @@ constexpr SkAlpha kDimDark = 0x73;
 // The intro. Each phase is a window of milliseconds within it.
 constexpr base::TimeDelta kIntro = base::Milliseconds(1000);
 constexpr base::TimeDelta kReducedFade = base::Milliseconds(150);
+// The field's crossfade to an imported Space's theme.
+constexpr base::TimeDelta kThemeFade = base::Milliseconds(350);
 constexpr int kIntroFrameRate = 60;
 struct Phase {
   int start;
@@ -181,7 +184,10 @@ WelcomeView::WelcomeView(bool offers_import,
     : radius_(std::move(radius)),
       action_(std::move(action)),
       reduced_motion_(gfx::Animation::PrefersReducedMotion()),
-      intro_(kIntro, kIntroFrameRate, this) {
+      intro_(kIntro, kIntroFrameRate, this),
+      theme_fade_(reduced_motion_ ? kReducedFade : kThemeFade,
+                  kIntroFrameRate,
+                  this) {
   SetPaintToLayer();
   layer()->SetFillsBoundsOpaquely(false);
   SetEventTargeter(std::make_unique<views::ViewTargeter>(this));
@@ -289,6 +295,16 @@ void WelcomeView::FinishIntro() {
   SchedulePaint();
 }
 
+void WelcomeView::CrossfadeTo(SidebarTint tint, base::OnceClosure done) {
+  FinishIntro();
+  import_->SetText(kImported);
+  import_->SetEnabled(false);
+  theme_ = tint;
+  theme_done_ = std::move(done);
+  theme_progress_ = 0;
+  theme_fade_.Start();
+}
+
 void WelcomeView::StartIntro() {
   if (reduced_motion_) {
     views::AnimationBuilder()
@@ -326,12 +342,25 @@ bool WelcomeView::DoesIntersectRect(const views::View* target,
 }
 
 void WelcomeView::AnimationProgressed(const gfx::Animation* animation) {
+  if (animation == &theme_fade_) {
+    theme_progress_ = animation->GetCurrentValue();
+    SchedulePaint();
+    return;
+  }
   progress_ = animation->GetCurrentValue();
   ApplyIntro(progress_);
   SchedulePaint();
 }
 
 void WelcomeView::AnimationEnded(const gfx::Animation* animation) {
+  if (animation == &theme_fade_) {
+    theme_progress_ = 1;
+    SchedulePaint();
+    if (theme_done_) {
+      std::move(theme_done_).Run();
+    }
+    return;
+  }
   progress_ = 1;
   ApplyIntro(1);
   SchedulePaint();
@@ -419,6 +448,19 @@ void WelcomeView::OnPaint(gfx::Canvas* canvas) {
     canvas->DrawRoundRect(
         field, gfx::Tween::FloatValueBetween(grow, kSeedSize / 2, radius),
         flags);
+  }
+
+  // An imported Space's theme, a second gradient fading in over the field,
+  // diagonal like the sidebar's tint.
+  if (theme_ && theme_progress_ > 0 && !sheet.IsEmpty()) {
+    cc::PaintFlags flags;
+    flags.setAntiAlias(true);
+    flags.setAlphaf(static_cast<float>(
+        gfx::Tween::CalculateValue(gfx::Tween::EASE_OUT, theme_progress_)));
+    flags.setShader(gfx::CreateGradientShader(
+        gfx::ToRoundedPoint(sheet.origin()),
+        gfx::ToRoundedPoint(sheet.bottom_right()), theme_->start, theme_->end));
+    canvas->DrawRoundRect(sheet, radius, flags);
   }
 
   // A strip splits off the sheet's left edge and slides into the sidebar's

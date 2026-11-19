@@ -1,9 +1,12 @@
 #ifndef MYARC_WELCOME_VIEW_H_
 #define MYARC_WELCOME_VIEW_H_
 
+#include <optional>
+
 #include "base/functional/callback.h"
 #include "base/memory/raw_ptr.h"
 #include "base/memory/weak_ptr.h"
+#include "myarc/sidebar_tint.h"
 #include "ui/base/metadata/metadata_header_macros.h"
 #include "ui/gfx/animation/animation_delegate.h"
 #include "ui/gfx/animation/linear_animation.h"
@@ -29,7 +32,8 @@ namespace myarc {
 // in from the window's edges and meet in the middle, grow into the sheet, and
 // a strip splits off to the sidebar's place while the text sharpens in.
 // Under Reduce Motion the finished sheet fades in over 150 ms instead. A
-// press ends either at its final frame first. UI sequence only.
+// press ends either at its final frame first. Once an import commits, the
+// colour field crossfades to the imported Space's theme. UI sequence only.
 class WelcomeView : public views::AccessiblePaneView,
                     public views::ViewTargeterDelegate,
                     public gfx::AnimationDelegate {
@@ -56,6 +60,11 @@ class WelcomeView : public views::AccessiblePaneView,
 
   // Jumps the intro, or its reduced fade, to its final frame.
   void FinishIntro();
+
+  // Ends the intro, shows Import from Arc… as done and crossfades the colour
+  // field to `tint`, a Space's sidebar tint, in 350 ms, or 150 ms under
+  // Reduce Motion. Runs `done` once the field holds the new theme.
+  void CrossfadeTo(SidebarTint tint, base::OnceClosure done);
 
   // views::AccessiblePaneView:
   bool AcceleratorPressed(const ui::Accelerator& accelerator) override;
@@ -93,6 +102,11 @@ class WelcomeView : public views::AccessiblePaneView,
   bool intro_started_ = false;
   double progress_ = 0;
   gfx::LinearAnimation intro_;
+  // The theme the field crossfades to, and how far, 0 to 1.
+  std::optional<SidebarTint> theme_;
+  double theme_progress_ = 0;
+  gfx::LinearAnimation theme_fade_;
+  base::OnceClosure theme_done_;
   base::WeakPtrFactory<WelcomeView> weak_factory_{this};
 };
 

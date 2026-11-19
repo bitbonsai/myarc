@@ -301,6 +301,7 @@ source_set("onboarding") {
   ]
   public_deps = [
     ":bridge",
+    ":sidebar_tint",
     "//base",
     "//ui/views",
   ]
@@ -308,6 +309,7 @@ source_set("onboarding") {
     ":arc_import",
     ":onboarding_prefs",
     ":test_buildflags",
+    ":workspace_service",
     "//cc/paint",
     "//chrome/browser:browser_process",
     "//chrome/browser/profiles:profile",

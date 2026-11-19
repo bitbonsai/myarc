@@ -40,9 +40,11 @@ constexpr size_t kShownLines = 10;
 
 using Confirmed = base::OnceCallback<void(uint64_t)>;
 
-// Runs the caller's ArcImportDone once the last step holding it lets go: the
-// picker, the preview's buttons or the apply. Posted, since the last release
-// may happen while a dialog closes.
+// Runs the caller's ArcImportDone. A commit runs it at once, before anything
+// else, so the caller can save it before a kill. Otherwise it runs once the
+// last step holding it lets go: the picker, the preview's buttons or the
+// apply. Posted then, since the last release may happen while a dialog
+// closes.
 class Outcome : public base::RefCounted<Outcome> {
  public:
   explicit Outcome(ArcImportDone done) : done_(std::move(done)) {}
@@ -54,6 +56,9 @@ class Outcome : public base::RefCounted<Outcome> {
     outcome_.content_hash = std::move(content_hash);
     if (first_space) {
       outcome_.space_ids = {first_space};
+    }
+    if (done_) {
+      std::move(done_).Run(outcome_);
     }
   }
 
@@ -417,8 +422,10 @@ void ImportFromArc(Profile& profile,
 void ImportArcFileForCapture(Profile& profile,
                              gfx::NativeWindow parent,
                              const base::FilePath& path,
-                             Confirmed confirmed) {
-  Read(profile.GetWeakPtr(), parent, /*inactive=*/true, path, nullptr,
+                             Confirmed confirmed,
+                             ArcImportDone done) {
+  Read(profile.GetWeakPtr(), parent, /*inactive=*/true, path,
+       done ? base::MakeRefCounted<Outcome>(std::move(done)) : nullptr,
        std::move(confirmed));
 }
 

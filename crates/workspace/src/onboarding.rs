@@ -100,6 +100,14 @@ impl TourRecord {
         self.receipt.is_none()
     }
 
+    /// The Space whose theme the welcome's colour field crossfades to once an import
+    /// commits: the first Space the commit reported.
+    pub fn theme_space(&self) -> Option<SpaceId> {
+        self.receipt
+            .as_ref()
+            .and_then(|receipt| receipt.space_ids.first().copied())
+    }
+
     /// True when an export with this hash was already imported through the tour.
     pub fn imported(&self, content_hash: &str) -> bool {
         self.receipt
@@ -147,6 +155,9 @@ pub enum TourEffect {
     Show { animate: bool },
     /// Run the existing Import from Arc… dialog.
     OpenImport,
+    /// An import committed and its receipt is saved: crossfade the welcome's colour
+    /// field to `TourRecord::theme_space`'s theme, then show the reveal.
+    Imported,
     /// The tour was skipped and is already saved complete; fade out through the
     /// handoff once.
     Handoff,
@@ -207,7 +218,7 @@ pub fn apply(record: &TourRecord, event: TourEvent) -> Transition {
                 next.receipt = Some(receipt);
             }
             next.state = Reveal;
-            shown
+            TourEffect::Imported
         }
         (Importing, TourEvent::ImportCancelled | TourEvent::ImportFailed) => {
             next.state = Welcome;
@@ -686,7 +697,7 @@ mod tests {
         let committed = apply(&started.record, TourEvent::ImportCommitted(receipt()));
         assert_eq!(committed.record.state, Reveal);
         assert_eq!(committed.record.receipt, Some(receipt()));
-        assert_eq!(committed.effect, TourEffect::Show { animate: true });
+        assert_eq!(committed.effect, TourEffect::Imported);
         // A kill right after the commit keeps the receipt.
         let resumed = relaunch(&committed.record).record;
         assert_eq!(resumed.receipt, Some(receipt()));
@@ -830,6 +841,57 @@ mod tests {
             space_ids: vec![],
         };
         assert!(!long.valid());
+    }
+
+    #[test]
+    fn import_crossfades_to_the_first_imported_space() {
+        let committed = apply(&at(Importing), TourEvent::ImportCommitted(receipt()));
+        assert_eq!(committed.effect, TourEffect::Imported);
+        assert_eq!(committed.record.theme_space(), Some(5));
+        // A commit that reported no Space crossfades to the default theme.
+        let empty = ImportReceipt {
+            content_hash: "ab12".to_owned(),
+            space_ids: vec![],
+        };
+        let committed = apply(&at(Importing), TourEvent::ImportCommitted(empty));
+        assert_eq!(committed.effect, TourEffect::Imported);
+        assert_eq!(committed.record.theme_space(), None);
+        assert_eq!(TourRecord::fresh().theme_space(), None);
+    }
+
+    #[test]
+    fn kill_after_the_commit_resumes_past_the_welcome_without_import() {
+        // The record is saved at the commit, so a kill before the tour moves on
+        // relaunches at the reveal's resume point, never back at the welcome.
+        let committed = apply(&TourRecord::fresh(), TourEvent::ImportStarted).record;
+        let committed = apply(&committed, TourEvent::ImportCommitted(receipt())).record;
+        let resumed = relaunch(&committed);
+        assert_eq!(resumed.record.state, Practice(1));
+        assert_eq!(resumed.effect, TourEffect::Show { animate: false });
+        assert!(!resumed.record.offers_import());
+        assert_eq!(resumed.record.theme_space(), Some(5));
+        // A second relaunch, and a window closing on the way, keep it there.
+        let again = relaunch(&apply(&resumed.record, TourEvent::WindowClosed).record);
+        assert_eq!(again.record, resumed.record);
+        // Nothing in the resumed tour opens the import again.
+        for event in [TourEvent::ImportStarted, TourEvent::Back] {
+            let next = apply(&resumed.record, event.clone());
+            assert_ne!(next.effect, TourEffect::OpenImport, "{event:?}");
+        }
+    }
+
+    #[test]
+    fn a_second_commit_never_replaces_the_receipt() {
+        let committed = apply(&at(Importing), TourEvent::ImportCommitted(receipt())).record;
+        let other = ImportReceipt {
+            content_hash: "cd34".to_owned(),
+            space_ids: vec![9],
+        };
+        for record in [committed.clone(), relaunch(&committed).record] {
+            let next = apply(&record, TourEvent::ImportCommitted(other.clone()));
+            assert_eq!(next.record, record);
+            assert_eq!(next.effect, TourEffect::None);
+        }
     }
 
     #[test]

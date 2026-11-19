@@ -57,8 +57,11 @@
 #   ONBOARDING=<state> seeds the welcome tour record at that state via
 #   --myarc-test-onboarding=<state> (welcome, reveal, practice1…3, handoff,
 #   complete) and logs each decision; ONBOARDING=1 only logs.
-#   ONBOARDING_EVENT=skip_tour (or start_browsing) presses that welcome
-#   button a second after the sheet shows. Both need myarc_test_hooks.
+#   ONBOARDING_EVENT=skip_tour (or start_browsing, import) presses that
+#   welcome button a second after the sheet shows. ONBOARDING_IMPORT=<file>
+#   makes Import from Arc… read that export instead of asking, and press
+#   Import in its preview. ONBOARDING_HOLD=1 keeps the tour at the reveal
+#   after the import's crossfade. All need myarc_test_hooks.
 #   SCRIPT=<file> runs that bash script once the window settles, before the
 #   capture, with PID and MYARC_CONTROL_DIR set; it can drive myarc and
 #   take its own shots with bgcapture.swift.
@@ -130,6 +133,8 @@ if [ "${1:-}" = "--inner" ]; then
     *) EXTRA+=(--myarc-test-onboarding="$ONBOARDING") ;;
   esac
   [ -n "${ONBOARDING_EVENT:-}" ] && EXTRA+=(--myarc-test-onboarding-event="$ONBOARDING_EVENT")
+  [ -n "${ONBOARDING_IMPORT:-}" ] && EXTRA+=(--myarc-test-onboarding-import="$ONBOARDING_IMPORT")
+  [ -n "${ONBOARDING_HOLD:-}" ] && EXTRA+=(--myarc-test-onboarding-hold)
   [ -n "${ARGS:-}" ] && read -r -a MORE <<< "$ARGS" && EXTRA+=("${MORE[@]}")
   OPEN_ENV=()
   if [ -n "${CONTROL:-}" ]; then

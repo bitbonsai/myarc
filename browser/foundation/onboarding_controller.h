@@ -19,13 +19,18 @@ struct ArcImportOutcome;
 // The welcome tour in one browser window, owned by BrowserView next to the
 // sidebar and destroyed before it. Feeds the tour's events to Rust through
 // the saved record and runs the effects it returns. Only one window shows
-// the welcome at a time. Later steps (reveal, practice, handoff) aren't
-// built yet, so a tour that reaches one of them ends as skipped. UI sequence
-// only.
+// the welcome at a time. A committed import crossfades the welcome to the
+// first imported Space's theme. Later steps (reveal, practice, handoff)
+// aren't built yet, so a tour that reaches one of them ends as skipped. UI
+// sequence only.
 //
-// With test hooks, --myarc-test-onboarding-event=skip_tour or start_browsing
-// presses that button a second after the sheet shows, or
+// With test hooks, --myarc-test-onboarding-event=skip_tour, start_browsing
+// or import presses that button a second after the sheet shows, or
 // --myarc-test-onboarding-event-delay=<ms> after it.
+// --myarc-test-onboarding-import=<file> imports that export instead of
+// asking for one, pressing Import in the preview.
+// --myarc-test-onboarding-hold keeps the tour at the reveal after the
+// crossfade, so a capture can kill the browser there.
 // --myarc-test-onboarding-show-delay=<ms> holds the sheet back that long, and
 // --myarc-test-reduce-motion plays it as Reduce Motion does.
 class OnboardingController final : public views::ViewObserver {
@@ -55,6 +60,9 @@ class OnboardingController final : public views::ViewObserver {
   void CloseWelcome();
   void OnAction(WelcomeView::Action action);
   void OnImportDone(const ArcImportOutcome& outcome);
+  // Crossfades the welcome to the theme of `space`, then runs the reveal.
+  void ShowImported(uint64_t space);
+  void OpenImport();
   // Runs the effect of a saved transition.
   void Run(const foundation::OnboardingTransition& transition);
   void PressForTest();
@@ -66,6 +74,8 @@ class OnboardingController final : public views::ViewObserver {
   const base::RepeatingClosure restore_focus_;
   raw_ptr<WelcomeView> sheet_ = nullptr;
   bool importing_ = false;
+  // The welcome crossfades to the imported theme; the reveal follows.
+  bool recolouring_ = false;
   [[maybe_unused]] bool test_event_scheduled_ = false;
   [[maybe_unused]] bool test_show_delayed_ = false;
   base::ScopedObservation<views::View, views::ViewObserver> area_observation_{

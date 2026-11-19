@@ -7,6 +7,7 @@
 
 #include "base/command_line.h"
 #include "base/functional/bind.h"
+#include "base/functional/callback_helpers.h"
 #include "base/location.h"
 #include "base/strings/string_number_conversions.h"
 #include "base/task/single_thread_task_runner.h"
@@ -16,8 +17,13 @@
 #include "components/prefs/pref_service.h"
 #include "myarc/arc_import.h"
 #include "myarc/onboarding_prefs.h"
+#include "myarc/sidebar_tint.h"
 #include "myarc/test_buildflags.h"
+#include "myarc/workspace_service.h"
+#include "ui/color/color_id.h"
+#include "ui/color/color_provider.h"
 #include "ui/gfx/animation/animation.h"
+#include "ui/gfx/color_utils.h"
 #include "ui/gfx/geometry/rect.h"
 #include "ui/views/focus/focus_manager.h"
 #include "ui/views/view.h"
@@ -39,6 +45,8 @@ constexpr char kMyarcTestOnboardingEventDelay[] =
 constexpr char kMyarcTestOnboardingShowDelay[] =
     "myarc-test-onboarding-show-delay";
 constexpr char kMyarcTestReduceMotion[] = "myarc-test-reduce-motion";
+constexpr char kMyarcTestOnboardingImport[] = "myarc-test-onboarding-import";
+constexpr char kMyarcTestOnboardingHold[] = "myarc-test-onboarding-hold";
 
 // The switch's milliseconds, or `fallback`, up to 30 seconds.
 base::TimeDelta SwitchDelay(const char* name, int fallback) {
@@ -58,6 +66,23 @@ PrefService* LocalState() {
 
 foundation::OnboardingEvent Event(EventKind kind) {
   return foundation::OnboardingEvent{kind, 0, {}, {}};
+}
+
+// `space`'s theme in `profile`'s workspace; none for an unthemed Space, which
+// shows the default tint.
+std::optional<SpaceTheme> ThemeOf(Profile& profile, uint64_t space) {
+  const auto snapshot = WorkspaceService::ForProfile(profile).ExportSnapshot();
+  if (!snapshot || !space) {
+    return std::nullopt;
+  }
+  for (const auto& record : snapshot->spaces) {
+    if (record.id == space && record.theme.set) {
+      return SpaceTheme{
+          .color = SkColorSetA(record.theme.color, SK_AlphaOPAQUE),
+          .opacity = record.theme.opacity};
+    }
+  }
+  return std::nullopt;
 }
 
 }  // namespace
@@ -89,7 +114,7 @@ OnboardingController::~OnboardingController() {
 
 void OnboardingController::Refresh() {
   PrefService* local_state = LocalState();
-  if (importing_ || !local_state) {
+  if (importing_ || recolouring_ || !local_state) {
     return;
   }
   const auto tour = ReadOnboardingTour(*local_state);
@@ -181,6 +206,7 @@ void OnboardingController::ShowWelcome(bool offers_import) {
 }
 
 void OnboardingController::CloseWelcome() {
+  recolouring_ = false;
   if (g_welcome_window == this) {
     g_welcome_window = nullptr;
   }
@@ -228,20 +254,78 @@ void OnboardingController::OnImportDone(const ArcImportOutcome& outcome) {
       event.space_ids.push_back(id);
     }
   }
-  Run(FeedOnboardingEvent(*local_state, event));
+  // A commit lands here inside the import dialog's press, right after the
+  // workspace is saved: save the receipt now, so a kill from here on
+  // relaunches past the welcome, and change the screen once the press is
+  // over. Until then a workspace refresh leaves the welcome up.
+  recolouring_ = outcome.committed;
+  base::SingleThreadTaskRunner::GetCurrentDefault()->PostTask(
+      FROM_HERE,
+      base::BindOnce(&OnboardingController::Run, weak_factory_.GetWeakPtr(),
+                     FeedOnboardingEvent(*local_state, event)));
+}
+
+void OnboardingController::ShowImported(uint64_t space) {
+  if (!sheet_) {
+    recolouring_ = false;
+    Refresh();
+    return;
+  }
+  const ui::ColorProvider* provider = sheet_->GetColorProvider();
+  const bool dark =
+      provider && color_utils::IsDark(provider->GetColor(ui::kColorSysSurface));
+  recolouring_ = true;
+  sheet_->CrossfadeTo(
+      GetSidebarTint(dark, ThemeOf(*profile_, space)),
+      base::BindOnce(
+          [](base::WeakPtr<OnboardingController> controller) {
+            if (!controller || !controller->recolouring_) {
+              return;
+            }
+#if BUILDFLAG(MYARC_TEST_HOOKS)
+            // Holds the tour at the reveal, so a capture can kill it there.
+            if (base::CommandLine::ForCurrentProcess()->HasSwitch(
+                    kMyarcTestOnboardingHold)) {
+              return;
+            }
+#endif  // BUILDFLAG(MYARC_TEST_HOOKS)
+            controller->recolouring_ = false;
+            controller->Refresh();
+          },
+          weak_factory_.GetWeakPtr()));
+}
+
+void OnboardingController::OpenImport() {
+  if (!host_ || !host_->GetWidget()) {
+    return;
+  }
+  importing_ = true;
+  auto done = base::BindOnce(&OnboardingController::OnImportDone,
+                             weak_factory_.GetWeakPtr());
+#if BUILDFLAG(MYARC_TEST_HOOKS)
+  const base::CommandLine& command_line =
+      *base::CommandLine::ForCurrentProcess();
+  if (command_line.HasSwitch(kMyarcTestOnboardingImport)) {
+    ImportArcFileForCapture(
+        *profile_, host_->GetWidget()->GetNativeWindow(),
+        command_line.GetSwitchValuePath(kMyarcTestOnboardingImport),
+        base::DoNothing(), std::move(done));
+    return;
+  }
+#endif  // BUILDFLAG(MYARC_TEST_HOOKS)
+  ImportFromArc(*profile_, host_->GetWidget()->GetNativeWindow(),
+                std::move(done));
 }
 
 void OnboardingController::Run(
     const foundation::OnboardingTransition& transition) {
   const std::string state(transition.tour.state);
   if (transition.effect == foundation::OnboardingEffect::OpenImport) {
-    if (!host_ || !host_->GetWidget()) {
-      return;
-    }
-    importing_ = true;
-    ImportFromArc(*profile_, host_->GetWidget()->GetNativeWindow(),
-                  base::BindOnce(&OnboardingController::OnImportDone,
-                                 weak_factory_.GetWeakPtr()));
+    OpenImport();
+    return;
+  }
+  if (transition.effect == foundation::OnboardingEffect::Imported) {
+    ShowImported(transition.tour.theme_space);
     return;
   }
   if (state == "welcome") {
@@ -268,6 +352,8 @@ void OnboardingController::PressForTest() {
     OnAction(WelcomeView::Action::kSkipTour);
   } else if (event == "start_browsing") {
     OnAction(WelcomeView::Action::kStartBrowsing);
+  } else if (event == "import") {
+    OnAction(WelcomeView::Action::kImport);
   }
 #endif  // BUILDFLAG(MYARC_TEST_HOOKS)
 }
