@@ -952,6 +952,9 @@ mod ffi {
         fn retain_row_selection(order: &[u64], selected: &[u64], anchor: u64) -> RowSelection;
         // The rows a command from `row`'s menu applies to.
         fn row_selection_menu_targets(selected: &[u64], row: u64) -> Vec<u64>;
+        // The row to show before `closing` all close: the first of `live`
+        // not closing, or 0. See workspace::selection::row_after_closing.
+        fn row_after_closing(live: &[u64], closing: &[u64]) -> u64;
 
         // The one closed Peek a window can bring back with Cmd+Shift+T
         // (BC-005). See workspace::peek::PeekReopen.
@@ -1105,6 +1108,10 @@ pub fn retain_row_selection(order: &[u64], selected: &[u64], anchor: u64) -> ffi
 
 pub fn row_selection_menu_targets(selected: &[u64], row: u64) -> Vec<u64> {
     workspace::selection::Selection::from_parts(selected, None).menu_targets(row)
+}
+
+pub fn row_after_closing(live: &[u64], closing: &[u64]) -> u64 {
+    workspace::selection::row_after_closing(live, closing).unwrap_or(0)
 }
 
 fn arc_import_result(

@@ -1,5 +1,5 @@
 diff --git a/chrome/browser/ui/views/frame/browser_view.cc b/chrome/browser/ui/views/frame/browser_view.cc
-index 7b568f6de760af21d6e9d2aa44415a7cef617c51..4f37fa91fd8438486fd7b18f94023ba933ba7555 100644
+index 7b568f6de760af21d6e9d2aa44415a7cef617c51..1bb0734cb6918b4eb89ff3a9b7778fd50065b457 100644
 --- a/chrome/browser/ui/views/frame/browser_view.cc
 +++ b/chrome/browser/ui/views/frame/browser_view.cc
 @@ -22,6 +22,7 @@
@@ -1877,7 +1877,23 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..4f37fa91fd8438486fd7b18f94023ba9
  #if BUILDFLAG(IS_MAC)
    // Immersive full screen makes it possible to display the toolbar when
    // kShowFullscreenToolbar is not set.
-@@ -3414,7 +4960,7 @@ void BrowserView::CutCopyPaste(int command_id) {
+@@ -3241,6 +4787,15 @@ content::KeyboardEventProcessingResult BrowserView::PreHandleKeyboardEvent(
+     return content::KeyboardEventProcessingResult::NOT_HANDLED;
+   }
+ 
++  // Esc ends a myArc sidebar selection before the page sees it.
++  if (event.GetType() == blink::WebInputEvent::Type::kRawKeyDown &&
++      event.windows_key_code == ui::VKEY_ESCAPE &&
++      !(event.GetModifiers() & blink::WebInputEvent::kKeyModifiers) &&
++      HasMyarcWorkspaceSidebar() &&
++      myarc_workspace_sidebar_->ClearRowSelection()) {
++    return content::KeyboardEventProcessingResult::HANDLED;
++  }
++
+   views::FocusManager* focus_manager = GetFocusManager();
+   CHECK(focus_manager, base::NotFatalUntil::M162);
+ 
+@@ -3414,7 +4969,7 @@ void BrowserView::CutCopyPaste(int command_id) {
    // key events (and not accelerators) to the WebContents so it can give the web
    // page a chance to override them.
    WebContents* contents = browser_->GetTabStripModel()->GetActiveWebContents();
@@ -1886,7 +1902,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..4f37fa91fd8438486fd7b18f94023ba9
      void (WebContents::*method)();
      if (command_id == IDC_CUT) {
        method = &content::WebContents::Cut;
-@@ -3483,6 +5029,10 @@ LocationBarView* BrowserView::GetLocationBarView() const {
+@@ -3483,6 +5038,10 @@ LocationBarView* BrowserView::GetLocationBarView() const {
  // BrowserView, TabStripModelObserver implementation:
  
  void BrowserView::OnSplitTabChanged(const SplitTabChange& change) {
@@ -1897,7 +1913,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..4f37fa91fd8438486fd7b18f94023ba9
    switch (change.type) {
      case SplitTabChange::Type::kAdded: {
        const tabs::TabInterface* active_tab =
-@@ -3690,6 +5240,9 @@ bool BrowserView::CanActivate() const {
+@@ -3690,6 +5249,9 @@ bool BrowserView::CanActivate() const {
  }
  
  std::u16string BrowserView::GetWindowTitle() const {
@@ -1907,7 +1923,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..4f37fa91fd8438486fd7b18f94023ba9
    std::u16string title =
        WindowMetadataController::From(browser_.get())
            ->GetWindowTitleForCurrentTab(true /* include_app_name */);
-@@ -3710,6 +5263,9 @@ std::u16string BrowserView::GetWindowTitle() const {
+@@ -3710,6 +5272,9 @@ std::u16string BrowserView::GetWindowTitle() const {
  }
  
  std::u16string BrowserView::GetAccessibleWindowTitle() const {
@@ -1917,7 +1933,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..4f37fa91fd8438486fd7b18f94023ba9
    // If there is a focused and visible tab-modal dialog, report the dialog's
    // title instead of the page title.
    views::Widget* tab_modal =
-@@ -3947,7 +5503,10 @@ bool BrowserView::CanChangeWindowIcon() const {
+@@ -3947,7 +5512,10 @@ bool BrowserView::CanChangeWindowIcon() const {
  }
  
  views::View* BrowserView::GetInitiallyFocusedView() {
@@ -1929,7 +1945,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..4f37fa91fd8438486fd7b18f94023ba9
  }
  
  bool BrowserView::ShouldShowWindowTitle() const {
-@@ -3971,6 +5530,9 @@ ui::ImageModel BrowserView::GetWindowAppIcon() {
+@@ -3971,6 +5539,9 @@ ui::ImageModel BrowserView::GetWindowAppIcon() {
  }
  
  ui::ImageModel BrowserView::GetWindowIcon() {
@@ -1939,7 +1955,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..4f37fa91fd8438486fd7b18f94023ba9
    // Use the default icon for devtools.
    if (browser_->GetType() == BrowserWindowInterface::Type::TYPE_DEVTOOLS) {
      return ui::ImageModel();
-@@ -4199,6 +5761,8 @@ void BrowserView::OnWidgetDestroying(views::Widget* widget) {
+@@ -4199,6 +5770,8 @@ void BrowserView::OnWidgetDestroying(views::Widget* widget) {
  
  void BrowserView::OnWidgetActivationChanged(views::Widget* widget,
                                              bool active) {
@@ -1948,7 +1964,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..4f37fa91fd8438486fd7b18f94023ba9
    if (browser_->GetWindow()) {
      if (active) {
        if (restore_focus_on_activation_.has_value() &&
-@@ -4336,6 +5900,10 @@ void BrowserView::UpdateTabSearchBubbleHost() {
+@@ -4336,6 +5909,10 @@ void BrowserView::UpdateTabSearchBubbleHost() {
  }
  
  void BrowserView::ShowSplitView(bool focus_active_view) {
@@ -1959,7 +1975,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..4f37fa91fd8438486fd7b18f94023ba9
    const int active_index = browser_->GetTabStripModel()->active_index();
  
    std::optional<split_tabs::SplitTabId> split_tab_id =
-@@ -4610,8 +6178,10 @@ views::CloseRequestResult BrowserView::OnWindowCloseRequested() {
+@@ -4610,8 +6187,10 @@ views::CloseRequestResult BrowserView::OnWindowCloseRequested() {
    // Give beforeunload handlers, the user, or policy the chance to cancel the
    // close before we hide the window below.
    if (!UnloadController::From(browser_)->HandleBeforeClose()) {
@@ -1970,7 +1986,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..4f37fa91fd8438486fd7b18f94023ba9
  
    views::CloseRequestResult result = views::CloseRequestResult::kCanClose;
    if (!browser_->GetTabStripModel()->empty()) {
-@@ -4632,6 +6202,15 @@ views::CloseRequestResult BrowserView::OnWindowCloseRequested() {
+@@ -4632,6 +6211,15 @@ views::CloseRequestResult BrowserView::OnWindowCloseRequested() {
  }
  
  int BrowserView::NonClientHitTest(const gfx::Point& point) {
@@ -1986,7 +2002,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..4f37fa91fd8438486fd7b18f94023ba9
  #if BUILDFLAG(IS_MAC)
    // The top container while in immersive fullscreen on macOS lives in another
    // Widget (OverlayWidgetMac). This means that BrowserView does not need to
-@@ -4908,6 +6487,7 @@ void BrowserView::Layout(PassKey) {
+@@ -4908,6 +6496,7 @@ void BrowserView::Layout(PassKey) {
    }
  
    LayoutSuperclass<views::View>(this);
@@ -1994,7 +2010,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..4f37fa91fd8438486fd7b18f94023ba9
  
    // TODO(jamescook): Why was this in the middle of layout code?
    toolbar_->location_bar()->UpdateFocusBehavior(IsToolbarVisible());
-@@ -4954,6 +6534,9 @@ void BrowserView::Layout(PassKey) {
+@@ -4954,6 +6543,9 @@ void BrowserView::Layout(PassKey) {
      if (fallback_popup_anchor_) {
        fallback_popup_anchor_->MaybeUpdateAnchor(rect);
      }
@@ -2004,7 +2020,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..4f37fa91fd8438486fd7b18f94023ba9
  
      if (dialog_anchor_) {
        rect.Offset(0, -kAdditionalDialogToolbarOverlap);
-@@ -5197,6 +6780,222 @@ void BrowserView::AddedToWidget() {
+@@ -5197,6 +6789,222 @@ void BrowserView::AddedToWidget() {
        kFallbackPopupAnchorElementId, *this);
  
    initialized_ = true;
@@ -2227,7 +2243,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..4f37fa91fd8438486fd7b18f94023ba9
  }
  
  void BrowserView::RemovedFromWidget() {
-@@ -5267,117 +7066,2852 @@ const views::View* BrowserView::GetViewByElementId(
+@@ -5267,116 +7075,2862 @@ const views::View* BrowserView::GetViewByElementId(
  ///////////////////////////////////////////////////////////////////////////////
  // BrowserView, ui::AcceleratorTarget overrides:
  
@@ -2278,8 +2294,15 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..4f37fa91fd8438486fd7b18f94023ba9
 +    myarc_copied_url_toast_ =
 +        std::make_unique<myarc::CopiedUrlToast>(GetWidget());
 +  }
++  // Copy URL just wrote the selected rows' URLs, one per line, if any.
++  const std::u16string selected = GetMyarcSelectedUrls();
++  const int links =
++      selected.empty()
++          ? 1
++          : static_cast<int>(std::ranges::count(selected, u'\n')) + 1;
 +  myarc_copied_url_toast_->Show(
-+      base::CommandLine::ForCurrentProcess()->HasSwitch(kMyarcCaptureCopyUrl));
++      base::CommandLine::ForCurrentProcess()->HasSwitch(kMyarcCaptureCopyUrl),
++      links);
 +  return true;
 +}
  
@@ -2636,7 +2659,6 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..4f37fa91fd8438486fd7b18f94023ba9
  
 -  if (!bookmark_bar_view_) {
 -    auto* factory = UIControllerFactory::From(browser_.get());
--    auto controller = factory->CreateBookmarkBarController();
 +void BrowserView::RevealMyarcActiveTab() {
 +  if (!IsMyarcWorkspaceBlank()) {
 +    return;
@@ -2939,6 +2961,10 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..4f37fa91fd8438486fd7b18f94023ba9
 +  if (weak) {
 +    weak->MyarcWorkspaceResult(std::move(result));
 +  }
++}
++
++void BrowserView::ShowRowAfterClosing(const std::vector<uint64_t>& items) {
++  MyarcWorkspaceResult(myarc_workspace_adapter_->ShowRowAfterClosing(items));
 +}
 +
 +void BrowserView::PinItem(uint64_t item) {
@@ -5159,11 +5185,10 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..4f37fa91fd8438486fd7b18f94023ba9
 +
 +  if (!bookmark_bar_view_) {
 +    auto* factory = UIControllerFactory::From(browser_.get());
-+    auto controller = factory->CreateBookmarkBarController();
+     auto controller = factory->CreateBookmarkBarController();
      detached_bookmark_bar_view_ = std::make_unique<BookmarkBarView>(
          browser_.get(), std::move(controller), this);
-     bookmark_bar_view_ = detached_bookmark_bar_view_.get();
-@@ -5471,6 +10005,10 @@ bool BrowserView::MaybeUpdateDevtools(content::WebContents* contents) {
+@@ -5471,6 +10025,10 @@ bool BrowserView::MaybeUpdateDevtools(content::WebContents* contents) {
  
  void BrowserView::UpdateUIForContents(WebContents* contents,
                                        bool should_layout_immediately) {
@@ -5174,7 +5199,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..4f37fa91fd8438486fd7b18f94023ba9
    TRACE_EVENT0("ui", "BrowserView::UpdateUIForContents");
    bool needs_layout = MaybeShowBookmarkBar(contents);
  
-@@ -5706,6 +10244,26 @@ void BrowserView::LoadAccelerators() {
+@@ -5706,6 +10264,26 @@ void BrowserView::LoadAccelerators() {
    }
  
  #if BUILDFLAG(IS_MAC)

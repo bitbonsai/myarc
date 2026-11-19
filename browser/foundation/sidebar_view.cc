@@ -1736,12 +1736,15 @@ void SidebarView::ExecuteCommand(int command_id, int event_flags) {
 void SidebarView::OnRowDragEvent(ui::Event& event) {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
   if (event.IsKeyEvent()) {
-    // Esc drops a lifted row back where it was.
-    if (row_drag_ && row_drag_->lifted &&
-        event.type() == ui::EventType::kKeyPressed &&
+    // Esc drops a lifted row back where it was, or else ends a selection.
+    if (event.type() == ui::EventType::kKeyPressed &&
         event.AsKeyEvent()->key_code() == ui::VKEY_ESCAPE) {
-      event.StopPropagation();
-      EndRowDrag(/*commit=*/false);
+      if (row_drag_ && row_drag_->lifted) {
+        event.StopPropagation();
+        EndRowDrag(/*commit=*/false);
+      } else if (ClearRowSelection()) {
+        event.StopPropagation();
+      }
     }
     return;
   }
@@ -3598,6 +3601,17 @@ bool SidebarView::CloseSelectedRows() {
   return true;
 }
 
+bool SidebarView::ClearRowSelection() {
+  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
+  selection_anchor_ = 0;
+  if (selected_rows_.empty()) {
+    return false;
+  }
+  selected_rows_.clear();
+  UpdateRowSelection();
+  return true;
+}
+
 void SidebarView::ApplyToRowsLater(std::vector<uint64_t> ids,
                                    bool move,
                                    uint64_t folder) {
@@ -3608,6 +3622,9 @@ void SidebarView::ApplyToRowsLater(std::vector<uint64_t> ids,
       base::BindOnce(
           [](base::WeakPtr<SidebarView> sidebar, std::vector<uint64_t> ids,
              bool move, uint64_t folder) {
+            if (sidebar && !move) {
+              sidebar->delegate_->ShowRowAfterClosing(ids);
+            }
             for (const uint64_t id : ids) {
               if (!sidebar) {
                 return;

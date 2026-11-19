@@ -9,6 +9,7 @@
 #include <set>
 #include <string>
 #include <string_view>
+#include <vector>
 
 #include "base/callback_list.h"
 #include "base/memory/raw_ptr.h"
@@ -157,6 +158,11 @@ class BrowserWorkspaceAdapter final : public TabStripModelObserver {
                                  BrowserWorkspaceAdapter** owner) const;
   // Close this window's projection only. Dormant saved rows remain unchanged.
   foundation::MutationResult CloseItem(uint64_t item);
+  // Before `items` close together, shows the row closing the one on screen
+  // alone would hand on to, when it is one of them, so the pages' close
+  // order can't change what shows next.
+  foundation::MutationResult ShowRowAfterClosing(
+      const std::vector<uint64_t>& items);
   foundation::MutationResult CreateSpace(std::string_view name);
   foundation::MutationResult CreateSpace(
       std::string_view name,

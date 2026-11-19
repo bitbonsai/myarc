@@ -151,6 +151,9 @@ class SidebarView final : public views::View,
     // Resolve the saved canonical URL in the controller for dormant items.
     virtual void ActivateItem(uint64_t item_id) = 0;
     virtual void CloseLiveItem(uint64_t item_id) = 0;
+    // Before closing several rows together, shows the row closing the one on
+    // screen alone would show next, when it is among them.
+    virtual void ShowRowAfterClosing(const std::vector<uint64_t>& item_ids) = 0;
     // Parent resolves the canonical URL and reports errors. Unsave is explicit
     // removal of saved data, distinct from closing a live page.
     virtual void PinItem(uint64_t item_id) = 0;
@@ -302,6 +305,8 @@ class SidebarView final : public views::View,
   // Cmd+W with rows selected closes them all, each as its close button does,
   // so a Pin keeps its row. Returns false without a selection.
   bool CloseSelectedRows();
+  // Esc ends the selection. Returns false without one.
+  bool ClearRowSelection();
   // Replaces the rows, or the Library, with Arc's Create a Space panel until
   // Create or Cancel. Needs a usable model. `own_profile` is the window's
   // Profile, selected first. Without `profile_menu` the Profile pill only

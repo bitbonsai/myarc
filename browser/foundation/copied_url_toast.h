@@ -24,7 +24,8 @@ class CopiedUrlToast {
   ~CopiedUrlToast();
 
   // Shows or restarts the toast. `hold` keeps it up for background captures.
-  void Show(bool hold = false);
+  // With `links` above 1 it reads "Copied 3 Links", for a multi-row copy.
+  void Show(bool hold = false, int links = 1);
   bool IsShowing() const;
 
  private:

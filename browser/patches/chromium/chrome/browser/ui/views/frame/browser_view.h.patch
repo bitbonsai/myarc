@@ -1,5 +1,5 @@
 diff --git a/chrome/browser/ui/views/frame/browser_view.h b/chrome/browser/ui/views/frame/browser_view.h
-index 750e46c97b64dccccf4268e912df5dbdb6516b3c..cfa498c00db5ee766b31cf51f50c22d62d5ca9f0 100644
+index 750e46c97b64dccccf4268e912df5dbdb6516b3c..086a020641bb494afd53fc3e5bfb1b49fc35b29a 100644
 --- a/chrome/browser/ui/views/frame/browser_view.h
 +++ b/chrome/browser/ui/views/frame/browser_view.h
 @@ -8,11 +8,13 @@
@@ -133,7 +133,7 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..cfa498c00db5ee766b31cf51f50c22d6
    base::WeakPtr<BrowserView> GetAsWeakPtr() {
      return weak_ptr_factory_.GetWeakPtr();
    }
-@@ -1253,12 +1320,259 @@ class BrowserView : public BrowserWindow,
+@@ -1253,12 +1320,260 @@ class BrowserView : public BrowserWindow,
  
    // Anchor point for help bubbles and other dialogs that want to reliably
    // anchor outside the content area of the window.
@@ -141,6 +141,7 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..cfa498c00db5ee766b31cf51f50c22d6
 +      const myarc::foundation::ItemRecord& item) const override;
 +  void ActivateItem(uint64_t item) override;
 +  void CloseLiveItem(uint64_t item) override;
++  void ShowRowAfterClosing(const std::vector<uint64_t>& items) override;
 +  void PinItem(uint64_t item) override;
 +  void FavoriteItem(uint64_t item) override;
 +  bool DropFavorite(uint64_t item, uint64_t before) override;
@@ -393,7 +394,7 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..cfa498c00db5ee766b31cf51f50c22d6
  
    // A mapping between accelerators and command IDs.
    std::map<ui::Accelerator, int> accelerator_table_;
-@@ -1411,6 +1725,7 @@ class BrowserView : public BrowserWindow,
+@@ -1411,6 +1726,7 @@ class BrowserView : public BrowserWindow,
    base::EnumSet<TabStripAndWebAppViewsReparentedState>
        tab_strip_web_apps_reparented_state_;
  

@@ -1,9 +1,11 @@
 #include "myarc/copied_url_toast.h"
 
 #include <memory>
+#include <string>
 #include <utility>
 
 #include "base/functional/bind.h"
+#include "base/strings/string_number_conversions.h"
 #include "base/time/time.h"
 #include "cc/paint/paint_flags.h"
 #include "third_party/skia/include/core/SkColor.h"
@@ -80,7 +82,8 @@ class ToastView : public views::BoxLayoutView {
     GetViewAccessibility().SetRole(ax::mojom::Role::kAlert);
     GetViewAccessibility().SetName(std::u16string(kText));
 
-    auto* label = AddChildView(std::make_unique<views::Label>(kText));
+    label_ = AddChildView(std::make_unique<views::Label>(kText));
+    auto* label = label_.get();
     const gfx::FontList base;
     label->SetFontList(base.Derive(kLabelSize - base.GetFontSize(),
                                    gfx::Font::NORMAL,
@@ -98,6 +101,11 @@ class ToastView : public views::BoxLayoutView {
     layer()->SetFillsBoundsOpaquely(false);
   }
 
+  void SetText(const std::u16string& text) {
+    label_->SetText(text);
+    GetViewAccessibility().SetName(text);
+  }
+
   gfx::Size CalculatePreferredSize(
       const views::SizeBounds& available_size) const override {
     return gfx::Size(
@@ -112,6 +120,9 @@ class ToastView : public views::BoxLayoutView {
         gfx::Point(), gfx::Point(0, height()), kFillTop, kFillBottom));
     canvas->DrawRoundRect(gfx::RectF(GetLocalBounds()), kRadius, flags);
   }
+
+ private:
+  raw_ptr<views::Label> label_ = nullptr;
 };
 
 BEGIN_METADATA(ToastView)
@@ -123,7 +134,7 @@ CopiedUrlToast::CopiedUrlToast(views::Widget* parent) : parent_(parent) {}
 
 CopiedUrlToast::~CopiedUrlToast() = default;
 
-void CopiedUrlToast::Show(bool hold) {
+void CopiedUrlToast::Show(bool hold, int links) {
   if (!widget_) {
     views::Widget::InitParams params(
         views::Widget::InitParams::CLIENT_OWNS_WIDGET,
@@ -137,6 +148,11 @@ void CopiedUrlToast::Show(bool hold) {
     widget_ = std::make_unique<views::Widget>(std::move(params));
     contents_ = widget_->SetContentsView(std::make_unique<ToastView>());
   }
+  // Arc's Super Copy names how many links it copied.
+  const std::u16string text =
+      links > 1 ? u"Copied " + base::NumberToString16(links) + u" Links"
+                : std::u16string(kText);
+  views::AsViewClass<ToastView>(contents_.get())->SetText(text);
 
   const gfx::Rect window = parent_->GetClientAreaBoundsInScreen();
   const gfx::Size size = contents_->GetPreferredSize();
@@ -156,7 +172,7 @@ void CopiedUrlToast::Show(bool hold) {
                                    : kFadeIn);
     layer->SetOpacity(1);
   }
-  contents_->GetViewAccessibility().AnnounceText(std::u16string(kText));
+  contents_->GetViewAccessibility().AnnounceText(text);
 
   timer_.Stop();
   if (!hold) {

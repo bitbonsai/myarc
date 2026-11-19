@@ -3,9 +3,9 @@
 //! Cmd-click adds a row to the selection or takes it out, and Shift-click
 //! selects every row from the anchor to the clicked one. The first Cmd-click
 //! or Shift-click starts from the row on screen, so it joins the selection
-//! too, as in Arc. A plain click ends the selection. Rows are the ones the
-//! sidebar shows for the window's Space, top to bottom: Pins, each folder's
-//! Pins while open, then Today. Favorites don't take part.
+//! too, as in Arc. A plain click or Esc ends the selection. Rows are the ones
+//! the sidebar shows for the window's Space, top to bottom: Pins, each
+//! folder's Pins while open, then Today. Favorites don't take part.
 //!
 //! Cmd+W closes the selection, Cmd+Shift+C copies its URLs, and a row's menu
 //! acts on the selection when the row is in it. Without a selection those
@@ -128,6 +128,16 @@ impl Selection {
             .sort_by_key(|id| order.iter().position(|row| row == id).unwrap_or(usize::MAX));
         self.items.dedup();
     }
+}
+
+/// The row to show before `closing` all close, when the row on screen is one
+/// of them. `live` is the rows with a page in the window, in the order the
+/// window hands on the selection after a single close: Pins, Today, then
+/// Favorites. Picking it first keeps the result the same as closing the row
+/// on screen alone, whatever order the pages go in. `None` when every live
+/// row closes.
+pub fn row_after_closing(live: &[ItemId], closing: &[ItemId]) -> Option<ItemId> {
+    live.iter().copied().find(|id| !closing.contains(id))
 }
 
 #[cfg(test)]
@@ -259,5 +269,15 @@ mod tests {
         selection.extend(ORDER, Some(10), 12);
         assert_eq!(selection.menu_targets(11), vec![10, 11, 12]);
         assert_eq!(selection.menu_targets(14), vec![14]);
+    }
+
+    #[test]
+    fn closing_a_selection_shows_the_first_live_row_outside_it() {
+        // The row on screen, 10, closes with 12; 11 and 14 stay.
+        assert_eq!(row_after_closing(&[10, 11, 12, 14], &[12, 10]), Some(11));
+        assert_eq!(row_after_closing(&[10, 11, 12, 14], &[10, 11]), Some(12));
+        // Closing the row on screen alone lands on the same first row.
+        assert_eq!(row_after_closing(&[10, 11, 12, 14], &[10]), Some(11));
+        assert_eq!(row_after_closing(&[10, 11], &[11, 10]), None);
     }
 }

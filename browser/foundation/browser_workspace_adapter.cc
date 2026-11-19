@@ -2208,6 +2208,28 @@ foundation::MutationResult BrowserWorkspaceAdapter::CloseItem(uint64_t item) {
   return Remember(Ok(item));
 }
 
+foundation::MutationResult BrowserWorkspaceAdapter::ShowRowAfterClosing(
+    const std::vector<uint64_t>& items) {
+  if (!ready())
+    return Fail(error());
+  const auto sidebar = Sidebar();
+  if (!sidebar.ok || !std::ranges::contains(items, sidebar.selected_item_id))
+    return Ok();
+  // The rows ShowSelected hands the selection on to, in its order.
+  std::vector<uint64_t> live;
+  for (const auto* section :
+       {&sidebar.pins, &sidebar.temporary, &sidebar.favorites}) {
+    for (const auto& row : *section) {
+      if (LocalPage(*tabs_, row.id))
+        live.push_back(row.id);
+    }
+  }
+  const uint64_t next = foundation::row_after_closing(
+      rust::Slice<const uint64_t>(live.data(), live.size()),
+      rust::Slice<const uint64_t>(items.data(), items.size()));
+  return next ? ActivateItem(next) : Ok();
+}
+
 foundation::MutationResult BrowserWorkspaceAdapter::CreateSpace(
     std::string_view name) {
   return Remember(ready() ? service_->CreateSpace(name) : Fail(error()));
