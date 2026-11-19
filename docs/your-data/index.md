@@ -40,4 +40,4 @@ Crash report uploads are off too. Crash reports stay on your Mac. [Known limitat
 
 Agents and scripts can't touch myArc until you turn on Allow agents to control myArc in Settings \> Advanced. Until then myArc writes nothing to its control folder. [CLI and MCP](https://myarc.dev/docs/cli-and-mcp/) covers how it works.
 
-[Next: CLI and MCP →](https://myarc.dev/docs/cli-and-mcp/)
+[Next: Ad blocking →](https://myarc.dev/docs/ad-blocking/)

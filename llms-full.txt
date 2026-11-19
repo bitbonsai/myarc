@@ -6,7 +6,7 @@ HTML: https://myarc.dev/
 
 An open-source browser bringing back Arc, with no account required and optional AI.
 
-[Download pre-alphaNightly v2026.11.18.2](https://myarc.dev/download/)
+[Download pre-alphaNightly v2026.11.19](https://myarc.dev/download/)
 [See what works](https://github.com/bitbonsai/myarc#try-it)
 
 ## How you browse is part of how you work. It should outlast the company behind your browser.
@@ -42,7 +42,7 @@ An open-source browser bringing back Arc, with no account required and optional 
 
   Builds for Windows and Linux.
 
-[Download the 2026.11.18.2 nightly →](https://myarc.dev/download/) [Full alpha checklist →](https://github.com/bitbonsai/myarc/blob/main/docs/ALPHA.md)
+[Download the 2026.11.19 nightly →](https://myarc.dev/download/) [Full alpha checklist →](https://github.com/bitbonsai/myarc/blob/main/docs/ALPHA.md)
 
 ## Read along
 
@@ -121,12 +121,12 @@ HTML: https://myarc.dev/download/
 
 Pre-alpha nightly, for trying the Arc-like shell. Not for daily or sensitive browsing.
 
-[Download for macOS (Apple silicon)](https://github.com/bitbonsai/myarc/releases/download/nightly-2026.11.18.2/myArc-Nightly-2026.11.18.2-arm64.dmg)
+[Download for macOS (Apple silicon)](https://github.com/bitbonsai/myarc/releases/download/nightly-2026.11.19/myArc-Nightly-2026.11.19-arm64.dmg)
 
-- **Version:** 2026.11.18.2
-- **Date:** November 18, 2026
+- **Version:** 2026.11.19
+- **Date:** November 19, 2026
 - **Size:** 243.4 MB
-- **SHA-256:** `07d3b42d1c87398e697b80de32c30318f1bbed56bb5e05b3bc9ad526d5202535`
+- **SHA-256:** `1a0c07efcee77d03535f06dc5e589ee555e1e8c97ff5e8c414a8b67757317b43`
 
 ## System requirements
 
@@ -138,7 +138,7 @@ Pre-alpha nightly, for trying the Arc-like shell. Not for daily or sensitive bro
 1. Check the download against the SHA-256 listed with it. The two values must match.
 
    ```
-   shasum -a 256 ~/Downloads/myArc-Nightly-2026.11.18.2-arm64.dmg
+   shasum -a 256 ~/Downloads/myArc-Nightly-2026.11.19-arm64.dmg
    ```
 2. Open the DMG and drag myArc Nightly to Applications.
 3. Open myArc Nightly. From 2026.11.18 on, Apple has notarized each nightly, so macOS only asks once whether to open an app downloaded from the internet. Choose Open.
@@ -159,7 +159,7 @@ Each item was seen working in a native run or experiment note. None of it has ha
 - Folders for a Space's pinned tabs. Create, rename and delete them from the right-click menu, and open or close them. Drag tabs in and out, and rename a pinned tab from its menu.
 - Split View for two tabs side by side. Use Open in Split View in a tab's menu or Ctrl\+Shift\+\=, and Ctrl\+Shift\+- to separate them. The split shows as one sidebar row and comes back after a restart.
 - Peek: a link from a pinned tab or Favorite to another site opens in a card over the page. Cmd\+W or Esc closes it, Cmd\+O turns it into a tab, a button splits it beside the pinned page, and Cmd\+Shift\+T reopens the last one closed. Settings \> Links can turn it off.
-- Ad and tracker blocking, on by default, with uBlock Origin Lite built in. Window \> Ad Blocking for This Site… turns it off for one site. Private windows block only after you allow the extension there.
+- Ad and tracker blocking, on by default, with uBlock Origin Lite built in. Turn it off for one site with the Block ads on this site switch in the site info popover, which opens from the "i" in the address field. Private windows block only after you allow the extension there.
 - Ctrl\+Tab switches to your last tab, and holding Ctrl goes further back through the five most recent.
 - Little Arc: links from other apps open in a small window, and Option-Cmd-N opens one. Open in \<Space\> or Cmd\+O moves the page into your current Space. Settings \> Links turns it off.
 - The command bar runs actions: type pin, archive, split or a Space's name, or / to list them. View has Clear Cookies and Refresh and Clear Cache and Refresh for the current site.
@@ -176,7 +176,7 @@ Each item was seen working in a native run or experiment note. None of it has ha
 
 ## Other ways to get it
 
-- [GitHub releases](https://github.com/bitbonsai/myarc/releases/tag/nightly-2026.11.18.2) lists every nightly.
+- [GitHub releases](https://github.com/bitbonsai/myarc/releases/tag/nightly-2026.11.19) lists every nightly.
 - [Source on GitHub](https://github.com/bitbonsai/myarc), with instructions to [build it from source](https://github.com/bitbonsai/myarc/blob/main/browser/README.md).
 - [GitHub issues](https://github.com/bitbonsai/myarc/issues) take bug reports. Include the version, your macOS version and the steps that trigger the problem, and leave out private pages.
 
@@ -216,6 +216,9 @@ How to move from Arc to myArc: install the nightly, import your Spaces, learn th
 - [Your data](https://myarc.dev/docs/your-data/)
 
   Where myArc keeps your workspace on disk, how to back it up, and what it sends over the network. There is no account.
+- [Ad blocking](https://myarc.dev/docs/ad-blocking/)
+
+  How myArc blocks ads and trackers, and how to turn blocking off or on for one site.
 
 ## Control
 
@@ -489,6 +492,31 @@ Crash report uploads are off too. Crash reports stay on your Mac. [Known limitat
 ## Agent control
 
 Agents and scripts can't touch myArc until you turn on Allow agents to control myArc in Settings \> Advanced. Until then myArc writes nothing to its control folder. [CLI and MCP](https://myarc.dev/docs/cli-and-mcp/) covers how it works.
+
+[Next: Ad blocking →](https://myarc.dev/docs/ad-blocking/)
+
+
+---
+
+HTML: https://myarc.dev/docs/ad-blocking/
+
+# Ad blocking
+
+How myArc blocks ads and trackers, and how to turn blocking off or on for one site.
+
+myArc blocks ads and trackers on every site from the first page you open. It does this with uBlock Origin Lite, which comes with myArc and is installed in each Profile. It needs no account and downloads nothing when it starts.
+
+## Turning blocking off for one site
+
+If a site breaks or asks you to allow ads, open its site info: click the "i" at the left of the address field, or choose Window \> Ad Blocking for This Site…. Turn off Block ads on this site. The page reloads with nothing blocked. Turn the switch back on to block ads there again.
+
+The switch only changes the site you're on. Other sites keep blocking, and so do your other Profiles: each Profile keeps its own list of sites.
+
+## More blocker settings
+
+Under the switch, More blocker settings… opens uBlock Origin Lite's own panel. It has four filtering modes for the site: no filtering, basic, optimal and complete. Optimal is the default. The switch and the panel change the same setting, so off in one shows as no filtering in the other, and on puts the site back at your default mode.
+
+To remove the blocker from a Profile, go to the Extensions page and remove uBlock Origin Lite. myArc doesn't put it back.
 
 [Next: CLI and MCP →](https://myarc.dev/docs/cli-and-mcp/)
 

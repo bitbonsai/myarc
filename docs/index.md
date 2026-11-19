@@ -27,6 +27,9 @@ How to move from Arc to myArc: install the nightly, import your Spaces, learn th
 - [Your data](https://myarc.dev/docs/your-data/)
 
   Where myArc keeps your workspace on disk, how to back it up, and what it sends over the network. There is no account.
+- [Ad blocking](https://myarc.dev/docs/ad-blocking/)
+
+  How myArc blocks ads and trackers, and how to turn blocking off or on for one site.
 
 ## Control
 
