@@ -1,5 +1,5 @@
 diff --git a/chrome/browser/ui/views/frame/BUILD.gn b/chrome/browser/ui/views/frame/BUILD.gn
-index 41231752d903fec4f355a7b20037f5058904661c..f40343f9c2db169bf6ca05403428aec71394b78f 100644
+index 41231752d903fec4f355a7b20037f5058904661c..ed14daf912afcd6b8179e1203870e89b247c9411 100644
 --- a/chrome/browser/ui/views/frame/BUILD.gn
 +++ b/chrome/browser/ui/views/frame/BUILD.gn
 @@ -591,6 +591,7 @@ source_set("app_menu_button_impl") {
@@ -80,7 +80,7 @@ index 41231752d903fec4f355a7b20037f5058904661c..f40343f9c2db169bf6ca05403428aec7
      "//ui/color:color_headers",
      "//ui/views",
    ]
-@@ -1392,6 +1410,7 @@ source_set("contents_web_view") {
+@@ -1392,12 +1410,14 @@ source_set("contents_web_view") {
    deps = [
      ":safe_invoke",
      ":web_contents_close_handler",
@@ -88,7 +88,14 @@ index 41231752d903fec4f355a7b20037f5058904661c..f40343f9c2db169bf6ca05403428aec7
      "//chrome/browser/ui/color:color_headers",
      "//chrome/browser/ui/views:status_bubble",
      "//chrome/browser/ui/views/animations",
-@@ -1943,6 +1962,7 @@ if (is_mac) {
+     "//components/tabs:public",
+     "//components/web_modal",
+     "//content/public/browser",
++    "//myarc:local_page_marker",
+     "//skia:skia_core_public_headers",
+     "//third_party/blink/public/common:headers",
+     "//ui/color:color_headers",
+@@ -1943,6 +1963,7 @@ if (is_mac) {
        "//chrome/browser/ui:fullscreen_util_mac",
        "//chrome/browser/ui:layout_constants",
        "//chrome/browser/ui:view_ids",
@@ -96,7 +103,7 @@ index 41231752d903fec4f355a7b20037f5058904661c..f40343f9c2db169bf6ca05403428aec7
        "//chrome/browser/ui/browser_window",
        "//chrome/browser/ui/cocoa",
        "//chrome/browser/ui/color:color_headers",
-@@ -1950,6 +1970,7 @@ if (is_mac) {
+@@ -1950,6 +1971,7 @@ if (is_mac) {
        "//chrome/browser/ui/exclusive_access",
        "//chrome/browser/ui/immersive:immersive_mode_controller",
        "//chrome/browser/ui/tabs",
@@ -104,16 +111,17 @@ index 41231752d903fec4f355a7b20037f5058904661c..f40343f9c2db169bf6ca05403428aec7
        "//chrome/browser/ui/views/bookmarks",
        "//chrome/browser/ui/views/tabs:tab_strip",
        "//chrome/browser/ui/views/toolbar",
-@@ -2023,6 +2044,8 @@ if (is_mac) {
+@@ -2023,6 +2045,9 @@ if (is_mac) {
        "//components/remote_cocoa/app_shim",
        "//components/remote_cocoa/common:mojo",
        "//components/web_modal",
 +      "//myarc:little_arc",
++      "//myarc:local_page_marker",
 +      "//myarc:sidebar_tint",
        "//skia",
        "//ui/accessibility",
        "//ui/actions",
-@@ -2262,6 +2285,7 @@ source_set("browser_tests") {
+@@ -2262,6 +2287,7 @@ source_set("browser_tests") {
      "//chrome/browser/devtools",
      "//chrome/browser/devtools:test_support",
      "//chrome/browser/glic/test_support",
@@ -121,7 +129,7 @@ index 41231752d903fec4f355a7b20037f5058904661c..f40343f9c2db169bf6ca05403428aec7
      "//chrome/browser/ui:browser_actions",
      "//chrome/browser/ui:browser_tabstrip",
      "//chrome/browser/ui:recently_audible_helper",
-@@ -2269,20 +2293,30 @@ source_set("browser_tests") {
+@@ -2269,20 +2295,30 @@ source_set("browser_tests") {
      "//chrome/browser/ui/actions:actions_util",
      "//chrome/browser/ui/browser_web_contents_delegate",
      "//chrome/browser/ui/find_bar",
@@ -152,7 +160,7 @@ index 41231752d903fec4f355a7b20037f5058904661c..f40343f9c2db169bf6ca05403428aec7
    ]
  
    if (use_ozone) {
-@@ -3032,6 +3066,7 @@ source_set("browser_view_tabbed_layout_impl") {
+@@ -3032,6 +3068,7 @@ source_set("browser_view_tabbed_layout_impl") {
      "//chrome/browser/ui/views/infobars",
      "//chrome/browser/ui/views/side_panel",
      "//chrome/browser/ui/views/tabs/organizer",

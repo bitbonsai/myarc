@@ -531,6 +531,17 @@ inline constexpr gfx::VectorIcon kPeekSplitIcon(kPeekSplitRep,
                                                 std::size(kPeekSplitRep),
                                                 "myarc_peek_split");
 
+// Lucide "code-xml" for the address field's local page chip.
+inline constexpr gfx::PathElement kCodeXmlPath[] = {
+    gfx::CANVAS_DIMENSIONS, 24, gfx::STROKE, 2,
+    gfx::MOVE_TO, 18, 16, gfx::R_LINE_TO, 4, -4, gfx::R_LINE_TO, -4, -4,
+    gfx::MOVE_TO, 6, 8, gfx::R_LINE_TO, -4, 4, gfx::R_LINE_TO, 4, 4,
+    gfx::MOVE_TO, 14.5f, 4, gfx::R_LINE_TO, -5, 16};
+inline constexpr gfx::VectorIconRep kCodeXmlRep[] = {{kCodeXmlPath}};
+inline constexpr gfx::VectorIcon kCodeXmlIcon(kCodeXmlRep,
+                                              std::size(kCodeXmlRep),
+                                              "myarc_code_xml");
+
 #undef MYARC_RAIL_FILL
 
 }  // namespace myarc

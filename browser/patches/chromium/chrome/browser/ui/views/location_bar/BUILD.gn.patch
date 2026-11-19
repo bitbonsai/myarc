@@ -1,0 +1,12 @@
+diff --git a/chrome/browser/ui/views/location_bar/BUILD.gn b/chrome/browser/ui/views/location_bar/BUILD.gn
+index 7240098ddda452e5658e21811c2cb4775806ff84..5b0aff8f6671ae71ea516eb09e3589e858a539ad 100644
+--- a/chrome/browser/ui/views/location_bar/BUILD.gn
++++ b/chrome/browser/ui/views/location_bar/BUILD.gn
+@@ -200,6 +200,7 @@ source_set("impl") {
+       "//ui/native_theme",
+       "//ui/strings:ui_strings_grit",
+     ]
++    deps += [ "//myarc:local_page_marker" ]
+     if (is_mac) {
+       deps += [ "//chrome/browser/ui:fullscreen_util_mac" ]
+     }

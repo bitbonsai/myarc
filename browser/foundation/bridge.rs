@@ -853,6 +853,9 @@ mod ffi {
         // Row label for a saved URL whose page has no title yet: host plus
         // path, without scheme, `www.` or trailing slash.
         fn url_label(url: &str) -> String;
+        // Whether a canonical URL host is a local development server:
+        // localhost, *.localhost, *.local, 127.0.0.0/8, [::1] or 0.0.0.0.
+        fn is_local_dev_host(host: &str) -> bool;
         // Where a link from a `source` item's page on site `from_site` to
         // `to_site` opens. Sites are registrable domains (or the host when
         // there is none); empty means unknown and never Peeks. `new_tab` is
@@ -1113,6 +1116,10 @@ pub fn site_icon_scan_bytes() -> usize {
 
 pub fn url_label(url: &str) -> String {
     workspace::url_label::url_label(url)
+}
+
+pub fn is_local_dev_host(host: &str) -> bool {
+    workspace::local_dev::is_local_dev_host(host)
 }
 
 pub fn route_peek_navigation(

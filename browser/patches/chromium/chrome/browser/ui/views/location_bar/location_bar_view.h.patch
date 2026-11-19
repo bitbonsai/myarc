@@ -1,8 +1,19 @@
 diff --git a/chrome/browser/ui/views/location_bar/location_bar_view.h b/chrome/browser/ui/views/location_bar/location_bar_view.h
-index 856d9d7c66a7314d7046571bb3dfefda898970cc..b1663d7c411b832043519152dfa2087e1cb9d8aa 100644
+index 856d9d7c66a7314d7046571bb3dfefda898970cc..e14d9246c4b8b0eba5dd27250fd46d83cbd74913 100644
 --- a/chrome/browser/ui/views/location_bar/location_bar_view.h
 +++ b/chrome/browser/ui/views/location_bar/location_bar_view.h
-@@ -303,6 +303,7 @@ class LocationBarView
+@@ -53,6 +53,10 @@
+ #endif  // BUILDFLAG(OS_LEVEL_GEOLOCATION_PERMISSION_SUPPORTED)
+ 
+ class BrowserWindowInterface;
++
++namespace myarc {
++class LocalPageChip;
++}  // namespace myarc
+ class CommandUpdater;
+ class ContentSettingBubbleModelDelegate;
+ class OmniboxController;
+@@ -303,6 +307,7 @@ class LocationBarView
    // LocationIconView::Delegate:
    const LocationBarModel* GetLocationBarModel() const override;
    bool IsEditingOrEmpty() const override;
@@ -10,7 +21,7 @@ index 856d9d7c66a7314d7046571bb3dfefda898970cc..b1663d7c411b832043519152dfa2087e
    void OnLocationIconGestureEvent(ui::GestureEvent* event) override;
    void OnLocationIconPressed(const ui::MouseEvent& event) override;
    void OnLocationIconDragged(const ui::MouseEvent& event) override;
-@@ -449,6 +450,7 @@ class LocationBarView
+@@ -449,6 +454,7 @@ class LocationBarView
    bool OnMousePressed(const ui::MouseEvent& event) override;
    bool OnMouseDragged(const ui::MouseEvent& event) override;
    void OnMouseReleased(const ui::MouseEvent& event) override;
@@ -18,7 +29,7 @@ index 856d9d7c66a7314d7046571bb3dfefda898970cc..b1663d7c411b832043519152dfa2087e
    void OnMouseMoved(const ui::MouseEvent& event) override;
    void OnMouseExited(const ui::MouseEvent& event) override;
    void ShowContextMenu(const gfx::Point& p,
-@@ -463,6 +465,9 @@ class LocationBarView
+@@ -463,6 +469,9 @@ class LocationBarView
                             const gfx::Point& press_pt,
                             const gfx::Point& p) override;
  
@@ -28,11 +39,12 @@ index 856d9d7c66a7314d7046571bb3dfefda898970cc..b1663d7c411b832043519152dfa2087e
    bool ShouldUsePopupOpenAppearance() const;
  
    bool ShouldHidePageActionIcons() const;
-@@ -575,6 +580,8 @@ class LocationBarView
+@@ -575,6 +584,9 @@ class LocationBarView
    // An icon to the left of the edit field: the HTTPS lock, blank page icon,
    // search icon, EV HTTPS bubble, etc.
    raw_ptr<LocationIconView> location_icon_view_ = nullptr;
 +  raw_ptr<views::ImageButton> myarc_copy_url_button_ = nullptr;
++  raw_ptr<myarc::LocalPageChip> myarc_local_page_chip_ = nullptr;
 +  bool myarc_url_hovered_ = false;
  
    // Views to show inline autocompletion when an IME is active.  In this case,
