@@ -1,5 +1,5 @@
 diff --git a/chrome/browser/ui/views/frame/browser_view.h b/chrome/browser/ui/views/frame/browser_view.h
-index 750e46c97b64dccccf4268e912df5dbdb6516b3c..0388a55f37c740f9490381dac9cda237a65c6dd4 100644
+index 750e46c97b64dccccf4268e912df5dbdb6516b3c..cfa498c00db5ee766b31cf51f50c22d62d5ca9f0 100644
 --- a/chrome/browser/ui/views/frame/browser_view.h
 +++ b/chrome/browser/ui/views/frame/browser_view.h
 @@ -8,11 +8,13 @@
@@ -83,7 +83,7 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..0388a55f37c740f9490381dac9cda237
    std::optional<int> theme_background_y_offset() const {
      return theme_background_y_offset_;
    }
-@@ -311,6 +335,47 @@ class BrowserView : public BrowserWindow,
+@@ -311,6 +335,49 @@ class BrowserView : public BrowserWindow,
  
    ScrimView* window_scrim_view() { return window_scrim_view_; }
  
@@ -116,6 +116,8 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..0388a55f37c740f9490381dac9cda237
 +      const std::vector<int>& indices) const override;
 +  bool SetMyarcTabsSaved(const std::vector<int>& indices, bool saved) override;
 +  bool ShowMyarcCopiedUrlToast() override;
++  std::u16string GetMyarcSelectedUrls() const override;
++  bool CloseMyarcSelectedTabs() override;
 +  bool ShowMyarcSettings() override;
 +  uint64_t GetMyarcAgentSpaceOf(content::WebContents& source) override;
 +  void AdoptMyarcAgentTab(content::WebContents& contents,
@@ -131,7 +133,7 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..0388a55f37c740f9490381dac9cda237
    base::WeakPtr<BrowserView> GetAsWeakPtr() {
      return weak_ptr_factory_.GetWeakPtr();
    }
-@@ -1253,12 +1318,258 @@ class BrowserView : public BrowserWindow,
+@@ -1253,12 +1320,259 @@ class BrowserView : public BrowserWindow,
  
    // Anchor point for help bubbles and other dialogs that want to reliably
    // anchor outside the content area of the window.
@@ -336,6 +338,7 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..0388a55f37c740f9490381dac9cda237
 +  std::unique_ptr<myarc::CopiedUrlToast> myarc_copied_url_toast_;
 +  // --myarc-capture-copy-url copies the URL once per window.
 +  bool myarc_capture_copy_url_scheduled_ = false;
++  bool myarc_capture_close_tab_scheduled_ = false;
 +  std::unique_ptr<myarc::SettingsWindow> myarc_settings_window_;
 +  // --myarc-capture-open-settings opens Settings once per window.
 +  bool myarc_capture_settings_scheduled_ = false;
@@ -390,7 +393,7 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..0388a55f37c740f9490381dac9cda237
  
    // A mapping between accelerators and command IDs.
    std::map<ui::Accelerator, int> accelerator_table_;
-@@ -1411,6 +1722,7 @@ class BrowserView : public BrowserWindow,
+@@ -1411,6 +1725,7 @@ class BrowserView : public BrowserWindow,
    base::EnumSet<TabStripAndWebAppViewsReparentedState>
        tab_strip_web_apps_reparented_state_;
  

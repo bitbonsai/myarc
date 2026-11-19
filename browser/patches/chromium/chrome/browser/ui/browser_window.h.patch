@@ -1,5 +1,5 @@
 diff --git a/chrome/browser/ui/browser_window.h b/chrome/browser/ui/browser_window.h
-index 3b0e66f8a95dc0518c74122eec1baab5717c3028..75958b202ebc02d4c9b4582d81d1cb10305c7e2d 100644
+index 3b0e66f8a95dc0518c74122eec1baab5717c3028..61f8827b8dd8a6578e4bdb95058cc28f44353197 100644
 --- a/chrome/browser/ui/browser_window.h
 +++ b/chrome/browser/ui/browser_window.h
 @@ -5,6 +5,7 @@
@@ -10,7 +10,7 @@ index 3b0e66f8a95dc0518c74122eec1baab5717c3028..75958b202ebc02d4c9b4582d81d1cb10
  #include <memory>
  #include <optional>
  #include <string>
-@@ -112,6 +113,35 @@ class BrowserWindow : public ui::BaseWindow {
+@@ -112,6 +113,40 @@ class BrowserWindow : public ui::BaseWindow {
   public:
    virtual ~BrowserWindow() = default;
  
@@ -34,6 +34,11 @@ index 3b0e66f8a95dc0518c74122eec1baab5717c3028..75958b202ebc02d4c9b4582d81d1cb10
 +  virtual bool SetMyarcTabsSaved(const std::vector<int>& indices, bool saved);
 +  // True when myArc showed its own copied-URL toast instead of Chromium's.
 +  virtual bool ShowMyarcCopiedUrlToast();
++  // The URLs of the myArc sidebar rows selected together, one per line, or
++  // empty without a selection. Copy URL copies them instead of the page's.
++  virtual std::u16string GetMyarcSelectedUrls() const;
++  // True when Close Tab closed the myArc sidebar rows selected together.
++  virtual bool CloseMyarcSelectedTabs();
 +  // True when myArc opened its native Settings window instead of Chromium's.
 +  virtual bool ShowMyarcSettings();
 +  // The myArc agent Space `source` is a tab of, or 0. Navigate opens the tabs
@@ -46,7 +51,7 @@ index 3b0e66f8a95dc0518c74122eec1baab5717c3028..75958b202ebc02d4c9b4582d81d1cb10
    //////////////////////////////////////////////////////////////////////////////
    // ui::BaseWindow interface notes:
  
-@@ -508,4 +538,40 @@ class BrowserWindow : public ui::BaseWindow {
+@@ -508,4 +543,48 @@ class BrowserWindow : public ui::BaseWindow {
    virtual void DeleteBrowserWindow() = 0;
  };
  
@@ -71,6 +76,14 @@ index 3b0e66f8a95dc0518c74122eec1baab5717c3028..75958b202ebc02d4c9b4582d81d1cb10
 +}
 +
 +inline bool BrowserWindow::ShowMyarcCopiedUrlToast() {
++  return false;
++}
++
++inline std::u16string BrowserWindow::GetMyarcSelectedUrls() const {
++  return {};
++}
++
++inline bool BrowserWindow::CloseMyarcSelectedTabs() {
 +  return false;
 +}
 +

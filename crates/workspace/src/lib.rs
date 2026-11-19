@@ -79,6 +79,7 @@ pub type WindowId = u64;
 pub mod little_arc;
 pub mod local_dev;
 pub mod peek;
+pub mod selection;
 pub mod site_icon;
 pub mod tab_ops;
 pub mod url_label;

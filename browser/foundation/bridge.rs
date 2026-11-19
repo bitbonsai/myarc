@@ -51,6 +51,13 @@ mod ffi {
         error: String,
     }
 
+    // Sidebar rows selected together, top to bottom, and the row a
+    // Shift-click range starts from (0 for none).
+    struct RowSelection {
+        items: Vec<u64>,
+        anchor: u64,
+    }
+
     enum PlacementKind {
         Temporary,
         Pin,
@@ -927,6 +934,25 @@ mod ffi {
         // from `shown` stay in the list for when their Space is shown again.
         fn cycle_recent_tab(recent: &mut RecentTabs, shown: &[u64], step: i32) -> u64;
 
+        // The sidebar rows selected with Cmd-click and Shift-click in one
+        // window, kept by the sidebar between calls. `order` is the rows
+        // shown, top to bottom; `active` the row on screen, or 0; `anchor`
+        // the row a range starts from, or 0. See workspace::selection.
+        // Cmd-click toggles `clicked`; Shift-click (`range`) selects from the
+        // anchor to it.
+        fn click_row_selection(
+            order: &[u64],
+            selected: &[u64],
+            anchor: u64,
+            active: u64,
+            clicked: u64,
+            range: bool,
+        ) -> RowSelection;
+        // Drops rows missing from `order`, after the rows rebuilt.
+        fn retain_row_selection(order: &[u64], selected: &[u64], anchor: u64) -> RowSelection;
+        // The rows a command from `row`'s menu applies to.
+        fn row_selection_menu_targets(selected: &[u64], row: u64) -> Vec<u64>;
+
         // The one closed Peek a window can bring back with Cmd+Shift+T
         // (BC-005). See workspace::peek::PeekReopen.
         type PeekReopen;
@@ -1039,6 +1065,46 @@ pub fn cycle_recent_tab(recent: &mut RecentTabs, shown: &[u64], step: i32) -> u6
         .0
         .cycle_within(step, |id| shown.contains(&id))
         .unwrap_or(0)
+}
+
+fn row_selection(order: &[u64], selected: &[u64], anchor: u64) -> workspace::selection::Selection {
+    let mut selection =
+        workspace::selection::Selection::from_parts(selected, (anchor != 0).then_some(anchor));
+    selection.retain(order);
+    selection
+}
+
+fn row_selection_result(selection: &workspace::selection::Selection) -> ffi::RowSelection {
+    ffi::RowSelection {
+        items: selection.items().to_vec(),
+        anchor: selection.anchor().unwrap_or(0),
+    }
+}
+
+pub fn click_row_selection(
+    order: &[u64],
+    selected: &[u64],
+    anchor: u64,
+    active: u64,
+    clicked: u64,
+    range: bool,
+) -> ffi::RowSelection {
+    let mut selection = row_selection(order, selected, anchor);
+    let active = (active != 0).then_some(active);
+    if range {
+        selection.extend(order, active, clicked);
+    } else {
+        selection.toggle(order, active, clicked);
+    }
+    row_selection_result(&selection)
+}
+
+pub fn retain_row_selection(order: &[u64], selected: &[u64], anchor: u64) -> ffi::RowSelection {
+    row_selection_result(&row_selection(order, selected, anchor))
+}
+
+pub fn row_selection_menu_targets(selected: &[u64], row: u64) -> Vec<u64> {
+    workspace::selection::Selection::from_parts(selected, None).menu_targets(row)
 }
 
 fn arc_import_result(

@@ -18,6 +18,7 @@
 #include "base/scoped_observation.h"
 #include "base/strings/string_number_conversions.h"
 #include "base/strings/string_split.h"
+#include "base/strings/string_util.h"
 #include "base/strings/utf_string_conversions.h"
 #include "base/task/sequenced_task_runner.h"
 #include "cc/paint/paint_flags.h"
@@ -477,6 +478,9 @@ enum ItemCommand {
   kEditPinnedPage,
   kResetToSaved,
   kReplaceSavedUrl,
+  // A selection's menu: every selected row's URL, and closing them all.
+  kCopyLinks,
+  kCloseSelected,
   // Move to Folder's entries: this plus the folder's index in folders_.
   kMoveToFolderFirst = 1000
 };
@@ -535,6 +539,10 @@ constexpr char kCaptureDrag[] = "myarc-capture-drag";
 // the back arrow once its page left the saved URL; <item ID>:reset and
 // <item ID>:replace run Edit Pinned Page's two commands. Once, for captures.
 constexpr char kCapturePin[] = "myarc-capture-pin";
+// Clicks seeded rows with Cmd (c<item ID>) or Shift (s<item ID>) held, comma
+// separated, one every 500 ms from 3 s after the workspace loads. Once, for
+// captures of multi-select.
+constexpr char kCaptureSelect[] = "myarc-capture-select";
 
 // The creation menu floats 17 DIP above the Create button, its notch tip 12
 // DIP above it and 4 DIP left of its center, and its right edge 5 DIP inside
@@ -611,7 +619,34 @@ class ItemRow final : public views::View, public views::FocusChangeListener {
     UpdateClose();
   }
 
+  // A row selected with Cmd-click or Shift-click keeps a fill and an outline
+  // in the title's colour, so it reads apart from the row on screen.
+  void SetMarked(bool marked) {
+    if (marked_ != marked) {
+      marked_ = marked;
+      UpdateClose();
+      SchedulePaint();
+    }
+  }
+
+  void OnPaint(gfx::Canvas* canvas) override {
+    views::View::OnPaint(canvas);
+    if (!marked_) {
+      return;
+    }
+    cc::PaintFlags flags;
+    flags.setAntiAlias(true);
+    flags.setStyle(cc::PaintFlags::kStroke_Style);
+    flags.setStrokeWidth(kMarkWidth);
+    flags.setColor(GetFills(GetColorProvider()).title);
+    gfx::RectF bounds(GetLocalBounds());
+    bounds.Inset(kMarkWidth / 2);
+    canvas->DrawRoundRect(bounds, 10 - kMarkWidth / 2, flags);
+  }
+
  private:
+  static constexpr float kMarkWidth = 1.5f;
+
   void UpdateClose() {
     auto* manager = GetFocusManager();
     const bool reveal =
@@ -620,7 +655,7 @@ class ItemRow final : public views::View, public views::FocusChangeListener {
     // (#505060 on the New Tab row) for the selected row, the resting tile
     // fill for hover.
     const Fills fills = GetFills(GetColorProvider());
-    SetBackground(selected_ || reveal
+    SetBackground(selected_ || reveal || marked_
                       ? views::CreateRoundedRectBackground(
                             selected_ ? fills.new_tab : fills.tile, 10)
                       : nullptr);
@@ -639,6 +674,7 @@ class ItemRow final : public views::View, public views::FocusChangeListener {
   ui::ImageModel icon_;
   const ui::ImageModel back_;
   bool hovered_ = false;
+  bool marked_ = false;
   base::ScopedObservation<views::FocusManager, views::FocusChangeListener>
       focus_observation_{this};
 };
@@ -1073,6 +1109,34 @@ void SidebarView::ShowContextMenuForViewImpl(
   folder_menu_model_.reset();
   edit_pin_menu_model_.reset();
   menu_folder_ids_.clear();
+  menu_targets_.clear();
+  // A selected row's menu acts on the whole selection, as Arc's does.
+  if (const rust::Vec<uint64_t> targets = foundation::row_selection_menu_targets(
+          rust::Slice<const uint64_t>(selected_rows_.data(),
+                                      selected_rows_.size()),
+          target->id);
+      targets.size() > 1) {
+    menu_targets_.assign(targets.begin(), targets.end());
+    menu_model_->AddItem(kCopyLinks, u"Copy Links");
+    menu_model_->AddSeparator(ui::NORMAL_SEPARATOR);
+    folder_menu_model_ = std::make_unique<ui::SimpleMenuModel>(this);
+    for (const FolderEntry& folder : folders_) {
+      folder_menu_model_->AddItem(
+          kMoveToFolderFirst + static_cast<int>(menu_folder_ids_.size()),
+          folder.name);
+      menu_folder_ids_.push_back(folder.id);
+    }
+    if (!menu_folder_ids_.empty()) {
+      menu_model_->AddSubMenu(kMoveToFolder, u"Move to Folder",
+                              folder_menu_model_.get());
+    }
+    menu_model_->AddSeparator(ui::NORMAL_SEPARATOR);
+    menu_model_->AddItem(
+        kCloseSelected,
+        u"Close " + base::NumberToString16(menu_targets_.size()) + u" Tabs");
+    RunMenu(point, source_type);
+    return;
+  }
   // Arc's order: Copy Link first, the page's own actions next, and removal
   // last behind its own separator.
   if (!menu_state_.url.empty()) {
@@ -1245,6 +1309,7 @@ void SidebarView::DropRows() {
   new_tab_ = nullptr;
   space_rows_ = nullptr;
   tiles_.clear();
+  selectable_rows_.clear();
   create_panel_ = nullptr;
   RemoveAllChildViews();
 }
@@ -1275,6 +1340,7 @@ void SidebarView::OpenCreateSpace(std::vector<ProfileChoice> profiles,
     new_tab_ = nullptr;
     space_rows_ = nullptr;
     tiles_.clear();
+    selectable_rows_.clear();
     while (children().front() != footer_) {
       RemoveChildViewT(children().front());
     }
@@ -1610,6 +1676,21 @@ void SidebarView::ExecuteCommand(int command_id, int event_flags) {
   }
   const uint64_t id = std::exchange(menu_item_id_, 0);
   if (!id) {
+    return;
+  }
+  if (std::vector<uint64_t> targets = std::exchange(menu_targets_, {});
+      !targets.empty()) {
+    const size_t folder = static_cast<size_t>(command_id - kMoveToFolderFirst);
+    if (command_id == kCopyLinks) {
+      ui::ScopedClipboardWriter(ui::ClipboardBuffer::kCopyPaste)
+          .WriteText(RowUrls(targets));
+    } else if (command_id == kCloseSelected) {
+      ApplyToRowsLater(std::move(targets), /*move=*/false, 0);
+    } else if (command_id >= kMoveToFolderFirst &&
+               folder < menu_folder_ids_.size()) {
+      ApplyToRowsLater(std::move(targets), /*move=*/true,
+                       menu_folder_ids_[folder]);
+    }
     return;
   }
   // Each call can synchronously rebuild or destroy the view. Touch no members
@@ -1978,25 +2059,14 @@ std::unique_ptr<views::View> SidebarView::MakeItem(
   // back. A tile shows it while selected; a row's icon always offers it.
   const bool saved = item.placement != foundation::PlacementKind::Temporary;
   const bool back = saved && presentation.navigated_away && (!tile || selected);
-  auto activate_callback =
-      back ? base::BindRepeating(
-                 [](Delegate* delegate, uint64_t id, bool tile,
-                    const ui::Event& event) {
-                   const bool on_icon =
-                       tile || !event.IsLocatedEvent() ||
-                       event.AsLocatedEvent()->x() < kRowTextStart;
-                   if (on_icon) {
-                     delegate->ResetItem(id);
-                   } else {
-                     delegate->ActivateItem(id);
-                   }
-                 },
-                 base::Unretained(&delegate_.get()), item.id, tile)
-           : base::BindRepeating(
-                 [](Delegate* delegate, uint64_t id, const ui::Event&) {
-                   delegate->ActivateItem(id);
-                 },
-                 base::Unretained(&delegate_.get()), item.id);
+  auto activate_callback = base::BindRepeating(
+      [](base::WeakPtr<SidebarView> sidebar, uint64_t id, bool back, bool tile,
+         const ui::Event& event) {
+        if (sidebar) {
+          sidebar->ClickItem(id, back, tile, event);
+        }
+      },
+      weak_factory_.GetWeakPtr(), item.id, back, tile);
   std::unique_ptr<views::MdTextButton> activate =
       tile ? Button<ItemTile>(std::move(activate_callback), {})
            : Button(std::move(activate_callback), presentation.title);
@@ -2031,6 +2101,12 @@ std::unique_ptr<views::View> SidebarView::MakeItem(
   if (tile) {
     tiles_.emplace_back(activate.get(), selected);
   }
+  // Pins, folder Pins and Today rows take part in multi-select; Favorites
+  // don't.
+  const bool selectable = item.placement != foundation::PlacementKind::Favorite;
+  if (selectable && tile) {
+    selectable_rows_.emplace_back(item.id, activate.get());
+  }
   const ItemMenuState menu_state = {
       item.placement == foundation::PlacementKind::Pin,
       item.placement == foundation::PlacementKind::Favorite,
@@ -2055,10 +2131,17 @@ std::unique_ptr<views::View> SidebarView::MakeItem(
 
   // Today tabs close even while dormant. A folder's Pin only closes its live
   // page.
+  const auto add_row = [this, &item, selectable](std::unique_ptr<ItemRow> row) {
+    if (selectable) {
+      row->SetMarked(std::ranges::contains(selected_rows_, item.id));
+      selectable_rows_.emplace_back(item.id, row.get());
+    }
+    return row;
+  };
   if (item.placement != foundation::PlacementKind::Temporary &&
       !presentation.is_live) {
-    return std::make_unique<ItemRow>(std::move(activate), nullptr, selected,
-                                     back_icon);
+    return add_row(std::make_unique<ItemRow>(std::move(activate), nullptr,
+                                             selected, back_icon));
   }
   auto close = IconButton(
       base::BindRepeating(&Delegate::CloseLiveItem,
@@ -2071,8 +2154,9 @@ std::unique_ptr<views::View> SidebarView::MakeItem(
   close->SetTooltipText(close_name);
   close->GetViewAccessibility().SetName(close_name);
   TrackFocus(close.get(), FocusAction::kClose, item.id, menu_state);
-  return std::make_unique<ItemRow>(std::move(activate), std::move(close),
-                                   selected, back_icon);
+  return add_row(std::make_unique<ItemRow>(std::move(activate),
+                                           std::move(close), selected,
+                                           back_icon));
 }
 
 std::unique_ptr<views::View> SidebarView::MakeSplit(
@@ -2320,6 +2404,13 @@ void SidebarView::SetModel(const foundation::SidebarResult& model,
   current_space_id_ = model.current_space.id;
   focus_targets_.clear();
   drop_zones_.clear();
+  selectable_rows_.clear();
+  // A selection belongs to one Space's rows.
+  if (space_changed) {
+    selected_rows_.clear();
+    selection_anchor_ = 0;
+  }
+  active_item_id_ = model.selected_item_id;
   rows_scroll_ = nullptr;
   new_tab_ = nullptr;
   tiles_.clear();
@@ -2611,6 +2702,28 @@ void SidebarView::SetModel(const foundation::SidebarResult& model,
                                        ? model.temporary[i + 1].id
                                        : 0});
   }
+  // Rows that closed or left the view leave the selection.
+  if (!selected_rows_.empty()) {
+    std::vector<uint64_t> order;
+    for (const auto& [id, view] : selectable_rows_) {
+      order.push_back(id);
+    }
+    const foundation::RowSelection kept = foundation::retain_row_selection(
+        rust::Slice<const uint64_t>(order.data(), order.size()),
+        rust::Slice<const uint64_t>(selected_rows_.data(),
+                                    selected_rows_.size()),
+        selection_anchor_);
+    const bool dropped = kept.items.size() != selected_rows_.size();
+    selected_rows_.assign(kept.items.begin(), kept.items.end());
+    selection_anchor_ = kept.anchor;
+    if (dropped) {
+      for (const auto& [id, view] : selectable_rows_) {
+        if (auto* row = views::AsViewClass<ItemRow>(view.get())) {
+          row->SetMarked(std::ranges::contains(selected_rows_, id));
+        }
+      }
+    }
+  }
   if (outgoing) {
     outgoing->TakeOutgoing();
     rows->SetOutgoing(std::move(outgoing), space_slide_shift_);
@@ -2732,6 +2845,41 @@ void SidebarView::SetModel(const foundation::SidebarResult& model,
               },
               weak_factory_.GetWeakPtr(), id),
           base::Milliseconds(1500));
+    }
+  }
+
+  if (!capture_select_scheduled_ && !selectable_rows_.empty() &&
+      base::CommandLine::ForCurrentProcess()->HasSwitch(kCaptureSelect)) {
+    capture_select_scheduled_ = true;
+    const std::vector<std::string> clicks = base::SplitString(
+        base::CommandLine::ForCurrentProcess()->GetSwitchValueASCII(
+            kCaptureSelect),
+        ",", base::TRIM_WHITESPACE, base::SPLIT_WANT_NONEMPTY);
+    for (size_t i = 0; i < clicks.size(); ++i) {
+      uint64_t id = 0;
+      const std::string& click = clicks[i];
+      if (click.size() < 2 || (click[0] != 'c' && click[0] != 's') ||
+          !base::StringToUint64(click.substr(1), &id)) {
+        continue;
+      }
+      const int flags =
+          click[0] == 's' ? ui::EF_SHIFT_DOWN : ui::EF_COMMAND_DOWN;
+      base::SequencedTaskRunner::GetCurrentDefault()->PostDelayedTask(
+          FROM_HERE,
+          base::BindOnce(
+              [](base::WeakPtr<SidebarView> sidebar, uint64_t id, int flags) {
+                if (!sidebar) {
+                  return;
+                }
+                const ui::MouseEvent event(
+                    ui::EventType::kMouseReleased, gfx::Point(kRowTextStart, 8),
+                    gfx::Point(kRowTextStart, 8), base::TimeTicks::Now(),
+                    flags | ui::EF_LEFT_MOUSE_BUTTON, ui::EF_LEFT_MOUSE_BUTTON);
+                LOG(WARNING) << "myarc-capture-select " << id << " " << flags;
+                sidebar->ClickItem(id, false, false, event);
+              },
+              weak_factory_.GetWeakPtr(), id, flags),
+          base::Milliseconds(3000 + 500 * static_cast<int>(i)));
     }
   }
 
@@ -3364,6 +3512,116 @@ void SidebarView::OnThemeChanged() {
   UpdateFills();
 }
 
+void SidebarView::ClickItem(uint64_t id,
+                            bool back,
+                            bool tile,
+                            const ui::Event& event) {
+  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
+  const bool range = event.IsShiftDown();
+  if ((range || event.IsCommandDown()) &&
+      std::ranges::contains(selectable_rows_, id,
+                     &decltype(selectable_rows_)::value_type::first)) {
+    std::vector<uint64_t> order;
+    for (const auto& [row, view] : selectable_rows_) {
+      order.push_back(row);
+    }
+    const foundation::RowSelection selection = foundation::click_row_selection(
+        rust::Slice<const uint64_t>(order.data(), order.size()),
+        rust::Slice<const uint64_t>(selected_rows_.data(),
+                                    selected_rows_.size()),
+        selection_anchor_, active_item_id_, id, range);
+    selected_rows_.assign(selection.items.begin(), selection.items.end());
+    selection_anchor_ = selection.anchor;
+    UpdateRowSelection();
+    return;
+  }
+  // A plain click ends the selection and acts as before.
+  selection_anchor_ = 0;
+  if (!selected_rows_.empty()) {
+    selected_rows_.clear();
+    UpdateRowSelection();
+  }
+  const bool on_icon = tile || !event.IsLocatedEvent() ||
+                       event.AsLocatedEvent()->x() < kRowTextStart;
+  // Either can rebuild the rows. Touch no members after.
+  if (back && on_icon) {
+    delegate_->ResetItem(id);
+  } else {
+    delegate_->ActivateItem(id);
+  }
+}
+
+void SidebarView::UpdateRowSelection() {
+  if (base::CommandLine::ForCurrentProcess()->HasSwitch(kCaptureSelect)) {
+    std::vector<std::string> ids;
+    for (const uint64_t id : selected_rows_) {
+      ids.push_back(base::NumberToString(id));
+    }
+    LOG(WARNING) << "myarc-row-selection " << base::JoinString(ids, ",");
+  }
+  for (const auto& [id, view] : selectable_rows_) {
+    if (auto* row = views::AsViewClass<ItemRow>(view.get())) {
+      row->SetMarked(std::ranges::contains(selected_rows_, id));
+    }
+  }
+  UpdateFills();
+}
+
+std::u16string SidebarView::RowUrls(const std::vector<uint64_t>& ids) const {
+  std::vector<std::u16string> urls;
+  for (const uint64_t id : ids) {
+    const auto target =
+        std::ranges::find_if(focus_targets_, [id](const FocusTarget& target) {
+          return target.action == FocusAction::kActivate && target.id == id &&
+                 target.item_menu && !target.item_menu->url.empty();
+        });
+    if (target != focus_targets_.end()) {
+      urls.push_back(target->item_menu->url);
+    }
+  }
+  return base::JoinString(urls, u"\n");
+}
+
+std::u16string SidebarView::SelectedRowUrls() const {
+  return RowUrls(selected_rows_);
+}
+
+bool SidebarView::CloseSelectedRows() {
+  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
+  if (selected_rows_.empty()) {
+    return false;
+  }
+  std::vector<uint64_t> rows = std::exchange(selected_rows_, {});
+  selection_anchor_ = 0;
+  UpdateRowSelection();
+  ApplyToRowsLater(std::move(rows), /*move=*/false, 0);
+  return true;
+}
+
+void SidebarView::ApplyToRowsLater(std::vector<uint64_t> ids,
+                                   bool move,
+                                   uint64_t folder) {
+  // Every change rebuilds the rows, and the last close can close the window.
+  // Stop once the sidebar is gone.
+  base::SequencedTaskRunner::GetCurrentDefault()->PostTask(
+      FROM_HERE,
+      base::BindOnce(
+          [](base::WeakPtr<SidebarView> sidebar, std::vector<uint64_t> ids,
+             bool move, uint64_t folder) {
+            for (const uint64_t id : ids) {
+              if (!sidebar) {
+                return;
+              }
+              if (move) {
+                sidebar->delegate_->MovePinToFolder(id, folder);
+              } else {
+                sidebar->delegate_->CloseLiveItem(id);
+              }
+            }
+          },
+          weak_factory_.GetWeakPtr(), std::move(ids), move, folder));
+}
+
 void SidebarView::UpdateFills() {
   const Fills fills = GetFills(GetColorProvider());
   // With Increase Contrast on, the selected tile also gets a 1px outline.
@@ -3380,11 +3638,21 @@ void SidebarView::UpdateFills() {
                          std::max<SkAlpha>(SkColorGetA(fill), 0x80));
     }
     tile->SetBgColorOverrideDeprecated(fill);
+    // A Pin tile selected with Cmd-click or Shift-click is outlined in the
+    // title's colour, as a selected row is.
+    const auto row = std::ranges::find(selectable_rows_, tile.get(),
+                                       [](const auto& row) {
+                                         return row.second.get();
+                                       });
+    const bool marked = row != selectable_rows_.end() &&
+                        std::ranges::contains(selected_rows_, row->first);
     if (auto* item_tile = views::AsViewClass<ItemTile>(tile.get())) {
       item_tile->SetRing(
-          tint ? std::optional(SkColorSetA(
-                     color_utils::AlphaBlend(*tint, SK_ColorWHITE, 0.5f), 0xD9))
-               : std::nullopt);
+          marked ? std::optional(fills.title)
+          : tint ? std::optional(SkColorSetA(
+                       color_utils::AlphaBlend(*tint, SK_ColorWHITE, 0.5f),
+                       0xD9))
+                 : std::nullopt);
     }
     tile->SetStrokeColorIdOverride(selected && more_contrast
                                        ? std::optional(ui::kColorSysOutline)

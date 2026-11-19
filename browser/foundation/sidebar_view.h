@@ -296,6 +296,12 @@ class SidebarView final : public views::View,
   // Reloads an open Library's Downloads list if it changed.
   void RefreshLibraryDownloads();
   bool library_open() const { return !!library_; }
+  // The URLs of the rows selected with Cmd-click or Shift-click, one per
+  // line, or empty without a selection. Cmd+Shift+C copies them.
+  std::u16string SelectedRowUrls() const;
+  // Cmd+W with rows selected closes them all, each as its close button does,
+  // so a Pin keeps its row. Returns false without a selection.
+  bool CloseSelectedRows();
   // Replaces the rows, or the Library, with Arc's Create a Space panel until
   // Create or Cancel. Needs a usable model. `own_profile` is the window's
   // Profile, selected first. Without `profile_menu` the Profile pill only
@@ -421,6 +427,17 @@ class SidebarView final : public views::View,
                   FocusAction action,
                   uint64_t id = 0,
                   std::optional<ItemMenuState> item_menu = std::nullopt);
+  // A click on a row or Pin tile. Cmd-click and Shift-click change the
+  // selection; a plain click ends it and activates the row, or with `back`
+  // sends a Pin away from its saved page back there from its icon.
+  void ClickItem(uint64_t id, bool back, bool tile, const ui::Event& event);
+  // Marks the selected rows and tiles after the selection changed.
+  void UpdateRowSelection();
+  // The URLs of `ids`, one per line, as Copy Link writes each.
+  std::u16string RowUrls(const std::vector<uint64_t>& ids) const;
+  // Closes each of `ids`, or moves each to `folder` when `move`, after the
+  // caller unwinds, since each change rebuilds the rows.
+  void ApplyToRowsLater(std::vector<uint64_t> ids, bool move, uint64_t folder);
   // views::View:
   void Layout(PassKey) override;
   void AddedToWidget() override;
@@ -554,6 +571,17 @@ class SidebarView final : public views::View,
   std::optional<SpaceTheme> space_theme_;
   uint64_t menu_space_id_ = 0;
   uint64_t menu_item_id_ = 0;
+  // The selected rows an open row menu acts on, when it opened on one.
+  std::vector<uint64_t> menu_targets_;
+  // Rows that take part in multi-select, top to bottom: Pins, folder Pins and
+  // Today, with the view that shows each.
+  std::vector<std::pair<uint64_t, raw_ptr<views::View>>> selectable_rows_;
+  // The rows selected with Cmd-click and Shift-click, in row order, and the
+  // row a Shift-click range starts from (0 for none).
+  std::vector<uint64_t> selected_rows_;
+  uint64_t selection_anchor_ = 0;
+  // The row on screen, which the first Cmd-click or Shift-click selects too.
+  uint64_t active_item_id_ = 0;
   // The folder whose row menu is open, or 0.
   uint64_t menu_folder_id_ = 0;
   // The current Space's folders, for the Move to Folder menu.
@@ -596,6 +624,7 @@ class SidebarView final : public views::View,
   bool capture_menu_scheduled_ = false;
   // --myarc-capture-activate=<item ID> opens a seeded row once, for captures.
   bool capture_activate_scheduled_ = false;
+  bool capture_select_scheduled_ = false;
   // --myarc-capture-item-menu opens the first tile's context menu once.
   bool capture_item_menu_scheduled_ = false;
   // Shared with the Library, so a press there keeps the tooltip quiet here.
