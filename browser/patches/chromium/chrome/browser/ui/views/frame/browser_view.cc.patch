@@ -1,5 +1,5 @@
 diff --git a/chrome/browser/ui/views/frame/browser_view.cc b/chrome/browser/ui/views/frame/browser_view.cc
-index 7b568f6de760af21d6e9d2aa44415a7cef617c51..53e21e7a486883f453f2c910b8c0d8cd8a58ebb0 100644
+index 7b568f6de760af21d6e9d2aa44415a7cef617c51..8eb61e30eae24b8c7fe677aa6672f068562465ec 100644
 --- a/chrome/browser/ui/views/frame/browser_view.cc
 +++ b/chrome/browser/ui/views/frame/browser_view.cc
 @@ -22,6 +22,7 @@
@@ -2292,7 +2292,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..53e21e7a486883f453f2c910b8c0d8cd
  }
  
  void BrowserView::RemovedFromWidget() {
-@@ -5267,106 +7119,2850 @@ const views::View* BrowserView::GetViewByElementId(
+@@ -5267,106 +7119,2865 @@ const views::View* BrowserView::GetViewByElementId(
  ///////////////////////////////////////////////////////////////////////////////
  // BrowserView, ui::AcceleratorTarget overrides:
  
@@ -3145,9 +3145,24 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..53e21e7a486883f453f2c910b8c0d8cd
 +              return;
 +            }
 +            // A click with a user gesture, as a person's would be.
++            // "hover-close" also shows the link's address in the status
++            // bubble, as the pointer over it would, before closing.
++            content::RenderFrameHost::JavaScriptResultCallback hover;
++            if (step == "hover-close") {
++              hover = base::BindOnce(
++                  [](base::WeakPtr<content::WebContents> page,
++                     base::Value href) {
++                    if (page && href.is_string() && page->GetDelegate()) {
++                      page->GetDelegate()->UpdateTargetURL(
++                          page.get(), GURL(href.GetString()));
++                    }
++                  },
++                  page->GetWeakPtr());
++            }
 +            page->GetPrimaryMainFrame()->ExecuteJavaScriptWithUserGestureForTests(
-+                u"document.querySelector('a').click()", base::NullCallback(),
-+                content::ISOLATED_WORLD_ID_GLOBAL);
++                u"(() => { const a = document.querySelector('a'); a.click(); "
++                u"return a.href })()",
++                std::move(hover), content::ISOLATED_WORLD_ID_GLOBAL);
 +            const auto later = [](base::WeakPtr<BrowserView> view,
 +                                  int command, int ms) {
 +              base::SingleThreadTaskRunner::GetCurrentDefault()
@@ -3173,7 +3188,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..53e21e7a486883f453f2c910b8c0d8cd
 +                          view, command),
 +                      base::Milliseconds(ms));
 +            };
-+            if (step == "close") {
++            if (step == "close" || step == "hover-close") {
 +              later(view, IDC_CLOSE_TAB, 3000);
 +            } else if (step == "expand") {
 +              later(view, IDC_OPEN_FILE, 3000);
@@ -5220,7 +5235,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..53e21e7a486883f453f2c910b8c0d8cd
    const bool show_bookmark_bar =
        contents &&
        WindowFeatureController::From(browser_)->SupportsWindowFeature(
-@@ -5471,6 +10067,10 @@ bool BrowserView::MaybeUpdateDevtools(content::WebContents* contents) {
+@@ -5471,6 +10082,10 @@ bool BrowserView::MaybeUpdateDevtools(content::WebContents* contents) {
  
  void BrowserView::UpdateUIForContents(WebContents* contents,
                                        bool should_layout_immediately) {
@@ -5231,7 +5246,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..53e21e7a486883f453f2c910b8c0d8cd
    TRACE_EVENT0("ui", "BrowserView::UpdateUIForContents");
    bool needs_layout = MaybeShowBookmarkBar(contents);
  
-@@ -5706,6 +10306,26 @@ void BrowserView::LoadAccelerators() {
+@@ -5706,6 +10321,26 @@ void BrowserView::LoadAccelerators() {
    }
  
  #if BUILDFLAG(IS_MAC)

@@ -598,9 +598,14 @@ void PeekController::Close(std::optional<foundation::PeekTrigger> trigger) {
   // the page itself goes with `contents`, never touching the tab strip or
   // the workspace.
   closed_ = foundation::can_reopen_peek(*reopen_) ? contents->Clone() : nullptr;
-  // The pinned page beneath gets its focus back.
+  // The pinned page beneath gets its focus back. The link that opened the
+  // Peek never saw the pointer leave, so its address would stay in the status
+  // bubble.
   if (content::WebContents* tab = ActiveTab()) {
     tab->Focus();
+    if (tab->GetDelegate()) {
+      tab->GetDelegate()->UpdateTargetURL(tab, GURL());
+    }
   }
 }
 
