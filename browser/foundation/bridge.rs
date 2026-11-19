@@ -78,6 +78,14 @@ mod ffi {
     // OpenInTab turns the Peek page into a Today tab of the current Space;
     // OpenInSplit puts it in a split beside a Today copy of the source page;
     // Close dismisses it and leaves the workspace as it was.
+    // The per-site ad blocking switch for a blocker level (see
+    // workspace::blocker). Unknown keeps the switch disabled.
+    enum BlockerSwitchState {
+        Unknown,
+        Off,
+        On,
+    }
+
     enum PeekActionKind {
         OpenInTab,
         OpenInSplit,
@@ -862,6 +870,11 @@ mod ffi {
         // How far a sidebar drag at `pointer_y` scrolls rows shown from 0 to
         // `height` per tick: negative up, 0 in the middle.
         fn drag_autoscroll_step(pointer_y: i32, height: i32) -> i32;
+        // What the blocker switch shows for a host at blocker `level`.
+        fn blocker_switch_state(level: i32) -> BlockerSwitchState;
+        // The blocker level to set when the switch goes `on`, given the
+        // Profile's default level.
+        fn blocker_switch_level(on: bool, default_level: i32) -> i32;
         // Expand Current Split: the first pane's share after expanding pane
         // `focused` (0 or 1) of a split at `ratio`.
         fn expand_split_ratio(ratio: f64, focused: usize) -> f64;
@@ -1307,6 +1320,19 @@ pub fn set_pins_collapsed(
             .set_pins_collapsed(window_id, collapsed)
             .map(|()| window_id),
     )
+}
+
+pub fn blocker_switch_state(level: i32) -> ffi::BlockerSwitchState {
+    use workspace::blocker::SwitchState;
+    match workspace::blocker::switch_state(level) {
+        SwitchState::Unknown => ffi::BlockerSwitchState::Unknown,
+        SwitchState::Off => ffi::BlockerSwitchState::Off,
+        SwitchState::On => ffi::BlockerSwitchState::On,
+    }
+}
+
+pub fn blocker_switch_level(on: bool, default_level: i32) -> i32 {
+    workspace::blocker::level_for(on, default_level)
 }
 
 pub fn drag_autoscroll_step(pointer_y: i32, height: i32) -> i32 {

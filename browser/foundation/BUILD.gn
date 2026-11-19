@@ -10,6 +10,7 @@ rust_static_library("workspace") {
   crate_root = "workspace/src/lib.rs"
   sources = [
     "workspace/src/archive.rs",
+    "workspace/src/blocker.rs",
     "workspace/src/command_bar.rs",
     "workspace/src/drag.rs",
     "workspace/src/folder.rs",
@@ -530,25 +531,39 @@ source_set("blocker") {
   ]
 }
 
+# Window > Ad Blocking for This Site…, the site info popover's "Block ads on
+# this site" row and the blocker's own popup.
 source_set("blocker_popup") {
   sources = [
     "blocker_popup.cc",
     "blocker_popup.h",
+    "blocker_switch.cc",
+    "blocker_switch.h",
   ]
   deps = [
     ":blocker",
+    ":bridge",
+    ":settings_window",
+    ":test_buildflags",
     "//base",
     "//chrome/browser/extensions",
     "//chrome/browser/profiles:profile",
     "//chrome/browser/ui:browser_element_identifiers",
     "//chrome/browser/ui:chrome_pages",
     "//chrome/browser/ui/browser_window",
+    "//chrome/browser/ui/views/controls",
     "//chrome/browser/ui/views/extensions:extension_popup",
     "//chrome/browser/ui/views/interaction",
+    "//chrome/browser/ui/views/location_bar",
+    "//chrome/browser/ui/views/page_info",
     "//components/sessions",
     "//components/tabs:public",
+    "//components/vector_icons",
+    "//content/public/browser",
     "//extensions/browser",
+    "//extensions/common",
     "//ui/views",
+    "//url",
   ]
 }
 

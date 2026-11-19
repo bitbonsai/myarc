@@ -7,11 +7,14 @@
 //   node tools/check_blocker.mjs set-level <profile dir> <extension ID> <level>
 //     clicks the popup's filtering-mode step with real mouse events: 0 is
 //     "no filtering" (blocking off for the site), 2 is the default "optimal"
+//   node tools/check_blocker.mjs popup-mode <profile dir> <extension ID> [want]
+//     prints the mode the newest open popup shows for the site, waiting up to
+//     10 s for it to equal <want> (such as "no filtering") when given
 import fs from 'node:fs'
 
 const [mode, profile, arg, want] = process.argv.slice(2)
-if (!['title', 'set-level'].includes(mode) || !profile || !arg || (mode === 'set-level' && !want)) {
-  console.error('usage: check_blocker.mjs title|set-level <profile dir> <arg> [want|level]')
+if (!['title', 'set-level', 'popup-mode'].includes(mode) || !profile || !arg || (mode === 'set-level' && !want)) {
+  console.error('usage: check_blocker.mjs title|set-level|popup-mode <profile dir> <arg> [want|level]')
   process.exit(64)
 }
 
@@ -80,8 +83,29 @@ if (mode === 'title') {
   process.exit(want && title !== `tracker: ${want}` ? 1 : 0)
 }
 
-const popup = await findTarget((t) => t.url.startsWith(`chrome-extension://${arg}/popup.html`))
+const popupUrl = `chrome-extension://${arg}/popup.html`
+let popup = await findTarget((t) => t.url.startsWith(popupUrl))
+if (mode === 'popup-mode') {
+  // A popup opened again shows as a new target; read the newest one.
+  popup = (await targets()).filter((t) => t.url.startsWith(popupUrl)).at(0) ?? popup
+}
 const cdp = await session(popup)
+
+if (mode === 'popup-mode') {
+  let shown = null
+  for (let i = 0; i < 40; i++) {
+    shown = await evaluate(cdp, `(() => {
+      const level = document.querySelector('.filteringModeSlider')?.dataset.level
+      const name = document.querySelector('#filteringModeText > span')?.textContent
+      return level === undefined || !name || name === '_' ? null : { level, name }
+    })()`)
+    if (shown && (!want || shown.name === want)) break
+    await sleep(250)
+  }
+  cdp.close()
+  console.log(`popup mode: ${shown?.name ?? 'unknown'} (level ${shown?.level ?? '?'})`)
+  process.exit(want && shown?.name !== want ? 1 : 0)
+}
 let box = null
 for (let i = 0; i < 40 && !box; i++) {
   box = await evaluate(cdp, `(() => {

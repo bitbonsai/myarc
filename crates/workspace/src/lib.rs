@@ -33,6 +33,7 @@ use std::collections::BTreeSet;
 use std::fmt;
 
 pub mod archive;
+pub mod blocker;
 pub mod command_bar;
 pub mod drag;
 pub mod folder;
