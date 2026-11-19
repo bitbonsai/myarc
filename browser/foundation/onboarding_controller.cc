@@ -1,5 +1,6 @@
 #include "myarc/onboarding_controller.h"
 
+#include <algorithm>
 #include <memory>
 #include <string>
 #include <utility>
@@ -7,6 +8,7 @@
 #include "base/command_line.h"
 #include "base/functional/bind.h"
 #include "base/location.h"
+#include "base/strings/string_number_conversions.h"
 #include "base/task/single_thread_task_runner.h"
 #include "base/time/time.h"
 #include "chrome/browser/browser_process.h"
@@ -15,6 +17,7 @@
 #include "myarc/arc_import.h"
 #include "myarc/onboarding_prefs.h"
 #include "myarc/test_buildflags.h"
+#include "ui/gfx/animation/animation.h"
 #include "ui/gfx/geometry/rect.h"
 #include "ui/views/focus/focus_manager.h"
 #include "ui/views/view.h"
@@ -31,6 +34,22 @@ OnboardingController* g_welcome_window = nullptr;
 
 #if BUILDFLAG(MYARC_TEST_HOOKS)
 constexpr char kMyarcTestOnboardingEvent[] = "myarc-test-onboarding-event";
+constexpr char kMyarcTestOnboardingEventDelay[] =
+    "myarc-test-onboarding-event-delay";
+constexpr char kMyarcTestOnboardingShowDelay[] =
+    "myarc-test-onboarding-show-delay";
+constexpr char kMyarcTestReduceMotion[] = "myarc-test-reduce-motion";
+
+// The switch's milliseconds, or `fallback`, up to 30 seconds.
+base::TimeDelta SwitchDelay(const char* name, int fallback) {
+  int ms = fallback;
+  if (!base::StringToInt(
+          base::CommandLine::ForCurrentProcess()->GetSwitchValueASCII(name),
+          &ms)) {
+    ms = fallback;
+  }
+  return base::Milliseconds(std::clamp(ms, 0, 30000));
+}
 #endif  // BUILDFLAG(MYARC_TEST_HOOKS)
 
 PrefService* LocalState() {
@@ -95,7 +114,8 @@ void OnboardingController::Refresh() {
 
 void OnboardingController::OnViewBoundsChanged(views::View* observed_view) {
   if (sheet_ && host_) {
-    sheet_->SetBoundsRect(views::View::ConvertRectToTarget(
+    sheet_->SetBoundsRect(host_->GetLocalBounds());
+    sheet_->SetSheetBounds(views::View::ConvertRectToTarget(
         observed_view->parent(), host_, observed_view->bounds()));
   }
 }
@@ -115,6 +135,23 @@ void OnboardingController::ShowWelcome(bool offers_import) {
     return;
   }
   g_welcome_window = this;
+#if BUILDFLAG(MYARC_TEST_HOOKS)
+  // Holds the sheet back, so a frame capture can start before its intro.
+  if (!test_show_delayed_ && base::CommandLine::ForCurrentProcess()->HasSwitch(
+                                 kMyarcTestOnboardingShowDelay)) {
+    test_show_delayed_ = true;
+    base::SingleThreadTaskRunner::GetCurrentDefault()->PostDelayedTask(
+        FROM_HERE,
+        base::BindOnce(&OnboardingController::ShowWelcome,
+                       weak_factory_.GetWeakPtr(), offers_import),
+        SwitchDelay(kMyarcTestOnboardingShowDelay, 0));
+    return;
+  }
+  if (base::CommandLine::ForCurrentProcess()->HasSwitch(
+          kMyarcTestReduceMotion)) {
+    gfx::Animation::SetPrefersReducedMotionForTesting(true);
+  }
+#endif  // BUILDFLAG(MYARC_TEST_HOOKS)
   sheet_ = host_->AddChildView(std::make_unique<WelcomeView>(
       offers_import, radius_,
       base::BindRepeating(
@@ -138,7 +175,7 @@ void OnboardingController::ShowWelcome(bool offers_import) {
         FROM_HERE,
         base::BindOnce(&OnboardingController::PressForTest,
                        weak_factory_.GetWeakPtr()),
-        base::Seconds(1));
+        SwitchDelay(kMyarcTestOnboardingEventDelay, 1000));
   }
 #endif  // BUILDFLAG(MYARC_TEST_HOOKS)
 }

@@ -319,6 +319,7 @@ source_set("onboarding") {
     "//ui/compositor",
     "//ui/events",
     "//ui/gfx",
+    "//ui/gfx/animation",
     "//ui/gfx/geometry",
   ]
 }

@@ -24,7 +24,10 @@ struct ArcImportOutcome;
 // only.
 //
 // With test hooks, --myarc-test-onboarding-event=skip_tour or start_browsing
-// presses that button a second after the sheet shows.
+// presses that button a second after the sheet shows, or
+// --myarc-test-onboarding-event-delay=<ms> after it.
+// --myarc-test-onboarding-show-delay=<ms> holds the sheet back that long, and
+// --myarc-test-reduce-motion plays it as Reduce Motion does.
 class OnboardingController final : public views::ViewObserver {
  public:
   // `host` holds the sheet over `area`, the window's page area; both must
@@ -64,6 +67,7 @@ class OnboardingController final : public views::ViewObserver {
   raw_ptr<WelcomeView> sheet_ = nullptr;
   bool importing_ = false;
   [[maybe_unused]] bool test_event_scheduled_ = false;
+  [[maybe_unused]] bool test_show_delayed_ = false;
   base::ScopedObservation<views::View, views::ViewObserver> area_observation_{
       this};
   base::WeakPtrFactory<OnboardingController> weak_factory_{this};
