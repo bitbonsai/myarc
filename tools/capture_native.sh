@@ -58,7 +58,9 @@
 #   --myarc-test-onboarding=<state> (welcome, reveal, practice1…3, handoff,
 #   complete) and logs each decision; ONBOARDING=1 only logs.
 #   ONBOARDING_EVENT=skip_tour (or start_browsing, import) presses that
-#   welcome button a second after the sheet shows. ONBOARDING_IMPORT=<file>
+#   welcome button a second after the sheet shows; back, next or skip_tour
+#   presses that coach mark button a second after a coach mark shows.
+#   ONBOARDING_IMPORT=<file>
 #   makes Import from Arc… read that export instead of asking, and press
 #   Import in its preview. ONBOARDING_HOLD=1 keeps the tour at the reveal
 #   after the import's crossfade. All need myarc_test_hooks.

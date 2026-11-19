@@ -101,11 +101,19 @@ impl TourRecord {
     }
 
     /// The Space whose theme the welcome's colour field crossfades to once an import
-    /// commits: the first Space the commit reported.
+    /// commits: the first Space the commit reported. The window also switches to it
+    /// before the reveal, so the reveal shows the imported rows rather than an empty
+    /// default Space.
     pub fn theme_space(&self) -> Option<SpaceId> {
         self.receipt
             .as_ref()
             .and_then(|receipt| receipt.space_ids.first().copied())
+    }
+
+    /// True when Back changes the tour, so the coach mark shows a Back button. From
+    /// the reveal that holds only while nothing was imported.
+    pub fn offers_back(&self) -> bool {
+        apply(self, TourEvent::Back).record.state != self.state
     }
 
     /// True when an export with this hash was already imported through the tour.
@@ -634,6 +642,48 @@ mod tests {
         let back = apply(&record, TourEvent::Back);
         assert_eq!(back.record, record);
         assert_eq!(back.effect, TourEffect::None);
+    }
+
+    #[test]
+    fn back_is_offered_exactly_where_it_changes_the_state() {
+        let imported = TourRecord {
+            receipt: Some(receipt()),
+            ..at(Reveal)
+        };
+        for (record, offered) in [
+            (at(Welcome), false),
+            (at(Importing), false),
+            (at(Reveal), true),
+            (imported, false),
+            (at(Practice(1)), true),
+            (at(Practice(3)), true),
+            (at(Handoff), true),
+            (at(Complete), false),
+        ] {
+            assert_eq!(record.offers_back(), offered, "{record:?}");
+            let back = apply(&record, TourEvent::Back);
+            assert_eq!(back.effect != TourEffect::None, offered, "{record:?}");
+        }
+    }
+
+    #[test]
+    fn practice_one_backs_to_the_reveal_end_state_and_continues() {
+        // Back shows the reveal as it ended, with no replay, and its coach mark's
+        // Next moves on to practice 1 again.
+        let back = apply(&at(Practice(1)), TourEvent::Back);
+        assert_eq!(back.record.state, Reveal);
+        assert_eq!(back.effect, TourEffect::Show { animate: false });
+        let next = apply(&back.record, TourEvent::RevealDone);
+        assert_eq!(next.record.state, Practice(1));
+        // Opening a page from the command bar finishes practice 1 and moves on.
+        let done = apply(&next.record, TourEvent::StepDone(1));
+        assert_eq!(done.record.state, Practice(2));
+        assert!(done.record.is_done(1));
+        assert_eq!(done.effect, TourEffect::Show { animate: true });
+        // A command bar page during another step changes nothing.
+        let late = apply(&done.record, TourEvent::StepDone(1));
+        assert_eq!(late.record, done.record);
+        assert_eq!(late.effect, TourEffect::None);
     }
 
     #[test]

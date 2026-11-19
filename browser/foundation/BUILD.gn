@@ -294,6 +294,8 @@ source_set("onboarding_prefs") {
 # The welcome tour's per-window controller and its welcome sheet.
 source_set("onboarding") {
   sources = [
+    "coach_mark.cc",
+    "coach_mark.h",
     "onboarding_controller.cc",
     "onboarding_controller.h",
     "welcome_view.cc",

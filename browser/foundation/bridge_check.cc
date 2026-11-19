@@ -1404,7 +1404,8 @@ bool CheckSpacesIndex() {
 
 // The welcome tour record round trip across the bridge: a fresh workspace
 // starts at the welcome, an existing one gets a finished tour, an event's
-// record decodes to the same tour, and a damaged record reads as finished.
+// record decodes to the same tour, Back shows where it applies, and a
+// damaged record reads as finished.
 bool CheckOnboarding() {
   using namespace myarc::foundation;
   auto fresh = onboarding_on_load(false, "", true);
@@ -1430,13 +1431,22 @@ bool CheckOnboarding() {
   auto revealed = onboarding_event(std::string(importing.record), event);
   if (std::string(revealed.tour.state) != "reveal" ||
       revealed.effect != OnboardingEffect::Imported ||
-      revealed.tour.theme_space != 5 || revealed.tour.offers_import) {
+      revealed.tour.theme_space != 5 || revealed.tour.offers_import ||
+      revealed.tour.offers_back) {
     return false;
   }
   // A relaunch mid-reveal resumes at practice 1, without animation.
   auto resumed = onboarding_on_load(true, std::string(revealed.record), false);
   if (std::string(resumed.tour.state) != "practice" ||
-      resumed.tour.step != 1 || resumed.animate) {
+      resumed.tour.step != 1 || resumed.animate || !resumed.tour.offers_back) {
+    return false;
+  }
+  // Back from practice 1 shows the reveal's end state, without animation.
+  OnboardingEvent back;
+  back.kind = OnboardingEventKind::Back;
+  auto backed = onboarding_event(std::string(resumed.record), back);
+  if (std::string(backed.tour.state) != "reveal" ||
+      backed.effect != OnboardingEffect::Show || backed.animate) {
     return false;
   }
   OnboardingEvent skip;

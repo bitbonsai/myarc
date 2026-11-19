@@ -167,6 +167,8 @@ mod ffi {
         offers_import: bool,
         // The first Space the tour's import committed, or 0.
         theme_space: u64,
+        // Back changes the tour, so its coach mark shows Back.
+        offers_back: bool,
     }
 
     // The record to save, before running `effect`, and what it decodes to.
@@ -1403,6 +1405,7 @@ fn onboarding_tour(record: &workspace::onboarding::TourRecord) -> ffi::Onboardin
         skipped: steps(workspace::onboarding::TourRecord::is_skipped),
         offers_import: record.offers_import(),
         theme_space: record.theme_space().unwrap_or(0),
+        offers_back: record.offers_back(),
     }
 }
 

@@ -40,10 +40,24 @@ using EventKind = foundation::OnboardingEventKind;
 
 // The window showing the welcome, so a second window doesn't show it too.
 OnboardingController* g_welcome_window = nullptr;
+// The window showing a coach mark, likewise.
+OnboardingController* g_coach_window = nullptr;
 
 // The sidebar's rows start to settle this long into the sheet's exit, once
 // the dim has mostly lifted.
 constexpr base::TimeDelta kRowsDelay = base::Milliseconds(200);
+// The first coach mark shows this long after the reveal's last row lands.
+constexpr base::TimeDelta kCoachDelay = base::Milliseconds(200);
+
+// The reveal's end state, which Back from practice 1 shows.
+constexpr char16_t kRevealTitle[] = u"Your sidebar";
+constexpr char16_t kRevealBody[] =
+    u"Your Spaces, pinned tabs and today's tabs live here.";
+// Practice 1: open a site from the command bar.
+constexpr char16_t kCommandBarTitle[] = u"Open a site";
+constexpr char16_t kCommandBarBody[] =
+    u"Type an address or a search in the command bar.";
+constexpr char16_t kCommandBarHint[] = u"Press \u2318T";
 
 #if BUILDFLAG(MYARC_TEST_HOOKS)
 constexpr char kMyarcTestOnboarding[] = "myarc-test-onboarding";
@@ -132,13 +146,17 @@ OnboardingController::OnboardingController(Profile& profile,
                                            views::View& area,
                                            WelcomeView::RadiusCallback radius,
                                            base::RepeatingClosure restore_focus,
-                                           SettleRowsCallback settle_rows)
+                                           SettleRowsCallback settle_rows,
+                                           SelectSpaceCallback select_space,
+                                           AnchorCallback anchor)
     : profile_(&profile),
       host_(&host),
       area_(&area),
       radius_(std::move(radius)),
       restore_focus_(std::move(restore_focus)),
-      settle_rows_(std::move(settle_rows)) {
+      settle_rows_(std::move(settle_rows)),
+      select_space_(std::move(select_space)),
+      anchor_(std::move(anchor)) {
   area_observation_.Observe(&area);
 }
 
@@ -152,6 +170,7 @@ OnboardingController::~OnboardingController() {
     }
   }
   CloseWelcome();
+  CloseCoach();
 }
 
 void OnboardingController::Refresh() {
@@ -160,28 +179,55 @@ void OnboardingController::Refresh() {
       !local_state) {
     return;
   }
+  // Another window shows the tour's coach mark.
+  if (g_coach_window && g_coach_window != this) {
+    return;
+  }
   const auto tour = ReadOnboardingTour(*local_state);
   if (!tour) {
     return;
   }
   const std::string state(tour->state);
   if (state == "welcome") {
+    CloseCoach();
     if (!sheet_ && !g_welcome_window) {
       ShowWelcome(tour->offers_import);
     }
     return;
   }
   if (state == "reveal") {
-    StartReveal();
+    // Back from practice 1 shows the reveal's end state, which stays.
+    if (coach_state_ != "reveal") {
+      StartReveal();
+    }
     return;
   }
   // Another window may have ended the tour.
   CloseWelcome();
+  if (state == "practice" && tour->step == 1) {
+    ShowCoach(*tour, base::TimeDelta());
+    return;
+  }
+  CloseCoach();
   if (state == "complete" || state == "importing") {
     return;
   }
-  // Practice and handoff aren't built yet: end the tour as skipped.
+  // Practice 2, 3 and the handoff aren't built yet: end the tour as skipped.
   Run(FeedOnboardingEvent(*local_state, Event(EventKind::SkipTour)));
+}
+
+void OnboardingController::OnCommandBarOpenedPage() {
+  PrefService* local_state = LocalState();
+  if (!local_state || (g_coach_window && g_coach_window != this)) {
+    return;
+  }
+  const auto tour = ReadOnboardingTour(*local_state);
+  if (!tour || std::string(tour->state) != "practice" || tour->step != 1) {
+    return;
+  }
+  auto event = Event(EventKind::StepDone);
+  event.step = 1;
+  Run(FeedOnboardingEvent(*local_state, event));
 }
 
 void OnboardingController::OnViewBoundsChanged(views::View* observed_view) {
@@ -190,10 +236,12 @@ void OnboardingController::OnViewBoundsChanged(views::View* observed_view) {
     sheet_->SetSheetBounds(views::View::ConvertRectToTarget(
         observed_view->parent(), host_, observed_view->bounds()));
   }
+  PlaceCoach();
 }
 
 void OnboardingController::OnViewIsDeleting(views::View* observed_view) {
   CloseWelcome();
+  CloseCoach();
   area_observation_.Reset();
   area_ = nullptr;
 }
@@ -326,6 +374,11 @@ void OnboardingController::OnImportDone(const ArcImportOutcome& outcome) {
 }
 
 void OnboardingController::ShowImported(uint64_t space) {
+  // The import adds its Spaces next to the current one: show the first, so
+  // the reveal settles the imported rows. Refresh waits while recolouring_.
+  if (space && select_space_) {
+    select_space_.Run(space);
+  }
   if (!sheet_) {
     recolouring_ = false;
     Refresh();
@@ -443,22 +496,170 @@ void OnboardingController::Run(
     return;
   }
   if (state == "welcome") {
+    CloseCoach();
     ShowWelcome(transition.tour.offers_import);
     return;
   }
   if (state == "reveal") {
+    // Back from practice 1: the reveal as it ended, with its own card.
+    if (!transition.animate && !sheet_) {
+      ShowCoach(transition.tour, base::TimeDelta());
+      return;
+    }
+    CloseCoach();
     StartReveal();
     return;
   }
   CloseWelcome();
+  if (state == "practice" && transition.tour.step == 1) {
+    ShowCoach(transition.tour,
+              transition.animate ? kCoachDelay : base::TimeDelta());
+    return;
+  }
+  CloseCoach();
   if (state == "complete" || state == "importing") {
     return;
   }
-  // Practice and handoff aren't built yet: end the tour as skipped after
-  // `reveal_done`. The import receipt stays in the record.
+  // Practice 2, 3 and the handoff aren't built yet: end the tour as skipped
+  // there. Done steps and the import receipt stay in the record.
   if (PrefService* local_state = LocalState()) {
     Run(FeedOnboardingEvent(*local_state, Event(EventKind::SkipTour)));
   }
+}
+
+void OnboardingController::ShowCoach(const foundation::OnboardingTour& tour,
+                                     base::TimeDelta delay) {
+  const std::string state(tour.state);
+  if (state == coach_state_ && tour.step == coach_step_ &&
+      (coach_ || coach_timer_.IsRunning())) {
+    return;
+  }
+  if (!host_ || !area_ || (g_coach_window && g_coach_window != this)) {
+    return;
+  }
+  CloseCoach();
+  g_coach_window = this;
+  coach_state_ = state;
+  coach_step_ = tour.step;
+  coach_offers_back_ = tour.offers_back;
+  if (delay.is_positive()) {
+    coach_timer_.Start(FROM_HERE, delay,
+                       base::BindOnce(&OnboardingController::OpenCoach,
+                                      weak_factory_.GetWeakPtr()));
+    return;
+  }
+  OpenCoach();
+}
+
+void OnboardingController::OpenCoach() {
+  if (!host_ || coach_ || coach_state_.empty()) {
+    return;
+  }
+#if BUILDFLAG(MYARC_TEST_HOOKS)
+  if (base::CommandLine::ForCurrentProcess()->HasSwitch(
+          kMyarcTestReduceMotion)) {
+    gfx::Animation::SetPrefersReducedMotionForTesting(true);
+  }
+#endif  // BUILDFLAG(MYARC_TEST_HOOKS)
+  const bool reveal = coach_state_ == "reveal";
+  CoachMark::Content content{
+      .title = reveal ? kRevealTitle : kCommandBarTitle,
+      .body = reveal ? kRevealBody : kCommandBarBody,
+      .hint = reveal ? u"" : kCommandBarHint,
+      .offers_back = coach_offers_back_,
+      .offers_next = reveal,
+  };
+  coach_ = host_->AddChildView(std::make_unique<CoachMark>(
+      content,
+      base::BindRepeating(
+          [](base::WeakPtr<OnboardingController> controller,
+             CoachMark::Action action) {
+            // Posted: the press runs inside the card, which the next step
+            // removes.
+            base::SingleThreadTaskRunner::GetCurrentDefault()->PostTask(
+                FROM_HERE, base::BindOnce(&OnboardingController::OnCoachAction,
+                                          controller, action));
+          },
+          weak_factory_.GetWeakPtr())));
+  PlaceCoach();
+  coach_->Show();
+#if BUILDFLAG(MYARC_TEST_HOOKS)
+  if (base::CommandLine::ForCurrentProcess()->HasSwitch(kMyarcTestOnboarding)) {
+    LOG(WARNING) << "Test onboarding: coach mark state=" << coach_state_
+                 << " step=" << static_cast<int>(coach_step_)
+                 << " back=" << coach_offers_back_
+                 << " bounds=" << coach_->bounds().ToString();
+  }
+  const std::string event =
+      base::CommandLine::ForCurrentProcess()->GetSwitchValueASCII(
+          kMyarcTestOnboardingEvent);
+  if (!test_coach_event_scheduled_ &&
+      (event == "back" || event == "next" || event == "skip_tour")) {
+    test_coach_event_scheduled_ = true;
+    base::SingleThreadTaskRunner::GetCurrentDefault()->PostDelayedTask(
+        FROM_HERE,
+        base::BindOnce(&OnboardingController::PressCoachForTest,
+                       weak_factory_.GetWeakPtr()),
+        SwitchDelay(kMyarcTestOnboardingEventDelay, 1000));
+  }
+#endif  // BUILDFLAG(MYARC_TEST_HOOKS)
+}
+
+void OnboardingController::CloseCoach() {
+  coach_timer_.Stop();
+  coach_state_.clear();
+  coach_step_ = 0;
+  if (g_coach_window == this) {
+    g_coach_window = nullptr;
+  }
+  if (coach_ && host_) {
+    host_->RemoveChildViewT(std::exchange(coach_, nullptr).get());
+  }
+}
+
+void OnboardingController::PlaceCoach() {
+  if (!coach_ || !host_ || !area_ || !area_->parent()) {
+    return;
+  }
+  const gfx::Rect bounds =
+      views::View::ConvertRectToTarget(area_->parent(), host_, area_->bounds());
+  coach_->Place(anchor_ ? anchor_.Run() : gfx::Rect(), bounds);
+}
+
+void OnboardingController::OnCoachAction(CoachMark::Action action) {
+  PrefService* local_state = LocalState();
+  if (!local_state || !coach_) {
+    return;
+  }
+  switch (action) {
+    case CoachMark::Action::kBack:
+      Run(FeedOnboardingEvent(*local_state, Event(EventKind::Back)));
+      break;
+    case CoachMark::Action::kNext:
+      Run(FeedOnboardingEvent(*local_state, Event(EventKind::RevealDone)));
+      break;
+    case CoachMark::Action::kSkipTour:
+      Run(FeedOnboardingEvent(*local_state, Event(EventKind::SkipTour)));
+      break;
+  }
+}
+
+void OnboardingController::PressCoachForTest() {
+#if BUILDFLAG(MYARC_TEST_HOOKS)
+  const std::string event =
+      base::CommandLine::ForCurrentProcess()->GetSwitchValueASCII(
+          kMyarcTestOnboardingEvent);
+  if (!coach_) {
+    return;
+  }
+  if (event == "back") {
+    coach_->Press(CoachMark::Action::kBack);
+  } else if (event == "next") {
+    coach_->Press(CoachMark::Action::kNext);
+  } else if (event == "skip_tour") {
+    coach_->Press(CoachMark::Action::kSkipTour);
+  }
+#endif  // BUILDFLAG(MYARC_TEST_HOOKS)
 }
 
 void OnboardingController::PressForTest() {
