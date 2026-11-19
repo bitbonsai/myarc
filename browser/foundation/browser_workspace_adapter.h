@@ -361,6 +361,9 @@ class BrowserWorkspaceAdapter final : public TabStripModelObserver {
   bool bound_ = false;
   bool refresh_pending_ = false;
   bool refreshing_ = false;
+  // The dormant selected row ShowSelected last opened, so a page that fails
+  // to open isn't retried on every refresh.
+  uint64_t dormant_opened_ = 0;
   bool bindings_dirty_ = true;
   bool legacy_pending_ = false;
   bool reveal_active_ = false;

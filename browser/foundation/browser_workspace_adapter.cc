@@ -1447,15 +1447,23 @@ void BrowserWorkspaceAdapter::ShowSelected() {
   content::WebContents* page = LocalPage(*tabs_, sidebar.selected_item_id);
   // Selection is UI policy over Rust's supplied rows, never native tab order
   // or independently computed placement/Profile visibility. A dormant
-  // temporary row stays selected, showing nothing until it reopens; a saved
-  // row whose page closed hands selection on.
-  const bool dormant =
-      !page && sidebar.selected_item_id &&
-      !AnyPage(*profile_, sidebar.selected_item_id) &&
-      std::ranges::any_of(sidebar.temporary, [&sidebar](const auto& row) {
-        return row.id == sidebar.selected_item_id;
-      });
-  if (!page && !dormant) {
+  // temporary row stays selected and opens its remembered page, as on launch
+  // with a restored selection; a saved row whose page closed hands selection
+  // on.
+  const auto dormant =
+      page || !sidebar.selected_item_id ||
+              AnyPage(*profile_, sidebar.selected_item_id)
+          ? sidebar.temporary.end()
+          : std::ranges::find(sidebar.temporary, sidebar.selected_item_id,
+                              &foundation::ItemRecord::id);
+  if (dormant != sidebar.temporary.end() &&
+      dormant->id != dormant_opened_) {
+    // Once per row, so a page that can't open doesn't retry every refresh.
+    dormant_opened_ = dormant->id;
+    if (Remember(OpenDormantPage(*dormant, &page)).ok)
+      PersistBindings();
+  }
+  if (!page && dormant == sidebar.temporary.end()) {
     for (const auto* section :
          {&sidebar.pins, &sidebar.temporary, &sidebar.favorites}) {
       for (const auto& row : *section) {
