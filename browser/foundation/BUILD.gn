@@ -123,6 +123,7 @@ source_set("arc_import") {
     "//chrome/browser/profiles:profile",
     "//chrome/browser/ui/select_file_policy",
     "//components/constrained_window",
+    "//crypto",
     "//ui/base",
     "//ui/shell_dialogs",
     "//ui/views",
@@ -282,11 +283,43 @@ source_set("onboarding_prefs") {
     "onboarding_prefs.cc",
     "onboarding_prefs.h",
   ]
+  public_deps = [ ":bridge" ]
   deps = [
-    ":bridge",
     ":test_buildflags",
     "//base",
     "//components/prefs",
+  ]
+}
+
+# The welcome tour's per-window controller and its welcome sheet.
+source_set("onboarding") {
+  sources = [
+    "onboarding_controller.cc",
+    "onboarding_controller.h",
+    "welcome_view.cc",
+    "welcome_view.h",
+  ]
+  public_deps = [
+    ":bridge",
+    "//base",
+    "//ui/views",
+  ]
+  deps = [
+    ":arc_import",
+    ":onboarding_prefs",
+    ":test_buildflags",
+    "//cc/paint",
+    "//chrome/browser:browser_process",
+    "//chrome/browser/profiles:profile",
+    "//components/prefs",
+    "//skia",
+    "//ui/accessibility",
+    "//ui/base",
+    "//ui/color",
+    "//ui/compositor",
+    "//ui/events",
+    "//ui/gfx",
+    "//ui/gfx/geometry",
   ]
 }
 

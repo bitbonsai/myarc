@@ -9,6 +9,7 @@
 
 #include "base/files/file_util.h"
 #include "base/functional/bind.h"
+#include "base/memory/ref_counted.h"
 #include "base/memory/scoped_refptr.h"
 #include "base/memory/weak_ptr.h"
 #include "base/strings/strcat.h"
@@ -20,6 +21,7 @@
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/ui/select_file_policy/chrome_select_file_policy.h"
 #include "components/constrained_window/constrained_window_views.h"
+#include "crypto/hash.h"
 #include "myarc/workspace_service.h"
 #include "ui/base/models/dialog_model.h"
 #include "ui/shell_dialogs/select_file_dialog.h"
@@ -38,9 +40,40 @@ constexpr size_t kShownLines = 10;
 
 using Confirmed = base::OnceCallback<void(uint64_t)>;
 
+// Runs the caller's ArcImportDone once the last step holding it lets go: the
+// picker, the preview's buttons or the apply. Posted, since the last release
+// may happen while a dialog closes.
+class Outcome : public base::RefCounted<Outcome> {
+ public:
+  explicit Outcome(ArcImportDone done) : done_(std::move(done)) {}
+  Outcome(const Outcome&) = delete;
+  Outcome& operator=(const Outcome&) = delete;
+
+  void Commit(std::string content_hash, uint64_t first_space) {
+    outcome_.committed = true;
+    outcome_.content_hash = std::move(content_hash);
+    if (first_space) {
+      outcome_.space_ids = {first_space};
+    }
+  }
+
+ private:
+  friend class base::RefCounted<Outcome>;
+  ~Outcome() {
+    if (done_) {
+      base::SingleThreadTaskRunner::GetCurrentDefault()->PostTask(
+          FROM_HERE, base::BindOnce(std::move(done_), std::move(outcome_)));
+    }
+  }
+
+  ArcImportDone done_;
+  ArcImportOutcome outcome_;
+};
+
 struct ReadResult {
   std::string error;
   std::optional<rust::Box<foundation::ArcExport>> export_data;
+  std::string content_hash;
 };
 
 // Worker sequence: reads at most the export limit and parses. The file is
@@ -62,7 +95,8 @@ ReadResult ReadExport(const base::FilePath& path) {
     return {"myArc couldn't read this file.", std::nullopt};
   }
   return {std::string(),
-          WorkspaceService::ParseArcExport(base::as_byte_span(bytes))};
+          WorkspaceService::ParseArcExport(base::as_byte_span(bytes)),
+          base::HexEncodeLower(crypto::hash::Sha256(bytes))};
 }
 
 std::u16string Count(size_t count,
@@ -181,6 +215,8 @@ void Apply(base::WeakPtr<Profile> profile,
            gfx::NativeWindow parent,
            bool inactive,
            rust::Box<foundation::ArcExport> export_data,
+           const std::string& content_hash,
+           scoped_refptr<Outcome> outcome,
            Confirmed confirmed) {
   if (!profile) {
     return;
@@ -188,6 +224,9 @@ void Apply(base::WeakPtr<Profile> profile,
   auto result =
       WorkspaceService::ForProfile(*profile).ApplyArcImport(*export_data);
   const uint64_t first_space = result.ok ? result.first_space : 0;
+  if (result.ok && outcome) {
+    outcome->Commit(content_hash, first_space);
+  }
   // Post: the preview is still closing.
   if (!result.ok) {
     base::SingleThreadTaskRunner::GetCurrentDefault()->PostTask(
@@ -199,8 +238,8 @@ void Apply(base::WeakPtr<Profile> profile,
             parent, inactive));
   } else {
     base::SingleThreadTaskRunner::GetCurrentDefault()->PostTask(
-        FROM_HERE, base::BindOnce(&ShowReport, std::move(result), parent,
-                                  inactive));
+        FROM_HERE,
+        base::BindOnce(&ShowReport, std::move(result), parent, inactive));
   }
   if (confirmed) {
     std::move(confirmed).Run(first_space);
@@ -210,6 +249,7 @@ void Apply(base::WeakPtr<Profile> profile,
 void ShowPreview(base::WeakPtr<Profile> profile,
                  gfx::NativeWindow parent,
                  bool inactive,
+                 scoped_refptr<Outcome> outcome,
                  Confirmed confirmed,
                  ReadResult read) {
   if (!profile) {
@@ -224,9 +264,8 @@ void ShowPreview(base::WeakPtr<Profile> profile,
       WorkspaceService::ForProfile(*profile).PreviewArcImport(*export_data);
   ui::DialogModel::Builder builder;
   builder.SetTitle(kTitle);
-  const bool noop = preview.ok && !preview.new_spaces &&
-                    !preview.new_folders && !preview.new_pins &&
-                    !preview.moved_pins;
+  const bool noop = preview.ok && !preview.new_spaces && !preview.new_folders &&
+                    !preview.new_pins && !preview.moved_pins;
   if (!preview.ok) {
     builder.AddParagraph(ui::DialogModelLabel(
         base::StrCat({u"This file can't be imported. ",
@@ -242,8 +281,7 @@ void ShowPreview(base::WeakPtr<Profile> profile,
     }
     if (preview.moved_pins) {
       builder.AddParagraph(ui::DialogModelLabel(base::StrCat(
-          {u"Moves ",
-           Count(preview.moved_pins, u"pinned tab", u"pinned tabs"),
+          {u"Moves ", Count(preview.moved_pins, u"pinned tab", u"pinned tabs"),
            u" you already have into the folder Arc keeps ",
            preview.moved_pins == 1 ? u"it" : u"them", u" in."})));
     }
@@ -282,7 +320,8 @@ void ShowPreview(base::WeakPtr<Profile> profile,
   if (can_import) {
     builder.AddOkButton(
         base::BindOnce(&Apply, profile, parent, inactive,
-                       std::move(export_data), std::move(confirmed)),
+                       std::move(export_data), read.content_hash, outcome,
+                       std::move(confirmed)),
         ui::DialogModel::Button::Params().SetLabel(u"Import"));
     builder.AddCancelButton(base::DoNothing());
   } else {
@@ -316,19 +355,24 @@ void Read(base::WeakPtr<Profile> profile,
           gfx::NativeWindow parent,
           bool inactive,
           const base::FilePath& path,
+          scoped_refptr<Outcome> outcome,
           Confirmed confirmed) {
   base::ThreadPool::PostTaskAndReplyWithResult(
       FROM_HERE, {base::MayBlock(), base::TaskPriority::USER_VISIBLE},
       base::BindOnce(&ReadExport, path),
       base::BindOnce(&ShowPreview, profile, parent, inactive,
-                     std::move(confirmed)));
+                     std::move(outcome), std::move(confirmed)));
 }
 
 // Owns itself while the file picker is up.
 class Picker : public ui::SelectFileDialog::Listener {
  public:
-  Picker(Profile& profile, gfx::NativeWindow parent)
-      : profile_(profile.GetWeakPtr()), parent_(parent) {}
+  Picker(Profile& profile,
+         gfx::NativeWindow parent,
+         scoped_refptr<Outcome> outcome)
+      : profile_(profile.GetWeakPtr()),
+        parent_(parent),
+        outcome_(std::move(outcome)) {}
   Picker(const Picker&) = delete;
   Picker& operator=(const Picker&) = delete;
   ~Picker() override { dialog_->ListenerDestroyed(); }
@@ -347,7 +391,8 @@ class Picker : public ui::SelectFileDialog::Listener {
 
   // ui::SelectFileDialog::Listener:
   void FileSelected(const ui::SelectedFileInfo& file, int index) override {
-    Read(profile_, parent_, /*inactive=*/false, file.path(), Confirmed());
+    Read(profile_, parent_, /*inactive=*/false, file.path(), outcome_,
+         Confirmed());
     delete this;
   }
   void FileSelectionCanceled() override { delete this; }
@@ -355,20 +400,25 @@ class Picker : public ui::SelectFileDialog::Listener {
  private:
   const base::WeakPtr<Profile> profile_;
   const gfx::NativeWindow parent_;
+  const scoped_refptr<Outcome> outcome_;
   scoped_refptr<ui::SelectFileDialog> dialog_;
 };
 
 }  // namespace
 
-void ImportFromArc(Profile& profile, gfx::NativeWindow parent) {
-  (new Picker(profile, parent))->Start();
+void ImportFromArc(Profile& profile,
+                   gfx::NativeWindow parent,
+                   ArcImportDone done) {
+  (new Picker(profile, parent,
+              done ? base::MakeRefCounted<Outcome>(std::move(done)) : nullptr))
+      ->Start();
 }
 
 void ImportArcFileForCapture(Profile& profile,
                              gfx::NativeWindow parent,
                              const base::FilePath& path,
                              Confirmed confirmed) {
-  Read(profile.GetWeakPtr(), parent, /*inactive=*/true, path,
+  Read(profile.GetWeakPtr(), parent, /*inactive=*/true, path, nullptr,
        std::move(confirmed));
 }
 

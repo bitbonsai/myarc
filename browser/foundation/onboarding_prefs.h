@@ -1,7 +1,10 @@
 #ifndef MYARC_ONBOARDING_PREFS_H_
 #define MYARC_ONBOARDING_PREFS_H_
 
+#include <optional>
 #include <string>
+
+#include "myarc/bridge.rs.h"
 
 class PrefRegistrySimple;
 class PrefService;
@@ -23,9 +26,22 @@ void RegisterOnboardingPrefs(PrefRegistrySimple& registry);
 // be null, which decides nothing.
 //
 // With test hooks, --myarc-test-onboarding logs the decision for captures.
+// --myarc-test-onboarding=<state> first replaces the saved record with a
+// fresh one at that state: welcome, importing, reveal, practice1 to
+// practice3, handoff or complete.
 void DecideOnboardingOnLoad(PrefService* local_state,
                             bool first_run,
                             const std::string& profile_dir);
+
+// The saved tour, or nothing while no load decided it yet.
+std::optional<foundation::OnboardingTour> ReadOnboardingTour(
+    PrefService& local_state);
+
+// Applies `event` to the saved record and commits the new record before
+// returning, so the caller runs the returned effect only once it is saved.
+foundation::OnboardingTransition FeedOnboardingEvent(
+    PrefService& local_state,
+    const foundation::OnboardingEvent& event);
 
 }  // namespace myarc
 

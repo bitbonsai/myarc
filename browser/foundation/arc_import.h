@@ -2,6 +2,8 @@
 #define MYARC_ARC_IMPORT_H_
 
 #include <cstdint>
+#include <string>
+#include <vector>
 
 #include "base/files/file_path.h"
 #include "base/functional/callback.h"
@@ -17,7 +19,21 @@ namespace myarc {
 // could not read. Import writes them into `profile`'s workspace, then shows a
 // report of every kind of entry it left out or changed, with counts; Cancel
 // changes nothing. Opens no tabs and fetches nothing. UI sequence only.
-void ImportFromArc(Profile& profile, gfx::NativeWindow parent);
+//
+// `done`, when given, runs once the import is over: committed when Import
+// wrote something, and not committed when the picker or the preview was
+// cancelled or closed, the file was unreadable, or nothing was new.
+struct ArcImportOutcome {
+  bool committed = false;
+  // Lowercase hex SHA-256 of the export file.
+  std::string content_hash;
+  // The export's first Space, the only one the commit reports.
+  std::vector<uint64_t> space_ids;
+};
+using ArcImportDone = base::OnceCallback<void(const ArcImportOutcome&)>;
+void ImportFromArc(Profile& profile,
+                   gfx::NativeWindow parent,
+                   ArcImportDone done = ArcImportDone());
 
 // For background captures: skips the file picker, reads `path` and shows the
 // preview without taking focus. A non-null `confirmed` presses Import after a

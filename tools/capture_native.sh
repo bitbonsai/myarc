@@ -54,6 +54,11 @@
 #   endpoint in <dir> (MYARC_CONTROL_DIR) for myarc. CONTROL_SWITCH=0 sets
 #   only the directory, so the Settings switch decides; test-hook builds then
 #   take "control-on", "allow", "decline" or "stop" written to <dir>/test-hook.
+#   ONBOARDING=<state> seeds the welcome tour record at that state via
+#   --myarc-test-onboarding=<state> (welcome, reveal, practice1…3, handoff,
+#   complete) and logs each decision; ONBOARDING=1 only logs.
+#   ONBOARDING_EVENT=skip_tour (or start_browsing) presses that welcome
+#   button a second after the sheet shows. Both need myarc_test_hooks.
 #   SCRIPT=<file> runs that bash script once the window settles, before the
 #   capture, with PID and MYARC_CONTROL_DIR set; it can drive myarc and
 #   take its own shots with bgcapture.swift.
@@ -119,6 +124,12 @@ if [ "${1:-}" = "--inner" ]; then
     select) EXTRA+=(--myarc-test-agent-space=select) ;;
     *) EXTRA+=(--myarc-test-agent-space) ;;
   esac
+  case "${ONBOARDING:-}" in
+    '') ;;
+    1) EXTRA+=(--myarc-test-onboarding) ;;
+    *) EXTRA+=(--myarc-test-onboarding="$ONBOARDING") ;;
+  esac
+  [ -n "${ONBOARDING_EVENT:-}" ] && EXTRA+=(--myarc-test-onboarding-event="$ONBOARDING_EVENT")
   [ -n "${ARGS:-}" ] && read -r -a MORE <<< "$ARGS" && EXTRA+=("${MORE[@]}")
   OPEN_ENV=()
   if [ -n "${CONTROL:-}" ]; then
