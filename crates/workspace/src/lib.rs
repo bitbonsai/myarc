@@ -78,6 +78,7 @@ pub type ItemId = u64;
 pub type WindowId = u64;
 pub mod little_arc;
 pub mod local_dev;
+pub mod onboarding;
 pub mod peek;
 pub mod selection;
 pub mod site_icon;

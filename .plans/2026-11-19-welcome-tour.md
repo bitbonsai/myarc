@@ -63,7 +63,7 @@ The state machine lives in a new `crates/workspace/src/onboarding.rs` (the `brow
 
 States: `welcome → importing → reveal → practice(1..3) → handoff → complete`. `importing` exists only while the import dialog is open.
 
-Events: `start_browsing`, `import_started`, `import_committed(receipt)`, `import_cancelled`, `import_failed`, `step_done(n)`, `skip_step(n)`, `back`, `skip_tour`, `finish`, `replay`, `window_closed`, `relaunched(workspace_summary)`.
+Events: `start_browsing`, `import_started`, `import_committed(receipt)`, `import_cancelled`, `import_failed`, `reveal_done`, `step_done(n)`, `skip_step(n)`, `back`, `skip_tour`, `finish`, `replay`, `window_closed`, `relaunched`. `reveal_done` moves the reveal on to practice 1 once its rows have settled. `relaunched` needs no workspace summary: the only workspace fact the rules use is whether the load found a first run, and `on_load` takes that directly.
 
 The tour record is a small JSON string in a Local State pref, `myarc.onboarding.tour`, registered the way `little_arc_prefs.cc` registers its prefs. Rust encodes and decodes it and treats it as untrusted. It holds the state, the steps done, the steps skipped, the import receipt and a version number. An unreadable record reads as `complete`, so a damaged file never traps someone in the tour.
 
@@ -124,6 +124,7 @@ The frame-time trace, the VoiceOver review and the five-person study stay on the
 
 ## Open questions
 
-1. Should an existing user who upgrades to the build with the tour see it once, or only find it in Settings > Advanced? The plan shows it only on a fresh workspace.
-2. Is the Space step the right third practice step? Peek is the alternative, but it needs a pinned page with a link to another site, which the tour can't promise without opening a sample URL.
-3. Should the intro dim the whole desktop first, as Arc's does? That needs a full-screen transparent window over other apps for about a second. The plan keeps the intro inside the browser window.
+Decided on 2026-11-19:
+1. Only a fresh workspace sees the tour. Someone who upgrades finds it later under Settings > Advanced > Replay welcome tour, which step 9 adds.
+2. Practice 3 is switching Space with Ctrl+2, or Create a Space when there's only one Space.
+3. The intro motion stays inside the browser window and never dims the desktop.

@@ -17,6 +17,7 @@ rust_static_library("workspace") {
     "workspace/src/lib.rs",
     "workspace/src/little_arc.rs",
     "workspace/src/local_dev.rs",
+    "workspace/src/onboarding.rs",
     "workspace/src/peek.rs",
     "workspace/src/selection.rs",
     "workspace/src/site_icon.rs",
