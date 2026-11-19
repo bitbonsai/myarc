@@ -4,12 +4,12 @@ HTML: https://myarc.dev/download/
 
 Pre-alpha nightly, for trying the Arc-like shell. Not for daily or sensitive browsing.
 
-[Download for macOS (Apple silicon)](https://github.com/bitbonsai/myarc/releases/download/nightly-2026.11.19/myArc-Nightly-2026.11.19-arm64.dmg)
+[Download for macOS (Apple silicon)](https://github.com/bitbonsai/myarc/releases/download/nightly-2026.11.19.1/myArc-Nightly-2026.11.19.1-arm64.dmg)
 
-- **Version:** 2026.11.19
+- **Version:** 2026.11.19.1
 - **Date:** November 19, 2026
-- **Size:** 243.4 MB
-- **SHA-256:** `1a0c07efcee77d03535f06dc5e589ee555e1e8c97ff5e8c414a8b67757317b43`
+- **Size:** 243.5 MB
+- **SHA-256:** `01c4f4dd3dcd18978e8f27793d14e4beb4f37429d12549252f9e08749052565b`
 
 ## System requirements
 
@@ -21,7 +21,7 @@ Pre-alpha nightly, for trying the Arc-like shell. Not for daily or sensitive bro
 1. Check the download against the SHA-256 listed with it. The two values must match.
 
    ```
-   shasum -a 256 ~/Downloads/myArc-Nightly-2026.11.19-arm64.dmg
+   shasum -a 256 ~/Downloads/myArc-Nightly-2026.11.19.1-arm64.dmg
    ```
 2. Open the DMG and drag myArc Nightly to Applications.
 3. Open myArc Nightly. From 2026.11.18 on, Apple has notarized each nightly, so macOS only asks once whether to open an app downloaded from the internet. Choose Open.
@@ -59,7 +59,7 @@ Each item was seen working in a native run or experiment note. None of it has ha
 
 ## Other ways to get it
 
-- [GitHub releases](https://github.com/bitbonsai/myarc/releases/tag/nightly-2026.11.19) lists every nightly.
+- [GitHub releases](https://github.com/bitbonsai/myarc/releases/tag/nightly-2026.11.19.1) lists every nightly.
 - [Source on GitHub](https://github.com/bitbonsai/myarc), with instructions to [build it from source](https://github.com/bitbonsai/myarc/blob/main/browser/README.md).
 - [GitHub issues](https://github.com/bitbonsai/myarc/issues) take bug reports. Include the version, your macOS version and the steps that trigger the problem, and leave out private pages.
 
