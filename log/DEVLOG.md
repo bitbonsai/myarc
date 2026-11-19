@@ -9,7 +9,7 @@
 ## 2026-11-19: Local pages get a blue border
 
 - The 2 DIP line along the top of a local page's card is gone. A 2 DIP border in macOS system blue (#0A84FF) now runs around the whole card, just inside its edge, and its corners follow the card's own radii, so the card's rounded mask clips none of it. In a split each local pane draws its own. The address field chip uses the same blue as its fill, with a white `code-xml` icon and port. Both use that fixed blue instead of the Space theme colour, so the theme-change refresh in `BrowserNativeWidgetMac` and the `sidebar_tint` dependency are gone. Which hosts count as local, the chip following the focused pane and hiding while the field is edited are unchanged.
-- Evidence: `out/MyarcM0` built from Chromium `e056cd148d`. Captures are waiting for a live test to finish.
+- Evidence: `out/MyarcM0` built from Chromium `e056cd148d`. Background captures of synthetic pages are in `research-private/captures/localhost-border-20261119/`: `local.png` shows the blue border and a blue ":8000" chip, and `split.png` shows the border on the localhost:3000 pane only, with no chip for the focused non-local pane.
 - Verification: `cargo fmt --check`, the `bridge.rs` rustfmt check, `cargo clippy -D warnings`, `cargo test`, `check_docs.py`, the onboarding unit tests and `export_patches.py --check` pass.
 
 ## 2026-11-19: Selection follow-ups for the toast, Esc and Cmd+W
