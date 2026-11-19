@@ -26,7 +26,7 @@ A complete myArc browser remains unimplemented, and the Arc importer brings over
 
 ## Posts
 
-- [Keeping Arc's ideas going](https://myarc.dev/blog/keeping-arcs-ideas-going/index.md): Arc shuts down on December 22, and its ideas are worth keeping. This round brought Peek, Split View and Little Arc to myArc, along with ad blocking and nightlies that open on a Mac without a security warning.
+- [Keeping Arc's ideas going](https://myarc.dev/blog/keeping-arcs-ideas-going/index.md): Arc shuts down on December 22. myArc now has Peek, Split View and Little Arc, blocks ads from the first page, and opens on a Mac like any other app.
 - [Letting agents use myArc](https://myarc.dev/blog/agents-use-myarc/index.md): The agents that build myArc can now use it, in a Space of their own and only after you say yes. Getting there turned up a bug in Chromium and a sidebar full of gray globes.
 - [One window, two profiles](https://myarc.dev/blog/one-window-two-profiles/index.md): myArc now has real Profiles, so Work and Personal keep their own cookies and logins. Getting them to live in one window, the way Arc did, took more than I expected.
 - [Taking a few patches from ungoogled-chromium](https://myarc.dev/blog/ungoogled-chromium/index.md): myArc now borrows four build flags and five patches from ungoogled-chromium. I left out the patches that would cost myArc more than they give, like the ones that break the Chrome Web Store.

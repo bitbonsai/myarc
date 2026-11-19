@@ -8,7 +8,7 @@ November 2026
 
 November 19, 2026
 
-Arc shuts down on December 22, and its ideas are worth keeping. This round brought Peek, Split View and Little Arc to myArc, along with ad blocking and nightlies that open on a Mac without a security warning.
+Arc shuts down on December 22\. myArc now has Peek, Split View and Little Arc, blocks ads from the first page, and opens on a Mac like any other app.
 
 ## [Letting agents use myArc](https://myarc.dev/blog/agents-use-myarc/)
 
