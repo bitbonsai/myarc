@@ -136,8 +136,8 @@ bool g_rename_item_hook_done = false;
 // Ctrl+Shift+1 and 2 do. "close" focuses the right pane and closes it as
 // Cmd+W does, and "close-row" closes the left one as Close in its sidebar
 // menu does. "new" instead runs New Split on the first tab, as Ctrl+Shift+=
-// does; "new-pick" then picks the command bar's first tab and "new-esc"
-// dismisses it.
+// does, once that tab's page is open; "new-pick" then picks the command bar's
+// first tab and "new-esc" dismisses it.
 constexpr char kMyarcTestSplit[] = "myarc-test-split";
 bool g_split_hook_done = false;
 // --myarc-test-ctrl-tab=<presses> shows the first window's first three Today
@@ -1622,9 +1622,13 @@ void BrowserWorkspaceAdapter::Refresh() {
   if (ready() && !g_split_hook_done &&
       command_line->HasSwitch(kMyarcTestSplit)) {
     const auto sidebar = Sidebar();
+    // New Split's bar lists Today tabs that haven't loaded too, so "new"
+    // waits only for the first tab's page.
+    const bool new_split = command_line->GetSwitchValueASCII(kMyarcTestSplit)
+                               .starts_with("new");
     if (sidebar.ok && sidebar.temporary.size() >= 2 &&
         LocalPage(*tabs_, sidebar.temporary[0].id) &&
-        LocalPage(*tabs_, sidebar.temporary[1].id)) {
+        (new_split || LocalPage(*tabs_, sidebar.temporary[1].id))) {
       g_split_hook_done = true;
       base::SingleThreadTaskRunner::GetCurrentDefault()->PostTask(
           FROM_HERE,
@@ -1942,6 +1946,41 @@ foundation::MutationResult BrowserWorkspaceAdapter::RestoreArchivedTab(
   return result;
 }
 
+foundation::MutationResult BrowserWorkspaceAdapter::OpenDormantPage(
+    const foundation::ItemRecord& row,
+    content::WebContents** out) {
+  const uint64_t item = row.id;
+  // A dormant temporary row reopens its remembered page, unless the page is
+  // still open in another window.
+  if (!row.has_url ||
+      (row.placement == foundation::PlacementKind::Temporary &&
+       AnyPage(*profile_, item))) {
+    return Fail("Temporary page is detached or unavailable in this window.");
+  }
+  const GURL url(std::string(row.canonical_url));
+  if (!url.is_valid() || url.has_username() || url.has_password() ||
+      !(url.SchemeIsHTTPOrHTTPS() || url.spec() == "about:blank"))
+    return Fail("Saved URL is invalid.");
+  // Native navigation owns security policy and page lifetime. Background
+  // insertion avoids revealing a new item before Rust validates selection.
+  NavigateParams params(browser_, url, ui::PAGE_TRANSITION_AUTO_BOOKMARK);
+  params.disposition = WindowOpenDisposition::kNewBackgroundTab;
+  params.tabstrip_add_types = ADD_NONE;
+  Navigate(&params);
+  content::WebContents* page = params.navigated_or_inserted_contents;
+  if (!page || params.browser != browser_ ||
+      page->GetBrowserContext() != profile_ ||
+      tabs_->GetIndexOfWebContents(page) < 0)
+    return Fail(
+        "Native navigation did not open in the owning window/Profile.");
+  auto result = Binding::Set(*page, item);
+  if (!result.ok)
+    return result;
+  DCHECK_EQ(ItemIdForContents(*page), item);
+  *out = page;
+  return Ok(item);
+}
+
 foundation::MutationResult BrowserWorkspaceAdapter::ActivateItem(
     uint64_t item) {
   if (!ready())
@@ -1955,33 +1994,9 @@ foundation::MutationResult BrowserWorkspaceAdapter::ActivateItem(
     return Fail("Workspace item does not exist.");
   auto* page = LocalPage(*tabs_, item);
   if (!page) {
-    // A dormant temporary row reopens its remembered page, unless the page is
-    // still open in another window.
-    if (!row->has_url ||
-        (row->placement == foundation::PlacementKind::Temporary &&
-         AnyPage(*profile_, item))) {
-      return Fail("Temporary page is detached or unavailable in this window.");
-    }
-    const GURL url(std::string(row->canonical_url));
-    if (!url.is_valid() || url.has_username() || url.has_password() ||
-        !(url.SchemeIsHTTPOrHTTPS() || url.spec() == "about:blank"))
-      return Fail("Saved URL is invalid.");
-    // Native navigation owns security policy and page lifetime. Background
-    // insertion avoids revealing a new item before Rust validates selection.
-    NavigateParams params(browser_, url, ui::PAGE_TRANSITION_AUTO_BOOKMARK);
-    params.disposition = WindowOpenDisposition::kNewBackgroundTab;
-    params.tabstrip_add_types = ADD_NONE;
-    Navigate(&params);
-    page = params.navigated_or_inserted_contents;
-    if (!page || params.browser != browser_ ||
-        page->GetBrowserContext() != profile_ ||
-        tabs_->GetIndexOfWebContents(page) < 0)
-      return Fail(
-          "Native navigation did not open in the owning window/Profile.");
-    auto result = Binding::Set(*page, item);
-    if (!result.ok)
-      return result;
-    DCHECK_EQ(ItemIdForContents(*page), item);
+    auto opened = OpenDormantPage(*row, &page);
+    if (!opened.ok)
+      return opened;
   }
   auto result = service_->RevealItem(window_id_, item);
   if (!result.ok)
@@ -2673,9 +2688,19 @@ foundation::MutationResult BrowserWorkspaceAdapter::OpenInSplitView(
   // The parent runs New Split for the active tab itself.
   if (item == active_item)
     return Remember(Fail("Pick another tab to split this one with."));
+  base::AutoReset<bool> changing(&changing_, true);
   auto* page = LocalPage(*tabs_, item);
-  if (!page)
-    return Remember(Fail("Open that tab first, then split it."));
+  if (!page) {
+    // A dormant Today row opens its remembered page to take the pane.
+    auto state = service_->ExportSnapshot();
+    const auto* row = state ? FindItem(*state, item) : nullptr;
+    if (!row)
+      return Remember(Fail("Workspace item does not exist."));
+    auto opened = OpenDormantPage(*row, &page);
+    if (!opened.ok)
+      return Remember(std::move(opened));
+    PersistBindings();
+  }
   if (page->GetBrowserContext() != active->GetBrowserContext())
     return Remember(Fail("Tabs of different Profiles can't share a split."));
   const int index = tabs_->GetIndexOfWebContents(page);
@@ -2686,7 +2711,6 @@ foundation::MutationResult BrowserWorkspaceAdapter::OpenInSplitView(
   if (!result.ok)
     return Remember(std::move(result));
   {
-    base::AutoReset<bool> changing(&changing_, true);
     const auto id = tabs_->AddToNewSplit(
         {tabs_->active_index(), index},
         split_tabs::SplitTabVisualData(split_tabs::SplitTabLayout::kSideBySide),
@@ -2715,27 +2739,39 @@ foundation::MutationResult BrowserWorkspaceAdapter::SeparateSplit(
   return Remember(service_->SeparateSplit(item));
 }
 
-std::set<uint64_t> BrowserWorkspaceAdapter::SplitCandidates() const {
+std::vector<BrowserWorkspaceAdapter::SplitCandidate>
+BrowserWorkspaceAdapter::SplitCandidates() const {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
-  std::set<uint64_t> items;
+  std::vector<SplitCandidate> candidates;
   // Not ready(): New Split's own pane is waiting for its binding, and the
   // other tabs are bound already.
   if (!tabs_ || !IsReady(*service_))
-    return items;
+    return candidates;
   const auto sidebar = service_->Sidebar(window_id_);
   if (!sidebar.ok)
-    return items;
-  for (const auto& row : sidebar.temporary) {
-    // The sidebar hides an untouched New Tab page, so it can't be a pane.
-    auto* page = LocalPage(*tabs_, row.id);
-    if (page && !IsUntouchedNewTabPage(*page))
-      items.insert(row.id);
+    return candidates;
+  for (const uint64_t id : sidebar.split_candidates) {
+    const auto row = std::ranges::find(sidebar.temporary, id,
+                                       &foundation::ItemRecord::id);
+    if (row == sidebar.temporary.end())
+      continue;
+    auto* page = LocalPage(*tabs_, id);
+    if (page) {
+      // The sidebar hides an untouched New Tab page, so it can't be a pane.
+      if (!IsUntouchedNewTabPage(*page))
+        candidates.push_back({.item = id, .page = page});
+      continue;
+    }
+    // A dormant row, unless its page is open in another window.
+    const GURL url(std::string(row->canonical_url));
+    if (!row->has_url || !url.SchemeIsHTTPOrHTTPS() ||
+        AnyPage(*profile_, id))
+      continue;
+    std::u16string title = base::UTF8ToUTF16(std::string(
+        row->name.empty() ? row->title : row->name));
+    candidates.push_back({.item = id, .title = std::move(title), .url = url});
   }
-  for (const auto& split : sidebar.splits) {
-    items.erase(split.left);
-    items.erase(split.right);
-  }
-  return items;
+  return candidates;
 }
 
 foundation::MutationResult BrowserWorkspaceAdapter::FocusSplitPane(int index) {

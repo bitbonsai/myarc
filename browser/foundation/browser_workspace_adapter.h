@@ -244,9 +244,16 @@ class BrowserWorkspaceAdapter final : public TabStripModelObserver {
   foundation::MutationResult SeparateSplit(uint64_t item);
   // Ctrl+Shift+1 and Ctrl+Shift+2 focus the active split's panes.
   foundation::MutationResult FocusSplitPane(int index);
-  // Today tabs of this window's Space, open here and in no split, which New
-  // Split's blank pane can take, as Rust allows.
-  std::set<uint64_t> SplitCandidates() const;
+  // Today tabs of this window's Space in no split, which New Split's blank
+  // pane can take, as Rust allows. `page` is null for a dormant row, whose
+  // remembered page OpenInSplitView opens.
+  struct SplitCandidate {
+    uint64_t item = 0;
+    raw_ptr<content::WebContents> page = nullptr;
+    std::u16string title;
+    GURL url;
+  };
+  std::vector<SplitCandidate> SplitCandidates() const;
 
   // Peek (BC-005). The sidebar section of `page`, a tab of this window, or
   // nullopt when it has no row.
@@ -289,6 +296,11 @@ class BrowserWorkspaceAdapter final : public TabStripModelObserver {
   static void AutoArchive(Profile& profile);
   foundation::MutationResult BindWindow();
   foundation::MutationResult BindTabs();
+  // Opens a dormant row's remembered page as a background tab of this window
+  // bound to the row, and sets `page` to it.
+  foundation::MutationResult OpenDormantPage(
+      const foundation::ItemRecord& row,
+      content::WebContents** page);
   foundation::MutationResult Save(uint64_t item,
                                   foundation::PlacementKind kind);
   foundation::MutationResult Open(const GURL& url,

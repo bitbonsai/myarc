@@ -1,5 +1,5 @@
 diff --git a/chrome/browser/ui/views/frame/browser_view.h b/chrome/browser/ui/views/frame/browser_view.h
-index 750e46c97b64dccccf4268e912df5dbdb6516b3c..086a020641bb494afd53fc3e5bfb1b49fc35b29a 100644
+index 750e46c97b64dccccf4268e912df5dbdb6516b3c..900f08240d0d6ecc42aa340d7f256789cb264e55 100644
 --- a/chrome/browser/ui/views/frame/browser_view.h
 +++ b/chrome/browser/ui/views/frame/browser_view.h
 @@ -8,11 +8,13 @@
@@ -91,9 +91,9 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..086a020641bb494afd53fc3e5bfb1b49
 +  // a URL or search loads in it, and a Today tab of this Space replaces it.
 +  bool ShowMyarcCommandPalette(bool new_tab = true,
 +                               content::WebContents* split_pane = nullptr);
-+  // Replaces New Split's blank `pane`, if still open, with `page` beside the
-+  // pane's partner.
-+  void MyarcSplitWith(content::WebContents* pane, content::WebContents& page);
++  // Replaces New Split's blank `pane`, if still open, with the tab of `item`
++  // beside the pane's partner, opening the tab's page if it hasn't loaded.
++  void MyarcSplitWith(content::WebContents* pane, uint64_t item);
 +  // Runs an action the command bar offered (command_bar.rs) through the same
 +  // command or sidebar call its menu item runs. `space` is SwitchSpace's.
 +  void RunMyarcCommandAction(myarc::foundation::CommandActionKind kind,

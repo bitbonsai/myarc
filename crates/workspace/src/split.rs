@@ -16,7 +16,7 @@
 
 use std::collections::BTreeSet;
 
-use crate::{ItemId, MAX_ITEMS, Placement, SpaceId, Workspace, WorkspaceError};
+use crate::{ItemId, MAX_ITEMS, Placement, SidebarSnapshot, SpaceId, Workspace, WorkspaceError};
 
 /// Each split holds two items, so this many fit every item.
 pub const MAX_SPLITS: usize = MAX_ITEMS / 2;
@@ -67,6 +67,19 @@ impl Split {
         } else {
             self.left
         }
+    }
+}
+
+impl SidebarSnapshot {
+    /// The Today tabs New Split's pane offers, in sidebar order: every one of
+    /// this Space's Today tabs in no split. Tabs whose page hasn't loaded yet
+    /// count too, since they are Today tabs of this Space all the same.
+    pub fn split_candidates(&self) -> Vec<ItemId> {
+        self.temporary
+            .iter()
+            .map(|item| item.id)
+            .filter(|&id| !self.splits.iter().any(|split| split.contains(id)))
+            .collect()
     }
 }
 
@@ -493,6 +506,27 @@ mod tests {
                 right: ids[1]
             }]
         );
+    }
+
+    #[test]
+    fn new_split_offers_every_today_tab_of_this_space_in_no_split() {
+        let mut workspace = Workspace::default();
+        let other = workspace.create_space(DEFAULT_PROFILE_ID, "Work").unwrap();
+        let ids = today(&mut workspace, 5);
+        workspace.add_temporary_item(other).unwrap();
+        workspace
+            .set_placement(
+                ids[4],
+                Placement::Pin {
+                    space_id: DEFAULT_SPACE_ID,
+                },
+                Some(URL),
+            )
+            .unwrap();
+        workspace.create_split(ids[0], ids[1]).unwrap();
+        // None of these rows has a live page; Rust doesn't know or care.
+        let sidebar = workspace.sidebar_snapshot(DEFAULT_WINDOW_ID).unwrap();
+        assert_eq!(sidebar.split_candidates(), vec![ids[2], ids[3]]);
     }
 
     #[test]

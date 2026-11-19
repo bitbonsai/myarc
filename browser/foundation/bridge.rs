@@ -308,6 +308,9 @@ mod ffi {
         // selected one, and every Pin but the selected one while Pins are
         // collapsed.
         row_order: Vec<u64>,
+        // Today tabs New Split's pane may take, dormant ones included, in
+        // sidebar order: this Space's Today tabs in no split.
+        split_candidates: Vec<u64>,
         // Collapse Pinned Tabs is on in this window: the sidebar shows only
         // the selected Pin.
         pins_collapsed: bool,
@@ -2059,6 +2062,7 @@ pub fn sidebar_snapshot(workspace: &Workspace, window_id: u64) -> ffi::SidebarRe
     match workspace.0.sidebar_snapshot(window_id) {
         Ok(sidebar) => ffi::SidebarResult {
             row_order: sidebar.row_order(),
+            split_candidates: sidebar.split_candidates(),
             pins_collapsed: sidebar.pins_collapsed,
             ok: true,
             error: String::new(),
@@ -2095,6 +2099,7 @@ pub fn sidebar_snapshot(workspace: &Workspace, window_id: u64) -> ffi::SidebarRe
             folders: Vec::new(),
             splits: Vec::new(),
             row_order: Vec::new(),
+            split_candidates: Vec::new(),
             pins_collapsed: false,
         },
     }
