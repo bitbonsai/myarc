@@ -1,5 +1,5 @@
 diff --git a/chrome/browser/ui/views/frame/contents_web_view.cc b/chrome/browser/ui/views/frame/contents_web_view.cc
-index 184614e93db97174631601f8b34dd1f9ecec550b..51873c903ff68ef2470f739cc746ec8e852c1430 100644
+index 184614e93db97174631601f8b34dd1f9ecec550b..c461c6590907c7bcb8dcbec2e3f11bcd50fcf79c 100644
 --- a/chrome/browser/ui/views/frame/contents_web_view.cc
 +++ b/chrome/browser/ui/views/frame/contents_web_view.cc
 @@ -4,8 +4,10 @@
@@ -120,7 +120,7 @@ index 184614e93db97174631601f8b34dd1f9ecec550b..51873c903ff68ef2470f739cc746ec8e
 +                       : GURL();
 +  const bool blank =
 +      url.is_empty() || url.IsAboutBlank() || search::IsNTPURL(url);
-+  myarc::UpdateLocalPageLine(*this, url);
++  myarc::UpdateLocalPageBorder(*this, url);
 +  if (contents) {
 +    // nullopt restores Blink's default canvas, including page color-scheme.
 +    contents->SetPageBaseBackgroundColor(

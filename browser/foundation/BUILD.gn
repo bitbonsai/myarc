@@ -420,10 +420,9 @@ source_set("local_page_marker") {
   ]
   deps = [
     ":bridge",
-    ":sidebar_tint",
+    "//cc/paint",
     "//skia",
     "//ui/accessibility",
-    "//ui/color",
     "//ui/compositor",
     "//ui/gfx",
     "//url",

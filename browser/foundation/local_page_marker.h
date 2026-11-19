@@ -11,7 +11,6 @@ namespace views {
 class ImageView;
 class Label;
 class View;
-class Widget;
 }  // namespace views
 
 namespace myarc {
@@ -20,16 +19,13 @@ namespace myarc {
 // *.local, 127.0.0.0/8, [::1] or 0.0.0.0. The Rust core decides the host.
 bool IsLocalPage(const GURL& url);
 
-// While `url` is local, `card` shows a 2 px line along its top edge in the
-// current Space's accent. `card` paints to a layer; the line sits above its
-// children, so it draws over the page.
-void UpdateLocalPageLine(views::View& card, const GURL& url);
+// While `url` is local, `card` shows a 2 px system-blue border just inside its
+// edge that follows its rounded corners. `card` paints to a layer; the border
+// sits above its children, so it draws over the page.
+void UpdateLocalPageBorder(views::View& card, const GURL& url);
 
-// Recolours the lines and chips in `widget` after its Space theme changes.
-void RefreshLocalPageMarkers(views::Widget& widget);
-
-// The address field's pill for a local page: a code icon and the port, on the
-// Space accent at about 15%.
+// The address field's pill for a local page: a white code icon and the port on
+// the border's blue.
 class LocalPageChip : public views::BoxLayoutView {
   METADATA_HEADER(LocalPageChip, views::BoxLayoutView)
 
@@ -43,10 +39,6 @@ class LocalPageChip : public views::BoxLayoutView {
 
   // Shows `url`'s port, if it has one. Returns whether `url` is local.
   bool Update(const GURL& url);
-  void UpdateColors();
-
-  // views::View:
-  void OnThemeChanged() override;
 
  private:
   raw_ptr<views::ImageView> icon_ = nullptr;

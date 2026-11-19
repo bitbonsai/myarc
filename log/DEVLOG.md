@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-11-19: Local pages get a blue border
+
+- The 2 DIP line along the top of a local page's card is gone. A 2 DIP border in macOS system blue (#0A84FF) now runs around the whole card, just inside its edge, and its corners follow the card's own radii, so the card's rounded mask clips none of it. In a split each local pane draws its own. The address field chip uses the same blue as its fill, with a white `code-xml` icon and port. Both use that fixed blue instead of the Space theme colour, so the theme-change refresh in `BrowserNativeWidgetMac` and the `sidebar_tint` dependency are gone. Which hosts count as local, the chip following the focused pane and hiding while the field is edited are unchanged.
+- Evidence: `out/MyarcM0` built from Chromium `e056cd148d`. Captures are waiting for a live test to finish.
+- Verification: `cargo fmt --check`, the `bridge.rs` rustfmt check, `cargo clippy -D warnings`, `cargo test`, `check_docs.py`, the onboarding unit tests and `export_patches.py --check` pass.
+
 ## 2026-11-19: Selection follow-ups for the toast, Esc and Cmd+W
 
 - After Cmd+Shift+C copies several selected rows, the toast reads "Copied 3 Links" with the real count; a single copy still reads "Copied Current URL". Esc ends a sidebar selection and does nothing else, whether focus is on the page or in the sidebar, and behaves as before without one. Fullscreen still takes Esc first. When Cmd+W or Close N Tabs closes a selection that holds the row on screen, the window first shows the row a single close would hand on to: the first row with a page in this window, Pins, then Today, then Favorites, that isn't closing. The pages then close. Before, the next row was picked after the closes on a later refresh, so pages still closing could take it and the result varied. `workspace::selection::row_after_closing` makes the choice (1 new test), and `BrowserWorkspaceAdapter::ShowRowAfterClosing` calls it.
