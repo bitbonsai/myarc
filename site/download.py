@@ -29,7 +29,7 @@ WORKS = [
     'Folders for a Space\'s pinned tabs. Create, rename and delete them from the right-click menu, and open or close them. Drag tabs in and out, and rename a pinned tab from its menu.',
     'Split View for two tabs side by side. Use Open in Split View in a tab\'s menu or Ctrl+Shift+=, and Ctrl+Shift+- to separate them. The split shows as one sidebar row and comes back after a restart.',
     'Peek: a link from a pinned tab or Favorite to another site opens in a card over the page. Cmd+W or Esc closes it, Cmd+O turns it into a tab, a button splits it beside the pinned page, and Cmd+Shift+T reopens the last one closed. Settings > Links can turn it off.',
-    'Ad and tracker blocking, on by default, with uBlock Origin Lite built in. Window > Ad Blocking for This Site… turns it off for one site. Private windows block only after you allow the extension there.',
+    'Ad and tracker blocking, on by default, with uBlock Origin Lite built in. Turn it off for one site with the Block ads on this site switch in the site info popover, which opens from the "i" in the address field. Private windows block only after you allow the extension there.',
     'Ctrl+Tab switches to your last tab, and holding Ctrl goes further back through the five most recent.',
     'Little Arc: links from other apps open in a small window, and Option-Cmd-N opens one. Open in <Space> or Cmd+O moves the page into your current Space. Settings > Links turns it off.',
     'The command bar runs actions: type pin, archive, split or a Space\'s name, or / to list them. View has Clear Cookies and Refresh and Clear Cache and Refresh for the current site.',
