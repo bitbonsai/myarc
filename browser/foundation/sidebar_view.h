@@ -331,6 +331,11 @@ class SidebarView final : public views::View,
   void OpenSpacePicker(uint64_t space, SpacePicker picker, bool hold = false);
   // Closes that popover, which saves a picked theme.
   void CloseSpacePicker();
+  // Picks `icon` in the open icon popover as a click on its grid does, for
+  // background captures.
+  void PickSpaceIconForCapture(SpaceIconChoice icon) {
+    PickSpaceIcon(std::move(icon));
+  }
   // Opens the current Space's menu from its title, or with `footer` from its
   // footer icon, and reopens it for `tries` beats of 300 ms, for background
   // captures.

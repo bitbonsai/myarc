@@ -3236,10 +3236,13 @@ void SidebarView::PickSpaceTheme(SpaceTheme theme) {
 }
 
 void SidebarView::PickSpaceIcon(SpaceIconChoice icon) {
+  // The popover closes synchronously and OnSpacePickerClosed clears
+  // space_picker_space_, so read it first.
+  const uint64_t space = space_picker_space_;
   if (space_picker_widget_) {
     space_picker_widget_->Close();
   }
-  if (IsBundledSpaceIcon(icon) && space_picker_space_) {
+  if (IsBundledSpaceIcon(icon) && space) {
     // Saving rebuilds the rows; the popover is already closing.
     base::SequencedTaskRunner::GetCurrentDefault()->PostTask(
         FROM_HERE,
@@ -3250,7 +3253,7 @@ void SidebarView::PickSpaceIcon(SpaceIconChoice icon) {
                 sidebar->delegate_->SetSpaceIcon(space, icon);
               }
             },
-            weak_factory_.GetWeakPtr(), space_picker_space_, std::move(icon)));
+            weak_factory_.GetWeakPtr(), space, std::move(icon)));
   }
 }
 
