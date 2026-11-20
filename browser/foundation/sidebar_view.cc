@@ -49,7 +49,6 @@
 #include "ui/gfx/animation/animation.h"
 #include "ui/gfx/animation/tween.h"
 #include "ui/gfx/canvas.h"
-#include "ui/gfx/color_analysis.h"
 #include "ui/gfx/color_utils.h"
 #include "ui/gfx/font_list.h"
 #include "ui/gfx/geometry/insets.h"
@@ -116,7 +115,9 @@ constexpr gfx::VectorIcon kDotIcon(kDotRep, std::size(kDotRep), "myarc_dot");
 
 struct Fills {
   SkColor tile;
-  SkColor selected_tile;
+  // White on a dark sidebar, black on a light one: the selected and hovered
+  // tiles' wash and the selected tile's inner edge.
+  SkColor tile_ink;
   SkColor new_tab;
   SkColor current_space;
   SkColor space_dot;
@@ -131,13 +132,12 @@ struct Fills {
 Fills GetFills(const ui::ColorProvider* provider) {
   const bool dark = !provider || color_utils::IsDark(
                                      provider->GetColor(ui::kColorSysSurface));
-  return dark ? Fills{SkColorSetA(SK_ColorWHITE, 0x18),
-                      SkColorSetA(SK_ColorWHITE, 0x6F),
+  return dark ? Fills{SkColorSetA(SK_ColorWHITE, 0x18), SK_ColorWHITE,
                       SkColorSetA(SK_ColorWHITE, 0x33),
                       GetCurrentSpaceColor(provider),
                       SkColorSetA(SK_ColorWHITE, 0x2D),
                       SkColorSetA(SK_ColorWHITE, 0x73)}
-              : Fills{SkColorSetA(SK_ColorWHITE, 0x80), SK_ColorWHITE,
+              : Fills{SkColorSetA(SK_ColorWHITE, 0x80), SK_ColorBLACK,
                       SkColorSetA(SK_ColorWHITE, 0xB3),
                       GetCurrentSpaceColor(provider),
                       SkColorSetA(SK_ColorBLACK, 0x33),
@@ -203,12 +203,23 @@ void AlignRowContents(views::MdTextButton& button, int icon_size) {
 // three or more share it in thirds.
 constexpr size_t kTileColumns = 3;
 
-// A Favorite or Pin tile. Arc rings the selected tile in its favicon's colour.
+// A Favorite or Pin tile. Arc and Zen fill the selected tile with a bright
+// grey that glares on a dark sidebar; this one takes a quiet wash of the
+// sidebar's ink and a faint inner edge instead, and the hovered tile half that
+// wash. The favicon paints above both, untouched.
 class ItemTile final : public views::MdTextButton {
   METADATA_HEADER(ItemTile, views::MdTextButton)
 
  public:
   using views::MdTextButton::MdTextButton;
+
+  void SetLook(bool selected, SkColor ink) {
+    if (selected_ != selected || ink_ != ink) {
+      selected_ = selected;
+      ink_ = ink;
+      SchedulePaint();
+    }
+  }
 
   void SetRing(std::optional<SkColor> ring) {
     if (ring_ != ring) {
@@ -244,21 +255,44 @@ class ItemTile final : public views::MdTextButton {
   // Arc's ring is ~1.5 DIP inside the tile's 10 DIP corners.
   static constexpr float kRingWidth = 1.5f;
   static constexpr float kCornerRadius = 10;
+  // The selected tile's wash and edge, and the hovered tile's wash.
+  static constexpr SkAlpha kSelectedWash = 0x1F;  // 12%
+  static constexpr SkAlpha kSelectedEdge = 0x38;  // 22%
+  static constexpr SkAlpha kHoverWash = 0x12;     // 7%
 
-  void PaintButtonContents(gfx::Canvas* canvas) override {
-    if (!ring_) {
-      return;
-    }
+  void StrokeInside(gfx::Canvas* canvas, float width, SkColor color) {
     cc::PaintFlags flags;
     flags.setAntiAlias(true);
     flags.setStyle(cc::PaintFlags::kStroke_Style);
-    flags.setStrokeWidth(kRingWidth);
-    flags.setColor(*ring_);
+    flags.setStrokeWidth(width);
+    flags.setColor(color);
     gfx::RectF bounds(GetLocalBounds());
-    bounds.Inset(kRingWidth / 2);
-    canvas->DrawRoundRect(bounds, kCornerRadius - kRingWidth / 2, flags);
+    bounds.Inset(width / 2);
+    canvas->DrawRoundRect(bounds, kCornerRadius - width / 2, flags);
   }
 
+  // Paints over the resting fill and under the favicon, which is a child view.
+  void PaintButtonContents(gfx::Canvas* canvas) override {
+    const bool hovered = GetState() == STATE_HOVERED ||
+                         GetState() == STATE_PRESSED;
+    if (selected_ || hovered) {
+      cc::PaintFlags flags;
+      flags.setAntiAlias(true);
+      flags.setColor(
+          SkColorSetA(ink_, selected_ ? kSelectedWash : kHoverWash));
+      canvas->DrawRoundRect(gfx::RectF(GetLocalBounds()), kCornerRadius,
+                            flags);
+    }
+    if (selected_) {
+      StrokeInside(canvas, 1, SkColorSetA(ink_, kSelectedEdge));
+    }
+    if (ring_) {
+      StrokeInside(canvas, kRingWidth, *ring_);
+    }
+  }
+
+  bool selected_ = false;
+  SkColor ink_ = SK_ColorWHITE;
   std::optional<SkColor> ring_;
   ui::ImageModel icon_;
   ui::ImageModel back_;
@@ -266,23 +300,6 @@ class ItemTile final : public views::MdTextButton {
 
 BEGIN_METADATA(ItemTile)
 END_METADATA
-
-// The favicon's dominant colour when it has one; grey, black or white icons
-// leave Arc's selected tile untinted.
-std::optional<SkColor> FaviconTint(const views::MdTextButton& tile) {
-  const gfx::ImageSkia image = tile.GetImage(views::Button::STATE_NORMAL);
-  const SkBitmap* bitmap = image.isNull() ? nullptr : image.bitmap();
-  if (!bitmap || bitmap->drawsNothing()) {
-    return std::nullopt;
-  }
-  const SkColor color = color_utils::CalculateKMeanColorOfBitmap(*bitmap);
-  color_utils::HSL hsl;
-  color_utils::SkColorToHSL(color, &hsl);
-  if (hsl.s < 0.3 || hsl.l < 0.2 || hsl.l > 0.85) {
-    return std::nullopt;
-  }
-  return color;
-}
 
 // STYLE_EMPHASIZED is not allowed for CONTEXT_BUTTON_MD and LabelButton hides
 // its label, so reweight the button's Label child directly.
@@ -2127,6 +2144,9 @@ std::unique_ptr<views::View> SidebarView::MakeItem(
   activate->GetViewAccessibility().SetIsSelected(selected);
   activate->SetEnabledTextColors(foreground);
   if (tile) {
+    // The tile paints its own hover wash.
+    views::InkDrop::Get(activate.get())
+        ->SetMode(views::InkDropHost::InkDropMode::OFF);
     tiles_.emplace_back(activate.get(), selected);
   }
   // Pins, folder Pins and Today rows take part in multi-select; Favorites
@@ -3808,16 +3828,7 @@ void SidebarView::UpdateFills() {
   const bool more_contrast = GetNativeTheme()->preferred_contrast() ==
                              ui::NativeTheme::PreferredContrast::kMore;
   for (const auto& [tile, selected] : tiles_) {
-    // Arc tints a selected tile's fill and rings it in its favicon's colour.
-    const std::optional<SkColor> tint =
-        selected ? FaviconTint(*tile) : std::nullopt;
-    SkColor fill = selected ? fills.selected_tile : fills.tile;
-    if (tint) {
-      fill = SkColorSetA(color_utils::AlphaBlend(
-                             *tint, SkColorSetA(fill, SK_AlphaOPAQUE), 0.12f),
-                         std::max<SkAlpha>(SkColorGetA(fill), 0x80));
-    }
-    tile->SetBgColorOverrideDeprecated(fill);
+    tile->SetBgColorOverrideDeprecated(fills.tile);
     // A Pin tile selected with Cmd-click or Shift-click is outlined in the
     // title's colour, as a selected row is.
     const auto row = std::ranges::find(selectable_rows_, tile.get(),
@@ -3827,12 +3838,8 @@ void SidebarView::UpdateFills() {
     const bool marked = row != selectable_rows_.end() &&
                         std::ranges::contains(selected_rows_, row->first);
     if (auto* item_tile = views::AsViewClass<ItemTile>(tile.get())) {
-      item_tile->SetRing(
-          marked ? std::optional(fills.title)
-          : tint ? std::optional(SkColorSetA(
-                       color_utils::AlphaBlend(*tint, SK_ColorWHITE, 0.5f),
-                       0xD9))
-                 : std::nullopt);
+      item_tile->SetLook(selected, fills.tile_ink);
+      item_tile->SetRing(marked ? std::optional(fills.title) : std::nullopt);
     }
     tile->SetStrokeColorIdOverride(selected && more_contrast
                                        ? std::optional(ui::kColorSysOutline)

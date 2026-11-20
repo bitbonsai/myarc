@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-11-20: A quieter selected tile
+
+- Arc and Zen fill the selected Favorite or pinned tile with a bright grey that glares on a dark sidebar. myArc's selected tile now takes 12% of the sidebar's ink (white on dark, black on light) with a 1 px inner edge at 22%, and a hovered tile 7%. The favicon paints above it, untouched.
+- Evidence: the hooks build, checked by the user live with a pinned myarc.dev tile on Dusk.
+- Limits: no pixel samples on a light Space theme.
+
 ## 2026-11-20: Dusk as dark as Arc's default, and the sidebar drags the window
 
 - From the user's side-by-side with Arc. Dusk's stops over the glass are now `#0f0d26` to `#230d27` at 85%, so the sidebar renders near Arc's `#151228` to `#1a1228`; Reduce Transparency draws `#151228` to `#261229` at 95%. The empty page card is white at 9/255 instead of 18 (Chromium `c1254b7534`). Empty sidebar space, the gaps between rows and the strip around the traffic lights and nav buttons now return HTCAPTION, so they drag the window on macOS. `SidebarView::IsPositionInWindowCaption` keeps buttons, fields, scroll bars, filled views and the Favorites' tile rows on HTCLIENT, and the vertical strip's top container asks the toolbar, which keeps the address field and buttons clickable. That fixes the address field, which was HTCAPTION before.
