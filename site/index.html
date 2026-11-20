@@ -711,9 +711,11 @@
         if (w && h && (canvas.width !== w || canvas.height !== h)) { canvas.width = w; canvas.height = h }
       }
 
+      // Offscreen or in a hidden tab the loop stops outright, and wake() restarts it.
       const draw = (now) => {
-        raf = still ? 0 : requestAnimationFrame(draw)
-        if (!visible && !still) { last = 0; return }
+        raf = 0
+        if (!still && (!visible || document.hidden)) { last = 0; return }
+        if (!still) raf = requestAnimationFrame(draw)
         const dt = last ? Math.min((now - last) / 1000, 1 / 30) : 1 / 60
         last = now; time += dt
         resize()
@@ -802,7 +804,9 @@
         }
       }
 
-      const io = new IntersectionObserver(([e]) => { visible = e.isIntersecting })
+      const wake = () => { if (!raf && !still && visible && !document.hidden) raf = requestAnimationFrame(draw) }
+      const io = new IntersectionObserver(([e]) => { visible = e.isIntersecting; wake() })
+      document.addEventListener('visibilitychange', wake)
       io.observe(canvas)
       if (!still) {
         addEventListener('pointermove', onMove, { passive: true })
@@ -815,7 +819,7 @@
       return {
         sheen, play,
         destroy: () => {
-          cancelAnimationFrame(raf); io.disconnect(); ro.disconnect()
+          cancelAnimationFrame(raf); io.disconnect(); ro.disconnect(); document.removeEventListener('visibilitychange', wake)
           removeEventListener('pointermove', onMove); removeEventListener('pointerdown', onDown)
         },
       }
