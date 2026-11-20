@@ -1,0 +1,26 @@
+{"app_name":"myArc","timestamp":"2026-11-20 15:00:00.00 +0100","app_version":"158.0.8122.0","slice_uuid":"00000000-0000-0000-0000-000000000001","build_version":"8122.0","platform":1,"bundleID":"dev.myarc.nightly","share_with_app_devs":0,"is_first_party":0,"bug_type":"309","os_version":"macOS 26.7.1 (25G241)","roots_installed":0,"name":"myArc","incident_id":"00000000-0000-0000-0000-000000000002"}
+{
+  "uptime" : 1000,
+  "procRole" : "Foreground",
+  "version" : 2,
+  "userID" : 501,
+  "modelCode" : "Mac00,0",
+  "captureTime" : "2026-11-20 15:00:00.0000 +0100",
+  "incident" : "00000000-0000-0000-0000-000000000002",
+  "pid" : 4242,
+  "cpuType" : "ARM-64",
+  "procName" : "myArc",
+  "procPath" : "\/Applications\/myArc Nightly.app\/Contents\/MacOS\/myArc",
+  "storeInfo" : {"deviceIdentifierForVendor":"00000000-0000-0000-0000-000000000003","thirdParty":true},
+  "crashReporterKey" : "00000000-0000-0000-0000-000000000004",
+  "exception" : {"codes":"0x0000000000000001, 0x0000000000000000","rawCodes":[1,0],"type":"EXC_BAD_ACCESS","signal":"SIGSEGV","subtype":"KERN_INVALID_ADDRESS at 0x0000000000000000"},
+  "termination" : {"flags":0,"code":11,"namespace":"SIGNAL","indicator":"Segmentation fault: 11","byProc":"exc handler","byPid":4242},
+  "faultingThread" : 0,
+  "threads" : [{"triggered":true,"id":1,"queue":"com.apple.main-thread","frames":[
+    {"imageOffset":1000,"symbol":"myarc::SyntheticFixtureCrash()","imageIndex":0},
+    {"imageOffset":2000,"symbol":"base::TaskAnnotator::RunTaskImpl()","imageIndex":0},
+    {"imageOffset":3000,"symbol":"base::MessagePumpCFRunLoopBase::RunWork()","imageIndex":0}
+  ]}],
+  "usedImages" : [{"source":"P","arch":"arm64","name":"myArc Framework"}],
+  "note" : "Synthetic fixture for tools and captures; not from a real crash. ``` fence test"
+}

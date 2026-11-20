@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-11-20: Crash reports through a prefilled GitHub issue
+
+- After a crashed session, the launch shows a card at the window's top-right, "myArc quit unexpectedly. Report it?", built on the control prompt's card. Report opens a new issue on github.com/bitbonsai/myarc with the myArc, Chromium and macOS versions and a summary of the newest `myArc*.ips`: header, exception, termination and the crashed thread's top frames, identifiers dropped. A marker file in the user-data dir keeps a log from being offered twice. Hooked into `SessionCrashedBubble::ShowIfNotOffTheRecordProfile` (Chromium commit "Offer a crash report after a crashed session").
+- Evidence: `tools/check_crash_report.sh` passed on the hooks build with `tests/fixtures/crash-report/`: prompt after a SIGKILL, none after a clean quit, no repeat of an offered log, and Report pressed. A generated 60-frame log trimmed to 15 frames and a 6.7 KB URL.
+- Limits: the screen was locked, so ScreenCaptureKit had no display and the card and the GitHub tab have no capture. A SIGKILL leaves no `.ips`, so only the synthetic log has gone through the log path. Chromium saves the running state a few seconds after launch, so a crash in those first seconds isn't noticed.
+
 ## 2026-11-20: Bitwarden from the store's update server survives a restart
 
 - `tools/check_extension_store.sh` installs Bitwarden into the installed nightly 2026.11.20.2, in background launches of a disposable user-data dir. An external-extension file inside that dir points at the store's update server, so the browser fetches and verifies the store's CRX itself. The check turns the extension on from `chrome://extensions`, finds its content script on a local login page and its service worker, quits with Browser.close and relaunches. A watcher kills the test browser if it ever becomes the frontmost app.

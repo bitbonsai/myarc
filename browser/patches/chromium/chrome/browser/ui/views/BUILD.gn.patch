@@ -1,16 +1,17 @@
 diff --git a/chrome/browser/ui/views/BUILD.gn b/chrome/browser/ui/views/BUILD.gn
-index d0dce2a8753cdb05b5e825c4473ff6105914f40b..ceafcbe206815499c92ce7b81bfe7726189e063c 100644
+index d0dce2a8753cdb05b5e825c4473ff6105914f40b..0baa330f3bb617a168c87e5fa59599e5d8e6a6bf 100644
 --- a/chrome/browser/ui/views/BUILD.gn
 +++ b/chrome/browser/ui/views/BUILD.gn
-@@ -1609,6 +1609,7 @@ source_set("session_crashed_bubble_view") {
+@@ -1609,6 +1609,8 @@ source_set("session_crashed_bubble_view") {
      "//chrome/installer/util:with_no_strings",
      "//components/strings:components_strings",
      "//content/public/browser",
++    "//myarc:crash_report",
 +    "//myarc:workspace_lifecycle",
      "//ui/base",
      "//ui/views",
    ]
-@@ -1990,11 +1991,14 @@ if (!is_chromeos_device) {
+@@ -1990,11 +1992,14 @@ if (!is_chromeos_device) {
        ":ssl_client_certificate_selector",
        ":tab_modal_confirm_dialog_views",
        "//chrome/browser/prefs:util",
@@ -25,7 +26,7 @@ index d0dce2a8753cdb05b5e825c4473ff6105914f40b..ceafcbe206815499c92ce7b81bfe7726
        "//chrome/browser/ui/views/test:view_event_test_base",
        "//chrome/browser/ui/views/toolbar:interactive_ui_tests",
        "//chrome/browser/ui/webui:chrome_web_contents_handler",
-@@ -2002,7 +2006,10 @@ if (!is_chromeos_device) {
+@@ -2002,7 +2007,10 @@ if (!is_chromeos_device) {
        "//chrome/test:test_support_ui",
        "//components/enterprise/data_controls/content/browser",
        "//components/enterprise/data_controls/core/browser:test_support",

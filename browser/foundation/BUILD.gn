@@ -450,6 +450,27 @@ source_set("control_prompt") {
   ]
 }
 
+source_set("crash_report") {
+  sources = [
+    "crash_report.h",
+    "crash_report_mac.mm",
+  ]
+  deps = [
+    ":control_prompt",
+    ":test_buildflags",
+    "//base",
+    "//base/version_info",
+    "//chrome/browser/profiles:profile",
+    "//chrome/browser/ui/browser_window",
+    "//chrome/browser/ui/navigator",
+    "//chrome/common:constants",
+    "//ui/base",
+    "//ui/views",
+    "//url",
+  ]
+  frameworks = [ "Foundation.framework" ]
+}
+
 source_set("library_logic") {
   sources = [
     "library_logic.cc",

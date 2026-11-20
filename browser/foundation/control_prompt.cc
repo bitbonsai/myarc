@@ -83,7 +83,8 @@ views::LabelButton* AddButton(views::View* parent,
   button->SetEnabledTextColors(color);
   button->SetTextColor(views::Button::STATE_DISABLED, color);
   button->SetHorizontalAlignment(gfx::ALIGN_CENTER);
-  button->SetBackground(views::CreateRoundedRectBackground(fill, kButtonRadius));
+  button->SetBackground(
+      views::CreateRoundedRectBackground(fill, kButtonRadius));
   button->SetBorder(views::CreateEmptyBorder(gfx::Insets::VH(0, kButtonPad)));
   button->SetMinSize(gfx::Size(0, kButtonHeight));
   button->SetMaxSize(gfx::Size(0, kButtonHeight));
@@ -94,27 +95,22 @@ class PromptView : public views::BoxLayoutView {
   METADATA_HEADER(PromptView, views::BoxLayoutView)
 
  public:
-  PromptView(const std::u16string& client,
+  PromptView(const ControlPrompt::Copy& copy,
              base::RepeatingCallback<void(bool)> answer) {
     SetOrientation(views::BoxLayout::Orientation::kVertical);
     SetInsideBorderInsets(gfx::Insets(kInset));
     SetBetweenChildSpacing(6);
-    const std::u16string title =
-        client + u" wants to control your Agent Space";
     GetViewAccessibility().SetRole(ax::mojom::Role::kAlertDialog);
-    GetViewAccessibility().SetName(title);
-    AddText(this, title, 13, gfx::Font::Weight::SEMIBOLD, kTitle);
-    AddText(this,
-            u"It can open tabs, read pages and click in the Agent Space. It "
-            u"can’t see your other Spaces.",
-            12, gfx::Font::Weight::NORMAL, kBody);
+    GetViewAccessibility().SetName(copy.title);
+    AddText(this, copy.title, 13, gfx::Font::Weight::SEMIBOLD, kTitle);
+    AddText(this, copy.body, 12, gfx::Font::Weight::NORMAL, kBody);
     auto* buttons = AddChildView(std::make_unique<views::BoxLayoutView>());
     buttons->SetBetweenChildSpacing(8);
     buttons->SetMainAxisAlignment(views::BoxLayout::MainAxisAlignment::kEnd);
     buttons->SetProperty(views::kMarginsKey, gfx::Insets::TLBR(6, 0, 0, 0));
     decline_ = AddButton(buttons, base::BindRepeating(answer, false),
-                         u"Don’t allow", kGrayButton, kButtonText);
-    allow_ = AddButton(buttons, base::BindRepeating(answer, true), u"Allow",
+                         copy.decline, kGrayButton, kButtonText);
+    allow_ = AddButton(buttons, base::BindRepeating(answer, true), copy.accept,
                        kBlueButton, SK_ColorWHITE);
     SetPaintToLayer();
     layer()->SetFillsBoundsOpaquely(false);
@@ -159,6 +155,18 @@ END_METADATA
 ControlPrompt::ControlPrompt(views::Widget& parent,
                              const std::u16string& client,
                              Done done)
+    : ControlPrompt(
+          parent,
+          Copy{
+              .title = client + u" wants to control your Agent Space",
+              .body = u"It can open tabs, read pages and click in the Agent "
+                      u"Space. It can’t see your other Spaces.",
+              .decline = u"Don’t allow",
+              .accept = u"Allow",
+          },
+          std::move(done)) {}
+
+ControlPrompt::ControlPrompt(views::Widget& parent, const Copy& copy, Done done)
     : done_(std::move(done)) {
   views::Widget::InitParams params(
       views::Widget::InitParams::CLIENT_OWNS_WIDGET,
@@ -173,24 +181,23 @@ ControlPrompt::ControlPrompt(views::Widget& parent,
   observation_.Observe(widget_.get());
   // The buttons answer after their own press has unwound.
   auto* contents = widget_->SetContentsView(std::make_unique<PromptView>(
-      client, base::BindRepeating(
-                  [](ControlPrompt* prompt, bool allow) {
-                    base::SingleThreadTaskRunner::GetCurrentDefault()->PostTask(
-                        FROM_HERE,
-                        base::BindOnce(&ControlPrompt::Finish,
-                                       prompt->weak_factory_.GetWeakPtr(),
-                                       allow ? Answer::kAllow
-                                             : Answer::kDecline));
-                  },
-                  base::Unretained(this))));
+      copy, base::BindRepeating(
+                [](ControlPrompt* prompt, bool allow) {
+                  base::SingleThreadTaskRunner::GetCurrentDefault()->PostTask(
+                      FROM_HERE,
+                      base::BindOnce(
+                          &ControlPrompt::Finish,
+                          prompt->weak_factory_.GetWeakPtr(),
+                          allow ? Answer::kAllow : Answer::kDecline));
+                },
+                base::Unretained(this))));
   const gfx::Rect window = parent.GetClientAreaBoundsInScreen();
   const gfx::Size size = contents->GetPreferredSize();
   widget_->SetBounds(gfx::Rect(window.right() - kRightMargin - size.width(),
                                window.y() + kTopMargin, size.width(),
                                size.height()));
   widget_->ShowInactive();
-  contents->GetViewAccessibility().AnnounceText(
-      client + u" wants to control your Agent Space");
+  contents->GetViewAccessibility().AnnounceText(copy.title);
 }
 
 ControlPrompt::~ControlPrompt() {

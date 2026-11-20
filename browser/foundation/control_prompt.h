@@ -13,23 +13,32 @@
 
 namespace myarc {
 
-// The card at a browser window's top-right that asks whether a control
-// client may use the Agent Space: "<client> wants to control your Agent
-// Space", with Allow and Don't allow. It shows without activating the window.
-// UI sequence only; `parent` must outlive it or close first.
+// The card at a browser window's top-right that asks a yes or no question,
+// such as whether a control client may use the Agent Space: "<client> wants
+// to control your Agent Space", with Allow and Don't allow. It shows without
+// activating the window. UI sequence only; `parent` must outlive it or close
+// first.
 class ControlPrompt : public views::WidgetObserver {
  public:
   enum class Answer { kAllow, kDecline, kClosed };
   using Done = base::OnceCallback<void(Answer)>;
+  // The card's text. `accept` answers kAllow and `decline` kDecline.
+  struct Copy {
+    std::u16string title;
+    std::u16string body;
+    std::u16string decline;
+    std::u16string accept;
+  };
 
   // `client` is already cleaned for display. `done` runs once, with kClosed
   // when the window goes away first, and never after this object is gone.
   ControlPrompt(views::Widget& parent, const std::u16string& client, Done done);
+  ControlPrompt(views::Widget& parent, const Copy& copy, Done done);
   ControlPrompt(const ControlPrompt&) = delete;
   ControlPrompt& operator=(const ControlPrompt&) = delete;
   ~ControlPrompt() override;
 
-  // Presses Allow or Don't allow, for test hooks.
+  // Presses accept (Allow) or decline (Don't allow), for test hooks.
   void PressForTesting(bool allow);
 
  private:

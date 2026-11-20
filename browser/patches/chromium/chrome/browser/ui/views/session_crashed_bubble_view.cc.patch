@@ -1,5 +1,5 @@
 diff --git a/chrome/browser/ui/views/session_crashed_bubble_view.cc b/chrome/browser/ui/views/session_crashed_bubble_view.cc
-index 352f95135d8a0a05f1ff9f5079d2509604629070..7d0b32963f531916018f6a5f7bb59fbb05fb0406 100644
+index 352f95135d8a0a05f1ff9f5079d2509604629070..a9ae184f8f327e63458eeb8cce309b46fa1a21b0 100644
 --- a/chrome/browser/ui/views/session_crashed_bubble_view.cc
 +++ b/chrome/browser/ui/views/session_crashed_bubble_view.cc
 @@ -10,6 +10,7 @@
@@ -18,7 +18,7 @@ index 352f95135d8a0a05f1ff9f5079d2509604629070..7d0b32963f531916018f6a5f7bb59fbb
  #include "chrome/browser/sessions/exit_type_service.h"
  #include "chrome/browser/sessions/session_restore.h"
  #include "chrome/browser/ui/browser_window/public/browser_collection_observer.h"
-@@ -38,10 +40,12 @@
+@@ -38,10 +40,13 @@
  #include "chrome/grit/branded_strings.h"
  #include "chrome/grit/generated_resources.h"
  #include "chrome/installer/util/google_update_settings.h"
@@ -27,11 +27,12 @@ index 352f95135d8a0a05f1ff9f5079d2509604629070..7d0b32963f531916018f6a5f7bb59fbb
  #include "components/strings/grit/components_strings.h"
  #include "content/public/browser/browser_context.h"
  #include "content/public/browser/browser_thread.h"
++#include "myarc/crash_report.h"
 +#include "myarc/workspace_lifecycle.h"
  #include "ui/base/buildflags.h"
  #include "ui/base/interaction/element_identifier.h"
  #include "ui/base/l10n/l10n_util.h"
-@@ -59,6 +63,62 @@
+@@ -59,6 +64,62 @@
  #include "ui/views/layout/box_layout.h"
  #include "ui/views/widget/widget.h"
  
@@ -94,7 +95,7 @@ index 352f95135d8a0a05f1ff9f5079d2509604629070..7d0b32963f531916018f6a5f7bb59fbb
  namespace {
  
  views::BubbleDialogDelegate* g_instance_for_test = nullptr;
-@@ -101,7 +161,11 @@ DEFINE_LOCAL_ELEMENT_IDENTIFIER_VALUE(kUmaConsentCheckboxId);
+@@ -101,7 +162,11 @@ DEFINE_LOCAL_ELEMENT_IDENTIFIER_VALUE(kUmaConsentCheckboxId);
  
  class SessionCrashedBubbleDelegate : public ui::DialogModelDelegate {
   public:
@@ -107,7 +108,7 @@ index 352f95135d8a0a05f1ff9f5079d2509604629070..7d0b32963f531916018f6a5f7bb59fbb
      if (ExitTypeService* exit_type_service =
              ExitTypeService::GetInstanceForProfile(profile)) {
        crashed_lock_ = exit_type_service->CreateCrashedLock();
-@@ -116,6 +180,7 @@ class SessionCrashedBubbleDelegate : public ui::DialogModelDelegate {
+@@ -116,6 +181,7 @@ class SessionCrashedBubbleDelegate : public ui::DialogModelDelegate {
      }
      ignored_ = false;
      MaybeEnableUma();
@@ -115,7 +116,7 @@ index 352f95135d8a0a05f1ff9f5079d2509604629070..7d0b32963f531916018f6a5f7bb59fbb
      dialog_model()->host()->Close();
  
      RecordBubbleHistogramValue(SESSION_CRASHED_BUBBLE_STARTUP_PAGES);
-@@ -142,6 +207,7 @@ class SessionCrashedBubbleDelegate : public ui::DialogModelDelegate {
+@@ -142,6 +208,7 @@ class SessionCrashedBubbleDelegate : public ui::DialogModelDelegate {
      // won't wait for restore to complete.
      std::unique_ptr<ExitTypeService::CrashedLock> lock =
          std::move(crashed_lock_);
@@ -123,7 +124,7 @@ index 352f95135d8a0a05f1ff9f5079d2509604629070..7d0b32963f531916018f6a5f7bb59fbb
      dialog_model()->host()->Close();
  
      RecordBubbleHistogramValue(SESSION_CRASHED_BUBBLE_RESTORED);
-@@ -169,7 +235,8 @@ class SessionCrashedBubbleDelegate : public ui::DialogModelDelegate {
+@@ -169,7 +236,8 @@ class SessionCrashedBubbleDelegate : public ui::DialogModelDelegate {
  
   private:
    bool RejectActionIfBrowserClosing(BrowserWindowInterface* browser) {
@@ -133,7 +134,7 @@ index 352f95135d8a0a05f1ff9f5079d2509604629070..7d0b32963f531916018f6a5f7bb59fbb
          !browser->IsDeleteScheduled()) {
        return false;
      }
-@@ -181,42 +248,13 @@ class SessionCrashedBubbleDelegate : public ui::DialogModelDelegate {
+@@ -181,42 +249,13 @@ class SessionCrashedBubbleDelegate : public ui::DialogModelDelegate {
    }
  
    bool ignored_ = true;
@@ -178,7 +179,7 @@ index 352f95135d8a0a05f1ff9f5079d2509604629070..7d0b32963f531916018f6a5f7bb59fbb
  // static
  void SessionCrashedBubble::ShowIfNotOffTheRecordProfile(
      BrowserWindowInterface* browser,
-@@ -231,6 +269,43 @@ void SessionCrashedBubble::ShowIfNotOffTheRecordProfile(
+@@ -231,6 +270,45 @@ void SessionCrashedBubble::ShowIfNotOffTheRecordProfile(
        std::make_unique<SessionCrashedBubbleView::BrowserRemovalObserver>(
            browser);
  
@@ -187,6 +188,8 @@ index 352f95135d8a0a05f1ff9f5079d2509604629070..7d0b32963f531916018f6a5f7bb59fbb
 +  // loop.
 +  if (base::CommandLine::ForCurrentProcess()->HasSwitch(
 +          "myarc-workspace-sidebar")) {
++    // Either way, offer to report the crash on GitHub.
++    myarc::MaybeOfferCrashReport(*browser);
 +    PrefService* prefs = browser->GetProfile()->GetPrefs();
 +    const int crashed_launches =
 +        prefs->GetInteger(SessionStartupPref::kMyarcCrashedLaunches) + 1;
@@ -222,7 +225,7 @@ index 352f95135d8a0a05f1ff9f5079d2509604629070..7d0b32963f531916018f6a5f7bb59fbb
    if (DoesSupportConsentCheck()) {
      GoogleUpdateSettings::CollectStatsConsentTaskRunner()
          ->PostTaskAndReplyWithResult(
-@@ -262,7 +337,8 @@ void SessionCrashedBubbleView::Show(
+@@ -262,7 +340,8 @@ void SessionCrashedBubbleView::Show(
  
    if (browser && (skip_tab_checking ||
                    browser->GetTabStripModel()->GetActiveWebContents())) {
@@ -232,7 +235,7 @@ index 352f95135d8a0a05f1ff9f5079d2509604629070..7d0b32963f531916018f6a5f7bb59fbb
      return;
    }
  
-@@ -278,6 +354,15 @@ views::BubbleDialogDelegate* SessionCrashedBubbleView::ShowBubble(
+@@ -278,6 +357,15 @@ views::BubbleDialogDelegate* SessionCrashedBubbleView::ShowBubble(
      BrowserWindowInterface* browser,
      bool uma_opted_in_already,
      bool offer_uma_optin) {
@@ -248,7 +251,7 @@ index 352f95135d8a0a05f1ff9f5079d2509604629070..7d0b32963f531916018f6a5f7bb59fbb
    BrowserView* browser_view = BrowserView::GetBrowserViewForBrowser(browser);
    // TODO(webium): WebUI browser does not use BrowserView. Make an WebUI anchor
    // for the bubble.
-@@ -289,8 +374,8 @@ views::BubbleDialogDelegate* SessionCrashedBubbleView::ShowBubble(
+@@ -289,8 +377,8 @@ views::BubbleDialogDelegate* SessionCrashedBubbleView::ShowBubble(
    views::BubbleAnchor anchor =
        control ? control->GetAnchor() : views::BubbleAnchor();
  
