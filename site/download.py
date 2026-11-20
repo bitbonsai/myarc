@@ -144,7 +144,7 @@ def limitations(release):
             'myArc checks for a new nightly once a day and asks before installing it, and Check for Updates… in the myArc menu checks right away. Nightlies get no separate security updates.' if 'ed_signature' in (release or {}) else 'No automatic updates and no security updates. Install each new nightly by hand.',
             'From 2026.11.03 on, nightlies are signed with an Apple Developer ID that later nightlies keep. macOS asks once more for your login password so it can read the saved-data key; choose Always Allow, and newer nightlies stop asking.',
             'Recent tabs and navigation can be lost after a crash or force quit.',
-            'Private window, Profile, cookie and credential guarantees are not verified.',
+            'Profile, cookie and credential guarantees are not verified.',
             'RAR downloads are not scanned by Safe Browsing, because the UnRAR license conflicts with GPL-3.0.',
             'No Widevine, so Netflix, Spotify and Disney+ will not play.',
             codecs(release),
@@ -194,7 +194,7 @@ def content(release):
         html += f'<h2>First launch</h2><ol>{steps}</ol>'
     html += '<h2>What works today</h2><p>Each item was seen working in a native run or experiment note. None of it has had release testing.</p>' + item_list(WORKS)
     html += ('<h2>Known limitations</h2>'
-             + item_list(['No automatic updates and no security updates. Install each new nightly by hand.',
+             + item_list([('myArc checks for new nightlies itself and asks before it installs one, but there are no scheduled security updates yet.' if release and release.get('ed_signature') else 'No automatic updates and no security updates. Install each new nightly by hand.'),
                           'Recent tabs and navigation can be lost after a crash or force quit.',
                           codecs(release)])
              + '<p><a href="/docs/known-limitations/">Known limitations</a> lists the rest, with what does not work yet and what to do after a crash.</p>')

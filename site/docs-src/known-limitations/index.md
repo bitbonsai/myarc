@@ -11,7 +11,7 @@ myArc is a pre-alpha. Use it to try the Arc-style sidebar, and keep daily and se
 
 - Each nightly is built from a Chromium 158 development revision, before Chromium ships it as a stable release.
 - There are no security updates between nightlies. Nightlies after 2026.11.20.2 update themselves; older ones need the new nightly installed by hand once. [Install myArc](../install/) covers both.
-- The protections around private windows, Profile separation, cookies and saved passwords aren't verified yet.
+- The protections around Profile separation, cookies and saved passwords aren't verified yet.
 - Safe Browsing doesn't scan RAR downloads, because the UnRAR license conflicts with GPL-3.0, the license myArc uses.
 - myArc is an independent project with no ties to Arc or The Browser Company.
 
