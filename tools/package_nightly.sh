@@ -9,6 +9,10 @@
 # own entitlements from chrome/app (JIT for the renderer and GPU helpers).
 # With a Developer ID and the notarytool keychain profile NOTARY_PROFILE, it
 # notarizes and staples the app, then the DMG. NOTARIZE=0 skips that.
+# Embeds Sparkle 2 (tools/fetch_sparkle.sh) for in-app updates, sets
+# CFBundleVersion from VERSION so Sparkle can compare nightlies, and signs the
+# DMG with the EdDSA key that generate_keys keeps in the login keychain under
+# the account myarc-sparkle.
 # Usage: tools/package_nightly.sh
 #   env: APP_SRC=<built myArc.app> DATE=YYYY-MM-DD VERSION=<label> TAG=<release tag>
 #        OUT=<output dir, default ~/.cache/myarc-m0/release/DATE>
@@ -26,6 +30,15 @@ VERSION=${VERSION:-${DATE//-/.}}
 TAG=${TAG:-nightly-$VERSION}
 OUT=${OUT:-$HOME/.cache/myarc-m0/release/$DATE}
 NAME="myArc-Nightly-$VERSION-arm64.dmg"
+# Sparkle compares CFBundleVersion, which stays Chromium's build number, so
+# the label becomes YYYYMMDD.N: 2026.11.20.2 is 20261120.2, 2026.11.20 is
+# 20261120.0. site/download.py derives the appcast's sparkle:version the same way.
+if [[ ! "$VERSION" =~ ^([0-9]{4})\.([0-9]{2})\.([0-9]{2})(\.([0-9]+))?$ ]]; then
+  echo "VERSION must be YYYY.MM.DD or YYYY.MM.DD.N" >&2; exit 1
+fi
+BUNDLE_VERSION="${BASH_REMATCH[1]}${BASH_REMATCH[2]}${BASH_REMATCH[3]}.${BASH_REMATCH[5]:-0}"
+SPARKLE_PUBLIC_KEY=FmqrueFbhFEei7eqJscw8wxH3pJ8aVwf0lZYVgf1MnY=
+SPARKLE_ACCOUNT=myarc-sparkle
 ENTITLEMENTS=${ENTITLEMENTS:-$HOME/.cache/myarc-m0/chromium/src/chrome/app}
 NOTARY_PROFILE=${NOTARY_PROFILE:-myarc-notary}
 STAGE="$OUT/stage"
@@ -54,6 +67,10 @@ mkdir -p "$OUT"
 rm -rf "$STAGE"
 mkdir -p "$STAGE"
 ditto "$APP_SRC" "$APP"
+SPARKLE=$("$ROOT/tools/fetch_sparkle.sh")
+ditto "$SPARKLE/Sparkle.framework" "$APP/Contents/Frameworks/Sparkle.framework"
+# Sparkle's MIT notice ships with the framework.
+cp "$SPARKLE/LICENSE" "$APP/Contents/Frameworks/Sparkle.framework/Versions/B/Resources/LICENSE"
 xattr -cr "$APP"
 
 # The CLI and MCP server ships inside the bundle and gets the app's signature.
@@ -64,11 +81,19 @@ cp "$ROOT/target/aarch64-apple-darwin/release/myarc" "$CTL"
 "$CTL" --help >/dev/null
 case "$("$CTL" --version)" in "myarc $VERSION "*) ;; *) echo "myarc does not report $VERSION" >&2; exit 1;; esac
 
-# The app menu shows this label above About. Chromium's own version stays.
+# The app menu shows this label above About. CFBundleShortVersionString
+# stays Chromium's. Sparkle reads the feed, key and automatic checks from here.
 PLIST="$APP/Contents/Info.plist"
-/usr/libexec/PlistBuddy -c 'Delete :MyarcVersion' "$PLIST" 2>/dev/null || true
-/usr/libexec/PlistBuddy -c "Add :MyarcVersion string $VERSION" "$PLIST"
-echo "MyarcVersion: $(/usr/libexec/PlistBuddy -c 'Print :MyarcVersion' "$PLIST")"
+set_plist() {
+  /usr/libexec/PlistBuddy -c "Delete :$1" "$PLIST" 2>/dev/null || true
+  /usr/libexec/PlistBuddy -c "Add :$1 $2 $3" "$PLIST"
+}
+set_plist MyarcVersion string "$VERSION"
+set_plist CFBundleVersion string "$BUNDLE_VERSION"
+set_plist SUFeedURL string https://myarc.dev/appcast.xml
+set_plist SUPublicEDKey string "$SPARKLE_PUBLIC_KEY"
+set_plist SUEnableAutomaticChecks bool true
+echo "MyarcVersion: $(/usr/libexec/PlistBuddy -c 'Print :MyarcVersion' "$PLIST"), CFBundleVersion: $BUNDLE_VERSION"
 
 # The bundle must not load anything from the build tree.
 BIN="$APP/Contents/MacOS/myArc"
@@ -116,6 +141,14 @@ for helper in "$FWV"/Helpers/*.app; do
   esac
 done
 sign "$FW"
+# Sparkle's helpers, as in Sparkle's own signing instructions. The downloader
+# keeps its sandbox entitlements.
+SP="$APP/Contents/Frameworks/Sparkle.framework/Versions/B"
+sign --options runtime "$SP/XPCServices/Installer.xpc"
+sign --options runtime --preserve-metadata=entitlements "$SP/XPCServices/Downloader.xpc"
+sign --options runtime "$SP/Autoupdate"
+sign --options runtime "$SP/Updater.app"
+sign "$APP/Contents/Frameworks/Sparkle.framework"
 sign --options "$FULL" "$CTL"
 sign --options "$FULL" --entitlements "$ENTITLEMENTS/app-entitlements.plist" "$APP"
 codesign --verify --deep --strict --verbose=2 "$APP"
@@ -167,6 +200,11 @@ if [ "$NOTARIZE" = 1 ]; then
   spctl -a -vvv "$APP"
 fi
 
+# Sparkle installs an update only when this signature matches the DMG.
+ED_SIGNATURE=$("$SPARKLE/bin/sign_update" --account "$SPARKLE_ACCOUNT" -p "$OUT/$NAME")
+"$SPARKLE/bin/sign_update" --account "$SPARKLE_ACCOUNT" --verify "$OUT/$NAME" "$ED_SIGNATURE"
+echo "ed_signature: $ED_SIGNATURE"
+
 SIZE=$(stat -f %z "$OUT/$NAME")
 SHA=$(shasum -a 256 "$OUT/$NAME" | cut -d' ' -f1)
 echo "$SHA  $NAME" > "$OUT/$NAME.sha256"
@@ -186,6 +224,7 @@ cat <<EOF
   "sha256": "$SHA",
   "release_url": "$REPO/releases/tag/$TAG",
   "min_macos": "26",
-  "proprietary_codecs": true
+  "proprietary_codecs": true,
+  "ed_signature": "$ED_SIGNATURE"
 }
 EOF

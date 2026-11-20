@@ -4,7 +4,9 @@ import json
 import tempfile
 import unittest
 
-from download import apply_release, build_download, content, limitations, read_release, release_notes
+import xml.etree.ElementTree as ET
+
+from download import appcast, apply_release, build_download, bundle_version, content, limitations, read_release, release_notes
 
 TEMPLATE = (Path(__file__).parent / 'index.template.html').read_text()
 SAMPLE = {'published': True, 'version': '0.0.0-fake.1', 'date': '2099-01-02', 'size_bytes': 123456789,
@@ -39,6 +41,23 @@ class DownloadTests(unittest.TestCase):
                 load({**SAMPLE, **change})
         with self.assertRaises(ValueError):
             load({**SAMPLE, 'extra': 1})
+
+    def test_appcast_lists_only_a_signed_nightly(self):
+        sparkle = '{http://www.andymatuschak.org/xml-namespaces/sparkle}'
+        self.assertEqual(ET.fromstring(appcast(SAMPLE)).findall('channel/item'), [])
+        self.assertEqual(ET.fromstring(appcast(None)).findall('channel/item'), [])
+        signed = {**SAMPLE, 'version': '2099.01.02.3', 'ed_signature': 'A' * 86 + '=='}
+        self.assertEqual(load(signed), signed)
+        item = ET.fromstring(appcast(signed)).find('channel/item')
+        self.assertEqual(item.find(sparkle + 'version').text, '20990102.3')
+        enclosure = item.find('enclosure')
+        self.assertEqual(enclosure.get('url'), SAMPLE['dmg_url'])
+        self.assertEqual(enclosure.get('length'), str(SAMPLE['size_bytes']))
+        self.assertEqual(enclosure.get(sparkle + 'edSignature'), signed['ed_signature'])
+        self.assertEqual(bundle_version('2026.11.20'), '20261120.0')
+        for change in ({'ed_signature': 'short=='}, {'version': '0.0.0-fake.1'}):
+            with self.assertRaises(ValueError, msg=change):
+                load({**signed, **change})
 
     def test_published_page_shows_values_and_steps(self):
         html = content(SAMPLE)

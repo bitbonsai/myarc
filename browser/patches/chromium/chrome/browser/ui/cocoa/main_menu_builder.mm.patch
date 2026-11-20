@@ -1,5 +1,5 @@
 diff --git a/chrome/browser/ui/cocoa/main_menu_builder.mm b/chrome/browser/ui/cocoa/main_menu_builder.mm
-index 047674248727a122fb3aee712981eefd0a4c3049..cad9d733162b75e2e20764154f1309dab816ac66 100644
+index 047674248727a122fb3aee712981eefd0a4c3049..5e662fe3559dca9af3beee9c57af39a843bd63a8 100644
 --- a/chrome/browser/ui/cocoa/main_menu_builder.mm
 +++ b/chrome/browser/ui/cocoa/main_menu_builder.mm
 @@ -6,6 +6,9 @@
@@ -12,15 +12,16 @@ index 047674248727a122fb3aee712981eefd0a4c3049..cad9d733162b75e2e20764154f1309da
  #include "base/feature_list.h"
  #include "base/i18n/rtl.h"
  #include "base/mac/mac_util.h"
-@@ -23,6 +26,7 @@
+@@ -23,6 +26,8 @@
  #include "chrome/grit/generated_resources.h"
  #include "components/dom_distiller/core/dom_distiller_features.h"
  #include "components/strings/grit/components_strings.h"
 +#include "myarc/command_ids.h"
++#include "myarc/updater_mac.h"
  #include "ui/base/accelerators/platform_accelerator_cocoa.h"
  #import "ui/base/cocoa/macos27_sdk.h"
  #include "ui/base/l10n/l10n_util.h"
-@@ -34,6 +38,33 @@ namespace {
+@@ -34,6 +39,39 @@ namespace {
  
  using Item = internal::MenuItemBuilder;
  
@@ -49,12 +50,18 @@ index 047674248727a122fb3aee712981eefd0a4c3049..cad9d733162b75e2e20764154f1309da
 +      l10n_util::GetNSStringFWithFixup(IDS_HIDE_APP_MAC, u"myArc");
 +  [app_menu itemWithTag:IDC_EXIT].title =
 +      l10n_util::GetNSStringFWithFixup(IDS_EXIT_MAC, u"myArc");
++  // Arc puts Check for Updates… above the separator before Services.
++  // Nightly builds only.
++  NSInteger services = [app_menu indexOfItemWithSubmenu:NSApp.servicesMenu];
++  myarc::AddUpdaterMenuItem(
++      app_menu, services > 0 ? services - 1
++                             : [app_menu indexOfItemWithTag:IDC_ABOUT] + 1);
 +}
 +
  // Capitalization Policy (go/chrome-capitalization):
  // Native macOS system menu bar items follow Apple Human Interface
  // Guidelines (HIG) and must use Title Case (via `_MAC` string variants or
-@@ -107,6 +138,10 @@ NSMenuItem* BuildAppMenu(NSApplication* nsapp,
+@@ -107,6 +145,10 @@ NSMenuItem* BuildAppMenu(NSApplication* nsapp,
  
    nsapp.servicesMenu = services_item.submenu;
  
@@ -65,7 +72,7 @@ index 047674248727a122fb3aee712981eefd0a4c3049..cad9d733162b75e2e20764154f1309da
    return item;
  }
  
-@@ -361,6 +396,46 @@ NSMenuItem* BuildViewMenu(NSApplication* nsapp,
+@@ -361,6 +403,46 @@ NSMenuItem* BuildViewMenu(NSApplication* nsapp,
          })
          .Build();
    // clang-format on
@@ -112,7 +119,7 @@ index 047674248727a122fb3aee712981eefd0a4c3049..cad9d733162b75e2e20764154f1309da
    return item;
  }
  
-@@ -500,6 +575,18 @@ NSMenuItem* BuildWindowMenu(NSApplication* nsapp,
+@@ -500,6 +582,18 @@ NSMenuItem* BuildWindowMenu(NSApplication* nsapp,
            })
            .Build();
    // clang-format on

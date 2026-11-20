@@ -13,7 +13,7 @@ from artwork import bake_shadow
 from blog import build_blog
 from discovery import build_discovery
 from docs import URL as DOCS_URL, build_docs, load_docs
-from download import apply_release, build_download, read_release
+from download import appcast, apply_release, build_download, read_release
 from welcome import build_welcome
 
 ROOT = Path(__file__).resolve().parent
@@ -120,6 +120,7 @@ except (ValueError, OSError, RecursionError) as error:
     raise SystemExit(f'Blog build failed: {error}') from None
 build_download(ROOT, template, embed, release)
 build_welcome(ROOT, template, embed)
+(ROOT / 'appcast.xml').write_text(appcast(release))
 template = template.replace('</head>', '<link rel="alternate" type="text/markdown" href="https://myarc.dev/index.md" title="Markdown">\n<link rel="alternate" type="text/plain" href="https://myarc.dev/llms.txt" title="Site context">\n</head>', 1)
 html = embed(template)
 (ROOT / 'index.html').write_text(html)

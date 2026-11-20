@@ -646,6 +646,21 @@ buildflag_header("nightly_buildflags") {
   flags = [ "MYARC_NIGHTLY=$myarc_nightly" ]
 }
 
+# Sparkle 2 in-app updates for the nightly. tools/package_nightly.sh embeds
+# Sparkle.framework, which this loads at runtime.
+source_set("updater") {
+  sources = [
+    "updater_mac.h",
+    "updater_mac.mm",
+  ]
+  deps = [
+    ":nightly_buildflags",
+    ":test_buildflags",
+    "//base",
+  ]
+  frameworks = [ "Cocoa.framework" ]
+}
+
 source_set("nightly_switches") {
   sources = [
     "nightly_switches.cc",

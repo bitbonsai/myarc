@@ -17,7 +17,7 @@ IDENTITY = {'name': 'bitbonsai', 'email': '44185+bitbonsai@users.noreply.github.
 
 
 def artifacts(root):
-    names = ('index.html', 'og-image.png', 'og-image.webp', 'product-window-light.webp', 'product-window-dark.webp', 'favicon.png', 'favicon.ico', 'robots.txt', 'sitemap.xml', 'index.md', 'download/index.html', 'download/index.md', 'llms.txt', 'llms-full.txt')
+    names = ('index.html', 'og-image.png', 'og-image.webp', 'product-window-light.webp', 'product-window-dark.webp', 'favicon.png', 'favicon.ico', 'robots.txt', 'sitemap.xml', 'index.md', 'download/index.html', 'download/index.md', 'llms.txt', 'llms-full.txt', 'appcast.xml')
     files = {'.nojekyll': b'', 'CNAME': b'myarc.dev\n'}
     paths = [root / name for name in names]
     for folder in OWNED:

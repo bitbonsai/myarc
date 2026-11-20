@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-11-20: Sparkle updates for the nightly
+
+- `tools/package_nightly.sh` embeds Sparkle 2.10.1 (`tools/fetch_sparkle.sh` checks the pinned SHA-256), signs its helpers, writes `CFBundleVersion` as `YYYYMMDD.N`, sets `SUFeedURL`, `SUPublicEDKey` and `SUEnableAutomaticChecks`, and signs the DMG with the `myarc-sparkle` EdDSA key from the login keychain. The nightly loads Sparkle at startup and adds Check for Updates… above Services (Chromium `e83856b9eb`). The site writes `/appcast.xml` from `release.json`'s new `ed_signature`.
+- Evidence: `tools/check_updates.sh` ran a hooks build of 2026.11.20.8 against a local appcast on 127.0.0.1. Sparkle offered nothing for an older nightly, refused 2026.11.20.9 with another file's signature ("improperly signed and could not be validated"), and installed the correctly signed 2026.11.20.9 over its copy on quit, which then passed `codesign --verify --deep --strict`.
+- Limits: the test DMGs skipped notarization, so the notarized build hasn't gone through the check. No published nightly has Sparkle yet. Sparkle never called `willInstallUpdateOnQuit`, so the check waits for extraction plus 15 s without an abort instead.
+
 ## 2026-11-20: Arc Favorites from the sidebar file
 
 - Arc's Markdown export can't tell Favorites from Space pins, but `StorableSidebar.json` lists each profile's Favorites under `topAppsContainerIDs` (Firefox's `ArcMigrationUtils.sys.mjs`, Raycast's `useArcBookmarks.ts`). `myarc_import::arc_sidebar` reads it into Profile Favorites, Space pins and folders, behind the default `arc-sidebar` Cargo feature, and the import report drops "Favorites added as pinned tabs" for it.

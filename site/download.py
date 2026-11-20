@@ -1,6 +1,8 @@
 """Build the pre-alpha downloads page and release notes from site/release.json."""
-from datetime import date
+from datetime import date, datetime, timezone
+from email.utils import format_datetime
 from html import escape
+from xml.sax.saxutils import quoteattr
 from pathlib import Path
 import json
 import re
@@ -10,6 +12,9 @@ from blog import page_shell
 URL = 'https://myarc.dev/download/'
 REPO = 'https://github.com/bitbonsai/myarc'
 KEYS = {'published', 'version', 'date', 'dmg_url', 'size_bytes', 'sha256', 'release_url', 'min_macos', 'proprietary_codecs'}
+# Present from the first nightly with Sparkle, whose appcast needs the DMG's
+# EdDSA signature from tools/package_nightly.sh.
+OPTIONAL = {'ed_signature'}
 DEFAULTS = {'release_url': REPO + '/releases', 'min_macos': '26', 'proprietary_codecs': False}
 TITLE = 'myArc pre-alpha nightly'
 STATUS = 'Pre-alpha nightly, for trying the Arc-like shell. Not for daily or sensitive browsing.'
@@ -47,8 +52,8 @@ def read_release(root):
         data = json.loads(path.read_text())
     except json.JSONDecodeError:
         raise ValueError('release.json is not valid JSON') from None
-    if not isinstance(data, dict) or set(data) != KEYS:
-        raise ValueError('release.json needs exactly: ' + ', '.join(sorted(KEYS)))
+    if not isinstance(data, dict) or not KEYS <= set(data) <= KEYS | OPTIONAL:
+        raise ValueError('release.json needs exactly: ' + ', '.join(sorted(KEYS)) + ', and optionally ed_signature')
     if type(data['published']) is not bool:
         raise ValueError('release.json: published must be true or false')
     if not data['published']:
@@ -77,6 +82,44 @@ def validate(data):
         raise ValueError('release.json: min_macos must look like 26 or 26.1')
     if type(data['proprietary_codecs']) is not bool:
         raise ValueError('release.json: proprietary_codecs must be true or false')
+    if 'ed_signature' in data:
+        if not re.fullmatch(r'[A-Za-z0-9+/]{86}==', str(data['ed_signature'])):
+            raise ValueError('release.json: ed_signature must be the 88-character output of sign_update -p')
+        bundle_version(data['version'])
+
+
+def bundle_version(version):
+    """Return the CFBundleVersion tools/package_nightly.sh writes for a nightly label."""
+    match = re.fullmatch(r'(\d{4})\.(\d{2})\.(\d{2})(?:\.(\d+))?', version)
+    if not match:
+        raise ValueError('release.json: version must be YYYY.MM.DD or YYYY.MM.DD.N for an update')
+    return f'{match[1]}{match[2]}{match[3]}.{match[4] or 0}'
+
+
+def appcast(release):
+    """Sparkle appcast with the published nightly, or an empty feed before one is signed."""
+    item = ''
+    if release and 'ed_signature' in release:
+        day = date.fromisoformat(release['date'])
+        published = format_datetime(datetime(day.year, day.month, day.day, tzinfo=timezone.utc))
+        item = f"""    <item>
+      <title>myArc Nightly {escape(release['version'])}</title>
+      <pubDate>{published}</pubDate>
+      <link>{escape(release['release_url'])}</link>
+      <sparkle:version>{bundle_version(release['version'])}</sparkle:version>
+      <sparkle:shortVersionString>{escape(release['version'])}</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>{escape(release['min_macos'])}</sparkle:minimumSystemVersion>
+      <enclosure url={quoteattr(release['dmg_url'])} length="{release['size_bytes']}" type="application/octet-stream" sparkle:edSignature={quoteattr(release['ed_signature'])}/>
+    </item>
+"""
+    return f"""<?xml version="1.0" encoding="utf-8"?>
+<rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle">
+  <channel>
+    <title>myArc Nightly</title>
+    <link>https://myarc.dev/appcast.xml</link>
+{item}  </channel>
+</rss>
+"""
 
 
 def facts(release):
@@ -98,7 +141,7 @@ def codecs(release):
 
 def limitations(release):
     return ['Built from a Chromium 158 development revision, not a stable release.',
-            'No automatic updates and no security updates. Install each new nightly by hand.',
+            'myArc checks for a new nightly once a day and asks before installing it, and Check for Updates… in the myArc menu checks right away. Nightlies get no separate security updates.' if 'ed_signature' in (release or {}) else 'No automatic updates and no security updates. Install each new nightly by hand.',
             'From 2026.11.03 on, nightlies are signed with an Apple Developer ID that later nightlies keep. macOS asks once more for your login password so it can read the saved-data key; choose Always Allow, and newer nightlies stop asking.',
             'Recent tabs and navigation can be lost after a crash or force quit.',
             'Private window, Profile, cookie and credential guarantees are not verified.',

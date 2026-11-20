@@ -35,6 +35,7 @@ site/og-image.webp
 site/product-window-*.webp
 site/llms.txt
 site/llms-full.txt
+site/appcast.xml
 *.pyc
 .DS_Store
 
