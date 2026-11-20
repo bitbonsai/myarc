@@ -41,6 +41,7 @@
 #include "ui/gfx/geometry/size.h"
 #include "ui/gfx/geometry/transform.h"
 #include "ui/gfx/image/image_skia.h"
+#include "ui/gfx/image/image_skia_operations.h"
 #include "ui/gfx/skia_paint_util.h"
 #include "ui/views/accessibility/view_accessibility.h"
 #include "ui/views/animation/animation_builder.h"
@@ -73,10 +74,10 @@ constexpr char16_t kImported[] = u"Imported from Arc";
 constexpr char16_t kStart[] = u"Start fresh";
 constexpr char16_t kSkip[] = u"Skip tour";
 
-constexpr int kMarkSize = 176;
-// Where the logo ends up: this big, this far above the headline.
-constexpr float kMarkDockedSize = 56;
-constexpr int kMarkDockedGap = 24;
+// The logo keeps this size throughout and only moves, so it never resamples.
+constexpr int kMarkSize = 120;
+// It ends at the top of the centred stack, this far above the headline.
+constexpr int kMarkGap = 28;
 constexpr int kButtonWidth = 240;
 constexpr int kButtonHeight = 40;
 // The base in dark mode, myarc.dev's dark page.
@@ -87,7 +88,8 @@ constexpr uint32_t kMidnightDark = 0x0B1420;
 // out, so its blur clears.
 constexpr float kMarkRiseBy = 20;   // 1.25rem
 constexpr float kMarkDriftBy = 14;  // .875rem
-constexpr float kMarkTurn = 1;      // degrees
+// The site turns it 1° too; a turn resamples the logo, so it stays upright.
+constexpr float kMarkTurn = 0;  // degrees
 constexpr float kHeadlineSlideBy = 56;
 constexpr float kHeadlineBlur = 12;
 constexpr base::TimeDelta kSharpIn = base::Milliseconds(200);
@@ -138,15 +140,19 @@ void SetButtonFont(views::LabelButton& button, const gfx::FontList& font) {
   }
 }
 
-// The ribbon logo, decoded once, kMarkSize DIP wide.
+// The ribbon logo, decoded once from its 512 px PNG, kMarkSize DIP wide.
+// Each display scale gets its own copy downsampled from the PNG with a
+// high-quality filter, so the edges stay smooth at 1x and 2x alike.
 const gfx::ImageSkia& Mark() {
   static const gfx::ImageSkia* const mark = [] {
     const SkBitmap bitmap = gfx::PNGCodec::Decode(base::span(kWelcomeMarkPng));
-    return new gfx::ImageSkia(
-        bitmap.isNull()
-            ? gfx::ImageSkia()
-            : gfx::ImageSkia::CreateFromBitmap(
-                  bitmap, static_cast<float>(bitmap.width()) / kMarkSize));
+    if (bitmap.isNull()) {
+      return new gfx::ImageSkia();
+    }
+    return new gfx::ImageSkia(gfx::ImageSkiaOperations::CreateResizedImage(
+        gfx::ImageSkia::CreateFromBitmap(
+            bitmap, static_cast<float>(bitmap.width()) / kMarkSize),
+        skia::ImageOperations::RESIZE_BEST, gfx::Size(kMarkSize, kMarkSize)));
   }();
   return *mark;
 }
@@ -429,7 +435,8 @@ void WelcomeView::Play(base::TimeTicks start) {
                .Then()
                .SetDuration(kMarkDrift / 2)
                .SetTransform(mark, MarkAt(0, 0), gfx::Tween::EASE_IN_OUT);
-  // Then it shrinks and moves up above the headline, and stays there.
+  // Then it moves up to the top of the stack above the headline, and stays
+  // there.
   mark_docked_ = true;
   block = &block->At(at(kMarkDockAt))
                .SetDuration(kMarkDock)
@@ -572,12 +579,15 @@ void WelcomeView::Layout(PassKey) {
   mark_->SetBounds((w - kMarkSize) / 2, (h - kMarkSize) / 2, kMarkSize,
                    kMarkSize);
 
-  // The headline and the choice under it, centred together.
+  // The logo, the headline and the choice under it, centred together. The
+  // logo is laid out at the centre, where it rises in, and moves up to the
+  // stack's top.
   const gfx::Size headline = headline_->GetPreferredSize();
   const gfx::Size skip = skip_->GetPreferredSize();
-  const int column = headline.height() + 28 + kButtonHeight + 10 +
-                     kButtonHeight + 14 + skip.height();
-  int y = std::max(0, (h - column) / 2);
+  const int column = kMarkSize + kMarkGap + headline.height() + 28 +
+                     kButtonHeight + 10 + kButtonHeight + 14 + skip.height();
+  mark_top_ = std::max(0, (h - column) / 2);
+  int y = mark_top_ + kMarkSize + kMarkGap;
   for (views::View* view :
        std::initializer_list<views::View*>{headline_, headline_blur_}) {
     view->SetBounds((w - headline.width()) / 2, y, headline.width(),
@@ -589,8 +599,7 @@ void WelcomeView::Layout(PassKey) {
   start_->SetBounds((w - kButtonWidth) / 2, y, kButtonWidth, kButtonHeight);
   y += kButtonHeight + 14;
   skip_->SetBounds((w - skip.width()) / 2, y, skip.width(), skip.height());
-  // A resize moves the spot above the headline; a dock under way keeps its
-  // target.
+  // A resize moves the stack's top; a move under way keeps its target.
   if (mark_docked_ && !mark_->layer()->GetAnimator()->is_animating()) {
     mark_->layer()->SetTransform(MarkDocked());
   }
@@ -598,16 +607,8 @@ void WelcomeView::Layout(PassKey) {
 }
 
 gfx::Transform WelcomeView::MarkDocked() const {
-  // From the logo's centred bounds to kMarkDockedSize, centred above the
-  // headline.
-  const float half = kMarkSize / 2.f;
-  const float center = headline_->y() - kMarkDockedGap - kMarkDockedSize / 2;
-  gfx::Transform transform =
-      gfx::Transform::MakeTranslation(0, center - (mark_->y() + half));
-  transform.Translate(half, half);
-  transform.Scale(kMarkDockedSize / kMarkSize, kMarkDockedSize / kMarkSize);
-  transform.Translate(-half, -half);
-  return transform;
+  // Only a whole-DIP move up from the centre, so the logo stays crisp.
+  return gfx::Transform::MakeTranslation(0, mark_top_ - mark_->y());
 }
 
 void WelcomeView::TakeFocus() {

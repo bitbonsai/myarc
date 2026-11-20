@@ -93,7 +93,7 @@ class WelcomeView : public views::AccessiblePaneView {
   void Press(Action action);
   // Starts the fields' drift once the view has a size and is playing.
   void StartDrift();
-  // The logo's transform in its spot above the headline, from the layout.
+  // The logo's move from the centre to the stack's top, from the layout.
   gfx::Transform MarkDocked() const;
 
   const ActionCallback action_;
@@ -116,6 +116,8 @@ class WelcomeView : public views::AccessiblePaneView {
   // The logo has been sent to its spot above the headline, or starts there
   // under Reduce Motion.
   bool mark_docked_ = false;
+  // The top of the centred stack of logo, headline and choice.
+  int mark_top_ = 0;
   bool exiting_ = false;
   // Starts the drift once the window shows.
   base::OneShotTimer drift_timer_;

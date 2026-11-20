@@ -356,7 +356,7 @@ PY
     fi
     # The dim is the largest window, and the welcome shows over it.
     dim=$(grep 'layer=0 ' <<< "$before" | sed -E 's/.*size=([0-9]+)x([0-9]+)/\1 \2 &/' \
-      | sort -k1,1nr -k2,2nr | head -1 | sed -E 's/.*(size=[0-9]+x[0-9]+)$/\1/')
+      | sort -k1,1nr -k2,2nr | head -1 | sed -E 's/.*(size=[0-9]+x[0-9]+).*/\1/')
     [ "$(grep -c 'layer=0 ' <<< "$before")" -ge 2 ] || { echo "no welcome over the dim" >&2; return 1; }
     [ "$(grep 'layer=0 ' <<< "$before" | head -1 | grep -c -F "$dim")" = 0 ] \
       || { echo "the dim is in front of the welcome" >&2; return 1; }

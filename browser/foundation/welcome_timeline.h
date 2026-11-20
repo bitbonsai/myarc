@@ -24,8 +24,8 @@ inline constexpr base::TimeDelta kTrafficLights = base::Milliseconds(1900);
 inline constexpr base::TimeDelta kTrafficLightsFade = base::Milliseconds(250);
 
 // The ribbon logo: it rises in over 1.1 s from 1.7 s and drifts once in
-// 0.8 s, then shrinks and moves up over 0.5 s to sit above the headline,
-// where it stays.
+// 0.8 s, then moves up over 0.5 s to the top of the stack above the
+// headline, where it stays.
 inline constexpr base::TimeDelta kMarkIn = base::Milliseconds(1700);
 inline constexpr base::TimeDelta kMarkRise = base::Milliseconds(1100);
 inline constexpr base::TimeDelta kMarkDrift = base::Milliseconds(800);

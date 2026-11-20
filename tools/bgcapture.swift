@@ -11,7 +11,7 @@
 //     that covers the screen, such as the welcome's desktop dim, shows over
 //     what it covers; the PID only has to exist)
 //   swift tools/bgcapture.swift windows <pid> list (one line per on-screen
-//     window of the PID, front to back: layer, alpha, width and height in
+//     window of the PID, front to back: layer, alpha, size and origin in
 //     points, so a check can tell a hidden welcome window from a dim)
 import CoreGraphics
 import CoreImage
@@ -222,7 +222,7 @@ case "windows":
     let bounds = info[kCGWindowBounds as String] as? [String: CGFloat] ?? [:]
     let layer = info[kCGWindowLayer as String] as? Int ?? 0
     let alpha = info[kCGWindowAlpha as String] as? Double ?? 0
-    print("layer=\(layer) alpha=\(String(format: "%.2f", alpha)) size=\(Int(bounds["Width"] ?? 0))x\(Int(bounds["Height"] ?? 0))")
+    print("layer=\(layer) alpha=\(String(format: "%.2f", alpha)) size=\(Int(bounds["Width"] ?? 0))x\(Int(bounds["Height"] ?? 0)) at=\(Int(bounds["X"] ?? 0)),\(Int(bounds["Y"] ?? 0))")
   }
 default:
   exit(64)

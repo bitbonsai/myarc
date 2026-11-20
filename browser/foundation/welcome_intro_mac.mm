@@ -482,32 +482,27 @@ WelcomeIntro::~WelcomeIntro() {
       button.alphaValue = 1;
     }
   }
-  // The dim fades out in step with the sound. Core Animation's completion
-  // holds the dim windows and closes them, so nothing points back here.
+  // The dim fades out in step with the sound: every display's dim window,
+  // with everything in it, in one fade, so the screen lifts evenly. AppKit's
+  // completion holds the dim windows and closes them, so nothing points back
+  // here.
   NSArray<NSWindow*>* dims = [cocoa_->dims copy];
   [cocoa_->dims removeAllObjects];
-  [CATransaction begin];
-  [CATransaction setDisableActions:YES];
-  [CATransaction setCompletionBlock:^{
-    for (NSWindow* dim in dims) {
-      [dim.contentView.layer removeFromSuperlayer];
-      [dim orderOut:nil];
-      [dim close];
-    }
-  }];
-  NSMutableArray<CALayer*>* fading = [cocoa_->shades mutableCopy];
-  if (cocoa_->clip && !cocoa_->clip.hidden) {
-    [fading addObject:cocoa_->clip];
-  }
-  for (CALayer* layer in fading) {
-    const float from = layer.presentationLayer ? layer.presentationLayer.opacity
-                                               : layer.opacity;
-    layer.opacity = 0;
-    [layer addAnimation:From(@"opacity", @(from), welcome::kDimFadeOut,
-                             kCAMediaTimingFunctionEaseOut)
-                 forKey:@"out"];
-  }
-  [CATransaction commit];
+  [NSAnimationContext
+      runAnimationGroup:^(NSAnimationContext* context) {
+        context.duration = Seconds(welcome::kDimFadeOut);
+        context.timingFunction = [CAMediaTimingFunction
+            functionWithName:kCAMediaTimingFunctionEaseOut];
+        for (NSWindow* dim in dims) {
+          dim.animator.alphaValue = 0;
+        }
+      }
+      completionHandler:^{
+        for (NSWindow* dim in dims) {
+          [dim orderOut:nil];
+          [dim close];
+        }
+      }];
 }
 
 void WelcomeIntro::Grow() {

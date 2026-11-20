@@ -31,9 +31,10 @@ struct SidebarTint {
   SkColor end;
 };
 
-// Without a theme, fixed stops per appearance. A theme shades its colour
-// toward black in dark mode and toward white in light mode, so the sidebar's
-// labels stay readable, and scales the stops' alpha by its opacity.
+// Without a theme, fixed stops per appearance, a neutral graphite in dark
+// mode. A theme shades its colour toward black in dark mode and toward white
+// in light mode, so the sidebar's labels stay readable, and scales the stops'
+// alpha by its opacity.
 SidebarTint GetSidebarTint(bool dark, const std::optional<SpaceTheme>& theme);
 
 // Arc paints its peeked sidebar opaque in the Space colour. This is the tint
