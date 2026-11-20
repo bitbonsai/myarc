@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-11-20: Bitwarden from the store's update server survives a restart
+
+- `tools/check_extension_store.sh` installs Bitwarden into the installed nightly 2026.11.20.2, in background launches of a disposable user-data dir. An external-extension file inside that dir points at the store's update server, so the browser fetches and verifies the store's CRX itself. The check turns the extension on from `chrome://extensions`, finds its content script on a local login page and its service worker, quits with Browser.close and relaunches. A watcher kills the test browser if it ever becomes the frontmost app.
+- Evidence: a passing run of Bitwarden 2026.11.0, saved as location 6 from the web store with no disable reasons. The content script saw the fixture's password field before the quit and after the relaunch, and the worker reported itself enabled.
+- Limits: the store page's Add to Chrome wasn't clicked. Its confirm dialog calls `activateIgnoringOtherApps` and would take focus, so that path still needs one live run by hand. The external install arrives off on macOS, like any external install, so the check turns it on, which a store install skips.
+
 ## 2026-11-20: Sparkle updates for the nightly
 
 - `tools/package_nightly.sh` embeds Sparkle 2.10.1 (`tools/fetch_sparkle.sh` checks the pinned SHA-256), signs its helpers, writes `CFBundleVersion` as `YYYYMMDD.N`, sets `SUFeedURL`, `SUPublicEDKey` and `SUEnableAutomaticChecks`, and signs the DMG with the `myarc-sparkle` EdDSA key from the login keychain. The nightly loads Sparkle at startup and adds Check for Updates… above Services (Chromium `e83856b9eb`). The site writes `/appcast.xml` from `release.json`'s new `ed_signature`.
