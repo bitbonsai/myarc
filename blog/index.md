@@ -4,6 +4,12 @@ HTML: https://myarc.dev/blog/
 
 November 2026
 
+## [A proper welcome](https://myarc.dev/blog/a-proper-welcome/)
+
+November 20, 2026
+
+myArc now says hello before your first tab. The screen dims, a soft blob of colour grows into a window, and a short tour has you try the basics on the real browser.
+
 ## [Keeping Arc's ideas going](https://myarc.dev/blog/keeping-arcs-ideas-going/)
 
 November 19, 2026

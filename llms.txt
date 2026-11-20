@@ -26,6 +26,7 @@ A complete myArc browser remains unimplemented, and the Arc importer brings over
 
 ## Posts
 
+- [A proper welcome](https://myarc.dev/blog/a-proper-welcome/index.md): myArc now says hello before your first tab. The screen dims, a soft blob of colour grows into a window, and a short tour has you try the basics on the real browser.
 - [Keeping Arc's ideas going](https://myarc.dev/blog/keeping-arcs-ideas-going/index.md): Arc shuts down on December 22. myArc now has Peek, Split View and Little Arc, blocks ads from the first page, and opens on a Mac like any other app.
 - [Letting agents use myArc](https://myarc.dev/blog/agents-use-myarc/index.md): The agents that build myArc can now use it, in a Space of their own and only after you say yes. Getting there turned up a bug in Chromium and a sidebar full of gray globes.
 - [One window, two profiles](https://myarc.dev/blog/one-window-two-profiles/index.md): myArc now has real Profiles, so Work and Personal keep their own cookies and logins. Getting them to live in one window, the way Arc did, took more than I expected.
