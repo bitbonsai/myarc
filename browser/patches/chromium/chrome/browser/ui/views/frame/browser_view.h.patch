@@ -1,5 +1,5 @@
 diff --git a/chrome/browser/ui/views/frame/browser_view.h b/chrome/browser/ui/views/frame/browser_view.h
-index 750e46c97b64dccccf4268e912df5dbdb6516b3c..08ce1cd7f33a388d258d5d6fdc4ffc129887e16e 100644
+index 750e46c97b64dccccf4268e912df5dbdb6516b3c..3dc160995fcb08b2de39e4548e89feb5b73fe0cc 100644
 --- a/chrome/browser/ui/views/frame/browser_view.h
 +++ b/chrome/browser/ui/views/frame/browser_view.h
 @@ -8,11 +8,13 @@
@@ -32,7 +32,7 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..08ce1cd7f33a388d258d5d6fdc4ffc12
  class ScrimView;
  class SidePanel;
  class SidePanelAnimationContentView;
-@@ -104,6 +108,20 @@ class TopControlsSlideControllerTest;
+@@ -104,6 +108,21 @@ class TopControlsSlideControllerTest;
  class VerticalTabStripRegionView;
  class WebAppFrameToolbarView;
  
@@ -47,13 +47,14 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..08ce1cd7f33a388d258d5d6fdc4ffc12
 +namespace foundation {
 +struct MutationResult;
 +enum class CommandActionKind : std::uint8_t;
++enum class CommandRun : std::uint8_t;
 +}
 +}  // namespace myarc
 +
  namespace gfx {
  class AnimationRunner;
  }  // namespace gfx
-@@ -121,7 +139,11 @@ enum class Channel;
+@@ -121,7 +140,11 @@ enum class Channel;
  }
  
  namespace views {
@@ -65,7 +66,7 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..08ce1cd7f33a388d258d5d6fdc4ffc12
  class NativeViewHost;
  class WebView;
  }  // namespace views
-@@ -143,7 +165,8 @@ class BrowserView : public BrowserWindow,
+@@ -143,7 +166,8 @@ class BrowserView : public BrowserWindow,
                      public ImmersiveModeController::Observer,
                      public GlobalErrorObserver,
                      public views::FocusChangeListener,
@@ -75,7 +76,7 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..08ce1cd7f33a388d258d5d6fdc4ffc12
    METADATA_HEADER(BrowserView, views::ClientView)
  
   public:
-@@ -234,6 +257,8 @@ class BrowserView : public BrowserWindow,
+@@ -234,6 +258,8 @@ class BrowserView : public BrowserWindow,
    // Container for the tabstrip, toolbar, etc.
    TopContainerView* top_container() { return top_container_; }
  
@@ -84,7 +85,7 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..08ce1cd7f33a388d258d5d6fdc4ffc12
    std::optional<int> theme_background_y_offset() const {
      return theme_background_y_offset_;
    }
-@@ -311,6 +336,54 @@ class BrowserView : public BrowserWindow,
+@@ -311,6 +337,56 @@ class BrowserView : public BrowserWindow,
  
    ScrimView* window_scrim_view() { return window_scrim_view_; }
  
@@ -98,9 +99,11 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..08ce1cd7f33a388d258d5d6fdc4ffc12
 +  // beside the pane's partner, opening the tab's page if it hasn't loaded.
 +  void MyarcSplitWith(content::WebContents* pane, uint64_t item);
 +  // Runs an action the command bar offered (command_bar.rs) through the same
-+  // command or sidebar call its menu item runs. `space` is SwitchSpace's.
++  // command or sidebar call its menu item runs. `space` is SwitchSpace's and
++  // `command` is Run's.
 +  void RunMyarcCommandAction(myarc::foundation::CommandActionKind kind,
-+                             uint64_t space);
++                             uint64_t space,
++                             myarc::foundation::CommandRun command);
 +  // The command bar opened a page in this window, as a typed address, a
 +  // search or a suggestion.
 +  void OnMyarcCommandBarOpenedPage();
@@ -139,7 +142,7 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..08ce1cd7f33a388d258d5d6fdc4ffc12
    base::WeakPtr<BrowserView> GetAsWeakPtr() {
      return weak_ptr_factory_.GetWeakPtr();
    }
-@@ -1253,12 +1326,263 @@ class BrowserView : public BrowserWindow,
+@@ -1253,12 +1329,263 @@ class BrowserView : public BrowserWindow,
  
    // Anchor point for help bubbles and other dialogs that want to reliably
    // anchor outside the content area of the window.
@@ -403,7 +406,7 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..08ce1cd7f33a388d258d5d6fdc4ffc12
  
    // A mapping between accelerators and command IDs.
    std::map<ui::Accelerator, int> accelerator_table_;
-@@ -1411,6 +1735,7 @@ class BrowserView : public BrowserWindow,
+@@ -1411,6 +1738,7 @@ class BrowserView : public BrowserWindow,
    base::EnumSet<TabStripAndWebAppViewsReparentedState>
        tab_strip_web_apps_reparented_state_;
  

@@ -25,6 +25,25 @@ Legend: `DOC` = public documentation/index evidence; `BRIEF` = project requireme
 | CONV-01 | Air Traffic Control, Little Arc, rich customization | Later; Little Arc required for [alpha](ALPHA.md) | DOC: organization/release-note index | User value and exact behavior before scheduling |
 | NO-01 | Easels | Excluded | BRIEF | Report omissions only |
 
+## Command bar actions (CMD-01)
+
+Arc's help pages on the command bar and shortcuts returned 403 on 2026-11-20 and the archived copies couldn't be fetched, so this list comes from a private Arc recording of Actions mode. Tab in the empty bar adds the Actions chip in both browsers.
+
+| Arc action | Status in myArc |
+| --- | --- |
+| Privacy Policy | Wired: opens myarc.dev's your-data page |
+| Search Settings | Wired: opens Settings, without focusing a search field |
+| Switch to Dark Mode / Switch to Light Mode | Wired: the row offers the other appearance and sets the browser's color scheme |
+| Add Top Split, Add Left Split | Not wired: myArc offers Add Split View |
+| Add Extension… | Partial: myArc offers Manage Extensions… |
+| New Folder… | Not wired yet |
+| Check for Updates… | Not wired: in the app menu of nightlies only |
+| New Repl, Export Arc Notes, Share Arc | Skipped: Arc-only |
+| View Boosts… | Skipped: Boosts aren't built |
+| View Easels… | Skipped: Easels are out of scope |
+
+myArc's list also has the window actions it already offered, such as Pin Tab and Switch to a Space, and browser commands under Arc-style names: Select Next Space, Select Previous Space, Duplicate Current Tab, Reopen Last Closed Tab, Reload Page, Go Back and Go Forward in History, Find…, Print…, Save Page As…, Zoom In, Zoom Out, Zoom to Actual Size, Developer Tools, Toggle Sidebar, Enter Full Screen, New Window, New Private Window, New Little Arc, Minimize Window, Close Window, View History, Downloads, Manage Extensions… and Quit myArc. A command the window has disabled, such as Go Back with no history, isn't listed.
+
 ## How to measure later
 
 For each feature, track these independently: specified, implemented, exercised by automated checks, verified in an end-to-end journey, and observed in daily use. Report breadth and reliability separately. An implemented button does not establish workflow parity.

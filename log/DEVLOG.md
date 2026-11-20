@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-11-20: Actions mode in the command bar
+
+- Tab in the empty command bar shows Arc's blue Actions chip, sets the placeholder to "Search..." and lists the "/" actions without a typed "/"; Tab again or Backspace in the empty field leaves, and Tab after text works as before. The chip is named "Actions mode" and the change is announced. Entering the mode plays a blue glow: one layer under the bar, blurred once at paint, whose opacity and scale animate over 850 ms, measured from the Arc recording; Reduce Motion skips it. `command_bar.rs` adds Arc's Privacy Policy, Search Settings and Switch to Dark or Light Mode plus existing browser commands, and the window hides the ones it has disabled (Chromium commit "Add Arc's Actions mode to the command bar"). [PARITY](../docs/PARITY.md) lists Arc's actions and their status.
+- Evidence: Rust tests for the new titles, aliases, the appearance swap and one-letter filtering, plus fmt and clippy. Background runs of a copy of the hooks build with `--myarc-test-palette-keys` logged the mode and rows for Tab, Tab then z (Zoom In, Zoom Out), Tab twice, Backspace twice after z, "/z", Tab after text and Esc. Window bursts showed the glow up within about 130 ms and gone by about 800 ms, and none with `--force-prefers-reduced-motion`.
+- Limits: Arc's help pages were unreachable, so the list follows the recording. Bursts on a dimmed screen gave coarse values, and one run's key went in before the bar was ready. Nobody has pressed Tab in a live run.
+
 ## 2026-11-20: Sparkle shows the nightly label, and Check for Updates… moves under About
 
 - The updater delegate is now also Sparkle's user driver delegate and version displayer, so "You're up to date!" and the update offer name the bundle by `MyarcVersion` instead of Chromium's `CFBundleShortVersionString`. That key stays Chromium's, since web app shims fall back to it to find the framework's version folder and crash reports read the framework's copy. Check for Updates… now sits right under About myArc (Chromium commit "Put Check for Updates… right under About myArc").

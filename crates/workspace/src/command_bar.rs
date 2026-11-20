@@ -34,7 +34,119 @@ pub enum Action {
     TogglePinsCollapsed,
     /// Expand Current Split: the focused pane takes most of the window.
     ExpandSplit,
+    /// A command a menu item or shortcut already runs, by its Arc name.
+    Run(Command),
 }
+
+/// Browser commands the bar offers under Arc's names. The window runs each
+/// as its menu item or shortcut does, and leaves out any it has disabled.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Command {
+    NextSpace,
+    PreviousSpace,
+    DuplicateTab,
+    ReopenTab,
+    Reload,
+    Back,
+    Forward,
+    Find,
+    Print,
+    SavePage,
+    ZoomIn,
+    ZoomOut,
+    ZoomReset,
+    DevTools,
+    ToggleSidebar,
+    FullScreen,
+    NewWindow,
+    NewPrivateWindow,
+    LittleArc,
+    MinimizeWindow,
+    CloseWindow,
+    History,
+    Downloads,
+    Extensions,
+    Settings,
+    /// Opens myarc.dev's page on what myArc keeps and sends.
+    PrivacyPolicy,
+    /// Listed as Switch to Light Mode while the window is dark.
+    DarkMode,
+    LightMode,
+    Quit,
+}
+
+/// Each command's title, whether it needs a page, and the other words it
+/// answers to, in the order "/" lists them after the window's actions.
+const COMMANDS: &[(Command, &str, bool, &[&str])] = &[
+    (Command::PrivacyPolicy, "Privacy Policy", false, &["data"]),
+    (
+        Command::Settings,
+        "Search Settings",
+        false,
+        &["open", "preferences", "options"],
+    ),
+    (
+        Command::DarkMode,
+        "Switch to Dark Mode",
+        false,
+        &["appearance", "theme"],
+    ),
+    (Command::NextSpace, "Select Next Space", false, &[]),
+    (Command::PreviousSpace, "Select Previous Space", false, &[]),
+    (Command::DuplicateTab, "Duplicate Current Tab", true, &[]),
+    (
+        Command::ReopenTab,
+        "Reopen Last Closed Tab",
+        false,
+        &["restore", "undo"],
+    ),
+    (Command::Reload, "Reload Page", true, &["refresh"]),
+    (Command::Back, "Go Back in History", true, &[]),
+    (Command::Forward, "Go Forward in History", true, &[]),
+    (Command::Find, "Find…", true, &["search"]),
+    (Command::Print, "Print…", true, &[]),
+    (Command::SavePage, "Save Page As…", true, &["download"]),
+    (Command::ZoomIn, "Zoom In", true, &["bigger"]),
+    (Command::ZoomOut, "Zoom Out", true, &["smaller"]),
+    (Command::ZoomReset, "Zoom to Actual Size", true, &["100"]),
+    (
+        Command::DevTools,
+        "Developer Tools",
+        true,
+        &["inspect", "console", "devtools"],
+    ),
+    (
+        Command::ToggleSidebar,
+        "Toggle Sidebar",
+        false,
+        &["hide", "show"],
+    ),
+    (
+        Command::FullScreen,
+        "Enter Full Screen",
+        false,
+        &["fullscreen"],
+    ),
+    (Command::NewWindow, "New Window", false, &[]),
+    (
+        Command::NewPrivateWindow,
+        "New Private Window",
+        false,
+        &["incognito"],
+    ),
+    (Command::LittleArc, "New Little Arc", false, &["window"]),
+    (Command::MinimizeWindow, "Minimize Window", false, &[]),
+    (Command::CloseWindow, "Close Window", false, &[]),
+    (Command::History, "View History", false, &[]),
+    (Command::Downloads, "Downloads", false, &[]),
+    (
+        Command::Extensions,
+        "Manage Extensions…",
+        false,
+        &["add-ons", "plugins"],
+    ),
+    (Command::Quit, "Quit myArc", false, &["exit"]),
+];
 
 /// What the selected row is.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -58,6 +170,8 @@ pub struct Context {
     pub navigated_away: bool,
     /// The window's Pins are collapsed.
     pub pins_collapsed: bool,
+    /// The window shows dark, so the bar offers Switch to Light Mode.
+    pub dark: bool,
 }
 
 /// One offered action and the title its row shows.
@@ -156,13 +270,20 @@ fn entries(context: &Context, spaces: &[(SpaceId, &str)], current: SpaceId) -> V
     }
     add(true, Action::NewSpace, "New Space", &["create", "add"]);
     for &(id, name) in spaces {
-        if id != current {
-            entries.push(Entry {
-                action: Action::SwitchSpace(id),
-                title: format!("Switch to {name}"),
-                aliases: &["space", "go"],
-            });
-        }
+        add(
+            id != current,
+            Action::SwitchSpace(id),
+            &format!("Switch to {name}"),
+            &["space", "go"],
+        );
+    }
+    for &(command, title, needs_page, aliases) in COMMANDS {
+        // Dark Mode's row offers the other appearance.
+        let (command, title) = match command {
+            Command::DarkMode if context.dark => (Command::LightMode, "Switch to Light Mode"),
+            _ => (command, title),
+        };
+        add(!needs_page || page, Action::Run(command), title, aliases);
     }
     entries
 }
@@ -250,6 +371,7 @@ mod tests {
         in_split: false,
         navigated_away: false,
         pins_collapsed: false,
+        dark: true,
     };
     const SPACES: &[(SpaceId, &str)] = &[(1, "Work"), (2, "Reading"), (3, "Home")];
 
@@ -262,8 +384,9 @@ mod tests {
 
     #[test]
     fn slash_lists_every_action_that_applies() {
+        // The window's actions come first, then the browser commands.
         assert_eq!(
-            titles("/", &TODAY),
+            titles("/", &TODAY)[..13],
             [
                 "Pin Tab",
                 "Archive Tab",
@@ -275,6 +398,9 @@ mod tests {
                 "New Space",
                 "Switch to Reading",
                 "Switch to Home",
+                "Privacy Policy",
+                "Search Settings",
+                "Switch to Light Mode",
             ]
         );
         // The current Space is not offered.
@@ -289,7 +415,9 @@ mod tests {
                 "Add Split View",
                 "New Space",
                 "Switch to Reading",
-                "Switch to Home"
+                "Switch to Home",
+                "Select Next Space",
+                "Select Previous Space",
             ]
         );
         assert_eq!(titles("/copy", &TODAY), ["Copy URL"]);
@@ -301,7 +429,10 @@ mod tests {
         assert_eq!(titles("pin", &TODAY), ["Pin Tab", "Collapse Pinned Tabs"]);
         assert_eq!(titles("new space", &TODAY), ["New Space"]);
         assert_eq!(titles("archive", &TODAY), ["Archive Tab"]);
-        assert_eq!(titles("close", &TODAY), ["Archive Tab"]);
+        assert_eq!(
+            titles("close", &TODAY),
+            ["Close Window", "Archive Tab", "Reopen Last Closed Tab"]
+        );
         assert_eq!(titles("copy url", &TODAY), ["Copy URL"]);
         assert_eq!(titles("split", &TODAY), ["Add Split View"]);
         assert_eq!(titles("Reading", &TODAY), ["Switch to Reading"]);
@@ -313,7 +444,11 @@ mod tests {
         // "sw" starts both Switch titles; "Add Split View" only matches a word.
         assert_eq!(
             titles("sw", &TODAY),
-            ["Switch to Reading", "Switch to Home"]
+            [
+                "Switch to Reading",
+                "Switch to Home",
+                "Switch to Light Mode"
+            ]
         );
         let space = titles("space", &TODAY);
         assert_eq!(space.first().map(String::as_str), Some("New Space"));
@@ -355,9 +490,10 @@ mod tests {
             in_split: false,
             navigated_away: false,
             pins_collapsed: false,
+            dark: true,
         };
         assert_eq!(
-            titles("/", &empty),
+            titles("/", &empty)[..4],
             [
                 "Collapse Pinned Tabs",
                 "New Space",
@@ -365,6 +501,9 @@ mod tests {
                 "Switch to Home"
             ]
         );
+        // Commands that act on a page wait for one.
+        assert!(titles("/reload", &empty).is_empty());
+        assert_eq!(titles("/new window", &empty)[0], "New Window");
     }
 
     #[test]
@@ -423,6 +562,46 @@ mod tests {
             ..TODAY
         };
         assert_eq!(titles("expand", &split), ["Expand Current Split"]);
+    }
+
+    #[test]
+    fn browser_commands_go_by_arc_names() {
+        assert_eq!(titles("privacy", &TODAY), ["Privacy Policy"]);
+        assert_eq!(titles("preferences", &TODAY), ["Search Settings"]);
+        assert_eq!(titles("open settings", &TODAY), ["Search Settings"]);
+        assert_eq!(titles("reload", &TODAY)[0], "Reload Page");
+        assert!(titles("refresh", &TODAY).contains(&"Reload Page".to_owned()));
+        assert_eq!(titles("incognito", &TODAY), ["New Private Window"]);
+        assert_eq!(titles("zoom", &TODAY).len(), 3);
+        let offer = offers("dev", &TODAY, SPACES, 1);
+        assert_eq!(offer[0].action, Action::Run(Command::DevTools));
+    }
+
+    #[test]
+    fn appearance_offers_the_other_mode() {
+        assert_eq!(titles("light mode", &TODAY), ["Switch to Light Mode"]);
+        assert_eq!(titles("dark", &TODAY), Vec::<String>::new());
+        assert_eq!(titles("theme", &TODAY), ["Switch to Light Mode"]);
+        let light = Context {
+            dark: false,
+            ..TODAY
+        };
+        assert_eq!(titles("dark", &light), ["Switch to Dark Mode"]);
+        assert_eq!(
+            offers("light", &TODAY, SPACES, 1)[0].action,
+            Action::Run(Command::LightMode)
+        );
+    }
+
+    #[test]
+    fn actions_mode_lists_from_one_letter() {
+        // Actions mode sends "/" before the text, so one letter narrows the
+        // list where plain text needs two.
+        assert!(titles("z", &TODAY).is_empty());
+        assert_eq!(
+            titles("/z", &TODAY),
+            ["Zoom In", "Zoom Out", "Zoom to Actual Size"]
+        );
     }
 
     #[test]

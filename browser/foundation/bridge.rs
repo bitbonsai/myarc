@@ -223,6 +223,43 @@ mod ffi {
         ClearCache,
         TogglePinsCollapsed,
         ExpandSplit,
+        // A browser command, named by the offer's `command`.
+        Run,
+    }
+
+    // The browser command a Run offer names (command_bar::Command); None for
+    // the other kinds.
+    enum CommandRun {
+        None,
+        NextSpace,
+        PreviousSpace,
+        DuplicateTab,
+        ReopenTab,
+        Reload,
+        Back,
+        Forward,
+        Find,
+        Print,
+        SavePage,
+        ZoomIn,
+        ZoomOut,
+        ZoomReset,
+        DevTools,
+        ToggleSidebar,
+        FullScreen,
+        NewWindow,
+        NewPrivateWindow,
+        LittleArc,
+        MinimizeWindow,
+        CloseWindow,
+        History,
+        Downloads,
+        Extensions,
+        Settings,
+        PrivacyPolicy,
+        DarkMode,
+        LightMode,
+        Quit,
     }
 
     // What the window's selected row is when the bar opens.
@@ -239,6 +276,7 @@ mod ffi {
         in_split: bool,
         navigated_away: bool,
         pins_collapsed: bool,
+        dark: bool,
         current_space: u64,
     }
 
@@ -251,6 +289,7 @@ mod ffi {
     struct CommandOffer {
         kind: CommandActionKind,
         space: u64,
+        command: CommandRun,
         title: String,
     }
 
@@ -1730,7 +1769,7 @@ pub fn command_bar_offers(
     context: &ffi::CommandBarContext,
     spaces: &[ffi::CommandBarSpace],
 ) -> Vec<ffi::CommandOffer> {
-    use workspace::command_bar::{Action, Context, Selected};
+    use workspace::command_bar::{Action, Command, Context, Selected};
     let selected = match context.selected {
         ffi::CommandSelected::Today => Selected::Today,
         ffi::CommandSelected::Pin => Selected::Pin,
@@ -1743,6 +1782,7 @@ pub fn command_bar_offers(
         in_split: context.in_split,
         navigated_away: context.navigated_away,
         pins_collapsed: context.pins_collapsed,
+        dark: context.dark,
     };
     let names: Vec<(u64, &str)> = spaces
         .iter()
@@ -1751,6 +1791,7 @@ pub fn command_bar_offers(
     workspace::command_bar::offers(query, &context_rule, &names, context.current_space)
         .into_iter()
         .map(|offer| {
+            let mut command = ffi::CommandRun::None;
             let (kind, space) = match offer.action {
                 Action::PinTab => (ffi::CommandActionKind::PinTab, 0),
                 Action::UnpinTab => (ffi::CommandActionKind::UnpinTab, 0),
@@ -1765,10 +1806,45 @@ pub fn command_bar_offers(
                 Action::ClearCache => (ffi::CommandActionKind::ClearCache, 0),
                 Action::TogglePinsCollapsed => (ffi::CommandActionKind::TogglePinsCollapsed, 0),
                 Action::ExpandSplit => (ffi::CommandActionKind::ExpandSplit, 0),
+                Action::Run(run) => {
+                    command = match run {
+                        Command::NextSpace => ffi::CommandRun::NextSpace,
+                        Command::PreviousSpace => ffi::CommandRun::PreviousSpace,
+                        Command::DuplicateTab => ffi::CommandRun::DuplicateTab,
+                        Command::ReopenTab => ffi::CommandRun::ReopenTab,
+                        Command::Reload => ffi::CommandRun::Reload,
+                        Command::Back => ffi::CommandRun::Back,
+                        Command::Forward => ffi::CommandRun::Forward,
+                        Command::Find => ffi::CommandRun::Find,
+                        Command::Print => ffi::CommandRun::Print,
+                        Command::SavePage => ffi::CommandRun::SavePage,
+                        Command::ZoomIn => ffi::CommandRun::ZoomIn,
+                        Command::ZoomOut => ffi::CommandRun::ZoomOut,
+                        Command::ZoomReset => ffi::CommandRun::ZoomReset,
+                        Command::DevTools => ffi::CommandRun::DevTools,
+                        Command::ToggleSidebar => ffi::CommandRun::ToggleSidebar,
+                        Command::FullScreen => ffi::CommandRun::FullScreen,
+                        Command::NewWindow => ffi::CommandRun::NewWindow,
+                        Command::NewPrivateWindow => ffi::CommandRun::NewPrivateWindow,
+                        Command::LittleArc => ffi::CommandRun::LittleArc,
+                        Command::MinimizeWindow => ffi::CommandRun::MinimizeWindow,
+                        Command::CloseWindow => ffi::CommandRun::CloseWindow,
+                        Command::History => ffi::CommandRun::History,
+                        Command::Downloads => ffi::CommandRun::Downloads,
+                        Command::Extensions => ffi::CommandRun::Extensions,
+                        Command::Settings => ffi::CommandRun::Settings,
+                        Command::PrivacyPolicy => ffi::CommandRun::PrivacyPolicy,
+                        Command::DarkMode => ffi::CommandRun::DarkMode,
+                        Command::LightMode => ffi::CommandRun::LightMode,
+                        Command::Quit => ffi::CommandRun::Quit,
+                    };
+                    (ffi::CommandActionKind::Run, 0)
+                }
             };
             ffi::CommandOffer {
                 kind,
                 space,
+                command,
                 title: offer.title,
             }
         })
