@@ -1,0 +1,62 @@
+{
+  "sidebar": {
+    "containers": [
+      { "global": {} },
+      {
+        "topAppsContainerIDs": [
+          { "default": {} }, "fav-main",
+          { "custom": { "_0": { "directoryBasename": "Profile 1" } } }, "fav-other"
+        ],
+        "spaces": [
+          "space-work",
+          {
+            "id": "space-work",
+            "title": "Work",
+            "profile": { "default": {} },
+            "containerIDs": ["pinned", "work-pinned", "unpinned", "work-today"]
+          },
+          "space-home",
+          {
+            "id": "space-home",
+            "title": "Home",
+            "profile": { "default": {} },
+            "containerIDs": ["pinned", "home-pinned", "unpinned", "home-today", "boosts", "home-boosts"]
+          }
+        ],
+        "items": [
+          "fav-main", { "id": "fav-main", "childrenIds": ["fav-mail", "fav-cal"], "data": { "itemContainer": {} } },
+          "fav-mail", { "id": "fav-mail", "parentID": "fav-main", "childrenIds": [], "data": { "tab": { "savedURL": "https://mail.example.test/", "savedTitle": "Mail" } } },
+          "fav-cal", { "id": "fav-cal", "parentID": "fav-main", "childrenIds": [], "data": { "tab": { "savedURL": "https://calendar.example.test/", "savedTitle": "Calendar" } } },
+          "fav-other", { "id": "fav-other", "childrenIds": ["fav-other-tab"], "data": { "itemContainer": {} } },
+          "fav-other-tab", { "id": "fav-other-tab", "parentID": "fav-other", "childrenIds": [], "data": { "tab": { "savedURL": "https://other-profile.example.test/" } } },
+
+          "work-pinned", { "id": "work-pinned", "childrenIds": ["work-docs", "work-projects", "work-split", "work-easel"], "data": { "itemContainer": {} } },
+          "work-docs", { "id": "work-docs", "parentID": "work-pinned", "childrenIds": [], "data": { "tab": { "savedURL": "https://docs.example.test/" } } },
+          "work-projects", { "id": "work-projects", "parentID": "work-pinned", "title": "Projects", "childrenIds": ["work-alpha", "work-old"], "data": { "list": {} } },
+          "work-alpha", { "id": "work-alpha", "parentID": "work-projects", "childrenIds": [], "data": { "tab": { "savedURL": "https://alpha.example.test/" } } },
+          "work-old", { "id": "work-old", "parentID": "work-projects", "title": "Old", "childrenIds": ["work-beta"], "data": { "list": {} } },
+          "work-beta", { "id": "work-beta", "parentID": "work-old", "childrenIds": [], "data": { "tab": { "savedURL": "https://beta.example.test/" } } },
+          "work-split", { "id": "work-split", "parentID": "work-pinned", "childrenIds": ["work-left", "work-right"], "data": { "splitView": {} } },
+          "work-left", { "id": "work-left", "parentID": "work-split", "childrenIds": [], "data": { "tab": { "savedURL": "https://left.example.test/" } } },
+          "work-right", { "id": "work-right", "parentID": "work-split", "childrenIds": [], "data": { "tab": { "savedURL": "https://right.example.test/" } } },
+          "work-easel", { "id": "work-easel", "parentID": "work-pinned", "childrenIds": [], "data": { "easel": {} } },
+          "work-today", { "id": "work-today", "childrenIds": ["work-temp"], "data": { "itemContainer": {} } },
+          "work-temp", { "id": "work-temp", "parentID": "work-today", "childrenIds": [], "data": { "tab": { "savedURL": "https://today.example.test/" } } },
+
+          "home-pinned", { "id": "home-pinned", "childrenIds": [], "data": { "itemContainer": {} } },
+          "home-news", { "id": "home-news", "parentID": "home-pinned", "childrenIds": [], "data": { "tab": { "savedURL": "https://news.example.test/" } } },
+          "home-local", { "id": "home-local", "parentID": "home-pinned", "childrenIds": [], "data": { "tab": { "savedURL": "file:///Users/example/notes.txt" } } },
+          "home-today", { "id": "home-today", "childrenIds": [], "data": { "itemContainer": {} } }
+        ]
+      },
+      { "littleBrowser": {} },
+      {
+        "items": [
+          "little-tab", { "id": "little-tab", "childrenIds": [], "data": { "tab": { "savedURL": "https://little.example.test/" } } }
+        ]
+      },
+      { "futureContainer": {} },
+      {}
+    ]
+  }
+}

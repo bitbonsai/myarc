@@ -18,12 +18,14 @@
 //! observed in a real export yet.
 //!
 //! Labels and URLs are kept as written. `Favorites` is an ordinary group label: the
-//! format does not say whether it means Profile favorites or Space pins. The export
+//! format does not say whether it means Profile favorites or Space pins, so this
+//! reader leaves [`Report::favorites`] and [`Space::pins`] empty. Arc's sidebar
+//! file does say, and `arc_sidebar` fills them from it. The export
 //! carries no Profile identity and no titles, so the report has neither. URLs are
 //! never fetched or canonicalized; the reader only checks that an entry looks like
 //! `scheme:rest` and classifies the scheme.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 
 /// Largest input accepted, in bytes. Larger files are rejected before parsing.
@@ -38,19 +40,45 @@ pub const MAX_EXCERPT_BYTES: usize = 256;
 const UTF8_BOM: &str = "\u{feff}";
 
 /// Parsed export: Spaces in document order plus every line the reader skipped.
+///
+/// Entries are ordered [`Self::favorites`] first, then each Space's
+/// [`Space::pins`] and its groups. That is the order of every per-entry list,
+/// such as the canonical URLs an import is given.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Report {
     pub spaces: Vec<Space>,
+    /// Profile Favorites, in order. Only Arc's sidebar file marks them.
+    pub favorites: Vec<Entry>,
     pub unrecognized: Vec<Unrecognized>,
+    /// Parts of the source left out on purpose, counted by kind. Only Arc's
+    /// sidebar file has any.
+    pub omitted: BTreeMap<Omission, usize>,
 }
 
 /// A first-level heading and the groups under it.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Space {
     pub label: String,
-    /// 1-based line of the heading.
+    /// 1-based line of the heading, or 0 when the source has no lines.
     pub line: usize,
+    /// Pins outside any folder, in order. Only Arc's sidebar file marks them.
+    pub pins: Vec<Entry>,
     pub groups: Vec<Group>,
+}
+
+/// Something in Arc's sidebar file the import leaves out on purpose.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub enum Omission {
+    /// Unpinned tabs. Arc archives them, so they are not saved sites.
+    TodayTab,
+    /// Favorites of an Arc profile other than the main one. myarc imports
+    /// into one Profile.
+    OtherProfileFavorite,
+    /// Folders inside a folder. myarc's folders don't nest, so their tabs
+    /// join the outermost folder.
+    NestedFolder,
+    /// Containers and sidebar items of a kind the reader doesn't know.
+    UnknownContainer,
 }
 
 /// A second-level heading and its URLs in order. A group may be empty.
@@ -68,7 +96,7 @@ pub struct Entry {
     /// The URL exactly as written.
     pub url: String,
     pub scheme: Scheme,
-    /// 1-based line of the list item.
+    /// 1-based line of the list item, or 0 when the source has no lines.
     pub line: usize,
 }
 
@@ -170,11 +198,17 @@ impl Report {
             .len()
     }
 
-    fn entries(&self) -> impl Iterator<Item = &Entry> {
-        self.spaces
+    /// Every entry in report order: Favorites, then each Space's pins and
+    /// groups.
+    pub fn entries(&self) -> impl Iterator<Item = &Entry> {
+        self.favorites
             .iter()
-            .flat_map(|space| &space.groups)
-            .flat_map(|group| &group.entries)
+            .chain(self.spaces.iter().flat_map(|space| {
+                space
+                    .pins
+                    .iter()
+                    .chain(space.groups.iter().flat_map(|group| &group.entries))
+            }))
     }
 }
 
@@ -232,6 +266,7 @@ fn place(report: &mut Report, content: &str, line: usize) -> Result<(), Reason> 
         report.spaces.push(Space {
             label,
             line,
+            pins: Vec::new(),
             groups: Vec::new(),
         });
         return Ok(());
@@ -267,7 +302,7 @@ fn heading<'a>(content: &'a str, marker: &str) -> Option<&'a str> {
     rest.strip_prefix([' ', '\t'])
 }
 
-fn label(rest: &str) -> Result<String, Reason> {
+pub(crate) fn label(rest: &str) -> Result<String, Reason> {
     let label = rest.trim_matches([' ', '\t']);
     if label.is_empty() {
         return Err(Reason::EmptyLabel);
@@ -283,7 +318,7 @@ fn label(rest: &str) -> Result<String, Reason> {
 
 /// Accepts one token shaped `scheme:rest` (RFC 3986 scheme syntax, non-empty rest,
 /// no whitespace or control characters). Says nothing about host validity.
-fn scheme(url: &str) -> Result<Scheme, Reason> {
+pub(crate) fn scheme(url: &str) -> Result<Scheme, Reason> {
     if url.len() > MAX_URL_BYTES {
         return Err(Reason::UrlTooLong);
     }

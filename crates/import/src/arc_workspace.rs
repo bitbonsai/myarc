@@ -1,23 +1,27 @@
-//! Maps an Arc Markdown [`Report`] into a myarc [`Workspace`].
+//! Maps an Arc [`Report`] into a myarc [`Workspace`].
 //!
-//! Each `#` Space becomes a Space with that name. Each `##` group becomes a
-//! folder of that Space's Pins with the group's name, and its URLs become Pins
-//! in that folder, in document order. A `Favorites` group is the exception:
-//! its URLs become ungrouped Pins, which the sidebar shows as tiles, because
-//! Arc's Favorites are tiles rather than a folder. They stay Space Pins rather
-//! than Profile favorites because the export does not say which they are (see
+//! The report's [`Report::favorites`] become Favorites of the workspace's
+//! Profile, after any it already has. Only Arc's sidebar file fills that list.
+//! Each Space becomes a Space with that name, and its [`Space::pins`] become
+//! Pins outside any folder. Each group becomes a folder of that Space's Pins
+//! with the group's name, and its URLs become Pins in that folder, in order.
+//! A Markdown `Favorites` group is the exception: its URLs become ungrouped
+//! Pins, which the sidebar shows as tiles, because Arc's Favorites are tiles
+//! rather than a folder. They stay Space Pins rather than Profile Favorites
+//! because the Markdown export does not say which they are (see
 //! `tests/fixtures/arc-markdown/README.md`). Folders don't nest, and neither
-//! do export groups.
+//! do report groups.
 //!
-//! Importing is idempotent. An export Space reuses an existing ordinary Space
-//! of the same name, and a group reuses the first folder of that Space with
-//! the same name. A URL the folder already holds is kept. A URL of a group
-//! that the Space pins outside any folder moves into the folder rather than
-//! being added again, which tidies up an import made before folders existed.
-//! A `Favorites` URL the Space already pins outside any folder is kept. Each
-//! existing Pin answers for one entry, so repeated URLs stay repeated. Every
-//! import is rehearsed on a copy first, so a failed import changes nothing.
-//! Nothing here opens tabs or fetches URLs.
+//! Importing is idempotent. A Favorite whose URL the Profile already has is
+//! kept. An export Space reuses an existing ordinary Space of the same name,
+//! and a group reuses the first folder of that Space with the same name. A URL
+//! the folder already holds is kept. A URL of a group that the Space pins
+//! outside any folder moves into the folder rather than being added again,
+//! which tidies up an import made before folders existed. An ungrouped URL the
+//! Space already pins outside any folder is kept. Each existing Favorite or
+//! Pin answers for one entry, so repeated URLs stay repeated. Every import is
+//! rehearsed on a copy first, so a failed import changes nothing. Nothing here
+//! opens tabs or fetches URLs.
 //!
 //! The browser canonicalizes URLs before they reach the workspace, so callers
 //! pass one canonical URL per entry, in [`entry_urls`] order, or `None` for an
@@ -28,11 +32,11 @@ use std::collections::BTreeMap;
 use std::fmt;
 
 use myarc_workspace::{
-    FolderId, ItemId, MAX_FOLDER_NAME_BYTES, MAX_SPACE_NAME_BYTES, Placement, SpaceId, Workspace,
-    WorkspaceError,
+    DEFAULT_SPACE_ID, FolderId, ItemId, MAX_FOLDER_NAME_BYTES, MAX_SPACE_NAME_BYTES, Placement,
+    SpaceId, Workspace, WorkspaceError,
 };
 
-use crate::arc_markdown::{Report, Scheme};
+use crate::arc_markdown::{Entry, Group, Report, Scheme};
 
 /// The group label Arc gives a Space's Favorites. Its URLs become ungrouped Pins.
 pub const FAVORITES_LABEL: &str = "Favorites";
@@ -40,6 +44,10 @@ pub const FAVORITES_LABEL: &str = "Favorites";
 /// What an import would change, computed against the current workspace.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Preview {
+    /// Canonical URLs of the Profile Favorites the import adds, in order.
+    pub new_favorites: Vec<String>,
+    /// Favorites the Profile already has, so the import leaves them alone.
+    pub kept_favorites: usize,
     /// One per distinct Space name, in the order the export first lists it.
     pub spaces: Vec<SpacePreview>,
     /// Entries that will not be imported.
@@ -51,9 +59,11 @@ pub struct SpacePreview {
     pub name: String,
     /// The Space this name reuses, or `None` when the import creates it.
     pub existing: Option<SpaceId>,
-    /// Canonical URLs of `Favorites` groups the import adds as ungrouped Pins,
-    /// in order.
+    /// Canonical URLs the import adds as ungrouped Pins, in order: the Space's
+    /// pins and its Markdown `Favorites` groups.
     pub new_pins: Vec<String>,
+    /// How many of `new_pins` come from a Markdown `Favorites` group.
+    pub favorites_as_pins: usize,
     /// Entries the Space already pins in the right place, so the import leaves
     /// them alone. Covers folders too.
     pub kept_pins: usize,
@@ -122,6 +132,10 @@ impl Preview {
         self.folders().filter(|f| f.existing.is_none()).count()
     }
 
+    pub fn new_favorite_count(&self) -> usize {
+        self.new_favorites.len()
+    }
+
     /// New Pins, ungrouped and in folders.
     pub fn new_pin_count(&self) -> usize {
         let ungrouped: usize = self.spaces.iter().map(|s| s.new_pins.len()).sum();
@@ -151,7 +165,8 @@ impl Preview {
 
     /// True when applying would change nothing.
     pub fn is_noop(&self) -> bool {
-        self.new_space_count() == 0
+        self.new_favorite_count() == 0
+            && self.new_space_count() == 0
             && self.new_folder_count() == 0
             && self.new_pin_count() == 0
             && self.moved_pin_count() == 0
@@ -160,15 +175,14 @@ impl Preview {
 
 /// Every entry's URL as written, in document order.
 pub fn entry_urls(report: &Report) -> Vec<&str> {
-    entries(report)
-        .map(|(_, _, entry)| entry.url.as_str())
-        .collect()
+    report.entries().map(|entry| entry.url.as_str()).collect()
 }
 
 /// HTTP(S) URLs as written and `None` for other schemes.
 pub fn as_written(report: &Report) -> Vec<Option<String>> {
-    entries(report)
-        .map(|(_, _, entry)| {
+    report
+        .entries()
+        .map(|entry| {
             matches!(entry.scheme, Scheme::Http | Scheme::Https).then(|| entry.url.clone())
         })
         .collect()
@@ -210,25 +224,36 @@ pub fn apply(
     Ok(plan)
 }
 
-/// Every entry with its export Space index and whether its group is `Favorites`.
-fn entries(
-    report: &Report,
-) -> impl Iterator<
-    Item = (
-        usize,
-        &crate::arc_markdown::Group,
-        &crate::arc_markdown::Entry,
-    ),
-> {
-    report.spaces.iter().enumerate().flat_map(|(index, space)| {
-        space
-            .groups
-            .iter()
-            .flat_map(move |group| group.entries.iter().map(move |entry| (index, group, entry)))
-    })
+/// Where a report entry goes.
+enum Role<'a> {
+    /// A Profile Favorite.
+    Favorite,
+    /// An ungrouped Pin of the export Space with this index.
+    Pin(usize),
+    /// An entry of a group of the export Space with this index.
+    Grouped(usize, &'a Group),
 }
 
-fn is_favorites(group: &crate::arc_markdown::Group) -> bool {
+/// Every entry with its role, in [`Report::entries`] order.
+fn entries(report: &Report) -> impl Iterator<Item = (Role<'_>, &Entry)> {
+    let favorites = report.favorites.iter().map(|entry| (Role::Favorite, entry));
+    let spaces = report.spaces.iter().enumerate().flat_map(|(index, space)| {
+        let pins = space
+            .pins
+            .iter()
+            .map(move |entry| (Role::Pin(index), entry));
+        let groups = space.groups.iter().flat_map(move |group| {
+            group
+                .entries
+                .iter()
+                .map(move |entry| (Role::Grouped(index, group), entry))
+        });
+        pins.chain(groups)
+    });
+    favorites.chain(spaces)
+}
+
+fn is_favorites(group: &Group) -> bool {
     group.label.trim() == FAVORITES_LABEL
 }
 
@@ -271,6 +296,7 @@ fn plan(
                     name,
                     existing,
                     new_pins: Vec::new(),
+                    favorites_as_pins: 0,
                     kept_pins: 0,
                     folders: Vec::new(),
                 });
@@ -311,13 +337,40 @@ fn plan(
             present
         })
         .collect();
-    for ((index, group, entry), url) in entries(report).zip(canonical) {
+    // The Profile's Favorites, by URL, each answering for one entry.
+    let mut favorites: BTreeMap<&str, usize> = BTreeMap::new();
+    for item in &state.items {
+        if item.placement
+            == (Placement::Favorite {
+                profile_id: state.profile_id,
+            })
+        {
+            if let Some(url) = item.canonical_url.as_deref() {
+                *favorites.entry(url).or_default() += 1;
+            }
+        }
+    }
+    for ((role, entry), url) in entries(report).zip(canonical) {
         let Some(url) = url else {
             preview.skipped.push(Skipped {
                 line: entry.line,
                 url: entry.url.clone(),
             });
             continue;
+        };
+        let (index, group) = match role {
+            Role::Favorite => {
+                match favorites.get_mut(url.as_str()).filter(|count| **count > 0) {
+                    Some(count) => {
+                        *count -= 1;
+                        preview.kept_favorites += 1;
+                    }
+                    None => preview.new_favorites.push(url.clone()),
+                }
+                continue;
+            }
+            Role::Pin(index) => (index, None),
+            Role::Grouped(index, group) => (index, Some(group)),
         };
         let slot = slots[index];
         let space = &mut preview.spaces[slot];
@@ -326,16 +379,22 @@ fn plan(
             .ungrouped
             .get_mut(url.as_str())
             .filter(|ids| !ids.is_empty());
-        if is_favorites(group) {
-            match ungrouped {
-                Some(ids) => {
-                    ids.remove(0);
-                    space.kept_pins += 1;
+        let group = match group {
+            Some(group) if !is_favorites(group) => group,
+            _ => {
+                match ungrouped {
+                    Some(ids) => {
+                        ids.remove(0);
+                        space.kept_pins += 1;
+                    }
+                    None => {
+                        space.new_pins.push(url.clone());
+                        space.favorites_as_pins += usize::from(group.is_some());
+                    }
                 }
-                None => space.new_pins.push(url.clone()),
+                continue;
             }
-            continue;
-        }
+        };
         let folder = folder_slot(space, &group.label, workspace);
         let held = space.folders[folder]
             .existing
@@ -382,7 +441,21 @@ fn folder_slot(space: &mut SpacePreview, label: &str, workspace: &Workspace) -> 
 
 /// Applies `plan`. Stops at the first refused step, leaving earlier steps applied.
 fn write(plan: &Preview, workspace: &mut Workspace) -> Result<(), ImportError> {
-    let profile_id = workspace.snapshot().profile_id;
+    let state = workspace.snapshot();
+    let profile_id = state.profile_id;
+    if !plan.new_favorites.is_empty() {
+        // A new item starts in a Space before it becomes a Favorite. A Profile
+        // always keeps one; without it `add_temporary_item` refuses.
+        let host = state
+            .spaces
+            .iter()
+            .find(|s| s.profile_id == profile_id)
+            .map_or(DEFAULT_SPACE_ID, |s| s.id);
+        for url in &plan.new_favorites {
+            let item = workspace.add_temporary_item(host)?;
+            workspace.set_placement(item, Placement::Favorite { profile_id }, Some(url))?;
+        }
+    }
     for space in &plan.spaces {
         let id = match space.existing {
             Some(id) => id,

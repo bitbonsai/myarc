@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-11-20: Arc Favorites from the sidebar file
+
+- Arc's Markdown export can't tell Favorites from Space pins, but `StorableSidebar.json` lists each profile's Favorites under `topAppsContainerIDs` (Firefox's `ArcMigrationUtils.sys.mjs`, Raycast's `useArcBookmarks.ts`). `myarc_import::arc_sidebar` reads it into Profile Favorites, Space pins and folders, behind the default `arc-sidebar` Cargo feature, and the import report drops "Favorites added as pinned tabs" for it.
+- Evidence: 9 Rust tests on the synthetic `tests/fixtures/arc-sidebar/StorableSidebar.json` (Favorites become Favorites, pins stay pins, a re-import adds nothing, the file is unchanged, Today tabs, other profiles' Favorites, nested folders and unknown containers are counted), plus fmt, clippy and the workspace tests.
+- Limits: the browser still imports only the Markdown export. Wiring the reader in needs the GN `import` target to list `arc_sidebar.rs`, enable the feature and depend on `serde_json`, a bridge function and a file picker that accepts `.json`.
+
 ## 2026-11-20: Nightly 2026.11.20.2
 
 - Published the prerelease `nightly-2026.11.20.2` from `main` `a02c2a1` and Chromium `c1254b7534`: the redesigned welcome, Dusk as the default theme, the glass sidebar, window drag from empty sidebar and the calmer selected tile. `site/release.json` points at it.

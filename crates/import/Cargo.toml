@@ -6,5 +6,12 @@ rust-version = "1.85"
 license = "GPL-3.0-only"
 publish = false
 
+[features]
+default = ["arc-sidebar"]
+# Reads Arc's StorableSidebar.json. The Chromium GN build doesn't enable it
+# yet, so it needs no GN sources or serde_json dependency there.
+arc-sidebar = ["dep:serde_json"]
+
 [dependencies]
 myarc-workspace = { path = "../workspace" }
+serde_json = { version = "1", optional = true }

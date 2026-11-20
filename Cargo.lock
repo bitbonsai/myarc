@@ -36,6 +36,7 @@ name = "myarc-import"
 version = "0.1.0"
 dependencies = [
  "myarc-workspace",
+ "serde_json",
 ]
 
 [[package]]

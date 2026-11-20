@@ -7,7 +7,7 @@ use std::collections::BTreeMap;
 
 use myarc_workspace::{MAX_FOLDER_NAME_BYTES, MAX_SPACE_NAME_BYTES};
 
-use crate::arc_markdown::{Reason, Report, Scheme};
+use crate::arc_markdown::{Omission, Reason, Report, Scheme};
 use crate::arc_workspace::{FAVORITES_LABEL, Preview};
 
 /// What Arc's export never carries, so no import can bring it over.
@@ -23,9 +23,12 @@ pub enum Kind {
     UnreadableLink,
     /// Lines the reader did not understand, by reason.
     UnreadableLine(Reason),
-    /// `Favorites` entries added as pinned tabs, because the export does not
-    /// say whether they are Profile favorites or Space pins.
+    /// Markdown `Favorites` entries added as pinned tabs, because that export
+    /// does not say whether they are Profile Favorites or Space pins. Arc's
+    /// sidebar file does, so its Favorites never count here.
     FavoriteAsPin,
+    /// Parts of Arc's sidebar file left out on purpose.
+    Omitted(Omission),
     /// Space names cut to the workspace's length limit.
     SpaceNameShortened,
     /// Folder names cut to the workspace's length limit.
@@ -54,6 +57,14 @@ impl Line {
                 return format!("Lines left out, {}: {}", reason.label(), self.count);
             }
             Kind::FavoriteAsPin => "Favorites added as pinned tabs",
+            Kind::Omitted(Omission::TodayTab) => "Today tabs left out",
+            Kind::Omitted(Omission::OtherProfileFavorite) => {
+                "Favorites of other Arc profiles left out"
+            }
+            Kind::Omitted(Omission::NestedFolder) => {
+                "Folders inside folders, their tabs moved to the outer folder"
+            }
+            Kind::Omitted(Omission::UnknownContainer) => "Unknown sidebar parts left out",
             Kind::SpaceNameShortened => "Space names shortened to fit",
             Kind::FolderNameShortened => "Folder names shortened to fit",
             Kind::RepeatedSpace => "Spaces merged into an earlier one with the same name",
@@ -73,12 +84,7 @@ pub fn lines(report: &Report, canonical: &[Option<String>], plan: &Preview) -> V
             *counts.entry(kind).or_default() += count;
         }
     };
-    let entries = report
-        .spaces
-        .iter()
-        .flat_map(|space| &space.groups)
-        .flat_map(|group| &group.entries);
-    for (entry, url) in entries.zip(canonical) {
+    for (entry, url) in report.entries().zip(canonical) {
         if url.is_none() {
             let kind = match entry.scheme {
                 Scheme::Http | Scheme::Https => Kind::UnreadableLink,
@@ -92,8 +98,14 @@ pub fn lines(report: &Report, canonical: &[Option<String>], plan: &Preview) -> V
     }
     add(
         Kind::FavoriteAsPin,
-        plan.spaces.iter().map(|space| space.new_pins.len()).sum(),
+        plan.spaces
+            .iter()
+            .map(|space| space.favorites_as_pins)
+            .sum(),
     );
+    for (&omission, &count) in &report.omitted {
+        add(Kind::Omitted(omission), count);
+    }
     let groups: Vec<_> = report
         .spaces
         .iter()
