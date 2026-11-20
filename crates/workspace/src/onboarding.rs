@@ -379,6 +379,32 @@ pub fn space_step_done(start: (SpaceId, usize), now: (SpaceId, usize)) -> bool {
 }
 
 /// The state's name as `encode` writes it.
+/// What the end of the tour does about the quick start page (myarc.dev/welcome/).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum QuickStart {
+    /// The tour didn't end here, or the page isn't pending: change nothing.
+    Keep,
+    /// Open the page as the first Today tab, then clear the pending flag.
+    Open,
+    /// The tour ended after an import: clear the flag without opening the page.
+    Drop,
+}
+
+/// The quick start rule, for one tour transition from `before` to `after`.
+/// `pending` is the workspace's `quick_start_pending`, true only for a workspace
+/// created fresh. The page opens once, when the tour first reaches `Complete` by
+/// Start fresh or Skip tour; an import's receipt means the Arc setup is there,
+/// so the page is dropped instead.
+pub fn quick_start(before: &TourRecord, after: &TourRecord, pending: bool) -> QuickStart {
+    if !pending || before.state == TourState::Complete || after.state != TourState::Complete {
+        QuickStart::Keep
+    } else if after.receipt.is_some() {
+        QuickStart::Drop
+    } else {
+        QuickStart::Open
+    }
+}
+
 pub fn state_name(state: TourState) -> &'static str {
     match state {
         TourState::Welcome => "welcome",
@@ -1149,5 +1175,143 @@ mod tests {
         // With no receipt, the replayed welcome offers import again.
         let replayed = apply(&TourRecord::complete(), TourEvent::Replay).record;
         assert!(replayed.offers_import() && replayed.receipt.is_none());
+    }
+
+    // The quick start rule, fed each transition the way the browser feeds it.
+    fn quick_starts(
+        record: &TourRecord,
+        events: impl IntoIterator<Item = TourEvent>,
+        mut pending: bool,
+    ) -> Vec<QuickStart> {
+        let mut record = record.clone();
+        let mut seen = Vec::new();
+        for event in events {
+            let next = apply(&record, event).record;
+            let decided = quick_start(&record, &next, pending);
+            if decided != QuickStart::Keep {
+                pending = false;
+                seen.push(decided);
+            }
+            record = next;
+        }
+        seen
+    }
+
+    const START_FRESH: [TourEvent; 6] = [
+        TourEvent::StartBrowsing,
+        TourEvent::RevealDone,
+        TourEvent::StepDone(1),
+        TourEvent::StepDone(2),
+        TourEvent::StepDone(3),
+        TourEvent::Finish,
+    ];
+
+    #[test]
+    fn start_fresh_opens_the_quick_start_page_at_the_end() {
+        assert_eq!(
+            quick_starts(&TourRecord::fresh(), START_FRESH, true),
+            [QuickStart::Open]
+        );
+        // Nothing before the end opens it.
+        let mut record = TourRecord::fresh();
+        for event in &START_FRESH[..5] {
+            let next = apply(&record, event.clone()).record;
+            assert_eq!(quick_start(&record, &next, true), QuickStart::Keep);
+            record = next;
+        }
+    }
+
+    #[test]
+    fn skip_tour_opens_it_from_the_welcome_and_from_a_coach_mark() {
+        assert_eq!(
+            quick_starts(&TourRecord::fresh(), [TourEvent::SkipTour], true),
+            [QuickStart::Open]
+        );
+        assert_eq!(
+            quick_starts(
+                &TourRecord::fresh(),
+                [
+                    TourEvent::StartBrowsing,
+                    TourEvent::RevealDone,
+                    TourEvent::SkipStep(1),
+                    TourEvent::SkipTour
+                ],
+                true
+            ),
+            [QuickStart::Open]
+        );
+    }
+
+    #[test]
+    fn a_tour_after_an_import_drops_the_page() {
+        let import = [
+            TourEvent::ImportStarted,
+            TourEvent::ImportCommitted(receipt()),
+            TourEvent::RevealDone,
+        ];
+        let skipped = import.iter().cloned().chain([TourEvent::SkipTour]);
+        assert_eq!(
+            quick_starts(&TourRecord::fresh(), skipped, true),
+            [QuickStart::Drop]
+        );
+        let finished = import
+            .iter()
+            .cloned()
+            .chain(START_FRESH[2..].iter().cloned());
+        assert_eq!(
+            quick_starts(&TourRecord::fresh(), finished, true),
+            [QuickStart::Drop]
+        );
+        // A cancelled import leaves no receipt, so Start fresh still opens it.
+        let cancelled = [TourEvent::ImportStarted, TourEvent::ImportCancelled]
+            .into_iter()
+            .chain(START_FRESH);
+        assert_eq!(
+            quick_starts(&TourRecord::fresh(), cancelled, true),
+            [QuickStart::Open]
+        );
+    }
+
+    #[test]
+    fn the_page_opens_once_and_never_after_a_replay() {
+        // The end clears the flag, so a replay that ends again keeps it shut.
+        let events = START_FRESH
+            .into_iter()
+            .chain([TourEvent::Replay, TourEvent::SkipTour]);
+        assert_eq!(
+            quick_starts(&TourRecord::fresh(), events, true),
+            [QuickStart::Open]
+        );
+        // A workspace that isn't new, or a finished tour fed again, never opens it.
+        assert!(quick_starts(&TourRecord::fresh(), [TourEvent::SkipTour], false).is_empty());
+        let complete = TourRecord::complete();
+        assert_eq!(
+            quick_start(&complete, &apply(&complete, TourEvent::Finish).record, true),
+            QuickStart::Keep
+        );
+        let replayed = apply(&complete, TourEvent::Replay).record;
+        assert!(quick_starts(&replayed, [TourEvent::SkipTour], false).is_empty());
+    }
+
+    #[test]
+    fn closing_the_window_or_a_relaunch_mid_tour_keeps_it_pending() {
+        for state in [Welcome, Reveal, Practice(2), Handoff] {
+            for event in [TourEvent::WindowClosed, TourEvent::Relaunched] {
+                let next = apply(&at(state), event).record;
+                assert_eq!(quick_start(&at(state), &next, true), QuickStart::Keep);
+            }
+        }
+    }
+
+    #[test]
+    fn only_a_fresh_workspace_starts_with_the_page_pending() {
+        let mut fresh = crate::Workspace::default();
+        assert!(fresh.quick_start_pending());
+        // Saved and restored, it stays pending until the tour ends.
+        let restored = crate::Workspace::from_snapshot(fresh.snapshot()).unwrap();
+        assert!(restored.quick_start_pending());
+        fresh.clear_quick_start();
+        let restored = crate::Workspace::from_snapshot(fresh.snapshot()).unwrap();
+        assert!(!restored.quick_start_pending());
     }
 }

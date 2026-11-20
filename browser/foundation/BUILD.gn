@@ -354,6 +354,7 @@ source_set("onboarding") {
   ]
   deps = [
     ":arc_import",
+    ":browser_workspace_adapter",
     ":onboarding_prefs",
     ":test_buildflags",
     ":welcome_mark",
@@ -362,6 +363,7 @@ source_set("onboarding") {
     "//chrome/browser:browser_process",
     "//chrome/browser:shell_integration",
     "//chrome/browser/profiles:profile",
+    "//chrome/browser/ui/browser_window",
     "//components/prefs",
     "//skia",
     "//ui/accessibility",

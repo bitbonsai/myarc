@@ -299,6 +299,10 @@ std::optional<std::string> EncodeWorkspaceMetadata(
     root.Set("archive_interval_secs",
              base::NumberToString(snapshot.archive_interval_secs));
   }
+  // Only a fresh workspace whose tour hasn't ended carries it, so write it
+  // only then, as the older keys above are.
+  if (snapshot.quick_start_pending)
+    root.Set("quick_start_pending", true);
   auto json = base::WriteJson(root);
   if (json && json->size() <= kMaxMetadataBytes) {
     return json;
@@ -358,6 +362,10 @@ MetadataResult DecodeWorkspaceMetadata(std::string_view json) {
                               snapshot.archive_interval_secs)) {
     snapshot.archive_interval_secs = 0;
   }
+  // Files from before the quick start page, or a bad value, read as done, so
+  // an existing workspace never opens it.
+  snapshot.quick_start_pending =
+      root->FindBool("quick_start_pending").value_or(false);
   for (const auto& value : *spaces) {
     const auto* record = value.GetIfDict();
     foundation::SpaceRecord space;
@@ -1003,6 +1011,18 @@ foundation::MutationResult WorkspaceService::SetArchiveInterval(
   if (!CanMutate())
     return Failure("Workspace is not loaded. Check storage state.");
   return Changed(foundation::set_archive_interval(*workspace_, secs));
+}
+
+bool WorkspaceService::QuickStartPending() const {
+  return CanMutate() && !ephemeral_ &&
+         foundation::quick_start_pending(*workspace_);
+}
+
+foundation::MutationResult WorkspaceService::ClearQuickStart() {
+  if (!CanMutate())
+    return Failure("Workspace is not loaded. Check storage state.");
+  foundation::clear_quick_start(*workspace_);
+  return Changed({true, 0, {}});
 }
 
 foundation::MutationResult WorkspaceService::ClearArchivedTabs() {

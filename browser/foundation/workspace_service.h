@@ -150,6 +150,10 @@ class WorkspaceService final : public base::SupportsUserData::Data {
   // Auto Archive pass uses the new interval.
   uint64_t ArchiveIntervalSecs() const;
   foundation::MutationResult SetArchiveInterval(uint64_t secs);
+  // A fresh workspace whose welcome tour hasn't ended (quick start page).
+  bool QuickStartPending() const;
+  // The tour ended: the quick start page never opens for this Profile.
+  foundation::MutationResult ClearQuickStart();
   // History deletion: drops Archived Tabs whose URL is in `urls`, and with
   // `range` those closed between its begin and end, inclusive. A null end
   // means no end. Writes only when an entry went.

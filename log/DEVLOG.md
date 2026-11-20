@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-11-20: The quick start page opens once after the tour
+
+- A fresh workspace carries `quick_start_pending`, written to the file only while set, so older files read as done. `onboarding::quick_start` takes the tour record before and after each event: the first transition into complete opens https://myarc.dev/welcome/ as a Today tab in the tour's window, or drops it when an import receipt exists, and either way clears the flag first. Replays go through `FeedOnboardingEvent` without the rule's effect on an existing workspace, because the flag is already clear.
+- Evidence: seven new Rust tests plus fmt, clippy and the workspace tests. On the hooks build: Skip tour on a fresh Profile opened the page and cleared the flag; `ONBOARDING=welcome` with Skip tour on that Profile added no second page; Import from Arc… with the Markdown fixture, then Skip tour on a coach mark, left the flag cleared and no page.
+- Limits: Start fresh through the handoff's Finish was checked only by the Rust tests. A second Profile created after the tour keeps the flag until a replay there ends, which then opens the page once in that Profile.
+
 ## 2026-11-20: Option-Cmd-O picks the Space for a Little Arc's page
 
 - In a Little Arc, Option-Cmd-O (`IDC_MYARC_LITTLE_ARC_PICK_SPACE`, a hidden key in the workspace shortcut table) opens a menu of the target window's Spaces under "Open in", the current one checked. Picking one selects that Space in the most recently used main window of the Profile, then runs the Cmd+O move. Also fixed a dangling `raw_ptr` to the Little Arc header in `~BrowserView` that a DCHECK build reports whenever a Little Arc closes (Chromium commit "Pick a Space for a Little Arc's page with Option-Cmd-O").

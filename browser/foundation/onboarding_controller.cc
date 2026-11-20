@@ -19,7 +19,10 @@
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/shell_integration.h"
 #include "components/prefs/pref_service.h"
+#include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
+#include "chrome/browser/ui/browser_window/public/browser_window_interface_iterator.h"
 #include "myarc/arc_import.h"
+#include "myarc/browser_workspace_adapter.h"
 #include "myarc/onboarding_prefs.h"
 #include "myarc/sidebar_tint.h"
 #include "myarc/test_buildflags.h"
@@ -40,6 +43,9 @@
 namespace myarc {
 
 namespace {
+
+// The quick start page the tour's end opens on a fresh workspace.
+constexpr char kQuickStartUrl[] = "https://myarc.dev/welcome/";
 
 using EventKind = foundation::OnboardingEventKind;
 
@@ -313,7 +319,7 @@ void OnboardingController::OnCommandBarOpenedPage() {
   auto event = Event(EventKind::StepDone);
   event.step = 1;
   by_back_ = false;
-  Run(FeedOnboardingEvent(*local_state, event));
+  Run(Feed(*local_state, event));
 }
 
 void OnboardingController::Replay() {
@@ -332,13 +338,14 @@ void OnboardingController::Replay() {
   CloseCoach(/*fade=*/false);
   by_back_ = false;
   replaying_ = true;
-  Run(FeedOnboardingEvent(*local_state, Event(EventKind::Replay)));
+  Run(Feed(*local_state, Event(EventKind::Replay)));
   replaying_ = false;
 }
 
 // static
 void OnboardingController::ReplayRecord() {
   if (PrefService* local_state = LocalState()) {
+    // A replay never ends the tour, so it never opens the quick start page.
     FeedOnboardingEvent(*local_state, Event(EventKind::Replay));
   }
 }
@@ -553,13 +560,13 @@ void OnboardingController::OnAction(WelcomeView::Action action) {
 #endif  // BUILDFLAG(IS_MAC)
   switch (action) {
     case WelcomeView::Action::kStartBrowsing:
-      Run(FeedOnboardingEvent(*local_state, Event(EventKind::StartBrowsing)));
+      Run(Feed(*local_state, Event(EventKind::StartBrowsing)));
       break;
     case WelcomeView::Action::kImport:
-      Run(FeedOnboardingEvent(*local_state, Event(EventKind::ImportStarted)));
+      Run(Feed(*local_state, Event(EventKind::ImportStarted)));
       break;
     case WelcomeView::Action::kSkipTour:
-      Run(FeedOnboardingEvent(*local_state, Event(EventKind::SkipTour)));
+      Run(Feed(*local_state, Event(EventKind::SkipTour)));
       break;
   }
 }
@@ -588,7 +595,7 @@ void OnboardingController::OnImportDone(const ArcImportOutcome& outcome) {
   base::SingleThreadTaskRunner::GetCurrentDefault()->PostTask(
       FROM_HERE,
       base::BindOnce(&OnboardingController::Run, weak_factory_.GetWeakPtr(),
-                     FeedOnboardingEvent(*local_state, event)));
+                     Feed(*local_state, event)));
 }
 
 void OnboardingController::ShowImported(uint64_t space) {
@@ -678,7 +685,7 @@ void OnboardingController::FinishReveal() {
 #endif  // BUILDFLAG(MYARC_TEST_HOOKS)
   CloseWelcome();
   if (PrefService* local_state = LocalState()) {
-    Run(FeedOnboardingEvent(*local_state, Event(EventKind::RevealDone)));
+    Run(Feed(*local_state, Event(EventKind::RevealDone)));
   }
 }
 
@@ -704,6 +711,40 @@ void OnboardingController::OpenImport() {
 #endif  // BUILDFLAG(MYARC_TEST_HOOKS)
   ImportFromArc(*profile_, host_->GetWidget()->GetNativeWindow(),
                 std::move(done), std::move(report_closed));
+}
+
+foundation::OnboardingTransition OnboardingController::Feed(
+    PrefService& local_state,
+    const foundation::OnboardingEvent& event) {
+  const std::string before = local_state.GetString(kOnboardingTourPref);
+  auto transition = FeedOnboardingEvent(local_state, event);
+  WorkspaceService& service = WorkspaceService::ForProfile(*profile_);
+  const auto quick_start = foundation::onboarding_quick_start(
+      before, std::string(transition.record), service.QuickStartPending());
+  if (quick_start == foundation::OnboardingQuickStart::Keep) {
+    return transition;
+  }
+  // Cleared first, so a kill right after never opens the page twice.
+  const auto cleared = service.ClearQuickStart();
+  LOG_IF(ERROR, !cleared.ok)
+      << "Quick start flag not cleared: " << std::string(cleared.error);
+  if (quick_start == foundation::OnboardingQuickStart::Open && cleared.ok) {
+    // The tour's window is the most recently used one of this Profile.
+    BrowserWorkspaceAdapter* adapter = nullptr;
+    ForEachCurrentBrowserWindowInterfaceOrderedByActivation(
+        [&](BrowserWindowInterface* browser) {
+          if (browser->GetProfile() == profile_) {
+            adapter = BrowserWorkspaceAdapter::ForBrowser(*browser);
+          }
+          return !adapter;
+        });
+    const auto opened =
+        adapter ? adapter->OpenInCurrentSpace(GURL(kQuickStartUrl))
+                : foundation::MutationResult{false, 0, "No workspace window."};
+    LOG_IF(ERROR, !opened.ok)
+        << "Quick start page not opened: " << std::string(opened.error);
+  }
+  return transition;
 }
 
 void OnboardingController::Run(
@@ -1049,7 +1090,7 @@ void OnboardingController::FeedLater(EventKind kind, uint8_t step) {
             auto event = Event(kind);
             event.step = step;
             controller->by_back_ = kind == EventKind::Back;
-            controller->Run(FeedOnboardingEvent(*local_state, event));
+            controller->Run(controller->Feed(*local_state, event));
           },
           weak_factory_.GetWeakPtr(), kind, step));
 }
@@ -1172,7 +1213,7 @@ void OnboardingController::OnCoachAction(CoachMark::Action action) {
       break;
     case CoachMark::Action::kBack:
       by_back_ = true;
-      Run(FeedOnboardingEvent(*local_state, Event(EventKind::Back)));
+      Run(Feed(*local_state, Event(EventKind::Back)));
       break;
     case CoachMark::Action::kNext:
       if (card_ == Card::kCreate) {
@@ -1187,13 +1228,13 @@ void OnboardingController::OnCoachAction(CoachMark::Action action) {
       if (card_ == Card::kPinned) {
         auto event = Event(EventKind::StepDone);
         event.step = 2;
-        Run(FeedOnboardingEvent(*local_state, event));
+        Run(Feed(*local_state, event));
       } else {
-        Run(FeedOnboardingEvent(*local_state, Event(EventKind::RevealDone)));
+        Run(Feed(*local_state, Event(EventKind::RevealDone)));
       }
       break;
     case CoachMark::Action::kSkipTour:
-      Run(FeedOnboardingEvent(*local_state, Event(EventKind::SkipTour)));
+      Run(Feed(*local_state, Event(EventKind::SkipTour)));
       break;
   }
 }
@@ -1204,7 +1245,7 @@ void OnboardingController::FinishHandoff() {
     return;
   }
   // Finish keeps the steps done and skipped; the card fades as it closes.
-  Run(FeedOnboardingEvent(*local_state, Event(EventKind::Finish)));
+  Run(Feed(*local_state, Event(EventKind::Finish)));
   [[maybe_unused]] const bool focused =
       window_.focus_current_row && window_.focus_current_row.Run();
 #if BUILDFLAG(MYARC_TEST_HOOKS)

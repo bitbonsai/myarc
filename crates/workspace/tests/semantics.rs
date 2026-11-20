@@ -1146,6 +1146,7 @@ fn old_snapshot_with_space_one_loads_unchanged() {
         archived: Vec::new(),
         open_secs: 0,
         archive_interval: Default::default(),
+        quick_start_pending: false,
         folders: Vec::new(),
         splits: Vec::new(),
         next_window_id: 2,

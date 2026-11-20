@@ -318,6 +318,11 @@ pub struct WorkspaceSnapshot {
     /// Pairs of Today tabs shown side by side. Snapshots from before Split
     /// View have none.
     pub splits: Vec<Split>,
+    /// True only for a workspace created fresh, until the welcome tour ends;
+    /// that end may open the quick start page once (`onboarding::quick_start`).
+    /// Snapshots from before it read false, so an existing workspace never
+    /// opens it, and a replayed tour never sets it again.
+    pub quick_start_pending: bool,
     pub next_space_id: SpaceId,
     pub next_item_id: ItemId,
     pub next_window_id: WindowId,
@@ -405,6 +410,7 @@ impl Default for Workspace {
                 archive_interval: archive::ArchiveInterval::Hours12,
                 folders: Vec::new(),
                 splits: Vec::new(),
+                quick_start_pending: true,
                 next_space_id: 2,
                 next_item_id: 1,
                 next_window_id: 2,
@@ -1239,6 +1245,16 @@ impl Workspace {
             .copied()
             .collect();
         Ok(sidebar)
+    }
+
+    /// See `WorkspaceSnapshot::quick_start_pending`.
+    pub fn quick_start_pending(&self) -> bool {
+        self.state.quick_start_pending
+    }
+
+    /// The tour ended, so the quick start page never opens for this Profile.
+    pub fn clear_quick_start(&mut self) {
+        self.state.quick_start_pending = false;
     }
 
     pub fn snapshot(&self) -> WorkspaceSnapshot {

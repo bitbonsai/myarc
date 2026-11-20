@@ -156,6 +156,15 @@ mod ffi {
         Imported,
     }
 
+    // What a tour transition does about the quick start page
+    // (onboarding::QuickStart): Open it as the first Today tab, or Drop it
+    // after an import. Both clear the workspace's pending flag.
+    enum OnboardingQuickStart {
+        Keep,
+        Open,
+        Drop,
+    }
+
     // A decoded tour record. `state` is "welcome", "importing", "reveal",
     // "practice", "handoff" or "complete"; `step` is the practice step, 0
     // outside practice.
@@ -362,6 +371,9 @@ mod ffi {
         // Restore drops a bad split rather than failing; its tabs show as
         // normal rows.
         splits: Vec<SplitRecord>,
+        // A fresh workspace whose welcome tour hasn't ended yet; the end may
+        // open the quick start page once. Old files read false.
+        quick_start_pending: bool,
     }
 
     struct SidebarResult {
@@ -674,6 +686,9 @@ mod ffi {
         // "Archive tabs after" in seconds: 12 hours, 24 hours, 7 days or 30
         // days.
         fn archive_interval_secs(workspace: &Workspace) -> u64;
+        // True for a fresh workspace until its welcome tour ends.
+        fn quick_start_pending(workspace: &Workspace) -> bool;
+        fn clear_quick_start(workspace: &mut Workspace);
         // Rejects any other value.
         fn set_archive_interval(workspace: &mut Workspace, secs: u64) -> MutationResult;
         // Clear Archive: drops every entry; `id` is how many went.
@@ -1001,6 +1016,10 @@ mod ffi {
         fn onboarding_event(record: &str, event: &OnboardingEvent) -> OnboardingTransition;
         // The saved `record` decoded. An unreadable one reads as complete.
         fn onboarding_decode(record: &str) -> OnboardingTour;
+        // The quick start rule for a transition from record `before` to
+        // record `after`, with the workspace's `pending` flag.
+        fn onboarding_quick_start(before: &str, after: &str, pending: bool)
+        -> OnboardingQuickStart;
         // Practice 2 for `tab`. `shown` is what its card shows, unless
         // `starting`, as the step shows; `by_back` says Back brought the tour
         // there.
@@ -1506,6 +1525,19 @@ pub fn onboarding_decode(record: &str) -> ffi::OnboardingTour {
     onboarding_tour(&workspace::onboarding::decode(record))
 }
 
+pub fn onboarding_quick_start(
+    before: &str,
+    after: &str,
+    pending: bool,
+) -> ffi::OnboardingQuickStart {
+    use workspace::onboarding::{QuickStart, decode, quick_start};
+    match quick_start(&decode(before), &decode(after), pending) {
+        QuickStart::Keep => ffi::OnboardingQuickStart::Keep,
+        QuickStart::Open => ffi::OnboardingQuickStart::Open,
+        QuickStart::Drop => ffi::OnboardingQuickStart::Drop,
+    }
+}
+
 pub fn onboarding_pin_practice(
     starting: bool,
     shown: ffi::OnboardingPin,
@@ -1925,6 +1957,14 @@ pub fn auto_archive(
 
 pub fn archive_interval_secs(workspace: &Workspace) -> u64 {
     workspace.0.archive_interval().seconds()
+}
+
+pub fn quick_start_pending(workspace: &Workspace) -> bool {
+    workspace.0.quick_start_pending()
+}
+
+pub fn clear_quick_start(workspace: &mut Workspace) {
+    workspace.0.clear_quick_start();
 }
 
 pub fn set_archive_interval(workspace: &mut Workspace, secs: u64) -> ffi::MutationResult {
@@ -2368,6 +2408,7 @@ pub fn export_snapshot(workspace: &Workspace) -> ffi::StateSnapshot {
         folders: state.folders.into_iter().map(folder_record).collect(),
         next_folder_id: state.next_folder_id,
         splits: state.splits.into_iter().map(split_record).collect(),
+        quick_start_pending: state.quick_start_pending,
     }
 }
 
@@ -2500,6 +2541,7 @@ pub fn restore_snapshot(
                         right: split.right,
                     })
                     .collect(),
+                quick_start_pending: snapshot.quick_start_pending,
             })
             .map(|()| 0),
     )

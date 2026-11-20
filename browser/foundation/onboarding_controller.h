@@ -191,6 +191,10 @@ class OnboardingController final : public views::ViewObserver {
   // myArc is the default.
   void OnDefaultState(bool is_default);
   // Runs the effect of a saved transition.
+  // Feeds `event` to the saved tour and, when the tour ends on a fresh
+  // workspace, opens or drops the quick start page (onboarding::quick_start).
+  foundation::OnboardingTransition Feed(PrefService& local_state,
+                                        const foundation::OnboardingEvent& event);
   void Run(const foundation::OnboardingTransition& transition);
   void PressForTest();
   // Ends PlayIntro()'s welcome: the dim and the sound fade out at once and
