@@ -10,7 +10,7 @@
 
 - After a crashed session, the launch shows a card at the window's top-right, "myArc quit unexpectedly. Report it?", built on the control prompt's card. Report opens a new issue on github.com/bitbonsai/myarc with the myArc, Chromium and macOS versions and a summary of the newest `myArc*.ips`: header, exception, termination and the crashed thread's top frames, identifiers dropped. A marker file in the user-data dir keeps a log from being offered twice. Hooked into `SessionCrashedBubble::ShowIfNotOffTheRecordProfile` (Chromium commit "Offer a crash report after a crashed session").
 - Evidence: `tools/check_crash_report.sh` passed on the hooks build with `tests/fixtures/crash-report/`: prompt after a SIGKILL, none after a clean quit, no repeat of an offered log, and Report pressed. A generated 60-frame log trimmed to 15 frames and a 6.7 KB URL.
-- Limits: the screen was locked, so ScreenCaptureKit had no display and the card and the GitHub tab have no capture. A SIGKILL leaves no `.ips`, so only the synthetic log has gone through the log path. Chromium saves the running state a few seconds after launch, so a crash in those first seconds isn't noticed.
+- Limits: the first capture showed no card, because the crash restore replaced the window it sat on; the card now moves to the window in front, and later captures show it and the GitHub tab. A signed-out GitHub sends the issue form through its login page first. A SIGKILL leaves no `.ips`, so only the synthetic log has gone through the log path. Chromium saves the running state a few seconds after launch, so a crash in those first seconds isn't noticed.
 
 ## 2026-11-20: Bitwarden from the store's update server survives a restart
 

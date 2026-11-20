@@ -33,6 +33,7 @@
 #include "base/time/time.h"
 #include "base/values.h"
 #include "base/version_info/version_info.h"
+#include "chrome/browser/lifetime/browser_shutdown.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
 #include "chrome/browser/ui/browser_window/public/browser_window_interface_iterator.h"
@@ -64,6 +65,9 @@ constexpr size_t kMaxUrlBytes = 7000;
 constexpr size_t kLogReadBytes = 4 * 1024 * 1024;
 // A log older than this belongs to some other crash.
 constexpr base::TimeDelta kLogMaxAge = base::Days(3);
+// How often, and how long apart, the card looks for a window to sit on.
+constexpr int kMaxAttempts = 10;
+constexpr base::TimeDelta kRetryDelay = base::Seconds(1);
 // Keys in a .ips header that identify the Mac rather than the crash.
 constexpr const char* kDroppedKeys[] = {
     "\"crashReporterKey\"", "\"deviceIdentifierForVendor\"",
@@ -375,10 +379,22 @@ std::unique_ptr<ControlPrompt>& Prompt() {
   return *prompt;
 }
 
-void OpenIssue(const GURL& url, ControlPrompt::Answer answer) {
+void ShowPrompt(GURL url, int attempt);
+
+void OpenIssue(const GURL& url, int attempt, ControlPrompt::Answer answer) {
   // The prompt is done with; drop it after its callback unwinds.
   base::SingleThreadTaskRunner::GetCurrentDefault()->DeleteSoon(
       FROM_HERE, Prompt().release());
+  // Restoring the crashed session can replace the window the card sat on.
+  // Unanswered, it moves to the window in front.
+  if (answer == ControlPrompt::Answer::kClosed) {
+    if (!browser_shutdown::HasShutdownStarted()) {
+      base::SingleThreadTaskRunner::GetCurrentDefault()->PostDelayedTask(
+          FROM_HERE, base::BindOnce(&ShowPrompt, url, attempt + 1),
+          kRetryDelay);
+    }
+    return;
+  }
   BrowserWindowInterface* browser = PromptWindow();
   if (answer != ControlPrompt::Answer::kAllow || !browser) {
     return;
@@ -389,15 +405,21 @@ void OpenIssue(const GURL& url, ControlPrompt::Answer answer) {
   Navigate(&params);
 }
 
-void Offer(Report report) {
+// Shows the card on the window in front, waiting for one to show.
+void ShowPrompt(GURL url, int attempt) {
+  if (Prompt() || attempt > kMaxAttempts) {
+    return;
+  }
   BrowserWindowInterface* browser = PromptWindow();
   views::Widget* widget = browser ? views::Widget::GetWidgetForNativeWindow(
                                         browser->GetWindow()->GetNativeWindow())
                                   : nullptr;
-  if (!widget || Prompt()) {
+  if (!widget || !widget->IsVisible()) {
+    base::SingleThreadTaskRunner::GetCurrentDefault()->PostDelayedTask(
+        FROM_HERE, base::BindOnce(&ShowPrompt, std::move(url), attempt + 1),
+        kRetryDelay);
     return;
   }
-  const GURL url = IssueUrl(report);
   Prompt() = std::make_unique<ControlPrompt>(
       *widget,
       ControlPrompt::Copy{
@@ -408,7 +430,12 @@ void Offer(Report report) {
           .decline = u"Not Now",
           .accept = u"Report…",
       },
-      base::BindOnce(&OpenIssue, url));
+      base::BindOnce(&OpenIssue, url, attempt));
+}
+
+void Offer(Report report) {
+  const GURL url = IssueUrl(report);
+  ShowPrompt(url, 0);
 #if BUILDFLAG(MYARC_TEST_HOOKS)
   const base::CommandLine& command_line =
       *base::CommandLine::ForCurrentProcess();

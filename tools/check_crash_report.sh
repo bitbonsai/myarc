@@ -28,12 +28,13 @@ cp "$ROOT/tests/fixtures/crash-report/"*.ips "$LOGS/"
 touch "$LOGS/"*.ips
 KILL="$WORK/kill.sh"
 printf 'kill -KILL "$PID"\nsleep 1\n' > "$KILL"
-HOOKS="--myarc-test-crash-logs=$LOGS --myarc-test-crash-report-url=$WORK/url.txt"
+# The tour is seeded complete so the welcome doesn't cover the card.
+HOOKS="--myarc-test-crash-logs=$LOGS --myarc-test-crash-report-url=$WORK/url.txt --myarc-test-onboarding=complete"
 
 crash() {
   # Chromium saves the session as running a few seconds after launch, so the
   # kill waits for that. The capture after the kill finds no window.
-  SETTLE=15 SCRIPT="$KILL" "$ROOT/tools/capture_native.sh" "$WORK/killed.png" > /dev/null 2>&1 || true
+  ARGS=--myarc-test-onboarding=complete SETTLE=15 SCRIPT="$KILL" "$ROOT/tools/capture_native.sh" "$WORK/killed.png" > /dev/null 2>&1 || true
 }
 run() {
   rm -f "$WORK/url.txt"

@@ -460,6 +460,7 @@ source_set("crash_report") {
     ":test_buildflags",
     "//base",
     "//base/version_info",
+    "//chrome/browser/lifetime",
     "//chrome/browser/profiles:profile",
     "//chrome/browser/ui/browser_window",
     "//chrome/browser/ui/navigator",
