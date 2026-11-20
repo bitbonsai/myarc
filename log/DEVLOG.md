@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-11-20: Nightly 2026.11.20.2
+
+- Published the prerelease `nightly-2026.11.20.2` from `main` `a02c2a1` and Chromium `c1254b7534`: the redesigned welcome, Dusk as the default theme, the glass sidebar, window drag from empty sidebar and the calmer selected tile. `site/release.json` points at it.
+- Evidence: `tools/package_nightly.sh` signed with the Developer ID, Apple notarized and stapled the app and the DMG, and `spctl` accepted both. The asset URL returns 200 with 245089290 bytes, SHA-256 `49324a1a...461c16`.
+- Limits: no live run of the packaged app beyond checking the installed version.
+
 ## 2026-11-20: A quieter selected tile
 
 - Arc and Zen fill the selected Favorite or pinned tile with a bright grey that glares on a dark sidebar. myArc's selected tile now takes 12% of the sidebar's ink (white on dark, black on light) with a 1 px inner edge at 22%, and a hovered tile 7%. The favicon paints above it, untouched.
