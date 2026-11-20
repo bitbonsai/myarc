@@ -167,6 +167,8 @@ nice -n 10 autoninja -C out/MyarcNightly -j 14 chrome
 
 The build uses its own output directory, so it does not take `/tmp/myarc-build.lock`. With a Developer ID and the `myarc-notary` notarytool keychain profile, the script signs with the hardened runtime, has Apple notarize the app and the DMG and staples both; `NOTARIZE=0` skips that. The app has no updater.
 
+Only static builds check for dangling pointers. On macOS, `build_overrides/partition_alloc.gni` turns PartitionAlloc off in component builds, so `out/MyarcM0` has `enable_backup_ref_ptr_support` and `enable_dangling_raw_ptr_checks` off and never sees a `raw_ptr` outlive its object. The nightly has both on, and the first dangling pointer crashes it. To run the hook-driven checks such as `tools/check_onboarding.sh` with those checks on, add `myarc_test_hooks = true` and `myarc_nightly = false` to `out/MyarcNightly/args.gn` (BUILD.gn refuses hooks in a nightly), build under the lock and pass `out/MyarcNightly/myArc.app`. Only myArc's own targets rebuild. Copy `args-nightly.gn` back and build again before packaging.
+
 ## Runtime regression checks
 
 The [native fixture instructions](../tests/fixtures/browser/README.md) cover marked disposable profiles, expected-PID/version checks, causal extension on/off probes, process-restart verification and renderer/private-storage smoke checks. `tools/check_browser_foundation.mjs` is a privileged developer test client. It is separate from product CLI/MCP authorization and runs manually against the external browser build.

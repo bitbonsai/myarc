@@ -21,6 +21,10 @@
 #   practice3  killed once practice 2's pin is done  -> practice 3, done [2], pin kept
 #   handoff    killed once practice 3's switch is    -> handoff, done [3]
 #              done
+#   skip       Skip tour on the welcome, which closes -> complete
+#              the sheet; the browser must outlive it
+#   retire     Skip tour on practice 1's card, which  -> complete
+#              fades it out; the browser must outlive it
 # Needs a build with the GN arg myarc_test_hooks = true, as browser/args.gn sets.
 # Usage: tools/check_onboarding.sh [build]   build is an out dir or a .app
 #   (default ~/.cache/myarc-m0/chromium/src/out/MyarcM0).
@@ -42,7 +46,7 @@ PAGE="http://127.0.0.1:$PORT/"
 
 if [ "${2:-}" = "--inner" ]; then
   [ -x "$BIN" ] || { echo "native binary missing: $BIN" >&2; exit 1; }
-  CASES=${CASES:-"welcome intro import reveal practice1 practice2 practice3 handoff"}
+  CASES=${CASES:-"welcome intro import reveal practice1 practice2 practice3 handoff skip retire"}
   OUTDIR=${OUTDIR:-$ROOT/research-private/captures/onboarding-$(date -u +%Y%m%dT%H%M%SZ)}
   mkdir -p "$OUTDIR"
   PID=""
@@ -112,6 +116,16 @@ if [ "${2:-}" = "--inner" ]; then
     done
     echo "no log line in $3 s: $2" >&2
     grep -E "Test onboarding" "$1/chrome.log" | tail -5 >&2 || true
+    return 1
+  }
+
+  # alive <profile> <seconds>: fails when the browser exits within that time,
+  # for example on a dangling pointer check.
+  alive() {
+    sleep "$2"
+    kill -0 "$PID" 2>/dev/null && return 0
+    echo "browser exited" >&2
+    grep -m1 -E "DanglingSignature|FATAL|Check failed" "$1/chrome.log" | cut -c1-300 >&2 || true
     return 1
   }
 
@@ -293,6 +307,27 @@ PY
     kill_now
     check "$p" "after kill" "$(rec handoff 0 3)" saved
     relaunch handoff "$p" "$(rec handoff 0 3)" saved "state=handoff step=0 effect=show animate=0"
+  }
+
+  case_skip() {
+    local p; p=$(fresh)
+    launch "$p" --myarc-test-onboarding --myarc-test-onboarding-event=skip_tour about:blank
+    wait_log "$p" 'event state=complete' 30
+    alive "$p" 3
+    kill_now
+    check "$p" "after kill" "$(rec complete 0 '')" any
+    relaunch skip "$p" "$(rec complete 0 '')" saved "state=complete step=0 effect=none"
+  }
+
+  case_retire() {
+    local p; p=$(fresh)
+    launch "$p" --myarc-test-onboarding=practice1 --myarc-test-onboarding-event=skip_tour about:blank
+    wait_log "$p" 'event state=complete' 30
+    # The card fades out over 120 ms, then goes.
+    alive "$p" 3
+    kill_now
+    check "$p" "after kill" "$(rec complete 0 '')" any
+    relaunch retire "$p" "$(rec complete 0 '')" saved "state=complete step=0 effect=none"
   }
 
   RUNS=0

@@ -402,7 +402,9 @@ void OnboardingController::CloseWelcome() {
   const bool had_focus = sheet_->Contains(
       sheet_->GetFocusManager() ? sheet_->GetFocusManager()->GetFocusedView()
                                 : nullptr);
-  host_->RemoveChildViewT(std::exchange(sheet_, nullptr).get());
+  // Clears the pointer before the view goes, so no raw_ptr dangles.
+  WelcomeView* const sheet = std::exchange(sheet_, nullptr);
+  host_->RemoveChildViewT(sheet);
   if (had_focus && restore_focus_) {
     restore_focus_.Run();
   }
@@ -491,7 +493,11 @@ void OnboardingController::ShowImported(uint64_t space) {
             }
 #endif  // BUILDFLAG(MYARC_TEST_HOOKS)
             controller->recolouring_ = false;
-            controller->Refresh();
+            // Posted: this runs inside the sheet's animation, and Refresh
+            // may close the sheet.
+            base::SingleThreadTaskRunner::GetCurrentDefault()->PostTask(
+                FROM_HERE,
+                base::BindOnce(&OnboardingController::Refresh, controller));
           },
           weak_factory_.GetWeakPtr()));
 }
@@ -939,7 +945,8 @@ void OnboardingController::RetireCard(bool fade) {
     return;
   }
   if (!fade) {
-    host_->RemoveChildViewT(std::exchange(coach_, nullptr).get());
+    CoachMark* const coach = std::exchange(coach_, nullptr);
+    host_->RemoveChildViewT(coach);
     return;
   }
   // One card leaves at a time; an older one still fading goes at once.
@@ -959,10 +966,10 @@ void OnboardingController::RetireCard(bool fade) {
 }
 
 void OnboardingController::RemoveLeavingCoach() {
-  if (leaving_coach_ && host_) {
-    host_->RemoveChildViewT(std::exchange(leaving_coach_, nullptr).get());
+  CoachMark* const leaving = std::exchange(leaving_coach_, nullptr);
+  if (leaving && host_) {
+    host_->RemoveChildViewT(leaving);
   }
-  leaving_coach_ = nullptr;
 }
 
 void OnboardingController::PlaceCoach() {
