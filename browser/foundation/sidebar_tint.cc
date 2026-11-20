@@ -54,14 +54,18 @@ SidebarTint GetSidebarTint(bool dark,
                            const std::optional<SpaceTheme>& theme,
                            bool solid) {
   if (!theme) {
-    // Dark: Dusk, from an indigo top-leading corner (#2b2a40) to a plum
-    // bottom-trailing one (#4a3442), at about 65% over the glass. Its middle,
-    // #3a2f45, sits on that line, so two stops draw it.
-    const SkAlpha dusk = solid ? 242 : 166;
-    return dark ? SidebarTint{SkColorSetARGB(dusk, 0x2B, 0x2A, 0x40),
-                              SkColorSetARGB(dusk, 0x4A, 0x34, 0x42)}
-                : SidebarTint{SkColorSetARGB(166, 227, 224, 242),
-                              SkColorSetARGB(166, 240, 230, 240)};
+    // Dark: Dusk, Arc's deep indigo (#151228) at the top-leading corner to
+    // a dark plum (#261229) at the bottom-trailing one. Over the glass the
+    // stops are darker and about 85% opaque, so the blurred desktop lifts
+    // them to those colours; solid draws them as they are.
+    if (dark) {
+      return solid ? SidebarTint{SkColorSetARGB(242, 0x15, 0x12, 0x28),
+                                 SkColorSetARGB(242, 0x26, 0x12, 0x29)}
+                   : SidebarTint{SkColorSetARGB(217, 0x0F, 0x0D, 0x26),
+                                 SkColorSetARGB(217, 0x23, 0x0D, 0x27)};
+    }
+    return SidebarTint{SkColorSetARGB(166, 227, 224, 242),
+                       SkColorSetARGB(166, 240, 230, 240)};
   }
   const SkColor color = SkColorSetA(theme->color, SK_AlphaOPAQUE);
   // At 100% the sidebar is two thirds tint over the glass, or nearly opaque

@@ -77,6 +77,7 @@
 #include "ui/views/controls/label.h"
 #include "ui/views/controls/menu/menu_runner.h"
 #include "ui/views/controls/scroll_view.h"
+#include "ui/views/controls/scrollbar/scroll_bar.h"
 #include "ui/views/controls/separator.h"
 #include "ui/views/controls/textfield/textfield.h"
 #include "ui/views/focus/focus_manager.h"
@@ -3529,6 +3530,25 @@ gfx::Rect SidebarView::GetTourAnchorInWidget(TourAnchor anchor,
     return gfx::Rect();
   }
   return view->ConvertRectToWidget(view->GetVisibleBounds());
+}
+
+bool SidebarView::IsPositionInWindowCaption(const gfx::Point& point) {
+  // Anything that takes a click, paints a fill of its own like a selected
+  // row, or holds the Favorites' tiles, gaps included, keeps the press.
+  for (const views::View* view = GetEventHandlerForPoint(point);
+       view && view != this; view = view->parent()) {
+    if (std::ranges::any_of(tiles_, [view](const auto& tile) {
+          return tile.first && tile.first->parent() == view;
+        })) {
+      return false;
+    }
+    if (views::IsViewClass<views::Button>(view) ||
+        views::IsViewClass<views::Textfield>(view) ||
+        views::IsViewClass<views::ScrollBar>(view) || view->GetBackground()) {
+      return false;
+    }
+  }
+  return true;
 }
 
 bool SidebarView::FocusCurrentRow() {

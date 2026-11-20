@@ -282,6 +282,10 @@ class SidebarView final : public views::View,
                       StorageRetry retry = StorageRetry::kNone);
   // Fills the New Tab row while the parent's New Tab palette is open.
   void SetNewTabIntent(bool intent);
+  // Whether `point`, in this view's coordinates, is empty sidebar that drags
+  // the window, as in Arc: not on a row, tile, button, field, card or
+  // scroll bar.
+  bool IsPositionInWindowCaption(const gfx::Point& point);
   // The current Space's rows in widget coordinates, cut to the part that
   // shows. Empty while the Library or the Create a Space panel shows.
   gfx::Rect GetSpaceRowsBoundsInWidget() const;

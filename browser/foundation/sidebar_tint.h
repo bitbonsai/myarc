@@ -36,7 +36,8 @@ struct SidebarTint {
 // dark mode. A theme shades its colour toward black in dark mode and toward white
 // in light mode, so the sidebar's labels stay readable, and scales the stops'
 // alpha by its opacity. Over the window's glass the tint is translucent, at
-// most about two thirds, so the blurred desktop shows through as in Arc.
+// most about two thirds for a theme and 85% for Dusk, so the blurred desktop
+// shows through as in Arc.
 // `solid` keeps the near-opaque fill, for Reduce Transparency and for
 // surfaces with no glass behind them.
 SidebarTint GetSidebarTint(bool dark,
