@@ -87,7 +87,7 @@ Adjacent article images use a two-column grid with uncropped 16:10 image boxes a
 
 Native cross-document View Transitions blur/fade the root over 1s on same-origin navigation. Incoming content sharpens from 2rem blur; outgoing content blurs and fades away with matching ease-in-out timing. The header has its own capture and stays crisp. The shared template opts all HTML pages in with `@view-transition`; reduced motion sets navigation to `none`. Unsupported browsers retain ordinary links. Navigation adds no router or JavaScript; the article lightbox is a separate progressive enhancement.
 
-Intro motion is finite and ends within five seconds. Footer hover/focus produces one heart pulse per 1.5 seconds, 40 BPM. `prefers-reduced-motion` disables animation, transitions and smooth scrolling in both themes.
+Intro motion is finite and ends within five seconds. The homepage hero ribbon is the one exception: it is drawn in WebGL, a sheen crosses it every 7 to 12 seconds, and a short showpiece plays every 9 to 14 seconds or on click. It pauses off screen, and reduced motion keeps the static image. Footer hover/focus produces one heart pulse per 1.5 seconds, 40 BPM. `prefers-reduced-motion` disables animation, transitions and smooth scrolling in both themes.
 
 Verify light and dark rendering, image decoding, text contrast, keyboard focus and mobile overflow. Theme-specific wordmarks must change with the system preference while ribbon artwork stays unchanged.
 
