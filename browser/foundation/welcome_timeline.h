@@ -5,20 +5,20 @@
 
 // When each part of the welcome's arrival happens, from t = 0, when the
 // sound, the dim and the blob all start. The sound
-// (design/brand/sounds/welcome.m4a, 16.2 s with a 0.4 s fade-in) sets them:
-// its first accent lands at 1.6 s and its second at 4.3 s. WelcomeIntro,
-// WelcomeView and WelcomeSound all read this table, and the times hold
-// whether or not the sound plays.
+// (design/brand/sounds/welcome.m4a, 14 s) sets them: its first accent lands
+// at 1.6 s and its second at 4.3 s. WelcomeIntro, WelcomeView and
+// WelcomeSound all read this table, and the times hold whether or not the
+// sound plays.
 namespace myarc::welcome {
 
 // The blob holds, then swells, and the window's frame clips it on the first
 // accent.
 inline constexpr base::TimeDelta kGrowStart = base::Milliseconds(1300);
 inline constexpr base::TimeDelta kGrowLands = base::Milliseconds(1600);
-// The window shows under the grown blob as the dim lifts, and the blob's
-// copy of its background goes once the window has drawn.
+// The window shows under the grown blob, and once it has drawn the blob's
+// copy of its background goes and the dim moves behind the window, where it
+// stays until a press or a close.
 inline constexpr base::TimeDelta kWindowShown = base::Milliseconds(1700);
-inline constexpr base::TimeDelta kDimGone = base::Milliseconds(1900);
 // The traffic lights fade in 300 ms after the grow lands.
 inline constexpr base::TimeDelta kTrafficLights = base::Milliseconds(1900);
 inline constexpr base::TimeDelta kTrafficLightsFade = base::Milliseconds(250);
@@ -38,9 +38,11 @@ inline constexpr base::TimeDelta kHeadlineSlide = base::Milliseconds(800);
 inline constexpr base::TimeDelta kChoiceAt = base::Milliseconds(4700);
 inline constexpr base::TimeDelta kChoiceFade = base::Milliseconds(400);
 
-// The sound fades out over this long once the user picks a button or the
-// window closes, unless it has ended on its own.
+// The sound and the dim start fading out together once the user picks a
+// button or the window closes, the sound over this long, unless it has ended
+// on its own, and the dim over kDimFadeOut.
 inline constexpr base::TimeDelta kSoundFadeOut = base::Milliseconds(600);
+inline constexpr base::TimeDelta kDimFadeOut = base::Milliseconds(400);
 
 }  // namespace myarc::welcome
 

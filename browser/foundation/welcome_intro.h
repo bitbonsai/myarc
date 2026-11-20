@@ -4,7 +4,6 @@
 #include <cstdint>
 #include <memory>
 
-#include "base/functional/callback.h"
 #include "base/memory/weak_ptr.h"
 #include "base/time/time.h"
 #include "base/timer/timer.h"
@@ -26,28 +25,28 @@ namespace myarc {
 // welcome's background as it starts: the base with WelcomeView's blurred
 // fields. The welcome window stays hidden until then, and is then ordered
 // front without activating when the app isn't active, so a background launch
-// lands on it too. It shows the same picture, so it shows under the field
-// while the dim lifts, until 1.9 s, and the field goes at 1.7 s, once the
-// window has drawn. Its traffic lights fade in on their own at 1.9 s, 300 ms
-// after the grow lands. The times are welcome_timeline.h's.
+// lands on it too. It shows the same picture, so it shows under the field,
+// and at 1.7 s, once the window has drawn, the field goes and the dim moves
+// just behind the window. The dim stays there, still click-through, as long
+// as the intro lives. The window's traffic lights fade in on their own at
+// 1.9 s, 300 ms after the grow lands. The times are welcome_timeline.h's.
 //
 // Everything moves in Core Animation, at the display's rate. The outline's
 // blur is worked out once, at the start, as a loop of images, so no frame
 // blurs anything.
 //
-// The intro owns its dim windows and the blob, and deleting it removes them
-// at once and shows the welcome window. It never deletes itself: `done` runs
-// posted once the dim has lifted, and its owner deletes it from there. The
-// windows are ordered front without activating the app, so a background
-// launch shows them too. Mac only; UI sequence only.
+// The intro owns its dim windows and the blob, and it never deletes itself.
+// Its owner deletes it once a button is pressed or the welcome closes:
+// that shows the welcome window at once and fades the dim out over
+// welcome::kDimFadeOut, after which Core Animation's completion closes the
+// dim windows, holding no pointer to the intro. The windows are ordered
+// front without activating the app, so a background launch shows them too.
+// Mac only; UI sequence only.
 class WelcomeIntro {
  public:
   // `window` is the welcome window and `base` its background's base colour,
   // as 0xRRGGBB. With `log`, each phase logs its start.
-  WelcomeIntro(gfx::NativeWindow window,
-               uint32_t base,
-               base::OnceClosure done,
-               bool log);
+  WelcomeIntro(gfx::NativeWindow window, uint32_t base, bool log);
   WelcomeIntro(const WelcomeIntro&) = delete;
   WelcomeIntro& operator=(const WelcomeIntro&) = delete;
   ~WelcomeIntro();
@@ -60,7 +59,7 @@ class WelcomeIntro {
   struct Cocoa;
 
   void Grow();
-  void Lift();
+  void Land();
   void Shown();
   void Finish();
   // Runs `phase` at `at` from the start.
@@ -68,7 +67,6 @@ class WelcomeIntro {
   void Log(const char* phase) const;
 
   std::unique_ptr<Cocoa> cocoa_;
-  base::OnceClosure done_;
   const bool log_;
   base::TimeTicks start_;
   base::OneShotTimer timer_;

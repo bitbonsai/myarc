@@ -49,8 +49,8 @@ class RevealFrames;
 // quarters of the main display, centred, while Replay keeps its size and
 // display. The sound, the desktop dim and a blob start together, the blob
 // grows into the window and the welcome plays, all on welcome_timeline.h's
-// times. The sound keeps playing under the welcome and fades out once a
-// button is pressed or the welcome closes. UI sequence only.
+// times. The sound and the dim stay under the welcome and fade out together
+// once a button is pressed or the welcome closes. UI sequence only.
 //
 // With test hooks, --myarc-test-onboarding-event=skip_tour, start_browsing
 // or import presses that button a second after the welcome shows, or
@@ -131,8 +131,6 @@ class OnboardingController final : public views::ViewObserver {
  private:
   void ShowWelcome(bool offers_import);
   void CloseWelcome();
-  // The desktop intro lifted; drops it.
-  void OnIntroDone();
   // Gives focus back to the window if the sheet holds it.
   void ReleaseFocus();
   void OnAction(WelcomeView::Action action);
@@ -198,8 +196,8 @@ class OnboardingController final : public views::ViewObserver {
   const AnchorCallback anchor_;
   const Window window_;
   raw_ptr<WelcomeView> sheet_ = nullptr;
-  // The desktop dim and blob while the welcome arrives. Dropped from a posted
-  // task, a press or CloseWelcome, never from inside its own timer.
+  // The desktop dim and blob, from the welcome's arrival until a press or
+  // CloseWelcome drops it, which fades the dim out. It never drops itself.
   std::unique_ptr<WelcomeIntro> intro_;
   // The welcome's sound, Mac only. Dropping it fades it out.
   std::unique_ptr<WelcomeSound> sound_;

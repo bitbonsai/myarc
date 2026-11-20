@@ -7,13 +7,11 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
-#include <utility>
 #include <vector>
 
 #include "base/functional/bind.h"
 #include "base/location.h"
 #include "base/logging.h"
-#include "base/task/single_thread_task_runner.h"
 #include "myarc/welcome_palette.h"
 #include "myarc/welcome_timeline.h"
 
@@ -286,14 +284,26 @@ struct WelcomeIntro::Cocoa {
   // The main display's shade, which leaves the window's frame undimmed once
   // the window shows.
   CALayer* home_shade = nil;
+  // True once the dim sits just behind the welcome window.
+  bool behind = false;
 };
 
-WelcomeIntro::WelcomeIntro(gfx::NativeWindow window,
-                           uint32_t base,
-                           base::OnceClosure done,
-                           bool log)
+namespace {
+
+// Puts the dim windows just behind `welcome`, at its level, so the window
+// shows undimmed wherever it moves and other apps' windows can come over
+// both. Without activating the app.
+void PutBehind(NSArray<NSWindow*>* dims, NSWindow* welcome) {
+  for (NSWindow* dim in dims) {
+    dim.level = welcome.level;
+    [dim orderWindow:NSWindowBelow relativeTo:welcome.windowNumber];
+  }
+}
+
+}  // namespace
+
+WelcomeIntro::WelcomeIntro(gfx::NativeWindow window, uint32_t base, bool log)
     : cocoa_(std::make_unique<Cocoa>()),
-      done_(std::move(done)),
       log_(log),
       start_(base::TimeTicks::Now()) {
   NSWindow* welcome = window.GetNativeNSWindow();
@@ -448,14 +458,16 @@ WelcomeIntro::WelcomeIntro(gfx::NativeWindow window,
 
 WelcomeIntro::~WelcomeIntro() {
   timer_.Stop();
-  for (NSWindow* dim in cocoa_->dims) {
-    [dim.contentView.layer removeFromSuperlayer];
-    [dim orderOut:nil];
-    [dim close];
-  }
-  [cocoa_->dims removeAllObjects];
-  if (NSWindow* welcome = cocoa_->welcome) {
+  NSWindow* welcome = cocoa_->welcome;
+  if (welcome) {
     welcome.alphaValue = cocoa_->welcome_alpha;
+    // Ended before the window landed: it shows at once, over the dim.
+    if (!cocoa_->behind) {
+      if (!NSApp.active) {
+        [welcome orderFrontRegardless];
+      }
+      PutBehind(cocoa_->dims, welcome);
+    }
   }
   // Ended early, by a press or a close: the traffic lights show at once. A
   // fade already under way finishes on its own.
@@ -464,6 +476,32 @@ WelcomeIntro::~WelcomeIntro() {
       button.alphaValue = 1;
     }
   }
+  // The dim fades out in step with the sound. Core Animation's completion
+  // holds the dim windows and closes them, so nothing points back here.
+  NSArray<NSWindow*>* dims = [cocoa_->dims copy];
+  [cocoa_->dims removeAllObjects];
+  [CATransaction begin];
+  [CATransaction setDisableActions:YES];
+  [CATransaction setCompletionBlock:^{
+    for (NSWindow* dim in dims) {
+      [dim.contentView.layer removeFromSuperlayer];
+      [dim orderOut:nil];
+      [dim close];
+    }
+  }];
+  NSMutableArray<CALayer*>* fading = [cocoa_->shades mutableCopy];
+  if (cocoa_->clip && !cocoa_->clip.hidden) {
+    [fading addObject:cocoa_->clip];
+  }
+  for (CALayer* layer in fading) {
+    const float from = layer.presentationLayer ? layer.presentationLayer.opacity
+                                               : layer.opacity;
+    layer.opacity = 0;
+    [layer addAnimation:From(@"opacity", @(from), welcome::kDimFadeOut,
+                             kCAMediaTimingFunctionEaseOut)
+                 forKey:@"out"];
+  }
+  [CATransaction commit];
 }
 
 void WelcomeIntro::Grow() {
@@ -505,14 +543,14 @@ void WelcomeIntro::Grow() {
     [field addAnimation:show forKey:@"grow"];
     [CATransaction commit];
   }
-  At(welcome::kGrowLands, &WelcomeIntro::Lift);
+  At(welcome::kGrowLands, &WelcomeIntro::Land);
 }
 
-void WelcomeIntro::Lift() {
-  Log("lift");
-  // The window shows under the clipped field as the dim lifts. It shows the
-  // same picture, so the field stays opaque until the window has drawn: a
-  // crossfade of two copies would dip in brightness halfway.
+void WelcomeIntro::Land() {
+  Log("land");
+  // The window shows under the clipped field. It shows the same picture, so
+  // the field stays opaque until the window has drawn: a crossfade of two
+  // copies would dip in brightness halfway.
   if (NSWindow* welcome = cocoa_->welcome) {
     welcome.alphaValue = cocoa_->welcome_alpha;
     // An app launched in the background has its window behind the others,
@@ -524,15 +562,9 @@ void WelcomeIntro::Lift() {
   }
   [CATransaction begin];
   [CATransaction setDisableActions:YES];
-  const base::TimeDelta lift = welcome::kDimGone - welcome::kGrowLands;
-  for (CALayer* shade in cocoa_->shades) {
-    shade.opacity = 0;
-    [shade addAnimation:From(@"opacity", @(kDim), lift,
-                             kCAMediaTimingFunctionEaseOut)
-                 forKey:@"out"];
-  }
   // The main display's shade no longer covers the window's frame, which the
-  // field covers until the window has drawn.
+  // field covers until the window has drawn, so the window never shows
+  // dimmed while the dim moves behind it.
   CALayer* shade = cocoa_->home_shade;
   CALayer* clip = cocoa_->clip;
   if (shade && clip) {
@@ -553,12 +585,17 @@ void WelcomeIntro::Lift() {
 
 void WelcomeIntro::Shown() {
   Log("shown");
-  // The window has drawn under the field, so the field can go.
+  // The window has drawn under the field, so the field can go, and the dim
+  // moves behind the window, where it stays.
   [CATransaction begin];
   [CATransaction setDisableActions:YES];
   cocoa_->clip.hidden = YES;
   [CATransaction commit];
-  At(welcome::kDimGone, &WelcomeIntro::Finish);
+  if (NSWindow* welcome = cocoa_->welcome) {
+    PutBehind(cocoa_->dims, welcome);
+    cocoa_->behind = true;
+  }
+  At(welcome::kTrafficLights, &WelcomeIntro::Finish);
 }
 
 void WelcomeIntro::At(base::TimeDelta at, void (WelcomeIntro::*phase)()) {
@@ -582,11 +619,13 @@ void WelcomeIntro::Finish() {
       button.animator.alphaValue = 1;
     }
   }];
-  // Posted: the owner deletes the intro from `done`, and this runs inside
-  // the intro's own timer.
-  if (done_) {
-    base::SingleThreadTaskRunner::GetCurrentDefault()->PostTask(
-        FROM_HERE, std::move(done_));
+  // The dim is behind the window now, so the hole that kept the window's
+  // frame undimmed goes, and the window can move anywhere.
+  if (cocoa_->behind) {
+    [CATransaction begin];
+    [CATransaction setDisableActions:YES];
+    cocoa_->home_shade.mask = nil;
+    [CATransaction commit];
   }
 }
 

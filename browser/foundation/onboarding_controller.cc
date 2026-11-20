@@ -410,10 +410,7 @@ void OnboardingController::ShowWelcome(bool offers_import) {
       sound_ = WelcomeSound::Load(log);
     }
     intro_ = std::make_unique<WelcomeIntro>(
-        host_->GetWidget()->GetNativeWindow(), sheet_->BaseColor(),
-        base::BindOnce(&OnboardingController::OnIntroDone,
-                       weak_factory_.GetWeakPtr()),
-        log);
+        host_->GetWidget()->GetNativeWindow(), sheet_->BaseColor(), log);
     start = intro_->start();
     if (sound_) {
       sound_->Start(start);
@@ -436,14 +433,10 @@ void OnboardingController::ShowWelcome(bool offers_import) {
 #endif  // BUILDFLAG(MYARC_TEST_HOOKS)
 }
 
-void OnboardingController::OnIntroDone() {
-  intro_.reset();
-}
-
 void OnboardingController::CloseWelcome() {
+  // Both fade out rather than stopping dead.
   intro_.reset();
 #if BUILDFLAG(IS_MAC)
-  // Fades out rather than stopping dead.
   sound_.reset();
 #endif  // BUILDFLAG(IS_MAC)
   recolouring_ = false;
@@ -480,8 +473,8 @@ void OnboardingController::OnAction(WelcomeView::Action action) {
   if (!local_state || !sheet_ || importing_ || revealing_) {
     return;
   }
-  // A press ends the desktop intro at once, showing the window, and fades
-  // the sound out.
+  // A press ends the desktop intro, showing the window, and fades the dim
+  // and the sound out together.
   intro_.reset();
 #if BUILDFLAG(IS_MAC)
   sound_.reset();
