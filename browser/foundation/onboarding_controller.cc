@@ -804,6 +804,17 @@ OnboardingController::Card OnboardingController::PracticeCard(bool starting,
         tab = current;
       }
     }
+    if (!tab || *tab == foundation::OnboardingPinTab::Missing) {
+      // Nor is the current tab a page: point at another Today tab's row
+      // when one has a web page. The step skips only with no web tab open.
+      for (const auto& row : model.temporary) {
+        if (IsWebPage(row)) {
+          pin_item_ = row.id;
+          tab = foundation::OnboardingPinTab::Other;
+          break;
+        }
+      }
+    }
 #if BUILDFLAG(MYARC_TEST_HOOKS)
     if (base::CommandLine::ForCurrentProcess()->HasSwitch(
             kMyarcTestOnboarding)) {

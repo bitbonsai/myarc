@@ -174,6 +174,7 @@ mod ffi {
     // The tab practice 2 points at (onboarding.rs `PinTab`).
     enum OnboardingPinTab {
         Missing,
+        Other,
         Today,
         Saved,
     }
@@ -1521,6 +1522,7 @@ pub fn onboarding_pin_practice(
         _ => Some(PinPractice::Pin),
     };
     let tab = match tab {
+        ffi::OnboardingPinTab::Other => PinTab::Other,
         ffi::OnboardingPinTab::Today => PinTab::Today,
         ffi::OnboardingPinTab::Saved => PinTab::Saved,
         _ => PinTab::Missing,

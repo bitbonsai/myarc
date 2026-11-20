@@ -300,11 +300,15 @@ fn after(step: u8) -> TourState {
 }
 
 /// The tab practice 2 points at, as the window sees it: the tab practice 1 opened
-/// while it's still open, otherwise the window's current tab.
+/// while it's still open, otherwise the window's current tab, otherwise another
+/// Today tab with a web page.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum PinTab {
-    /// No web page to pin: the tab closed, or the current one is blank.
+    /// No web tab open at all.
     Missing,
+    /// The current tab isn't a web page, but another Today tab is. The card points
+    /// at that tab's row.
+    Other,
     /// A Today tab with a web page.
     Today,
     /// Already a Pin or a Favorite.
@@ -331,6 +335,8 @@ pub enum PinPractice {
 /// starts; `by_back` says Back brought the tour here.
 pub fn pin_practice(shown: Option<PinPractice>, tab: PinTab, by_back: bool) -> PinPractice {
     match (shown, tab) {
+        // Another tab to pin keeps the step going, whatever the card showed.
+        (_, PinTab::Other) => PinPractice::Pin,
         (None, PinTab::Today) => PinPractice::Pin,
         (None, PinTab::Saved) if by_back => PinPractice::Pinned,
         (None, PinTab::Saved) => PinPractice::Done,
@@ -1060,6 +1066,27 @@ mod tests {
         let skipped = apply(&at(Practice(2)), TourEvent::SkipStep(2)).record;
         assert_eq!(skipped.state, Practice(3));
         assert!(skipped.is_skipped(2) && !skipped.is_done(2));
+    }
+
+    #[test]
+    fn pin_practice_points_at_another_web_tab_before_skipping() {
+        // The current tab isn't a page, but another web tab is open: the card
+        // points at that one, as the step starts, after Back and when the tab
+        // under the card closes.
+        for by_back in [false, true] {
+            assert_eq!(pin_practice(None, PinTab::Other, by_back), PinPractice::Pin);
+        }
+        for shown in [PinPractice::Pin, PinPractice::Pinned] {
+            assert_eq!(
+                pin_practice(Some(shown), PinTab::Other, false),
+                PinPractice::Pin
+            );
+        }
+        // Only no web tab at all skips the step.
+        assert_eq!(
+            pin_practice(None, PinTab::Missing, false),
+            PinPractice::Skip
+        );
     }
 
     #[test]

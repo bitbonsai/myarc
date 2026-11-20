@@ -1460,7 +1460,8 @@ bool CheckOnboarding() {
     return false;
   }
   // Practice 2 points at a Today tab and finishes on its pin; Back into it
-  // with nothing to pin carries on to practice 1.
+  // with nothing to pin carries on to practice 1, and another web tab keeps
+  // the step going.
   if (onboarding_pin_practice(true, OnboardingPin::Pin, OnboardingPinTab::Today,
                               false) != OnboardingPin::Pin ||
       onboarding_pin_practice(false, OnboardingPin::Pin,
@@ -1468,7 +1469,10 @@ bool CheckOnboarding() {
                               false) != OnboardingPin::Done ||
       onboarding_pin_practice(true, OnboardingPin::Pin,
                               OnboardingPinTab::Missing,
-                              true) != OnboardingPin::Back) {
+                              true) != OnboardingPin::Back ||
+      onboarding_pin_practice(true, OnboardingPin::Pin,
+                              OnboardingPinTab::Other,
+                              false) != OnboardingPin::Pin) {
     return false;
   }
   // Practice 3 teaches a key for another Space, or Create a Space.
