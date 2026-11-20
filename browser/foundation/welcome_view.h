@@ -10,6 +10,7 @@
 #include "base/timer/timer.h"
 #include "myarc/sidebar_tint.h"
 #include "ui/base/metadata/metadata_header_macros.h"
+#include "ui/gfx/geometry/transform.h"
 #include "ui/views/accessible_pane_view.h"
 
 namespace views {
@@ -92,6 +93,8 @@ class WelcomeView : public views::AccessiblePaneView {
   void Press(Action action);
   // Starts the fields' drift once the view has a size and is playing.
   void StartDrift();
+  // The logo's transform in its spot above the headline, from the layout.
+  gfx::Transform MarkDocked() const;
 
   const ActionCallback action_;
   // The background's blurred fields, and the imported theme over them.
@@ -110,6 +113,9 @@ class WelcomeView : public views::AccessiblePaneView {
   const bool reduced_motion_;
   bool playing_ = false;
   bool drifting_ = false;
+  // The logo has been sent to its spot above the headline, or starts there
+  // under Reduce Motion.
+  bool mark_docked_ = false;
   bool exiting_ = false;
   // Starts the drift once the window shows.
   base::OneShotTimer drift_timer_;

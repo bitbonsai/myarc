@@ -174,6 +174,16 @@ std::optional<SpaceTheme> ThemeOf(Profile& profile, uint64_t space) {
   return std::nullopt;
 }
 
+// The welcome window's frame in `work`, a display's visible area: 16:10,
+// as wide as three quarters of the area allows, at most 1440 pt, centred.
+gfx::Rect WelcomeFrame(const gfx::Rect& work) {
+  const int width =
+      std::min({work.width() * 3 / 4, work.height() * 3 / 4 * 16 / 10, 1440});
+  gfx::Rect frame = work;
+  frame.ClampToCenteredSize(gfx::Size(width, width * 10 / 16));
+  return frame;
+}
+
 }  // namespace
 
 // The compositor frames the window starts during the reveal, and the longest
@@ -384,16 +394,17 @@ void OnboardingController::ShowWelcome(bool offers_import) {
   base::TimeTicks start = base::TimeTicks::Now();
 #if BUILDFLAG(IS_MAC)
   if (!gfx::Animation::PrefersReducedMotion() && host_->GetWidget()) {
-    // On first run the welcome window is three quarters of the main
-    // display, centred, so the blob at the display's centre grows into it.
-    if (!replay) {
-      const gfx::Rect work =
-          display::Screen::Get()->GetPrimaryDisplay().work_area();
-      gfx::Rect frame = work;
-      frame.ClampToCenteredSize(
-          gfx::Size(work.width() * 3 / 4, work.height() * 3 / 4));
-      host_->GetWidget()->SetBounds(frame);
-    }
+    // The welcome window is 16:10, three quarters of the display's visible
+    // area where that fits and at most 1440 pt wide, centred, so the blob at
+    // the display's centre grows into it and an ultrawide display doesn't
+    // stretch it into a band. First run uses the main display, Replay the
+    // window's own.
+    display::Screen* screen = display::Screen::Get();
+    const gfx::Rect work = (replay ? screen->GetDisplayNearestView(
+                                         host_->GetWidget()->GetNativeView())
+                                   : screen->GetPrimaryDisplay())
+                               .work_area();
+    host_->GetWidget()->SetBounds(WelcomeFrame(work));
     bool log = false;
 #if BUILDFLAG(MYARC_TEST_HOOKS)
     log =

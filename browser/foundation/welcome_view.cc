@@ -59,9 +59,9 @@ using welcome::kChoiceAt;
 using welcome::kChoiceFade;
 using welcome::kHeadlineAt;
 using welcome::kHeadlineSlide;
+using welcome::kMarkDock;
+using welcome::kMarkDockAt;
 using welcome::kMarkDrift;
-using welcome::kMarkFade;
-using welcome::kMarkFadeAt;
 using welcome::kMarkIn;
 using welcome::kMarkRise;
 using welcome::kWindowShown;
@@ -74,6 +74,9 @@ constexpr char16_t kStart[] = u"Start fresh";
 constexpr char16_t kSkip[] = u"Skip tour";
 
 constexpr int kMarkSize = 176;
+// Where the logo ends up: this big, this far above the headline.
+constexpr float kMarkDockedSize = 56;
+constexpr int kMarkDockedGap = 24;
 constexpr int kButtonWidth = 240;
 constexpr int kButtonHeight = 40;
 // The base in dark mode, myarc.dev's dark page.
@@ -352,6 +355,8 @@ WelcomeView::WelcomeView(bool offers_import, ActionCallback action)
     button->layer()->SetFillsBoundsOpaquely(false);
   }
 
+  // Under Reduce Motion the logo starts in its spot above the headline.
+  mark_docked_ = reduced_motion_;
   // Before Play(): only the background shows.
   for (views::View* view : std::initializer_list<views::View*>{
            mark_, headline_blur_, headline_, import_, start_, skip_}) {
@@ -373,15 +378,20 @@ void WelcomeView::Play(base::TimeTicks start) {
     return;
   }
   playing_ = true;
+  // The logo's spot above the headline comes from the layout.
+  if (needs_layout()) {
+    DeprecatedLayoutImmediately();
+  }
   views::AnimationBuilder builder;
   builder.SetPreemptionStrategy(
       ui::LayerAnimator::IMMEDIATELY_ANIMATE_TO_NEW_TARGET);
   if (reduced_motion_) {
-    // Nothing moves: the headline and the choice fade in together.
+    // Nothing moves: the logo, the headline and the choice fade in
+    // together.
     views::AnimationSequenceBlock& fade =
         builder.Once().SetDuration(kReducedFade);
     for (views::View* view : std::initializer_list<views::View*>{
-             headline_, import_, start_, skip_}) {
+             mark_, headline_, import_, start_, skip_}) {
       fade.SetOpacity(view->layer(), 1, gfx::Tween::EASE_OUT);
     }
     return;
@@ -411,7 +421,7 @@ void WelcomeView::Play(base::TimeTicks start) {
                  .SetTransform(headline, slide)
                  .SetTransform(blurred, slide);
   }
-  // One drift, up and turned, then back, fading as it returns.
+  // One drift, up and turned, then back.
   block = &block->At(at(kMarkIn + kMarkRise))
                .SetDuration(kMarkDrift / 2)
                .SetTransform(mark, MarkAt(kMarkDriftBy, kMarkTurn),
@@ -419,9 +429,11 @@ void WelcomeView::Play(base::TimeTicks start) {
                .Then()
                .SetDuration(kMarkDrift / 2)
                .SetTransform(mark, MarkAt(0, 0), gfx::Tween::EASE_IN_OUT);
-  block = &block->At(at(kMarkFadeAt))
-               .SetDuration(kMarkFade)
-               .SetOpacity(mark, 0, gfx::Tween::EASE_OUT);
+  // Then it shrinks and moves up above the headline, and stays there.
+  mark_docked_ = true;
+  block = &block->At(at(kMarkDockAt))
+               .SetDuration(kMarkDock)
+               .SetTransform(mark, MarkDocked(), gfx::Tween::EASE_IN_OUT);
   // The blur clears: the blurred copy comes in, then gives way to the sharp
   // one.
   block = &block->At(at(kHeadlineAt))
@@ -486,12 +498,13 @@ void WelcomeView::FinishIntro() {
            mark_, headline_blur_, headline_, import_, start_, skip_}) {
     view->layer()->GetAnimator()->StopAnimating();
   }
-  mark_->layer()->SetOpacity(0);
+  mark_docked_ = true;
+  mark_->layer()->SetTransform(MarkDocked());
   headline_blur_->layer()->SetOpacity(0);
   headline_blur_->layer()->SetTransform(gfx::Transform());
   headline_->layer()->SetTransform(gfx::Transform());
-  for (views::View* view :
-       std::initializer_list<views::View*>{headline_, import_, start_, skip_}) {
+  for (views::View* view : std::initializer_list<views::View*>{
+           mark_, headline_, import_, start_, skip_}) {
     view->layer()->SetOpacity(1);
   }
   if (drift_timer_.IsRunning()) {
@@ -576,7 +589,25 @@ void WelcomeView::Layout(PassKey) {
   start_->SetBounds((w - kButtonWidth) / 2, y, kButtonWidth, kButtonHeight);
   y += kButtonHeight + 14;
   skip_->SetBounds((w - skip.width()) / 2, y, skip.width(), skip.height());
+  // A resize moves the spot above the headline; a dock under way keeps its
+  // target.
+  if (mark_docked_ && !mark_->layer()->GetAnimator()->is_animating()) {
+    mark_->layer()->SetTransform(MarkDocked());
+  }
   StartDrift();
+}
+
+gfx::Transform WelcomeView::MarkDocked() const {
+  // From the logo's centred bounds to kMarkDockedSize, centred above the
+  // headline.
+  const float half = kMarkSize / 2.f;
+  const float center = headline_->y() - kMarkDockedGap - kMarkDockedSize / 2;
+  gfx::Transform transform =
+      gfx::Transform::MakeTranslation(0, center - (mark_->y() + half));
+  transform.Translate(half, half);
+  transform.Scale(kMarkDockedSize / kMarkSize, kMarkDockedSize / kMarkSize);
+  transform.Translate(-half, -half);
+  return transform;
 }
 
 void WelcomeView::TakeFocus() {

@@ -10,6 +10,9 @@
 //     whole main display at half size with every app's windows, so a window
 //     that covers the screen, such as the welcome's desktop dim, shows over
 //     what it covers; the PID only has to exist)
+//   swift tools/bgcapture.swift windows <pid> list (one line per on-screen
+//     window of the PID, front to back: layer, alpha, width and height in
+//     points, so a check can tell a hidden welcome window from a dim)
 import CoreGraphics
 import CoreImage
 import CoreMedia
@@ -18,7 +21,7 @@ import ScreenCaptureKit
 
 let args = CommandLine.arguments
 guard args.count == 4 || args.count == 5, let pid = Int32(args[2]) else {
-  FileHandle.standardError.write("usage: bgcapture.swift key|shot|burst|screen <pid> <arg> [title|seconds]\n".data(using: .utf8)!)
+  FileHandle.standardError.write("usage: bgcapture.swift key|shot|burst|screen|windows <pid> <arg> [title|seconds]\n".data(using: .utf8)!)
   exit(64)
 }
 
@@ -212,6 +215,15 @@ case "screen":
     }
   }
   dispatchMain()
+case "windows":
+  let list =
+    CGWindowListCopyWindowInfo([.optionOnScreenOnly], kCGNullWindowID) as? [[String: Any]] ?? []
+  for info in list where (info[kCGWindowOwnerPID as String] as? Int32) == pid {
+    let bounds = info[kCGWindowBounds as String] as? [String: CGFloat] ?? [:]
+    let layer = info[kCGWindowLayer as String] as? Int ?? 0
+    let alpha = info[kCGWindowAlpha as String] as? Double ?? 0
+    print("layer=\(layer) alpha=\(String(format: "%.2f", alpha)) size=\(Int(bounds["Width"] ?? 0))x\(Int(bounds["Height"] ?? 0))")
+  }
 default:
   exit(64)
 }

@@ -24,9 +24,11 @@ constexpr base::TimeDelta kDimIn = base::Milliseconds(750);
 constexpr base::TimeDelta kBlobIn = base::Milliseconds(400);
 
 constexpr CGFloat kDim = 0.85;
-// The blob's width as a share of the main display's, and its blur as a
-// share of that width.
-constexpr CGFloat kBlobShare = 0.25;
+// The blob's width as a share of the welcome window's width, at most this
+// share of its height so it stays inside the frame, and its blur as a share
+// of that width.
+constexpr CGFloat kBlobShare = 1.0 / 3;
+constexpr CGFloat kBlobHeightShare = 0.5;
 constexpr CGFloat kBlurShare = 0.06;
 // The welcome window's corner radius, which clips the grow.
 constexpr CGFloat kWindowRadius = 12;
@@ -269,7 +271,6 @@ struct WelcomeIntro::Cocoa {
   // The welcome window, hidden until the blob lands. Weak: the browser can
   // close it first.
   __weak NSWindow* welcome = nil;
-  CGFloat welcome_alpha = 1;
   // Its traffic lights, hidden until they fade in after the grow.
   NSArray<NSButton*>* buttons = nil;
   bool buttons_shown = false;
@@ -352,19 +353,22 @@ WelcomeIntro::WelcomeIntro(gfx::NativeWindow window, uint32_t base, bool log)
       continue;
     }
     cocoa_->home_shade = shade;
-    // The welcome window's frame; it clips the blob only once it grows.
+    // The welcome window's frame, which clips the blob from the start, so
+    // neither the pop nor the swell ever leaves it.
     NSRect target = welcome ? welcome.frame : screen.visibleFrame;
     target.origin.x -= area.origin.x;
     target.origin.y -= area.origin.y;
     CALayer* clip = [CALayer layer];
     clip.frame = target;
     clip.cornerRadius = kWindowRadius;
+    clip.masksToBounds = YES;
     [root addSublayer:clip];
     cocoa_->clip = clip;
 
     // The blob sits at the window's centre, which on first run is the
     // display's, whatever the pointer does.
-    const CGFloat width = NSWidth(screen.frame) * kBlobShare;
+    const CGFloat width = std::min(NSWidth(target) * kBlobShare,
+                                   NSHeight(target) * kBlobHeightShare);
     const CGFloat side = width * 1.8;
     const CGPoint at = CGPointMake(NSWidth(target) / 2, NSHeight(target) / 2);
     CALayer* blob = [CALayer layer];
@@ -438,7 +442,9 @@ WelcomeIntro::WelcomeIntro(gfx::NativeWindow window, uint32_t base, bool log)
   }
   [CATransaction commit];
   if (welcome) {
-    cocoa_->welcome_alpha = welcome.alphaValue;
+    // Not saved to put back later: a window Chromium hasn't drawn yet sits
+    // at alpha 0 until its first frame (kAlphaInsteadOfCATransaction), which
+    // a foreground launch hits, so the intro always shows it at 1.
     welcome.alphaValue = 0;
     cocoa_->buttons = Buttons(welcome);
     for (NSButton* button in cocoa_->buttons) {
@@ -460,7 +466,7 @@ WelcomeIntro::~WelcomeIntro() {
   timer_.Stop();
   NSWindow* welcome = cocoa_->welcome;
   if (welcome) {
-    welcome.alphaValue = cocoa_->welcome_alpha;
+    welcome.alphaValue = 1;
     // Ended before the window landed: it shows at once, over the dim.
     if (!cocoa_->behind) {
       if (!NSApp.active) {
@@ -516,11 +522,11 @@ void WelcomeIntro::Grow() {
                                        CGRectGetMidY(frame) - side * 0.04);
     [CATransaction begin];
     [CATransaction setDisableActions:YES];
-    // The blob swells unevenly past the window's edges, still morphing, and
-    // the window's rounded frame clips it.
-    clip.masksToBounds = YES;
+    // The blob swells unevenly until it fills the window's frame, still
+    // morphing, and the frame's rounded clip keeps the spring's overshoot
+    // inside it. Its blurred edge reaches about 0.7 of the layer's side.
     const CATransform3D swell = CATransform3DMakeScale(
-        frame.size.width / side * 2.1, frame.size.height / side * 2.6, 1);
+        frame.size.width / side * 1.5, frame.size.height / side * 1.7, 1);
     blob.position = center;
     blob.transform = swell;
     // A spring, so the swell overshoots a little and settles.
@@ -552,7 +558,7 @@ void WelcomeIntro::Land() {
   // the field stays opaque until the window has drawn: a crossfade of two
   // copies would dip in brightness halfway.
   if (NSWindow* welcome = cocoa_->welcome) {
-    welcome.alphaValue = cocoa_->welcome_alpha;
+    welcome.alphaValue = 1;
     // An app launched in the background has its window behind the others,
     // where the blob would land on nothing. Front without activating, so
     // focus stays where it is.

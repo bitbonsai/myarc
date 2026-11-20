@@ -25,6 +25,10 @@
 #              the sheet; the browser must outlive it
 #   retire     Skip tour on practice 1's card, which  -> complete
 #              fades it out; the browser must outlive it
+#   foreground launched the way a user launches it, not in the background,
+#              so the app may activate: once the intro is done the welcome
+#              window must be fully opaque over the dim, and once Skip tour
+#              closes it the dim must be gone. No relaunch.
 # Needs a build with the GN arg myarc_test_hooks = true, as browser/args.gn sets.
 # Usage: tools/check_onboarding.sh [build]   build is an out dir or a .app
 #   (default ~/.cache/myarc-m0/chromium/src/out/MyarcM0).
@@ -46,7 +50,7 @@ PAGE="http://127.0.0.1:$PORT/"
 
 if [ "${2:-}" = "--inner" ]; then
   [ -x "$BIN" ] || { echo "native binary missing: $BIN" >&2; exit 1; }
-  CASES=${CASES:-"welcome intro import reveal practice1 practice2 practice3 handoff skip retire"}
+  CASES=${CASES:-"welcome intro import reveal practice1 practice2 practice3 handoff skip retire foreground"}
   OUTDIR=${OUTDIR:-$ROOT/research-private/captures/onboarding-$(date -u +%Y%m%dT%H%M%SZ)}
   mkdir -p "$OUTDIR"
   PID=""
@@ -77,15 +81,18 @@ if [ "${2:-}" = "--inner" ]; then
   }
 
   # launch <profile> [switches...]: starts the browser in the background and
-  # sets PID to its browser process.
+  # sets PID to its browser process. FOREGROUND=1 launches it as a user does,
+  # which may activate it; only the foreground case does that.
   launch() {
     local p=$1; shift
     # -g: launch without activating, so the user's frontmost app keeps focus.
-    open -g -n -a "$APP" --args --user-data-dir="$p" \
+    local how=(-g) background=(--myarc-background-launch)
+    [ -z "${FOREGROUND:-}" ] || { how=(); background=(); }
+    open ${how[@]+"${how[@]}"} -n -a "$APP" --args --user-data-dir="$p" \
       --no-first-run --no-default-browser-check --use-mock-keychain \
       --enable-logging --log-file="$p/chrome.log" \
       --enable-features=GlassFrame --disable-features=InitialWebUI \
-      --disable-backgrounding-occluded-windows --myarc-background-launch \
+      --disable-backgrounding-occluded-windows ${background[@]+"${background[@]}"} \
       --myarc-visual-parity --myarc-workspace-sidebar --myarc-test-mute-sound --window-size=1280,800 --window-position=40,60 "$@"
     PID=""
     for _ in $(seq 1 80); do
@@ -328,6 +335,42 @@ PY
     kill_now
     check "$p" "after kill" "$(rec complete 0 '')" any
     relaunch retire "$p" "$(rec complete 0 '')" saved "state=complete step=0 effect=none"
+  }
+
+  # windows <name>: the browser's on-screen windows, front to back, also kept
+  # in OUTDIR as <name>.txt.
+  windows() {
+    swift "$ROOT/tools/bgcapture.swift" windows "$PID" list | tee "$OUTDIR/$1.txt"
+  }
+
+  case_foreground() {
+    local p before dim after; p=$(fresh)
+    FOREGROUND=1 launch "$p" --myarc-test-onboarding --myarc-test-onboarding-event=skip_tour \
+      --myarc-test-onboarding-event-delay=6000 about:blank
+    wait_log "$p" "Test onboarding: intro done" 30
+    sleep 1
+    before=$(windows foreground-shown)
+    # A window kept at alpha 0 is the welcome that never showed.
+    if grep -q -E 'layer=0 alpha=0\.([0-8]|9[0-8])' <<< "$before"; then
+      echo "a window is not fully opaque after the intro" >&2; return 1
+    fi
+    # The dim is the largest window, and the welcome shows over it.
+    dim=$(grep 'layer=0 ' <<< "$before" | sed -E 's/.*size=([0-9]+)x([0-9]+)/\1 \2 &/' \
+      | sort -k1,1nr -k2,2nr | head -1 | sed -E 's/.*(size=[0-9]+x[0-9]+)$/\1/')
+    [ "$(grep -c 'layer=0 ' <<< "$before")" -ge 2 ] || { echo "no welcome over the dim" >&2; return 1; }
+    [ "$(grep 'layer=0 ' <<< "$before" | head -1 | grep -c -F "$dim")" = 0 ] \
+      || { echo "the dim is in front of the welcome" >&2; return 1; }
+    wait_log "$p" 'event state=complete' 30
+    # The dim fades out over 400 ms, then its windows close.
+    sleep 1.5
+    after=$(windows foreground-closed)
+    if grep -q -F "$dim" <<< "$after"; then
+      echo "the dim is still up after the welcome closed ($dim)" >&2; return 1
+    fi
+    alive "$p" 1
+    kill_now
+    check "$p" "after kill" "$(rec complete 0 '')" any
+    cp "$p/chrome.log" "$OUTDIR/foreground-log.txt"
   }
 
   RUNS=0

@@ -23,13 +23,14 @@ inline constexpr base::TimeDelta kWindowShown = base::Milliseconds(1700);
 inline constexpr base::TimeDelta kTrafficLights = base::Milliseconds(1900);
 inline constexpr base::TimeDelta kTrafficLightsFade = base::Milliseconds(250);
 
-// The ribbon logo: it rises in over 1.1 s, drifts once in 1.2 s and fades as
-// the drift returns, on screen from 1.7 to 4.0 s.
+// The ribbon logo: it rises in over 1.1 s from 1.7 s and drifts once in
+// 0.8 s, then shrinks and moves up over 0.5 s to sit above the headline,
+// where it stays.
 inline constexpr base::TimeDelta kMarkIn = base::Milliseconds(1700);
 inline constexpr base::TimeDelta kMarkRise = base::Milliseconds(1100);
-inline constexpr base::TimeDelta kMarkDrift = base::Milliseconds(1200);
-inline constexpr base::TimeDelta kMarkFadeAt = base::Milliseconds(3600);
-inline constexpr base::TimeDelta kMarkFade = base::Milliseconds(400);
+inline constexpr base::TimeDelta kMarkDrift = base::Milliseconds(800);
+inline constexpr base::TimeDelta kMarkDockAt = base::Milliseconds(3600);
+inline constexpr base::TimeDelta kMarkDock = base::Milliseconds(500);
 
 // The headline slides in on the second accent, and the choice fades in
 // 0.4 s after.

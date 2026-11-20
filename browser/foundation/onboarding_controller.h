@@ -45,9 +45,10 @@ class RevealFrames;
 // Esc ends the tour, keeping the steps done and skipped, and the card fades
 // out over 180 ms. Replay, from Settings > Advanced, starts the tour again at
 // the welcome in this window. Unless Reduce Motion is on, the welcome arrives
-// through WelcomeIntro with WelcomeSound: on first run the window takes three
-// quarters of the main display, centred, while Replay keeps its size and
-// display. The sound, the desktop dim and a blob start together, the blob
+// through WelcomeIntro with WelcomeSound: the window becomes a centred 16:10
+// frame, three quarters of the visible area where that fits and at most
+// 1440 pt wide, on the main display on first run and on its own on Replay.
+// The sound, the desktop dim and a blob start together, the blob
 // grows into the window and the welcome plays, all on welcome_timeline.h's
 // times. The sound and the dim stay under the welcome and fade out together
 // once a button is pressed or the welcome closes. UI sequence only.

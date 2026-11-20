@@ -16,12 +16,13 @@ namespace myarc {
 // fades to 85% of myarc.dev's midnight over 750 ms, above other apps'
 // windows; the menu bar never dims. With it, a blob pops in at the centre of
 // the welcome window, which on first run is the main display's centre. It's
-// about a quarter of the display's width: one heavily blurred shape in the
-// site blue whose outline keeps morphing, a closed curve through 7 points
-// whose radii wobble out of phase, with highlights in the ribbon logo's
-// violet, pink and coral drifting across it at different speeds. At 1.3 s it
-// swells unevenly past the window's edges on a spring, clipped by the
-// window's rounded frame, and by 1.6 s its highlights have smeared into the
+// a third of the window's width, at most half its height, and the window's
+// rounded frame clips it from the start, so it never shows outside the
+// window. It's one heavily blurred shape in the site blue whose outline keeps
+// morphing, a closed curve through 7 points whose radii wobble out of phase,
+// with highlights in the ribbon logo's violet, pink and coral drifting across
+// it at different speeds. At 1.3 s it swells unevenly on a spring until it
+// fills the frame, and by 1.6 s its highlights have smeared into the
 // welcome's background as it starts: the base with WelcomeView's blurred
 // fields. The welcome window stays hidden until then, and is then ordered
 // front without activating when the app isn't active, so a background launch
