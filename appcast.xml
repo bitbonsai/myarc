@@ -3,5 +3,14 @@
   <channel>
     <title>myArc Nightly</title>
     <link>https://myarc.dev/appcast.xml</link>
+    <item>
+      <title>myArc Nightly 2026.11.20.3</title>
+      <pubDate>Fri, 20 Nov 2026 00:00:00 +0000</pubDate>
+      <link>https://github.com/bitbonsai/myarc/releases/tag/nightly-2026.11.20.3</link>
+      <sparkle:version>20261120.3</sparkle:version>
+      <sparkle:shortVersionString>2026.11.20.3</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>26</sparkle:minimumSystemVersion>
+      <enclosure url="https://github.com/bitbonsai/myarc/releases/download/nightly-2026.11.20.3/myArc-Nightly-2026.11.20.3-arm64.dmg" length="246788346" type="application/octet-stream" sparkle:edSignature="mt3ZqN6uSCQSVizVRZH/44/nUYy32hZf6Doan+EuAxOF0bSDZGk7l2yGeTGrtIP4016kC/33y9cUXrN6FG5iBg=="/>
+    </item>
   </channel>
 </rss>

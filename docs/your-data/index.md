@@ -26,7 +26,11 @@ There is no export command yet. To back up everything, quit myArc and copy the w
 
 ## What goes over the network
 
-myArc adds no analytics and no usage tracking. It makes one kind of request of its own. When a pinned tab or Favorite has no icon yet, myArc asks that site for its icon. The request goes only to that site's domain, carries no cookies and never sends the path of the page you saved. No Google icon service or other third party is involved.
+myArc adds no analytics and no usage tracking. It makes two kinds of request of its own.
+
+Nightlies after 2026.11.20.2 ask myarc.dev once a day whether a newer nightly is out. When you install one, it downloads from GitHub.
+
+When a pinned tab or Favorite has no icon yet, myArc asks that site for its icon. The request goes only to that site's domain, carries no cookies and never sends the path of the page you saved. No Google icon service or other third party is involved.
 
 Every other request comes from Chromium itself. myArc turns off a few of the ones that go to Google:
 
@@ -34,7 +38,7 @@ Every other request comes from Chromium itself. myArc turns off a few of the one
 - Domain Reliability reports, which Chromium sends Google when a connection to one of its sites fails, are off.
 - WebRTC text logs, which video calls can upload for debugging, are off by default.
 
-Crash report uploads are off too. Crash reports stay on your Mac. [Known limitations](https://myarc.dev/docs/known-limitations/) says where to find them.
+Crash report uploads are off too. Crash reports stay on your Mac. After a crash, myArc can open a filled-in GitHub issue, which goes out only if you submit it. [Known limitations](https://myarc.dev/docs/known-limitations/) covers both.
 
 ## Agent control
 

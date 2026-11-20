@@ -9,8 +9,8 @@ myArc is a pre-alpha. Use it to try the Arc-style sidebar, and keep daily and se
 ## Safety and updates
 
 - Each nightly is built from a Chromium 158 development revision, before Chromium ships it as a stable release.
-- There are no automatic updates and no security updates. Install each new nightly by hand, as [Install myArc](https://myarc.dev/docs/install/) describes.
-- The protections around private windows, Profile separation, cookies and saved passwords aren't verified yet.
+- There are no security updates between nightlies. Nightlies after 2026.11.20.2 update themselves; older ones need the new nightly installed by hand once. [Install myArc](https://myarc.dev/docs/install/) covers both.
+- The protections around Profile separation, cookies and saved passwords aren't verified yet.
 - Safe Browsing doesn't scan RAR downloads, because the UnRAR license conflicts with GPL-3.0, the license myArc uses.
 - myArc is an independent project with no ties to Arc or The Browser Company.
 
@@ -21,21 +21,22 @@ myArc is a pre-alpha. Use it to try the Arc-style sidebar, and keep daily and se
 
 ## What doesn't work yet
 
-- Arc Favorites arrive as pinned tabs in their Space, because the export doesn't mark them.
-- Folders inside folders, and dragging a tab up to pin it.
+- Arc Favorites imported from Arc's Markdown export arrive as pinned tabs in their Space, because the export doesn't mark them. Import Arc's sidebar file instead, as [Import from Arc](https://myarc.dev/docs/import-from-arc/) describes.
+- Folders inside folders.
 - Split View holds two tabs at most, and a split can't be pinned or put in a folder.
 - Peek's split button splits a copy of the pinned page, because a split can't hold a pinned tab yet. Cmd\+Z doesn't bring back a closed Peek, so use Cmd\+Shift\+T.
-- Little Arc windows don't come back after a relaunch. Option-Cmd-N works from any app, unless another app such as Raycast already uses that key.
+- Little Arc windows don't come back after a relaunch. Option-Cmd-N works from any app while Links from other apps open in Little Arc is on in Settings \> Links, unless another app such as Raycast already uses that key.
 - Boosts and the Mini Player.
-- The animated onboarding.
-- The Links and Shortcuts tabs in Settings.
+- The Shortcuts tab in Settings.
 - Only the dark appearance has been compared with Arc. Light mode, Reduce Transparency and full-screen layouts haven't been checked.
 
 ## After a crash
 
-Recent tabs and navigation can be lost after a crash or a force quit. Pinned tabs, Favorites, folders and Spaces are saved to your workspace file, which [Your data](https://myarc.dev/docs/your-data/) describes, before the sidebar shows the change, so a force quit right after keeps it. If that file is ever damaged, myArc opens the copy it kept before the last change and leaves the damaged one beside it as `.corrupt`. A power cut or a full disk hasn't been tested yet.
+After a crash, myArc reopens your last session on its own. If the next launch crashes too, it asks before restoring, so a session that keeps crashing can't trap you. Recent tabs and navigation can still be lost after a crash or a force quit. Pinned tabs, Favorites, folders and Spaces are saved to your workspace file, which [Your data](https://myarc.dev/docs/your-data/) describes, before the sidebar shows the change, so a force quit right after keeps it. If that file is ever damaged, myArc opens the copy it kept before the last change and leaves the damaged one beside it as `.corrupt`. A power cut or a full disk hasn't been tested yet.
 
 If a single page crashes, reload it with Cmd\+R. The rest of the browser keeps running.
+
+A crash also brings up a card that asks "myArc quit unexpectedly. Report it?" Report… opens a new GitHub issue in a tab, filled in with the myArc and macOS versions and the top of the crash log macOS wrote, without the lines that identify your Mac. Nothing is sent until you read it and submit it, which needs a GitHub account. Not Now closes the card. It offers each crash log once.
 
 Crash report uploads are off. Chromium keeps crash reports on your Mac, in `~/Library/Application Support/myArc Nightly/Crashpad/`. They can hold pieces of the pages you had open, so don't attach them to a public issue.
 

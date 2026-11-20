@@ -4,12 +4,12 @@ HTML: https://myarc.dev/download/
 
 Pre-alpha nightly, for trying the Arc-like shell. Not for daily or sensitive browsing.
 
-[Download for macOS (Apple silicon)](https://github.com/bitbonsai/myarc/releases/download/nightly-2026.11.20.2/myArc-Nightly-2026.11.20.2-arm64.dmg)
+[Download for macOS (Apple silicon)](https://github.com/bitbonsai/myarc/releases/download/nightly-2026.11.20.3/myArc-Nightly-2026.11.20.3-arm64.dmg)
 
-- **Version:** 2026.11.20.2
+- **Version:** 2026.11.20.3
 - **Date:** November 20, 2026
-- **Size:** 245.1 MB
-- **SHA-256:** `49324a1accae023abe9a28316081442dd859f32732727b8a8139112b18461c16`
+- **Size:** 246.8 MB
+- **SHA-256:** `4c0838224441dc627f2fbb18b6e9a81ed26700fd4e6afb43f0716a00bc443780`
 
 ## System requirements
 
@@ -21,7 +21,7 @@ Pre-alpha nightly, for trying the Arc-like shell. Not for daily or sensitive bro
 1. Check the download against the SHA-256 listed with it. The two values must match.
 
    ```
-   shasum -a 256 ~/Downloads/myArc-Nightly-2026.11.20.2-arm64.dmg
+   shasum -a 256 ~/Downloads/myArc-Nightly-2026.11.20.3-arm64.dmg
    ```
 2. Open the DMG and drag myArc Nightly to Applications.
 3. Open myArc Nightly. From 2026.11.18 on, Apple has notarized each nightly, so macOS only asks once whether to open an app downloaded from the internet. Choose Open.
@@ -51,7 +51,7 @@ Each item was seen working in a native run or experiment note. None of it has ha
 
 ## Known limitations
 
-- No automatic updates and no security updates. Install each new nightly by hand.
+- myArc checks for new nightlies itself and asks before it installs one, but there are no scheduled security updates yet.
 - Recent tabs and navigation can be lost after a crash or force quit.
 - H.264 and AAC are included, so most other web video plays.
 
@@ -59,7 +59,7 @@ Each item was seen working in a native run or experiment note. None of it has ha
 
 ## Other ways to get it
 
-- [GitHub releases](https://github.com/bitbonsai/myarc/releases/tag/nightly-2026.11.20.2) lists every nightly.
+- [GitHub releases](https://github.com/bitbonsai/myarc/releases/tag/nightly-2026.11.20.3) lists every nightly.
 - [Source on GitHub](https://github.com/bitbonsai/myarc), with instructions to [build it from source](https://github.com/bitbonsai/myarc/blob/main/browser/README.md).
 - [GitHub issues](https://github.com/bitbonsai/myarc/issues) take bug reports. Include the version, your macOS version and the steps that trigger the problem, and leave out private pages.
 

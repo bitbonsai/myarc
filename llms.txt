@@ -14,8 +14,8 @@ A complete myArc browser remains unimplemented, and the Arc importer brings over
 ## Docs
 
 - [Docs index](https://myarc.dev/docs/index.md): User guides for people moving from Arc.
-- [Install myArc](https://myarc.dev/docs/install/index.md): What your Mac needs, what macOS asks on first launch, and how to move to a newer nightly.
-- [Import from Arc](https://myarc.dev/docs/import-from-arc/index.md): Export your Spaces from Arc, preview what myArc will add, and import them with their folders and pinned tabs. Importing the same file twice adds nothing.
+- [Install myArc](https://myarc.dev/docs/install/index.md): What your Mac needs, what macOS asks on first launch, the welcome tour, and how myArc moves to a newer nightly.
+- [Import from Arc](https://myarc.dev/docs/import-from-arc/index.md): Import your Spaces, folders, pinned tabs and Favorites from Arc's sidebar file or its export, preview what myArc will add, and import again without duplicates.
 - [Spaces and Profiles](https://myarc.dev/docs/spaces-and-profiles/index.md): How Spaces, Profiles, pinned tabs, Favorites and temporary tabs fit together in the myArc sidebar.
 - [Peek](https://myarc.dev/docs/peek/index.md): How links from pinned tabs and Favorites open in a preview over the page, and how to keep, split, reopen or turn off that preview.
 - [Keyboard shortcuts](https://myarc.dev/docs/shortcuts/index.md): The shortcuts that work in myArc today, and the Arc shortcuts that are still missing.

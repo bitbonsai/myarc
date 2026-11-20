@@ -492,18 +492,145 @@
     }
 
   
-    .journal.welcome { max-width: 60rem }
-    .welcome .post-header { margin-bottom: 3rem }
-    .welcome-intro { margin-top: 1rem; max-width: 40ch; color: var(--quiet); font-size: 1.25rem; line-height: 1.5 }
-    .welcome h2 { margin-top: 3.5rem; font-size: 1.5rem }
-    .welcome-cards, .welcome-keys, .welcome-links { margin: 1.25rem 0 0; padding: 0; list-style: none }
-    .welcome-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(17rem, 1fr)); gap: 1rem }
-    .welcome-cards li { padding: 1.25rem 1.5rem 1.5rem; border-radius: 1rem; background: rgb(var(--link-rgb) / .06) }
-    .welcome-cards h3 { font-size: 1.25rem }
-    .welcome-cards h3 a { color: var(--link-solid); text-decoration: none }
-    .welcome-cards h3 a::after { content: ' \2192' / '' }
-    .welcome-cards h3 a:hover, .welcome-cards h3 a:focus-visible { text-decoration: underline }
-    .welcome-cards p { margin-top: .5rem; font-size: 1rem; line-height: 1.5 }
+    .journal.welcome { max-width: 68rem }
+    .welcome { --rb-blue: #1a85ff; --rb-violet: #7c6cff; --rb-pink: #f25cbf; --rb-coral: #ff7a5c }
+    .welcome h2 { margin-top: 4.5rem; font-size: 1.5rem }
+
+    /* Hero. Title on the left, the homepage ribbon on the right over a soft glow in its own colours. */
+    .welcome .welcome-hero { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 22rem); align-items: center; gap: 2rem 3rem; margin-bottom: 1rem }
+    .welcome-hero::before { content: ''; position: absolute; z-index: -1; top: -6rem; right: -8rem; width: 44rem; height: 34rem; pointer-events: none; filter: blur(3rem); opacity: .5;
+      background: radial-gradient(40% 45% at 35% 40%, rgb(26 133 255 / .45), transparent 70%), radial-gradient(35% 40% at 65% 35%, rgb(124 108 255 / .4), transparent 70%), radial-gradient(40% 40% at 55% 70%, rgb(255 122 92 / .35), transparent 70%) }
+    .welcome h1 { font-size: 4.25rem; max-width: 12ch }
+    .welcome-intro { margin-top: 1.25rem; max-width: 40ch; color: var(--quiet); font-size: 1.25rem; line-height: 1.5 }
+    .welcome .hero-art { --shift: 0%; max-width: 22rem; justify-self: end }
+
+    /* The tour, after Zen's welcome: a short list on the left, one sticky stage on the right.
+       Picking a feature swaps the stage to its scene. Without script the first scene stays as a still. */
+    .tour { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); align-items: start; gap: 2rem 3.5rem; margin-top: 1.5rem }
+    .welcome-cards { display: grid; gap: .25rem; margin: 0; padding: 0; list-style: none }
+    .welcome-cards > li { position: relative; padding: 1rem 1.25rem 1.125rem; border-radius: 1rem; transition: background-color .25s ease-in-out; animation: rise .9s var(--ease) both; animation-delay: calc(.4s + var(--i) * .07s) }
+    .welcome-cards > li:hover { background: rgb(var(--link-rgb) / .045) }
+    .welcome-cards > li.is-active { background: rgb(var(--link-rgb) / .09) }
+    .welcome-cards h3 { font-size: 1.25rem; line-height: 1.25 }
+    .welcome-cards h3 button { padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer }
+    /* The whole card is the button's hit area; the docs link sits above it. */
+    .welcome-cards h3 button::after { content: ''; position: absolute; inset: 0; border-radius: 1rem }
+    .welcome-cards h3 button:focus-visible { outline: 0 }
+    .welcome-cards h3 button:focus-visible::after { outline: .1875rem solid var(--link-solid); outline-offset: .125rem }
+    .welcome-cards p { margin-top: .375rem; color: var(--quiet); font-size: 1rem; line-height: 1.5 }
+    .welcome-cards kbd { min-width: 0 }
+    .tour-docs { position: relative; z-index: 1; display: inline-block; margin-top: .375rem; font-size: 1rem }
+
+    .tour-stage { position: sticky; top: 2rem; isolation: isolate; aspect-ratio: 400 / 290; overflow: hidden; border-radius: 1.75rem; background: linear-gradient(rgb(var(--link-rgb) / .05), rgb(var(--link-rgb) / .05)) var(--page); box-shadow: inset 0 0 0 .0625rem rgb(255 255 255 / .35), 0 1.75rem 3.5rem -2rem rgb(16 28 43 / .45); animation: rise 1s var(--ease) .3s both }
+    .tour-stage::before { content: ''; position: absolute; z-index: -2; inset: -15%; transform: rotate(calc(var(--turn, 0) * 1deg)) scale(1.05); transition: transform 1.4s var(--ease);
+      background: radial-gradient(45% 55% at 14% 20%, rgb(26 133 255 / .6), transparent 70%), radial-gradient(45% 50% at 88% 14%, rgb(124 108 255 / .5), transparent 70%), radial-gradient(50% 55% at 84% 90%, rgb(255 122 92 / .55), transparent 70%), radial-gradient(45% 50% at 16% 92%, rgb(242 92 191 / .45), transparent 70%) }
+    .tour-stage::after { content: ''; position: absolute; z-index: -1; inset: 0; background-image: var(--grain), var(--grain); background-size: 16rem 16rem; mix-blend-mode: overlay; pointer-events: none }
+    .glass { position: absolute; z-index: -1; inset: 15% 5% 7% 17%; border-radius: 1.25rem; background: rgb(255 255 255 / .26); box-shadow: inset 0 0 0 .0625rem rgb(255 255 255 / .5); -webkit-backdrop-filter: blur(.75rem); backdrop-filter: blur(.75rem) }
+    .scene { position: absolute; inset: 0; display: grid; place-items: center; padding: 1.25rem 1.75rem; opacity: 0; transform: translateY(.75rem) scale(.97); transition: opacity .35s ease-in-out, transform .5s var(--ease) }
+    .scene.is-active { opacity: 1; transform: none }
+    .ui { display: block; width: 100%; height: auto; overflow: visible }
+
+    /* Mini-UI paint. Light first, dark below. */
+    .ui .ui-win { fill: #fbfaf7; stroke: rgb(24 36 50 / .08) }
+    .ui .ui-pane { fill: #fff }
+    .ui .ui-row { fill: rgb(24 36 50 / .08) }
+    .ui .ui-row-faint { fill: rgb(24 36 50 / .04) }
+    .ui .ui-sel { fill: rgb(255 255 255 / .9) }
+    .ui .ui-line { fill: rgb(24 36 50 / .14) }
+    .ui .ui-slot { fill: none; stroke: rgb(24 36 50 / .22); stroke-dasharray: 3 2 }
+    .ui .ui-ink { fill: rgb(24 36 50 / .6) }
+    .ui .ui-dim { fill: rgb(16 28 43 / .16) }
+    .ui .ui-app { fill: #2b3442 }
+    .ui .ui-app-row { fill: rgb(255 255 255 / .12) }
+    .ui .glyph { fill: none; stroke: #fff; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round }
+    .ui .glyph-fill { fill: #fff }
+    .ui .key { fill: var(--ink); font-size: 9px; font-weight: 600 }
+    .ui .f-blue { fill: var(--rb-blue) }
+    .ui .f-violet { fill: var(--rb-violet) }
+    .ui .f-pink { fill: var(--rb-pink) }
+    .ui .f-coral { fill: var(--rb-coral) }
+    .ui .side { fill-opacity: .2 }
+    .ui .tint { fill-opacity: .3 }
+    .ui .tint-strong { fill-opacity: .16 }
+    .ui .tl-r { fill: #ff5f57 }
+    .ui .tl-y { fill: #febc2e }
+    .ui .tl-g { fill: #28c840 }
+    @media (prefers-color-scheme: dark) {
+      .tour-stage { background: linear-gradient(rgb(var(--link-rgb) / .04), rgb(var(--link-rgb) / .04)) var(--page); box-shadow: inset 0 0 0 .0625rem rgb(255 255 255 / .1), 0 1.75rem 3.5rem -2rem rgb(0 0 0 / .7) }
+      .tour-stage::before { opacity: .9 }
+      .glass { background: rgb(16 28 43 / .25); box-shadow: inset 0 0 0 .0625rem rgb(255 255 255 / .14) }
+      .ui .ui-win { fill: #1a2635; stroke: rgb(255 255 255 / .08) }
+      .ui .ui-pane { fill: #223145 }
+      .ui .ui-row { fill: rgb(255 255 255 / .09) }
+      .ui .ui-row-faint { fill: rgb(255 255 255 / .04) }
+      .ui .ui-sel { fill: rgb(255 255 255 / .14) }
+      .ui .ui-line { fill: rgb(255 255 255 / .16) }
+      .ui .ui-slot { stroke: rgb(255 255 255 / .28) }
+      .ui .ui-ink { fill: rgb(255 255 255 / .62) }
+      .ui .ui-dim { fill: rgb(0 0 0 / .35) }
+      .ui .ui-app { fill: #0f1722 }
+      .ui .key { fill: var(--ivory) }
+      .ui .side { fill-opacity: .3 }
+      .ui .tint { fill-opacity: .42 }
+      .ui .tint-strong { fill-opacity: .3 }
+    }
+
+    /* Scene loops, 5s each. The resting style is the last frame, so no script, reduced motion and the
+       first paint all show the feature done. The script adds .is-live only when motion is allowed. */
+    .ui .pk-card, .ui .sv-a, .ui .sv-b, .ui .la-pop, .ui .la-btn, .ui .cb-pal, .ui .cb-type, .ui .cb-caret, .ui .pn-fly { transform-box: view-box }
+    .ui .pk-card { transform-origin: 162px 68px }
+    .ui .sv-a { transform-origin: 120px 0 }
+    .ui .la-pop { transform-origin: 250px 228px }
+    .ui .la-btn { transform-origin: 315px 90px }
+    .ui .cb-pal { transform-origin: 200px 144px }
+    .ui .cb-type { transform-origin: 130px 0 }
+    .ui .pn-row, .ui .pn-fly, .ui .pn-key { opacity: 0 }
+    .tour.is-live .is-active .ui * { animation-duration: 5s; animation-iteration-count: infinite; animation-timing-function: var(--ease) }
+    .tour.is-live .is-active .sp-side, .tour.is-live .is-active .sp-tint { animation-name: sp-fill }
+    .tour.is-live .is-active .sp-tabs { animation-name: sp-tabs }
+    .tour.is-live .is-active .sp-dot { animation-name: sp-dot }
+    .tour.is-live .is-active .pk-card { animation-name: pk-card }
+    .tour.is-live .is-active .pk-dim { animation-name: pk-dim }
+    .tour.is-live .is-active .pk-link { animation-name: pk-link }
+    .tour.is-live .is-active .sv-a { animation-name: sv-a }
+    .tour.is-live .is-active .sv-b { animation-name: sv-b }
+    .tour.is-live .is-active .sv-fav { animation-name: sv-fav }
+    .tour.is-live .is-active .la-pop { animation-name: la-pop }
+    .tour.is-live .is-active .la-btn { animation-name: la-btn }
+    .tour.is-live .is-active .la-link { animation-name: pk-link }
+    .tour.is-live .is-active .cb-pal { animation-name: cb-pal }
+    .tour.is-live .is-active .cb-type { animation-name: cb-type }
+    .tour.is-live .is-active .cb-caret { animation-name: cb-caret }
+    .tour.is-live .is-active .cb-r1 { animation-name: cb-r1 }
+    .tour.is-live .is-active .cb-r2 { animation-name: cb-r2 }
+    .tour.is-live .is-active .cb-r3 { animation-name: cb-r3 }
+    .tour.is-live .is-active .pn-row { animation-name: pn-row }
+    .tour.is-live .is-active .pn-fly { animation-name: pn-fly }
+    .tour.is-live .is-active .pn-tile { animation-name: pn-tile }
+    .tour.is-live .is-active .pn-key { animation-name: pn-key }
+    @keyframes sp-fill { 0%, 28% { fill: var(--rb-coral) } 34%, 61% { fill: var(--rb-violet) } 67%, 100% { fill: var(--rb-blue) } }
+    @keyframes sp-tabs { 0%, 28%, 36%, 61%, 69%, 100% { transform: none; opacity: 1 } 31%, 64% { transform: translateX(-10px); opacity: 0 } 32%, 65% { transform: translateX(10px); opacity: 0 } }
+    @keyframes sp-dot { 0%, 28% { transform: translateX(11px) } 34%, 61% { transform: translateX(22px) } 67%, 100% { transform: none } }
+    @keyframes pk-card { 0%, 14% { transform: scale(.05); opacity: 0 } 28%, 86% { transform: none; opacity: 1 } 96%, 100% { transform: scale(.05); opacity: 0 } }
+    @keyframes pk-dim { 0%, 14% { opacity: 0 } 28%, 86% { opacity: 1 } 96%, 100% { opacity: 0 } }
+    @keyframes pk-link { 0%, 4% { opacity: .35 } 10%, 100% { opacity: 1 } }
+    @keyframes sv-a { 0%, 18% { transform: scaleX(2.008) } 34%, 88% { transform: none } 100% { transform: scaleX(2.008) } }
+    @keyframes sv-b { 0%, 18% { transform: translateX(125px); opacity: 0 } 34%, 88% { transform: none; opacity: 1 } 100% { transform: translateX(125px); opacity: 0 } }
+    @keyframes sv-fav { 0%, 22% { opacity: 0 } 32%, 88% { opacity: 1 } 100% { opacity: 0 } }
+    @keyframes la-pop { 0%, 16% { transform: translateY(14px) scale(.7); opacity: 0 } 30%, 88% { transform: none; opacity: 1 } 98%, 100% { transform: scale(.94); opacity: 0 } }
+    @keyframes la-btn { 0%, 52%, 64%, 100% { transform: none } 58% { transform: scale(1.18) } }
+    @keyframes cb-pal { 0%, 4% { transform: scale(.94); opacity: 0 } 12%, 90% { transform: none; opacity: 1 } 100% { transform: scale(.98); opacity: 0 } }
+    @keyframes cb-type { 0%, 14% { transform: scaleX(0); animation-timing-function: steps(6, end) } 42%, 100% { transform: none } }
+    @keyframes cb-caret { 0%, 14% { transform: translateX(-62px); animation-timing-function: steps(6, end) } 42%, 100% { transform: none } }
+    @keyframes cb-r1 { 0%, 44% { opacity: 0; transform: translateY(4px) } 50%, 100% { opacity: 1; transform: none } }
+    @keyframes cb-r2 { 0%, 49% { opacity: 0; transform: translateY(4px) } 55%, 100% { opacity: 1; transform: none } }
+    @keyframes cb-r3 { 0%, 54% { opacity: 0; transform: translateY(4px) } 60%, 100% { opacity: 1; transform: none } }
+    @keyframes pn-row { 0%, 22% { opacity: 1 } 34%, 92% { opacity: 0 } 100% { opacity: 1 } }
+    @keyframes pn-fly { 0%, 22% { opacity: 0; transform: translate(-59px, 31.5px) } 26% { opacity: 1; transform: translate(-59px, 31.5px) } 48% { opacity: 1; transform: none } 52%, 100% { opacity: 0; transform: none } }
+    @keyframes pn-tile { 0%, 46% { opacity: 0 } 52%, 92% { opacity: 1 } 100% { opacity: 0 } }
+    @keyframes pn-key { 0%, 8% { opacity: 0 } 14%, 34% { opacity: 1 } 42%, 100% { opacity: 0 } }
+
+    .welcome-keys, .welcome-links { margin: 1.25rem 0 0; padding: 0; list-style: none }
     .welcome-keys { display: grid; grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr)); gap: .75rem 1.5rem }
     .welcome-keys li { display: flex; align-items: baseline; gap: .75rem; font-size: 1rem }
     .welcome kbd { min-width: 4.5rem; padding: .05em .4em; border: 1px solid color-mix(in srgb, currentColor 18%, transparent); border-bottom-width: 2px; border-radius: .375rem; background: color-mix(in srgb, currentColor 6%, transparent); font-family: inherit; font-size: 1rem; font-weight: 500; text-align: center; white-space: nowrap }
@@ -512,6 +639,22 @@
     .welcome-links { display: grid; grid-template-columns: repeat(auto-fill, minmax(17rem, 1fr)); gap: 1rem 1.5rem }
     .welcome-links a { font-weight: 600 }
     .welcome-links p { margin-top: .25rem; color: var(--quiet); font-size: 1rem }
+
+    /* Phones: the stage sits on top and stays in view while the list scrolls under it. */
+    @media (max-width: 48rem) {
+      .welcome .welcome-hero { grid-template-columns: minmax(0, 1fr) }
+      .welcome .hero-art { justify-self: center; max-width: 15rem }
+      .welcome h1 { font-size: 3rem }
+      .tour { grid-template-columns: minmax(0, 1fr); gap: 1rem }
+      /* Below the sticky top bar, which is 4.25rem tall here, flush so no text shows between them. */
+      .tour-stage { order: -1; top: 4.25rem; z-index: 1; border-radius: 1.25rem }
+      .scene { padding: .75rem 1rem }
+      .welcome-cards > li { padding: .875rem 1rem 1rem }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .welcome-cards > li, .tour-stage { animation: none }
+      .tour-stage::before, .scene, .welcome-cards > li { transition: none }
+    }
   </style>
 <link rel="alternate" type="text/plain" href="https://myarc.dev/llms.txt" title="Site context">
 <script type="application/json" id="asset-notices">{"Outfit": "Copyright 2021 The Outfit Project Authors (https://github.com/Outfitio/Outfit-Fonts)\n\nThis Font Software is licensed under the SIL Open Font License, Version 1.1.\nThis license is copied below, and is also available with a FAQ at:\nhttps://scripts.sil.org/OFL\n\n\n-----------------------------------------------------------\nSIL OPEN FONT LICENSE Version 1.1 - 26 February 2007\n-----------------------------------------------------------\n\nPREAMBLE\nThe goals of the Open Font License (OFL) are to stimulate worldwide\ndevelopment of collaborative font projects, to support the font creation\nefforts of academic and linguistic communities, and to provide a free and\nopen framework in which fonts may be shared and improved in partnership\nwith others.\n\nThe OFL allows the licensed fonts to be used, studied, modified and\nredistributed freely as long as they are not sold by themselves. The\nfonts, including any derivative works, can be bundled, embedded,\nredistributed and/or sold with any software provided that any reserved\nnames are not used by derivative works. The fonts and derivatives,\nhowever, cannot be released under any other type of license. The\nrequirement for fonts to remain under this license does not apply\nto any document created using the fonts or their derivatives.\n\nDEFINITIONS\n\"Font Software\" refers to the set of files released by the Copyright\nHolder(s) under this license and clearly marked as such. This may\ninclude source files, build scripts and documentation.\n\n\"Reserved Font Name\" refers to any names specified as such after the\ncopyright statement(s).\n\n\"Original Version\" refers to the collection of Font Software components as\ndistributed by the Copyright Holder(s).\n\n\"Modified Version\" refers to any derivative made by adding to, deleting,\nor substituting -- in part or in whole -- any of the components of the\nOriginal Version, by changing formats or by porting the Font Software to a\nnew environment.\n\n\"Author\" refers to any designer, engineer, programmer, technical\nwriter or other person who contributed to the Font Software.\n\nPERMISSION & CONDITIONS\nPermission is hereby granted, free of charge, to any person obtaining\na copy of the Font Software, to use, study, copy, merge, embed, modify,\nredistribute, and sell modified and unmodified copies of the Font\nSoftware, subject to the following conditions:\n\n1) Neither the Font Software nor any of its individual components,\nin Original or Modified Versions, may be sold by itself.\n\n2) Original or Modified Versions of the Font Software may be bundled,\nredistributed and/or sold with any software, provided that each copy\ncontains the above copyright notice and this license. These can be\nincluded either as stand-alone text files, human-readable headers or\nin the appropriate machine-readable metadata fields within text or\nbinary files as long as those fields can be easily viewed by the user.\n\n3) No Modified Version of the Font Software may use the Reserved Font\nName(s) unless explicit written permission is granted by the corresponding\nCopyright Holder. This restriction only applies to the primary font name as\npresented to the users.\n\n4) The name(s) of the Copyright Holder(s) or the Author(s) of the Font\nSoftware shall not be used to promote, endorse or advertise any\nModified Version, except to acknowledge the contribution(s) of the\nCopyright Holder(s) and the Author(s) or with their explicit written\npermission.\n\n5) The Font Software, modified or unmodified, in part or in whole,\nmust be distributed entirely under this license, and must not be\ndistributed under any other license. The requirement for fonts to\nremain under this license does not apply to any document created\nusing the Font Software.\n\nTERMINATION\nThis license becomes null and void if any of the above conditions are\nnot met.\n\nDISCLAIMER\nTHE FONT SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND,\nEXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO ANY WARRANTIES OF\nMERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT\nOF COPYRIGHT, PATENT, TRADEMARK, OR OTHER RIGHT. IN NO EVENT SHALL THE\nCOPYRIGHT HOLDER BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,\nINCLUDING ANY GENERAL, SPECIAL, INDIRECT, INCIDENTAL, OR CONSEQUENTIAL\nDAMAGES, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING\nFROM, OUT OF THE USE OR INABILITY TO USE THE FONT SOFTWARE OR FROM\nOTHER DEALINGS IN THE FONT SOFTWARE.\n", "Lucide": "ISC License\n\nCopyright (c) 2026 Lucide Icons and Contributors\n\nPermission to use, copy, modify, and/or distribute this software for any\npurpose with or without fee is hereby granted, provided that the above\ncopyright notice and this permission notice appear in all copies.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\" AND THE AUTHOR DISCLAIMS ALL WARRANTIES\nWITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF\nMERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR\nANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES\nWHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN\nACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF\nOR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.\n\n---\n\nThe following Lucide icons are derived from the Feather project:\n\nairplay, alert-circle, alert-octagon, alert-triangle, aperture, arrow-down-circle, arrow-down-left, arrow-down-right, arrow-down, arrow-left-circle, arrow-left, arrow-right-circle, arrow-right, arrow-up-circle, arrow-up-left, arrow-up-right, arrow-up, at-sign, calendar, cast, check, chevron-down, chevron-left, chevron-right, chevron-up, chevrons-down, chevrons-left, chevrons-right, chevrons-up, circle, clipboard, clock, code, columns, command, compass, corner-down-left, corner-down-right, corner-left-down, corner-left-up, corner-right-down, corner-right-up, corner-up-left, corner-up-right, crosshair, database, divide-circle, divide-square, dollar-sign, download, external-link, feather, frown, hash, headphones, help-circle, info, italic, key, layout, life-buoy, link-2, link, loader, lock, log-in, log-out, maximize, meh, minimize, minimize-2, minus-circle, minus-square, minus, monitor, moon, more-horizontal, more-vertical, move, music, navigation-2, navigation, octagon, pause-circle, percent, plus-circle, plus-square, plus, power, radio, rss, search, server, share, shopping-bag, sidebar, smartphone, smile, square, table-2, tablet, target, terminal, trash-2, trash, triangle, tv, type, upload, x-circle, x-octagon, x-square, x, zoom-in, zoom-out\n\nThe MIT License (MIT) (for the icons listed above)\n\nCopyright (c) 2013-present Cole Bemis\n\nPermission is hereby granted, free of charge, to any person obtaining a copy\nof this software and associated documentation files (the \"Software\"), to deal\nin the Software without restriction, including without limitation the rights\nto use, copy, modify, merge, publish, distribute, sublicense, and/or sell\ncopies of the Software, and to permit persons to whom the Software is\nfurnished to do so, subject to the following conditions:\n\nThe above copyright notice and this permission notice shall be included in all\ncopies or substantial portions of the Software.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR\nIMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,\nFITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE\nAUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER\nLIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,\nOUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE\nSOFTWARE.\n", "artwork": "User-supplied ribbon logos. Original grain and custom wordmark generated for myArc. See repository ATTRIBUTION.md for provenance and rights limitations."}</script>
@@ -548,7 +691,405 @@
           })
         })()
       </script>
-    </header><main id="main" class="journal welcome"><header class="post-header"><h1>Welcome to myArc</h1><p class="welcome-intro">myArc is an open-source browser that keeps Arc&#x27;s way of browsing, with no account to sign up for. Here&#x27;s where to start.</p></header><div class="welcome-body"><h2>The basics</h2><ul class="welcome-cards"><li><h3><a href="/docs/spaces-and-profiles/">Spaces and Profiles</a></h3><p>A Space holds the tabs for one part of your life, like Work or Travel. A Profile keeps your logins apart, and several Spaces can share one.</p></li><li><h3><a href="/docs/peek/">Peek</a></h3><p>A link from a pinned tab or Favorite to another site opens in a card over the page. Press <kbd>⌘O</kbd> to keep it as a tab.</p></li><li><h3>Split View</h3><p>Press <kbd>⌃⇧=</kbd> to put two tabs side by side. The pair shows as one row in the sidebar and comes back after a restart.</p></li><li><h3>Little Arc</h3><p>Links from other apps open in a small window, and <kbd>⌥⌘N</kbd> opens one from anywhere. Press <kbd>⌘O</kbd> to move the page into your current Space.</p></li><li><h3>Command bar</h3><p><kbd>⌘T</kbd> opens it for a new tab and <kbd>⌘L</kbd> on the current address. Type an action like pin or split to run it, or / to list them all.</p></li><li><h3><a href="/docs/spaces-and-profiles/#pinned-tabs-and-favorites">Pinned tabs and Favorites</a></h3><p>Press <kbd>⌘D</kbd> to pin a tab to its Space. Favorites show in every Space of a Profile, and closing either one keeps its tile.</p></li></ul><h2>Shortcuts to learn first</h2><ul class="welcome-keys"><li><kbd>⌘T</kbd><span>New tab</span></li><li><kbd>⌘L</kbd><span>Edit the address</span></li><li><kbd>⌘D</kbd><span>Pin or unpin the tab</span></li><li><kbd>⌃1–9</kbd><span>Switch Spaces</span></li><li><kbd>⌥⌘N</kbd><span>Open Little Arc</span></li><li><kbd>⌃⇧=</kbd><span>Open a Split View</span></li><li><kbd>⌃⌥⌘A</kbd><span>Replay the welcome</span></li></ul><p class="welcome-more"><a href="/docs/shortcuts/">All shortcuts</a></p><h2>Keep going</h2><ul class="welcome-links"><li><a href="/docs/import-from-arc/">Import from Arc</a><p>Bring over your Spaces, folders and pinned tabs.</p></li><li><a href="/docs/">Docs</a><p>How everything works, and what is still missing.</p></li><li><a href="/download/">Release notes</a><p>What works in this nightly, and the latest download.</p></li><li><a href="https://github.com/bitbonsai/myarc">GitHub</a><p>The code, the plans and the roadmap.</p></li><li><a href="https://github.com/bitbonsai/myarc/issues">Report an issue</a><p>Found a bug? Tell me what happened.</p></li></ul></div></main><footer class="end">
+    </header><main id="main" class="journal welcome"><header class="post-header welcome-hero"><div class="welcome-hero-copy"><h1 class="rise">Welcome to myArc</h1><p class="welcome-intro rise">myArc is an open-source browser that keeps Arc&#x27;s way of browsing, with no account to sign up for. Here&#x27;s where to start.</p></div><div class="hero-art">
+  <img src="../blog/_assets/logo-hero.4ac1596a77ee.webp" alt="myArc ribbon logo, a looping A in blue, violet, pink and coral" width="1440" height="1440">
+  <canvas aria-hidden="true"></canvas>
+</div>
+<script>
+  // Progressive enhancement. Without script, WebGL2 or motion, the image above stays.
+  (() => {
+
+    // myArc ribbon, drawn in WebGL2 with no dependencies.
+    // mountRibbon(canvas) returns { sheen, play, destroy }, or null when WebGL2 is missing.
+    const mountRibbon = (canvas) => {
+      const gl = canvas.getContext('webgl2', { alpha: true, antialias: true, premultipliedAlpha: true })
+      if (!gl) return null
+
+      const still = matchMedia('(prefers-reduced-motion: reduce)').matches
+      const DIST = 6.2
+      const F = 1 / Math.tan((30 * Math.PI) / 360)
+
+      // ---- geometry -------------------------------------------------------
+      const sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]]
+      const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
+      const cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]]
+      const norm = (a) => { const l = Math.hypot(a[0], a[1], a[2]) || 1; return [a[0] / l, a[1] / l, a[2] / l] }
+      const mad = (a, b, s) => [a[0] + b[0] * s, a[1] + b[1] * s, a[2] + b[2] * s]
+
+      // Sweeps an ellipse (half-sizes a across, b along "up") down a path. Open paths get round caps.
+      // Optional: per-point scale [across, along], and "face", an axis the wide side turns toward like a flat stroke.
+      const tube = (pts, up, a, b, closed, scale, face) => {
+        const SEG = 36, CAP = 10, n = pts.length, rings = []
+        const frame = (i) => {
+          const p0 = pts[closed ? (i - 1 + n) % n : Math.max(i - 1, 0)]
+          const p1 = pts[closed ? (i + 1) % n : Math.min(i + 1, n - 1)]
+          const T = norm(sub(p1, p0))
+          const B = face ? norm(cross(T, face)) : norm(mad(up, T, -dot(up, T)))
+          const [sa, sb] = scale ? scale[i] : [1, 1]
+          return { T, B, N: cross(B, T), ra: a * sa, rb: b * sb }
+        }
+        const cap = (i, sign) => {
+          const f = frame(i), out = []
+          for (let k = 1; k <= CAP; k++) {
+            const al = (k / CAP) * Math.PI / 2
+            out.push({ ...f, c: mad(pts[i], f.T, sign * f.ra * Math.sin(al)), s: Math.cos(al), nt: sign * Math.sin(al) })
+          }
+          return out
+        }
+        if (!closed) rings.push(...cap(0, -1).reverse())
+        const last = closed ? n : n - 1
+        for (let i = 0; i <= last; i++) rings.push({ ...frame(i % n), c: pts[i % n], s: 1, nt: 0 })
+        if (!closed) rings.push(...cap(n - 1, 1))
+
+        const data = [], index = [], R = rings.length
+        rings.forEach((r, i) => {
+          for (let j = 0; j <= SEG; j++) {
+            const ph = (j / SEG) * Math.PI * 2, cs = Math.cos(ph), sn = Math.sin(ph)
+            const off = mad(mad([0, 0, 0], r.N, r.ra * cs * r.s), r.B, r.rb * sn * r.s)
+            const rad = norm(mad(mad([0, 0, 0], r.N, r.rb * cs), r.B, r.ra * sn))
+            const nr = norm(mad(mad([0, 0, 0], rad, Math.sqrt(1 - r.nt * r.nt)), r.T, r.nt))
+            data.push(...r.c, ...off, ...nr, i / (R - 1))
+          }
+        })
+        for (let i = 0; i < R - 1; i++) for (let j = 0; j < SEG; j++) {
+          const p = i * (SEG + 1) + j, q = p + SEG + 1
+          index.push(p, p + 1, q, q, p + 1, q + 1)
+        }
+        return { data: new Float32Array(data), index: new Uint16Array(index) }
+      }
+
+      // The A: one tube, two straight legs tangent to a circular apex.
+      const archPath = () => {
+        const LEAN = 0.43, R = 0.36, cy = 0.46, pts = []
+        const tx = -R * Math.cos(LEAN), ty = cy + R * Math.sin(LEAN)
+        const foot = [tx - (ty + 0.82) * Math.tan(LEAN), -0.82, 0]
+        for (let i = 0; i < 48; i++) pts.push(mad(foot, sub([tx, ty, 0], foot), i / 48))
+        for (let i = 0; i <= 28; i++) {
+          const al = Math.PI - LEAN - (i / 28) * (Math.PI - 2 * LEAN)
+          pts.push([R * Math.cos(al), cy + R * Math.sin(al), 0])
+        }
+        for (let i = 1; i <= 48; i++) pts.push(mad([-tx, ty, 0], sub([-foot[0], -0.82, 0], [-tx, ty, 0]), i / 48))
+        return pts
+      }
+
+      // The loop: a flat ribbon in a figure of eight. Its front runs from high on the left to low on the right
+      // and its back does the opposite. Both curls wrap a leg, so the back strand runs behind the whole A.
+      const TILT = 0.1
+      const tilt = (p) => [p[0], p[1] * Math.cos(TILT) - p[2] * Math.sin(TILT) - 0.14, p[1] * Math.sin(TILT) + p[2] * Math.cos(TILT)]
+      const loopPath = () => {
+        const pts = [], scale = []
+        for (let i = 0; i < 200; i++) {
+          const th = -Math.PI * 0.735 + (i / 200) * Math.PI * 2 // starts behind the left leg, so the seam and the growing tip stay hidden
+          const right = 0.5 + 0.5 * Math.cos(th), left = 1 - right // 1 at that turn, 0 at the other
+          const d = Math.atan2(Math.sin(th - Math.PI), Math.cos(th - Math.PI)) // angle from the left turn
+          pts.push(tilt([
+            1.03 * Math.cos(th) + 0.16 * right * right - 0.17 * left * left - 0.02,
+            -(0.36 - 0.12 * right) * Math.sin(2 * th),
+            0.85 * Math.sin(th),
+          ]))
+          // Broad on the left, slim on the right, and pinched where the left curl squeezes past the leg.
+          scale.push([1, (1 - 0.5 * right) * (1 - 0.35 * Math.exp(-d * d / 0.25))])
+        }
+        return { pts, scale }
+      }
+
+      // ---- shaders --------------------------------------------------------
+      const VS = '#version 300 es\n' + [
+        'in vec3 aCenter, aOffset, aNormal; in float aU;',
+        'uniform mat3 uRot, uLocal; uniform float uScale, uGrow, uAsp, uSeam; uniform vec2 uShift, uStretch;',
+        'out vec3 vN, vP, vO; out float vU;',
+        'void main() {',
+        '  float s = clamp((uGrow * 1.1 - aU) / .1, 0., 1.);',
+        '  s = sqrt(1. - (1. - s) * (1. - s));',
+        // A closed loop has no cap where it starts. Until it closes, round that end off so no cut edge shows.
+        '  float e = 1. - clamp(aU / .025, 0., 1.);',
+        '  s *= mix(sqrt(1. - e * e), 1., max(1. - uSeam, smoothstep(.97, 1., uGrow)));',
+        '  vO = aCenter + aOffset * s;',
+        '  vP = uRot * ((uLocal * vO) * uStretch.xyx) * uScale + vec3(uShift, 0.);',
+        '  vN = uRot * (uLocal * aNormal); vU = aU;',
+        '  float f = ' + F.toFixed(5) + ', d = ' + DIST.toFixed(2) + ' - vP.z;',
+        '  gl_Position = vec4(vP.x * f / uAsp, vP.y * f, (d - 3.) / 6. * d, d);',
+        '}'].join('\n')
+
+      const FS = '#version 300 es\nprecision highp float;\n' + [
+        'in vec3 vN, vP, vO; in float vU;',
+        'uniform vec3 uPal[8]; uniform float uUseU, uAlpha, uSheen, uTime;',
+        'out vec4 o;',
+        'vec3 pal(float t) {',
+        '  t = clamp(t, 0., 1.) * 7.; int i = int(min(floor(t), 6.));',
+        '  return mix(uPal[i], uPal[i + 1], smoothstep(0., 1., t - float(i)));',
+        '}',
+        'vec3 spectrum(float t) { return .5 + .5 * cos(6.2832 * (t + vec3(0., .33, .67))); }',
+        'void main() {',
+        '  vec3 n = normalize(vN), v = normalize(vec3(0., 0., ' + DIST.toFixed(2) + ') - vP);',
+        '  vec3 L = normalize(vec3(-.5, .75, .7));',
+        '  vec3 base = pal(mix(vO.x / 2.5 + .5 + vO.y * .06, vU, uUseU));',
+        // Painted detail from the flat artwork, drawn on the simple shapes.
+        '  if (uUseU > .5) {',
+        // A: the apex reads as a cap folded over the left leg. The fold line is an arc from the left leg's outer edge to the top of the opening.
+        '    float fd = length(vO.xy - vec2(-.2785, .1884)), fr0 = .4924;',
+        '    float cap = smoothstep(fr0 - .006, fr0 + .006, fd) * max(smoothstep(.29, .32, vO.y), step(.5, vU));',
+        '    vec3 capc = mix(vec3(1., .64, .48), vec3(1., .25, .42), smoothstep(-.55, .2, vO.x));',
+        '    float under = (1. - cap) * smoothstep(.24, .3, vU) * (1. - smoothstep(.5, .56, vU)) * exp(-max(fr0 - fd, 0.) / .1);',
+        '    base = mix(base, mix(capc, base, smoothstep(.5, .64, vU)), cap);',
+        '    base = mix(base, vec3(.62, .16, .62), under * .5);',
+        '  } else {',
+        // Loop: the same trick on the left curl. Below an arc the curl shows its darker inner face, as if the near strand folded over it.
+        '    float ld = length(vO.xy - vec2(-1.141, -.888)), lr = .784;',
+        '    float inner = (1. - smoothstep(lr - .006, lr + .006, ld)) * (1. - smoothstep(-.74, -.54, vO.x));',
+        '    base = mix(base, vec3(.04, .12, .9), inner * .75 * exp(-max(lr - ld, 0.) / .11));', // a shadow that fades out, so no flat patch
+        '  }',
+        '  float nv = max(dot(n, v), 0.), d = dot(n, L) * .5 + .5;',
+        '  float fr = pow(1. - nv, 2.2);',
+        // matte body: wrapped light, a darker saturated underside, a pastel rim
+        '  vec3 col = base * (.56 + .58 * d * d);',
+        '  col = mix(col, base * base * 1.1, (1. - d) * .35);',
+        '  col = mix(col, mix(base, vec3(1.), .7), fr * .6);',
+        '  col += pow(max(dot(n, normalize(L + v)), 0.), 28.) * .16;',
+        // spectral sheen: a diagonal band of thin-film colour that crosses the mark
+        '  float band = vP.x * .8 + vP.y * .6;',
+        '  float w = exp(-pow((band - uSheen) / .3, 2.));',
+        '  vec3 iri = spectrum(band * .9 + nv * 1.4 + uTime * .07);',
+        '  col += iri * w * (.3 + 1.1 * fr) + w * pow(nv, 6.) * .12;',
+        '  o = vec4(col * uAlpha, uAlpha);',
+        '}'].join('\n')
+
+      const program = (vs, fs) => {
+        const p = gl.createProgram()
+        for (const [type, src] of [[gl.VERTEX_SHADER, vs], [gl.FRAGMENT_SHADER, fs]]) {
+          const s = gl.createShader(type)
+          gl.shaderSource(s, src); gl.compileShader(s)
+          if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s))
+          gl.attachShader(p, s)
+        }
+        gl.linkProgram(p)
+        if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(p))
+        return p
+      }
+      const prog = program(VS, FS)
+      const U = (p, name) => gl.getUniformLocation(p, name)
+
+      const mesh = ({ data, index }, pal, useU, alpha) => {
+        const vao = gl.createVertexArray()
+        gl.bindVertexArray(vao)
+        gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer())
+        gl.bufferData(gl.ARRAY_BUFFER, data, gl.STATIC_DRAW)
+        ;[['aCenter', 3, 0], ['aOffset', 3, 12], ['aNormal', 3, 24], ['aU', 1, 36]].forEach(([name, size, at]) => {
+          const loc = gl.getAttribLocation(prog, name)
+          gl.enableVertexAttribArray(loc)
+          gl.vertexAttribPointer(loc, size, gl.FLOAT, false, 40, at)
+        })
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, gl.createBuffer())
+        gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, index, gl.STATIC_DRAW)
+        return { vao, count: index.length, pal: new Float32Array(pal.flat()), useU, alpha, grow: 0, local: [1, 0, 0, 0, 1, 0, 0, 0, 1] }
+      }
+      const lp = loopPath()
+      const arch = mesh(tube(archPath(), [0, 0, 1], 0.27, 0.19, false),
+        [[.58, .30, 1], [.31, .23, .97], [.45, .29, .96], [.81, .40, .89], [.97, .32, .51], [1, .25, .42], [1, .30, .39], [1, .50, .36]], 1, 1)
+      const loop = mesh(tube(lp.pts, [0, 1, 0], 0.07, 0.27, true, lp.scale, [0, 0, 1]),
+        [[.05, .68, 1], [.10, .52, 1], [.20, .40, 1], [.50, .44, 1], [.80, .40, .95], [.95, .36, .82], [1, .58, .60], [1, .80, .70]], 0, 0.84)
+
+      // ---- motion ---------------------------------------------------------
+      const spring = (x, k, c) => ({ x, v: 0, to: x, k, c })
+      const step = (s, dt) => { s.v += (s.k * (s.to - s.x) - s.c * s.v) * dt; s.x += s.v * dt }
+      const rotX = spring(0, 70, 6.5), rotY = spring(0, 70, 6.5)
+      const scale = spring(1, 120, 9), shiftX = spring(0, 50, 9), shiftY = spring(0, 50, 9), stretch = spring(1, 170, 9)
+      const ease = (t) => { t = Math.min(Math.max(t, 0), 1); return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2 }
+
+      let spin = 0, nod = 0, hop = 0, roll = 0, grown = 1, sheenAt = -10, nextSheen = 2.5, time = 0, last = 0, raf = 0, visible = true, mouse = [0, 0], seen = false
+      const sheen = (kick = 0) => { sheenAt = time; nextSheen = time + 7 + Math.random() * 5; scale.v += kick }
+
+      // Showpieces. One plays every so often, and on a click.
+      //   spin       a full turn with an overshoot
+      //   halo       the loop puffs out, orbits the A once and snaps back
+      //   hop        squash, jump with a flip, bouncy landing
+      //   redraw     the loop unwinds and draws itself back
+      //   swing      a pendulum wobble that dies down
+      //   rebuild    the whole mark undraws, then redraws through a full turn
+      //   heartbeat  two quick pulses
+      const ACTS = ['spin', 'halo', 'hop', 'redraw', 'swing', 'rebuild', 'heartbeat']
+      // 3x3 matrices, column-major.
+      const mul = (a, b) => [0, 1, 2].flatMap((c) => [0, 1, 2].map((r) => a[r] * b[c * 3] + a[3 + r] * b[c * 3 + 1] + a[6 + r] * b[c * 3 + 2]))
+      const turnX = (a) => [1, 0, 0, 0, Math.cos(a), Math.sin(a), 0, -Math.sin(a), Math.cos(a)]
+      const turnY = (a) => [Math.cos(a), 0, -Math.sin(a), 0, 1, 0, Math.sin(a), 0, Math.cos(a)]
+      const turnZ = (a) => [Math.cos(a), Math.sin(a), 0, -Math.sin(a), Math.cos(a), 0, 0, 0, 1]
+      let act = null, actN = 0, nextAct = 6.5
+      const play = (kind) => { act = { kind: kind || ACTS[actN++ % ACTS.length], t0: time, lit: false, landed: false }; nextAct = time + 9 + Math.random() * 5 }
+      const back = (k) => 1 + 2.70158 * Math.pow(k - 1, 3) + 1.70158 * Math.pow(k - 1, 2) // ease out with an overshoot
+
+      const onMove = (e) => {
+        const r = canvas.getBoundingClientRect()
+        mouse = [(e.clientX - (r.left + r.width / 2)) / (innerWidth / 2), (e.clientY - (r.top + r.height / 2)) / (innerHeight / 2)]
+          .map((m) => Math.min(Math.max(m, -1), 1))
+        seen = true
+      }
+      const onDown = (e) => {
+        const r = canvas.getBoundingClientRect()
+        const dx = e.clientX - (r.left + r.width / 2), dy = e.clientY - (r.top + r.height / 2)
+        if (Math.hypot(dx, dy) > r.width * 0.3) return
+        if (time > 2.8 && !act) play()
+      }
+
+      const resize = () => {
+        const dpr = Math.min(devicePixelRatio || 1, 2)
+        const w = Math.round(canvas.clientWidth * dpr), h = Math.round(canvas.clientHeight * dpr)
+        if (w && h && (canvas.width !== w || canvas.height !== h)) { canvas.width = w; canvas.height = h }
+      }
+
+      const draw = (now) => {
+        raf = still ? 0 : requestAnimationFrame(draw)
+        if (!visible && !still) { last = 0; return }
+        const dt = last ? Math.min((now - last) / 1000, 1 / 30) : 1 / 60
+        last = now; time += dt
+        resize()
+
+        if (still) { arch.grow = loop.grow = 1 } else {
+          arch.grow = ease((time - 0.15) / 1.15)
+          loop.grow = ease((time - 0.95) / 1.25)
+          // At rest the mark faces front, where the painted detail reads best. The pointer only nudges it.
+          // The entrance turn and the idle sway are one continuous curve: the turn eases out over the whole
+          // draw-in while the sway and pointer nudge fade in underneath, so nothing stops or snaps.
+          const formed = time > 2.6, live = ease((time - 1.2) / 2.2)
+          const k = Math.min(time / 1.5, 1), intro = Math.pow(1 - k, 3) // facing front before the loop starts, so its seam stays behind the leg
+          rotY.to = live * (mouse[0] * 0.12 + Math.sin(time * 0.5) * 0.06)
+          rotX.to = live * (mouse[1] * 0.08 + Math.sin(time * 0.8) * 0.03)
+          shiftX.to = live * mouse[0] * 0.04
+          shiftY.to = live * (-mouse[1] * 0.03 + Math.sin(time * 1.1) * 0.03)
+          scale.to = 1; stretch.to = 1; spin = -1.5 * intro; nod = 0.5 * intro; hop = 0; roll = 0; grown = 1 - 0.28 * intro
+          loop.local = turnY(0)
+          if (formed && !act && time > nextAct) play()
+          if (act) {
+            const t = time - act.t0
+            let lightAt = 0, end = 0
+            if (act.kind === 'spin') {
+              const k = Math.min(t / 1.5, 1)
+              spin = Math.PI * 2 * back(k); nod = 0.3 * Math.sin(Math.PI * k); lightAt = 0.85; end = 1.6
+            } else if (act.kind === 'redraw') {
+              loop.grow = t < 0.7 ? 1 - ease(t / 0.7) : ease((t - 0.85) / 1.15)
+              spin = 0.45 * Math.sin(Math.PI * Math.min(t / 2, 1)); lightAt = 1.85; end = 2.1
+            } else if (act.kind === 'halo') {
+              const puff = 1 + 0.28 * ease(t / 0.35) * (1 - ease((t - 1.45) / 0.35))
+              loop.local = turnY(Math.PI * 2 * ease((t - 0.15) / 1.5)).map((m) => m * puff)
+              nod = 0.22 * Math.sin(Math.PI * Math.min(t / 1.8, 1)); lightAt = 1.5; end = 1.9
+            } else if (act.kind === 'swing') {
+              roll = 0.45 * Math.sin(t * 7) * Math.exp(-t * 1.6)
+              stretch.to = 1 + 0.06 * Math.sin(t * 14) * Math.exp(-t * 2); lightAt = 0.2; end = 2.4
+            } else if (act.kind === 'rebuild') {
+              arch.grow = t < 0.6 ? 1 - ease(t / 0.6) : ease((t - 0.7) / 0.9)
+              loop.grow = t < 0.6 ? 1 - ease(t / 0.6) : ease((t - 1.2) / 1.1)
+              spin = -Math.PI * 2 * (1 - ease(t / 2.4)); lightAt = 2.3; end = 2.5
+            } else if (act.kind === 'heartbeat') {
+              if (!act.beat1) { act.beat1 = true; scale.v += 1.9 }
+              if (t > 0.3 && !act.beat2) { act.beat2 = true; scale.v += 1.9 }
+              lightAt = 0.3; end = 1.2
+            } else {
+              const k = Math.min(Math.max((t - 0.22) / 0.58, 0), 1)
+              if (t < 0.22) stretch.to = 0.8
+              else if (k < 1) { stretch.to = 1.14; hop = 0.45 * 4 * k * (1 - k); spin = Math.PI * 2 * ease(k) }
+              else if (!act.landed) { act.landed = true; stretch.v -= 3.5 }
+              lightAt = 0.8; end = 1.7
+            }
+            if (t > lightAt && !act.lit) { act.lit = true; sheen(0.5) }
+            if (t > end) act = null
+          }
+          ;[rotX, rotY, scale, shiftX, shiftY, stretch].forEach((s) => step(s, dt))
+          if (time > nextSheen && !act) sheen()
+        }
+
+        const rot = mul(mul(turnY(rotY.x + spin), turnX(rotX.x + nod)), turnZ(roll))
+        const asp = canvas.width / canvas.height
+        const sheenPos = still ? -9 : -2.4 + (time - sheenAt) * 2.4
+
+        gl.viewport(0, 0, canvas.width, canvas.height)
+        gl.clearColor(0, 0, 0, 0)
+        gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
+        gl.enable(gl.DEPTH_TEST); gl.enable(gl.CULL_FACE); gl.enable(gl.BLEND)
+        gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA)
+
+        gl.useProgram(prog)
+        gl.uniformMatrix3fv(U(prog, 'uRot'), false, rot)
+        gl.uniform1f(U(prog, 'uScale'), scale.x * grown * 0.82)
+        gl.uniform1f(U(prog, 'uAsp'), asp)
+        gl.uniform2f(U(prog, 'uShift'), shiftX.x, shiftY.x + hop)
+        gl.uniform2f(U(prog, 'uStretch'), 1 / Math.sqrt(stretch.x), stretch.x)
+        gl.uniform1f(U(prog, 'uSheen'), sheenPos)
+        gl.uniform1f(U(prog, 'uTime'), time)
+        // The A is opaque; the loop goes on top slightly see-through, so the A shows through where they cross.
+        for (const m of [arch, loop]) {
+          gl.uniform3fv(U(prog, 'uPal'), m.pal)
+          gl.uniform1f(U(prog, 'uUseU'), m.useU)
+          gl.uniform1f(U(prog, 'uAlpha'), m.alpha)
+          gl.uniform1f(U(prog, 'uGrow'), m.grow)
+          gl.uniformMatrix3fv(U(prog, 'uLocal'), false, m.local)
+          gl.uniform1f(U(prog, 'uSeam'), m === loop ? 1 : 0)
+          gl.bindVertexArray(m.vao)
+          gl.drawElements(gl.TRIANGLES, m.count, gl.UNSIGNED_SHORT, 0)
+        }
+      }
+
+      const io = new IntersectionObserver(([e]) => { visible = e.isIntersecting })
+      io.observe(canvas)
+      if (!still) {
+        addEventListener('pointermove', onMove, { passive: true })
+        addEventListener('pointerdown', onDown, { passive: true })
+      }
+      const ro = new ResizeObserver(() => { if (still) draw(0) })
+      ro.observe(canvas)
+      raf = requestAnimationFrame(draw)
+
+      return {
+        sheen, play,
+        destroy: () => {
+          cancelAnimationFrame(raf); io.disconnect(); ro.disconnect()
+          removeEventListener('pointermove', onMove); removeEventListener('pointerdown', onDown)
+        },
+      }
+    }
+
+    if (matchMedia('(prefers-reduced-motion: reduce)').matches) return
+    const art = document.currentScript.previousElementSibling
+    try {
+      if (mountRibbon(art.querySelector('canvas'))) art.classList.add('is-live')
+    } catch (error) {
+      console.warn('Ribbon animation unavailable', error)
+    }
+  })()
+</script></header><div class="welcome-body"><h2 class="visually-hidden">The basics</h2><div class="tour"><ul class="welcome-cards"><li class="is-active" style="--i: 0"><h3>Spaces and Profiles</h3><p>A Space holds the tabs for one part of your life, like Work or Travel. A Profile keeps your logins apart, and several Spaces can share one.</p><a class="tour-docs" href="/docs/spaces-and-profiles/">How it works<span class="visually-hidden">: Spaces and Profiles</span></a></li><li style="--i: 1"><h3>Peek</h3><p>A link from a pinned tab or Favorite to another site opens in a card over the page. Press <kbd>⌘O</kbd> to keep it as a tab.</p><a class="tour-docs" href="/docs/peek/">How it works<span class="visually-hidden">: Peek</span></a></li><li style="--i: 2"><h3>Split View</h3><p>Press <kbd>⌃⇧=</kbd> to put two tabs side by side. The pair shows as one row in the sidebar and comes back after a restart.</p></li><li style="--i: 3"><h3>Little Arc</h3><p>Links from other apps open in a small window, and <kbd>⌥⌘N</kbd> opens one from anywhere. Press <kbd>⌘O</kbd> to move the page into your current Space.</p></li><li style="--i: 4"><h3>Command bar</h3><p><kbd>⌘T</kbd> opens it for a new tab and <kbd>⌘L</kbd> on the current address. Type an action like pin or split to run it, or / to list them all.</p></li><li style="--i: 5"><h3>Pinned tabs and Favorites</h3><p>Press <kbd>⌘D</kbd> to pin a tab to its Space. Favorites show in every Space of a Profile, and closing either one keeps its tile.</p><a class="tour-docs" href="/docs/spaces-and-profiles/#pinned-tabs-and-favorites">How it works<span class="visually-hidden">: Pinned tabs and Favorites</span></a></li></ul><div class="tour-stage" aria-hidden="true"><span class="glass"></span><div class="scene is-active"><svg class="ui" viewBox="0 0 400 260" aria-hidden="true" focusable="false"><defs><filter id="lift-0" x="-20%" y="-20%" width="140%" height="150%"><feDropShadow dx="0" dy="8" stdDeviation="9" flood-color="#101c2b" flood-opacity=".28"/></filter></defs><rect class="f-violet" x="12" y="14" width="80" height="196" rx="10" opacity=".45"/><rect class="f-coral" x="25" y="28" width="80" height="196" rx="10" opacity=".6"/><g filter="url(#lift-0)"><rect class="ui-win" x="38" y="42" width="300" height="196" rx="12"/><rect class="side f-blue sp-side" x="43" y="47" width="81" height="186" rx="8"/><circle class="tl-r" cx="53" cy="57" r="2.6"/><circle class="tl-y" cx="62" cy="57" r="2.6"/><circle class="tl-g" cx="71" cy="57" r="2.6"/><rect class="ui-row" x="49" y="68" width="69" height="10" rx="5"/><g class="sp-tabs"><rect class="ui-sel" x="49" y="88" width="69" height="11" rx="4"/><rect class="f-blue" x="53" y="91" width="5" height="5" rx="1.5"/><rect class="ui-line" x="62" y="92.5" width="43" height="2" rx="1"/><rect class="ui-row" x="49" y="103" width="69" height="11" rx="4"/><rect class="f-coral" x="53" y="106" width="5" height="5" rx="1.5"/><rect class="ui-line" x="62" y="107.5" width="36" height="2" rx="1"/><rect class="ui-row" x="49" y="118" width="69" height="11" rx="4"/><rect class="f-violet" x="53" y="121" width="5" height="5" rx="1.5"/><rect class="ui-line" x="62" y="122.5" width="43" height="2" rx="1"/><rect class="ui-row" x="49" y="133" width="69" height="11" rx="4"/><rect class="f-pink" x="53" y="136" width="5" height="5" rx="1.5"/><rect class="ui-line" x="62" y="137.5" width="36" height="2" rx="1"/></g><rect class="ui-pane" x="128" y="47" width="205" height="186" rx="8"/><rect class="ui-ink" x="142" y="62" width="88" height="7" rx="3"/><rect class="ui-line" x="142" y="77" width="152" height="3" rx="1.5"/><rect class="ui-line" x="142" y="85" width="124" height="3" rx="1.5"/><rect class="tint f-blue sp-tint" x="142" y="98" width="177" height="58" rx="6"/><rect class="ui-line" x="142" y="166" width="142" height="3" rx="1.5"/><rect class="ui-line" x="142" y="174" width="97" height="3" rx="1.5"/></g><circle class="ui-line" cx="60" cy="226" r="3"/><circle class="ui-line" cx="71" cy="226" r="3"/><circle class="ui-line" cx="82" cy="226" r="3"/><circle class="f-blue sp-dot" cx="60" cy="226" r="3"/><circle class="f-coral" cx="112" cy="57" r="5"/><circle class="ui-pane" cx="112" cy="57" r="2"/></svg></div><div class="scene"><svg class="ui" viewBox="0 0 400 260" aria-hidden="true" focusable="false"><defs><filter id="lift-1" x="-20%" y="-20%" width="140%" height="150%"><feDropShadow dx="0" dy="8" stdDeviation="9" flood-color="#101c2b" flood-opacity=".28"/></filter></defs><rect class="ui-win" x="30" y="30" width="340" height="210" rx="12"/><rect class="side f-violet " x="35" y="35" width="81" height="200" rx="8"/><circle class="tl-r" cx="45" cy="45" r="2.6"/><circle class="tl-y" cx="54" cy="45" r="2.6"/><circle class="tl-g" cx="63" cy="45" r="2.6"/><rect class="ui-row" x="41" y="56" width="69" height="10" rx="5"/><rect class="ui-sel" x="41" y="76" width="69" height="11" rx="4"/><rect class="f-blue" x="45" y="79" width="5" height="5" rx="1.5"/><rect class="ui-line" x="54" y="80.5" width="43" height="2" rx="1"/><rect class="ui-row" x="41" y="91" width="69" height="11" rx="4"/><rect class="f-coral" x="45" y="94" width="5" height="5" rx="1.5"/><rect class="ui-line" x="54" y="95.5" width="36" height="2" rx="1"/><rect class="ui-row" x="41" y="106" width="69" height="11" rx="4"/><rect class="f-violet" x="45" y="109" width="5" height="5" rx="1.5"/><rect class="ui-line" x="54" y="110.5" width="43" height="2" rx="1"/><rect class="ui-row" x="41" y="121" width="69" height="11" rx="4"/><rect class="f-pink" x="45" y="124" width="5" height="5" rx="1.5"/><rect class="ui-line" x="54" y="125.5" width="36" height="2" rx="1"/><rect class="ui-pane" x="120" y="35" width="245" height="200" rx="8"/><rect class="ui-ink" x="132" y="44" width="110" height="7" rx="3"/><rect class="ui-line" x="132" y="59" width="189" height="3" rx="1.5"/><rect class="ui-line" x="132" y="67" width="154" height="3" rx="1.5"/><rect class="tint f-blue " x="132" y="80" width="220" height="58" rx="6"/><rect class="ui-line" x="132" y="148" width="176" height="3" rx="1.5"/><rect class="ui-line" x="132" y="156" width="121" height="3" rx="1.5"/><rect class="f-blue pk-link" x="132" y="67" width="62" height="3" rx="1.5"/><rect class="ui-dim pk-dim" x="120" y="35" width="245" height="200" rx="8"/><g class="pk-card" filter="url(#lift-1)"><rect class="ui-pane" x="150" y="62" width="150" height="148" rx="10"/><rect class="ui-row" x="160" y="71" width="44" height="8" rx="4"/><circle class="f-blue" cx="287" cy="75" r="4"/><rect class="ui-ink" x="162" y="90" width="63" height="7" rx="3"/><rect class="ui-line" x="162" y="105" width="108" height="3" rx="1.5"/><rect class="ui-line" x="162" y="113" width="88" height="3" rx="1.5"/><rect class="tint f-pink " x="162" y="126" width="126" height="58" rx="6"/><rect class="ui-line" x="162" y="194" width="101" height="3" rx="1.5"/><rect class="ui-line" x="162" y="202" width="69" height="3" rx="1.5"/></g></svg></div><div class="scene"><svg class="ui" viewBox="0 0 400 260" aria-hidden="true" focusable="false"><defs><filter id="lift-2" x="-20%" y="-20%" width="140%" height="150%"><feDropShadow dx="0" dy="8" stdDeviation="9" flood-color="#101c2b" flood-opacity=".28"/></filter></defs><g filter="url(#lift-2)"><rect class="ui-win" x="30" y="30" width="340" height="210" rx="12"/><rect class="side f-coral" x="35" y="35" width="81" height="200" rx="8"/><circle class="tl-r" cx="45" cy="45" r="2.6"/><circle class="tl-y" cx="54" cy="45" r="2.6"/><circle class="tl-g" cx="63" cy="45" r="2.6"/><rect class="ui-row" x="41" y="56" width="69" height="10" rx="5"/><rect class="ui-sel" x="41" y="76" width="69" height="11" rx="4"/><rect class="f-coral" x="45" y="79" width="5" height="5" rx="1.5"/><rect class="f-blue sv-fav" x="53" y="79" width="5" height="5" rx="1.5"/><rect class="ui-line" x="62" y="80.5" width="34" height="2" rx="1"/><rect class="ui-row" x="41" y="91" width="69" height="11" rx="4"/><rect class="f-coral" x="45" y="94" width="5" height="5" rx="1.5"/><rect class="ui-line" x="54" y="95.5" width="43" height="2" rx="1"/><rect class="ui-row" x="41" y="106" width="69" height="11" rx="4"/><rect class="f-violet" x="45" y="109" width="5" height="5" rx="1.5"/><rect class="ui-line" x="54" y="110.5" width="36" height="2" rx="1"/><rect class="ui-row" x="41" y="121" width="69" height="11" rx="4"/><rect class="f-pink" x="45" y="124" width="5" height="5" rx="1.5"/><rect class="ui-line" x="54" y="125.5" width="43" height="2" rx="1"/><rect class="ui-pane sv-a" x="120" y="35" width="122" height="200" rx="8"/><rect class="ui-ink" x="132" y="50" width="49" height="7" rx="3"/><rect class="ui-line" x="132" y="65" width="84" height="3" rx="1.5"/><rect class="ui-line" x="132" y="73" width="69" height="3" rx="1.5"/><rect class="tint f-coral " x="132" y="86" width="98" height="58" rx="6"/><rect class="ui-line" x="132" y="154" width="78" height="3" rx="1.5"/><rect class="ui-line" x="132" y="162" width="54" height="3" rx="1.5"/><g class="sv-b"><rect class="ui-pane" x="246" y="35" width="119" height="200" rx="8"/><rect class="ui-ink" x="258" y="50" width="48" height="7" rx="3"/><rect class="ui-line" x="258" y="65" width="82" height="3" rx="1.5"/><rect class="ui-line" x="258" y="73" width="66" height="3" rx="1.5"/><rect class="tint f-blue " x="258" y="86" width="95" height="58" rx="6"/><rect class="ui-line" x="258" y="154" width="76" height="3" rx="1.5"/><rect class="ui-line" x="258" y="162" width="52" height="3" rx="1.5"/></g></g></svg></div><div class="scene"><svg class="ui" viewBox="0 0 400 260" aria-hidden="true" focusable="false"><defs><filter id="lift-3" x="-20%" y="-20%" width="140%" height="150%"><feDropShadow dx="0" dy="8" stdDeviation="9" flood-color="#101c2b" flood-opacity=".28"/></filter></defs><rect class="ui-app" x="30" y="30" width="290" height="180" rx="12"/><circle class="tl-r" cx="44" cy="44" r="2.6"/><circle class="tl-y" cx="53" cy="44" r="2.6"/><circle class="tl-g" cx="62" cy="44" r="2.6"/><rect class="ui-app-row" x="44" y="60" width="52" height="12" rx="4"/><rect class="ui-app-row" x="44" y="80" width="52" height="12" rx="4"/><rect class="ui-app-row" x="44" y="100" width="52" height="12" rx="4"/><rect class="ui-app-row" x="44" y="120" width="52" height="12" rx="4"/><rect class="ui-app-row" x="44" y="140" width="52" height="12" rx="4"/><rect class="ui-app-row" x="106" y="40" width="1" height="160"/><rect class="ui-app-row" x="118" y="64" width="120" height="16" rx="8"/><rect class="ui-app-row" x="168" y="88" width="130" height="16" rx="8"/><rect class="f-blue la-link" x="118" y="112" width="96" height="16" rx="8"/><rect class="ui-app-row" x="118" y="136" width="80" height="16" rx="8"/><g class="la-pop" filter="url(#lift-3)"><rect class="ui-win" x="150" y="78" width="200" height="150" rx="11"/><circle class="tl-r" cx="162" cy="90" r="2.6"/><circle class="tl-y" cx="171" cy="90" r="2.6"/><circle class="tl-g" cx="180" cy="90" r="2.6"/><rect class="ui-row" x="190" y="85" width="92" height="10" rx="5"/><g class="la-btn"><rect class="f-blue" x="290" y="84" width="50" height="12" rx="6"/><rect class="glyph-fill" x="300" y="89" width="22" height="2" rx="1"/><path class="glyph" d="M327 87.5l3 2.5-3 2.5"/></g><rect class="ui-pane" x="156" y="102" width="188" height="120" rx="7"/><rect class="ui-ink" x="168" y="114" width="82" height="7" rx="3"/><rect class="ui-line" x="168" y="129" width="141" height="3" rx="1.5"/><rect class="ui-line" x="168" y="137" width="115" height="3" rx="1.5"/><rect class="tint f-coral " x="168" y="150" width="164" height="58" rx="6"/><rect class="ui-line" x="168" y="218" width="131" height="3" rx="1.5"/><rect class="ui-line" x="168" y="226" width="90" height="3" rx="1.5"/></g></svg></div><div class="scene"><svg class="ui" viewBox="0 0 400 260" aria-hidden="true" focusable="false"><defs><filter id="lift-4" x="-20%" y="-20%" width="140%" height="150%"><feDropShadow dx="0" dy="8" stdDeviation="9" flood-color="#101c2b" flood-opacity=".28"/></filter></defs><rect class="ui-win" x="30" y="30" width="340" height="210" rx="12"/><rect class="side f-pink " x="35" y="35" width="81" height="200" rx="8"/><circle class="tl-r" cx="45" cy="45" r="2.6"/><circle class="tl-y" cx="54" cy="45" r="2.6"/><circle class="tl-g" cx="63" cy="45" r="2.6"/><rect class="ui-row" x="41" y="56" width="69" height="10" rx="5"/><rect class="ui-sel" x="41" y="76" width="69" height="11" rx="4"/><rect class="f-blue" x="45" y="79" width="5" height="5" rx="1.5"/><rect class="ui-line" x="54" y="80.5" width="43" height="2" rx="1"/><rect class="ui-row" x="41" y="91" width="69" height="11" rx="4"/><rect class="f-coral" x="45" y="94" width="5" height="5" rx="1.5"/><rect class="ui-line" x="54" y="95.5" width="36" height="2" rx="1"/><rect class="ui-row" x="41" y="106" width="69" height="11" rx="4"/><rect class="f-violet" x="45" y="109" width="5" height="5" rx="1.5"/><rect class="ui-line" x="54" y="110.5" width="43" height="2" rx="1"/><rect class="ui-row" x="41" y="121" width="69" height="11" rx="4"/><rect class="f-pink" x="45" y="124" width="5" height="5" rx="1.5"/><rect class="ui-line" x="54" y="125.5" width="36" height="2" rx="1"/><rect class="ui-pane" x="120" y="35" width="245" height="200" rx="8"/><rect class="ui-ink" x="134" y="50" width="108" height="7" rx="3"/><rect class="ui-line" x="134" y="65" width="187" height="3" rx="1.5"/><rect class="ui-line" x="134" y="73" width="152" height="3" rx="1.5"/><rect class="tint f-pink " x="134" y="86" width="217" height="58" rx="6"/><rect class="ui-line" x="134" y="154" width="174" height="3" rx="1.5"/><rect class="ui-line" x="134" y="162" width="119" height="3" rx="1.5"/><rect class="ui-dim" x="30" y="30" width="340" height="210" rx="12"/><g class="cb-pal" filter="url(#lift-4)"><rect class="ui-pane" x="100" y="80" width="200" height="128" rx="12"/><rect class="f-blue" x="112" y="94" width="11" height="15" rx="3"/><path class="glyph" d="M120 97.5l-4 8"/><rect class="ui-ink cb-type" x="130" y="99" width="62" height="5" rx="2.5"/><rect class="f-blue cb-caret" x="194" y="94" width="2" height="15" rx="1"/><rect class="ui-line" x="100" y="117" width="200" height="1"/><g class="cb-r1"><rect class="tint-strong f-violet" x="110" y="126" width="180" height="19" rx="6"/><rect class="f-violet" x="118" y="131" width="9" height="9" rx="2.5"/><rect class="ui-line" x="134" y="134" width="70" height="3" rx="1.5"/><rect class="ui-row" x="262" y="131" width="20" height="9" rx="3"/></g><g class="cb-r2"><rect class="ui-row-faint" x="110" y="150" width="180" height="19" rx="6"/><rect class="f-blue" x="118" y="155" width="9" height="9" rx="2.5"/><rect class="ui-line" x="134" y="158" width="92" height="3" rx="1.5"/><rect class="ui-row" x="262" y="155" width="20" height="9" rx="3"/></g><g class="cb-r3"><rect class="ui-row-faint" x="110" y="174" width="180" height="19" rx="6"/><rect class="f-coral" x="118" y="179" width="9" height="9" rx="2.5"/><rect class="ui-line" x="134" y="182" width="58" height="3" rx="1.5"/><rect class="ui-row" x="262" y="179" width="20" height="9" rx="3"/></g></g></svg></div><div class="scene"><svg class="ui" viewBox="0 0 400 260" aria-hidden="true" focusable="false"><defs><filter id="lift-5" x="-20%" y="-20%" width="140%" height="150%"><feDropShadow dx="0" dy="8" stdDeviation="9" flood-color="#101c2b" flood-opacity=".28"/></filter></defs><g filter="url(#lift-5)"><rect class="ui-win" x="30" y="30" width="340" height="210" rx="12"/><rect class="side f-blue " x="35" y="35" width="89" height="200" rx="8"/><circle class="tl-r" cx="45" cy="45" r="2.6"/><circle class="tl-y" cx="54" cy="45" r="2.6"/><circle class="tl-g" cx="63" cy="45" r="2.6"/><rect class="ui-row" x="41" y="56" width="77" height="10" rx="5"/><rect class="ui-sel" x="41" y="72" width="23" height="18" rx="5"/><circle class="f-blue" cx="52.5" cy="81" r="4"/><rect class="ui-sel" x="68" y="72" width="23" height="18" rx="5"/><circle class="f-coral" cx="79.5" cy="81" r="4"/><rect class="ui-sel" x="95" y="72" width="23" height="18" rx="5"/><circle class="f-violet" cx="106.5" cy="81" r="4"/><rect class="ui-sel" x="41" y="94" width="23" height="18" rx="5"/><circle class="f-pink" cx="52.5" cy="103" r="4"/><rect class="ui-sel" x="68" y="94" width="23" height="18" rx="5"/><circle class="f-coral" cx="79.5" cy="103" r="4"/><rect class="ui-slot" x="95" y="94" width="23" height="18" rx="5"/><g class="pn-tile"><rect class="ui-sel" x="95" y="94" width="23" height="18" rx="5"/><circle class="f-blue" cx="106.5" cy="103" r="4"/></g><rect class="ui-line" x="41" y="124" width="77" height="1"/><g class="pn-row"><rect class="ui-sel" x="41" y="132" width="77" height="11" rx="4"/><rect class="f-blue" x="45" y="135" width="5" height="5" rx="1.5"/><rect class="ui-line" x="54" y="136.5" width="48" height="2" rx="1"/></g><rect class="ui-row" x="41" y="147" width="77" height="11" rx="4"/><rect class="f-coral" x="45" y="150" width="5" height="5" rx="1.5"/><rect class="ui-line" x="54" y="151.5" width="48" height="2" rx="1"/><rect class="ui-row" x="41" y="162" width="77" height="11" rx="4"/><rect class="f-violet" x="45" y="165" width="5" height="5" rx="1.5"/><rect class="ui-line" x="54" y="166.5" width="40" height="2" rx="1"/><circle class="f-blue pn-fly" cx="106.5" cy="103" r="4"/><rect class="ui-pane" x="128" y="35" width="237" height="200" rx="8"/><rect class="ui-ink" x="142" y="50" width="104" height="7" rx="3"/><rect class="ui-line" x="142" y="65" width="180" height="3" rx="1.5"/><rect class="ui-line" x="142" y="73" width="146" height="3" rx="1.5"/><rect class="tint f-blue " x="142" y="86" width="209" height="58" rx="6"/><rect class="ui-line" x="142" y="154" width="167" height="3" rx="1.5"/><rect class="ui-line" x="142" y="162" width="115" height="3" rx="1.5"/><g class="pn-key"><rect class="ui-pane" x="300" y="48" width="44" height="22" rx="6" stroke="currentColor" stroke-opacity=".15"/><text class="key" x="322" y="62.5" text-anchor="middle">⌘D</text></g></g></svg></div></div></div><script>
+  (() => {
+    const tour = document.querySelector('.tour')
+    const items = [...tour.querySelectorAll('.welcome-cards > li')]
+    const scenes = [...tour.querySelectorAll('.scene')]
+    const stage = tour.querySelector('.tour-stage')
+    const still = matchMedia('(prefers-reduced-motion: reduce)').matches
+    const buttons = items.map((item) => {
+      const heading = item.querySelector('h3')
+      const button = document.createElement('button')
+      button.type = 'button'
+      button.textContent = heading.textContent
+      heading.replaceChildren(button)
+      return button
+    })
+    let current = -1, timer = 0
+    const show = (index) => {
+      if (index === current) return
+      current = index
+      items.forEach((item, i) => item.classList.toggle('is-active', i === index))
+      buttons.forEach((button, i) => button.setAttribute('aria-pressed', String(i === index)))
+      scenes.forEach((scene, i) => scene.classList.toggle('is-active', i === index))
+      stage.style.setProperty('--turn', String(index * 24))
+    }
+    const stop = () => clearInterval(timer)
+    items.forEach((item, i) => {
+      item.addEventListener('pointerenter', (event) => { if (event.pointerType === 'mouse') { stop(); show(i) } })
+      item.addEventListener('focusin', () => { stop(); show(i) })
+      buttons[i].addEventListener('click', () => { stop(); show(i) })
+    })
+    show(0)
+    if (still) return
+    tour.classList.add('is-live')
+    timer = setInterval(() => { if (!document.hidden) show((current + 1) % items.length) }, 5000)
+  })()
+</script><h2>Shortcuts to learn first</h2><ul class="welcome-keys"><li><kbd>⌘T</kbd><span>New tab</span></li><li><kbd>⌘L</kbd><span>Edit the address</span></li><li><kbd>⌘D</kbd><span>Pin or unpin the tab</span></li><li><kbd>⌃1–9</kbd><span>Switch Spaces</span></li><li><kbd>⌥⌘N</kbd><span>Open Little Arc</span></li><li><kbd>⌃⇧=</kbd><span>Open a Split View</span></li><li><kbd>⌃⌥⌘A</kbd><span>Replay the welcome</span></li></ul><p class="welcome-more"><a href="/docs/shortcuts/">All shortcuts</a></p><h2>Keep going</h2><ul class="welcome-links"><li><a href="/docs/import-from-arc/">Import from Arc</a><p>Bring over your Spaces, folders and pinned tabs.</p></li><li><a href="/docs/">Docs</a><p>How everything works, and what is still missing.</p></li><li><a href="/download/">Release notes</a><p>What works in this nightly, and the latest download.</p></li><li><a href="https://github.com/bitbonsai/myarc">GitHub</a><p>The code, the plans and the roadmap.</p></li><li><a href="https://github.com/bitbonsai/myarc/issues">Report an issue</a><p>Found a bug? Tell me what happened.</p></li></ul></div></main><footer class="end">
       <a class="mark plain" href="#main" aria-label="Back to top"><img class="ribbon" src="../blog/_assets/logo-matte.adbb3c7ddc14.webp" alt="" width="1254" height="1254"><picture><source media="(prefers-color-scheme: dark)" srcset="../blog/_assets/wordmark-ivory.3a99cf025832.svg"><img class="wordmark" src="../blog/_assets/wordmark-ink.18b9e7ae3785.svg" alt="myArc" width="3056" height="1049"></picture></a>
       <div class="end-copy">
         <p>Made with <svg class="heart" role="img" aria-label="love" focusable="false"
