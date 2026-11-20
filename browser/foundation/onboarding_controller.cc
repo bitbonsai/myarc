@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <memory>
+#include <optional>
 #include <string>
 #include <utility>
 
@@ -48,6 +49,10 @@ OnboardingController* g_coach_window = nullptr;
 constexpr base::TimeDelta kRowsDelay = base::Milliseconds(200);
 // The first coach mark shows this long after the reveal's last row lands.
 constexpr base::TimeDelta kCoachDelay = base::Milliseconds(200);
+// The window's tabs can trail the tour, for example a page still loading,
+// so practice 2 waits up to this long for a page before it skips itself;
+// a workspace refresh that shows one ends the wait.
+constexpr base::TimeDelta kPinSettle = base::Milliseconds(3000);
 
 // The reveal's end state, which Back from practice 1 shows.
 constexpr char16_t kRevealTitle[] = u"Your sidebar";
@@ -58,6 +63,24 @@ constexpr char16_t kCommandBarTitle[] = u"Open a site";
 constexpr char16_t kCommandBarBody[] =
     u"Type an address or a search in the command bar.";
 constexpr char16_t kCommandBarHint[] = u"Press \u2318T";
+// Practice 2: pin the tab.
+constexpr char16_t kPinTitle[] = u"Pin this tab";
+constexpr char16_t kPinBody[] =
+    u"Pinned tabs stay in your sidebar, even after you close them.";
+constexpr char16_t kPinHint[] = u"Press \u2318D";
+// Back into practice 2 once the tab is pinned.
+constexpr char16_t kPinnedTitle[] = u"Pinned";
+constexpr char16_t kPinnedBody[] = u"This tab stays in your sidebar now.";
+// Practice 3: switch Space, or make one when there's only one.
+constexpr char16_t kSwitchTitle[] = u"Switch Spaces";
+constexpr char16_t kSwitchBody[] =
+    u"Each Space keeps its own tabs. Hop over to another one.";
+constexpr char16_t kCreateTitle[] = u"Make a Space";
+constexpr char16_t kCreateBody[] =
+    u"Give work, home or a project its own set of tabs.";
+constexpr char16_t kCreateButton[] = u"Create a Space";
+// The panel's Create follows Create a Space this long later in test hooks.
+constexpr base::TimeDelta kTestCreateDelay = base::Milliseconds(1500);
 
 #if BUILDFLAG(MYARC_TEST_HOOKS)
 constexpr char kMyarcTestOnboarding[] = "myarc-test-onboarding";
@@ -88,6 +111,38 @@ PrefService* LocalState() {
 
 foundation::OnboardingEvent Event(EventKind kind) {
   return foundation::OnboardingEvent{kind, 0, {}, {}};
+}
+
+// A Today tab practice 2 can pin: one with a web page.
+bool IsWebPage(const foundation::ItemRecord& item) {
+  const std::string url(item.canonical_url);
+  return item.has_url &&
+         (url.starts_with("https://") || url.starts_with("http://"));
+}
+
+// How `item` looks to practice 2, or nothing when the window doesn't show
+// it.
+std::optional<foundation::OnboardingPinTab> PinTabOf(
+    const foundation::SidebarResult& model,
+    uint64_t item,
+    bool shown_page_is_web) {
+  const auto has = [item](const auto& rows) {
+    return item && std::ranges::any_of(rows, [item](const auto& row) {
+             return row.id == item;
+           });
+  };
+  if (has(model.favorites) || has(model.pins)) {
+    return foundation::OnboardingPinTab::Saved;
+  }
+  for (const auto& row : model.temporary) {
+    if (item && row.id == item) {
+      return IsWebPage(row) ||
+                     (item == model.selected_item_id && shown_page_is_web)
+                 ? foundation::OnboardingPinTab::Today
+                 : foundation::OnboardingPinTab::Missing;
+    }
+  }
+  return std::nullopt;
 }
 
 // `space`'s theme in `profile`'s workspace; none for an unthemed Space, which
@@ -148,7 +203,8 @@ OnboardingController::OnboardingController(Profile& profile,
                                            base::RepeatingClosure restore_focus,
                                            SettleRowsCallback settle_rows,
                                            SelectSpaceCallback select_space,
-                                           AnchorCallback anchor)
+                                           AnchorCallback anchor,
+                                           Window window)
     : profile_(&profile),
       host_(&host),
       area_(&area),
@@ -156,7 +212,8 @@ OnboardingController::OnboardingController(Profile& profile,
       restore_focus_(std::move(restore_focus)),
       settle_rows_(std::move(settle_rows)),
       select_space_(std::move(select_space)),
-      anchor_(std::move(anchor)) {
+      anchor_(std::move(anchor)),
+      window_(std::move(window)) {
   area_observation_.Observe(&area);
 }
 
@@ -170,7 +227,8 @@ OnboardingController::~OnboardingController() {
     }
   }
   CloseWelcome();
-  CloseCoach();
+  CloseCoach(/*fade=*/false);
+  RemoveLeavingCoach();
 }
 
 void OnboardingController::Refresh() {
@@ -204,16 +262,16 @@ void OnboardingController::Refresh() {
   }
   // Another window may have ended the tour.
   CloseWelcome();
-  if (state == "practice" && tour->step == 1) {
+  if (state == "practice") {
     ShowCoach(*tour, base::TimeDelta());
     return;
   }
   CloseCoach();
-  if (state == "complete" || state == "importing") {
-    return;
+  // The handoff isn't built yet: the tour ends there, done and skipped
+  // steps kept.
+  if (state == "handoff") {
+    Run(FeedOnboardingEvent(*local_state, Event(EventKind::Finish)));
   }
-  // Practice 2, 3 and the handoff aren't built yet: end the tour as skipped.
-  Run(FeedOnboardingEvent(*local_state, Event(EventKind::SkipTour)));
 }
 
 void OnboardingController::OnCommandBarOpenedPage() {
@@ -227,6 +285,7 @@ void OnboardingController::OnCommandBarOpenedPage() {
   }
   auto event = Event(EventKind::StepDone);
   event.step = 1;
+  by_back_ = false;
   Run(FeedOnboardingEvent(*local_state, event));
 }
 
@@ -241,7 +300,8 @@ void OnboardingController::OnViewBoundsChanged(views::View* observed_view) {
 
 void OnboardingController::OnViewIsDeleting(views::View* observed_view) {
   CloseWelcome();
-  CloseCoach();
+  CloseCoach(/*fade=*/false);
+  RemoveLeavingCoach();
   area_observation_.Reset();
   area_ = nullptr;
 }
@@ -511,33 +571,49 @@ void OnboardingController::Run(
     return;
   }
   CloseWelcome();
-  if (state == "practice" && transition.tour.step == 1) {
-    ShowCoach(transition.tour,
-              transition.animate ? kCoachDelay : base::TimeDelta());
+  if (state == "practice") {
+    // The first card waits for the reveal's rows to land; the others come
+    // in as the last one fades out.
+    ShowCoach(transition.tour, transition.animate && transition.tour.step == 1
+                                   ? kCoachDelay
+                                   : base::TimeDelta());
     return;
   }
   CloseCoach();
-  if (state == "complete" || state == "importing") {
-    return;
-  }
-  // Practice 2, 3 and the handoff aren't built yet: end the tour as skipped
-  // there. Done steps and the import receipt stay in the record.
-  if (PrefService* local_state = LocalState()) {
-    Run(FeedOnboardingEvent(*local_state, Event(EventKind::SkipTour)));
+  // The handoff isn't built yet: the tour ends there. Done and skipped
+  // steps and the import receipt stay in the record.
+  if (state == "handoff") {
+    if (PrefService* local_state = LocalState()) {
+      Run(FeedOnboardingEvent(*local_state, Event(EventKind::Finish)));
+    }
   }
 }
 
 void OnboardingController::ShowCoach(const foundation::OnboardingTour& tour,
                                      base::TimeDelta delay) {
+  if (feed_pending_) {
+    return;
+  }
   const std::string state(tour.state);
   if (state == coach_state_ && tour.step == coach_step_ &&
       (coach_ || coach_timer_.IsRunning())) {
+    // Practice 2 waiting for a page: show the card once one is there.
+    if (!coach_ && pin_settled_) {
+      const Card card = PracticeCard(/*starting=*/true, /*peek=*/true);
+      if (card != Card::kNone) {
+        coach_timer_.Stop();
+        AddCard(card);
+      }
+      return;
+    }
+    CheckProgress();
     return;
   }
   if (!host_ || !area_ || (g_coach_window && g_coach_window != this)) {
     return;
   }
   CloseCoach();
+  pin_settled_ = false;
   g_coach_window = this;
   coach_state_ = state;
   coach_step_ = tour.step;
@@ -555,20 +631,59 @@ void OnboardingController::OpenCoach() {
   if (!host_ || coach_ || coach_state_.empty()) {
     return;
   }
+  const Card card = coach_state_ == "reveal" ? Card::kReveal
+                    : coach_step_ == 1       ? Card::kCommandBar
+                                             : PracticeCard(/*starting=*/true);
+  if (card == Card::kNone) {
+    return;
+  }
+  AddCard(card);
+}
+
+void OnboardingController::AddCard(Card card) {
 #if BUILDFLAG(MYARC_TEST_HOOKS)
   if (base::CommandLine::ForCurrentProcess()->HasSwitch(
           kMyarcTestReduceMotion)) {
     gfx::Animation::SetPrefersReducedMotionForTesting(true);
   }
 #endif  // BUILDFLAG(MYARC_TEST_HOOKS)
-  const bool reveal = coach_state_ == "reveal";
-  CoachMark::Content content{
-      .title = reveal ? kRevealTitle : kCommandBarTitle,
-      .body = reveal ? kRevealBody : kCommandBarBody,
-      .hint = reveal ? u"" : kCommandBarHint,
-      .offers_back = coach_offers_back_,
-      .offers_next = reveal,
-  };
+  card_ = card;
+  CoachMark::Content content{.offers_back = coach_offers_back_};
+  switch (card) {
+    case Card::kNone:
+      return;
+    case Card::kReveal:
+      content.title = kRevealTitle;
+      content.body = kRevealBody;
+      content.offers_next = true;
+      break;
+    case Card::kCommandBar:
+      content.title = kCommandBarTitle;
+      content.body = kCommandBarBody;
+      content.hint = kCommandBarHint;
+      break;
+    case Card::kPin:
+      content.title = kPinTitle;
+      content.body = kPinBody;
+      content.hint = kPinHint;
+      break;
+    case Card::kPinned:
+      content.title = kPinnedTitle;
+      content.body = kPinnedBody;
+      content.offers_next = true;
+      break;
+    case Card::kSwitch:
+      content.title = kSwitchTitle;
+      content.body = kSwitchBody;
+      content.hint = u"Press \u2303" + base::NumberToString16(space_key_);
+      break;
+    case Card::kCreate:
+      content.title = kCreateTitle;
+      content.body = kCreateBody;
+      content.offers_next = true;
+      content.next_label = kCreateButton;
+      break;
+  }
   coach_ = host_->AddChildView(std::make_unique<CoachMark>(
       content,
       base::BindRepeating(
@@ -587,14 +702,18 @@ void OnboardingController::OpenCoach() {
   if (base::CommandLine::ForCurrentProcess()->HasSwitch(kMyarcTestOnboarding)) {
     LOG(WARNING) << "Test onboarding: coach mark state=" << coach_state_
                  << " step=" << static_cast<int>(coach_step_)
-                 << " back=" << coach_offers_back_
+                 << " card=" << static_cast<int>(card)
+                 << " back=" << coach_offers_back_ << " item=" << pin_item_
+                 << " key=" << static_cast<int>(space_key_)
                  << " bounds=" << coach_->bounds().ToString();
   }
   const std::string event =
       base::CommandLine::ForCurrentProcess()->GetSwitchValueASCII(
           kMyarcTestOnboardingEvent);
-  if (!test_coach_event_scheduled_ &&
-      (event == "back" || event == "next" || event == "skip_tour")) {
+  // do acts on every card, so one run walks several steps.
+  if ((!test_coach_event_scheduled_ &&
+       (event == "back" || event == "next" || event == "skip_tour")) ||
+      event == "do") {
     test_coach_event_scheduled_ = true;
     base::SingleThreadTaskRunner::GetCurrentDefault()->PostDelayedTask(
         FROM_HERE,
@@ -605,16 +724,181 @@ void OnboardingController::OpenCoach() {
 #endif  // BUILDFLAG(MYARC_TEST_HOOKS)
 }
 
-void OnboardingController::CloseCoach() {
+OnboardingController::Card OnboardingController::PracticeCard(bool starting,
+                                                              bool peek) {
+  if (!window_.model) {
+    return Card::kNone;
+  }
+  const foundation::SidebarResult model = window_.model.Run();
+  if (!model.ok) {
+    return starting ? Card::kNone : card_;
+  }
+  if (coach_step_ == 2) {
+    // Going forward, the step points at the tab showing as it starts: the
+    // one practice 1 just opened, or the current tab when practice 1 was
+    // skipped or the tour resumed.
+    if (starting && !by_back_) {
+      pin_item_ = 0;
+    }
+    const bool shown_web =
+        window_.shown_page_is_web && window_.shown_page_is_web.Run();
+    std::optional<foundation::OnboardingPinTab> tab =
+        PinTabOf(model, pin_item_, shown_web);
+    if (!tab || *tab == foundation::OnboardingPinTab::Missing) {
+      // That tab closed: point at the current one if it's a page to pin. A
+      // current tab pinned already counts only as the step starts.
+      const auto current = PinTabOf(model, model.selected_item_id, shown_web);
+      if (current &&
+          (*current == foundation::OnboardingPinTab::Today ||
+           (starting && *current == foundation::OnboardingPinTab::Saved))) {
+        pin_item_ = model.selected_item_id;
+        tab = current;
+      }
+    }
+#if BUILDFLAG(MYARC_TEST_HOOKS)
+    if (base::CommandLine::ForCurrentProcess()->HasSwitch(
+            kMyarcTestOnboarding)) {
+      LOG(WARNING) << "Test onboarding: pin starting=" << starting
+                   << " back=" << by_back_ << " item=" << pin_item_
+                   << " selected=" << model.selected_item_id
+                   << " web=" << shown_web << " tab="
+                   << static_cast<int>(
+                          tab.value_or(foundation::OnboardingPinTab::Missing));
+    }
+#endif  // BUILDFLAG(MYARC_TEST_HOOKS)
+    const auto shown = card_ == Card::kPinned
+                           ? foundation::OnboardingPin::Pinned
+                           : foundation::OnboardingPin::Pin;
+    switch (foundation::onboarding_pin_practice(
+        starting, shown, tab.value_or(foundation::OnboardingPinTab::Missing),
+        by_back_)) {
+      case foundation::OnboardingPin::Pin:
+        return Card::kPin;
+      case foundation::OnboardingPin::Pinned:
+        return Card::kPinned;
+      case foundation::OnboardingPin::Done:
+        FeedLater(EventKind::StepDone, 2);
+        return Card::kNone;
+      case foundation::OnboardingPin::Skip:
+        if (peek) {
+          return Card::kNone;
+        }
+        if (starting && !pin_settled_) {
+          pin_settled_ = true;
+          coach_timer_.Start(FROM_HERE, kPinSettle,
+                             base::BindOnce(&OnboardingController::OpenCoach,
+                                            weak_factory_.GetWeakPtr()));
+          return Card::kNone;
+        }
+        FeedLater(EventKind::SkipStep, 2);
+        return Card::kNone;
+      default:
+        FeedLater(EventKind::Back, 2);
+        return Card::kNone;
+    }
+  }
+  const size_t count = model.spaces.size();
+  size_t current = 0;
+  for (size_t i = 0; i < count; ++i) {
+    if (model.spaces[i].id == model.current_space.id) {
+      current = i;
+    }
+  }
+  if (starting) {
+    start_space_ = model.current_space.id;
+    start_space_count_ = count;
+  } else if (foundation::onboarding_space_done(start_space_, start_space_count_,
+                                               model.current_space.id, count)) {
+    FeedLater(EventKind::StepDone, 3);
+    return Card::kNone;
+  }
+  space_key_ = foundation::onboarding_space_key(count, current);
+  return space_key_ ? Card::kSwitch : Card::kCreate;
+}
+
+void OnboardingController::CheckProgress() {
+  if (!coach_ || coach_state_ != "practice" || coach_step_ < 2) {
+    return;
+  }
+  const Card card = PracticeCard(/*starting=*/false);
+  if (card == Card::kNone) {
+    CloseCoach();
+    return;
+  }
+  if (card != card_) {
+    RetireCard(/*fade=*/true);
+    AddCard(card);
+    return;
+  }
+  // A rebuilt row may have moved what the card points at.
+  PlaceCoach();
+}
+
+void OnboardingController::FeedLater(EventKind kind, uint8_t step) {
+  feed_pending_ = true;
+  base::SingleThreadTaskRunner::GetCurrentDefault()->PostTask(
+      FROM_HERE,
+      base::BindOnce(
+          [](base::WeakPtr<OnboardingController> controller, EventKind kind,
+             uint8_t step) {
+            if (!controller) {
+              return;
+            }
+            controller->feed_pending_ = false;
+            PrefService* local_state = LocalState();
+            const auto tour =
+                local_state ? ReadOnboardingTour(*local_state) : std::nullopt;
+            // The tour moved on meanwhile, for example in another window.
+            if (!tour || std::string(tour->state) != "practice" ||
+                tour->step != step) {
+              return;
+            }
+            auto event = Event(kind);
+            event.step = step;
+            controller->by_back_ = kind == EventKind::Back;
+            controller->Run(FeedOnboardingEvent(*local_state, event));
+          },
+          weak_factory_.GetWeakPtr(), kind, step));
+}
+
+void OnboardingController::CloseCoach(bool fade) {
   coach_timer_.Stop();
   coach_state_.clear();
   coach_step_ = 0;
   if (g_coach_window == this) {
     g_coach_window = nullptr;
   }
-  if (coach_ && host_) {
-    host_->RemoveChildViewT(std::exchange(coach_, nullptr).get());
+  RetireCard(fade);
+}
+
+void OnboardingController::RetireCard(bool fade) {
+  card_ = Card::kNone;
+  if (!coach_ || !host_) {
+    coach_ = nullptr;
+    return;
   }
+  if (!fade) {
+    host_->RemoveChildViewT(std::exchange(coach_, nullptr).get());
+    return;
+  }
+  // One card leaves at a time; an older one still fading goes at once.
+  RemoveLeavingCoach();
+  leaving_coach_ = std::exchange(coach_, nullptr);
+  leaving_coach_->FadeOut(base::BindOnce(
+      [](base::WeakPtr<OnboardingController> controller) {
+        // Posted: the fade's end runs inside the card's layer animation.
+        base::SingleThreadTaskRunner::GetCurrentDefault()->PostTask(
+            FROM_HERE, base::BindOnce(&OnboardingController::RemoveLeavingCoach,
+                                      controller));
+      },
+      weak_factory_.GetWeakPtr()));
+}
+
+void OnboardingController::RemoveLeavingCoach() {
+  if (leaving_coach_ && host_) {
+    host_->RemoveChildViewT(std::exchange(leaving_coach_, nullptr).get());
+  }
+  leaving_coach_ = nullptr;
 }
 
 void OnboardingController::PlaceCoach() {
@@ -623,7 +907,29 @@ void OnboardingController::PlaceCoach() {
   }
   const gfx::Rect bounds =
       views::View::ConvertRectToTarget(area_->parent(), host_, area_->bounds());
-  coach_->Place(anchor_ ? anchor_.Run() : gfx::Rect(), bounds);
+  Target target = Target::kAddress;
+  switch (card_) {
+    case Card::kPin:
+    case Card::kPinned:
+      target = Target::kItem;
+      break;
+    case Card::kSwitch:
+      target = Target::kSpaces;
+      break;
+    case Card::kCreate:
+      target = Target::kCreate;
+      break;
+    default:
+      break;
+  }
+  const gfx::Rect anchor =
+      anchor_ ? anchor_.Run(target, pin_item_) : gfx::Rect();
+  // A row mid-rebuild has no bounds yet: the card stays where it was.
+  if (anchor.IsEmpty() && target != Target::kAddress &&
+      !coach_->bounds().IsEmpty()) {
+    return;
+  }
+  coach_->Place(anchor, bounds);
 }
 
 void OnboardingController::OnCoachAction(CoachMark::Action action) {
@@ -633,10 +939,26 @@ void OnboardingController::OnCoachAction(CoachMark::Action action) {
   }
   switch (action) {
     case CoachMark::Action::kBack:
+      by_back_ = true;
       Run(FeedOnboardingEvent(*local_state, Event(EventKind::Back)));
       break;
     case CoachMark::Action::kNext:
-      Run(FeedOnboardingEvent(*local_state, Event(EventKind::RevealDone)));
+      if (card_ == Card::kCreate) {
+        // Opens the panel; its Create finishes the step. The card stays.
+        coach_->Rearm();
+        if (window_.create_space) {
+          window_.create_space.Run();
+        }
+        break;
+      }
+      by_back_ = false;
+      if (card_ == Card::kPinned) {
+        auto event = Event(EventKind::StepDone);
+        event.step = 2;
+        Run(FeedOnboardingEvent(*local_state, event));
+      } else {
+        Run(FeedOnboardingEvent(*local_state, Event(EventKind::RevealDone)));
+      }
       break;
     case CoachMark::Action::kSkipTour:
       Run(FeedOnboardingEvent(*local_state, Event(EventKind::SkipTour)));
@@ -652,12 +974,50 @@ void OnboardingController::PressCoachForTest() {
   if (!coach_) {
     return;
   }
-  if (event == "back") {
+  if (event == "do") {
+    ActForTest();
+  } else if (event == "back") {
     coach_->Press(CoachMark::Action::kBack);
   } else if (event == "next") {
     coach_->Press(CoachMark::Action::kNext);
   } else if (event == "skip_tour") {
     coach_->Press(CoachMark::Action::kSkipTour);
+  }
+#endif  // BUILDFLAG(MYARC_TEST_HOOKS)
+}
+
+void OnboardingController::ActForTest() {
+#if BUILDFLAG(MYARC_TEST_HOOKS)
+  if (!coach_ || !window_.act_for_test) {
+    return;
+  }
+  LOG(WARNING) << "Test onboarding: do card=" << static_cast<int>(card_);
+  switch (card_) {
+    case Card::kPin:
+      window_.act_for_test.Run("pin");
+      break;
+    case Card::kSwitch:
+      window_.act_for_test.Run("space:" + base::NumberToString(space_key_));
+      break;
+    case Card::kCreate:
+      coach_->Press(CoachMark::Action::kNext);
+      base::SingleThreadTaskRunner::GetCurrentDefault()->PostDelayedTask(
+          FROM_HERE,
+          base::BindOnce(
+              [](base::WeakPtr<OnboardingController> controller) {
+                if (controller && controller->window_.act_for_test) {
+                  controller->window_.act_for_test.Run("create");
+                }
+              },
+              weak_factory_.GetWeakPtr()),
+          kTestCreateDelay);
+      break;
+    case Card::kReveal:
+    case Card::kPinned:
+      coach_->Press(CoachMark::Action::kNext);
+      break;
+    default:
+      break;
   }
 #endif  // BUILDFLAG(MYARC_TEST_HOOKS)
 }

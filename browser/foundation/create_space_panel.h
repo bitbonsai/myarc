@@ -115,6 +115,8 @@ class CreateSpacePanel final : public views::View,
   void OpenProfileMenu();
   // Swaps the Profile row for the Profile name field.
   void ShowNewProfile();
+  // Types `name` and presses Create, for background captures.
+  void CreateForCapture(const std::u16string& name);
 
  private:
   // views::View:

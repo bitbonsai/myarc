@@ -171,6 +171,23 @@ mod ffi {
         offers_back: bool,
     }
 
+    // The tab practice 2 points at (onboarding.rs `PinTab`).
+    enum OnboardingPinTab {
+        Missing,
+        Today,
+        Saved,
+    }
+
+    // What practice 2 shows, or the event it feeds instead: Done feeds
+    // StepDone(2), Skip feeds SkipStep(2) and Back feeds Back.
+    enum OnboardingPin {
+        Pin,
+        Pinned,
+        Done,
+        Skip,
+        Back,
+    }
+
     // The record to save, before running `effect`, and what it decodes to.
     struct OnboardingTransition {
         record: String,
@@ -983,6 +1000,26 @@ mod ffi {
         fn onboarding_event(record: &str, event: &OnboardingEvent) -> OnboardingTransition;
         // The saved `record` decoded. An unreadable one reads as complete.
         fn onboarding_decode(record: &str) -> OnboardingTour;
+        // Practice 2 for `tab`. `shown` is what its card shows, unless
+        // `starting`, as the step shows; `by_back` says Back brought the tour
+        // there.
+        fn onboarding_pin_practice(
+            starting: bool,
+            shown: OnboardingPin,
+            tab: OnboardingPinTab,
+            by_back: bool,
+        ) -> OnboardingPin;
+        // The Ctrl+number key practice 3 teaches for `space_count` Spaces, the
+        // current one at `current`, or 0 for Create a Space.
+        fn onboarding_space_key(space_count: usize, current: usize) -> u8;
+        // True once the window shows another Space, or there are more Spaces,
+        // than when practice 3 showed.
+        fn onboarding_space_done(
+            start_space: u64,
+            start_count: usize,
+            space: u64,
+            count: usize,
+        ) -> bool;
 
         type ArcExport;
         // Largest export accepted, in bytes.
@@ -1466,6 +1503,52 @@ pub fn onboarding_event(record: &str, event: &ffi::OnboardingEvent) -> ffi::Onbo
 
 pub fn onboarding_decode(record: &str) -> ffi::OnboardingTour {
     onboarding_tour(&workspace::onboarding::decode(record))
+}
+
+pub fn onboarding_pin_practice(
+    starting: bool,
+    shown: ffi::OnboardingPin,
+    tab: ffi::OnboardingPinTab,
+    by_back: bool,
+) -> ffi::OnboardingPin {
+    use workspace::onboarding::{PinPractice, PinTab, pin_practice};
+    let shown = match shown {
+        _ if starting => None,
+        ffi::OnboardingPin::Pinned => Some(PinPractice::Pinned),
+        ffi::OnboardingPin::Done => Some(PinPractice::Done),
+        ffi::OnboardingPin::Skip => Some(PinPractice::Skip),
+        ffi::OnboardingPin::Back => Some(PinPractice::Back),
+        _ => Some(PinPractice::Pin),
+    };
+    let tab = match tab {
+        ffi::OnboardingPinTab::Today => PinTab::Today,
+        ffi::OnboardingPinTab::Saved => PinTab::Saved,
+        _ => PinTab::Missing,
+    };
+    match pin_practice(shown, tab, by_back) {
+        PinPractice::Pin => ffi::OnboardingPin::Pin,
+        PinPractice::Pinned => ffi::OnboardingPin::Pinned,
+        PinPractice::Done => ffi::OnboardingPin::Done,
+        PinPractice::Skip => ffi::OnboardingPin::Skip,
+        PinPractice::Back => ffi::OnboardingPin::Back,
+    }
+}
+
+pub fn onboarding_space_key(space_count: usize, current: usize) -> u8 {
+    use workspace::onboarding::{SpacePractice, space_practice};
+    match space_practice(space_count, current) {
+        SpacePractice::Switch { key } => key,
+        SpacePractice::Create => 0,
+    }
+}
+
+pub fn onboarding_space_done(
+    start_space: u64,
+    start_count: usize,
+    space: u64,
+    count: usize,
+) -> bool {
+    workspace::onboarding::space_step_done((start_space, start_count), (space, count))
 }
 
 pub fn little_arc_move_target(windows: &[ffi::LittleArcMainWindow]) -> i64 {

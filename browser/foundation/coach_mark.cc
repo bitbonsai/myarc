@@ -61,6 +61,7 @@ constexpr SkColor kPrimary = SkColorSetRGB(0x3D, 0x4B, 0xF2);
 
 constexpr base::TimeDelta kGrow = base::Milliseconds(180);
 constexpr base::TimeDelta kReducedFade = base::Milliseconds(150);
+constexpr base::TimeDelta kFadeOut = base::Milliseconds(120);
 constexpr float kStartScale = 0.96f;
 
 gfx::FontList Font(int delta, gfx::Font::Weight weight) {
@@ -155,7 +156,8 @@ CoachMark::CoachMark(const Content& content, ActionCallback action)
   if (content.offers_next) {
     next_ = buttons->AddChildView(MakeButton(
         base::BindRepeating(pressed, base::Unretained(this), Action::kNext),
-        kNext));
+        content.next_label.empty() ? std::u16string(kNext)
+                                   : content.next_label));
   }
 }
 
@@ -207,6 +209,18 @@ void CoachMark::Show() {
         .SetTransform(layer(), gfx::Transform(), gfx::Tween::EASE_OUT);
   }
   GetViewAccessibility().AnnounceText(announcement_);
+}
+
+void CoachMark::FadeOut(base::OnceClosure done) {
+  pressed_ = true;
+  SetCanProcessEventsWithinSubtree(false);
+  views::AnimationBuilder()
+      .SetPreemptionStrategy(
+          ui::LayerAnimator::IMMEDIATELY_ANIMATE_TO_NEW_TARGET)
+      .OnEnded(std::move(done))
+      .Once()
+      .SetDuration(kFadeOut)
+      .SetOpacity(layer(), 0.f, gfx::Tween::EASE_OUT);
 }
 
 void CoachMark::Press(Action action) {

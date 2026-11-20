@@ -3475,6 +3475,40 @@ gfx::Rect SidebarView::GetSpaceRowsBoundsInWidget() const {
   return space_rows_->ConvertRectToWidget(space_rows_->GetVisibleBounds());
 }
 
+void SidebarView::CreateSpaceForCapture(const std::u16string& name) {
+  if (create_panel_) {
+    create_panel_->CreateForCapture(name);
+  }
+}
+
+gfx::Rect SidebarView::GetTourAnchorInWidget(TourAnchor anchor,
+                                             uint64_t item) const {
+  if (library_ || !GetWidget()) {
+    return gfx::Rect();
+  }
+  const views::View* view = nullptr;
+  switch (anchor) {
+    case TourAnchor::kItem:
+      if (!create_panel_) {
+        const auto row =
+            std::ranges::find(selectable_rows_, item,
+                              [](const auto& entry) { return entry.first; });
+        view = row != selectable_rows_.end() ? row->second.get() : nullptr;
+      }
+      break;
+    case TourAnchor::kSpaces:
+      view = spaces_scroll_;
+      break;
+    case TourAnchor::kCreate:
+      view = create_button_;
+      break;
+  }
+  if (!view || !view->IsDrawn()) {
+    return gfx::Rect();
+  }
+  return view->ConvertRectToWidget(view->GetVisibleBounds());
+}
+
 void SidebarView::SlideInSpace(const gfx::ImageSkia& outgoing,
                                const gfx::Point& origin,
                                int shift) {

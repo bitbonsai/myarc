@@ -1459,6 +1459,24 @@ bool CheckOnboarding() {
       !decoded.done.empty() || decoded.offers_import) {
     return false;
   }
+  // Practice 2 points at a Today tab and finishes on its pin; Back into it
+  // with nothing to pin carries on to practice 1.
+  if (onboarding_pin_practice(true, OnboardingPin::Pin, OnboardingPinTab::Today,
+                              false) != OnboardingPin::Pin ||
+      onboarding_pin_practice(false, OnboardingPin::Pin,
+                              OnboardingPinTab::Saved,
+                              false) != OnboardingPin::Done ||
+      onboarding_pin_practice(true, OnboardingPin::Pin,
+                              OnboardingPinTab::Missing,
+                              true) != OnboardingPin::Back) {
+    return false;
+  }
+  // Practice 3 teaches a key for another Space, or Create a Space.
+  if (onboarding_space_key(1, 0) != 0 || onboarding_space_key(3, 0) != 2 ||
+      onboarding_space_key(3, 1) != 1 || !onboarding_space_done(1, 1, 1, 2) ||
+      onboarding_space_done(1, 3, 1, 3)) {
+    return false;
+  }
   return std::string(onboarding_decode("{broken").state) == "complete" &&
          std::string(onboarding_on_load(true, "{broken", true).tour.state) ==
              "complete";

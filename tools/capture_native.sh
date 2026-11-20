@@ -59,7 +59,9 @@
 #   complete) and logs each decision; ONBOARDING=1 only logs.
 #   ONBOARDING_EVENT=skip_tour (or start_browsing, import) presses that
 #   welcome button a second after the sheet shows; back, next or skip_tour
-#   presses that coach mark button a second after a coach mark shows.
+#   presses that coach mark button a second after a coach mark shows, and
+#   do does what each card asks (Cmd+D, Ctrl+number, or Create a Space and
+#   then Create in its panel).
 #   ONBOARDING_IMPORT=<file>
 #   makes Import from Arc… read that export instead of asking, and press
 #   Import in its preview. ONBOARDING_HOLD=1 keeps the tour at the reveal

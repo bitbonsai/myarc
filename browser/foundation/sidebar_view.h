@@ -285,6 +285,12 @@ class SidebarView final : public views::View,
   // The current Space's rows in widget coordinates, cut to the part that
   // shows. Empty while the Library or the Create a Space panel shows.
   gfx::Rect GetSpaceRowsBoundsInWidget() const;
+  // What the welcome tour's coach marks point at: `item`'s row or tile, the
+  // footer's Space icons or its "+" button.
+  enum class TourAnchor { kItem, kSpaces, kCreate };
+  // That target's bounds in widget coordinates, cut to the part that shows,
+  // or empty while it doesn't show.
+  gfx::Rect GetTourAnchorInWidget(TourAnchor anchor, uint64_t item) const;
   // Runs the Space switch slide with `outgoing`, a picture of another
   // window's rows that showed at `origin` in widget coordinates, leaving as
   // the current rows come in. A Profile swap uses it. +1 slides them right.
@@ -324,6 +330,9 @@ class SidebarView final : public views::View,
   void SetCreateSpaceProfiles(std::vector<ProfileChoice> profiles,
                               const std::string& selected_id);
   bool create_space_open() const { return !!create_panel_; }
+  // Types `name` in the open Create a Space panel and presses Create, for
+  // background captures.
+  void CreateSpaceForCapture(const std::u16string& name);
   // Shows the footer tooltip of "library", "space" (the current one) or
   // "create" without hover and keeps it up, for background captures.
   void ShowFooterTooltipForCapture(std::string_view target);

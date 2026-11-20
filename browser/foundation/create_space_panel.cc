@@ -893,6 +893,12 @@ void CreateSpacePanel::Cancel() {
                      weak_factory_.GetWeakPtr()));
 }
 
+void CreateSpacePanel::CreateForCapture(const std::u16string& name) {
+  name_->SetText(name);
+  UpdateCreateButton();
+  RunCreate();
+}
+
 void CreateSpacePanel::RunCreate() {
   const std::u16string name = TrimmedName();
   if (name.empty()) {

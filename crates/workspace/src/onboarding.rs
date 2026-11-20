@@ -299,21 +299,77 @@ fn after(step: u8) -> TourState {
     }
 }
 
+/// The tab practice 2 points at, as the window sees it: the tab practice 1 opened
+/// while it's still open, otherwise the window's current tab.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum PinTab {
+    /// No web page to pin: the tab closed, or the current one is blank.
+    Missing,
+    /// A Today tab with a web page.
+    Today,
+    /// Already a Pin or a Favorite.
+    Saved,
+}
+
+/// What practice 2 shows, or the event it feeds instead.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum PinPractice {
+    /// "Press Cmd+D", pointing at the Today tab.
+    Pin,
+    /// The tab is pinned already and the card says so, with Next. Only Back gets
+    /// here, so Back from practice 3 doesn't bounce straight forward again.
+    Pinned,
+    /// Feed `step_done(2)`: the tab got pinned, or was pinned already.
+    Done,
+    /// Feed `skip_step(2)`: there's no web tab to pin.
+    Skip,
+    /// Feed `back`: Back landed here with no web tab, so it goes on to practice 1.
+    Back,
+}
+
+/// Practice 2 for `tab`. `shown` is what the card shows now, or `None` as the step
+/// starts; `by_back` says Back brought the tour here.
+pub fn pin_practice(shown: Option<PinPractice>, tab: PinTab, by_back: bool) -> PinPractice {
+    match (shown, tab) {
+        (None, PinTab::Today) => PinPractice::Pin,
+        (None, PinTab::Saved) if by_back => PinPractice::Pinned,
+        (None, PinTab::Saved) => PinPractice::Done,
+        (None, PinTab::Missing) if by_back => PinPractice::Back,
+        (_, PinTab::Missing) => PinPractice::Skip,
+        // The pin the card asked for.
+        (Some(PinPractice::Pin), PinTab::Saved) => PinPractice::Done,
+        // Unpinned again under the "pinned" card: ask for the pin.
+        (Some(PinPractice::Pinned), PinTab::Today) => PinPractice::Pin,
+        (Some(shown), _) => shown,
+    }
+}
+
 /// Which third practice step a workspace with `space_count` Spaces gets.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SpacePractice {
-    /// "Press Ctrl+2 to switch Space", pointing at the footer icons.
-    Switch,
+    /// "Press Ctrl+`key`", pointing at the footer icons. `key` names a Space
+    /// other than the current one, so the press always switches.
+    Switch { key: u8 },
     /// Create a Space, pointing at the "+" button.
     Create,
 }
 
-pub fn space_practice(space_count: usize) -> SpacePractice {
-    if space_count >= 2 {
-        SpacePractice::Switch
-    } else {
+/// The third practice step for `space_count` Spaces, the current one at index
+/// `current` in footer order.
+pub fn space_practice(space_count: usize, current: usize) -> SpacePractice {
+    if space_count < 2 {
         SpacePractice::Create
+    } else if current == 0 {
+        SpacePractice::Switch { key: 2 }
+    } else {
+        SpacePractice::Switch { key: 1 }
     }
+}
+
+/// True once the window shows another Space, or the Profile has more Spaces, than
+/// when practice 3 showed. Either finishes the step, whichever card it showed.
+pub fn space_step_done(start: (SpaceId, usize), now: (SpaceId, usize)) -> bool {
+    now.0 != start.0 || now.1 > start.1
 }
 
 /// The state's name as `encode` writes it.
@@ -946,9 +1002,80 @@ mod tests {
 
     #[test]
     fn third_practice_switches_space_or_creates_one() {
-        assert_eq!(space_practice(0), SpacePractice::Create);
-        assert_eq!(space_practice(1), SpacePractice::Create);
-        assert_eq!(space_practice(2), SpacePractice::Switch);
-        assert_eq!(space_practice(8), SpacePractice::Switch);
+        assert_eq!(space_practice(0, 0), SpacePractice::Create);
+        assert_eq!(space_practice(1, 0), SpacePractice::Create);
+        // The key always names another Space than the current one.
+        assert_eq!(space_practice(2, 0), SpacePractice::Switch { key: 2 });
+        assert_eq!(space_practice(3, 1), SpacePractice::Switch { key: 1 });
+        assert_eq!(space_practice(8, 7), SpacePractice::Switch { key: 1 });
+    }
+
+    #[test]
+    fn third_practice_finishes_on_a_switch_or_a_new_space() {
+        assert!(!space_step_done((1, 3), (1, 3)));
+        assert!(space_step_done((1, 3), (2, 3)));
+        // Creating a Space finishes it whether or not the window switches.
+        assert!(space_step_done((1, 1), (1, 2)));
+        assert!(space_step_done((1, 1), (4, 2)));
+        // Deleting a Space doesn't.
+        assert!(!space_step_done((1, 3), (1, 2)));
+        let done = apply(&at(Practice(3)), TourEvent::StepDone(3));
+        assert_eq!(done.record.state, Handoff);
+        assert!(done.record.is_done(3));
+    }
+
+    #[test]
+    fn pin_practice_points_at_a_today_tab_and_finishes_on_the_pin() {
+        let shown = pin_practice(None, PinTab::Today, false);
+        assert_eq!(shown, PinPractice::Pin);
+        assert_eq!(pin_practice(Some(shown), PinTab::Today, false), shown);
+        assert_eq!(
+            pin_practice(Some(shown), PinTab::Saved, false),
+            PinPractice::Done
+        );
+        // Back doesn't change what a Today tab gets.
+        assert_eq!(pin_practice(None, PinTab::Today, true), PinPractice::Pin);
+    }
+
+    #[test]
+    fn pin_practice_counts_a_tab_pinned_already_as_done() {
+        assert_eq!(pin_practice(None, PinTab::Saved, false), PinPractice::Done);
+        let done = apply(&at(Practice(2)), TourEvent::StepDone(2));
+        assert_eq!(done.record.state, Practice(3));
+    }
+
+    #[test]
+    fn pin_practice_skips_itself_without_a_web_tab() {
+        assert_eq!(
+            pin_practice(None, PinTab::Missing, false),
+            PinPractice::Skip
+        );
+        // The tab closing under the card skips the step too.
+        for shown in [PinPractice::Pin, PinPractice::Pinned] {
+            assert_eq!(
+                pin_practice(Some(shown), PinTab::Missing, false),
+                PinPractice::Skip
+            );
+        }
+        let skipped = apply(&at(Practice(2)), TourEvent::SkipStep(2)).record;
+        assert_eq!(skipped.state, Practice(3));
+        assert!(skipped.is_skipped(2) && !skipped.is_done(2));
+    }
+
+    #[test]
+    fn back_into_practice_two_never_bounces_forward() {
+        // A tab pinned in practice 2 gets a card with Next instead of feeding
+        // step_done again, and unpinning it asks for the pin.
+        let shown = pin_practice(None, PinTab::Saved, true);
+        assert_eq!(shown, PinPractice::Pinned);
+        assert_eq!(pin_practice(Some(shown), PinTab::Saved, true), shown);
+        assert_eq!(
+            pin_practice(Some(shown), PinTab::Today, true),
+            PinPractice::Pin
+        );
+        // With no tab to pin, Back carries on to practice 1.
+        assert_eq!(pin_practice(None, PinTab::Missing, true), PinPractice::Back);
+        let record = run(&at(Practice(3)), [TourEvent::Back, TourEvent::Back]);
+        assert_eq!(record.state, Practice(1));
     }
 }

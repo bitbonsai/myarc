@@ -1,5 +1,5 @@
 diff --git a/chrome/browser/ui/views/frame/browser_view.cc b/chrome/browser/ui/views/frame/browser_view.cc
-index 7b568f6de760af21d6e9d2aa44415a7cef617c51..c8bf0e1e616082f1015f0d8bd9675850b8af3073 100644
+index 7b568f6de760af21d6e9d2aa44415a7cef617c51..8d70913891bf624cbc42e09e519f10fdccf35952 100644
 --- a/chrome/browser/ui/views/frame/browser_view.cc
 +++ b/chrome/browser/ui/views/frame/browser_view.cc
 @@ -22,6 +22,7 @@
@@ -2075,7 +2075,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..c8bf0e1e616082f1015f0d8bd9675850
  
      if (dialog_anchor_) {
        rect.Offset(0, -kAdditionalDialogToolbarOverlap);
-@@ -5197,6 +6848,265 @@ void BrowserView::AddedToWidget() {
+@@ -5197,6 +6848,340 @@ void BrowserView::AddedToWidget() {
        kFallbackPopupAnchorElementId, *this);
  
    initialized_ = true;
@@ -2266,15 +2266,90 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..c8bf0e1e616082f1015f0d8bd9675850
 +              },
 +              myarc_workspace_weak_factory_.GetWeakPtr()),
 +          base::BindRepeating(
-+              [](base::WeakPtr<BrowserView> view) {
-+                // The address field, wherever the window shows it.
-+                views::View* bar = view ? view->GetLocationBarView() : nullptr;
-+                return bar && bar->IsDrawn() && bar->parent()
-+                           ? views::View::ConvertRectToTarget(
-+                                 bar->parent(), view.get(), bar->bounds())
-+                           : gfx::Rect();
++              [](base::WeakPtr<BrowserView> view,
++                 myarc::OnboardingController::Target target, uint64_t item) {
++                using Target = myarc::OnboardingController::Target;
++                if (!view) {
++                  return gfx::Rect();
++                }
++                if (target == Target::kAddress) {
++                  // The address field, wherever the window shows it.
++                  views::View* bar = view->GetLocationBarView();
++                  return bar && bar->IsDrawn() && bar->parent()
++                             ? views::View::ConvertRectToTarget(
++                                   bar->parent(), view.get(), bar->bounds())
++                             : gfx::Rect();
++                }
++                auto* sidebar = view->myarc_workspace_sidebar_.get();
++                if (!sidebar || !view->GetWidget()) {
++                  return gfx::Rect();
++                }
++                // Rows a refresh just rebuilt get their bounds first.
++                view->GetWidget()->LayoutRootViewIfNecessary();
++                using Anchor = myarc::SidebarView::TourAnchor;
++                gfx::Rect rect = sidebar->GetTourAnchorInWidget(
++                    target == Target::kItem     ? Anchor::kItem
++                    : target == Target::kSpaces ? Anchor::kSpaces
++                                                : Anchor::kCreate,
++                    item);
++                gfx::Point origin = rect.origin();
++                views::View::ConvertPointFromWidget(view.get(), &origin);
++                rect.set_origin(origin);
++                return rect;
 +              },
-+              myarc_workspace_weak_factory_.GetWeakPtr()));
++              myarc_workspace_weak_factory_.GetWeakPtr()),
++          myarc::OnboardingController::Window{
++              .model = base::BindRepeating(
++                  [](base::WeakPtr<BrowserView> view) {
++                    return view && view->myarc_workspace_adapter_
++                               ? view->myarc_workspace_adapter_->Sidebar()
++                               : myarc::foundation::SidebarResult{};
++                  },
++                  myarc_workspace_weak_factory_.GetWeakPtr()),
++              .shown_page_is_web = base::BindRepeating(
++                  [](base::WeakPtr<BrowserView> view) {
++                    content::WebContents* page =
++                        view ? view->browser_->GetTabStripModel()
++                                   ->GetActiveWebContents()
++                             : nullptr;
++                    return page &&
++                           page->GetLastCommittedURL().SchemeIsHTTPOrHTTPS();
++                  },
++                  myarc_workspace_weak_factory_.GetWeakPtr()),
++              .create_space = base::BindRepeating(
++                  [](base::WeakPtr<BrowserView> view) {
++                    if (view) {
++                      view->CreateSpace();
++                    }
++                  },
++                  myarc_workspace_weak_factory_.GetWeakPtr()),
++              .act_for_test = base::BindRepeating(
++                  [](base::WeakPtr<BrowserView> view,
++                     const std::string& action) {
++                    if (!view) {
++                      return;
++                    }
++                    int space = 0;
++                    if (action == "pin") {
++                      chrome::ExecuteCommand(view->browser_.get(),
++                                             IDC_MYARC_TOGGLE_PIN);
++                    } else if (action == "create") {
++                      if (view->myarc_workspace_sidebar_) {
++                        view->myarc_workspace_sidebar_->CreateSpaceForCapture(
++                            u"Home");
++                      }
++                    } else if (base::StringToInt(
++                                   std::string_view(action).substr(
++                                       std::min<size_t>(6, action.size())),
++                                   &space) &&
++                               action.starts_with("space:") && space >= 1 &&
++                               space <= 8) {
++                      chrome::ExecuteCommand(
++                          view->browser_.get(),
++                          IDC_MYARC_SELECT_SPACE_0 + space - 1);
++                    }
++                  },
++                  myarc_workspace_weak_factory_.GetWeakPtr())});
 +    }
 +  }
 +  if (vertical && myarc_workspace_adapter_ && !myarc_workspace_sidebar_) {
@@ -2341,7 +2416,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..c8bf0e1e616082f1015f0d8bd9675850
  }
  
  void BrowserView::RemovedFromWidget() {
-@@ -5267,106 +7177,2874 @@ const views::View* BrowserView::GetViewByElementId(
+@@ -5267,112 +7252,2880 @@ const views::View* BrowserView::GetViewByElementId(
  ///////////////////////////////////////////////////////////////////////////////
  // BrowserView, ui::AcceleratorTarget overrides:
  
@@ -2514,7 +2589,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..c8bf0e1e616082f1015f0d8bd9675850
 +    if (!base::StringToInt(std::string_view(value).substr(5), &delay_ms)) {
 +      delay_ms = 2500;
 +    }
-+  }
+   }
 +  delay_ms = std::clamp(delay_ms, 0, 120000);
 +  base::SingleThreadTaskRunner::GetCurrentDefault()->PostDelayedTask(
 +      FROM_HERE,
@@ -2558,7 +2633,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..c8bf0e1e616082f1015f0d8bd9675850
 +  }
 +  if (!myarc_settings_window_) {
 +    myarc_settings_window_ = CreateMyarcSettingsWindow();
-   }
++  }
 +  myarc_settings_window_->Show(myarc::SettingsWindow::Section::kGeneral,
 +                               /*inactive=*/false);
 +  return true;
@@ -2569,25 +2644,34 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..c8bf0e1e616082f1015f0d8bd9675850
 -  // Ensure that this browser's Profile has a JumpList so that the JumpList is
 -  // kept up to date.
 -  JumpListFactory::GetForProfile(browser_->GetProfile());
+-}
+-#endif
+-
+-BrowserFrameView* BrowserView::GetFrameView() {
+-  return browser_widget_ ? browser_widget_->GetFrameView() : nullptr;
 +void BrowserView::OpenChromiumSettings() {
 +  chrome::ShowSettings(browser());
  }
--#endif
  
--BrowserFrameView* BrowserView::GetFrameView() {
+-const BrowserFrameView* BrowserView::GetFrameView() const {
 -  return browser_widget_ ? browser_widget_->GetFrameView() : nullptr;
 +void BrowserView::OpenMyarcSite() {
 +  chrome::AddSelectedTabWithURL(browser(), GURL("https://myarc.dev"),
 +                                ui::PAGE_TRANSITION_LINK);
  }
  
--const BrowserFrameView* BrowserView::GetFrameView() const {
--  return browser_widget_ ? browser_widget_->GetFrameView() : nullptr;
+-BrowserViewLayout* BrowserView::GetBrowserViewLayout() const {
+-  return static_cast<BrowserViewLayout*>(GetLayoutManager());
 -}
 +namespace {
  
--BrowserViewLayout* BrowserView::GetBrowserViewLayout() const {
--  return static_cast<BrowserViewLayout*>(GetLayoutManager());
+-bool BrowserView::MaybeShowBookmarkBar(WebContents* contents) {
+-  const bool show_bookmark_bar =
+-      contents &&
+-      WindowFeatureController::From(browser_)->SupportsWindowFeature(
+-          WindowFeatureController::WindowFeature::kFeatureBookmarkBar);
+-  if (!show_bookmark_bar && !bookmark_bar_view_) {
+-    return false;
 +// The entry's local name. Arc calls the first Profile "Default" until it is
 +// renamed, where Chromium would say "Your Chromium".
 +std::u16string MyarcProfileEntryName(const ProfileAttributesEntry& entry) {
@@ -2689,9 +2773,8 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..c8bf0e1e616082f1015f0d8bd9675850
 +    }
 +  }
 +  return result;
- }
- 
--bool BrowserView::MaybeShowBookmarkBar(WebContents* contents) {
++}
++
 +}  // namespace
 +
 +std::unique_ptr<myarc::SettingsWindow> BrowserView::CreateMyarcSettingsWindow() {
@@ -5290,10 +5373,16 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..c8bf0e1e616082f1015f0d8bd9675850
 +}
 +
 +bool BrowserView::MaybeShowBookmarkBar(WebContents* contents) {
-   const bool show_bookmark_bar =
-       contents &&
-       WindowFeatureController::From(browser_)->SupportsWindowFeature(
-@@ -5471,6 +10149,10 @@ bool BrowserView::MaybeUpdateDevtools(content::WebContents* contents) {
++  const bool show_bookmark_bar =
++      contents &&
++      WindowFeatureController::From(browser_)->SupportsWindowFeature(
++          WindowFeatureController::WindowFeature::kFeatureBookmarkBar);
++  if (!show_bookmark_bar && !bookmark_bar_view_) {
++    return false;
+   }
+ 
+   if (!bookmark_bar_view_) {
+@@ -5471,6 +10224,10 @@ bool BrowserView::MaybeUpdateDevtools(content::WebContents* contents) {
  
  void BrowserView::UpdateUIForContents(WebContents* contents,
                                        bool should_layout_immediately) {
@@ -5304,7 +5393,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..c8bf0e1e616082f1015f0d8bd9675850
    TRACE_EVENT0("ui", "BrowserView::UpdateUIForContents");
    bool needs_layout = MaybeShowBookmarkBar(contents);
  
-@@ -5706,6 +10388,26 @@ void BrowserView::LoadAccelerators() {
+@@ -5706,6 +10463,26 @@ void BrowserView::LoadAccelerators() {
    }
  
  #if BUILDFLAG(IS_MAC)

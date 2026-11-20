@@ -21,7 +21,8 @@ namespace myarc {
 // It never takes focus, so the shortcut it teaches still reaches the window,
 // and Esc while it shows means Skip tour. VoiceOver hears its text when it
 // shows. It grows in from 96% as it fades in, 180 ms with ease-out, from the
-// side of its anchor; under Reduce Motion it only fades in, over 150 ms.
+// side of its anchor; under Reduce Motion it only fades in, over 150 ms. It
+// leaves with a 120 ms fade.
 // UI sequence only.
 class CoachMark : public views::View {
   METADATA_HEADER(CoachMark, views::View)
@@ -37,6 +38,8 @@ class CoachMark : public views::View {
     std::u16string hint;
     bool offers_back = false;
     bool offers_next = false;
+    // Next's label, or empty for "Next".
+    std::u16string next_label;
   };
 
   CoachMark(const Content& content, ActionCallback action);
@@ -52,6 +55,14 @@ class CoachMark : public views::View {
   // Fades the card in, growing it unless Reduce Motion is on, and announces
   // its text.
   void Show();
+
+  // Fades the card out over 120 ms, ignoring presses from the start, then
+  // runs `done`, which removes it. Moving to the next step does this while
+  // the next card comes in.
+  void FadeOut(base::OnceClosure done);
+
+  // Takes presses again after one that leaves the card up.
+  void Rearm() { pressed_ = false; }
 
   // Presses a button, as the test hooks do.
   void Press(Action action);

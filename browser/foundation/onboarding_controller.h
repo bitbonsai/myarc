@@ -34,14 +34,19 @@ class RevealFrames;
 // then `reveal_done` moves the tour to practice 1. Its coach mark shows 200 ms
 // after the last row lands and points at the address area: opening a page
 // from the command bar finishes the step. Back from it shows the reveal's end
-// state with a card of its own. Practice 2, 3 and the handoff aren't built
-// yet, so the tour ends as skipped once it gets there. UI sequence only.
+// state with a card of its own. Practice 2 points at the tab practice 1
+// opened, or the current one, and finishes once it's pinned. Practice 3
+// points at the footer's Spaces, or its "+" with one Space, and finishes on
+// a switch or a new Space. A card leaving fades out over 120 ms while the
+// next comes in. The handoff isn't built yet, so the tour ends once it gets
+// there. UI sequence only.
 //
 // With test hooks, --myarc-test-onboarding-event=skip_tour, start_browsing
 // or import presses that button a second after the sheet shows, or
 // --myarc-test-onboarding-event-delay=<ms> after it; back, next or
 // skip_tour presses that coach mark button the same way once a coach mark
-// shows.
+// shows, and do does what each card asks: Cmd+D, Ctrl+number, or Create a
+// Space then the panel's Create.
 // --myarc-test-onboarding-import=<file> imports that export instead of
 // asking for one, pressing Import in the preview.
 // --myarc-test-onboarding-hold keeps the tour at the reveal after the
@@ -56,12 +61,27 @@ class OnboardingController final : public views::ViewObserver {
   // `restore_focus` gives focus back to the window once the sheet closes.
   // `settle_rows` runs the sidebar's row settle after the delay it gets and
   // returns how long until its last row lands. `select_space` shows a Space
-  // in the window. `anchor` gives the address area's bounds in `host`'s
-  // coordinates, or an empty rect.
+  // in the window. `anchor` gives the bounds of what a card points at in
+  // `host`'s coordinates, or an empty rect. `window` reaches the rest.
   using SettleRowsCallback =
       base::RepeatingCallback<base::TimeDelta(base::TimeDelta delay)>;
   using SelectSpaceCallback = base::RepeatingCallback<void(uint64_t space)>;
-  using AnchorCallback = base::RepeatingCallback<gfx::Rect()>;
+  // What a coach mark points at. kItem is a sidebar row or tile.
+  enum class Target { kAddress, kItem, kSpaces, kCreate };
+  using AnchorCallback =
+      base::RepeatingCallback<gfx::Rect(Target target, uint64_t item)>;
+  struct Window {
+    // The window's sidebar model.
+    base::RepeatingCallback<foundation::SidebarResult()> model;
+    // True when the window shows a web page. The selected Today row's
+    // saved address can trail its live page.
+    base::RepeatingCallback<bool()> shown_page_is_web;
+    // Opens the Create a Space panel.
+    base::RepeatingClosure create_space;
+    // Test hooks only: "pin" runs Cmd+D's command, "space:<n>" Ctrl+<n>'s,
+    // and "create" presses Create in the open Create a Space panel.
+    base::RepeatingCallback<void(const std::string&)> act_for_test;
+  };
   OnboardingController(Profile& profile,
                        views::View& host,
                        views::View& area,
@@ -69,7 +89,8 @@ class OnboardingController final : public views::ViewObserver {
                        base::RepeatingClosure restore_focus,
                        SettleRowsCallback settle_rows,
                        SelectSpaceCallback select_space,
-                       AnchorCallback anchor);
+                       AnchorCallback anchor,
+                       Window window);
   OnboardingController(const OnboardingController&) = delete;
   OnboardingController& operator=(const OnboardingController&) = delete;
   ~OnboardingController() override;
@@ -100,18 +121,43 @@ class OnboardingController final : public views::ViewObserver {
   // `reveal_done`.
   void StartReveal();
   void FinishReveal();
-  // Shows the coach mark for the saved `tour`, which is at the reveal or
-  // practice 1, after `delay`. Keeps a card already showing for it.
+  // What a coach mark shows.
+  enum class Card {
+    kNone,
+    kReveal,
+    kCommandBar,
+    kPin,
+    kPinned,
+    kSwitch,
+    kCreate
+  };
+  // Shows the coach mark for the saved `tour`, at the reveal or a practice
+  // step, after `delay`. A card already showing for that step stays, and
+  // the workspace is checked for the step's progress instead.
   void ShowCoach(const foundation::OnboardingTour& tour, base::TimeDelta delay);
-  // Adds the card ShowCoach set up.
+  // Adds the card ShowCoach set up, or feeds the event its step calls for.
   void OpenCoach();
-  void CloseCoach();
+  void AddCard(Card card);
+  // The card practice 2 or 3 shows now, or kNone once it fed an event.
+  // `peek` only looks while practice 2 waits for a page, and never skips.
+  Card PracticeCard(bool starting, bool peek = false);
+  // Swaps the card when the step's card changed, for example an unpin
+  // under the "pinned" card.
+  void CheckProgress();
+  // Removes the card, fading it out unless `fade` is false.
+  void CloseCoach(bool fade = true);
+  // Removes the card view only, fading it out with `fade`.
+  void RetireCard(bool fade);
+  void RemoveLeavingCoach();
+  // Feeds a step event, posted, so it never runs inside a card's setup.
+  void FeedLater(foundation::OnboardingEventKind kind, uint8_t step);
   void PlaceCoach();
   void OnCoachAction(CoachMark::Action action);
   // Runs the effect of a saved transition.
   void Run(const foundation::OnboardingTransition& transition);
   void PressForTest();
   void PressCoachForTest();
+  void ActForTest();
 
   const raw_ptr<Profile> profile_;
   raw_ptr<views::View> host_;
@@ -121,8 +167,25 @@ class OnboardingController final : public views::ViewObserver {
   const SettleRowsCallback settle_rows_;
   const SelectSpaceCallback select_space_;
   const AnchorCallback anchor_;
+  const Window window_;
   raw_ptr<WelcomeView> sheet_ = nullptr;
   raw_ptr<CoachMark> coach_ = nullptr;
+  // The card fading out as the next one comes in.
+  raw_ptr<CoachMark> leaving_coach_ = nullptr;
+  Card card_ = Card::kNone;
+  // Back brought the tour to the step showing.
+  bool by_back_ = false;
+  // A step event is posted; no card shows until it runs.
+  bool feed_pending_ = false;
+  // Practice 2 looked again for a tab before skipping itself.
+  bool pin_settled_ = false;
+  // The tab practice 2 points at.
+  uint64_t pin_item_ = 0;
+  // The Ctrl+number key practice 3 teaches.
+  uint8_t space_key_ = 0;
+  // The Space shown, and how many there were, when practice 3 showed.
+  uint64_t start_space_ = 0;
+  size_t start_space_count_ = 0;
   // The state and step the coach mark shows, or is about to show.
   std::string coach_state_;
   uint8_t coach_step_ = 0;
