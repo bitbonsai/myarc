@@ -61,6 +61,8 @@ font.save(font_bytes)
 heart = (ASSETS / 'heart.svg').read_text()
 heart = heart.replace('<svg\n', '<svg class="heart" role="img" aria-label="love" focusable="false"\n', 1)
 assets = {
+    # The hero ribbon (image fallback, WebGL canvas, script), shared by the homepage and /welcome/. First, so its own tokens resolve below.
+    '@@RIBBON@@': (ROOT / 'ribbon.html').read_text().strip(),
     '@@OUTFIT_FONT@@': uri('font/woff2', font_bytes.getvalue()),
     '@@WORDMARK_INK@@': uri('image/svg+xml', (ASSETS / 'wordmark-ink.svg').read_bytes()),
     '@@WORDMARK_IVORY@@': uri('image/svg+xml', (ASSETS / 'wordmark-ivory.svg').read_bytes()),
