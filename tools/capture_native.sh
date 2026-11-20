@@ -67,6 +67,16 @@
 #   makes Import from Arc… read that export instead of asking, and press
 #   Import in its preview. ONBOARDING_HOLD=1 keeps the tour at the reveal
 #   after the import's crossfade. All need myarc_test_hooks.
+#   SCREEN_BURST=<seconds> records the whole main display, every app's
+#   windows included, from just after launch, as frames in screen-frames/
+#   next to the output (tools/bgcapture.swift screen). The welcome's desktop
+#   dim covers other apps, so a window burst can't show it. Pair it with
+#   ONBOARDING=1 and ARGS=--myarc-test-onboarding-show-delay=<ms> so the
+#   burst is running before the intro starts. The frames show the real
+#   desktop: keep them out of the repo. BURST=<seconds> records only the
+#   browser's largest window the same way, as frames in window-frames/, for
+#   Reduce Motion, where the welcome fades in inside a window that a
+#   background launch leaves behind other apps.
 #   SCRIPT=<file> runs that bash script once the window settles, before the
 #   capture, with PID and MYARC_CONTROL_DIR set; it can drive myarc and
 #   take its own shots with bgcapture.swift.
@@ -157,7 +167,7 @@ if [ "${1:-}" = "--inner" ]; then
     *) EXTRA+=(--myarc-capture-open-settings); SHOT_TITLE=(General) ;;
   esac
   # -g: launch without activating, so the user's frontmost app keeps focus.
-  open -g -n ${OPEN_ENV[@]+"${OPEN_ENV[@]}"} -a "$APP" --args --user-data-dir="$PROFILE" --no-first-run --no-default-browser-check \
+  open -g -n ${OPEN_ENV[@]+"${OPEN_ENV[@]}"} -a "$APP" --args --user-data-dir="$PROFILE" --no-first-run --no-default-browser-check --use-mock-keychain \
     --enable-features=GlassFrame --disable-features=InitialWebUI \
     --disable-backgrounding-occluded-windows --myarc-background-launch ${EXTRA[@]+"${EXTRA[@]}"} \
     --myarc-visual-parity --myarc-workspace-sidebar --window-size="$W,$H" --window-position=40,60 ${URLS[@]+"${URLS[@]}"}
@@ -169,12 +179,25 @@ if [ "${1:-}" = "--inner" ]; then
     sleep 0.25
   done
   [ -n "$PID" ] || { echo "native process did not start" >&2; exit 1; }
+  BURST_PID=""
+  if [ -n "${SCREEN_BURST:-}" ]; then
+    swift "$(dirname "$0")/bgcapture.swift" screen "$PID" "$(dirname "$OUT")/screen-frames" "$SCREEN_BURST" \
+      > "$(dirname "$OUT")/screen-burst.txt" 2>&1 &
+    BURST_PID=$!
+  elif [ -n "${BURST:-}" ]; then
+    # The window burst needs the window, which shows a moment after launch.
+    sleep 1
+    swift "$(dirname "$0")/bgcapture.swift" burst "$PID" "$(dirname "$OUT")/window-frames" "$BURST" \
+      > "$(dirname "$OUT")/window-burst.txt" 2>&1 &
+    BURST_PID=$!
+  fi
   sleep "$SETTLE"
   [ -n "${EXTRA[*]-}" ] && sleep "$KEY_SETTLE"
   kill -0 "$PID" 2>/dev/null || { echo "native process exited early" >&2; exit 1; }
   if [ -n "${SCRIPT:-}" ]; then
     PID=$PID MYARC_CONTROL_DIR=${CONTROL:-} bash "$SCRIPT" || echo "script exited $?" >&2
   fi
+  [ -z "$BURST_PID" ] || wait "$BURST_PID" || echo "burst exited $?" >&2
   swift "$(dirname "$0")/bgcapture.swift" shot "$PID" "$OUT" ${SHOT_TITLE[@]+"${SHOT_TITLE[@]}"}
   WID=bg; RECT=window
   echo "pid=$PID window=$WID rect=$RECT"

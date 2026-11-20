@@ -6,6 +6,10 @@
 //   swift tools/bgcapture.swift burst <pid> <outdir> <seconds> (every frame that
 //     changes in the PID's largest window's area, all its windows included, as
 //     numbered PNGs named with milliseconds since the start)
+//   swift tools/bgcapture.swift screen <pid> <outdir> <seconds> (the same, for the
+//     whole main display at half size with every app's windows, so a window
+//     that covers the screen, such as the welcome's desktop dim, shows over
+//     what it covers; the PID only has to exist)
 import CoreGraphics
 import CoreImage
 import CoreMedia
@@ -14,7 +18,7 @@ import ScreenCaptureKit
 
 let args = CommandLine.arguments
 guard args.count == 4 || args.count == 5, let pid = Int32(args[2]) else {
-  FileHandle.standardError.write("usage: bgcapture.swift key|shot|burst <pid> <arg> [title|seconds]\n".data(using: .utf8)!)
+  FileHandle.standardError.write("usage: bgcapture.swift key|shot|burst|screen <pid> <arg> [title|seconds]\n".data(using: .utf8)!)
   exit(64)
 }
 
@@ -148,6 +152,35 @@ func burst(_ dir: String, seconds: Double) async throws {
   exit(0)
 }
 
+func screenBurst(_ dir: String, seconds: Double) async throws {
+  let content = try await SCShareableContent.excludingDesktopWindows(
+    false, onScreenWindowsOnly: true)
+  guard let display = content.displays.first(where: { $0.displayID == CGMainDisplayID() })
+    ?? content.displays.first
+  else {
+    FileHandle.standardError.write("no display\n".data(using: .utf8)!)
+    exit(66)
+  }
+  let filter = SCContentFilter(display: display, excludingWindows: [])
+  let config = SCStreamConfiguration()
+  config.width = display.width / 2
+  config.height = display.height / 2
+  config.minimumFrameInterval = CMTime(value: 1, timescale: 60)
+  config.queueDepth = 8
+  config.showsCursor = false
+  let writer = FrameWriter(dir: dir)
+  let stream = SCStream(filter: filter, configuration: config, delegate: nil)
+  try stream.addStreamOutput(writer, type: .screen,
+                             sampleHandlerQueue: DispatchQueue(label: "bgcapture.frames"))
+  try await stream.startCapture()
+  print(String(format: "start=%.3f", writer.start.timeIntervalSince1970))
+  try await Task.sleep(nanoseconds: UInt64(seconds * 1_000_000_000))
+  try await stream.stopCapture()
+  writer.queue.sync {}
+  print("frames=\(writer.count) dir=\(dir)")
+  exit(0)
+}
+
 switch args[1] {
 case "key":
   postKey(args[3])
@@ -164,6 +197,16 @@ case "burst":
   try? FileManager.default.createDirectory(atPath: args[3], withIntermediateDirectories: true)
   Task {
     do { try await burst(args[3], seconds: seconds) } catch {
+      FileHandle.standardError.write("capture failed: \(error)\n".data(using: .utf8)!)
+      exit(1)
+    }
+  }
+  dispatchMain()
+case "screen":
+  guard args.count == 5, let seconds = Double(args[4]) else { exit(64) }
+  try? FileManager.default.createDirectory(atPath: args[3], withIntermediateDirectories: true)
+  Task {
+    do { try await screenBurst(args[3], seconds: seconds) } catch {
       FileHandle.standardError.write("capture failed: \(error)\n".data(using: .utf8)!)
       exit(1)
     }

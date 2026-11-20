@@ -12,6 +12,7 @@
 #include "base/timer/timer.h"
 #include "myarc/bridge.rs.h"
 #include "myarc/coach_mark.h"
+#include "myarc/welcome_intro.h"
 #include "myarc/welcome_view.h"
 #include "ui/gfx/geometry/rect.h"
 #include "ui/views/view_observer.h"
@@ -42,7 +43,10 @@ class RevealFrames;
 // a closing card offers Make myArc your default browser and Done. Done or
 // Esc ends the tour, keeping the steps done and skipped, and the card fades
 // out over 180 ms. Replay, from Settings > Advanced, starts the tour again at
-// the welcome in this window. UI sequence only.
+// the welcome in this window. Unless Reduce Motion is on, the welcome arrives
+// through WelcomeIntro: the window takes three quarters of the main display,
+// centred, the desktop dims and a blob at the display's centre grows into
+// the window, and the sheet shows its finished state. UI sequence only.
 //
 // With test hooks, --myarc-test-onboarding-event=skip_tour, start_browsing
 // or import presses that button a second after the sheet shows, or
@@ -123,6 +127,8 @@ class OnboardingController final : public views::ViewObserver {
  private:
   void ShowWelcome(bool offers_import);
   void CloseWelcome();
+  // The desktop intro lifted; drops it.
+  void OnIntroDone();
   // Gives focus back to the window if the sheet holds it.
   void ReleaseFocus();
   void OnAction(WelcomeView::Action action);
@@ -189,6 +195,9 @@ class OnboardingController final : public views::ViewObserver {
   const AnchorCallback anchor_;
   const Window window_;
   raw_ptr<WelcomeView> sheet_ = nullptr;
+  // The desktop dim and blob while the welcome arrives. Dropped from a posted
+  // task, a press or CloseWelcome, never from inside its own timer.
+  std::unique_ptr<WelcomeIntro> intro_;
   raw_ptr<CoachMark> coach_ = nullptr;
   // The card fading out as the next one comes in.
   raw_ptr<CoachMark> leaving_coach_ = nullptr;

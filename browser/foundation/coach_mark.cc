@@ -38,6 +38,9 @@
 #include "ui/views/controls/button/label_button.h"
 #include "ui/views/controls/highlight_path_generator.h"
 #include "ui/views/controls/label.h"
+#include "ui/views/controls/textfield/textfield.h"
+#include "ui/views/controls/webview/webview.h"
+#include "ui/views/focus/focus_manager.h"
 #include "ui/views/layout/box_layout.h"
 #include "ui/views/layout/box_layout_view.h"
 #include "ui/views/view_class_properties.h"
@@ -247,8 +250,21 @@ void CoachMark::Press(Action action) {
   run.Run(action);
 }
 
+bool EscSkipsTour(const views::View& view) {
+  const views::FocusManager* focus = view.GetFocusManager();
+  for (const views::View* focused = focus ? focus->GetFocusedView() : nullptr;
+       focused; focused = focused->parent()) {
+    if (views::IsViewClass<views::Textfield>(focused) ||
+        views::IsViewClass<views::WebView>(focused)) {
+      return false;
+    }
+  }
+  return true;
+}
+
 bool CoachMark::AcceleratorPressed(const ui::Accelerator& accelerator) {
-  if (accelerator.key_code() != ui::VKEY_ESCAPE) {
+  // Returning false lets Esc reach the field or the page.
+  if (accelerator.key_code() != ui::VKEY_ESCAPE || !EscSkipsTour(*this)) {
     return false;
   }
   Press(Action::kSkipTour);

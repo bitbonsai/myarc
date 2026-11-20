@@ -14,6 +14,7 @@
 #include "base/strings/string_number_conversions.h"
 #include "base/task/single_thread_task_runner.h"
 #include "base/time/time.h"
+#include "build/build_config.h"
 #include "chrome/browser/browser_process.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/shell_integration.h"
@@ -27,6 +28,8 @@
 #include "ui/color/color_provider.h"
 #include "ui/compositor/compositor.h"
 #include "ui/compositor/compositor_observer.h"
+#include "ui/display/display.h"
+#include "ui/display/screen.h"
 #include "ui/gfx/animation/animation.h"
 #include "ui/gfx/color_utils.h"
 #include "ui/gfx/geometry/rect.h"
@@ -373,6 +376,31 @@ void OnboardingController::ShowWelcome(bool offers_import) {
           },
           weak_factory_.GetWeakPtr())));
   OnViewBoundsChanged(area_);
+  // The desktop dims and the blob grows into the window, which shows the
+  // finished sheet. Reduce Motion keeps the sheet's own fade instead.
+#if BUILDFLAG(IS_MAC)
+  if (!gfx::Animation::PrefersReducedMotion() && host_->GetWidget()) {
+    sheet_->FinishIntro();
+    // The welcome window is three quarters of the main display, centred, so
+    // the blob at the display's centre grows into it.
+    const gfx::Rect work =
+        display::Screen::Get()->GetPrimaryDisplay().work_area();
+    gfx::Rect frame = work;
+    frame.ClampToCenteredSize(
+        gfx::Size(work.width() * 3 / 4, work.height() * 3 / 4));
+    host_->GetWidget()->SetBounds(frame);
+    bool log = false;
+#if BUILDFLAG(MYARC_TEST_HOOKS)
+    log =
+        base::CommandLine::ForCurrentProcess()->HasSwitch(kMyarcTestOnboarding);
+#endif  // BUILDFLAG(MYARC_TEST_HOOKS)
+    intro_ = std::make_unique<WelcomeIntro>(
+        host_->GetWidget()->GetNativeWindow(),
+        base::BindOnce(&OnboardingController::OnIntroDone,
+                       weak_factory_.GetWeakPtr()),
+        log);
+  }
+#endif  // BUILDFLAG(IS_MAC)
   sheet_->TakeFocus();
 #if BUILDFLAG(MYARC_TEST_HOOKS)
   if (!test_event_scheduled_ &&
@@ -388,7 +416,12 @@ void OnboardingController::ShowWelcome(bool offers_import) {
 #endif  // BUILDFLAG(MYARC_TEST_HOOKS)
 }
 
+void OnboardingController::OnIntroDone() {
+  intro_.reset();
+}
+
 void OnboardingController::CloseWelcome() {
+  intro_.reset();
   recolouring_ = false;
   revealing_ = false;
   reveal_timer_.Stop();
@@ -423,6 +456,8 @@ void OnboardingController::OnAction(WelcomeView::Action action) {
   if (!local_state || !sheet_ || importing_ || revealing_) {
     return;
   }
+  // A press ends the desktop intro at once, showing the window.
+  intro_.reset();
   switch (action) {
     case WelcomeView::Action::kStartBrowsing:
       Run(FeedOnboardingEvent(*local_state, Event(EventKind::StartBrowsing)));

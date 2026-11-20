@@ -11,6 +11,7 @@
 #include "base/time/time.h"
 #include "cc/paint/paint_flags.h"
 #include "cc/paint/paint_shader.h"
+#include "myarc/coach_mark.h"
 #include "third_party/skia/include/core/SkColor.h"
 #include "ui/accessibility/ax_enums.mojom.h"
 #include "ui/base/accelerators/accelerator.h"
@@ -425,7 +426,7 @@ void WelcomeView::TakeFocus() {
 }
 
 bool WelcomeView::AcceleratorPressed(const ui::Accelerator& accelerator) {
-  if (accelerator.key_code() == ui::VKEY_ESCAPE) {
+  if (accelerator.key_code() == ui::VKEY_ESCAPE && EscSkipsTour(*this)) {
     Press(Action::kSkipTour);
     return true;
   }

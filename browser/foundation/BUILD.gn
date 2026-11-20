@@ -298,9 +298,18 @@ source_set("onboarding") {
     "coach_mark.h",
     "onboarding_controller.cc",
     "onboarding_controller.h",
+    "welcome_intro.h",
     "welcome_view.cc",
     "welcome_view.h",
   ]
+  if (is_mac) {
+    sources += [ "welcome_intro_mac.mm" ]
+    frameworks = [
+      "Cocoa.framework",
+      "CoreImage.framework",
+      "QuartzCore.framework",
+    ]
+  }
   public_deps = [
     ":bridge",
     ":sidebar_tint",
@@ -322,10 +331,12 @@ source_set("onboarding") {
     "//ui/base",
     "//ui/color",
     "//ui/compositor",
+    "//ui/display",
     "//ui/events",
     "//ui/gfx",
     "//ui/gfx/animation",
     "//ui/gfx/geometry",
+    "//ui/views/controls/webview",
   ]
 }
 

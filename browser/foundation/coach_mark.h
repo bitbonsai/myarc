@@ -21,7 +21,8 @@ namespace myarc {
 // of text, an optional key hint, an optional extra button on its own row,
 // then Back, Skip tour and an optional Next. It never takes focus, so the
 // shortcut it teaches still reaches the window, and Esc while it shows
-// presses Skip tour, whether or not the card shows it. VoiceOver hears its
+// presses Skip tour, whether or not the card shows it, unless EscSkipsTour()
+// says Esc keeps its own meaning there. VoiceOver hears its
 // text when it shows. It grows in from 96% as it fades in, 180 ms with
 // ease-out, from the side of its anchor; under Reduce Motion it only fades
 // in, over 150 ms. It leaves with a fade, 120 ms unless told otherwise.
@@ -98,6 +99,11 @@ class CoachMark : public views::View {
   bool pressed_ = false;
   bool dark_ = true;
 };
+
+// Whether Esc in `view`'s window skips the tour: only when focus isn't in an
+// editable field, such as the address field or the command bar's input, or
+// in the page, where Esc keeps its own meaning.
+bool EscSkipsTour(const views::View& view);
 
 }  // namespace myarc
 
