@@ -11,7 +11,9 @@
 #include "base/functional/bind.h"
 #include "base/logging.h"
 #include "base/no_destructor.h"
+#include "base/strings/string_number_conversions.h"
 #include "base/strings/utf_string_conversions.h"
+#include "base/task/single_thread_task_runner.h"
 #include "cc/paint/paint_flags.h"
 #include "chrome/browser/browser_process.h"
 #include "chrome/browser/profiles/profile.h"
@@ -40,6 +42,7 @@
 #include "ui/base/base_window.h"
 #include "ui/base/metadata/metadata_impl_macros.h"
 #include "ui/base/models/image_model.h"
+#include "ui/base/mojom/menu_source_type.mojom.h"
 #include "ui/base/page_transition_types.h"
 #include "ui/base/window_open_disposition.h"
 #include "ui/color/color_id.h"
@@ -57,6 +60,8 @@
 #include "ui/views/controls/button/button.h"
 #include "ui/views/controls/image_view.h"
 #include "ui/views/controls/label.h"
+#include "ui/views/controls/menu/menu_runner.h"
+#include "ui/views/widget/widget.h"
 #include "url/url_constants.h"
 
 namespace myarc {
@@ -498,6 +503,10 @@ BrowserWindowInterface* LittleArcMoveTarget(
 }
 
 bool MoveLittleArcToSpace(BrowserWindowInterface& little_arc) {
+  return MoveLittleArcToSpace(little_arc, 0);
+}
+
+bool MoveLittleArcToSpace(BrowserWindowInterface& little_arc, uint64_t space) {
   if (!IsLittleArc(little_arc)) {
     return false;
   }
@@ -507,6 +516,10 @@ bool MoveLittleArcToSpace(BrowserWindowInterface& little_arc) {
   TabStripModel* tabs = little_arc.GetTabStripModel();
   const int index = tabs->active_index();
   if (!adapter || index == TabStripModel::kNoTab) {
+    return false;
+  }
+  if (space && space != adapter->Sidebar().current_space.id &&
+      !adapter->SelectSpace(space).ok) {
     return false;
   }
   std::unique_ptr<content::WebContents> page =
@@ -537,6 +550,24 @@ LittleArcHeader::LittleArcHeader(BrowserWindowInterface& browser,
       base::BindRepeating(&LittleArcHeader::Move, base::Unretained(this))));
   GetViewAccessibility().SetRole(ax::mojom::Role::kToolbar);
   GetViewAccessibility().SetName(u"Little Arc");
+#if BUILDFLAG(MYARC_TEST_HOOKS)
+  size_t pick = 0;
+  if (base::StringToSizeT(
+          base::CommandLine::ForCurrentProcess()->GetSwitchValueASCII(
+              "myarc-test-little-arc-pick"),
+          &pick)) {
+    auto runner = base::SingleThreadTaskRunner::GetCurrentDefault();
+    runner->PostDelayedTask(FROM_HERE,
+                            base::BindOnce(&LittleArcHeader::ShowSpacePicker,
+                                           weak_factory_.GetWeakPtr()),
+                            base::Seconds(2));
+    runner->PostDelayedTask(
+        FROM_HERE,
+        base::BindOnce(&LittleArcHeader::PickSpaceForTesting,
+                       weak_factory_.GetWeakPtr(), pick),
+        base::Seconds(4));
+  }
+#endif  // BUILDFLAG(MYARC_TEST_HOOKS)
 }
 
 LittleArcHeader::~LittleArcHeader() = default;
@@ -607,6 +638,94 @@ void LittleArcHeader::OnThemeChanged() {
 
 void LittleArcHeader::Move() {
   MoveLittleArcToSpace(*browser_);
+}
+
+void LittleArcHeader::ShowSpacePicker() {
+  BrowserWindowInterface* window = LittleArcMoveTarget(*browser_);
+  auto* adapter =
+      window ? BrowserWorkspaceAdapter::ForBrowser(*window) : nullptr;
+  if (!adapter || !GetWidget() ||
+      (picker_runner_ && picker_runner_->IsRunning())) {
+    return;
+  }
+  const auto sidebar = adapter->Sidebar();
+  if (!sidebar.ok) {
+    return;
+  }
+  picker_spaces_.clear();
+  picker_current_ = sidebar.current_space.id;
+  picker_model_ = std::make_unique<ui::SimpleMenuModel>(this);
+  for (const auto& space : sidebar.spaces) {
+    picker_model_->AddCheckItem(static_cast<int>(picker_spaces_.size()),
+                                base::UTF8ToUTF16(std::string(space.name)));
+    picker_spaces_.push_back(space.id);
+  }
+  picker_runner_ = std::make_unique<views::MenuRunner>(picker_model_.get(),
+                                                       /*run_types=*/0);
+  picker_runner_->RunMenuAt(GetWidget(), nullptr, open_in_->GetBoundsInScreen(),
+                            views::MenuAnchorPosition::kTopRight,
+                            ui::mojom::MenuSourceType::kKeyboard);
+}
+
+void LittleArcHeader::PickSpaceForTesting(size_t index) {
+  if (index < picker_spaces_.size()) {
+    ExecuteCommand(static_cast<int>(index), 0);
+  }
+  if (picker_runner_) {
+    picker_runner_->Cancel();
+  }
+}
+
+void LittleArcHeader::ExecuteCommand(int command_id, int event_flags) {
+  if (command_id < 0 ||
+      static_cast<size_t>(command_id) >= picker_spaces_.size()) {
+    return;
+  }
+  // The move closes this window, so it runs once the menu has unwound.
+  base::SingleThreadTaskRunner::GetCurrentDefault()->PostTask(
+      FROM_HERE,
+      base::BindOnce(
+          [](base::WeakPtr<BrowserWindowInterface> browser, uint64_t space) {
+            if (browser) {
+              MoveLittleArcToSpace(*browser, space);
+            }
+          },
+          browser_->GetWeakPtr(), picker_spaces_[command_id]));
+}
+
+bool LittleArcHeader::IsCommandIdChecked(int command_id) const {
+  return command_id >= 0 &&
+         static_cast<size_t>(command_id) < picker_spaces_.size() &&
+         picker_spaces_[command_id] == picker_current_;
+}
+
+namespace {
+LittleArcHeader* FindHeader(views::View* view) {
+  if (!view) {
+    return nullptr;
+  }
+  if (auto* header = views::AsViewClass<LittleArcHeader>(view)) {
+    return header;
+  }
+  for (views::View* child : view->children()) {
+    if (auto* header = FindHeader(child)) {
+      return header;
+    }
+  }
+  return nullptr;
+}
+}  // namespace
+
+void ShowLittleArcSpacePicker(BrowserWindowInterface& little_arc) {
+  if (!IsLittleArc(little_arc)) {
+    return;
+  }
+  views::Widget* widget = views::Widget::GetWidgetForNativeWindow(
+      little_arc.GetWindow()->GetNativeWindow());
+  if (LittleArcHeader* header =
+          widget ? FindHeader(widget->GetRootView()) : nullptr) {
+    header->ShowSpacePicker();
+  }
 }
 
 BEGIN_METADATA(LittleArcHeader)

@@ -27,5 +27,7 @@
 #define IDC_MYARC_EXPAND_SPLIT 35420
 // Ctrl+Option+Cmd+A, a hidden extra: plays the welcome's arrival again.
 #define IDC_MYARC_REPLAY_INTRO 35421
+// Option-Cmd-O in a Little Arc: pick the Space its page moves to.
+#define IDC_MYARC_LITTLE_ARC_PICK_SPACE 35422
 
 #endif  // MYARC_COMMAND_IDS_H_

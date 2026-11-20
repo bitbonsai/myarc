@@ -1,5 +1,5 @@
 diff --git a/chrome/browser/global_keyboard_shortcuts_mac.mm b/chrome/browser/global_keyboard_shortcuts_mac.mm
-index 4e41528d09564f6b11c0d691565568c36aa25dc3..f1197584cea281761e7779d13e6af7998d5a33b5 100644
+index 4e41528d09564f6b11c0d691565568c36aa25dc3..42e5435ec40240a8d9fc6e072d70ab0dc7d6791d 100644
 --- a/chrome/browser/global_keyboard_shortcuts_mac.mm
 +++ b/chrome/browser/global_keyboard_shortcuts_mac.mm
 @@ -9,6 +9,7 @@
@@ -76,7 +76,7 @@ index 4e41528d09564f6b11c0d691565568c36aa25dc3..f1197584cea281761e7779d13e6af799
        {true,  false, false, true,  kVK_ANSI_C,            IDC_DEV_TOOLS_INSPECT},
        {true,  false, false, true,  kVK_DownArrow,         IDC_FOCUS_NEXT_PANE},
        {true,  false, false, true,  kVK_UpArrow,           IDC_FOCUS_PREVIOUS_PANE},
-@@ -165,6 +186,52 @@ const std::vector<KeyboardShortcutData>& GetShortcutsNotPresentInMainMenu() {
+@@ -165,6 +186,55 @@ const std::vector<KeyboardShortcutData>& GetShortcutsNotPresentInMainMenu() {
      keys.push_back(
          {true, false, true, false, kVK_ANSI_Z, IDC_FOCUS_PREV_TAB_GROUP});
  
@@ -124,6 +124,9 @@ index 4e41528d09564f6b11c0d691565568c36aa25dc3..f1197584cea281761e7779d13e6af799
 +      // with no menu item.
 +      keys.push_back(
 +          {true, false, true, true, kVK_ANSI_A, IDC_MYARC_REPLAY_INTRO});
++      // Option-Cmd-O in a Little Arc picks the Space its page moves to.
++      keys.push_back({true, false, false, true, kVK_ANSI_O,
++                      IDC_MYARC_LITTLE_ARC_PICK_SPACE});
 +    }
 +
      if (base::FeatureList::IsEnabled(features::kUIDebugTools)) {

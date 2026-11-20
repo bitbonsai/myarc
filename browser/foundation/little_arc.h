@@ -1,11 +1,17 @@
 #ifndef MYARC_LITTLE_ARC_H_
 #define MYARC_LITTLE_ARC_H_
 
+#include <cstdint>
+#include <memory>
+#include <vector>
+
 #include "base/functional/callback.h"
 #include "base/memory/raw_ptr.h"
 #include "base/memory/raw_ref.h"
+#include "base/memory/weak_ptr.h"
 #include "third_party/skia/include/core/SkColor.h"
 #include "ui/base/metadata/metadata_header_macros.h"
+#include "ui/menus/simple_menu_model.h"
 #include "ui/views/view.h"
 #include "url/gurl.h"
 
@@ -19,6 +25,7 @@ class Point;
 namespace views {
 class ImageView;
 class Label;
+class MenuRunner;
 }  // namespace views
 
 namespace myarc {
@@ -62,11 +69,23 @@ BrowserWindowInterface* LittleArcMoveTarget(BrowserWindowInterface& little_arc);
 // shows that window. The Little Arc closes once its page has gone. Returns
 // false, changing nothing, when there is no target.
 bool MoveLittleArcToSpace(BrowserWindowInterface& little_arc);
+// The same, into Space `space` of the target window's Profile, which the
+// target window switches to first.
+bool MoveLittleArcToSpace(BrowserWindowInterface& little_arc, uint64_t space);
+
+// Option-Cmd-O: a menu of the target window's Spaces under the "Open in"
+// button. Picking one moves the page there as Cmd+O does. Does nothing
+// outside a Little Arc or without a target window.
+// Test-hook builds take --myarc-test-little-arc-pick=<index>: two seconds
+// after a Little Arc opens, it opens this menu, and two seconds later picks
+// the Space at that index.
+void ShowLittleArcSpacePicker(BrowserWindowInterface& little_arc);
 
 // The Little Arc header, level with the traffic lights: an address pill with
 // the target Space and the page's host, and the "Open in <Space> ⌘O" button.
 // BrowserView owns it and lays the page card out beneath it.
-class LittleArcHeader final : public views::View {
+class LittleArcHeader final : public views::View,
+                              public ui::SimpleMenuModel::Delegate {
   METADATA_HEADER(LittleArcHeader, views::View)
 
  public:
@@ -86,6 +105,10 @@ class LittleArcHeader final : public views::View {
 
   // Rereads the page and the Space "Open in" would move it to.
   void Update();
+  // Opens the Space picker under "Open in".
+  void ShowSpacePicker();
+  // Picks the Space at `index`, as a click on it does, and closes the menu.
+  void PickSpaceForTesting(size_t index);
   // Points on no control drag the window.
   bool IsDraggableAt(const gfx::Point& point) const;
   // The window colour around the page card.
@@ -95,6 +118,10 @@ class LittleArcHeader final : public views::View {
   void Layout(PassKey) override;
   void OnThemeChanged() override;
 
+  // ui::SimpleMenuModel::Delegate:
+  void ExecuteCommand(int command_id, int event_flags) override;
+  bool IsCommandIdChecked(int command_id) const override;
+
  private:
   bool IsDark() const;
   void Move();
@@ -102,6 +129,12 @@ class LittleArcHeader final : public views::View {
   const raw_ref<BrowserWindowInterface> browser_;
   raw_ptr<LittleArcAddressPill> address_ = nullptr;
   raw_ptr<LittleArcOpenInButton> open_in_ = nullptr;
+  // The picker's Spaces, by menu command ID, and the one shown now.
+  std::vector<uint64_t> picker_spaces_;
+  uint64_t picker_current_ = 0;
+  std::unique_ptr<ui::SimpleMenuModel> picker_model_;
+  std::unique_ptr<views::MenuRunner> picker_runner_;
+  base::WeakPtrFactory<LittleArcHeader> weak_factory_{this};
 };
 
 }  // namespace myarc

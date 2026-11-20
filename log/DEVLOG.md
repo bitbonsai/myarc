@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-11-20: Option-Cmd-O picks the Space for a Little Arc's page
+
+- In a Little Arc, Option-Cmd-O (`IDC_MYARC_LITTLE_ARC_PICK_SPACE`, a hidden key in the workspace shortcut table) opens a menu of the target window's Spaces under "Open in", the current one checked. Picking one selects that Space in the most recently used main window of the Profile, then runs the Cmd+O move. Also fixed a dangling `raw_ptr` to the Little Arc header in `~BrowserView` that a DCHECK build reports whenever a Little Arc closes (Chromium commit "Pick a Space for a Little Arc's page with Option-Cmd-O").
+- Evidence: a background capture with the two-Space durability fixture and `--myarc-test-little-arc-pick=1` showed the menu (Everyday checked, Doomed), then the main window on Doomed with the page as its Today tab and the Little Arc gone; the workspace file had the new Today tab in Space 2 and the window on Space 2.
+- Limits: the hook opens the menu and picks through the menu's own command; the key itself wasn't posted. The menu is a native one, not an Arc-styled popover.
+
 ## 2026-11-20: Private windows stay out of the workspace file
 
 - Audited each path that writes the workspace file, Local State or the bridge: a private Profile gets an ephemeral `WorkspaceService` with no file path or IO runner, and the control host, site icon fetcher, Little Arc routing and the crash report skip it. No leak found, so nothing changed outside the new `--myarc-test-private-window` hook.

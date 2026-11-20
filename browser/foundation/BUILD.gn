@@ -397,6 +397,7 @@ source_set("little_arc") {
     "//base",
     "//skia",
     "//ui/base",
+    "//ui/menus",
     "//ui/views",
     "//url",
   ]
