@@ -3,12 +3,14 @@
 
 #include <cstdint>
 #include <memory>
-
 #include <string>
+#include <utility>
+#include <vector>
 
 #include "base/functional/callback.h"
 #include "base/memory/raw_ptr.h"
 #include "base/memory/weak_ptr.h"
+#include "ui/base/models/image_model.h"
 
 class PrefService;
 class Profile;
@@ -29,13 +31,52 @@ class SettingsWindow {
  public:
   enum class Section { kGeneral, kProfiles, kLinks, kAdvanced };
 
-  // The bound Profile's timer, Arc's "Archive tabs after". `get` returns its
-  // seconds, or 0 while the workspace is not loaded or the Profile keeps no
-  // workspace (Guest); `set` applies one of the four choices.
-  struct ArchiveTimer {
-    std::u16string profile_name;  // Shown on the Profiles page.
-    base::RepeatingCallback<uint64_t()> get;
-    base::RepeatingCallback<void(uint64_t)> set;
+  // One Profile on the Profiles page.
+  struct ProfileRow {
+    std::string id;  // The Profile's directory name.
+    std::u16string name;
+    ui::ImageModel icon;
+    // The Spaces that use it, from the Spaces index, in order.
+    std::vector<std::u16string> spaces;
+    // False when it has no Spaces, or only the empty Space every new
+    // Profile starts with.
+    bool in_use = false;
+    // The Profile the window was opened from.
+    bool current = false;
+  };
+
+  // The Profiles page's actions, which the browser implements with
+  // Chromium's Profile manager. Each action that can fail returns or reports
+  // the reason to show, or an empty string once done.
+  struct Profiles {
+    // Every listed Profile in Chromium's display order, without ones being
+    // deleted.
+    base::RepeatingCallback<std::vector<ProfileRow>()> list;
+    // Creates a Profile named `name`, as the Create a Space panel's New
+    // Profile… does, and reports when it exists.
+    base::RepeatingCallback<void(
+        const std::u16string& name,
+        base::OnceCallback<void(const std::u16string&)>)>
+        create;
+    base::RepeatingCallback<std::u16string(const std::string& id,
+                                           const std::u16string& name)>
+        rename;
+    // The icons to pick from, with their names; `set_icon` takes an index
+    // into this list.
+    base::RepeatingCallback<
+        std::vector<std::pair<ui::ImageModel, std::u16string>>()>
+        icons;
+    base::RepeatingCallback<std::u16string(const std::string& id, size_t icon)>
+        set_icon;
+    // Deletes the Profile and its data. Refuses the last Profile, one that
+    // Spaces still use, and one with open windows.
+    base::RepeatingCallback<std::u16string(const std::string& id)> remove;
+    // Arc's "Archive tabs after" for Profile `id`: `get_archive` returns
+    // seconds, or 0 while its workspace isn't loaded or it keeps none
+    // (Guest); `set_archive` applies one of the four choices.
+    base::RepeatingCallback<uint64_t(const std::string& id)> get_archive;
+    base::RepeatingCallback<void(const std::string& id, uint64_t secs)>
+        set_archive;
   };
 
   // `profile` is the original (never off-the-record) Profile the window edits,
@@ -49,7 +90,7 @@ class SettingsWindow {
                  base::RepeatingClosure open_more_settings,
                  base::RepeatingClosure open_site,
                  base::RepeatingClosure replay_tour,
-                 ArchiveTimer archive_timer);
+                 Profiles profiles);
   SettingsWindow(const SettingsWindow&) = delete;
   SettingsWindow& operator=(const SettingsWindow&) = delete;
   ~SettingsWindow();
@@ -82,7 +123,7 @@ class SettingsWindow {
   base::RepeatingClosure open_more_settings_;
   base::RepeatingClosure open_site_;
   base::RepeatingClosure replay_tour_;
-  ArchiveTimer archive_timer_;
+  Profiles profiles_;
   std::unique_ptr<views::WidgetDelegate> delegate_;
   std::unique_ptr<views::Widget> widget_;
   base::WeakPtrFactory<SettingsWindow> weak_factory_{this};

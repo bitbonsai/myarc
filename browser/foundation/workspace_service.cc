@@ -301,8 +301,9 @@ std::optional<std::string> EncodeWorkspaceMetadata(
   }
   // Only a fresh workspace whose tour hasn't ended carries it, so write it
   // only then, as the older keys above are.
-  if (snapshot.quick_start_pending)
+  if (snapshot.quick_start_pending) {
     root.Set("quick_start_pending", true);
+  }
   auto json = base::WriteJson(root);
   if (json && json->size() <= kMaxMetadataBytes) {
     return json;
@@ -1019,8 +1020,9 @@ bool WorkspaceService::QuickStartPending() const {
 }
 
 foundation::MutationResult WorkspaceService::ClearQuickStart() {
-  if (!CanMutate())
+  if (!CanMutate()) {
     return Failure("Workspace is not loaded. Check storage state.");
+  }
   foundation::clear_quick_start(*workspace_);
   return Changed({true, 0, {}});
 }

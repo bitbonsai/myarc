@@ -1696,8 +1696,7 @@ void BrowserWorkspaceAdapter::Refresh() {
               command_line->GetSwitchValueASCII(kMyarcTestSplit)));
     }
   }
-  if (ready() && !g_private_window_hook_done &&
-      !profile_->IsOffTheRecord() &&
+  if (ready() && !g_private_window_hook_done && !profile_->IsOffTheRecord() &&
       command_line->HasSwitch(kMyarcTestPrivateWindow)) {
     g_private_window_hook_done = true;
     Profile* private_profile =
@@ -1708,9 +1707,9 @@ void BrowserWorkspaceAdapter::Refresh() {
              base::TRIM_WHITESPACE, base::SPLIT_WANT_NONEMPTY)) {
       const GURL url(spec);
       NavigateParams params =
-          window ? NavigateParams(window, url, ui::PAGE_TRANSITION_TYPED)
-                 : NavigateParams(private_profile, url,
-                                  ui::PAGE_TRANSITION_TYPED);
+          window
+              ? NavigateParams(window, url, ui::PAGE_TRANSITION_TYPED)
+              : NavigateParams(private_profile, url, ui::PAGE_TRANSITION_TYPED);
       params.disposition = window ? WindowOpenDisposition::kNewForegroundTab
                                   : WindowOpenDisposition::kNewWindow;
       params.window_action = NavigateParams::WindowAction::kShowWindowInactive;

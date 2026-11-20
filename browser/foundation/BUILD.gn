@@ -624,6 +624,7 @@ source_set("settings_window") {
     ":arc_import",
     ":control_prefs",
     ":little_arc_prefs",
+    ":test_buildflags",
     "//cc/paint",
     "//chrome/browser:shell_integration",
     "//chrome/common:constants",

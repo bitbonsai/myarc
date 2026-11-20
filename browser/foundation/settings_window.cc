@@ -8,12 +8,17 @@
 #include <utility>
 #include <vector>
 
+#include "base/command_line.h"
 #include "base/functional/bind.h"
 #include "base/location.h"
+#include "base/logging.h"
 #include "base/memory/raw_ptr.h"
 #include "base/memory/raw_ptr_exclusion.h"
 #include "base/memory/raw_ref.h"
 #include "base/memory/scoped_refptr.h"
+#include "base/strings/string_number_conversions.h"
+#include "base/strings/string_split.h"
+#include "base/strings/utf_string_conversions.h"
 #include "base/task/single_thread_task_runner.h"
 #include "build/build_config.h"
 #include "cc/paint/paint_canvas.h"
@@ -26,6 +31,7 @@
 #include "myarc/arc_import.h"
 #include "myarc/control_prefs.h"
 #include "myarc/little_arc_prefs.h"
+#include "myarc/test_buildflags.h"
 #include "third_party/skia/include/core/SkColor.h"
 #include "third_party/skia/include/core/SkPoint.h"
 #include "third_party/skia/include/core/SkRRect.h"
@@ -51,10 +57,13 @@
 #include "ui/gfx/vector_icon_types.h"
 #include "ui/menus/simple_menu_model.h"
 #include "ui/views/accessibility/view_accessibility.h"
+#include "ui/views/border.h"
 #include "ui/views/controls/button/button.h"
 #include "ui/views/controls/image_view.h"
 #include "ui/views/controls/label.h"
 #include "ui/views/controls/menu/menu_runner.h"
+#include "ui/views/controls/textfield/textfield.h"
+#include "ui/views/controls/textfield/textfield_controller.h"
 #include "ui/views/layout/box_layout.h"
 #include "ui/views/view.h"
 #include "ui/views/widget/widget.h"
@@ -165,6 +174,15 @@ constexpr gfx::PathElement kPeekRowPath[] = {
     gfx::ARC_TO, 2, 2, 0, 0, 0, 4, 18, gfx::H_LINE_TO, 8,
     gfx::NEW_PATH, gfx::STROKE, 2, gfx::ROUND_RECT, 12, 13, 10, 7, 2};
 
+// Lucide "plus" and "minus", for the Profile list's buttons.
+constexpr gfx::PathElement kPlusPath[] = {
+    gfx::CANVAS_DIMENSIONS, 24, gfx::STROKE, 2,
+    gfx::MOVE_TO, 5, 12, gfx::H_LINE_TO, 19,
+    gfx::MOVE_TO, 12, 5, gfx::V_LINE_TO, 19};
+constexpr gfx::PathElement kMinusPath[] = {
+    gfx::CANVAS_DIMENSIONS, 24, gfx::STROKE, 2,
+    gfx::MOVE_TO, 5, 12, gfx::H_LINE_TO, 19};
+
 #define MYARC_ICON(name, path)                                   \
   constexpr gfx::VectorIconRep name##Rep[] = {{path}};           \
   constexpr gfx::VectorIcon name(name##Rep, std::size(name##Rep), \
@@ -177,6 +195,8 @@ MYARC_ICON(kSlidersIcon, kSlidersPath);
 MYARC_ICON(kHeartIcon, kHeartPath);
 MYARC_ICON(kChevronsUpDownIcon, kChevronsUpDownPath);
 MYARC_ICON(kPeekRowIcon, kPeekRowPath);
+MYARC_ICON(kPlusIcon, kPlusPath);
+MYARC_ICON(kMinusIcon, kMinusPath);
 #undef MYARC_ICON
 
 // Measured from Arc's dark Settings window at 2x (DIP).
@@ -210,6 +230,12 @@ constexpr int kGeneralRowPad = 10;
 constexpr int kSwitchRowHeight = 36;
 constexpr int kProfileRowHeight = 47;
 constexpr int kProfileTextWidth = 340;
+// The Profiles page's list, as in Arc's: rows of icon, name and Spaces count.
+constexpr int kListWidth = 232;
+constexpr int kListRowHeight = 34;
+constexpr int kListRowPad = 10;
+constexpr int kListRowGap = 8;
+constexpr int kListIconSize = 18;
 // AppKit's regular switch: a 36 × 16 track around a 22 × 12 pill knob.
 constexpr gfx::Size kSwitchSize(36, 16);
 constexpr gfx::Size kKnobSize(22, 12);
@@ -236,6 +262,9 @@ constexpr SkColor kCardStroke = SkColorSetRGB(0x3A, 0x3A, 0x3B);
 constexpr SkColor kCardText = SkColorSetRGB(0xC2, 0xC2, 0xC3);
 constexpr SkColor kGrayButton = SkColorSetRGB(0x45, 0x45, 0x46);
 constexpr SkColor kButtonText = SkColorSetRGB(0xE3, 0xE3, 0xE3);
+constexpr SkColor kListSelectedFill = SkColorSetRGB(0x26, 0x30, 0x42);
+constexpr SkColor kDeleteButton = SkColorSetRGB(0xD7, 0x3A, 0x31);
+constexpr SkColor kErrorText = SkColorSetRGB(0xFF, 0x9F, 0x8F);
 constexpr SkColor kSwitchTrack = SkColorSetRGB(0x37, 0x37, 0x38);
 constexpr SkColor kSwitchKnob = SkColorSetRGB(0xC8, 0xC8, 0xC8);
 // Arc's grouped switch rows: a 20 DIP rounded tile 10 DIP in, the label 8 DIP
@@ -1085,79 +1114,463 @@ constexpr std::array<ArchiveChoice, 4> kArchiveChoices = {{
     {30 * 24 * kHourSecs, u"30 days"},
 }};
 
-// Profiles: Arc's "Archive tabs after" row for the bound Profile.
-class ProfilesPage : public views::View, public ui::SimpleMenuModel::Delegate {
+// One Profile in the Profiles page's list: its icon, its name and how many
+// Spaces use it.
+class ProfileListRow : public views::Button {
+  METADATA_HEADER(ProfileListRow, views::Button)
+
+ public:
+  ProfileListRow(PressedCallback callback,
+                 const SettingsWindow::ProfileRow& row,
+                 bool selected)
+      : views::Button(std::move(callback)), selected_(selected) {
+    auto* layout = SetLayoutManager(std::make_unique<views::BoxLayout>(
+        views::BoxLayout::Orientation::kHorizontal,
+        gfx::Insets::VH(0, kListRowPad), kListRowGap));
+    layout->set_cross_axis_alignment(
+        views::BoxLayout::CrossAxisAlignment::kCenter);
+    auto* icon = AddChildView(std::make_unique<views::ImageView>(row.icon));
+    icon->SetImageSize(gfx::Size(kListIconSize, kListIconSize));
+    icon->SetPreferredSize(gfx::Size(kListIconSize, kListIconSize));
+    auto* name =
+        AddLabel(this, row.name, 13, gfx::Font::Weight::NORMAL, kButtonText);
+    name->SetHorizontalAlignment(gfx::ALIGN_LEFT);
+    name->SetElideBehavior(gfx::ELIDE_TAIL);
+    layout->SetFlexForView(name, 1);
+    const std::u16string used = SpacesCount(row.in_use ? row.spaces.size() : 0);
+    AddLabel(this, used, 12, gfx::Font::Weight::NORMAL, kTabText);
+    SetAccessibleName(row.name + u", " + used);
+    GetViewAccessibility().SetRole(ax::mojom::Role::kListBoxOption);
+    GetViewAccessibility().SetIsSelected(selected);
+  }
+
+  static std::u16string SpacesCount(size_t spaces) {
+    if (!spaces) {
+      return u"Not used";
+    }
+    return base::NumberToString16(spaces) +
+           (spaces == 1 ? u" Space" : u" Spaces");
+  }
+
+  gfx::Size CalculatePreferredSize(
+      const views::SizeBounds& available_size) const override {
+    return gfx::Size(
+        views::Button::CalculatePreferredSize(available_size).width(),
+        kListRowHeight);
+  }
+
+  void OnPaintBackground(gfx::Canvas* canvas) override {
+    if (selected_) {
+      PaintPanel(canvas, GetLocalBounds(), kButtonRadius, kListSelectedFill,
+                 std::nullopt);
+    }
+  }
+
+ private:
+  const bool selected_;
+};
+
+BEGIN_METADATA(ProfileListRow)
+END_METADATA
+
+// Profiles: Arc's tab. The list of Profiles with their icons and how many
+// Spaces use each, with + to create one and - to delete the selected one.
+// On the right, the selected Profile's name, icon, "Archive tabs after" and
+// the Spaces that use it.
+class ProfilesPage : public views::View,
+                     public ui::SimpleMenuModel::Delegate,
+                     public views::TextfieldController {
   METADATA_HEADER(ProfilesPage, views::View)
 
  public:
-  explicit ProfilesPage(SettingsWindow::ArchiveTimer timer)
-      : timer_(std::move(timer)) {
-    card_ = AddChildView(
+  explicit ProfilesPage(SettingsWindow::Profiles profiles)
+      : profiles_(std::move(profiles)) {
+    intro_ = AddLabel(this,
+                      u"Profiles keep history, logins, cookies and extensions "
+                      u"apart. Several Spaces can share one Profile.",
+                      13, gfx::Font::Weight::NORMAL, kCardText);
+    intro_->SetMultiLine(true);
+    intro_->SetHorizontalAlignment(gfx::ALIGN_LEFT);
+
+    list_panel_ = AddChildView(
         std::make_unique<Panel>(kCardFill, kCardStroke, kCardRadius));
-    auto* layout = card_->SetLayoutManager(std::make_unique<views::BoxLayout>(
-        views::BoxLayout::Orientation::kHorizontal,
-        gfx::Insets::VH(0, kBannerPad)));
-    layout->set_cross_axis_alignment(
-        views::BoxLayout::CrossAxisAlignment::kCenter);
-    // The title over the Profile it applies to, which may not be the Profile
-    // of the window in front (Incognito edits its regular Profile).
-    auto* text = card_->AddChildView(std::make_unique<views::View>());
-    text->SetLayoutManager(std::make_unique<views::BoxLayout>(
-        views::BoxLayout::Orientation::kVertical));
-    auto* label = AddLabel(text, u"Archive tabs after", 13,
-                           gfx::Font::Weight::NORMAL, kCardText);
-    label->SetHorizontalAlignment(gfx::ALIGN_LEFT);
-    auto* profile = AddLabel(text, u"Profile: " + timer_.profile_name, 11,
-                             gfx::Font::Weight::NORMAL, kTabText);
-    profile->SetHorizontalAlignment(gfx::ALIGN_LEFT);
-    const std::u16string tooltip =
-        u"Unpinned tabs you haven\u2019t viewed for this long move to "
-        u"Archived Tabs. Applies to the " +
-        timer_.profile_name + u" Profile.";
-    label->SetTooltipText(tooltip);
-    profile->SetTooltipText(tooltip);
-    layout->SetFlexForView(text, 1);
-    picker_ = card_->AddChildView(std::make_unique<PillButton>(
-        base::BindRepeating(&ProfilesPage::OpenMenu, base::Unretained(this)),
+    list_title_ = AddLabel(list_panel_, u"Your Profiles", 12,
+                           gfx::Font::Weight::MEDIUM, kTabText);
+    list_title_->SetHorizontalAlignment(gfx::ALIGN_LEFT);
+    rows_ = list_panel_->AddChildView(std::make_unique<views::View>());
+    rows_->SetLayoutManager(std::make_unique<views::BoxLayout>(
+        views::BoxLayout::Orientation::kVertical, gfx::Insets(), 2));
+    rows_->GetViewAccessibility().SetRole(ax::mojom::Role::kListBox);
+    rows_->GetViewAccessibility().SetName(u"Your Profiles");
+    add_ = list_panel_->AddChildView(std::make_unique<PillButton>(
+        base::BindRepeating(&ProfilesPage::Create, base::Unretained(this)), u"",
+        kCardFill, kButtonText, gfx::Font::Weight::NORMAL, &kPlusIcon));
+    add_->SetAccessibleName(u"New Profile");
+    add_->SetTooltipText(u"New Profile");
+    remove_ = list_panel_->AddChildView(std::make_unique<PillButton>(
+        base::BindRepeating(&ProfilesPage::AskRemove, base::Unretained(this)),
+        u"", kCardFill, kButtonText, gfx::Font::Weight::NORMAL, &kMinusIcon));
+    remove_->SetAccessibleName(u"Delete Profile");
+    remove_->SetTooltipText(u"Delete Profile");
+
+    detail_ = AddChildView(
+        std::make_unique<Panel>(kCardFill, kCardStroke, kCardRadius));
+    name_title_ =
+        AddLabel(detail_, u"Name", 13, gfx::Font::Weight::NORMAL, kCardText);
+    name_ = detail_->AddChildView(std::make_unique<views::Textfield>());
+    name_->set_controller(this);
+    name_->SetBackgroundColor(kWindowFill);
+    name_->SetColor(kButtonText);
+    name_->SetFontList(Font(13, gfx::Font::Weight::NORMAL));
+    name_->SetBorder(views::CreateEmptyBorder(gfx::Insets::VH(0, 6)));
+    name_->GetViewAccessibility().SetName(u"Profile name");
+    icon_title_ =
+        AddLabel(detail_, u"Icon", 13, gfx::Font::Weight::NORMAL, kCardText);
+    icon_ = detail_->AddChildView(std::make_unique<PillButton>(
+        base::BindRepeating(&ProfilesPage::OpenIconMenu,
+                            base::Unretained(this)),
+        u"Change…", kGrayButton, kButtonText, gfx::Font::Weight::NORMAL,
+        nullptr));
+    icon_->GetViewAccessibility().SetRole(ax::mojom::Role::kPopUpButton);
+    icon_->GetViewAccessibility().SetHasPopup(ax::mojom::HasPopup::kMenu);
+    icon_image_ =
+        icon_->AddChildViewAt(std::make_unique<views::ImageView>(), 0);
+    icon_image_->SetImageSize(gfx::Size(kListIconSize, kListIconSize));
+    archive_title_ = AddLabel(detail_, u"Archive tabs after", 13,
+                              gfx::Font::Weight::NORMAL, kCardText);
+    archive_title_->SetTooltipText(
+        u"Unpinned tabs you haven’t viewed for this long move to "
+        u"Archived Tabs.");
+    archive_ = detail_->AddChildView(std::make_unique<PillButton>(
+        base::BindRepeating(&ProfilesPage::OpenArchiveMenu,
+                            base::Unretained(this)),
         u"", kGrayButton, kButtonText, gfx::Font::Weight::NORMAL, nullptr));
-    picker_->AddChildView(std::make_unique<views::ImageView>(
+    archive_->AddChildView(std::make_unique<views::ImageView>(
         ui::ImageModel::FromVectorIcon(kChevronsUpDownIcon, kButtonText, 12)));
-    picker_->GetViewAccessibility().SetRole(ax::mojom::Role::kPopUpButton);
-    picker_->GetViewAccessibility().SetHasPopup(ax::mojom::HasPopup::kMenu);
+    archive_->GetViewAccessibility().SetRole(ax::mojom::Role::kPopUpButton);
+    archive_->GetViewAccessibility().SetHasPopup(ax::mojom::HasPopup::kMenu);
+    spaces_title_ =
+        AddLabel(this, u"Used by", 12, gfx::Font::Weight::MEDIUM, kTabText);
+    spaces_title_->SetHorizontalAlignment(gfx::ALIGN_LEFT);
+    spaces_ = AddLabel(this, u"", 13, gfx::Font::Weight::NORMAL, kCardText);
+    spaces_->SetMultiLine(true);
+    spaces_->SetHorizontalAlignment(gfx::ALIGN_LEFT);
+
+    // Delete's confirmation, and any reason an action was refused.
+    status_ = AddLabel(this, u"", 12, gfx::Font::Weight::NORMAL, kCardText);
+    status_->SetMultiLine(true);
+    status_->SetHorizontalAlignment(gfx::ALIGN_LEFT);
+    status_->GetViewAccessibility().SetRole(ax::mojom::Role::kStatus);
+    cancel_ = AddChildView(std::make_unique<PillButton>(
+        base::BindRepeating(&ProfilesPage::CancelRemove,
+                            base::Unretained(this)),
+        u"Cancel", kGrayButton, kButtonText, gfx::Font::Weight::NORMAL,
+        nullptr));
+    confirm_ = AddChildView(std::make_unique<PillButton>(
+        base::BindRepeating(&ProfilesPage::Remove, base::Unretained(this)),
+        u"Delete Profile", kDeleteButton, SK_ColorWHITE,
+        gfx::Font::Weight::NORMAL, nullptr));
     Refresh();
+#if BUILDFLAG(MYARC_TEST_HOOKS)
+    ScheduleTestSteps();
+#endif
   }
 
   void Refresh() {
-    secs_ = timer_.get.Run();
+    rows_data_ = profiles_.list.Run();
+    if (std::ranges::none_of(rows_data_, [this](const auto& row) {
+          return row.id == selected_;
+        })) {
+      selected_.clear();
+      for (const auto& row : rows_data_) {
+        if (selected_.empty() || row.current) {
+          selected_ = row.id;
+        }
+      }
+    }
+    rows_->RemoveAllChildViews();
+    for (const auto& row : rows_data_) {
+      // Selecting rebuilds the rows, so it runs after the press unwinds.
+      rows_->AddChildView(std::make_unique<ProfileListRow>(
+          base::BindRepeating(
+              [](base::WeakPtr<ProfilesPage> page, std::string id) {
+                base::SingleThreadTaskRunner::GetCurrentDefault()->PostTask(
+                    FROM_HERE, base::BindOnce(&ProfilesPage::Select,
+                                              std::move(page), std::move(id)));
+              },
+              weak_factory_.GetWeakPtr(), row.id),
+          row, row.id == selected_));
+    }
+    const SettingsWindow::ProfileRow* row = Selected();
+    detail_->SetVisible(row);
+    spaces_title_->SetVisible(row);
+    spaces_->SetVisible(row);
+    remove_->SetEnabled(row && rows_data_.size() > 1);
+    if (row) {
+      // A name being typed stays, unless another Profile was selected.
+      if (!name_->HasFocus() || named_ != row->id) {
+        name_->SetText(row->name);
+        named_ = row->id;
+      }
+      icon_image_->SetImage(row->icon);
+      icon_->SetAccessibleName(u"Change icon of " + row->name);
+      std::u16string used;
+      for (const std::u16string& space : row->spaces) {
+        used += (used.empty() ? u"" : u", ") + space;
+      }
+      spaces_->SetText(!row->in_use || used.empty()
+                           ? u"No Spaces use this Profile yet."
+                           : used);
+      secs_ = profiles_.get_archive.Run(row->id);
+    } else {
+      secs_ = 0;
+    }
     std::u16string text = u"Unavailable";
     for (const ArchiveChoice& choice : kArchiveChoices) {
       if (choice.secs == secs_) {
         text = choice.label;
       }
     }
-    picker_->SetText(text);
-    picker_->SetAccessibleName(u"Archive tabs after: " + text);
-    picker_->SetEnabled(secs_ != 0);
+    archive_->SetText(text);
+    archive_->SetAccessibleName(u"Archive tabs after: " + text);
+    archive_->SetEnabled(secs_ != 0);
+    archive_->SetTooltipText(
+        secs_ ? std::u16string()
+              : u"Open a window of this Profile to change its timer.");
+    if (!confirming_) {
+      cancel_->SetVisible(false);
+      confirm_->SetVisible(false);
+    }
     InvalidateLayout();
+    SchedulePaint();
   }
 
   void Layout(PassKey) override {
-    card_->SetBounds(kSideMargin, kContentTop, width() - 2 * kSideMargin,
-                     kRowHeight);
+    const int content = width() - 2 * kSideMargin;
+    intro_->SetMaximumWidth(content);
+    intro_->SetBounds(kSideMargin, kContentTop, content,
+                      intro_->GetHeightForWidth(content));
+    const int top = intro_->bounds().bottom() + 16;
+    const int bottom = height() - kSideMargin;
+    list_panel_->SetBounds(kSideMargin, top, kListWidth, bottom - top);
+    list_title_->SetBounds(kListRowPad, 8, kListWidth - 2 * kListRowPad, 20);
+    const int footer = kButtonHeight + 12;
+    rows_->SetBounds(6, 34, kListWidth - 12,
+                     list_panel_->height() - 34 - footer);
+    add_->SetBounds(8, list_panel_->height() - footer + 6, kButtonHeight + 6,
+                    kButtonHeight);
+    remove_->SetBounds(add_->bounds().right() + 4, add_->y(), kButtonHeight + 6,
+                       kButtonHeight);
+
+    const int x = list_panel_->bounds().right() + 14;
+    const int w = width() - kSideMargin - x;
+    detail_->SetBounds(x, top, w, 3 * kRowHeight);
+    const int label_w = 140;
+    const int field_x = kBannerPad + label_w;
+    const int field_w = w - field_x - kBannerPad;
+    const auto row_y = [](int i, int h) {
+      return i * kRowHeight + (kRowHeight - h) / 2;
+    };
+    name_title_->SetBounds(kBannerPad, row_y(0, 20), label_w, 20);
+    name_title_->SetHorizontalAlignment(gfx::ALIGN_LEFT);
+    name_->SetBounds(field_x, row_y(0, kButtonHeight + 4), field_w,
+                     kButtonHeight + 4);
+    icon_title_->SetBounds(kBannerPad, row_y(1, 20), label_w, 20);
+    icon_title_->SetHorizontalAlignment(gfx::ALIGN_LEFT);
+    const int icon_w = icon_->GetPreferredSize().width();
+    icon_->SetBounds(w - kBannerPad - icon_w, row_y(1, kButtonHeight), icon_w,
+                     kButtonHeight);
+    archive_title_->SetBounds(kBannerPad, row_y(2, 20), label_w, 20);
+    archive_title_->SetHorizontalAlignment(gfx::ALIGN_LEFT);
+    const int archive_w = archive_->GetPreferredSize().width();
+    archive_->SetBounds(w - kBannerPad - archive_w, row_y(2, kButtonHeight),
+                        archive_w, kButtonHeight);
+
+    int y = detail_->bounds().bottom() + 16;
+    spaces_title_->SetBounds(x + 2, y, w, 18);
+    y += 20;
+    spaces_->SetMaximumWidth(w);
+    spaces_->SetBounds(x + 2, y, w, spaces_->GetHeightForWidth(w));
+    y = spaces_->bounds().bottom() + 18;
+    status_->SetMaximumWidth(w);
+    status_->SetBounds(x + 2, y, w, status_->GetHeightForWidth(w));
+    y = status_->bounds().bottom() + 8;
+    const int confirm_w = confirm_->GetPreferredSize().width();
+    const int cancel_w = cancel_->GetPreferredSize().width();
+    confirm_->SetBounds(x + w - confirm_w, y, confirm_w, kButtonHeight);
+    cancel_->SetBounds(confirm_->x() - 8 - cancel_w, y, cancel_w,
+                       kButtonHeight);
   }
 
   // ui::SimpleMenuModel::Delegate:
   bool IsCommandIdChecked(int command_id) const override {
-    return kArchiveChoices[command_id].secs == secs_;
+    return command_id >= kArchiveCommand &&
+           kArchiveChoices[command_id - kArchiveCommand].secs == secs_;
   }
 
   void ExecuteCommand(int command_id, int event_flags) override {
-    timer_.set.Run(kArchiveChoices[command_id].secs);
-    Refresh();
+    const SettingsWindow::ProfileRow* row = Selected();
+    if (!row) {
+      return;
+    }
+    if (command_id >= kArchiveCommand) {
+      profiles_.set_archive.Run(
+          row->id, kArchiveChoices[command_id - kArchiveCommand].secs);
+      Refresh();
+      return;
+    }
+    Show(profiles_.set_icon.Run(row->id, static_cast<size_t>(command_id)));
+  }
+
+  // views::TextfieldController:
+  bool HandleKeyEvent(views::Textfield* sender,
+                      const ui::KeyEvent& key_event) override {
+    if (key_event.type() != ui::EventType::kKeyPressed) {
+      return false;
+    }
+    if (key_event.key_code() == ui::VKEY_RETURN) {
+      CommitName();
+      return true;
+    }
+    if (key_event.key_code() == ui::VKEY_ESCAPE) {
+      if (const SettingsWindow::ProfileRow* row = Selected()) {
+        name_->SetText(row->name);
+      }
+      return true;
+    }
+    return false;
   }
 
  private:
-  void OpenMenu() {
+  static constexpr int kArchiveCommand = 1000;
+
+  const SettingsWindow::ProfileRow* Selected() const {
+    for (const auto& row : rows_data_) {
+      if (row.id == selected_) {
+        return &row;
+      }
+    }
+    return nullptr;
+  }
+
+  // By value: Refresh replaces the rows `id` may come from.
+  void Select(std::string id) {
+    CommitName();
+    selected_ = std::move(id);
+    confirming_ = false;
+    status_->SetText(u"");
+    Refresh();
+  }
+
+  // Shows `error`, or refreshes the page once an action is done.
+  void Show(const std::u16string& error) {
+    confirming_ = false;
+    status_->SetText(error);
+    status_->SetEnabledColor(error.empty() ? kCardText : kErrorText);
+    Refresh();
+  }
+
+  void CommitName() {
+    const SettingsWindow::ProfileRow* row = Selected();
+    if (!row || name_->GetText() == row->name) {
+      return;
+    }
+    Show(profiles_.rename.Run(row->id, std::u16string(name_->GetText())));
+  }
+
+  void Create() {
+    if (creating_) {
+      return;
+    }
+    // "Profile 2", or the next number no Profile uses.
+    std::u16string name;
+    for (size_t n = rows_data_.size() + 1;; ++n) {
+      name = u"Profile " + base::NumberToString16(n);
+      if (std::ranges::none_of(rows_data_, [&name](const auto& row) {
+            return row.name == name;
+          })) {
+        break;
+      }
+    }
+    creating_ = true;
+    add_->SetEnabled(false);
+    status_->SetText(u"Creating " + name + u"…");
+    profiles_.create.Run(
+        name, base::BindOnce(&ProfilesPage::Created, weak_factory_.GetWeakPtr(),
+                             name));
+  }
+
+  void Created(const std::u16string& name, const std::u16string& error) {
+    creating_ = false;
+    add_->SetEnabled(true);
+    if (error.empty()) {
+      for (const auto& row : profiles_.list.Run()) {
+        if (row.name == name) {
+          selected_ = row.id;
+        }
+      }
+    }
+    Show(error);
+    if (error.empty()) {
+      name_->RequestFocus();
+      name_->SelectAll(false);
+    }
+  }
+
+  void AskRemove() {
+    const SettingsWindow::ProfileRow* row = Selected();
+    if (!row) {
+      return;
+    }
+    // The same refusals Delete gives, before asking.
+    std::u16string refusal;
+    if (rows_data_.size() < 2) {
+      refusal = u"myArc needs at least one Profile, so the last one stays.";
+    } else if (row->in_use) {
+      refusal = row->name +
+                u" can’t be deleted while Spaces use it. Delete those "
+                u"Spaces, or move them to another Profile, first.";
+    }
+    if (!refusal.empty()) {
+      Show(refusal);
+      return;
+    }
+    confirming_ = true;
+    status_->SetEnabledColor(kCardText);
+    status_->SetText(u"Delete " + row->name +
+                     u"? Its history, logins, cookies and extensions are "
+                     u"removed from this Mac.");
+    cancel_->SetVisible(true);
+    confirm_->SetVisible(true);
+    InvalidateLayout();
+  }
+
+  void CancelRemove() { Show(u""); }
+
+  void Remove() {
+    const SettingsWindow::ProfileRow* row = Selected();
+    if (!row || !confirming_) {
+      return;
+    }
+    const std::string id = row->id;
+    Show(profiles_.remove.Run(id));
+  }
+
+  void OpenIconMenu() {
+    if (!GetWidget() || (runner_ && runner_->IsRunning()) || !Selected()) {
+      return;
+    }
+    runner_.reset();
+    model_ = std::make_unique<ui::SimpleMenuModel>(this);
+    const auto icons = profiles_.icons.Run();
+    for (size_t i = 0; i < icons.size(); ++i) {
+      model_->AddItemWithIcon(static_cast<int>(i), icons[i].second,
+                              icons[i].first);
+    }
+    RunMenu(icon_);
+  }
+
+  void OpenArchiveMenu() {
     if (!GetWidget() || (runner_ && runner_->IsRunning())) {
       return;
     }
@@ -1170,22 +1583,108 @@ class ProfilesPage : public views::View, public ui::SimpleMenuModel::Delegate {
     runner_.reset();
     model_ = std::make_unique<ui::SimpleMenuModel>(this);
     for (size_t i = 0; i < kArchiveChoices.size(); ++i) {
-      model_->AddRadioItem(static_cast<int>(i), kArchiveChoices[i].label,
-                           /*group_id=*/0);
+      model_->AddRadioItem(kArchiveCommand + static_cast<int>(i),
+                           kArchiveChoices[i].label, /*group_id=*/0);
     }
+    RunMenu(archive_);
+  }
+
+  void RunMenu(views::View* anchor) {
     runner_ = std::make_unique<views::MenuRunner>(model_.get(),
                                                   views::MenuRunner::NO_FLAGS);
-    runner_->RunMenuAt(GetWidget(), nullptr, picker_->GetBoundsInScreen(),
+    runner_->RunMenuAt(GetWidget(), nullptr, anchor->GetBoundsInScreen(),
                        views::MenuAnchorPosition::kTopLeft,
                        ui::mojom::MenuSourceType::kNone);
   }
 
-  SettingsWindow::ArchiveTimer timer_;
+#if BUILDFLAG(MYARC_TEST_HOOKS)
+  // --myarc-test-settings-profiles=<step>[,<step>…] runs one step every two
+  // seconds and logs the page after each: "select:<n>" selects the nth
+  // Profile, "create" presses +, "rename:<name>" types a name and Return,
+  // "icon:<n>" picks the nth icon, "delete" presses - and "confirm" presses
+  // Delete Profile. For background captures.
+  void ScheduleTestSteps() {
+    const std::string steps =
+        base::CommandLine::ForCurrentProcess()->GetSwitchValueASCII(
+            "myarc-test-settings-profiles");
+    int delay = 0;
+    for (const std::string& step : base::SplitString(
+             steps, ",", base::TRIM_WHITESPACE, base::SPLIT_WANT_NONEMPTY)) {
+      delay += 2;
+      base::SingleThreadTaskRunner::GetCurrentDefault()->PostDelayedTask(
+          FROM_HERE,
+          base::BindOnce(&ProfilesPage::RunTestStep, weak_factory_.GetWeakPtr(),
+                         step),
+          base::Seconds(delay));
+    }
+  }
+
+  void RunTestStep(const std::string& step) {
+    const auto [verb, value] = [&step] {
+      const size_t colon = step.find(':');
+      return std::pair(step.substr(0, colon), colon == std::string::npos
+                                                  ? std::string()
+                                                  : step.substr(colon + 1));
+    }();
+    size_t index = 0;
+    if (verb == "select" && base::StringToSizeT(value, &index) &&
+        index < rows_data_.size()) {
+      Select(rows_data_[index].id);
+    } else if (verb == "create") {
+      Create();
+    } else if (verb == "rename") {
+      name_->SetText(base::UTF8ToUTF16(value));
+      CommitName();
+    } else if (verb == "icon" && base::StringToSizeT(value, &index)) {
+      ExecuteCommand(static_cast<int>(index), 0);
+    } else if (verb == "delete") {
+      AskRemove();
+    } else if (verb == "confirm") {
+      Remove();
+    }
+    std::string rows;
+    for (const auto& row : rows_data_) {
+      rows += " [" + row.id + " \"" + base::UTF16ToUTF8(row.name) + "\" " +
+              base::NumberToString(row.spaces.size()) + " spaces" +
+              (row.in_use ? "" : " unused") +
+              (row.id == selected_ ? " selected" : "") + "]";
+    }
+    LOG(WARNING) << "Test settings profiles: " << step << " ->" << rows
+                 << " status=\"" << base::UTF16ToUTF8(status_->GetText())
+                 << "\"";
+  }
+#endif  // BUILDFLAG(MYARC_TEST_HOOKS)
+
+  SettingsWindow::Profiles profiles_;
+  std::vector<SettingsWindow::ProfileRow> rows_data_;
+  std::string selected_;
+  // The Profile whose name the field shows.
+  std::string named_;
   uint64_t secs_ = 0;
-  raw_ptr<Panel> card_ = nullptr;
-  raw_ptr<PillButton> picker_ = nullptr;
+  bool confirming_ = false;
+  bool creating_ = false;
+  raw_ptr<views::Label> intro_ = nullptr;
+  raw_ptr<Panel> list_panel_ = nullptr;
+  raw_ptr<views::Label> list_title_ = nullptr;
+  raw_ptr<views::View> rows_ = nullptr;
+  raw_ptr<PillButton> add_ = nullptr;
+  raw_ptr<PillButton> remove_ = nullptr;
+  raw_ptr<Panel> detail_ = nullptr;
+  raw_ptr<views::Label> name_title_ = nullptr;
+  raw_ptr<views::Textfield> name_ = nullptr;
+  raw_ptr<views::Label> icon_title_ = nullptr;
+  raw_ptr<PillButton> icon_ = nullptr;
+  raw_ptr<views::ImageView> icon_image_ = nullptr;
+  raw_ptr<views::Label> archive_title_ = nullptr;
+  raw_ptr<PillButton> archive_ = nullptr;
+  raw_ptr<views::Label> spaces_title_ = nullptr;
+  raw_ptr<views::Label> spaces_ = nullptr;
+  raw_ptr<views::Label> status_ = nullptr;
+  raw_ptr<PillButton> cancel_ = nullptr;
+  raw_ptr<PillButton> confirm_ = nullptr;
   std::unique_ptr<ui::SimpleMenuModel> model_;
   std::unique_ptr<views::MenuRunner> runner_;
+  base::WeakPtrFactory<ProfilesPage> weak_factory_{this};
 };
 
 BEGIN_METADATA(ProfilesPage)
@@ -1218,7 +1717,7 @@ class SettingsView : public views::View {
                base::RepeatingClosure open_site,
                base::RepeatingClosure import_arc,
                base::RepeatingClosure replay_tour,
-               SettingsWindow::ArchiveTimer archive_timer,
+               SettingsWindow::Profiles profiles,
                base::RepeatingClosure close)
       : close_(std::move(close)) {
     title_ = AddLabel(this, u"", 13, gfx::Font::Weight::BOLD, kTitleText);
@@ -1242,7 +1741,7 @@ class SettingsView : public views::View {
                             SettingsWindow::Section::kProfiles),
         std::move(open_site)));
     profiles_ =
-        AddChildView(std::make_unique<ProfilesPage>(std::move(archive_timer)));
+        AddChildView(std::make_unique<ProfilesPage>(std::move(profiles)));
     links_ = AddChildView(std::make_unique<LinksPage>(local_state));
     advanced_ = AddChildView(std::make_unique<AdvancedPage>(
         local_state, more_settings, std::move(import_arc),
@@ -1354,13 +1853,13 @@ SettingsWindow::SettingsWindow(Profile* profile,
                                base::RepeatingClosure open_more_settings,
                                base::RepeatingClosure open_site,
                                base::RepeatingClosure replay_tour,
-                               ArchiveTimer archive_timer)
+                               Profiles profiles)
     : profile_(profile),
       local_state_(local_state),
       open_more_settings_(std::move(open_more_settings)),
       open_site_(std::move(open_site)),
       replay_tour_(std::move(replay_tour)),
-      archive_timer_(std::move(archive_timer)) {}
+      profiles_(std::move(profiles)) {}
 
 SettingsWindow::~SettingsWindow() {
   widget_.reset();
@@ -1410,7 +1909,7 @@ void SettingsWindow::Show(Section section, bool inactive) {
                             weak_factory_.GetWeakPtr()),
         base::BindRepeating(&SettingsWindow::ReplayTour,
                             weak_factory_.GetWeakPtr()),
-        archive_timer_,
+        profiles_,
         base::BindRepeating(&SettingsWindow::Close,
                             weak_factory_.GetWeakPtr())));
     delegate_->SetClientViewFactory(

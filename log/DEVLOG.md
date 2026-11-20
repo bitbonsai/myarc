@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-11-20: Profiles in Settings
+
+- Settings > Profiles now has Arc's list of Profiles with avatars and Spaces counts, + and −, and a detail card with Name, Icon and "Archive tabs after" for the selected Profile, plus the Spaces that use it. `SettingsWindow::Profiles` is a set of callbacks that BrowserView fills from Chromium's Profile manager, reusing `BrowserView::CreateProfile` (the Create a Space panel's New Profile…), the Spaces index, `ProfileAttributesEntry` for name and icon, and `DeleteProfileHelper` for deletion. A Profile whose only Space is the empty default counts as not used, since every new Profile gets one (Chromium commit "Back the Settings Profiles tab with Chromium's Profile manager"). Also formats a few earlier hunks.
+- Evidence: a background run on the hooks build with `--myarc-test-settings-profiles=create,rename:Work,icon:5,select:0,delete,select:1,delete,confirm` logged each step and captured the page: Work created, renamed and given a new icon, Default refused with the reason, Work deleted after the confirmation, and Local State's Profile list back to Default with the directory gone.
+- Limits: the timer is editable only for a loaded Profile. A Profile not loaded this session with one indexed Space counts as used, so it can't be deleted until a window of it has opened. The window is dark only. Spaces can't move between Profiles yet, so a used Profile can be deleted only after its Spaces are.
+
 ## 2026-11-20: The quick start page opens once after the tour
 
 - A fresh workspace carries `quick_start_pending`, written to the file only while set, so older files read as done. `onboarding::quick_start` takes the tour record before and after each event: the first transition into complete opens https://myarc.dev/welcome/ as a Today tab in the tour's window, or drops it when an import receipt exists, and either way clears the flag first. Replays go through `FeedOnboardingEvent` without the rule's effect on an existing workspace, because the flag is already clear.
