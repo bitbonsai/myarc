@@ -1358,10 +1358,11 @@ foundation::MutationResult WorkspaceService::RestoreSnapshot(
 
 // static
 rust::Box<foundation::ArcExport> WorkspaceService::ParseArcExport(
-    base::span<const uint8_t> bytes) {
-  auto export_data =
-      foundation::parse_arc_export(rust::Slice<const uint8_t>(bytes.data(),
-                                                              bytes.size()));
+    base::span<const uint8_t> bytes,
+    bool sidebar) {
+  const rust::Slice<const uint8_t> slice(bytes.data(), bytes.size());
+  auto export_data = sidebar ? foundation::parse_arc_sidebar(slice)
+                             : foundation::parse_arc_export(slice);
   rust::Vec<rust::String> canonical;
   for (const auto& url : foundation::arc_export_urls(*export_data)) {
     const auto spec = CanonicalUrl(std::string_view(url.data(), url.size()));
@@ -1390,8 +1391,9 @@ foundation::ArcImportPreview WorkspaceService::ApplyArcImport(
   if (!CanMutate())
     return PreviewArcImport(export_data);
   auto result = foundation::apply_arc_import(*workspace_, export_data);
-  if (result.ok && (result.new_spaces || result.new_pins ||
-                    result.new_folders || result.moved_pins)) {
+  if (result.ok &&
+      (result.new_spaces || result.new_pins || result.new_favorites ||
+       result.new_folders || result.moved_pins)) {
     SpacesChanged({true, 0, rust::String()});
   }
   return result;

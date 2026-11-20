@@ -8,8 +8,8 @@ publish = false
 
 [features]
 default = ["arc-sidebar"]
-# Reads Arc's StorableSidebar.json. The Chromium GN build doesn't enable it
-# yet, so it needs no GN sources or serde_json dependency there.
+# Reads Arc's StorableSidebar.json. The Chromium GN build's `import` target
+# enables it too and depends on Chromium's serde_json.
 arc-sidebar = ["dep:serde_json"]
 
 [dependencies]

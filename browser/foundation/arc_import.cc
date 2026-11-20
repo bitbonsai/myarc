@@ -9,6 +9,7 @@
 
 #include "base/files/file_util.h"
 #include "base/functional/bind.h"
+#include "base/logging.h"
 #include "base/memory/ref_counted.h"
 #include "base/memory/scoped_refptr.h"
 #include "base/memory/weak_ptr.h"
@@ -22,6 +23,7 @@
 #include "chrome/browser/ui/select_file_policy/chrome_select_file_policy.h"
 #include "components/constrained_window/constrained_window_views.h"
 #include "crypto/hash.h"
+#include "myarc/test_buildflags.h"
 #include "myarc/workspace_service.h"
 #include "ui/base/models/dialog_model.h"
 #include "ui/shell_dialogs/select_file_dialog.h"
@@ -88,12 +90,27 @@ struct ReadResult {
   std::string error;
   std::optional<rust::Box<foundation::ArcExport>> export_data;
   std::string content_hash;
+  // Arc's sidebar file rather than its Markdown export.
+  bool sidebar = false;
 };
+
+// Arc's sidebar file, which keeps Favorites apart from Space pins. Read only
+// after the user picks it.
+constexpr char kArcSidebarDir[] = "Library/Application Support/Arc";
+constexpr char kArcSidebarName[] = "StorableSidebar.json";
+
+// A .json file is Arc's sidebar file; anything else is read as the Markdown
+// export.
+bool IsSidebarFile(const base::FilePath& path) {
+  return path.MatchesExtension(FILE_PATH_LITERAL(".json"));
+}
 
 // Worker sequence: reads at most the export limit and parses. The file is
 // only read, never written.
 ReadResult ReadExport(const base::FilePath& path) {
-  const size_t max = foundation::arc_export_max_bytes();
+  const bool sidebar = IsSidebarFile(path);
+  const size_t max = sidebar ? foundation::arc_sidebar_max_bytes()
+                             : foundation::arc_export_max_bytes();
   const std::optional<int64_t> size = base::GetFileSize(path);
   if (!size) {
     return {"myArc couldn't open this file.", std::nullopt};
@@ -109,8 +126,8 @@ ReadResult ReadExport(const base::FilePath& path) {
     return {"myArc couldn't read this file.", std::nullopt};
   }
   return {std::string(),
-          WorkspaceService::ParseArcExport(base::as_byte_span(bytes)),
-          base::HexEncodeLower(crypto::hash::Sha256(bytes))};
+          WorkspaceService::ParseArcExport(base::as_byte_span(bytes), sidebar),
+          base::HexEncodeLower(crypto::hash::Sha256(bytes)), sidebar};
 }
 
 std::u16string Count(size_t count,
@@ -152,6 +169,9 @@ std::u16string List(const rust::Vec<rust::String>& lines, size_t total) {
 // "4 Spaces, 1 folder and 13 pinned tabs", or empty when nothing is new.
 std::u16string Additions(const foundation::ArcImportPreview& preview) {
   std::vector<std::u16string> adds;
+  if (preview.new_favorites) {
+    adds.push_back(Count(preview.new_favorites, u"Favorite", u"Favorites"));
+  }
   if (preview.new_spaces) {
     adds.push_back(Count(preview.new_spaces, u"Space", u"Spaces"));
   }
@@ -225,6 +245,16 @@ void ShowReport(const foundation::ArcImportPreview& result,
   builder.AddParagraph(
       ui::DialogModelLabel(base::UTF8ToUTF16(std::string(result.report_note)))
           .set_is_secondary());
+#if BUILDFLAG(MYARC_TEST_HOOKS)
+  // Background runs can't read the sheet, so log what it says.
+  std::string lines;
+  for (const auto& line : result.report) {
+    lines += " [" + std::string(line) + "]";
+  }
+  LOG(WARNING) << "Test Arc import report: added=\"" << base::UTF16ToUTF8(adds)
+               << "\" lines=" << lines << " note=\""
+               << std::string(result.report_note) << "\"";
+#endif  // BUILDFLAG(MYARC_TEST_HOOKS)
   builder.AddOkButton(base::DoNothing(),
                       ui::DialogModel::Button::Params().SetLabel(u"OK"));
   views::Widget* widget = Show(builder.Build(), parent, inactive);
@@ -299,7 +329,8 @@ void ShowPreview(base::WeakPtr<Profile> profile,
   ui::DialogModel::Builder builder;
   builder.SetTitle(kTitle);
   const bool noop = preview.ok && !preview.new_spaces && !preview.new_folders &&
-                    !preview.new_pins && !preview.moved_pins;
+                    !preview.new_pins && !preview.new_favorites &&
+                    !preview.moved_pins;
   if (!preview.ok) {
     builder.AddParagraph(ui::DialogModelLabel(
         base::StrCat({u"This file can't be imported. ",
@@ -325,10 +356,14 @@ void ShowPreview(base::WeakPtr<Profile> profile,
            u" already in myArc and stay as they are."})));
     }
     builder.AddParagraph(
-        ui::DialogModelLabel(u"Each Arc folder becomes a folder in its "
-                             u"Space. Favorites become pinned tabs there, "
-                             u"because the export doesn't mark them apart. "
-                             u"Nothing opens until you click it.")
+        ui::DialogModelLabel(
+            read.sidebar
+                ? u"Favorites stay Favorites, and each Arc folder becomes a "
+                  u"folder in its Space. Page titles aren't imported yet. "
+                  u"Nothing opens until you click it."
+                : u"Each Arc folder becomes a folder in its Space. Favorites "
+                  u"become pinned tabs there, because the export doesn't mark "
+                  u"them apart. Nothing opens until you click it.")
             .set_is_secondary());
   }
   if (preview.skipped_count) {
@@ -411,15 +446,31 @@ class Picker : public ui::SelectFileDialog::Listener {
   Picker& operator=(const Picker&) = delete;
   ~Picker() override { dialog_->ListenerDestroyed(); }
 
+  // Looks for Arc's sidebar file off the UI thread, without reading it, so
+  // the picker can open on it.
   void Start() {
+    base::ThreadPool::PostTaskAndReplyWithResult(
+        FROM_HERE, {base::MayBlock(), base::TaskPriority::USER_BLOCKING},
+        base::BindOnce([] {
+          const base::FilePath file =
+              base::GetHomeDir().Append(kArcSidebarDir).Append(kArcSidebarName);
+          return base::PathExists(file) ? file : base::FilePath();
+        }),
+        base::BindOnce(&Picker::Open, base::Unretained(this)));
+  }
+
+  void Open(const base::FilePath& sidebar) {
     dialog_ = ui::SelectFileDialog::Create(
         this, std::make_unique<ChromeSelectFilePolicy>(nullptr));
     ui::SelectFileDialog::FileTypeInfo types;
     types.extensions = {{FILE_PATH_LITERAL("md"), FILE_PATH_LITERAL("markdown"),
-                         FILE_PATH_LITERAL("txt")}};
+                         FILE_PATH_LITERAL("txt")},
+                        {FILE_PATH_LITERAL("json")}};
     types.include_all_files = true;
-    dialog_->SelectFile(ui::SelectFileDialog::SELECT_OPEN_FILE, kTitle,
-                        base::FilePath(), &types, 1,
+    // The picker opens on Arc's folder with the sidebar file selected; the
+    // user still confirms it.
+    dialog_->SelectFile(ui::SelectFileDialog::SELECT_OPEN_FILE, kTitle, sidebar,
+                        &types, sidebar.empty() ? 1 : 2,
                         base::FilePath::StringType(), parent_);
   }
 

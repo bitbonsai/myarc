@@ -55,13 +55,19 @@ rust_static_library("import") {
   sources = [
     "import/src/arc_markdown.rs",
     "import/src/arc_report.rs",
+    "import/src/arc_sidebar.rs",
     "import/src/arc_workspace.rs",
     "import/src/lib.rs",
   ]
+  # Reads Arc's StorableSidebar.json.
+  features = [ "arc-sidebar" ]
   aliased_deps = {
     myarc_workspace = ":workspace"
   }
-  deps = [ ":workspace" ]
+  deps = [
+    ":workspace",
+    "//third_party/rust/serde_json/v1:lib",
+  ]
 }
 
 rust_static_library("bridge") {
@@ -119,6 +125,7 @@ source_set("arc_import") {
     "//ui/gfx",
   ]
   deps = [
+    ":test_buildflags",
     ":workspace_service",
     "//chrome/browser/profiles:profile",
     "//chrome/browser/ui/select_file_policy",

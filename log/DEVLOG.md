@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-11-20: Import from Arc… reads the sidebar file
+
+- The GN `import` target builds `arc_sidebar.rs` with the `arc-sidebar` feature and Chromium's `serde_json`. The bridge has `parse_arc_sidebar` beside `parse_arc_export`, `ArcImportPreview` gains `new_favorites`, and the closing note for the sidebar file says its page titles aren't imported yet. The picker accepts `.json` and, when `StorableSidebar.json` exists in Arc's folder, opens there with it as the default; it only checks that the file exists until the user picks it.
+- Evidence: the hooks build imported `tests/fixtures/arc-sidebar/StorableSidebar.json` through `--myarc-test-onboarding-import`: the logged report read "2 Favorites, 2 Spaces, 1 folder and 6 pinned tabs" with five left-out lines and the sidebar note, the workspace file held 2 Favorites, and the fixture's hash was unchanged. The Markdown fixture still gets its own note. fmt, clippy and the workspace tests pass.
+- Limits: the screen was locked, so no capture of the preview or the report sheet. The real picker wasn't opened, since it would take focus, and no real Arc folder was read.
+
 ## 2026-11-20: Profiles in Settings
 
 - Settings > Profiles now has Arc's list of Profiles with avatars and Spaces counts, + and −, and a detail card with Name, Icon and "Archive tabs after" for the selected Profile, plus the Spaces that use it. `SettingsWindow::Profiles` is a set of callbacks that BrowserView fills from Chromium's Profile manager, reusing `BrowserView::CreateProfile` (the Create a Space panel's New Profile…), the Spaces index, `ProfileAttributesEntry` for name and icon, and `DeleteProfileHelper` for deletion. A Profile whose only Space is the empty default counts as not used, since every new Profile gets one (Chromium commit "Back the Settings Profiles tab with Chromium's Profile manager"). Also formats a few earlier hunks.

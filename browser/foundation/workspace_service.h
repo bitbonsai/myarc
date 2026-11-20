@@ -244,10 +244,12 @@ class WorkspaceService final : public base::SupportsUserData::Data {
   std::optional<foundation::StateSnapshot> ExportSnapshot() const;
   foundation::MutationResult RestoreSnapshot(
       foundation::StateSnapshot snapshot);
-  // Parses an Arc Markdown export and canonicalizes its URLs with the same
-  // rules as saved URLs. Pure: callable on any sequence, never fails.
+  // Parses an Arc Markdown export, or with `sidebar` Arc's sidebar file
+  // (StorableSidebar.json), and canonicalizes its URLs with the same rules
+  // as saved URLs. Pure: callable on any sequence, never fails.
   static rust::Box<foundation::ArcExport> ParseArcExport(
-      base::span<const uint8_t> bytes);
+      base::span<const uint8_t> bytes,
+      bool sidebar);
   // What importing `export` would add to this workspace, without changing it.
   foundation::ArcImportPreview PreviewArcImport(
       const foundation::ArcExport& export_data) const;

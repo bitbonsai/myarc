@@ -14,6 +14,8 @@ pub struct ArcExport {
     report: import::arc_markdown::Report,
     error: String,
     canonical: Vec<Option<String>>,
+    // Read from Arc's sidebar file rather than its Markdown export.
+    sidebar: bool,
 }
 
 // One request or hello from a control client, or none once the host has
@@ -570,6 +572,8 @@ mod ffi {
         spaces: usize,
         new_spaces: usize,
         new_pins: usize,
+        // Profile Favorites the import adds; only Arc's sidebar file has any.
+        new_favorites: usize,
         // Entries already pinned in their place, left alone.
         kept_pins: usize,
         // Folders the import creates, one per new group name in a Space.
@@ -1048,6 +1052,10 @@ mod ffi {
         // Parses untrusted bytes. Never fails; a file it can't read carries an
         // error that previews report.
         fn parse_arc_export(bytes: &[u8]) -> Box<ArcExport>;
+        // Largest sidebar file accepted, in bytes.
+        fn arc_sidebar_max_bytes() -> usize;
+        // The same for Arc's sidebar file, StorableSidebar.json.
+        fn parse_arc_sidebar(bytes: &[u8]) -> Box<ArcExport>;
         // Every entry's URL as written, for the browser to canonicalize.
         fn arc_export_urls(arc: &ArcExport) -> Vec<String>;
         // One URL per `arc_export_urls` entry, canonicalized; empty rejects it.
@@ -1130,6 +1138,24 @@ pub fn parse_arc_export(bytes: &[u8]) -> Box<ArcExport> {
         report,
         error,
         canonical: Vec::new(),
+        sidebar: false,
+    })
+}
+
+pub fn arc_sidebar_max_bytes() -> usize {
+    import::arc_sidebar::MAX_INPUT_BYTES
+}
+
+pub fn parse_arc_sidebar(bytes: &[u8]) -> Box<ArcExport> {
+    let (report, error) = match import::arc_sidebar::parse(bytes) {
+        Ok(report) => (report, String::new()),
+        Err(error) => (Default::default(), error.to_string()),
+    };
+    Box::new(ArcExport {
+        report,
+        error,
+        canonical: Vec::new(),
+        sidebar: true,
     })
 }
 
@@ -1181,7 +1207,12 @@ pub fn apply_arc_import(workspace: &mut Workspace, export: &ArcExport) -> ffi::A
     preview.first_space = first.unwrap_or(0);
     if let Some(report) = report.filter(|_| preview.ok) {
         preview.report = report;
-        preview.report_note = import::arc_report::NOT_IN_EXPORT.to_owned();
+        preview.report_note = if export.sidebar {
+            import::arc_report::NOT_FROM_SIDEBAR
+        } else {
+            import::arc_report::NOT_IN_EXPORT
+        }
+        .to_owned();
     }
     preview
 }
@@ -1258,6 +1289,7 @@ fn arc_import_result(
         spaces: 0,
         new_spaces: 0,
         new_pins: 0,
+        new_favorites: 0,
         kept_pins: 0,
         new_folders: 0,
         kept_folders: 0,
@@ -1290,6 +1322,7 @@ fn arc_import_result(
             preview.spaces = plan.spaces.len();
             preview.new_spaces = plan.new_space_count();
             preview.new_pins = plan.new_pin_count();
+            preview.new_favorites = plan.new_favorite_count();
             preview.kept_pins = plan.kept_pin_count();
             preview.new_folders = plan.new_folder_count();
             preview.kept_folders = plan
