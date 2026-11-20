@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-11-20: Private windows stay out of the workspace file
+
+- Audited each path that writes the workspace file, Local State or the bridge: a private Profile gets an ephemeral `WorkspaceService` with no file path or IO runner, and the control host, site icon fetcher, Little Arc routing and the crash report skip it. No leak found, so nothing changed outside the new `--myarc-test-private-window` hook.
+- Evidence: `tools/check_private_windows.sh` passed on the hooks build. A private window with two fixture pages that retitle themselves and push new paths, one of them pinned, ran beside a regular page; after a clean quit and after a SIGKILL, no myArc file and no other file in the user-data dir held the private token, and the regular page was in the workspace file.
+- Limits: the private pages came from the hook, not from Cmd+Shift+N and typing. Chromium's own private-mode guarantees (history, cache, cookies) are its own and weren't audited beyond that grep.
+
 ## 2026-11-20: Crash reports through a prefilled GitHub issue
 
 - After a crashed session, the launch shows a card at the window's top-right, "myArc quit unexpectedly. Report it?", built on the control prompt's card. Report opens a new issue on github.com/bitbonsai/myarc with the myArc, Chromium and macOS versions and a summary of the newest `myArc*.ips`: header, exception, termination and the crashed thread's top frames, identifiers dropped. A marker file in the user-data dir keeps a log from being offered twice. Hooked into `SessionCrashedBubble::ShowIfNotOffTheRecordProfile` (Chromium commit "Offer a crash report after a crashed session").

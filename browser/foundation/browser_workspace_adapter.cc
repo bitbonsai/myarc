@@ -155,6 +155,13 @@ bool g_ctrl_tab_hook_done = false;
 // (an item, before item <value> or 0 for the end) or "delete-space". For
 // tools/check_durability.sh.
 constexpr char kMyarcTestDurability[] = "myarc-test-durability";
+
+// --myarc-test-private-window=<url>[,<url>…] opens a private window beside
+// the first regular workspace window once it is ready, with each URL as a
+// tab, and pins the first one in the private Space three seconds later. For
+// tools/check_private_windows.sh.
+constexpr char kMyarcTestPrivateWindow[] = "myarc-test-private-window";
+bool g_private_window_hook_done = false;
 constexpr char kMyarcTestKillAfterMs[] = "myarc-test-kill-after-ms";
 bool g_durability_hook_done = false;
 
@@ -1687,6 +1694,49 @@ void BrowserWorkspaceAdapter::Refresh() {
               weak_factory_.GetWeakPtr(), sidebar.temporary[0].id,
               sidebar.temporary[1].id,
               command_line->GetSwitchValueASCII(kMyarcTestSplit)));
+    }
+  }
+  if (ready() && !g_private_window_hook_done &&
+      !profile_->IsOffTheRecord() &&
+      command_line->HasSwitch(kMyarcTestPrivateWindow)) {
+    g_private_window_hook_done = true;
+    Profile* private_profile =
+        profile_->GetPrimaryOTRProfile(/*create_if_needed=*/true);
+    BrowserWindowInterface* window = nullptr;
+    for (const std::string& spec : base::SplitString(
+             command_line->GetSwitchValueASCII(kMyarcTestPrivateWindow), ",",
+             base::TRIM_WHITESPACE, base::SPLIT_WANT_NONEMPTY)) {
+      const GURL url(spec);
+      NavigateParams params =
+          window ? NavigateParams(window, url, ui::PAGE_TRANSITION_TYPED)
+                 : NavigateParams(private_profile, url,
+                                  ui::PAGE_TRANSITION_TYPED);
+      params.disposition = window ? WindowOpenDisposition::kNewForegroundTab
+                                  : WindowOpenDisposition::kNewWindow;
+      params.window_action = NavigateParams::WindowAction::kShowWindowInactive;
+      Navigate(&params);
+      window = params.browser;
+    }
+    LOG_IF(ERROR, !window) << "Test private window: none opened";
+    if (window) {
+      base::SingleThreadTaskRunner::GetCurrentDefault()->PostDelayedTask(
+          FROM_HERE,
+          base::BindOnce(
+              [](base::WeakPtr<BrowserWindowInterface> window) {
+                auto* adapter =
+                    window ? BrowserWorkspaceAdapter::ForBrowser(*window)
+                           : nullptr;
+                if (!adapter) {
+                  LOG(ERROR) << "Test private window: no workspace";
+                  return;
+                }
+                window->GetTabStripModel()->ActivateTabAt(0);
+                const auto result = adapter->TogglePin();
+                LOG(WARNING) << "Test private window: pin "
+                             << (result.ok ? "ok" : std::string(result.error));
+              },
+              window->GetWeakPtr()),
+          base::Seconds(3));
     }
   }
   if (ready() && !g_durability_hook_done &&
