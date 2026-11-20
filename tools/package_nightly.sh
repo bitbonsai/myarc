@@ -14,6 +14,7 @@
 #        OUT=<output dir, default ~/.cache/myarc-m0/release/DATE>
 #        NOTARIZE=0|1 NOTARY_PROFILE=<keychain profile, default myarc-notary>
 #        ENTITLEMENTS=<dir with Chromium's entitlement plists>
+#        CHROMIUM_SRC=<checkout> ALLOW_STALE=1 (skip the stale build check)
 # Prints the DMG path, size, SHA-256 and the site/release.json values.
 set -euo pipefail
 
@@ -35,6 +36,19 @@ for plist in app helper-renderer helper-gpu; do
   [ -f "$ENTITLEMENTS/$plist-entitlements.plist" ] || { echo "entitlements missing: $ENTITLEMENTS/$plist-entitlements.plist" >&2; exit 1; }
 done
 case "$OUT" in "$ROOT"*) echo "OUT must be outside the repository" >&2; exit 1;; esac
+
+# A failed build leaves the previous app in place. Refuse a framework older than
+# the Chromium checkout's last commit. ALLOW_STALE=1 skips this check.
+CHROMIUM_SRC=${CHROMIUM_SRC:-$HOME/.cache/myarc-m0/chromium/src}
+if [ "${ALLOW_STALE:-0}" != 1 ] && git -C "$CHROMIUM_SRC" rev-parse -q --verify HEAD >/dev/null 2>&1; then
+  FRAMEWORK=$(find "$APP_SRC/Contents/Frameworks" -maxdepth 4 -type f -name '* Framework' | head -1)
+  BUILT=$(stat -f %m "$FRAMEWORK")
+  HEAD_TIME=$(git -C "$CHROMIUM_SRC" log -1 --format=%ct)
+  if [ "$BUILT" -lt "$HEAD_TIME" ]; then
+    echo "built app is older than Chromium HEAD $(git -C "$CHROMIUM_SRC" log -1 --format=%h); did the build fail?" >&2
+    exit 1
+  fi
+fi
 
 mkdir -p "$OUT"
 rm -rf "$STAGE"
