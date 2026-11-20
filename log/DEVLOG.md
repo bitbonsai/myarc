@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-11-20: Nightly 2026.11.20.4
+
+- Published the prerelease `nightly-2026.11.20.4` from `main` `3f9f541` and Chromium `724a8f6feb`: Actions mode in the command bar (Tab), the nightly label in Sparkle's dialogs and Check for Updates… under About.
+- Evidence: `tools/package_nightly.sh` signed with the Developer ID, Apple notarized and stapled the app and the DMG, and `spctl` accepted both. Packaged with `ALLOW_STALE=1`, since the build predates the Chromium commit's timestamp but ninja had nothing to rebuild. 242545213 bytes, SHA-256 `a505f0b7...fc81`.
+- Limits: no update from 2026.11.20.3 through Sparkle has been tried yet.
+
 ## 2026-11-20: Actions mode in the command bar
 
 - Tab in the empty command bar shows Arc's blue Actions chip, sets the placeholder to "Search..." and lists the "/" actions without a typed "/"; Tab again or Backspace in the empty field leaves, and Tab after text works as before. The chip is named "Actions mode" and the change is announced. Entering the mode plays a blue glow: one layer under the bar, blurred once at paint, whose opacity and scale animate over 850 ms, measured from the Arc recording; Reduce Motion skips it. `command_bar.rs` adds Arc's Privacy Policy, Search Settings and Switch to Dark or Light Mode plus existing browser commands, and the window hides the ones it has disabled (Chromium commit "Add Arc's Actions mode to the command bar"). [PARITY](../docs/PARITY.md) lists Arc's actions and their status.
