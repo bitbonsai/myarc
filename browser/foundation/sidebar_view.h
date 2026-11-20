@@ -488,6 +488,8 @@ class SidebarView final : public views::View,
   void DropRows();
   // Row drags, fed every mouse event under this view before its target.
   void OnRowDragEvent(ui::Event& event);
+  // The footer's first Space, which falls back to the planet; 0 if none.
+  uint64_t FirstSpaceId() const;
   // Where a row dragged to `point` would land, or nothing outside the rows.
   std::optional<Drop> DropAt(const gfx::Point& point) const;
   void ShowDrop(const std::optional<Drop>& drop);

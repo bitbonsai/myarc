@@ -162,18 +162,27 @@ SpaceIconChoice SpaceIconOf(const foundation::SpaceRecord& space) {
   return {};
 }
 
-// The Space title's icon: the Space's emoji or icon, else Arc's default
-// planet, or the bot for the agent Space. 18 DIP, as Arc's title glyph is a
-// size up from the rows' 16 DIP favicons.
+// The Space title's icon: the Space's emoji or icon, else the footer's
+// fallback, so both show the same glyph: the bot for the agent Space, the
+// planet for the first Space and a dot for the rest. 18 DIP, as Arc's title
+// glyph is a size up from the rows' 16 DIP favicons; the dot is padded to it.
 constexpr int kSpaceIconSize = 18;
 ui::ImageModel SpaceIcon(const SpaceIconChoice& icon,
                          SkColor color,
-                         bool agent = false) {
+                         bool agent,
+                         bool first) {
   ui::ImageModel image = SpaceIconImage(icon, color, kSpaceIconSize);
-  return image.IsEmpty()
-             ? ui::ImageModel::FromVectorIcon(agent ? kBotIcon : kSaturnIcon,
-                                              color, kSpaceIconSize)
-             : image;
+  if (!image.IsEmpty()) {
+    return image;
+  }
+  if (agent || first) {
+    return ui::ImageModel::FromVectorIcon(agent ? kBotIcon : kSaturnIcon,
+                                          color, kSpaceIconSize);
+  }
+  constexpr int kDot = 8;
+  return ui::ImageModel::FromImageSkia(gfx::CanvasImageSource::CreatePadded(
+      gfx::CreateVectorIcon(kDotIcon, kDot, color),
+      gfx::Insets((kSpaceIconSize - kDot) / 2)));
 }
 
 // Arc centres every row icon 18 DIP into the row, on New Tab's plus, and starts
@@ -1344,6 +1353,13 @@ void SidebarView::OpenCreateSpace(std::vector<ProfileChoice> profiles,
     space_rows_ = nullptr;
     tiles_.clear();
     selectable_rows_.clear();
+    // The rows go, so nothing may point at them: a click in the panel walks
+    // the drop zones.
+    row_drag_.reset();
+    autoscroll_timer_.Stop();
+    rows_scroll_ = nullptr;
+    drop_indicator_ = nullptr;
+    drop_zones_.clear();
     while (children().front() != footer_) {
       RemoveChildViewT(children().front());
     }
@@ -1734,6 +1750,11 @@ void SidebarView::ExecuteCommand(int command_id, int event_flags) {
   if (command_id >= kMoveToFolderFirst && index < menu_folder_ids_.size()) {
     delegate_->MovePinToFolder(id, menu_folder_ids_[index]);
   }
+}
+
+uint64_t SidebarView::FirstSpaceId() const {
+  const auto first = std::ranges::find(spaces_, false, &SpaceEntry::agent);
+  return first == spaces_.end() ? 0 : first->id;
 }
 
 void SidebarView::OnRowDragEvent(ui::Event& event) {
@@ -2545,7 +2566,8 @@ void SidebarView::SetModel(const foundation::SidebarResult& model,
   const bool agent = model.current_space.agent;
   heading->SetImageModel(
       views::Button::STATE_NORMAL,
-      SpaceIcon(SpaceIconOf(model.current_space), fills.title, agent));
+      SpaceIcon(SpaceIconOf(model.current_space), fills.title, agent,
+                !agent && model.current_space.id == FirstSpaceId()));
   AlignRowContents(*heading, kSpaceIconSize);
   heading->SetEnabledTextColors(fills.title);
   if (!tile_items.empty()) {
@@ -3843,7 +3865,9 @@ void SidebarView::UpdateFills() {
     heading->SetImageModel(
         views::Button::STATE_NORMAL,
         SpaceIcon(space != spaces_.end() ? space->icon : SpaceIconChoice(),
-                  fills.title, space != spaces_.end() && space->agent));
+                  fills.title, space != spaces_.end() && space->agent,
+                  space != spaces_.end() && !space->agent &&
+                      space->id == FirstSpaceId()));
   }
   for (const auto& target : focus_targets_) {
     if (target.action == FocusAction::kOtherSpace &&
