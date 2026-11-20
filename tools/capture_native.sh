@@ -66,7 +66,8 @@
 #   ONBOARDING_IMPORT=<file>
 #   makes Import from Arc… read that export instead of asking, and press
 #   Import in its preview. ONBOARDING_HOLD=1 keeps the tour at the reveal
-#   after the import's crossfade. All need myarc_test_hooks.
+#   after the import's crossfade. The welcome's sound is muted with
+#   --myarc-test-mute-sound unless SOUND=1. All need myarc_test_hooks.
 #   SCREEN_BURST=<seconds> records the whole main display, every app's
 #   windows included, from just after launch, as frames in screen-frames/
 #   next to the output (tools/bgcapture.swift screen). The welcome's desktop
@@ -150,6 +151,8 @@ if [ "${1:-}" = "--inner" ]; then
   [ -n "${ONBOARDING_EVENT:-}" ] && EXTRA+=(--myarc-test-onboarding-event="$ONBOARDING_EVENT")
   [ -n "${ONBOARDING_IMPORT:-}" ] && EXTRA+=(--myarc-test-onboarding-import="$ONBOARDING_IMPORT")
   [ -n "${ONBOARDING_HOLD:-}" ] && EXTRA+=(--myarc-test-onboarding-hold)
+  # The welcome stays silent unless SOUND=1.
+  [ -z "${SOUND:-}" ] && EXTRA+=(--myarc-test-mute-sound)
   [ -n "${ARGS:-}" ] && read -r -a MORE <<< "$ARGS" && EXTRA+=("${MORE[@]}")
   OPEN_ENV=()
   if [ -n "${CONTROL:-}" ]; then

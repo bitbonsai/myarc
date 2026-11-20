@@ -1,6 +1,7 @@
 #ifndef MYARC_WELCOME_INTRO_H_
 #define MYARC_WELCOME_INTRO_H_
 
+#include <cstdint>
 #include <memory>
 
 #include "base/functional/callback.h"
@@ -14,17 +15,25 @@ namespace myarc {
 // The welcome's arrival on the desktop, before its window shows. A
 // borderless, click-through window covering each display below its menu bar
 // fades to 85% of myarc.dev's midnight over 750 ms, above other apps'
-// windows; the menu bar never dims. With it, a blob comes in at the centre of
-// the main display, about a quarter of its width: one heavily blurred shape
-// in the site blue whose outline keeps morphing, a closed curve through 7
-// points whose radii wobble out of phase, with highlights in the ribbon
-// logo's violet, pink and coral drifting across it. After 3 s it swells
-// unevenly past the welcome window's edges over 300 ms, clipped by the
-// window's rounded frame, and its highlights smear into the window's field.
-// The field then crossfades into the window while the dim lifts, over
-// 300 ms. The welcome window stays hidden until the blob lands, and is then
-// ordered front without activating when the app isn't active, so a
-// background launch lands on it too.
+// windows; the menu bar never dims. With it, a blob pops in at the centre of
+// the welcome window, which on first run is the main display's centre. It's
+// about a quarter of the display's width: one heavily blurred shape in the
+// site blue whose outline keeps morphing, a closed curve through 7 points
+// whose radii wobble out of phase, with highlights in the ribbon logo's
+// violet, pink and coral drifting across it at different speeds. At 1.3 s it
+// swells unevenly past the window's edges on a spring, clipped by the
+// window's rounded frame, and by 1.6 s its highlights have smeared into the
+// welcome's background as it starts: the base with WelcomeView's blurred
+// fields. The welcome window stays hidden until then, and is then ordered
+// front without activating when the app isn't active, so a background launch
+// lands on it too. It shows the same picture, so it shows under the field
+// while the dim lifts, until 1.9 s, and the field goes at 1.7 s, once the
+// window has drawn. Its traffic lights fade in on their own at 1.9 s, 300 ms
+// after the grow lands. The times are welcome_timeline.h's.
+//
+// Everything moves in Core Animation, at the display's rate. The outline's
+// blur is worked out once, at the start, as a loop of images, so no frame
+// blurs anything.
 //
 // The intro owns its dim windows and the blob, and deleting it removes them
 // at once and shows the welcome window. It never deletes itself: `done` runs
@@ -33,24 +42,35 @@ namespace myarc {
 // launch shows them too. Mac only; UI sequence only.
 class WelcomeIntro {
  public:
-  // `window` is the welcome window. With `log`, each phase logs its start.
-  WelcomeIntro(gfx::NativeWindow window, base::OnceClosure done, bool log);
+  // `window` is the welcome window and `base` its background's base colour,
+  // as 0xRRGGBB. With `log`, each phase logs its start.
+  WelcomeIntro(gfx::NativeWindow window,
+               uint32_t base,
+               base::OnceClosure done,
+               bool log);
   WelcomeIntro(const WelcomeIntro&) = delete;
   WelcomeIntro& operator=(const WelcomeIntro&) = delete;
   ~WelcomeIntro();
+
+  // t = 0 of welcome_timeline.h: when the dim and the blob were ordered
+  // front, at the end of the constructor.
+  base::TimeTicks start() const { return start_; }
 
  private:
   struct Cocoa;
 
   void Grow();
   void Lift();
+  void Shown();
   void Finish();
+  // Runs `phase` at `at` from the start.
+  void At(base::TimeDelta at, void (WelcomeIntro::*phase)());
   void Log(const char* phase) const;
 
   std::unique_ptr<Cocoa> cocoa_;
   base::OnceClosure done_;
   const bool log_;
-  const base::TimeTicks start_;
+  base::TimeTicks start_;
   base::OneShotTimer timer_;
 };
 

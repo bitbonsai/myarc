@@ -1,5 +1,5 @@
 diff --git a/chrome/BUILD.gn b/chrome/BUILD.gn
-index 06bfcf5a90d093b9ac8e255e93ef2ffd0a00421e..1b6b382f4adf5168a24a468d283df51bbb39d645 100644
+index 06bfcf5a90d093b9ac8e255e93ef2ffd0a00421e..0e948c8cb0c5de311c7454f8a9c6051b46b39774 100644
 --- a/chrome/BUILD.gn
 +++ b/chrome/BUILD.gn
 @@ -54,6 +54,7 @@ if (is_android) {
@@ -73,7 +73,7 @@ index 06bfcf5a90d093b9ac8e255e93ef2ffd0a00421e..1b6b382f4adf5168a24a468d283df51b
        "//third_party/cld_3/src/src:cld_3",
      ]
  
-@@ -1409,7 +1431,12 @@ if (is_win) {
+@@ -1409,7 +1431,15 @@ if (is_win) {
        ":widevine_cdm_library",
        "//chrome/browser/resources/media/mei_preload:component_bundle",
        "//chrome/browser/web_applications/isolated_web_apps/key_distribution/preload:component_bundle",
@@ -81,6 +81,9 @@ index 06bfcf5a90d093b9ac8e255e93ef2ffd0a00421e..1b6b382f4adf5168a24a468d283df51b
 +
 +      # myArc: the bundled ad and tracker blocker's release zip.
 +      "//myarc:blocker_bundle_data",
++
++      # myArc: the welcome's sound.
++      "//myarc:welcome_sound",
 +
 +      # myArc: no bundled Privacy Sandbox attestations list (from
 +      # ungoogled-chromium's disable-privacy-sandbox.patch).

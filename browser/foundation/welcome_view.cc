@@ -1,38 +1,46 @@
 #include "myarc/welcome_view.h"
 
 #include <algorithm>
+#include <initializer_list>
 #include <memory>
+#include <optional>
 #include <string>
 #include <utility>
 
+#include "base/containers/span.h"
 #include "base/functional/bind.h"
-#include "base/location.h"
-#include "base/task/single_thread_task_runner.h"
 #include "base/time/time.h"
 #include "cc/paint/paint_flags.h"
 #include "cc/paint/paint_shader.h"
 #include "myarc/coach_mark.h"
+#include "myarc/welcome_mark.h"
+#include "myarc/welcome_palette.h"
+#include "myarc/welcome_timeline.h"
+#include "third_party/skia/include/core/SkBitmap.h"
 #include "third_party/skia/include/core/SkColor.h"
 #include "ui/accessibility/ax_enums.mojom.h"
 #include "ui/base/accelerators/accelerator.h"
 #include "ui/base/metadata/metadata_impl_macros.h"
+#include "ui/base/models/image_model.h"
 #include "ui/color/color_id.h"
 #include "ui/color/color_provider.h"
 #include "ui/compositor/layer.h"
+#include "ui/compositor/layer_animator.h"
 #include "ui/events/event.h"
 #include "ui/events/keycodes/keyboard_codes.h"
 #include "ui/gfx/animation/animation.h"
 #include "ui/gfx/animation/tween.h"
 #include "ui/gfx/canvas.h"
+#include "ui/gfx/codec/png_codec.h"
 #include "ui/gfx/color_utils.h"
 #include "ui/gfx/font_list.h"
+#include "ui/gfx/geometry/cubic_bezier.h"
 #include "ui/gfx/geometry/insets.h"
-#include "ui/gfx/geometry/point_conversions.h"
-#include "ui/gfx/geometry/point_f.h"
+#include "ui/gfx/geometry/point.h"
 #include "ui/gfx/geometry/rect_f.h"
 #include "ui/gfx/geometry/size.h"
 #include "ui/gfx/geometry/transform.h"
-#include "ui/gfx/scoped_canvas.h"
+#include "ui/gfx/image/image_skia.h"
 #include "ui/gfx/skia_paint_util.h"
 #include "ui/views/accessibility/view_accessibility.h"
 #include "ui/views/animation/animation_builder.h"
@@ -40,95 +48,81 @@
 #include "ui/views/border.h"
 #include "ui/views/controls/button/label_button.h"
 #include "ui/views/controls/highlight_path_generator.h"
+#include "ui/views/controls/image_view.h"
 #include "ui/views/controls/label.h"
-#include "ui/views/layout/box_layout.h"
-#include "ui/views/view_class_properties.h"
-#include "ui/views/view_targeter.h"
 #include "ui/views/view_utils.h"
 
 namespace myarc {
 namespace {
 
-constexpr char16_t kTitle[] = u"Welcome to myArc";
-constexpr char16_t kBody[] =
-    u"Everything stays on this Mac, and there's no account to make. Bring "
-    u"your Spaces over from Arc, or start with a clean sidebar.";
-constexpr char16_t kStart[] = u"Start browsing";
+using welcome::kChoiceAt;
+using welcome::kChoiceFade;
+using welcome::kHeadlineAt;
+using welcome::kHeadlineSlide;
+using welcome::kMarkDrift;
+using welcome::kMarkFade;
+using welcome::kMarkFadeAt;
+using welcome::kMarkIn;
+using welcome::kMarkRise;
+using welcome::kWindowShown;
+
+// myArc's own line, as on the myarc.dev hero.
+constexpr char16_t kHeadline[] = u"myArc, forever yours.";
 constexpr char16_t kImport[] = u"Import from Arc…";
 constexpr char16_t kImported[] = u"Imported from Arc";
+constexpr char16_t kStart[] = u"Start fresh";
 constexpr char16_t kSkip[] = u"Skip tour";
 
-constexpr int kColumnWidth = 360;
+constexpr int kMarkSize = 176;
 constexpr int kButtonWidth = 240;
-constexpr int kButtonHeight = 36;
-constexpr int kButtonRadius = 8;
-constexpr SkColor kPrimary = SkColorSetRGB(0x3D, 0x4B, 0xF2);
+constexpr int kButtonHeight = 40;
+// The base in dark mode, myarc.dev's dark page.
+constexpr uint32_t kMidnightDark = 0x0B1420;
 
-// A field of two quiet tints, light or dark.
-constexpr SkColor kFieldLightTop = SkColorSetRGB(0xF1, 0xF0, 0xFF);
-constexpr SkColor kFieldLightBottom = SkColorSetRGB(0xFB, 0xF1, 0xF6);
-constexpr SkColor kFieldDarkTop = SkColorSetRGB(0x1F, 0x20, 0x33);
-constexpr SkColor kFieldDarkBottom = SkColorSetRGB(0x2A, 0x20, 0x33);
-// The dim over the window around the sheet, sidebar included.
-constexpr SkAlpha kDimLight = 0x47;
-constexpr SkAlpha kDimDark = 0x73;
+// The logo plays the site hero's rise-art and drift keyframes, the drift
+// shortened, and the headline slides in while a blurred copy of it fades
+// out, so its blur clears.
+constexpr float kMarkRiseBy = 20;   // 1.25rem
+constexpr float kMarkDriftBy = 14;  // .875rem
+constexpr float kMarkTurn = 1;      // degrees
+constexpr float kHeadlineSlideBy = 56;
+constexpr float kHeadlineBlur = 12;
+constexpr base::TimeDelta kSharpIn = base::Milliseconds(200);
+constexpr base::TimeDelta kBlurIn = base::Milliseconds(300);
+// The site's ease runs as this many straight legs on the compositor.
+constexpr int kEaseLegs = 10;
 
-// The intro. Each phase is a window of milliseconds within it.
-constexpr base::TimeDelta kIntro = base::Milliseconds(1000);
 constexpr base::TimeDelta kReducedFade = base::Milliseconds(150);
-// The field's crossfade to an imported Space's theme.
 constexpr base::TimeDelta kThemeFade = base::Milliseconds(350);
-// The reveal's exit: the sheet slides right as it fades.
 constexpr base::TimeDelta kExit = base::Milliseconds(350);
 constexpr float kExitSlide = 64;
-constexpr int kIntroFrameRate = 60;
-struct Phase {
-  int start;
-  int end;
-};
-constexpr Phase kDimIn{0, 400};
-constexpr Phase kGather{0, 600};
-constexpr Phase kMerge{480, 620};
-constexpr Phase kGrow{520, 850};
-constexpr Phase kFieldIn{520, 620};
-constexpr Phase kStrip{700, 1000};
-constexpr Phase kTitleIn{600, 850};
-constexpr Phase kBodyIn{720, 970};
-constexpr Phase kButtonsIn{840, 1000};
-constexpr float kRise = 8;
-constexpr float kTextBlur = 6;
-constexpr float kDotRadius = 18;
-constexpr float kSeedSize = 56;
 
-// The Space theme swatches, one dot each, and where on the window's edge
-// (as fractions of its size) each one starts.
-struct Dot {
-  SkColor color;
-  float x;
-  float y;
-};
-constexpr Dot kDots[] = {
-    {SkColorSetRGB(0xF2, 0x9B, 0xBB), 0.0f, 0.22f},
-    {SkColorSetRGB(0xA6, 0x72, 0x9E), 0.28f, 0.0f},
-    {SkColorSetRGB(0xF2, 0x5E, 0x6C), 0.74f, 0.0f},
-    {SkColorSetRGB(0xFF, 0x86, 0x57), 1.0f, 0.36f},
-    {SkColorSetRGB(0xF8, 0xD5, 0x58), 1.0f, 0.86f},
-    {SkColorSetRGB(0x33, 0xE8, 0x95), 0.52f, 1.0f},
-    {SkColorSetRGB(0x6D, 0xBA, 0xD9), 0.0f, 0.78f},
-};
-
-// Where `progress` sits in `phase`, 0 to 1, eased by `tween`.
-double At(double progress,
-          Phase phase,
-          gfx::Tween::Type tween = gfx::Tween::LINEAR) {
-  const double ms = progress * kIntro.InMillisecondsF();
-  return gfx::Tween::CalculateValue(
-      tween,
-      std::clamp((ms - phase.start) / (phase.end - phase.start), 0.0, 1.0));
+// myarc.dev's ease, cubic-bezier(.2, .7, .2, 1).
+double SiteEase(double t) {
+  static const gfx::CubicBezier ease(0.2, 0.7, 0.2, 1);
+  return ease.Solve(std::clamp(t, 0.0, 1.0));
 }
+
+constexpr SkColor Rgb(uint32_t rgb, SkAlpha alpha = SK_AlphaOPAQUE) {
+  return SkColorSetARGB(alpha, (rgb >> 16) & 0xFF, (rgb >> 8) & 0xFF,
+                        rgb & 0xFF);
+}
+
+constexpr SkColor kInk = Rgb(welcome::kIvory);
 
 gfx::FontList Font(int delta, gfx::Font::Weight weight) {
   return gfx::FontList().Derive(delta, gfx::Font::NORMAL, weight);
+}
+
+std::unique_ptr<views::Label> Headline() {
+  auto label = std::make_unique<views::Label>(kHeadline);
+  label->SetFontList(Font(17, gfx::Font::Weight::BOLD));
+  label->SetAutoColorReadabilityEnabled(false);
+  label->SetBackgroundColor(SK_ColorTRANSPARENT);
+  // It paints to a translucent layer.
+  label->SetSubpixelRenderingEnabled(false);
+  label->SetEnabledColor(kInk);
+  return label;
 }
 
 // LabelButton hides its label, so set the font on its Label child.
@@ -136,24 +130,48 @@ void SetButtonFont(views::LabelButton& button, const gfx::FontList& font) {
   for (views::View* child : button.children()) {
     if (auto* label = views::AsViewClass<views::Label>(child)) {
       label->SetFontList(font);
-      // The sheet paints to a translucent layer.
       label->SetSubpixelRenderingEnabled(false);
     }
   }
 }
 
+// The ribbon logo, decoded once, kMarkSize DIP wide.
+const gfx::ImageSkia& Mark() {
+  static const gfx::ImageSkia* const mark = [] {
+    const SkBitmap bitmap = gfx::PNGCodec::Decode(base::span(kWelcomeMarkPng));
+    return new gfx::ImageSkia(
+        bitmap.isNull()
+            ? gfx::ImageSkia()
+            : gfx::ImageSkia::CreateFromBitmap(
+                  bitmap, static_cast<float>(bitmap.width()) / kMarkSize));
+  }();
+  return *mark;
+}
+
+// The logo `up` DIP up and turned `turn` degrees about its centre.
+gfx::Transform MarkAt(float up, float turn) {
+  const float half = kMarkSize / 2.f;
+  gfx::Transform transform = gfx::Transform::MakeTranslation(0, -up);
+  transform.Translate(half, half);
+  transform.Rotate(turn);
+  transform.Translate(-half, -half);
+  return transform;
+}
+
 // macOS views buttons ignore Return and take focus only with Full Keyboard
-// Access; the sheet needs both.
+// Access; the welcome needs both.
 class SheetButton : public views::LabelButton {
   METADATA_HEADER(SheetButton, views::LabelButton)
 
  public:
-  SheetButton(PressedCallback callback, const std::u16string& text)
+  SheetButton(PressedCallback callback, const std::u16string& text, int radius)
       : views::LabelButton(std::move(callback), text) {
     SetFocusBehavior(FocusBehavior::ALWAYS);
     SetHorizontalAlignment(gfx::ALIGN_CENTER);
-    views::InstallRoundRectHighlightPathGenerator(this, gfx::Insets(),
-                                                  kButtonRadius);
+    // The welcome keeps its contrast while another app is active, as on a
+    // first launch from the Finder.
+    SetAppearDisabledInInactiveWidget(false);
+    views::InstallRoundRectHighlightPathGenerator(this, gfx::Insets(), radius);
   }
 
   bool OnKeyPressed(const ui::KeyEvent& event) override {
@@ -181,134 +199,323 @@ bool IsDark(const views::View& view) {
          color_utils::IsDark(provider->GetColor(ui::kColorSysSurface));
 }
 
+// A view on its own layer that takes no events.
+void OnLayer(views::View& view) {
+  view.SetPaintToLayer();
+  view.layer()->SetFillsBoundsOpaquely(false);
+  view.SetCanProcessEventsWithinSubtree(false);
+}
+
+// One of the background's blurred fields: a radial gradient filling its
+// square bounds, on its own layer so the compositor drifts it.
+class Field : public views::View {
+  METADATA_HEADER(Field, views::View)
+
+ public:
+  explicit Field(const welcome::Field& field) : field_(field) {
+    OnLayer(*this);
+  }
+
+  const welcome::Field& field() const { return field_; }
+
+  void OnPaint(gfx::Canvas* canvas) override {
+    const float radius = width() / 2.f;
+    if (radius <= 0) {
+      return;
+    }
+    SkColor4f color = SkColor4f::FromColor(Rgb(field_.rgb));
+    color.fA = field_.alpha;
+    SkColor4f mid = color;
+    mid.fA = field_.alpha * welcome::kFieldMid;
+    SkColor4f clear = color;
+    clear.fA = 0;
+    const SkColor4f colors[] = {color, mid, clear};
+    const float stops[] = {0, welcome::kFieldMidStop, 1};
+    cc::PaintFlags flags;
+    flags.setAntiAlias(true);
+    flags.setShader(cc::PaintShader::MakeRadialGradient(
+        SkPoint::Make(radius, radius), radius, colors, stops, 3,
+        SkTileMode::kClamp));
+    canvas->DrawRect(gfx::RectF(GetLocalBounds()), flags);
+  }
+
+ private:
+  const welcome::Field field_;
+};
+
+BEGIN_METADATA(Field)
+END_METADATA
+
+// An imported Space's theme over the whole window, diagonal like the
+// sidebar's tint.
+class Theme : public views::View {
+  METADATA_HEADER(Theme, views::View)
+
+ public:
+  Theme() { OnLayer(*this); }
+
+  void SetTint(SidebarTint tint) {
+    tint_ = tint;
+    SchedulePaint();
+  }
+
+  void OnPaint(gfx::Canvas* canvas) override {
+    if (!tint_) {
+      return;
+    }
+    cc::PaintFlags flags;
+    flags.setShader(gfx::CreateGradientShader(
+        gfx::Point(), gfx::Point(width(), height()), tint_->start, tint_->end));
+    canvas->DrawRect(gfx::RectF(GetLocalBounds()), flags);
+  }
+
+ private:
+  std::optional<SidebarTint> tint_;
+};
+
+BEGIN_METADATA(Theme)
+END_METADATA
+
 }  // namespace
 
-WelcomeView::WelcomeView(bool offers_import,
-                         RadiusCallback radius,
-                         ActionCallback action)
-    : radius_(std::move(radius)),
-      action_(std::move(action)),
-      reduced_motion_(gfx::Animation::PrefersReducedMotion()),
-      intro_(kIntro, kIntroFrameRate, this),
-      theme_fade_(reduced_motion_ ? kReducedFade : kThemeFade,
-                  kIntroFrameRate,
-                  this),
-      exit_(kExit, kIntroFrameRate, this) {
+WelcomeView::WelcomeView(bool offers_import, ActionCallback action)
+    : action_(std::move(action)),
+      reduced_motion_(gfx::Animation::PrefersReducedMotion()) {
   SetPaintToLayer();
-  layer()->SetFillsBoundsOpaquely(false);
-  SetEventTargeter(std::make_unique<views::ViewTargeter>(this));
-  layout_ = SetLayoutManager(std::make_unique<views::BoxLayout>(
-      views::BoxLayout::Orientation::kVertical, gfx::Insets(24), 0));
-  layout_->set_main_axis_alignment(
-      views::BoxLayout::MainAxisAlignment::kCenter);
-  layout_->set_cross_axis_alignment(
-      views::BoxLayout::CrossAxisAlignment::kCenter);
+  layer()->SetMasksToBounds(true);
   GetViewAccessibility().SetRole(ax::mojom::Role::kGroup);
-  GetViewAccessibility().SetName(std::u16string(kTitle));
-  GetViewAccessibility().SetDescription(std::u16string(kBody));
+  GetViewAccessibility().SetName(std::u16string(kHeadline));
 
-  auto title = std::make_unique<views::Label>(kTitle);
-  title->SetFontList(Font(14, gfx::Font::Weight::BOLD));
-  title->SetAutoColorReadabilityEnabled(false);
-  title->SetBackgroundColor(SK_ColorTRANSPARENT);
-  title->SetSubpixelRenderingEnabled(false);
-  title->GetViewAccessibility().SetRole(ax::mojom::Role::kHeading);
-  title_ = AddChildView(std::move(title));
+  size_t i = 0;
+  for (const welcome::Field& spec : welcome::kFields) {
+    fields_[i++] = AddChildView(std::make_unique<Field>(spec));
+  }
+  theme_ = AddChildView(std::make_unique<Theme>());
+  theme_->layer()->SetOpacity(0);
 
-  auto body = std::make_unique<views::Label>(kBody);
-  body->SetFontList(Font(2, gfx::Font::Weight::NORMAL));
-  body->SetMultiLine(true);
-  body->SetLineHeight(22);
-  body->SetMaximumWidth(kColumnWidth);
-  body->SetHorizontalAlignment(gfx::ALIGN_CENTER);
-  body->SetAutoColorReadabilityEnabled(false);
-  body->SetBackgroundColor(SK_ColorTRANSPARENT);
-  body->SetSubpixelRenderingEnabled(false);
-  body->SetProperty(views::kMarginsKey, gfx::Insets::TLBR(12, 0, 28, 0));
-  body_ = AddChildView(std::move(body));
+  content_ = AddChildView(std::make_unique<views::View>());
+  content_->SetPaintToLayer();
+  content_->layer()->SetFillsBoundsOpaquely(false);
+
+  auto mark =
+      std::make_unique<views::ImageView>(ui::ImageModel::FromImageSkia(Mark()));
+  mark->SetImageSize(gfx::Size(kMarkSize, kMarkSize));
+  mark->GetViewAccessibility().SetIsIgnored(true);
+  mark_ = content_->AddChildView(std::move(mark));
+  OnLayer(*mark_);
+
+  // The blurred copy sits under the headline and fades out as it sharpens.
+  headline_blur_ = content_->AddChildView(Headline());
+  headline_blur_->GetViewAccessibility().SetIsIgnored(true);
+  OnLayer(*headline_blur_);
+  headline_blur_->layer()->SetLayerBlur(kHeadlineBlur);
+  headline_ = content_->AddChildView(Headline());
+  headline_->GetViewAccessibility().SetRole(ax::mojom::Role::kHeading);
+  OnLayer(*headline_);
 
   const auto pressed = [](WelcomeView* view, Action action) {
     view->Press(action);
   };
-  start_ = AddChildView(std::make_unique<SheetButton>(
+  import_ = content_->AddChildView(std::make_unique<SheetButton>(
+      base::BindRepeating(pressed, base::Unretained(this), Action::kImport),
+      offers_import ? kImport : kImported, kButtonHeight / 2));
+  import_->SetEnabled(offers_import);
+  start_ = content_->AddChildView(std::make_unique<SheetButton>(
       base::BindRepeating(pressed, base::Unretained(this),
                           Action::kStartBrowsing),
-      kStart));
-  import_ = AddChildView(std::make_unique<SheetButton>(
-      base::BindRepeating(pressed, base::Unretained(this), Action::kImport),
-      offers_import ? kImport : kImported));
-  import_->SetProperty(views::kMarginsKey, gfx::Insets::TLBR(10, 0, 0, 0));
-  import_->SetEnabled(offers_import);
-  skip_ = AddChildView(std::make_unique<SheetButton>(
-      base::BindRepeating(pressed, base::Unretained(this), Action::kSkipTour),
-      kSkip));
-  skip_->SetProperty(views::kMarginsKey, gfx::Insets::TLBR(16, 0, 0, 0));
-  skip_->SetBorder(views::CreateEmptyBorder(gfx::Insets::VH(4, 10)));
-  for (views::LabelButton* button : {start_.get(), import_.get()}) {
+      kStart, kButtonHeight / 2));
+  // The primary button is the site blue: Import from Arc…, or Start fresh
+  // once the import is done. The other one is translucent ivory.
+  views::LabelButton* primary = offers_import ? import_.get() : start_.get();
+  views::LabelButton* secondary = offers_import ? start_.get() : import_.get();
+  primary->SetBackground(views::CreateRoundedRectBackground(
+      Rgb(welcome::kSiteBlue), kButtonHeight / 2));
+  secondary->SetBackground(views::CreateRoundedRectBackground(
+      SkColorSetA(kInk, 0x2E), kButtonHeight / 2));
+  for (views::LabelButton* button : {import_.get(), start_.get()}) {
+    button->SetEnabledTextColors(kInk);
+    button->SetTextColor(views::Button::STATE_DISABLED,
+                         SkColorSetA(kInk, 0x99));
     button->SetPreferredSize(gfx::Size(kButtonWidth, kButtonHeight));
     button->SetBorder(views::CreateEmptyBorder(gfx::Insets()));
     SetButtonFont(*button, Font(1, gfx::Font::Weight::SEMIBOLD));
   }
+  skip_ = content_->AddChildView(std::make_unique<SheetButton>(
+      base::BindRepeating(pressed, base::Unretained(this), Action::kSkipTour),
+      kSkip, 6));
+  skip_->SetBorder(views::CreateEmptyBorder(gfx::Insets::VH(4, 10)));
+  skip_->SetEnabledTextColors(SkColorSetA(kInk, 0xB0));
   SetButtonFont(*skip_, Font(0, gfx::Font::Weight::MEDIUM));
-
-  for (views::View* child : children()) {
-    child->SetPaintToLayer();
-    child->layer()->SetFillsBoundsOpaquely(false);
+  for (views::View* button :
+       std::initializer_list<views::View*>{import_, start_, skip_}) {
+    button->SetPaintToLayer();
+    button->layer()->SetFillsBoundsOpaquely(false);
   }
-  if (reduced_motion_) {
-    progress_ = 1;
-    layer()->SetOpacity(0);
-  } else {
-    ApplyIntro(0);
+
+  // Before Play(): only the background shows.
+  for (views::View* view : std::initializer_list<views::View*>{
+           mark_, headline_blur_, headline_, import_, start_, skip_}) {
+    view->layer()->SetOpacity(0);
+  }
+  if (!reduced_motion_) {
+    mark_->layer()->SetTransform(MarkAt(-kMarkRiseBy, 0));
+    const gfx::Transform left =
+        gfx::Transform::MakeTranslation(-kHeadlineSlideBy, 0);
+    headline_->layer()->SetTransform(left);
+    headline_blur_->layer()->SetTransform(left);
   }
 }
 
 WelcomeView::~WelcomeView() = default;
 
-void WelcomeView::SetSheetBounds(const gfx::Rect& sheet) {
-  sheet_ = sheet;
-  layout_->set_inside_border_insets(
-      gfx::Insets::TLBR(sheet.y() + 24, sheet.x() + 24,
-                        std::max(0, height() - sheet.bottom()) + 24,
-                        std::max(0, width() - sheet.right()) + 24));
-  InvalidateLayout();
-  SchedulePaint();
-  // A layer at zero opacity never paints, so the reduced fade can't wait for
-  // the first paint the way the intro does.
-  if (reduced_motion_ && !intro_started_ && !sheet_.IsEmpty()) {
-    intro_started_ = true;
-    base::SingleThreadTaskRunner::GetCurrentDefault()->PostTask(
-        FROM_HERE,
-        base::BindOnce(&WelcomeView::StartIntro, weak_factory_.GetWeakPtr()));
+void WelcomeView::Play(base::TimeTicks start) {
+  if (playing_) {
+    return;
+  }
+  playing_ = true;
+  views::AnimationBuilder builder;
+  builder.SetPreemptionStrategy(
+      ui::LayerAnimator::IMMEDIATELY_ANIMATE_TO_NEW_TARGET);
+  if (reduced_motion_) {
+    // Nothing moves: the headline and the choice fade in together.
+    views::AnimationSequenceBlock& fade =
+        builder.Once().SetDuration(kReducedFade);
+    for (views::View* view : std::initializer_list<views::View*>{
+             headline_, import_, start_, skip_}) {
+      fade.SetOpacity(view->layer(), 1, gfx::Tween::EASE_OUT);
+    }
+    return;
+  }
+  // welcome_timeline.h's times, from `start`.
+  const base::TimeDelta elapsed = base::TimeTicks::Now() - start;
+  const auto at = [elapsed](base::TimeDelta t) {
+    return std::max(base::TimeDelta(), t - elapsed);
+  };
+  // Each At() ends the block before it, so `block` is always the newest.
+  views::AnimationSequenceBlock* block = &builder.Once();
+  ui::Layer* mark = mark_->layer();
+  ui::Layer* headline = headline_->layer();
+  ui::Layer* blurred = headline_blur_->layer();
+  // The site's ease, leg by leg: the logo's rise and the headline's slide.
+  for (int leg = 0; leg < kEaseLegs; ++leg) {
+    const double from = static_cast<double>(leg) / kEaseLegs;
+    const float eased = static_cast<float>(SiteEase((leg + 1.0) / kEaseLegs));
+    block = &block->At(at(kMarkIn + kMarkRise * from))
+                 .SetDuration(kMarkRise / kEaseLegs)
+                 .SetOpacity(mark, eased)
+                 .SetTransform(mark, MarkAt(-kMarkRiseBy * (1 - eased), 0));
+    const gfx::Transform slide =
+        gfx::Transform::MakeTranslation(-kHeadlineSlideBy * (1 - eased), 0);
+    block = &block->At(at(kHeadlineAt + kHeadlineSlide * from))
+                 .SetDuration(kHeadlineSlide / kEaseLegs)
+                 .SetTransform(headline, slide)
+                 .SetTransform(blurred, slide);
+  }
+  // One drift, up and turned, then back, fading as it returns.
+  block = &block->At(at(kMarkIn + kMarkRise))
+               .SetDuration(kMarkDrift / 2)
+               .SetTransform(mark, MarkAt(kMarkDriftBy, kMarkTurn),
+                             gfx::Tween::EASE_IN_OUT)
+               .Then()
+               .SetDuration(kMarkDrift / 2)
+               .SetTransform(mark, MarkAt(0, 0), gfx::Tween::EASE_IN_OUT);
+  block = &block->At(at(kMarkFadeAt))
+               .SetDuration(kMarkFade)
+               .SetOpacity(mark, 0, gfx::Tween::EASE_OUT);
+  // The blur clears: the blurred copy comes in, then gives way to the sharp
+  // one.
+  block = &block->At(at(kHeadlineAt))
+               .SetDuration(kBlurIn)
+               .SetOpacity(blurred, 0.9f, gfx::Tween::EASE_OUT)
+               .Then()
+               .SetDuration(kHeadlineSlide - kBlurIn)
+               .SetOpacity(blurred, 0, gfx::Tween::EASE_IN);
+  block = &block->At(at(kHeadlineAt + kSharpIn))
+               .SetDuration(kHeadlineSlide - kSharpIn)
+               .SetOpacity(headline, 1, gfx::Tween::EASE_OUT);
+  // The choice fades in as the headline lands. It only fades, so it never
+  // moves while it can be pressed.
+  block = &block->At(at(kChoiceAt)).SetDuration(kChoiceFade);
+  for (views::View* view :
+       std::initializer_list<views::View*>{import_, start_, skip_}) {
+    block->SetOpacity(view->layer(), 1, gfx::Tween::EASE_OUT);
+  }
+  // The fields hold still until the window shows, so the blob's copy of
+  // them hands off with no jump.
+  drift_timer_.Start(
+      FROM_HERE, at(kWindowShown),
+      base::BindOnce(&WelcomeView::StartDrift, base::Unretained(this)));
+}
+
+void WelcomeView::StartDrift() {
+  if (drifting_ || !playing_ || reduced_motion_ || width() <= 0 ||
+      drift_timer_.IsRunning()) {
+    return;
+  }
+  drifting_ = true;
+  // A slow loop around where each field starts, easing at each turn.
+  for (views::View* view : fields_) {
+    const welcome::Field& spec = views::AsViewClass<Field>(view)->field();
+    const float dx = spec.reach * width();
+    const float dy = spec.reach * height();
+    const std::array<gfx::Transform, 4> stops = {
+        gfx::Transform::MakeTranslation(dx, dy / 2),
+        gfx::Transform::MakeTranslation(0, dy),
+        gfx::Transform::MakeTranslation(-dx, dy / 2),
+        gfx::Transform(),
+    };
+    const base::TimeDelta leg = base::Seconds(spec.period / stops.size());
+    views::AnimationBuilder builder;
+    builder.SetPreemptionStrategy(
+        ui::LayerAnimator::IMMEDIATELY_ANIMATE_TO_NEW_TARGET);
+    views::AnimationSequenceBlock* block = &builder.Repeatedly();
+    bool first = true;
+    for (const gfx::Transform& stop : stops) {
+      if (!std::exchange(first, false)) {
+        block = &block->Then();
+      }
+      block->SetDuration(leg).SetTransform(view->layer(), stop,
+                                           gfx::Tween::EASE_IN_OUT);
+    }
   }
 }
 
 void WelcomeView::FinishIntro() {
-  // Drops a start that is still posted.
-  intro_started_ = true;
-  weak_factory_.InvalidateWeakPtrs();
-  if (reduced_motion_) {
-    layer()->GetAnimator()->StopAnimating();
-    layer()->SetOpacity(1);
-    return;
+  playing_ = true;
+  for (views::View* view : std::initializer_list<views::View*>{
+           mark_, headline_blur_, headline_, import_, start_, skip_}) {
+    view->layer()->GetAnimator()->StopAnimating();
   }
-  if (intro_.is_animating()) {
-    intro_.End();
-    return;
+  mark_->layer()->SetOpacity(0);
+  headline_blur_->layer()->SetOpacity(0);
+  headline_blur_->layer()->SetTransform(gfx::Transform());
+  headline_->layer()->SetTransform(gfx::Transform());
+  for (views::View* view :
+       std::initializer_list<views::View*>{headline_, import_, start_, skip_}) {
+    view->layer()->SetOpacity(1);
   }
-  progress_ = 1;
-  ApplyIntro(1);
-  SchedulePaint();
+  if (drift_timer_.IsRunning()) {
+    drift_timer_.Stop();
+  }
+  StartDrift();
 }
 
 void WelcomeView::CrossfadeTo(SidebarTint tint, base::OnceClosure done) {
   FinishIntro();
   import_->SetText(kImported);
   import_->SetEnabled(false);
-  theme_ = tint;
-  theme_done_ = std::move(done);
-  theme_progress_ = 0;
-  theme_fade_.Start();
+  views::AsViewClass<Theme>(theme_.get())->SetTint(tint);
+  const base::TimeDelta fade = reduced_motion_ ? kReducedFade : kThemeFade;
+  // The fields give way to the theme.
+  views::AnimationBuilder builder;
+  builder.SetPreemptionStrategy(
+      ui::LayerAnimator::IMMEDIATELY_ANIMATE_TO_NEW_TARGET);
+  views::AnimationSequenceBlock& block = builder.Once().SetDuration(fade);
+  block.SetOpacity(theme_->layer(), 1, gfx::Tween::EASE_OUT);
+  for (views::View* field : fields_) {
+    block.SetOpacity(field->layer(), 0, gfx::Tween::EASE_OUT);
+  }
+  theme_timer_.Start(FROM_HERE, fade, std::move(done));
 }
 
 base::TimeDelta WelcomeView::Exit() {
@@ -316,113 +523,69 @@ base::TimeDelta WelcomeView::Exit() {
     return base::TimeDelta();
   }
   FinishIntro();
-  theme_done_.Reset();
-  if (theme_fade_.is_animating()) {
-    theme_fade_.End();
-  }
+  theme_timer_.Stop();
   exiting_ = true;
   SetCanProcessEventsWithinSubtree(false);
-  // Read again: Reduce Motion may have changed since the sheet showed.
-  const base::TimeDelta duration =
-      gfx::Animation::PrefersReducedMotion() ? kReducedFade : kExit;
-  exit_.SetDuration(duration);
-  exit_.Start();
+  // Read again: Reduce Motion may have changed since the welcome showed.
+  const bool reduced = gfx::Animation::PrefersReducedMotion();
+  const base::TimeDelta duration = reduced ? kReducedFade : kExit;
+  views::AnimationBuilder builder;
+  builder.SetPreemptionStrategy(
+      ui::LayerAnimator::IMMEDIATELY_ANIMATE_TO_NEW_TARGET);
+  views::AnimationSequenceBlock& block =
+      builder.Once().SetDuration(duration).SetOpacity(layer(), 0,
+                                                      gfx::Tween::EASE_OUT);
+  if (!reduced) {
+    block.SetTransform(content_->layer(),
+                       gfx::Transform::MakeTranslation(kExitSlide, 0),
+                       gfx::Tween::EASE_OUT);
+  }
   return duration;
 }
 
-float WelcomeView::ExitShift() const {
-  return gfx::Animation::PrefersReducedMotion()
-             ? 0.f
-             : kExitSlide * static_cast<float>(gfx::Tween::CalculateValue(
-                                gfx::Tween::EASE_OUT, exit_progress_));
-}
-
-float WelcomeView::ExitOpacity() const {
-  return 1.f - static_cast<float>(gfx::Tween::CalculateValue(
-                   gfx::Tween::EASE_OUT, exit_progress_));
-}
-
-void WelcomeView::StartIntro() {
-  if (reduced_motion_) {
-    views::AnimationBuilder()
-        .SetPreemptionStrategy(
-            ui::LayerAnimator::IMMEDIATELY_ANIMATE_TO_NEW_TARGET)
-        .Once()
-        .SetDuration(kReducedFade)
-        .SetOpacity(layer(), 1.f, gfx::Tween::EASE_OUT);
-    return;
+void WelcomeView::Layout(PassKey) {
+  const int w = width();
+  const int h = height();
+  const float longer = std::max(w, h);
+  for (views::View* view : fields_) {
+    const welcome::Field& spec = views::AsViewClass<Field>(view)->field();
+    const int radius = static_cast<int>(spec.radius * longer);
+    view->SetBounds(static_cast<int>(spec.x * w) - radius,
+                    static_cast<int>(spec.y * h) - radius, 2 * radius,
+                    2 * radius);
   }
-  intro_.Start();
-}
+  theme_->SetBoundsRect(GetLocalBounds());
+  content_->SetBoundsRect(GetLocalBounds());
+  mark_->SetBounds((w - kMarkSize) / 2, (h - kMarkSize) / 2, kMarkSize,
+                   kMarkSize);
 
-void WelcomeView::ApplyIntro(double progress) {
-  const auto text = [progress](views::View* view, Phase phase) {
-    const float in =
-        static_cast<float>(At(progress, phase, gfx::Tween::EASE_OUT));
-    view->layer()->SetOpacity(in);
-    view->layer()->SetTransform(
-        gfx::Transform::MakeTranslation(0, kRise * (1 - in)));
-    view->layer()->SetLayerBlur(kTextBlur * (1 - in));
-  };
-  text(title_, kTitleIn);
-  text(body_, kBodyIn);
-  // The buttons only fade, so they never move while they can be pressed.
-  for (views::View* button : {start_.get(), import_.get(), skip_.get()}) {
-    button->layer()->SetOpacity(
-        static_cast<float>(At(progress, kButtonsIn, gfx::Tween::EASE_OUT)));
+  // The headline and the choice under it, centred together.
+  const gfx::Size headline = headline_->GetPreferredSize();
+  const gfx::Size skip = skip_->GetPreferredSize();
+  const int column = headline.height() + 28 + kButtonHeight + 10 +
+                     kButtonHeight + 14 + skip.height();
+  int y = std::max(0, (h - column) / 2);
+  for (views::View* view :
+       std::initializer_list<views::View*>{headline_, headline_blur_}) {
+    view->SetBounds((w - headline.width()) / 2, y, headline.width(),
+                    headline.height());
   }
-}
-
-bool WelcomeView::DoesIntersectRect(const views::View* target,
-                                    const gfx::Rect& rect) const {
-  return !exiting_ && sheet_.Intersects(rect);
-}
-
-void WelcomeView::AnimationProgressed(const gfx::Animation* animation) {
-  if (animation == &exit_) {
-    exit_progress_ = animation->GetCurrentValue();
-    // The text and buttons go with the sheet.
-    for (views::View* child : children()) {
-      child->layer()->SetOpacity(ExitOpacity());
-      child->layer()->SetTransform(
-          gfx::Transform::MakeTranslation(ExitShift(), 0));
-    }
-    SchedulePaint();
-    return;
-  }
-  if (animation == &theme_fade_) {
-    theme_progress_ = animation->GetCurrentValue();
-    SchedulePaint();
-    return;
-  }
-  progress_ = animation->GetCurrentValue();
-  ApplyIntro(progress_);
-  SchedulePaint();
-}
-
-void WelcomeView::AnimationEnded(const gfx::Animation* animation) {
-  if (animation == &exit_) {
-    exit_progress_ = 1;
-    AnimationProgressed(animation);
-    return;
-  }
-  if (animation == &theme_fade_) {
-    theme_progress_ = 1;
-    SchedulePaint();
-    if (theme_done_) {
-      std::move(theme_done_).Run();
-    }
-    return;
-  }
-  progress_ = 1;
-  ApplyIntro(1);
-  SchedulePaint();
+  y += headline.height() + 28;
+  import_->SetBounds((w - kButtonWidth) / 2, y, kButtonWidth, kButtonHeight);
+  y += kButtonHeight + 10;
+  start_->SetBounds((w - kButtonWidth) / 2, y, kButtonWidth, kButtonHeight);
+  y += kButtonHeight + 14;
+  skip_->SetBounds((w - skip.width()) / 2, y, skip.width(), skip.height());
+  StartDrift();
 }
 
 void WelcomeView::TakeFocus() {
   SetPaneFocusAndFocusDefault();
-  GetViewAccessibility().AnnounceText(std::u16string(kTitle) + u". " +
-                                      std::u16string(kBody));
+  GetViewAccessibility().AnnounceText(std::u16string(kHeadline));
+}
+
+uint32_t WelcomeView::BaseColor() const {
+  return IsDark(*this) ? kMidnightDark : welcome::kMidnight;
 }
 
 bool WelcomeView::AcceleratorPressed(const ui::Accelerator& accelerator) {
@@ -434,133 +597,12 @@ bool WelcomeView::AcceleratorPressed(const ui::Accelerator& accelerator) {
 }
 
 views::View* WelcomeView::GetDefaultFocusableChild() {
-  return start_;
+  // Return picks the primary button.
+  return import_->GetEnabled() ? import_.get() : start_.get();
 }
 
 void WelcomeView::OnPaint(gfx::Canvas* canvas) {
-  if (!intro_started_ && !sheet_.IsEmpty()) {
-    // Starts once the first frame is on screen, so none of it plays unseen.
-    intro_started_ = true;
-    base::SingleThreadTaskRunner::GetCurrentDefault()->PostTask(
-        FROM_HERE,
-        base::BindOnce(&WelcomeView::StartIntro, weak_factory_.GetWeakPtr()));
-  }
-  const bool dark = IsDark(*this);
-  const double t = progress_;
-  const gfx::RectF sheet(sheet_);
-  const float radius = radius_ ? radius_.Run() : 0;
-
-  // The reveal lifts the dim, and the sheet slides right as it fades.
-  const float shown = ExitOpacity();
-  cc::PaintFlags dim;
-  dim.setColor(SkColorSetA(
-      SK_ColorBLACK,
-      static_cast<SkAlpha>((dark ? kDimDark : kDimLight) *
-                           At(t, kDimIn, gfx::Tween::EASE_OUT) * shown)));
-  canvas->DrawRect(gfx::RectF(GetLocalBounds()), dim);
-  if (shown <= 0) {
-    return;
-  }
-  gfx::ScopedCanvas exit(canvas);
-  if (shown < 1) {
-    canvas->SaveLayerAlpha(static_cast<uint8_t>(0xFF * shown));
-    canvas->sk_canvas()->translate(ExitShift(), 0);
-  }
-
-  // The dots drift in and meet in the middle of the sheet.
-  const gfx::PointF center = sheet.CenterPoint();
-  const double gather = At(t, kGather, gfx::Tween::EASE_OUT);
-  const double merge = At(t, kMerge, gfx::Tween::EASE_IN);
-  if (merge < 1) {
-    for (const Dot& dot : kDots) {
-      const gfx::PointF from(dot.x * width(), dot.y * height());
-      const gfx::PointF at(
-          gfx::Tween::FloatValueBetween(gather, from.x(), center.x()),
-          gfx::Tween::FloatValueBetween(gather, from.y(), center.y()));
-      const float r = kDotRadius * static_cast<float>(1 - 0.5 * merge);
-      SkColor4f color = SkColor4f::FromColor(dot.color);
-      color.fA = 0.95f * static_cast<float>(1 - merge);
-      SkColor4f clear = color;
-      clear.fA = 0;
-      const SkColor4f colors[] = {color, color, clear};
-      const float stops[] = {0, 0.35f, 1};
-      cc::PaintFlags flags;
-      flags.setAntiAlias(true);
-      flags.setShader(cc::PaintShader::MakeRadialGradient(
-          SkPoint::Make(at.x(), at.y()), r, colors, stops, 3,
-          SkTileMode::kClamp));
-      canvas->DrawCircle(at, r, flags);
-    }
-  }
-
-  // They join into one rounded square that widens to the sheet.
-  const double grow = At(t, kGrow, gfx::Tween::FAST_OUT_SLOW_IN);
-  const double field_in = At(t, kFieldIn);
-  if (field_in > 0 && !sheet.IsEmpty()) {
-    const gfx::RectF seed(center.x() - kSeedSize / 2,
-                          center.y() - kSeedSize / 2, kSeedSize, kSeedSize);
-    const gfx::RectF field = gfx::Tween::RectFValueBetween(grow, seed, sheet);
-    cc::PaintFlags flags;
-    flags.setAntiAlias(true);
-    flags.setAlphaf(static_cast<float>(field_in));
-    flags.setShader(gfx::CreateGradientShader(
-        gfx::Point(0, static_cast<int>(field.y())),
-        gfx::Point(0, static_cast<int>(field.bottom())),
-        dark ? kFieldDarkTop : kFieldLightTop,
-        dark ? kFieldDarkBottom : kFieldLightBottom));
-    canvas->DrawRoundRect(
-        field, gfx::Tween::FloatValueBetween(grow, kSeedSize / 2, radius),
-        flags);
-  }
-
-  // An imported Space's theme, a second gradient fading in over the field,
-  // diagonal like the sidebar's tint.
-  if (theme_ && theme_progress_ > 0 && !sheet.IsEmpty()) {
-    cc::PaintFlags flags;
-    flags.setAntiAlias(true);
-    flags.setAlphaf(static_cast<float>(
-        gfx::Tween::CalculateValue(gfx::Tween::EASE_OUT, theme_progress_)));
-    flags.setShader(gfx::CreateGradientShader(
-        gfx::ToRoundedPoint(sheet.origin()),
-        gfx::ToRoundedPoint(sheet.bottom_right()), theme_->start, theme_->end));
-    canvas->DrawRoundRect(sheet, radius, flags);
-  }
-
-  // A strip splits off the sheet's left edge and slides into the sidebar's
-  // place, fading into the dimmed sidebar.
-  const double strip = At(t, kStrip, gfx::Tween::FAST_OUT_SLOW_IN);
-  const double strip_linear = At(t, kStrip);
-  if (strip_linear > 0 && strip_linear < 1 && sheet.x() > 40) {
-    const gfx::RectF from(sheet.x(), sheet.y() + sheet.height() * 0.2f, 6,
-                          sheet.height() * 0.6f);
-    const gfx::RectF to(8, sheet.y(), sheet.x() - 16, sheet.height());
-    cc::PaintFlags flags;
-    flags.setAntiAlias(true);
-    flags.setColor(SkColorSetA(
-        dark ? kFieldDarkBottom : kFieldLightTop,
-        static_cast<SkAlpha>(0xE6 * std::min(1.0, strip_linear * 5) *
-                             (1 - strip_linear))));
-    canvas->DrawRoundRect(gfx::Tween::RectFValueBetween(strip, from, to), 10,
-                          flags);
-  }
-}
-
-void WelcomeView::OnThemeChanged() {
-  views::AccessiblePaneView::OnThemeChanged();
-  const bool dark = IsDark(*this);
-  const SkColor ink = dark ? SK_ColorWHITE : SkColorSetRGB(0x1A, 0x1A, 0x22);
-  views::AsViewClass<views::Label>(title_.get())->SetEnabledColor(ink);
-  views::AsViewClass<views::Label>(body_.get())
-      ->SetEnabledColor(SkColorSetA(ink, 0xB8));
-  start_->SetBackground(
-      views::CreateRoundedRectBackground(kPrimary, kButtonRadius));
-  start_->SetEnabledTextColors(SK_ColorWHITE);
-  import_->SetBackground(views::CreateRoundedRectBackground(
-      SkColorSetA(ink, dark ? 0x1F : 0x12), kButtonRadius));
-  import_->SetEnabledTextColors(ink);
-  import_->SetTextColor(views::Button::STATE_DISABLED, SkColorSetA(ink, 0x80));
-  skip_->SetEnabledTextColors(SkColorSetA(ink, 0x99));
-  SchedulePaint();
+  canvas->DrawColor(Rgb(BaseColor()));
 }
 
 void WelcomeView::Press(Action action) {
@@ -568,7 +610,7 @@ void WelcomeView::Press(Action action) {
     return;
   }
   FinishIntro();
-  // A copy: the action may close the sheet and delete this view.
+  // A copy: the action may close the welcome and delete this view.
   auto run = action_;
   run.Run(action);
 }

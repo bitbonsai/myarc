@@ -1,127 +1,120 @@
 #ifndef MYARC_WELCOME_VIEW_H_
 #define MYARC_WELCOME_VIEW_H_
 
-#include <optional>
+#include <array>
+#include <cstdint>
 
 #include "base/functional/callback.h"
 #include "base/memory/raw_ptr.h"
-#include "base/memory/weak_ptr.h"
+#include "base/time/time.h"
+#include "base/timer/timer.h"
 #include "myarc/sidebar_tint.h"
 #include "ui/base/metadata/metadata_header_macros.h"
-#include "ui/gfx/animation/animation_delegate.h"
-#include "ui/gfx/animation/linear_animation.h"
-#include "ui/gfx/geometry/rect.h"
 #include "ui/views/accessible_pane_view.h"
-#include "ui/views/view_targeter_delegate.h"
 
 namespace views {
-class BoxLayout;
+class ImageView;
+class Label;
 class LabelButton;
 }  // namespace views
 
 namespace myarc {
 
-// The welcome tour's first sheet. The view covers the whole window: it dims
-// everything and paints the sheet over the page area, given by
-// SetSheetBounds(), and only the sheet takes events. Three actions, live
-// from the first frame: Start browsing, Import from Arc… and Skip tour. Tab
-// and Shift+Tab cycle them, Return presses the focused one and Esc means Skip
-// tour.
+// The welcome tour's first screen: it covers the whole browser window, so
+// the sidebar and toolbar stay hidden until the reveal. Its background is
+// myarc.dev's midnight with large blurred fields of the ribbon logo's
+// colours and the site blue, drifting on 20 to 30 s loops.
 //
-// On its first paint the sheet plays a one-second intro: colored dots drift
-// in from the window's edges and meet in the middle, grow into the sheet, and
-// a strip splits off to the sidebar's place while the text sharpens in.
-// Under Reduce Motion the finished sheet fades in over 150 ms instead. A
-// press ends either at its final frame first. Once an import commits, the
-// colour field crossfades to the imported Space's theme. The reveal ends it:
-// the sheet slides right as it fades and the dim lifts. UI sequence only.
-class WelcomeView : public views::AccessiblePaneView,
-                    public views::ViewTargeterDelegate,
-                    public gfx::AnimationDelegate {
+// Play() starts the arrival on welcome_timeline.h's times, which the sound
+// sets. At 1.7 s the ribbon logo rises 20 DIP while it fades in over 1.1 s
+// on the site's ease, as on the myarc.dev hero, then drifts once in 1.2 s
+// (up 14 DIP and a 1° turn, and back), fading as it returns. At 4.3 s
+// "myArc, forever yours." slides in from the left while its blur clears,
+// and 0.4 s later the choice fades in under it: Import from Arc…, the primary
+// button, Start fresh and Skip tour. Return presses the focused button, which
+// starts on the primary one, Tab and Shift+Tab cycle them and Esc means Skip
+// tour. Under Reduce Motion nothing moves: Play() fades the headline and the
+// choice in over 150 ms.
+//
+// Every change is a layer animation, so the compositor runs it at the
+// display's rate. Once an import commits, the background crossfades to the
+// imported Space's theme. The reveal ends it: the content slides right as
+// the whole screen fades. UI sequence only.
+class WelcomeView : public views::AccessiblePaneView {
   METADATA_HEADER(WelcomeView, views::AccessiblePaneView)
 
  public:
   enum class Action { kStartBrowsing, kImport, kSkipTour };
   using ActionCallback = base::RepeatingCallback<void(Action)>;
-  using RadiusCallback = base::RepeatingCallback<float()>;
 
-  // `offers_import` false shows Import from Arc… as already done. `radius`
-  // gives the page area's corner radius, so the sheet rounds like it.
-  WelcomeView(bool offers_import, RadiusCallback radius, ActionCallback action);
+  // `offers_import` false shows Import from Arc… as already done, and Start
+  // fresh becomes the primary button.
+  WelcomeView(bool offers_import, ActionCallback action);
   WelcomeView(const WelcomeView&) = delete;
   WelcomeView& operator=(const WelcomeView&) = delete;
   ~WelcomeView() override;
 
-  // Puts focus on Start browsing, keeps Tab inside the sheet and says what
-  // the sheet is.
+  // Puts focus on the primary button, keeps Tab inside the window and says
+  // what it shows.
   void TakeFocus();
 
-  // The page area, in this view's coordinates.
-  void SetSheetBounds(const gfx::Rect& sheet);
+  // The background's base, myarc.dev's midnight or its dark page, as
+  // 0xRRGGBB.
+  uint32_t BaseColor() const;
 
-  // Jumps the intro, or its reduced fade, to its final frame.
+  // Starts the arrival and, once the window shows, the background's drift,
+  // on welcome_timeline.h's times from `start`, its t = 0.
+  void Play(base::TimeTicks start);
+
+  // Jumps the arrival to its end, with the headline and the choice showing.
   void FinishIntro();
 
-  // Ends the intro, shows Import from Arc… as done and crossfades the colour
-  // field to `tint`, a Space's sidebar tint, in 350 ms, or 150 ms under
-  // Reduce Motion. Runs `done` once the field holds the new theme.
+  // Ends the arrival, shows Import from Arc… as done and crossfades the
+  // background to `tint`, a Space's sidebar tint, in 350 ms, or 150 ms under
+  // Reduce Motion. Runs `done` once it holds the new theme.
   void CrossfadeTo(SidebarTint tint, base::OnceClosure done);
 
-  // Starts the reveal's exit: the sheet slides 64 DIP right and fades, and
-  // the dim lifts, in 350 ms, or only fades in 150 ms under Reduce Motion.
-  // From here the sheet takes no events. Returns how long the exit takes;
-  // the caller removes the sheet after it.
+  // Starts the reveal's exit: the content slides 64 DIP right and the whole
+  // screen fades, in 350 ms, or only fades in 150 ms under Reduce Motion.
+  // From here it takes no events. Returns how long the exit takes; the
+  // caller removes the view after it.
   base::TimeDelta Exit();
 
   // views::AccessiblePaneView:
   bool AcceleratorPressed(const ui::Accelerator& accelerator) override;
   void OnPaint(gfx::Canvas* canvas) override;
-  void OnThemeChanged() override;
-
-  // views::ViewTargeterDelegate:
-  bool DoesIntersectRect(const views::View* target,
-                         const gfx::Rect& rect) const override;
-
-  // gfx::AnimationDelegate:
-  void AnimationProgressed(const gfx::Animation* animation) override;
-  void AnimationEnded(const gfx::Animation* animation) override;
+  void Layout(PassKey) override;
 
  protected:
   views::View* GetDefaultFocusableChild() override;
 
  private:
   void Press(Action action);
-  void StartIntro();
-  // Sets the text and buttons to the intro at `progress`, 0 to 1.
-  void ApplyIntro(double progress);
-  // How far the exit has moved the sheet right, and how much of it shows.
-  float ExitShift() const;
-  float ExitOpacity() const;
+  // Starts the fields' drift once the view has a size and is playing.
+  void StartDrift();
 
-  const RadiusCallback radius_;
   const ActionCallback action_;
-  raw_ptr<views::LabelButton> start_ = nullptr;
+  // The background's blurred fields, and the imported theme over them.
+  std::array<raw_ptr<views::View>, 3> fields_ = {};
+  raw_ptr<views::View> theme_ = nullptr;
+  // Everything the exit slides: the logo, the headline and its blurred copy,
+  // which fades out as the headline sharpens, and the choice.
+  raw_ptr<views::View> content_ = nullptr;
+  raw_ptr<views::ImageView> mark_ = nullptr;
+  raw_ptr<views::Label> headline_ = nullptr;
+  raw_ptr<views::Label> headline_blur_ = nullptr;
   raw_ptr<views::LabelButton> import_ = nullptr;
+  raw_ptr<views::LabelButton> start_ = nullptr;
   raw_ptr<views::LabelButton> skip_ = nullptr;
-  raw_ptr<views::View> title_ = nullptr;
-  raw_ptr<views::View> body_ = nullptr;
-  raw_ptr<views::BoxLayout> layout_ = nullptr;
-  gfx::Rect sheet_;
-  // Read once, when the sheet is made.
+  // Read once, when the view is made.
   const bool reduced_motion_;
-  bool intro_started_ = false;
-  double progress_ = 0;
-  gfx::LinearAnimation intro_;
-  // The theme the field crossfades to, and how far, 0 to 1.
-  std::optional<SidebarTint> theme_;
-  double theme_progress_ = 0;
-  gfx::LinearAnimation theme_fade_;
-  base::OnceClosure theme_done_;
-  // The reveal's exit, and how far it is, 0 to 1.
+  bool playing_ = false;
+  bool drifting_ = false;
   bool exiting_ = false;
-  double exit_progress_ = 0;
-  gfx::LinearAnimation exit_;
-  base::WeakPtrFactory<WelcomeView> weak_factory_{this};
+  // Starts the drift once the window shows.
+  base::OneShotTimer drift_timer_;
+  // Runs CrossfadeTo's `done` once the theme holds.
+  base::OneShotTimer theme_timer_;
 };
 
 }  // namespace myarc

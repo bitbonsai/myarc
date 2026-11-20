@@ -1,5 +1,5 @@
 diff --git a/chrome/browser/ui/views/frame/browser_view.cc b/chrome/browser/ui/views/frame/browser_view.cc
-index 7b568f6de760af21d6e9d2aa44415a7cef617c51..5e39844ca0f52ca6fb00c027a597ef52202bc85c 100644
+index 7b568f6de760af21d6e9d2aa44415a7cef617c51..0f3e2acab82d70693b320bfdef8d8b670f6aff9e 100644
 --- a/chrome/browser/ui/views/frame/browser_view.cc
 +++ b/chrome/browser/ui/views/frame/browser_view.cc
 @@ -22,6 +22,7 @@
@@ -2081,7 +2081,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..5e39844ca0f52ca6fb00c027a597ef52
  
      if (dialog_anchor_) {
        rect.Offset(0, -kAdditionalDialogToolbarOverlap);
-@@ -5197,6 +6854,346 @@ void BrowserView::AddedToWidget() {
+@@ -5197,6 +6854,338 @@ void BrowserView::AddedToWidget() {
        kFallbackPopupAnchorElementId, *this);
  
    initialized_ = true;
@@ -2242,14 +2242,6 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..5e39844ca0f52ca6fb00c027a597ef52
 +    if (!browser_->GetProfile()->IsOffTheRecord()) {
 +      myarc_onboarding_ = std::make_unique<myarc::OnboardingController>(
 +          *browser_->GetProfile(), *this, *multi_contents_view_,
-+          base::BindRepeating(
-+              [](base::WeakPtr<BrowserView> view) {
-+                return view && view->multi_contents_view_
-+                           ? view->multi_contents_view_->GetBackgroundRadii()
-+                                 .upper_left()
-+                           : 0.f;
-+              },
-+              myarc_workspace_weak_factory_.GetWeakPtr()),
 +          base::BindRepeating(
 +              [](base::WeakPtr<BrowserView> view) {
 +                if (view) {
@@ -2428,7 +2420,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..5e39844ca0f52ca6fb00c027a597ef52
  }
  
  void BrowserView::RemovedFromWidget() {
-@@ -5267,112 +7264,2894 @@ const views::View* BrowserView::GetViewByElementId(
+@@ -5267,112 +7256,2894 @@ const views::View* BrowserView::GetViewByElementId(
  ///////////////////////////////////////////////////////////////////////////////
  // BrowserView, ui::AcceleratorTarget overrides:
  
@@ -5408,7 +5400,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..5e39844ca0f52ca6fb00c027a597ef52
    }
  
    if (!bookmark_bar_view_) {
-@@ -5471,6 +10250,10 @@ bool BrowserView::MaybeUpdateDevtools(content::WebContents* contents) {
+@@ -5471,6 +10242,10 @@ bool BrowserView::MaybeUpdateDevtools(content::WebContents* contents) {
  
  void BrowserView::UpdateUIForContents(WebContents* contents,
                                        bool should_layout_immediately) {
@@ -5419,7 +5411,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..5e39844ca0f52ca6fb00c027a597ef52
    TRACE_EVENT0("ui", "BrowserView::UpdateUIForContents");
    bool needs_layout = MaybeShowBookmarkBar(contents);
  
-@@ -5706,6 +10489,26 @@ void BrowserView::LoadAccelerators() {
+@@ -5706,6 +10481,26 @@ void BrowserView::LoadAccelerators() {
    }
  
  #if BUILDFLAG(IS_MAC)

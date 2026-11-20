@@ -86,7 +86,7 @@ if [ "${2:-}" = "--inner" ]; then
       --enable-logging --log-file="$p/chrome.log" \
       --enable-features=GlassFrame --disable-features=InitialWebUI \
       --disable-backgrounding-occluded-windows --myarc-background-launch \
-      --myarc-visual-parity --myarc-workspace-sidebar --window-size=1280,800 --window-position=40,60 "$@"
+      --myarc-visual-parity --myarc-workspace-sidebar --myarc-test-mute-sound --window-size=1280,800 --window-position=40,60 "$@"
     PID=""
     for _ in $(seq 1 80); do
       for q in $(pgrep -f -- "--user-data-dir=$p" || true); do
@@ -224,8 +224,8 @@ PY
     local p; p=$(fresh)
     launch "$p" --myarc-test-onboarding about:blank
     wait_log "$p" "first_run=1 had_record=0 state=welcome" 30
-    # The intro takes about a second from the sheet's first paint.
-    sleep 4
+    # The arrival ends with the choice at about 5.1 s.
+    sleep 6
     kill_now
     check "$p" "after kill" "$(rec welcome 0 '')" any
     relaunch welcome "$p" "$(rec welcome 0 '')" saved "state=welcome step=0 effect=show animate=0"

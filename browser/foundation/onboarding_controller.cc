@@ -103,6 +103,7 @@ constexpr char kMyarcTestOnboardingShowDelay[] =
 constexpr char kMyarcTestReduceMotion[] = "myarc-test-reduce-motion";
 constexpr char kMyarcTestOnboardingImport[] = "myarc-test-onboarding-import";
 constexpr char kMyarcTestOnboardingHold[] = "myarc-test-onboarding-hold";
+constexpr char kMyarcTestMuteSound[] = "myarc-test-mute-sound";
 
 // The switch's milliseconds, or `fallback`, up to 30 seconds.
 base::TimeDelta SwitchDelay(const char* name, int fallback) {
@@ -210,7 +211,6 @@ class RevealFrames : public ui::CompositorObserver {
 OnboardingController::OnboardingController(Profile& profile,
                                            views::View& host,
                                            views::View& area,
-                                           WelcomeView::RadiusCallback radius,
                                            base::RepeatingClosure restore_focus,
                                            SettleRowsCallback settle_rows,
                                            SelectSpaceCallback select_space,
@@ -219,7 +219,6 @@ OnboardingController::OnboardingController(Profile& profile,
     : profile_(&profile),
       host_(&host),
       area_(&area),
-      radius_(std::move(radius)),
       restore_focus_(std::move(restore_focus)),
       settle_rows_(std::move(settle_rows)),
       select_space_(std::move(select_space)),
@@ -310,7 +309,9 @@ void OnboardingController::Replay() {
   CloseWelcome();
   CloseCoach(/*fade=*/false);
   by_back_ = false;
+  replaying_ = true;
   Run(FeedOnboardingEvent(*local_state, Event(EventKind::Replay)));
+  replaying_ = false;
 }
 
 // static
@@ -321,10 +322,9 @@ void OnboardingController::ReplayRecord() {
 }
 
 void OnboardingController::OnViewBoundsChanged(views::View* observed_view) {
+  // The welcome covers the whole window, sidebar and toolbar included.
   if (sheet_ && host_) {
     sheet_->SetBoundsRect(host_->GetLocalBounds());
-    sheet_->SetSheetBounds(views::View::ConvertRectToTarget(
-        observed_view->parent(), host_, observed_view->bounds()));
   }
   PlaceCoach();
 }
@@ -363,8 +363,10 @@ void OnboardingController::ShowWelcome(bool offers_import) {
     gfx::Animation::SetPrefersReducedMotionForTesting(true);
   }
 #endif  // BUILDFLAG(MYARC_TEST_HOOKS)
+  // Replay keeps the window where it is and as big as it is.
+  const bool replay = std::exchange(replaying_, false);
   sheet_ = host_->AddChildView(std::make_unique<WelcomeView>(
-      offers_import, radius_,
+      offers_import,
       base::BindRepeating(
           [](base::WeakPtr<OnboardingController> controller,
              WelcomeView::Action action) {
@@ -376,31 +378,49 @@ void OnboardingController::ShowWelcome(bool offers_import) {
           },
           weak_factory_.GetWeakPtr())));
   OnViewBoundsChanged(area_);
-  // The desktop dims and the blob grows into the window, which shows the
-  // finished sheet. Reduce Motion keeps the sheet's own fade instead.
+  // The sound, the desktop dim and the blob start together at t = 0 of
+  // welcome_timeline.h, the blob grows into the window and the welcome plays
+  // on the same times. Reduce Motion plays it at once, as a fade, silently.
+  base::TimeTicks start = base::TimeTicks::Now();
 #if BUILDFLAG(IS_MAC)
   if (!gfx::Animation::PrefersReducedMotion() && host_->GetWidget()) {
-    sheet_->FinishIntro();
-    // The welcome window is three quarters of the main display, centred, so
-    // the blob at the display's centre grows into it.
-    const gfx::Rect work =
-        display::Screen::Get()->GetPrimaryDisplay().work_area();
-    gfx::Rect frame = work;
-    frame.ClampToCenteredSize(
-        gfx::Size(work.width() * 3 / 4, work.height() * 3 / 4));
-    host_->GetWidget()->SetBounds(frame);
+    // On first run the welcome window is three quarters of the main
+    // display, centred, so the blob at the display's centre grows into it.
+    if (!replay) {
+      const gfx::Rect work =
+          display::Screen::Get()->GetPrimaryDisplay().work_area();
+      gfx::Rect frame = work;
+      frame.ClampToCenteredSize(
+          gfx::Size(work.width() * 3 / 4, work.height() * 3 / 4));
+      host_->GetWidget()->SetBounds(frame);
+    }
     bool log = false;
 #if BUILDFLAG(MYARC_TEST_HOOKS)
     log =
         base::CommandLine::ForCurrentProcess()->HasSwitch(kMyarcTestOnboarding);
 #endif  // BUILDFLAG(MYARC_TEST_HOOKS)
+    bool sound = true;
+#if BUILDFLAG(MYARC_TEST_HOOKS)
+    sound =
+        !base::CommandLine::ForCurrentProcess()->HasSwitch(kMyarcTestMuteSound);
+#endif  // BUILDFLAG(MYARC_TEST_HOOKS)
+    // Loaded first, so it starts right after the dim is ordered front, in
+    // the same task.
+    if (sound) {
+      sound_ = WelcomeSound::Load(log);
+    }
     intro_ = std::make_unique<WelcomeIntro>(
-        host_->GetWidget()->GetNativeWindow(),
+        host_->GetWidget()->GetNativeWindow(), sheet_->BaseColor(),
         base::BindOnce(&OnboardingController::OnIntroDone,
                        weak_factory_.GetWeakPtr()),
         log);
+    start = intro_->start();
+    if (sound_) {
+      sound_->Start(start);
+    }
   }
 #endif  // BUILDFLAG(IS_MAC)
+  sheet_->Play(start);
   sheet_->TakeFocus();
 #if BUILDFLAG(MYARC_TEST_HOOKS)
   if (!test_event_scheduled_ &&
@@ -422,6 +442,10 @@ void OnboardingController::OnIntroDone() {
 
 void OnboardingController::CloseWelcome() {
   intro_.reset();
+#if BUILDFLAG(IS_MAC)
+  // Fades out rather than stopping dead.
+  sound_.reset();
+#endif  // BUILDFLAG(IS_MAC)
   recolouring_ = false;
   revealing_ = false;
   reveal_timer_.Stop();
@@ -456,8 +480,12 @@ void OnboardingController::OnAction(WelcomeView::Action action) {
   if (!local_state || !sheet_ || importing_ || revealing_) {
     return;
   }
-  // A press ends the desktop intro at once, showing the window.
+  // A press ends the desktop intro at once, showing the window, and fades
+  // the sound out.
   intro_.reset();
+#if BUILDFLAG(IS_MAC)
+  sound_.reset();
+#endif  // BUILDFLAG(IS_MAC)
   switch (action) {
     case WelcomeView::Action::kStartBrowsing:
       Run(FeedOnboardingEvent(*local_state, Event(EventKind::StartBrowsing)));

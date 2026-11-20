@@ -13,6 +13,7 @@
 #include "myarc/bridge.rs.h"
 #include "myarc/coach_mark.h"
 #include "myarc/welcome_intro.h"
+#include "myarc/welcome_sound.h"
 #include "myarc/welcome_view.h"
 #include "ui/gfx/geometry/rect.h"
 #include "ui/views/view_observer.h"
@@ -31,7 +32,7 @@ class RevealFrames;
 // the welcome at a time. A committed import crossfades the welcome to the
 // first imported Space's theme. The reveal follows Start browsing, or a
 // committed import once its report closes: the window switches to the first
-// imported Space, the sheet slides away and the sidebar's rows settle in,
+// imported Space, the welcome fades away and the sidebar's rows settle in,
 // then `reveal_done` moves the tour to practice 1. Its coach mark shows 200 ms
 // after the last row lands and points at the address area: opening a page
 // from the command bar finishes the step. Back from it shows the reveal's end
@@ -44,12 +45,15 @@ class RevealFrames;
 // Esc ends the tour, keeping the steps done and skipped, and the card fades
 // out over 180 ms. Replay, from Settings > Advanced, starts the tour again at
 // the welcome in this window. Unless Reduce Motion is on, the welcome arrives
-// through WelcomeIntro: the window takes three quarters of the main display,
-// centred, the desktop dims and a blob at the display's centre grows into
-// the window, and the sheet shows its finished state. UI sequence only.
+// through WelcomeIntro with WelcomeSound: on first run the window takes three
+// quarters of the main display, centred, while Replay keeps its size and
+// display. The sound, the desktop dim and a blob start together, the blob
+// grows into the window and the welcome plays, all on welcome_timeline.h's
+// times. The sound keeps playing under the welcome and fades out once a
+// button is pressed or the welcome closes. UI sequence only.
 //
 // With test hooks, --myarc-test-onboarding-event=skip_tour, start_browsing
-// or import presses that button a second after the sheet shows, or
+// or import presses that button a second after the welcome shows, or
 // --myarc-test-onboarding-event-delay=<ms> after it; back, next or
 // skip_tour presses that coach mark button the same way once a coach mark
 // shows, and do does what each card asks: Cmd+D, Ctrl+number, Create a
@@ -59,14 +63,15 @@ class RevealFrames;
 // asking for one, pressing Import in the preview.
 // --myarc-test-onboarding-hold keeps the tour at the reveal after the
 // crossfade, so a capture can kill the browser there.
-// --myarc-test-onboarding-show-delay=<ms> holds the sheet back that long, and
-// --myarc-test-reduce-motion plays it as Reduce Motion does. With
+// --myarc-test-onboarding-show-delay=<ms> holds the welcome back that long,
+// --myarc-test-reduce-motion plays it as Reduce Motion does and
+// --myarc-test-mute-sound keeps it silent. With
 // --myarc-test-onboarding, the reveal logs its length and frame gaps.
 class OnboardingController final : public views::ViewObserver {
  public:
-  // `host` holds the sheet over `area`, the window's page area; both must
-  // outlive this. `radius` gives the page area's corner radius.
-  // `restore_focus` gives focus back to the window once the sheet closes.
+  // `host` holds the welcome, which covers it, and `area` is the window's
+  // page area; both must outlive this. `restore_focus` gives focus back to
+  // the window once the welcome closes.
   // `settle_rows` runs the sidebar's row settle after the delay it gets and
   // returns how long until its last row lands. `select_space` shows a Space
   // in the window. `anchor` gives the bounds of what a card points at in
@@ -95,7 +100,6 @@ class OnboardingController final : public views::ViewObserver {
   OnboardingController(Profile& profile,
                        views::View& host,
                        views::View& area,
-                       WelcomeView::RadiusCallback radius,
                        base::RepeatingClosure restore_focus,
                        SettleRowsCallback settle_rows,
                        SelectSpaceCallback select_space,
@@ -137,7 +141,7 @@ class OnboardingController final : public views::ViewObserver {
   void ShowImported(uint64_t space);
   void OpenImport();
   void OnReportClosed();
-  // The sheet slides away while the rows settle, then FinishReveal feeds
+  // The welcome fades away while the rows settle, then FinishReveal feeds
   // `reveal_done`.
   void StartReveal();
   void FinishReveal();
@@ -188,7 +192,6 @@ class OnboardingController final : public views::ViewObserver {
   const raw_ptr<Profile> profile_;
   raw_ptr<views::View> host_;
   raw_ptr<views::View> area_;
-  const WelcomeView::RadiusCallback radius_;
   const base::RepeatingClosure restore_focus_;
   const SettleRowsCallback settle_rows_;
   const SelectSpaceCallback select_space_;
@@ -198,6 +201,8 @@ class OnboardingController final : public views::ViewObserver {
   // The desktop dim and blob while the welcome arrives. Dropped from a posted
   // task, a press or CloseWelcome, never from inside its own timer.
   std::unique_ptr<WelcomeIntro> intro_;
+  // The welcome's sound, Mac only. Dropping it fades it out.
+  std::unique_ptr<WelcomeSound> sound_;
   raw_ptr<CoachMark> coach_ = nullptr;
   // The card fading out as the next one comes in.
   raw_ptr<CoachMark> leaving_coach_ = nullptr;
@@ -220,6 +225,8 @@ class OnboardingController final : public views::ViewObserver {
   uint8_t coach_step_ = 0;
   bool coach_offers_back_ = false;
   base::OneShotTimer coach_timer_;
+  // Replay is showing the welcome: the window keeps its size and display.
+  bool replaying_ = false;
   bool importing_ = false;
   // The welcome crossfades to the imported theme; the reveal follows.
   bool recolouring_ = false;
