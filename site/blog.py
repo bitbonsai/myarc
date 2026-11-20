@@ -163,6 +163,10 @@ def screenshot(folder, source):
     return relative.as_posix(), data
 
 
+REDUCED_MOTION_SCRIPT = ("<script>if (matchMedia('(prefers-reduced-motion: reduce)').matches) "
+                         "for (const v of document.querySelectorAll('video[autoplay]')) { v.removeAttribute('autoplay'); v.pause(); v.currentTime = 0 }</script>")
+
+
 def video(folder, source):
     """Validate a local MP4 and its required same-name -poster.png beside it."""
     url = urlsplit(source)
@@ -315,7 +319,7 @@ def load_post(path):
     rendered = BeautifulSoup(MD.renderer.render(tokens, MD.options, {}), 'html.parser')
     for image in rendered.find_all('img', src=lambda src: src in videos):
         poster, width, height = videos[image['src']]
-        player = rendered.new_tag('video', attrs={'controls': '', 'playsinline': '', 'preload': 'metadata', 'poster': poster,
+        player = rendered.new_tag('video', attrs={'controls': '', 'autoplay': '', 'muted': '', 'loop': '', 'playsinline': '', 'preload': 'metadata', 'poster': poster,
                                                   'width': str(width), 'height': str(height), 'aria-label': image['alt']})
         player.append(rendered.new_tag('source', src=image['src'], type='video/mp4'))
         image.replace_with(player)
@@ -490,6 +494,8 @@ def build_blog(root, template, embed, extra_urls=()):
             page = page.replace('</head>', preloads + '</head>')
             lightbox = '<dialog id="image-lightbox" class="image-lightbox" aria-labelledby="lightbox-caption"><div class="lightbox-content"><button type="button" aria-label="Close image" autofocus>' + close_icon + '</button><img alt=""><p id="lightbox-caption"></p></div></dialog>'
             page = page.replace('</body>', lightbox + f'<script defer src="../_assets/{gallery_name}"></script></body>')
+        if '<video' in post.html:
+            page = page.replace('</body>', REDUCED_MOTION_SCRIPT + '</body>')
         (folder / 'index.html').write_text(embed(page, '../'))
         for name, data in {**post.images, **(post.media or {})}.items():
             target = folder / name
