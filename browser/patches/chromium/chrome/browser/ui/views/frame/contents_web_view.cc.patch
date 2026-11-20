@@ -1,5 +1,5 @@
 diff --git a/chrome/browser/ui/views/frame/contents_web_view.cc b/chrome/browser/ui/views/frame/contents_web_view.cc
-index 184614e93db97174631601f8b34dd1f9ecec550b..c461c6590907c7bcb8dcbec2e3f11bcd50fcf79c 100644
+index 184614e93db97174631601f8b34dd1f9ecec550b..2251fab4e447dbeee7ec1b0d8c69f3d8284c069a 100644
 --- a/chrome/browser/ui/views/frame/contents_web_view.cc
 +++ b/chrome/browser/ui/views/frame/contents_web_view.cc
 @@ -4,8 +4,10 @@
@@ -13,13 +13,14 @@ index 184614e93db97174631601f8b34dd1f9ecec550b..c461c6590907c7bcb8dcbec2e3f11bcd
  #include "chrome/browser/ui/color/chrome_color_id.h"
  #include "chrome/browser/ui/views/animations/common_animation_values.h"
  #include "chrome/browser/ui/views/frame/safe_invoke/safe_invoke.h"
-@@ -13,14 +15,21 @@
+@@ -13,14 +15,22 @@
  #include "chrome/browser/ui/views/status_bubble_views.h"
  #include "components/tabs/public/tab_interface.h"
  #include "components/web_modal/web_contents_modal_dialog_manager.h"
 +#include "content/public/browser/render_frame_host.h"
  #include "content/public/browser/render_widget_host_view.h"
  #include "content/public/browser/web_contents.h"
++#include "myarc/content_card.h"
 +#include "myarc/local_page_marker.h"
  #include "third_party/blink/public/common/input/web_input_event.h"
  #include "third_party/skia/include/core/SkColor.h"
@@ -35,7 +36,7 @@ index 184614e93db97174631601f8b34dd1f9ecec550b..c461c6590907c7bcb8dcbec2e3f11bcd
  #include "ui/views/view_class_properties.h"
  #include "ui/views/widget/widget.h"
  
-@@ -33,6 +42,21 @@
+@@ -33,6 +43,21 @@
  #include "chrome/browser/actor/actor_util.h"  // nogncheck
  #endif
  
@@ -57,8 +58,15 @@ index 184614e93db97174631601f8b34dd1f9ecec550b..c461c6590907c7bcb8dcbec2e3f11bcd
  DEFINE_CLASS_ELEMENT_IDENTIFIER_VALUE(ContentsWebView,
                                        kContentsWebViewElementId);
  
-@@ -50,7 +74,13 @@ ContentsWebView::ContentsWebView(content::BrowserContext* browser_context)
+@@ -48,9 +73,20 @@ ContentsWebView::ContentsWebView(content::BrowserContext* browser_context)
+   status_bubble_ = std::make_unique<StatusBubbleViews>(this);
+   status_bubble_->Reposition();
    web_contents_close_handler_ = std::make_unique<WebContentsCloseHandler>(this);
++  if (base::CommandLine::ForCurrentProcess()->HasSwitch(
++          "myarc-visual-parity")) {
++    // A faint hairline inside the card's edge lifts it off the sidebar.
++    myarc::AddContentCardEdge(*this);
++  }
  }
  
 -ContentsWebView::~ContentsWebView() = default;
@@ -72,7 +80,7 @@ index 184614e93db97174631601f8b34dd1f9ecec550b..c461c6590907c7bcb8dcbec2e3f11bcd
  
  StatusBubbleViews* ContentsWebView::GetStatusBubble() const {
    if (status_bubble_) {
-@@ -130,6 +160,9 @@ void ContentsWebView::UpdateIsBlockedByModal() {
+@@ -130,6 +166,9 @@ void ContentsWebView::UpdateIsBlockedByModal() {
        is_blocked = tab->IsBlocked();
      }
    }
@@ -82,7 +90,7 @@ index 184614e93db97174631601f8b34dd1f9ecec550b..c461c6590907c7bcb8dcbec2e3f11bcd
    holder()->SetProperty(views::kIsBlockedByModalKey, is_blocked);
  }
  
-@@ -157,7 +190,17 @@ void ContentsWebView::OnLetterboxingChanged() {
+@@ -157,7 +196,17 @@ void ContentsWebView::OnLetterboxingChanged() {
  }
  
  void ContentsWebView::SetWebContents(content::WebContents* web_contents) {
@@ -100,7 +108,7 @@ index 184614e93db97174631601f8b34dd1f9ecec550b..c461c6590907c7bcb8dcbec2e3f11bcd
    if (web_contents == nullptr) {
      status_bubble_.reset();
      holder()->SetProperty(views::kIsBlockedByModalKey, false);
-@@ -207,6 +250,31 @@ void ContentsWebView::DidGetUserInteraction(const blink::WebInputEvent& event) {
+@@ -207,6 +256,31 @@ void ContentsWebView::DidGetUserInteraction(const blink::WebInputEvent& event) {
  }
  #endif
  
@@ -132,7 +140,7 @@ index 184614e93db97174631601f8b34dd1f9ecec550b..c461c6590907c7bcb8dcbec2e3f11bcd
  void ContentsWebView::UpdateBackgroundColor() {
    const SkColor color = GetColorProvider()->GetColor(
        is_letterboxing() ? kColorWebContentsBackgroundLetterboxing
-@@ -221,9 +289,19 @@ void ContentsWebView::UpdateBackgroundColor() {
+@@ -221,9 +295,19 @@ void ContentsWebView::UpdateBackgroundColor() {
      }
    }
  

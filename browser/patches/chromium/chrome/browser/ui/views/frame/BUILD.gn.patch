@@ -1,5 +1,5 @@
 diff --git a/chrome/browser/ui/views/frame/BUILD.gn b/chrome/browser/ui/views/frame/BUILD.gn
-index 41231752d903fec4f355a7b20037f5058904661c..ef4015ccbce1df2b58cc8b72e418faba7ddae295 100644
+index 41231752d903fec4f355a7b20037f5058904661c..0848bbb187b226f4f1a749127e69afcd0642fb4b 100644
 --- a/chrome/browser/ui/views/frame/BUILD.gn
 +++ b/chrome/browser/ui/views/frame/BUILD.gn
 @@ -591,6 +591,7 @@ source_set("app_menu_button_impl") {
@@ -58,12 +58,13 @@ index 41231752d903fec4f355a7b20037f5058904661c..ef4015ccbce1df2b58cc8b72e418faba
      "//components/infobars/content",
      "//components/javascript_dialogs",
      "//components/performance_manager",
-@@ -960,6 +970,14 @@ source_set("browser_view") {
+@@ -960,6 +970,15 @@ source_set("browser_view") {
      "//content/public/common",
      "//extensions/common",
      "//media/capture:capture_switches",
 +    "//myarc:browser_workspace_adapter",
 +    "//myarc:command_ids",
++    "//myarc:content_card",
 +    "//myarc:little_arc",
 +    "//myarc:onboarding",
 +    "//myarc:peek",
@@ -73,7 +74,7 @@ index 41231752d903fec4f355a7b20037f5058904661c..ef4015ccbce1df2b58cc8b72e418faba
      "//third_party/blink/public/common:headers",
      "//ui/accessibility",
      "//ui/accessibility:ax_base",
-@@ -1130,6 +1148,7 @@ source_set("custom_corners") {
+@@ -1130,6 +1149,7 @@ source_set("custom_corners") {
    public = [ "custom_corners.h" ]
    public_deps = [
      "//base",
@@ -81,7 +82,7 @@ index 41231752d903fec4f355a7b20037f5058904661c..ef4015ccbce1df2b58cc8b72e418faba
      "//ui/color:color_headers",
      "//ui/views",
    ]
-@@ -1392,12 +1411,14 @@ source_set("contents_web_view") {
+@@ -1392,12 +1412,15 @@ source_set("contents_web_view") {
    deps = [
      ":safe_invoke",
      ":web_contents_close_handler",
@@ -92,11 +93,12 @@ index 41231752d903fec4f355a7b20037f5058904661c..ef4015ccbce1df2b58cc8b72e418faba
      "//components/tabs:public",
      "//components/web_modal",
      "//content/public/browser",
++    "//myarc:content_card",
 +    "//myarc:local_page_marker",
      "//skia:skia_core_public_headers",
      "//third_party/blink/public/common:headers",
      "//ui/color:color_headers",
-@@ -1943,6 +1964,7 @@ if (is_mac) {
+@@ -1943,6 +1966,7 @@ if (is_mac) {
        "//chrome/browser/ui:fullscreen_util_mac",
        "//chrome/browser/ui:layout_constants",
        "//chrome/browser/ui:view_ids",
@@ -104,7 +106,7 @@ index 41231752d903fec4f355a7b20037f5058904661c..ef4015ccbce1df2b58cc8b72e418faba
        "//chrome/browser/ui/browser_window",
        "//chrome/browser/ui/cocoa",
        "//chrome/browser/ui/color:color_headers",
-@@ -1950,6 +1972,7 @@ if (is_mac) {
+@@ -1950,6 +1974,7 @@ if (is_mac) {
        "//chrome/browser/ui/exclusive_access",
        "//chrome/browser/ui/immersive:immersive_mode_controller",
        "//chrome/browser/ui/tabs",
@@ -112,7 +114,7 @@ index 41231752d903fec4f355a7b20037f5058904661c..ef4015ccbce1df2b58cc8b72e418faba
        "//chrome/browser/ui/views/bookmarks",
        "//chrome/browser/ui/views/tabs:tab_strip",
        "//chrome/browser/ui/views/toolbar",
-@@ -2023,6 +2046,8 @@ if (is_mac) {
+@@ -2023,6 +2048,8 @@ if (is_mac) {
        "//components/remote_cocoa/app_shim",
        "//components/remote_cocoa/common:mojo",
        "//components/web_modal",
@@ -121,7 +123,7 @@ index 41231752d903fec4f355a7b20037f5058904661c..ef4015ccbce1df2b58cc8b72e418faba
        "//skia",
        "//ui/accessibility",
        "//ui/actions",
-@@ -2262,6 +2287,7 @@ source_set("browser_tests") {
+@@ -2262,6 +2289,7 @@ source_set("browser_tests") {
      "//chrome/browser/devtools",
      "//chrome/browser/devtools:test_support",
      "//chrome/browser/glic/test_support",
@@ -129,7 +131,7 @@ index 41231752d903fec4f355a7b20037f5058904661c..ef4015ccbce1df2b58cc8b72e418faba
      "//chrome/browser/ui:browser_actions",
      "//chrome/browser/ui:browser_tabstrip",
      "//chrome/browser/ui:recently_audible_helper",
-@@ -2269,20 +2295,30 @@ source_set("browser_tests") {
+@@ -2269,20 +2297,30 @@ source_set("browser_tests") {
      "//chrome/browser/ui/actions:actions_util",
      "//chrome/browser/ui/browser_web_contents_delegate",
      "//chrome/browser/ui/find_bar",
@@ -160,7 +162,7 @@ index 41231752d903fec4f355a7b20037f5058904661c..ef4015ccbce1df2b58cc8b72e418faba
    ]
  
    if (use_ozone) {
-@@ -3032,6 +3068,7 @@ source_set("browser_view_tabbed_layout_impl") {
+@@ -3032,6 +3070,7 @@ source_set("browser_view_tabbed_layout_impl") {
      "//chrome/browser/ui/views/infobars",
      "//chrome/browser/ui/views/side_panel",
      "//chrome/browser/ui/views/tabs/organizer",

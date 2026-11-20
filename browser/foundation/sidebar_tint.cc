@@ -54,11 +54,12 @@ SidebarTint GetSidebarTint(bool dark,
                            const std::optional<SpaceTheme>& theme,
                            bool solid) {
   if (!theme) {
-    // Dark: a neutral graphite, the sidebar's corner (#24252a) one step
-    // lighter than the base (#1c1d21), at two thirds over the glass.
-    const SkAlpha graphite = solid ? 242 : 170;
-    return dark ? SidebarTint{SkColorSetARGB(graphite, 0x24, 0x25, 0x2A),
-                              SkColorSetARGB(graphite, 0x1C, 0x1D, 0x21)}
+    // Dark: Dusk, from an indigo top-leading corner (#2b2a40) to a plum
+    // bottom-trailing one (#4a3442), at about 65% over the glass. Its middle,
+    // #3a2f45, sits on that line, so two stops draw it.
+    const SkAlpha dusk = solid ? 242 : 166;
+    return dark ? SidebarTint{SkColorSetARGB(dusk, 0x2B, 0x2A, 0x40),
+                              SkColorSetARGB(dusk, 0x4A, 0x34, 0x42)}
                 : SidebarTint{SkColorSetARGB(166, 227, 224, 242),
                               SkColorSetARGB(166, 240, 230, 240)};
   }

@@ -1,5 +1,5 @@
 diff --git a/chrome/browser/ui/views/frame/browser_native_widget_mac.mm b/chrome/browser/ui/views/frame/browser_native_widget_mac.mm
-index fd4cc9a121ef9a7bf20e1269bcb381eabf6fa055..4d2924e27741cfed8063ba4b20fbffdf126457ac 100644
+index fd4cc9a121ef9a7bf20e1269bcb381eabf6fa055..bac6a211f697a134978a0b2746bf2069acbcb701 100644
 --- a/chrome/browser/ui/views/frame/browser_native_widget_mac.mm
 +++ b/chrome/browser/ui/views/frame/browser_native_widget_mac.mm
 @@ -4,10 +4,14 @@
@@ -223,7 +223,7 @@ index fd4cc9a121ef9a7bf20e1269bcb381eabf6fa055..4d2924e27741cfed8063ba4b20fbffdf
    UpdateBackgroundColor();
  }
  
-@@ -1081,17 +1185,38 @@ void BrowserNativeWidgetMac::UpdateGlassEligibility(bool is_glass_eligible) {
+@@ -1081,17 +1185,39 @@ void BrowserNativeWidgetMac::UpdateGlassEligibility(bool is_glass_eligible) {
      if (!glass_background_view_) {
        NSView* const content_view = [ns_window contentView];
  
@@ -237,7 +237,8 @@ index fd4cc9a121ef9a7bf20e1269bcb381eabf6fa055..4d2924e27741cfed8063ba4b20fbffdf
 +                initWithFrame:content_view.bounds];
 +        material_view.material = NSVisualEffectMaterialSidebar;
 +        material_view.blendingMode = NSVisualEffectBlendingModeBehindWindow;
-+        material_view.state = NSVisualEffectStateFollowsWindowActiveState;
++        // Arc and Zen keep the blur while another app is frontmost.
++        material_view.state = NSVisualEffectStateActive;
 +        glass_view = material_view;
 +        NSLog(@"myarc material: native behind-window view installed");
 +      } else {
@@ -267,7 +268,7 @@ index fd4cc9a121ef9a7bf20e1269bcb381eabf6fa055..4d2924e27741cfed8063ba4b20fbffdf
  
        tint_view_ = tint_view;
        [glass_view addSubview:tint_view_];
-@@ -1167,7 +1292,22 @@ void BrowserNativeWidgetMac::UpdateBackgroundGeometry() {
+@@ -1167,7 +1293,22 @@ void BrowserNativeWidgetMac::UpdateBackgroundGeometry() {
      tint_view_.frame = glass_background_view_.bounds;
    }
  
@@ -290,7 +291,7 @@ index fd4cc9a121ef9a7bf20e1269bcb381eabf6fa055..4d2924e27741cfed8063ba4b20fbffdf
      int opaque_x = 0;
      int opaque_y = 0;
      int opaque_width = content_width;
-@@ -1206,6 +1346,26 @@ void BrowserNativeWidgetMac::UpdateBackgroundColor() {
+@@ -1206,6 +1347,26 @@ void BrowserNativeWidgetMac::UpdateBackgroundColor() {
  
    const bool is_vertical_tabs = browser_view_->ShouldDrawVerticalTabStrip();
  
@@ -317,7 +318,7 @@ index fd4cc9a121ef9a7bf20e1269bcb381eabf6fa055..4d2924e27741cfed8063ba4b20fbffdf
    auto* const glass_frame_service = GlassFrameService::GetInstance();
    const bool are_multiple_profiles_open =
        glass_frame_service && glass_frame_service->HasMultipleOpenProfiles();
-@@ -1223,8 +1383,11 @@ void BrowserNativeWidgetMac::UpdateBackgroundColor() {
+@@ -1223,8 +1384,11 @@ void BrowserNativeWidgetMac::UpdateBackgroundColor() {
    has_multiple_profiles_open_ = are_multiple_profiles_open;
  
    const double tint_opacity =

@@ -533,6 +533,26 @@ source_set("local_page_marker") {
   ]
 }
 
+source_set("content_card") {
+  sources = [
+    "content_card.cc",
+    "content_card.h",
+  ]
+  public_deps = [
+    "//base",
+    "//ui/base",
+    "//ui/gfx/geometry",
+    "//ui/views",
+  ]
+  deps = [
+    "//cc/paint",
+    "//skia",
+    "//ui/color",
+    "//ui/compositor",
+    "//ui/gfx",
+  ]
+}
+
 source_set("sidebar_tint") {
   sources = [
     "sidebar_tint.cc",

@@ -24,15 +24,16 @@ struct SpaceTheme {
   bool operator==(const SpaceTheme&) const = default;
 };
 
-// The Space tint over the window's sidebar material: a translucent diagonal
-// gradient from the top-leading corner to the bottom-trailing one.
+// The Space tint over the window's material: a translucent diagonal gradient
+// across the whole window, from the top-leading corner to the bottom-trailing
+// one.
 struct SidebarTint {
   SkColor start;
   SkColor end;
 };
 
-// Without a theme, fixed stops per appearance, a neutral graphite in dark
-// mode. A theme shades its colour toward black in dark mode and toward white
+// Without a theme, fixed stops per appearance, Dusk's indigo to plum in
+// dark mode. A theme shades its colour toward black in dark mode and toward white
 // in light mode, so the sidebar's labels stay readable, and scales the stops'
 // alpha by its opacity. Over the window's glass the tint is translucent, at
 // most about two thirds, so the blurred desktop shows through as in Arc.
