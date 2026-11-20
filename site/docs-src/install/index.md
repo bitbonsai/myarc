@@ -1,6 +1,6 @@
 ---
 title: Install myArc
-summary: "What your Mac needs, what macOS asks on first launch, and how to move to a newer nightly."
+summary: "What your Mac needs, what macOS asks on first launch, the welcome tour, and how myArc moves to a newer nightly."
 area: Getting started
 order: 1
 ---
@@ -29,9 +29,19 @@ Open myArc Nightly from Applications. From 2026.11.18 on, each nightly is signed
 
 macOS may then ask for your login password so myArc can read the key that protects its saved data. Choose Always Allow. Nightlies from 2026.11.03 on are signed with the same Developer ID, so later nightlies stop asking.
 
+## The welcome tour
+
+The first time myArc opens, a welcome window plays with sound. Choose Import from Arc… to bring your Spaces over, as [Import from Arc](../import-from-arc/) describes, Start fresh to begin without an import, or Skip tour. Three short practice steps follow: open a site from the command bar, pin a tab with Cmd+D, and switch to another Space or make one.
+
+When the tour ends after Start fresh or Skip tour, myArc opens a quick start page, [myarc.dev/welcome](https://myarc.dev/welcome/), in a new tab. It does this only once, and not after an import. To take the tour again, open Settings, go to Advanced and click Replay welcome tour.
+
 ## Update to a newer nightly
 
-myArc doesn't update itself, and it gets no security updates between nightlies. To move to a newer one:
+Nightlies after 2026.11.20.2 update themselves. Once a day, myArc checks myarc.dev for a newer nightly and asks before it installs one. To check right away, choose myArc > Check for Updates…. Each nightly is signed, and myArc refuses an update whose signature doesn't match.
+
+myArc gets no security updates between nightlies, so a Chromium fix reaches you with the next nightly.
+
+Nightly 2026.11.20.2 and older can't update themselves. To move from one of those, install the new nightly by hand once:
 
 1. Quit myArc with Cmd+Q.
 2. Download the new DMG and drag myArc Nightly to Applications, replacing the old copy.

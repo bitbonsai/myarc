@@ -21,7 +21,16 @@ A Space is a set of tabs for one part of your life, such as Work, Reading or Tra
 
 A Profile holds your cookies, logins, history and extensions. Spaces that share a Profile share all of that, plus the Profile's Favorites. A Work Profile and a Personal Profile let you stay signed in to two accounts on the same site.
 
-Each myArc Profile is a full Chromium Profile, so the separation is the same one Chrome gives you. To make a new Profile, open the Profile menu while you create a Space and choose New Profile.
+Each myArc Profile is a full Chromium Profile, so the separation is the same one Chrome gives you. To make a new Profile, open the Profile menu while you create a Space and choose New Profile, or use Settings > Profiles.
+
+Settings > Profiles lists your Profiles and the Spaces that use each one. To create a Profile, click + below the list. Select a Profile to change it:
+
+- To rename it, type in Name and press Return.
+- To change its icon, click Change… next to Icon.
+- To set how long its temporary tabs wait before they're archived, pick a time under Archive tabs after. This needs a window of that Profile open.
+- To delete it, click − below the list, then Delete Profile. This removes its history, logins, cookies and extensions from your Mac.
+
+myArc won't delete your last Profile, a Profile that Spaces still use, or a Profile with a window open. Delete the Spaces that use it and close its windows first, then open Settings from another Profile's window.
 
 Switching to a Space in another Profile brings in that Profile's window at the same position and size, so it still feels like one window.
 
@@ -34,6 +43,8 @@ Pinned tabs and Favorites both appear as favicon tiles at the top of the sidebar
 
 Right-click a tab in the sidebar to pin it to the Space or add it to the Profile's Favorites. The same menu moves a tile between the two, and Unpin from Space or Remove Favorite takes it away.
 
+You can also drag a temporary tab up onto the pinned tiles, the Space name or a folder to pin it, or onto a Favorite tile to make it a Favorite. Drag a pinned tab down into the temporary tabs to unpin it.
+
 Closing a pinned tab or a Favorite keeps its tile. The page closes, and clicking the tile opens it again. When one has moved away from its saved page, its row shows both names. Click the back arrow on its icon to return to the saved page, or right-click it and choose Edit Pinned Page > Replace Pinned URL with Current to save the new one. Drag Favorite tiles to reorder them.
 
 ## Folders
@@ -44,8 +55,8 @@ A folder groups pinned tabs inside a Space. To make one, right-click the Space n
 
 Every other tab is a temporary tab. Temporary tabs sit in a list below the Space name and the New Tab row. They come back after you quit and reopen myArc.
 
-When you close a temporary tab, it moves to Archived Tabs in the Library. Open the Library with the archive icon at the bottom left of the sidebar. It also lists your Spaces and recent downloads.
+When you close a temporary tab, it moves to Archived Tabs in the Library. So does a temporary tab you haven't looked at for 12 hours. Only time with myArc open counts. To wait 24 hours, 7 days or 30 days instead, change Archive tabs after in Settings > Profiles. Open the Library with the archive icon at the bottom left of the sidebar. It also lists your Spaces and recent downloads.
 
 ## Not in myArc yet
 
-Folders inside folders and dragging a tab up to pin it don't work yet. [Known limitations](../known-limitations/) has the full list.
+Folders inside folders don't work yet. [Known limitations](../known-limitations/) has the full list.
