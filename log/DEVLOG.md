@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-11-20: Nightly 2026.11.20.3
+
+- Published the prerelease `nightly-2026.11.20.3` from `main` `f5cad26` and Chromium `3b56b24cc7`, the first nightly with Sparkle 2.10.1: in-app updates and Check for Updates…, the crash report card, Settings > Profiles, Arc sidebar-file import, Option-Cmd-O in Little Arc, the quick start page and the private window check. `site/release.json` carries its `ed_signature`, so `/appcast.xml` lists it.
+- Evidence: `tools/package_nightly.sh` signed with the Developer ID, Apple notarized and stapled the app and the DMG, `spctl` accepted both, and `sign_update --verify` passed. GitHub reports the asset at 246788346 bytes, SHA-256 `4c083822...443780`.
+- Limits: no live run of the packaged app beyond checking the installed version, and no update has come from myarc.dev yet, since no installed nightly had Sparkle before this one.
+
 ## 2026-11-20: Import from Arc… reads the sidebar file
 
 - The GN `import` target builds `arc_sidebar.rs` with the `arc-sidebar` feature and Chromium's `serde_json`. The bridge has `parse_arc_sidebar` beside `parse_arc_export`, `ArcImportPreview` gains `new_favorites`, and the closing note for the sidebar file says its page titles aren't imported yet. The picker accepts `.json` and, when `StorableSidebar.json` exists in Arc's folder, opens there with it as the default; it only checks that the file exists until the user picks it.
