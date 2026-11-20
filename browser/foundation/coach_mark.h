@@ -5,6 +5,7 @@
 
 #include "base/functional/callback.h"
 #include "base/memory/raw_ptr.h"
+#include "base/time/time.h"
 #include "ui/base/metadata/metadata_header_macros.h"
 #include "ui/gfx/geometry/rect.h"
 #include "ui/views/view.h"
@@ -17,18 +18,19 @@ class LabelButton;
 namespace myarc {
 
 // A welcome tour card that points at a real control: a short title, one line
-// of text, an optional key hint, then Back, an optional Next and Skip tour.
-// It never takes focus, so the shortcut it teaches still reaches the window,
-// and Esc while it shows means Skip tour. VoiceOver hears its text when it
-// shows. It grows in from 96% as it fades in, 180 ms with ease-out, from the
-// side of its anchor; under Reduce Motion it only fades in, over 150 ms. It
-// leaves with a 120 ms fade.
+// of text, an optional key hint, an optional extra button on its own row,
+// then Back, Skip tour and an optional Next. It never takes focus, so the
+// shortcut it teaches still reaches the window, and Esc while it shows
+// presses Skip tour, whether or not the card shows it. VoiceOver hears its
+// text when it shows. It grows in from 96% as it fades in, 180 ms with
+// ease-out, from the side of its anchor; under Reduce Motion it only fades
+// in, over 150 ms. It leaves with a fade, 120 ms unless told otherwise.
 // UI sequence only.
 class CoachMark : public views::View {
   METADATA_HEADER(CoachMark, views::View)
 
  public:
-  enum class Action { kBack, kNext, kSkipTour };
+  enum class Action { kBack, kNext, kSkipTour, kExtra };
   using ActionCallback = base::RepeatingCallback<void(Action)>;
 
   struct Content {
@@ -40,6 +42,10 @@ class CoachMark : public views::View {
     bool offers_next = false;
     // Next's label, or empty for "Next".
     std::u16string next_label;
+    // False hides Skip tour; Esc still presses it.
+    bool offers_skip = true;
+    // The extra button's label, or empty for none.
+    std::u16string extra_label;
   };
 
   CoachMark(const Content& content, ActionCallback action);
@@ -56,10 +62,14 @@ class CoachMark : public views::View {
   // its text.
   void Show();
 
-  // Fades the card out over 120 ms, ignoring presses from the start, then
-  // runs `done`, which removes it. Moving to the next step does this while
-  // the next card comes in.
-  void FadeOut(base::OnceClosure done);
+  // Fades the card out over `duration`, ignoring presses from the start,
+  // then runs `done`, which removes it. Moving to the next step does this
+  // while the next card comes in.
+  void FadeOut(base::OnceClosure done,
+               base::TimeDelta duration = base::Milliseconds(120));
+
+  // Hides the extra button. The card's height changes, so place it again.
+  void HideExtra();
 
   // Takes presses again after one that leaves the card up.
   void Rearm() { pressed_ = false; }
@@ -81,6 +91,7 @@ class CoachMark : public views::View {
   raw_ptr<views::LabelButton> back_ = nullptr;
   raw_ptr<views::LabelButton> next_ = nullptr;
   raw_ptr<views::LabelButton> skip_ = nullptr;
+  raw_ptr<views::LabelButton> extra_ = nullptr;
   // Where the pointer meets the card's left edge, in this view's
   // coordinates, or -1 for none.
   int pointer_y_ = -1;

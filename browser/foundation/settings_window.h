@@ -42,11 +42,13 @@ class SettingsWindow {
   // including Advanced > Import from Arc…;
   // it and `local_state` must outlive this object. `open_more_settings` opens
   // chrome://settings and `open_site` opens myarc.dev, both in the owning
-  // browser window.
+  // browser window. `replay_tour` starts the welcome tour again there, from
+  // Advanced > Replay welcome tour.
   SettingsWindow(Profile* profile,
                  PrefService* local_state,
                  base::RepeatingClosure open_more_settings,
                  base::RepeatingClosure open_site,
+                 base::RepeatingClosure replay_tour,
                  ArchiveTimer archive_timer);
   SettingsWindow(const SettingsWindow&) = delete;
   SettingsWindow& operator=(const SettingsWindow&) = delete;
@@ -65,17 +67,21 @@ class SettingsWindow {
   bool IsShowing() const;
   // Runs the More Settings… action as if its button was pressed.
   void PressMoreSettingsForCapture();
+  // Runs Replay welcome tour as if its button was pressed.
+  void PressReplayForCapture();
   void Close();
 
  private:
   void OpenMoreSettings();
   void OpenSite();
   void ImportFromArc();
+  void ReplayTour();
 
   const raw_ptr<Profile> profile_;
   const raw_ptr<PrefService> local_state_;
   base::RepeatingClosure open_more_settings_;
   base::RepeatingClosure open_site_;
+  base::RepeatingClosure replay_tour_;
   ArchiveTimer archive_timer_;
   std::unique_ptr<views::WidgetDelegate> delegate_;
   std::unique_ptr<views::Widget> widget_;

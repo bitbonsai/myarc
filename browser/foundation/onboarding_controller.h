@@ -38,15 +38,19 @@ class RevealFrames;
 // opened, or the current one, and finishes once it's pinned. Practice 3
 // points at the footer's Spaces, or its "+" with one Space, and finishes on
 // a switch or a new Space. A card leaving fades out over 120 ms while the
-// next comes in. The handoff isn't built yet, so the tour ends once it gets
-// there. UI sequence only.
+// next comes in. At the handoff focus moves to the sidebar's current row and
+// a closing card offers Make myArc your default browser and Done. Done or
+// Esc ends the tour, keeping the steps done and skipped, and the card fades
+// out over 180 ms. Replay, from Settings > Advanced, starts the tour again at
+// the welcome in this window. UI sequence only.
 //
 // With test hooks, --myarc-test-onboarding-event=skip_tour, start_browsing
 // or import presses that button a second after the sheet shows, or
 // --myarc-test-onboarding-event-delay=<ms> after it; back, next or
 // skip_tour presses that coach mark button the same way once a coach mark
-// shows, and do does what each card asks: Cmd+D, Ctrl+number, or Create a
-// Space then the panel's Create.
+// shows, and do does what each card asks: Cmd+D, Ctrl+number, Create a
+// Space then the panel's Create, or Done on the handoff. No hook presses
+// the default browser button.
 // --myarc-test-onboarding-import=<file> imports that export instead of
 // asking for one, pressing Import in the preview.
 // --myarc-test-onboarding-hold keeps the tour at the reveal after the
@@ -78,6 +82,8 @@ class OnboardingController final : public views::ViewObserver {
     base::RepeatingCallback<bool()> shown_page_is_web;
     // Opens the Create a Space panel.
     base::RepeatingClosure create_space;
+    // Moves focus to the sidebar's current row; false when none shows.
+    base::RepeatingCallback<bool()> focus_current_row;
     // Test hooks only: "pin" runs Cmd+D's command, "space:<n>" Ctrl+<n>'s,
     // and "create" presses Create in the open Create a Space panel.
     base::RepeatingCallback<void(const std::string&)> act_for_test;
@@ -101,6 +107,14 @@ class OnboardingController final : public views::ViewObserver {
 
   // The command bar opened a page in this window: finishes practice 1.
   void OnCommandBarOpenedPage();
+
+  // Settings > Advanced > Replay welcome tour: resets the record with the
+  // tour's replay rule, which keeps the import receipt, and shows the
+  // welcome in this window. Never imports on its own.
+  void Replay();
+  // Replay for a window with no tour, such as Incognito: only resets the
+  // record, so the next regular window shows the welcome.
+  static void ReplayRecord();
 
   // views::ViewObserver:
   void OnViewBoundsChanged(views::View* observed_view) override;
@@ -129,7 +143,8 @@ class OnboardingController final : public views::ViewObserver {
     kPin,
     kPinned,
     kSwitch,
-    kCreate
+    kCreate,
+    kHandoff
   };
   // Shows the coach mark for the saved `tour`, at the reveal or a practice
   // step, after `delay`. A card already showing for that step stays, and
@@ -153,6 +168,11 @@ class OnboardingController final : public views::ViewObserver {
   void FeedLater(foundation::OnboardingEventKind kind, uint8_t step);
   void PlaceCoach();
   void OnCoachAction(CoachMark::Action action);
+  // Done or Esc on the handoff card: ends the tour and focuses the row.
+  void FinishHandoff();
+  // The default browser check or request answered; hides the button once
+  // myArc is the default.
+  void OnDefaultState(bool is_default);
   // Runs the effect of a saved transition.
   void Run(const foundation::OnboardingTransition& transition);
   void PressForTest();

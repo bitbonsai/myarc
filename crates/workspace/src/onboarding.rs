@@ -1078,4 +1078,49 @@ mod tests {
         let record = run(&at(Practice(3)), [TourEvent::Back, TourEvent::Back]);
         assert_eq!(record.state, Practice(1));
     }
+
+    #[test]
+    fn done_or_esc_on_the_handoff_completes_and_keeps_the_steps() {
+        let handoff = run(
+            &at(Practice(1)),
+            [
+                TourEvent::StepDone(1),
+                TourEvent::SkipStep(2),
+                TourEvent::StepDone(3),
+            ],
+        );
+        assert_eq!(handoff.state, Handoff);
+        // Done feeds finish, and Esc on the handoff card does too; skip_tour, which
+        // Esc means on earlier cards, ends at the same record.
+        for event in [TourEvent::Finish, TourEvent::SkipTour] {
+            let done = apply(&handoff, event.clone());
+            assert_eq!(done.record.state, Complete, "{event:?}");
+            assert!(
+                done.record.is_done(1) && done.record.is_skipped(2),
+                "{event:?}"
+            );
+            assert!(done.record.is_done(3), "{event:?}");
+            assert_eq!(relaunch(&done.record).effect, TourEffect::None);
+        }
+    }
+
+    #[test]
+    fn replay_from_any_state_never_imports_or_drops_the_receipt() {
+        for state in [Welcome, Importing, Reveal, Practice(2), Handoff, Complete] {
+            let mut record = at(state);
+            record.receipt = Some(receipt());
+            let replayed = apply(&record, TourEvent::Replay);
+            assert_eq!(replayed.record.state, Welcome, "{state:?}");
+            assert_eq!(replayed.effect, TourEffect::Show { animate: true });
+            assert_eq!(replayed.record.receipt, Some(receipt()), "{state:?}");
+            assert!(!replayed.record.offers_import(), "{state:?}");
+            // The welcome's import offer stays off, so nothing opens the dialog.
+            let pressed = apply(&replayed.record, TourEvent::ImportStarted);
+            assert_eq!(pressed.record, replayed.record, "{state:?}");
+            assert_eq!(pressed.effect, TourEffect::None, "{state:?}");
+        }
+        // With no receipt, the replayed welcome offers import again.
+        let replayed = apply(&TourRecord::complete(), TourEvent::Replay).record;
+        assert!(replayed.offers_import() && replayed.receipt.is_none());
+    }
 }

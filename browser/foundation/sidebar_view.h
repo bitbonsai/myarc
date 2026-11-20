@@ -291,6 +291,10 @@ class SidebarView final : public views::View,
   // That target's bounds in widget coordinates, cut to the part that shows,
   // or empty while it doesn't show.
   gfx::Rect GetTourAnchorInWidget(TourAnchor anchor, uint64_t item) const;
+  // Moves focus to the current row or tile, or to the New Tab row when no
+  // tab is current, as the welcome tour's handoff does. False when it
+  // doesn't show.
+  bool FocusCurrentRow();
   // Runs the Space switch slide with `outgoing`, a picture of another
   // window's rows that showed at `origin` in widget coordinates, leaving as
   // the current rows come in. A Profile swap uses it. +1 slides them right.

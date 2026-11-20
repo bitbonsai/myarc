@@ -61,7 +61,6 @@ constexpr SkColor kPrimary = SkColorSetRGB(0x3D, 0x4B, 0xF2);
 
 constexpr base::TimeDelta kGrow = base::Milliseconds(180);
 constexpr base::TimeDelta kReducedFade = base::Milliseconds(150);
-constexpr base::TimeDelta kFadeOut = base::Milliseconds(120);
 constexpr float kStartScale = 0.96f;
 
 gfx::FontList Font(int delta, gfx::Font::Weight weight) {
@@ -134,23 +133,32 @@ CoachMark::CoachMark(const Content& content, ActionCallback action)
     hint_->SetProperty(views::kMarginsKey, gfx::Insets::TLBR(10, 0, 0, 0));
   }
 
+  const auto pressed = [](CoachMark* view, Action action) {
+    view->Press(action);
+  };
+  if (!content.extra_label.empty()) {
+    extra_ = AddChildView(MakeButton(
+        base::BindRepeating(pressed, base::Unretained(this), Action::kExtra),
+        content.extra_label));
+    extra_->SetProperty(views::kMarginsKey, gfx::Insets::TLBR(12, 0, 0, 0));
+  }
+
   auto* buttons = AddChildView(std::make_unique<views::BoxLayoutView>());
   buttons->SetOrientation(views::BoxLayout::Orientation::kHorizontal);
   buttons->SetBetweenChildSpacing(4);
   buttons->SetProperty(views::kMarginsKey, gfx::Insets::TLBR(12, -10, 0, 0));
   buttons->SetPreferredSize(gfx::Size(kWidth - kPointer - 20, 28));
   buttons->SetCrossAxisAlignment(views::BoxLayout::CrossAxisAlignment::kCenter);
-  const auto pressed = [](CoachMark* view, Action action) {
-    view->Press(action);
-  };
   if (content.offers_back) {
     back_ = buttons->AddChildView(MakeButton(
         base::BindRepeating(pressed, base::Unretained(this), Action::kBack),
         kBack));
   }
-  skip_ = buttons->AddChildView(MakeButton(
-      base::BindRepeating(pressed, base::Unretained(this), Action::kSkipTour),
-      kSkip));
+  if (content.offers_skip) {
+    skip_ = buttons->AddChildView(MakeButton(
+        base::BindRepeating(pressed, base::Unretained(this), Action::kSkipTour),
+        kSkip));
+  }
   auto* spacer = buttons->AddChildView(std::make_unique<views::View>());
   buttons->SetFlexForView(spacer, 1);
   if (content.offers_next) {
@@ -211,7 +219,13 @@ void CoachMark::Show() {
   GetViewAccessibility().AnnounceText(announcement_);
 }
 
-void CoachMark::FadeOut(base::OnceClosure done) {
+void CoachMark::HideExtra() {
+  if (extra_) {
+    extra_->SetVisible(false);
+  }
+}
+
+void CoachMark::FadeOut(base::OnceClosure done, base::TimeDelta duration) {
   pressed_ = true;
   SetCanProcessEventsWithinSubtree(false);
   views::AnimationBuilder()
@@ -219,7 +233,7 @@ void CoachMark::FadeOut(base::OnceClosure done) {
           ui::LayerAnimator::IMMEDIATELY_ANIMATE_TO_NEW_TARGET)
       .OnEnded(std::move(done))
       .Once()
-      .SetDuration(kFadeOut)
+      .SetDuration(duration)
       .SetOpacity(layer(), 0.f, gfx::Tween::EASE_OUT);
 }
 
@@ -290,7 +304,14 @@ void CoachMark::OnThemeChanged() {
   if (back_) {
     back_->SetEnabledTextColors(SkColorSetA(ink, 0xCC));
   }
-  skip_->SetEnabledTextColors(SkColorSetA(ink, 0x99));
+  if (skip_) {
+    skip_->SetEnabledTextColors(SkColorSetA(ink, 0x99));
+  }
+  if (extra_) {
+    extra_->SetBackground(views::CreateRoundedRectBackground(
+        SkColorSetA(ink, dark_ ? 0x1F : 0x12), kButtonRadius));
+    extra_->SetEnabledTextColors(ink);
+  }
   if (next_) {
     next_->SetBackground(
         views::CreateRoundedRectBackground(kPrimary, kButtonRadius));

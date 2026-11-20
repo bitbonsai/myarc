@@ -3509,6 +3509,26 @@ gfx::Rect SidebarView::GetTourAnchorInWidget(TourAnchor anchor,
   return view->ConvertRectToWidget(view->GetVisibleBounds());
 }
 
+bool SidebarView::FocusCurrentRow() {
+  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
+  if (library_ || create_panel_) {
+    return false;
+  }
+  // With no tab current, as in a Space just switched to, the New Tab row.
+  const auto current =
+      std::ranges::find_if(focus_targets_, [this](const FocusTarget& target) {
+        return active_item_id_ ? target.action == FocusAction::kActivate &&
+                                     target.id == active_item_id_
+                               : target.action == FocusAction::kNewTab;
+      });
+  if (current == focus_targets_.end() || !current->view ||
+      !current->view->IsDrawn()) {
+    return false;
+  }
+  current->view->RequestFocus();
+  return current->view->HasFocus();
+}
+
 void SidebarView::SlideInSpace(const gfx::ImageSkia& outgoing,
                                const gfx::Point& origin,
                                int shift) {

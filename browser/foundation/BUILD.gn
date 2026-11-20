@@ -314,6 +314,7 @@ source_set("onboarding") {
     ":workspace_service",
     "//cc/paint",
     "//chrome/browser:browser_process",
+    "//chrome/browser:shell_integration",
     "//chrome/browser/profiles:profile",
     "//components/prefs",
     "//skia",

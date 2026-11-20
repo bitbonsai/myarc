@@ -755,15 +755,16 @@ BEGIN_METADATA(GeneralPage)
 END_METADATA
 
 // Advanced: the way out to Chromium's full settings page, Import from Arc,
-// then the Browser control switch that lets tools such as Claude Code drive
-// the Agent Space through myarc.
+// Replay welcome tour, then the Browser control switch that lets tools such as
+// Claude Code drive the Agent Space through myarc.
 class AdvancedPage : public views::View {
   METADATA_HEADER(AdvancedPage, views::View)
 
  public:
   AdvancedPage(PrefService* local_state,
                base::RepeatingClosure more_settings,
-               base::RepeatingClosure import_arc)
+               base::RepeatingClosure import_arc,
+               base::RepeatingClosure replay_tour)
       : local_state_(local_state) {
     card_ = AddChildView(
         std::make_unique<Panel>(kCardFill, kCardStroke, kCardRadius));
@@ -788,6 +789,15 @@ class AdvancedPage : public views::View {
                                      kButtonText, gfx::Font::Weight::NORMAL,
                                      nullptr));
     static_cast<views::BoxLayout*>(import_panel_->GetLayoutManager())
+        ->set_inside_border_insets(gfx::Insets::VH(0, kBannerPad));
+
+    replay_panel_ = AddRowPanel(
+        this, u"The welcome and the three practice steps",
+        /*multi_line=*/false,
+        std::make_unique<PillButton>(
+            std::move(replay_tour), u"Replay welcome tour", kGrayButton,
+            kButtonText, gfx::Font::Weight::NORMAL, nullptr));
+    static_cast<views::BoxLayout*>(replay_panel_->GetLayoutManager())
         ->set_inside_border_insets(gfx::Insets::VH(0, kBannerPad));
 
     control_title_ = AddLabel(this, u"Browser control", 13,
@@ -826,9 +836,11 @@ class AdvancedPage : public views::View {
     card_->SetBounds(kSideMargin, kContentTop, panel_width, kRowHeight);
     import_panel_->SetBounds(kSideMargin, card_->bounds().bottom() + 8,
                              panel_width, kRowHeight);
+    replay_panel_->SetBounds(kSideMargin, import_panel_->bounds().bottom() + 8,
+                             panel_width, kRowHeight);
     const int title_height = control_title_->GetPreferredSize().height();
     control_title_->SetBounds(kSideMargin + kBannerPad,
-                              import_panel_->bounds().bottom() + 24,
+                              replay_panel_->bounds().bottom() + 24,
                               panel_width - kBannerPad, title_height);
     control_panel_->SetBounds(kSideMargin, control_title_->bounds().bottom() + 8,
                               panel_width, kSwitchRowHeight);
@@ -858,6 +870,7 @@ class AdvancedPage : public views::View {
   PrefChangeRegistrar registrar_;
   raw_ptr<Panel> card_ = nullptr;
   raw_ptr<Panel> import_panel_ = nullptr;
+  raw_ptr<Panel> replay_panel_ = nullptr;
   raw_ptr<views::Label> control_title_ = nullptr;
   raw_ptr<Panel> control_panel_ = nullptr;
   raw_ptr<Switch> control_switch_ = nullptr;
@@ -1204,6 +1217,7 @@ class SettingsView : public views::View {
                base::RepeatingClosure more_settings,
                base::RepeatingClosure open_site,
                base::RepeatingClosure import_arc,
+               base::RepeatingClosure replay_tour,
                SettingsWindow::ArchiveTimer archive_timer,
                base::RepeatingClosure close)
       : close_(std::move(close)) {
@@ -1230,9 +1244,9 @@ class SettingsView : public views::View {
     profiles_ =
         AddChildView(std::make_unique<ProfilesPage>(std::move(archive_timer)));
     links_ = AddChildView(std::make_unique<LinksPage>(local_state));
-    advanced_ = AddChildView(
-        std::make_unique<AdvancedPage>(local_state, more_settings,
-                                       std::move(import_arc)));
+    advanced_ = AddChildView(std::make_unique<AdvancedPage>(
+        local_state, more_settings, std::move(import_arc),
+        std::move(replay_tour)));
     // The pages fill the whole view, so the tabs go above them or the shown
     // page takes their clicks.
     for (SectionTab* tab : tabs_) {
@@ -1339,11 +1353,13 @@ SettingsWindow::SettingsWindow(Profile* profile,
                                PrefService* local_state,
                                base::RepeatingClosure open_more_settings,
                                base::RepeatingClosure open_site,
+                               base::RepeatingClosure replay_tour,
                                ArchiveTimer archive_timer)
     : profile_(profile),
       local_state_(local_state),
       open_more_settings_(std::move(open_more_settings)),
       open_site_(std::move(open_site)),
+      replay_tour_(std::move(replay_tour)),
       archive_timer_(std::move(archive_timer)) {}
 
 SettingsWindow::~SettingsWindow() {
@@ -1391,6 +1407,8 @@ void SettingsWindow::Show(Section section, bool inactive) {
         base::BindRepeating(&SettingsWindow::OpenSite,
                             weak_factory_.GetWeakPtr()),
         base::BindRepeating(&SettingsWindow::ImportFromArc,
+                            weak_factory_.GetWeakPtr()),
+        base::BindRepeating(&SettingsWindow::ReplayTour,
                             weak_factory_.GetWeakPtr()),
         archive_timer_,
         base::BindRepeating(&SettingsWindow::Close,
@@ -1443,6 +1461,12 @@ void SettingsWindow::PressMoreSettingsForCapture() {
   }
 }
 
+void SettingsWindow::PressReplayForCapture() {
+  if (widget_) {
+    ReplayTour();
+  }
+}
+
 void SettingsWindow::Close() {
   // Callers may be inside the widget's own event dispatch; destroy it later.
   base::SingleThreadTaskRunner::GetCurrentDefault()->PostTask(
@@ -1466,6 +1490,13 @@ void SettingsWindow::OpenMoreSettings() {
 
 void SettingsWindow::OpenSite() {
   open_site_.Run();
+  Close();
+}
+
+void SettingsWindow::ReplayTour() {
+  // The welcome shows in the owning browser window, so Settings gets out of
+  // its way.
+  replay_tour_.Run();
   Close();
 }
 

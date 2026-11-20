@@ -47,9 +47,10 @@
 #   --myarc-capture-little-arc; LITTLE_ARC=move:<ms> instead presses Cmd+O in
 #   every open Little Arc <ms> after launch, moving its page into a Space.
 #   Pair it with SCRIPT to capture the Little Arc window by its title.
-#   SETTINGS=1 (or general/profiles/links/advanced/more) opens the native Settings window via
+#   SETTINGS=1 (or general/profiles/links/advanced/more/replay) opens the native Settings window via
 #   --myarc-capture-open-settings and captures only that window; "more" presses
-#   More Settings… and captures the browser window instead.
+#   More Settings… and "replay" presses Advanced > Replay welcome tour, and
+#   both capture the browser window instead.
 #   CONTROL=<dir> passes --myarc-enable-control and serves the control
 #   endpoint in <dir> (MYARC_CONTROL_DIR) for myarc. CONTROL_SWITCH=0 sets
 #   only the directory, so the Settings switch decides; test-hook builds then
@@ -149,6 +150,7 @@ if [ "${1:-}" = "--inner" ]; then
   case "${SETTINGS:-}" in
     "") ;;
     more) EXTRA+=(--myarc-capture-open-settings=more); KEY_SETTLE=$((KEY_SETTLE + 2)) ;;
+    replay) EXTRA+=(--myarc-capture-open-settings=replay); KEY_SETTLE=$((KEY_SETTLE + 4)) ;;
     profiles) EXTRA+=(--myarc-capture-open-settings=profiles); SHOT_TITLE=(Profiles) ;;
     links) EXTRA+=(--myarc-capture-open-settings=links); SHOT_TITLE=(Links) ;;
     advanced) EXTRA+=(--myarc-capture-open-settings=advanced); SHOT_TITLE=(Advanced) ;;

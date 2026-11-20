@@ -16,6 +16,7 @@
 #include "base/time/time.h"
 #include "chrome/browser/browser_process.h"
 #include "chrome/browser/profiles/profile.h"
+#include "chrome/browser/shell_integration.h"
 #include "components/prefs/pref_service.h"
 #include "myarc/arc_import.h"
 #include "myarc/onboarding_prefs.h"
@@ -79,6 +80,14 @@ constexpr char16_t kCreateTitle[] = u"Make a Space";
 constexpr char16_t kCreateBody[] =
     u"Give work, home or a project its own set of tabs.";
 constexpr char16_t kCreateButton[] = u"Create a Space";
+// The handoff: the tour is over.
+constexpr char16_t kHandoffTitle[] = u"You\u2019re ready";
+constexpr char16_t kHandoffBody[] =
+    u"That\u2019s the tour. You can replay it from Settings, under Advanced.";
+constexpr char16_t kHandoffDefault[] = u"Make myArc your default browser";
+constexpr char16_t kHandoffDone[] = u"Done";
+// The handoff card fades out slower than a card between steps.
+constexpr base::TimeDelta kHandoffFade = base::Milliseconds(180);
 // The panel's Create follows Create a Space this long later in test hooks.
 constexpr base::TimeDelta kTestCreateDelay = base::Milliseconds(1500);
 
@@ -262,16 +271,11 @@ void OnboardingController::Refresh() {
   }
   // Another window may have ended the tour.
   CloseWelcome();
-  if (state == "practice") {
+  if (state == "practice" || state == "handoff") {
     ShowCoach(*tour, base::TimeDelta());
     return;
   }
   CloseCoach();
-  // The handoff isn't built yet: the tour ends there, done and skipped
-  // steps kept.
-  if (state == "handoff") {
-    Run(FeedOnboardingEvent(*local_state, Event(EventKind::Finish)));
-  }
 }
 
 void OnboardingController::OnCommandBarOpenedPage() {
@@ -287,6 +291,31 @@ void OnboardingController::OnCommandBarOpenedPage() {
   event.step = 1;
   by_back_ = false;
   Run(FeedOnboardingEvent(*local_state, event));
+}
+
+void OnboardingController::Replay() {
+  PrefService* local_state = LocalState();
+  if (!local_state || importing_ || recolouring_ || report_open_) {
+    return;
+  }
+  // The tour may show in another window: this one takes it over.
+  if (g_coach_window && g_coach_window != this) {
+    g_coach_window->CloseCoach(/*fade=*/false);
+  }
+  if (g_welcome_window && g_welcome_window != this) {
+    g_welcome_window->CloseWelcome();
+  }
+  CloseWelcome();
+  CloseCoach(/*fade=*/false);
+  by_back_ = false;
+  Run(FeedOnboardingEvent(*local_state, Event(EventKind::Replay)));
+}
+
+// static
+void OnboardingController::ReplayRecord() {
+  if (PrefService* local_state = LocalState()) {
+    FeedOnboardingEvent(*local_state, Event(EventKind::Replay));
+  }
 }
 
 void OnboardingController::OnViewBoundsChanged(views::View* observed_view) {
@@ -571,22 +600,16 @@ void OnboardingController::Run(
     return;
   }
   CloseWelcome();
-  if (state == "practice") {
+  if (state == "practice" || state == "handoff") {
     // The first card waits for the reveal's rows to land; the others come
     // in as the last one fades out.
-    ShowCoach(transition.tour, transition.animate && transition.tour.step == 1
+    ShowCoach(transition.tour, transition.animate && state == "practice" &&
+                                       transition.tour.step == 1
                                    ? kCoachDelay
                                    : base::TimeDelta());
     return;
   }
   CloseCoach();
-  // The handoff isn't built yet: the tour ends there. Done and skipped
-  // steps and the import receipt stay in the record.
-  if (state == "handoff") {
-    if (PrefService* local_state = LocalState()) {
-      Run(FeedOnboardingEvent(*local_state, Event(EventKind::Finish)));
-    }
-  }
 }
 
 void OnboardingController::ShowCoach(const foundation::OnboardingTour& tour,
@@ -631,9 +654,10 @@ void OnboardingController::OpenCoach() {
   if (!host_ || coach_ || coach_state_.empty()) {
     return;
   }
-  const Card card = coach_state_ == "reveal" ? Card::kReveal
-                    : coach_step_ == 1       ? Card::kCommandBar
-                                             : PracticeCard(/*starting=*/true);
+  const Card card = coach_state_ == "reveal"    ? Card::kReveal
+                    : coach_state_ == "handoff" ? Card::kHandoff
+                    : coach_step_ == 1 ? Card::kCommandBar
+                                       : PracticeCard(/*starting=*/true);
   if (card == Card::kNone) {
     return;
   }
@@ -683,6 +707,18 @@ void OnboardingController::AddCard(Card card) {
       content.offers_next = true;
       content.next_label = kCreateButton;
       break;
+    case Card::kHandoff:
+      content.title = kHandoffTitle;
+      content.body = kHandoffBody;
+      content.offers_skip = false;
+      content.offers_next = true;
+      content.next_label = kHandoffDone;
+      content.extra_label = kHandoffDefault;
+      // The card never takes focus, so the row keeps it.
+      if (window_.focus_current_row) {
+        window_.focus_current_row.Run();
+      }
+      break;
   }
   coach_ = host_->AddChildView(std::make_unique<CoachMark>(
       content,
@@ -698,6 +734,19 @@ void OnboardingController::AddCard(Card card) {
           weak_factory_.GetWeakPtr())));
   PlaceCoach();
   coach_->Show();
+  if (card == Card::kHandoff) {
+    // Only reads the default; asking to change it waits for a press.
+    base::MakeRefCounted<shell_integration::DefaultBrowserWorker>()
+        ->StartCheckIsDefault(base::BindOnce(
+            [](base::WeakPtr<OnboardingController> controller,
+               shell_integration::DefaultWebClientState state) {
+              if (controller) {
+                controller->OnDefaultState(state ==
+                                           shell_integration::IS_DEFAULT);
+              }
+            },
+            weak_factory_.GetWeakPtr()));
+  }
 #if BUILDFLAG(MYARC_TEST_HOOKS)
   if (base::CommandLine::ForCurrentProcess()->HasSwitch(kMyarcTestOnboarding)) {
     LOG(WARNING) << "Test onboarding: coach mark state=" << coach_state_
@@ -872,6 +921,8 @@ void OnboardingController::CloseCoach(bool fade) {
 }
 
 void OnboardingController::RetireCard(bool fade) {
+  const base::TimeDelta duration =
+      card_ == Card::kHandoff ? kHandoffFade : base::Milliseconds(120);
   card_ = Card::kNone;
   if (!coach_ || !host_) {
     coach_ = nullptr;
@@ -884,14 +935,17 @@ void OnboardingController::RetireCard(bool fade) {
   // One card leaves at a time; an older one still fading goes at once.
   RemoveLeavingCoach();
   leaving_coach_ = std::exchange(coach_, nullptr);
-  leaving_coach_->FadeOut(base::BindOnce(
-      [](base::WeakPtr<OnboardingController> controller) {
-        // Posted: the fade's end runs inside the card's layer animation.
-        base::SingleThreadTaskRunner::GetCurrentDefault()->PostTask(
-            FROM_HERE, base::BindOnce(&OnboardingController::RemoveLeavingCoach,
-                                      controller));
-      },
-      weak_factory_.GetWeakPtr()));
+  leaving_coach_->FadeOut(
+      base::BindOnce(
+          [](base::WeakPtr<OnboardingController> controller) {
+            // Posted: the fade's end runs inside the card's layer animation.
+            base::SingleThreadTaskRunner::GetCurrentDefault()->PostTask(
+                FROM_HERE,
+                base::BindOnce(&OnboardingController::RemoveLeavingCoach,
+                               controller));
+          },
+          weak_factory_.GetWeakPtr()),
+      duration);
 }
 
 void OnboardingController::RemoveLeavingCoach() {
@@ -908,10 +962,16 @@ void OnboardingController::PlaceCoach() {
   const gfx::Rect bounds =
       views::View::ConvertRectToTarget(area_->parent(), host_, area_->bounds());
   Target target = Target::kAddress;
+  uint64_t item = pin_item_;
   switch (card_) {
     case Card::kPin:
     case Card::kPinned:
       target = Target::kItem;
+      break;
+    case Card::kHandoff:
+      // Beside the current row, which has focus.
+      target = Target::kItem;
+      item = window_.model ? window_.model.Run().selected_item_id : 0;
       break;
     case Card::kSwitch:
       target = Target::kSpaces;
@@ -922,8 +982,7 @@ void OnboardingController::PlaceCoach() {
     default:
       break;
   }
-  const gfx::Rect anchor =
-      anchor_ ? anchor_.Run(target, pin_item_) : gfx::Rect();
+  const gfx::Rect anchor = anchor_ ? anchor_.Run(target, item) : gfx::Rect();
   // A row mid-rebuild has no bounds yet: the card stays where it was.
   if (anchor.IsEmpty() && target != Target::kAddress &&
       !coach_->bounds().IsEmpty()) {
@@ -937,7 +996,35 @@ void OnboardingController::OnCoachAction(CoachMark::Action action) {
   if (!local_state || !coach_) {
     return;
   }
+  if (card_ == Card::kHandoff) {
+    switch (action) {
+      case CoachMark::Action::kExtra:
+        // Chromium's own request, as Settings > General makes it. The card
+        // stays for Done.
+        coach_->Rearm();
+        base::MakeRefCounted<shell_integration::DefaultBrowserWorker>()
+            ->StartSetAsDefault(base::BindOnce(
+                [](base::WeakPtr<OnboardingController> controller,
+                   shell_integration::DefaultWebClientState state) {
+                  if (controller) {
+                    controller->OnDefaultState(state ==
+                                               shell_integration::IS_DEFAULT);
+                  }
+                },
+                weak_factory_.GetWeakPtr()));
+        return;
+      case CoachMark::Action::kBack:
+        break;
+      case CoachMark::Action::kNext:
+      case CoachMark::Action::kSkipTour:
+        // Done, or Esc.
+        FinishHandoff();
+        return;
+    }
+  }
   switch (action) {
+    case CoachMark::Action::kExtra:
+      break;
     case CoachMark::Action::kBack:
       by_back_ = true;
       Run(FeedOnboardingEvent(*local_state, Event(EventKind::Back)));
@@ -963,6 +1050,34 @@ void OnboardingController::OnCoachAction(CoachMark::Action action) {
     case CoachMark::Action::kSkipTour:
       Run(FeedOnboardingEvent(*local_state, Event(EventKind::SkipTour)));
       break;
+  }
+}
+
+void OnboardingController::FinishHandoff() {
+  PrefService* local_state = LocalState();
+  if (!local_state) {
+    return;
+  }
+  // Finish keeps the steps done and skipped; the card fades as it closes.
+  Run(FeedOnboardingEvent(*local_state, Event(EventKind::Finish)));
+  [[maybe_unused]] const bool focused =
+      window_.focus_current_row && window_.focus_current_row.Run();
+#if BUILDFLAG(MYARC_TEST_HOOKS)
+  if (base::CommandLine::ForCurrentProcess()->HasSwitch(kMyarcTestOnboarding)) {
+    LOG(WARNING) << "Test onboarding: handoff done, row focused=" << focused;
+  }
+#endif  // BUILDFLAG(MYARC_TEST_HOOKS)
+}
+
+void OnboardingController::OnDefaultState(bool is_default) {
+#if BUILDFLAG(MYARC_TEST_HOOKS)
+  if (base::CommandLine::ForCurrentProcess()->HasSwitch(kMyarcTestOnboarding)) {
+    LOG(WARNING) << "Test onboarding: handoff default=" << is_default;
+  }
+#endif  // BUILDFLAG(MYARC_TEST_HOOKS)
+  if (is_default && coach_ && card_ == Card::kHandoff) {
+    coach_->HideExtra();
+    PlaceCoach();
   }
 }
 
@@ -1014,6 +1129,7 @@ void OnboardingController::ActForTest() {
       break;
     case Card::kReveal:
     case Card::kPinned:
+    case Card::kHandoff:
       coach_->Press(CoachMark::Action::kNext);
       break;
     default:
