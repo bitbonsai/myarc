@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-11-20: Sparkle shows the nightly label, and Check for Updates… moves under About
+
+- The updater delegate is now also Sparkle's user driver delegate and version displayer, so "You're up to date!" and the update offer name the bundle by `MyarcVersion` instead of Chromium's `CFBundleShortVersionString`. That key stays Chromium's, since web app shims fall back to it to find the framework's version folder and crash reports read the framework's copy. Check for Updates… now sits right under About myArc (Chromium commit "Put Check for Updates… right under About myArc").
+- Evidence: a background run of a `tools/package_nightly.sh` copy labeled 2026.11.20.9 checked an empty local appcast and logged "none", and System Events read the app menu as the label, About myArc, Check for Updates…, then Settings…. Sparkle 2.10.1's `SPUStandardUserDriver` builds the up-to-date text through `standardUserDriverRequestsVersionDisplayer`.
+- Limits: the dialog itself wasn't opened, since it takes focus. Its grey icon is the system's Clear icon style (`AppleIconAppearanceTheme` is `ClearLight`), not a wrong icon.
+
 ## 2026-11-20: Nightly 2026.11.20.3
 
 - Published the prerelease `nightly-2026.11.20.3` from `main` `f5cad26` and Chromium `3b56b24cc7`, the first nightly with Sparkle 2.10.1: in-app updates and Check for Updates…, the crash report card, Settings > Profiles, Arc sidebar-file import, Option-Cmd-O in Little Arc, the quick start page and the private window check. `site/release.json` carries its `ed_signature`, so `/appcast.xml` lists it.

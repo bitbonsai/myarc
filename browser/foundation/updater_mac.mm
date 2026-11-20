@@ -3,6 +3,7 @@
 #import <Cocoa/Cocoa.h>
 
 #include "base/apple/bundle_locations.h"
+#include "base/apple/foundation_util.h"
 #include "base/command_line.h"
 #include "base/logging.h"
 #include "base/strings/sys_string_conversions.h"
@@ -23,8 +24,15 @@
 - (void)checkForUpdates:(id)sender;
 @end
 
+@protocol MyarcSparkleAppcastItem <NSObject>
+@property(nonatomic, readonly) NSString* displayVersionString;
+@end
+
 // Sparkle's SPUUpdaterDelegate. The feed comes from Info.plist's SUFeedURL
-// unless a test hook set `feedURL`.
+// unless a test hook set `feedURL`. It is also the SPUStandardUserDriverDelegate
+// and SUVersionDisplay, so Sparkle's dialogs show the nightly label
+// (Info.plist `MyarcVersion`) instead of CFBundleShortVersionString, which
+// stays Chromium's version.
 @interface MyarcUpdaterDelegate : NSObject
 @property(nonatomic, copy) NSString* feedURL;
 @end
@@ -35,6 +43,31 @@
 
 - (NSString*)feedURLStringForUpdater:(id)updater {
   return _feedURL;
+}
+
+- (id)standardUserDriverRequestsVersionDisplayer {
+  return self;
+}
+
+- (NSString*)myarcVersionOr:(NSString*)fallback {
+  NSString* version = base::apple::ObjCCast<NSString>(
+      [base::apple::OuterBundle() objectForInfoDictionaryKey:@"MyarcVersion"]);
+  return version.length ? version : fallback;
+}
+
+- (NSString*)formatUpdateDisplayVersionFromUpdate:
+                 (id<MyarcSparkleAppcastItem>)update
+                          andBundleDisplayVersion:
+                              (NSString* __autoreleasing*)inOutBundleVersion
+                                withBundleVersion:(NSString*)bundleVersion {
+  *inOutBundleVersion = [self myarcVersionOr:*inOutBundleVersion];
+  return update.displayVersionString;
+}
+
+- (NSString*)formatBundleDisplayVersion:(NSString*)bundleDisplayVersion
+                      withBundleVersion:(NSString*)bundleVersion
+                         matchingUpdate:(id)matchingUpdate {
+  return [self myarcVersionOr:bundleDisplayVersion];
 }
 
 #if BUILDFLAG(MYARC_TEST_HOOKS)
@@ -143,7 +176,7 @@ id<MyarcSparkleController> StartUpdater() {
       [(id<MyarcSparkleController>)[controller_class alloc]
           initWithStartingUpdater:YES
                   updaterDelegate:g_delegate
-               userDriverDelegate:nil];
+               userDriverDelegate:g_delegate];
 #if BUILDFLAG(MYARC_TEST_HOOKS)
   if (feed) {
     [controller.updater checkForUpdatesInBackground];
