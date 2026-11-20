@@ -66,7 +66,9 @@ class RevealFrames;
 // crossfade, so a capture can kill the browser there.
 // --myarc-test-onboarding-show-delay=<ms> holds the welcome back that long,
 // --myarc-test-reduce-motion plays it as Reduce Motion does and
-// --myarc-test-mute-sound keeps it silent. With
+// --myarc-test-mute-sound keeps it silent.
+// --myarc-test-replay-intro=<ms> runs PlayIntro() that long after the window
+// opens. With
 // --myarc-test-onboarding, the reveal logs its length and frame gaps.
 class OnboardingController final : public views::ViewObserver {
  public:
@@ -124,6 +126,12 @@ class OnboardingController final : public views::ViewObserver {
   // Replay for a window with no tour, such as Incognito: only resets the
   // record, so the next regular window shows the welcome.
   static void ReplayRecord();
+
+  // Ctrl+Option+Cmd+A, a hidden extra: plays the welcome's whole arrival
+  // again in this window, sound included, without touching the tour record.
+  // Esc, any click or any of its buttons closes it and the dim lifts. Only
+  // when no part of the tour is showing.
+  void PlayIntro();
 
   // views::ViewObserver:
   void OnViewBoundsChanged(views::View* observed_view) override;
@@ -185,6 +193,9 @@ class OnboardingController final : public views::ViewObserver {
   // Runs the effect of a saved transition.
   void Run(const foundation::OnboardingTransition& transition);
   void PressForTest();
+  // Ends PlayIntro()'s welcome: the dim and the sound fade out at once and
+  // the screen fades before the view goes.
+  void EndShowcase();
   void PressCoachForTest();
   void ActForTest();
 
@@ -226,6 +237,8 @@ class OnboardingController final : public views::ViewObserver {
   base::OneShotTimer coach_timer_;
   // Replay is showing the welcome: the window keeps its size and display.
   bool replaying_ = false;
+  // The welcome shows only for PlayIntro(), so its buttons change nothing.
+  bool showcase_ = false;
   bool importing_ = false;
   // The welcome crossfades to the imported theme; the reveal follows.
   bool recolouring_ = false;

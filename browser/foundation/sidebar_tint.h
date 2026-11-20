@@ -34,8 +34,13 @@ struct SidebarTint {
 // Without a theme, fixed stops per appearance, a neutral graphite in dark
 // mode. A theme shades its colour toward black in dark mode and toward white
 // in light mode, so the sidebar's labels stay readable, and scales the stops'
-// alpha by its opacity.
-SidebarTint GetSidebarTint(bool dark, const std::optional<SpaceTheme>& theme);
+// alpha by its opacity. Over the window's glass the tint is translucent, at
+// most about two thirds, so the blurred desktop shows through as in Arc.
+// `solid` keeps the near-opaque fill, for Reduce Transparency and for
+// surfaces with no glass behind them.
+SidebarTint GetSidebarTint(bool dark,
+                           const std::optional<SpaceTheme>& theme,
+                           bool solid = false);
 
 // Arc paints its peeked sidebar opaque in the Space colour. This is the tint
 // where the sidebar sits, over the frame colour standing in for the material.

@@ -1,0 +1,375 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>myArc ribbon, 3D prototype</title>
+<style>
+  :root { --page: #f5f2ec; --text: #182432; --quiet: #54616d }
+  @media (prefers-color-scheme: dark) { :root { --page: #0b1420; --text: #f5f2ec; --quiet: #b1bcc9 } }
+  * { box-sizing: border-box }
+  html, body { margin: 0; overflow-x: clip }
+  body { background: var(--page); color: var(--text); font: 1rem/1.5 system-ui, sans-serif }
+  .hero { display: grid; grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); align-items: center; gap: 2rem 3rem; max-width: 80rem; min-height: 100vh; margin: 0 auto; padding: 4rem 3rem }
+  h1 { margin: 0; font-size: 5.5rem; font-weight: 600; letter-spacing: -.045em; line-height: .98 }
+  p { max-width: 34rem; margin: 1.75rem 0 0; font-size: 1.375rem; line-height: 1.45; color: var(--quiet) }
+  .hero-art { position: relative; justify-self: end; width: 100%; max-width: 34rem; aspect-ratio: 1; pointer-events: none }
+  .hero-art canvas { position: absolute; top: -25%; left: -25%; width: 150%; height: 150% }
+  @media (max-width: 48rem) { .hero { grid-template-columns: 1fr } h1 { font-size: 3.75rem } }
+</style>
+<main class="hero">
+  <div>
+    <h1>myArc,<br>forever yours.</h1>
+    <p>Wait for a showpiece, or click the mark to play one.</p>
+  </div>
+  <div class="hero-art"><canvas role="img" aria-label="myArc ribbon logo, a looping A in blue, violet, pink and coral"></canvas></div>
+</main>
+<script>
+// myArc ribbon, drawn in WebGL2 with no dependencies.
+// mountRibbon(canvas) returns { sheen, play, destroy }, or null when WebGL2 is missing.
+const mountRibbon = (canvas) => {
+  const gl = canvas.getContext('webgl2', { alpha: true, antialias: true, premultipliedAlpha: true })
+  if (!gl) return null
+
+  const still = matchMedia('(prefers-reduced-motion: reduce)').matches
+  const DIST = 6.2
+  const F = 1 / Math.tan((30 * Math.PI) / 360)
+
+  // ---- geometry -------------------------------------------------------
+  const sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]]
+  const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
+  const cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]]
+  const norm = (a) => { const l = Math.hypot(a[0], a[1], a[2]) || 1; return [a[0] / l, a[1] / l, a[2] / l] }
+  const mad = (a, b, s) => [a[0] + b[0] * s, a[1] + b[1] * s, a[2] + b[2] * s]
+
+  // Sweeps an ellipse (half-sizes a across, b along "up") down a path. Open paths get round caps.
+  // Optional: per-point scale [across, along], and "face", an axis the wide side turns toward like a flat stroke.
+  const tube = (pts, up, a, b, closed, scale, face) => {
+    const SEG = 36, CAP = 10, n = pts.length, rings = []
+    const frame = (i) => {
+      const p0 = pts[closed ? (i - 1 + n) % n : Math.max(i - 1, 0)]
+      const p1 = pts[closed ? (i + 1) % n : Math.min(i + 1, n - 1)]
+      const T = norm(sub(p1, p0))
+      const B = face ? norm(cross(T, face)) : norm(mad(up, T, -dot(up, T)))
+      const [sa, sb] = scale ? scale[i] : [1, 1]
+      return { T, B, N: cross(B, T), ra: a * sa, rb: b * sb }
+    }
+    const cap = (i, sign) => {
+      const f = frame(i), out = []
+      for (let k = 1; k <= CAP; k++) {
+        const al = (k / CAP) * Math.PI / 2
+        out.push({ ...f, c: mad(pts[i], f.T, sign * f.ra * Math.sin(al)), s: Math.cos(al), nt: sign * Math.sin(al) })
+      }
+      return out
+    }
+    if (!closed) rings.push(...cap(0, -1).reverse())
+    const last = closed ? n : n - 1
+    for (let i = 0; i <= last; i++) rings.push({ ...frame(i % n), c: pts[i % n], s: 1, nt: 0 })
+    if (!closed) rings.push(...cap(n - 1, 1))
+
+    const data = [], index = [], R = rings.length
+    rings.forEach((r, i) => {
+      for (let j = 0; j <= SEG; j++) {
+        const ph = (j / SEG) * Math.PI * 2, cs = Math.cos(ph), sn = Math.sin(ph)
+        const off = mad(mad([0, 0, 0], r.N, r.ra * cs * r.s), r.B, r.rb * sn * r.s)
+        const rad = norm(mad(mad([0, 0, 0], r.N, r.rb * cs), r.B, r.ra * sn))
+        const nr = norm(mad(mad([0, 0, 0], rad, Math.sqrt(1 - r.nt * r.nt)), r.T, r.nt))
+        data.push(...r.c, ...off, ...nr, i / (R - 1))
+      }
+    })
+    for (let i = 0; i < R - 1; i++) for (let j = 0; j < SEG; j++) {
+      const p = i * (SEG + 1) + j, q = p + SEG + 1
+      index.push(p, p + 1, q, q, p + 1, q + 1)
+    }
+    return { data: new Float32Array(data), index: new Uint16Array(index) }
+  }
+
+  // The A: one tube, two straight legs tangent to a circular apex.
+  const archPath = () => {
+    const LEAN = 0.43, R = 0.36, cy = 0.46, pts = []
+    const tx = -R * Math.cos(LEAN), ty = cy + R * Math.sin(LEAN)
+    const foot = [tx - (ty + 0.82) * Math.tan(LEAN), -0.82, 0]
+    for (let i = 0; i < 48; i++) pts.push(mad(foot, sub([tx, ty, 0], foot), i / 48))
+    for (let i = 0; i <= 28; i++) {
+      const al = Math.PI - LEAN - (i / 28) * (Math.PI - 2 * LEAN)
+      pts.push([R * Math.cos(al), cy + R * Math.sin(al), 0])
+    }
+    for (let i = 1; i <= 48; i++) pts.push(mad([-tx, ty, 0], sub([-foot[0], -0.82, 0], [-tx, ty, 0]), i / 48))
+    return pts
+  }
+
+  // The loop: a flat ribbon in a figure of eight. Its front runs from high on the left to low on the right
+  // and its back does the opposite. Both curls wrap a leg, so the back strand runs behind the whole A.
+  const TILT = 0.1
+  const tilt = (p) => [p[0], p[1] * Math.cos(TILT) - p[2] * Math.sin(TILT) - 0.14, p[1] * Math.sin(TILT) + p[2] * Math.cos(TILT)]
+  const loopPath = () => {
+    const pts = [], scale = []
+    for (let i = 0; i < 200; i++) {
+      const th = -Math.PI * 0.735 + (i / 200) * Math.PI * 2 // starts behind the left leg, so the seam and the growing tip stay hidden
+      const right = 0.5 + 0.5 * Math.cos(th), left = 1 - right // 1 at that turn, 0 at the other
+      const d = Math.atan2(Math.sin(th - Math.PI), Math.cos(th - Math.PI)) // angle from the left turn
+      pts.push(tilt([
+        1.03 * Math.cos(th) + 0.16 * right * right - 0.17 * left * left - 0.02,
+        -(0.36 - 0.12 * right) * Math.sin(2 * th),
+        0.85 * Math.sin(th),
+      ]))
+      // Broad on the left, slim on the right, and pinched where the left curl squeezes past the leg.
+      scale.push([1, (1 - 0.5 * right) * (1 - 0.35 * Math.exp(-d * d / 0.25))])
+    }
+    return { pts, scale }
+  }
+
+  // ---- shaders --------------------------------------------------------
+  const VS = '#version 300 es\n' + [
+    'in vec3 aCenter, aOffset, aNormal; in float aU;',
+    'uniform mat3 uRot, uLocal; uniform float uScale, uGrow, uAsp, uSeam; uniform vec2 uShift, uStretch;',
+    'out vec3 vN, vP, vO; out float vU;',
+    'void main() {',
+    '  float s = clamp((uGrow * 1.1 - aU) / .1, 0., 1.);',
+    '  s = sqrt(1. - (1. - s) * (1. - s));',
+    // A closed loop has no cap where it starts. Until it closes, round that end off so no cut edge shows.
+    '  float e = 1. - clamp(aU / .025, 0., 1.);',
+    '  s *= mix(sqrt(1. - e * e), 1., max(1. - uSeam, smoothstep(.97, 1., uGrow)));',
+    '  vO = aCenter + aOffset * s;',
+    '  vP = uRot * ((uLocal * vO) * uStretch.xyx) * uScale + vec3(uShift, 0.);',
+    '  vN = uRot * (uLocal * aNormal); vU = aU;',
+    '  float f = ' + F.toFixed(5) + ', d = ' + DIST.toFixed(2) + ' - vP.z;',
+    '  gl_Position = vec4(vP.x * f / uAsp, vP.y * f, (d - 3.) / 6. * d, d);',
+    '}'].join('\n')
+
+  const FS = '#version 300 es\nprecision highp float;\n' + [
+    'in vec3 vN, vP, vO; in float vU;',
+    'uniform vec3 uPal[8]; uniform float uUseU, uAlpha, uSheen, uTime;',
+    'out vec4 o;',
+    'vec3 pal(float t) {',
+    '  t = clamp(t, 0., 1.) * 7.; int i = int(min(floor(t), 6.));',
+    '  return mix(uPal[i], uPal[i + 1], smoothstep(0., 1., t - float(i)));',
+    '}',
+    'vec3 spectrum(float t) { return .5 + .5 * cos(6.2832 * (t + vec3(0., .33, .67))); }',
+    'void main() {',
+    '  vec3 n = normalize(vN), v = normalize(vec3(0., 0., ' + DIST.toFixed(2) + ') - vP);',
+    '  vec3 L = normalize(vec3(-.5, .75, .7));',
+    '  vec3 base = pal(mix(vO.x / 2.5 + .5 + vO.y * .06, vU, uUseU));',
+    // Painted detail from the flat artwork, drawn on the simple shapes.
+    '  if (uUseU > .5) {',
+    // A: the apex reads as a cap folded over the left leg. The fold line is an arc from the left leg's outer edge to the top of the opening.
+    '    float fd = length(vO.xy - vec2(-.2785, .1884)), fr0 = .4924;',
+    '    float cap = smoothstep(fr0 - .006, fr0 + .006, fd) * max(smoothstep(.29, .32, vO.y), step(.5, vU));',
+    '    vec3 capc = mix(vec3(1., .64, .48), vec3(1., .25, .42), smoothstep(-.55, .2, vO.x));',
+    '    float under = (1. - cap) * smoothstep(.24, .3, vU) * (1. - smoothstep(.5, .56, vU)) * exp(-max(fr0 - fd, 0.) / .1);',
+    '    base = mix(base, mix(capc, base, smoothstep(.5, .64, vU)), cap);',
+    '    base = mix(base, vec3(.62, .16, .62), under * .5);',
+    '  } else {',
+    // Loop: the same trick on the left curl. Below an arc the curl shows its darker inner face, as if the near strand folded over it.
+    '    float ld = length(vO.xy - vec2(-1.141, -.888)), lr = .784;',
+    '    float inner = (1. - smoothstep(lr - .006, lr + .006, ld)) * (1. - smoothstep(-.74, -.54, vO.x));',
+    '    base = mix(base, vec3(.04, .12, .9), inner * .75 * exp(-max(lr - ld, 0.) / .11));', // a shadow that fades out, so no flat patch
+    '  }',
+    '  float nv = max(dot(n, v), 0.), d = dot(n, L) * .5 + .5;',
+    '  float fr = pow(1. - nv, 2.2);',
+    // matte body: wrapped light, a darker saturated underside, a pastel rim
+    '  vec3 col = base * (.56 + .58 * d * d);',
+    '  col = mix(col, base * base * 1.1, (1. - d) * .35);',
+    '  col = mix(col, mix(base, vec3(1.), .7), fr * .6);',
+    '  col += pow(max(dot(n, normalize(L + v)), 0.), 28.) * .16;',
+    // spectral sheen: a diagonal band of thin-film colour that crosses the mark
+    '  float band = vP.x * .8 + vP.y * .6;',
+    '  float w = exp(-pow((band - uSheen) / .3, 2.));',
+    '  vec3 iri = spectrum(band * .9 + nv * 1.4 + uTime * .07);',
+    '  col += iri * w * (.3 + 1.1 * fr) + w * pow(nv, 6.) * .12;',
+    '  o = vec4(col * uAlpha, uAlpha);',
+    '}'].join('\n')
+
+  const program = (vs, fs) => {
+    const p = gl.createProgram()
+    for (const [type, src] of [[gl.VERTEX_SHADER, vs], [gl.FRAGMENT_SHADER, fs]]) {
+      const s = gl.createShader(type)
+      gl.shaderSource(s, src); gl.compileShader(s)
+      if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s))
+      gl.attachShader(p, s)
+    }
+    gl.linkProgram(p)
+    if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(p))
+    return p
+  }
+  const prog = program(VS, FS)
+  const U = (p, name) => gl.getUniformLocation(p, name)
+
+  const mesh = ({ data, index }, pal, useU, alpha) => {
+    const vao = gl.createVertexArray()
+    gl.bindVertexArray(vao)
+    gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer())
+    gl.bufferData(gl.ARRAY_BUFFER, data, gl.STATIC_DRAW)
+    ;[['aCenter', 3, 0], ['aOffset', 3, 12], ['aNormal', 3, 24], ['aU', 1, 36]].forEach(([name, size, at]) => {
+      const loc = gl.getAttribLocation(prog, name)
+      gl.enableVertexAttribArray(loc)
+      gl.vertexAttribPointer(loc, size, gl.FLOAT, false, 40, at)
+    })
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, gl.createBuffer())
+    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, index, gl.STATIC_DRAW)
+    return { vao, count: index.length, pal: new Float32Array(pal.flat()), useU, alpha, grow: 0, local: [1, 0, 0, 0, 1, 0, 0, 0, 1] }
+  }
+  const lp = loopPath()
+  const arch = mesh(tube(archPath(), [0, 0, 1], 0.27, 0.19, false),
+    [[.58, .30, 1], [.31, .23, .97], [.45, .29, .96], [.81, .40, .89], [.97, .32, .51], [1, .25, .42], [1, .30, .39], [1, .50, .36]], 1, 1)
+  const loop = mesh(tube(lp.pts, [0, 1, 0], 0.07, 0.27, true, lp.scale, [0, 0, 1]),
+    [[.05, .68, 1], [.10, .52, 1], [.20, .40, 1], [.50, .44, 1], [.80, .40, .95], [.95, .36, .82], [1, .58, .60], [1, .80, .70]], 0, 0.84)
+
+  // ---- motion ---------------------------------------------------------
+  const spring = (x, k, c) => ({ x, v: 0, to: x, k, c })
+  const step = (s, dt) => { s.v += (s.k * (s.to - s.x) - s.c * s.v) * dt; s.x += s.v * dt }
+  const rotX = spring(0, 70, 6.5), rotY = spring(0, 70, 6.5)
+  const scale = spring(1, 120, 9), shiftX = spring(0, 50, 9), shiftY = spring(0, 50, 9), stretch = spring(1, 170, 9)
+  const ease = (t) => { t = Math.min(Math.max(t, 0), 1); return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2 }
+
+  let spin = 0, nod = 0, hop = 0, roll = 0, grown = 1, sheenAt = -10, nextSheen = 2.5, time = 0, last = 0, raf = 0, visible = true, mouse = [0, 0], seen = false
+  const sheen = (kick = 0) => { sheenAt = time; nextSheen = time + 7 + Math.random() * 5; scale.v += kick }
+
+  // Showpieces. One plays every so often, and on a click.
+  //   spin       a full turn with an overshoot
+  //   halo       the loop puffs out, orbits the A once and snaps back
+  //   hop        squash, jump with a flip, bouncy landing
+  //   redraw     the loop unwinds and draws itself back
+  //   swing      a pendulum wobble that dies down
+  //   rebuild    the whole mark undraws, then redraws through a full turn
+  //   heartbeat  two quick pulses
+  const ACTS = ['spin', 'halo', 'hop', 'redraw', 'swing', 'rebuild', 'heartbeat']
+  // 3x3 matrices, column-major.
+  const mul = (a, b) => [0, 1, 2].flatMap((c) => [0, 1, 2].map((r) => a[r] * b[c * 3] + a[3 + r] * b[c * 3 + 1] + a[6 + r] * b[c * 3 + 2]))
+  const turnX = (a) => [1, 0, 0, 0, Math.cos(a), Math.sin(a), 0, -Math.sin(a), Math.cos(a)]
+  const turnY = (a) => [Math.cos(a), 0, -Math.sin(a), 0, 1, 0, Math.sin(a), 0, Math.cos(a)]
+  const turnZ = (a) => [Math.cos(a), Math.sin(a), 0, -Math.sin(a), Math.cos(a), 0, 0, 0, 1]
+  let act = null, actN = 0, nextAct = 6.5
+  const play = (kind) => { act = { kind: kind || ACTS[actN++ % ACTS.length], t0: time, lit: false, landed: false }; nextAct = time + 9 + Math.random() * 5 }
+  const back = (k) => 1 + 2.70158 * Math.pow(k - 1, 3) + 1.70158 * Math.pow(k - 1, 2) // ease out with an overshoot
+
+  const onMove = (e) => {
+    const r = canvas.getBoundingClientRect()
+    mouse = [(e.clientX - (r.left + r.width / 2)) / (innerWidth / 2), (e.clientY - (r.top + r.height / 2)) / (innerHeight / 2)]
+      .map((m) => Math.min(Math.max(m, -1), 1))
+    seen = true
+  }
+  const onDown = (e) => {
+    const r = canvas.getBoundingClientRect()
+    const dx = e.clientX - (r.left + r.width / 2), dy = e.clientY - (r.top + r.height / 2)
+    if (Math.hypot(dx, dy) > r.width * 0.3) return
+    if (time > 2.8 && !act) play()
+  }
+
+  const resize = () => {
+    const dpr = Math.min(devicePixelRatio || 1, 2)
+    const w = Math.round(canvas.clientWidth * dpr), h = Math.round(canvas.clientHeight * dpr)
+    if (w && h && (canvas.width !== w || canvas.height !== h)) { canvas.width = w; canvas.height = h }
+  }
+
+  const draw = (now) => {
+    raf = still ? 0 : requestAnimationFrame(draw)
+    if (!visible && !still) { last = 0; return }
+    const dt = last ? Math.min((now - last) / 1000, 1 / 30) : 1 / 60
+    last = now; time += dt
+    resize()
+
+    if (still) { arch.grow = loop.grow = 1 } else {
+      arch.grow = ease((time - 0.15) / 1.15)
+      loop.grow = ease((time - 0.95) / 1.25)
+      // At rest the mark faces front, where the painted detail reads best. The pointer only nudges it.
+      // The entrance turn and the idle sway are one continuous curve: the turn eases out over the whole
+      // draw-in while the sway and pointer nudge fade in underneath, so nothing stops or snaps.
+      const formed = time > 2.6, live = ease((time - 1.2) / 2.2)
+      const k = Math.min(time / 1.5, 1), intro = Math.pow(1 - k, 3) // facing front before the loop starts, so its seam stays behind the leg
+      rotY.to = live * (mouse[0] * 0.12 + Math.sin(time * 0.5) * 0.06)
+      rotX.to = live * (mouse[1] * 0.08 + Math.sin(time * 0.8) * 0.03)
+      shiftX.to = live * mouse[0] * 0.04
+      shiftY.to = live * (-mouse[1] * 0.03 + Math.sin(time * 1.1) * 0.03)
+      scale.to = 1; stretch.to = 1; spin = -1.5 * intro; nod = 0.5 * intro; hop = 0; roll = 0; grown = 1 - 0.28 * intro
+      loop.local = turnY(0)
+      if (formed && !act && time > nextAct) play()
+      if (act) {
+        const t = time - act.t0
+        let lightAt = 0, end = 0
+        if (act.kind === 'spin') {
+          const k = Math.min(t / 1.5, 1)
+          spin = Math.PI * 2 * back(k); nod = 0.3 * Math.sin(Math.PI * k); lightAt = 0.85; end = 1.6
+        } else if (act.kind === 'redraw') {
+          loop.grow = t < 0.7 ? 1 - ease(t / 0.7) : ease((t - 0.85) / 1.15)
+          spin = 0.45 * Math.sin(Math.PI * Math.min(t / 2, 1)); lightAt = 1.85; end = 2.1
+        } else if (act.kind === 'halo') {
+          const puff = 1 + 0.28 * ease(t / 0.35) * (1 - ease((t - 1.45) / 0.35))
+          loop.local = turnY(Math.PI * 2 * ease((t - 0.15) / 1.5)).map((m) => m * puff)
+          nod = 0.22 * Math.sin(Math.PI * Math.min(t / 1.8, 1)); lightAt = 1.5; end = 1.9
+        } else if (act.kind === 'swing') {
+          roll = 0.45 * Math.sin(t * 7) * Math.exp(-t * 1.6)
+          stretch.to = 1 + 0.06 * Math.sin(t * 14) * Math.exp(-t * 2); lightAt = 0.2; end = 2.4
+        } else if (act.kind === 'rebuild') {
+          arch.grow = t < 0.6 ? 1 - ease(t / 0.6) : ease((t - 0.7) / 0.9)
+          loop.grow = t < 0.6 ? 1 - ease(t / 0.6) : ease((t - 1.2) / 1.1)
+          spin = -Math.PI * 2 * (1 - ease(t / 2.4)); lightAt = 2.3; end = 2.5
+        } else if (act.kind === 'heartbeat') {
+          if (!act.beat1) { act.beat1 = true; scale.v += 1.9 }
+          if (t > 0.3 && !act.beat2) { act.beat2 = true; scale.v += 1.9 }
+          lightAt = 0.3; end = 1.2
+        } else {
+          const k = Math.min(Math.max((t - 0.22) / 0.58, 0), 1)
+          if (t < 0.22) stretch.to = 0.8
+          else if (k < 1) { stretch.to = 1.14; hop = 0.45 * 4 * k * (1 - k); spin = Math.PI * 2 * ease(k) }
+          else if (!act.landed) { act.landed = true; stretch.v -= 3.5 }
+          lightAt = 0.8; end = 1.7
+        }
+        if (t > lightAt && !act.lit) { act.lit = true; sheen(0.5) }
+        if (t > end) act = null
+      }
+      ;[rotX, rotY, scale, shiftX, shiftY, stretch].forEach((s) => step(s, dt))
+      if (time > nextSheen && !act) sheen()
+    }
+
+    const rot = mul(mul(turnY(rotY.x + spin), turnX(rotX.x + nod)), turnZ(roll))
+    const asp = canvas.width / canvas.height
+    const sheenPos = still ? -9 : -2.4 + (time - sheenAt) * 2.4
+
+    gl.viewport(0, 0, canvas.width, canvas.height)
+    gl.clearColor(0, 0, 0, 0)
+    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
+    gl.enable(gl.DEPTH_TEST); gl.enable(gl.CULL_FACE); gl.enable(gl.BLEND)
+    gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA)
+
+    gl.useProgram(prog)
+    gl.uniformMatrix3fv(U(prog, 'uRot'), false, rot)
+    gl.uniform1f(U(prog, 'uScale'), scale.x * grown * 0.82)
+    gl.uniform1f(U(prog, 'uAsp'), asp)
+    gl.uniform2f(U(prog, 'uShift'), shiftX.x, shiftY.x + hop)
+    gl.uniform2f(U(prog, 'uStretch'), 1 / Math.sqrt(stretch.x), stretch.x)
+    gl.uniform1f(U(prog, 'uSheen'), sheenPos)
+    gl.uniform1f(U(prog, 'uTime'), time)
+    // The A is opaque; the loop goes on top slightly see-through, so the A shows through where they cross.
+    for (const m of [arch, loop]) {
+      gl.uniform3fv(U(prog, 'uPal'), m.pal)
+      gl.uniform1f(U(prog, 'uUseU'), m.useU)
+      gl.uniform1f(U(prog, 'uAlpha'), m.alpha)
+      gl.uniform1f(U(prog, 'uGrow'), m.grow)
+      gl.uniformMatrix3fv(U(prog, 'uLocal'), false, m.local)
+      gl.uniform1f(U(prog, 'uSeam'), m === loop ? 1 : 0)
+      gl.bindVertexArray(m.vao)
+      gl.drawElements(gl.TRIANGLES, m.count, gl.UNSIGNED_SHORT, 0)
+    }
+  }
+
+  const io = new IntersectionObserver(([e]) => { visible = e.isIntersecting })
+  io.observe(canvas)
+  if (!still) {
+    addEventListener('pointermove', onMove, { passive: true })
+    addEventListener('pointerdown', onDown, { passive: true })
+  }
+  const ro = new ResizeObserver(() => { if (still) draw(0) })
+  ro.observe(canvas)
+  raf = requestAnimationFrame(draw)
+
+  return {
+    sheen, play,
+    destroy: () => {
+      cancelAnimationFrame(raf); io.disconnect(); ro.disconnect()
+      removeEventListener('pointermove', onMove); removeEventListener('pointerdown', onDown)
+    },
+  }
+}
+</script>
+<script>window.ribbon = mountRibbon(document.querySelector('canvas'))</script>
+</html>

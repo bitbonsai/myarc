@@ -1,5 +1,5 @@
 diff --git a/chrome/browser/ui/views/frame/browser_native_widget_mac.mm b/chrome/browser/ui/views/frame/browser_native_widget_mac.mm
-index fd4cc9a121ef9a7bf20e1269bcb381eabf6fa055..a935d291fa1e26996e54f363d5d1cb45a6889aea 100644
+index fd4cc9a121ef9a7bf20e1269bcb381eabf6fa055..4d2924e27741cfed8063ba4b20fbffdf126457ac 100644
 --- a/chrome/browser/ui/views/frame/browser_native_widget_mac.mm
 +++ b/chrome/browser/ui/views/frame/browser_native_widget_mac.mm
 @@ -4,10 +4,14 @@
@@ -290,7 +290,7 @@ index fd4cc9a121ef9a7bf20e1269bcb381eabf6fa055..a935d291fa1e26996e54f363d5d1cb45
      int opaque_x = 0;
      int opaque_y = 0;
      int opaque_width = content_width;
-@@ -1206,6 +1346,22 @@ void BrowserNativeWidgetMac::UpdateBackgroundColor() {
+@@ -1206,6 +1346,26 @@ void BrowserNativeWidgetMac::UpdateBackgroundColor() {
  
    const bool is_vertical_tabs = browser_view_->ShouldDrawVerticalTabStrip();
  
@@ -299,10 +299,14 @@ index fd4cc9a121ef9a7bf20e1269bcb381eabf6fa055..a935d291fa1e26996e54f363d5d1cb45
 +    CAGradientLayer* const tint =
 +        base::apple::ObjCCast<CAGradientLayer>(tint_view_.layer);
 +    if (tint) {
++      // Translucent over the glass, so the blurred desktop shows through;
++      // Reduce Transparency keeps the solid fill.
 +      const myarc::SidebarTint stops = myarc::GetSidebarTint(
 +          color_utils::IsDark(browser_view_->GetColorProvider()->GetColor(
 +              ui::kColorSysSurface)),
-+          myarc::GetSidebarTheme(GetWidget()));
++          myarc::GetSidebarTheme(GetWidget()),
++          NSWorkspace.sharedWorkspace
++              .accessibilityDisplayShouldReduceTransparency);
 +      tint.colors = @[
 +        (__bridge id)skia::SkColorToSRGBNSColor(stops.start).CGColor,
 +        (__bridge id)skia::SkColorToSRGBNSColor(stops.end).CGColor
@@ -313,7 +317,7 @@ index fd4cc9a121ef9a7bf20e1269bcb381eabf6fa055..a935d291fa1e26996e54f363d5d1cb45
    auto* const glass_frame_service = GlassFrameService::GetInstance();
    const bool are_multiple_profiles_open =
        glass_frame_service && glass_frame_service->HasMultipleOpenProfiles();
-@@ -1223,8 +1379,11 @@ void BrowserNativeWidgetMac::UpdateBackgroundColor() {
+@@ -1223,8 +1383,11 @@ void BrowserNativeWidgetMac::UpdateBackgroundColor() {
    has_multiple_profiles_open_ = are_multiple_profiles_open;
  
    const double tint_opacity =

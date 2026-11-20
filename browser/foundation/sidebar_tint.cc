@@ -50,19 +50,23 @@ SidebarThemeState* EnsureState(views::Widget& widget) {
 
 }  // namespace
 
-SidebarTint GetSidebarTint(bool dark, const std::optional<SpaceTheme>& theme) {
+SidebarTint GetSidebarTint(bool dark,
+                           const std::optional<SpaceTheme>& theme,
+                           bool solid) {
   if (!theme) {
-    // Dark: a neutral graphite, nearly opaque over the material, the
-    // sidebar's corner (#24252a) one step lighter than the base (#1c1d21).
-    return dark ? SidebarTint{SkColorSetARGB(242, 0x24, 0x25, 0x2A),
-                              SkColorSetARGB(242, 0x1C, 0x1D, 0x21)}
+    // Dark: a neutral graphite, the sidebar's corner (#24252a) one step
+    // lighter than the base (#1c1d21), at two thirds over the glass.
+    const SkAlpha graphite = solid ? 242 : 170;
+    return dark ? SidebarTint{SkColorSetARGB(graphite, 0x24, 0x25, 0x2A),
+                              SkColorSetARGB(graphite, 0x1C, 0x1D, 0x21)}
                 : SidebarTint{SkColorSetARGB(166, 227, 224, 242),
                               SkColorSetARGB(166, 240, 230, 240)};
   }
   const SkColor color = SkColorSetA(theme->color, SK_AlphaOPAQUE);
-  // At 100% the sidebar is nearly opaque; at 0% the material shows plain.
-  const SkAlpha alpha =
-      static_cast<SkAlpha>(230 * std::clamp(theme->opacity, 0, 100) / 100);
+  // At 100% the sidebar is two thirds tint over the glass, or nearly opaque
+  // when solid; at 0% the material shows plain.
+  const SkAlpha alpha = static_cast<SkAlpha>(
+      (solid ? 230 : 170) * std::clamp(theme->opacity, 0, 100) / 100);
   // White labels need a deep shade, black ones a pale tint. The end stop is a
   // step stronger, like the default gradient.
   const SkColor base = dark ? SK_ColorBLACK : SK_ColorWHITE;

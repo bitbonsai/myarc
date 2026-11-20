@@ -304,10 +304,14 @@ action("welcome_mark") {
   ]
 }
 
-# The welcome's sound, a copy of design/brand/sounds/welcome.m4a in the
-# framework's resources. The bundle copy keeps symlinks, so it's a real copy.
+# The welcome's sound, a copy of design/brand/sounds/welcome.m4a, and its 3D
+# ribbon video, from tools/render_welcome_ribbon.mjs, in the framework's
+# resources. The bundle copy keeps symlinks, so the sound is a real copy.
 bundle_data("welcome_sound") {
-  sources = [ "resources/myarc_welcome.m4a" ]
+  sources = [
+    "resources/myarc_welcome.m4a",
+    "resources/myarc_welcome_ribbon.mov",
+  ]
   outputs = [ "{{bundle_resources_dir}}/{{source_file_part}}" ]
 }
 
@@ -320,6 +324,7 @@ source_set("onboarding") {
     "onboarding_controller.h",
     "welcome_intro.h",
     "welcome_palette.h",
+    "welcome_ribbon.h",
     "welcome_sound.h",
     "welcome_timeline.h",
     "welcome_view.cc",
@@ -328,13 +333,17 @@ source_set("onboarding") {
   if (is_mac) {
     sources += [
       "welcome_intro_mac.mm",
+      "welcome_ribbon_mac.mm",
       "welcome_sound_mac.mm",
     ]
     frameworks = [
       "AVFoundation.framework",
       "Accelerate.framework",
       "Cocoa.framework",
+      "CoreMedia.framework",
+      "CoreVideo.framework",
       "QuartzCore.framework",
+      "VideoToolbox.framework",
     ]
   }
   public_deps = [

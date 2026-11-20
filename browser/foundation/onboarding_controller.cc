@@ -104,6 +104,7 @@ constexpr char kMyarcTestReduceMotion[] = "myarc-test-reduce-motion";
 constexpr char kMyarcTestOnboardingImport[] = "myarc-test-onboarding-import";
 constexpr char kMyarcTestOnboardingHold[] = "myarc-test-onboarding-hold";
 constexpr char kMyarcTestMuteSound[] = "myarc-test-mute-sound";
+constexpr char kMyarcTestReplayIntro[] = "myarc-test-replay-intro";
 
 // The switch's milliseconds, or `fallback`, up to 30 seconds.
 base::TimeDelta SwitchDelay(const char* name, int fallback) {
@@ -235,6 +236,16 @@ OnboardingController::OnboardingController(Profile& profile,
       anchor_(std::move(anchor)),
       window_(std::move(window)) {
   area_observation_.Observe(&area);
+#if BUILDFLAG(MYARC_TEST_HOOKS)
+  if (base::CommandLine::ForCurrentProcess()->HasSwitch(
+          kMyarcTestReplayIntro)) {
+    base::SingleThreadTaskRunner::GetCurrentDefault()->PostDelayedTask(
+        FROM_HERE,
+        base::BindOnce(&OnboardingController::PlayIntro,
+                       weak_factory_.GetWeakPtr()),
+        SwitchDelay(kMyarcTestReplayIntro, 3000));
+  }
+#endif  // BUILDFLAG(MYARC_TEST_HOOKS)
 }
 
 OnboardingController::~OnboardingController() {
@@ -253,7 +264,8 @@ OnboardingController::~OnboardingController() {
 
 void OnboardingController::Refresh() {
   PrefService* local_state = LocalState();
-  if (importing_ || recolouring_ || report_open_ || revealing_ ||
+  // PlayIntro()'s welcome isn't the tour's, so a refresh leaves it be.
+  if (showcase_ || importing_ || recolouring_ || report_open_ || revealing_ ||
       !local_state) {
     return;
   }
@@ -404,7 +416,10 @@ void OnboardingController::ShowWelcome(bool offers_import) {
                                          host_->GetWidget()->GetNativeView())
                                    : screen->GetPrimaryDisplay())
                                .work_area();
-    host_->GetWidget()->SetBounds(WelcomeFrame(work));
+    // PlayIntro() leaves the user's window as it is.
+    if (!showcase_) {
+      host_->GetWidget()->SetBounds(WelcomeFrame(work));
+    }
     bool log = false;
 #if BUILDFLAG(MYARC_TEST_HOOKS)
     log =
@@ -444,7 +459,47 @@ void OnboardingController::ShowWelcome(bool offers_import) {
 #endif  // BUILDFLAG(MYARC_TEST_HOOKS)
 }
 
+void OnboardingController::PlayIntro() {
+  if (sheet_ || coach_ || g_welcome_window || g_coach_window || importing_ ||
+      recolouring_ || report_open_ || revealing_ || !host_ || !area_) {
+    return;
+  }
+  showcase_ = true;
+  ShowWelcome(/*offers_import=*/true);
+  if (!sheet_) {
+    showcase_ = false;
+    return;
+  }
+  sheet_->SetClosesOnClick();
+#if BUILDFLAG(MYARC_TEST_HOOKS)
+  if (base::CommandLine::ForCurrentProcess()->HasSwitch(kMyarcTestOnboarding)) {
+    LOG(WARNING) << "Test onboarding: intro replay shown";
+  }
+#endif  // BUILDFLAG(MYARC_TEST_HOOKS)
+}
+
+void OnboardingController::EndShowcase() {
+  intro_.reset();
+#if BUILDFLAG(IS_MAC)
+  sound_.reset();
+#endif  // BUILDFLAG(IS_MAC)
+  ReleaseFocus();
+  const base::TimeDelta exit = sheet_ ? sheet_->Exit() : base::TimeDelta();
+#if BUILDFLAG(MYARC_TEST_HOOKS)
+  if (base::CommandLine::ForCurrentProcess()->HasSwitch(kMyarcTestOnboarding)) {
+    LOG(WARNING) << "Test onboarding: intro replay closed";
+  }
+#endif  // BUILDFLAG(MYARC_TEST_HOOKS)
+  // Posted: the press runs inside the welcome, which this removes.
+  base::SingleThreadTaskRunner::GetCurrentDefault()->PostDelayedTask(
+      FROM_HERE,
+      base::BindOnce(&OnboardingController::CloseWelcome,
+                     weak_factory_.GetWeakPtr()),
+      exit);
+}
+
 void OnboardingController::CloseWelcome() {
+  showcase_ = false;
   // Both fade out rather than stopping dead.
   intro_.reset();
 #if BUILDFLAG(IS_MAC)
@@ -481,6 +536,12 @@ void OnboardingController::ReleaseFocus() {
 
 void OnboardingController::OnAction(WelcomeView::Action action) {
   PrefService* local_state = LocalState();
+  if (showcase_) {
+    if (sheet_) {
+      EndShowcase();
+    }
+    return;
+  }
   if (!local_state || !sheet_ || importing_ || revealing_) {
     return;
   }
@@ -546,7 +607,7 @@ void OnboardingController::ShowImported(uint64_t space) {
       provider && color_utils::IsDark(provider->GetColor(ui::kColorSysSurface));
   recolouring_ = true;
   sheet_->CrossfadeTo(
-      GetSidebarTint(dark, ThemeOf(*profile_, space)),
+      GetSidebarTint(dark, ThemeOf(*profile_, space), /*solid=*/true),
       base::BindOnce(
           [](base::WeakPtr<OnboardingController> controller) {
             if (!controller || !controller->recolouring_) {

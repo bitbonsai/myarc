@@ -9,6 +9,7 @@
 #include "base/time/time.h"
 #include "base/timer/timer.h"
 #include "myarc/sidebar_tint.h"
+#include "myarc/welcome_ribbon.h"
 #include "ui/base/metadata/metadata_header_macros.h"
 #include "ui/gfx/geometry/transform.h"
 #include "ui/views/accessible_pane_view.h"
@@ -28,14 +29,15 @@ namespace myarc {
 //
 // Play() starts the arrival on welcome_timeline.h's times, which the sound
 // sets. At 1.7 s the ribbon logo rises 20 DIP while it fades in over 1.1 s
-// on the site's ease, as on the myarc.dev hero, then drifts once in 1.2 s
-// (up 14 DIP and a 1° turn, and back), fading as it returns. At 4.3 s
+// on the site's ease, as on the myarc.dev hero, drifts once in 0.8 s (up
+// 14 DIP and back), then moves up over 0.5 s to the top of a centred stack
+// above the headline and the choice, where it stays. At 4.3 s
 // "myArc, forever yours." slides in from the left while its blur clears,
 // and 0.4 s later the choice fades in under it: Import from Arc…, the primary
 // button, Start fresh and Skip tour. Return presses the focused button, which
 // starts on the primary one, Tab and Shift+Tab cycle them and Esc means Skip
-// tour. Under Reduce Motion nothing moves: Play() fades the headline and the
-// choice in over 150 ms.
+// tour. Under Reduce Motion nothing moves: Play() fades the logo, the
+// headline and the choice in over 150 ms.
 //
 // Every change is a layer animation, so the compositor runs it at the
 // display's rate. Once an import commits, the background crossfades to the
@@ -81,8 +83,12 @@ class WelcomeView : public views::AccessiblePaneView {
   // caller removes the view after it.
   base::TimeDelta Exit();
 
+  // A click anywhere then means Skip tour, for the intro's replay.
+  void SetClosesOnClick() { closes_on_click_ = true; }
+
   // views::AccessiblePaneView:
   bool AcceleratorPressed(const ui::Accelerator& accelerator) override;
+  bool OnMousePressed(const ui::MouseEvent& event) override;
   void OnPaint(gfx::Canvas* canvas) override;
   void Layout(PassKey) override;
 
@@ -93,6 +99,9 @@ class WelcomeView : public views::AccessiblePaneView {
   void Press(Action action);
   // Starts the fields' drift once the view has a size and is playing.
   void StartDrift();
+  // The ribbon video's frames, one per tick, from its start.
+  void StartRibbon();
+  void NextRibbonFrame();
   // The logo's move from the centre to the stack's top, from the layout.
   gfx::Transform MarkDocked() const;
 
@@ -118,7 +127,14 @@ class WelcomeView : public views::AccessiblePaneView {
   bool mark_docked_ = false;
   // The top of the centred stack of logo, headline and choice.
   int mark_top_ = 0;
+  // The logo's view: kMarkSize for the PNG, larger for the ribbon's frames.
+  int mark_view_size_ = 0;
+  // The 3D ribbon while it plays, then null; null without the video.
+  std::unique_ptr<WelcomeRibbon> ribbon_;
+  base::OneShotTimer ribbon_start_timer_;
+  base::RepeatingTimer ribbon_timer_;
   bool exiting_ = false;
+  bool closes_on_click_ = false;
   // Starts the drift once the window shows.
   base::OneShotTimer drift_timer_;
   // Runs CrossfadeTo's `done` once the theme holds.

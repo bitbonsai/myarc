@@ -10,11 +10,13 @@
 #include "base/containers/span.h"
 #include "base/functional/bind.h"
 #include "base/time/time.h"
+#include "build/build_config.h"
 #include "cc/paint/paint_flags.h"
 #include "cc/paint/paint_shader.h"
 #include "myarc/coach_mark.h"
 #include "myarc/welcome_mark.h"
 #include "myarc/welcome_palette.h"
+#include "myarc/welcome_ribbon.h"
 #include "myarc/welcome_timeline.h"
 #include "third_party/skia/include/core/SkBitmap.h"
 #include "third_party/skia/include/core/SkColor.h"
@@ -78,6 +80,9 @@ constexpr char16_t kSkip[] = u"Skip tour";
 constexpr int kMarkSize = 120;
 // It ends at the top of the centred stack, this far above the headline.
 constexpr int kMarkGap = 28;
+// The ribbon video's frames: the mark fills about two thirds of them, so
+// they show this big, centred on the logo's box, to match its size.
+constexpr int kRibbonSize = 180;
 constexpr int kButtonWidth = 240;
 constexpr int kButtonHeight = 40;
 // The base in dark mode, myarc.dev's dark page.
@@ -306,9 +311,23 @@ WelcomeView::WelcomeView(bool offers_import, ActionCallback action)
   content_->SetPaintToLayer();
   content_->layer()->SetFillsBoundsOpaquely(false);
 
-  auto mark =
-      std::make_unique<views::ImageView>(ui::ImageModel::FromImageSkia(Mark()));
-  mark->SetImageSize(gfx::Size(kMarkSize, kMarkSize));
+  // The 3D ribbon's video when it's there, its last frame alone under Reduce
+  // Motion, and the PNG otherwise.
+  gfx::ImageSkia first;
+#if BUILDFLAG(IS_MAC)
+  if (reduced_motion_) {
+    first = WelcomeRibbon::LastFrame();
+  } else if ((ribbon_ = WelcomeRibbon::Load())) {
+    first = ribbon_->Next();
+    if (first.isNull()) {
+      ribbon_.reset();
+    }
+  }
+#endif  // BUILDFLAG(IS_MAC)
+  mark_view_size_ = first.isNull() ? kMarkSize : kRibbonSize;
+  auto mark = std::make_unique<views::ImageView>(
+      ui::ImageModel::FromImageSkia(first.isNull() ? Mark() : first));
+  mark->SetImageSize(gfx::Size(mark_view_size_, mark_view_size_));
   mark->GetViewAccessibility().SetIsIgnored(true);
   mark_ = content_->AddChildView(std::move(mark));
   OnLayer(*mark_);
@@ -427,6 +446,11 @@ void WelcomeView::Play(base::TimeTicks start) {
                  .SetTransform(headline, slide)
                  .SetTransform(blurred, slide);
   }
+  // The ribbon plays once as the logo comes in and rests on its last frame.
+  if (ribbon_) {
+    ribbon_start_timer_.Start(FROM_HERE, at(kMarkIn), this,
+                              &WelcomeView::StartRibbon);
+  }
   // One drift, up and turned, then back.
   block = &block->At(at(kMarkIn + kMarkRise))
                .SetDuration(kMarkDrift / 2)
@@ -499,8 +523,28 @@ void WelcomeView::StartDrift() {
   }
 }
 
+void WelcomeView::StartRibbon() {
+  ribbon_timer_.Start(FROM_HERE, WelcomeRibbon::FrameInterval(), this,
+                      &WelcomeView::NextRibbonFrame);
+}
+
+void WelcomeView::NextRibbonFrame() {
+  const gfx::ImageSkia frame = ribbon_ ? ribbon_->Next() : gfx::ImageSkia();
+  if (frame.isNull()) {
+    // The last frame stays.
+    ribbon_timer_.Stop();
+    ribbon_.reset();
+    return;
+  }
+  mark_->SetImage(ui::ImageModel::FromImageSkia(frame));
+}
+
 void WelcomeView::FinishIntro() {
   playing_ = true;
+  // A press stops the ribbon where it is.
+  ribbon_start_timer_.Stop();
+  ribbon_timer_.Stop();
+  ribbon_.reset();
   for (views::View* view : std::initializer_list<views::View*>{
            mark_, headline_blur_, headline_, import_, start_, skip_}) {
     view->layer()->GetAnimator()->StopAnimating();
@@ -576,8 +620,9 @@ void WelcomeView::Layout(PassKey) {
   }
   theme_->SetBoundsRect(GetLocalBounds());
   content_->SetBoundsRect(GetLocalBounds());
-  mark_->SetBounds((w - kMarkSize) / 2, (h - kMarkSize) / 2, kMarkSize,
-                   kMarkSize);
+  // The logo's box is kMarkSize; the ribbon's frames overhang it evenly.
+  mark_->SetBounds((w - mark_view_size_) / 2, (h - mark_view_size_) / 2,
+                   mark_view_size_, mark_view_size_);
 
   // The logo, the headline and the choice under it, centred together. The
   // logo is laid out at the centre, where it rises in, and moves up to the
@@ -608,7 +653,8 @@ void WelcomeView::Layout(PassKey) {
 
 gfx::Transform WelcomeView::MarkDocked() const {
   // Only a whole-DIP move up from the centre, so the logo stays crisp.
-  return gfx::Transform::MakeTranslation(0, mark_top_ - mark_->y());
+  const int box = mark_->y() + (mark_view_size_ - kMarkSize) / 2;
+  return gfx::Transform::MakeTranslation(0, mark_top_ - box);
 }
 
 void WelcomeView::TakeFocus() {
@@ -635,6 +681,14 @@ views::View* WelcomeView::GetDefaultFocusableChild() {
 
 void WelcomeView::OnPaint(gfx::Canvas* canvas) {
   canvas->DrawColor(Rgb(BaseColor()));
+}
+
+bool WelcomeView::OnMousePressed(const ui::MouseEvent& event) {
+  if (!closes_on_click_) {
+    return views::AccessiblePaneView::OnMousePressed(event);
+  }
+  Press(Action::kSkipTour);
+  return true;
 }
 
 void WelcomeView::Press(Action action) {

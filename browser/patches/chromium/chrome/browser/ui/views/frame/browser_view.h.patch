@@ -1,5 +1,5 @@
 diff --git a/chrome/browser/ui/views/frame/browser_view.h b/chrome/browser/ui/views/frame/browser_view.h
-index 750e46c97b64dccccf4268e912df5dbdb6516b3c..c19c391291298495fba9e8d42a12e29fc8202f69 100644
+index 750e46c97b64dccccf4268e912df5dbdb6516b3c..08ce1cd7f33a388d258d5d6fdc4ffc129887e16e 100644
 --- a/chrome/browser/ui/views/frame/browser_view.h
 +++ b/chrome/browser/ui/views/frame/browser_view.h
 @@ -8,11 +8,13 @@
@@ -84,10 +84,12 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..c19c391291298495fba9e8d42a12e29f
    std::optional<int> theme_background_y_offset() const {
      return theme_background_y_offset_;
    }
-@@ -311,6 +336,52 @@ class BrowserView : public BrowserWindow,
+@@ -311,6 +336,54 @@ class BrowserView : public BrowserWindow,
  
    ScrimView* window_scrim_view() { return window_scrim_view_; }
  
++  // Ctrl-Option-Cmd-A: the welcome's arrival again, outside the tour.
++  void PlayMyarcIntro();
 +  // With `split_pane`, New Split's blank pane, the pick goes to that pane:
 +  // a URL or search loads in it, and a Today tab of this Space replaces it.
 +  bool ShowMyarcCommandPalette(bool new_tab = true,
@@ -137,7 +139,7 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..c19c391291298495fba9e8d42a12e29f
    base::WeakPtr<BrowserView> GetAsWeakPtr() {
      return weak_ptr_factory_.GetWeakPtr();
    }
-@@ -1253,12 +1324,263 @@ class BrowserView : public BrowserWindow,
+@@ -1253,12 +1326,263 @@ class BrowserView : public BrowserWindow,
  
    // Anchor point for help bubbles and other dialogs that want to reliably
    // anchor outside the content area of the window.
@@ -401,7 +403,7 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..c19c391291298495fba9e8d42a12e29f
  
    // A mapping between accelerators and command IDs.
    std::map<ui::Accelerator, int> accelerator_table_;
-@@ -1411,6 +1733,7 @@ class BrowserView : public BrowserWindow,
+@@ -1411,6 +1735,7 @@ class BrowserView : public BrowserWindow,
    base::EnumSet<TabStripAndWebAppViewsReparentedState>
        tab_strip_web_apps_reparented_state_;
  

@@ -25,5 +25,7 @@
 #define IDC_MYARC_CLEAR_CACHE_RELOAD 35418
 #define IDC_MYARC_TOGGLE_PINS_COLLAPSED 35419
 #define IDC_MYARC_EXPAND_SPLIT 35420
+// Ctrl+Option+Cmd+A, a hidden extra: plays the welcome's arrival again.
+#define IDC_MYARC_REPLAY_INTRO 35421
 
 #endif  // MYARC_COMMAND_IDS_H_

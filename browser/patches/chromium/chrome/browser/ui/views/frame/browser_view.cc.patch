@@ -1,5 +1,5 @@
 diff --git a/chrome/browser/ui/views/frame/browser_view.cc b/chrome/browser/ui/views/frame/browser_view.cc
-index 7b568f6de760af21d6e9d2aa44415a7cef617c51..36d3c7df9f9c690d94957e95475710bf44cc7d12 100644
+index 7b568f6de760af21d6e9d2aa44415a7cef617c51..cf101a5260bb5b79d3ee66b12cadcf9bde8c8f47 100644
 --- a/chrome/browser/ui/views/frame/browser_view.cc
 +++ b/chrome/browser/ui/views/frame/browser_view.cc
 @@ -22,6 +22,7 @@
@@ -2435,7 +2435,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..36d3c7df9f9c690d94957e95475710bf
  }
  
  void BrowserView::RemovedFromWidget() {
-@@ -5267,106 +7276,2888 @@ const views::View* BrowserView::GetViewByElementId(
+@@ -5267,106 +7276,2894 @@ const views::View* BrowserView::GetViewByElementId(
  ///////////////////////////////////////////////////////////////////////////////
  // BrowserView, ui::AcceleratorTarget overrides:
  
@@ -3152,6 +3152,12 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..36d3c7df9f9c690d94957e95475710bf
 +            }
 +          },
 +          myarc_workspace_weak_factory_.GetWeakPtr(), retry));
++}
++
++void BrowserView::PlayMyarcIntro() {
++  if (myarc_onboarding_) {
++    myarc_onboarding_->PlayIntro();
++  }
 +}
 +
 +void BrowserView::ActivateItem(uint64_t item) {
@@ -5401,7 +5407,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..36d3c7df9f9c690d94957e95475710bf
    const bool show_bookmark_bar =
        contents &&
        WindowFeatureController::From(browser_)->SupportsWindowFeature(
-@@ -5471,6 +10262,10 @@ bool BrowserView::MaybeUpdateDevtools(content::WebContents* contents) {
+@@ -5471,6 +10268,10 @@ bool BrowserView::MaybeUpdateDevtools(content::WebContents* contents) {
  
  void BrowserView::UpdateUIForContents(WebContents* contents,
                                        bool should_layout_immediately) {
@@ -5412,7 +5418,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..36d3c7df9f9c690d94957e95475710bf
    TRACE_EVENT0("ui", "BrowserView::UpdateUIForContents");
    bool needs_layout = MaybeShowBookmarkBar(contents);
  
-@@ -5706,6 +10501,26 @@ void BrowserView::LoadAccelerators() {
+@@ -5706,6 +10507,26 @@ void BrowserView::LoadAccelerators() {
    }
  
  #if BUILDFLAG(IS_MAC)
