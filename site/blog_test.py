@@ -377,6 +377,45 @@ class BlogTests(unittest.TestCase):
                 self.build()
 
 
+    def video(self, data=b'\x00\x00\x00\x18ftypmp42' + bytes(16), poster=True):
+        (self.folder / 'clip.mp4').write_bytes(data)
+        if poster:
+            Image.new('RGB', (32, 20), 'blue').save(self.folder / 'clip-poster.png')
+        self.post('Intro.\n\n![Synthetic welcome clip](clip.mp4)\n\n*The clip plays here.*')
+
+    def test_mp4_renders_video_with_hashed_file_and_webp_poster(self):
+        self.video()
+        posts = self.build()
+        folder = self.root / 'blog' / self.folder.name
+        soup = BeautifulSoup((folder / 'index.html').read_text(), 'html.parser')
+        player = soup.select_one('.post-body figure > video')
+        self.assertIsNotNone(player)
+        self.assertEqual('Synthetic welcome clip', player['aria-label'])
+        self.assertEqual(('32', '20', 'metadata'), (player['width'], player['height'], player['preload']))
+        self.assertTrue(player.has_attr('controls') and player.has_attr('playsinline'))
+        self.assertEqual('The clip plays here.', player.find_next_sibling('figcaption').get_text())
+        source = player.find('source')
+        self.assertEqual('video/mp4', source['type'])
+        self.assertRegex(source['src'], r'^clip\.[0-9a-f]{12}\.mp4$')
+        self.assertEqual((self.folder / 'clip.mp4').read_bytes(), (folder / source['src']).read_bytes())
+        self.assertRegex(player['poster'], r'^clip-poster\.[0-9a-f]{12}\.webp$')
+        with Image.open(folder / player['poster']) as image:
+            self.assertEqual('WEBP', image.format)
+        self.assertIsNone(posts[0].cover)
+        self.assertEqual({}, posts[0].images)
+        self.assertFalse((folder / 'clip.mp4').exists())
+
+    def test_rejects_non_mp4_video_bytes(self):
+        self.video(data=b'<html>not a video</html>')
+        with self.assertRaisesRegex(ValueError, 'not an MP4'):
+            load_post(self.source)
+
+    def test_rejects_video_without_poster(self):
+        self.video(poster=False)
+        with self.assertRaisesRegex(ValueError, 'poster'):
+            load_post(self.source)
+
+
 class PublisherTests(unittest.TestCase):
     def test_only_artifacts_are_selected(self):
         from publish import artifacts, blob_sha

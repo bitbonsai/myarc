@@ -19,6 +19,7 @@ import yaml
 MD = MarkdownIt('commonmark', {'html': False, 'maxNesting': 20})
 MAX_POSTS = 200
 MAX_IMAGE_BYTES = 10 * 1024 * 1024
+MAX_VIDEO_BYTES = 20 * 1024 * 1024
 MAX_TOTAL_IMAGE_BYTES = 256 * 1024 * 1024
 SLUG = re.compile(r'[a-z0-9]+(?:-[a-z0-9]+)*')
 IMAGE_FORMATS = {'.png': 'PNG', '.jpg': 'JPEG', '.jpeg': 'JPEG', '.webp': 'WEBP'}
@@ -54,6 +55,7 @@ BLOG_CSS = '''
     .post-body ol { padding-left: 1.5rem }
     .post-body li + li { margin-top: .5rem }
     .post-body img { border-radius: 1rem; margin: 2rem 0; max-width: 100% }
+    .post-body video { display: block; width: 100%; height: auto; border-radius: 1rem }
     .post-body figure { margin: 2rem 0 }
     .post-body > figure.portrait { float: right; width: 9rem; margin: 0 0 1.5rem 1.5rem }
     .post-body > figure.portrait:first-child + p { margin-top: 0 }
@@ -113,6 +115,7 @@ class Post:
     source_bytes: int = 0
     thumbnail: bytes = b''
     redirect_from: tuple = ()
+    media: dict = None
 
     @property
     def url(self):
@@ -158,6 +161,34 @@ def screenshot(folder, source):
             raise ValueError(f'Use a static screenshot under 24 megapixels: {source}')
         image.verify()
     return relative.as_posix(), data
+
+
+def video(folder, source):
+    """Validate a local MP4 and its required same-name -poster.png beside it."""
+    url = urlsplit(source)
+    if url.scheme or url.netloc or url.query or url.fragment:
+        raise ValueError(f'Videos must be local files: {source}')
+    relative = Path(unquote(url.path))
+    if relative.is_absolute() or '..' in relative.parts or '\\' in str(relative) or relative.suffix.lower() != '.mp4':
+        raise ValueError(f'Use a relative MP4 video: {source}')
+    path = folder / relative
+    if path.is_symlink():
+        raise ValueError(f'Video cannot be a symlink: {source}')
+    try:
+        path.resolve().relative_to(folder.resolve())
+    except ValueError:
+        raise ValueError(f'Video escapes its post folder: {source}') from None
+    if path.stat().st_size > MAX_VIDEO_BYTES:
+        raise ValueError(f'Video exceeds 20 MiB: {source}')
+    data = path.read_bytes()
+    if data[4:8] != b'ftyp':
+        raise ValueError(f'Video is not an MP4 file: {source}')
+    poster = relative.with_name(relative.stem + '-poster.png')
+    if (folder / poster).is_symlink() or not (folder / poster).is_file():
+        raise ValueError(f'Video needs a poster at {poster.as_posix()}: {source}')
+    _, poster_data = screenshot(folder, quote(poster.as_posix()))
+    name = (relative.parent / (relative.stem + '.' + hashlib.sha256(data).hexdigest()[:12] + '.mp4')).as_posix()
+    return name, data, poster.as_posix(), poster_data
 
 
 def webp_images(name, data):
@@ -225,6 +256,8 @@ def load_post(path):
         raise ValueError(f'Published post has no body: {path}')
     tokens = MD.parse(body)
     images = {}
+    media = {}
+    videos = {}
     cover_alt = ''
     replacements = {}
     thumbnail = b''
@@ -245,6 +278,16 @@ def load_post(path):
                 if count > 20:
                     raise ValueError(f'Maximum 20 screenshots per post: {path}')
                 source = child.attrGet('src')
+                if urlsplit(source).path.lower().endswith('.mp4'):
+                    name, data, poster, poster_data = video(path.parent, source)
+                    poster, files, width, height = webp_images(poster, poster_data)
+                    source_bytes += len(data) + len(poster_data)
+                    media[name] = data
+                    media[poster] = files[poster]
+                    destination = quote(name, safe='/')
+                    videos[destination] = (quote(poster, safe='/'), width, height)
+                    child.attrSet('src', destination)
+                    continue
                 name, data = screenshot(path.parent, source)
                 source_bytes += len(data)
                 first = not images
@@ -270,8 +313,14 @@ def load_post(path):
             if child.type == 'link_open' and child.attrGet('href') in replacements:
                 child.attrSet('href', replacements[child.attrGet('href')])
     rendered = BeautifulSoup(MD.renderer.render(tokens, MD.options, {}), 'html.parser')
+    for image in rendered.find_all('img', src=lambda src: src in videos):
+        poster, width, height = videos[image['src']]
+        player = rendered.new_tag('video', attrs={'controls': '', 'playsinline': '', 'preload': 'metadata', 'poster': poster,
+                                                  'width': str(width), 'height': str(height), 'aria-label': image['alt']})
+        player.append(rendered.new_tag('source', src=image['src'], type='video/mp4'))
+        image.replace_with(player)
     for paragraph in list(rendered.find_all('p')):
-        if len(paragraph.find_all('img')) != 1 or paragraph.get_text(strip=True):
+        if len(paragraph.find_all(['img', 'video'])) != 1 or paragraph.get_text(strip=True):
             continue
         caption = paragraph.find_next_sibling()
         paragraph.name = 'figure'
@@ -283,6 +332,8 @@ def load_post(path):
                 paragraph.append(caption.extract())
     for figure in rendered.find_all('figure'):
         image = figure.find('img')
+        if image is None:
+            continue
         if int(image['height']) > int(image['width']):
             figure['class'] = ['portrait']
             image['sizes'] = '(max-width: 48rem) 6rem, 9rem'
@@ -292,16 +343,16 @@ def load_post(path):
         if 'image-grid' in figure.parent.get('class', []):
             continue
         following = figure.find_next_sibling()
-        if following is None or following.name != 'figure':
+        if figure.img is None or following is None or following.name != 'figure' or following.img is None:
             continue
         grid = rendered.new_tag('div', attrs={'class': 'image-grid'})
         figure.insert_before(grid)
-        while figure is not None and figure.name == 'figure':
+        while figure is not None and figure.name == 'figure' and figure.img is not None:
             following = figure.find_next_sibling()
             figure.img['sizes'] = '(max-width: 48rem) calc((100vw - 4rem) / 2), 24rem'
             grid.append(figure.extract())
             figure = following
-    return Post(slug, published, meta['title'].strip(), meta['summary'].strip(), str(rendered), images, cover_alt, source_bytes, thumbnail, tuple(redirect_from))
+    return Post(slug, published, meta['title'].strip(), meta['summary'].strip(), str(rendered), images, cover_alt, source_bytes, thumbnail, tuple(redirect_from), media)
 
 
 def redirect_page(post):
@@ -375,7 +426,7 @@ def build_blog(root, template, embed, extra_urls=()):
     for path in sorted(paths):
         post = load_post(path)
         if post:
-            total += max(post.source_bytes, sum(map(len, post.images.values())))
+            total += max(post.source_bytes, sum(map(len, [*post.images.values(), *(post.media or {}).values()])))
             if total > MAX_TOTAL_IMAGE_BYTES:
                 raise ValueError('Published screenshots exceed the 256 MiB site budget')
             posts.append(post)
@@ -440,7 +491,7 @@ def build_blog(root, template, embed, extra_urls=()):
             lightbox = '<dialog id="image-lightbox" class="image-lightbox" aria-labelledby="lightbox-caption"><div class="lightbox-content"><button type="button" aria-label="Close image" autofocus>' + close_icon + '</button><img alt=""><p id="lightbox-caption"></p></div></dialog>'
             page = page.replace('</body>', lightbox + f'<script defer src="../_assets/{gallery_name}"></script></body>')
         (folder / 'index.html').write_text(embed(page, '../'))
-        for name, data in post.images.items():
+        for name, data in {**post.images, **(post.media or {})}.items():
             target = folder / name
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_bytes(data)
