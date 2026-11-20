@@ -88,10 +88,9 @@ constexpr char16_t kHandoffDefault[] = u"Make myArc your default browser";
 constexpr char16_t kHandoffDone[] = u"Done";
 // The handoff card fades out slower than a card between steps.
 constexpr base::TimeDelta kHandoffFade = base::Milliseconds(180);
+#if BUILDFLAG(MYARC_TEST_HOOKS)
 // The panel's Create follows Create a Space this long later in test hooks.
 constexpr base::TimeDelta kTestCreateDelay = base::Milliseconds(1500);
-
-#if BUILDFLAG(MYARC_TEST_HOOKS)
 constexpr char kMyarcTestOnboarding[] = "myarc-test-onboarding";
 constexpr char kMyarcTestOnboardingEvent[] = "myarc-test-onboarding-event";
 constexpr char kMyarcTestOnboardingEventDelay[] =
