@@ -129,7 +129,7 @@
     .top nav .nav-github .github-icon { width: 1.375rem; height: 1.375rem }
     .top nav .button[aria-current] { color: #fff }
 
-    /* Hero. Headline owns the left, the matte ribbon drifts past the right column edge. */
+    /* Hero. Headline owns the left, the ribbon sits past the right column edge. */
     .hero { display: grid; grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); align-items: center; gap: 2rem 3rem; padding: 4rem 0 6rem }
     .hero-copy p { max-width: 34rem; margin-top: 1.75rem; font-size: 1.375rem; line-height: 1.45; color: var(--quiet) }
     .cta { display: flex; align-items: center; flex-wrap: wrap; gap: 1.25rem 1.75rem; margin-top: 2.5rem }
@@ -137,6 +137,9 @@
     .hero-art { --shift: 6%; position: relative; justify-self: end; width: 100%; max-width: 34rem; aspect-ratio: 1; transform: translateX(var(--shift)); pointer-events: none }
     /* Transparent image padding holds baked shadows outside the original artwork box. */
     .hero-art img { position: absolute; top: -25%; left: -25%; width: 150%; max-width: none }
+    /* The drawn ribbon covers the same padded box. The image stays as the fallback and the accessible name. */
+    .hero-art canvas { position: absolute; top: -25%; left: -25%; width: 150%; height: 150% }
+    .hero-art.is-live img { opacity: 0 }
 
     /* Sections breathe instead of drawing rules. One column of headings, content grids below them. */
     .block { padding: 6rem 0 }
@@ -630,6 +633,7 @@
 </table>
 <p>The command bar is the box for addresses and searches. Inside it, the arrow keys move through suggestions, Enter opens the selected one and Escape closes the bar. Type an action, such as pin, archive, split or a Space's name, to run it, or type / to list the actions.</p>
 <p>Cmd+Shift+C opens the element inspector in Chrome. myArc follows Arc and copies the address instead.</p>
+<p>Ctrl+Option+Cmd+A is a hidden extra that plays the welcome's arrival again, sound included, without restarting the tour. Esc or a click closes it.</p>
 <p>You can't change shortcuts yet. The Shortcuts tab in Settings is greyed out until it's built.</p>
 </article><p class="docs-next"><a href="../your-data/" rel="next">Next: Your data &rarr;</a></p></main></div><footer class="end">
       <a class="mark plain" href="#main" aria-label="Back to top"><img class="ribbon" src="../../blog/_assets/logo-matte.adbb3c7ddc14.webp" alt="" width="1254" height="1254"><picture><source media="(prefers-color-scheme: dark)" srcset="../../blog/_assets/wordmark-ivory.3a99cf025832.svg"><img class="wordmark" src="../../blog/_assets/wordmark-ink.18b9e7ae3785.svg" alt="myArc" width="3056" height="1049"></picture></a>

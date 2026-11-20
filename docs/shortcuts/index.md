@@ -28,6 +28,8 @@ The command bar is the box for addresses and searches. Inside it, the arrow keys
 
 Cmd\+Shift\+C opens the element inspector in Chrome. myArc follows Arc and copies the address instead.
 
+Ctrl\+Option\+Cmd\+A is a hidden extra that plays the welcome's arrival again, sound included, without restarting the tour. Esc or a click closes it.
+
 You can't change shortcuts yet. The Shortcuts tab in Settings is greyed out until it's built.
 
 [Next: Your data →](https://myarc.dev/docs/your-data/)
