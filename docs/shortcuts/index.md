@@ -32,6 +32,8 @@ Cmd\+1 to Cmd\+8 open the first eight rows of the sidebar, Favorites first, and 
 
 The command bar is the box for addresses and searches. Inside it, the arrow keys move through suggestions, Enter opens the selected one and Escape closes the bar. Type an action, such as pin, archive, split or a Space's name, to run it, or type / to list the actions.
 
+Press Tab in the empty command bar to switch to Actions mode, which lists only actions, as Arc does. Press Tab again, or Backspace in the empty field, to go back.
+
 Cmd\+Shift\+C opens the element inspector in Chrome. myArc follows Arc and copies the address instead.
 
 Ctrl\+Option\+Cmd\+A is a hidden extra that plays the welcome's arrival again, sound included, without restarting the tour. Esc or a click closes it. To take the whole tour again, open Settings, go to Advanced and click Replay welcome tour.

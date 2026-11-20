@@ -497,6 +497,12 @@
     .welcome h2 { margin-top: 4.5rem; font-size: 1.5rem }
 
     /* Hero. Title on the left, the homepage ribbon on the right over a soft glow in its own colours. */
+    .welcome-top { flex-wrap: nowrap; justify-content: space-between }
+    .welcome-nav { display: flex; align-items: center; gap: 1.75rem }
+    .welcome-nav a { display: inline-flex; align-items: center; min-height: 2.75rem; color: var(--text); font-weight: 500; text-decoration: none }
+    .welcome-nav a:hover, .welcome-nav a:focus-visible { color: var(--link-solid) }
+    .welcome-nav .github-icon { width: 1.375rem; height: 1.375rem }
+
     .welcome .welcome-hero { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 22rem); align-items: center; gap: 2rem 3rem; margin-bottom: 1rem }
     .welcome-hero::before { content: ''; position: absolute; z-index: -1; top: -6rem; right: -8rem; width: 44rem; height: 34rem; pointer-events: none; filter: blur(3rem); opacity: .5;
       background: radial-gradient(40% 45% at 35% 40%, rgb(26 133 255 / .45), transparent 70%), radial-gradient(35% 40% at 65% 35%, rgb(124 108 255 / .4), transparent 70%), radial-gradient(40% 40% at 55% 70%, rgb(255 122 92 / .35), transparent 70%) }
@@ -504,34 +510,55 @@
     .welcome-intro { margin-top: 1.25rem; max-width: 40ch; color: var(--quiet); font-size: 1.25rem; line-height: 1.5 }
     .welcome .hero-art { --shift: 0%; max-width: 22rem; justify-self: end }
 
-    /* The tour, after Zen's welcome: a short list on the left, one sticky stage on the right.
-       Picking a feature swaps the stage to its scene. Without script the first scene stays as a still. */
-    .tour { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); align-items: start; gap: 2rem 3.5rem; margin-top: 1.5rem }
-    .welcome-cards { display: grid; gap: .25rem; margin: 0; padding: 0; list-style: none }
-    .welcome-cards > li { position: relative; padding: 1rem 1.25rem 1.125rem; border-radius: 1rem; transition: background-color .25s ease-in-out; animation: rise .9s var(--ease) both; animation-delay: calc(.4s + var(--i) * .07s) }
-    .welcome-cards > li:hover { background: rgb(var(--link-rgb) / .045) }
-    .welcome-cards > li.is-active { background: rgb(var(--link-rgb) / .09) }
+    /* The basics as a bento grid: Spaces and Peek wide, four single tiles below. Each tile is one rounded gradient
+       card holding its own looping scene and its text. Hover, focus or a tap grows a tile; the tracks animate
+       and the grid reflows around it. */
+    .welcome-cards { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; grid-template-rows: 22rem 22rem; gap: 1rem; margin: 1.5rem 0 0; padding: 0; list-style: none }
+    .welcome-cards.is-live { transition: grid-template-columns .55s var(--ease), grid-template-rows .55s var(--ease) }
+    .welcome-cards.is-live[data-focus="0"] { grid-template-columns: 1.2fr 1.2fr .8fr .8fr; grid-template-rows: 25rem 19.5rem }
+    .welcome-cards.is-live[data-focus="1"] { grid-template-columns: .8fr .8fr 1.2fr 1.2fr; grid-template-rows: 25rem 19.5rem }
+    .welcome-cards.is-live[data-focus="2"] { grid-template-columns: 1.9fr .7fr .7fr .7fr; grid-template-rows: 18.5rem 25.5rem }
+    .welcome-cards.is-live[data-focus="3"] { grid-template-columns: .7fr 1.9fr .7fr .7fr; grid-template-rows: 18.5rem 25.5rem }
+    .welcome-cards.is-live[data-focus="4"] { grid-template-columns: .7fr .7fr 1.9fr .7fr; grid-template-rows: 18.5rem 25.5rem }
+    .welcome-cards.is-live[data-focus="5"] { grid-template-columns: .7fr .7fr .7fr 1.9fr; grid-template-rows: 18.5rem 25.5rem }
+    .welcome-cards > li { min-width: 0; min-height: 0; animation: rise .9s var(--ease) both; animation-delay: calc(.35s + var(--i) * .07s) }
+    .welcome-cards > .wide { grid-column: span 2 }
+    .tile { position: relative; isolation: isolate; contain: layout paint; display: flex; flex-direction: column; height: 100%; overflow: hidden; border-radius: 1.5rem; outline: 0;
+      --base: color-mix(in srgb, var(--page) 95%, rgb(var(--link-rgb)));
+      background: var(--base); box-shadow: inset 0 0 0 .0625rem rgb(255 255 255 / .35), 0 1.25rem 2.5rem -1.75rem rgb(16 28 43 / .4) }
+    .tile:focus-visible { outline: .1875rem solid var(--link-solid); outline-offset: .25rem }
+    /* The mesh is painted once and never moves. The spotlight is a fixed-size glow that only translates. */
+    .tile::before { content: ''; position: absolute; z-index: -2; inset: 0; pointer-events: none;
+      background: radial-gradient(55% 60% at var(--m1, 14% 18%), rgb(26 133 255 / .55), transparent 70%), radial-gradient(50% 55% at var(--m2, 88% 12%), rgb(124 108 255 / .45), transparent 70%), radial-gradient(55% 60% at var(--m3, 80% 70%), rgb(255 122 92 / .45), transparent 70%), radial-gradient(50% 55% at var(--m4, 18% 66%), rgb(242 92 191 / .4), transparent 70%) }
+    .welcome-cards > li:nth-child(2) .tile { --m1: 84% 16%; --m2: 12% 60%; --m3: 66% 72%; --m4: 36% 8% }
+    .welcome-cards > li:nth-child(3n) .tile { --m1: 50% 70%; --m2: 8% 12%; --m3: 96% 30%; --m4: 60% 6% }
+    .welcome-cards > li:nth-child(3n + 4) .tile { --m1: 90% 60%; --m2: 30% 10%; --m3: 10% 70% }
+    .tile::after { content: ''; position: absolute; z-index: -1; top: -11rem; left: -11rem; width: 22rem; height: 22rem; border-radius: 50%; pointer-events: none; opacity: 0;
+      background: radial-gradient(closest-side, rgb(255 255 255 / .45), transparent); transform: translate3d(var(--x, 50%), var(--y, 40%), 0); transition: opacity .3s ease-in-out }
+    .tile.is-focus::after { opacity: 1; will-change: transform }
+    .tile-art { position: relative; flex: 1 1 auto; min-height: 0; transition: opacity .3s ease-in-out }
+    .welcome-cards.is-live[data-focus] .tile:not(.is-focus) .tile-art { opacity: .55 }
+    /* The art fills whatever box the track leaves it and keeps its proportions inside. */
+    .tile-art .ui { position: absolute; top: .875rem; left: 1rem; width: calc(100% - 2rem); height: calc(100% - .875rem) }
+    /* With script the art keeps one layout size and a transform fits it to the box, so a reflow scales a cached
+       layer instead of redrawing the SVG every frame. It is a layer only while the grid moves. */
+    .welcome-cards.is-sized .ui { left: 50%; width: 640px; height: 416px; transform-origin: 50% 0; transform: translateX(-50%) scale(.4) }
+    .welcome-cards.is-moving .ui { will-change: transform }
+    /* Body copy never sits on the art: the band fades from clear to 90% of the tile's base above the text. */
+    .tile-copy { position: relative; z-index: 0; flex: none; padding: .75rem 1.25rem 1.125rem }
+    .tile-copy::before { content: ''; position: absolute; z-index: -1; inset: -2rem 0 0; pointer-events: none;
+      background: linear-gradient(to bottom, transparent, color-mix(in srgb, var(--base) 90%, transparent) 2rem) }
+    .tile-more { display: none }
+    .welcome-cards.is-live .is-focus .tile-more { display: block }
     .welcome-cards h3 { font-size: 1.25rem; line-height: 1.25 }
-    .welcome-cards h3 button { padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer }
-    /* The whole card is the button's hit area; the docs link sits above it. */
-    .welcome-cards h3 button::after { content: ''; position: absolute; inset: 0; border-radius: 1rem }
-    .welcome-cards h3 button:focus-visible { outline: 0 }
-    .welcome-cards h3 button:focus-visible::after { outline: .1875rem solid var(--link-solid); outline-offset: .125rem }
-    .welcome-cards p { margin-top: .375rem; color: var(--quiet); font-size: 1rem; line-height: 1.5 }
-    .welcome-cards kbd { min-width: 0 }
-    .tour-docs { position: relative; z-index: 1; display: inline-block; margin-top: .375rem; font-size: 1rem }
-
-    .tour-stage { position: sticky; top: 2rem; isolation: isolate; aspect-ratio: 400 / 290; overflow: hidden; border-radius: 1.75rem; background: linear-gradient(rgb(var(--link-rgb) / .05), rgb(var(--link-rgb) / .05)) var(--page); box-shadow: inset 0 0 0 .0625rem rgb(255 255 255 / .35), 0 1.75rem 3.5rem -2rem rgb(16 28 43 / .45); animation: rise 1s var(--ease) .3s both }
-    .tour-stage::before { content: ''; position: absolute; z-index: -2; inset: -15%; transform: rotate(calc(var(--turn, 0) * 1deg)) scale(1.05); transition: transform 1.4s var(--ease);
-      background: radial-gradient(45% 55% at 14% 20%, rgb(26 133 255 / .6), transparent 70%), radial-gradient(45% 50% at 88% 14%, rgb(124 108 255 / .5), transparent 70%), radial-gradient(50% 55% at 84% 90%, rgb(255 122 92 / .55), transparent 70%), radial-gradient(45% 50% at 16% 92%, rgb(242 92 191 / .45), transparent 70%) }
-    .tour-stage::after { content: ''; position: absolute; z-index: -1; inset: 0; background-image: var(--grain), var(--grain); background-size: 16rem 16rem; mix-blend-mode: overlay; pointer-events: none }
-    .glass { position: absolute; z-index: -1; inset: 15% 5% 7% 17%; border-radius: 1.25rem; background: rgb(255 255 255 / .26); box-shadow: inset 0 0 0 .0625rem rgb(255 255 255 / .5); -webkit-backdrop-filter: blur(.75rem); backdrop-filter: blur(.75rem) }
-    .scene { position: absolute; inset: 0; display: grid; place-items: center; padding: 1.25rem 1.75rem; opacity: 0; transform: translateY(.75rem) scale(.97); transition: opacity .35s ease-in-out, transform .5s var(--ease) }
-    .scene.is-active { opacity: 1; transform: none }
-    .ui { display: block; width: 100%; height: auto; overflow: visible }
+    .welcome-cards p { margin-top: .25rem; color: var(--quiet); font-size: 1rem; line-height: 1.45 }
+    /* Solid link and key colours: over the 90% band the site's 90% link tint falls just under AA in light. */
+    .tile-docs { display: inline-block; margin-top: .25rem; color: var(--link-solid); font-size: 1rem }
+    .ui { display: block; overflow: visible }
 
     /* Mini-UI paint. Light first, dark below. */
     .ui .ui-win { fill: #fbfaf7; stroke: rgb(24 36 50 / .08) }
+    .ui .ui-shadow { fill: rgb(16 28 43 / .07) }
     .ui .ui-pane { fill: #fff }
     .ui .ui-row { fill: rgb(24 36 50 / .08) }
     .ui .ui-row-faint { fill: rgb(24 36 50 / .04) }
@@ -556,9 +583,9 @@
     .ui .tl-y { fill: #febc2e }
     .ui .tl-g { fill: #28c840 }
     @media (prefers-color-scheme: dark) {
-      .tour-stage { background: linear-gradient(rgb(var(--link-rgb) / .04), rgb(var(--link-rgb) / .04)) var(--page); box-shadow: inset 0 0 0 .0625rem rgb(255 255 255 / .1), 0 1.75rem 3.5rem -2rem rgb(0 0 0 / .7) }
-      .tour-stage::before { opacity: .9 }
-      .glass { background: rgb(16 28 43 / .25); box-shadow: inset 0 0 0 .0625rem rgb(255 255 255 / .14) }
+      .tile { --base: color-mix(in srgb, var(--page) 96%, rgb(var(--link-rgb))); box-shadow: inset 0 0 0 .0625rem rgb(255 255 255 / .1), 0 1.25rem 2.5rem -1.75rem rgb(0 0 0 / .7) }
+      .tile::after { background: radial-gradient(closest-side, rgb(143 177 255 / .22), transparent) }
+      .ui .ui-shadow { fill: rgb(0 0 0 / .14) }
       .ui .ui-win { fill: #1a2635; stroke: rgb(255 255 255 / .08) }
       .ui .ui-pane { fill: #223145 }
       .ui .ui-row { fill: rgb(255 255 255 / .09) }
@@ -576,7 +603,8 @@
     }
 
     /* Scene loops, 5s each. The resting style is the last frame, so no script, reduced motion and the
-       first paint all show the feature done. The script adds .is-live only when motion is allowed. */
+       first paint all show the feature done. The script marks a tile .is-playing only while it is on screen, the tab is
+       visible and motion is allowed. Once a tile has focus it is the only one playing, in a slower take. */
     .ui .pk-card, .ui .sv-a, .ui .sv-b, .ui .la-pop, .ui .la-btn, .ui .cb-pal, .ui .cb-type, .ui .cb-caret, .ui .pn-fly { transform-box: view-box }
     .ui .pk-card { transform-origin: 162px 68px }
     .ui .sv-a { transform-origin: 120px 0 }
@@ -584,35 +612,48 @@
     .ui .la-btn { transform-origin: 315px 90px }
     .ui .cb-pal { transform-origin: 200px 144px }
     .ui .cb-type { transform-origin: 130px 0 }
-    .ui .pn-row, .ui .pn-fly, .ui .pn-key { opacity: 0 }
-    .tour.is-live .is-active .ui * { animation-duration: 5s; animation-iteration-count: infinite; animation-timing-function: var(--ease) }
-    .tour.is-live .is-active .sp-side, .tour.is-live .is-active .sp-tint { animation-name: sp-fill }
-    .tour.is-live .is-active .sp-tabs { animation-name: sp-tabs }
-    .tour.is-live .is-active .sp-dot { animation-name: sp-dot }
-    .tour.is-live .is-active .pk-card { animation-name: pk-card }
-    .tour.is-live .is-active .pk-dim { animation-name: pk-dim }
-    .tour.is-live .is-active .pk-link { animation-name: pk-link }
-    .tour.is-live .is-active .sv-a { animation-name: sv-a }
-    .tour.is-live .is-active .sv-b { animation-name: sv-b }
-    .tour.is-live .is-active .sv-fav { animation-name: sv-fav }
-    .tour.is-live .is-active .la-pop { animation-name: la-pop }
-    .tour.is-live .is-active .la-btn { animation-name: la-btn }
-    .tour.is-live .is-active .la-link { animation-name: pk-link }
-    .tour.is-live .is-active .cb-pal { animation-name: cb-pal }
-    .tour.is-live .is-active .cb-type { animation-name: cb-type }
-    .tour.is-live .is-active .cb-caret { animation-name: cb-caret }
-    .tour.is-live .is-active .cb-r1 { animation-name: cb-r1 }
-    .tour.is-live .is-active .cb-r2 { animation-name: cb-r2 }
-    .tour.is-live .is-active .cb-r3 { animation-name: cb-r3 }
-    .tour.is-live .is-active .pn-row { animation-name: pn-row }
-    .tour.is-live .is-active .pn-fly { animation-name: pn-fly }
-    .tour.is-live .is-active .pn-tile { animation-name: pn-tile }
-    .tour.is-live .is-active .pn-key { animation-name: pn-key }
-    @keyframes sp-fill { 0%, 28% { fill: var(--rb-coral) } 34%, 61% { fill: var(--rb-violet) } 67%, 100% { fill: var(--rb-blue) } }
+    .ui .pn-row, .ui .pn-fly, .ui .sp-c, .ui .sp-v, .ui .kc { opacity: 0 }
+    .is-playing .ui * { animation-duration: 5s; animation-iteration-count: infinite; animation-timing-function: var(--ease) }
+    .is-playing.is-focus .ui * { animation-duration: 7s }
+    .is-playing :is(.sp-b, .sp-c, .sp-v, .sp-tabs, .sp-dot, .pk-card, .pk-dim, .pk-link, .sv-a, .sv-b, .sv-fav, .la-pop, .la-btn, .la-link, .cb-pal, .cb-type, .cb-caret, .cb-r1, .cb-r2, .cb-r3, .pn-row, .pn-fly, .pn-tile) { will-change: transform, opacity }
+    .is-playing.is-focus .kc { will-change: opacity }
+    .is-playing .sp-b { animation-name: sp-b }
+    .is-playing .sp-c { animation-name: sp-c }
+    .is-playing .sp-v { animation-name: sp-v }
+    .is-playing .sp-tabs { animation-name: sp-tabs }
+    .is-playing .sp-dot { animation-name: sp-dot }
+    .is-playing .pk-card { animation-name: pk-card }
+    .is-playing .pk-dim { animation-name: pk-dim }
+    .is-playing .pk-link { animation-name: pk-link }
+    .is-playing .sv-a { animation-name: sv-a }
+    .is-playing .sv-b { animation-name: sv-b }
+    .is-playing .sv-fav { animation-name: sv-fav }
+    .is-playing .la-pop { animation-name: la-pop }
+    .is-playing .la-btn { animation-name: la-btn }
+    .is-playing .la-link { animation-name: pk-link }
+    .is-playing .cb-pal { animation-name: cb-pal }
+    .is-playing .cb-type { animation-name: cb-type }
+    .is-playing .cb-caret { animation-name: cb-caret }
+    .is-playing .cb-r1 { animation-name: cb-r1 }
+    .is-playing .cb-r2 { animation-name: cb-r2 }
+    .is-playing .cb-r3 { animation-name: cb-r3 }
+    .is-playing .pn-row { animation-name: pn-row }
+    .is-playing .pn-fly { animation-name: pn-fly }
+    .is-playing .pn-tile { animation-name: pn-tile }
+    .is-playing.is-focus .kc-sp1 { animation-name: kc-sp1 }
+    .is-playing.is-focus .kc-sp2 { animation-name: kc-sp2 }
+    .is-playing.is-focus .kc-pk { animation-name: kc-pk }
+    .is-playing.is-focus .kc-sv { animation-name: kc-sv }
+    .is-playing.is-focus .kc-la { animation-name: kc-la }
+    .is-playing.is-focus .kc-cb { animation-name: kc-cb }
+    .is-playing.is-focus .kc-pn { animation-name: kc-pn }
+    @keyframes sp-b { 0%, 61% { opacity: 0 } 67%, 100% { opacity: 1 } }
+    @keyframes sp-c { 0%, 28% { opacity: 1 } 34%, 100% { opacity: 0 } }
+    @keyframes sp-v { 0%, 28% { opacity: 0 } 34%, 61% { opacity: 1 } 67%, 100% { opacity: 0 } }
     @keyframes sp-tabs { 0%, 28%, 36%, 61%, 69%, 100% { transform: none; opacity: 1 } 31%, 64% { transform: translateX(-10px); opacity: 0 } 32%, 65% { transform: translateX(10px); opacity: 0 } }
     @keyframes sp-dot { 0%, 28% { transform: translateX(11px) } 34%, 61% { transform: translateX(22px) } 67%, 100% { transform: none } }
-    @keyframes pk-card { 0%, 14% { transform: scale(.05); opacity: 0 } 28%, 86% { transform: none; opacity: 1 } 96%, 100% { transform: scale(.05); opacity: 0 } }
-    @keyframes pk-dim { 0%, 14% { opacity: 0 } 28%, 86% { opacity: 1 } 96%, 100% { opacity: 0 } }
+    @keyframes pk-card { 0%, 4% { transform: scale(.05); opacity: 0 } 18%, 88% { transform: none; opacity: 1 } 98%, 100% { transform: scale(.05); opacity: 0 } }
+    @keyframes pk-dim { 0%, 4% { opacity: 0 } 18%, 88% { opacity: 1 } 98%, 100% { opacity: 0 } }
     @keyframes pk-link { 0%, 4% { opacity: .35 } 10%, 100% { opacity: 1 } }
     @keyframes sv-a { 0%, 18% { transform: scaleX(2.008) } 34%, 88% { transform: none } 100% { transform: scaleX(2.008) } }
     @keyframes sv-b { 0%, 18% { transform: translateX(125px); opacity: 0 } 34%, 88% { transform: none; opacity: 1 } 100% { transform: translateX(125px); opacity: 0 } }
@@ -628,70 +669,54 @@
     @keyframes pn-row { 0%, 22% { opacity: 1 } 34%, 92% { opacity: 0 } 100% { opacity: 1 } }
     @keyframes pn-fly { 0%, 22% { opacity: 0; transform: translate(-59px, 31.5px) } 26% { opacity: 1; transform: translate(-59px, 31.5px) } 48% { opacity: 1; transform: none } 52%, 100% { opacity: 0; transform: none } }
     @keyframes pn-tile { 0%, 46% { opacity: 0 } 52%, 92% { opacity: 1 } 100% { opacity: 0 } }
-    @keyframes pn-key { 0%, 8% { opacity: 0 } 14%, 34% { opacity: 1 } 42%, 100% { opacity: 0 } }
+    @keyframes kc-sp1 { 0%, 20% { opacity: 0 } 24%, 34% { opacity: 1 } 40%, 100% { opacity: 0 } }
+    @keyframes kc-sp2 { 0%, 53% { opacity: 0 } 57%, 67% { opacity: 1 } 73%, 100% { opacity: 0 } }
+    @keyframes kc-pk { 0%, 72% { opacity: 0 } 76%, 88% { opacity: 1 } 94%, 100% { opacity: 0 } }
+    @keyframes kc-sv { 0%, 8% { opacity: 0 } 12%, 30% { opacity: 1 } 38%, 100% { opacity: 0 } }
+    @keyframes kc-la { 0%, 48% { opacity: 0 } 52%, 64% { opacity: 1 } 70%, 100% { opacity: 0 } }
+    @keyframes kc-cb { 0%, 6% { opacity: 1 } 12%, 90% { opacity: 0 } 96%, 100% { opacity: 1 } }
+    @keyframes kc-pn { 0%, 8% { opacity: 0 } 14%, 34% { opacity: 1 } 42%, 100% { opacity: 0 } }
 
     .welcome-keys, .welcome-links { margin: 1.25rem 0 0; padding: 0; list-style: none }
     .welcome-keys { display: grid; grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr)); gap: .75rem 1.5rem }
     .welcome-keys li { display: flex; align-items: baseline; gap: .75rem; font-size: 1rem }
     .welcome kbd { min-width: 4.5rem; padding: .05em .4em; border: 1px solid color-mix(in srgb, currentColor 18%, transparent); border-bottom-width: 2px; border-radius: .375rem; background: color-mix(in srgb, currentColor 6%, transparent); font-family: inherit; font-size: 1rem; font-weight: 500; text-align: center; white-space: nowrap }
-    .welcome-cards kbd { min-width: 0 }
+    .welcome-cards kbd { min-width: 0; color: var(--text) }
     .welcome-more { margin-top: 1rem; font-size: 1rem }
     .welcome-links { display: grid; grid-template-columns: repeat(auto-fill, minmax(17rem, 1fr)); gap: 1rem 1.5rem }
     .welcome-links a { font-weight: 600 }
     .welcome-links p { margin-top: .25rem; color: var(--quiet); font-size: 1rem }
 
-    /* Phones: the stage sits on top and stays in view while the list scrolls under it. */
+    /* Below 75rem four columns get too narrow for the shrunk tiles' text, so two columns. Tiles size to their
+       art, and a focused tile just gets taller. */
+    @media (max-width: 75rem) {
+      .welcome-cards, .welcome-cards.is-live[data-focus] { grid-template-columns: 1fr 1fr; grid-template-rows: none }
+      .tile-art { flex: none; height: 13rem; transition: height .45s var(--ease), opacity .3s ease-in-out }
+      .welcome-cards.is-live .tile.is-focus .tile-art { height: 19rem }
+    }
+    /* Phones: one column. */
+    @media (max-width: 40rem) {
+      .welcome-cards, .welcome-cards.is-live[data-focus] { grid-template-columns: minmax(0, 1fr) }
+      .welcome-cards > .wide { grid-column: auto }
+      .tile-art { height: 12rem }
+    }
     @media (max-width: 48rem) {
+      .welcome-top { justify-content: space-between }
+      .welcome-nav { gap: 1.25rem }
       .welcome .welcome-hero { grid-template-columns: minmax(0, 1fr) }
       .welcome .hero-art { justify-self: center; max-width: 15rem }
       .welcome h1 { font-size: 3rem }
-      .tour { grid-template-columns: minmax(0, 1fr); gap: 1rem }
-      /* Below the sticky top bar, which is 4.25rem tall here, flush so no text shows between them. */
-      .tour-stage { order: -1; top: 4.25rem; z-index: 1; border-radius: 1.25rem }
-      .scene { padding: .75rem 1rem }
-      .welcome-cards > li { padding: .875rem 1rem 1rem }
     }
     @media (prefers-reduced-motion: reduce) {
-      .welcome-cards > li, .tour-stage { animation: none }
-      .tour-stage::before, .scene, .welcome-cards > li { transition: none }
+      .welcome-cards > li { animation: none }
+      .tile-art, .tile::after { transition: none }
+      .tile.is-focus { outline: .1875rem solid var(--link-solid); outline-offset: .25rem }
     }
   </style>
 <link rel="alternate" type="text/plain" href="https://myarc.dev/llms.txt" title="Site context">
 <script type="application/json" id="asset-notices">{"Outfit": "Copyright 2021 The Outfit Project Authors (https://github.com/Outfitio/Outfit-Fonts)\n\nThis Font Software is licensed under the SIL Open Font License, Version 1.1.\nThis license is copied below, and is also available with a FAQ at:\nhttps://scripts.sil.org/OFL\n\n\n-----------------------------------------------------------\nSIL OPEN FONT LICENSE Version 1.1 - 26 February 2007\n-----------------------------------------------------------\n\nPREAMBLE\nThe goals of the Open Font License (OFL) are to stimulate worldwide\ndevelopment of collaborative font projects, to support the font creation\nefforts of academic and linguistic communities, and to provide a free and\nopen framework in which fonts may be shared and improved in partnership\nwith others.\n\nThe OFL allows the licensed fonts to be used, studied, modified and\nredistributed freely as long as they are not sold by themselves. The\nfonts, including any derivative works, can be bundled, embedded,\nredistributed and/or sold with any software provided that any reserved\nnames are not used by derivative works. The fonts and derivatives,\nhowever, cannot be released under any other type of license. The\nrequirement for fonts to remain under this license does not apply\nto any document created using the fonts or their derivatives.\n\nDEFINITIONS\n\"Font Software\" refers to the set of files released by the Copyright\nHolder(s) under this license and clearly marked as such. This may\ninclude source files, build scripts and documentation.\n\n\"Reserved Font Name\" refers to any names specified as such after the\ncopyright statement(s).\n\n\"Original Version\" refers to the collection of Font Software components as\ndistributed by the Copyright Holder(s).\n\n\"Modified Version\" refers to any derivative made by adding to, deleting,\nor substituting -- in part or in whole -- any of the components of the\nOriginal Version, by changing formats or by porting the Font Software to a\nnew environment.\n\n\"Author\" refers to any designer, engineer, programmer, technical\nwriter or other person who contributed to the Font Software.\n\nPERMISSION & CONDITIONS\nPermission is hereby granted, free of charge, to any person obtaining\na copy of the Font Software, to use, study, copy, merge, embed, modify,\nredistribute, and sell modified and unmodified copies of the Font\nSoftware, subject to the following conditions:\n\n1) Neither the Font Software nor any of its individual components,\nin Original or Modified Versions, may be sold by itself.\n\n2) Original or Modified Versions of the Font Software may be bundled,\nredistributed and/or sold with any software, provided that each copy\ncontains the above copyright notice and this license. These can be\nincluded either as stand-alone text files, human-readable headers or\nin the appropriate machine-readable metadata fields within text or\nbinary files as long as those fields can be easily viewed by the user.\n\n3) No Modified Version of the Font Software may use the Reserved Font\nName(s) unless explicit written permission is granted by the corresponding\nCopyright Holder. This restriction only applies to the primary font name as\npresented to the users.\n\n4) The name(s) of the Copyright Holder(s) or the Author(s) of the Font\nSoftware shall not be used to promote, endorse or advertise any\nModified Version, except to acknowledge the contribution(s) of the\nCopyright Holder(s) and the Author(s) or with their explicit written\npermission.\n\n5) The Font Software, modified or unmodified, in part or in whole,\nmust be distributed entirely under this license, and must not be\ndistributed under any other license. The requirement for fonts to\nremain under this license does not apply to any document created\nusing the Font Software.\n\nTERMINATION\nThis license becomes null and void if any of the above conditions are\nnot met.\n\nDISCLAIMER\nTHE FONT SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND,\nEXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO ANY WARRANTIES OF\nMERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT\nOF COPYRIGHT, PATENT, TRADEMARK, OR OTHER RIGHT. IN NO EVENT SHALL THE\nCOPYRIGHT HOLDER BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,\nINCLUDING ANY GENERAL, SPECIAL, INDIRECT, INCIDENTAL, OR CONSEQUENTIAL\nDAMAGES, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING\nFROM, OUT OF THE USE OR INABILITY TO USE THE FONT SOFTWARE OR FROM\nOTHER DEALINGS IN THE FONT SOFTWARE.\n", "Lucide": "ISC License\n\nCopyright (c) 2026 Lucide Icons and Contributors\n\nPermission to use, copy, modify, and/or distribute this software for any\npurpose with or without fee is hereby granted, provided that the above\ncopyright notice and this permission notice appear in all copies.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\" AND THE AUTHOR DISCLAIMS ALL WARRANTIES\nWITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF\nMERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR\nANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES\nWHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN\nACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF\nOR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.\n\n---\n\nThe following Lucide icons are derived from the Feather project:\n\nairplay, alert-circle, alert-octagon, alert-triangle, aperture, arrow-down-circle, arrow-down-left, arrow-down-right, arrow-down, arrow-left-circle, arrow-left, arrow-right-circle, arrow-right, arrow-up-circle, arrow-up-left, arrow-up-right, arrow-up, at-sign, calendar, cast, check, chevron-down, chevron-left, chevron-right, chevron-up, chevrons-down, chevrons-left, chevrons-right, chevrons-up, circle, clipboard, clock, code, columns, command, compass, corner-down-left, corner-down-right, corner-left-down, corner-left-up, corner-right-down, corner-right-up, corner-up-left, corner-up-right, crosshair, database, divide-circle, divide-square, dollar-sign, download, external-link, feather, frown, hash, headphones, help-circle, info, italic, key, layout, life-buoy, link-2, link, loader, lock, log-in, log-out, maximize, meh, minimize, minimize-2, minus-circle, minus-square, minus, monitor, moon, more-horizontal, more-vertical, move, music, navigation-2, navigation, octagon, pause-circle, percent, plus-circle, plus-square, plus, power, radio, rss, search, server, share, shopping-bag, sidebar, smartphone, smile, square, table-2, tablet, target, terminal, trash-2, trash, triangle, tv, type, upload, x-circle, x-octagon, x-square, x, zoom-in, zoom-out\n\nThe MIT License (MIT) (for the icons listed above)\n\nCopyright (c) 2013-present Cole Bemis\n\nPermission is hereby granted, free of charge, to any person obtaining a copy\nof this software and associated documentation files (the \"Software\"), to deal\nin the Software without restriction, including without limitation the rights\nto use, copy, modify, merge, publish, distribute, sublicense, and/or sell\ncopies of the Software, and to permit persons to whom the Software is\nfurnished to do so, subject to the following conditions:\n\nThe above copyright notice and this permission notice shall be included in all\ncopies or substantial portions of the Software.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR\nIMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,\nFITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE\nAUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER\nLIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,\nOUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE\nSOFTWARE.\n", "artwork": "User-supplied ribbon logos. Original grain and custom wordmark generated for myArc. See repository ATTRIBUTION.md for provenance and rights limitations."}</script>
 </head>
-<body><a class="skip" href="#main">Skip to content</a><div class="wrap"><header class="top">
-      <button class="menu-toggle" type="button" popovertarget="site-menu" aria-controls="site-menu" aria-label="Menu"><svg class="icon-open" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M4 5h16"/><path d="M4 12h16"/><path d="M4 19h16"/></svg><svg class="icon-close" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
-      <a class="mark plain" href="/" aria-label="myArc home"><img class="ribbon" src="../blog/_assets/logo-matte.adbb3c7ddc14.webp" alt="" width="1254" height="1254"><picture><source media="(prefers-color-scheme: dark)" srcset="../blog/_assets/wordmark-ivory.3a99cf025832.svg"><img class="wordmark" src="../blog/_assets/wordmark-ink.18b9e7ae3785.svg" alt="myArc" width="3056" height="1049"></picture></a>
-      <div class="quick">
-        <a class="quick-blog" href="/blog/">Blog</a>
-        <a class="quick-icon" href="https://github.com/bitbonsai/myarc" aria-label="Follow development"><svg class="github-icon" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false"><path fill-rule="evenodd" clip-rule="evenodd" d="M8 0C3.58 0 0 3.58 0 8C0 11.54 2.29 14.53 5.47 15.59C5.87 15.66 6.02 15.42 6.02 15.21C6.02 15.02 6.01 14.39 6.01 13.72C4 14.09 3.48 13.23 3.32 12.78C3.23 12.55 2.84 11.84 2.5 11.65C2.22 11.5 1.82 11.13 2.49 11.12C3.12 11.11 3.57 11.7 3.72 11.94C4.44 13.15 5.59 12.81 6.05 12.6C6.12 12.08 6.33 11.73 6.56 11.53C4.78 11.33 2.92 10.64 2.92 7.58C2.92 6.71 3.23 5.99 3.74 5.43C3.66 5.23 3.38 4.41 3.82 3.31C3.82 3.31 4.49 3.1 6.02 4.13C6.66 3.95 7.34 3.86 8.02 3.86C8.7 3.86 9.38 3.95 10.02 4.13C11.55 3.09 12.22 3.31 12.22 3.31C12.66 4.41 12.38 5.23 12.3 5.43C12.81 5.99 13.12 6.7 13.12 7.58C13.12 10.65 11.25 11.33 9.47 11.53C9.76 11.78 10.01 12.26 10.01 13.01C10.01 14.08 10 14.94 10 15.21C10 15.42 10.15 15.67 10.55 15.59C13.71 14.53 16 11.53 16 8C16 3.58 12.42 0 8 0Z" transform="scale(64)" fill="currentColor"/></svg></a>
-      </div>
-      <nav id="site-menu" aria-label="Page" popover>
-        <a href="/#principles">Principles</a>
-        <a href="/#building">Progress</a>
-        <a class="docs-link" href="/docs/">Docs</a>
-        <a class="blog-link" href="/blog/">Blog</a>
-        <a class="nav-github" href="https://github.com/bitbonsai/myarc" aria-label="myArc on GitHub"><svg class="github-icon" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false"><path fill-rule="evenodd" clip-rule="evenodd" d="M8 0C3.58 0 0 3.58 0 8C0 11.54 2.29 14.53 5.47 15.59C5.87 15.66 6.02 15.42 6.02 15.21C6.02 15.02 6.01 14.39 6.01 13.72C4 14.09 3.48 13.23 3.32 12.78C3.23 12.55 2.84 11.84 2.5 11.65C2.22 11.5 1.82 11.13 2.49 11.12C3.12 11.11 3.57 11.7 3.72 11.94C4.44 13.15 5.59 12.81 6.05 12.6C6.12 12.08 6.33 11.73 6.56 11.53C4.78 11.33 2.92 10.64 2.92 7.58C2.92 6.71 3.23 5.99 3.74 5.43C3.66 5.23 3.38 4.41 3.82 3.31C3.82 3.31 4.49 3.1 6.02 4.13C6.66 3.95 7.34 3.86 8.02 3.86C8.7 3.86 9.38 3.95 10.02 4.13C11.55 3.09 12.22 3.31 12.22 3.31C12.66 4.41 12.38 5.23 12.3 5.43C12.81 5.99 13.12 6.7 13.12 7.58C13.12 10.65 11.25 11.33 9.47 11.53C9.76 11.78 10.01 12.26 10.01 13.01C10.01 14.08 10 14.94 10 15.21C10 15.42 10.15 15.67 10.55 15.59C13.71 14.53 16 11.53 16 8C16 3.58 12.42 0 8 0Z" transform="scale(64)" fill="currentColor"/></svg></a>
-        <a class="button download-link" href="/download/">Download pre-alpha</a>
-        <button class="menu-close" type="button" popovertarget="site-menu" popovertargetaction="hide" aria-label="Close menu"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
-      </nav>
-      <script>
-        (() => {
-          const menu = document.querySelector('#site-menu')
-          const toggle = document.querySelector('.menu-toggle')
-          if (!menu || !toggle || typeof menu.showPopover !== 'function') return
-          const open = () => menu.matches(':popover-open')
-          toggle.setAttribute('aria-expanded', 'false')
-          menu.addEventListener('toggle', () => toggle.setAttribute('aria-expanded', String(open())))
-          menu.addEventListener('click', event => {
-            if (event.target.closest('a') && open()) menu.hidePopover()
-          })
-          matchMedia('(min-width: 48.0625rem)').addEventListener('change', event => {
-            if (event.matches && open()) menu.hidePopover()
-          })
-        })()
-      </script>
-    </header><main id="main" class="journal welcome"><header class="post-header welcome-hero"><div class="welcome-hero-copy"><h1 class="rise">Welcome to myArc</h1><p class="welcome-intro rise">myArc is an open-source browser that keeps Arc&#x27;s way of browsing, with no account to sign up for. Here&#x27;s where to start.</p></div><div class="hero-art">
+<body><a class="skip" href="#main">Skip to content</a><div class="wrap"><header class="top welcome-top"><a class="mark plain" href="/" aria-label="myArc home"><img class="ribbon" src="../blog/_assets/logo-matte.adbb3c7ddc14.webp" alt="" width="1254" height="1254"><picture><source media="(prefers-color-scheme: dark)" srcset="../blog/_assets/wordmark-ivory.3a99cf025832.svg"><img class="wordmark" src="../blog/_assets/wordmark-ink.18b9e7ae3785.svg" alt="myArc" width="3056" height="1049"></picture></a><div class="welcome-nav" role="navigation" aria-label="Site"><a href="/docs/">Docs</a><a class="welcome-github" href="https://github.com/bitbonsai/myarc" aria-label="myArc on GitHub"><svg class="github-icon" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false"><path fill-rule="evenodd" clip-rule="evenodd" d="M8 0C3.58 0 0 3.58 0 8C0 11.54 2.29 14.53 5.47 15.59C5.87 15.66 6.02 15.42 6.02 15.21C6.02 15.02 6.01 14.39 6.01 13.72C4 14.09 3.48 13.23 3.32 12.78C3.23 12.55 2.84 11.84 2.5 11.65C2.22 11.5 1.82 11.13 2.49 11.12C3.12 11.11 3.57 11.7 3.72 11.94C4.44 13.15 5.59 12.81 6.05 12.6C6.12 12.08 6.33 11.73 6.56 11.53C4.78 11.33 2.92 10.64 2.92 7.58C2.92 6.71 3.23 5.99 3.74 5.43C3.66 5.23 3.38 4.41 3.82 3.31C3.82 3.31 4.49 3.1 6.02 4.13C6.66 3.95 7.34 3.86 8.02 3.86C8.7 3.86 9.38 3.95 10.02 4.13C11.55 3.09 12.22 3.31 12.22 3.31C12.66 4.41 12.38 5.23 12.3 5.43C12.81 5.99 13.12 6.7 13.12 7.58C13.12 10.65 11.25 11.33 9.47 11.53C9.76 11.78 10.01 12.26 10.01 13.01C10.01 14.08 10 14.94 10 15.21C10 15.42 10.15 15.67 10.55 15.59C13.71 14.53 16 11.53 16 8C16 3.58 12.42 0 8 0Z" transform="scale(64)" fill="currentColor"/></svg></a></div></header><main id="main" class="journal welcome"><header class="post-header welcome-hero"><div class="welcome-hero-copy"><h1 class="rise">Welcome to myArc</h1><p class="welcome-intro rise">myArc is an open-source browser that keeps Arc&#x27;s way of browsing, with no account to sign up for. Here&#x27;s where to start.</p></div><div class="hero-art">
   <img src="../blog/_assets/logo-hero.4ac1596a77ee.webp" alt="myArc ribbon logo, a looping A in blue, violet, pink and coral" width="1440" height="1440">
   <canvas aria-hidden="true"></canvas>
 </div>
@@ -936,9 +961,11 @@
         if (w && h && (canvas.width !== w || canvas.height !== h)) { canvas.width = w; canvas.height = h }
       }
 
+      // Offscreen or in a hidden tab the loop stops outright, and wake() restarts it.
       const draw = (now) => {
-        raf = still ? 0 : requestAnimationFrame(draw)
-        if (!visible && !still) { last = 0; return }
+        raf = 0
+        if (!still && (!visible || document.hidden)) { last = 0; return }
+        if (!still) raf = requestAnimationFrame(draw)
         const dt = last ? Math.min((now - last) / 1000, 1 / 30) : 1 / 60
         last = now; time += dt
         resize()
@@ -1027,7 +1054,9 @@
         }
       }
 
-      const io = new IntersectionObserver(([e]) => { visible = e.isIntersecting })
+      const wake = () => { if (!raf && !still && visible && !document.hidden) raf = requestAnimationFrame(draw) }
+      const io = new IntersectionObserver(([e]) => { visible = e.isIntersecting; wake() })
+      document.addEventListener('visibilitychange', wake)
       io.observe(canvas)
       if (!still) {
         addEventListener('pointermove', onMove, { passive: true })
@@ -1040,7 +1069,7 @@
       return {
         sheen, play,
         destroy: () => {
-          cancelAnimationFrame(raf); io.disconnect(); ro.disconnect()
+          cancelAnimationFrame(raf); io.disconnect(); ro.disconnect(); document.removeEventListener('visibilitychange', wake)
           removeEventListener('pointermove', onMove); removeEventListener('pointerdown', onDown)
         },
       }
@@ -1054,40 +1083,64 @@
       console.warn('Ribbon animation unavailable', error)
     }
   })()
-</script></header><div class="welcome-body"><h2 class="visually-hidden">The basics</h2><div class="tour"><ul class="welcome-cards"><li class="is-active" style="--i: 0"><h3>Spaces and Profiles</h3><p>A Space holds the tabs for one part of your life, like Work or Travel. A Profile keeps your logins apart, and several Spaces can share one.</p><a class="tour-docs" href="/docs/spaces-and-profiles/">How it works<span class="visually-hidden">: Spaces and Profiles</span></a></li><li style="--i: 1"><h3>Peek</h3><p>A link from a pinned tab or Favorite to another site opens in a card over the page. Press <kbd>⌘O</kbd> to keep it as a tab.</p><a class="tour-docs" href="/docs/peek/">How it works<span class="visually-hidden">: Peek</span></a></li><li style="--i: 2"><h3>Split View</h3><p>Press <kbd>⌃⇧=</kbd> to put two tabs side by side. The pair shows as one row in the sidebar and comes back after a restart.</p></li><li style="--i: 3"><h3>Little Arc</h3><p>Links from other apps open in a small window, and <kbd>⌥⌘N</kbd> opens one from anywhere. Press <kbd>⌘O</kbd> to move the page into your current Space.</p></li><li style="--i: 4"><h3>Command bar</h3><p><kbd>⌘T</kbd> opens it for a new tab and <kbd>⌘L</kbd> on the current address. Type an action like pin or split to run it, or / to list them all.</p></li><li style="--i: 5"><h3>Pinned tabs and Favorites</h3><p>Press <kbd>⌘D</kbd> to pin a tab to its Space. Favorites show in every Space of a Profile, and closing either one keeps its tile.</p><a class="tour-docs" href="/docs/spaces-and-profiles/#pinned-tabs-and-favorites">How it works<span class="visually-hidden">: Pinned tabs and Favorites</span></a></li></ul><div class="tour-stage" aria-hidden="true"><span class="glass"></span><div class="scene is-active"><svg class="ui" viewBox="0 0 400 260" aria-hidden="true" focusable="false"><defs><filter id="lift-0" x="-20%" y="-20%" width="140%" height="150%"><feDropShadow dx="0" dy="8" stdDeviation="9" flood-color="#101c2b" flood-opacity=".28"/></filter></defs><rect class="f-violet" x="12" y="14" width="80" height="196" rx="10" opacity=".45"/><rect class="f-coral" x="25" y="28" width="80" height="196" rx="10" opacity=".6"/><g filter="url(#lift-0)"><rect class="ui-win" x="38" y="42" width="300" height="196" rx="12"/><rect class="side f-blue sp-side" x="43" y="47" width="81" height="186" rx="8"/><circle class="tl-r" cx="53" cy="57" r="2.6"/><circle class="tl-y" cx="62" cy="57" r="2.6"/><circle class="tl-g" cx="71" cy="57" r="2.6"/><rect class="ui-row" x="49" y="68" width="69" height="10" rx="5"/><g class="sp-tabs"><rect class="ui-sel" x="49" y="88" width="69" height="11" rx="4"/><rect class="f-blue" x="53" y="91" width="5" height="5" rx="1.5"/><rect class="ui-line" x="62" y="92.5" width="43" height="2" rx="1"/><rect class="ui-row" x="49" y="103" width="69" height="11" rx="4"/><rect class="f-coral" x="53" y="106" width="5" height="5" rx="1.5"/><rect class="ui-line" x="62" y="107.5" width="36" height="2" rx="1"/><rect class="ui-row" x="49" y="118" width="69" height="11" rx="4"/><rect class="f-violet" x="53" y="121" width="5" height="5" rx="1.5"/><rect class="ui-line" x="62" y="122.5" width="43" height="2" rx="1"/><rect class="ui-row" x="49" y="133" width="69" height="11" rx="4"/><rect class="f-pink" x="53" y="136" width="5" height="5" rx="1.5"/><rect class="ui-line" x="62" y="137.5" width="36" height="2" rx="1"/></g><rect class="ui-pane" x="128" y="47" width="205" height="186" rx="8"/><rect class="ui-ink" x="142" y="62" width="88" height="7" rx="3"/><rect class="ui-line" x="142" y="77" width="152" height="3" rx="1.5"/><rect class="ui-line" x="142" y="85" width="124" height="3" rx="1.5"/><rect class="tint f-blue sp-tint" x="142" y="98" width="177" height="58" rx="6"/><rect class="ui-line" x="142" y="166" width="142" height="3" rx="1.5"/><rect class="ui-line" x="142" y="174" width="97" height="3" rx="1.5"/></g><circle class="ui-line" cx="60" cy="226" r="3"/><circle class="ui-line" cx="71" cy="226" r="3"/><circle class="ui-line" cx="82" cy="226" r="3"/><circle class="f-blue sp-dot" cx="60" cy="226" r="3"/><circle class="f-coral" cx="112" cy="57" r="5"/><circle class="ui-pane" cx="112" cy="57" r="2"/></svg></div><div class="scene"><svg class="ui" viewBox="0 0 400 260" aria-hidden="true" focusable="false"><defs><filter id="lift-1" x="-20%" y="-20%" width="140%" height="150%"><feDropShadow dx="0" dy="8" stdDeviation="9" flood-color="#101c2b" flood-opacity=".28"/></filter></defs><rect class="ui-win" x="30" y="30" width="340" height="210" rx="12"/><rect class="side f-violet " x="35" y="35" width="81" height="200" rx="8"/><circle class="tl-r" cx="45" cy="45" r="2.6"/><circle class="tl-y" cx="54" cy="45" r="2.6"/><circle class="tl-g" cx="63" cy="45" r="2.6"/><rect class="ui-row" x="41" y="56" width="69" height="10" rx="5"/><rect class="ui-sel" x="41" y="76" width="69" height="11" rx="4"/><rect class="f-blue" x="45" y="79" width="5" height="5" rx="1.5"/><rect class="ui-line" x="54" y="80.5" width="43" height="2" rx="1"/><rect class="ui-row" x="41" y="91" width="69" height="11" rx="4"/><rect class="f-coral" x="45" y="94" width="5" height="5" rx="1.5"/><rect class="ui-line" x="54" y="95.5" width="36" height="2" rx="1"/><rect class="ui-row" x="41" y="106" width="69" height="11" rx="4"/><rect class="f-violet" x="45" y="109" width="5" height="5" rx="1.5"/><rect class="ui-line" x="54" y="110.5" width="43" height="2" rx="1"/><rect class="ui-row" x="41" y="121" width="69" height="11" rx="4"/><rect class="f-pink" x="45" y="124" width="5" height="5" rx="1.5"/><rect class="ui-line" x="54" y="125.5" width="36" height="2" rx="1"/><rect class="ui-pane" x="120" y="35" width="245" height="200" rx="8"/><rect class="ui-ink" x="132" y="44" width="110" height="7" rx="3"/><rect class="ui-line" x="132" y="59" width="189" height="3" rx="1.5"/><rect class="ui-line" x="132" y="67" width="154" height="3" rx="1.5"/><rect class="tint f-blue " x="132" y="80" width="220" height="58" rx="6"/><rect class="ui-line" x="132" y="148" width="176" height="3" rx="1.5"/><rect class="ui-line" x="132" y="156" width="121" height="3" rx="1.5"/><rect class="f-blue pk-link" x="132" y="67" width="62" height="3" rx="1.5"/><rect class="ui-dim pk-dim" x="120" y="35" width="245" height="200" rx="8"/><g class="pk-card" filter="url(#lift-1)"><rect class="ui-pane" x="150" y="62" width="150" height="148" rx="10"/><rect class="ui-row" x="160" y="71" width="44" height="8" rx="4"/><circle class="f-blue" cx="287" cy="75" r="4"/><rect class="ui-ink" x="162" y="90" width="63" height="7" rx="3"/><rect class="ui-line" x="162" y="105" width="108" height="3" rx="1.5"/><rect class="ui-line" x="162" y="113" width="88" height="3" rx="1.5"/><rect class="tint f-pink " x="162" y="126" width="126" height="58" rx="6"/><rect class="ui-line" x="162" y="194" width="101" height="3" rx="1.5"/><rect class="ui-line" x="162" y="202" width="69" height="3" rx="1.5"/></g></svg></div><div class="scene"><svg class="ui" viewBox="0 0 400 260" aria-hidden="true" focusable="false"><defs><filter id="lift-2" x="-20%" y="-20%" width="140%" height="150%"><feDropShadow dx="0" dy="8" stdDeviation="9" flood-color="#101c2b" flood-opacity=".28"/></filter></defs><g filter="url(#lift-2)"><rect class="ui-win" x="30" y="30" width="340" height="210" rx="12"/><rect class="side f-coral" x="35" y="35" width="81" height="200" rx="8"/><circle class="tl-r" cx="45" cy="45" r="2.6"/><circle class="tl-y" cx="54" cy="45" r="2.6"/><circle class="tl-g" cx="63" cy="45" r="2.6"/><rect class="ui-row" x="41" y="56" width="69" height="10" rx="5"/><rect class="ui-sel" x="41" y="76" width="69" height="11" rx="4"/><rect class="f-coral" x="45" y="79" width="5" height="5" rx="1.5"/><rect class="f-blue sv-fav" x="53" y="79" width="5" height="5" rx="1.5"/><rect class="ui-line" x="62" y="80.5" width="34" height="2" rx="1"/><rect class="ui-row" x="41" y="91" width="69" height="11" rx="4"/><rect class="f-coral" x="45" y="94" width="5" height="5" rx="1.5"/><rect class="ui-line" x="54" y="95.5" width="43" height="2" rx="1"/><rect class="ui-row" x="41" y="106" width="69" height="11" rx="4"/><rect class="f-violet" x="45" y="109" width="5" height="5" rx="1.5"/><rect class="ui-line" x="54" y="110.5" width="36" height="2" rx="1"/><rect class="ui-row" x="41" y="121" width="69" height="11" rx="4"/><rect class="f-pink" x="45" y="124" width="5" height="5" rx="1.5"/><rect class="ui-line" x="54" y="125.5" width="43" height="2" rx="1"/><rect class="ui-pane sv-a" x="120" y="35" width="122" height="200" rx="8"/><rect class="ui-ink" x="132" y="50" width="49" height="7" rx="3"/><rect class="ui-line" x="132" y="65" width="84" height="3" rx="1.5"/><rect class="ui-line" x="132" y="73" width="69" height="3" rx="1.5"/><rect class="tint f-coral " x="132" y="86" width="98" height="58" rx="6"/><rect class="ui-line" x="132" y="154" width="78" height="3" rx="1.5"/><rect class="ui-line" x="132" y="162" width="54" height="3" rx="1.5"/><g class="sv-b"><rect class="ui-pane" x="246" y="35" width="119" height="200" rx="8"/><rect class="ui-ink" x="258" y="50" width="48" height="7" rx="3"/><rect class="ui-line" x="258" y="65" width="82" height="3" rx="1.5"/><rect class="ui-line" x="258" y="73" width="66" height="3" rx="1.5"/><rect class="tint f-blue " x="258" y="86" width="95" height="58" rx="6"/><rect class="ui-line" x="258" y="154" width="76" height="3" rx="1.5"/><rect class="ui-line" x="258" y="162" width="52" height="3" rx="1.5"/></g></g></svg></div><div class="scene"><svg class="ui" viewBox="0 0 400 260" aria-hidden="true" focusable="false"><defs><filter id="lift-3" x="-20%" y="-20%" width="140%" height="150%"><feDropShadow dx="0" dy="8" stdDeviation="9" flood-color="#101c2b" flood-opacity=".28"/></filter></defs><rect class="ui-app" x="30" y="30" width="290" height="180" rx="12"/><circle class="tl-r" cx="44" cy="44" r="2.6"/><circle class="tl-y" cx="53" cy="44" r="2.6"/><circle class="tl-g" cx="62" cy="44" r="2.6"/><rect class="ui-app-row" x="44" y="60" width="52" height="12" rx="4"/><rect class="ui-app-row" x="44" y="80" width="52" height="12" rx="4"/><rect class="ui-app-row" x="44" y="100" width="52" height="12" rx="4"/><rect class="ui-app-row" x="44" y="120" width="52" height="12" rx="4"/><rect class="ui-app-row" x="44" y="140" width="52" height="12" rx="4"/><rect class="ui-app-row" x="106" y="40" width="1" height="160"/><rect class="ui-app-row" x="118" y="64" width="120" height="16" rx="8"/><rect class="ui-app-row" x="168" y="88" width="130" height="16" rx="8"/><rect class="f-blue la-link" x="118" y="112" width="96" height="16" rx="8"/><rect class="ui-app-row" x="118" y="136" width="80" height="16" rx="8"/><g class="la-pop" filter="url(#lift-3)"><rect class="ui-win" x="150" y="78" width="200" height="150" rx="11"/><circle class="tl-r" cx="162" cy="90" r="2.6"/><circle class="tl-y" cx="171" cy="90" r="2.6"/><circle class="tl-g" cx="180" cy="90" r="2.6"/><rect class="ui-row" x="190" y="85" width="92" height="10" rx="5"/><g class="la-btn"><rect class="f-blue" x="290" y="84" width="50" height="12" rx="6"/><rect class="glyph-fill" x="300" y="89" width="22" height="2" rx="1"/><path class="glyph" d="M327 87.5l3 2.5-3 2.5"/></g><rect class="ui-pane" x="156" y="102" width="188" height="120" rx="7"/><rect class="ui-ink" x="168" y="114" width="82" height="7" rx="3"/><rect class="ui-line" x="168" y="129" width="141" height="3" rx="1.5"/><rect class="ui-line" x="168" y="137" width="115" height="3" rx="1.5"/><rect class="tint f-coral " x="168" y="150" width="164" height="58" rx="6"/><rect class="ui-line" x="168" y="218" width="131" height="3" rx="1.5"/><rect class="ui-line" x="168" y="226" width="90" height="3" rx="1.5"/></g></svg></div><div class="scene"><svg class="ui" viewBox="0 0 400 260" aria-hidden="true" focusable="false"><defs><filter id="lift-4" x="-20%" y="-20%" width="140%" height="150%"><feDropShadow dx="0" dy="8" stdDeviation="9" flood-color="#101c2b" flood-opacity=".28"/></filter></defs><rect class="ui-win" x="30" y="30" width="340" height="210" rx="12"/><rect class="side f-pink " x="35" y="35" width="81" height="200" rx="8"/><circle class="tl-r" cx="45" cy="45" r="2.6"/><circle class="tl-y" cx="54" cy="45" r="2.6"/><circle class="tl-g" cx="63" cy="45" r="2.6"/><rect class="ui-row" x="41" y="56" width="69" height="10" rx="5"/><rect class="ui-sel" x="41" y="76" width="69" height="11" rx="4"/><rect class="f-blue" x="45" y="79" width="5" height="5" rx="1.5"/><rect class="ui-line" x="54" y="80.5" width="43" height="2" rx="1"/><rect class="ui-row" x="41" y="91" width="69" height="11" rx="4"/><rect class="f-coral" x="45" y="94" width="5" height="5" rx="1.5"/><rect class="ui-line" x="54" y="95.5" width="36" height="2" rx="1"/><rect class="ui-row" x="41" y="106" width="69" height="11" rx="4"/><rect class="f-violet" x="45" y="109" width="5" height="5" rx="1.5"/><rect class="ui-line" x="54" y="110.5" width="43" height="2" rx="1"/><rect class="ui-row" x="41" y="121" width="69" height="11" rx="4"/><rect class="f-pink" x="45" y="124" width="5" height="5" rx="1.5"/><rect class="ui-line" x="54" y="125.5" width="36" height="2" rx="1"/><rect class="ui-pane" x="120" y="35" width="245" height="200" rx="8"/><rect class="ui-ink" x="134" y="50" width="108" height="7" rx="3"/><rect class="ui-line" x="134" y="65" width="187" height="3" rx="1.5"/><rect class="ui-line" x="134" y="73" width="152" height="3" rx="1.5"/><rect class="tint f-pink " x="134" y="86" width="217" height="58" rx="6"/><rect class="ui-line" x="134" y="154" width="174" height="3" rx="1.5"/><rect class="ui-line" x="134" y="162" width="119" height="3" rx="1.5"/><rect class="ui-dim" x="30" y="30" width="340" height="210" rx="12"/><g class="cb-pal" filter="url(#lift-4)"><rect class="ui-pane" x="100" y="80" width="200" height="128" rx="12"/><rect class="f-blue" x="112" y="94" width="11" height="15" rx="3"/><path class="glyph" d="M120 97.5l-4 8"/><rect class="ui-ink cb-type" x="130" y="99" width="62" height="5" rx="2.5"/><rect class="f-blue cb-caret" x="194" y="94" width="2" height="15" rx="1"/><rect class="ui-line" x="100" y="117" width="200" height="1"/><g class="cb-r1"><rect class="tint-strong f-violet" x="110" y="126" width="180" height="19" rx="6"/><rect class="f-violet" x="118" y="131" width="9" height="9" rx="2.5"/><rect class="ui-line" x="134" y="134" width="70" height="3" rx="1.5"/><rect class="ui-row" x="262" y="131" width="20" height="9" rx="3"/></g><g class="cb-r2"><rect class="ui-row-faint" x="110" y="150" width="180" height="19" rx="6"/><rect class="f-blue" x="118" y="155" width="9" height="9" rx="2.5"/><rect class="ui-line" x="134" y="158" width="92" height="3" rx="1.5"/><rect class="ui-row" x="262" y="155" width="20" height="9" rx="3"/></g><g class="cb-r3"><rect class="ui-row-faint" x="110" y="174" width="180" height="19" rx="6"/><rect class="f-coral" x="118" y="179" width="9" height="9" rx="2.5"/><rect class="ui-line" x="134" y="182" width="58" height="3" rx="1.5"/><rect class="ui-row" x="262" y="179" width="20" height="9" rx="3"/></g></g></svg></div><div class="scene"><svg class="ui" viewBox="0 0 400 260" aria-hidden="true" focusable="false"><defs><filter id="lift-5" x="-20%" y="-20%" width="140%" height="150%"><feDropShadow dx="0" dy="8" stdDeviation="9" flood-color="#101c2b" flood-opacity=".28"/></filter></defs><g filter="url(#lift-5)"><rect class="ui-win" x="30" y="30" width="340" height="210" rx="12"/><rect class="side f-blue " x="35" y="35" width="89" height="200" rx="8"/><circle class="tl-r" cx="45" cy="45" r="2.6"/><circle class="tl-y" cx="54" cy="45" r="2.6"/><circle class="tl-g" cx="63" cy="45" r="2.6"/><rect class="ui-row" x="41" y="56" width="77" height="10" rx="5"/><rect class="ui-sel" x="41" y="72" width="23" height="18" rx="5"/><circle class="f-blue" cx="52.5" cy="81" r="4"/><rect class="ui-sel" x="68" y="72" width="23" height="18" rx="5"/><circle class="f-coral" cx="79.5" cy="81" r="4"/><rect class="ui-sel" x="95" y="72" width="23" height="18" rx="5"/><circle class="f-violet" cx="106.5" cy="81" r="4"/><rect class="ui-sel" x="41" y="94" width="23" height="18" rx="5"/><circle class="f-pink" cx="52.5" cy="103" r="4"/><rect class="ui-sel" x="68" y="94" width="23" height="18" rx="5"/><circle class="f-coral" cx="79.5" cy="103" r="4"/><rect class="ui-slot" x="95" y="94" width="23" height="18" rx="5"/><g class="pn-tile"><rect class="ui-sel" x="95" y="94" width="23" height="18" rx="5"/><circle class="f-blue" cx="106.5" cy="103" r="4"/></g><rect class="ui-line" x="41" y="124" width="77" height="1"/><g class="pn-row"><rect class="ui-sel" x="41" y="132" width="77" height="11" rx="4"/><rect class="f-blue" x="45" y="135" width="5" height="5" rx="1.5"/><rect class="ui-line" x="54" y="136.5" width="48" height="2" rx="1"/></g><rect class="ui-row" x="41" y="147" width="77" height="11" rx="4"/><rect class="f-coral" x="45" y="150" width="5" height="5" rx="1.5"/><rect class="ui-line" x="54" y="151.5" width="48" height="2" rx="1"/><rect class="ui-row" x="41" y="162" width="77" height="11" rx="4"/><rect class="f-violet" x="45" y="165" width="5" height="5" rx="1.5"/><rect class="ui-line" x="54" y="166.5" width="40" height="2" rx="1"/><circle class="f-blue pn-fly" cx="106.5" cy="103" r="4"/><rect class="ui-pane" x="128" y="35" width="237" height="200" rx="8"/><rect class="ui-ink" x="142" y="50" width="104" height="7" rx="3"/><rect class="ui-line" x="142" y="65" width="180" height="3" rx="1.5"/><rect class="ui-line" x="142" y="73" width="146" height="3" rx="1.5"/><rect class="tint f-blue " x="142" y="86" width="209" height="58" rx="6"/><rect class="ui-line" x="142" y="154" width="167" height="3" rx="1.5"/><rect class="ui-line" x="142" y="162" width="115" height="3" rx="1.5"/><g class="pn-key"><rect class="ui-pane" x="300" y="48" width="44" height="22" rx="6" stroke="currentColor" stroke-opacity=".15"/><text class="key" x="322" y="62.5" text-anchor="middle">⌘D</text></g></g></svg></div></div></div><script>
+</script></header><div class="welcome-body"><h2 class="visually-hidden">The basics</h2><ul class="welcome-cards"><li class="wide" style="--i: 0"><article class="tile" tabindex="0" aria-labelledby="tile-spaces"><div class="tile-art" aria-hidden="true"><svg class="ui" viewBox="0 0 400 260" aria-hidden="true" focusable="false"><rect class="f-violet" x="12" y="14" width="80" height="196" rx="10" opacity=".45"/><rect class="f-coral" x="25" y="28" width="80" height="196" rx="10" opacity=".6"/><rect class="ui-shadow" x="35" y="47" width="306" height="202" rx="15"/><rect class="ui-shadow" x="37" y="44" width="302" height="198" rx="13"/><rect class="ui-win" x="38" y="42" width="300" height="196" rx="12"/><rect class="side f-blue sp-b" x="43" y="47" width="81" height="186" rx="8"/><circle class="tl-r" cx="53" cy="57" r="2.6"/><circle class="tl-y" cx="62" cy="57" r="2.6"/><circle class="tl-g" cx="71" cy="57" r="2.6"/><rect class="ui-row" x="49" y="68" width="69" height="10" rx="5"/><rect class="side f-coral sp-c" x="43" y="47" width="81" height="186" rx="8"/><rect class="side f-violet sp-v" x="43" y="47" width="81" height="186" rx="8"/><g class="sp-tabs"><rect class="ui-sel" x="49" y="88" width="69" height="11" rx="4"/><rect class="f-blue" x="53" y="91" width="5" height="5" rx="1.5"/><rect class="ui-line" x="62" y="92.5" width="43" height="2" rx="1"/><rect class="ui-row" x="49" y="103" width="69" height="11" rx="4"/><rect class="f-coral" x="53" y="106" width="5" height="5" rx="1.5"/><rect class="ui-line" x="62" y="107.5" width="36" height="2" rx="1"/><rect class="ui-row" x="49" y="118" width="69" height="11" rx="4"/><rect class="f-violet" x="53" y="121" width="5" height="5" rx="1.5"/><rect class="ui-line" x="62" y="122.5" width="43" height="2" rx="1"/><rect class="ui-row" x="49" y="133" width="69" height="11" rx="4"/><rect class="f-pink" x="53" y="136" width="5" height="5" rx="1.5"/><rect class="ui-line" x="62" y="137.5" width="36" height="2" rx="1"/></g><rect class="ui-pane" x="128" y="47" width="205" height="186" rx="8"/><rect class="ui-ink" x="142" y="62" width="88" height="7" rx="3"/><rect class="ui-line" x="142" y="77" width="152" height="3" rx="1.5"/><rect class="ui-line" x="142" y="85" width="124" height="3" rx="1.5"/><rect class="tint f-blue " x="142" y="98" width="177" height="58" rx="6"/><rect class="ui-line" x="142" y="166" width="142" height="3" rx="1.5"/><rect class="ui-line" x="142" y="174" width="97" height="3" rx="1.5"/><circle class="ui-line" cx="60" cy="226" r="3"/><circle class="ui-line" cx="71" cy="226" r="3"/><circle class="ui-line" cx="82" cy="226" r="3"/><circle class="f-blue sp-dot" cx="60" cy="226" r="3"/><circle class="f-coral" cx="112" cy="57" r="5"/><circle class="ui-pane" cx="112" cy="57" r="2"/><g class="kc kc-sp1"><rect class="ui-pane" x="286" y="50" width="44" height="22" rx="6" stroke="currentColor" stroke-opacity=".15"/><text class="key" x="308" y="64.5" text-anchor="middle">⌃3</text></g><g class="kc kc-sp2"><rect class="ui-pane" x="286" y="50" width="44" height="22" rx="6" stroke="currentColor" stroke-opacity=".15"/><text class="key" x="308" y="64.5" text-anchor="middle">⌃1</text></g></svg></div><div class="tile-copy"><h3 id="tile-spaces">Spaces and Profiles</h3><p>A Space holds the tabs for one part of your life, like Work or Travel. A Profile keeps your logins apart, and several Spaces can share one.</p><p class="tile-more"><kbd>⌃1</kbd> to <kbd>⌃8</kbd> jump to a Space, and <kbd>⌥⌘→</kbd> moves to the next one.</p><a class="tile-docs" href="/docs/spaces-and-profiles/">How it works<span class="visually-hidden">: Spaces and Profiles</span></a></div></article></li><li class="wide" style="--i: 1"><article class="tile" tabindex="0" aria-labelledby="tile-peek"><div class="tile-art" aria-hidden="true"><svg class="ui" viewBox="0 0 400 260" aria-hidden="true" focusable="false"><rect class="ui-win" x="30" y="30" width="340" height="210" rx="12"/><rect class="side f-violet " x="35" y="35" width="81" height="200" rx="8"/><circle class="tl-r" cx="45" cy="45" r="2.6"/><circle class="tl-y" cx="54" cy="45" r="2.6"/><circle class="tl-g" cx="63" cy="45" r="2.6"/><rect class="ui-row" x="41" y="56" width="69" height="10" rx="5"/><rect class="ui-sel" x="41" y="76" width="69" height="11" rx="4"/><rect class="f-blue" x="45" y="79" width="5" height="5" rx="1.5"/><rect class="ui-line" x="54" y="80.5" width="43" height="2" rx="1"/><rect class="ui-row" x="41" y="91" width="69" height="11" rx="4"/><rect class="f-coral" x="45" y="94" width="5" height="5" rx="1.5"/><rect class="ui-line" x="54" y="95.5" width="36" height="2" rx="1"/><rect class="ui-row" x="41" y="106" width="69" height="11" rx="4"/><rect class="f-violet" x="45" y="109" width="5" height="5" rx="1.5"/><rect class="ui-line" x="54" y="110.5" width="43" height="2" rx="1"/><rect class="ui-row" x="41" y="121" width="69" height="11" rx="4"/><rect class="f-pink" x="45" y="124" width="5" height="5" rx="1.5"/><rect class="ui-line" x="54" y="125.5" width="36" height="2" rx="1"/><rect class="ui-pane" x="120" y="35" width="245" height="200" rx="8"/><rect class="ui-ink" x="132" y="44" width="110" height="7" rx="3"/><rect class="ui-line" x="132" y="59" width="189" height="3" rx="1.5"/><rect class="ui-line" x="132" y="67" width="154" height="3" rx="1.5"/><rect class="tint f-blue " x="132" y="80" width="220" height="58" rx="6"/><rect class="ui-line" x="132" y="148" width="176" height="3" rx="1.5"/><rect class="ui-line" x="132" y="156" width="121" height="3" rx="1.5"/><rect class="f-blue pk-link" x="132" y="67" width="62" height="3" rx="1.5"/><rect class="ui-dim pk-dim" x="120" y="35" width="245" height="200" rx="8"/><g class="pk-card"><rect class="ui-shadow" x="147" y="67" width="156" height="154" rx="13"/><rect class="ui-shadow" x="149" y="64" width="152" height="150" rx="11"/><rect class="ui-pane" x="150" y="62" width="150" height="148" rx="10"/><rect class="ui-row" x="160" y="71" width="44" height="8" rx="4"/><circle class="f-blue" cx="287" cy="75" r="4"/><rect class="ui-ink" x="162" y="90" width="63" height="7" rx="3"/><rect class="ui-line" x="162" y="105" width="108" height="3" rx="1.5"/><rect class="ui-line" x="162" y="113" width="88" height="3" rx="1.5"/><rect class="tint f-pink " x="162" y="126" width="126" height="58" rx="6"/><rect class="ui-line" x="162" y="194" width="101" height="3" rx="1.5"/><rect class="ui-line" x="162" y="202" width="69" height="3" rx="1.5"/></g><g class="kc kc-pk"><rect class="ui-pane" x="312" y="42" width="44" height="22" rx="6" stroke="currentColor" stroke-opacity=".15"/><text class="key" x="334" y="56.5" text-anchor="middle">⌘O</text></g></svg></div><div class="tile-copy"><h3 id="tile-peek">Peek</h3><p>A link from a pinned tab or Favorite to another site opens in a card over the page. Press <kbd>⌘O</kbd> to keep it as a tab.</p><p class="tile-more">Esc or a click outside closes it, and <kbd>⇧⌘T</kbd> brings it back.</p><a class="tile-docs" href="/docs/peek/">How it works<span class="visually-hidden">: Peek</span></a></div></article></li><li style="--i: 2"><article class="tile" tabindex="0" aria-labelledby="tile-split"><div class="tile-art" aria-hidden="true"><svg class="ui" viewBox="0 0 400 260" aria-hidden="true" focusable="false"><rect class="ui-shadow" x="27" y="35" width="346" height="216" rx="15"/><rect class="ui-shadow" x="29" y="32" width="342" height="212" rx="13"/><g><rect class="ui-win" x="30" y="30" width="340" height="210" rx="12"/><rect class="side f-coral" x="35" y="35" width="81" height="200" rx="8"/><circle class="tl-r" cx="45" cy="45" r="2.6"/><circle class="tl-y" cx="54" cy="45" r="2.6"/><circle class="tl-g" cx="63" cy="45" r="2.6"/><rect class="ui-row" x="41" y="56" width="69" height="10" rx="5"/><rect class="ui-sel" x="41" y="76" width="69" height="11" rx="4"/><rect class="f-coral" x="45" y="79" width="5" height="5" rx="1.5"/><rect class="f-blue sv-fav" x="53" y="79" width="5" height="5" rx="1.5"/><rect class="ui-line" x="62" y="80.5" width="34" height="2" rx="1"/><rect class="ui-row" x="41" y="91" width="69" height="11" rx="4"/><rect class="f-coral" x="45" y="94" width="5" height="5" rx="1.5"/><rect class="ui-line" x="54" y="95.5" width="43" height="2" rx="1"/><rect class="ui-row" x="41" y="106" width="69" height="11" rx="4"/><rect class="f-violet" x="45" y="109" width="5" height="5" rx="1.5"/><rect class="ui-line" x="54" y="110.5" width="36" height="2" rx="1"/><rect class="ui-row" x="41" y="121" width="69" height="11" rx="4"/><rect class="f-pink" x="45" y="124" width="5" height="5" rx="1.5"/><rect class="ui-line" x="54" y="125.5" width="43" height="2" rx="1"/><rect class="ui-pane sv-a" x="120" y="35" width="122" height="200" rx="8"/><rect class="ui-ink" x="132" y="50" width="49" height="7" rx="3"/><rect class="ui-line" x="132" y="65" width="84" height="3" rx="1.5"/><rect class="ui-line" x="132" y="73" width="69" height="3" rx="1.5"/><rect class="tint f-coral " x="132" y="86" width="98" height="58" rx="6"/><rect class="ui-line" x="132" y="154" width="78" height="3" rx="1.5"/><rect class="ui-line" x="132" y="162" width="54" height="3" rx="1.5"/><g class="sv-b"><rect class="ui-pane" x="246" y="35" width="119" height="200" rx="8"/><rect class="ui-ink" x="258" y="50" width="48" height="7" rx="3"/><rect class="ui-line" x="258" y="65" width="82" height="3" rx="1.5"/><rect class="ui-line" x="258" y="73" width="66" height="3" rx="1.5"/><rect class="tint f-blue " x="258" y="86" width="95" height="58" rx="6"/><rect class="ui-line" x="258" y="154" width="76" height="3" rx="1.5"/><rect class="ui-line" x="258" y="162" width="52" height="3" rx="1.5"/></g></g><g class="kc kc-sv"><rect class="ui-pane" x="302" y="42" width="54" height="22" rx="6" stroke="currentColor" stroke-opacity=".15"/><text class="key" x="329" y="56.5" text-anchor="middle">⌃⇧=</text></g></svg></div><div class="tile-copy"><h3 id="tile-split">Split View</h3><p>Press <kbd>⌃⇧=</kbd> to put two tabs side by side. The pair shows as one row in the sidebar and comes back after a restart.</p><p class="tile-more"><kbd>⌃⇧-</kbd> separates the pair again and keeps both tabs.</p></div></article></li><li style="--i: 3"><article class="tile" tabindex="0" aria-labelledby="tile-little"><div class="tile-art" aria-hidden="true"><svg class="ui" viewBox="0 0 400 260" aria-hidden="true" focusable="false"><rect class="ui-app" x="30" y="30" width="290" height="180" rx="12"/><circle class="tl-r" cx="44" cy="44" r="2.6"/><circle class="tl-y" cx="53" cy="44" r="2.6"/><circle class="tl-g" cx="62" cy="44" r="2.6"/><rect class="ui-app-row" x="44" y="60" width="52" height="12" rx="4"/><rect class="ui-app-row" x="44" y="80" width="52" height="12" rx="4"/><rect class="ui-app-row" x="44" y="100" width="52" height="12" rx="4"/><rect class="ui-app-row" x="44" y="120" width="52" height="12" rx="4"/><rect class="ui-app-row" x="44" y="140" width="52" height="12" rx="4"/><rect class="ui-app-row" x="106" y="40" width="1" height="160"/><rect class="ui-app-row" x="118" y="64" width="120" height="16" rx="8"/><rect class="ui-app-row" x="168" y="88" width="130" height="16" rx="8"/><rect class="f-blue la-link" x="118" y="112" width="96" height="16" rx="8"/><rect class="ui-app-row" x="118" y="136" width="80" height="16" rx="8"/><g class="la-pop"><rect class="ui-shadow" x="147" y="83" width="206" height="156" rx="14"/><rect class="ui-shadow" x="149" y="80" width="202" height="152" rx="12"/><rect class="ui-win" x="150" y="78" width="200" height="150" rx="11"/><circle class="tl-r" cx="162" cy="90" r="2.6"/><circle class="tl-y" cx="171" cy="90" r="2.6"/><circle class="tl-g" cx="180" cy="90" r="2.6"/><rect class="ui-row" x="190" y="85" width="92" height="10" rx="5"/><g class="la-btn"><rect class="f-blue" x="290" y="84" width="50" height="12" rx="6"/><rect class="glyph-fill" x="300" y="89" width="22" height="2" rx="1"/><path class="glyph" d="M327 87.5l3 2.5-3 2.5"/></g><rect class="ui-pane" x="156" y="102" width="188" height="120" rx="7"/><rect class="ui-ink" x="168" y="114" width="82" height="7" rx="3"/><rect class="ui-line" x="168" y="129" width="141" height="3" rx="1.5"/><rect class="ui-line" x="168" y="137" width="115" height="3" rx="1.5"/><rect class="tint f-coral " x="168" y="150" width="164" height="58" rx="6"/><rect class="ui-line" x="168" y="218" width="131" height="3" rx="1.5"/><rect class="ui-line" x="168" y="226" width="90" height="3" rx="1.5"/></g><g class="kc kc-la"><rect class="ui-pane" x="270" y="40" width="44" height="22" rx="6" stroke="currentColor" stroke-opacity=".15"/><text class="key" x="292" y="54.5" text-anchor="middle">⌘O</text></g></svg></div><div class="tile-copy"><h3 id="tile-little">Little Arc</h3><p>Links from other apps open in a small window, and <kbd>⌥⌘N</kbd> opens one from anywhere. Press <kbd>⌘O</kbd> to move the page into your current Space.</p><p class="tile-more"><kbd>⌥⌘O</kbd> lets you pick another Space instead.</p></div></article></li><li style="--i: 4"><article class="tile" tabindex="0" aria-labelledby="tile-command"><div class="tile-art" aria-hidden="true"><svg class="ui" viewBox="0 0 400 260" aria-hidden="true" focusable="false"><rect class="ui-win" x="30" y="30" width="340" height="210" rx="12"/><rect class="side f-pink " x="35" y="35" width="81" height="200" rx="8"/><circle class="tl-r" cx="45" cy="45" r="2.6"/><circle class="tl-y" cx="54" cy="45" r="2.6"/><circle class="tl-g" cx="63" cy="45" r="2.6"/><rect class="ui-row" x="41" y="56" width="69" height="10" rx="5"/><rect class="ui-sel" x="41" y="76" width="69" height="11" rx="4"/><rect class="f-blue" x="45" y="79" width="5" height="5" rx="1.5"/><rect class="ui-line" x="54" y="80.5" width="43" height="2" rx="1"/><rect class="ui-row" x="41" y="91" width="69" height="11" rx="4"/><rect class="f-coral" x="45" y="94" width="5" height="5" rx="1.5"/><rect class="ui-line" x="54" y="95.5" width="36" height="2" rx="1"/><rect class="ui-row" x="41" y="106" width="69" height="11" rx="4"/><rect class="f-violet" x="45" y="109" width="5" height="5" rx="1.5"/><rect class="ui-line" x="54" y="110.5" width="43" height="2" rx="1"/><rect class="ui-row" x="41" y="121" width="69" height="11" rx="4"/><rect class="f-pink" x="45" y="124" width="5" height="5" rx="1.5"/><rect class="ui-line" x="54" y="125.5" width="36" height="2" rx="1"/><rect class="ui-pane" x="120" y="35" width="245" height="200" rx="8"/><rect class="ui-ink" x="134" y="50" width="108" height="7" rx="3"/><rect class="ui-line" x="134" y="65" width="187" height="3" rx="1.5"/><rect class="ui-line" x="134" y="73" width="152" height="3" rx="1.5"/><rect class="tint f-pink " x="134" y="86" width="217" height="58" rx="6"/><rect class="ui-line" x="134" y="154" width="174" height="3" rx="1.5"/><rect class="ui-line" x="134" y="162" width="119" height="3" rx="1.5"/><rect class="ui-dim" x="30" y="30" width="340" height="210" rx="12"/><g class="cb-pal"><rect class="ui-shadow" x="97" y="85" width="206" height="134" rx="15"/><rect class="ui-shadow" x="99" y="82" width="202" height="130" rx="13"/><rect class="ui-pane" x="100" y="80" width="200" height="128" rx="12"/><rect class="f-blue" x="112" y="94" width="11" height="15" rx="3"/><path class="glyph" d="M120 97.5l-4 8"/><rect class="ui-ink cb-type" x="130" y="99" width="62" height="5" rx="2.5"/><rect class="f-blue cb-caret" x="194" y="94" width="2" height="15" rx="1"/><rect class="ui-line" x="100" y="117" width="200" height="1"/><g class="cb-r1"><rect class="tint-strong f-violet" x="110" y="126" width="180" height="19" rx="6"/><rect class="f-violet" x="118" y="131" width="9" height="9" rx="2.5"/><rect class="ui-line" x="134" y="134" width="70" height="3" rx="1.5"/><rect class="ui-row" x="262" y="131" width="20" height="9" rx="3"/></g><g class="cb-r2"><rect class="ui-row-faint" x="110" y="150" width="180" height="19" rx="6"/><rect class="f-blue" x="118" y="155" width="9" height="9" rx="2.5"/><rect class="ui-line" x="134" y="158" width="92" height="3" rx="1.5"/><rect class="ui-row" x="262" y="155" width="20" height="9" rx="3"/></g><g class="cb-r3"><rect class="ui-row-faint" x="110" y="174" width="180" height="19" rx="6"/><rect class="f-coral" x="118" y="179" width="9" height="9" rx="2.5"/><rect class="ui-line" x="134" y="182" width="58" height="3" rx="1.5"/><rect class="ui-row" x="262" y="179" width="20" height="9" rx="3"/></g></g><g class="kc kc-cb"><rect class="ui-pane" x="312" y="42" width="44" height="22" rx="6" stroke="currentColor" stroke-opacity=".15"/><text class="key" x="334" y="56.5" text-anchor="middle">⌘T</text></g></svg></div><div class="tile-copy"><h3 id="tile-command">Command bar</h3><p><kbd>⌘T</kbd> opens it for a new tab and <kbd>⌘L</kbd> on the current address. Type an action like pin or split to run it, or / to list them all.</p><p class="tile-more">The arrow keys move through suggestions, Enter opens one and Esc closes the bar.</p></div></article></li><li style="--i: 5"><article class="tile" tabindex="0" aria-labelledby="tile-pinned"><div class="tile-art" aria-hidden="true"><svg class="ui" viewBox="0 0 400 260" aria-hidden="true" focusable="false"><rect class="ui-shadow" x="27" y="35" width="346" height="216" rx="15"/><rect class="ui-shadow" x="29" y="32" width="342" height="212" rx="13"/><rect class="ui-win" x="30" y="30" width="340" height="210" rx="12"/><rect class="side f-blue " x="35" y="35" width="89" height="200" rx="8"/><circle class="tl-r" cx="45" cy="45" r="2.6"/><circle class="tl-y" cx="54" cy="45" r="2.6"/><circle class="tl-g" cx="63" cy="45" r="2.6"/><rect class="ui-row" x="41" y="56" width="77" height="10" rx="5"/><rect class="ui-sel" x="41" y="72" width="23" height="18" rx="5"/><circle class="f-blue" cx="52.5" cy="81" r="4"/><rect class="ui-sel" x="68" y="72" width="23" height="18" rx="5"/><circle class="f-coral" cx="79.5" cy="81" r="4"/><rect class="ui-sel" x="95" y="72" width="23" height="18" rx="5"/><circle class="f-violet" cx="106.5" cy="81" r="4"/><rect class="ui-sel" x="41" y="94" width="23" height="18" rx="5"/><circle class="f-pink" cx="52.5" cy="103" r="4"/><rect class="ui-sel" x="68" y="94" width="23" height="18" rx="5"/><circle class="f-coral" cx="79.5" cy="103" r="4"/><rect class="ui-slot" x="95" y="94" width="23" height="18" rx="5"/><g class="pn-tile"><rect class="ui-sel" x="95" y="94" width="23" height="18" rx="5"/><circle class="f-blue" cx="106.5" cy="103" r="4"/></g><rect class="ui-line" x="41" y="124" width="77" height="1"/><g class="pn-row"><rect class="ui-sel" x="41" y="132" width="77" height="11" rx="4"/><rect class="f-blue" x="45" y="135" width="5" height="5" rx="1.5"/><rect class="ui-line" x="54" y="136.5" width="48" height="2" rx="1"/></g><rect class="ui-row" x="41" y="147" width="77" height="11" rx="4"/><rect class="f-coral" x="45" y="150" width="5" height="5" rx="1.5"/><rect class="ui-line" x="54" y="151.5" width="48" height="2" rx="1"/><rect class="ui-row" x="41" y="162" width="77" height="11" rx="4"/><rect class="f-violet" x="45" y="165" width="5" height="5" rx="1.5"/><rect class="ui-line" x="54" y="166.5" width="40" height="2" rx="1"/><circle class="f-blue pn-fly" cx="106.5" cy="103" r="4"/><rect class="ui-pane" x="128" y="35" width="237" height="200" rx="8"/><rect class="ui-ink" x="142" y="50" width="104" height="7" rx="3"/><rect class="ui-line" x="142" y="65" width="180" height="3" rx="1.5"/><rect class="ui-line" x="142" y="73" width="146" height="3" rx="1.5"/><rect class="tint f-blue " x="142" y="86" width="209" height="58" rx="6"/><rect class="ui-line" x="142" y="154" width="167" height="3" rx="1.5"/><rect class="ui-line" x="142" y="162" width="115" height="3" rx="1.5"/><g class="kc kc-pn"><rect class="ui-pane" x="300" y="48" width="44" height="22" rx="6" stroke="currentColor" stroke-opacity=".15"/><text class="key" x="322" y="62.5" text-anchor="middle">⌘D</text></g></svg></div><div class="tile-copy"><h3 id="tile-pinned">Pinned tabs and Favorites</h3><p>Press <kbd>⌘D</kbd> to pin a tab to its Space. Favorites show in every Space of a Profile, and closing either one keeps its tile.</p><p class="tile-more">Press <kbd>⌘D</kbd> again to unpin it. To remove a Favorite, use its right-click menu.</p><a class="tile-docs" href="/docs/spaces-and-profiles/#pinned-tabs-and-favorites">How it works<span class="visually-hidden">: Pinned tabs and Favorites</span></a></div></article></li></ul><script>
   (() => {
-    const tour = document.querySelector('.tour')
-    const items = [...tour.querySelectorAll('.welcome-cards > li')]
-    const scenes = [...tour.querySelectorAll('.scene')]
-    const stage = tour.querySelector('.tour-stage')
+    const grid = document.querySelector('.welcome-cards')
+    const tiles = [...grid.querySelectorAll('.tile')]
     const still = matchMedia('(prefers-reduced-motion: reduce)').matches
-    const buttons = items.map((item) => {
-      const heading = item.querySelector('h3')
-      const button = document.createElement('button')
-      button.type = 'button'
-      button.textContent = heading.textContent
-      heading.replaceChildren(button)
-      return button
-    })
-    let current = -1, timer = 0
-    const show = (index) => {
-      if (index === current) return
-      current = index
-      items.forEach((item, i) => item.classList.toggle('is-active', i === index))
-      buttons.forEach((button, i) => button.setAttribute('aria-pressed', String(i === index)))
-      scenes.forEach((scene, i) => scene.classList.toggle('is-active', i === index))
-      stage.style.setProperty('--turn', String(index * 24))
+    const seen = new Set()
+    let focus = -1, lock = 0, tapped = -1
+    const sync = () => {
+      tiles.forEach((tile, i) => {
+        tile.classList.toggle('is-focus', i === focus)
+        tile.classList.toggle('is-playing', !still && !document.hidden && seen.has(tile) && (focus < 0 || i === focus))
+      })
+      if (focus < 0) delete grid.dataset.focus
+      else grid.dataset.focus = String(focus)
     }
-    const stop = () => clearInterval(timer)
-    items.forEach((item, i) => {
-      item.addEventListener('pointerenter', (event) => { if (event.pointerType === 'mouse') { stop(); show(i) } })
-      item.addEventListener('focusin', () => { stop(); show(i) })
-      buttons[i].addEventListener('click', () => { stop(); show(i) })
+    // A short lock after each change keeps a resting cursor from flipping focus while the grid reflows under it.
+    const set = (index) => { if (index !== focus) { focus = index; lock = performance.now() + 450; sync() } }
+    const aim = (tile, x, y) => { tile.style.setProperty('--x', x + 'px'); tile.style.setProperty('--y', y + 'px') }
+    tiles.forEach((tile, i) => {
+      tile.addEventListener('pointermove', (event) => {
+        if (event.pointerType !== 'mouse') return
+        const box = tile.getBoundingClientRect()
+        aim(tile, event.clientX - box.left, event.clientY - box.top)
+        if (i !== focus && performance.now() > lock) set(i)
+      })
+      tile.addEventListener('pointerdown', (event) => { tapped = event.pointerType === 'mouse' ? -2 : focus })
+      tile.addEventListener('pointerup', (event) => {
+        if (event.pointerType !== 'mouse' && !event.target.closest('a')) set(tapped === i ? -1 : i)
+        tapped = -1
+      })
+      tile.addEventListener('focus', () => {
+        if (tapped !== -1 || i === focus) return
+        aim(tile, tile.offsetWidth / 2, tile.offsetHeight / 3)
+        set(i)
+      })
     })
-    show(0)
-    if (still) return
-    tour.classList.add('is-live')
-    timer = setInterval(() => { if (!document.hidden) show((current + 1) % items.length) }, 5000)
+    grid.addEventListener('pointerleave', (event) => { if (event.pointerType === 'mouse') set(-1) })
+    grid.addEventListener('focusout', (event) => { if (!grid.contains(event.relatedTarget)) set(-1) })
+    document.addEventListener('pointerdown', (event) => { if (!grid.contains(event.target)) set(-1) })
+    document.addEventListener('visibilitychange', sync)
+    const io = new IntersectionObserver((entries) => {
+      entries.forEach((entry) => entry.isIntersecting ? seen.add(entry.target) : seen.delete(entry.target))
+      sync()
+    })
+    tiles.forEach((tile) => io.observe(tile))
+    // Fit each 640 x 416 drawing to its box, the same contain-fit the SVG does on its own without script.
+    const fit = new ResizeObserver((entries) => entries.forEach(({ target, contentRect: { width, height } }) => {
+      const scale = Math.max(.1, Math.min((width - 32) / 640, (height - 14) / 416))
+      target.firstElementChild.style.transform = 'translateX(-50%) scale(' + scale.toFixed(4) + ')'
+    }))
+    tiles.forEach((tile) => fit.observe(tile.querySelector('.tile-art')))
+    grid.classList.add('is-sized')
+    let moving = 0
+    grid.addEventListener('transitionrun', () => { clearTimeout(moving); grid.classList.add('is-moving') })
+    grid.addEventListener('transitionend', (event) => {
+      if (event.target === grid || event.target.classList.contains('tile-art')) moving = setTimeout(() => grid.classList.remove('is-moving'), 100)
+    })
+    if (!still) grid.classList.add('is-live')
   })()
 </script><h2>Shortcuts to learn first</h2><ul class="welcome-keys"><li><kbd>⌘T</kbd><span>New tab</span></li><li><kbd>⌘L</kbd><span>Edit the address</span></li><li><kbd>⌘D</kbd><span>Pin or unpin the tab</span></li><li><kbd>⌃1–9</kbd><span>Switch Spaces</span></li><li><kbd>⌥⌘N</kbd><span>Open Little Arc</span></li><li><kbd>⌃⇧=</kbd><span>Open a Split View</span></li><li><kbd>⌃⌥⌘A</kbd><span>Replay the welcome</span></li></ul><p class="welcome-more"><a href="/docs/shortcuts/">All shortcuts</a></p><h2>Keep going</h2><ul class="welcome-links"><li><a href="/docs/import-from-arc/">Import from Arc</a><p>Bring over your Spaces, folders and pinned tabs.</p></li><li><a href="/docs/">Docs</a><p>How everything works, and what is still missing.</p></li><li><a href="/download/">Release notes</a><p>What works in this nightly, and the latest download.</p></li><li><a href="https://github.com/bitbonsai/myarc">GitHub</a><p>The code, the plans and the roadmap.</p></li><li><a href="https://github.com/bitbonsai/myarc/issues">Report an issue</a><p>Found a bug? Tell me what happened.</p></li></ul></div></main><footer class="end">
       <a class="mark plain" href="#main" aria-label="Back to top"><img class="ribbon" src="../blog/_assets/logo-matte.adbb3c7ddc14.webp" alt="" width="1254" height="1254"><picture><source media="(prefers-color-scheme: dark)" srcset="../blog/_assets/wordmark-ivory.3a99cf025832.svg"><img class="wordmark" src="../blog/_assets/wordmark-ink.18b9e7ae3785.svg" alt="myArc" width="3056" height="1049"></picture></a>
