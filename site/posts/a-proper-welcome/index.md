@@ -17,7 +17,7 @@ The first time you open myArc, your desktop dims and a blob of colour shows up i
 
 Below that, myArc asks one thing: are you bringing anything with you? Import from Arc… turns an Arc export into Spaces, folders and pinned tabs, and Start fresh gives you an empty sidebar. Either way, the window opens into the browser and the sidebar fills in row by row.
 
-The 3D "A" wasn't in the plan. Once the welcome got this big, a flat logo looked out of place, so the logo got a version that moves, and more polish came with it. The browser chrome is glassy now, so you see your desktop blurred behind the sidebar, and with Reduce Transparency on it stays solid. The default colours got darker and warmer, closer to Arc's, and the selected tile in the sidebar is a soft highlight now instead of a bright grey block.
+The 3D "A" wasn't in the plan. The welcome needed a logo that moves, and once it had one, the rest of the browser needed more polish to match, like the glassy sidebar with your desktop blurred behind it.
 
 ## A sound of its own
 
@@ -25,7 +25,7 @@ The arrival has a short ambient sound, with one accent when the blob becomes the
 
 ## Learning by doing
 
-After the welcome, a small card points at a real control and asks you to try it. Press ⌘T and open a site. Press ⌘D to pin that tab, so it stays in the sidebar after you close it. Press ⌃2 to jump to another Space, or create your first one if you only have one. Every card has Back and Skip tour, and none of them takes focus, so the shortcut you're practising goes to the browser the same way it will tomorrow.
+After the welcome, a small card points at a real control and asks you to try it. Press ⌘T and open a site. Press ⌘D to pin that tab, so it stays in the sidebar after you close it. Press ⌃2 to jump to another Space, or create your first one if you only have one. Every card has Back and Skip tour. None of them takes focus, so the shortcut you're practising reaches the browser like it will tomorrow.
 
 The last card says "You're ready" and offers to make myArc your default browser. If you want to take the tour again later, it's in Settings, under Advanced.
 
@@ -37,8 +37,6 @@ The window keeps a 16:10 shape and stops growing at a comfortable width, so on a
 
 If you miss the arrival, press ⌃⌥⌘A to watch it again, sound and all, without restarting the tour. Esc or a click closes it. Consider it a small secret between you and the shortcuts page.
 
-## What's next
+## Try it
 
-In the next nightly, the tour ends on a quick start page with the basics and the shortcuts worth learning first.
-
-The welcome is already in the latest nightly on the [download page](https://myarc.dev/download/). If you use myArc today, press ⌃⌥⌘A to see it. The code is [on GitHub](https://github.com/bitbonsai/myarc) if you'd like to help make that first minute even better.
+The welcome is in the latest nightly on the [download page](https://myarc.dev/download/), and the tour now ends on a quick start page with the basics and the shortcuts worth learning first. If you already use myArc, press ⌃⌥⌘A to see the welcome. The code is [on GitHub](https://github.com/bitbonsai/myarc) if you'd like to help make that first minute better.
