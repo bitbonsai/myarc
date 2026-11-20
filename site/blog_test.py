@@ -431,6 +431,8 @@ class PublisherTests(unittest.TestCase):
             (root / 'blog/index.html').write_text('synthetic index')
             (root / 'docs').mkdir()
             (root / 'docs/index.html').write_text('synthetic docs')
+            (root / 'welcome').mkdir()
+            (root / 'welcome/index.html').write_text('synthetic welcome')
             (root / 'download').mkdir()
             for name in ('index.html', 'index.md'):
                 (root / 'download' / name).write_text('synthetic download')
@@ -439,6 +441,7 @@ class PublisherTests(unittest.TestCase):
             (root / 'posts/private.md').write_text('unapproved source')
             files = artifacts(root)
             self.assertIn('blog/index.html', files)
+            self.assertIn('welcome/index.html', files)
             self.assertIn('download/index.html', files)
             self.assertIn('docs/index.html', files)
             self.assertNotIn('release.json', files)

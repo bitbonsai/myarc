@@ -12,7 +12,7 @@ ROOT = Path(__file__).resolve().parent
 REPO = 'bitbonsai/myarc'
 BRANCH = 'gh-pages'
 # Generated subtrees replaced whole on each publish, so removed pages disappear.
-OWNED = ('blog', 'docs')
+OWNED = ('blog', 'docs', 'welcome')
 IDENTITY = {'name': 'bitbonsai', 'email': '44185+bitbonsai@users.noreply.github.com'}
 
 

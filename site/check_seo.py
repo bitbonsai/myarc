@@ -117,6 +117,12 @@ def check():
         canonical = soup.select_one('link[rel="canonical"]')['href']
         assert canonical in listed and soup.select_one('meta[name="robots"]')['content'] == 'noindex', f'Redirect stub must point at a listed page: {path}'
         assert soup.select_one('meta[http-equiv="refresh"]')['content'] == '0; url=' + urlsplit(canonical).path, f'Redirect target mismatch: {path}'
+    welcome = BeautifulSoup((ROOT / 'welcome/index.html').read_text(), 'html.parser')
+    assert welcome.select_one('link[rel="canonical"]')['href'] == 'https://myarc.dev/welcome/' and len(welcome.select('h1')) == 1
+    assert welcome.select_one('meta[name="robots"]')['content'] == 'noindex' and 'https://myarc.dev/welcome/' not in listed, 'Welcome page must stay noindex and out of the sitemap'
+    assert not BeautifulSoup((ROOT / 'index.html').read_text(), 'html.parser').select('a[href="/welcome/"]'), 'Welcome page stays out of the nav'
+    for link in welcome.select('main a[href^="/"]'):
+        local_file('https://myarc.dev' + link['href'].split('#')[0])
     print(f'PASS: {len(pages)} canonical pages, {len(redirects)} redirects, metadata, schemas, WebP images and Markdown/discovery routes')
 
 

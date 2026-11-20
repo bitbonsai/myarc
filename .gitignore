@@ -28,6 +28,7 @@ __pycache__/
 site/blog/
 site/download/
 site/docs/
+site/welcome/
 site/.publish-receipt.json
 site/index.md
 site/og-image.webp

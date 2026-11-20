@@ -493,6 +493,22 @@ try:
         browser('set', 'media', theme)
         browser('set', 'viewport', str(width), '1000')
         browser('screenshot', '/tmp/myarc-docs-' + name + '.png')
+    browser('open', (ROOT / 'welcome/index.html').as_uri())
+    for theme in ('light', 'dark'):
+        browser('set', 'media', theme)
+        for width in (1440, 768, 390, 320):
+            browser('set', 'viewport', str(width), '1000')
+            browser(expression="""(async () => {
+              await document.fonts.ready
+              if (!Array.from(document.fonts).some(font => font.family === 'Outfit' && font.status === 'loaded')) throw new Error('Welcome Outfit not loaded')
+              if (document.querySelectorAll('h1').length !== 1 || document.querySelectorAll('.welcome-cards li').length !== 6) throw new Error('Welcome structure')
+              if (document.documentElement.scrollWidth > innerWidth) throw new Error('Welcome horizontal overflow')
+              if (performance.getEntriesByType('resource').some(r => /^https?:/.test(r.name))) throw new Error('Welcome remote resource request')
+              return true
+            })()""")
+        browser('set', 'viewport', '1440', '1000')
+        browser('screenshot', '/tmp/myarc-welcome-' + theme + '.png')
+    print('Welcome: light/dark at 1440/768/390/320')
     with ThreadingHTTPServer(('127.0.0.1', 0), partial(SimpleHTTPRequestHandler, directory=str(ROOT))) as server:
         Thread(target=server.serve_forever, daemon=True).start()
         try:
