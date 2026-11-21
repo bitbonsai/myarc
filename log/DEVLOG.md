@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-11-21: Nightly 2026.11.21.3
+
+- Published the prerelease `nightly-2026.11.21.3` from `main` `029d1ce` and Chromium `d7a395ea6a`, built in `out/MyarcRelease`: Export Pins and Favorites… as a bookmarks file, Import from Arc with names, titles, every Arc profile and one-click import, and the welcome page's Tab line.
+- Notarization now uses an App Store Connect API key in the `myarc-notary` profile on this Mac. The earlier app-password profile was missing from the keychain. The script stopped during the DMG step, so the DMG was stapled and given its Sparkle signature by hand after Apple accepted it.
+- Evidence: Developer ID signed, Apple notarized and stapled, `spctl` accepted the DMG. 184198908 bytes, SHA-256 `eb9fc8b2...58aa`.
+
 ## 2026-11-21: Arc profile names, JSON skip lines and untitled export text
 
 - Other Arc profiles now import into a myArc Profile with their Arc name, such as "Work", read from Arc's `User Data/Local State` next to the sidebar file (`profile.info_cache.<directory>.name`, as Chromium writes it). The file is only read, capped at 4 MB, and a missing or bad one, an empty name or a name two Arc profiles share falls back to "Arc Profile 1". A re-import that finds no Profile by the new name uses one an earlier import named "Arc Profile 1". The preview names the Arc profile the same way, and lists left-out links from the sidebar file without "Line 0:". The bookmarks export titles a link that has no name or title with the sidebar's short URL label and keeps the full URL in `HREF`.
