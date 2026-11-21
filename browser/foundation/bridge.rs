@@ -1112,9 +1112,20 @@ mod ffi {
         fn preview_arc_import(workspace: &Workspace, arc: &ArcExport) -> ArcImportPreview;
         // Adds the export's Spaces and Pins that are missing, all or nothing.
         fn apply_arc_import(workspace: &mut Workspace, arc: &ArcExport) -> ArcImportPreview;
-        // Favorites and every Space's Pins and folders as a Netscape bookmarks
-        // file (import::bookmarks_html), for Export Pins and Favorites….
-        fn bookmarks_html(workspace: &Workspace) -> String;
+        // Export Pins and Favorites…: collects each Profile's workspace, in
+        // display order, then writes them all as a Netscape bookmarks file
+        // (import::bookmarks_html). Building it touches no live workspace, so
+        // it runs on any sequence.
+        type BookmarksExport;
+        fn new_bookmarks_export() -> Box<BookmarksExport>;
+        // Adds Profile `name`; false when `snapshot` doesn't restore, and then
+        // the Profile is left out.
+        fn add_bookmarks_profile(
+            bookmarks: &mut BookmarksExport,
+            name: &str,
+            snapshot: StateSnapshot,
+        ) -> bool;
+        fn bookmarks_export_html(bookmarks: &BookmarksExport) -> String;
         // The save panel's default file name.
         fn bookmarks_html_file_name() -> String;
 
@@ -1226,8 +1237,32 @@ pub fn set_arc_export_canonical_urls(export: &mut ArcExport, urls: Vec<String>) 
         .collect();
 }
 
-pub fn bookmarks_html(workspace: &Workspace) -> String {
-    import::bookmarks_html::write(&workspace.0.snapshot())
+pub struct BookmarksExport(Vec<(String, workspace::WorkspaceSnapshot)>);
+
+pub fn new_bookmarks_export() -> Box<BookmarksExport> {
+    Box::new(BookmarksExport(Vec::new()))
+}
+
+pub fn add_bookmarks_profile(
+    bookmarks: &mut BookmarksExport,
+    name: &str,
+    snapshot: ffi::StateSnapshot,
+) -> bool {
+    let mut restored = Workspace(workspace::Workspace::default());
+    if !restore_snapshot(&mut restored, snapshot).ok {
+        return false;
+    }
+    bookmarks.0.push((name.to_owned(), restored.0.snapshot()));
+    true
+}
+
+pub fn bookmarks_export_html(bookmarks: &BookmarksExport) -> String {
+    let profiles: Vec<(&str, &workspace::WorkspaceSnapshot)> = bookmarks
+        .0
+        .iter()
+        .map(|(name, snapshot)| (name.as_str(), snapshot))
+        .collect();
+    import::bookmarks_html::write_profiles(&profiles)
 }
 
 pub fn bookmarks_html_file_name() -> String {

@@ -635,9 +635,11 @@ source_set("settings_window") {
     "settings_window.cc",
     "settings_window.h",
   ]
-  public_deps = [ "//base" ]
-  deps = [
+  public_deps = [
     ":arc_import",
+    "//base",
+  ]
+  deps = [
     ":control_prefs",
     ":little_arc_prefs",
     ":test_buildflags",

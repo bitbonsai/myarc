@@ -10,6 +10,7 @@
 #include "base/functional/callback.h"
 #include "base/memory/raw_ptr.h"
 #include "base/memory/weak_ptr.h"
+#include "myarc/bookmarks_export.h"
 #include "ui/base/models/image_model.h"
 
 class PrefService;
@@ -77,6 +78,8 @@ class SettingsWindow {
     base::RepeatingCallback<uint64_t(const std::string& id)> get_archive;
     base::RepeatingCallback<void(const std::string& id, uint64_t secs)>
         set_archive;
+    // Every regular Profile, for Advanced > Export Pins and Favorites….
+    BookmarksProfiles bookmarks;
   };
 
   // `profile` is the original (never off-the-record) Profile the window edits,

@@ -1,5 +1,5 @@
 diff --git a/chrome/browser/ui/views/frame/browser_view.cc b/chrome/browser/ui/views/frame/browser_view.cc
-index 7b568f6de760af21d6e9d2aa44415a7cef617c51..12e28f85fc826dc3bf2bc2e1801ab6ba320155da 100644
+index 7b568f6de760af21d6e9d2aa44415a7cef617c51..46aa62b5af0e8e618647676859508707315de180 100644
 --- a/chrome/browser/ui/views/frame/browser_view.cc
 +++ b/chrome/browser/ui/views/frame/browser_view.cc
 @@ -11,6 +11,7 @@
@@ -2771,7 +2771,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..12e28f85fc826dc3bf2bc2e1801ab6ba
  }
  
  void BrowserView::RemovedFromWidget() {
-@@ -5267,104 +7611,3108 @@ const views::View* BrowserView::GetViewByElementId(
+@@ -5267,104 +7611,3129 @@ const views::View* BrowserView::GetViewByElementId(
  ///////////////////////////////////////////////////////////////////////////////
  // BrowserView, ui::AcceleratorTarget overrides:
  
@@ -3073,6 +3073,25 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..12e28f85fc826dc3bf2bc2e1801ab6ba
 +  return IsProfileDirectoryMarkedForDeletion(path) ? base::FilePath() : path;
 +}
 +
++// Every listed Profile for Export Pins and Favorites…, in display order, with
++// the Profile when it is loaded. Loads no Profile.
++std::vector<myarc::BookmarksProfile> MyarcBookmarksProfiles() {
++  std::vector<myarc::BookmarksProfile> profiles;
++  ProfileManager* manager = g_browser_process->profile_manager();
++  if (!manager) {
++    return profiles;
++  }
++  for (myarc::ProfileChoice& choice : MyarcProfileChoices()) {
++    const base::FilePath path = MyarcProfilePath(choice.id);
++    if (!path.empty()) {
++      profiles.push_back({.name = std::move(choice.name),
++                          .profile = manager->GetProfileByPath(path),
++                          .dir = path});
++    }
++  }
++  return profiles;
++}
++
 +// Every other listed Profile's Spaces from the Spaces index, in the Profile
 +// menu's order. Reads Local State only and loads no Profile. Incognito and
 +// Guest windows show none.
@@ -3305,6 +3324,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..12e28f85fc826dc3bf2bc2e1801ab6ba
 +                   : service.ArchiveIntervalSecs();
 +      },
 +      +loaded);
++  profiles.bookmarks = base::BindRepeating(&MyarcBookmarksProfiles);
 +  profiles.set_archive = base::BindRepeating(
 +      [](Profile* (*loaded)(const std::string&),
 +         base::WeakPtr<BrowserView> view, const std::string& id,
@@ -5835,7 +5855,8 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..12e28f85fc826dc3bf2bc2e1801ab6ba
 +    chrome::NavigateFromMyarcPalette(browser_.get(),
 +                                     u"https://myarc.dev/docs/your-data/");
 +  } else if (command == Run::ExportPins) {
-+    myarc::ExportPinsAndFavorites(*GetProfile()->GetOriginalProfile(),
++    // Every regular Profile, also from a private window.
++    myarc::ExportPinsAndFavorites(base::BindRepeating(&MyarcBookmarksProfiles),
 +                                  GetWidget()->GetNativeWindow());
 +  } else if (command == Run::DarkMode || command == Run::LightMode) {
 +    ThemeServiceFactory::GetForProfile(GetProfile())
@@ -5957,7 +5978,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..12e28f85fc826dc3bf2bc2e1801ab6ba
  
  bool BrowserView::MaybeShowBookmarkBar(WebContents* contents) {
    const bool show_bookmark_bar =
-@@ -5471,6 +10819,10 @@ bool BrowserView::MaybeUpdateDevtools(content::WebContents* contents) {
+@@ -5471,6 +10840,10 @@ bool BrowserView::MaybeUpdateDevtools(content::WebContents* contents) {
  
  void BrowserView::UpdateUIForContents(WebContents* contents,
                                        bool should_layout_immediately) {
@@ -5968,7 +5989,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..12e28f85fc826dc3bf2bc2e1801ab6ba
    TRACE_EVENT0("ui", "BrowserView::UpdateUIForContents");
    bool needs_layout = MaybeShowBookmarkBar(contents);
  
-@@ -5706,6 +11058,26 @@ void BrowserView::LoadAccelerators() {
+@@ -5706,6 +11079,26 @@ void BrowserView::LoadAccelerators() {
    }
  
  #if BUILDFLAG(IS_MAC)

@@ -29,7 +29,6 @@
 #include "components/prefs/pref_change_registrar.h"
 #include "components/prefs/pref_service.h"
 #include "myarc/arc_import.h"
-#include "myarc/bookmarks_export.h"
 #include "myarc/control_prefs.h"
 #include "myarc/little_arc_prefs.h"
 #include "myarc/test_buildflags.h"
@@ -2027,7 +2026,7 @@ void SettingsWindow::ImportFromArc() {
 void SettingsWindow::ExportPins() {
   // The save panel sits over Settings, which stays open.
   if (widget_) {
-    ExportPinsAndFavorites(*profile_, widget_->GetNativeWindow());
+    ExportPinsAndFavorites(profiles_.bookmarks, widget_->GetNativeWindow());
   }
 }
 

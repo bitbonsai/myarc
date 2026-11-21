@@ -1,12 +1,13 @@
-//! Writes a workspace's Favorites and Pins as a Netscape bookmarks file, the
+//! Writes workspaces' Favorites and Pins as a Netscape bookmarks file, the
 //! `<!DOCTYPE NETSCAPE-Bookmark-file-1>` HTML that every browser imports.
 //!
-//! The file starts with a "Favorites" folder holding the Profile's Favorites,
-//! then has one folder per Space named after it. A Space's folder lists its
+//! For each Profile, the file has a "Favorites" folder holding the Profile's
+//! Favorites, then one folder per Space named after it. With several Profiles
+//! each one's folders go inside a folder named after the Profile. A Space's folder lists its
 //! ungrouped Pins first and then its sidebar folders, each as a nested folder
 //! with its Pins, as the sidebar shows them. Everything keeps workspace order.
-//! Favorites, Spaces and sidebar folders with nothing to list are left out, so
-//! an empty Agent Space adds no clutter.
+//! Profiles, Favorites, Spaces and sidebar folders with nothing to list are
+//! left out, so an empty Agent Space adds no clutter.
 //!
 //! Each bookmark is titled with the item's Rename name, else its page title,
 //! else its URL. Items without a saved URL are skipped. Titles, folder names
@@ -32,11 +33,48 @@ pub const FAVORITES_FOLDER: &str = "Favorites";
 /// Default file name for the save panel.
 pub const DEFAULT_FILE_NAME: &str = "myArc Bookmarks.html";
 
-/// The whole bookmarks file for `snapshot`.
+/// The whole bookmarks file for one Profile's `snapshot`.
 pub fn write(snapshot: &WorkspaceSnapshot) -> String {
+    write_profiles(&[("", snapshot)])
+}
+
+/// The whole bookmarks file for several Profiles, each a `(name, snapshot)`
+/// pair in display order. Each Profile with something to list gets a
+/// top-level folder named after it, holding its Favorites and then its
+/// Spaces. When only one Profile has anything to list, its folders sit at the
+/// top level as `write` puts them.
+pub fn write_profiles(profiles: &[(&str, &WorkspaceSnapshot)]) -> String {
+    let listed: Vec<(&str, Vec<Section>)> = profiles
+        .iter()
+        .map(|(name, snapshot)| (*name, sections(snapshot)))
+        .filter(|(_, sections)| !sections.is_empty())
+        .collect();
     let mut out = String::from(HEADER);
     out.push_str("<DL><p>\n");
+    if let [(_, sections)] = listed.as_slice() {
+        write_sections(&mut out, 1, sections);
+    } else {
+        for (name, sections) in &listed {
+            open_folder(&mut out, 1, name);
+            write_sections(&mut out, 2, sections);
+            close_folder(&mut out, 1);
+        }
+    }
+    out.push_str("</DL><p>\n");
+    out
+}
 
+/// A top-level folder of one Profile: Favorites or a Space, with its loose
+/// bookmarks and then its sidebar folders.
+struct Section<'a> {
+    name: &'a str,
+    items: Vec<&'a Item>,
+    folders: Vec<(&'a str, Vec<&'a Item>)>,
+}
+
+/// The Profile's Favorites, then each Space, leaving out empty ones.
+fn sections(snapshot: &WorkspaceSnapshot) -> Vec<Section<'_>> {
+    let mut sections = Vec::new();
     let favorites: Vec<&Item> = snapshot
         .items
         .iter()
@@ -44,13 +82,12 @@ pub fn write(snapshot: &WorkspaceSnapshot) -> String {
         .filter(|item| url_of(item).is_some())
         .collect();
     if !favorites.is_empty() {
-        open_folder(&mut out, 1, FAVORITES_FOLDER);
-        for item in favorites {
-            bookmark(&mut out, 2, item);
-        }
-        close_folder(&mut out, 1);
+        sections.push(Section {
+            name: FAVORITES_FOLDER,
+            items: favorites,
+            folders: Vec::new(),
+        });
     }
-
     for space in &snapshot.spaces {
         let pins: Vec<&Item> = snapshot
             .items
@@ -58,10 +95,13 @@ pub fn write(snapshot: &WorkspaceSnapshot) -> String {
             .filter(|item| item.placement == Placement::Pin { space_id: space.id })
             .filter(|item| url_of(item).is_some())
             .collect();
-        let folders: Vec<(&str, Vec<&Item>)> = snapshot
-            .folders
-            .iter()
-            .filter(|folder| folder.space_id == space.id)
+        let space_folders = || {
+            snapshot
+                .folders
+                .iter()
+                .filter(|folder| folder.space_id == space.id)
+        };
+        let folders: Vec<(&str, Vec<&Item>)> = space_folders()
             .map(|folder| {
                 let items = folder
                     .items
@@ -72,34 +112,37 @@ pub fn write(snapshot: &WorkspaceSnapshot) -> String {
             })
             .filter(|(_, items)| !items.is_empty())
             .collect();
-        let ungrouped: Vec<&Item> =
-            pins.iter()
-                .filter(|item| {
-                    !snapshot.folders.iter().any(|folder| {
-                        folder.space_id == space.id && folder.items.contains(&item.id)
-                    })
-                })
-                .copied()
-                .collect();
-        if ungrouped.is_empty() && folders.is_empty() {
-            continue;
+        let items: Vec<&Item> = pins
+            .iter()
+            .filter(|item| !space_folders().any(|folder| folder.items.contains(&item.id)))
+            .copied()
+            .collect();
+        if !items.is_empty() || !folders.is_empty() {
+            sections.push(Section {
+                name: &space.name,
+                items,
+                folders,
+            });
         }
-        open_folder(&mut out, 1, &space.name);
-        for item in ungrouped {
-            bookmark(&mut out, 2, item);
-        }
-        for (name, items) in folders {
-            open_folder(&mut out, 2, name);
-            for item in items {
-                bookmark(&mut out, 3, item);
-            }
-            close_folder(&mut out, 2);
-        }
-        close_folder(&mut out, 1);
     }
+    sections
+}
 
-    out.push_str("</DL><p>\n");
-    out
+fn write_sections(out: &mut String, depth: usize, sections: &[Section<'_>]) {
+    for section in sections {
+        open_folder(out, depth, section.name);
+        for item in &section.items {
+            bookmark(out, depth + 1, item);
+        }
+        for (name, items) in &section.folders {
+            open_folder(out, depth + 1, name);
+            for item in items {
+                bookmark(out, depth + 2, item);
+            }
+            close_folder(out, depth + 1);
+        }
+        close_folder(out, depth);
+    }
 }
 
 fn url_of(item: &Item) -> Option<&str> {
@@ -271,6 +314,65 @@ mod tests {
         assert!(!html.contains("Favorites"));
         assert!(!html.contains("today.example"));
         assert!(html.contains("<DT><H3>Kept</H3>"));
+    }
+
+    #[test]
+    fn several_profiles_each_get_a_folder_with_favorites_first() {
+        let mut work = Workspace::default().snapshot();
+        work.spaces = vec![space(1, "Projects")];
+        work.items = vec![
+            pin(1, 1, "https://repo.example/", "Repo"),
+            favorite(2, "https://mail.example/", "Mail"),
+        ];
+        let empty = Workspace::default().snapshot();
+        let mut home = Workspace::default().snapshot();
+        home.spaces = vec![space(1, "Reading")];
+        home.items = vec![pin(1, 1, "https://news.example/", "News")];
+        assert_eq!(
+            body(&write_profiles(&[
+                ("Work & Co", &work),
+                ("Empty", &empty),
+                ("Home", &home)
+            ])),
+            "<DL><p>
+    <DT><H3>Work &amp; Co</H3>
+    <DL><p>
+        <DT><H3>Favorites</H3>
+        <DL><p>
+            <DT><A HREF=\"https://mail.example/\">Mail</A>
+        </DL><p>
+        <DT><H3>Projects</H3>
+        <DL><p>
+            <DT><A HREF=\"https://repo.example/\">Repo</A>
+        </DL><p>
+    </DL><p>
+    <DT><H3>Home</H3>
+    <DL><p>
+        <DT><H3>Reading</H3>
+        <DL><p>
+            <DT><A HREF=\"https://news.example/\">News</A>
+        </DL><p>
+    </DL><p>
+</DL><p>
+"
+        );
+    }
+
+    #[test]
+    fn one_profile_with_anything_to_list_skips_the_profile_level() {
+        let mut work = Workspace::default().snapshot();
+        work.spaces = vec![space(1, "Projects")];
+        work.items = vec![pin(1, 1, "https://repo.example/", "Repo")];
+        let empty = Workspace::default().snapshot();
+        let flat = write(&work);
+        assert_eq!(write_profiles(&[("Work", &work)]), flat);
+        assert_eq!(write_profiles(&[("Empty", &empty), ("Work", &work)]), flat);
+        assert!(!flat.contains("Work"));
+        assert_eq!(
+            body(&write_profiles(&[("Empty", &empty)])),
+            "<DL><p>\n</DL><p>\n"
+        );
+        assert_eq!(body(&write_profiles(&[])), "<DL><p>\n</DL><p>\n");
     }
 
     #[test]

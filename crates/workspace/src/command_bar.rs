@@ -308,20 +308,40 @@ fn words(text: &str) -> Vec<String> {
         .collect()
 }
 
-/// How well `query` names `entry`: 2 when the title starts with it, 1 when
-/// each query word starts a word of the title or an alias, else 0.
+/// Title words that match an action only weakly, ranking it below every
+/// other match: Export Pins and Favorites… answers to "pin", but below the
+/// actions that pin, unpin or collapse.
+fn weak_words(action: Action) -> &'static [&'static str] {
+    match action {
+        Action::Run(Command::ExportPins) => &["pins"],
+        _ => &[],
+    }
+}
+
+/// How well `query` names `entry`: 3 when the title starts with it, 2 when
+/// each query word starts a word of the title or an alias, 1 when some word
+/// only starts one of the action's weak words, else 0.
 fn score(entry: &Entry, query: &[String], typed: &str) -> u8 {
     if entry.title.to_lowercase().starts_with(typed) {
-        return 2;
+        return 3;
     }
-    let mut known = words(&entry.title);
-    known.extend(entry.aliases.iter().map(|alias| (*alias).to_owned()));
-    let all = query.iter().all(|word| {
-        known
-            .iter()
-            .any(|candidate| candidate.starts_with(word.as_str()))
-    });
-    u8::from(all)
+    let weak = weak_words(entry.action);
+    let mut strong = words(&entry.title);
+    strong.retain(|word| !weak.contains(&word.as_str()));
+    strong.extend(entry.aliases.iter().map(|alias| (*alias).to_owned()));
+    let starts = |known: &[&str], word: &str| known.iter().any(|known| known.starts_with(word));
+    let strong: Vec<&str> = strong.iter().map(String::as_str).collect();
+    let mut value = 2;
+    for word in query {
+        if starts(&strong, word) {
+            continue;
+        }
+        if !starts(weak, word) {
+            return 0;
+        }
+        value = 1;
+    }
+    value
 }
 
 /// The actions `query` offers. With a leading "/" every applicable action
@@ -480,6 +500,36 @@ mod tests {
         let space = titles("space", &TODAY);
         assert_eq!(space.first().map(String::as_str), Some("New Space"));
         assert!(space.contains(&"Switch to Home".to_owned()));
+    }
+
+    #[test]
+    fn export_ranks_below_the_pin_actions() {
+        let pin = Context {
+            selected: Selected::Pin,
+            navigated_away: true,
+            ..TODAY
+        };
+        let nothing = Context {
+            selected: Selected::Nothing,
+            has_page: false,
+            ..TODAY
+        };
+        for context in [TODAY, pin, nothing] {
+            for query in ["pin", "pins", "pinned"] {
+                let titles = titles(query, &context);
+                let export = titles
+                    .iter()
+                    .position(|title| title == "Export Pins and Favorites…");
+                if let Some(export) = export {
+                    assert_eq!(export, titles.len() - 1, "{query}: {titles:?}");
+                }
+            }
+        }
+        assert_eq!(titles("export", &TODAY), ["Export Pins and Favorites…"]);
+        assert_eq!(
+            titles("pins export", &TODAY),
+            ["Export Pins and Favorites…"]
+        );
     }
 
     #[test]

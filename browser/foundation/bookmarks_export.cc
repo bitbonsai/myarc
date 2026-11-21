@@ -4,13 +4,15 @@
 #include <optional>
 #include <string>
 #include <utility>
+#include <vector>
 
 #include "base/files/file_path.h"
 #include "base/files/file_util.h"
 #include "base/functional/bind.h"
 #include "base/functional/callback_helpers.h"
 #include "base/memory/scoped_refptr.h"
-#include "base/memory/weak_ptr.h"
+#include "base/strings/strcat.h"
+#include "base/strings/utf_string_conversions.h"
 #include "base/task/thread_pool.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/ui/select_file_policy/chrome_select_file_policy.h"
@@ -27,6 +29,54 @@ namespace myarc {
 namespace {
 
 constexpr char16_t kTitle[] = u"Export Pins and Favorites";
+constexpr char kWorkspaceFile[] = "myarc-workspace-v1.json";
+// The workspace file's own bound (workspace_service.cc).
+constexpr size_t kMaxWorkspaceBytes = 20 * 1024 * 1024;
+
+// A Profile to write: its live snapshot, or the workspace file to read.
+struct Source {
+  std::u16string name;
+  std::optional<foundation::StateSnapshot> snapshot;
+  base::FilePath file;
+};
+
+struct Result {
+  bool written = false;
+  // Profiles whose workspace couldn't be read, so they're left out.
+  std::vector<std::u16string> skipped;
+};
+
+// Worker sequence: reads the files of Profiles that aren't loaded, builds the
+// bookmarks file and writes it to `path`. Profile workspace files are only
+// read. A Profile without a workspace file has nothing to export.
+Result Write(std::vector<Source> sources, const base::FilePath& path) {
+  Result result;
+  rust::Box<foundation::BookmarksExport> bookmarks =
+      foundation::new_bookmarks_export();
+  for (Source& source : sources) {
+    if (!source.snapshot) {
+      if (!base::PathExists(source.file)) {
+        continue;
+      }
+      std::string json;
+      if (base::ReadFileToStringWithMaxSize(source.file, &json,
+                                            kMaxWorkspaceBytes)) {
+        source.snapshot =
+            std::move(internal::DecodeWorkspaceMetadata(json).snapshot);
+      }
+    }
+    const std::string name = base::UTF16ToUTF8(source.name);
+    if (!source.snapshot || !foundation::add_bookmarks_profile(
+                                *bookmarks, rust::Str(name.data(), name.size()),
+                                std::move(*source.snapshot))) {
+      result.skipped.push_back(std::move(source.name));
+    }
+  }
+  const rust::String html = foundation::bookmarks_export_html(*bookmarks);
+  result.written =
+      base::WriteFile(path, std::string_view(html.data(), html.size()));
+  return result;
+}
 
 void ShowMessage(std::u16string message, gfx::NativeWindow parent) {
   constrained_window::CreateBrowserModalDialogViews(
@@ -42,20 +92,32 @@ void ShowMessage(std::u16string message, gfx::NativeWindow parent) {
       ->Show();
 }
 
-void Written(gfx::NativeWindow parent, bool ok) {
-  if (!ok) {
+void Written(gfx::NativeWindow parent, Result result) {
+  if (!result.written) {
     ShowMessage(
         u"myArc couldn’t save the file there. Pick another folder and "
         u"try again.",
         parent);
+    return;
+  }
+  if (!result.skipped.empty()) {
+    std::u16string names;
+    for (const std::u16string& name : result.skipped) {
+      names = names.empty() ? name : base::StrCat({names, u", ", name});
+    }
+    ShowMessage(base::StrCat({u"The file is saved, but myArc couldn’t "
+                              u"read the Spaces of these Profiles, so they "
+                              u"are left out: ",
+                              names, u"."}),
+                parent);
   }
 }
 
 // Owns itself while the save panel is up.
 class Picker : public ui::SelectFileDialog::Listener {
  public:
-  Picker(Profile& profile, gfx::NativeWindow parent)
-      : profile_(profile.GetWeakPtr()), parent_(parent) {}
+  Picker(BookmarksProfiles profiles, gfx::NativeWindow parent)
+      : profiles_(std::move(profiles)), parent_(parent) {}
   Picker(const Picker&) = delete;
   Picker& operator=(const Picker&) = delete;
   ~Picker() override { dialog_->ListenerDestroyed(); }
@@ -73,42 +135,40 @@ class Picker : public ui::SelectFileDialog::Listener {
 
   // ui::SelectFileDialog::Listener:
   void FileSelected(const ui::SelectedFileInfo& file, int index) override {
-    // Built only now, so the file holds the workspace as it is when saved.
-    std::optional<std::string> html;
-    if (profile_) {
-      html = WorkspaceService::ForProfile(*profile_).BookmarksHtml();
+    // Taken only now, so the file holds the workspaces as they are when saved.
+    std::vector<Source> sources;
+    for (const BookmarksProfile& profile : profiles_.Run()) {
+      Source source{.name = profile.name};
+      if (profile.profile) {
+        source.snapshot =
+            WorkspaceService::ForProfile(*profile.profile).ExportSnapshot();
+      }
+      if (!source.snapshot) {
+        source.file = profile.dir.Append(kWorkspaceFile);
+      }
+      sources.push_back(std::move(source));
     }
-    if (!html) {
-      ShowMessage(
-          u"Your Spaces haven’t loaded yet, so there’s nothing to "
-          u"export. Try again in a moment.",
-          parent_);
-    } else {
-      base::ThreadPool::PostTaskAndReplyWithResult(
-          FROM_HERE,
-          {base::MayBlock(), base::TaskPriority::USER_VISIBLE,
-           base::TaskShutdownBehavior::BLOCK_SHUTDOWN},
-          base::BindOnce(
-              [](const base::FilePath& path, const std::string& html) {
-                return base::WriteFile(path, html);
-              },
-              file.path(), std::move(*html)),
-          base::BindOnce(&Written, parent_));
-    }
+    base::ThreadPool::PostTaskAndReplyWithResult(
+        FROM_HERE,
+        {base::MayBlock(), base::TaskPriority::USER_VISIBLE,
+         base::TaskShutdownBehavior::BLOCK_SHUTDOWN},
+        base::BindOnce(&Write, std::move(sources), file.path()),
+        base::BindOnce(&Written, parent_));
     delete this;
   }
   void FileSelectionCanceled() override { delete this; }
 
  private:
-  const base::WeakPtr<Profile> profile_;
+  const BookmarksProfiles profiles_;
   const gfx::NativeWindow parent_;
   scoped_refptr<ui::SelectFileDialog> dialog_;
 };
 
 }  // namespace
 
-void ExportPinsAndFavorites(Profile& profile, gfx::NativeWindow parent) {
-  (new Picker(profile, parent))->Open();
+void ExportPinsAndFavorites(BookmarksProfiles profiles,
+                            gfx::NativeWindow parent) {
+  (new Picker(std::move(profiles), parent))->Open();
 }
 
 }  // namespace myarc

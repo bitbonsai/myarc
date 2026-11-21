@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-11-21: Export covers every Profile
+
+- Export Pins and Favorites… now writes every regular Profile, one top-level folder each with Favorites first and then its Spaces, and skips that level when only one Profile has anything to list. A loaded Profile exports its live workspace. Any other Profile is read from its `myarc-workspace-v1.json`, which stays untouched, and a Profile that can't be read is named in a note after the save. In the command bar, "pin" now counts as a weak match for Export, so it always ranks below the pin actions.
+- Evidence: `MyarcNightly` chrome builds. Rust fmt, clippy and tests pass, including a round trip that imports the synthetic Arc sidebar fixture, exports it, reads the HTML back and compares folders, order and URLs with Arc's report.
+- Limits: not run live, so the multi-Profile file and the note about unreadable Profiles are unchecked.
+
 ## 2026-11-21: Export Pins and Favorites
 
 - Settings > Advanced has Export Pins and Favorites… under Import from Arc…, and the command bar offers the same action (also on "export" and "bookmarks"). Both open a save panel named `myArc Bookmarks.html` in Downloads and write only after a file is picked: a Netscape bookmarks file with a Favorites folder first, then one folder per Space holding its loose Pins and then its sidebar folders, in workspace order. `crates/import/src/bookmarks_html.rs` writes it; titles fall back from the Rename name to the page title to the URL, and everything is HTML-escaped.
