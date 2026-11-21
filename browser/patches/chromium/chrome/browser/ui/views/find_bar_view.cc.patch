@@ -1,0 +1,124 @@
+diff --git a/chrome/browser/ui/views/find_bar_view.cc b/chrome/browser/ui/views/find_bar_view.cc
+index 52005135b6fc2a46bc7a2492a151d251aa830cce..71257aa3a12a2c975ded2df08e918b71bf78104d 100644
+--- a/chrome/browser/ui/views/find_bar_view.cc
++++ b/chrome/browser/ui/views/find_bar_view.cc
+@@ -33,6 +33,7 @@
+ #include "components/strings/grit/components_strings.h"
+ #include "components/vector_icons/vector_icons.h"
+ #include "content/public/browser/clipboard_types.h"
++#include "myarc/icons.h"
+ #include "ui/accessibility/ax_enums.mojom.h"
+ #include "ui/accessibility/ax_node_data.h"
+ #include "ui/base/data_transfer_policy/data_transfer_endpoint.h"
+@@ -54,6 +55,7 @@
+ #include "ui/views/controls/button/image_button_factory.h"
+ #include "ui/views/controls/button/md_text_button.h"
+ #include "ui/views/controls/highlight_path_generator.h"
++#include "ui/views/controls/image_view.h"
+ #include "ui/views/controls/label.h"
+ #include "ui/views/controls/separator.h"
+ #include "ui/views/layout/box_layout.h"
+@@ -66,6 +68,10 @@
+ #include "ui/views/widget/widget.h"
+ 
+ namespace {
++// myArc's find pill is about 370 DIP wide, as Arc's is.
++constexpr int kMyarcFindWidth = 370;
++constexpr float kMyarcPillRadius = 999;
++
+ void SetCommonButtonAttributes(views::ImageButton* button) {
+   views::ConfigureVectorImageButton(button);
+   views::InstallCircleHighlightPathGenerator(button);
+@@ -205,12 +211,19 @@ FindBarView::FindBarView(FindBarHost* host) {
+               gfx::Insets(layout_provider->GetInsetsMetric(INSETS_TOAST) -
+                           horizontal_margin))
+           .AddChildren(
++              // myArc's pill starts with a magnifier, as Arc's does.
++              views::Builder<views::ImageView>()
++                  .SetImage(ui::ImageModel::FromVectorIcon(
++                      myarc::kSearchIcon, kColorFindBarMatchCount, 14))
++                  .SetCanProcessEventsWithinSubtree(false)
++                  .SetProperty(views::kMarginsKey, horizontal_margin),
+               views::Builder<views::Textfield>()
+                   .CopyAddressTo(&find_text_)
+                   .SetAccessibleName(
+                       l10n_util::GetStringUTF16(IDS_ACCNAME_FIND))
+                   .SetBorder(views::CreateEmptyBorder(textfield_hover_padding))
+                   .SetDefaultWidthInChars(30)
++                  .SetPlaceholderText(u"Find in page\u2026")
+                   .SetID(VIEW_ID_FIND_IN_PAGE_TEXT_FIELD)
+                   .SetMinimumWidthInChars(1)
+                   .SetTextInputFlags(ui::TEXT_INPUT_FLAG_AUTOCORRECT_OFF)
+@@ -338,15 +351,15 @@ FindBarView::FindBarView(FindBarHost* host) {
+   SetProperty(views::kElementIdentifierKey, kElementId);
+   AddChildView(std::move(main_container));
+ 
+-  const float corner_radius = layout_provider->GetCornerRadiusMetric(
+-      ChromeShapeContextTokens::kFindBarViewRadius);
+   {
+     auto border = std::make_unique<views::BubbleBorder>(
+         views::BubbleBorder::NONE, views::BubbleBorder::STANDARD_SHADOW);
+     border->set_background_color(kColorFindBarBackground);
+     border->set_md_shadow_elevation(
+         layout_provider->GetCornerRadiusMetric(views::Emphasis::kHigh));
+-    border->set_rounded_corners(gfx::RoundedCornersF(corner_radius));
++    // myArc draws a pill: Skia shrinks the oversized radius to half the
++    // height.
++    border->set_rounded_corners(gfx::RoundedCornersF(kMyarcPillRadius));
+ 
+     SetBackground(std::make_unique<views::BubbleBackground>(border.get()));
+     SetBorder(std::move(border));
+@@ -358,6 +371,8 @@ FindBarView::FindBarView(FindBarHost* host) {
+   SetCommonButtonAttributes(find_previous_button_);
+   SetCommonButtonAttributes(find_next_button_);
+   SetCommonButtonAttributes(close_button_);
++  // The count and arrows wait for text.
++  UpdateMatchCountAppearance(false);
+ }
+ 
+ FindBarView::~FindBarView() = default;
+@@ -374,6 +389,7 @@ void FindBarView::SetFindTextAndSelectedRange(
+   find_text_->SetText(find_text);
+   find_text_->SetSelectedRange(selected_range);
+   last_searched_text_ = find_text;
++  UpdateMatchCountAppearance(false);
+ }
+ 
+ std::u16string_view FindBarView::GetFindText() const {
+@@ -471,10 +487,9 @@ FindBarView::GetFindBarMatchCountLabelViewAccessibilityForTesting() {
+ gfx::Size FindBarView::CalculatePreferredSize(
+     const views::SizeBounds& available_size) const {
+   gfx::Size size = views::View::CalculatePreferredSize(available_size);
+-  // Ignore the preferred size for the match count label, and just let it take
+-  // up part of the space for the input textfield. This prevents the overall
+-  // width from changing every time the match count text changes.
+-  size.set_width(size.width() - match_count_text_->GetPreferredSize().width());
++  // myArc keeps one width, whether or not the count and arrows show, so it
++  // doesn't change as the match count does.
++  size.set_width(kMyarcFindWidth + GetInsets().width());
+   return size;
+ }
+ 
+@@ -546,6 +561,9 @@ void FindBarView::OnAfterUserAction(views::Textfield* sender) {
+   if (!sender->IsIMEComposing() && sender->GetText() != last_searched_text_) {
+     Find(sender->GetText());
+   }
++  if (sender->GetText().empty()) {
++    ClearMatchCount();
++  }
+ }
+ 
+ void FindBarView::OnAfterPaste() {
+@@ -646,6 +664,12 @@ void FindBarView::UpdateMatchCountAppearance(bool no_match) {
+   bool enable_buttons = !find_text_->GetText().empty() && !no_match;
+   find_previous_button_->SetEnabled(enable_buttons);
+   find_next_button_->SetEnabled(enable_buttons);
++  // myArc shows the count and arrows only once there's text.
++  const bool has_text = !find_text_->GetText().empty();
++  match_count_text_->SetVisible(has_text);
++  separator_->SetVisible(has_text);
++  find_previous_button_->SetVisible(has_text);
++  find_next_button_->SetVisible(has_text);
+ }
+ 
+ BEGIN_METADATA(FindBarView)

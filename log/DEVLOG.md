@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-11-21: Arc-style find bar and New Folder entry points
+
+- Find in page sits 12 DIP inside the focused page's top right corner (`BrowserView::GetFindBarBoundingBox` uses the active contents container) and is clipped to it, so it never covers the sidebar. `FindBarView` is a 370 DIP pill with Lucide's magnifier and "Find in page…", and shows the match count and arrows only once there's text. New Folder is in the sidebar's + menu and in the command bar as New Folder…, and both start the same create-and-rename flow as the Space title's menu.
+- Evidence: `MyarcNightly` chrome builds. Rust fmt, clippy and tests (with new command bar cases), `check_docs.py` and `export_patches.py --check` pass. In one background launch the pill drew with its icon, placeholder and ✕ in dark and light, and "/mode" in the command bar ran Switch to Light Mode.
+- Limits: the fresh profile opened on the welcome tour, whose overlay covered the page, so the shots can't confirm the top-right placement next to the sidebar, with it hidden or in Split View. The + menu's New Folder row, the command bar's New Folder… and the with-text state weren't captured.
+
 ## 2026-11-21: Nightly 2026.11.21.1
 
 - Published the prerelease `nightly-2026.11.21.1` from `main` `b9f95c4` and Chromium `724a8f6feb`, the first nightly built from `browser/args-nightly.gn` in its own `out/MyarcRelease`: no DCHECKs, stripped binaries, Sparkle started after launch, fewer sidebar rebuilds and batched workspace saves. Earlier nightlies were packaged from `out/MyarcNightly`, which carries the test-hooks args.

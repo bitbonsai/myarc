@@ -543,6 +543,12 @@ source_set("sidebar_view") {
   ]
 }
 
+# The shared vector icons, for upstream views such as the find bar.
+source_set("icons") {
+  sources = [ "icons.h" ]
+  public_deps = [ "//ui/gfx" ]
+}
+
 source_set("local_page_marker") {
   sources = [
     "icons.h",

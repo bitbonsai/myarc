@@ -18,6 +18,7 @@ Legend: `DOC` = public documentation/index evidence; `BRIEF` = project requireme
 | CORE-01 | Permissions, downloads, history, private browsing, DevTools | P0 | Inherit platform; integration UNKNOWN | Native integration smoke tests and private-data non-persistence |
 | REL-01 | Crash recovery, versioned export, secure updates | P0 | BRIEF; project release standard | Fault injection and signed-update rehearsal |
 | AUTO-01 | CLI and MCP for scoped tab/Space and real-page control | P0 | BRIEF; [control contract](CONTROL-PROTOCOL.md) | Both-interface journey and external client evidence; grants, stale references, cancellation, Stop control; not implemented |
+| FIND-01 | Find in page floats at the page's top right as one pill, never over the sidebar | P1 | Private Arc screenshot: a dark pill about 370 pt wide, 12 pt from the page's top and right edges, with a magnifier, "Find in page…" and a close button | Native placement next to the sidebar, with it hidden and in Split View, in light and dark |
 | VIEW-01 | Peek and two-pane Split View | P1; Split View required for [alpha](ALPHA.md) | DOC: Split View index; details UNKNOWN | Navigation/focus, reopen, drag, dismiss, persistence |
 | BST-01 | Appearance/CSS/hiding Boosts | P1 | DOC: Boosts index; BRIEF | Scope, reversibility, SPA/iframe rules, unsafe input checks |
 | BST-02 | JavaScript Boosts and safe sharing | P2 | DOC: disable/release notes; BRIEF | Threat review, disabled imports, revocation |
@@ -36,7 +37,7 @@ Arc's help pages on the command bar and shortcuts returned 403 on 2026-11-20 and
 | Switch to Dark Mode / Switch to Light Mode | Wired: the row offers the other appearance and sets the browser's color scheme |
 | Add Top Split, Add Left Split | Not wired: myArc offers Add Split View |
 | Add Extension… | Partial: myArc offers Manage Extensions… |
-| New Folder… | Not wired yet |
+| New Folder… | Wired: adds a folder to the current Space and opens its rename field |
 | Check for Updates… | Not wired: in the app menu of nightlies only |
 | New Repl, Export Arc Notes, Share Arc | Skipped: Arc-only |
 | View Boosts… | Skipped: Boosts aren't built |

@@ -18,6 +18,8 @@ pub enum Action {
     PinTab,
     UnpinTab,
     NewSpace,
+    /// Arc's New Folder…: a folder in the current Space, named on creation.
+    NewFolder,
     ArchiveTab,
     CopyUrl,
     SplitView,
@@ -269,6 +271,7 @@ fn entries(context: &Context, spaces: &[(SpaceId, &str)], current: SpaceId) -> V
         );
     }
     add(true, Action::NewSpace, "New Space", &["create", "add"]);
+    add(true, Action::NewFolder, "New Folder…", &["create", "add"]);
     for &(id, name) in spaces {
         add(
             id != current,
@@ -386,7 +389,7 @@ mod tests {
     fn slash_lists_every_action_that_applies() {
         // The window's actions come first, then the browser commands.
         assert_eq!(
-            titles("/", &TODAY)[..13],
+            titles("/", &TODAY)[..14],
             [
                 "Pin Tab",
                 "Archive Tab",
@@ -396,6 +399,7 @@ mod tests {
                 "Clear Cache and Refresh",
                 "Collapse Pinned Tabs",
                 "New Space",
+                "New Folder…",
                 "Switch to Reading",
                 "Switch to Home",
                 "Privacy Policy",
@@ -428,6 +432,11 @@ mod tests {
     fn typed_names_offer_actions() {
         assert_eq!(titles("pin", &TODAY), ["Pin Tab", "Collapse Pinned Tabs"]);
         assert_eq!(titles("new space", &TODAY), ["New Space"]);
+        assert_eq!(titles("folder", &TODAY), ["New Folder…"]);
+        assert_eq!(
+            offers("new folder", &TODAY, SPACES, 1)[0].action,
+            Action::NewFolder
+        );
         assert_eq!(titles("archive", &TODAY), ["Archive Tab"]);
         assert_eq!(
             titles("close", &TODAY),
@@ -493,10 +502,11 @@ mod tests {
             dark: true,
         };
         assert_eq!(
-            titles("/", &empty)[..4],
+            titles("/", &empty)[..5],
             [
                 "Collapse Pinned Tabs",
                 "New Space",
+                "New Folder…",
                 "Switch to Reading",
                 "Switch to Home"
             ]

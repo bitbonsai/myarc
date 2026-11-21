@@ -49,7 +49,7 @@ Closing a pinned tab or a Favorite keeps its tile. The page closes, and clicking
 
 ## Folders
 
-A folder groups pinned tabs inside a Space. To make one, right-click the Space name at the top of the sidebar and choose New Folder. Right-click a folder to rename or delete it, and click it to open or close it. To file a tab, right-click it and choose Move to Folder. Remove from Folder takes it out again. Folders don't nest.
+A folder groups pinned tabs inside a Space. To make one, choose New Folder from the + menu at the bottom of the sidebar, right-click the Space name at the top of the sidebar, or type "new folder" in the command bar. Right-click a folder to rename or delete it, and click it to open or close it. To file a tab, right-click it and choose Move to Folder. Remove from Folder takes it out again. Folders don't nest.
 
 ## Temporary tabs
 

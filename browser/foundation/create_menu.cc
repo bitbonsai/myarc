@@ -59,7 +59,9 @@ constexpr float kPanelRadius = 11;
 constexpr int kPad = 7;
 constexpr int kRowHeight = 40;
 constexpr int kSeparatorBand = 17;
-constexpr int kPanelHeight = 2 * kPad + 3 * kRowHeight + kSeparatorBand;
+// Rows above the separator: New Space and New Folder.
+constexpr int kRowsAboveSeparator = 2;
+constexpr int kPanelHeight = 2 * kPad + 4 * kRowHeight + kSeparatorBand;
 constexpr int kSeparatorInset = 17;
 constexpr int kPillInset = 7;
 constexpr float kPillRadius = 7.5f;
@@ -135,6 +137,10 @@ struct RowSpec {
 constexpr auto kRows = std::to_array<RowSpec>({
     {CreateMenu::Item::kNewSpace, u"New Space", &kNewSpaceIcon, 24, {},
      nullptr, true, nullptr, kPad},
+    // Arc's Tabs menu has New Folder with no shortcut; the Space title's menu
+    // starts the same create and rename.
+    {CreateMenu::Item::kNewFolder, u"New Folder", &kFolderClosedIcon, 18, {},
+     nullptr, true, nullptr, kPad + kRowHeight},
     {CreateMenu::Item::kNewSplit,
      u"New Split",
      &kNewSplitIcon,
@@ -143,7 +149,7 @@ constexpr auto kRows = std::to_array<RowSpec>({
      "Control+Shift+=",
      true,
      nullptr,
-     kPad + kRowHeight + kSeparatorBand},
+     kPad + kRowsAboveSeparator * kRowHeight + kSeparatorBand},
     {CreateMenu::Item::kNewTab,
      u"New Tab",
      &kNewTabIcon,
@@ -152,7 +158,7 @@ constexpr auto kRows = std::to_array<RowSpec>({
      "Meta+T",
      true,
      nullptr,
-     kPad + 2 * kRowHeight + kSeparatorBand},
+     kPad + (kRowsAboveSeparator + 1) * kRowHeight + kSeparatorBand},
 });
 
 gfx::FontList FontOfSize(int size, gfx::Font::Weight weight) {
@@ -477,7 +483,8 @@ void CreateMenu::OnPaint(gfx::Canvas* canvas) {
     canvas->DrawPath(path, border);
   }
   const gfx::Rect panel = PanelBounds();
-  const int separator_y = panel.y() + kPad + kRowHeight + kSeparatorBand / 2;
+  const int separator_y = panel.y() + kPad + kRowsAboveSeparator * kRowHeight +
+                          kSeparatorBand / 2;
   canvas->FillRect(gfx::Rect(panel.x() + kSeparatorInset, separator_y,
                              panel.width() - 2 * kSeparatorInset, 1),
                    colors.separator);

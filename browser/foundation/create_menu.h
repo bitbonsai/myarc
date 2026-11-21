@@ -31,8 +31,8 @@ namespace myarc {
 class CreateMenuRow;
 
 // Arc's "+" creation menu: a navy panel with a notch, floating above the
-// sidebar footer's Create button, with New Space, a separator, New Split and
-// New Tab. New Tab is highlighted shortly after it opens; the pointer and the
+// sidebar footer's Create button, with New Space, New Folder, a separator,
+// New Split and New Tab. New Tab is highlighted shortly after it opens; the pointer and the
 // arrow keys move the highlight, Return chooses and Esc or a click elsewhere
 // closes it. It fades and scales in and out from the notch. The sidebar owns
 // and places it, hidden while closed. On the UI sequence.
@@ -44,7 +44,7 @@ class CreateMenu : public views::View,
   METADATA_HEADER(CreateMenu, views::View)
 
  public:
-  enum class Item { kNewSpace, kNewSplit, kNewTab };
+  enum class Item { kNewSpace, kNewFolder, kNewSplit, kNewTab };
 
   // `select` runs for the chosen row once closing has started. `open_changed`
   // runs with true on opening and with false as soon as closing starts.

@@ -1,0 +1,14 @@
+diff --git a/chrome/browser/ui/views/frame/find_bar_owner_views.cc b/chrome/browser/ui/views/frame/find_bar_owner_views.cc
+index 7b42226cbe1617d1a87e3b3843c3403c01e58bc0..acc018564921b72a989a304a8e074395a7a0c4bc 100644
+--- a/chrome/browser/ui/views/frame/find_bar_owner_views.cc
++++ b/chrome/browser/ui/views/frame/find_bar_owner_views.cc
+@@ -31,7 +31,8 @@ gfx::Rect FindBarOwnerViews::GetFindBarBoundingBox() {
+ }
+ 
+ gfx::Rect FindBarOwnerViews::GetFindBarClippingBox() {
+-  return browser_view_->bounds();
++  // myArc keeps the find bar inside the page it searches.
++  return browser_view_->GetFindBarBoundingBox();
+ }
+ 
+ bool FindBarOwnerViews::IsOffTheRecord() const {

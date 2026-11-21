@@ -1592,6 +1592,9 @@ void SidebarView::ChooseCreateItem(int item) {
                          case CreateMenu::Item::kNewSpace:
                            sidebar->delegate_->CreateSpace();
                            return;
+                         case CreateMenu::Item::kNewFolder:
+                           sidebar->delegate_->CreateFolder();
+                           return;
                          case CreateMenu::Item::kNewTab:
                            sidebar->delegate_->NewTab();
                            return;
