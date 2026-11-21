@@ -518,7 +518,9 @@ Saved passwords and cookies stay in Chromium's own stores. Chromium encrypts the
 
 ## Back it up
 
-There is no export command yet. To back up everything, quit myArc and copy the whole `myArc Nightly` folder somewhere safe. Quitting first means nothing is halfway through a save while you copy.
+To back up everything, quit myArc and copy the whole `myArc Nightly` folder somewhere safe. Quitting first means nothing is halfway through a save while you copy.
+
+To take your Favorites and pinned tabs to another browser, open Settings \> Advanced and click Export Pins and Favorites…, or type Export in the command bar. myArc saves a bookmarks file that any browser can import, with Favorites in a Favorites folder and one folder per Space that keeps your sidebar folders. With more than one Profile, each Profile gets its own folder, even when you export from a private window.
 
 ## What goes over the network
 
