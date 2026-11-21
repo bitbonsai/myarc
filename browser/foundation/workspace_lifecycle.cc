@@ -80,6 +80,13 @@ void WorkspaceLifecycle::NotifyAll(Event event) {
   }
 }
 
+bool WorkspaceLifecycle::WindowRestoresOrderedOut(
+    const ExtraData& window_data) {
+  // BrowserWorkspaceAdapter::kGroupHiddenKey.
+  const auto hidden = window_data.find("myarc.group_hidden.v1");
+  return hidden != window_data.end() && hidden->second == "1";
+}
+
 WorkspaceLifecycle::ExtraData WorkspaceLifecycle::PreserveUnknownData(
     const ExtraData& data) {
   ExtraData unknown = data;

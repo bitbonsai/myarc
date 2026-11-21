@@ -722,6 +722,18 @@ source_set("nightly_switches") {
   ]
 }
 
+# --myarc-startup-timing: logs time to the first window and first paint.
+source_set("startup_timing") {
+  sources = [
+    "startup_timing.cc",
+    "startup_timing.h",
+  ]
+  deps = [
+    "//base",
+    "//content/public/browser",
+  ]
+}
+
 # uBlock Origin Lite, myArc's default ad and tracker blocker. See
 # blocker/README.md.
 source_set("blocker") {
@@ -730,6 +742,7 @@ source_set("blocker") {
     "blocker.h",
   ]
   deps = [
+    ":startup_timing",
     "//base",
     "//chrome/browser/profiles:profile",
     "//chrome/common:constants",

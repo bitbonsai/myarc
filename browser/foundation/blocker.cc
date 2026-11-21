@@ -32,6 +32,7 @@
 #include "extensions/browser/install/crx_install_error.h"
 #include "extensions/common/extension.h"
 #include "extensions/common/mojom/manifest.mojom-shared.h"
+#include "myarc/startup_timing.h"
 #include "third_party/zlib/google/zip.h"
 
 namespace myarc {
@@ -59,7 +60,9 @@ constexpr char kVisualParitySwitch[] = "myarc-visual-parity";
 // How long a navigation may wait for the blocker's rules. Unpacking,
 // installing and indexing take about a second on a new Profile.
 constexpr base::TimeDelta kMaxRulesWait = base::Seconds(10);
-constexpr base::TimeDelta kRulesPoll = base::Milliseconds(50);
+// The check is a map lookup, so a short poll lets the page go as soon as the
+// rules are live instead of up to one long poll later.
+constexpr base::TimeDelta kRulesPoll = base::Milliseconds(10);
 
 // Per-Profile state for this session, kept on the original Profile.
 struct BlockerState : base::SupportsUserData::Data {
@@ -222,6 +225,7 @@ class BlockerRulesThrottle final : public content::NavigationThrottle {
       return;
     }
     poll_.Stop();
+    NoteBlockerHold(base::TimeTicks::Now() - started_);
     if (timed_out) {
       LOG(WARNING) << "myArc: page load went ahead before the blocker's rules";
     }

@@ -16,6 +16,7 @@
 - Follow [tests/fixtures/browser/README.md](../tests/fixtures/browser/README.md). The checks crash a renderer on purpose and temporarily disable the test extension.
 - Do not create default-context CDP targets until the recorded profile-initialization assertion is isolated. Reuse the existing test tab.
 - The external Chromium build has its own [run record](../browser/README.md).
+- To time a launch, pass `--myarc-startup-timing` with `--enable-logging --log-file=<file>`. The log gets `myarc-startup-timing window_shown_ms=` and `first_paint_ms=`, counted from process start, and `blocker_hold_ms=` when the blocker held the first page load. Each line shows once per launch.
 
 ## Native evidence gotcha
 

@@ -1,5 +1,5 @@
 diff --git a/chrome/browser/sessions/session_restore.cc b/chrome/browser/sessions/session_restore.cc
-index ea1990e8cd42875e6d651edbe429c76de7e8ab9f..f55cf8d61fa21921879646f0e86120ef48b115d5 100644
+index ea1990e8cd42875e6d651edbe429c76de7e8ab9f..cd0fa0bbec7a6c6449553f5620b3f05a885069f4 100644
 --- a/chrome/browser/sessions/session_restore.cc
 +++ b/chrome/browser/sessions/session_restore.cc
 @@ -115,6 +115,7 @@
@@ -76,7 +76,33 @@ index ea1990e8cd42875e6d651edbe429c76de7e8ab9f..f55cf8d61fa21921879646f0e86120ef
        } else {
  #if BUILDFLAG(IS_CHROMEOS)
          ash::BootTimesRecorder::Get()->AddLoginTimeMarker(
-@@ -1404,6 +1421,9 @@ class SessionRestoreImpl : public BrowserCollectionObserver {
+@@ -1098,6 +1115,7 @@ class SessionRestoreImpl : public BrowserCollectionObserver {
+     // base::Time) can be mapped onto the TimeTicks timeline WebContents wants.
+     const base::Time now = base::Time::Now();
+     const base::TimeTicks now_ticks = base::TimeTicks::Now();
++    const size_t first_restored_tab = restored_tabs.size();
+     for (int i = 0; i < static_cast<int>(window.tabs.size()); ++i) {
+       const sessions::SessionTab& tab = *(window.tabs[i]);
+ 
+@@ -1119,6 +1137,17 @@ class SessionRestoreImpl : public BrowserCollectionObserver {
+                  last_active_time_ticks, tab.last_active_time,
+                  did_show_browser);
+     }
++    // myArc: a Profile window that was ordered out stays out of sight, so
++    // only its active tab loads. The others load once shown or activated,
++    // as after myArc's crash restore.
++    if (myarc::WorkspaceLifecycle::WindowRestoresOrderedOut(
++            window.extra_data)) {
++      restored_tabs.erase(
++          std::remove_if(
++              restored_tabs.begin() + first_restored_tab, restored_tabs.end(),
++              [](const RestoredTab& tab) { return !tab.is_active(); }),
++          restored_tabs.end());
++    }
+ 
+     for (const auto& pair : tabs_by_split_id) {
+       const split_tabs::SplitTabId split_id = pair.first;
+@@ -1404,6 +1433,9 @@ class SessionRestoreImpl : public BrowserCollectionObserver {
        manager->SetWindowCreationInfo(
            waap::NewWindowCreationSource::kSessionRestore, now);
      }
@@ -86,7 +112,7 @@ index ea1990e8cd42875e6d651edbe429c76de7e8ab9f..f55cf8d61fa21921879646f0e86120ef
      g_is_any_session_restored = true;
      return browser_window;
    }
-@@ -1545,6 +1565,10 @@ class SessionRestoreImpl : public BrowserCollectionObserver {
+@@ -1545,6 +1577,10 @@ class SessionRestoreImpl : public BrowserCollectionObserver {
    // If true, restores the normal browser.
    bool restore_browser_ = true;
  
@@ -97,7 +123,7 @@ index ea1990e8cd42875e6d651edbe429c76de7e8ab9f..f55cf8d61fa21921879646f0e86120ef
    // True if this instance is restoring a session from another device, rather
    // than this profile's own last session. Foreign restores are not reported to
    // SessionRestoreObservers.
-@@ -1635,11 +1659,15 @@ BrowserWindowInterface* SessionRestore::RestoreSession(
+@@ -1635,11 +1671,15 @@ BrowserWindowInterface* SessionRestore::RestoreSession(
        (behavior & RESTORE_APPS) != 0, (behavior & RESTORE_BROWSER) != 0,
        /* log_event */ true, /* is_foreign_session_restore */ false,
        startup_tabs);
@@ -114,7 +140,7 @@ index ea1990e8cd42875e6d651edbe429c76de7e8ab9f..f55cf8d61fa21921879646f0e86120ef
    auto* profile = browser->GetProfile();
  
  #if BUILDFLAG(IS_CHROMEOS)
-@@ -1657,6 +1685,9 @@ void SessionRestore::RestoreSessionAfterCrash(BrowserWindowInterface* browser) {
+@@ -1657,6 +1697,9 @@ void SessionRestore::RestoreSessionAfterCrash(BrowserWindowInterface* browser) {
        (browser && HasSingleNewTabPage(browser)
             ? SessionRestore::CLOBBER_CURRENT_TAB
             : 0);

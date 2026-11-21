@@ -47,6 +47,9 @@ class WorkspaceLifecycle {
   // Preserve opaque keys, while current native producers and bounded adapter
   // helpers regenerate the keys they own (including deliberately absent ones).
   static ExtraData PreserveUnknownData(const ExtraData& data);
+  // A window saved ordered out, behind another Profile's window of its group,
+  // as the adapter writes it. Session restore loads only its active tab.
+  static bool WindowRestoresOrderedOut(const ExtraData& window_data);
 
   virtual void OnLifecycleEvent(Event event) = 0;
   virtual void RestoreTab(BrowserWindowInterface& browser,

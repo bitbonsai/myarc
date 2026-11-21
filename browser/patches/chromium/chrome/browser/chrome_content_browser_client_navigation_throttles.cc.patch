@@ -1,20 +1,21 @@
 diff --git a/chrome/browser/chrome_content_browser_client_navigation_throttles.cc b/chrome/browser/chrome_content_browser_client_navigation_throttles.cc
-index 1dc3fdf54fb9acdbba0450b349e3de3eb0ed3225..a6371e6597088a80c46bb98f2fa9f8ca8991ebc2 100644
+index 1dc3fdf54fb9acdbba0450b349e3de3eb0ed3225..3f03a54db44b73874ae5c9df879a716fd4e26027 100644
 --- a/chrome/browser/chrome_content_browser_client_navigation_throttles.cc
 +++ b/chrome/browser/chrome_content_browser_client_navigation_throttles.cc
-@@ -130,6 +130,11 @@
+@@ -130,6 +130,12 @@
  #include "chrome/browser/ui/web_applications/app_browser_controller.h"
  #endif  // !BUILDFLAG(IS_ANDROID)
  
 +#if !BUILDFLAG(IS_ANDROID)
 +#include "myarc/blocker.h"
 +#include "myarc/peek_hook.h"
++#include "myarc/startup_timing.h"
 +#endif  // !BUILDFLAG(IS_ANDROID)
 +
  #if BUILDFLAG(ENABLE_DEVTOOLS_FRONTEND)
  #include "chrome/browser/devtools/devtools_window.h"
  #endif  // BUILDFLAG(ENABLE_DEVTOOLS_FRONTEND)
-@@ -308,6 +313,12 @@ void CreateAndAddChromeThrottlesForNavigation(
+@@ -308,6 +314,14 @@ void CreateAndAddChromeThrottlesForNavigation(
  
  #if BUILDFLAG(IS_ANDROID)
      CrossDeviceSigninFlowNavigationThrottle::MaybeCreateAndAdd(registry);
@@ -24,6 +25,8 @@ index 1dc3fdf54fb9acdbba0450b349e3de3eb0ed3225..a6371e6597088a80c46bb98f2fa9f8ca
 +    myarc::MaybeAddPeekThrottle(registry);
 +    // myArc: a new Profile's first pages wait for the bundled blocker.
 +    myarc::MaybeAddBlockerRulesThrottle(registry);
++    // myArc's --myarc-startup-timing: time to the first painted page.
++    myarc::WatchFirstPaint(registry.GetNavigationHandle());
  #endif  // BUILDFLAG(IS_ANDROID)
    }
  

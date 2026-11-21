@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-11-21: Lazy hidden Profile windows and a startup timing log
+
+- A Profile window saved ordered out, behind another Profile's window of its group, now restores with only its active tab scheduled to load (`WorkspaceLifecycle::WindowRestoresOrderedOut` in `SessionRestoreImpl::RestoreTabsToBrowser`). Its other tabs load once the window shows and they are activated, as after the silent crash restore. The blocker's first-load hold polls every 10 ms instead of 50 ms, so a page goes as soon as the rules are live. `--myarc-startup-timing` logs process start to the first shown window, to the first painted page, and the blocker hold (Chromium commit "Load only the active tab of a Profile window restored ordered out"); [VERIFY](../docs/VERIFY.md) says how to read it.
+- Measured on `out/MyarcNightly` with a synthetic user-data dir: 3 Profiles, 40 pins, 35 tabs, two windows ordered out and one shown, relaunched in the background 20 s each. Before: 30 renderers, first window at a median 740 ms (664 to 836) and first paint at 1120 ms (1058 to 1174) over 5 runs. After: 17 renderers, 692 ms (579 to 836) and 1059 ms (954 to 1130) over 9 runs, leaving out the first launch after the rebuild (3471 and 3863 ms). The time to the first window and the first paint moved within noise; the gain is 13 fewer pages loading in the background. No run logged a blocker hold, so its rules were live before the first request and the shorter poll didn't show up here.
+- Evidence: after a swap to a window restored ordered out, activating one of its background tabs loaded it (`readyState` complete, visible). `chrome` builds; `export_patches.py --check` and `check_docs.py` pass. Scripts and the seed are in `/tmp/myarc-startup/`.
+
 ## 2026-11-21: Command bar actions without web suggestions
 
 - `command_bar::offers` marks an offer `strong` when the typed text is the action's whole title (a closing "…" optional) or its start in two or more words, such as "switch to". The bridge passes it on, and `MyarcPaletteView::RenderResults` then leaves out search-type matches, as Arc shows only the action. Open tabs, URL and history matches stay below the actions, and one word such as "switch" keeps its suggestions (Chromium commit "Leave web suggestions out when the command bar text names an action").
