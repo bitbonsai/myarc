@@ -6,6 +6,7 @@
 #include "base/functional/bind.h"
 #include "base/task/single_thread_task_runner.h"
 #include "cc/paint/paint_flags.h"
+#include "myarc/glass_mac.h"
 #include "third_party/skia/include/core/SkColor.h"
 #include "ui/accessibility/ax_enums.mojom.h"
 #include "ui/base/metadata/metadata_header_macros.h"
@@ -18,6 +19,7 @@
 #include "ui/gfx/geometry/rect.h"
 #include "ui/gfx/geometry/rect_f.h"
 #include "ui/gfx/geometry/size.h"
+#include "ui/gfx/skia_paint_util.h"
 #include "ui/views/accessibility/view_accessibility.h"
 #include "ui/views/background.h"
 #include "ui/views/border.h"
@@ -44,12 +46,16 @@ constexpr int kButtonPad = 12;
 constexpr int kTopMargin = 19;
 constexpr int kRightMargin = 17;
 constexpr SkColor kFill = SkColorSetRGB(0x25, 0x25, 0x26);
+constexpr SkColor kGlassFill = SkColorSetARGB(0xB4, 0x1A, 0x1A, 0x20);
 constexpr SkColor kStroke = SkColorSetRGB(0x3A, 0x3A, 0x3B);
-constexpr SkColor kTitle = SkColorSetRGB(0xF2, 0xF2, 0xF2);
-constexpr SkColor kBody = SkColorSetRGB(0xC2, 0xC2, 0xC3);
+constexpr SkColor kRimTop = SkColorSetA(SK_ColorWHITE, 0x38);
+constexpr SkColor kRimBottom = SkColorSetA(SK_ColorWHITE, 0x12);
+constexpr SkColor kTitle = SkColorSetRGB(0xF5, 0xF5, 0xF7);
+constexpr SkColor kBody = SkColorSetRGB(0xD0, 0xD0, 0xD4);
 constexpr SkColor kBlueButton = SkColorSetRGB(0x00, 0x7A, 0xFF);
 constexpr SkColor kGrayButton = SkColorSetRGB(0x45, 0x45, 0x46);
-constexpr SkColor kButtonText = SkColorSetRGB(0xE3, 0xE3, 0xE3);
+constexpr SkColor kGrayButtonGlass = SkColorSetA(SK_ColorWHITE, 0x1E);
+constexpr SkColor kButtonText = SkColorSetRGB(0xEC, 0xEC, 0xEF);
 
 gfx::FontList Font(int size, gfx::Font::Weight weight) {
   const gfx::FontList base;
@@ -108,8 +114,10 @@ class PromptView : public views::BoxLayoutView {
     buttons->SetBetweenChildSpacing(8);
     buttons->SetMainAxisAlignment(views::BoxLayout::MainAxisAlignment::kEnd);
     buttons->SetProperty(views::kMarginsKey, gfx::Insets::TLBR(6, 0, 0, 0));
-    decline_ = AddButton(buttons, base::BindRepeating(answer, false),
-                         copy.decline, kGrayButton, kButtonText);
+    decline_ = AddButton(
+        buttons, base::BindRepeating(answer, false), copy.decline,
+        ShouldReduceTransparency() ? kGrayButton : kGrayButtonGlass,
+        kButtonText);
     allow_ = AddButton(buttons, base::BindRepeating(answer, true), copy.accept,
                        kBlueButton, SK_ColorWHITE);
     SetPaintToLayer();
@@ -129,14 +137,20 @@ class PromptView : public views::BoxLayoutView {
   }
 
   void OnPaint(gfx::Canvas* canvas) override {
+    const bool glass = !ShouldReduceTransparency();
     cc::PaintFlags flags;
     flags.setAntiAlias(true);
-    flags.setColor(kFill);
+    flags.setColor(glass ? kGlassFill : kFill);
     const gfx::RectF bounds(GetLocalBounds());
     canvas->DrawRoundRect(bounds, kRadius, flags);
     flags.setStyle(cc::PaintFlags::kStroke_Style);
     flags.setStrokeWidth(1);
-    flags.setColor(kStroke);
+    if (glass) {
+      flags.setShader(gfx::CreateGradientShader(
+          gfx::Point(), gfx::Point(0, height()), kRimTop, kRimBottom));
+    } else {
+      flags.setColor(kStroke);
+    }
     gfx::RectF stroke = bounds;
     stroke.Inset(0.5f);
     canvas->DrawRoundRect(stroke, kRadius - 0.5f, flags);
@@ -196,6 +210,7 @@ ControlPrompt::ControlPrompt(views::Widget& parent, const Copy& copy, Done done)
   widget_->SetBounds(gfx::Rect(window.right() - kRightMargin - size.width(),
                                window.y() + kTopMargin, size.width(),
                                size.height()));
+  ApplyWidgetGlass(*widget_, GlassMaterial::kHud, kRadius, /*dark=*/true);
   widget_->ShowInactive();
   contents->GetViewAccessibility().AnnounceText(copy.title);
 }

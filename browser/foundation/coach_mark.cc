@@ -7,10 +7,12 @@
 #include "base/functional/bind.h"
 #include "base/time/time.h"
 #include "cc/paint/paint_flags.h"
+#include "myarc/glass_mac.h"
 #include "third_party/skia/include/core/SkColor.h"
 #include "third_party/skia/include/core/SkPath.h"
 #include "third_party/skia/include/core/SkPathBuilder.h"
 #include "third_party/skia/include/core/SkRRect.h"
+#include "third_party/skia/include/pathops/SkPathOps.h"
 #include "ui/accessibility/ax_enums.mojom.h"
 #include "ui/base/accelerators/accelerator.h"
 #include "ui/base/metadata/metadata_impl_macros.h"
@@ -31,6 +33,7 @@
 #include "ui/gfx/geometry/size.h"
 #include "ui/gfx/geometry/transform.h"
 #include "ui/gfx/geometry/transform_util.h"
+#include "ui/gfx/skia_paint_util.h"
 #include "ui/views/accessibility/view_accessibility.h"
 #include "ui/views/animation/animation_builder.h"
 #include "ui/views/background.h"
@@ -100,6 +103,37 @@ std::unique_ptr<views::LabelButton> MakeButton(
     }
   }
   return button;
+}
+
+SkPath BuildCardPath(int width, int height, int pointer_y) {
+  const gfx::RectF card(kPointer + 0.5f, 0.5f, width - kPointer - 1.f,
+                        height - 1.f);
+  const SkPath rounded =
+      SkPath::RRect(SkRRect::MakeRectXY(gfx::RectFToSkRect(card), kRadius,
+                                        kRadius));
+  if (pointer_y < 0) {
+    return rounded;
+  }
+  const SkPoint pointer_pts[] = {
+      {kPointer + 1.5f, static_cast<float>(pointer_y - kPointerHalf)},
+      {0.5f, static_cast<float>(pointer_y)},
+      {kPointer + 1.5f, static_cast<float>(pointer_y + kPointerHalf)},
+  };
+  const SkPath pointer = SkPath::Polygon(pointer_pts, /*isClosed=*/true);
+  return Op(rounded, pointer, kUnion_SkPathOp).value_or(rounded);
+}
+
+void UpdateBackdropBlur(ui::Layer* layer, int width, int height, int pointer_y) {
+  if (!layer || width <= 0 || height <= 0) {
+    return;
+  }
+  if (ShouldReduceTransparency()) {
+    layer->SetBackgroundBlur(0.f);
+    layer->ClearBackdropFilterBounds();
+    return;
+  }
+  layer->SetBackgroundBlur(24.f);
+  layer->SetBackdropFilterBounds(BuildCardPath(width, height, pointer_y));
 }
 
 }  // namespace
@@ -179,6 +213,7 @@ void CoachMark::Place(const gfx::Rect& anchor, const gfx::Rect& bounds) {
   if (anchor.IsEmpty()) {
     pointer_y_ = -1;
     SetBoundsRect(gfx::Rect(bounds.origin() + gfx::Vector2d(16, 16), size));
+    UpdateBackdropBlur(layer(), size.width(), size.height(), pointer_y_);
     return;
   }
   const int anchor_y = anchor.CenterPoint().y();
@@ -190,6 +225,7 @@ void CoachMark::Place(const gfx::Rect& anchor, const gfx::Rect& bounds) {
   pointer_y_ = std::clamp(anchor_y - y, static_cast<int>(kRadius) + 8,
                           size.height() - static_cast<int>(kRadius) - 8);
   SetBoundsRect(gfx::Rect(gfx::Point(x, y), size));
+  UpdateBackdropBlur(layer(), size.width(), size.height(), pointer_y_);
   SchedulePaint();
 }
 
@@ -272,36 +308,32 @@ bool CoachMark::AcceleratorPressed(const ui::Accelerator& accelerator) {
 }
 
 void CoachMark::OnPaint(gfx::Canvas* canvas) {
-  const gfx::RectF card(kPointer + 0.5f, 0.5f, width() - kPointer - 1.f,
-                        height() - 1.f);
-  SkPathBuilder builder;
-  builder.addRRect(
-      SkRRect::MakeRectXY(gfx::RectFToSkRect(card), kRadius, kRadius));
-  if (pointer_y_ >= 0) {
-    builder.moveTo(kPointer + 1.f, pointer_y_ - kPointerHalf);
-    builder.lineTo(0.5f, pointer_y_);
-    builder.lineTo(kPointer + 1.f, pointer_y_ + kPointerHalf);
-    builder.close();
-  }
-  const SkPath path = builder.detach();
+  const bool glass = !ShouldReduceTransparency();
+  const SkPath path = BuildCardPath(width(), height(), pointer_y_);
   cc::PaintFlags fill;
   fill.setAntiAlias(true);
   fill.setStyle(cc::PaintFlags::kFill_Style);
-  fill.setColor(dark_ ? SkColorSetRGB(0x27, 0x28, 0x2D) : SK_ColorWHITE);
+  fill.setColor(glass ? (dark_ ? SkColorSetARGB(0xBC, 0x1C, 0x1D, 0x24)
+                               : SkColorSetARGB(0xD8, 0xFA, 0xFA, 0xFD))
+                      : (dark_ ? SkColorSetRGB(0x27, 0x28, 0x2D)
+                               : SK_ColorWHITE));
   canvas->DrawPath(path, fill);
   cc::PaintFlags stroke;
   stroke.setAntiAlias(true);
   stroke.setStyle(cc::PaintFlags::kStroke_Style);
   stroke.setStrokeWidth(1);
-  stroke.setColor(dark_ ? SkColorSetRGB(0x42, 0x43, 0x4A)
-                        : SkColorSetRGB(0xDD, 0xDD, 0xE3));
-  canvas->DrawPath(path, stroke);
-  // The pointer joins the card without a seam.
-  if (pointer_y_ >= 0) {
-    canvas->FillRect(gfx::Rect(kPointer, pointer_y_ - kPointerHalf + 1, 2,
-                               2 * kPointerHalf - 1),
-                     fill.getColor());
+  if (glass) {
+    stroke.setShader(gfx::CreateGradientShader(
+        gfx::Point(), gfx::Point(0, height()),
+        dark_ ? SkColorSetA(SK_ColorWHITE, 0x3A)
+              : SkColorSetA(SK_ColorWHITE, 0xE6),
+        dark_ ? SkColorSetA(SK_ColorWHITE, 0x14)
+              : SkColorSetA(SK_ColorBLACK, 0x24)));
+  } else {
+    stroke.setColor(dark_ ? SkColorSetRGB(0x42, 0x43, 0x4A)
+                          : SkColorSetRGB(0xDD, 0xDD, 0xE3));
   }
+  canvas->DrawPath(path, stroke);
 }
 
 void CoachMark::OnThemeChanged() {

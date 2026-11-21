@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-11-21: Frosted glass styling for Settings, dialogs, popovers, and coach marks
+
+- Added shared macOS frosted glass helpers (`browser/foundation/glass_mac.h`, `glass_mac.mm`) with `NSVisualEffectView` behind-window blending, cached rounded masks, Dark/Light appearance sync, and automatic opaque fallback under Reduce Transparency; replaced `footer_tooltip_mac.mm` and applied frosted glass with calibrated translucent tints and 1px specular hairlines across `SettingsWindow` (preserving Advanced's 3-group card layout), `ControlPrompt`, `CopiedUrlToast`, `FooterTooltip`, `SpaceIconPickerView`, `SpaceThemePickerView`, `CreateSpacePanel`, `CoachMark`, `CreateMenu`, `arc_import`, `bookmarks_export`, and Chromium's `MyarcPaletteView` and Space dialogs (`browser_view.cc`).
+- Evidence: `out/MyarcNightly chrome` builds cleanly; background captures in `research-private/captures/glass-ui-20261121/` (`settings-general.png`, `settings-advanced.png`, `palette.png`, `theme-picker.png`, `coach-mark.png`, `create-menu.png`, `delete-space.png`) verified clean rounded corners, blur visibility, and high-contrast text over both white and dark backdrops.
+- Verification: `check_docs.py`, `cargo fmt --check`, `rustfmt bridge.rs`, `cargo clippy -D warnings`, `cargo test --workspace --locked`, `export_patches.py --check`, and `node --test design/onboarding/state.test.mjs` pass. Reduce Transparency fallback and Light mode popovers verified by code inspection, not toggled live in macOS System Settings.
+
 ## 2026-11-21: Nightly 2026.11.21.4
 
 - Published the prerelease `nightly-2026.11.21.4` from `main` `c2a2761` and Chromium `921f499806`, built in `out/MyarcRelease`: decluttered Settings > Advanced, simplified one-click Arc import, minimal welcome screen (`Import from Arc` only when Arc is detected, `Let’s go`), action-only command bar matches, and lazy hidden Profile windows at startup.

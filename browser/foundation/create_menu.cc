@@ -10,6 +10,7 @@
 #include "base/memory/raw_ptr_exclusion.h"
 #include "base/time/time.h"
 #include "cc/paint/paint_flags.h"
+#include "myarc/glass_mac.h"
 #include "myarc/icons.h"
 #include "third_party/skia/include/core/SkColor.h"
 #include "third_party/skia/include/core/SkPath.h"
@@ -290,6 +291,13 @@ void CreateMenu::Place(int panel_right, int panel_bottom, int notch_x) {
                         kPanelWidth, kRowHeight);
   }
   // The transform's origin follows the notch.
+  if (ShouldReduceTransparency()) {
+    layer()->SetBackgroundBlur(0.f);
+    layer()->ClearBackdropFilterBounds();
+  } else {
+    layer()->SetBackgroundBlur(22.f);
+    layer()->SetBackdropFilterBounds(PanelPath());
+  }
   Apply(opacity_, scale_);
 }
 
@@ -466,15 +474,33 @@ void CreateMenu::Apply(float opacity, float scale) {
 }
 
 void CreateMenu::OnPaint(gfx::Canvas* canvas) {
-  const MenuColors& colors = GetColors(GetColorProvider());
+  const bool glass = !ShouldReduceTransparency();
+  const ui::ColorProvider* provider = GetColorProvider();
+  const bool dark =
+      !provider || color_utils::IsDark(provider->GetColor(ui::kColorSysSurface));
+  const MenuColors& colors = GetColors(provider);
   const SkPath path = PanelPath();
   cc::PaintFlags flags;
   flags.setAntiAlias(true);
-  flags.setColor(colors.panel);
+  flags.setColor(glass ? (dark ? SkColorSetARGB(0xC6, 0x0A, 0x0B, 0x26)
+                               : SkColorSetARGB(0xD6, 0xFA, 0xFA, 0xFD))
+                       : colors.panel);
   flags.setLooper(gfx::CreateShadowDrawLooper({gfx::ShadowValue(
       gfx::Vector2d(0, 4), 16, SkColorSetA(SK_ColorBLACK, 0x4D))}));
   canvas->DrawPath(path, flags);
-  if (SkColorGetA(colors.border)) {
+  if (glass) {
+    cc::PaintFlags border;
+    border.setAntiAlias(true);
+    border.setStyle(cc::PaintFlags::kStroke_Style);
+    border.setStrokeWidth(1);
+    border.setShader(gfx::CreateGradientShader(
+        gfx::Point(0, PanelBounds().y()), gfx::Point(0, PanelBounds().bottom()),
+        dark ? SkColorSetA(SK_ColorWHITE, 0x33)
+             : SkColorSetA(SK_ColorWHITE, 0xE6),
+        dark ? SkColorSetA(SK_ColorWHITE, 0x12)
+             : SkColorSetA(SK_ColorBLACK, 0x22)));
+    canvas->DrawPath(path, border);
+  } else if (SkColorGetA(colors.border)) {
     cc::PaintFlags border;
     border.setAntiAlias(true);
     border.setStyle(cc::PaintFlags::kStroke_Style);

@@ -32,9 +32,13 @@
 #include "components/constrained_window/constrained_window_views.h"
 #include "components/prefs/pref_service.h"
 #include "crypto/hash.h"
+#include "myarc/glass_mac.h"
 #include "myarc/test_buildflags.h"
 #include "myarc/workspace_service.h"
 #include "ui/base/models/dialog_model.h"
+#include "ui/color/color_id.h"
+#include "ui/color/color_provider.h"
+#include "ui/gfx/color_utils.h"
 #include "ui/shell_dialogs/select_file_dialog.h"
 #include "ui/shell_dialogs/selected_file_info.h"
 #include "ui/views/bubble/bubble_dialog_model_host.h"
@@ -275,6 +279,16 @@ views::Widget* Show(std::unique_ptr<ui::DialogModel> model,
       views::BubbleDialogModelHost::CreateModal(std::move(model),
                                                 ui::mojom::ModalType::kWindow),
       parent);
+  const ui::ColorProvider* provider = widget->GetColorProvider();
+  const bool dark =
+      !provider ||
+      color_utils::IsDark(provider->GetColor(ui::kColorDialogBackground));
+  ApplyBubbleGlass(
+      *widget, GlassMaterial::kSheet, dark,
+      dark ? SkColorSetARGB(0xB8, 0x1E, 0x1E, 0x24)
+           : SkColorSetARGB(0xD4, 0xFA, 0xFA, 0xFD),
+      provider ? provider->GetColor(ui::kColorDialogBackground)
+               : (dark ? SkColorSetRGB(0x25, 0x25, 0x28) : SK_ColorWHITE));
   if (inactive) {
     widget->ShowInactive();
   } else {

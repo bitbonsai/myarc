@@ -8,6 +8,7 @@
 #include "base/strings/string_number_conversions.h"
 #include "base/time/time.h"
 #include "cc/paint/paint_flags.h"
+#include "myarc/glass_mac.h"
 #include "third_party/skia/include/core/SkColor.h"
 #include "ui/accessibility/ax_enums.mojom.h"
 #include "ui/base/metadata/metadata_header_macros.h"
@@ -65,6 +66,10 @@ constexpr int kTopMargin = 19;
 constexpr int kRightMargin = 17;
 constexpr SkColor kFillTop = SkColorSetRGB(0x29, 0x13, 0x52);
 constexpr SkColor kFillBottom = SkColorSetRGB(0x20, 0x0F, 0x40);
+constexpr SkColor kGlassTop = SkColorSetARGB(0xC2, 0x29, 0x13, 0x52);
+constexpr SkColor kGlassBottom = SkColorSetARGB(0xC8, 0x20, 0x0F, 0x40);
+constexpr SkColor kRimTop = SkColorSetA(SK_ColorWHITE, 0x3D);
+constexpr SkColor kRimBottom = SkColorSetA(SK_ColorWHITE, 0x14);
 constexpr SkColor kWell = SkColorSetA(SK_ColorWHITE, 0x33);
 constexpr base::TimeDelta kFadeIn = base::Milliseconds(150);
 constexpr base::TimeDelta kHold = base::Milliseconds(2000);
@@ -114,11 +119,25 @@ class ToastView : public views::BoxLayoutView {
   }
 
   void OnPaint(gfx::Canvas* canvas) override {
+    const bool glass = !ShouldReduceTransparency();
     cc::PaintFlags flags;
     flags.setAntiAlias(true);
     flags.setShader(gfx::CreateGradientShader(
-        gfx::Point(), gfx::Point(0, height()), kFillTop, kFillBottom));
-    canvas->DrawRoundRect(gfx::RectF(GetLocalBounds()), kRadius, flags);
+        gfx::Point(), gfx::Point(0, height()), glass ? kGlassTop : kFillTop,
+        glass ? kGlassBottom : kFillBottom));
+    const gfx::RectF bounds(GetLocalBounds());
+    canvas->DrawRoundRect(bounds, kRadius, flags);
+    if (glass) {
+      gfx::RectF rim = bounds;
+      rim.Inset(0.5f);
+      cc::PaintFlags stroke;
+      stroke.setAntiAlias(true);
+      stroke.setStyle(cc::PaintFlags::kStroke_Style);
+      stroke.setStrokeWidth(1);
+      stroke.setShader(gfx::CreateGradientShader(
+          gfx::Point(), gfx::Point(0, height()), kRimTop, kRimBottom));
+      canvas->DrawRoundRect(rim, kRadius - 0.5f, stroke);
+    }
   }
 
  private:
@@ -159,6 +178,7 @@ void CopiedUrlToast::Show(bool hold, int links) {
   widget_->SetBounds(gfx::Rect(window.right() - kRightMargin - size.width(),
                                window.y() + kTopMargin, size.width(),
                                size.height()));
+  ApplyWidgetGlass(*widget_, GlassMaterial::kHud, kRadius, /*dark=*/true);
 
   ui::Layer* layer = contents_->layer();
   if (!widget_->IsVisible()) {

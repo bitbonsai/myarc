@@ -116,6 +116,23 @@ source_set("workspace_service") {
   ]
 }
 
+source_set("glass") {
+  sources = [ "glass_mac.h" ]
+  public_deps = [
+    "//skia",
+    "//ui/gfx/geometry",
+  ]
+  deps = [
+    "//build:buildflag_header_h",
+    "//ui/gfx",
+    "//ui/views",
+  ]
+  if (is_mac) {
+    sources += [ "glass_mac.mm" ]
+    frameworks = [ "Cocoa.framework" ]
+  }
+}
+
 source_set("arc_import") {
   sources = [
     "arc_import.cc",
@@ -128,6 +145,7 @@ source_set("arc_import") {
     "//ui/gfx",
   ]
   deps = [
+    ":glass",
     ":test_buildflags",
     ":workspace_service",
     "//chrome/browser:browser_process",
@@ -141,6 +159,7 @@ source_set("arc_import") {
     "//components/prefs",
     "//crypto",
     "//ui/base",
+    "//ui/color",
     "//ui/shell_dialogs",
     "//ui/views",
   ]
@@ -371,6 +390,7 @@ source_set("onboarding") {
   deps = [
     ":arc_import",
     ":browser_workspace_adapter",
+    ":glass",
     ":onboarding_prefs",
     ":test_buildflags",
     ":welcome_mark",
@@ -459,6 +479,7 @@ source_set("control_prompt") {
     "//ui/views",
   ]
   deps = [
+    ":glass",
     "//cc/paint",
     "//skia",
     "//ui/accessibility",
@@ -535,6 +556,7 @@ source_set("sidebar_view") {
   ]
   deps = [
     ":bridge",
+    ":glass",
     "//base:i18n",
     "//cc/paint",
     "//components/vector_icons",
@@ -624,6 +646,7 @@ source_set("copied_url_toast") {
   ]
   public_deps = [ "//base" ]
   deps = [
+    ":glass",
     "//cc/paint",
     "//skia",
     "//ui/accessibility",
@@ -643,6 +666,7 @@ source_set("settings_window") {
   ]
   public_deps = [
     ":arc_import",
+    ":glass",
     "//base",
   ]
   deps = [
@@ -665,7 +689,6 @@ source_set("settings_window") {
   if (is_mac) {
     sources += [
       "app_activation_mac.mm",
-      "footer_tooltip_mac.mm",
       "settings_window_mac.mm",
     ]
     deps += [ "//components/remote_cocoa/common:mojo" ]

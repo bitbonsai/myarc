@@ -9,6 +9,7 @@
 #include "base/strings/string_number_conversions.h"
 #include "cc/paint/paint_flags.h"
 #include "cc/paint/paint_shader.h"
+#include "myarc/glass_mac.h"
 #include "third_party/skia/include/core/SkColor.h"
 #include "third_party/skia/include/core/SkPath.h"
 #include "third_party/skia/include/core/SkPoint.h"
@@ -26,6 +27,7 @@
 #include "ui/gfx/geometry/skia_conversions.h"
 #include "ui/gfx/scoped_canvas.h"
 #include "ui/views/accessibility/view_accessibility.h"
+#include "ui/views/border.h"
 #include "ui/views/controls/button/button.h"
 #include "ui/views/controls/highlight_path_generator.h"
 #include "ui/views/controls/label.h"
@@ -229,8 +231,15 @@ void SpaceThemePickerView::Select(size_t index, int opacity) {
 
 void SpaceThemePickerView::OnThemeChanged() {
   views::View::OnThemeChanged();
-  percent_->SetEnabledColor(SkColorSetA(
-      IsDark(GetColorProvider()) ? SK_ColorWHITE : SK_ColorBLACK, 0x80));
+  const bool dark = IsDark(GetColorProvider());
+  SetBorder(ShouldReduceTransparency()
+                ? nullptr
+                : views::CreateRoundedRectBorder(
+                      1, 14,
+                      dark ? SkColorSetA(SK_ColorWHITE, 0x26)
+                           : SkColorSetA(SK_ColorBLACK, 0x18)));
+  percent_->SetEnabledColor(SkColorSetA(dark ? SK_ColorWHITE : SK_ColorBLACK,
+                                        0x80));
 }
 
 void SpaceThemePickerView::SliderValueChanged(

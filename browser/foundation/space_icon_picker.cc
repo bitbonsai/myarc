@@ -8,6 +8,7 @@
 #include "base/functional/bind.h"
 #include "base/strings/string_util.h"
 #include "base/strings/utf_string_conversions.h"
+#include "myarc/glass_mac.h"
 #include "myarc/icons.h"
 #include "third_party/skia/include/core/SkColor.h"
 #include "ui/base/metadata/metadata_impl_macros.h"
@@ -431,7 +432,16 @@ void SpaceIconPickerView::SetTab(SpaceIconChoice::Kind tab) {
 
 void SpaceIconPickerView::OnThemeChanged() {
   views::View::OnThemeChanged();
-  const Colors colors = GetColors(GetColorProvider());
+  const ui::ColorProvider* provider = GetColorProvider();
+  const bool dark =
+      !provider || color_utils::IsDark(provider->GetColor(ui::kColorSysSurface));
+  SetBorder(ShouldReduceTransparency()
+                ? nullptr
+                : views::CreateRoundedRectBorder(
+                      1, 14,
+                      dark ? SkColorSetA(SK_ColorWHITE, 0x26)
+                           : SkColorSetA(SK_ColorBLACK, 0x18)));
+  const Colors colors = GetColors(provider);
   const bool emoji = tab_ == SpaceIconChoice::Kind::kEmoji;
   segments_->SetBackground(
       views::CreateRoundedRectBackground(colors.segments, 8));

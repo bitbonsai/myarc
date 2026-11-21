@@ -17,8 +17,12 @@
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/ui/select_file_policy/chrome_select_file_policy.h"
 #include "components/constrained_window/constrained_window_views.h"
+#include "myarc/glass_mac.h"
 #include "myarc/workspace_service.h"
 #include "ui/base/models/dialog_model.h"
+#include "ui/color/color_id.h"
+#include "ui/color/color_provider.h"
+#include "ui/gfx/color_utils.h"
 #include "ui/shell_dialogs/select_file_dialog.h"
 #include "ui/shell_dialogs/selected_file_info.h"
 #include "ui/views/bubble/bubble_dialog_model_host.h"
@@ -79,7 +83,7 @@ Result Write(std::vector<Source> sources, const base::FilePath& path) {
 }
 
 void ShowMessage(std::u16string message, gfx::NativeWindow parent) {
-  constrained_window::CreateBrowserModalDialogViews(
+  views::Widget* widget = constrained_window::CreateBrowserModalDialogViews(
       views::BubbleDialogModelHost::CreateModal(
           ui::DialogModel::Builder()
               .SetTitle(kTitle)
@@ -88,8 +92,18 @@ void ShowMessage(std::u16string message, gfx::NativeWindow parent) {
                            ui::DialogModel::Button::Params().SetLabel(u"OK"))
               .Build(),
           ui::mojom::ModalType::kWindow),
-      parent)
-      ->Show();
+      parent);
+  const ui::ColorProvider* provider = widget->GetColorProvider();
+  const bool dark =
+      !provider ||
+      color_utils::IsDark(provider->GetColor(ui::kColorDialogBackground));
+  ApplyBubbleGlass(
+      *widget, GlassMaterial::kSheet, dark,
+      dark ? SkColorSetARGB(0xB8, 0x1E, 0x1E, 0x24)
+           : SkColorSetARGB(0xD4, 0xFA, 0xFA, 0xFD),
+      provider ? provider->GetColor(ui::kColorDialogBackground)
+               : (dark ? SkColorSetRGB(0x25, 0x25, 0x28) : SK_ColorWHITE));
+  widget->Show();
 }
 
 void Written(gfx::NativeWindow parent, Result result) {

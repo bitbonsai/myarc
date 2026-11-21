@@ -14,6 +14,7 @@
 #include "base/task/sequenced_task_runner.h"
 #include "base/task/single_thread_task_runner.h"
 #include "base/time/time.h"
+#include "myarc/glass_mac.h"
 #include "myarc/icons.h"
 #include "myarc/space_icon_picker.h"
 #include "myarc/space_theme_picker.h"
@@ -73,9 +74,12 @@ constexpr char kCaptureCreateSpace[] = "myarc-capture-create-space";
 constexpr int kNewProfileCommand = 1;
 constexpr int kFirstProfileCommand = 100;
 
-// Arc's popover: 14 DIP corners on its dark sidebar navy.
+// Arc's popover: 14 DIP corners on its dark sidebar navy, frosted when
+// transparency is enabled.
 constexpr int kPickerRadius = 14;
 constexpr SkColor kPickerDark = SkColorSetRGB(0x25, 0x24, 0x2E);
+constexpr SkColor kPickerDarkGlass = SkColorSetARGB(0xB4, 0x1E, 0x1D, 0x28);
+constexpr SkColor kPickerLightGlass = SkColorSetARGB(0xCE, 0xFA, 0xFA, 0xFD);
 
 // Arc's primary blue, sampled from its Create Space button; disabled, the
 // button fades into the sidebar.
@@ -222,6 +226,13 @@ void ReleaseSpacePickerPopover(
 }
 
 void ShowSpacePickerPopover(views::Widget& widget, bool hold) {
+  const ui::ColorProvider* provider = widget.GetColorProvider();
+  const bool dark =
+      !provider ||
+      color_utils::IsDark(provider->GetColor(ui::kColorSysSurface));
+  ApplyBubbleGlass(widget, GlassMaterial::kPopover, dark,
+                   dark ? kPickerDarkGlass : kPickerLightGlass,
+                   dark ? kPickerDark : SK_ColorWHITE);
   if (hold) {
     widget.ShowInactive();
   } else {
@@ -597,13 +608,20 @@ void CreateSpacePanel::OnThemeChanged() {
       ui::ImageModel::FromVectorIcon(kSpacesIcon, colors.subtitle, kArtSize));
   title_->SetEnabledColor(colors.ink);
   subtitle_->SetEnabledColor(colors.subtitle);
+  const SkColor row_rim =
+      colors.dark ? SkColorSetA(SK_ColorWHITE, 0x1E)
+                  : SkColorSetA(SK_ColorBLACK, 0x14);
   name_row_->SetBackground(
       views::CreateRoundedRectBackground(colors.row, kRowRadius));
+  name_row_->SetBorder(
+      views::CreateRoundedRectBorder(1, kRowRadius, row_rim));
   UpdateIconButton();
   name_->SetColor(colors.ink);
   error_->SetEnabledColor(colors.error);
   profile_row_->SetBackground(
       views::CreateRoundedRectBackground(colors.row, kRowRadius));
+  profile_row_->SetBorder(
+      views::CreateRoundedRectBorder(1, kRowRadius, row_rim));
   profile_icon_->SetImage(
       ui::ImageModel::FromVectorIcon(kSmileIcon, colors.muted, kRowIconSize));
   profile_label_->SetEnabledColor(colors.ink);
@@ -616,12 +634,16 @@ void CreateSpacePanel::OnThemeChanged() {
       ui::ImageModel::FromVectorIcon(kInfoIcon, colors.muted, 15));
   new_profile_row_->SetBackground(
       views::CreateRoundedRectBackground(colors.row, kRowRadius));
+  new_profile_row_->SetBorder(
+      views::CreateRoundedRectBorder(1, kRowRadius, row_rim));
   new_profile_icon_->SetImage(
       ui::ImageModel::FromVectorIcon(kSmileIcon, colors.muted, kRowIconSize));
   new_profile_name_->SetColor(colors.ink);
   profile_error_->SetEnabledColor(colors.error);
   theme_row_->SetBackground(
       views::CreateRoundedRectBackground(colors.row, kRowRadius));
+  theme_row_->SetBorder(
+      views::CreateRoundedRectBorder(1, kRowRadius, row_rim));
   UpdateThemeIcon();
   theme_label_->SetEnabledColor(colors.ink);
   cancel_button_->SetEnabledTextColors(colors.cancel);

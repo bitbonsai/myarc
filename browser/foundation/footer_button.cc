@@ -17,6 +17,7 @@
 #include "cc/paint/paint_filter.h"
 #include "cc/paint/paint_flags.h"
 #include "cc/paint/paint_shader.h"
+#include "myarc/glass_mac.h"
 #include "myarc/icons.h"
 #include "third_party/skia/include/core/SkColor.h"
 #include "third_party/skia/include/core/SkPath.h"
@@ -54,11 +55,6 @@
 #include "ui/views/widget/widget.h"
 
 namespace myarc {
-
-#if BUILDFLAG(IS_MAC)
-// footer_tooltip_mac.mm: the system's HUD blur behind the tooltip's pill.
-void ApplyFooterTooltipGlass(views::Widget& tooltip, bool dark);
-#endif
 
 namespace {
 
@@ -264,11 +260,7 @@ class TooltipView : public views::View {
     const gfx::RectF bounds(GetLocalBounds());
     cc::PaintFlags flags;
     flags.setAntiAlias(true);
-#if BUILDFLAG(IS_MAC)
-    flags.setColor(colors_.tint);
-#else
-    flags.setColor(colors_.fill);
-#endif
+    flags.setColor(ShouldReduceTransparency() ? colors_.fill : colors_.tint);
     canvas->DrawRoundRect(bounds, bounds.height() / 2, flags);
     gfx::RectF edge = bounds;
     edge.Inset(0.5f);
@@ -562,9 +554,7 @@ void FooterTooltip::Show(bool fade) {
         gfx::Point(x, anchor.y() - kTooltipGap - size.height()), size);
   }
   widget_->SetBounds(bounds);
-#if BUILDFLAG(IS_MAC)
-  ApplyFooterTooltipGlass(*widget_, dark);
-#endif
+  ApplyWidgetGlass(*widget_, GlassMaterial::kHud, kTooltipHeight / 2.f, dark);
   faded_at_ = base::TimeTicks();
   if (!fade || gfx::Animation::PrefersReducedMotion()) {
     fade_.Reset(1);

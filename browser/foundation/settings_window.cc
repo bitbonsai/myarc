@@ -30,6 +30,7 @@
 #include "components/prefs/pref_service.h"
 #include "myarc/arc_import.h"
 #include "myarc/control_prefs.h"
+#include "myarc/glass_mac.h"
 #include "myarc/little_arc_prefs.h"
 #include "myarc/test_buildflags.h"
 #include "third_party/skia/include/core/SkColor.h"
@@ -247,26 +248,39 @@ constexpr int kBrandIconSize = 44;
 constexpr float kBrandRadius = 10;
 
 constexpr SkColor kWindowFill = SkColorSetRGB(0x22, 0x22, 0x23);
-constexpr SkColor kTitleText = SkColorSetRGB(0x9E, 0x9E, 0x9F);
-constexpr SkColor kTabText = SkColorSetRGB(0x90, 0x91, 0x91);
-constexpr SkColor kTabIcon = SkColorSetRGB(0x9F, 0x9E, 0xA0);
+// Frosted dark glass tint over behind-window NSVisualEffectView, calibrated
+// to stay high-contrast over both bright white and dark pages behind Settings.
+constexpr SkColor kWindowGlassTint = SkColorSetARGB(0x9E, 0x18, 0x18, 0x1D);
+constexpr float kWindowCornerRadius = 16.f;
+constexpr SkColor kTitleText = SkColorSetRGB(0xB2, 0xB2, 0xB6);
+constexpr SkColor kTabText = SkColorSetRGB(0x9E, 0x9E, 0xA2);
+constexpr SkColor kTabIcon = SkColorSetRGB(0xAB, 0xAB, 0xAF);
 constexpr SkColor kTabDisabled = SkColorSetARGB(0x66, 0x90, 0x91, 0x91);
 constexpr SkColor kTabSelectedFill = SkColorSetRGB(0x28, 0x28, 0x29);
+constexpr SkColor kTabSelectedGlassFill = SkColorSetA(SK_ColorWHITE, 0x16);
 constexpr SkColor kTabSelectedStroke = SkColorSetRGB(0x3B, 0x3B, 0x3C);
+constexpr SkColor kTabSelectedGlassStroke = SkColorSetA(SK_ColorWHITE, 0x26);
 constexpr SkColor kAccent = SkColorSetRGB(0x0B, 0x86, 0xFE);
 constexpr SkColor kBannerFill = SkColorSetRGB(0x65, 0x60, 0x68);
-constexpr SkColor kBannerText = SkColorSetRGB(0xD4, 0xD3, 0xD5);
+constexpr SkColor kBannerGlassFill = SkColorSetARGB(0x78, 0x68, 0x62, 0x6E);
+constexpr SkColor kBannerGlassStroke = SkColorSetA(SK_ColorWHITE, 0x22);
+constexpr SkColor kBannerText = SkColorSetRGB(0xE0, 0xDF, 0xE2);
 constexpr SkColor kBlueButton = SkColorSetRGB(0x00, 0x7A, 0xFF);
 constexpr SkColor kCardFill = SkColorSetRGB(0x25, 0x25, 0x26);
+constexpr SkColor kCardGlassFill = SkColorSetARGB(0x74, 0x2A, 0x2A, 0x30);
 constexpr SkColor kCardStroke = SkColorSetRGB(0x3A, 0x3A, 0x3B);
-constexpr SkColor kCardText = SkColorSetRGB(0xC2, 0xC2, 0xC3);
+constexpr SkColor kCardGlassStroke = SkColorSetA(SK_ColorWHITE, 0x1C);
+constexpr SkColor kCardText = SkColorSetRGB(0xD2, 0xD2, 0xD6);
 constexpr SkColor kGrayButton = SkColorSetRGB(0x45, 0x45, 0x46);
-constexpr SkColor kButtonText = SkColorSetRGB(0xE3, 0xE3, 0xE3);
+constexpr SkColor kGrayButtonGlass = SkColorSetA(SK_ColorWHITE, 0x1C);
+constexpr SkColor kButtonText = SkColorSetRGB(0xEC, 0xEC, 0xEF);
 constexpr SkColor kListSelectedFill = SkColorSetRGB(0x26, 0x30, 0x42);
+constexpr SkColor kListSelectedGlassFill = SkColorSetARGB(0x55, 0x0B, 0x86, 0xFE);
 constexpr SkColor kDeleteButton = SkColorSetRGB(0xD7, 0x3A, 0x31);
 constexpr SkColor kErrorText = SkColorSetRGB(0xFF, 0x9F, 0x8F);
 constexpr SkColor kSwitchTrack = SkColorSetRGB(0x37, 0x37, 0x38);
-constexpr SkColor kSwitchKnob = SkColorSetRGB(0xC8, 0xC8, 0xC8);
+constexpr SkColor kSwitchTrackGlass = SkColorSetA(SK_ColorWHITE, 0x22);
+constexpr SkColor kSwitchKnob = SkColorSetRGB(0xD6, 0xD6, 0xDA);
 // Arc's grouped switch rows: a 20 DIP rounded tile 10 DIP in, the label 8 DIP
 // after it, rows 41 DIP tall, or 50 with a second grey line, and a hairline
 // between rows from the tile's left edge.
@@ -292,15 +306,22 @@ constexpr int kActionButtonHeight = 28;
 constexpr float kActionButtonRadius = 6;
 constexpr int kActionButtonPad = 14;
 constexpr SkColor kAdvancedCardFill = SkColorSetRGB(0x28, 0x28, 0x2A);
+constexpr SkColor kAdvancedCardGlassFill = SkColorSetARGB(0x78, 0x2B, 0x2B, 0x32);
 constexpr SkColor kAdvancedCardStroke = SkColorSetA(SK_ColorWHITE, 0x14);
-constexpr SkColor kAdvancedDivider = SkColorSetA(SK_ColorWHITE, 0x0F);
-constexpr SkColor kAdvancedSectionText = SkColorSetRGB(0x8A, 0x8A, 0x8E);
-constexpr SkColor kAdvancedRowTitle = SkColorSetRGB(0xEC, 0xEC, 0xED);
-constexpr SkColor kAdvancedRowSubtitle = SkColorSetRGB(0x8E, 0x8E, 0x93);
-constexpr SkColor kAdvancedFootnote = SkColorSetRGB(0x7D, 0x7D, 0x82);
+constexpr SkColor kAdvancedCardGlassStroke = SkColorSetA(SK_ColorWHITE, 0x1E);
+constexpr SkColor kAdvancedDivider = SkColorSetA(SK_ColorWHITE, 0x12);
+constexpr SkColor kAdvancedSectionText = SkColorSetRGB(0x9C, 0x9C, 0xA2);
+constexpr SkColor kAdvancedRowTitle = SkColorSetRGB(0xF2, 0xF2, 0xF5);
+constexpr SkColor kAdvancedRowSubtitle = SkColorSetRGB(0xA2, 0xA2, 0xA8);
+constexpr SkColor kAdvancedFootnote = SkColorSetRGB(0x90, 0x90, 0x96);
 constexpr SkColor kActionButtonFill = SkColorSetRGB(0x3E, 0x3E, 0x41);
-constexpr SkColor kActionButtonStroke = SkColorSetA(SK_ColorWHITE, 0x14);
-constexpr SkColor kActionPrimaryStroke = SkColorSetA(SK_ColorWHITE, 0x24);
+constexpr SkColor kActionButtonGlassFill = SkColorSetA(SK_ColorWHITE, 0x1A);
+constexpr SkColor kActionButtonStroke = SkColorSetA(SK_ColorWHITE, 0x18);
+constexpr SkColor kActionPrimaryStroke = SkColorSetA(SK_ColorWHITE, 0x28);
+
+bool UseGlass() {
+  return !ShouldReduceTransparency();
+}
 // myArc brand colors (design.md): ivory name and quiet grays. The card is
 // frosted glass tinted by the ribbon's blue, violet, pink and orange.
 constexpr SkColor kBrandName = SkColorSetRGB(0xF5, 0xF2, 0xEC);
@@ -454,8 +475,10 @@ class SectionTab : public views::Button {
 
   void OnPaintBackground(gfx::Canvas* canvas) override {
     if (selected_) {
-      PaintPanel(canvas, GetLocalBounds(), kTabRadius, kTabSelectedFill,
-                 kTabSelectedStroke);
+      const bool glass = UseGlass();
+      PaintPanel(canvas, GetLocalBounds(), kTabRadius,
+                 glass ? kTabSelectedGlassFill : kTabSelectedFill,
+                 glass ? kTabSelectedGlassStroke : kTabSelectedStroke);
     }
   }
 
@@ -509,8 +532,13 @@ class Switch : public views::Button {
     const gfx::Rect track(
         gfx::Point(0, (height() - kSwitchSize.height()) / 2), kSwitchSize);
     const SkColor alpha = GetEnabled() ? 0xFF : 0x66;
+    const SkColor track_off = UseGlass() ? kSwitchTrackGlass : kSwitchTrack;
     PaintPanel(canvas, track, kSwitchSize.height() / 2.f,
-               SkColorSetA(on_ ? kAccent : kSwitchTrack, alpha), std::nullopt);
+               SkColorSetA(on_ ? kAccent : track_off,
+                           on_ ? alpha
+                               : static_cast<SkAlpha>(SkColorGetA(track_off) *
+                                                      alpha / 0xFF)),
+               std::nullopt);
     const int inset_x = 1;
     const int inset_y = (kSwitchSize.height() - kKnobSize.height()) / 2;
     const int x = on_ ? track.right() - inset_x - kKnobSize.width()
@@ -529,20 +557,54 @@ BEGIN_METADATA(Switch)
 END_METADATA
 
 // Rounded fill with a hairline edge, laid out by its own layout manager.
+// When `glass_fill` is provided, switches dynamically with Reduce Transparency
+// and paints a subtle top specular rim over the glass edge.
 class Panel : public views::View {
   METADATA_HEADER(Panel, views::View)
 
  public:
-  Panel(SkColor fill, std::optional<SkColor> stroke, float radius)
-      : fill_(fill), stroke_(stroke), radius_(radius) {}
+  Panel(SkColor fill,
+        std::optional<SkColor> stroke,
+        float radius,
+        std::optional<SkColor> glass_fill = std::nullopt,
+        std::optional<SkColor> glass_stroke = std::nullopt)
+      : fill_(fill),
+        stroke_(stroke),
+        glass_fill_(glass_fill),
+        glass_stroke_(glass_stroke),
+        radius_(radius) {}
 
   void OnPaintBackground(gfx::Canvas* canvas) override {
-    PaintPanel(canvas, GetLocalBounds(), radius_, fill_, stroke_);
+    const bool glass = UseGlass();
+    const SkColor fill = (glass && glass_fill_) ? *glass_fill_ : fill_;
+    const std::optional<SkColor> stroke =
+        (glass && glass_stroke_) ? glass_stroke_ : stroke_;
+    PaintPanel(canvas, GetLocalBounds(), radius_, fill, stroke);
+    if (glass && glass_fill_) {
+      // Subtle top specular hairline so glass cards catch light cleanly.
+      gfx::ScopedCanvas scoped(canvas);
+      const float scale = canvas->UndoDeviceScaleFactor();
+      gfx::RectF rect(GetLocalBounds());
+      rect.Scale(scale);
+      const float r = radius_ * scale;
+      rect.Inset(0.5f);
+      cc::PaintFlags rim;
+      rim.setAntiAlias(true);
+      rim.setStyle(cc::PaintFlags::kStroke_Style);
+      rim.setStrokeWidth(1);
+      const SkPoint edge[] = {{0, rect.y()}, {0, rect.bottom()}};
+      const SkColor4f edge_colors[] = {{1, 1, 1, 0.18f}, {1, 1, 1, 0.0f}};
+      rim.setShader(cc::PaintShader::MakeLinearGradient(
+          edge, edge_colors, nullptr, 2, SkTileMode::kClamp));
+      canvas->DrawRoundRect(rect, std::max(0.f, r - 0.5f), rim);
+    }
   }
 
  private:
   const SkColor fill_;
   const std::optional<SkColor> stroke_;
+  const std::optional<SkColor> glass_fill_;
+  const std::optional<SkColor> glass_stroke_;
   const float radius_;
 };
 
@@ -631,8 +693,8 @@ Panel* AddRowPanel(views::View* parent,
                    std::u16string text,
                    bool multi_line,
                    std::unique_ptr<views::View> control) {
-  auto* panel = parent->AddChildView(
-      std::make_unique<Panel>(kCardFill, kCardStroke, kCardRadius));
+  auto* panel = parent->AddChildView(std::make_unique<Panel>(
+      kCardFill, kCardStroke, kCardRadius, kCardGlassFill, kCardGlassStroke));
   auto* layout = panel->SetLayoutManager(std::make_unique<views::BoxLayout>(
       views::BoxLayout::Orientation::kHorizontal,
       gfx::Insets::VH(0, kGeneralRowPad)));
@@ -660,8 +722,9 @@ class GeneralPage : public views::View {
               base::RepeatingClosure show_profiles,
               base::RepeatingClosure open_site)
       : local_state_(local_state) {
-    banner_ = AddChildView(
-        std::make_unique<Panel>(kBannerFill, std::nullopt, kBannerRadius));
+    banner_ = AddChildView(std::make_unique<Panel>(
+        kBannerFill, std::nullopt, kBannerRadius, kBannerGlassFill,
+        kBannerGlassStroke));
     auto* layout = banner_->SetLayoutManager(std::make_unique<views::BoxLayout>(
         views::BoxLayout::Orientation::kHorizontal,
         gfx::Insets::VH(0, kBannerPad), kBannerGap));
@@ -697,10 +760,13 @@ class GeneralPage : public views::View {
         u"Manage your default search engine, Auto Archive and downloads in "
         u"Profile Settings.",
         /*multi_line=*/true,
-        std::make_unique<PillButton>(std::move(show_profiles),
-                                     u"Profile Settings…", kGrayButton,
-                                     kButtonText, gfx::Font::Weight::NORMAL,
-                                     nullptr));
+        std::make_unique<PillButton>(
+            std::move(show_profiles), u"Profile Settings…",
+            UseGlass() ? kGrayButtonGlass : kGrayButton, kButtonText,
+            gfx::Font::Weight::NORMAL, nullptr, kButtonHeight, kButtonRadius,
+            kButtonPad,
+            UseGlass() ? std::optional<SkColor>(kActionButtonStroke)
+                       : std::nullopt));
 
     brand_ = AddChildView(std::make_unique<GlassCard>());
     auto* brand_layout =
@@ -864,7 +930,11 @@ class ActionGroup : public Panel {
 
  public:
   ActionGroup()
-      : Panel(kAdvancedCardFill, kAdvancedCardStroke, kAdvancedCardRadius) {}
+      : Panel(kAdvancedCardFill,
+              kAdvancedCardStroke,
+              kAdvancedCardRadius,
+              kAdvancedCardGlassFill,
+              kAdvancedCardGlassStroke) {}
 
   void AddRow(std::u16string title,
               std::u16string subtitle,
@@ -904,9 +974,11 @@ END_METADATA
 std::unique_ptr<PillButton> MakeActionButton(base::RepeatingClosure callback,
                                              std::u16string text,
                                              bool primary = false) {
+  const SkColor fill =
+      primary ? kTileBlue
+              : (UseGlass() ? kActionButtonGlassFill : kActionButtonFill);
   return std::make_unique<PillButton>(
-      std::move(callback), std::move(text),
-      primary ? kTileBlue : kActionButtonFill,
+      std::move(callback), std::move(text), fill,
       primary ? SK_ColorWHITE : kAdvancedRowTitle, gfx::Font::Weight::MEDIUM,
       nullptr, kActionButtonHeight, kActionButtonRadius, kActionButtonPad,
       primary ? kActionPrimaryStroke : kActionButtonStroke);
@@ -1111,7 +1183,12 @@ class SwitchGroup : public Panel {
   METADATA_HEADER(SwitchGroup, Panel)
 
  public:
-  SwitchGroup() : Panel(kCardFill, kCardStroke, kCardRadius) {}
+  SwitchGroup()
+      : Panel(kCardFill,
+              kCardStroke,
+              kCardRadius,
+              kCardGlassFill,
+              kCardGlassStroke) {}
 
   SwitchRow* AddRow(std::unique_ptr<SwitchRow> row) {
     rows_.push_back(AddChildView(std::move(row)));
@@ -1292,7 +1369,8 @@ class ProfileListRow : public views::Button {
 
   void OnPaintBackground(gfx::Canvas* canvas) override {
     if (selected_) {
-      PaintPanel(canvas, GetLocalBounds(), kButtonRadius, kListSelectedFill,
+      PaintPanel(canvas, GetLocalBounds(), kButtonRadius,
+                 UseGlass() ? kListSelectedGlassFill : kListSelectedFill,
                  std::nullopt);
     }
   }
@@ -1323,8 +1401,8 @@ class ProfilesPage : public views::View,
     intro_->SetMultiLine(true);
     intro_->SetHorizontalAlignment(gfx::ALIGN_LEFT);
 
-    list_panel_ = AddChildView(
-        std::make_unique<Panel>(kCardFill, kCardStroke, kCardRadius));
+    list_panel_ = AddChildView(std::make_unique<Panel>(
+        kCardFill, kCardStroke, kCardRadius, kCardGlassFill, kCardGlassStroke));
     list_title_ = AddLabel(list_panel_, u"Your Profiles", 12,
                            gfx::Font::Weight::MEDIUM, kTabText);
     list_title_->SetHorizontalAlignment(gfx::ALIGN_LEFT);
@@ -1344,13 +1422,14 @@ class ProfilesPage : public views::View,
     remove_->SetAccessibleName(u"Delete Profile");
     remove_->SetTooltipText(u"Delete Profile");
 
-    detail_ = AddChildView(
-        std::make_unique<Panel>(kCardFill, kCardStroke, kCardRadius));
+    detail_ = AddChildView(std::make_unique<Panel>(
+        kCardFill, kCardStroke, kCardRadius, kCardGlassFill, kCardGlassStroke));
     name_title_ =
         AddLabel(detail_, u"Name", 13, gfx::Font::Weight::NORMAL, kCardText);
     name_ = detail_->AddChildView(std::make_unique<views::Textfield>());
     name_->set_controller(this);
-    name_->SetBackgroundColor(kWindowFill);
+    name_->SetBackgroundColor(
+        UseGlass() ? SkColorSetA(SK_ColorBLACK, 0x38) : kWindowFill);
     name_->SetColor(kButtonText);
     name_->SetFontList(Font(13, gfx::Font::Weight::NORMAL));
     name_->SetBorder(views::CreateEmptyBorder(gfx::Insets::VH(0, 6)));
@@ -1920,7 +1999,35 @@ class SettingsView : public views::View {
   }
 
   void OnPaint(gfx::Canvas* canvas) override {
-    canvas->DrawColor(kWindowFill);
+    if (!UseGlass()) {
+      canvas->DrawColor(kWindowFill);
+      return;
+    }
+    canvas->DrawColor(kWindowGlassTint);
+    // Subtle top sheen + 1px specular hairline across the glass header.
+    gfx::ScopedCanvas scoped(canvas);
+    const float scale = canvas->UndoDeviceScaleFactor();
+    gfx::RectF bounds(GetLocalBounds());
+    bounds.Scale(scale);
+    cc::PaintFlags sheen;
+    sheen.setAntiAlias(true);
+    const SkPoint pts[] = {{0, 0}, {0, 104 * scale}};
+    const SkColor4f colors[] = {{1, 1, 1, 0.06f}, {1, 1, 1, 0.0f}};
+    sheen.setShader(cc::PaintShader::MakeLinearGradient(
+        pts, colors, nullptr, 2, SkTileMode::kClamp));
+    canvas->DrawRect(gfx::RectF(0, 0, bounds.width(), 104 * scale), sheen);
+
+    cc::PaintFlags rim;
+    rim.setAntiAlias(true);
+    rim.setStyle(cc::PaintFlags::kStroke_Style);
+    rim.setStrokeWidth(1);
+    const SkPoint edge[] = {{0, 0}, {0, bounds.height()}};
+    const SkColor4f edge_colors[] = {{1, 1, 1, 0.24f}, {1, 1, 1, 0.06f}};
+    rim.setShader(cc::PaintShader::MakeLinearGradient(
+        edge, edge_colors, nullptr, 2, SkTileMode::kClamp));
+    gfx::RectF inset = bounds;
+    inset.Inset(0.5f);
+    canvas->DrawRoundRect(inset, kWindowCornerRadius * scale - 0.5f, rim);
   }
 
   void Layout(PassKey) override {
@@ -2058,11 +2165,16 @@ void SettingsWindow::Show(Section section, bool inactive) {
     params.delegate = delegate_.get();
     params.name = "MyarcSettingsWindow";
     params.bounds = gfx::Rect(kWindowSize);
+#if BUILDFLAG(IS_MAC)
+    params.opacity = views::Widget::InitParams::WindowOpacity::kTranslucent;
+#endif
     widget_ = std::make_unique<views::Widget>();
 #if BUILDFLAG(IS_MAC)
     params.native_widget = CreateSettingsNativeWidget(widget_.get());
 #endif
     widget_->Init(std::move(params));
+    ApplyWidgetGlass(*widget_, GlassMaterial::kWindow, kWindowCornerRadius,
+                     /*dark=*/true);
     widget_->MakeCloseSynchronous(base::BindOnce(
         [](base::WeakPtr<SettingsWindow> self,
            views::Widget::ClosedReason reason) {
