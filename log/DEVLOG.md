@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-11-21: Nightly 2026.11.21.2
+
+- Published the prerelease `nightly-2026.11.21.2` from `main` `12542a0` and Chromium `cdb6db61a9`, built in `out/MyarcRelease`: the Arc-style find pill anchored to the focused pane, New Folder in the sidebar's + menu and the command bar, plus the ranked six-tile welcome page.
+- Evidence: Developer ID signed, Apple notarized and stapled. 184183642 bytes, SHA-256 `ac34ef99...2491`.
+- Limits: left for Sparkle to install, so the first real Check for Updates… run from 2026.11.21.1 is still to confirm.
+
 ## 2026-11-21: Arc-style find bar and New Folder entry points
 
 - Find in page sits 12 DIP inside the focused page's top right corner (`BrowserView::GetFindBarBoundingBox` uses the active contents container) and is clipped to it, so it never covers the sidebar. `FindBarView` is a 370 DIP pill with Lucide's magnifier and "Find in page…", and shows the match count and arrows only once there's text. New Folder is in the sidebar's + menu and in the command bar as New Folder…, and both start the same create-and-rename flow as the Space title's menu.
