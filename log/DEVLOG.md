@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-11-21: Find in dark split view was a test-hook artifact
+
+- In the live run where typing seemed to close find and focus the left pane, the hook's step list ran `IDC_MYARC_FOCUS_SPLIT_PANE_0` (35413) 6 s after Find. Each keystroke went through `swift bgcapture.swift key`, which compiles the script first, so the three keys and the shot ran past that step. Moving to the other pane hides find, as Chromium does when the active tab changes. The light-mode run had no pane step after it.
+- No code change. `BrowserView::GetFindBarBoundingBox`, the clipping box and `MultiContentsView::OnWebContentsFocused` only move focus when the inactive page itself takes focus, and typing in the find field doesn't give it focus.
+- Evidence: background runs of `out/MyarcNightly` on a synthetic split, with keys sent by the compiled `bgcapture` binary. In the left and in the right pane, "the" stays in the field with 421 matches highlighted 1.5 s and 4.5 s after typing. The pane-0 step at 18 s then hides find in the right-pane run, as before. Shots are in `/tmp/myarc-find-rep/`.
+
 ## 2026-11-21: Nightly 2026.11.21.3
 
 - Published the prerelease `nightly-2026.11.21.3` from `main` `029d1ce` and Chromium `d7a395ea6a`, built in `out/MyarcRelease`: Export Pins and Favorites… as a bookmarks file, Import from Arc with names, titles, every Arc profile and one-click import, and the welcome page's Tab line.
