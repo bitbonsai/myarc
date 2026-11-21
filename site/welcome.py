@@ -12,7 +12,7 @@ TITLE = 'Welcome to myArc'
 INTRO = "myArc is an open-source browser that keeps Arc's way of browsing, with no account to sign up for. Here's where to start."
 SUMMARY = 'Quick start for myArc: Spaces, Peek, Split View, Little Arc, the command bar, pinned tabs and the shortcuts to learn first.'
 
-# (title, text, extra line shown only on the focused tile, docs link or None, art).
+# (title, text, a second line of detail, docs link or None, art).
 # Only features with their own docs page or section link out.
 CARDS = [
     ('Spaces and Profiles', 'A Space holds the tabs for one part of your life, like Work or Travel. A Profile keeps your logins apart, and several Spaces can share one.', '⌃1 to ⌃8 jump to a Space, and ⌥⌘→ moves to the next one.', '/docs/spaces-and-profiles/', 'spaces'),
@@ -61,10 +61,11 @@ CSS = '''
     .welcome .hero-art { --shift: 0%; max-width: 22rem; justify-self: end }
 
     /* The basics as a bento grid: Spaces and Peek wide, four single tiles below. Each tile is one rounded gradient
-       card holding its own looping scene and its text. Hover, focus or a tap grows a tile; the tracks animate
-       and the grid reflows around it. */
+       card: its looping scene fills it and only the title sits on top. Hover, focus or a tap grows a tile, the
+       grid reflows, and then a shade rises over the lower art with the rest of the text. Leaving runs it backwards:
+       text and shade go first, then the tracks move. One tile always has focus. */
     .welcome-cards { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; grid-template-rows: 22rem 22rem; gap: 1rem; margin: 1.5rem 0 0; padding: 0; list-style: none }
-    .welcome-cards.is-live { transition: grid-template-columns .55s var(--ease), grid-template-rows .55s var(--ease) }
+    .welcome-cards.is-live { transition: grid-template-columns .55s var(--ease) .22s, grid-template-rows .55s var(--ease) .22s }
     .welcome-cards.is-live[data-focus="0"] { grid-template-columns: 1.2fr 1.2fr .8fr .8fr; grid-template-rows: 25rem 19.5rem }
     .welcome-cards.is-live[data-focus="1"] { grid-template-columns: .8fr .8fr 1.2fr 1.2fr; grid-template-rows: 25rem 19.5rem }
     .welcome-cards.is-live[data-focus="2"] { grid-template-columns: 1.9fr .7fr .7fr .7fr; grid-template-rows: 18.5rem 25.5rem }
@@ -73,8 +74,8 @@ CSS = '''
     .welcome-cards.is-live[data-focus="5"] { grid-template-columns: .7fr .7fr .7fr 1.9fr; grid-template-rows: 18.5rem 25.5rem }
     .welcome-cards > li { min-width: 0; min-height: 0; animation: rise .9s var(--ease) both; animation-delay: calc(.35s + var(--i) * .07s) }
     .welcome-cards > .wide { grid-column: span 2 }
-    .tile { position: relative; isolation: isolate; contain: layout paint; display: flex; flex-direction: column; height: 100%; overflow: hidden; border-radius: 1.5rem; outline: 0;
-      --base: color-mix(in srgb, var(--page) 95%, rgb(var(--link-rgb)));
+    .tile { position: relative; isolation: isolate; contain: layout paint; display: block; height: 100%; overflow: hidden; border-radius: 1.5rem; outline: 0;
+      --base: color-mix(in srgb, var(--page) 95%, rgb(var(--link-rgb))); --scrim: 65%;
       background: var(--base); box-shadow: inset 0 0 0 .0625rem rgb(255 255 255 / .35), 0 1.25rem 2.5rem -1.75rem rgb(16 28 43 / .4) }
     .tile:focus-visible { outline: .1875rem solid var(--link-solid); outline-offset: .25rem }
     /* The mesh is painted once and never moves. The spotlight is a fixed-size glow that only translates. */
@@ -86,24 +87,44 @@ CSS = '''
     .tile::after { content: ''; position: absolute; z-index: -1; top: -11rem; left: -11rem; width: 22rem; height: 22rem; border-radius: 50%; pointer-events: none; opacity: 0;
       background: radial-gradient(closest-side, rgb(255 255 255 / .45), transparent); transform: translate3d(var(--x, 50%), var(--y, 40%), 0); transition: opacity .3s ease-in-out }
     .tile.is-focus::after { opacity: 1; will-change: transform }
-    .tile-art { position: relative; flex: 1 1 auto; min-height: 0; transition: opacity .3s ease-in-out }
-    .welcome-cards.is-live[data-focus] .tile:not(.is-focus) .tile-art { opacity: .55 }
+    .tile-art { position: absolute; inset: 0; transition: opacity .3s ease-in-out }
+    .welcome-cards.is-js .tile:not(.is-focus) .tile-art { opacity: .8 }
     /* The art fills whatever box the track leaves it and keeps its proportions inside. */
     .tile-art .ui { position: absolute; top: .875rem; left: 1rem; width: calc(100% - 2rem); height: calc(100% - .875rem) }
     /* With script the art keeps one layout size and a transform fits it to the box, so a reflow scales a cached
        layer instead of redrawing the SVG every frame. It is a layer only while the grid moves. */
     .welcome-cards.is-sized .ui { left: 50%; width: 640px; height: 416px; transform-origin: 50% 0; transform: translateX(-50%) scale(.4) }
     .welcome-cards.is-moving .ui { will-change: transform }
-    /* Body copy never sits on the art: the band fades from clear to 90% of the tile's base above the text. */
-    .tile-copy { position: relative; z-index: 0; flex: none; padding: .75rem 1.25rem 1.125rem }
-    .tile-copy::before { content: ''; position: absolute; z-index: -1; inset: -2rem 0 0; pointer-events: none;
-      background: linear-gradient(to bottom, transparent, color-mix(in srgb, var(--base) 90%, transparent) 2rem) }
-    .tile-more { display: none }
-    .welcome-cards.is-live .is-focus .tile-more { display: block }
-    .welcome-cards h3 { font-size: 1.25rem; line-height: 1.25 }
-    .welcome-cards p { margin-top: .25rem; color: var(--quiet); font-size: 1rem; line-height: 1.45 }
-    /* Solid link and key colours: over the 90% band the site's 90% link tint falls just under AA in light. */
+    /* The copy sits on the art's lower edge. Without script every tile shows all of it over the shade. */
+    .tile-copy { position: absolute; z-index: 1; right: 0; bottom: 0; left: 0; padding: 0 1.25rem 1.125rem }
+    /* The shade is clear 3rem above the copy and 94% of the tile's base under every line, enough for AA over any art. */
+    .tile-copy::before { content: ''; position: absolute; z-index: -1; right: 0; bottom: 0; left: 0; height: calc(100% + 3rem); pointer-events: none;
+      background: linear-gradient(to bottom, transparent, color-mix(in srgb, var(--base) 94%, transparent) 3rem) }
+    .welcome-cards h3 { position: relative; font-size: 1.25rem; line-height: 1.25 }
+    /* A resting tile's scrim, behind the title only. 65% of the base keeps the title at 4.8:1 even over pure black or white. */
+    .welcome-cards h3::before { content: ''; position: absolute; z-index: -1; inset: -2.25rem -1.25rem -1.125rem; pointer-events: none; opacity: 0;
+      background: linear-gradient(to bottom, transparent, color-mix(in srgb, var(--base) var(--scrim), transparent) 2.25rem) }
+    .tile-detail { padding-top: .25rem }
+    .welcome-cards p { color: var(--quiet); font-size: 1rem; line-height: 1.45 }
+    .welcome-cards p + p { margin-top: .25rem }
     .tile-docs { display: inline-block; margin-top: .25rem; color: var(--link-solid); font-size: 1rem }
+    /* With script a resting tile shows only its title, dropped by the detail's height (--drop) to the bottom edge.
+       The detail stays in the accessibility tree and its link stays focusable; focusing it opens the tile. The
+       way out has no delay and the way in waits for the reflow, so a change of focus reads out, move, in. A
+       transition caught midway reverses from where it is. */
+    .is-js h3 { transform: translateY(var(--drop, 0)); transition: transform .35s var(--ease) .05s }
+    .is-js h3::before { opacity: 1; transition: opacity .25s ease-in-out .05s }
+    .is-js .tile-copy::before { opacity: 0; transform: translateY(2rem); transition: opacity .25s ease-in-out .05s, transform .35s var(--ease) .05s }
+    .is-js .tile-detail { pointer-events: none }
+    .is-js .tile-detail > * { opacity: 0; transform: translateY(.75rem); transition: opacity .18s ease-in-out, transform .18s ease-in }
+    .is-js .is-focus h3 { transform: none; transition-delay: .62s }
+    .is-js .is-focus h3::before { opacity: 0; transition-delay: .62s }
+    .is-js .is-focus .tile-copy::before { opacity: 1; transform: none; transition: opacity .4s ease-in-out .6s, transform .5s var(--ease) .6s }
+    .is-js .is-focus .tile-detail { pointer-events: auto }
+    .is-js .is-focus .tile-detail > * { opacity: 1; transform: none; transition: opacity .35s ease-in-out .7s, transform .45s var(--ease) .7s }
+    .is-js .is-focus .tile-detail > :nth-child(2) { transition-delay: .77s }
+    .is-js .is-focus .tile-detail > :nth-child(3) { transition-delay: .84s }
+    .is-instant, .is-instant * { transition: none !important }
     .ui { display: block; overflow: visible }
 
     /* Mini-UI paint. Light first, dark below. */
@@ -237,18 +258,20 @@ CSS = '''
     .welcome-links a { font-weight: 600 }
     .welcome-links p { margin-top: .25rem; color: var(--quiet); font-size: 1rem }
 
-    /* Below 75rem four columns get too narrow for the shrunk tiles' text, so two columns. Tiles size to their
-       art, and a focused tile just gets taller. */
+    /* Below 75rem four columns get too narrow for the shrunk tiles, so two columns. A focused tile just gets
+       taller. Without the growth (no script or reduced motion) every tile is tall enough for all its text. */
     @media (max-width: 75rem) {
       .welcome-cards, .welcome-cards.is-live[data-focus] { grid-template-columns: 1fr 1fr; grid-template-rows: none }
-      .tile-art { flex: none; height: 13rem; transition: height .45s var(--ease), opacity .3s ease-in-out }
-      .welcome-cards.is-live .tile.is-focus .tile-art { height: 19rem }
+      .tile { height: 21rem }
+      .welcome-cards.is-live .tile { height: 14rem; transition: height .45s var(--ease) .22s }
+      .welcome-cards.is-live .tile.is-focus { height: 23rem }
     }
     /* Phones: one column. */
     @media (max-width: 40rem) {
       .welcome-cards, .welcome-cards.is-live[data-focus] { grid-template-columns: minmax(0, 1fr) }
       .welcome-cards > .wide { grid-column: auto }
-      .tile-art { height: 12rem }
+      .welcome-cards.is-live .tile { height: 13rem }
+      .welcome-cards.is-live .tile.is-focus { height: 27rem }
     }
     @media (max-width: 48rem) {
       .welcome-top { justify-content: space-between }
@@ -259,30 +282,32 @@ CSS = '''
     }
     @media (prefers-reduced-motion: reduce) {
       .welcome-cards > li { animation: none }
-      .tile-art, .tile::after { transition: none }
+      .tile-art, .tile::after, .is-js h3, .is-js h3::before { transition: none !important }
+      /* No movement: the title jumps and the shade and detail only fade. */
+      .is-js .tile-copy::before, .is-js .tile-detail > * { transform: none !important; transition: opacity .2s ease-in-out !important }
       .tile.is-focus { outline: .1875rem solid var(--link-solid); outline-offset: .25rem }
     }
 '''
 
-# The bento script. Hover, focus or a tap grows a tile; a second tap or a tap elsewhere settles it back. Tiles
-# loop only while on screen in a visible tab, and only the focused one once a tile has focus.
+# The bento script. One tile always has focus: the first until hover, keyboard focus or a tap moves it, and then
+# the last one. Tiles loop only while on screen in a visible tab, and only the focused one plays.
 SCRIPT = """<script>
   (() => {
     const grid = document.querySelector('.welcome-cards')
     const tiles = [...grid.querySelectorAll('.tile')]
     const still = matchMedia('(prefers-reduced-motion: reduce)').matches
     const seen = new Set()
-    let focus = -1, lock = 0, tapped = -1
+    let focus = 0, lock = 0, tapped = -1
     const sync = () => {
       tiles.forEach((tile, i) => {
         tile.classList.toggle('is-focus', i === focus)
-        tile.classList.toggle('is-playing', !still && !document.hidden && seen.has(tile) && (focus < 0 || i === focus))
+        tile.classList.toggle('is-playing', !still && !document.hidden && seen.has(tile) && i === focus)
       })
-      if (focus < 0) delete grid.dataset.focus
-      else grid.dataset.focus = String(focus)
+      grid.dataset.focus = String(focus)
     }
-    // A short lock after each change keeps a resting cursor from flipping focus while the grid reflows under it.
-    const set = (index) => { if (index !== focus) { focus = index; lock = performance.now() + 450; sync() } }
+    // A lock after each change, as long as the out, move and in take, keeps a resting cursor from flipping focus
+    // while the grid reflows under it.
+    const set = (index) => { if (index !== focus) { focus = index; lock = performance.now() + 800; sync() } }
     const aim = (tile, x, y) => { tile.style.setProperty('--x', x + 'px'); tile.style.setProperty('--y', y + 'px') }
     tiles.forEach((tile, i) => {
       tile.addEventListener('pointermove', (event) => {
@@ -293,37 +318,43 @@ SCRIPT = """<script>
       })
       tile.addEventListener('pointerdown', (event) => { tapped = event.pointerType === 'mouse' ? -2 : focus })
       tile.addEventListener('pointerup', (event) => {
-        if (event.pointerType !== 'mouse' && !event.target.closest('a')) set(tapped === i ? -1 : i)
+        if (event.pointerType !== 'mouse' && !event.target.closest('a')) set(i)
         tapped = -1
       })
-      tile.addEventListener('focus', () => {
+      // focusin, not focus, so tabbing to the docs link inside a resting tile opens it too.
+      tile.addEventListener('focusin', () => {
         if (tapped !== -1 || i === focus) return
         aim(tile, tile.offsetWidth / 2, tile.offsetHeight / 3)
         set(i)
       })
     })
-    grid.addEventListener('pointerleave', (event) => { if (event.pointerType === 'mouse') set(-1) })
-    grid.addEventListener('focusout', (event) => { if (!grid.contains(event.relatedTarget)) set(-1) })
-    document.addEventListener('pointerdown', (event) => { if (!grid.contains(event.target)) set(-1) })
     document.addEventListener('visibilitychange', sync)
     const io = new IntersectionObserver((entries) => {
       entries.forEach((entry) => entry.isIntersecting ? seen.add(entry.target) : seen.delete(entry.target))
       sync()
     })
     tiles.forEach((tile) => io.observe(tile))
-    // Fit each 640 x 416 drawing to its box, the same contain-fit the SVG does on its own without script.
+    // Fit each 640 x 416 drawing to its box, the same contain-fit the SVG does on its own without script. Spare
+    // height centres it in the space above a resting title.
     const fit = new ResizeObserver((entries) => entries.forEach(({ target, contentRect: { width, height } }) => {
       const scale = Math.max(.1, Math.min((width - 32) / 640, (height - 14) / 416))
-      target.firstElementChild.style.transform = 'translateX(-50%) scale(' + scale.toFixed(4) + ')'
+      const y = Math.max(0, (height - 70 - 416 * scale) / 2)
+      target.firstElementChild.style.transform = 'translate(-50%, ' + y.toFixed(1) + 'px) scale(' + scale.toFixed(4) + ')'
     }))
     tiles.forEach((tile) => fit.observe(tile.querySelector('.tile-art')))
+    // A resting title drops by its detail's height, so it sits on the bottom edge until the detail comes in.
+    const drop = new ResizeObserver((entries) => entries.forEach(({ target }) => target.parentElement.parentElement.style.setProperty('--drop', target.offsetHeight + 'px')))
+    tiles.forEach((tile) => drop.observe(tile.querySelector('.tile-detail')))
     grid.classList.add('is-sized')
     let moving = 0
-    grid.addEventListener('transitionrun', () => { clearTimeout(moving); grid.classList.add('is-moving') })
-    grid.addEventListener('transitionend', (event) => {
-      if (event.target === grid || event.target.classList.contains('tile-art')) moving = setTimeout(() => grid.classList.remove('is-moving'), 100)
-    })
+    const layout = (event) => !event.pseudoElement && (event.target === grid || event.target.classList.contains('tile'))
+    grid.addEventListener('transitionrun', (event) => { if (layout(event)) { clearTimeout(moving); grid.classList.add('is-moving') } })
+    grid.addEventListener('transitionend', (event) => { if (layout(event)) moving = setTimeout(() => grid.classList.remove('is-moving'), 100) })
+    // The first focus lands without animating, then transitions turn on.
+    grid.classList.add('is-js', 'is-instant')
     if (!still) grid.classList.add('is-live')
+    sync()
+    requestAnimationFrame(() => requestAnimationFrame(() => grid.classList.remove('is-instant')))
   })()
 </script>"""
 
@@ -462,7 +493,7 @@ def content():
         wide = ' class="wide"' if art in ('spaces', 'peek') else ''
         cards += (f'<li{wide} style="--i: {n}"><article class="tile" tabindex="0" aria-labelledby="tile-{art}">'
                   f'<div class="tile-art" aria-hidden="true">{_art(art, n)}</div>'
-                  f'<div class="tile-copy"><h3 id="tile-{art}">{escape(title)}</h3><p>{keys(text)}</p><p class="tile-more">{keys(more)}</p>{docs}</div></article></li>')
+                  f'<div class="tile-copy"><h3 id="tile-{art}">{escape(title)}</h3><div class="tile-detail"><p>{keys(text)}</p><p>{keys(more)}</p>{docs}</div></div></article></li>')
     shortcuts = ''.join(f'<li><kbd>{key}</kbd><span>{escape(label)}</span></li>' for key, label in KEYS)
     links = ''.join(f'<li><a href="{escape(href, quote=True)}">{escape(label)}</a><p>{escape(text)}</p></li>' for label, href, text in LINKS)
     # @@RIBBON@@ is the homepage hero ribbon; embed() inlines the one shared copy.
