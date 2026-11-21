@@ -10,17 +10,17 @@ URL = 'https://myarc.dev/welcome/'
 REPO = 'https://github.com/bitbonsai/myarc'
 TITLE = 'Welcome to myArc'
 INTRO = "myArc is an open-source browser that keeps Arc's way of browsing, with no account to sign up for. Here's where to start."
-SUMMARY = 'Quick start for myArc: Spaces, Peek, Split View, Little Arc, the command bar, pinned tabs and the shortcuts to learn first.'
+SUMMARY = 'Quick start for myArc: Spaces, pinned tabs, the command bar, Peek, Split View, Little Arc and the shortcuts to learn first.'
 
 # (title, text, a second line of detail, docs link or None, art).
 # Only features with their own docs page or section link out.
 CARDS = [
     ('Spaces and Profiles', 'A Space holds the tabs for one part of your life, like Work or Travel. A Profile keeps your logins apart, and several Spaces can share one.', '⌃1 to ⌃8 jump to a Space, and ⌥⌘→ moves to the next one.', '/docs/spaces-and-profiles/', 'spaces'),
+    ('Pinned tabs and Favorites', 'Press ⌘D to pin a tab to its Space. Favorites show in every Space of a Profile, and closing either one keeps its tile.', 'Press ⌘D again to unpin it. To remove a Favorite, use its right-click menu.', '/docs/spaces-and-profiles/#pinned-tabs-and-favorites', 'pinned'),
+    ('Command bar', '⌘T opens it for a new tab and ⌘L on the current address. Type an action like pin or split to run it, or / to list them all.', 'The arrow keys move through suggestions, Enter opens one and Esc closes the bar.', None, 'command'),
     ('Peek', 'A link from a pinned tab or Favorite to another site opens in a card over the page. Press ⌘O to keep it as a tab.', 'Esc or a click outside closes it, and ⇧⌘T brings it back.', '/docs/peek/', 'peek'),
     ('Split View', 'Press ⌃⇧= to put two tabs side by side. The pair shows as one row in the sidebar and comes back after a restart.', '⌃⇧- separates the pair again and keeps both tabs.', None, 'split'),
     ('Little Arc', 'Links from other apps open in a small window, and ⌥⌘N opens one from anywhere. Press ⌘O to move the page into your current Space.', '⌥⌘O lets you pick another Space instead.', None, 'little'),
-    ('Command bar', '⌘T opens it for a new tab and ⌘L on the current address. Type an action like pin or split to run it, or / to list them all.', 'The arrow keys move through suggestions, Enter opens one and Esc closes the bar.', None, 'command'),
-    ('Pinned tabs and Favorites', 'Press ⌘D to pin a tab to its Space. Favorites show in every Space of a Profile, and closing either one keeps its tile.', 'Press ⌘D again to unpin it. To remove a Favorite, use its right-click menu.', '/docs/spaces-and-profiles/#pinned-tabs-and-favorites', 'pinned'),
 ]
 
 KEYS = [
@@ -30,7 +30,6 @@ KEYS = [
     ('⌃1–9', 'Switch Spaces'),
     ('⌥⌘N', 'Open Little Arc'),
     ('⌃⇧=', 'Open a Split View'),
-    ('⌃⌥⌘A', 'Replay the welcome'),
 ]
 
 LINKS = [
@@ -60,20 +59,23 @@ CSS = '''
     .welcome-intro { margin-top: 1.25rem; max-width: 40ch; color: var(--quiet); font-size: 1.25rem; line-height: 1.5 }
     .welcome .hero-art { --shift: 0%; max-width: 22rem; justify-self: end }
 
-    /* The basics as a bento grid: Spaces and Peek wide, four single tiles below. Each tile is one rounded gradient
+    /* The basics as a bento grid, ranked by daily use: four big tiles in two rows, with Split View and Little Arc
+       stacked in a narrow column on the right. Each tile is one rounded gradient
        card: its looping scene fills it and only the title sits on top. Hover, focus or a tap grows a tile, the
        grid reflows, and then a shade rises over the lower art with the rest of the text. Leaving runs it backwards:
        text and shade go first, then the tracks move. One tile always has focus. */
-    .welcome-cards { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; grid-template-rows: 22rem 22rem; gap: 1rem; margin: 1.5rem 0 0; padding: 0; list-style: none }
+    .welcome-cards { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr 1.1fr; grid-template-rows: 22rem 22rem; gap: 1rem; margin: 1.5rem 0 0; padding: 0; list-style: none }
     .welcome-cards.is-live { transition: grid-template-columns .55s var(--ease) .22s, grid-template-rows .55s var(--ease) .22s }
-    .welcome-cards.is-live[data-focus="0"] { grid-template-columns: 1.2fr 1.2fr .8fr .8fr; grid-template-rows: 25rem 19.5rem }
-    .welcome-cards.is-live[data-focus="1"] { grid-template-columns: .8fr .8fr 1.2fr 1.2fr; grid-template-rows: 25rem 19.5rem }
-    .welcome-cards.is-live[data-focus="2"] { grid-template-columns: 1.9fr .7fr .7fr .7fr; grid-template-rows: 18.5rem 25.5rem }
-    .welcome-cards.is-live[data-focus="3"] { grid-template-columns: .7fr 1.9fr .7fr .7fr; grid-template-rows: 18.5rem 25.5rem }
-    .welcome-cards.is-live[data-focus="4"] { grid-template-columns: .7fr .7fr 1.9fr .7fr; grid-template-rows: 18.5rem 25.5rem }
-    .welcome-cards.is-live[data-focus="5"] { grid-template-columns: .7fr .7fr .7fr 1.9fr; grid-template-rows: 18.5rem 25.5rem }
+    .welcome-cards.is-live[data-focus="0"] { grid-template-columns: 1.3fr 1.3fr .8fr .8fr .8fr; grid-template-rows: 25rem 19.5rem }
+    .welcome-cards.is-live[data-focus="1"] { grid-template-columns: .8fr .8fr 1.3fr 1.3fr .8fr; grid-template-rows: 25rem 19.5rem }
+    .welcome-cards.is-live[data-focus="2"] { grid-template-columns: 1.3fr 1.3fr .8fr .8fr .8fr; grid-template-rows: 19.5rem 25rem }
+    .welcome-cards.is-live[data-focus="3"] { grid-template-columns: .8fr .8fr 1.3fr 1.3fr .8fr; grid-template-rows: 19.5rem 25rem }
+    .welcome-cards.is-live[data-focus="4"] { grid-template-columns: .7fr .7fr .7fr .7fr 1.9fr; grid-template-rows: 25rem 19.5rem }
+    .welcome-cards.is-live[data-focus="5"] { grid-template-columns: .7fr .7fr .7fr .7fr 1.9fr; grid-template-rows: 19.5rem 25rem }
     .welcome-cards > li { min-width: 0; min-height: 0; animation: rise .9s var(--ease) both; animation-delay: calc(.35s + var(--i) * .07s) }
     .welcome-cards > .wide { grid-column: span 2 }
+    .welcome-cards > .side { grid-area: 1 / 5 }
+    .welcome-cards > .side + .side { grid-area: 2 / 5 }
     .tile { position: relative; isolation: isolate; contain: layout paint; display: block; height: 100%; overflow: hidden; border-radius: 1.5rem; outline: 0;
       --base: color-mix(in srgb, var(--page) 95%, rgb(var(--link-rgb))); --scrim: 65%;
       background: var(--base); box-shadow: inset 0 0 0 .0625rem rgb(255 255 255 / .35), 0 1.25rem 2.5rem -1.75rem rgb(16 28 43 / .4) }
@@ -262,10 +264,11 @@ CSS = '''
     .welcome-links a { font-weight: 600 }
     .welcome-links p { margin-top: .25rem; color: var(--quiet); font-size: 1rem }
 
-    /* Below 75rem four columns get too narrow for the shrunk tiles, so two columns. A focused tile just gets
+    /* Below 75rem five columns get too narrow for the shrunk tiles, so two columns. A focused tile just gets
        taller. Without the growth (no script or reduced motion) every tile is tall enough for all its text. */
     @media (max-width: 75rem) {
       .welcome-cards, .welcome-cards.is-live[data-focus] { grid-template-columns: 1fr 1fr; grid-template-rows: none }
+      .welcome-cards > .wide, .welcome-cards > .side, .welcome-cards > .side + .side { grid-area: auto }
       .tile { height: 21rem }
       .welcome-cards.is-live .tile { height: 14rem; transition: height .45s var(--ease) .22s }
       .welcome-cards.is-live .tile.is-focus { height: 23rem }
@@ -273,7 +276,6 @@ CSS = '''
     /* Phones: one column. */
     @media (max-width: 40rem) {
       .welcome-cards, .welcome-cards.is-live[data-focus] { grid-template-columns: minmax(0, 1fr) }
-      .welcome-cards > .wide { grid-column: auto }
       .welcome-cards.is-live .tile { height: 13rem }
       .welcome-cards.is-live .tile.is-focus { height: 27rem }
     }
@@ -491,8 +493,8 @@ def content():
     cards = ''
     for n, (title, text, more, link, art) in enumerate(CARDS):
         docs = f'<a class="tile-docs" href="{escape(link, quote=True)}">How it works<span class="visually-hidden">: {escape(title)}</span></a>' if link else ''
-        wide = ' class="wide"' if art in ('spaces', 'peek') else ''
-        cards += (f'<li{wide} style="--i: {n}"><article class="tile" tabindex="0" aria-labelledby="tile-{art}">'
+        size = 'wide' if n < 4 else 'side'
+        cards += (f'<li class="{size}" style="--i: {n}"><article class="tile" tabindex="0" aria-labelledby="tile-{art}">'
                   f'<div class="tile-art" aria-hidden="true">{_art(art, n)}</div>'
                   f'<div class="tile-copy"><h3 id="tile-{art}">{escape(title)}</h3><div class="tile-detail"><div class="tile-more"><p>{keys(text)}</p><p>{keys(more)}</p>{docs}</div></div></div></article></li>')
     shortcuts = ''.join(f'<li><kbd>{key}</kbd><span>{escape(label)}</span></li>' for key, label in KEYS)
