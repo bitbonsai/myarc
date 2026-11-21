@@ -13,7 +13,7 @@ import shutil
 
 from markdown_it import MarkdownIt
 from bs4 import BeautifulSoup
-from PIL import Image
+from PIL import Image, ImageSequence
 import yaml
 
 MD = MarkdownIt('commonmark', {'html': False, 'maxNesting': 20})
@@ -139,7 +139,7 @@ class Post:
                     'height': image.height, 'type': Image.MIME[image.format], 'alt': self.cover_alt}
 
 
-def screenshot(folder, source):
+def screenshot(folder, source, animated=False):
     url = urlsplit(source)
     if url.scheme or url.netloc or url.query or url.fragment:
         raise ValueError(f'Screenshots must be local files: {source}')
@@ -157,7 +157,7 @@ def screenshot(folder, source):
     with Image.open(io.BytesIO(data)) as image:
         if image.format != IMAGE_FORMATS[relative.suffix.lower()]:
             raise ValueError(f'Screenshot format does not match extension: {source}')
-        if image.width * image.height > 24_000_000 or getattr(image, 'is_animated', False):
+        if image.width * image.height > 24_000_000 or (getattr(image, 'is_animated', False) and not (animated and image.format == 'WEBP')):
             raise ValueError(f'Use a static screenshot under 24 megapixels: {source}')
         image.verify()
     return relative.as_posix(), data
@@ -268,7 +268,7 @@ def load_post(path):
     if 'thumbnail' in meta:
         if not isinstance(meta['thumbnail'], str) or not meta['thumbnail'].strip():
             raise ValueError(f'thumbnail needs a local image path: {path}')
-        _, thumbnail = screenshot(path.parent, meta['thumbnail'])
+        _, thumbnail = screenshot(path.parent, meta['thumbnail'], animated=True)
     source_bytes = len(thumbnail)
     count = 0
     for token in tokens:
@@ -465,15 +465,22 @@ def build_blog(root, template, embed, extra_urls=()):
         if post.thumbnail or post.images:
             thumbnails = output / '_thumbnails'
             thumbnails.mkdir(exist_ok=True)
-            with Image.open(io.BytesIO(post.thumbnail or next(iter(post.images.values())))) as image:
-                image = image.convert('RGBA')
-                image.thumbnail((384, 240), Image.Resampling.LANCZOS)
-                buffer = io.BytesIO()
-                image.save(buffer, format='WEBP', quality=85, method=6)
-                data = buffer.getvalue()
-                name = post.slug + '.' + hashlib.sha256(data).hexdigest()[:12] + '.webp'
-                (thumbnails / name).write_bytes(data)
-                thumb = f'<a class="post-thumb" href="{post.slug}/" aria-hidden="true" tabindex="-1"><img src="_thumbnails/{name}" alt="" width="{image.width}" height="{image.height}" loading="lazy"></a>'
+            with Image.open(io.BytesIO(post.thumbnail or next(iter(post.images.values())))) as source:
+                frames = [frame.convert('RGBA') for frame in ImageSequence.Iterator(source)] if getattr(source, 'is_animated', False) else [source.convert('RGBA')]
+                for frame in frames:
+                    frame.thumbnail((384, 240), Image.Resampling.LANCZOS)
+                names = []
+                for images in [frames[:1]] + ([frames] if len(frames) > 1 else []):
+                    buffer = io.BytesIO()
+                    images[0].save(buffer, format='WEBP', quality=85, method=6, save_all=len(images) > 1, append_images=images[1:], duration=source.info.get('duration', 50), loop=0)
+                    data = buffer.getvalue()
+                    names.append(post.slug + '.' + hashlib.sha256(data).hexdigest()[:12] + '.webp')
+                    (thumbnails / names[-1]).write_bytes(data)
+                image = images[0]
+                img = f'<img src="_thumbnails/{names[-1]}" alt="" width="{image.width}" height="{image.height}" loading="lazy">'
+                if len(names) > 1:
+                    img = f'<picture><source media="(prefers-reduced-motion: reduce)" srcset="_thumbnails/{names[0]}">{img}</picture>'
+                thumb = f'<a class="post-thumb" href="{post.slug}/" aria-hidden="true" tabindex="-1">{img}</a>'
         listing += f'<article class="post-preview">{thumb}<div class="post-preview-copy"><h2><a href="{post.slug}/">{escape(post.title)}</a></h2><time class="post-date" datetime="{post.published.isoformat()}">{post.published.strftime("%B %d, %Y")}</time><p class="post-summary">{escape(post.summary)}</p></div></article>'
     if not listing:
         listing = '<p class="quiet">Progress notes will appear here once published.</p>'
