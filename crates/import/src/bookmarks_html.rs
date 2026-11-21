@@ -10,13 +10,15 @@
 //! left out, so an empty Agent Space adds no clutter.
 //!
 //! Each bookmark is titled with the item's Rename name, else its page title,
-//! else its URL. Items without a saved URL are skipped. Titles, folder names
+//! else the short label the sidebar shows for its URL, such as
+//! `docs.example.test/start`; the full URL stays in `HREF`. Items without a saved URL are skipped. Titles, folder names
 //! and URLs are HTML-escaped, and control characters in them become spaces so
 //! one entry stays on one line. The output only grows with the workspace,
 //! which the workspace's own limits bound.
 
 use std::fmt::Write as _;
 
+use myarc_workspace::url_label::url_label;
 use myarc_workspace::{Item, Placement, WorkspaceSnapshot};
 
 const HEADER: &str = "<!DOCTYPE NETSCAPE-Bookmark-file-1>\n\
@@ -174,9 +176,14 @@ fn bookmark(out: &mut String, depth: usize, item: &Item) {
     let title = [item.name.as_str(), item.title.as_str()]
         .into_iter()
         .find(|text| !text.trim().is_empty())
-        .unwrap_or(url);
+        .map_or_else(|| url_label(url), str::to_owned);
     indent(out, depth);
-    let _ = writeln!(out, "<DT><A HREF=\"{}\">{}</A>", escape(url), escape(title));
+    let _ = writeln!(
+        out,
+        "<DT><A HREF=\"{}\">{}</A>",
+        escape(url),
+        escape(&title)
+    );
 }
 
 /// HTML-escapes `text` for an attribute or element body.
@@ -376,7 +383,7 @@ mod tests {
     }
 
     #[test]
-    fn titles_fall_back_from_name_to_title_to_url() {
+    fn titles_fall_back_from_name_to_title_to_the_sidebar_label() {
         let mut snapshot = Workspace::default().snapshot();
         let mut renamed = favorite(1, "https://a.example/", "Page title");
         renamed.name = "My name".into();
@@ -386,12 +393,14 @@ mod tests {
             renamed,
             favorite(2, "https://b.example/", "Page title"),
             favorite(3, "https://c.example/", "  "),
+            favorite(5, "https://www.d.example/start/?a=1", ""),
             no_url,
         ];
         let html = write(&snapshot);
         assert!(html.contains("<A HREF=\"https://a.example/\">My name</A>"));
         assert!(html.contains("<A HREF=\"https://b.example/\">Page title</A>"));
-        assert!(html.contains("<A HREF=\"https://c.example/\">https://c.example/</A>"));
+        assert!(html.contains("<A HREF=\"https://c.example/\">c.example</A>"));
+        assert!(html.contains("<A HREF=\"https://www.d.example/start/?a=1\">d.example/start</A>"));
         assert!(!html.contains("Gone"));
     }
 
