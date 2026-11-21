@@ -190,6 +190,10 @@ pub struct Context {
 pub struct Offer {
     pub action: Action,
     pub title: String,
+    /// The text plainly names this action: its whole title, or the start of
+    /// it in two or more words. Arc then shows the action without web search
+    /// suggestions.
+    pub strong: bool,
 }
 
 struct Entry {
@@ -344,6 +348,13 @@ fn score(entry: &Entry, query: &[String], typed: &str) -> u8 {
     value
 }
 
+/// Whether `typed`, lowercase and trimmed, is `title` in full (a closing
+/// "…" optional) or its start in at least two words, such as "switch to".
+fn names_strongly(title: &str, typed: &str) -> bool {
+    let title = title.to_lowercase();
+    typed == title.trim_end_matches('…') || (words(typed).len() >= 2 && title.starts_with(typed))
+}
+
 /// The actions `query` offers. With a leading "/" every applicable action
 /// lists, narrowed by the text after it. Without it, text of at least
 /// `MIN_TYPED_CHARS` characters offers the actions it names, the closest first.
@@ -388,6 +399,7 @@ pub fn offers(
         .into_iter()
         .map(|(_, entry)| Offer {
             action: entry.action,
+            strong: !listing && names_strongly(&entry.title, &typed),
             title: entry.title,
         })
         .collect()
@@ -694,5 +706,49 @@ mod tests {
         let offer = offers("home", &TODAY, SPACES, 1);
         assert_eq!(offer.len(), 1);
         assert_eq!(offer[0].action, Action::SwitchSpace(3));
+    }
+
+    #[test]
+    fn a_full_title_or_a_two_word_start_is_strong() {
+        let strong = |query: &str| -> Vec<String> {
+            offers(query, &TODAY, SPACES, 1)
+                .into_iter()
+                .filter(|offer| offer.strong)
+                .map(|offer| offer.title)
+                .collect()
+        };
+        assert_eq!(
+            strong("Switch to"),
+            [
+                "Switch to Reading",
+                "Switch to Home",
+                "Switch to Light Mode"
+            ]
+        );
+        assert_eq!(strong("switch to light mode "), ["Switch to Light Mode"]);
+        assert_eq!(strong("copy url"), ["Copy URL"]);
+        assert_eq!(strong("new folder"), ["New Folder…"]);
+        assert_eq!(strong("New Folder…"), ["New Folder…"]);
+        assert_eq!(strong("reload page"), ["Reload Page"]);
+    }
+
+    #[test]
+    fn a_word_or_a_partial_title_is_not_strong() {
+        for query in [
+            "sw",
+            "switch",
+            "space",
+            "home",
+            "pin",
+            "light mode",
+            "/switch to",
+        ] {
+            assert!(
+                offers(query, &TODAY, SPACES, 1)
+                    .iter()
+                    .all(|offer| !offer.strong),
+                "{query}"
+            );
+        }
     }
 }

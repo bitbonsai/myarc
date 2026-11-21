@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-11-21: Command bar actions without web suggestions
+
+- `command_bar::offers` marks an offer `strong` when the typed text is the action's whole title (a closing "…" optional) or its start in two or more words, such as "switch to". The bridge passes it on, and `MyarcPaletteView::RenderResults` then leaves out search-type matches, as Arc shows only the action. Open tabs, URL and history matches stay below the actions, and one word such as "switch" keeps its suggestions (Chromium commit "Leave web suggestions out when the command bar text names an action").
+- Rust tests cover full titles, two-word starts, "New Folder" without its "…", and single words, partial words and "/" listings that stay weak.
+- Evidence: `MyarcNightly` chrome builds. Background runs with `--myarc-capture-palette-enter` logged `rows=action:Switch to Light Mode` for "Switch to", and the action plus 4 Startpage suggestions for "switch". Rust fmt, clippy and tests, `check_docs.py` and `export_patches.py --check` pass.
+
 ## 2026-11-21: Find in dark split view was a test-hook artifact
 
 - In the live run where typing seemed to close find and focus the left pane, the hook's step list ran `IDC_MYARC_FOCUS_SPLIT_PANE_0` (35413) 6 s after Find. Each keystroke went through `swift bgcapture.swift key`, which compiles the script first, so the three keys and the shot ran past that step. Moving to the other pane hides find, as Chromium does when the active tab changes. The light-mode run had no pane step after it.

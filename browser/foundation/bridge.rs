@@ -320,6 +320,9 @@ mod ffi {
         space: u64,
         command: CommandRun,
         title: String,
+        // The text plainly names this action, so web search suggestions
+        // stay out of the list, as in Arc.
+        strong: bool,
     }
 
     // Where a dragged sidebar row lands.
@@ -2060,6 +2063,7 @@ pub fn command_bar_offers(
                 space,
                 command,
                 title: offer.title,
+                strong: offer.strong,
             }
         })
         .collect()
