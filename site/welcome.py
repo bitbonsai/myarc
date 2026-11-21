@@ -104,26 +104,27 @@ CSS = '''
     /* A resting tile's scrim, behind the title only. 65% of the base keeps the title at 4.8:1 even over pure black or white. */
     .welcome-cards h3::before { content: ''; position: absolute; z-index: -1; inset: -2.25rem -1.25rem -1.125rem; pointer-events: none; opacity: 0;
       background: linear-gradient(to bottom, transparent, color-mix(in srgb, var(--base) var(--scrim), transparent) 2.25rem) }
-    .tile-detail { padding-top: .25rem }
+    .tile-more { padding-top: .25rem }
     .welcome-cards p { color: var(--quiet); font-size: 1rem; line-height: 1.45 }
     .welcome-cards p + p { margin-top: .25rem }
     .tile-docs { display: inline-block; margin-top: .25rem; color: var(--link-solid); font-size: 1rem }
-    /* With script a resting tile shows only its title, dropped by the detail's height (--drop) to the bottom edge.
+    /* With script a resting tile shows only its title on the bottom edge. The detail below it opens from zero height, so the title rises with it and never leaves the tile.
        The detail stays in the accessibility tree and its link stays focusable; focusing it opens the tile. The
        way out has no delay and the way in waits for the reflow, so a change of focus reads out, move, in. A
        transition caught midway reverses from where it is. */
-    .is-js h3 { transform: translateY(var(--drop, 0)); transition: transform .35s var(--ease) .05s }
+    .is-js .tile-detail { display: grid; grid-template-rows: 0fr; transition: grid-template-rows .35s var(--ease) .15s }
+    .is-js .tile-more { min-height: 0; overflow: clip; overflow-clip-margin: .25rem }
     .is-js h3::before { opacity: 1; transition: opacity .25s ease-in-out .05s }
     .is-js .tile-copy::before { opacity: 0; transform: translateY(2rem); transition: opacity .25s ease-in-out .05s, transform .35s var(--ease) .05s }
     .is-js .tile-detail { pointer-events: none }
-    .is-js .tile-detail > * { opacity: 0; transform: translateY(.75rem); transition: opacity .18s ease-in-out, transform .18s ease-in }
-    .is-js .is-focus h3 { transform: none; transition-delay: .62s }
+    .is-js .tile-more > * { opacity: 0; transform: translateY(.75rem); transition: opacity .18s ease-in-out, transform .18s ease-in }
+    .is-js .is-focus .tile-detail { grid-template-rows: 1fr; transition-delay: .62s }
     .is-js .is-focus h3::before { opacity: 0; transition-delay: .62s }
     .is-js .is-focus .tile-copy::before { opacity: 1; transform: none; transition: opacity .4s ease-in-out .6s, transform .5s var(--ease) .6s }
     .is-js .is-focus .tile-detail { pointer-events: auto }
-    .is-js .is-focus .tile-detail > * { opacity: 1; transform: none; transition: opacity .35s ease-in-out .7s, transform .45s var(--ease) .7s }
-    .is-js .is-focus .tile-detail > :nth-child(2) { transition-delay: .77s }
-    .is-js .is-focus .tile-detail > :nth-child(3) { transition-delay: .84s }
+    .is-js .is-focus .tile-more > * { opacity: 1; transform: none; transition: opacity .35s ease-in-out .7s, transform .45s var(--ease) .7s }
+    .is-js .is-focus .tile-more > :nth-child(2) { transition-delay: .77s }
+    .is-js .is-focus .tile-more > :nth-child(3) { transition-delay: .84s }
     .is-instant, .is-instant * { transition: none !important }
     .ui { display: block; overflow: visible }
 
@@ -282,9 +283,9 @@ CSS = '''
     }
     @media (prefers-reduced-motion: reduce) {
       .welcome-cards > li { animation: none }
-      .tile-art, .tile::after, .is-js h3, .is-js h3::before { transition: none !important }
+      .tile-art, .tile::after, .is-js .tile-detail, .is-js h3::before { transition: none !important }
       /* No movement: the title jumps and the shade and detail only fade. */
-      .is-js .tile-copy::before, .is-js .tile-detail > * { transform: none !important; transition: opacity .2s ease-in-out !important }
+      .is-js .tile-copy::before, .is-js .tile-more > * { transform: none !important; transition: opacity .2s ease-in-out !important }
       .tile.is-focus { outline: .1875rem solid var(--link-solid); outline-offset: .25rem }
     }
 '''
@@ -342,9 +343,6 @@ SCRIPT = """<script>
       target.firstElementChild.style.transform = 'translate(-50%, ' + y.toFixed(1) + 'px) scale(' + scale.toFixed(4) + ')'
     }))
     tiles.forEach((tile) => fit.observe(tile.querySelector('.tile-art')))
-    // A resting title drops by its detail's height, so it sits on the bottom edge until the detail comes in.
-    const drop = new ResizeObserver((entries) => entries.forEach(({ target }) => target.parentElement.parentElement.style.setProperty('--drop', target.offsetHeight + 'px')))
-    tiles.forEach((tile) => drop.observe(tile.querySelector('.tile-detail')))
     grid.classList.add('is-sized')
     let moving = 0
     const layout = (event) => !event.pseudoElement && (event.target === grid || event.target.classList.contains('tile'))
@@ -493,7 +491,7 @@ def content():
         wide = ' class="wide"' if art in ('spaces', 'peek') else ''
         cards += (f'<li{wide} style="--i: {n}"><article class="tile" tabindex="0" aria-labelledby="tile-{art}">'
                   f'<div class="tile-art" aria-hidden="true">{_art(art, n)}</div>'
-                  f'<div class="tile-copy"><h3 id="tile-{art}">{escape(title)}</h3><div class="tile-detail"><p>{keys(text)}</p><p>{keys(more)}</p>{docs}</div></div></article></li>')
+                  f'<div class="tile-copy"><h3 id="tile-{art}">{escape(title)}</h3><div class="tile-detail"><div class="tile-more"><p>{keys(text)}</p><p>{keys(more)}</p>{docs}</div></div></div></article></li>')
     shortcuts = ''.join(f'<li><kbd>{key}</kbd><span>{escape(label)}</span></li>' for key, label in KEYS)
     links = ''.join(f'<li><a href="{escape(href, quote=True)}">{escape(label)}</a><p>{escape(text)}</p></li>' for label, href, text in LINKS)
     # @@RIBBON@@ is the homepage hero ribbon; embed() inlines the one shared copy.
