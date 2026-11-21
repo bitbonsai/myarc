@@ -13,20 +13,21 @@ class Profile;
 
 namespace myarc {
 
-// Settings' "Import from Arc…". Asks for an Arc Markdown export (Arc's
-// Settings > Advanced > Export Data) or Arc's sidebar file, reads it off the
-// UI sequence, then shows a preview over `parent` with what it adds and the
-// lines it could not read. Arc's sidebar file can hold several Arc profiles:
+// Settings' "Import from Arc" and the welcome screen's import button. Looks
+// for Arc's sidebar file (~/Library/Application Support/Arc/StorableSidebar.json)
+// off the UI sequence and opens its preview directly. Only when Arc isn't
+// found on this Mac does it offer a fallback dialog to choose an Arc export
+// or sidebar file manually. Arc's sidebar file can hold several Arc profiles:
 // the main one imports into `profile`, and each other one into the myArc
-// Profile named "Arc <its directory>", which the import creates when it is
-// missing. The preview names each mapping and loads or creates no Profile;
-// it reads an unloaded Profile's workspace file without changing it. Import
-// writes the Profiles' workspaces, then shows a report of every kind of entry
-// it left out or changed, with counts; Cancel changes nothing. Opens no tabs
-// and fetches nothing. UI sequence only.
+// Profile named after Arc's profile (or "Arc <its directory>"), which Import
+// creates when missing. The preview names each mapping and loads or creates no
+// Profile; it reads an unloaded Profile's workspace file without changing it.
+// Import writes the Profiles' workspaces, then shows a report of every kind of
+// entry it left out or changed, with counts; Cancel changes nothing. Opens no
+// tabs and fetches nothing. UI sequence only.
 //
 // `done`, when given, runs once the import is over: committed when Import
-// wrote something, and not committed when the picker or the preview was
+// wrote something, and not committed when the dialog, picker or preview was
 // cancelled or closed, the file was unreadable, or nothing was new. A commit
 // runs it right after `profile`'s workspace is saved, inside the Import press
 // and before other Profiles import and the report shows, so the caller can
@@ -48,24 +49,14 @@ void ImportFromArc(Profile& profile,
                    ArcImportDone done = ArcImportDone(),
                    base::OnceClosure report_closed = base::OnceClosure());
 
-// Looks for Arc's sidebar file,
-// ~/Library/Application Support/Arc/StorableSidebar.json, off the UI sequence
-// without reading it, and runs `found` on the UI sequence with its path, or an
-// empty path when there is none.
-void FindArcData(base::OnceCallback<void(const base::FilePath&)> found);
+// Checks off the UI sequence whether Arc's sidebar file exists on this Mac,
+// without reading it, and runs `callback` on the UI sequence.
+void HasArcData(base::OnceCallback<void(bool)> callback);
 
-// "Found your Arc data" > Import: like ImportFromArc with `path`, from
-// FindArcData, already picked, so the preview opens without the file picker.
-void ImportFoundArcData(Profile& profile,
-                        gfx::NativeWindow parent,
-                        const base::FilePath& path,
-                        ArcImportDone done = ArcImportDone(),
-                        base::OnceClosure report_closed = base::OnceClosure());
-
-// For background captures: skips the file picker, reads `path` and shows the
-// preview without taking focus. A non-null `confirmed` presses Import after a
-// short delay and gets the export's first Space, or 0 when nothing was
-// imported. `done` runs as ImportFromArc's does.
+// For background captures: skips auto-detection and the file picker, reads
+// `path` and shows the preview without taking focus. A non-null `confirmed`
+// presses Import after a short delay and gets the export's first Space, or 0
+// when nothing was imported. `done` runs as ImportFromArc's does.
 void ImportArcFileForCapture(
     Profile& profile,
     gfx::NativeWindow parent,

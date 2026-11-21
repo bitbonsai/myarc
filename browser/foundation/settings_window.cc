@@ -93,10 +93,6 @@ ui::ImageModel AppIconImage() {
 
 namespace {
 
-// Advanced > Import from Arc's handler: Arc's sidebar file for "Found your
-// Arc data" > Import, or an empty path for the file picker.
-using ImportArcCallback = base::RepeatingCallback<void(const base::FilePath&)>;
-
 // Lucide icons (ISC, lucide-static 1.61.0) on their 24 DIP canvas. Arc's
 // toolbar symbols are lighter than Lucide's default, so tabs stroke at 1.5.
 constexpr gfx::PathElement kSettingsPath[] = {
@@ -283,6 +279,28 @@ constexpr int kGroupRowHeight = 41;
 constexpr int kGroupTallRowHeight = 50;
 constexpr SkColor kTileBlue = SkColorSetRGB(0x0A, 0x84, 0xFF);
 constexpr SkColor kTileGreen = SkColorSetRGB(0x30, 0xC1, 0x59);
+// Advanced page: grouped macOS-style inset cards with generous breathing room.
+constexpr int kAdvancedMargin = 68;
+constexpr int kAdvancedTop = 114;
+constexpr int kAdvancedSectionGap = 26;
+constexpr int kAdvancedHeaderGap = 8;
+constexpr int kAdvancedHeaderIndent = 14;
+constexpr float kAdvancedCardRadius = 10;
+constexpr int kAdvancedRowHeight = 60;
+constexpr int kAdvancedRowPad = 16;
+constexpr int kActionButtonHeight = 28;
+constexpr float kActionButtonRadius = 6;
+constexpr int kActionButtonPad = 14;
+constexpr SkColor kAdvancedCardFill = SkColorSetRGB(0x28, 0x28, 0x2A);
+constexpr SkColor kAdvancedCardStroke = SkColorSetA(SK_ColorWHITE, 0x14);
+constexpr SkColor kAdvancedDivider = SkColorSetA(SK_ColorWHITE, 0x0F);
+constexpr SkColor kAdvancedSectionText = SkColorSetRGB(0x8A, 0x8A, 0x8E);
+constexpr SkColor kAdvancedRowTitle = SkColorSetRGB(0xEC, 0xEC, 0xED);
+constexpr SkColor kAdvancedRowSubtitle = SkColorSetRGB(0x8E, 0x8E, 0x93);
+constexpr SkColor kAdvancedFootnote = SkColorSetRGB(0x7D, 0x7D, 0x82);
+constexpr SkColor kActionButtonFill = SkColorSetRGB(0x3E, 0x3E, 0x41);
+constexpr SkColor kActionButtonStroke = SkColorSetA(SK_ColorWHITE, 0x14);
+constexpr SkColor kActionPrimaryStroke = SkColorSetA(SK_ColorWHITE, 0x24);
 // myArc brand colors (design.md): ivory name and quiet grays. The card is
 // frosted glass tinted by the ribbon's blue, violet, pink and orange.
 constexpr SkColor kBrandName = SkColorSetRGB(0xF5, 0xF2, 0xEC);
@@ -342,11 +360,19 @@ class PillButton : public views::Button {
              SkColor fill,
              SkColor text_color,
              gfx::Font::Weight weight,
-             const gfx::VectorIcon* icon)
-      : views::Button(std::move(callback)), fill_(fill) {
+             const gfx::VectorIcon* icon,
+             int height = kButtonHeight,
+             float radius = kButtonRadius,
+             int pad = kButtonPad,
+             std::optional<SkColor> stroke = std::nullopt)
+      : views::Button(std::move(callback)),
+        fill_(fill),
+        stroke_(stroke),
+        height_(height),
+        radius_(radius) {
     auto* layout = SetLayoutManager(std::make_unique<views::BoxLayout>(
         views::BoxLayout::Orientation::kHorizontal,
-        gfx::Insets::VH(0, kButtonPad - (icon ? 1 : 0)), 3));
+        gfx::Insets::VH(0, pad - (icon ? 1 : 0)), 3));
     layout->set_cross_axis_alignment(
         views::BoxLayout::CrossAxisAlignment::kCenter);
     if (icon) {
@@ -366,8 +392,7 @@ class PillButton : public views::Button {
   gfx::Size CalculatePreferredSize(
       const views::SizeBounds& available_size) const override {
     return gfx::Size(
-        views::Button::CalculatePreferredSize(available_size).width(),
-        kButtonHeight);
+        views::Button::CalculatePreferredSize(available_size).width(), height_);
   }
 
   void OnPaintBackground(gfx::Canvas* canvas) override {
@@ -375,11 +400,14 @@ class PillButton : public views::Button {
     if (GetState() == STATE_PRESSED) {
       fill = SkColorSetA(fill, 0xC0);
     }
-    PaintPanel(canvas, GetLocalBounds(), kButtonRadius, fill, std::nullopt);
+    PaintPanel(canvas, GetLocalBounds(), radius_, fill, stroke_);
   }
 
  private:
   const SkColor fill_;
+  const std::optional<SkColor> stroke_;
+  const int height_;
+  const float radius_;
   raw_ptr<views::Label> label_ = nullptr;
 };
 
@@ -787,102 +815,159 @@ class GeneralPage : public views::View {
 BEGIN_METADATA(GeneralPage)
 END_METADATA
 
-// Advanced: the way out to Chromium's full settings page, Import from Arc,
-// Export Pins and Favorites, Replay welcome tour, then the Browser control
-// switch that lets tools such as Claude Code drive the Agent Space through
-// myarc.
+// One row inside a grouped Advanced card: title and muted subtitle at left,
+// button or switch at right.
+class ActionRow : public views::View {
+  METADATA_HEADER(ActionRow, views::View)
+
+ public:
+  ActionRow(std::u16string title,
+            std::u16string subtitle,
+            std::unique_ptr<views::View> control) {
+    title_ = AddLabel(this, std::move(title), 13, gfx::Font::Weight::MEDIUM,
+                      kAdvancedRowTitle);
+    title_->SetHorizontalAlignment(gfx::ALIGN_LEFT);
+    subtitle_ = AddLabel(this, std::move(subtitle), 11,
+                         gfx::Font::Weight::NORMAL, kAdvancedRowSubtitle);
+    subtitle_->SetHorizontalAlignment(gfx::ALIGN_LEFT);
+    control_ = AddChildView(std::move(control));
+  }
+
+  void Layout(PassKey) override {
+    const gfx::Size size = control_->GetPreferredSize();
+    control_->SetBounds(width() - kAdvancedRowPad - size.width(),
+                        (height() - size.height()) / 2, size.width(),
+                        size.height());
+    const int text_width =
+        std::max(0, control_->x() - kAdvancedRowPad - kAdvancedRowPad);
+    const int title_h = title_->GetPreferredSize().height();
+    const int sub_h = subtitle_->GetPreferredSize().height();
+    const int gap = 2;
+    const int top = (height() - title_h - gap - sub_h) / 2;
+    title_->SetBounds(kAdvancedRowPad, top, text_width, title_h);
+    subtitle_->SetBounds(kAdvancedRowPad, top + title_h + gap, text_width,
+                         sub_h);
+  }
+
+ private:
+  raw_ptr<views::Label> title_ = nullptr;
+  raw_ptr<views::Label> subtitle_ = nullptr;
+  raw_ptr<views::View> control_ = nullptr;
+};
+
+BEGIN_METADATA(ActionRow)
+END_METADATA
+
+// Grouped rounded panel for Advanced rows, with subtle hairlines between them.
+class ActionGroup : public Panel {
+  METADATA_HEADER(ActionGroup, Panel)
+
+ public:
+  ActionGroup()
+      : Panel(kAdvancedCardFill, kAdvancedCardStroke, kAdvancedCardRadius) {}
+
+  void AddRow(std::u16string title,
+              std::u16string subtitle,
+              std::unique_ptr<views::View> control) {
+    rows_.push_back(AddChildView(std::make_unique<ActionRow>(
+        std::move(title), std::move(subtitle), std::move(control))));
+  }
+
+  int GroupHeight() const {
+    return static_cast<int>(rows_.size()) * kAdvancedRowHeight;
+  }
+
+  void Layout(PassKey) override {
+    int y = 0;
+    for (ActionRow* row : rows_) {
+      row->SetBounds(0, y, width(), kAdvancedRowHeight);
+      y += kAdvancedRowHeight;
+    }
+  }
+
+  void OnPaintBackground(gfx::Canvas* canvas) override {
+    Panel::OnPaintBackground(canvas);
+    for (size_t i = 0; i + 1 < rows_.size(); ++i) {
+      canvas->FillRect(
+          gfx::Rect(1, rows_[i]->bounds().bottom(), width() - 2, 1),
+          kAdvancedDivider);
+    }
+  }
+
+ private:
+  std::vector<raw_ptr<ActionRow>> rows_;
+};
+
+BEGIN_METADATA(ActionGroup)
+END_METADATA
+
+std::unique_ptr<PillButton> MakeActionButton(base::RepeatingClosure callback,
+                                             std::u16string text,
+                                             bool primary = false) {
+  return std::make_unique<PillButton>(
+      std::move(callback), std::move(text),
+      primary ? kTileBlue : kActionButtonFill,
+      primary ? SK_ColorWHITE : kAdvancedRowTitle, gfx::Font::Weight::MEDIUM,
+      nullptr, kActionButtonHeight, kActionButtonRadius, kActionButtonPad,
+      primary ? kActionPrimaryStroke : kActionButtonStroke);
+}
+
+views::Label* AddSectionHeader(views::View* parent, std::u16string text) {
+  auto* label = AddLabel(parent, std::move(text), 12,
+                         gfx::Font::Weight::SEMIBOLD, kAdvancedSectionText);
+  label->SetHorizontalAlignment(gfx::ALIGN_LEFT);
+  return label;
+}
+
+// Advanced: Data (Arc import and bookmarks export), Browser control for tools
+// such as Claude Code, and More (Chromium Settings and Welcome tour).
 class AdvancedPage : public views::View {
   METADATA_HEADER(AdvancedPage, views::View)
 
  public:
   AdvancedPage(PrefService* local_state,
                base::RepeatingClosure more_settings,
-               ImportArcCallback import_arc,
+               base::RepeatingClosure import_arc,
                base::RepeatingClosure export_pins,
                base::RepeatingClosure replay_tour)
       : local_state_(local_state) {
-    card_ = AddChildView(
-        std::make_unique<Panel>(kCardFill, kCardStroke, kCardRadius));
-    auto* layout = card_->SetLayoutManager(std::make_unique<views::BoxLayout>(
-        views::BoxLayout::Orientation::kHorizontal,
-        gfx::Insets::VH(0, kBannerPad)));
-    layout->set_cross_axis_alignment(
-        views::BoxLayout::CrossAxisAlignment::kCenter);
-    auto* label = AddLabel(card_, u"Chromium Settings", 13,
-                           gfx::Font::Weight::NORMAL, kCardText);
-    label->SetHorizontalAlignment(gfx::ALIGN_LEFT);
-    layout->SetFlexForView(label, 1);
-    card_->AddChildView(std::make_unique<PillButton>(
-        base::BindRepeating(std::move(more_settings)), u"More Settings…",
-        kGrayButton, kButtonText, gfx::Font::Weight::NORMAL, nullptr));
+    data_title_ = AddSectionHeader(this, u"Data");
+    data_group_ = AddChildView(std::make_unique<ActionGroup>());
+    data_group_->AddRow(
+        u"Import from Arc",
+        u"Bring over Spaces, folders, pins and Favorites from Arc",
+        MakeActionButton(std::move(import_arc), u"Import", /*primary=*/true));
+    data_group_->AddRow(u"Export Pins and Favorites",
+                        u"Save as a bookmarks file for another browser",
+                        MakeActionButton(std::move(export_pins), u"Export…"));
 
-    // Import from Arc…, or once Arc's sidebar file turns up, "Found your
-    // Arc data" with Import, which skips the file picker, and Choose a
-    // file….
-    auto import_buttons = std::make_unique<views::View>();
-    import_buttons->SetLayoutManager(std::make_unique<views::BoxLayout>(
-        views::BoxLayout::Orientation::kHorizontal, gfx::Insets(), 8));
-    choose_button_ = import_buttons->AddChildView(std::make_unique<PillButton>(
-        base::BindRepeating(&AdvancedPage::ImportArc, base::Unretained(this),
-                            /*found=*/false),
-        u"Import from Arc…", kGrayButton, kButtonText,
-        gfx::Font::Weight::NORMAL, nullptr));
-    found_button_ = import_buttons->AddChildView(std::make_unique<PillButton>(
-        base::BindRepeating(&AdvancedPage::ImportArc, base::Unretained(this),
-                            /*found=*/true),
-        u"Import", kBlueButton, SK_ColorWHITE, gfx::Font::Weight::NORMAL,
-        nullptr));
-    found_button_->SetVisible(false);
-    import_panel_ =
-        AddRowPanel(this, u"Spaces, folders and pinned tabs from an Arc export",
-                    /*multi_line=*/false, std::move(import_buttons));
-    import_label_ = static_cast<views::Label*>(import_panel_->children()[0]);
-    static_cast<views::BoxLayout*>(import_panel_->GetLayoutManager())
-        ->set_inside_border_insets(gfx::Insets::VH(0, kBannerPad));
-    import_arc_ = std::move(import_arc);
-    myarc::FindArcData(base::BindOnce(&AdvancedPage::FoundArcData,
-                                      weak_factory_.GetWeakPtr()));
-
-    export_panel_ = AddRowPanel(
-        this, u"Favorites and pinned tabs as bookmarks for another browser",
-        /*multi_line=*/false,
-        std::make_unique<PillButton>(
-            std::move(export_pins), u"Export Pins and Favorites…", kGrayButton,
-            kButtonText, gfx::Font::Weight::NORMAL, nullptr));
-    static_cast<views::BoxLayout*>(export_panel_->GetLayoutManager())
-        ->set_inside_border_insets(gfx::Insets::VH(0, kBannerPad));
-
-    replay_panel_ = AddRowPanel(
-        this, u"The welcome and the three practice steps",
-        /*multi_line=*/false,
-        std::make_unique<PillButton>(
-            std::move(replay_tour), u"Replay welcome tour", kGrayButton,
-            kButtonText, gfx::Font::Weight::NORMAL, nullptr));
-    static_cast<views::BoxLayout*>(replay_panel_->GetLayoutManager())
-        ->set_inside_border_insets(gfx::Insets::VH(0, kBannerPad));
-
-    control_title_ = AddLabel(this, u"Browser control", 13,
-                              gfx::Font::Weight::SEMIBOLD, kCardText);
-    control_title_->SetHorizontalAlignment(gfx::ALIGN_LEFT);
+    control_title_ = AddSectionHeader(this, u"Browser control");
+    control_group_ = AddChildView(std::make_unique<ActionGroup>());
     auto control_switch = std::make_unique<Switch>(
         base::BindRepeating(&AdvancedPage::ToggleControl,
                             base::Unretained(this)),
         u"Allow agents to control myArc");
     control_switch_ = control_switch.get();
-    control_panel_ =
-        AddRowPanel(this, u"Allow agents to control myArc",
-                    /*multi_line=*/false, std::move(control_switch));
-    // Line the switch row up with the Chromium Settings card above it.
-    static_cast<views::BoxLayout*>(control_panel_->GetLayoutManager())
-        ->set_inside_border_insets(gfx::Insets::VH(0, kBannerPad));
+    control_group_->AddRow(
+        u"Allow agents to control myArc",
+        u"Let tools like Claude Code open and use tabs in your Agent Space",
+        std::move(control_switch));
     control_help_ = AddLabel(
-        this,
-        u"Lets tools like Claude Code use the myarc command to open and "
-        u"use tabs in your Agent Space. You approve each tool the first time "
-        u"it connects.",
-        12, gfx::Font::Weight::NORMAL, kTabText);
+        this, u"You approve each tool the first time it connects.", 11,
+        gfx::Font::Weight::NORMAL, kAdvancedFootnote);
     control_help_->SetHorizontalAlignment(gfx::ALIGN_LEFT);
     control_help_->SetMultiLine(true);
+
+    more_title_ = AddSectionHeader(this, u"More");
+    more_group_ = AddChildView(std::make_unique<ActionGroup>());
+    more_group_->AddRow(
+        u"Chromium Settings",
+        u"Privacy, passwords, extensions and site permissions",
+        MakeActionButton(std::move(more_settings), u"Open…"));
+    more_group_->AddRow(u"Welcome tour",
+                        u"Replay the intro and quick-start steps",
+                        MakeActionButton(std::move(replay_tour), u"Replay"));
+
     if (local_state_) {
       registrar_.Init(local_state_);
       registrar_.Add(kControlEnabledPref,
@@ -893,42 +978,38 @@ class AdvancedPage : public views::View {
   }
 
   void Layout(PassKey) override {
-    const int panel_width = width() - 2 * kSideMargin;
-    card_->SetBounds(kSideMargin, kContentTop, panel_width, kRowHeight);
-    import_panel_->SetBounds(kSideMargin, card_->bounds().bottom() + 8,
-                             panel_width, kRowHeight);
-    export_panel_->SetBounds(kSideMargin, import_panel_->bounds().bottom() + 8,
-                             panel_width, kRowHeight);
-    replay_panel_->SetBounds(kSideMargin, export_panel_->bounds().bottom() + 8,
-                             panel_width, kRowHeight);
-    const int title_height = control_title_->GetPreferredSize().height();
-    control_title_->SetBounds(kSideMargin + kBannerPad,
-                              replay_panel_->bounds().bottom() + 24,
-                              panel_width - kBannerPad, title_height);
-    control_panel_->SetBounds(kSideMargin, control_title_->bounds().bottom() + 8,
-                              panel_width, kSwitchRowHeight);
-    const int help_width = panel_width - 2 * kBannerPad;
-    control_help_->SetBounds(kSideMargin + kBannerPad,
-                             control_panel_->bounds().bottom() + 8, help_width,
-                             control_help_->GetHeightForWidth(help_width));
+    const int panel_width = width() - 2 * kAdvancedMargin;
+    const int label_x = kAdvancedMargin + kAdvancedHeaderIndent;
+    const int label_w = panel_width - 2 * kAdvancedHeaderIndent;
+    int y = kAdvancedTop;
+
+    const auto place_header = [&](views::Label* header) {
+      const int h = header->GetPreferredSize().height();
+      header->SetBounds(label_x, y, label_w, h);
+      y += h + kAdvancedHeaderGap;
+    };
+    const auto place_group = [&](ActionGroup* group) {
+      const int h = group->GroupHeight();
+      group->SetBounds(kAdvancedMargin, y, panel_width, h);
+      y += h;
+    };
+
+    place_header(data_title_);
+    place_group(data_group_);
+    y += kAdvancedSectionGap;
+
+    place_header(control_title_);
+    place_group(control_group_);
+    y += kAdvancedHeaderGap;
+    const int help_h = control_help_->GetHeightForWidth(label_w);
+    control_help_->SetBounds(label_x, y, label_w, help_h);
+    y += help_h + kAdvancedSectionGap;
+
+    place_header(more_title_);
+    place_group(more_group_);
   }
 
  private:
-  void FoundArcData(const base::FilePath& path) {
-    if (path.empty()) {
-      return;
-    }
-    arc_data_ = path;
-    import_label_->SetText(u"Found your Arc data");
-    choose_button_->SetText(u"Choose a file…");
-    found_button_->SetVisible(true);
-    import_panel_->InvalidateLayout();
-  }
-
-  void ImportArc(bool found) {
-    import_arc_.Run(found ? arc_data_ : base::FilePath());
-  }
-
   void UpdateControl() {
     control_switch_->SetOn(IsControlEnabled(local_state_));
     // --myarc-enable-control keeps it on for this run.
@@ -946,21 +1027,14 @@ class AdvancedPage : public views::View {
 
   const raw_ptr<PrefService> local_state_;
   PrefChangeRegistrar registrar_;
-  raw_ptr<Panel> card_ = nullptr;
-  raw_ptr<Panel> import_panel_ = nullptr;
-  raw_ptr<views::Label> import_label_ = nullptr;
-  raw_ptr<PillButton> choose_button_ = nullptr;
-  raw_ptr<PillButton> found_button_ = nullptr;
-  ImportArcCallback import_arc_;
-  // Arc's sidebar file, once FindArcData finds it.
-  base::FilePath arc_data_;
-  raw_ptr<Panel> export_panel_ = nullptr;
-  raw_ptr<Panel> replay_panel_ = nullptr;
+  raw_ptr<views::Label> data_title_ = nullptr;
+  raw_ptr<ActionGroup> data_group_ = nullptr;
   raw_ptr<views::Label> control_title_ = nullptr;
-  raw_ptr<Panel> control_panel_ = nullptr;
+  raw_ptr<ActionGroup> control_group_ = nullptr;
   raw_ptr<Switch> control_switch_ = nullptr;
   raw_ptr<views::Label> control_help_ = nullptr;
-  base::WeakPtrFactory<AdvancedPage> weak_factory_{this};
+  raw_ptr<views::Label> more_title_ = nullptr;
+  raw_ptr<ActionGroup> more_group_ = nullptr;
 };
 
 BEGIN_METADATA(AdvancedPage)
@@ -1772,7 +1846,7 @@ class SettingsView : public views::View {
   SettingsView(PrefService* local_state,
                base::RepeatingClosure more_settings,
                base::RepeatingClosure open_site,
-               ImportArcCallback import_arc,
+               base::RepeatingClosure import_arc,
                base::RepeatingClosure export_pins,
                base::RepeatingClosure replay_tour,
                SettingsWindow::Profiles profiles,
@@ -2059,15 +2133,10 @@ void SettingsWindow::ReplayTour() {
   Close();
 }
 
-void SettingsWindow::ImportFromArc(const base::FilePath& found) {
-  // The picker and preview sit over Settings, which stays open.
-  if (!widget_) {
-    return;
-  }
-  if (found.empty()) {
+void SettingsWindow::ImportFromArc() {
+  // The preview sits over Settings, which stays open.
+  if (widget_) {
     myarc::ImportFromArc(*profile_, widget_->GetNativeWindow());
-  } else {
-    myarc::ImportFoundArcData(*profile_, widget_->GetNativeWindow(), found);
   }
 }
 

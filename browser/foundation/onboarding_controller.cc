@@ -111,6 +111,7 @@ constexpr char kMyarcTestOnboardingImport[] = "myarc-test-onboarding-import";
 constexpr char kMyarcTestOnboardingHold[] = "myarc-test-onboarding-hold";
 constexpr char kMyarcTestMuteSound[] = "myarc-test-mute-sound";
 constexpr char kMyarcTestReplayIntro[] = "myarc-test-replay-intro";
+constexpr char kMyarcTestNoArc[] = "myarc-test-no-arc";
 
 // The switch's milliseconds, or `fallback`, up to 30 seconds.
 base::TimeDelta SwitchDelay(const char* name, int fallback) {
@@ -395,7 +396,6 @@ void OnboardingController::ShowWelcome(bool offers_import) {
   // Replay keeps the window where it is and as big as it is.
   const bool replay = std::exchange(replaying_, false);
   sheet_ = host_->AddChildView(std::make_unique<WelcomeView>(
-      offers_import,
       base::BindRepeating(
           [](base::WeakPtr<OnboardingController> controller,
              WelcomeView::Action action) {
@@ -408,8 +408,20 @@ void OnboardingController::ShowWelcome(bool offers_import) {
           weak_factory_.GetWeakPtr())));
   OnViewBoundsChanged(area_);
   if (offers_import) {
-    FindArcData(base::BindOnce(&OnboardingController::FoundArcData,
-                               weak_factory_.GetWeakPtr()));
+#if BUILDFLAG(MYARC_TEST_HOOKS)
+    const base::CommandLine& cmd = *base::CommandLine::ForCurrentProcess();
+    if (cmd.HasSwitch(kMyarcTestNoArc)) {
+      // Simulate a Mac without Arc installed.
+    } else if (cmd.HasSwitch(kMyarcTestOnboardingImport)) {
+      sheet_->ShowImportFromArc();
+    } else {
+      HasArcData(base::BindOnce(&OnboardingController::OnArcDetected,
+                                weak_factory_.GetWeakPtr()));
+    }
+#else
+    HasArcData(base::BindOnce(&OnboardingController::OnArcDetected,
+                              weak_factory_.GetWeakPtr()));
+#endif  // BUILDFLAG(MYARC_TEST_HOOKS)
   }
   // The sound, the desktop dim and the blob start together at t = 0 of
   // welcome_timeline.h, the blob grows into the window and the welcome plays
@@ -567,8 +579,6 @@ void OnboardingController::OnAction(WelcomeView::Action action) {
       Run(Feed(*local_state, Event(EventKind::StartBrowsing)));
       break;
     case WelcomeView::Action::kImport:
-    case WelcomeView::Action::kChooseFile:
-      choose_file_ = action == WelcomeView::Action::kChooseFile;
       Run(Feed(*local_state, Event(EventKind::ImportStarted)));
       break;
     case WelcomeView::Action::kSkipTour:
@@ -715,21 +725,13 @@ void OnboardingController::OpenImport() {
     return;
   }
 #endif  // BUILDFLAG(MYARC_TEST_HOOKS)
-  // "Found your Arc data" imports that file without the picker; Choose a
-  // file… and a welcome without it open the picker.
-  if (!std::exchange(choose_file_, false) && !arc_data_.empty()) {
-    ImportFoundArcData(*profile_, host_->GetWidget()->GetNativeWindow(),
-                       arc_data_, std::move(done), std::move(report_closed));
-    return;
-  }
   ImportFromArc(*profile_, host_->GetWidget()->GetNativeWindow(),
                 std::move(done), std::move(report_closed));
 }
 
-void OnboardingController::FoundArcData(const base::FilePath& path) {
-  arc_data_ = path;
-  if (sheet_ && !path.empty()) {
-    sheet_->ShowFoundArcData();
+void OnboardingController::OnArcDetected(bool found) {
+  if (found && sheet_) {
+    sheet_->ShowImportFromArc();
   }
 }
 

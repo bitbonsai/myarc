@@ -107,7 +107,7 @@ struct ReadResult {
 };
 
 // Arc's sidebar file, which keeps Favorites apart from Space pins. Read only
-// after the user picks it or presses Import under "Found your Arc data".
+// after the user chooses Import from Arc.
 constexpr char kArcSidebarDir[] = "Library/Application Support/Arc";
 constexpr char kArcSidebarName[] = "StorableSidebar.json";
 
@@ -814,24 +814,16 @@ class Picker : public ui::SelectFileDialog::Listener {
   Picker& operator=(const Picker&) = delete;
   ~Picker() override { dialog_->ListenerDestroyed(); }
 
-  // Looks for Arc's sidebar file, without reading it, so the picker can open
-  // on it.
-  void Start() {
-    FindArcData(base::BindOnce(&Picker::Open, base::Unretained(this)));
-  }
-
-  void Open(const base::FilePath& sidebar) {
+  void Open() {
     dialog_ = ui::SelectFileDialog::Create(
         this, std::make_unique<ChromeSelectFilePolicy>(nullptr));
     ui::SelectFileDialog::FileTypeInfo types;
-    types.extensions = {{FILE_PATH_LITERAL("md"), FILE_PATH_LITERAL("markdown"),
-                         FILE_PATH_LITERAL("txt")},
-                        {FILE_PATH_LITERAL("json")}};
+    types.extensions = {{FILE_PATH_LITERAL("json")},
+                        {FILE_PATH_LITERAL("md"), FILE_PATH_LITERAL("markdown"),
+                         FILE_PATH_LITERAL("txt")}};
     types.include_all_files = true;
-    // The picker opens on Arc's folder with the sidebar file selected; the
-    // user still confirms it.
-    dialog_->SelectFile(ui::SelectFileDialog::SELECT_OPEN_FILE, kTitle, sidebar,
-                        &types, sidebar.empty() ? 1 : 2,
+    dialog_->SelectFile(ui::SelectFileDialog::SELECT_OPEN_FILE, kTitle,
+                        base::FilePath(), &types, 1,
                         base::FilePath::StringType(), parent_);
   }
 
@@ -850,18 +842,62 @@ class Picker : public ui::SelectFileDialog::Listener {
   scoped_refptr<ui::SelectFileDialog> dialog_;
 };
 
+void OnArcDataFound(base::WeakPtr<Profile> profile,
+                    gfx::NativeWindow parent,
+                    scoped_refptr<Outcome> outcome,
+                    const base::FilePath& sidebar) {
+  if (!profile) {
+    return;
+  }
+  if (!sidebar.empty()) {
+    Read(profile, parent, /*inactive=*/false, sidebar, std::move(outcome),
+         Confirmed());
+    return;
+  }
+  // Arc wasn't found at its default Mac path: explain cleanly and offer a
+  // fallback file picker for an export or backup from another Mac.
+  Show(ui::DialogModel::Builder()
+           .SetTitle(kTitle)
+           .AddParagraph(ui::DialogModelLabel(
+               u"myArc couldn\u2019t find Arc on this Mac. If you have an Arc "
+               u"export or sidebar file from another Mac, you can pick it "
+               u"manually."))
+           .AddOkButton(
+               base::BindOnce(
+                   [](base::WeakPtr<Profile> profile, gfx::NativeWindow parent,
+                      scoped_refptr<Outcome> outcome) {
+                     // Posted so the modal sheet finishes closing before the
+                     // native file picker attaches to `parent`.
+                     base::SingleThreadTaskRunner::GetCurrentDefault()
+                         ->PostTask(
+                             FROM_HERE,
+                             base::BindOnce(
+                                 [](base::WeakPtr<Profile> profile,
+                                    gfx::NativeWindow parent,
+                                    scoped_refptr<Outcome> outcome) {
+                                   if (!profile) {
+                                     return;
+                                   }
+                                   (new Picker(*profile, parent,
+                                               std::move(outcome)))
+                                       ->Open();
+                                 },
+                                 std::move(profile), parent,
+                                 std::move(outcome)));
+                   },
+                   profile, parent, std::move(outcome)),
+               ui::DialogModel::Button::Params().SetLabel(u"Choose a file…"))
+           .AddCancelButton(base::DoNothing())
+           .Build(),
+       parent, /*inactive=*/false);
+}
+
 }  // namespace
 
 void ImportFromArc(Profile& profile,
                    gfx::NativeWindow parent,
                    ArcImportDone done,
                    base::OnceClosure report_closed) {
-  (new Picker(profile, parent,
-              MakeOutcome(std::move(done), std::move(report_closed))))
-      ->Start();
-}
-
-void FindArcData(base::OnceCallback<void(const base::FilePath&)> found) {
   base::ThreadPool::PostTaskAndReplyWithResult(
       FROM_HERE, {base::MayBlock(), base::TaskPriority::USER_BLOCKING},
       base::BindOnce([] {
@@ -869,16 +905,18 @@ void FindArcData(base::OnceCallback<void(const base::FilePath&)> found) {
             base::GetHomeDir().Append(kArcSidebarDir).Append(kArcSidebarName);
         return base::PathExists(file) ? file : base::FilePath();
       }),
-      std::move(found));
+      base::BindOnce(&OnArcDataFound, profile.GetWeakPtr(), parent,
+                     MakeOutcome(std::move(done), std::move(report_closed))));
 }
 
-void ImportFoundArcData(Profile& profile,
-                        gfx::NativeWindow parent,
-                        const base::FilePath& path,
-                        ArcImportDone done,
-                        base::OnceClosure report_closed) {
-  Read(profile.GetWeakPtr(), parent, /*inactive=*/false, path,
-       MakeOutcome(std::move(done), std::move(report_closed)), Confirmed());
+void HasArcData(base::OnceCallback<void(bool)> callback) {
+  base::ThreadPool::PostTaskAndReplyWithResult(
+      FROM_HERE, {base::MayBlock(), base::TaskPriority::USER_BLOCKING},
+      base::BindOnce([] {
+        return base::PathExists(
+            base::GetHomeDir().Append(kArcSidebarDir).Append(kArcSidebarName));
+      }),
+      std::move(callback));
 }
 
 void ImportArcFileForCapture(Profile& profile,

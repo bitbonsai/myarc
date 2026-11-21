@@ -4,7 +4,6 @@
 #include <memory>
 #include <string>
 
-#include "base/files/file_path.h"
 #include "base/functional/callback.h"
 #include "base/memory/raw_ptr.h"
 #include "base/memory/weak_ptr.h"
@@ -148,8 +147,7 @@ class OnboardingController final : public views::ViewObserver {
   // Crossfades the welcome to the theme of `space`, then runs the reveal.
   void ShowImported(uint64_t space);
   void OpenImport();
-  // FindArcData's answer: Arc's sidebar file, or empty when there is none.
-  void FoundArcData(const base::FilePath& path);
+  void OnArcDetected(bool found);
   void OnReportClosed();
   // The welcome fades away while the rows settle, then FinishReveal feeds
   // `reveal_done`.
@@ -248,10 +246,6 @@ class OnboardingController final : public views::ViewObserver {
   // The welcome shows only for PlayIntro(), so its buttons change nothing.
   bool showcase_ = false;
   bool importing_ = false;
-  // Arc's sidebar file, once FindArcData finds it. Import reads it without
-  // the file picker unless Choose a file… was pressed.
-  base::FilePath arc_data_;
-  bool choose_file_ = false;
   // The welcome crossfades to the imported theme; the reveal follows.
   bool recolouring_ = false;
   // The import's report shows; the reveal waits for it to close.
