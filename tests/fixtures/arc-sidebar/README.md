@@ -11,6 +11,8 @@ Arc writes Swift dictionaries as flat lists that alternate key and value.
 - `topAppsContainerIDs` alternates an Arc profile marker and the id of the item holding that profile's Favorites. `{"default": {}}` is the main profile and `{"custom": {"_0": {"directoryBasename": "Profile 1"}}}` another.
 - `spaces` alternates an id and a Space. Each Space has a `title`, a `profile` marker and `containerIDs`, which alternates `"pinned"` or `"unpinned"` and an item id.
 
+Arc is built on Chromium, so its `User Data/Local State`, next to the sidebar file, names each profile as Chromium does: `profile.info_cache` maps a profile's directory, such as `Profile 1`, to an entry whose `name` is the name Arc shows. Chromium writes it in `chrome/browser/profiles/profile_attributes_storage.cc`. [User Data/Local State](User%20Data/Local%20State) is a synthetic counterpart.
+
 ## What the fixture holds
 
 - Two main-profile Favorites, one with a page title. One Favorite of "Profile 1", and an empty Favorites container for "Profile 2".
@@ -18,5 +20,6 @@ Arc writes Swift dictionaries as flat lists that alternate key and value.
 - A main-profile Space "Home" whose pinned container lists no `childrenIds`, so its two tabs are found by `parentID`; one is a `file:` URL. It has an unknown container key.
 - A "Profile 1" Space "Side Project" with a named, titled tab and a folder "Reading" holding a tab and a nested folder "Later".
 - A Little Arc container with one tab and a container of an unknown kind.
+- In `User Data/Local State`, the names "Personal" for `Default`, "Side Work" for `Profile 1` and "Empty" for `Profile 2`.
 
-[The tests](../../../crates/import/tests/arc_sidebar.rs) check that the reader splits the file into the main profile and "Profile 1", leaving out "Profile 2", which has nothing. The main profile gets 2 Favorites, Work's 3 pins and its "Projects" folder, and Home's pins; "Profile 1" gets its Favorite and "Side Project" with its "Reading" folder. Names and page titles reach the imported items. The reader counts 2 Today tabs, 2 nested folders, whose tabs join the outer folder, and 3 unknown parts. "Profile 1" imported into a new Profile holds only its own Space. Importing twice adds nothing and the file stays unchanged.
+[The tests](../../../crates/import/tests/arc_sidebar.rs) check that the reader splits the file into the main profile and "Profile 1", leaving out "Profile 2", which has nothing. The main profile gets 2 Favorites, Work's 3 pins and its "Projects" folder, and Home's pins; "Profile 1" gets its Favorite and "Side Project" with its "Reading" folder. Names and page titles reach the imported items. With the `Local State`, "Profile 1" maps to a myArc Profile named "Side Work", and without a usable name it keeps "Arc Profile 1". The reader counts 2 Today tabs, 2 nested folders, whose tabs join the outer folder, and 3 unknown parts. "Profile 1" imported into a new Profile holds only its own Space. Importing twice adds nothing and the file stays unchanged.

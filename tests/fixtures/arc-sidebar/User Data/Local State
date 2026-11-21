@@ -1,0 +1,24 @@
+{
+  "browser": {
+    "enabled_labs_experiments": []
+  },
+  "profile": {
+    "info_cache": {
+      "Default": {
+        "name": "Personal",
+        "avatar_icon": "chrome://theme/IDR_PROFILE_AVATAR_26",
+        "is_using_default_name": false
+      },
+      "Profile 1": {
+        "name": "Side Work",
+        "avatar_icon": "chrome://theme/IDR_PROFILE_AVATAR_26",
+        "is_using_default_name": false
+      },
+      "Profile 2": {
+        "name": "Empty",
+        "is_using_default_name": false
+      }
+    },
+    "last_used": "Default"
+  }
+}

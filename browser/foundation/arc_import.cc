@@ -111,6 +111,11 @@ struct ReadResult {
 constexpr char kArcSidebarDir[] = "Library/Application Support/Arc";
 constexpr char kArcSidebarName[] = "StorableSidebar.json";
 
+// Arc's Local State, beside the sidebar file in `User Data`. Like Chrome's, it
+// keeps each profile's name under `profile.info_cache`.
+constexpr char kArcUserDataDir[] = "User Data";
+constexpr char kArcLocalStateName[] = "Local State";
+
 // A .json file is Arc's sidebar file; anything else is read as the Markdown
 // export.
 bool IsSidebarFile(const base::FilePath& path) {
@@ -137,8 +142,19 @@ ReadResult ReadExport(const base::FilePath& path) {
   if (!base::ReadFileToStringWithMaxSize(path, &bytes, max)) {
     return {"myArc couldn't read this file.", std::nullopt};
   }
+  // The names of Arc's profiles, when a Local State sits next to the sidebar
+  // file. Only read; a missing, large or unreadable one leaves them unnamed.
+  std::string local_state;
+  if (sidebar && !base::ReadFileToStringWithMaxSize(
+                     path.DirName()
+                         .AppendASCII(kArcUserDataDir)
+                         .AppendASCII(kArcLocalStateName),
+                     &local_state, foundation::arc_local_state_max_bytes())) {
+    local_state.clear();
+  }
   return {std::string(),
-          WorkspaceService::ParseArcExport(base::as_byte_span(bytes), sidebar),
+          WorkspaceService::ParseArcExport(base::as_byte_span(bytes), sidebar,
+                                           base::as_byte_span(local_state)),
           base::HexEncodeLower(crypto::hash::Sha256(bytes)), sidebar};
 }
 
@@ -300,8 +316,8 @@ base::FilePath FindProfile(const std::u16string& name) {
 
 // Where one Arc profile's part of the export goes.
 struct Target {
-  // Arc's directory name and the myArc Profile's name; both empty for the
-  // main profile, which goes into the Profile running the import.
+  // Arc's name for the profile and the myArc Profile's name; both empty for
+  // the main profile, which goes into the Profile running the import.
   std::u16string arc_name;
   std::u16string myarc_name;
   // The existing myArc Profile it goes into, unless it's the main profile's.
@@ -346,6 +362,15 @@ class Session : public base::RefCounted<Session> {
                     .myarc_name = Utf16(part.myarc_name)};
       if (!target.myarc_name.empty()) {
         target.dir = FindProfile(target.myarc_name);
+        // An import from before Arc's names were read made "Arc Profile 1";
+        // keep using it rather than adding a second Profile.
+        const std::u16string old_name = Utf16(part.old_myarc_name);
+        if (target.dir.empty() && !old_name.empty()) {
+          target.dir = FindProfile(old_name);
+          if (!target.dir.empty()) {
+            target.myarc_name = old_name;
+          }
+        }
         target.create = target.dir.empty();
         if (!target.create &&
             !(manager && manager->GetProfileByPath(target.dir))) {
@@ -518,8 +543,7 @@ class Session : public base::RefCounted<Session> {
     }
   }
 
-  // "Arc profile 'Profile 1' → new myArc Profile 'Arc Profile 1': adds 2
-  // pinned tabs."
+  // "Arc profile 'Work' → new myArc Profile 'Work': adds 2 pinned tabs."
   static std::u16string Mapping(const Target& target) {
     std::u16string text =
         target.myarc_name.empty()

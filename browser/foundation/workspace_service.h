@@ -262,10 +262,13 @@ class WorkspaceService final : public base::SupportsUserData::Data {
       foundation::StateSnapshot snapshot);
   // Parses an Arc Markdown export, or with `sidebar` Arc's sidebar file
   // (StorableSidebar.json), and canonicalizes its URLs with the same rules
-  // as saved URLs. Pure: callable on any sequence, never fails.
+  // as saved URLs. `local_state`, Arc's `User Data/Local State` or empty,
+  // names a sidebar file's Arc profiles. Pure: callable on any sequence,
+  // never fails.
   static rust::Box<foundation::ArcExport> ParseArcExport(
       base::span<const uint8_t> bytes,
-      bool sidebar);
+      bool sidebar,
+      base::span<const uint8_t> local_state);
   // What importing part `part` of `export` (one Arc profile, see
   // foundation::arc_export_profiles) would add to this workspace, without
   // changing it.

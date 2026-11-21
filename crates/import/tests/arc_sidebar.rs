@@ -3,7 +3,8 @@
 use myarc_import::arc_markdown::{Omission, Report};
 use myarc_import::arc_report::{Line, lines};
 use myarc_import::arc_sidebar::{
-    ArcProfile, MAX_INPUT_BYTES, ProfileReport, SidebarError, parse, parse_profiles,
+    ArcProfile, MAX_INPUT_BYTES, MAX_LOCAL_STATE_BYTES, ProfileReport, SidebarError, name_profiles,
+    parse, parse_profiles, profile_names,
 };
 use myarc_import::arc_workspace::{Preview, apply, apply_to_new_profile, as_written};
 use myarc_workspace::{DEFAULT_PROFILE_ID, Placement, Workspace};
@@ -20,6 +21,11 @@ fn fixture() -> Report {
 fn fixture_profiles() -> Vec<ProfileReport> {
     parse_profiles(&std::fs::read(FIXTURE_PATH).unwrap()).expect("fixture parses")
 }
+
+const LOCAL_STATE_PATH: &str = concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/../../tests/fixtures/arc-sidebar/User Data/Local State"
+);
 
 fn urls(entries: &[myarc_import::arc_markdown::Entry]) -> Vec<&str> {
     entries.iter().map(|entry| entry.url.as_str()).collect()
@@ -413,4 +419,94 @@ fn another_profile_imports_into_its_own_new_profile_once() {
     let again = apply(report, &as_written(report), &mut workspace).unwrap();
     assert!(again.is_noop());
     assert_eq!(workspace.snapshot(), first);
+}
+
+#[test]
+fn local_state_gives_each_arc_profile_its_name() {
+    let names = profile_names(&std::fs::read(LOCAL_STATE_PATH).unwrap());
+    assert_eq!(
+        names.get("Profile 1").map(String::as_str),
+        Some("Side Work")
+    );
+    assert_eq!(names.get("Default").map(String::as_str), Some("Personal"));
+    let mut profiles = fixture_profiles();
+    name_profiles(&mut profiles, &names);
+    // The main profile still imports into the Profile running the import.
+    assert_eq!(profiles[0].name, None);
+    assert_eq!(profiles[0].arc_label(), None);
+    assert_eq!(profiles[0].myarc_name(), None);
+    let other = &profiles[1];
+    assert_eq!(other.arc_label(), Some("Side Work"));
+    assert_eq!(other.myarc_name().as_deref(), Some("Side Work"));
+    // Earlier imports named the Profile after the directory; a re-import
+    // looks for that name too.
+    assert_eq!(other.profile.myarc_name().as_deref(), Some("Arc Profile 1"));
+}
+
+#[test]
+fn missing_or_bad_local_state_keeps_the_directory_name() {
+    let unnamed = |local_state: &[u8]| {
+        let mut profiles = fixture_profiles();
+        name_profiles(&mut profiles, &profile_names(local_state));
+        (
+            profiles[1].arc_label().map(str::to_owned),
+            profiles[1].myarc_name(),
+        )
+    };
+    let fallback = (
+        Some("Profile 1".to_owned()),
+        Some("Arc Profile 1".to_owned()),
+    );
+    assert_eq!(unnamed(b""), fallback);
+    assert_eq!(unnamed(b"{not json"), fallback);
+    assert_eq!(unnamed(br#"{"profile":{"info_cache":[]}}"#), fallback);
+    assert_eq!(
+        unnamed(br#"{"profile":{"info_cache":{"Profile 1":{"name":" \n "}}}}"#),
+        fallback
+    );
+    assert_eq!(
+        unnamed(br#"{"profile":{"info_cache":{"Profile 1":{"name":7}}}}"#),
+        fallback
+    );
+    let mut big = br#"{"profile":{"info_cache":{"Profile 1":{"name":"Big"}}},"pad":""#.to_vec();
+    big.resize(MAX_LOCAL_STATE_BYTES + 1, b' ');
+    assert!(profile_names(&big).is_empty());
+}
+
+#[test]
+fn arc_profile_names_are_cleaned_and_shortened() {
+    let long = "W".repeat(100);
+    let json = format!(
+        r#"{{"profile":{{"info_cache":{{"Profile 1":{{"name":"  Work\tStuff "}},"Profile 2":{{"name":"{long}"}}}}}}}}"#
+    );
+    let names = profile_names(json.as_bytes());
+    assert_eq!(names["Profile 1"], "Work Stuff");
+    assert_eq!(names["Profile 2"].len(), 64);
+}
+
+#[test]
+fn two_arc_profiles_with_one_name_keep_their_directories() {
+    let json = r#"{"sidebar":{"containers":[{"global":{}},{
+        "topAppsContainerIDs":[
+            {"custom":{"_0":{"directoryBasename":"Profile 1"}}},"a",
+            {"custom":{"_0":{"directoryBasename":"Profile 2"}}},"b"],
+        "items":[{"id":"a","childrenIds":["t"]},{"id":"b","childrenIds":["u"]},
+                 {"id":"t","data":{"tab":{"savedURL":"https://t.example.test/"}}},
+                 {"id":"u","data":{"tab":{"savedURL":"https://u.example.test/"}}}]}]}}"#;
+    let mut profiles = parse_profiles(json.as_bytes()).unwrap();
+    let names = profile_names(
+        br#"{"profile":{"info_cache":{"Profile 1":{"name":"Work"},"Profile 2":{"name":"Work"}}}}"#,
+    );
+    name_profiles(&mut profiles, &names);
+    let mapped: Vec<_> = profiles[1..]
+        .iter()
+        .map(ProfileReport::myarc_name)
+        .collect();
+    assert_eq!(
+        mapped,
+        [
+            Some("Arc Profile 1".to_owned()),
+            Some("Arc Profile 2".to_owned())
+        ]
+    );
 }

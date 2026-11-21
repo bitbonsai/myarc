@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-11-21: Arc profile names, JSON skip lines and untitled export text
+
+- Other Arc profiles now import into a myArc Profile with their Arc name, such as "Work", read from Arc's `User Data/Local State` next to the sidebar file (`profile.info_cache.<directory>.name`, as Chromium writes it). The file is only read, capped at 4 MB, and a missing or bad one, an empty name or a name two Arc profiles share falls back to "Arc Profile 1". A re-import that finds no Profile by the new name uses one an earlier import named "Arc Profile 1". The preview names the Arc profile the same way, and lists left-out links from the sidebar file without "Line 0:". The bookmarks export titles a link that has no name or title with the sidebar's short URL label and keeps the full URL in `HREF`.
+- Evidence: `MyarcNightly` chrome builds. Rust fmt, clippy and tests pass, with a synthetic `Local State` beside the sidebar fixture and cases for the name, the fallbacks, shared names, long names and the export label. `check_docs.py` and `export_patches.py --check` pass.
+- Limits: not run live, so the preview text and the old-name lookup are unchecked in the browser. Whether Arc keeps the names it shows in `Local State` comes from Chromium's code, not from an Arc file.
+
 ## 2026-11-21: Arc import reads names, titles and every Arc profile
 
 - Arc's sidebar file now imports each tab's name (as Rename sets it) and saved page title, and splits the file by Arc profile: the main one goes into the Profile running the import, and each other one into a myArc Profile named "Arc <directory>", which Import creates when it's missing. The preview names each mapping and reads unloaded Profiles' workspace files without loading them. Folders inside folders still join the outer folder, because the workspace's folders don't nest. When `~/Library/Application Support/Arc/StorableSidebar.json` exists, Settings > Advanced and the welcome tour show "Found your Arc data" with Import, which opens the preview without the picker, and "Choose a file…" for the picker.

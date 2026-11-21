@@ -21,20 +21,27 @@ pub struct ArcExport {
 // entry once `set_arc_export_canonical_urls` ran (`None` for a rejected URL),
 // and what `apply_arc_import` did with it.
 struct ArcPart {
-    profile: import::arc_sidebar::ArcProfile,
-    report: import::arc_markdown::Report,
+    arc: import::arc_sidebar::ProfileReport,
     canonical: Vec<Option<String>>,
     applied: Option<import::arc_workspace::Preview>,
 }
 
 impl ArcPart {
-    fn new(profile: import::arc_sidebar::ArcProfile, report: import::arc_markdown::Report) -> Self {
+    fn new(arc: import::arc_sidebar::ProfileReport) -> Self {
         Self {
-            profile,
-            report,
+            arc,
             canonical: Vec::new(),
             applied: None,
         }
+    }
+
+    // The main profile's part of a Markdown export or an unreadable file.
+    fn main(report: import::arc_markdown::Report) -> Self {
+        Self::new(import::arc_sidebar::ProfileReport {
+            profile: import::arc_sidebar::ArcProfile::Main,
+            name: None,
+            report,
+        })
     }
 }
 
@@ -651,10 +658,12 @@ mod ffi {
         // Ungrouped Pins it moves into the folder their group names.
         moved_pins: usize,
         skipped_count: usize,
-        // "Line 12: file:///…" for entries that are not imported.
+        // "Line 12: file:///…" for entries that are not imported; Arc's
+        // sidebar file has no line numbers, so its entries list only the URL.
         skipped: Vec<String>,
         unrecognized_count: usize,
-        // "Line 4, indented: …" for lines the reader did not understand.
+        // "Line 4, indented: …" for lines the reader did not understand, or
+        // "not a link: …" from Arc's sidebar file.
         unrecognized: Vec<String>,
         // After an apply, the part's first Space; otherwise 0.
         first_space: u64,
@@ -663,10 +672,17 @@ mod ffi {
     // One Arc profile in an export. The main profile, always first, imports
     // into the Profile running the import and has both names empty.
     struct ArcImportProfile {
-        // Arc's directory name for the profile, such as "Profile 1".
+        // The name Arc shows for the profile, such as "Work", read from
+        // Arc's Local State, else its directory name, such as "Profile 1".
         arc_name: String,
-        // The myArc Profile it imports into, found or created by this name.
+        // The myArc Profile it imports into, found or created by this name:
+        // Arc's name, else "Arc Profile 1".
         myarc_name: String,
+        // The name imports gave the Profile before Arc's names were read,
+        // such as "Arc Profile 1", when it differs from `myarc_name`. A
+        // re-import goes into a Profile by that name when none has
+        // `myarc_name`. Empty otherwise.
+        old_myarc_name: String,
     }
 
     // Shown once an import has committed.
@@ -1135,8 +1151,12 @@ mod ffi {
         fn parse_arc_export(bytes: &[u8]) -> Box<ArcExport>;
         // Largest sidebar file accepted, in bytes.
         fn arc_sidebar_max_bytes() -> usize;
-        // The same for Arc's sidebar file, StorableSidebar.json.
-        fn parse_arc_sidebar(bytes: &[u8]) -> Box<ArcExport>;
+        // Largest Arc `Local State` file read for profile names, in bytes.
+        fn arc_local_state_max_bytes() -> usize;
+        // The same for Arc's sidebar file, StorableSidebar.json. `local_state`
+        // is Arc's `User Data/Local State`, or empty; it names the Arc
+        // profiles, and anything unreadable in it is ignored.
+        fn parse_arc_sidebar(bytes: &[u8], local_state: &[u8]) -> Box<ArcExport>;
         // Every entry's URL as written, for the browser to canonicalize.
         fn arc_export_urls(arc: &ArcExport) -> Vec<String>;
         // One URL per `arc_export_urls` entry, canonicalized; empty rejects it.
@@ -1247,7 +1267,7 @@ pub fn parse_arc_export(bytes: &[u8]) -> Box<ArcExport> {
         Err(error) => (Default::default(), error.to_string()),
     };
     Box::new(ArcExport {
-        parts: vec![ArcPart::new(import::arc_sidebar::ArcProfile::Main, report)],
+        parts: vec![ArcPart::main(report)],
         error,
         sidebar: false,
     })
@@ -1257,22 +1277,21 @@ pub fn arc_sidebar_max_bytes() -> usize {
     import::arc_sidebar::MAX_INPUT_BYTES
 }
 
-pub fn parse_arc_sidebar(bytes: &[u8]) -> Box<ArcExport> {
+pub fn arc_local_state_max_bytes() -> usize {
+    import::arc_sidebar::MAX_LOCAL_STATE_BYTES
+}
+
+pub fn parse_arc_sidebar(bytes: &[u8], local_state: &[u8]) -> Box<ArcExport> {
     let (parts, error) = match import::arc_sidebar::parse_profiles(bytes) {
-        Ok(profiles) => (
-            profiles
-                .into_iter()
-                .map(|part| ArcPart::new(part.profile, part.report))
-                .collect(),
-            String::new(),
-        ),
-        Err(error) => (
-            vec![ArcPart::new(
-                import::arc_sidebar::ArcProfile::Main,
-                Default::default(),
-            )],
-            error.to_string(),
-        ),
+        Ok(mut profiles) => {
+            let names = import::arc_sidebar::profile_names(local_state);
+            import::arc_sidebar::name_profiles(&mut profiles, &names);
+            (
+                profiles.into_iter().map(ArcPart::new).collect(),
+                String::new(),
+            )
+        }
+        Err(error) => (vec![ArcPart::main(Default::default())], error.to_string()),
     };
     Box::new(ArcExport {
         parts,
@@ -1285,7 +1304,7 @@ pub fn arc_export_urls(export: &ArcExport) -> Vec<String> {
     export
         .parts
         .iter()
-        .flat_map(|part| import::arc_workspace::entry_urls(&part.report))
+        .flat_map(|part| import::arc_workspace::entry_urls(&part.arc.report))
         .map(str::to_owned)
         .collect()
 }
@@ -1295,24 +1314,26 @@ pub fn set_arc_export_canonical_urls(export: &mut ArcExport, urls: Vec<String>) 
     // Each part takes its share in order. A short list leaves later parts
     // short too, which their preview reports as a mismatch.
     for part in &mut export.parts {
-        part.canonical = urls.by_ref().take(part.report.entry_count()).collect();
+        part.canonical = urls.by_ref().take(part.arc.report.entry_count()).collect();
     }
 }
 
 pub fn arc_export_profiles(export: &ArcExport) -> Vec<ffi::ArcImportProfile> {
-    use import::arc_sidebar::ArcProfile;
     export
         .parts
         .iter()
-        .map(|part| match &part.profile {
-            ArcProfile::Main => ffi::ArcImportProfile {
-                arc_name: String::new(),
-                myarc_name: String::new(),
-            },
-            ArcProfile::Custom(directory) => ffi::ArcImportProfile {
-                arc_name: directory.clone(),
-                myarc_name: part.profile.myarc_name().unwrap_or_default(),
-            },
+        .map(|part| {
+            let myarc_name = part.arc.myarc_name().unwrap_or_default();
+            let old_name = part.arc.profile.myarc_name().unwrap_or_default();
+            ffi::ArcImportProfile {
+                arc_name: part.arc.arc_label().unwrap_or_default().to_owned(),
+                old_myarc_name: if old_name == myarc_name {
+                    String::new()
+                } else {
+                    old_name
+                },
+                myarc_name,
+            }
         })
         .collect()
 }
@@ -1354,13 +1375,13 @@ pub fn preview_arc_import(
     export: &ArcExport,
     part: usize,
 ) -> ffi::ArcImportPreview {
-    let Some(arc) = export.parts.get(part) else {
+    let Some(chosen) = export.parts.get(part) else {
         return arc_import_failure("No such part of the export.");
     };
     arc_import_result(
         export,
         part,
-        import::arc_workspace::preview(&arc.report, &arc.canonical, &workspace.0),
+        import::arc_workspace::preview(&chosen.arc.report, &chosen.canonical, &workspace.0),
     )
 }
 
@@ -1370,7 +1391,7 @@ pub fn apply_arc_import(
     part: usize,
     new_profile: bool,
 ) -> ffi::ArcImportPreview {
-    let Some(arc) = export.parts.get(part) else {
+    let Some(chosen) = export.parts.get(part) else {
         return arc_import_failure("No such part of the export.");
     };
     let apply = if new_profile {
@@ -1378,7 +1399,7 @@ pub fn apply_arc_import(
     } else {
         import::arc_workspace::apply
     };
-    let result = apply(&arc.report, &arc.canonical, &mut workspace.0);
+    let result = apply(&chosen.arc.report, &chosen.canonical, &mut workspace.0);
     let first = result
         .as_ref()
         .ok()
@@ -1407,7 +1428,7 @@ pub fn arc_import_report(export: &ArcExport) -> ffi::ArcImportReport {
     let mut counts = std::collections::BTreeMap::new();
     for part in &export.parts {
         let Some(plan) = &part.applied else { continue };
-        for line in import::arc_report::lines(&part.report, &part.canonical, plan) {
+        for line in import::arc_report::lines(&part.arc.report, &part.canonical, plan) {
             *counts.entry(line.kind).or_insert(0) += line.count;
         }
     }
@@ -1498,6 +1519,12 @@ fn arc_import_failure(error: &str) -> ffi::ArcImportPreview {
     )
 }
 
+// "Line 12" for a listed entry of the Markdown export. Arc's sidebar file has
+// no line numbers and its entries carry line 0, so they get none.
+fn arc_import_line(export: &ArcExport, line: usize) -> Option<String> {
+    (!export.sidebar && line != 0).then(|| format!("Line {line}"))
+}
+
 fn arc_import_result(
     export: &ArcExport,
     part: usize,
@@ -1506,7 +1533,7 @@ fn arc_import_result(
     let unrecognized: &[import::arc_markdown::Unrecognized] = export
         .parts
         .get(part)
-        .map_or(&[], |part| &part.report.unrecognized);
+        .map_or(&[], |part| &part.arc.report.unrecognized);
     let mut preview = ffi::ArcImportPreview {
         ok: false,
         error: export.error.clone(),
@@ -1526,12 +1553,11 @@ fn arc_import_result(
             .iter()
             .take(ARC_IMPORT_LIST_LIMIT)
             .map(|line| {
-                format!(
-                    "Line {}, {}: {}",
-                    line.line,
-                    line.reason.label(),
-                    line.excerpt
-                )
+                let text = format!("{}: {}", line.reason.label(), line.excerpt);
+                match arc_import_line(export, line.line) {
+                    Some(number) => format!("{number}, {text}"),
+                    None => text,
+                }
             })
             .collect(),
     };
@@ -1559,7 +1585,10 @@ fn arc_import_result(
                 .skipped
                 .iter()
                 .take(ARC_IMPORT_LIST_LIMIT)
-                .map(|entry| format!("Line {}: {}", entry.line, entry.url))
+                .map(|entry| match arc_import_line(export, entry.line) {
+                    Some(number) => format!("{number}: {}", entry.url),
+                    None => entry.url.clone(),
+                })
                 .collect();
         }
         Err(error) => preview.error = error.to_string(),

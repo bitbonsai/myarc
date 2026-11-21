@@ -1395,10 +1395,14 @@ foundation::MutationResult WorkspaceService::RestoreSnapshot(
 // static
 rust::Box<foundation::ArcExport> WorkspaceService::ParseArcExport(
     base::span<const uint8_t> bytes,
-    bool sidebar) {
+    bool sidebar,
+    base::span<const uint8_t> local_state) {
   const rust::Slice<const uint8_t> slice(bytes.data(), bytes.size());
-  auto export_data = sidebar ? foundation::parse_arc_sidebar(slice)
-                             : foundation::parse_arc_export(slice);
+  auto export_data =
+      sidebar ? foundation::parse_arc_sidebar(
+                    slice, rust::Slice<const uint8_t>(local_state.data(),
+                                                      local_state.size()))
+              : foundation::parse_arc_export(slice);
   rust::Vec<rust::String> canonical;
   for (const auto& url : foundation::arc_export_urls(*export_data)) {
     const auto spec = CanonicalUrl(std::string_view(url.data(), url.size()));

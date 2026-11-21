@@ -31,6 +31,11 @@
 //! in the main profile's [`Report::omitted`]. Saved URLs that aren't
 //! `scheme:rest` become [`Report::unrecognized`] with line 0. Icons and colors
 //! are not read. Nothing is fetched and the file is only read.
+//!
+//! Arc is built on Chromium, so its `User Data/Local State`, next to the
+//! sidebar file, keeps each profile's name where Chromium does:
+//! `profile.info_cache.<directory>.name`. [`profile_names`] reads that, and
+//! [`name_profiles`] gives each [`ProfileReport`] its name.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
@@ -48,8 +53,10 @@ pub const MAX_DEPTH: usize = 32;
 /// Most Arc profiles read, the main one included. Favorites and Spaces of
 /// further profiles are counted as unknown.
 pub const MAX_PROFILES: usize = 16;
-/// Longest Arc profile directory name kept, in bytes.
+/// Longest Arc profile directory name or profile name kept, in bytes.
 pub const MAX_PROFILE_NAME_BYTES: usize = 64;
+/// Largest `Local State` file read for profile names, in bytes.
+pub const MAX_LOCAL_STATE_BYTES: usize = 4 * 1024 * 1024;
 
 /// One Arc profile, from its marker.
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -62,9 +69,11 @@ pub enum ArcProfile {
 }
 
 impl ArcProfile {
-    /// The name of the myArc Profile this Arc profile imports into, or `None`
-    /// for the main profile, which imports into the Profile that runs the
-    /// import. A re-import finds the Profile by this name.
+    /// The name of the myArc Profile this Arc profile imports into when its
+    /// Arc name is unknown, such as "Arc Profile 1", or `None` for the main
+    /// profile, which imports into the Profile that runs the import. Imports
+    /// from before Arc's names were read used this name, so a re-import looks
+    /// for it too.
     pub fn myarc_name(&self) -> Option<String> {
         match self {
             Self::Main => None,
@@ -77,7 +86,73 @@ impl ArcProfile {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ProfileReport {
     pub profile: ArcProfile,
+    /// The name Arc shows for the profile, such as "Work", once
+    /// [`name_profiles`] found one.
+    pub name: Option<String>,
     pub report: Report,
+}
+
+impl ProfileReport {
+    /// The name the preview gives the Arc profile: its Arc name, else its
+    /// directory. `None` for the main profile.
+    pub fn arc_label(&self) -> Option<&str> {
+        match &self.profile {
+            ArcProfile::Main => None,
+            ArcProfile::Custom(directory) => Some(self.name.as_deref().unwrap_or(directory)),
+        }
+    }
+
+    /// The name of the myArc Profile this part imports into: the Arc name,
+    /// else [`ArcProfile::myarc_name`]. `None` for the main profile. A
+    /// re-import finds the Profile by this name, then by
+    /// [`ArcProfile::myarc_name`].
+    pub fn myarc_name(&self) -> Option<String> {
+        match &self.profile {
+            ArcProfile::Main => None,
+            ArcProfile::Custom(_) => self.name.clone().or_else(|| self.profile.myarc_name()),
+        }
+    }
+}
+
+/// Arc profile names from Arc's `User Data/Local State`, by directory name,
+/// such as "Profile 1" to "Work". Empty when the file is larger than
+/// [`MAX_LOCAL_STATE_BYTES`], isn't JSON or has no `profile.info_cache`;
+/// entries without a usable name are left out.
+pub fn profile_names(local_state: &[u8]) -> BTreeMap<String, String> {
+    let mut names = BTreeMap::new();
+    if local_state.len() > MAX_LOCAL_STATE_BYTES {
+        return names;
+    }
+    let Ok(root) = serde_json::from_slice::<Value>(local_state) else {
+        return names;
+    };
+    let Some(cache) = root
+        .pointer("/profile/info_cache")
+        .and_then(Value::as_object)
+    else {
+        return names;
+    };
+    for (directory, info) in cache {
+        if let Some(name) = clean(info.get("name").and_then(Value::as_str)) {
+            names.insert(directory.clone(), shorten(&name));
+        }
+    }
+    names
+}
+
+/// Gives each Arc profile in `profiles` its name from `names`, as
+/// [`profile_names`] returns them. Two profiles with the same name both keep
+/// their directory instead, so they don't import into one Profile.
+pub fn name_profiles(profiles: &mut [ProfileReport], names: &BTreeMap<String, String>) {
+    let name_of = |profile: &ArcProfile| match profile {
+        ArcProfile::Main => None,
+        ArcProfile::Custom(directory) => names.get(directory),
+    };
+    let found: Vec<_> = profiles.iter().map(|p| name_of(&p.profile)).collect();
+    for (part, name) in profiles.iter_mut().zip(&found) {
+        let shared = found.iter().filter(|other| **other == *name).count() > 1;
+        part.name = name.filter(|_| !shared).cloned();
+    }
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -130,6 +205,7 @@ pub fn parse_profiles(input: &[u8]) -> Result<Vec<ProfileReport>, SidebarError> 
         .ok_or(SidebarError::NoSidebar)?;
     let mut profiles = vec![ProfileReport {
         profile: ArcProfile::Main,
+        name: None,
         report: Report::default(),
     }];
     let mut found = false;
@@ -161,6 +237,7 @@ fn report_of(profiles: &mut Vec<ProfileReport>, profile: ArcProfile) -> Option<&
         None if profiles.len() < MAX_PROFILES => {
             profiles.push(ProfileReport {
                 profile,
+                name: None,
                 report: Report::default(),
             });
             profiles.len() - 1
@@ -440,11 +517,16 @@ fn profile(marker: &Value) -> ArcProfile {
             .and_then(Value::as_str),
     )
     .unwrap_or_else(|| "Unnamed".to_owned());
+    ArcProfile::Custom(shorten(&name))
+}
+
+/// `name` cut to [`MAX_PROFILE_NAME_BYTES`] on a character boundary.
+fn shorten(name: &str) -> String {
     let mut end = name.len().min(MAX_PROFILE_NAME_BYTES);
     while !name.is_char_boundary(end) {
         end -= 1;
     }
-    ArcProfile::Custom(name[..end].trim_end().to_owned())
+    name[..end].trim_end().to_owned()
 }
 
 /// A title with control characters turned into spaces and trimmed, or `None`
