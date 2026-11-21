@@ -1,5 +1,5 @@
 diff --git a/chrome/browser/ui/views/toolbar/toolbar_view.h b/chrome/browser/ui/views/toolbar/toolbar_view.h
-index 7f1f5b7df703579934d7503ab4b9816de37d649f..9666864e0a745bde19f436f82b562349b757af7d 100644
+index 7f1f5b7df703579934d7503ab4b9816de37d649f..ce327ca514e1fb5976c550fc488743f59b65c8da 100644
 --- a/chrome/browser/ui/views/toolbar/toolbar_view.h
 +++ b/chrome/browser/ui/views/toolbar/toolbar_view.h
 @@ -174,6 +174,12 @@ class ToolbarView : public views::AccessiblePaneView,
@@ -24,7 +24,16 @@ index 7f1f5b7df703579934d7503ab4b9816de37d649f..9666864e0a745bde19f436f82b562349
    raw_ptr<ToolbarButton> back_ = nullptr;
    raw_ptr<ToolbarButton> forward_ = nullptr;
    raw_ptr<ReloadButton> reload_ = nullptr;
-@@ -466,7 +474,8 @@ class ToolbarView : public views::AccessiblePaneView,
+@@ -421,6 +429,8 @@ class ToolbarView : public views::AccessiblePaneView,
+   // An alias for `location_bar_view_` or `toolbar_webview_->GetLocationBar()`.
+   raw_ptr<LocationBar> location_bar_ = nullptr;
+   raw_ptr<ExtensionsToolbarDesktop> extensions_container_ = nullptr;
++  // Where `extensions_container_` returns to when it leaves the URL pill.
++  size_t myarc_extensions_index_ = 0;
+   raw_ptr<ToolbarDivider> toolbar_divider_ = nullptr;
+   raw_ptr<BatterySaverButton> battery_saver_button_ = nullptr;
+   raw_ptr<PerformanceInterventionButton> performance_intervention_button_ =
+@@ -466,7 +476,8 @@ class ToolbarView : public views::AccessiblePaneView,
    std::optional<ui::ScopedUnownedUserData<ToolbarButtonProvider>>
        scoped_unowned_user_data_;
  
@@ -34,7 +43,7 @@ index 7f1f5b7df703579934d7503ab4b9816de37d649f..9666864e0a745bde19f436f82b562349
  
    AppMenuIconController app_menu_icon_controller_;
  
-@@ -501,8 +510,7 @@ class ToolbarView : public views::AccessiblePaneView,
+@@ -501,8 +512,7 @@ class ToolbarView : public views::AccessiblePaneView,
    base::CallbackListSubscription vertical_tab_subscription_;
  
    // Subscription for when contextual tasks button position should update.

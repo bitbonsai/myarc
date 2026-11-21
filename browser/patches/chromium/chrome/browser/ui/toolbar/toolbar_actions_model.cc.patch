@@ -1,0 +1,25 @@
+diff --git a/chrome/browser/ui/toolbar/toolbar_actions_model.cc b/chrome/browser/ui/toolbar/toolbar_actions_model.cc
+index f35b42be33952f9d4b01728c82ce064830bda1e4..29036f51800b1ec072ed21f2887636e682454e97 100644
+--- a/chrome/browser/ui/toolbar/toolbar_actions_model.cc
++++ b/chrome/browser/ui/toolbar/toolbar_actions_model.cc
+@@ -47,6 +47,7 @@
+ #include "extensions/common/manifest.h"
+ #include "extensions/common/manifest_constants.h"
+ #include "extensions/common/permissions/permissions_data.h"
++#include "myarc/blocker.h"
+ 
+ #if !BUILDFLAG(IS_ANDROID)
+ #include "chrome/browser/ui/web_applications/app_browser_controller.h"
+@@ -142,7 +143,11 @@ void ToolbarActionsModel::OnExtensionInstalled(
+   const bool is_installed_from_sync =
+       sync_service && sync_service->IsPendingSyncInstall(extension->id());
+ 
+-  const bool is_installed_by_default = extension->was_installed_by_default();
++  // myArc's bundled blocker already has its own switch in the Site Info
++  // popover, so leave it unpinned on install unless the user pins it manually.
++  const bool is_installed_by_default =
++      extension->was_installed_by_default() ||
++      extension->id() == myarc::kBlockerExtensionId;
+ 
+   bool is_feature_enabled =
+       base::FeatureList::IsEnabled(features::kExtensionsPinnedByDefault);

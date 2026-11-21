@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-11-21: Extension icons in the URL pill
+
+- Pinned extension icons now sit at the trailing end of the sidebar's URL pill and show on hover or focus, next to Copy URL, as in Arc. An open popup keeps its icon. There's no Extensions (puzzle) button. The bundled uBlock Origin Lite stays unpinned on install, and Safety Check no longer flags it as off-store.
+- Evidence: test build with a throwaway unpacked popup extension, background launches, Accessibility focus and press instead of clicks. The pill is empty when idle, shows the icon on focus, and the popup opens under it. A fresh uBOL-only Profile shows no icon, and `chrome://extensions` shows no warning for uBOL. Captures are outside the repo.
+- Verification: `out/MyarcNightly chrome` builds; `export_patches.py --check` and `check_docs.py` pass. A real hover with the mouse and a store-installed Bitwarden weren't run.
+
 ## 2026-11-21: Frosted glass Sparkle updater UI (`MyarcSparkleUserDriver`)
 
 - Replaced `SPUStandardUpdaterController` / `SPUStandardUserDriver` in `browser/foundation/updater_mac.mm` with a custom `MyarcSparkleUserDriver` (implementing Sparkle 2.10.1's `SPUUserDriver` protocol and driving `SPUUpdater` directly via runtime `NSClassFromString` loading). Built a frosted-glass AppKit updater window (`ApplyNSWindowGlass`, full-size content view, 16 pt rounded corners, subtle ribbon ambient glow, 1 px specular hairline, embedded myArc ribbon icon, rounded pill progress bar, sanitized plain-text release notes card + HTTP(S)-checked release notes link, and blue/glass pill buttons) covering checking, up to date, update available, downloading, extracting, ready to install, installing, and error states, with automatic opaque fallback under Reduce Transparency, silent background automatic checks until ready, and all `MYARC_TEST_HOOKS` (`myarc-update:`) logging and `--myarc-test-update-feed` behavior preserved.

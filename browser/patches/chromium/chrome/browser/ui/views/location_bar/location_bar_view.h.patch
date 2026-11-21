@@ -1,8 +1,16 @@
 diff --git a/chrome/browser/ui/views/location_bar/location_bar_view.h b/chrome/browser/ui/views/location_bar/location_bar_view.h
-index 856d9d7c66a7314d7046571bb3dfefda898970cc..e14d9246c4b8b0eba5dd27250fd46d83cbd74913 100644
+index 856d9d7c66a7314d7046571bb3dfefda898970cc..954a22fe83e0ad4a52cca8e3d49fcb70d7d53e15 100644
 --- a/chrome/browser/ui/views/location_bar/location_bar_view.h
 +++ b/chrome/browser/ui/views/location_bar/location_bar_view.h
-@@ -53,6 +53,10 @@
+@@ -13,6 +13,7 @@
+ #include <vector>
+ 
+ #include "base/callback_list.h"
++#include "base/functional/callback.h"
+ #include "base/gtest_prod_util.h"
+ #include "base/memory/raw_ptr.h"
+ #include "base/memory/weak_ptr.h"
+@@ -53,6 +54,10 @@
  #endif  // BUILDFLAG(OS_LEVEL_GEOLOCATION_PERMISSION_SUPPORTED)
  
  class BrowserWindowInterface;
@@ -13,7 +21,20 @@ index 856d9d7c66a7314d7046571bb3dfefda898970cc..e14d9246c4b8b0eba5dd27250fd46d83
  class CommandUpdater;
  class ContentSettingBubbleModelDelegate;
  class OmniboxController;
-@@ -303,6 +307,7 @@ class LocationBarView
+@@ -138,6 +143,12 @@ class LocationBarView
+   // Initializes the LocationBarView.
+   void Init();
+ 
++  // Adopts myArc's pinned extension icons, a child added by the toolbar, as a
++  // trailing decoration. `set_revealed` tells them when the pill shows its
++  // hover actions.
++  void SetMyarcExtensionsView(views::View* view,
++                              base::RepeatingCallback<void(bool)> set_revealed);
++
+   bool in_popup_state_transition() const override;
+ 
+   // Returns a background that paints an (optionally stroked) rounded rect with
+@@ -303,6 +314,7 @@ class LocationBarView
    // LocationIconView::Delegate:
    const LocationBarModel* GetLocationBarModel() const override;
    bool IsEditingOrEmpty() const override;
@@ -21,7 +42,7 @@ index 856d9d7c66a7314d7046571bb3dfefda898970cc..e14d9246c4b8b0eba5dd27250fd46d83
    void OnLocationIconGestureEvent(ui::GestureEvent* event) override;
    void OnLocationIconPressed(const ui::MouseEvent& event) override;
    void OnLocationIconDragged(const ui::MouseEvent& event) override;
-@@ -449,6 +454,7 @@ class LocationBarView
+@@ -449,6 +461,7 @@ class LocationBarView
    bool OnMousePressed(const ui::MouseEvent& event) override;
    bool OnMouseDragged(const ui::MouseEvent& event) override;
    void OnMouseReleased(const ui::MouseEvent& event) override;
@@ -29,7 +50,7 @@ index 856d9d7c66a7314d7046571bb3dfefda898970cc..e14d9246c4b8b0eba5dd27250fd46d83
    void OnMouseMoved(const ui::MouseEvent& event) override;
    void OnMouseExited(const ui::MouseEvent& event) override;
    void ShowContextMenu(const gfx::Point& p,
-@@ -463,6 +469,9 @@ class LocationBarView
+@@ -463,6 +476,9 @@ class LocationBarView
                             const gfx::Point& press_pt,
                             const gfx::Point& p) override;
  
@@ -39,13 +60,15 @@ index 856d9d7c66a7314d7046571bb3dfefda898970cc..e14d9246c4b8b0eba5dd27250fd46d83
    bool ShouldUsePopupOpenAppearance() const;
  
    bool ShouldHidePageActionIcons() const;
-@@ -575,6 +584,9 @@ class LocationBarView
+@@ -575,6 +591,11 @@ class LocationBarView
    // An icon to the left of the edit field: the HTTPS lock, blank page icon,
    // search icon, EV HTTPS bubble, etc.
    raw_ptr<LocationIconView> location_icon_view_ = nullptr;
 +  raw_ptr<views::ImageButton> myarc_copy_url_button_ = nullptr;
 +  raw_ptr<myarc::LocalPageChip> myarc_local_page_chip_ = nullptr;
 +  bool myarc_url_hovered_ = false;
++  raw_ptr<views::View> myarc_extensions_view_ = nullptr;
++  base::RepeatingCallback<void(bool)> myarc_set_extensions_revealed_;
  
    // Views to show inline autocompletion when an IME is active.  In this case,
    // we shouldn't change the text or selection inside the OmniboxView itself,

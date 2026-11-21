@@ -1,0 +1,27 @@
+diff --git a/chrome/browser/ui/views/extensions/extensions_toolbar_desktop.h b/chrome/browser/ui/views/extensions/extensions_toolbar_desktop.h
+index b6de9f344dc9effa2115c7b89fcc2127d24f5997..7791cde1f8ea1ad9582cc763bbb14be2e267a601 100644
+--- a/chrome/browser/ui/views/extensions/extensions_toolbar_desktop.h
++++ b/chrome/browser/ui/views/extensions/extensions_toolbar_desktop.h
+@@ -115,6 +115,13 @@ class ExtensionsToolbarDesktop : public ToolbarIconContainerView,
+   // Updates the container visibility and animation as needed.
+   void UpdateContainerVisibility();
+ 
++  // Adapts container visibility, icon sizing and popup arrow direction for
++  // myArc's URL pill in the sidebar.
++  void SetMyarcSidebarMode(bool enabled);
++
++  // Shows or hides pinned icons with the URL pill's hover actions.
++  void SetMyarcRevealed(bool revealed);
++
+   // Updates the controls visibility.
+   void UpdateControlsVisibility();
+ 
+@@ -348,6 +355,8 @@ class ExtensionsToolbarDesktop : public ToolbarIconContainerView,
+   const raw_ptr<ToolbarActionsModel> model_;
+ 
+   DisplayMode display_mode_;
++  bool myarc_sidebar_mode_ = false;
++  bool myarc_revealed_ = false;
+ 
+   // Controller for showing the toolbar action hover card.
+   std::unique_ptr<ToolbarActionHoverCardController>

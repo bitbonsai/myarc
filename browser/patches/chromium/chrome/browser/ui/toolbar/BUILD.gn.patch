@@ -1,0 +1,12 @@
+diff --git a/chrome/browser/ui/toolbar/BUILD.gn b/chrome/browser/ui/toolbar/BUILD.gn
+index 875dde19521876fcf09954b6dce705052d05e9d4..6d1605f70e49018b00331fb1f6ebb2bdb44c6d24 100644
+--- a/chrome/browser/ui/toolbar/BUILD.gn
++++ b/chrome/browser/ui/toolbar/BUILD.gn
+@@ -271,6 +271,7 @@ source_set("impl") {
+       "//chrome/common:constants",
+       "//content/public/browser",
+       "//extensions/common",
++      "//myarc:blocker",
+     ]
+   }
+ 

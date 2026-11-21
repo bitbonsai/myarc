@@ -1,0 +1,25 @@
+diff --git a/chrome/browser/extensions/extension_safety_check_utils.cc b/chrome/browser/extensions/extension_safety_check_utils.cc
+index 5e61e9e45ccf6078b5f5d2acf725077b7bc6d798..e2d6a4495e624ce69b145b6b17237d4d91fe7df5 100644
+--- a/chrome/browser/extensions/extension_safety_check_utils.cc
++++ b/chrome/browser/extensions/extension_safety_check_utils.cc
+@@ -17,6 +17,7 @@
+ #include "extensions/browser/cws_info_service.h"
+ #include "extensions/browser/extension_prefs.h"
+ #include "extensions/buildflags/buildflags.h"
++#include "myarc/blocker.h"
+ #include "ui/base/l10n/l10n_util.h"
+ 
+ static_assert(BUILDFLAG(ENABLE_EXTENSIONS_CORE));
+@@ -236,8 +237,11 @@ developer::SafetyCheckWarningReason GetSafetyCheckWarningReasonHelper(
+   // - Chrome apps
+   // - Chrome extensions that are enterprise policy controlled OR not visible
+   // to the user.
++  // - myArc's bundled blocker, which ships with the browser rather than from
++  //   the Web Store.
+   if (!is_extension || is_non_visible_extension ||
+-      is_explicitly_allowed_by_policy) {
++      is_explicitly_allowed_by_policy ||
++      extension.id() == myarc::kBlockerExtensionId) {
+     return developer::SafetyCheckWarningReason::kNone;
+   }
+ 

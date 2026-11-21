@@ -1,0 +1,91 @@
+diff --git a/chrome/browser/ui/views/extensions/extensions_toolbar_desktop.cc b/chrome/browser/ui/views/extensions/extensions_toolbar_desktop.cc
+index dce94a0eb7efbdd2a569ddf636695fa090237a42..ebc7255c47ef55e3b496ae9b72af7c43d4b28bc1 100644
+--- a/chrome/browser/ui/views/extensions/extensions_toolbar_desktop.cc
++++ b/chrome/browser/ui/views/extensions/extensions_toolbar_desktop.cc
+@@ -697,6 +697,9 @@ views::LabelButton* ExtensionsToolbarDesktop::GetOverflowReferenceView() const {
+ 
+ gfx::Size ExtensionsToolbarDesktop::GetToolbarActionSize() {
+   constexpr gfx::Size kDefaultSize(28, 28);
++  if (myarc_sidebar_mode_) {
++    return kDefaultSize;
++  }
+   BrowserView* const browser_view =
+       BrowserView::GetBrowserViewForBrowser(browser_);
+   return browser_view
+@@ -877,6 +880,9 @@ void ExtensionsToolbarDesktop::OnPinnedActionsChanged() {
+     UpdateIconVisibility(it.first);
+   }
+   ReorderAllChildViews();
++  if (myarc_sidebar_mode_) {
++    UpdateContainerVisibility();
++  }
+ 
+   drop_weak_ptr_factory_.InvalidateWeakPtrs();
+ }
+@@ -1095,6 +1101,30 @@ void ExtensionsToolbarDesktop::SetExtensionIconVisibility(
+       visible ? GetExtensionIcon(extension_view) : ui::ImageModel());
+ }
+ 
++void ExtensionsToolbarDesktop::SetMyarcSidebarMode(bool enabled) {
++  if (myarc_sidebar_mode_ == enabled) {
++    return;
++  }
++  myarc_sidebar_mode_ = enabled;
++  myarc_revealed_ = false;
++  // The pill shows pinned icons only, as Arc's does.
++  extensions_button_->SetVisible(!enabled);
++  GetTargetLayoutManager()->SetCrossAxisAlignment(
++      enabled ? views::LayoutAlignment::kCenter
++              : views::LayoutAlignment::kStretch);
++  UpdateAllIcons();
++  UpdateContainerVisibility();
++  GetAnimatingLayoutManager()->ResetLayout();
++  PreferredSizeChanged();
++}
++
++void ExtensionsToolbarDesktop::SetMyarcRevealed(bool revealed) {
++  if (myarc_revealed_ != revealed) {
++    myarc_revealed_ = revealed;
++    UpdateContainerVisibility();
++  }
++}
++
+ void ExtensionsToolbarDesktop::UpdateContainerVisibility() {
+   bool was_visible = GetVisible();
+   SetVisible(ShouldContainerBeVisible());
+@@ -1103,6 +1133,10 @@ void ExtensionsToolbarDesktop::UpdateContainerVisibility() {
+   // resetting.
+   if (was_visible != GetVisible()) {
+     GetAnimatingLayoutManager()->ResetLayout();
++    // The URL pill makes room for the icons only on a size change.
++    if (myarc_sidebar_mode_) {
++      PreferredSizeChanged();
++    }
+   }
+ 
+   if (!was_visible && GetVisible() && GetOnVisibleCallbackForTesting()) {
+@@ -1117,6 +1151,14 @@ bool ExtensionsToolbarDesktop::ShouldContainerBeVisible() const {
+     return false;
+   }
+ 
++  if (myarc_sidebar_mode_) {
++    // In the URL pill, pinned icons show with its hover actions, and an open
++    // popup keeps its icon.
++    return popped_out_action_ || popup_owner_ ||
++           (myarc_revealed_ &&
++            !toolbar_view_model_->GetPinnedActionIds().empty());
++  }
++
+   // All other display modes are constantly visible.
+   if (display_mode_ != DisplayMode::kAutoHide) {
+     return true;
+@@ -1269,7 +1311,8 @@ views::BubbleAnchor ExtensionsToolbarDesktop::GetExtensionsButtonAnchor() {
+ }
+ 
+ views::BubbleBorder::Arrow ExtensionsToolbarDesktop::GetPopupArrow() const {
+-  return views::BubbleBorder::TOP_RIGHT;
++  return myarc_sidebar_mode_ ? views::BubbleBorder::TOP_LEFT
++                             : views::BubbleBorder::TOP_RIGHT;
+ }
+ 
+ void ExtensionsToolbarDesktop::OnMouseExited(const ui::MouseEvent& event) {
