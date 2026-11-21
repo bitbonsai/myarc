@@ -2,6 +2,12 @@
 # myArc mode on by default. Ad-hoc signed by tools/package_nightly.sh.
 is_debug = false
 is_official_build = false
+# Non-official release builds turn DCHECKs on by default, which costs startup
+# and runtime work. The nightly ships without them.
+dcheck_always_on = false
+# Dangling raw_ptr checks follow DCHECKs by default. Keep them on, as
+# browser/README.md describes.
+enable_dangling_raw_ptr_checks = true
 is_component_build = false
 symbol_level = 0
 target_cpu = "arm64"

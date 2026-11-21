@@ -80,6 +80,7 @@ class SidebarView final : public views::View,
     bool is_live = false;
     // A Pin's or Favorite's live page has left its saved URL (BC-003).
     bool navigated_away = false;
+    bool operator==(const ItemPresentation&) const = default;
   };
 
   // Arc's Library rail, top to bottom.
@@ -578,6 +579,10 @@ class SidebarView final : public views::View,
   std::unique_ptr<foundation::SidebarResult> deferred_model_;
   std::u16string deferred_status_;
   StorageRetry deferred_retry_ = StorageRetry::kNone;
+  // What the rows on screen were built from, so SetModel skips a rebuild
+  // that would draw the same thing. Only valid while `rows_scroll_` is set.
+  struct RowsInputs;
+  std::unique_ptr<RowsInputs> rows_inputs_;
   bool capture_drag_scheduled_ = false;
   bool capture_pin_scheduled_ = false;
   // The footer kept across row rebuilds, and the Spaces it shows.

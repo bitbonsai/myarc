@@ -1534,6 +1534,9 @@ void BrowserWorkspaceAdapter::Refresh() {
       !browser_->IsDeleteScheduled() && !tabs_->closing_all() &&
       IsReady(*service_) && !SessionRestore::IsRestoring(profile_)) {
     base::AutoReset<bool> changing(&changing_, true);
+    // Binding a restored window adds or moves a row per tab; write the file
+    // once for all of them.
+    WorkspaceService::ScopedBatch batch(*service_);
     // Late inserts and recovery use the same known-ID-first reconciliation.
     auto result = ReconcileBindings(*profile_);
     if (result.ok)
@@ -3105,8 +3108,21 @@ void BrowserWorkspaceAdapter::OnTabPinnedStateChanged(tabs::TabInterface*,
   OnServiceChanged();
 }
 
-void BrowserWorkspaceAdapter::OnTabChangedAt(tabs::TabInterface*,
-                                             TabChangeType) {
+void BrowserWorkspaceAdapter::OnTabChangedAt(tabs::TabInterface* tab,
+                                             TabChangeType type) {
+  // Loading-only changes matter only when a load starts or stops: the sidebar
+  // marks a loading page's title. Other loading ticks change nothing shown.
+  if (type == TabChangeType::kLoadingOnly && tab && tab->GetContents()) {
+    content::WebContents& page = *tab->GetContents();
+    if (const uint64_t item = ItemIdForContents(page)) {
+      const std::pair state(reinterpret_cast<uintptr_t>(&page),
+                            page.IsLoading());
+      const auto [last, added] = item_loading_.try_emplace(item, state);
+      if (!added && last->second == state)
+        return;
+      last->second = state;
+    }
+  }
   for (const auto& adapter : ForProfile(*profile_).adapters)
     adapter->OnServiceChanged();
 }

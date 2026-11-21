@@ -82,8 +82,24 @@ class WorkspaceService final : public base::SupportsUserData::Data {
   // Saves a change not saved yet, such as one a write error held back.
   void FlushForShutdown();
 
-  // A successful mutation is saved to the file before it returns, unless
-  // saving failed; observe storage_state for that. All IDs
+  // Holds back saves and change notifications while it lives, then saves
+  // once and notifies once, so a task making many changes writes the file
+  // once. Nothing outside the batch hears of a change before it is written.
+  // Batches nest; the outermost one saves.
+  class ScopedBatch {
+   public:
+    explicit ScopedBatch(WorkspaceService& service);
+    ScopedBatch(const ScopedBatch&) = delete;
+    ScopedBatch& operator=(const ScopedBatch&) = delete;
+    ~ScopedBatch();
+
+   private:
+    base::WeakPtr<WorkspaceService> service_;
+  };
+
+  // A successful mutation is saved to the file before it returns, or at the
+  // end of the ScopedBatch around it, unless saving failed; observe
+  // storage_state for that. All IDs
   // here are Rust model IDs. Profile 1 is local to each service, not a native
   // ID.
   foundation::MutationResult CreateSpace(std::string_view name);
@@ -277,6 +293,9 @@ class WorkspaceService final : public base::SupportsUserData::Data {
   // Writes the workspace file now, on the UI thread, so nothing shows a change
   // a process kill could lose, then flushes it to the disk off the UI thread.
   void Save();
+  // Save, unless a write error holds saves back or a ScopedBatch defers it.
+  void SaveSoon();
+  void EndBatch();
   void Sync();
   void OnSynced();
 
@@ -290,6 +309,10 @@ class WorkspaceService final : public base::SupportsUserData::Data {
   StorageState storage_state_;
   std::string storage_error_;
   bool dirty_ = false;
+  // Open ScopedBatches, and whether one held back a save or a notification.
+  int batch_depth_ = 0;
+  bool batch_save_ = false;
+  bool batch_notify_ = false;
   // A flush to the disk runs; another follows it when a save came meanwhile.
   bool sync_in_flight_ = false;
   bool sync_again_ = false;

@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-11-21: Startup trims
+
+- The nightly builds with `dcheck_always_on = false` (dangling raw_ptr checks stay on) and `tools/package_nightly.sh` runs `strip -x` on the main and framework binaries before signing. Sparkle loads 5 s after the menu is built, or on the first Check for Updates… click, instead of before the first window. `SidebarView::SetModel` skips the rebuild when the model (cxx-derived `==`), live titles and favicons, status, other Profiles' Spaces and the control client all match the last build. Loading-only tab changes refresh only when a page starts or stops loading, since the sidebar marks loading titles. Binding a window's tabs runs in a `WorkspaceService::ScopedBatch`, which writes the file once and notifies after the write.
+- Evidence: `MyarcNightly` chrome, `bridge_check` and `workspace_lifecycle_check` build and pass. Rust fmt, clippy and tests, the onboarding node test, `check_docs.py` and `export_patches.py --check` pass. A copy of `package_nightly.sh` cut before notarization stripped the framework from 603 MB to 374 MB, passed the stale and otool checks and verified the ad-hoc signature. `gn args` showed the DCHECK change only flips debug-only args.
+- Limits: no launch, so the startup gain is unmeasured and the deferred Sparkle start and the sidebar skip haven't run live. `out/MyarcNightly` still has DCHECKs on until `args-nightly.gn` is copied in for a release build, which rebuilds everything.
+
 ## 2026-11-20: Nightly 2026.11.20.4
 
 - Published the prerelease `nightly-2026.11.20.4` from `main` `3f9f541` and Chromium `724a8f6feb`: Actions mode in the command bar (Tab), the nightly label in Sparkle's dialogs and Check for Updates… under About.

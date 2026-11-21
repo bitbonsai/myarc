@@ -125,27 +125,45 @@ namespace {
 constexpr char kTestUpdateFeed[] = "myarc-test-update-feed";
 #endif
 
+// Seconds between building the menu and starting Sparkle, so loading the
+// framework and its first check stay off the startup path.
+constexpr int64_t kStartDelaySeconds = 5;
+
 MyarcUpdaterDelegate* g_delegate = nil;
 id<MyarcSparkleController> g_controller = nil;
+bool g_started = false;
 
-id<MyarcSparkleController> StartUpdater() {
-  NSString* feed = nil;
+NSString* TestFeed() {
 #if BUILDFLAG(MYARC_TEST_HOOKS)
   const base::CommandLine* command_line =
       base::CommandLine::ForCurrentProcess();
   if (command_line->HasSwitch(kTestUpdateFeed)) {
-    feed = base::SysUTF8ToNSString(
+    return base::SysUTF8ToNSString(
         command_line->GetSwitchValueASCII(kTestUpdateFeed));
   }
 #endif
+  return nil;
+}
+
+NSString* SparklePath() {
+  return [base::apple::OuterBundle().privateFrameworksPath
+      stringByAppendingPathComponent:@"Sparkle.framework"];
+}
+
+// True when StartUpdater() can run: a nightly or a test feed, and an embedded
+// Sparkle.framework. Only checks the file, so it is cheap at menu build time.
+bool UpdaterAvailable() {
 #if !BUILDFLAG(MYARC_NIGHTLY)
-  if (!feed) {
-    return nil;
+  if (!TestFeed()) {
+    return false;
   }
 #endif
-  NSString* path = [base::apple::OuterBundle().privateFrameworksPath
-      stringByAppendingPathComponent:@"Sparkle.framework"];
-  NSBundle* sparkle = [NSBundle bundleWithPath:path];
+  return [NSFileManager.defaultManager fileExistsAtPath:SparklePath()];
+}
+
+id<MyarcSparkleController> StartUpdater() {
+  NSString* feed = TestFeed();
+  NSBundle* sparkle = [NSBundle bundleWithPath:SparklePath()];
   NSError* error = nil;
   if (!sparkle || ![sparkle loadAndReturnError:&error]) {
     LOG(WARNING) << "No updater: Sparkle.framework did not load"
@@ -185,22 +203,65 @@ id<MyarcSparkleController> StartUpdater() {
   return controller;
 }
 
-}  // namespace
-
-void AddUpdaterMenuItem(NSMenu* app_menu, NSInteger index) {
-  static bool started = false;
-  if (!started) {
-    started = true;
+// Starts Sparkle once, from the delayed start or the first menu click.
+id<MyarcSparkleController> EnsureUpdater() {
+  if (!g_started) {
+    g_started = true;
     g_controller = StartUpdater();
   }
-  if (!g_controller) {
-    return;
+  return g_controller;
+}
+
+}  // namespace
+}  // namespace myarc
+
+// The menu item's target. Starts Sparkle on the first click if the delayed
+// start hasn't yet, then forwards to Sparkle's controller.
+@interface MyarcUpdaterMenuTarget : NSObject <NSMenuItemValidation>
+@end
+
+@implementation MyarcUpdaterMenuTarget
+
+- (void)checkForUpdates:(id)sender {
+  [myarc::EnsureUpdater() checkForUpdates:sender];
+}
+
+- (BOOL)validateMenuItem:(NSMenuItem*)item {
+  if (!myarc::g_started) {
+    return YES;
+  }
+  id controller = myarc::g_controller;
+  if (!controller) {
+    return NO;
+  }
+  return ![controller respondsToSelector:@selector(validateMenuItem:)] ||
+         [controller validateMenuItem:item];
+}
+
+@end
+
+namespace myarc {
+
+void AddUpdaterMenuItem(NSMenu* app_menu, NSInteger index) {
+  static MyarcUpdaterMenuTarget* target = nil;
+  if (!target) {
+    if (!UpdaterAvailable()) {
+      return;
+    }
+    target = [[MyarcUpdaterMenuTarget alloc] init];
+    // A test feed checks right away, so tools/check_updates.sh sees the
+    // result without waiting.
+    int64_t delay = TestFeed() ? 0 : kStartDelaySeconds * NSEC_PER_SEC;
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, delay),
+                   dispatch_get_main_queue(), ^{
+                     EnsureUpdater();
+                   });
   }
   NSMenuItem* item =
       [[NSMenuItem alloc] initWithTitle:@"Check for Updates…"
                                  action:@selector(checkForUpdates:)
                           keyEquivalent:@""];
-  item.target = g_controller;
+  item.target = target;
   [app_menu insertItem:item atIndex:index];
 }
 

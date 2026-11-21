@@ -708,13 +708,50 @@ foundation::MutationResult WorkspaceService::Changed(
   if (result.ok) {
     if (!ephemeral_) {
       dirty_ = true;
-      if (storage_state_ != StorageState::kWriteError) {
-        Save();
-      }
+      SaveSoon();
     }
-    changed_.Notify();
+    if (batch_depth_) {
+      batch_notify_ = true;
+    } else {
+      changed_.Notify();
+    }
   }
   return result;
+}
+
+WorkspaceService::ScopedBatch::ScopedBatch(WorkspaceService& service)
+    : service_(service.weak_factory_.GetWeakPtr()) {
+  DCHECK_CALLED_ON_VALID_SEQUENCE(service.sequence_checker_);
+  ++service.batch_depth_;
+}
+
+WorkspaceService::ScopedBatch::~ScopedBatch() {
+  if (service_) {
+    service_->EndBatch();
+  }
+}
+
+void WorkspaceService::SaveSoon() {
+  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
+  if (batch_depth_) {
+    batch_save_ = true;
+  } else if (storage_state_ != StorageState::kWriteError) {
+    Save();
+  }
+}
+
+void WorkspaceService::EndBatch() {
+  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
+  DCHECK_GT(batch_depth_, 0);
+  if (--batch_depth_) {
+    return;
+  }
+  if (std::exchange(batch_save_, false)) {
+    SaveSoon();
+  }
+  if (std::exchange(batch_notify_, false)) {
+    changed_.Notify();
+  }
 }
 
 foundation::MutationResult WorkspaceService::SpacesChanged(
@@ -1177,8 +1214,7 @@ foundation::MutationResult WorkspaceService::SetTemporaryPage(
   // now so a crash keeps the row reopenable.
   if (result.ok && result.id && !ephemeral_) {
     dirty_ = true;
-    if (storage_state_ != StorageState::kWriteError)
-      Save();
+    SaveSoon();
   }
   return result;
 }

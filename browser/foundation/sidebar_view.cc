@@ -1051,6 +1051,16 @@ class TodayDivider final : public views::View {
 BEGIN_METADATA(TodayDivider)
 END_METADATA
 
+struct SidebarView::RowsInputs {
+  foundation::SidebarResult model;
+  std::u16string status;
+  StorageRetry retry = StorageRetry::kNone;
+  std::vector<OtherSpaceEntry> other_spaces;
+  std::u16string control_client;
+  // Live titles and favicons of `model`'s Favorites, Pins and Today tabs.
+  std::vector<ItemPresentation> presentations;
+};
+
 SidebarView::SidebarView(Delegate& delegate)
     : views::AnimationDelegateViews(this),
       delegate_(delegate),
@@ -2409,6 +2419,31 @@ void SidebarView::SetModel(const foundation::SidebarResult& model,
     return;
   }
 
+  // Tab updates that change nothing the rows draw skip the rebuild, which
+  // also keeps hover and an open rename. The live titles and favicons count,
+  // as do the inputs SetOtherSpaces and SetControlClient leave for here.
+  auto inputs = std::make_unique<RowsInputs>(RowsInputs{
+      .model = model,
+      .status = status,
+      .retry = retry,
+      .other_spaces = other_spaces_,
+      .control_client = control_client_});
+  for (const auto* items : {&model.favorites, &model.pins, &model.temporary}) {
+    for (const auto& item : *items) {
+      inputs->presentations.push_back(Present(item));
+    }
+  }
+  if (rows_scroll_ && rows_inputs_ && !pending_space_picker_ &&
+      rows_inputs_->model == inputs->model &&
+      rows_inputs_->status == inputs->status &&
+      rows_inputs_->retry == inputs->retry &&
+      rows_inputs_->other_spaces == inputs->other_spaces &&
+      rows_inputs_->control_client == inputs->control_client &&
+      rows_inputs_->presentations == inputs->presentations) {
+    return;
+  }
+  rows_inputs_ = std::move(inputs);
+
   std::optional<std::pair<FocusAction, uint64_t>> focus;
   for (const auto& target : focus_targets_) {
     if (target.view->HasFocus()) {
@@ -3695,6 +3730,8 @@ void SidebarView::SetNewTabIntent(bool intent) {
 
 void SidebarView::OnThemeChanged() {
   views::View::OnThemeChanged();
+  // The rows' colors come from the theme, so the next SetModel rebuilds.
+  rows_inputs_.reset();
   UpdateFills();
 }
 

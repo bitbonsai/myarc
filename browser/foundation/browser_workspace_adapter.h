@@ -9,6 +9,7 @@
 #include <set>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 #include "base/callback_list.h"
@@ -360,6 +361,10 @@ class BrowserWorkspaceAdapter final : public TabStripModelObserver {
   bool changing_ = false;
   bool bound_ = false;
   bool refresh_pending_ = false;
+  // Each item's page, by address only, and whether it was loading at its last
+  // loading-only tab change, so ticks that don't start or stop a load skip
+  // the refresh.
+  std::map<uint64_t, std::pair<uintptr_t, bool>> item_loading_;
   bool refreshing_ = false;
   // The dormant selected row ShowSelected last opened, so a page that fails
   // to open isn't retried on every refresh.

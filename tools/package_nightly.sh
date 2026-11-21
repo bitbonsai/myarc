@@ -2,6 +2,7 @@
 # Package the nightly build as a signed, optionally notarized DMG outside the repository.
 # Signs with a Developer ID or Apple Development identity when the keychain has one, then
 # "myArc Local Signing", then ad-hoc. SIGN_ID overrides the choice.
+# Strips local symbols from the main and framework binaries before signing.
 # Builds the myarc CLI in release mode and bundles it as Contents/Helpers/myarc.
 # It reports VERSION through MYARC_VERSION, so the approval card shows the
 # nightly label.
@@ -99,6 +100,10 @@ echo "MyarcVersion: $(/usr/libexec/PlistBuddy -c 'Print :MyarcVersion' "$PLIST")
 BIN="$APP/Contents/MacOS/myArc"
 FRAMEWORK=$(find "$APP/Contents/Frameworks/myArc Framework.framework/Versions" -maxdepth 2 -type f -name 'myArc Framework' | head -1)
 [ -n "$FRAMEWORK" ] || { echo "framework binary missing in $APP" >&2; exit 1; }
+# symbol_level = 0 still leaves local symbols in the framework, about 230 MB of
+# a 600 MB binary. strip -x drops them and keeps the exported ones. Sparkle and
+# the myarc CLI ship as built. Signing below replaces the linker's signature.
+strip -x "$BIN" "$FRAMEWORK"
 if otool -XL "$BIN" "$FRAMEWORK" "$CTL" | grep -E '/out/|/Users/' ; then
   echo "binary references the build tree" >&2; exit 1
 fi

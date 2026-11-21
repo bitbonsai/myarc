@@ -312,6 +312,7 @@ mod ffi {
 
     // A Space's sidebar colour. `set` false is the default tint, with zero
     // `color` and `opacity`.
+    #[derive(PartialEq)]
     struct SpaceThemeRecord {
         set: bool,
         // 0xRRGGBB.
@@ -320,6 +321,7 @@ mod ffi {
         opacity: u8,
     }
 
+    #[derive(PartialEq)]
     struct SpaceRecord {
         id: u64,
         profile_id: u64,
@@ -332,6 +334,7 @@ mod ffi {
         agent: bool,
     }
 
+    #[derive(PartialEq)]
     struct ItemRecord {
         id: u64,
         placement: PlacementKind,
@@ -350,6 +353,7 @@ mod ffi {
 
     // A folder of a Space's Pins. `items` are Pins of `space_id` in folder
     // order; a closed folder shows only its row.
+    #[derive(PartialEq)]
     struct FolderRecord {
         id: u64,
         space_id: u64,
@@ -360,6 +364,7 @@ mod ffi {
 
     // Two Today tabs of one Space shown side by side; `left` is the left
     // pane.
+    #[derive(PartialEq)]
     struct SplitRecord {
         left: u64,
         right: u64,
@@ -417,6 +422,8 @@ mod ffi {
         quick_start_pending: bool,
     }
 
+    // SidebarView::SetModel compares models to skip unchanged rebuilds.
+    #[derive(PartialEq)]
     struct SidebarResult {
         ok: bool,
         error: String,
