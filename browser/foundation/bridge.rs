@@ -8,14 +8,34 @@ use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 
 pub struct Workspace(workspace::Workspace);
 
-// A parsed Arc Markdown export, plus one browser-canonicalized URL per entry
-// once `set_arc_export_canonical_urls` ran (`None` for a rejected URL).
+// A parsed Arc export, one part per Arc profile. The Markdown export and a
+// sidebar file with one profile have a single part, the main profile's.
 pub struct ArcExport {
-    report: import::arc_markdown::Report,
+    parts: Vec<ArcPart>,
     error: String,
-    canonical: Vec<Option<String>>,
     // Read from Arc's sidebar file rather than its Markdown export.
     sidebar: bool,
+}
+
+// One Arc profile's part of an export, plus one browser-canonicalized URL per
+// entry once `set_arc_export_canonical_urls` ran (`None` for a rejected URL),
+// and what `apply_arc_import` did with it.
+struct ArcPart {
+    profile: import::arc_sidebar::ArcProfile,
+    report: import::arc_markdown::Report,
+    canonical: Vec<Option<String>>,
+    applied: Option<import::arc_workspace::Preview>,
+}
+
+impl ArcPart {
+    fn new(profile: import::arc_sidebar::ArcProfile, report: import::arc_markdown::Report) -> Self {
+        Self {
+            profile,
+            report,
+            canonical: Vec::new(),
+            applied: None,
+        }
+    }
 }
 
 // One request or hello from a control client, or none once the host has
@@ -636,13 +656,26 @@ mod ffi {
         unrecognized_count: usize,
         // "Line 4, indented: …" for lines the reader did not understand.
         unrecognized: Vec<String>,
-        // After an apply, the export's first Space; otherwise 0.
+        // After an apply, the part's first Space; otherwise 0.
         first_space: u64,
-        // After an apply, "Links left out, not web pages: 2" for each kind of
-        // entry the import left out or changed; otherwise empty.
-        report: Vec<String>,
-        // After an apply, what Arc's export never carries; otherwise empty.
-        report_note: String,
+    }
+
+    // One Arc profile in an export. The main profile, always first, imports
+    // into the Profile running the import and has both names empty.
+    struct ArcImportProfile {
+        // Arc's directory name for the profile, such as "Profile 1".
+        arc_name: String,
+        // The myArc Profile it imports into, found or created by this name.
+        myarc_name: String,
+    }
+
+    // Shown once an import has committed.
+    struct ArcImportReport {
+        // "Links left out, not web pages: 2" for each kind of entry the
+        // applied parts left out or changed.
+        lines: Vec<String>,
+        // What Arc's export never carries.
+        note: String,
     }
 
     extern "Rust" {
@@ -1108,10 +1141,25 @@ mod ffi {
         fn arc_export_urls(arc: &ArcExport) -> Vec<String>;
         // One URL per `arc_export_urls` entry, canonicalized; empty rejects it.
         fn set_arc_export_canonical_urls(arc: &mut ArcExport, urls: Vec<String>);
+        // The export's Arc profiles; `part` below indexes this list.
+        fn arc_export_profiles(arc: &ArcExport) -> Vec<ArcImportProfile>;
         // What `apply_arc_import` would do now, without changing anything.
-        fn preview_arc_import(workspace: &Workspace, arc: &ArcExport) -> ArcImportPreview;
-        // Adds the export's Spaces and Pins that are missing, all or nothing.
-        fn apply_arc_import(workspace: &mut Workspace, arc: &ArcExport) -> ArcImportPreview;
+        fn preview_arc_import(
+            workspace: &Workspace,
+            arc: &ArcExport,
+            part: usize,
+        ) -> ArcImportPreview;
+        // Adds the part's Spaces and Pins that are missing, all or nothing.
+        // `new_profile` marks a Profile made for this import, whose empty
+        // default Space gives way to the first imported one.
+        fn apply_arc_import(
+            workspace: &mut Workspace,
+            arc: &mut ArcExport,
+            part: usize,
+            new_profile: bool,
+        ) -> ArcImportPreview;
+        // Everything the applied parts left out or changed.
+        fn arc_import_report(arc: &ArcExport) -> ArcImportReport;
         // Export Pins and Favorites…: collects each Profile's workspace, in
         // display order, then writes them all as a Netscape bookmarks file
         // (import::bookmarks_html). Building it touches no live workspace, so
@@ -1199,9 +1247,8 @@ pub fn parse_arc_export(bytes: &[u8]) -> Box<ArcExport> {
         Err(error) => (Default::default(), error.to_string()),
     };
     Box::new(ArcExport {
-        report,
+        parts: vec![ArcPart::new(import::arc_sidebar::ArcProfile::Main, report)],
         error,
-        canonical: Vec::new(),
         sidebar: false,
     })
 }
@@ -1211,30 +1258,63 @@ pub fn arc_sidebar_max_bytes() -> usize {
 }
 
 pub fn parse_arc_sidebar(bytes: &[u8]) -> Box<ArcExport> {
-    let (report, error) = match import::arc_sidebar::parse(bytes) {
-        Ok(report) => (report, String::new()),
-        Err(error) => (Default::default(), error.to_string()),
+    let (parts, error) = match import::arc_sidebar::parse_profiles(bytes) {
+        Ok(profiles) => (
+            profiles
+                .into_iter()
+                .map(|part| ArcPart::new(part.profile, part.report))
+                .collect(),
+            String::new(),
+        ),
+        Err(error) => (
+            vec![ArcPart::new(
+                import::arc_sidebar::ArcProfile::Main,
+                Default::default(),
+            )],
+            error.to_string(),
+        ),
     };
     Box::new(ArcExport {
-        report,
+        parts,
         error,
-        canonical: Vec::new(),
         sidebar: true,
     })
 }
 
 pub fn arc_export_urls(export: &ArcExport) -> Vec<String> {
-    import::arc_workspace::entry_urls(&export.report)
-        .into_iter()
+    export
+        .parts
+        .iter()
+        .flat_map(|part| import::arc_workspace::entry_urls(&part.report))
         .map(str::to_owned)
         .collect()
 }
 
 pub fn set_arc_export_canonical_urls(export: &mut ArcExport, urls: Vec<String>) {
-    export.canonical = urls
-        .into_iter()
-        .map(|url| (!url.is_empty()).then_some(url))
-        .collect();
+    let mut urls = urls.into_iter().map(|url| (!url.is_empty()).then_some(url));
+    // Each part takes its share in order. A short list leaves later parts
+    // short too, which their preview reports as a mismatch.
+    for part in &mut export.parts {
+        part.canonical = urls.by_ref().take(part.report.entry_count()).collect();
+    }
+}
+
+pub fn arc_export_profiles(export: &ArcExport) -> Vec<ffi::ArcImportProfile> {
+    use import::arc_sidebar::ArcProfile;
+    export
+        .parts
+        .iter()
+        .map(|part| match &part.profile {
+            ArcProfile::Main => ffi::ArcImportProfile {
+                arc_name: String::new(),
+                myarc_name: String::new(),
+            },
+            ArcProfile::Custom(directory) => ffi::ArcImportProfile {
+                arc_name: directory.clone(),
+                myarc_name: part.profile.myarc_name().unwrap_or_default(),
+            },
+        })
+        .collect()
 }
 
 pub struct BookmarksExport(Vec<(String, workspace::WorkspaceSnapshot)>);
@@ -1269,15 +1349,36 @@ pub fn bookmarks_html_file_name() -> String {
     import::bookmarks_html::DEFAULT_FILE_NAME.to_owned()
 }
 
-pub fn preview_arc_import(workspace: &Workspace, export: &ArcExport) -> ffi::ArcImportPreview {
+pub fn preview_arc_import(
+    workspace: &Workspace,
+    export: &ArcExport,
+    part: usize,
+) -> ffi::ArcImportPreview {
+    let Some(arc) = export.parts.get(part) else {
+        return arc_import_failure("No such part of the export.");
+    };
     arc_import_result(
         export,
-        import::arc_workspace::preview(&export.report, &export.canonical, &workspace.0),
+        part,
+        import::arc_workspace::preview(&arc.report, &arc.canonical, &workspace.0),
     )
 }
 
-pub fn apply_arc_import(workspace: &mut Workspace, export: &ArcExport) -> ffi::ArcImportPreview {
-    let result = import::arc_workspace::apply(&export.report, &export.canonical, &mut workspace.0);
+pub fn apply_arc_import(
+    workspace: &mut Workspace,
+    export: &mut ArcExport,
+    part: usize,
+    new_profile: bool,
+) -> ffi::ArcImportPreview {
+    let Some(arc) = export.parts.get(part) else {
+        return arc_import_failure("No such part of the export.");
+    };
+    let apply = if new_profile {
+        import::arc_workspace::apply_to_new_profile
+    } else {
+        import::arc_workspace::apply
+    };
+    let result = apply(&arc.report, &arc.canonical, &mut workspace.0);
     let first = result
         .as_ref()
         .ok()
@@ -1293,24 +1394,35 @@ pub fn apply_arc_import(workspace: &mut Workspace, export: &ArcExport) -> ffi::A
                     .map(|space| space.id)
             })
         });
-    let report = result.as_ref().ok().map(|plan| {
-        import::arc_report::lines(&export.report, &export.canonical, plan)
-            .iter()
-            .map(import::arc_report::Line::text)
-            .collect()
-    });
-    let mut preview = arc_import_result(export, result);
+    let applied = result.as_ref().ok().cloned();
+    let mut preview = arc_import_result(export, part, result);
     preview.first_space = first.unwrap_or(0);
-    if let Some(report) = report.filter(|_| preview.ok) {
-        preview.report = report;
-        preview.report_note = if export.sidebar {
+    if preview.ok {
+        export.parts[part].applied = applied;
+    }
+    preview
+}
+
+pub fn arc_import_report(export: &ArcExport) -> ffi::ArcImportReport {
+    let mut counts = std::collections::BTreeMap::new();
+    for part in &export.parts {
+        let Some(plan) = &part.applied else { continue };
+        for line in import::arc_report::lines(&part.report, &part.canonical, plan) {
+            *counts.entry(line.kind).or_insert(0) += line.count;
+        }
+    }
+    ffi::ArcImportReport {
+        lines: counts
+            .into_iter()
+            .map(|(kind, count)| import::arc_report::Line { kind, count }.text())
+            .collect(),
+        note: if export.sidebar {
             import::arc_report::NOT_FROM_SIDEBAR
         } else {
             import::arc_report::NOT_IN_EXPORT
         }
-        .to_owned();
+        .to_owned(),
     }
-    preview
 }
 
 pub struct RecentTabs(workspace::tab_ops::RecentTabs);
@@ -1374,11 +1486,27 @@ pub fn row_after_closing(live: &[u64], closing: &[u64]) -> u64 {
     workspace::selection::row_after_closing(live, closing).unwrap_or(0)
 }
 
+fn arc_import_failure(error: &str) -> ffi::ArcImportPreview {
+    arc_import_result(
+        &ArcExport {
+            parts: Vec::new(),
+            error: error.to_owned(),
+            sidebar: false,
+        },
+        0,
+        Ok(Default::default()),
+    )
+}
+
 fn arc_import_result(
     export: &ArcExport,
+    part: usize,
     result: Result<import::arc_workspace::Preview, import::arc_workspace::ImportError>,
 ) -> ffi::ArcImportPreview {
-    let unrecognized = &export.report.unrecognized;
+    let unrecognized: &[import::arc_markdown::Unrecognized] = export
+        .parts
+        .get(part)
+        .map_or(&[], |part| &part.report.unrecognized);
     let mut preview = ffi::ArcImportPreview {
         ok: false,
         error: export.error.clone(),
@@ -1394,8 +1522,6 @@ fn arc_import_result(
         skipped: Vec::new(),
         unrecognized_count: unrecognized.len(),
         first_space: 0,
-        report: Vec::new(),
-        report_note: String::new(),
         unrecognized: unrecognized
             .iter()
             .take(ARC_IMPORT_LIST_LIMIT)

@@ -19,9 +19,18 @@
 #include "base/task/single_thread_task_runner.h"
 #include "base/task/thread_pool.h"
 #include "base/time/time.h"
+#include "chrome/browser/browser_process.h"
+#include "chrome/browser/profiles/keep_alive/profile_keep_alive_types.h"
+#include "chrome/browser/profiles/keep_alive/scoped_profile_keep_alive.h"
+#include "chrome/browser/profiles/nuke_profile_directory_utils.h"
 #include "chrome/browser/profiles/profile.h"
+#include "chrome/browser/profiles/profile_attributes_entry.h"
+#include "chrome/browser/profiles/profile_attributes_storage.h"
+#include "chrome/browser/profiles/profile_manager.h"
 #include "chrome/browser/ui/select_file_policy/chrome_select_file_policy.h"
+#include "chrome/common/pref_names.h"
 #include "components/constrained_window/constrained_window_views.h"
+#include "components/prefs/pref_service.h"
 #include "crypto/hash.h"
 #include "myarc/test_buildflags.h"
 #include "myarc/workspace_service.h"
@@ -39,6 +48,9 @@ namespace {
 constexpr char16_t kTitle[] = u"Import from Arc";
 // Lines of each list the preview shows before "and N more".
 constexpr size_t kShownLines = 10;
+// The workspace file of a Profile and its bound (workspace_service.cc).
+constexpr char kWorkspaceFile[] = "myarc-workspace-v1.json";
+constexpr size_t kMaxWorkspaceBytes = 20 * 1024 * 1024;
 
 using Confirmed = base::OnceCallback<void(uint64_t)>;
 
@@ -95,7 +107,7 @@ struct ReadResult {
 };
 
 // Arc's sidebar file, which keeps Favorites apart from Space pins. Read only
-// after the user picks it.
+// after the user picks it or presses Import under "Found your Arc data".
 constexpr char kArcSidebarDir[] = "Library/Application Support/Arc";
 constexpr char kArcSidebarName[] = "StorableSidebar.json";
 
@@ -130,6 +142,25 @@ ReadResult ReadExport(const base::FilePath& path) {
           base::HexEncodeLower(crypto::hash::Sha256(bytes)), sidebar};
 }
 
+// Worker sequence: the workspace of each Profile in `dirs` that isn't loaded,
+// read from its file, which stays untouched. None for a Profile without one,
+// which holds only the empty default Space.
+std::vector<std::optional<foundation::StateSnapshot>> ReadWorkspaces(
+    const std::vector<base::FilePath>& dirs) {
+  std::vector<std::optional<foundation::StateSnapshot>> snapshots;
+  for (const base::FilePath& dir : dirs) {
+    std::string json;
+    if (base::ReadFileToStringWithMaxSize(dir.AppendASCII(kWorkspaceFile),
+                                          &json, kMaxWorkspaceBytes)) {
+      snapshots.push_back(
+          std::move(internal::DecodeWorkspaceMetadata(json).snapshot));
+    } else {
+      snapshots.push_back(std::nullopt);
+    }
+  }
+  return snapshots;
+}
+
 std::u16string Count(size_t count,
                      std::u16string_view one,
                      std::u16string_view many) {
@@ -149,14 +180,18 @@ std::u16string Join(const std::vector<std::u16string>& parts) {
   return text;
 }
 
-std::u16string List(const rust::Vec<rust::String>& lines, size_t total) {
+std::u16string Utf16(const rust::String& text) {
+  return base::UTF8ToUTF16(std::string_view(text.data(), text.size()));
+}
+
+// The first lines of `lines`, then "and N more" when `total` is larger.
+std::u16string List(const std::vector<std::u16string>& lines, size_t total) {
   std::u16string text;
   for (size_t i = 0; i < lines.size() && i < kShownLines; ++i) {
     if (!text.empty()) {
       text += u"\n";
     }
-    text +=
-        base::UTF8ToUTF16(std::string_view(lines[i].data(), lines[i].size()));
+    text += lines[i];
   }
   const size_t shown = std::min(lines.size(), kShownLines);
   if (total > shown) {
@@ -166,22 +201,55 @@ std::u16string List(const rust::Vec<rust::String>& lines, size_t total) {
   return text;
 }
 
-// "4 Spaces, 1 folder and 13 pinned tabs", or empty when nothing is new.
-std::u16string Additions(const foundation::ArcImportPreview& preview) {
-  std::vector<std::u16string> adds;
-  if (preview.new_favorites) {
-    adds.push_back(Count(preview.new_favorites, u"Favorite", u"Favorites"));
+// What one or more parts add, move or keep.
+struct Counts {
+  size_t new_profiles = 0;
+  size_t new_favorites = 0;
+  size_t new_spaces = 0;
+  size_t new_folders = 0;
+  size_t new_pins = 0;
+  size_t moved_pins = 0;
+  size_t kept_pins = 0;
+
+  void Add(const foundation::ArcImportPreview& preview) {
+    new_favorites += preview.new_favorites;
+    new_spaces += preview.new_spaces;
+    new_folders += preview.new_folders;
+    new_pins += preview.new_pins;
+    moved_pins += preview.moved_pins;
+    kept_pins += preview.kept_pins;
   }
-  if (preview.new_spaces) {
-    adds.push_back(Count(preview.new_spaces, u"Space", u"Spaces"));
+
+  bool Writes() const {
+    return new_favorites || new_spaces || new_folders || new_pins || moved_pins;
   }
-  if (preview.new_folders) {
-    adds.push_back(Count(preview.new_folders, u"folder", u"folders"));
+
+  // "4 Spaces, 1 folder and 13 pinned tabs", or empty when nothing is new.
+  std::u16string Additions() const {
+    std::vector<std::u16string> adds;
+    if (new_profiles) {
+      adds.push_back(Count(new_profiles, u"Profile", u"Profiles"));
+    }
+    if (new_favorites) {
+      adds.push_back(Count(new_favorites, u"Favorite", u"Favorites"));
+    }
+    if (new_spaces) {
+      adds.push_back(Count(new_spaces, u"Space", u"Spaces"));
+    }
+    if (new_folders) {
+      adds.push_back(Count(new_folders, u"folder", u"folders"));
+    }
+    if (new_pins) {
+      adds.push_back(Count(new_pins, u"pinned tab", u"pinned tabs"));
+    }
+    return Join(adds);
   }
-  if (preview.new_pins) {
-    adds.push_back(Count(preview.new_pins, u"pinned tab", u"pinned tabs"));
-  }
-  return Join(adds);
+};
+
+Counts CountsOf(const foundation::ArcImportPreview& preview) {
+  Counts counts;
+  counts.Add(preview);
+  return counts;
 }
 
 views::Widget* Show(std::unique_ptr<ui::DialogModel> model,
@@ -211,111 +279,471 @@ void ShowMessage(std::u16string message,
        parent, inactive);
 }
 
-// The done state: what the import added, then every kind of entry it left
-// out or changed, with counts from Rust. `closed` runs once it closes.
-void ShowReport(const foundation::ArcImportPreview& result,
-                gfx::NativeWindow parent,
-                bool inactive,
-                base::OnceClosure closed) {
-  ui::DialogModel::Builder builder;
-  const bool waited_on = !closed.is_null();
-  if (waited_on) {
-    builder.SetDialogDestroyingCallback(std::move(closed));
+// The Profile directory of the listed, regular myArc Profile named `name`,
+// or empty when there is none.
+base::FilePath FindProfile(const std::u16string& name) {
+  ProfileManager* manager = g_browser_process->profile_manager();
+  if (!manager) {
+    return {};
   }
-  builder.SetTitle(kTitle);
-  const std::u16string adds = Additions(result);
-  builder.AddParagraph(ui::DialogModelLabel(
-      adds.empty() ? std::u16string(u"Import finished.")
-                   : base::StrCat({u"Import finished. Added ", adds, u"."})));
-  if (result.moved_pins) {
-    builder.AddParagraph(ui::DialogModelLabel(base::StrCat(
-        {u"Moved ", Count(result.moved_pins, u"pinned tab", u"pinned tabs"),
-         u" into ", result.moved_pins == 1 ? u"its" : u"their",
-         u" Arc folder."})));
+  for (const ProfileAttributesEntry* entry :
+       manager->GetProfileAttributesStorage()
+           .GetAllProfilesAttributesSortedForDisplay()) {
+    if (!entry->IsOmitted() && !entry->IsEphemeral() &&
+        entry->GetLocalProfileName() == name &&
+        !IsProfileDirectoryMarkedForDeletion(entry->GetPath())) {
+      return entry->GetPath();
+    }
   }
-  if (result.report.empty()) {
-    builder.AddParagraph(
-        ui::DialogModelLabel(u"Nothing in the file was left out or changed."));
-  } else {
-    builder.AddParagraph(
-        ui::DialogModelLabel(List(result.report, result.report.size()))
-            .set_is_secondary(),
-        u"Left out or changed");
-  }
-  builder.AddParagraph(
-      ui::DialogModelLabel(base::UTF8ToUTF16(std::string(result.report_note)))
-          .set_is_secondary());
-#if BUILDFLAG(MYARC_TEST_HOOKS)
-  // Background runs can't read the sheet, so log what it says.
-  std::string lines;
-  for (const auto& line : result.report) {
-    lines += " [" + std::string(line) + "]";
-  }
-  LOG(WARNING) << "Test Arc import report: added=\"" << base::UTF16ToUTF8(adds)
-               << "\" lines=" << lines << " note=\""
-               << std::string(result.report_note) << "\"";
-#endif  // BUILDFLAG(MYARC_TEST_HOOKS)
-  builder.AddOkButton(base::DoNothing(),
-                      ui::DialogModel::Button::Params().SetLabel(u"OK"));
-  views::Widget* widget = Show(builder.Build(), parent, inactive);
-  if (inactive && waited_on) {
-    // A capture can't press OK, and its caller waits for the report to close.
-    base::SingleThreadTaskRunner::GetCurrentDefault()->PostDelayedTask(
-        FROM_HERE,
-        base::BindOnce(
-            [](base::WeakPtr<views::Widget> widget) {
-              if (widget) {
-                widget->Close();
-              }
-            },
-            widget->GetWeakPtr()),
-        base::Milliseconds(2000));
-  }
+  return {};
 }
 
-void Apply(base::WeakPtr<Profile> profile,
+// Where one Arc profile's part of the export goes.
+struct Target {
+  // Arc's directory name and the myArc Profile's name; both empty for the
+  // main profile, which goes into the Profile running the import.
+  std::u16string arc_name;
+  std::u16string myarc_name;
+  // The existing myArc Profile it goes into, unless it's the main profile's.
+  base::FilePath dir;
+  // No myArc Profile has the name yet, so Import creates one.
+  bool create = false;
+  foundation::ArcImportPreview preview;
+};
+
+// One import from the moment its file is read: the preview, then Import
+// writing each part into its Profile, then the report. Held by the callbacks
+// of whichever step runs.
+class Session : public base::RefCounted<Session> {
+ public:
+  Session(base::WeakPtr<Profile> profile,
+          gfx::NativeWindow parent,
+          bool inactive,
+          scoped_refptr<Outcome> outcome,
+          Confirmed confirmed,
+          ReadResult read)
+      : profile_(std::move(profile)),
+        parent_(parent),
+        inactive_(inactive),
+        outcome_(std::move(outcome)),
+        confirmed_(std::move(confirmed)),
+        export_(std::move(*read.export_data)),
+        content_hash_(std::move(read.content_hash)),
+        sidebar_(read.sidebar) {}
+  Session(const Session&) = delete;
+  Session& operator=(const Session&) = delete;
+
+  // Finds each part's Profile, reads the workspaces of those not loaded and
+  // shows the preview. Loads and creates nothing.
+  void Start() {
+    if (!profile_) {
+      return;
+    }
+    std::vector<base::FilePath> unloaded;
+    ProfileManager* manager = g_browser_process->profile_manager();
+    for (const auto& part : foundation::arc_export_profiles(*export_)) {
+      Target target{.arc_name = Utf16(part.arc_name),
+                    .myarc_name = Utf16(part.myarc_name)};
+      if (!target.myarc_name.empty()) {
+        target.dir = FindProfile(target.myarc_name);
+        target.create = target.dir.empty();
+        if (!target.create &&
+            !(manager && manager->GetProfileByPath(target.dir))) {
+          unloaded.push_back(target.dir);
+        }
+      }
+      targets_.push_back(std::move(target));
+    }
+    base::ThreadPool::PostTaskAndReplyWithResult(
+        FROM_HERE, {base::MayBlock(), base::TaskPriority::USER_VISIBLE},
+        base::BindOnce(&ReadWorkspaces, unloaded),
+        base::BindOnce(&Session::ShowPreview, base::WrapRefCounted(this),
+                       unloaded));
+  }
+
+ private:
+  friend class base::RefCounted<Session>;
+  ~Session() = default;
+
+  // The preview of every part, against its Profile's workspace as it is now:
+  // the live one, the one read from `unloaded`'s files, or a new Profile's.
+  void ShowPreview(
+      const std::vector<base::FilePath>& unloaded,
+      std::vector<std::optional<foundation::StateSnapshot>> snapshots) {
+    if (!profile_) {
+      return;
+    }
+    ProfileManager* manager = g_browser_process->profile_manager();
+    for (size_t part = 0; part < targets_.size(); ++part) {
+      Target& target = targets_[part];
+      Profile* loaded = part == 0 ? profile_.get()
+                        : target.create || !manager
+                            ? nullptr
+                            : manager->GetProfileByPath(target.dir);
+      if (loaded) {
+        target.preview = WorkspaceService::ForProfile(*loaded).PreviewArcImport(
+            *export_, part);
+        continue;
+      }
+      // A new Profile, or one not loaded: its workspace from the file, or a
+      // new Profile's.
+      rust::Box<foundation::Workspace> workspace = foundation::new_workspace();
+      const auto it = std::ranges::find(unloaded, target.dir);
+      if (!target.create && it != unloaded.end()) {
+        auto& snapshot = snapshots[it - unloaded.begin()];
+        if (snapshot) {
+          foundation::restore_snapshot(*workspace, std::move(*snapshot));
+          snapshot.reset();
+        }
+      }
+      target.preview =
+          foundation::preview_arc_import(*workspace, *export_, part);
+    }
+
+    ui::DialogModel::Builder builder;
+    builder.SetTitle(kTitle);
+    Counts total;
+    std::u16string error;
+    for (const Target& target : targets_) {
+      total.Add(target.preview);
+      if (!target.preview.ok && error.empty()) {
+        error = Utf16(target.preview.error);
+      }
+    }
+    const bool noop = error.empty() && !total.Writes();
+    if (!error.empty()) {
+      builder.AddParagraph(ui::DialogModelLabel(
+          base::StrCat({u"This file can't be imported. ", error})));
+    } else if (noop) {
+      builder.AddParagraph(ui::DialogModelLabel(
+          u"Everything in this file is already in myArc."));
+    } else if (targets_.size() == 1) {
+      const std::u16string adds = total.Additions();
+      if (!adds.empty()) {
+        builder.AddParagraph(
+            ui::DialogModelLabel(base::StrCat({u"Adds ", adds, u"."})));
+      }
+    } else {
+      // One line per Arc profile, naming the myArc Profile it goes into.
+      for (const Target& target : targets_) {
+        builder.AddParagraph(ui::DialogModelLabel(Mapping(target)));
+      }
+    }
+    if (error.empty() && !noop) {
+      if (total.moved_pins) {
+        builder.AddParagraph(ui::DialogModelLabel(base::StrCat(
+            {u"Moves ", Count(total.moved_pins, u"pinned tab", u"pinned tabs"),
+             u" you already have into the folder Arc keeps ",
+             total.moved_pins == 1 ? u"it" : u"them", u" in."})));
+      }
+      if (total.kept_pins) {
+        builder.AddParagraph(ui::DialogModelLabel(base::StrCat(
+            {Count(total.kept_pins, u"pinned tab is", u"pinned tabs are"),
+             u" already in myArc and stay as they are."})));
+      }
+      builder.AddParagraph(
+          ui::DialogModelLabel(
+              sidebar_
+                  ? u"Favorites stay Favorites, pinned tabs keep their names, "
+                    u"and each Arc folder becomes a folder in its Space. A "
+                    u"folder inside a folder joins the outer one, because "
+                    u"myArc's folders don't nest yet. Nothing opens until you "
+                    u"click it."
+                  : u"Each Arc folder becomes a folder in its Space. Favorites "
+                    u"become pinned tabs there, because the export doesn't "
+                    u"mark them apart. Nothing opens until you click it.")
+              .set_is_secondary());
+    }
+    std::vector<std::u16string> skipped;
+    size_t skipped_count = 0;
+    for (const Target& target : targets_) {
+      skipped_count += target.preview.skipped_count;
+      for (const auto& line : target.preview.skipped) {
+        skipped.push_back(Utf16(line));
+      }
+    }
+    if (skipped_count) {
+      builder.AddParagraph(
+          ui::DialogModelLabel(List(skipped, skipped_count))
+              .set_is_secondary()
+              .set_allow_character_break(),
+          base::StrCat({u"Links left out (",
+                        base::NumberToString16(skipped_count), u")"}));
+    }
+    const foundation::ArcImportPreview& main = targets_[0].preview;
+    if (main.unrecognized_count) {
+      std::vector<std::u16string> lines;
+      for (const auto& line : main.unrecognized) {
+        lines.push_back(Utf16(line));
+      }
+      builder.AddParagraph(
+          ui::DialogModelLabel(List(lines, main.unrecognized_count))
+              .set_is_secondary()
+              .set_allow_character_break(),
+          base::StrCat({u"Lines myArc couldn't read (",
+                        base::NumberToString16(main.unrecognized_count),
+                        u")"}));
+    }
+    const bool can_import = error.empty() && !noop;
+    const bool press = can_import && !confirmed_.is_null();
+    if (can_import) {
+      builder.AddOkButton(
+          base::BindOnce(&Session::Apply, base::WrapRefCounted(this)),
+          ui::DialogModel::Button::Params().SetLabel(u"Import"));
+      builder.AddCancelButton(base::DoNothing());
+    } else {
+      builder.AddOkButton(base::DoNothing(),
+                          ui::DialogModel::Button::Params().SetLabel(u"OK"));
+    }
+    views::Widget* widget = Show(builder.Build(), parent_, inactive_);
+    if (!can_import && confirmed_) {
+      std::move(confirmed_).Run(0);
+      return;
+    }
+    if (press) {
+      // Captures press Import once the sheet has settled.
+      base::SingleThreadTaskRunner::GetCurrentDefault()->PostDelayedTask(
+          FROM_HERE,
+          base::BindOnce(
+              [](base::WeakPtr<views::Widget> widget) {
+                if (widget && widget->widget_delegate()) {
+                  if (auto* dialog =
+                          widget->widget_delegate()->AsDialogDelegate()) {
+                    dialog->AcceptDialog();
+                  }
+                }
+              },
+              widget->GetWeakPtr()),
+          base::Milliseconds(1500));
+    }
+  }
+
+  // "Arc profile 'Profile 1' → new myArc Profile 'Arc Profile 1': adds 2
+  // pinned tabs."
+  static std::u16string Mapping(const Target& target) {
+    std::u16string text =
+        target.myarc_name.empty()
+            ? std::u16string(u"Main Arc profile → this myArc Profile")
+            : base::StrCat(
+                  {u"Arc profile '", target.arc_name, u"' → ",
+                   target.create ? u"new myArc Profile '" : u"myArc Profile '",
+                   target.myarc_name, u"'"});
+    const std::u16string adds = CountsOf(target.preview).Additions();
+    return base::StrCat({text, adds.empty() ? u": nothing new." : u": adds ",
+                         adds, adds.empty() ? u"" : u"."});
+  }
+
+  // Import: the main profile's part right away, then each other part once
+  // its Profile is loaded or created, one after another.
+  void Apply() {
+    if (!profile_) {
+      return;
+    }
+    auto result = WorkspaceService::ForProfile(*profile_).ApplyArcImport(
+        *export_, 0, false);
+    if (!result.ok) {
+      // Post: the preview is still closing.
+      base::SingleThreadTaskRunner::GetCurrentDefault()->PostTask(
+          FROM_HERE, base::BindOnce(&ShowMessage,
+                                    base::StrCat({u"Nothing was imported. ",
+                                                  Utf16(result.error)}),
+                                    parent_, inactive_));
+      if (confirmed_) {
+        std::move(confirmed_).Run(0);
+      }
+      return;
+    }
+    added_.Add(result);
+    first_space_ = result.first_space;
+    if (outcome_) {
+      outcome_->Commit(content_hash_, first_space_);
+    }
+    ApplyPart(1);
+  }
+
+  void ApplyPart(size_t part) {
+    // Parts with nothing new need no Profile opened, let alone created.
+    while (part < targets_.size() &&
+           !CountsOf(targets_[part].preview).Writes()) {
+      ++part;
+    }
+    if (part >= targets_.size()) {
+      // Post: the preview may still be closing.
+      base::SingleThreadTaskRunner::GetCurrentDefault()->PostTask(
+          FROM_HERE,
+          base::BindOnce(&Session::Finish, base::WrapRefCounted(this)));
+      return;
+    }
+    ProfileManager* manager = g_browser_process->profile_manager();
+    const Target& target = targets_[part];
+    auto opened =
+        base::BindOnce(&Session::Opened, base::WrapRefCounted(this), part);
+    if (!manager) {
+      std::move(opened).Run(nullptr);
+    } else if (target.create) {
+      ProfileManager::CreateMultiProfileAsync(
+          target.myarc_name,
+          manager->GetProfileAttributesStorage()
+              .ChooseAvatarIconIndexForNewProfile(),
+          /*is_hidden=*/false, std::move(opened));
+    } else if (Profile* loaded = manager->GetProfileByPath(target.dir)) {
+      std::move(opened).Run(loaded);
+    } else if (!manager->LoadProfileByPath(target.dir, /*incognito=*/false,
+                                           std::move(opened))) {
+      Failed(part);
+    }
+  }
+
+  void Opened(size_t part, Profile* profile) {
+    std::unique_ptr<ScopedProfileKeepAlive> keep_alive =
+        profile ? ScopedProfileKeepAlive::TryAcquire(
+                      profile, ProfileKeepAliveOrigin::kProfileCreationFlow)
+                : nullptr;
+    if (!keep_alive) {
+      Failed(part);
+      return;
+    }
+    if (targets_[part].create) {
+      // Arc has no Profile picker, so launch never shows Chromium's once
+      // there are several Profiles, as with New Profile…. A value set
+      // before stays.
+      PrefService* local_state = g_browser_process->local_state();
+      if (local_state && !local_state->HasPrefPath(
+                             prefs::kBrowserShowProfilePickerOnStartup)) {
+        local_state->SetBoolean(prefs::kBrowserShowProfilePickerOnStartup,
+                                false);
+      }
+    }
+    // Waits once if the Profile's workspace is still loading.
+    WorkspaceService::ForProfile(*profile).WhenLoaded(
+        base::BindOnce(&Session::Loaded, base::WrapRefCounted(this), part,
+                       profile->GetWeakPtr(), std::move(keep_alive)));
+  }
+
+  void Loaded(size_t part,
+              base::WeakPtr<Profile> profile,
+              std::unique_ptr<ScopedProfileKeepAlive>) {
+    if (!profile) {
+      Failed(part);
+      return;
+    }
+    auto result = WorkspaceService::ForProfile(*profile).ApplyArcImport(
+        *export_, part, targets_[part].create);
+    if (result.ok) {
+      added_.Add(result);
+      added_.new_profiles += targets_[part].create;
+    } else {
+      failed_.push_back(targets_[part].myarc_name);
+    }
+    ApplyPart(part + 1);
+  }
+
+  void Failed(size_t part) {
+    failed_.push_back(targets_[part].myarc_name);
+    ApplyPart(part + 1);
+  }
+
+  // The done state: what the import added, then every kind of entry it left
+  // out or changed, with counts from Rust.
+  void Finish() {
+    ui::DialogModel::Builder builder;
+    base::OnceClosure closed =
+        outcome_ ? outcome_->TakeReportClosed() : base::OnceClosure();
+    const bool waited_on = !closed.is_null();
+    if (waited_on) {
+      builder.SetDialogDestroyingCallback(std::move(closed));
+    }
+    builder.SetTitle(kTitle);
+    const std::u16string adds = added_.Additions();
+    builder.AddParagraph(ui::DialogModelLabel(
+        adds.empty() ? std::u16string(u"Import finished.")
+                     : base::StrCat({u"Import finished. Added ", adds, u"."})));
+    if (added_.moved_pins) {
+      builder.AddParagraph(ui::DialogModelLabel(base::StrCat(
+          {u"Moved ", Count(added_.moved_pins, u"pinned tab", u"pinned tabs"),
+           u" into ", added_.moved_pins == 1 ? u"its" : u"their",
+           u" Arc folder."})));
+    }
+    if (!failed_.empty()) {
+      std::vector<std::u16string> names;
+      for (const std::u16string& name : failed_) {
+        names.push_back(base::StrCat({u"'", name, u"'"}));
+      }
+      builder.AddParagraph(ui::DialogModelLabel(base::StrCat(
+          {u"myArc couldn't open or create the Profile",
+           failed_.size() == 1 ? u" " : u"s ", Join(names),
+           u", so nothing went there. Import the file again to try once "
+           u"more."})));
+    }
+    const auto report = foundation::arc_import_report(*export_);
+    std::vector<std::u16string> lines;
+    for (const auto& line : report.lines) {
+      lines.push_back(Utf16(line));
+    }
+    if (lines.empty()) {
+      builder.AddParagraph(ui::DialogModelLabel(
+          u"Nothing in the file was left out or changed."));
+    } else {
+      builder.AddParagraph(
+          ui::DialogModelLabel(List(lines, lines.size())).set_is_secondary(),
+          u"Left out or changed");
+    }
+    builder.AddParagraph(
+        ui::DialogModelLabel(Utf16(report.note)).set_is_secondary());
+#if BUILDFLAG(MYARC_TEST_HOOKS)
+    // Background runs can't read the sheet, so log what it says.
+    std::string logged;
+    for (const auto& line : report.lines) {
+      logged += " [" + std::string(line) + "]";
+    }
+    LOG(WARNING) << "Test Arc import report: added=\""
+                 << base::UTF16ToUTF8(adds) << "\" lines=" << logged
+                 << " failed=" << failed_.size() << " note=\""
+                 << std::string(report.note) << "\"";
+#endif  // BUILDFLAG(MYARC_TEST_HOOKS)
+    builder.AddOkButton(base::DoNothing(),
+                        ui::DialogModel::Button::Params().SetLabel(u"OK"));
+    views::Widget* widget = Show(builder.Build(), parent_, inactive_);
+    if (inactive_ && waited_on) {
+      // A capture can't press OK, and its caller waits for the report to
+      // close.
+      base::SingleThreadTaskRunner::GetCurrentDefault()->PostDelayedTask(
+          FROM_HERE,
+          base::BindOnce(
+              [](base::WeakPtr<views::Widget> widget) {
+                if (widget) {
+                  widget->Close();
+                }
+              },
+              widget->GetWeakPtr()),
+          base::Milliseconds(2000));
+    }
+    if (confirmed_) {
+      std::move(confirmed_).Run(first_space_);
+    }
+  }
+
+  const base::WeakPtr<Profile> profile_;
+  const gfx::NativeWindow parent_;
+  const bool inactive_;
+  const scoped_refptr<Outcome> outcome_;
+  Confirmed confirmed_;
+  rust::Box<foundation::ArcExport> export_;
+  const std::string content_hash_;
+  const bool sidebar_;
+  std::vector<Target> targets_;
+  // What Import has written so far, and the myArc Profiles it couldn't open.
+  Counts added_;
+  std::vector<std::u16string> failed_;
+  uint64_t first_space_ = 0;
+};
+
+void Begin(base::WeakPtr<Profile> profile,
            gfx::NativeWindow parent,
            bool inactive,
-           rust::Box<foundation::ArcExport> export_data,
-           const std::string& content_hash,
            scoped_refptr<Outcome> outcome,
-           Confirmed confirmed) {
-  if (!profile) {
-    return;
-  }
-  auto result =
-      WorkspaceService::ForProfile(*profile).ApplyArcImport(*export_data);
-  const uint64_t first_space = result.ok ? result.first_space : 0;
-  if (result.ok && outcome) {
-    outcome->Commit(content_hash, first_space);
-  }
-  // Post: the preview is still closing.
-  if (!result.ok) {
-    base::SingleThreadTaskRunner::GetCurrentDefault()->PostTask(
-        FROM_HERE,
-        base::BindOnce(
-            &ShowMessage,
-            base::StrCat({u"Nothing was imported. ",
-                          base::UTF8ToUTF16(std::string(result.error))}),
-            parent, inactive));
-  } else {
-    base::SingleThreadTaskRunner::GetCurrentDefault()->PostTask(
-        FROM_HERE,
-        base::BindOnce(
-            &ShowReport, std::move(result), parent, inactive,
-            outcome ? outcome->TakeReportClosed() : base::OnceClosure()));
-  }
-  if (confirmed) {
-    std::move(confirmed).Run(first_space);
-  }
-}
-
-void ShowPreview(base::WeakPtr<Profile> profile,
-                 gfx::NativeWindow parent,
-                 bool inactive,
-                 scoped_refptr<Outcome> outcome,
-                 Confirmed confirmed,
-                 ReadResult read) {
+           Confirmed confirmed,
+           ReadResult read) {
   if (!profile) {
     return;
   }
@@ -323,101 +751,10 @@ void ShowPreview(base::WeakPtr<Profile> profile,
     ShowMessage(base::UTF8ToUTF16(read.error), parent, inactive);
     return;
   }
-  auto export_data = std::move(*read.export_data);
-  const auto preview =
-      WorkspaceService::ForProfile(*profile).PreviewArcImport(*export_data);
-  ui::DialogModel::Builder builder;
-  builder.SetTitle(kTitle);
-  const bool noop = preview.ok && !preview.new_spaces && !preview.new_folders &&
-                    !preview.new_pins && !preview.new_favorites &&
-                    !preview.moved_pins;
-  if (!preview.ok) {
-    builder.AddParagraph(ui::DialogModelLabel(
-        base::StrCat({u"This file can't be imported. ",
-                      base::UTF8ToUTF16(std::string(preview.error))})));
-  } else if (noop) {
-    builder.AddParagraph(
-        ui::DialogModelLabel(u"Everything in this file is already in myArc."));
-  } else {
-    const std::u16string adds = Additions(preview);
-    if (!adds.empty()) {
-      builder.AddParagraph(
-          ui::DialogModelLabel(base::StrCat({u"Adds ", adds, u"."})));
-    }
-    if (preview.moved_pins) {
-      builder.AddParagraph(ui::DialogModelLabel(base::StrCat(
-          {u"Moves ", Count(preview.moved_pins, u"pinned tab", u"pinned tabs"),
-           u" you already have into the folder Arc keeps ",
-           preview.moved_pins == 1 ? u"it" : u"them", u" in."})));
-    }
-    if (preview.kept_pins) {
-      builder.AddParagraph(ui::DialogModelLabel(base::StrCat(
-          {Count(preview.kept_pins, u"pinned tab is", u"pinned tabs are"),
-           u" already in myArc and stay as they are."})));
-    }
-    builder.AddParagraph(
-        ui::DialogModelLabel(
-            read.sidebar
-                ? u"Favorites stay Favorites, and each Arc folder becomes a "
-                  u"folder in its Space. Page titles aren't imported yet. "
-                  u"Nothing opens until you click it."
-                : u"Each Arc folder becomes a folder in its Space. Favorites "
-                  u"become pinned tabs there, because the export doesn't mark "
-                  u"them apart. Nothing opens until you click it.")
-            .set_is_secondary());
-  }
-  if (preview.skipped_count) {
-    builder.AddParagraph(
-        ui::DialogModelLabel(List(preview.skipped, preview.skipped_count))
-            .set_is_secondary()
-            .set_allow_character_break(),
-        base::StrCat({u"Links left out (",
-                      base::NumberToString16(preview.skipped_count), u")"}));
-  }
-  if (preview.unrecognized_count) {
-    builder.AddParagraph(
-        ui::DialogModelLabel(
-            List(preview.unrecognized, preview.unrecognized_count))
-            .set_is_secondary()
-            .set_allow_character_break(),
-        base::StrCat({u"Lines myArc couldn't read (",
-                      base::NumberToString16(preview.unrecognized_count),
-                      u")"}));
-  }
-  const bool can_import = preview.ok && !noop;
-  const bool press = can_import && !confirmed.is_null();
-  if (can_import) {
-    builder.AddOkButton(
-        base::BindOnce(&Apply, profile, parent, inactive,
-                       std::move(export_data), read.content_hash, outcome,
-                       std::move(confirmed)),
-        ui::DialogModel::Button::Params().SetLabel(u"Import"));
-    builder.AddCancelButton(base::DoNothing());
-  } else {
-    builder.AddOkButton(base::DoNothing(),
-                        ui::DialogModel::Button::Params().SetLabel(u"OK"));
-  }
-  views::Widget* widget = Show(builder.Build(), parent, inactive);
-  if (!can_import && confirmed) {
-    std::move(confirmed).Run(0);
-    return;
-  }
-  if (press) {
-    // Captures press Import once the sheet has settled.
-    base::SingleThreadTaskRunner::GetCurrentDefault()->PostDelayedTask(
-        FROM_HERE,
-        base::BindOnce(
-            [](base::WeakPtr<views::Widget> widget) {
-              if (widget && widget->widget_delegate()) {
-                if (auto* dialog =
-                        widget->widget_delegate()->AsDialogDelegate()) {
-                  dialog->AcceptDialog();
-                }
-              }
-            },
-            widget->GetWeakPtr()),
-        base::Milliseconds(1500));
-  }
+  base::MakeRefCounted<Session>(std::move(profile), parent, inactive,
+                                std::move(outcome), std::move(confirmed),
+                                std::move(read))
+      ->Start();
 }
 
 void Read(base::WeakPtr<Profile> profile,
@@ -429,8 +766,15 @@ void Read(base::WeakPtr<Profile> profile,
   base::ThreadPool::PostTaskAndReplyWithResult(
       FROM_HERE, {base::MayBlock(), base::TaskPriority::USER_VISIBLE},
       base::BindOnce(&ReadExport, path),
-      base::BindOnce(&ShowPreview, profile, parent, inactive,
-                     std::move(outcome), std::move(confirmed)));
+      base::BindOnce(&Begin, profile, parent, inactive, std::move(outcome),
+                     std::move(confirmed)));
+}
+
+scoped_refptr<Outcome> MakeOutcome(ArcImportDone done,
+                                   base::OnceClosure report_closed) {
+  return done ? base::MakeRefCounted<Outcome>(std::move(done),
+                                              std::move(report_closed))
+              : nullptr;
 }
 
 // Owns itself while the file picker is up.
@@ -446,17 +790,10 @@ class Picker : public ui::SelectFileDialog::Listener {
   Picker& operator=(const Picker&) = delete;
   ~Picker() override { dialog_->ListenerDestroyed(); }
 
-  // Looks for Arc's sidebar file off the UI thread, without reading it, so
-  // the picker can open on it.
+  // Looks for Arc's sidebar file, without reading it, so the picker can open
+  // on it.
   void Start() {
-    base::ThreadPool::PostTaskAndReplyWithResult(
-        FROM_HERE, {base::MayBlock(), base::TaskPriority::USER_BLOCKING},
-        base::BindOnce([] {
-          const base::FilePath file =
-              base::GetHomeDir().Append(kArcSidebarDir).Append(kArcSidebarName);
-          return base::PathExists(file) ? file : base::FilePath();
-        }),
-        base::BindOnce(&Picker::Open, base::Unretained(this)));
+    FindArcData(base::BindOnce(&Picker::Open, base::Unretained(this)));
   }
 
   void Open(const base::FilePath& sidebar) {
@@ -496,10 +833,28 @@ void ImportFromArc(Profile& profile,
                    ArcImportDone done,
                    base::OnceClosure report_closed) {
   (new Picker(profile, parent,
-              done ? base::MakeRefCounted<Outcome>(std::move(done),
-                                                   std::move(report_closed))
-                   : nullptr))
+              MakeOutcome(std::move(done), std::move(report_closed))))
       ->Start();
+}
+
+void FindArcData(base::OnceCallback<void(const base::FilePath&)> found) {
+  base::ThreadPool::PostTaskAndReplyWithResult(
+      FROM_HERE, {base::MayBlock(), base::TaskPriority::USER_BLOCKING},
+      base::BindOnce([] {
+        const base::FilePath file =
+            base::GetHomeDir().Append(kArcSidebarDir).Append(kArcSidebarName);
+        return base::PathExists(file) ? file : base::FilePath();
+      }),
+      std::move(found));
+}
+
+void ImportFoundArcData(Profile& profile,
+                        gfx::NativeWindow parent,
+                        const base::FilePath& path,
+                        ArcImportDone done,
+                        base::OnceClosure report_closed) {
+  Read(profile.GetWeakPtr(), parent, /*inactive=*/false, path,
+       MakeOutcome(std::move(done), std::move(report_closed)), Confirmed());
 }
 
 void ImportArcFileForCapture(Profile& profile,
@@ -509,9 +864,7 @@ void ImportArcFileForCapture(Profile& profile,
                              ArcImportDone done,
                              base::OnceClosure report_closed) {
   Read(profile.GetWeakPtr(), parent, /*inactive=*/true, path,
-       done ? base::MakeRefCounted<Outcome>(std::move(done),
-                                            std::move(report_closed))
-            : nullptr,
+       MakeOutcome(std::move(done), std::move(report_closed)),
        std::move(confirmed));
 }
 

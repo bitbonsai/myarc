@@ -407,6 +407,10 @@ void OnboardingController::ShowWelcome(bool offers_import) {
           },
           weak_factory_.GetWeakPtr())));
   OnViewBoundsChanged(area_);
+  if (offers_import) {
+    FindArcData(base::BindOnce(&OnboardingController::FoundArcData,
+                               weak_factory_.GetWeakPtr()));
+  }
   // The sound, the desktop dim and the blob start together at t = 0 of
   // welcome_timeline.h, the blob grows into the window and the welcome plays
   // on the same times. Reduce Motion plays it at once, as a fade, silently.
@@ -563,6 +567,8 @@ void OnboardingController::OnAction(WelcomeView::Action action) {
       Run(Feed(*local_state, Event(EventKind::StartBrowsing)));
       break;
     case WelcomeView::Action::kImport:
+    case WelcomeView::Action::kChooseFile:
+      choose_file_ = action == WelcomeView::Action::kChooseFile;
       Run(Feed(*local_state, Event(EventKind::ImportStarted)));
       break;
     case WelcomeView::Action::kSkipTour:
@@ -709,8 +715,22 @@ void OnboardingController::OpenImport() {
     return;
   }
 #endif  // BUILDFLAG(MYARC_TEST_HOOKS)
+  // "Found your Arc data" imports that file without the picker; Choose a
+  // file… and a welcome without it open the picker.
+  if (!std::exchange(choose_file_, false) && !arc_data_.empty()) {
+    ImportFoundArcData(*profile_, host_->GetWidget()->GetNativeWindow(),
+                       arc_data_, std::move(done), std::move(report_closed));
+    return;
+  }
   ImportFromArc(*profile_, host_->GetWidget()->GetNativeWindow(),
                 std::move(done), std::move(report_closed));
+}
+
+void OnboardingController::FoundArcData(const base::FilePath& path) {
+  arc_data_ = path;
+  if (sheet_ && !path.empty()) {
+    sheet_->ShowFoundArcData();
+  }
 }
 
 foundation::OnboardingTransition OnboardingController::Feed(

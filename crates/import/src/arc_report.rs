@@ -14,11 +14,10 @@ use crate::arc_workspace::{FAVORITES_LABEL, Preview};
 pub const NOT_IN_EXPORT: &str = "Arc's export has no page titles, Space icons, \
      colors or archived tabs, so none of those were imported.";
 
-/// The same for Arc's sidebar file, which does carry page titles; the import
-/// leaves them out for now.
-pub const NOT_FROM_SIDEBAR: &str = "Arc's sidebar file has page titles, but \
-     myArc doesn't import them yet. Space icons, colors and archived tabs \
-     weren't imported either.";
+/// The same for Arc's sidebar file, which carries names and page titles but
+/// leaves the rest to other files.
+pub const NOT_FROM_SIDEBAR: &str = "Space icons, colors and archived tabs \
+     weren't imported.";
 
 /// One kind of entry the import left out or changed.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -64,9 +63,6 @@ impl Line {
             }
             Kind::FavoriteAsPin => "Favorites added as pinned tabs",
             Kind::Omitted(Omission::TodayTab) => "Today tabs left out",
-            Kind::Omitted(Omission::OtherProfileFavorite) => {
-                "Favorites of other Arc profiles left out"
-            }
             Kind::Omitted(Omission::NestedFolder) => {
                 "Folders inside folders, their tabs moved to the outer folder"
             }

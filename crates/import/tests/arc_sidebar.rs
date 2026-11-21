@@ -2,8 +2,10 @@
 
 use myarc_import::arc_markdown::{Omission, Report};
 use myarc_import::arc_report::{Line, lines};
-use myarc_import::arc_sidebar::{MAX_INPUT_BYTES, SidebarError, parse};
-use myarc_import::arc_workspace::{Preview, apply, as_written};
+use myarc_import::arc_sidebar::{
+    ArcProfile, MAX_INPUT_BYTES, ProfileReport, SidebarError, parse, parse_profiles,
+};
+use myarc_import::arc_workspace::{Preview, apply, apply_to_new_profile, as_written};
 use myarc_workspace::{DEFAULT_PROFILE_ID, Placement, Workspace};
 
 const FIXTURE_PATH: &str = concat!(
@@ -13,6 +15,10 @@ const FIXTURE_PATH: &str = concat!(
 
 fn fixture() -> Report {
     parse(&std::fs::read(FIXTURE_PATH).unwrap()).expect("fixture parses")
+}
+
+fn fixture_profiles() -> Vec<ProfileReport> {
+    parse_profiles(&std::fs::read(FIXTURE_PATH).unwrap()).expect("fixture parses")
 }
 
 fn urls(entries: &[myarc_import::arc_markdown::Entry]) -> Vec<&str> {
@@ -118,8 +124,7 @@ fn counts_what_it_leaves_out() {
         omitted,
         [
             (Omission::TodayTab, 2),
-            (Omission::OtherProfileFavorite, 1),
-            (Omission::NestedFolder, 1),
+            (Omission::NestedFolder, 2),
             (Omission::UnknownContainer, 3),
         ]
     );
@@ -200,7 +205,8 @@ fn keeps_a_favorite_the_profile_already_has() {
         .unwrap();
     let plan = import(&fixture(), &mut workspace);
     assert_eq!(plan.kept_favorites, 1);
-    assert_eq!(plan.new_favorites, ["https://mail.example.test/"]);
+    let new: Vec<_> = plan.new_favorites.iter().map(|n| n.url.as_str()).collect();
+    assert_eq!(new, ["https://mail.example.test/"]);
     assert_eq!(
         favorites(&workspace),
         [
@@ -225,8 +231,7 @@ fn report_names_omissions_and_no_favorites_as_pins() {
         [
             "Links left out, not web pages: 1",
             "Today tabs left out: 2",
-            "Favorites of other Arc profiles left out: 1",
-            "Folders inside folders, their tabs moved to the outer folder: 1",
+            "Folders inside folders, their tabs moved to the outer folder: 2",
             "Unknown sidebar parts left out: 3",
         ]
     );
@@ -284,4 +289,128 @@ fn rejects_what_is_not_a_sidebar() {
             max: MAX_INPUT_BYTES
         })
     );
+}
+
+#[test]
+fn reads_each_arc_profile_apart() {
+    let profiles = fixture_profiles();
+    // Profile 2 lists only an empty Favorites container, so it has no part.
+    let names: Vec<_> = profiles.iter().map(|p| p.profile.clone()).collect();
+    assert_eq!(
+        names,
+        [ArcProfile::Main, ArcProfile::Custom("Profile 1".into())]
+    );
+    assert_eq!(profiles[0].report, fixture());
+    let main: Vec<_> = profiles[0].report.spaces.iter().map(|s| &s.label).collect();
+    assert_eq!(main, ["Work", "Home"]);
+    let other = &profiles[1].report;
+    assert_eq!(
+        urls(&other.favorites),
+        ["https://other-profile.example.test/"]
+    );
+    assert_eq!(other.spaces.len(), 1);
+    let side = &other.spaces[0];
+    assert_eq!(side.label, "Side Project");
+    assert_eq!(urls(&side.pins), ["https://repo.example.test/"]);
+    assert_eq!(side.groups.len(), 1);
+    assert_eq!(side.groups[0].label, "Reading");
+    // "Later" sits inside "Reading"; its tab joins the outer folder.
+    assert_eq!(
+        urls(&side.groups[0].entries),
+        ["https://paper.example.test/", "https://essay.example.test/"]
+    );
+    assert!(other.omitted.is_empty() && other.unrecognized.is_empty());
+}
+
+#[test]
+fn custom_profiles_map_to_a_named_myarc_profile() {
+    assert_eq!(ArcProfile::Main.myarc_name(), None);
+    assert_eq!(
+        ArcProfile::Custom("Profile 1".into())
+            .myarc_name()
+            .as_deref(),
+        Some("Arc Profile 1")
+    );
+    let json = r#"{"sidebar":{"containers":[{"global":{}},{
+        "topAppsContainerIDs":[{"custom":{}},"f"],
+        "items":[{"id":"f","childrenIds":["t"]},
+                 {"id":"t","data":{"tab":{"savedURL":"https://t.example.test/"}}}]}]}}"#;
+    let profiles = parse_profiles(json.as_bytes()).unwrap();
+    assert_eq!(profiles[1].profile, ArcProfile::Custom("Unnamed".into()));
+}
+
+#[test]
+fn names_and_page_titles_reach_the_imported_items() {
+    let report = fixture();
+    let docs = &report.spaces[0].pins[0];
+    assert_eq!(
+        (docs.name.as_str(), docs.title.as_str()),
+        ("Team Docs", "Docs - Home")
+    );
+    let mut workspace = Workspace::default();
+    import(&report, &mut workspace);
+    let state = workspace.snapshot();
+    let item = |url: &str| {
+        state
+            .items
+            .iter()
+            .find(|item| item.canonical_url.as_deref() == Some(url))
+            .unwrap()
+    };
+    let docs = item("https://docs.example.test/");
+    assert_eq!(
+        (docs.name.as_str(), docs.title.as_str()),
+        ("Team Docs", "Docs - Home")
+    );
+    let alpha = item("https://alpha.example.test/");
+    assert_eq!(
+        (alpha.name.as_str(), alpha.title.as_str()),
+        ("", "Alpha Board")
+    );
+    let mail = item("https://mail.example.test/");
+    assert_eq!((mail.name.as_str(), mail.title.as_str()), ("", "Mail"));
+    let beta = item("https://beta.example.test/");
+    assert_eq!((beta.name.as_str(), beta.title.as_str()), ("", ""));
+}
+
+#[test]
+fn another_profile_imports_into_its_own_new_profile_once() {
+    let profiles = fixture_profiles();
+    let report = &profiles[1].report;
+    let mut workspace = Workspace::default();
+    let plan = apply_to_new_profile(report, &as_written(report), &mut workspace).unwrap();
+    assert_eq!(plan.new_space_count(), 1);
+    assert_eq!(
+        favorites(&workspace),
+        ["https://other-profile.example.test/"]
+    );
+    // The new Profile's empty default Space gave way to Arc's Space.
+    assert_eq!(
+        spaces(&workspace),
+        [(
+            "Side Project".to_owned(),
+            vec!["https://repo.example.test/".to_owned()],
+            vec![(
+                "Reading".to_owned(),
+                vec![
+                    "https://paper.example.test/".to_owned(),
+                    "https://essay.example.test/".to_owned(),
+                ]
+            )]
+        )]
+    );
+    let repo = workspace.snapshot();
+    let repo = repo
+        .items
+        .iter()
+        .find(|item| item.canonical_url.as_deref() == Some("https://repo.example.test/"))
+        .unwrap();
+    assert_eq!(
+        (repo.name.as_str(), repo.title.as_str()),
+        ("My Repo", "repo: main")
+    );
+    let first = workspace.snapshot();
+    let again = apply(report, &as_written(report), &mut workspace).unwrap();
+    assert!(again.is_noop());
+    assert_eq!(workspace.snapshot(), first);
 }

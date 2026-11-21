@@ -118,7 +118,8 @@ class SettingsWindow {
  private:
   void OpenMoreSettings();
   void OpenSite();
-  void ImportFromArc();
+  // `found` is Arc's sidebar file for its Import, or empty for the picker.
+  void ImportFromArc(const base::FilePath& found);
   void ExportPins();
   void ReplayTour();
 

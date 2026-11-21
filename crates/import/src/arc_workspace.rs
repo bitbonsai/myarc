@@ -10,7 +10,11 @@
 //! rather than a folder. They stay Space Pins rather than Profile Favorites
 //! because the Markdown export does not say which they are (see
 //! `tests/fixtures/arc-markdown/README.md`). Folders don't nest, and neither
-//! do report groups.
+//! do report groups. A new Favorite or Pin takes its entry's name as its Rename
+//! name and its saved page title as its title; only Arc's sidebar file has
+//! them. [`apply_to_new_profile`] is for a Profile made for the import: its
+//! first new Space takes the place of the empty default Space
+//! (`Workspace::create_first_space`), so the Profile holds only Arc's Spaces.
 //!
 //! Importing is idempotent. A Favorite whose URL the Profile already has is
 //! kept. An export Space reuses an existing ordinary Space of the same name,
@@ -44,8 +48,8 @@ pub const FAVORITES_LABEL: &str = "Favorites";
 /// What an import would change, computed against the current workspace.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Preview {
-    /// Canonical URLs of the Profile Favorites the import adds, in order.
-    pub new_favorites: Vec<String>,
+    /// The Profile Favorites the import adds, in order.
+    pub new_favorites: Vec<NewItem>,
     /// Favorites the Profile already has, so the import leaves them alone.
     pub kept_favorites: usize,
     /// One per distinct Space name, in the order the export first lists it.
@@ -59,9 +63,9 @@ pub struct SpacePreview {
     pub name: String,
     /// The Space this name reuses, or `None` when the import creates it.
     pub existing: Option<SpaceId>,
-    /// Canonical URLs the import adds as ungrouped Pins, in order: the Space's
-    /// pins and its Markdown `Favorites` groups.
-    pub new_pins: Vec<String>,
+    /// What the import adds as ungrouped Pins, in order: the Space's pins and
+    /// its Markdown `Favorites` groups.
+    pub new_pins: Vec<NewItem>,
     /// How many of `new_pins` come from a Markdown `Favorites` group.
     pub favorites_as_pins: usize,
     /// Entries the Space already pins in the right place, so the import leaves
@@ -82,10 +86,31 @@ pub struct FolderPreview {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum FolderAddition {
-    /// A new Pin with this canonical URL.
-    New(String),
+    /// A new Pin.
+    New(NewItem),
     /// An ungrouped Pin of the Space with the entry's URL, moved in.
     Move(ItemId),
+}
+
+/// A Favorite or Pin the import adds.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct NewItem {
+    /// Canonical URL.
+    pub url: String,
+    /// The entry's name, set as the item's Rename name. Empty when none.
+    pub name: String,
+    /// The entry's saved page title. Empty when unknown.
+    pub title: String,
+}
+
+impl NewItem {
+    fn new(url: &str, entry: &Entry) -> Self {
+        Self {
+            url: url.to_owned(),
+            name: entry.name.clone(),
+            title: entry.title.clone(),
+        }
+    }
 }
 
 /// An entry the import leaves out.
@@ -197,7 +222,7 @@ pub fn preview(
 ) -> Result<Preview, ImportError> {
     let plan = plan(report, canonical, workspace)?;
     let mut copy = Workspace::from_snapshot(workspace.snapshot())?;
-    write(&plan, &mut copy)?;
+    write(&plan, &mut copy, false)?;
     Ok(plan)
 }
 
@@ -206,6 +231,26 @@ pub fn apply(
     report: &Report,
     canonical: &[Option<String>],
     workspace: &mut Workspace,
+) -> Result<Preview, ImportError> {
+    apply_with(report, canonical, workspace, false)
+}
+
+/// Like [`apply`], for the workspace of a Profile made for this import. While
+/// that workspace is untouched, the first Space the import creates takes the
+/// place of its empty default Space.
+pub fn apply_to_new_profile(
+    report: &Report,
+    canonical: &[Option<String>],
+    workspace: &mut Workspace,
+) -> Result<Preview, ImportError> {
+    apply_with(report, canonical, workspace, true)
+}
+
+fn apply_with(
+    report: &Report,
+    canonical: &[Option<String>],
+    workspace: &mut Workspace,
+    first: bool,
 ) -> Result<Preview, ImportError> {
     let plan = plan(report, canonical, workspace)?;
     if plan.is_noop() {
@@ -216,8 +261,8 @@ pub fn apply(
     // against a workspace rule that is not deterministic.
     let before = workspace.snapshot();
     let mut copy = Workspace::from_snapshot(before.clone())?;
-    write(&plan, &mut copy)?;
-    if let Err(error) = write(&plan, workspace) {
+    write(&plan, &mut copy, first)?;
+    if let Err(error) = write(&plan, workspace, first) {
         workspace.restore(before)?;
         return Err(error);
     }
@@ -365,7 +410,7 @@ fn plan(
                         *count -= 1;
                         preview.kept_favorites += 1;
                     }
-                    None => preview.new_favorites.push(url.clone()),
+                    None => preview.new_favorites.push(NewItem::new(url, entry)),
                 }
                 continue;
             }
@@ -388,7 +433,7 @@ fn plan(
                         space.kept_pins += 1;
                     }
                     None => {
-                        space.new_pins.push(url.clone());
+                        space.new_pins.push(NewItem::new(url, entry));
                         space.favorites_as_pins += usize::from(group.is_some());
                     }
                 }
@@ -412,7 +457,7 @@ fn plan(
         } else {
             space.folders[folder]
                 .additions
-                .push(FolderAddition::New(url.clone()));
+                .push(FolderAddition::New(NewItem::new(url, entry)));
         }
     }
     Ok(preview)
@@ -439,30 +484,20 @@ fn folder_slot(space: &mut SpacePreview, label: &str, workspace: &Workspace) -> 
     space.folders.len() - 1
 }
 
-/// Applies `plan`. Stops at the first refused step, leaving earlier steps applied.
-fn write(plan: &Preview, workspace: &mut Workspace) -> Result<(), ImportError> {
-    let state = workspace.snapshot();
-    let profile_id = state.profile_id;
-    if !plan.new_favorites.is_empty() {
-        // A new item starts in a Space before it becomes a Favorite. A Profile
-        // always keeps one; without it `add_temporary_item` refuses.
-        let host = state
-            .spaces
-            .iter()
-            .find(|s| s.profile_id == profile_id)
-            .map_or(DEFAULT_SPACE_ID, |s| s.id);
-        for url in &plan.new_favorites {
-            let item = workspace.add_temporary_item(host)?;
-            workspace.set_placement(item, Placement::Favorite { profile_id }, Some(url))?;
-        }
-    }
+/// Applies `plan`. Stops at the first refused step, leaving earlier steps
+/// applied. With `first`, new Spaces go through `create_first_space`.
+fn write(plan: &Preview, workspace: &mut Workspace, first: bool) -> Result<(), ImportError> {
+    let profile_id = workspace.snapshot().profile_id;
+    // Spaces first: an untouched workspace stays untouched until the first
+    // new Space can take its default Space's place.
     for space in &plan.spaces {
         let id = match space.existing {
             Some(id) => id,
+            None if first => workspace.create_first_space(profile_id, &space.name, None, None)?,
             None => workspace.create_space(profile_id, &space.name)?,
         };
-        for url in &space.new_pins {
-            add_pin(workspace, id, url)?;
+        for item in &space.new_pins {
+            add_pin(workspace, id, item)?;
         }
         for folder in &space.folders {
             let folder_id = match folder.existing {
@@ -471,20 +506,51 @@ fn write(plan: &Preview, workspace: &mut Workspace) -> Result<(), ImportError> {
             };
             for addition in &folder.additions {
                 let item = match addition {
-                    FolderAddition::New(url) => add_pin(workspace, id, url)?,
+                    FolderAddition::New(item) => add_pin(workspace, id, item)?,
                     FolderAddition::Move(item) => *item,
                 };
                 workspace.move_pin_to_folder(item, Some(folder_id), None)?;
             }
         }
     }
+    if !plan.new_favorites.is_empty() {
+        // A new item starts in a Space before it becomes a Favorite. A Profile
+        // always keeps one; without it `add_temporary_item` refuses.
+        let host = workspace
+            .snapshot()
+            .spaces
+            .iter()
+            .find(|s| s.profile_id == profile_id)
+            .map_or(DEFAULT_SPACE_ID, |s| s.id);
+        for new in &plan.new_favorites {
+            let item = workspace.add_temporary_item(host)?;
+            save(workspace, item, Placement::Favorite { profile_id }, new)?;
+        }
+    }
     Ok(())
 }
 
-fn add_pin(workspace: &mut Workspace, space: SpaceId, url: &str) -> Result<ItemId, ImportError> {
+fn add_pin(
+    workspace: &mut Workspace,
+    space: SpaceId,
+    new: &NewItem,
+) -> Result<ItemId, ImportError> {
     let item = workspace.add_temporary_item(space)?;
-    workspace.set_placement(item, Placement::Pin { space_id: space }, Some(url))?;
+    save(workspace, item, Placement::Pin { space_id: space }, new)?;
     Ok(item)
+}
+
+/// Saves temporary `item` at `placement` with `new`'s URL, name and title.
+fn save(
+    workspace: &mut Workspace,
+    item: ItemId,
+    placement: Placement,
+    new: &NewItem,
+) -> Result<(), ImportError> {
+    workspace.set_placement(item, placement, Some(&new.url))?;
+    workspace.rename_item(item, &new.name)?;
+    workspace.set_title(item, &new.title)?;
+    Ok(())
 }
 
 /// The label trimmed and cut to `max` bytes on a character boundary. An empty

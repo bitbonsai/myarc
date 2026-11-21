@@ -73,6 +73,11 @@ using welcome::kWindowShown;
 constexpr char16_t kHeadline[] = u"myArc, forever yours.";
 constexpr char16_t kImport[] = u"Import from Arc…";
 constexpr char16_t kImported[] = u"Imported from Arc";
+// Once Arc's sidebar file turns up: a line over the primary button, which
+// then imports it without the file picker, and the picker as a fallback.
+constexpr char16_t kFound[] = u"Found your Arc data";
+constexpr char16_t kImportFound[] = u"Import";
+constexpr char16_t kChooseFile[] = u"Choose a file…";
 constexpr char16_t kStart[] = u"Start fresh";
 constexpr char16_t kSkip[] = u"Skip tour";
 
@@ -344,6 +349,13 @@ WelcomeView::WelcomeView(bool offers_import, ActionCallback action)
   const auto pressed = [](WelcomeView* view, Action action) {
     view->Press(action);
   };
+  found_ = content_->AddChildView(std::make_unique<views::Label>(kFound));
+  found_->SetFontList(Font(0, gfx::Font::Weight::MEDIUM));
+  found_->SetAutoColorReadabilityEnabled(false);
+  found_->SetBackgroundColor(SK_ColorTRANSPARENT);
+  found_->SetSubpixelRenderingEnabled(false);
+  found_->SetEnabledColor(SkColorSetA(kInk, 0xB0));
+  found_->SetVisible(false);
   import_ = content_->AddChildView(std::make_unique<SheetButton>(
       base::BindRepeating(pressed, base::Unretained(this), Action::kImport),
       offers_import ? kImport : kImported, kButtonHeight / 2));
@@ -368,14 +380,20 @@ WelcomeView::WelcomeView(bool offers_import, ActionCallback action)
     button->SetBorder(views::CreateEmptyBorder(gfx::Insets()));
     SetButtonFont(*button, Font(1, gfx::Font::Weight::SEMIBOLD));
   }
+  choose_ = content_->AddChildView(std::make_unique<SheetButton>(
+      base::BindRepeating(pressed, base::Unretained(this), Action::kChooseFile),
+      kChooseFile, 6));
+  choose_->SetVisible(false);
   skip_ = content_->AddChildView(std::make_unique<SheetButton>(
       base::BindRepeating(pressed, base::Unretained(this), Action::kSkipTour),
       kSkip, 6));
-  skip_->SetBorder(views::CreateEmptyBorder(gfx::Insets::VH(4, 10)));
-  skip_->SetEnabledTextColors(SkColorSetA(kInk, 0xB0));
-  SetButtonFont(*skip_, Font(0, gfx::Font::Weight::MEDIUM));
-  for (views::View* button :
-       std::initializer_list<views::View*>{import_, start_, skip_}) {
+  for (views::LabelButton* button : {choose_.get(), skip_.get()}) {
+    button->SetBorder(views::CreateEmptyBorder(gfx::Insets::VH(4, 10)));
+    button->SetEnabledTextColors(SkColorSetA(kInk, 0xB0));
+    SetButtonFont(*button, Font(0, gfx::Font::Weight::MEDIUM));
+  }
+  for (views::View* button : std::initializer_list<views::View*>{
+           found_, import_, start_, choose_, skip_}) {
     button->SetPaintToLayer();
     button->layer()->SetFillsBoundsOpaquely(false);
   }
@@ -384,7 +402,8 @@ WelcomeView::WelcomeView(bool offers_import, ActionCallback action)
   mark_docked_ = reduced_motion_;
   // Before Play(): only the background shows.
   for (views::View* view : std::initializer_list<views::View*>{
-           mark_, headline_blur_, headline_, import_, start_, skip_}) {
+           mark_, headline_blur_, headline_, found_, import_, start_, choose_,
+           skip_}) {
     view->layer()->SetOpacity(0);
   }
   if (!reduced_motion_) {
@@ -416,7 +435,7 @@ void WelcomeView::Play(base::TimeTicks start) {
     views::AnimationSequenceBlock& fade =
         builder.Once().SetDuration(kReducedFade);
     for (views::View* view : std::initializer_list<views::View*>{
-             mark_, headline_, import_, start_, skip_}) {
+             mark_, headline_, found_, import_, start_, choose_, skip_}) {
       fade.SetOpacity(view->layer(), 1, gfx::Tween::EASE_OUT);
     }
     return;
@@ -479,8 +498,8 @@ void WelcomeView::Play(base::TimeTicks start) {
   // The choice fades in as the headline lands. It only fades, so it never
   // moves while it can be pressed.
   block = &block->At(at(kChoiceAt)).SetDuration(kChoiceFade);
-  for (views::View* view :
-       std::initializer_list<views::View*>{import_, start_, skip_}) {
+  for (views::View* view : std::initializer_list<views::View*>{
+           found_, import_, start_, choose_, skip_}) {
     block->SetOpacity(view->layer(), 1, gfx::Tween::EASE_OUT);
   }
   // The fields hold still until the window shows, so the blob's copy of
@@ -546,7 +565,8 @@ void WelcomeView::FinishIntro() {
   ribbon_timer_.Stop();
   ribbon_.reset();
   for (views::View* view : std::initializer_list<views::View*>{
-           mark_, headline_blur_, headline_, import_, start_, skip_}) {
+           mark_, headline_blur_, headline_, found_, import_, start_, choose_,
+           skip_}) {
     view->layer()->GetAnimator()->StopAnimating();
   }
   mark_docked_ = true;
@@ -555,7 +575,7 @@ void WelcomeView::FinishIntro() {
   headline_blur_->layer()->SetTransform(gfx::Transform());
   headline_->layer()->SetTransform(gfx::Transform());
   for (views::View* view : std::initializer_list<views::View*>{
-           mark_, headline_, import_, start_, skip_}) {
+           mark_, headline_, found_, import_, start_, choose_, skip_}) {
     view->layer()->SetOpacity(1);
   }
   if (drift_timer_.IsRunning()) {
@@ -564,10 +584,25 @@ void WelcomeView::FinishIntro() {
   StartDrift();
 }
 
+void WelcomeView::ShowFoundArcData() {
+  if (!import_->GetEnabled() || exiting_) {
+    return;
+  }
+  found_->SetVisible(true);
+  choose_->SetVisible(true);
+  import_->SetText(kImportFound);
+  import_->GetViewAccessibility().SetName(u"Import your Arc data");
+  InvalidateLayout();
+}
+
 void WelcomeView::CrossfadeTo(SidebarTint tint, base::OnceClosure done) {
   FinishIntro();
   import_->SetText(kImported);
+  import_->GetViewAccessibility().SetName(std::u16string(kImported));
   import_->SetEnabled(false);
+  found_->SetVisible(false);
+  choose_->SetVisible(false);
+  InvalidateLayout();
   views::AsViewClass<Theme>(theme_.get())->SetTint(tint);
   const base::TimeDelta fade = reduced_motion_ ? kReducedFade : kThemeFade;
   // The fields give way to the theme.
@@ -629,8 +664,12 @@ void WelcomeView::Layout(PassKey) {
   // stack's top.
   const gfx::Size headline = headline_->GetPreferredSize();
   const gfx::Size skip = skip_->GetPreferredSize();
+  const gfx::Size found =
+      found_->GetVisible() ? found_->GetPreferredSize() : gfx::Size();
+  const int found_gap = found_->GetVisible() ? 8 : 0;
   const int column = kMarkSize + kMarkGap + headline.height() + 28 +
-                     kButtonHeight + 10 + kButtonHeight + 14 + skip.height();
+                     found.height() + found_gap + kButtonHeight + 10 +
+                     kButtonHeight + 14 + skip.height();
   mark_top_ = std::max(0, (h - column) / 2);
   int y = mark_top_ + kMarkSize + kMarkGap;
   for (views::View* view :
@@ -639,11 +678,20 @@ void WelcomeView::Layout(PassKey) {
                     headline.height());
   }
   y += headline.height() + 28;
+  found_->SetBounds((w - found.width()) / 2, y, found.width(), found.height());
+  y += found.height() + found_gap;
   import_->SetBounds((w - kButtonWidth) / 2, y, kButtonWidth, kButtonHeight);
   y += kButtonHeight + 10;
   start_->SetBounds((w - kButtonWidth) / 2, y, kButtonWidth, kButtonHeight);
   y += kButtonHeight + 14;
-  skip_->SetBounds((w - skip.width()) / 2, y, skip.width(), skip.height());
+  // Choose a file… sits beside Skip tour while it shows.
+  const gfx::Size choose =
+      choose_->GetVisible() ? choose_->GetPreferredSize() : gfx::Size();
+  const int choose_gap = choose_->GetVisible() ? 16 : 0;
+  const int row = choose.width() + choose_gap + skip.width();
+  choose_->SetBounds((w - row) / 2, y, choose.width(), choose.height());
+  skip_->SetBounds((w - row) / 2 + choose.width() + choose_gap, y, skip.width(),
+                   skip.height());
   // A resize moves the stack's top; a move under way keeps its target.
   if (mark_docked_ && !mark_->layer()->GetAnimator()->is_animating()) {
     mark_->layer()->SetTransform(MarkDocked());

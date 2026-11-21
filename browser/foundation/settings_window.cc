@@ -93,6 +93,10 @@ ui::ImageModel AppIconImage() {
 
 namespace {
 
+// Advanced > Import from Arc's handler: Arc's sidebar file for "Found your
+// Arc data" > Import, or an empty path for the file picker.
+using ImportArcCallback = base::RepeatingCallback<void(const base::FilePath&)>;
+
 // Lucide icons (ISC, lucide-static 1.61.0) on their 24 DIP canvas. Arc's
 // toolbar symbols are lighter than Lucide's default, so tabs stroke at 1.5.
 constexpr gfx::PathElement kSettingsPath[] = {
@@ -793,7 +797,7 @@ class AdvancedPage : public views::View {
  public:
   AdvancedPage(PrefService* local_state,
                base::RepeatingClosure more_settings,
-               base::RepeatingClosure import_arc,
+               ImportArcCallback import_arc,
                base::RepeatingClosure export_pins,
                base::RepeatingClosure replay_tour)
       : local_state_(local_state) {
@@ -812,15 +816,32 @@ class AdvancedPage : public views::View {
         base::BindRepeating(std::move(more_settings)), u"More Settings…",
         kGrayButton, kButtonText, gfx::Font::Weight::NORMAL, nullptr));
 
-    import_panel_ = AddRowPanel(
-        this, u"Spaces, folders and pinned tabs from an Arc export",
-        /*multi_line=*/false,
-        std::make_unique<PillButton>(std::move(import_arc),
-                                     u"Import from Arc…", kGrayButton,
-                                     kButtonText, gfx::Font::Weight::NORMAL,
-                                     nullptr));
+    // Import from Arc…, or once Arc's sidebar file turns up, "Found your
+    // Arc data" with Import, which skips the file picker, and Choose a
+    // file….
+    auto import_buttons = std::make_unique<views::View>();
+    import_buttons->SetLayoutManager(std::make_unique<views::BoxLayout>(
+        views::BoxLayout::Orientation::kHorizontal, gfx::Insets(), 8));
+    choose_button_ = import_buttons->AddChildView(std::make_unique<PillButton>(
+        base::BindRepeating(&AdvancedPage::ImportArc, base::Unretained(this),
+                            /*found=*/false),
+        u"Import from Arc…", kGrayButton, kButtonText,
+        gfx::Font::Weight::NORMAL, nullptr));
+    found_button_ = import_buttons->AddChildView(std::make_unique<PillButton>(
+        base::BindRepeating(&AdvancedPage::ImportArc, base::Unretained(this),
+                            /*found=*/true),
+        u"Import", kBlueButton, SK_ColorWHITE, gfx::Font::Weight::NORMAL,
+        nullptr));
+    found_button_->SetVisible(false);
+    import_panel_ =
+        AddRowPanel(this, u"Spaces, folders and pinned tabs from an Arc export",
+                    /*multi_line=*/false, std::move(import_buttons));
+    import_label_ = static_cast<views::Label*>(import_panel_->children()[0]);
     static_cast<views::BoxLayout*>(import_panel_->GetLayoutManager())
         ->set_inside_border_insets(gfx::Insets::VH(0, kBannerPad));
+    import_arc_ = std::move(import_arc);
+    myarc::FindArcData(base::BindOnce(&AdvancedPage::FoundArcData,
+                                      weak_factory_.GetWeakPtr()));
 
     export_panel_ = AddRowPanel(
         this, u"Favorites and pinned tabs as bookmarks for another browser",
@@ -893,6 +914,21 @@ class AdvancedPage : public views::View {
   }
 
  private:
+  void FoundArcData(const base::FilePath& path) {
+    if (path.empty()) {
+      return;
+    }
+    arc_data_ = path;
+    import_label_->SetText(u"Found your Arc data");
+    choose_button_->SetText(u"Choose a file…");
+    found_button_->SetVisible(true);
+    import_panel_->InvalidateLayout();
+  }
+
+  void ImportArc(bool found) {
+    import_arc_.Run(found ? arc_data_ : base::FilePath());
+  }
+
   void UpdateControl() {
     control_switch_->SetOn(IsControlEnabled(local_state_));
     // --myarc-enable-control keeps it on for this run.
@@ -912,12 +948,19 @@ class AdvancedPage : public views::View {
   PrefChangeRegistrar registrar_;
   raw_ptr<Panel> card_ = nullptr;
   raw_ptr<Panel> import_panel_ = nullptr;
+  raw_ptr<views::Label> import_label_ = nullptr;
+  raw_ptr<PillButton> choose_button_ = nullptr;
+  raw_ptr<PillButton> found_button_ = nullptr;
+  ImportArcCallback import_arc_;
+  // Arc's sidebar file, once FindArcData finds it.
+  base::FilePath arc_data_;
   raw_ptr<Panel> export_panel_ = nullptr;
   raw_ptr<Panel> replay_panel_ = nullptr;
   raw_ptr<views::Label> control_title_ = nullptr;
   raw_ptr<Panel> control_panel_ = nullptr;
   raw_ptr<Switch> control_switch_ = nullptr;
   raw_ptr<views::Label> control_help_ = nullptr;
+  base::WeakPtrFactory<AdvancedPage> weak_factory_{this};
 };
 
 BEGIN_METADATA(AdvancedPage)
@@ -1729,7 +1772,7 @@ class SettingsView : public views::View {
   SettingsView(PrefService* local_state,
                base::RepeatingClosure more_settings,
                base::RepeatingClosure open_site,
-               base::RepeatingClosure import_arc,
+               ImportArcCallback import_arc,
                base::RepeatingClosure export_pins,
                base::RepeatingClosure replay_tour,
                SettingsWindow::Profiles profiles,
@@ -2016,10 +2059,15 @@ void SettingsWindow::ReplayTour() {
   Close();
 }
 
-void SettingsWindow::ImportFromArc() {
+void SettingsWindow::ImportFromArc(const base::FilePath& found) {
   // The picker and preview sit over Settings, which stays open.
-  if (widget_) {
+  if (!widget_) {
+    return;
+  }
+  if (found.empty()) {
     myarc::ImportFromArc(*profile_, widget_->GetNativeWindow());
+  } else {
+    myarc::ImportFoundArcData(*profile_, widget_->GetNativeWindow(), found);
   }
 }
 

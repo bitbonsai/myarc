@@ -34,7 +34,9 @@ namespace myarc {
 // above the headline and the choice, where it stays. At 4.3 s
 // "myArc, forever yours." slides in from the left while its blur clears,
 // and 0.4 s later the choice fades in under it: Import from Arc…, the primary
-// button, Start fresh and Skip tour. Return presses the focused button, which
+// button, Start fresh and Skip tour. When Arc's sidebar file is there, the
+// primary button reads Import under "Found your Arc data", and Choose a
+// file… sits beside Skip tour. Return presses the focused button, which
 // starts on the primary one, Tab and Shift+Tab cycle them and Esc means Skip
 // tour. Under Reduce Motion nothing moves: Play() fades the logo, the
 // headline and the choice in over 150 ms.
@@ -47,7 +49,7 @@ class WelcomeView : public views::AccessiblePaneView {
   METADATA_HEADER(WelcomeView, views::AccessiblePaneView)
 
  public:
-  enum class Action { kStartBrowsing, kImport, kSkipTour };
+  enum class Action { kStartBrowsing, kImport, kChooseFile, kSkipTour };
   using ActionCallback = base::RepeatingCallback<void(Action)>;
 
   // `offers_import` false shows Import from Arc… as already done, and Start
@@ -71,6 +73,12 @@ class WelcomeView : public views::AccessiblePaneView {
 
   // Jumps the arrival to its end, with the headline and the choice showing.
   void FinishIntro();
+
+  // Arc's sidebar file is there: "Found your Arc data" shows over the primary
+  // button, which reads Import and imports that file without the file
+  // picker, and Choose a file… shows beside Skip tour for the picker. Does
+  // nothing once the import is done.
+  void ShowFoundArcData();
 
   // Ends the arrival, shows Import from Arc… as done and crossfades the
   // background to `tint`, a Space's sidebar tint, in 350 ms, or 150 ms under
@@ -115,8 +123,10 @@ class WelcomeView : public views::AccessiblePaneView {
   raw_ptr<views::ImageView> mark_ = nullptr;
   raw_ptr<views::Label> headline_ = nullptr;
   raw_ptr<views::Label> headline_blur_ = nullptr;
+  raw_ptr<views::Label> found_ = nullptr;
   raw_ptr<views::LabelButton> import_ = nullptr;
   raw_ptr<views::LabelButton> start_ = nullptr;
+  raw_ptr<views::LabelButton> choose_ = nullptr;
   raw_ptr<views::LabelButton> skip_ = nullptr;
   // Read once, when the view is made.
   const bool reduced_motion_;

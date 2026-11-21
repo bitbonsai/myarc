@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-11-21: Arc import reads names, titles and every Arc profile
+
+- Arc's sidebar file now imports each tab's name (as Rename sets it) and saved page title, and splits the file by Arc profile: the main one goes into the Profile running the import, and each other one into a myArc Profile named "Arc <directory>", which Import creates when it's missing. The preview names each mapping and reads unloaded Profiles' workspace files without loading them. Folders inside folders still join the outer folder, because the workspace's folders don't nest. When `~/Library/Application Support/Arc/StorableSidebar.json` exists, Settings > Advanced and the welcome tour show "Found your Arc data" with Import, which opens the preview without the picker, and "Choose a file…" for the picker.
+- Evidence: `MyarcNightly` chrome builds. Rust fmt, clippy and tests pass, with new fixture cases for a second Arc profile, names and titles, a nested folder, a new Profile holding only Arc's Space and a re-import that adds nothing. `check_docs.py`, `export_patches.py --check` and the onboarding state tests pass.
+- Limits: not run live, so the Settings row, the welcome tour's new line and button, Profile creation and the preview and report sheets are unchecked.
+
 ## 2026-11-21: Export covers every Profile
 
 - Export Pins and Favorites… now writes every regular Profile, one top-level folder each with Favorites first and then its Spaces, and skips that level when only one Profile has anything to list. A loaded Profile exports its live workspace. Any other Profile is read from its `myarc-workspace-v1.json`, which stays untouched, and a Profile that can't be read is named in a note after the save. In the command bar, "pin" now counts as a weak match for Export, so it always ranks below the pin actions.

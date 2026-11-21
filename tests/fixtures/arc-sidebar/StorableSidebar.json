@@ -5,7 +5,8 @@
       {
         "topAppsContainerIDs": [
           { "default": {} }, "fav-main",
-          { "custom": { "_0": { "directoryBasename": "Profile 1" } } }, "fav-other"
+          { "custom": { "_0": { "directoryBasename": "Profile 1" } } }, "fav-other",
+          { "custom": { "_0": { "directoryBasename": "Profile 2" } } }, "fav-empty"
         ],
         "spaces": [
           "space-work",
@@ -21,6 +22,13 @@
             "title": "Home",
             "profile": { "default": {} },
             "containerIDs": ["pinned", "home-pinned", "unpinned", "home-today", "boosts", "home-boosts"]
+          },
+          "space-side",
+          {
+            "id": "space-side",
+            "title": "Side Project",
+            "profile": { "custom": { "_0": { "directoryBasename": "Profile 1" } } },
+            "containerIDs": ["pinned", "side-pinned", "unpinned", "side-today"]
           }
         ],
         "items": [
@@ -28,12 +36,13 @@
           "fav-mail", { "id": "fav-mail", "parentID": "fav-main", "childrenIds": [], "data": { "tab": { "savedURL": "https://mail.example.test/", "savedTitle": "Mail" } } },
           "fav-cal", { "id": "fav-cal", "parentID": "fav-main", "childrenIds": [], "data": { "tab": { "savedURL": "https://calendar.example.test/", "savedTitle": "Calendar" } } },
           "fav-other", { "id": "fav-other", "childrenIds": ["fav-other-tab"], "data": { "itemContainer": {} } },
-          "fav-other-tab", { "id": "fav-other-tab", "parentID": "fav-other", "childrenIds": [], "data": { "tab": { "savedURL": "https://other-profile.example.test/" } } },
+          "fav-other-tab", { "id": "fav-other-tab", "parentID": "fav-other", "childrenIds": [], "data": { "tab": { "savedURL": "https://other-profile.example.test/", "savedTitle": "Other Profile Home" } } },
+          "fav-empty", { "id": "fav-empty", "childrenIds": [], "data": { "itemContainer": {} } },
 
           "work-pinned", { "id": "work-pinned", "childrenIds": ["work-docs", "work-projects", "work-split", "work-easel"], "data": { "itemContainer": {} } },
-          "work-docs", { "id": "work-docs", "parentID": "work-pinned", "childrenIds": [], "data": { "tab": { "savedURL": "https://docs.example.test/" } } },
+          "work-docs", { "id": "work-docs", "parentID": "work-pinned", "title": "Team Docs", "childrenIds": [], "data": { "tab": { "savedURL": "https://docs.example.test/", "savedTitle": "Docs - Home" } } },
           "work-projects", { "id": "work-projects", "parentID": "work-pinned", "title": "Projects", "childrenIds": ["work-alpha", "work-old"], "data": { "list": {} } },
-          "work-alpha", { "id": "work-alpha", "parentID": "work-projects", "childrenIds": [], "data": { "tab": { "savedURL": "https://alpha.example.test/" } } },
+          "work-alpha", { "id": "work-alpha", "parentID": "work-projects", "childrenIds": [], "data": { "tab": { "savedURL": "https://alpha.example.test/", "savedTitle": "Alpha Board" } } },
           "work-old", { "id": "work-old", "parentID": "work-projects", "title": "Old", "childrenIds": ["work-beta"], "data": { "list": {} } },
           "work-beta", { "id": "work-beta", "parentID": "work-old", "childrenIds": [], "data": { "tab": { "savedURL": "https://beta.example.test/" } } },
           "work-split", { "id": "work-split", "parentID": "work-pinned", "childrenIds": ["work-left", "work-right"], "data": { "splitView": {} } },
@@ -46,7 +55,15 @@
           "home-pinned", { "id": "home-pinned", "childrenIds": [], "data": { "itemContainer": {} } },
           "home-news", { "id": "home-news", "parentID": "home-pinned", "childrenIds": [], "data": { "tab": { "savedURL": "https://news.example.test/" } } },
           "home-local", { "id": "home-local", "parentID": "home-pinned", "childrenIds": [], "data": { "tab": { "savedURL": "file:///Users/example/notes.txt" } } },
-          "home-today", { "id": "home-today", "childrenIds": [], "data": { "itemContainer": {} } }
+          "home-today", { "id": "home-today", "childrenIds": [], "data": { "itemContainer": {} } },
+
+          "side-pinned", { "id": "side-pinned", "childrenIds": ["side-repo", "side-reading"], "data": { "itemContainer": {} } },
+          "side-repo", { "id": "side-repo", "parentID": "side-pinned", "title": "My Repo", "childrenIds": [], "data": { "tab": { "savedURL": "https://repo.example.test/", "savedTitle": "repo: main" } } },
+          "side-reading", { "id": "side-reading", "parentID": "side-pinned", "title": "Reading", "childrenIds": ["side-paper", "side-later"], "data": { "list": {} } },
+          "side-paper", { "id": "side-paper", "parentID": "side-reading", "childrenIds": [], "data": { "tab": { "savedURL": "https://paper.example.test/", "savedTitle": "A Paper" } } },
+          "side-later", { "id": "side-later", "parentID": "side-reading", "title": "Later", "childrenIds": ["side-essay"], "data": { "list": {} } },
+          "side-essay", { "id": "side-essay", "parentID": "side-later", "childrenIds": [], "data": { "tab": { "savedURL": "https://essay.example.test/" } } },
+          "side-today", { "id": "side-today", "childrenIds": [], "data": { "itemContainer": {} } }
         ]
       },
       { "littleBrowser": {} },

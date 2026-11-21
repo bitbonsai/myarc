@@ -1412,21 +1412,26 @@ rust::Box<foundation::ArcExport> WorkspaceService::ParseArcExport(
 }
 
 foundation::ArcImportPreview WorkspaceService::PreviewArcImport(
-    const foundation::ArcExport& export_data) const {
+    const foundation::ArcExport& export_data,
+    size_t part) const {
   if (!CanMutate()) {
-    auto preview = foundation::preview_arc_import(*workspace_, export_data);
+    auto preview =
+        foundation::preview_arc_import(*workspace_, export_data, part);
     preview.ok = false;
     preview.error = "Workspace is not loaded. Check storage state.";
     return preview;
   }
-  return foundation::preview_arc_import(*workspace_, export_data);
+  return foundation::preview_arc_import(*workspace_, export_data, part);
 }
 
 foundation::ArcImportPreview WorkspaceService::ApplyArcImport(
-    const foundation::ArcExport& export_data) {
+    foundation::ArcExport& export_data,
+    size_t part,
+    bool new_profile) {
   if (!CanMutate())
-    return PreviewArcImport(export_data);
-  auto result = foundation::apply_arc_import(*workspace_, export_data);
+    return PreviewArcImport(export_data, part);
+  auto result =
+      foundation::apply_arc_import(*workspace_, export_data, part, new_profile);
   if (result.ok &&
       (result.new_spaces || result.new_pins || result.new_favorites ||
        result.new_folders || result.moved_pins)) {

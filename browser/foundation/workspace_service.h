@@ -266,13 +266,19 @@ class WorkspaceService final : public base::SupportsUserData::Data {
   static rust::Box<foundation::ArcExport> ParseArcExport(
       base::span<const uint8_t> bytes,
       bool sidebar);
-  // What importing `export` would add to this workspace, without changing it.
+  // What importing part `part` of `export` (one Arc profile, see
+  // foundation::arc_export_profiles) would add to this workspace, without
+  // changing it.
   foundation::ArcImportPreview PreviewArcImport(
-      const foundation::ArcExport& export_data) const;
-  // Adds the export's missing Spaces and Pins, all or nothing, then saves.
-  // Opens no tabs and fetches nothing.
+      const foundation::ArcExport& export_data,
+      size_t part) const;
+  // Adds that part's missing Spaces and Pins, all or nothing, then saves.
+  // `new_profile` marks a Profile made for this import. Opens no tabs and
+  // fetches nothing.
   foundation::ArcImportPreview ApplyArcImport(
-      const foundation::ArcExport& export_data);
+      foundation::ArcExport& export_data,
+      size_t part,
+      bool new_profile);
   // Runs a browser control request as seen from `window`, saving and
   // notifying like the UI commands when it changes the workspace. Refused
   // while the workspace is not loaded. A tab command that passed the core's

@@ -71,9 +71,6 @@ pub struct Space {
 pub enum Omission {
     /// Unpinned tabs. Arc archives them, so they are not saved sites.
     TodayTab,
-    /// Favorites of an Arc profile other than the main one. myarc imports
-    /// into one Profile.
-    OtherProfileFavorite,
     /// Folders inside a folder. myarc's folders don't nest, so their tabs
     /// join the outermost folder.
     NestedFolder,
@@ -98,6 +95,12 @@ pub struct Entry {
     pub scheme: Scheme,
     /// 1-based line of the list item, or 0 when the source has no lines.
     pub line: usize,
+    /// The name the user gave the tab, as Arc's Rename does. Empty when none;
+    /// only Arc's sidebar file has names.
+    pub name: String,
+    /// The page title Arc saved with the tab. Empty when unknown; only Arc's
+    /// sidebar file has titles.
+    pub title: String,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -283,6 +286,8 @@ fn place(report: &mut Report, content: &str, line: usize) -> Result<(), Reason> 
             url: url.to_owned(),
             scheme,
             line,
+            name: String::new(),
+            title: String::new(),
         });
         return Ok(());
     }
