@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-11-21: Nightly 2026.11.21.4
+
+- Published the prerelease `nightly-2026.11.21.4` from `main` `c2a2761` and Chromium `921f499806`, built in `out/MyarcRelease`: decluttered Settings > Advanced, simplified one-click Arc import, minimal welcome screen (`Import from Arc` only when Arc is detected, `Let’s go`), action-only command bar matches, and lazy hidden Profile windows at startup.
+- Evidence: Developer ID signed, Apple notarized and stapled (`notarize-app.zip` `ddb465e9...` and DMG `e594735e...`), `spctl` accepted both the app and the DMG, and Sparkle EdDSA signature verified. 184182638 bytes, SHA-256 `0df6844e...59e`.
+- Limits: live checks on the packaged build (Arc import with real data, Bitwarden store install, live welcome tour replay, and `⌥⌘N` from other apps) follow after updating.
+
 ## 2026-11-21: Decluttered Settings Advanced, simplified Arc import, and minimal welcome screen
 
 - Redesigned `Settings > Advanced` (`browser/foundation/settings_window.cc`) with 68 DIP side margins and three grouped macOS-style inset cards (`Data`, `Browser control`, `More`) using title + subtitle rows, hairline dividers, and a single blue `Import` button. `ImportFromArc` (`browser/foundation/arc_import.cc`) now checks `~/Library/Application Support/Arc/StorableSidebar.json` automatically and opens the preview directly; only when Arc isn't found on this Mac does it show a fallback dialog to choose a file manually. Cleaned up `WelcomeView` (`browser/foundation/welcome_view.cc`, `onboarding_controller.cc`): removed "Found your Arc data", "Choose a file…", the visible "Skip tour" link (Esc still skips, and every coach mark has Skip tour), and the initial programmatic focus ring (focus ring appears on Tab traversal); `Import from Arc` now appears only when Arc is detected on this Mac, above `Let’s go`.
