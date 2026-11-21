@@ -3,6 +3,7 @@ title: "A proper welcome"
 summary: "myArc now says hello before your first tab. The screen dims, a soft blob of colour grows into a window, and a short tour has you try the basics on the real browser."
 date: 2026-11-20
 draft: false
+thumbnail: welcome-thumbnail.png
 ---
 
 Arc made its first minute feel like an event. Before you opened a single tab, it had already said hello, and that set the tone for everything after. Most browsers skip that part. They open on a blank page and leave you to find the good stuff on your own. I wanted myArc to say hello too.
