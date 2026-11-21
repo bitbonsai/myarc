@@ -1,5 +1,5 @@
 diff --git a/chrome/browser/ui/toolbar/toolbar_actions_model.cc b/chrome/browser/ui/toolbar/toolbar_actions_model.cc
-index f35b42be33952f9d4b01728c82ce064830bda1e4..29036f51800b1ec072ed21f2887636e682454e97 100644
+index f35b42be33952f9d4b01728c82ce064830bda1e4..01a5e16d5af098beaa0f23858d2f79a4852cb5e0 100644
 --- a/chrome/browser/ui/toolbar/toolbar_actions_model.cc
 +++ b/chrome/browser/ui/toolbar/toolbar_actions_model.cc
 @@ -47,6 +47,7 @@
@@ -23,3 +23,21 @@ index f35b42be33952f9d4b01728c82ce064830bda1e4..29036f51800b1ec072ed21f2887636e6
  
    bool is_feature_enabled =
        base::FeatureList::IsEnabled(features::kExtensionsPinnedByDefault);
+@@ -341,6 +346,17 @@ void ToolbarActionsModel::OnReady() {
+   extension_management_observation_.Observe(management);
+ 
+   actions_initialized_ = true;
++
++  // One-time migration for Profiles created before myArc stopped pinning the
++  // bundled blocker by default. Manual pins after this stay respected.
++  if (!profile_->IsOffTheRecord() &&
++      !prefs_->GetBoolean(myarc::kBlockerUnpinnedPref)) {
++    prefs_->SetBoolean(myarc::kBlockerUnpinnedPref, true);
++    if (IsActionPinned(myarc::kBlockerExtensionId)) {
++      SetActionVisibility(myarc::kBlockerExtensionId, false);
++    }
++  }
++
+   for (Observer& observer : observers_) {
+     observer.OnToolbarModelInitialized();
+   }

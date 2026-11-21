@@ -243,6 +243,7 @@ class BlockerRulesThrottle final : public content::NavigationThrottle {
 
 void RegisterBlockerProfilePrefs(PrefRegistrySimple& registry) {
   registry.RegisterBooleanPref(kBlockerInstalledPref, false);
+  registry.RegisterBooleanPref(kBlockerUnpinnedPref, false);
 }
 
 void MaybeInstallBlocker(Profile& profile) {

@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-11-21: Polish URL pill extension icons and unpin uBOL on existing profiles
+
+- Follow-up to `6e6bc4f`: compacted sidebar URL pill extension buttons and Copy URL from 28 to 24 DIP (`extensions_toolbar_desktop.cc`, `location_bar_view.cc`) so more of the address stays visible on hover; hid both while editing a URL (`⌘L`) or on blank Spaces (`myarc_has_page && !IsEditingOrEmpty()`); and added a one-time Profile pref migration (`myarc.blocker.unpinned_v1` in `blocker.h`/`blocker.cc` + `ToolbarActionsModel::OnReady`) to unpin `uBlock Origin Lite` on profiles created before `6e6bc4f` while preserving any later manual pin.
+- Evidence: `out/MyarcNightly chrome` builds cleanly; Chromium edits committed on branch `myarc` and exported via `python3 tools/export_patches.py`.
+- Verification: `check_docs.py`, `cargo fmt --check`, `rustfmt bridge.rs`, `cargo clippy -D warnings`, `cargo test --workspace --locked`, `export_patches.py --check`, and `node --test design/onboarding/state.test.mjs` pass. Not tested live yet: real mouse hover and existing-profile migration on a packaged nightly.
+
 ## 2026-11-21: Extension icons in the URL pill
 
 - Pinned extension icons now sit at the trailing end of the sidebar's URL pill and show on hover or focus, next to Copy URL, as in Arc. An open popup keeps its icon. There's no Extensions (puzzle) button. The bundled uBlock Origin Lite stays unpinned on install, and Safety Check no longer flags it as off-store.

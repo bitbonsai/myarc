@@ -1,18 +1,20 @@
 diff --git a/chrome/browser/ui/views/extensions/extensions_toolbar_desktop.cc b/chrome/browser/ui/views/extensions/extensions_toolbar_desktop.cc
-index dce94a0eb7efbdd2a569ddf636695fa090237a42..ebc7255c47ef55e3b496ae9b72af7c43d4b28bc1 100644
+index dce94a0eb7efbdd2a569ddf636695fa090237a42..6eb7036313e3667665e65ef0b10f750a9ab829b1 100644
 --- a/chrome/browser/ui/views/extensions/extensions_toolbar_desktop.cc
 +++ b/chrome/browser/ui/views/extensions/extensions_toolbar_desktop.cc
-@@ -697,6 +697,9 @@ views::LabelButton* ExtensionsToolbarDesktop::GetOverflowReferenceView() const {
+@@ -697,6 +697,11 @@ views::LabelButton* ExtensionsToolbarDesktop::GetOverflowReferenceView() const {
  
  gfx::Size ExtensionsToolbarDesktop::GetToolbarActionSize() {
    constexpr gfx::Size kDefaultSize(28, 28);
 +  if (myarc_sidebar_mode_) {
-+    return kDefaultSize;
++    // Compact 24 DIP icons inside the 36 DIP URL pill leave more room for the
++    // address text.
++    return gfx::Size(24, 24);
 +  }
    BrowserView* const browser_view =
        BrowserView::GetBrowserViewForBrowser(browser_);
    return browser_view
-@@ -877,6 +880,9 @@ void ExtensionsToolbarDesktop::OnPinnedActionsChanged() {
+@@ -877,6 +882,9 @@ void ExtensionsToolbarDesktop::OnPinnedActionsChanged() {
      UpdateIconVisibility(it.first);
    }
    ReorderAllChildViews();
@@ -22,7 +24,7 @@ index dce94a0eb7efbdd2a569ddf636695fa090237a42..ebc7255c47ef55e3b496ae9b72af7c43
  
    drop_weak_ptr_factory_.InvalidateWeakPtrs();
  }
-@@ -1095,6 +1101,30 @@ void ExtensionsToolbarDesktop::SetExtensionIconVisibility(
+@@ -1095,6 +1103,30 @@ void ExtensionsToolbarDesktop::SetExtensionIconVisibility(
        visible ? GetExtensionIcon(extension_view) : ui::ImageModel());
  }
  
@@ -53,7 +55,7 @@ index dce94a0eb7efbdd2a569ddf636695fa090237a42..ebc7255c47ef55e3b496ae9b72af7c43
  void ExtensionsToolbarDesktop::UpdateContainerVisibility() {
    bool was_visible = GetVisible();
    SetVisible(ShouldContainerBeVisible());
-@@ -1103,6 +1133,10 @@ void ExtensionsToolbarDesktop::UpdateContainerVisibility() {
+@@ -1103,6 +1135,10 @@ void ExtensionsToolbarDesktop::UpdateContainerVisibility() {
    // resetting.
    if (was_visible != GetVisible()) {
      GetAnimatingLayoutManager()->ResetLayout();
@@ -64,7 +66,7 @@ index dce94a0eb7efbdd2a569ddf636695fa090237a42..ebc7255c47ef55e3b496ae9b72af7c43
    }
  
    if (!was_visible && GetVisible() && GetOnVisibleCallbackForTesting()) {
-@@ -1117,6 +1151,14 @@ bool ExtensionsToolbarDesktop::ShouldContainerBeVisible() const {
+@@ -1117,6 +1153,14 @@ bool ExtensionsToolbarDesktop::ShouldContainerBeVisible() const {
      return false;
    }
  
@@ -79,7 +81,7 @@ index dce94a0eb7efbdd2a569ddf636695fa090237a42..ebc7255c47ef55e3b496ae9b72af7c43
    // All other display modes are constantly visible.
    if (display_mode_ != DisplayMode::kAutoHide) {
      return true;
-@@ -1269,7 +1311,8 @@ views::BubbleAnchor ExtensionsToolbarDesktop::GetExtensionsButtonAnchor() {
+@@ -1269,7 +1313,8 @@ views::BubbleAnchor ExtensionsToolbarDesktop::GetExtensionsButtonAnchor() {
  }
  
  views::BubbleBorder::Arrow ExtensionsToolbarDesktop::GetPopupArrow() const {

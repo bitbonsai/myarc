@@ -21,6 +21,9 @@ inline constexpr char kBlockerExtensionId[] =
 
 // Profile pref: the bundled blocker has been installed into this Profile.
 inline constexpr char kBlockerInstalledPref[] = "myarc.blocker.installed";
+// Profile pref: one-time unpin migration for Profiles where an older build
+// auto-pinned the bundled blocker to the toolbar.
+inline constexpr char kBlockerUnpinnedPref[] = "myarc.blocker.unpinned_v1";
 
 void RegisterBlockerProfilePrefs(PrefRegistrySimple& registry);
 
