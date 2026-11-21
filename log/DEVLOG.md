@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-11-21: Nightly 2026.11.21.1
+
+- Published the prerelease `nightly-2026.11.21.1` from `main` `b9f95c4` and Chromium `724a8f6feb`, the first nightly built from `browser/args-nightly.gn` in its own `out/MyarcRelease`: no DCHECKs, stripped binaries, Sparkle started after launch, fewer sidebar rebuilds and batched workspace saves. Earlier nightlies were packaged from `out/MyarcNightly`, which carries the test-hooks args.
+- Evidence: Developer ID signed, Apple notarized and stapled, `spctl` accepted the app and the DMG. 184189538 bytes (2026.11.20.4 was 242545213), SHA-256 `76731d6f...0e4d`.
+- Limits: startup gain not measured, and no Sparkle update has run yet.
+
 ## 2026-11-21: Startup trims
 
 - The nightly builds with `dcheck_always_on = false` (dangling raw_ptr checks stay on) and `tools/package_nightly.sh` runs `strip -x` on the main and framework binaries before signing. Sparkle loads 5 s after the menu is built, or on the first Check for Updates… click, instead of before the first window. `SidebarView::SetModel` skips the rebuild when the model (cxx-derived `==`), live titles and favicons, status, other Profiles' Spaces and the control client all match the last build. Loading-only tab changes refresh only when a page starts or stops loading, since the sidebar marks loading titles. Binding a window's tabs runs in a `WorkspaceService::ScopedBatch`, which writes the file once and notifies after the write.
