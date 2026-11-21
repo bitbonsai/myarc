@@ -258,6 +258,7 @@ mod ffi {
         Extensions,
         Settings,
         PrivacyPolicy,
+        ExportPins,
         DarkMode,
         LightMode,
         Quit,
@@ -1111,6 +1112,11 @@ mod ffi {
         fn preview_arc_import(workspace: &Workspace, arc: &ArcExport) -> ArcImportPreview;
         // Adds the export's Spaces and Pins that are missing, all or nothing.
         fn apply_arc_import(workspace: &mut Workspace, arc: &ArcExport) -> ArcImportPreview;
+        // Favorites and every Space's Pins and folders as a Netscape bookmarks
+        // file (import::bookmarks_html), for Export Pins and Favorites….
+        fn bookmarks_html(workspace: &Workspace) -> String;
+        // The save panel's default file name.
+        fn bookmarks_html_file_name() -> String;
 
         // Arc's Ctrl+Tab over one window's most recently shown items (BC-008).
         type RecentTabs;
@@ -1218,6 +1224,14 @@ pub fn set_arc_export_canonical_urls(export: &mut ArcExport, urls: Vec<String>) 
         .into_iter()
         .map(|url| (!url.is_empty()).then_some(url))
         .collect();
+}
+
+pub fn bookmarks_html(workspace: &Workspace) -> String {
+    import::bookmarks_html::write(&workspace.0.snapshot())
+}
+
+pub fn bookmarks_html_file_name() -> String {
+    import::bookmarks_html::DEFAULT_FILE_NAME.to_owned()
 }
 
 pub fn preview_arc_import(workspace: &Workspace, export: &ArcExport) -> ffi::ArcImportPreview {
@@ -1843,6 +1857,7 @@ pub fn command_bar_offers(
                         Command::Extensions => ffi::CommandRun::Extensions,
                         Command::Settings => ffi::CommandRun::Settings,
                         Command::PrivacyPolicy => ffi::CommandRun::PrivacyPolicy,
+                        Command::ExportPins => ffi::CommandRun::ExportPins,
                         Command::DarkMode => ffi::CommandRun::DarkMode,
                         Command::LightMode => ffi::CommandRun::LightMode,
                         Command::Quit => ffi::CommandRun::Quit,

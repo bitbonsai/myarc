@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-11-21: Export Pins and Favorites
+
+- Settings > Advanced has Export Pins and Favorites… under Import from Arc…, and the command bar offers the same action (also on "export" and "bookmarks"). Both open a save panel named `myArc Bookmarks.html` in Downloads and write only after a file is picked: a Netscape bookmarks file with a Favorites folder first, then one folder per Space holding its loose Pins and then its sidebar folders, in workspace order. `crates/import/src/bookmarks_html.rs` writes it; titles fall back from the Rename name to the page title to the URL, and everything is HTML-escaped.
+- Evidence: `MyarcNightly` chrome builds. Rust fmt, clippy and tests (six new serializer cases for ordering, nesting, empty Spaces, title fallback and escaping, plus command bar cases), `check_docs.py` and `export_patches.py --check` pass.
+- Limits: not run live, so the save panel, the Settings row layout and an import of the file into another browser are unchecked. Spaces and folders with nothing to list are left out of the file.
+
 ## 2026-11-21: Nightly 2026.11.21.2
 
 - Published the prerelease `nightly-2026.11.21.2` from `main` `12542a0` and Chromium `cdb6db61a9`, built in `out/MyarcRelease`: the Arc-style find pill anchored to the focused pane, New Folder in the sidebar's + menu and the command bar, plus the ranked six-tile welcome page.

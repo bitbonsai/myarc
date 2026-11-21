@@ -29,6 +29,7 @@
 #include "components/prefs/pref_change_registrar.h"
 #include "components/prefs/pref_service.h"
 #include "myarc/arc_import.h"
+#include "myarc/bookmarks_export.h"
 #include "myarc/control_prefs.h"
 #include "myarc/little_arc_prefs.h"
 #include "myarc/test_buildflags.h"
@@ -784,8 +785,9 @@ BEGIN_METADATA(GeneralPage)
 END_METADATA
 
 // Advanced: the way out to Chromium's full settings page, Import from Arc,
-// Replay welcome tour, then the Browser control switch that lets tools such as
-// Claude Code drive the Agent Space through myarc.
+// Export Pins and Favorites, Replay welcome tour, then the Browser control
+// switch that lets tools such as Claude Code drive the Agent Space through
+// myarc.
 class AdvancedPage : public views::View {
   METADATA_HEADER(AdvancedPage, views::View)
 
@@ -793,6 +795,7 @@ class AdvancedPage : public views::View {
   AdvancedPage(PrefService* local_state,
                base::RepeatingClosure more_settings,
                base::RepeatingClosure import_arc,
+               base::RepeatingClosure export_pins,
                base::RepeatingClosure replay_tour)
       : local_state_(local_state) {
     card_ = AddChildView(
@@ -818,6 +821,15 @@ class AdvancedPage : public views::View {
                                      kButtonText, gfx::Font::Weight::NORMAL,
                                      nullptr));
     static_cast<views::BoxLayout*>(import_panel_->GetLayoutManager())
+        ->set_inside_border_insets(gfx::Insets::VH(0, kBannerPad));
+
+    export_panel_ = AddRowPanel(
+        this, u"Favorites and pinned tabs as bookmarks for another browser",
+        /*multi_line=*/false,
+        std::make_unique<PillButton>(
+            std::move(export_pins), u"Export Pins and Favorites…", kGrayButton,
+            kButtonText, gfx::Font::Weight::NORMAL, nullptr));
+    static_cast<views::BoxLayout*>(export_panel_->GetLayoutManager())
         ->set_inside_border_insets(gfx::Insets::VH(0, kBannerPad));
 
     replay_panel_ = AddRowPanel(
@@ -865,7 +877,9 @@ class AdvancedPage : public views::View {
     card_->SetBounds(kSideMargin, kContentTop, panel_width, kRowHeight);
     import_panel_->SetBounds(kSideMargin, card_->bounds().bottom() + 8,
                              panel_width, kRowHeight);
-    replay_panel_->SetBounds(kSideMargin, import_panel_->bounds().bottom() + 8,
+    export_panel_->SetBounds(kSideMargin, import_panel_->bounds().bottom() + 8,
+                             panel_width, kRowHeight);
+    replay_panel_->SetBounds(kSideMargin, export_panel_->bounds().bottom() + 8,
                              panel_width, kRowHeight);
     const int title_height = control_title_->GetPreferredSize().height();
     control_title_->SetBounds(kSideMargin + kBannerPad,
@@ -899,6 +913,7 @@ class AdvancedPage : public views::View {
   PrefChangeRegistrar registrar_;
   raw_ptr<Panel> card_ = nullptr;
   raw_ptr<Panel> import_panel_ = nullptr;
+  raw_ptr<Panel> export_panel_ = nullptr;
   raw_ptr<Panel> replay_panel_ = nullptr;
   raw_ptr<views::Label> control_title_ = nullptr;
   raw_ptr<Panel> control_panel_ = nullptr;
@@ -1716,6 +1731,7 @@ class SettingsView : public views::View {
                base::RepeatingClosure more_settings,
                base::RepeatingClosure open_site,
                base::RepeatingClosure import_arc,
+               base::RepeatingClosure export_pins,
                base::RepeatingClosure replay_tour,
                SettingsWindow::Profiles profiles,
                base::RepeatingClosure close)
@@ -1745,7 +1761,7 @@ class SettingsView : public views::View {
     links_ = AddChildView(std::make_unique<LinksPage>(local_state));
     advanced_ = AddChildView(std::make_unique<AdvancedPage>(
         local_state, more_settings, std::move(import_arc),
-        std::move(replay_tour)));
+        std::move(export_pins), std::move(replay_tour)));
     // The pages fill the whole view, so the tabs go above them or the shown
     // page takes their clicks.
     for (SectionTab* tab : tabs_) {
@@ -1907,6 +1923,8 @@ void SettingsWindow::Show(Section section, bool inactive) {
                             weak_factory_.GetWeakPtr()),
         base::BindRepeating(&SettingsWindow::ImportFromArc,
                             weak_factory_.GetWeakPtr()),
+        base::BindRepeating(&SettingsWindow::ExportPins,
+                            weak_factory_.GetWeakPtr()),
         base::BindRepeating(&SettingsWindow::ReplayTour,
                             weak_factory_.GetWeakPtr()),
         profiles_,
@@ -2003,6 +2021,13 @@ void SettingsWindow::ImportFromArc() {
   // The picker and preview sit over Settings, which stays open.
   if (widget_) {
     myarc::ImportFromArc(*profile_, widget_->GetNativeWindow());
+  }
+}
+
+void SettingsWindow::ExportPins() {
+  // The save panel sits over Settings, which stays open.
+  if (widget_) {
+    ExportPinsAndFavorites(*profile_, widget_->GetNativeWindow());
   }
 }
 

@@ -1411,6 +1411,13 @@ rust::Box<foundation::ArcExport> WorkspaceService::ParseArcExport(
   return export_data;
 }
 
+std::optional<std::string> WorkspaceService::BookmarksHtml() const {
+  if (!CanMutate()) {
+    return std::nullopt;
+  }
+  return std::string(foundation::bookmarks_html(*workspace_));
+}
+
 foundation::ArcImportPreview WorkspaceService::PreviewArcImport(
     const foundation::ArcExport& export_data) const {
   if (!CanMutate()) {

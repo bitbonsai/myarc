@@ -57,6 +57,7 @@ rust_static_library("import") {
     "import/src/arc_report.rs",
     "import/src/arc_sidebar.rs",
     "import/src/arc_workspace.rs",
+    "import/src/bookmarks_html.rs",
     "import/src/lib.rs",
   ]
   # Reads Arc's StorableSidebar.json.
@@ -119,6 +120,8 @@ source_set("arc_import") {
   sources = [
     "arc_import.cc",
     "arc_import.h",
+    "bookmarks_export.cc",
+    "bookmarks_export.h",
   ]
   public_deps = [
     "//base",

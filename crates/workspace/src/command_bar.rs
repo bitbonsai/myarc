@@ -71,6 +71,9 @@ pub enum Command {
     Settings,
     /// Opens myarc.dev's page on what myArc keeps and sends.
     PrivacyPolicy,
+    /// Export Pins and Favorites…: saves them as a bookmarks file other
+    /// browsers import.
+    ExportPins,
     /// Listed as Switch to Light Mode while the window is dark.
     DarkMode,
     LightMode,
@@ -146,6 +149,12 @@ const COMMANDS: &[(Command, &str, bool, &[&str])] = &[
         "Manage Extensions…",
         false,
         &["add-ons", "plugins"],
+    ),
+    (
+        Command::ExportPins,
+        "Export Pins and Favorites…",
+        false,
+        &["bookmarks", "backup", "save"],
     ),
     (Command::Quit, "Quit myArc", false, &["exit"]),
 ];
@@ -430,7 +439,14 @@ mod tests {
 
     #[test]
     fn typed_names_offer_actions() {
-        assert_eq!(titles("pin", &TODAY), ["Pin Tab", "Collapse Pinned Tabs"]);
+        assert_eq!(
+            titles("pin", &TODAY),
+            [
+                "Pin Tab",
+                "Collapse Pinned Tabs",
+                "Export Pins and Favorites…"
+            ]
+        );
         assert_eq!(titles("new space", &TODAY), ["New Space"]);
         assert_eq!(titles("folder", &TODAY), ["New Folder…"]);
         assert_eq!(
@@ -445,6 +461,8 @@ mod tests {
         assert_eq!(titles("copy url", &TODAY), ["Copy URL"]);
         assert_eq!(titles("split", &TODAY), ["Add Split View"]);
         assert_eq!(titles("Reading", &TODAY), ["Switch to Reading"]);
+        assert_eq!(titles("export", &TODAY), ["Export Pins and Favorites…"]);
+        assert_eq!(titles("bookmarks", &TODAY), ["Export Pins and Favorites…"]);
         assert_eq!(titles("  HOME ", &TODAY), ["Switch to Home"]);
     }
 
@@ -480,7 +498,14 @@ mod tests {
             selected: Selected::Pin,
             ..TODAY
         };
-        assert_eq!(titles("pin", &pin), ["Unpin Tab", "Collapse Pinned Tabs"]);
+        assert_eq!(
+            titles("pin", &pin),
+            [
+                "Unpin Tab",
+                "Collapse Pinned Tabs",
+                "Export Pins and Favorites…"
+            ]
+        );
         assert!(titles("split", &pin).is_empty());
         let favorite = Context {
             selected: Selected::Favorite,

@@ -273,6 +273,9 @@ class WorkspaceService final : public base::SupportsUserData::Data {
   // Opens no tabs and fetches nothing.
   foundation::ArcImportPreview ApplyArcImport(
       const foundation::ArcExport& export_data);
+  // Favorites and every Space's Pins as a Netscape bookmarks file, or
+  // nullopt while the workspace is not loaded.
+  std::optional<std::string> BookmarksHtml() const;
   // Runs a browser control request as seen from `window`, saving and
   // notifying like the UI commands when it changes the workspace. Refused
   // while the workspace is not loaded. A tab command that passed the core's

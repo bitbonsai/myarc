@@ -80,7 +80,7 @@ class SettingsWindow {
   };
 
   // `profile` is the original (never off-the-record) Profile the window edits,
-  // including Advanced > Import from Arc…;
+  // including Advanced > Import from Arc… and Export Pins and Favorites…;
   // it and `local_state` must outlive this object. `open_more_settings` opens
   // chrome://settings and `open_site` opens myarc.dev, both in the owning
   // browser window. `replay_tour` starts the welcome tour again there, from
@@ -116,6 +116,7 @@ class SettingsWindow {
   void OpenMoreSettings();
   void OpenSite();
   void ImportFromArc();
+  void ExportPins();
   void ReplayTour();
 
   const raw_ptr<Profile> profile_;
