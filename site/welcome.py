@@ -97,9 +97,11 @@ CSS = '''
     .welcome-cards.is-moving .ui { will-change: transform }
     /* The copy sits on the art's lower edge. Without script every tile shows all of it over the shade. */
     .tile-copy { position: absolute; z-index: 1; right: 0; bottom: 0; left: 0; padding: 0 1.25rem 1.125rem }
-    /* The shade is clear 3rem above the copy and 94% of the tile's base under every line, enough for AA over any art. */
+    /* The shade blurs the art behind the copy and tints it with 72% of the tile's base. A mask fades both in over the 3rem above the copy. */
     .tile-copy::before { content: ''; position: absolute; z-index: -1; right: 0; bottom: 0; left: 0; height: calc(100% + 3rem); pointer-events: none;
-      background: linear-gradient(to bottom, transparent, color-mix(in srgb, var(--base) 94%, transparent) 3rem) }
+      background: color-mix(in srgb, var(--base) 72%, transparent);
+      -webkit-backdrop-filter: blur(1.25rem) saturate(1.3); backdrop-filter: blur(1.25rem) saturate(1.3);
+      -webkit-mask-image: linear-gradient(to bottom, transparent, #000 3rem); mask-image: linear-gradient(to bottom, transparent, #000 3rem) }
     .welcome-cards h3 { position: relative; font-size: 1.25rem; line-height: 1.25 }
     /* A resting tile's scrim, behind the title only. 65% of the base keeps the title at 4.8:1 even over pure black or white. */
     .welcome-cards h3::before { content: ''; position: absolute; z-index: -1; inset: -2.25rem -1.25rem -1.125rem; pointer-events: none; opacity: 0;
@@ -180,6 +182,7 @@ CSS = '''
     .ui .pk-card, .ui .sv-a, .ui .sv-b, .ui .la-pop, .ui .la-btn, .ui .cb-pal, .ui .cb-type, .ui .cb-caret, .ui .pn-fly { transform-box: view-box }
     .ui .pk-card { transform-origin: 162px 68px }
     .ui .sv-a { transform-origin: 120px 0 }
+    .ui .sv-b { transform-origin: 365px 0 }
     .ui .la-pop { transform-origin: 250px 228px }
     .ui .la-btn { transform-origin: 315px 90px }
     .ui .cb-pal { transform-origin: 200px 144px }
@@ -228,7 +231,7 @@ CSS = '''
     @keyframes pk-dim { 0%, 4% { opacity: 0 } 18%, 88% { opacity: 1 } 98%, 100% { opacity: 0 } }
     @keyframes pk-link { 0%, 4% { opacity: .35 } 10%, 100% { opacity: 1 } }
     @keyframes sv-a { 0%, 18% { transform: scaleX(2.008) } 34%, 88% { transform: none } 100% { transform: scaleX(2.008) } }
-    @keyframes sv-b { 0%, 18% { transform: translateX(125px); opacity: 0 } 34%, 88% { transform: none; opacity: 1 } 100% { transform: translateX(125px); opacity: 0 } }
+    @keyframes sv-b { 0%, 18% { transform: scaleX(0); opacity: 0 } 21% { opacity: 1 } 34%, 88% { transform: none; opacity: 1 } 97% { opacity: 1 } 100% { transform: scaleX(0); opacity: 0 } }
     @keyframes sv-fav { 0%, 22% { opacity: 0 } 32%, 88% { opacity: 1 } 100% { opacity: 0 } }
     @keyframes la-pop { 0%, 16% { transform: translateY(14px) scale(.7); opacity: 0 } 30%, 88% { transform: none; opacity: 1 } 98%, 100% { transform: scale(.94); opacity: 0 } }
     @keyframes la-btn { 0%, 52%, 64%, 100% { transform: none } 58% { transform: scale(1.18) } }
@@ -429,7 +432,7 @@ def _art(kind, n):
         pane = _page(132, 44, 220, 'blue') + '<rect class="f-blue pk-link" x="132" y="67" width="62" height="3" rx="1.5"/>'
         body = _window(30, 30, 340, 210, hue='violet', pane=pane) + '<rect class="ui-dim pk-dim" x="120" y="35" width="245" height="200" rx="8"/>' + card + _chip(312, 42, '⌘O', 'pk')
     elif kind == 'split':
-        # One page narrows to half and a second tab slides in beside it. The sidebar row gains the second favicon.
+        # One page narrows to half and a second tab unfolds beside it from the window's right edge. The sidebar row gains the second favicon.
         pane = ('<rect class="ui-pane sv-a" x="120" y="35" width="122" height="200" rx="8"/>' + _page(132, 50, 98, 'coral')
                 + '<g class="sv-b"><rect class="ui-pane" x="246" y="35" width="119" height="200" rx="8"/>' + _page(258, 50, 95, 'blue') + '</g>')
         tabs = ('<rect class="ui-sel" x="41" y="76" width="69" height="11" rx="4"/>'
