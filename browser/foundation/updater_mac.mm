@@ -1,38 +1,1466 @@
 #include "myarc/updater_mac.h"
 
 #import <Cocoa/Cocoa.h>
+#import <QuartzCore/QuartzCore.h>
+
+#include <algorithm>
+#include <cmath>
+#include <string>
 
 #include "base/apple/bundle_locations.h"
 #include "base/apple/foundation_util.h"
 #include "base/command_line.h"
 #include "base/logging.h"
 #include "base/strings/sys_string_conversions.h"
+#include "myarc/glass_mac.h"
 #include "myarc/nightly_buildflags.h"
 #include "myarc/test_buildflags.h"
+#include "myarc/welcome_mark.h"
 
 // Sparkle.framework is embedded by tools/package_nightly.sh, not by the build,
 // so it is loaded at runtime and only these parts of its API are declared.
-@protocol MyarcSparkleUpdater <NSObject>
-- (void)checkForUpdatesInBackground;
-@end
+// Enum values match Sparkle 2.10.1's SPUUserUpdateState.h.
+typedef NS_ENUM(NSInteger, MyarcSparkleUpdateChoice) {
+  MyarcSparkleUpdateChoiceSkip = 0,
+  MyarcSparkleUpdateChoiceInstall = 1,
+  MyarcSparkleUpdateChoiceDismiss = 2,
+};
 
-@protocol MyarcSparkleController <NSObject>
-- (instancetype)initWithStartingUpdater:(BOOL)startUpdater
-                        updaterDelegate:(id)updaterDelegate
-                     userDriverDelegate:(id)userDriverDelegate;
-@property(nonatomic, readonly) id<MyarcSparkleUpdater> updater;
-- (void)checkForUpdates:(id)sender;
-@end
+typedef NS_ENUM(NSInteger, MyarcSparkleUpdateStage) {
+  MyarcSparkleUpdateStageNotDownloaded = 0,
+  MyarcSparkleUpdateStageDownloaded = 1,
+  MyarcSparkleUpdateStageInstalling = 2,
+};
 
 @protocol MyarcSparkleAppcastItem <NSObject>
-@property(nonatomic, readonly) NSString* displayVersionString;
+@property(nonatomic, copy, readonly) NSString* versionString;
+@property(nonatomic, copy, readonly) NSString* displayVersionString;
+@property(nonatomic, readonly, nullable) NSURL* infoURL;
+@property(nonatomic, getter=isInformationOnlyUpdate, readonly)
+    BOOL informationOnlyUpdate;
+@property(nonatomic, readonly, nullable) NSURL* releaseNotesURL;
+@property(nonatomic, copy, readonly, nullable) NSString* itemDescription;
+@property(nonatomic, readonly, nullable) NSURL* fullReleaseNotesURL;
+@property(nonatomic, getter=isCriticalUpdate, readonly) BOOL criticalUpdate;
+@end
+
+@protocol MyarcSparkleUserUpdateState <NSObject>
+@property(nonatomic, readonly) MyarcSparkleUpdateStage stage;
+@property(nonatomic, readonly) BOOL userInitiated;
+@end
+
+@protocol MyarcSparkleDownloadData <NSObject>
+@property(nonatomic, readonly) NSData* data;
+@property(nonatomic, readonly, nullable, copy) NSString* textEncodingName;
+@end
+
+@protocol MyarcSparklePermissionResponse <NSObject>
+- (instancetype)initWithAutomaticUpdateChecks:(BOOL)automaticUpdateChecks
+                   automaticUpdateDownloading:
+                       (NSNumber* _Nullable)automaticUpdateDownloading
+                            sendSystemProfile:(BOOL)sendSystemProfile;
+@end
+
+@protocol MyarcSparkleUpdater <NSObject>
+- (instancetype)initWithHostBundle:(NSBundle*)hostBundle
+                 applicationBundle:(NSBundle*)applicationBundle
+                        userDriver:(id)userDriver
+                          delegate:(id)delegate;
+- (BOOL)startUpdater:(NSError* __autoreleasing*)error;
+- (void)checkForUpdates;
+- (void)checkForUpdatesInBackground;
+@property(nonatomic, readonly) BOOL canCheckForUpdates;
+@end
+
+namespace myarc {
+namespace {
+
+#if BUILDFLAG(MYARC_TEST_HOOKS)
+// Points Sparkle at a local appcast, downloads in the background and checks
+// right away, so a test sees the result without any window.
+constexpr char kTestUpdateFeed[] = "myarc-test-update-feed";
+// Opens the frosted updater UI in a preview state for background capture.
+constexpr char kCaptureUpdaterUi[] = "myarc-capture-updater-ui";
+#endif
+
+// Seconds between building the menu and starting Sparkle, so loading the
+// framework and its first check stay off the startup path.
+constexpr int64_t kStartDelaySeconds = 5;
+constexpr CGFloat kWindowWidth = 448;
+constexpr CGFloat kWindowCornerRadius = 16;
+// Bounds on untrusted release notes read from an appcast or remote URL.
+constexpr size_t kMaxReleaseNotesInputBytes = 16 * 1024;
+constexpr NSUInteger kMaxReleaseNotesChars = 360;
+
+NSString* TestFeed() {
+#if BUILDFLAG(MYARC_TEST_HOOKS)
+  const base::CommandLine* command_line =
+      base::CommandLine::ForCurrentProcess();
+  if (command_line->HasSwitch(kTestUpdateFeed)) {
+    return base::SysUTF8ToNSString(
+        command_line->GetSwitchValueASCII(kTestUpdateFeed));
+  }
+#endif
+  return nil;
+}
+
+NSString* CurrentVersionLabel() {
+  NSString* version = base::apple::ObjCCast<NSString>(
+      [base::apple::OuterBundle() objectForInfoDictionaryKey:@"MyarcVersion"]);
+  if (version.length) {
+    return [NSString stringWithFormat:@"Nightly %@", version];
+  }
+  return @"Development build";
+}
+
+NSString* FormatUpdateVersion(id<MyarcSparkleAppcastItem> item) {
+  if (!item) {
+    return @"the latest nightly";
+  }
+  NSString* label = item.displayVersionString.length ? item.displayVersionString
+                                                     : item.versionString;
+  if (!label.length) {
+    return @"the latest nightly";
+  }
+  if ([label hasPrefix:@"Nightly "] || [label hasPrefix:@"myArc "]) {
+    return label;
+  }
+  return [NSString stringWithFormat:@"Nightly %@", label];
+}
+
+NSImage* UpdaterAppIcon() {
+  NSData* data =
+      [NSData dataWithBytesNoCopy:const_cast<uint8_t*>(kWelcomeMarkPng)
+                           length:sizeof(kWelcomeMarkPng)
+                     freeWhenDone:NO];
+  NSImage* mark = [[NSImage alloc] initWithData:data];
+  if (mark) {
+    return mark;
+  }
+  NSString* path =
+      [base::apple::OuterBundle() pathForResource:@"app" ofType:@"icns"];
+  return path ? [[NSImage alloc] initWithContentsOfFile:path] : nil;
+}
+
+BOOL IsSafeExternalURL(NSURL* url) {
+  if (!url) {
+    return NO;
+  }
+  NSString* scheme = url.scheme.lowercaseString;
+  return [scheme isEqualToString:@"https"] || [scheme isEqualToString:@"http"];
+}
+
+// Strips HTML tags and decodes common entities linearly with bounded length so
+// untrusted appcast/release-notes text can be shown safely as plain text.
+NSString* SanitizeReleaseNotes(NSString* raw) {
+  if (!raw.length) {
+    return nil;
+  }
+  NSString* bounded =
+      raw.length > kMaxReleaseNotesInputBytes
+          ? [raw substringToIndex:kMaxReleaseNotesInputBytes]
+          : raw;
+  NSMutableString* out = [NSMutableString stringWithCapacity:256];
+  BOOL in_tag = NO;
+  BOOL last_space = YES;
+  for (NSUInteger i = 0; i < bounded.length && out.length < kMaxReleaseNotesChars + 32;
+       ++i) {
+    unichar ch = [bounded characterAtIndex:i];
+    if (ch == '<') {
+      in_tag = YES;
+      // Preserve line breaks across block tags and list items.
+      NSString* tail =
+          [bounded substringWithRange:NSMakeRange(
+                                          i, std::min<NSUInteger>(
+                                                 6, bounded.length - i))]
+              .lowercaseString;
+      if ([tail hasPrefix:@"<br"] || [tail hasPrefix:@"<li"] ||
+          [tail hasPrefix:@"</p"] || [tail hasPrefix:@"</l"] ||
+          [tail hasPrefix:@"</h"] || [tail hasPrefix:@"<p"]) {
+        if (out.length && ![out hasSuffix:@"\n"]) {
+          [out appendString:@"\n"];
+        }
+        if ([tail hasPrefix:@"<li"]) {
+          [out appendString:@"• "];
+        }
+        last_space = YES;
+      }
+      continue;
+    }
+    if (ch == '>') {
+      in_tag = NO;
+      continue;
+    }
+    if (in_tag) {
+      continue;
+    }
+    if (ch == '\r' || ch == '\n') {
+      if (out.length && ![out hasSuffix:@"\n"]) {
+        [out appendString:@"\n"];
+      }
+      last_space = YES;
+      continue;
+    }
+    if (ch == ' ' || ch == '\t') {
+      if (!last_space) {
+        [out appendString:@" "];
+        last_space = YES;
+      }
+      continue;
+    }
+    [out appendFormat:@"%C", ch];
+    last_space = NO;
+  }
+
+  NSDictionary<NSString*, NSString*>* entities = @{
+    @"&amp;" : @"&",
+    @"&lt;" : @"<",
+    @"&gt;" : @">",
+    @"&quot;" : @"\"",
+    @"&#39;" : @"'",
+    @"&apos;" : @"'",
+    @"&nbsp;" : @" ",
+    @"&mdash;" : @"—",
+    @"&ndash;" : @"–",
+    @"&hellip;" : @"…",
+  };
+  for (NSString* key in entities) {
+    [out replaceOccurrencesOfString:key
+                         withString:entities[key]
+                            options:NSLiteralSearch
+                              range:NSMakeRange(0, out.length)];
+  }
+  NSString* trimmed = [out
+      stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceAndNewlineCharacterSet];
+  if (!trimmed.length) {
+    return nil;
+  }
+  if (trimmed.length > kMaxReleaseNotesChars) {
+    trimmed = [[trimmed substringToIndex:kMaxReleaseNotesChars]
+        stringByAppendingString:@"…"];
+  }
+  return trimmed;
+}
+
+NSString* FormatByteProgress(uint64_t received, uint64_t expected) {
+  auto format = [](uint64_t bytes) -> NSString* {
+    if (bytes >= 1024ULL * 1024ULL) {
+      return [NSString
+          stringWithFormat:@"%.1f MB",
+                           static_cast<double>(bytes) / (1024.0 * 1024.0)];
+    }
+    if (bytes >= 1024ULL) {
+      return [NSString
+          stringWithFormat:@"%.0f KB", static_cast<double>(bytes) / 1024.0];
+    }
+    return [NSString stringWithFormat:@"%llu B", bytes];
+  };
+  if (expected > 0) {
+    return [NSString
+        stringWithFormat:@"%@ of %@", format(received), format(expected)];
+  }
+  if (received > 0) {
+    return [NSString stringWithFormat:@"%@ downloaded", format(received)];
+  }
+  return @"Connecting to update server…";
+}
+
+}  // namespace
+}  // namespace myarc
+
+// Frosted glass backdrop layer with subtle ribbon glow, top sheen, and 1px
+// specular hairline (falling back to crisp opaque dark fill under Reduce
+// Transparency).
+@interface MyarcUpdaterCanvasView : NSView
+@end
+
+@implementation MyarcUpdaterCanvasView
+
+- (BOOL)isFlipped {
+  return YES;
+}
+
+- (void)drawRect:(NSRect)dirtyRect {
+  const BOOL glass = !myarc::ShouldReduceTransparency();
+  const NSRect bounds = self.bounds;
+  NSBezierPath* outer =
+      [NSBezierPath bezierPathWithRoundedRect:bounds
+                                      xRadius:myarc::kWindowCornerRadius
+                                      yRadius:myarc::kWindowCornerRadius];
+  [NSGraphicsContext saveGraphicsState];
+  [outer addClip];
+
+  if (glass) {
+    [[NSColor colorWithSRGBRed:0x18 / 255.0
+                         green:0x18 / 255.0
+                          blue:0x1D / 255.0
+                         alpha:0.62] setFill];
+    NSRectFillUsingOperation(bounds, NSCompositingOperationSourceOver);
+
+    // Subtle ribbon-tinted ambient glow behind the app mark.
+    NSGradient* blueGlow = [[NSGradient alloc]
+        initWithStartingColor:[NSColor colorWithSRGBRed:0.20
+                                                  green:0.44
+                                                   blue:1.00
+                                                  alpha:0.18]
+                  endingColor:[NSColor colorWithSRGBRed:0.20
+                                                  green:0.44
+                                                   blue:1.00
+                                                  alpha:0.0]];
+    [blueGlow drawFromCenter:NSMakePoint(56, 72)
+                      radius:0
+                    toCenter:NSMakePoint(56, 72)
+                      radius:150
+                     options:0];
+
+    NSGradient* violetGlow = [[NSGradient alloc]
+        initWithStartingColor:[NSColor colorWithSRGBRed:0.62
+                                                  green:0.32
+                                                   blue:1.00
+                                                  alpha:0.12]
+                  endingColor:[NSColor colorWithSRGBRed:0.62
+                                                  green:0.32
+                                                   blue:1.00
+                                                  alpha:0.0]];
+    [violetGlow drawFromCenter:NSMakePoint(126, 42)
+                        radius:0
+                      toCenter:NSMakePoint(126, 42)
+                        radius:140
+                       options:0];
+
+    // Top glass sheen.
+    NSGradient* sheen = [[NSGradient alloc]
+        initWithStartingColor:[NSColor colorWithWhite:1.0 alpha:0.07]
+                  endingColor:[NSColor colorWithWhite:1.0 alpha:0.0]];
+    [sheen drawInRect:NSMakeRect(0, 0, NSWidth(bounds), 76) angle:90];
+  } else {
+    [[NSColor colorWithSRGBRed:0x22 / 255.0
+                         green:0x22 / 255.0
+                          blue:0x24 / 255.0
+                         alpha:1.0] setFill];
+    NSRectFill(bounds);
+  }
+
+  [NSGraphicsContext restoreGraphicsState];
+
+  // Crisp 1px outer specular hairline.
+  NSRect inset = NSInsetRect(bounds, 0.5, 0.5);
+  NSBezierPath* rim =
+      [NSBezierPath bezierPathWithRoundedRect:inset
+                                      xRadius:myarc::kWindowCornerRadius - 0.5
+                                      yRadius:myarc::kWindowCornerRadius - 0.5];
+  rim.lineWidth = 1.0;
+  if (glass) {
+    [[NSColor colorWithWhite:1.0 alpha:0.20] setStroke];
+  } else {
+    [[NSColor colorWithSRGBRed:0x3A / 255.0
+                         green:0x3A / 255.0
+                          blue:0x3D / 255.0
+                         alpha:1.0] setStroke];
+  }
+  [rim stroke];
+}
+
+@end
+
+// Translucent inset box for release notes summary.
+@interface MyarcUpdaterNotesCard : NSView
+@end
+
+@implementation MyarcUpdaterNotesCard
+
+- (BOOL)isFlipped {
+  return YES;
+}
+
+- (void)drawRect:(NSRect)dirtyRect {
+  const BOOL glass = !myarc::ShouldReduceTransparency();
+  const NSRect bounds = self.bounds;
+  NSBezierPath* bg = [NSBezierPath bezierPathWithRoundedRect:bounds
+                                                     xRadius:8
+                                                     yRadius:8];
+  [(glass ? [NSColor colorWithWhite:1.0 alpha:0.06]
+          : [NSColor colorWithSRGBRed:0x2A / 255.0
+                                green:0x2A / 255.0
+                                 blue:0x2E / 255.0
+                                alpha:1.0]) setFill];
+  [bg fill];
+
+  NSRect inset = NSInsetRect(bounds, 0.5, 0.5);
+  NSBezierPath* rim = [NSBezierPath bezierPathWithRoundedRect:inset
+                                                      xRadius:7.5
+                                                      yRadius:7.5];
+  rim.lineWidth = 1.0;
+  [[NSColor colorWithWhite:1.0 alpha:glass ? 0.14 : 0.10] setStroke];
+  [rim stroke];
+}
+
+@end
+
+// Sleek rounded pill progress bar that stays crisp on dark frosted glass and
+// supports both determinate progress and smooth indeterminate animation.
+@interface MyarcUpdaterProgressBar : NSView
+@property(nonatomic) double progress;
+@property(nonatomic) BOOL indeterminate;
+@end
+
+@implementation MyarcUpdaterProgressBar {
+  NSTimer* _timer;
+  CGFloat _phase;
+}
+
+@synthesize progress = _progress;
+@synthesize indeterminate = _indeterminate;
+
+- (void)dealloc {
+  [_timer invalidate];
+}
+
+- (void)setProgress:(double)progress {
+  _progress = std::clamp(progress, 0.0, 1.0);
+  [self setNeedsDisplay:YES];
+}
+
+- (void)setIndeterminate:(BOOL)indeterminate {
+  if (_indeterminate == indeterminate) {
+    return;
+  }
+  _indeterminate = indeterminate;
+  [_timer invalidate];
+  _timer = nil;
+  if (indeterminate) {
+    _phase = 0.0;
+    __weak MyarcUpdaterProgressBar* weakSelf = self;
+    _timer = [NSTimer
+        scheduledTimerWithTimeInterval:1.0 / 30.0
+                               repeats:YES
+                                 block:^(NSTimer* timer) {
+                                   MyarcUpdaterProgressBar* strong = weakSelf;
+                                   if (!strong) {
+                                     [timer invalidate];
+                                     return;
+                                   }
+                                   strong->_phase += 0.025;
+                                   if (strong->_phase > 1.35) {
+                                     strong->_phase = -0.35;
+                                   }
+                                   [strong setNeedsDisplay:YES];
+                                 }];
+  }
+  [self setNeedsDisplay:YES];
+}
+
+- (void)drawRect:(NSRect)dirtyRect {
+  const NSRect bounds = self.bounds;
+  const CGFloat radius = NSHeight(bounds) / 2.0;
+  NSBezierPath* track = [NSBezierPath bezierPathWithRoundedRect:bounds
+                                                        xRadius:radius
+                                                        yRadius:radius];
+  [[NSColor colorWithWhite:1.0 alpha:0.14] setFill];
+  [track fill];
+
+  [NSGraphicsContext saveGraphicsState];
+  [track addClip];
+
+  NSRect fillRect = NSZeroRect;
+  if (_indeterminate) {
+    const CGFloat barWidth = NSWidth(bounds) * 0.34;
+    const CGFloat x = _phase * NSWidth(bounds);
+    fillRect = NSMakeRect(x, 0, barWidth, NSHeight(bounds));
+  } else if (_progress > 0.0) {
+    const CGFloat w =
+        std::max<CGFloat>(NSHeight(bounds), NSWidth(bounds) * _progress);
+    fillRect = NSMakeRect(0, 0, w, NSHeight(bounds));
+  }
+
+  if (!NSIsEmptyRect(fillRect)) {
+    NSBezierPath* bar = [NSBezierPath bezierPathWithRoundedRect:fillRect
+                                                        xRadius:radius
+                                                        yRadius:radius];
+    NSGradient* grad = [[NSGradient alloc]
+        initWithStartingColor:[NSColor colorWithSRGBRed:0x0A / 255.0
+                                                  green:0x84 / 255.0
+                                                   blue:1.0
+                                                  alpha:1.0]
+                  endingColor:[NSColor colorWithSRGBRed:0x4D / 255.0
+                                                  green:0xA3 / 255.0
+                                                   blue:1.0
+                                                  alpha:1.0]];
+    [grad drawInBezierPath:bar angle:0];
+  }
+  [NSGraphicsContext restoreGraphicsState];
+}
+
+@end
+
+typedef NS_ENUM(NSInteger, MyarcUpdaterButtonStyle) {
+  MyarcUpdaterButtonStylePrimary,
+  MyarcUpdaterButtonStyleSecondary,
+  MyarcUpdaterButtonStyleLink,
+};
+
+// Pill push button matching Settings > Advanced's primary blue & glass buttons.
+@interface MyarcUpdaterButton : NSButton
+@property(nonatomic) MyarcUpdaterButtonStyle pillStyle;
+@end
+
+@implementation MyarcUpdaterButton {
+  BOOL _hovered;
+  NSTrackingArea* _tracking;
+}
+
+@synthesize pillStyle = _pillStyle;
+
+- (instancetype)initWithStyle:(MyarcUpdaterButtonStyle)style {
+  self = [super initWithFrame:NSZeroRect];
+  if (self) {
+    _pillStyle = style;
+    self.bordered = NO;
+    self.bezelStyle = NSBezelStyleInline;
+    self.focusRingType = NSFocusRingTypeExterior;
+  }
+  return self;
+}
+
+- (void)updateTrackingAreas {
+  [super updateTrackingAreas];
+  if (_tracking) {
+    [self removeTrackingArea:_tracking];
+  }
+  _tracking = [[NSTrackingArea alloc]
+      initWithRect:self.bounds
+           options:NSTrackingMouseEnteredAndExited | NSTrackingActiveAlways
+             owner:self
+          userInfo:nil];
+  [self addTrackingArea:_tracking];
+}
+
+- (void)mouseEntered:(NSEvent*)event {
+  _hovered = YES;
+  [self setNeedsDisplay:YES];
+}
+
+- (void)mouseExited:(NSEvent*)event {
+  _hovered = NO;
+  [self setNeedsDisplay:YES];
+}
+
+- (NSSize)intrinsicContentSize {
+  NSFont* font = [self labelFont];
+  NSDictionary* attrs = @{NSFontAttributeName : font};
+  NSSize textSize = [self.title sizeWithAttributes:attrs];
+  if (_pillStyle == MyarcUpdaterButtonStyleLink) {
+    return NSMakeSize(std::ceil(textSize.width) + 4, 24);
+  }
+  return NSMakeSize(std::max<CGFloat>(74, std::ceil(textSize.width) + 28), 30);
+}
+
+- (NSFont*)labelFont {
+  if (_pillStyle == MyarcUpdaterButtonStyleLink) {
+    return [NSFont systemFontOfSize:12 weight:NSFontWeightMedium];
+  }
+  return [NSFont systemFontOfSize:13 weight:NSFontWeightMedium];
+}
+
+- (void)drawRect:(NSRect)dirtyRect {
+  const BOOL glass = !myarc::ShouldReduceTransparency();
+  const BOOL pressed = self.cell.isHighlighted;
+  const NSRect bounds = self.bounds;
+
+  if (_pillStyle != MyarcUpdaterButtonStyleLink) {
+    const CGFloat radius = 7.0;
+    NSBezierPath* pill = [NSBezierPath bezierPathWithRoundedRect:bounds
+                                                         xRadius:radius
+                                                         yRadius:radius];
+    NSColor* fill = nil;
+    NSColor* stroke = nil;
+    if (_pillStyle == MyarcUpdaterButtonStylePrimary) {
+      fill = [NSColor colorWithSRGBRed:0x0A / 255.0
+                                 green:0x84 / 255.0
+                                  blue:1.0
+                                 alpha:pressed ? 0.78 : (_hovered ? 0.94 : 1.0)];
+      stroke = [NSColor colorWithWhite:1.0 alpha:0.26];
+    } else if (glass) {
+      fill = [NSColor colorWithWhite:1.0
+                               alpha:pressed ? 0.24 : (_hovered ? 0.20 : 0.14)];
+      stroke = [NSColor colorWithWhite:1.0 alpha:0.18];
+    } else {
+      fill = [NSColor colorWithSRGBRed:0x3E / 255.0
+                                 green:0x3E / 255.0
+                                  blue:0x42 / 255.0
+                                 alpha:pressed ? 0.8 : 1.0];
+      stroke = [NSColor colorWithWhite:1.0 alpha:0.14];
+    }
+    [fill setFill];
+    [pill fill];
+
+    NSRect inset = NSInsetRect(bounds, 0.5, 0.5);
+    NSBezierPath* rim = [NSBezierPath bezierPathWithRoundedRect:inset
+                                                        xRadius:radius - 0.5
+                                                        yRadius:radius - 0.5];
+    rim.lineWidth = 1.0;
+    [stroke setStroke];
+    [rim stroke];
+  }
+
+  NSColor* textColor = nil;
+  if (_pillStyle == MyarcUpdaterButtonStylePrimary) {
+    textColor = NSColor.whiteColor;
+  } else if (_pillStyle == MyarcUpdaterButtonStyleLink) {
+    textColor = _hovered ? [NSColor colorWithSRGBRed:0x74 / 255.0
+                                               green:0xB8 / 255.0
+                                                blue:1.0
+                                               alpha:1.0]
+                         : [NSColor colorWithSRGBRed:0x4D / 255.0
+                                               green:0xA3 / 255.0
+                                                blue:1.0
+                                               alpha:1.0];
+  } else {
+    textColor = [NSColor colorWithSRGBRed:0xF0 / 255.0
+                                    green:0xF0 / 255.0
+                                     blue:0xF4 / 255.0
+                                    alpha:1.0];
+  }
+  if (!self.enabled) {
+    textColor = [textColor colorWithAlphaComponent:0.45];
+  }
+
+  NSMutableParagraphStyle* para = [[NSMutableParagraphStyle alloc] init];
+  para.alignment = _pillStyle == MyarcUpdaterButtonStyleLink
+                       ? NSTextAlignmentLeft
+                       : NSTextAlignmentCenter;
+  NSDictionary* attrs = @{
+    NSFontAttributeName : [self labelFont],
+    NSForegroundColorAttributeName : textColor,
+    NSParagraphStyleAttributeName : para,
+  };
+  NSSize textSize = [self.title sizeWithAttributes:attrs];
+  NSRect textRect =
+      NSMakeRect(0, std::floor((NSHeight(bounds) - textSize.height) / 2.0) - 0.5,
+                 NSWidth(bounds), textSize.height + 2);
+  [self.title drawInRect:textRect withAttributes:attrs];
+}
+
+@end
+
+// Custom Sparkle 2 SPUUserDriver backed by a frosted-glass AppKit window.
+@interface MyarcSparkleUserDriver : NSObject <NSWindowDelegate>
+- (void)showPreviewState:(NSString*)state;
+@end
+
+@implementation MyarcSparkleUserDriver {
+  NSWindow* _window;
+  MyarcUpdaterCanvasView* _canvas;
+  NSImageView* _iconView;
+  NSTextField* _titleField;
+  NSTextField* _subtitleField;
+  MyarcUpdaterNotesCard* _notesCard;
+  NSTextField* _notesField;
+  MyarcUpdaterButton* _notesLinkButton;
+  MyarcUpdaterProgressBar* _progressBar;
+  MyarcUpdaterButton* _primaryButton;
+  MyarcUpdaterButton* _secondaryButton;
+  MyarcUpdaterButton* _skipButton;
+
+  // Pending Sparkle replies/callbacks. Each is invoked at most once.
+  void (^_choiceReply)(MyarcSparkleUpdateChoice);
+  void (^_acknowledgement)(void);
+  void (^_cancellation)(void);
+  void (^_retryTermination)(void);
+  BOOL _dismissingProgrammatically;
+
+  // State tracked across Sparkle callbacks in one update session.
+  NSString* _pendingVersionLabel;
+  NSURL* _releaseNotesURL;
+  NSString* _releaseNotesSummary;
+  BOOL _infoOnlyUpdate;
+  uint64_t _expectedBytes;
+  uint64_t _receivedBytes;
+}
+
+- (NSTextField*)makeLabelWithSize:(CGFloat)size
+                           weight:(NSFontWeight)weight
+                            color:(NSColor*)color {
+  NSTextField* label = [NSTextField labelWithString:@""];
+  label.font = [NSFont systemFontOfSize:size weight:weight];
+  label.textColor = color;
+  label.backgroundColor = NSColor.clearColor;
+  label.drawsBackground = NO;
+  label.lineBreakMode = NSLineBreakByWordWrapping;
+  label.maximumNumberOfLines = 0;
+  label.usesSingleLineMode = NO;
+  label.selectable = NO;
+  return label;
+}
+
+- (void)ensureWindow {
+  if (_window) {
+    myarc::ApplyNSWindowGlass(_window, myarc::GlassMaterial::kHud,
+                              myarc::kWindowCornerRadius, /*dark=*/true);
+    return;
+  }
+
+  NSRect rect = NSMakeRect(0, 0, myarc::kWindowWidth, 212);
+  NSWindowStyleMask style = NSWindowStyleMaskTitled |
+                            NSWindowStyleMaskClosable |
+                            NSWindowStyleMaskFullSizeContentView;
+  _window = [[NSWindow alloc] initWithContentRect:rect
+                                        styleMask:style
+                                          backing:NSBackingStoreBuffered
+                                            defer:NO];
+  _window.title = @"Software Update";
+  _window.titlebarAppearsTransparent = YES;
+  _window.titleVisibility = NSWindowTitleHidden;
+  _window.movableByWindowBackground = YES;
+  _window.releasedWhenClosed = NO;
+  _window.delegate = self;
+  [[_window standardWindowButton:NSWindowMiniaturizeButton] setHidden:YES];
+  [[_window standardWindowButton:NSWindowZoomButton] setHidden:YES];
+
+  NSView* root = [[NSView alloc] initWithFrame:rect];
+  root.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
+  _window.contentView = root;
+
+  myarc::ApplyNSWindowGlass(_window, myarc::GlassMaterial::kHud,
+                            myarc::kWindowCornerRadius, /*dark=*/true);
+
+  _canvas = [[MyarcUpdaterCanvasView alloc] initWithFrame:rect];
+  _canvas.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
+  [root addSubview:_canvas];
+
+  _iconView = [[NSImageView alloc] initWithFrame:NSMakeRect(24, 34, 58, 58)];
+  _iconView.image = myarc::UpdaterAppIcon();
+  _iconView.imageScaling = NSImageScaleProportionallyUpOrDown;
+  _iconView.wantsLayer = YES;
+  _iconView.layer.shadowColor = NSColor.blackColor.CGColor;
+  _iconView.layer.shadowOpacity = 0.35f;
+  _iconView.layer.shadowRadius = 8.0f;
+  _iconView.layer.shadowOffset = CGSizeMake(0, -3);
+  [_canvas addSubview:_iconView];
+
+  _titleField = [self
+      makeLabelWithSize:15
+                 weight:NSFontWeightSemibold
+                  color:[NSColor colorWithSRGBRed:0xF5 / 255.0
+                                            green:0xF5 / 255.0
+                                             blue:0xF7 / 255.0
+                                            alpha:1.0]];
+  [_canvas addSubview:_titleField];
+
+  _subtitleField = [self
+      makeLabelWithSize:12.5
+                 weight:NSFontWeightRegular
+                  color:[NSColor colorWithSRGBRed:0xBA / 255.0
+                                            green:0xBA / 255.0
+                                             blue:0xC2 / 255.0
+                                            alpha:1.0]];
+  [_canvas addSubview:_subtitleField];
+
+  _notesCard = [[MyarcUpdaterNotesCard alloc] initWithFrame:NSZeroRect];
+  _notesField = [self
+      makeLabelWithSize:11.5
+                 weight:NSFontWeightRegular
+                  color:[NSColor colorWithSRGBRed:0xD6 / 255.0
+                                            green:0xD6 / 255.0
+                                             blue:0xDC / 255.0
+                                            alpha:1.0]];
+  [_notesCard addSubview:_notesField];
+  [_canvas addSubview:_notesCard];
+
+  _notesLinkButton =
+      [[MyarcUpdaterButton alloc] initWithStyle:MyarcUpdaterButtonStyleLink];
+  _notesLinkButton.title = @"View release notes ↗";
+  _notesLinkButton.target = self;
+  _notesLinkButton.action = @selector(openReleaseNotes:);
+  [_canvas addSubview:_notesLinkButton];
+
+  _progressBar = [[MyarcUpdaterProgressBar alloc] initWithFrame:NSZeroRect];
+  [_canvas addSubview:_progressBar];
+
+  _primaryButton =
+      [[MyarcUpdaterButton alloc] initWithStyle:MyarcUpdaterButtonStylePrimary];
+  _primaryButton.target = self;
+  _primaryButton.action = @selector(primaryPressed:);
+  _primaryButton.keyEquivalent = @"\r";
+  [_canvas addSubview:_primaryButton];
+
+  _secondaryButton = [[MyarcUpdaterButton alloc]
+      initWithStyle:MyarcUpdaterButtonStyleSecondary];
+  _secondaryButton.target = self;
+  _secondaryButton.action = @selector(secondaryPressed:);
+  _secondaryButton.keyEquivalent = @"\033";
+  [_canvas addSubview:_secondaryButton];
+
+  _skipButton =
+      [[MyarcUpdaterButton alloc] initWithStyle:MyarcUpdaterButtonStyleLink];
+  _skipButton.title = @"Skip This Version";
+  _skipButton.target = self;
+  _skipButton.action = @selector(skipPressed:);
+  [_canvas addSubview:_skipButton];
+
+  [_window center];
+}
+
+- (void)layoutWindow {
+  const CGFloat textX = 98;
+  const CGFloat rightPad = 24;
+  const CGFloat textW = myarc::kWindowWidth - textX - rightPad;
+
+  CGFloat y = 34;
+  NSSize titleSize =
+      [_titleField sizeThatFits:NSMakeSize(textW, CGFLOAT_MAX)];
+  _titleField.frame =
+      NSMakeRect(textX, y, textW, std::ceil(titleSize.height) + 2);
+  y = NSMaxY(_titleField.frame) + 5;
+
+  if (!_subtitleField.hidden && _subtitleField.stringValue.length) {
+    NSSize subSize =
+        [_subtitleField sizeThatFits:NSMakeSize(textW, CGFLOAT_MAX)];
+    _subtitleField.frame =
+        NSMakeRect(textX, y, textW, std::ceil(subSize.height) + 2);
+    y = NSMaxY(_subtitleField.frame) + 12;
+  } else {
+    y += 6;
+  }
+
+  if (!_progressBar.hidden) {
+    _progressBar.frame = NSMakeRect(textX, y, textW, 6);
+    y = NSMaxY(_progressBar.frame) + 16;
+  }
+
+  if (!_notesCard.hidden) {
+    const CGFloat cardPadX = 12;
+    const CGFloat cardPadY = 10;
+    NSSize notesSize = [_notesField
+        sizeThatFits:NSMakeSize(textW - cardPadX * 2, CGFLOAT_MAX)];
+    const CGFloat textH =
+        std::min<CGFloat>(88, std::ceil(notesSize.height) + 2);
+    const CGFloat cardH = textH + cardPadY * 2;
+    _notesCard.frame = NSMakeRect(textX, y, textW, cardH);
+    _notesField.frame =
+        NSMakeRect(cardPadX, cardPadY, textW - cardPadX * 2, textH);
+    y = NSMaxY(_notesCard.frame) + 8;
+  }
+
+  if (!_notesLinkButton.hidden) {
+    NSSize linkSize = _notesLinkButton.intrinsicContentSize;
+    _notesLinkButton.frame =
+        NSMakeRect(textX, y, linkSize.width, linkSize.height);
+    y = NSMaxY(_notesLinkButton.frame) + 12;
+  }
+
+  // Ensure the icon column never collides with the button strip.
+  const CGFloat buttonsY = std::max<CGFloat>(y + 8, 122);
+  const CGFloat buttonH = 30;
+  CGFloat rightX = myarc::kWindowWidth - rightPad;
+
+  if (!_primaryButton.hidden) {
+    NSSize size = _primaryButton.intrinsicContentSize;
+    rightX -= size.width;
+    _primaryButton.frame = NSMakeRect(rightX, buttonsY, size.width, buttonH);
+    rightX -= 10;
+  }
+  if (!_secondaryButton.hidden) {
+    NSSize size = _secondaryButton.intrinsicContentSize;
+    rightX -= size.width;
+    _secondaryButton.frame = NSMakeRect(rightX, buttonsY, size.width, buttonH);
+  }
+  if (!_skipButton.hidden) {
+    NSSize size = _skipButton.intrinsicContentSize;
+    _skipButton.frame =
+        NSMakeRect(24, buttonsY + 3, size.width, size.height);
+  }
+
+  const CGFloat totalH = buttonsY + buttonH + 22;
+  NSRect frame = _window.frame;
+  const CGFloat deltaH = totalH - NSHeight(frame);
+  if (std::abs(deltaH) > 0.5) {
+    frame.origin.y -= deltaH;
+    frame.size.height = totalH;
+    [_window setFrame:frame display:YES];
+  }
+  [_canvas setNeedsDisplay:YES];
+}
+
+- (void)presentWindow {
+  [self layoutWindow];
+  if (NSApp.active) {
+    [_window makeKeyAndOrderFront:nil];
+  } else {
+    // Keep background launches and captures from stealing focus.
+    [_window orderFront:nil];
+  }
+}
+
+- (void)clearCallbacks {
+  _choiceReply = nil;
+  _acknowledgement = nil;
+  _cancellation = nil;
+  _retryTermination = nil;
+}
+
+- (void)closeWindowSilently {
+  [self clearCallbacks];
+  _progressBar.indeterminate = NO;
+  if (_window && _window.visible) {
+    _dismissingProgrammatically = YES;
+    [_window orderOut:nil];
+    _dismissingProgrammatically = NO;
+  }
+}
+
+- (void)configureTitle:(NSString*)title
+              subtitle:(NSString*)subtitle
+          showProgress:(BOOL)showProgress
+         indeterminate:(BOOL)indeterminate
+              progress:(double)progress
+                 notes:(NSString*)notes
+              notesURL:(NSURL*)notesURL
+          primaryTitle:(NSString*)primaryTitle
+        secondaryTitle:(NSString*)secondaryTitle
+              showSkip:(BOOL)showSkip {
+  [self ensureWindow];
+  _titleField.stringValue = title ?: @"";
+  _subtitleField.stringValue = subtitle ?: @"";
+  _subtitleField.hidden = (subtitle.length == 0);
+
+  _progressBar.hidden = !showProgress;
+  _progressBar.indeterminate = showProgress && indeterminate;
+  if (showProgress && !indeterminate) {
+    _progressBar.progress = progress;
+  }
+
+  _notesField.stringValue = notes ?: @"";
+  _notesCard.hidden = (notes.length == 0);
+  _notesLinkButton.hidden = !myarc::IsSafeExternalURL(notesURL);
+
+  _primaryButton.title = primaryTitle ?: @"";
+  _primaryButton.hidden = (primaryTitle.length == 0);
+  _primaryButton.enabled = YES;
+
+  _secondaryButton.title = secondaryTitle ?: @"";
+  _secondaryButton.hidden = (secondaryTitle.length == 0);
+  _secondaryButton.enabled = YES;
+
+  _skipButton.hidden = !showSkip;
+}
+
+// Button actions.
+- (void)primaryPressed:(id)sender {
+  if (_infoOnlyUpdate && myarc::IsSafeExternalURL(_releaseNotesURL)) {
+    [NSWorkspace.sharedWorkspace openURL:_releaseNotesURL];
+    auto reply = _choiceReply;
+    [self closeWindowSilently];
+    if (reply) {
+      reply(MyarcSparkleUpdateChoiceDismiss);
+    }
+    return;
+  }
+  if (_choiceReply) {
+    auto reply = _choiceReply;
+    [self clearCallbacks];
+    _primaryButton.enabled = NO;
+    reply(MyarcSparkleUpdateChoiceInstall);
+    return;
+  }
+  if (_acknowledgement) {
+    auto ack = _acknowledgement;
+    [self closeWindowSilently];
+    ack();
+    return;
+  }
+  if (_retryTermination) {
+    _retryTermination();
+    return;
+  }
+  [self closeWindowSilently];
+}
+
+- (void)secondaryPressed:(id)sender {
+  if (_cancellation) {
+    auto cancel = _cancellation;
+    [self closeWindowSilently];
+    cancel();
+    return;
+  }
+  if (_choiceReply) {
+    auto reply = _choiceReply;
+    [self closeWindowSilently];
+    reply(MyarcSparkleUpdateChoiceDismiss);
+    return;
+  }
+  if (_acknowledgement) {
+    auto ack = _acknowledgement;
+    [self closeWindowSilently];
+    ack();
+    return;
+  }
+  [self closeWindowSilently];
+}
+
+- (void)skipPressed:(id)sender {
+  auto reply = _choiceReply;
+  [self closeWindowSilently];
+  if (reply) {
+    reply(MyarcSparkleUpdateChoiceSkip);
+  }
+}
+
+- (void)openReleaseNotes:(id)sender {
+  if (myarc::IsSafeExternalURL(_releaseNotesURL)) {
+    [NSWorkspace.sharedWorkspace openURL:_releaseNotesURL];
+  }
+}
+
+// NSWindowDelegate: closing via the red traffic light dismisses or cancels
+// cleanly so Sparkle never hangs waiting on a reply block.
+- (void)windowWillClose:(NSNotification*)notification {
+  if (_dismissingProgrammatically) {
+    return;
+  }
+  auto choice = _choiceReply;
+  auto ack = _acknowledgement;
+  auto cancel = _cancellation;
+  [self clearCallbacks];
+  _progressBar.indeterminate = NO;
+  if (choice) {
+    choice(MyarcSparkleUpdateChoiceDismiss);
+  } else if (ack) {
+    ack();
+  } else if (cancel) {
+    cancel();
+  }
+}
+
+// --- SPUUserDriver protocol ---
+
+- (void)showUpdatePermissionRequest:(id)request
+                              reply:(void (^)(id))reply {
+  // myArc sets SUEnableAutomaticChecks in Info.plist; if Sparkle still asks,
+  // allow automatic checks without sending system profiles.
+  Class response_class = NSClassFromString(@"SUUpdatePermissionResponse");
+  if (!response_class || !reply) {
+    return;
+  }
+  id response = [(id<MyarcSparklePermissionResponse>)[response_class alloc]
+      initWithAutomaticUpdateChecks:YES
+         automaticUpdateDownloading:nil
+                  sendSystemProfile:NO];
+  reply(response);
+}
+
+- (void)showUserInitiatedUpdateCheckWithCancellation:
+    (void (^)(void))cancellation {
+  [self clearCallbacks];
+  _cancellation = [cancellation copy];
+  _expectedBytes = 0;
+  _receivedBytes = 0;
+  [self configureTitle:@"Checking for Updates…"
+              subtitle:[NSString stringWithFormat:@"Current version: %@",
+                                                  myarc::CurrentVersionLabel()]
+          showProgress:YES
+         indeterminate:YES
+              progress:0
+                 notes:nil
+              notesURL:nil
+          primaryTitle:nil
+        secondaryTitle:@"Cancel"
+              showSkip:NO];
+  [self presentWindow];
+}
+
+- (void)showUpdateFoundWithAppcastItem:(id<MyarcSparkleAppcastItem>)appcastItem
+                                 state:(id<MyarcSparkleUserUpdateState>)state
+                                 reply:(void (^)(MyarcSparkleUpdateChoice))reply {
+  const BOOL userInitiated = state && state.userInitiated;
+  const MyarcSparkleUpdateStage stage =
+      state ? state.stage : MyarcSparkleUpdateStageNotDownloaded;
+
+  // Automated test feeds stay completely non-interactive.
+  if (myarc::TestFeed() != nil) {
+    if (reply) {
+      reply(MyarcSparkleUpdateChoiceDismiss);
+    }
+    return;
+  }
+
+  // Keep background automatic checks silent until an update is ready to
+  // install, or until the user clicks "Check for Updates…".
+  if (!userInitiated && stage == MyarcSparkleUpdateStageNotDownloaded) {
+    if (reply) {
+      reply(MyarcSparkleUpdateChoiceDismiss);
+    }
+    return;
+  }
+
+  [self clearCallbacks];
+  _choiceReply = [reply copy];
+  _pendingVersionLabel = myarc::FormatUpdateVersion(appcastItem);
+  _infoOnlyUpdate = appcastItem && appcastItem.informationOnlyUpdate;
+  _releaseNotesURL =
+      appcastItem.releaseNotesURL ?: appcastItem.infoURL;
+  _releaseNotesSummary = myarc::SanitizeReleaseNotes(appcastItem.itemDescription);
+
+  const BOOL ready = (stage == MyarcSparkleUpdateStageInstalling);
+  NSString* title =
+      ready ? @"Update Ready to Install"
+            : [NSString stringWithFormat:@"%@ is available",
+                                         _pendingVersionLabel];
+  NSString* subtitle =
+      ready ? [NSString stringWithFormat:
+                            @"%@ has been downloaded and verified. Relaunch "
+                            @"myArc to finish updating.",
+                            _pendingVersionLabel]
+            : [NSString stringWithFormat:
+                            @"You’re currently on %@. Install the latest "
+                            @"nightly to get recent fixes and improvements.",
+                            myarc::CurrentVersionLabel()];
+  NSString* primary =
+      _infoOnlyUpdate ? @"Learn More"
+                      : (ready ? @"Install and Relaunch" : @"Install Update");
+  BOOL showSkip =
+      !ready && !_infoOnlyUpdate && !(appcastItem && appcastItem.criticalUpdate);
+
+  [self configureTitle:title
+              subtitle:subtitle
+          showProgress:NO
+         indeterminate:NO
+              progress:0
+                 notes:_releaseNotesSummary
+              notesURL:_releaseNotesURL
+          primaryTitle:primary
+        secondaryTitle:@"Later"
+              showSkip:showSkip];
+  [self presentWindow];
+}
+
+- (void)showUpdateReleaseNotesWithDownloadData:
+    (id<MyarcSparkleDownloadData>)downloadData {
+  if (!downloadData || !downloadData.data.length || !_window ||
+      !_window.visible) {
+    return;
+  }
+  NSData* slice =
+      downloadData.data.length > myarc::kMaxReleaseNotesInputBytes
+          ? [downloadData.data
+                subdataWithRange:NSMakeRange(
+                                     0, myarc::kMaxReleaseNotesInputBytes)]
+          : downloadData.data;
+  NSString* text = [[NSString alloc] initWithData:slice
+                                         encoding:NSUTF8StringEncoding];
+  NSString* summary = myarc::SanitizeReleaseNotes(text);
+  if (!summary.length) {
+    return;
+  }
+  _releaseNotesSummary = summary;
+  _notesField.stringValue = summary;
+  _notesCard.hidden = NO;
+  [self layoutWindow];
+}
+
+- (void)showUpdateReleaseNotesFailedToDownloadWithError:(NSError*)error {
+  // The release notes link remains clickable if available; no modal error.
+}
+
+- (void)showUpdateNotFoundWithError:(NSError*)error
+                    acknowledgement:(void (^)(void))acknowledgement {
+  if (myarc::TestFeed() != nil) {
+    if (acknowledgement) {
+      acknowledgement();
+    }
+    return;
+  }
+  [self clearCallbacks];
+  _acknowledgement = [acknowledgement copy];
+  NSString* subtitle = error.localizedRecoverySuggestion.length
+                           ? error.localizedRecoverySuggestion
+                           : [NSString
+                                 stringWithFormat:
+                                     @"myArc %@ is the newest version "
+                                     @"available.",
+                                     myarc::CurrentVersionLabel()];
+  [self configureTitle:@"You’re up to date"
+              subtitle:subtitle
+          showProgress:NO
+         indeterminate:NO
+              progress:0
+                 notes:nil
+              notesURL:nil
+          primaryTitle:@"OK"
+        secondaryTitle:nil
+              showSkip:NO];
+  [self presentWindow];
+}
+
+- (void)showUpdaterError:(NSError*)error
+         acknowledgement:(void (^)(void))acknowledgement {
+  if (myarc::TestFeed() != nil) {
+    if (acknowledgement) {
+      acknowledgement();
+    }
+    return;
+  }
+  [self clearCallbacks];
+  _acknowledgement = [acknowledgement copy];
+  NSString* detail = error.localizedDescription ?: @"The update could not be "
+                                                   @"completed.";
+  if (error.localizedRecoverySuggestion.length &&
+      ![detail containsString:error.localizedRecoverySuggestion]) {
+    detail = [NSString stringWithFormat:@"%@ %@", detail,
+                                        error.localizedRecoverySuggestion];
+  }
+  [self configureTitle:@"Update Error"
+              subtitle:detail
+          showProgress:NO
+         indeterminate:NO
+              progress:0
+                 notes:nil
+              notesURL:nil
+          primaryTitle:@"OK"
+        secondaryTitle:nil
+              showSkip:NO];
+  [self presentWindow];
+}
+
+- (void)showDownloadInitiatedWithCancellation:(void (^)(void))cancellation {
+  [self clearCallbacks];
+  _cancellation = [cancellation copy];
+  _expectedBytes = 0;
+  _receivedBytes = 0;
+  [self configureTitle:@"Downloading Update…"
+              subtitle:@"Connecting to update server…"
+          showProgress:YES
+         indeterminate:YES
+              progress:0
+                 notes:nil
+              notesURL:nil
+          primaryTitle:nil
+        secondaryTitle:@"Cancel"
+              showSkip:NO];
+  [self presentWindow];
+}
+
+- (void)showDownloadDidReceiveExpectedContentLength:
+    (uint64_t)expectedContentLength {
+  _expectedBytes = expectedContentLength;
+  _receivedBytes = 0;
+  if (_expectedBytes > 0) {
+    _progressBar.indeterminate = NO;
+    _progressBar.progress = 0.0;
+  }
+  _subtitleField.stringValue =
+      myarc::FormatByteProgress(_receivedBytes, _expectedBytes);
+}
+
+- (void)showDownloadDidReceiveDataOfLength:(uint64_t)length {
+  _receivedBytes += length;
+  if (_expectedBytes > 0) {
+    _progressBar.indeterminate = NO;
+    _progressBar.progress =
+        static_cast<double>(_receivedBytes) /
+        static_cast<double>(_expectedBytes);
+  }
+  _subtitleField.stringValue =
+      myarc::FormatByteProgress(_receivedBytes, _expectedBytes);
+}
+
+- (void)showDownloadDidStartExtractingUpdate {
+  [self clearCallbacks];
+  [self configureTitle:@"Extracting Update…"
+              subtitle:@"Verifying signature and preparing the update…"
+          showProgress:YES
+         indeterminate:YES
+              progress:0
+                 notes:nil
+              notesURL:nil
+          primaryTitle:nil
+        secondaryTitle:nil
+              showSkip:NO];
+  [self presentWindow];
+}
+
+- (void)showExtractionReceivedProgress:(double)progress {
+  _progressBar.indeterminate = NO;
+  _progressBar.progress = progress;
+  const int pct =
+      static_cast<int>(std::lround(std::clamp(progress, 0.0, 1.0) * 100.0));
+  _subtitleField.stringValue =
+      [NSString stringWithFormat:@"Extracting update… %d%%", pct];
+}
+
+- (void)showReadyToInstallAndRelaunch:
+    (void (^)(MyarcSparkleUpdateChoice))reply {
+  if (myarc::TestFeed() != nil) {
+    if (reply) {
+      reply(MyarcSparkleUpdateChoiceDismiss);
+    }
+    return;
+  }
+  [self clearCallbacks];
+  _choiceReply = [reply copy];
+  NSString* version = _pendingVersionLabel.length ? _pendingVersionLabel
+                                                  : @"The new myArc nightly";
+  [self configureTitle:@"Ready to Install"
+              subtitle:[NSString stringWithFormat:
+                                     @"%@ is verified and ready. Relaunch "
+                                     @"myArc to finish updating.",
+                                     version]
+          showProgress:NO
+         indeterminate:NO
+              progress:0
+                 notes:nil
+              notesURL:nil
+          primaryTitle:@"Install and Relaunch"
+        secondaryTitle:@"Later"
+              showSkip:NO];
+  [self presentWindow];
+}
+
+- (void)showInstallingUpdateWithApplicationTerminated:
+            (BOOL)applicationTerminated
+                          retryTerminatingApplication:
+                              (void (^)(void))retryTerminatingApplication {
+  [self clearCallbacks];
+  if (!applicationTerminated && retryTerminatingApplication) {
+    _retryTermination = [retryTerminatingApplication copy];
+  }
+  [self configureTitle:@"Installing Update…"
+              subtitle:applicationTerminated
+                           ? @"Finishing installation…"
+                           : @"Closing myArc to install the update…"
+          showProgress:YES
+         indeterminate:YES
+              progress:0
+                 notes:nil
+              notesURL:nil
+          primaryTitle:_retryTermination ? @"Relaunch Now" : nil
+        secondaryTitle:nil
+              showSkip:NO];
+  [self presentWindow];
+}
+
+- (void)showUpdateInstalledAndRelaunched:(BOOL)relaunched
+                         acknowledgement:(void (^)(void))acknowledgement {
+  [self closeWindowSilently];
+  if (acknowledgement) {
+    acknowledgement();
+  }
+}
+
+- (void)dismissUpdateInstallation {
+  [self closeWindowSilently];
+}
+
+- (void)showUpdateInFocus {
+  if (_window && _window.visible) {
+    [self presentWindow];
+  }
+}
+
+- (void)showPreviewState:(NSString*)state {
+  [self clearCallbacks];
+  _pendingVersionLabel = @"Nightly 2026.11.22.1";
+  _releaseNotesURL = [NSURL URLWithString:@"https://myarc.dev/download/"];
+  _infoOnlyUpdate = NO;
+
+  if ([state isEqualToString:@"checking"]) {
+    [self configureTitle:@"Checking for Updates…"
+                subtitle:[NSString stringWithFormat:@"Current version: %@",
+                                                    myarc::CurrentVersionLabel()]
+            showProgress:YES
+           indeterminate:YES
+                progress:0
+                   notes:nil
+                notesURL:nil
+            primaryTitle:nil
+          secondaryTitle:@"Cancel"
+                showSkip:NO];
+  } else if ([state isEqualToString:@"downloading"]) {
+    [self configureTitle:@"Downloading Update…"
+                subtitle:@"118.4 MB of 184.0 MB"
+            showProgress:YES
+           indeterminate:NO
+                progress:0.64
+                   notes:nil
+                notesURL:nil
+            primaryTitle:nil
+          secondaryTitle:@"Cancel"
+                showSkip:NO];
+  } else if ([state isEqualToString:@"extracting"]) {
+    [self configureTitle:@"Extracting Update…"
+                subtitle:@"Extracting update… 72%"
+            showProgress:YES
+           indeterminate:NO
+                progress:0.72
+                   notes:nil
+                notesURL:nil
+            primaryTitle:nil
+          secondaryTitle:nil
+                showSkip:NO];
+  } else if ([state isEqualToString:@"up-to-date"]) {
+    [self configureTitle:@"You’re up to date"
+                subtitle:[NSString
+                             stringWithFormat:@"myArc %@ is the newest "
+                                              @"version available.",
+                                              myarc::CurrentVersionLabel()]
+            showProgress:NO
+           indeterminate:NO
+                progress:0
+                   notes:nil
+                notesURL:nil
+            primaryTitle:@"OK"
+          secondaryTitle:nil
+                showSkip:NO];
+  } else if ([state isEqualToString:@"error"]) {
+    [self configureTitle:@"Update Error"
+                subtitle:@"The downloaded update failed EdDSA signature "
+                         @"verification and was discarded."
+            showProgress:NO
+           indeterminate:NO
+                progress:0
+                   notes:nil
+                notesURL:nil
+            primaryTitle:@"OK"
+          secondaryTitle:nil
+                showSkip:NO];
+  } else if ([state isEqualToString:@"ready"]) {
+    [self configureTitle:@"Ready to Install"
+                subtitle:@"Nightly 2026.11.22.1 is verified and ready. "
+                         @"Relaunch myArc to finish updating."
+            showProgress:NO
+           indeterminate:NO
+                progress:0
+                   notes:nil
+                notesURL:nil
+            primaryTitle:@"Install and Relaunch"
+          secondaryTitle:@"Later"
+                showSkip:NO];
+  } else {
+    // Default preview: "Update Available" with release notes card + link.
+    [self configureTitle:@"Nightly 2026.11.22.1 is available"
+                subtitle:[NSString stringWithFormat:
+                                       @"You’re currently on %@. Install the "
+                                       @"latest nightly to get recent fixes.",
+                                       myarc::CurrentVersionLabel()]
+            showProgress:NO
+           indeterminate:NO
+                progress:0
+                   notes:@"• Frosted glass styling across Settings, dialogs, "
+                         @"popovers, and coach marks\n"
+                         @"• Faster startup with lazy hidden Profile windows\n"
+                         @"• Simplified one-click Arc import"
+                notesURL:_releaseNotesURL
+            primaryTitle:@"Install and Relaunch"
+          secondaryTitle:@"Later"
+                showSkip:YES];
+  }
+  [self presentWindow];
+}
+
 @end
 
 // Sparkle's SPUUpdaterDelegate. The feed comes from Info.plist's SUFeedURL
-// unless a test hook set `feedURL`. It is also the SPUStandardUserDriverDelegate
-// and SUVersionDisplay, so Sparkle's dialogs show the nightly label
-// (Info.plist `MyarcVersion`) instead of CFBundleShortVersionString, which
-// stays Chromium's version.
+// unless a test hook set `feedURL`.
 @interface MyarcUpdaterDelegate : NSObject
 @property(nonatomic, copy) NSString* feedURL;
 @end
@@ -43,31 +1471,6 @@
 
 - (NSString*)feedURLStringForUpdater:(id)updater {
   return _feedURL;
-}
-
-- (id)standardUserDriverRequestsVersionDisplayer {
-  return self;
-}
-
-- (NSString*)myarcVersionOr:(NSString*)fallback {
-  NSString* version = base::apple::ObjCCast<NSString>(
-      [base::apple::OuterBundle() objectForInfoDictionaryKey:@"MyarcVersion"]);
-  return version.length ? version : fallback;
-}
-
-- (NSString*)formatUpdateDisplayVersionFromUpdate:
-                 (id<MyarcSparkleAppcastItem>)update
-                          andBundleDisplayVersion:
-                              (NSString* __autoreleasing*)inOutBundleVersion
-                                withBundleVersion:(NSString*)bundleVersion {
-  *inOutBundleVersion = [self myarcVersionOr:*inOutBundleVersion];
-  return update.displayVersionString;
-}
-
-- (NSString*)formatBundleDisplayVersion:(NSString*)bundleDisplayVersion
-                      withBundleVersion:(NSString*)bundleVersion
-                         matchingUpdate:(id)matchingUpdate {
-  return [self myarcVersionOr:bundleDisplayVersion];
 }
 
 #if BUILDFLAG(MYARC_TEST_HOOKS)
@@ -119,31 +1522,10 @@
 namespace myarc {
 namespace {
 
-#if BUILDFLAG(MYARC_TEST_HOOKS)
-// Points Sparkle at a local appcast, downloads in the background and checks
-// right away, so a test sees the result without any window.
-constexpr char kTestUpdateFeed[] = "myarc-test-update-feed";
-#endif
-
-// Seconds between building the menu and starting Sparkle, so loading the
-// framework and its first check stay off the startup path.
-constexpr int64_t kStartDelaySeconds = 5;
-
 MyarcUpdaterDelegate* g_delegate = nil;
-id<MyarcSparkleController> g_controller = nil;
+MyarcSparkleUserDriver* g_driver = nil;
+id<MyarcSparkleUpdater> g_updater = nil;
 bool g_started = false;
-
-NSString* TestFeed() {
-#if BUILDFLAG(MYARC_TEST_HOOKS)
-  const base::CommandLine* command_line =
-      base::CommandLine::ForCurrentProcess();
-  if (command_line->HasSwitch(kTestUpdateFeed)) {
-    return base::SysUTF8ToNSString(
-        command_line->GetSwitchValueASCII(kTestUpdateFeed));
-  }
-#endif
-  return nil;
-}
 
 NSString* SparklePath() {
   return [base::apple::OuterBundle().privateFrameworksPath
@@ -161,7 +1543,7 @@ bool UpdaterAvailable() {
   return [NSFileManager.defaultManager fileExistsAtPath:SparklePath()];
 }
 
-id<MyarcSparkleController> StartUpdater() {
+id<MyarcSparkleUpdater> StartUpdater() {
   NSString* feed = TestFeed();
   NSBundle* sparkle = [NSBundle bundleWithPath:SparklePath()];
   NSError* error = nil;
@@ -172,12 +1554,13 @@ id<MyarcSparkleController> StartUpdater() {
                            : std::string());
     return nil;
   }
-  Class controller_class = NSClassFromString(@"SPUStandardUpdaterController");
-  if (!controller_class) {
+  Class updater_class = NSClassFromString(@"SPUUpdater");
+  if (!updater_class) {
     return nil;
   }
   g_delegate = [[MyarcUpdaterDelegate alloc] init];
   g_delegate.feedURL = feed;
+  g_driver = [[MyarcSparkleUserDriver alloc] init];
 #if BUILDFLAG(MYARC_TEST_HOOKS)
   if (feed) {
     // The argument domain is never saved, so the user's settings stay as
@@ -190,52 +1573,82 @@ id<MyarcSparkleController> StartUpdater() {
     [defaults setVolatileDomain:arguments forName:NSArgumentDomain];
   }
 #endif
-  id<MyarcSparkleController> controller =
-      [(id<MyarcSparkleController>)[controller_class alloc]
-          initWithStartingUpdater:YES
-                  updaterDelegate:g_delegate
-               userDriverDelegate:g_delegate];
+  NSBundle* bundle = base::apple::OuterBundle();
+  id<MyarcSparkleUpdater> updater =
+      [(id<MyarcSparkleUpdater>)[updater_class alloc]
+          initWithHostBundle:bundle
+           applicationBundle:bundle
+                  userDriver:g_driver
+                    delegate:g_delegate];
+  NSError* start_error = nil;
+  if (![updater startUpdater:&start_error]) {
+    LOG(WARNING) << "No updater: SPUUpdater failed to start"
+                 << (start_error
+                         ? ": " + base::SysNSStringToUTF8(
+                                      start_error.localizedDescription)
+                         : std::string());
+    return nil;
+  }
 #if BUILDFLAG(MYARC_TEST_HOOKS)
   if (feed) {
-    [controller.updater checkForUpdatesInBackground];
+    [updater checkForUpdatesInBackground];
   }
 #endif
-  return controller;
+  return updater;
 }
 
 // Starts Sparkle once, from the delayed start or the first menu click.
-id<MyarcSparkleController> EnsureUpdater() {
+id<MyarcSparkleUpdater> EnsureUpdater() {
   if (!g_started) {
     g_started = true;
-    g_controller = StartUpdater();
+    g_updater = StartUpdater();
   }
-  return g_controller;
+  return g_updater;
 }
+
+#if BUILDFLAG(MYARC_TEST_HOOKS)
+void MaybeShowUpdaterPreview() {
+  static bool scheduled = false;
+  if (scheduled) {
+    return;
+  }
+  const base::CommandLine* cmd = base::CommandLine::ForCurrentProcess();
+  if (!cmd->HasSwitch(kCaptureUpdaterUi)) {
+    return;
+  }
+  scheduled = true;
+  NSString* state =
+      base::SysUTF8ToNSString(cmd->GetSwitchValueASCII(kCaptureUpdaterUi));
+  dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 1 * NSEC_PER_SEC),
+                 dispatch_get_main_queue(), ^{
+                   if (!g_driver) {
+                     g_driver = [[MyarcSparkleUserDriver alloc] init];
+                   }
+                   [g_driver showPreviewState:state];
+                 });
+}
+#endif  // BUILDFLAG(MYARC_TEST_HOOKS)
 
 }  // namespace
 }  // namespace myarc
 
 // The menu item's target. Starts Sparkle on the first click if the delayed
-// start hasn't yet, then forwards to Sparkle's controller.
+// start hasn't yet, then forwards to Sparkle's updater.
 @interface MyarcUpdaterMenuTarget : NSObject <NSMenuItemValidation>
 @end
 
 @implementation MyarcUpdaterMenuTarget
 
 - (void)checkForUpdates:(id)sender {
-  [myarc::EnsureUpdater() checkForUpdates:sender];
+  [myarc::EnsureUpdater() checkForUpdates];
 }
 
 - (BOOL)validateMenuItem:(NSMenuItem*)item {
   if (!myarc::g_started) {
     return YES;
   }
-  id controller = myarc::g_controller;
-  if (!controller) {
-    return NO;
-  }
-  return ![controller respondsToSelector:@selector(validateMenuItem:)] ||
-         [controller validateMenuItem:item];
+  id<MyarcSparkleUpdater> updater = myarc::g_updater;
+  return updater != nil && updater.canCheckForUpdates;
 }
 
 @end
@@ -243,6 +1656,9 @@ id<MyarcSparkleController> EnsureUpdater() {
 namespace myarc {
 
 void AddUpdaterMenuItem(NSMenu* app_menu, NSInteger index) {
+#if BUILDFLAG(MYARC_TEST_HOOKS)
+  MaybeShowUpdaterPreview();
+#endif
   static MyarcUpdaterMenuTarget* target = nil;
   if (!target) {
     if (!UpdaterAvailable()) {

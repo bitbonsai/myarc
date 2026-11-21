@@ -727,11 +727,16 @@ source_set("updater") {
     "updater_mac.mm",
   ]
   deps = [
+    ":glass",
     ":nightly_buildflags",
     ":test_buildflags",
+    ":welcome_mark",
     "//base",
   ]
-  frameworks = [ "Cocoa.framework" ]
+  frameworks = [
+    "Cocoa.framework",
+    "QuartzCore.framework",
+  ]
 }
 
 source_set("nightly_switches") {

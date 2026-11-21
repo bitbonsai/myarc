@@ -169,6 +169,11 @@ if [ "${1:-}" = "--inner" ]; then
     advanced) EXTRA+=(--myarc-capture-open-settings=advanced); SHOT_TITLE=(Advanced) ;;
     *) EXTRA+=(--myarc-capture-open-settings); SHOT_TITLE=(General) ;;
   esac
+  case "${UPDATER:-}" in
+    "") ;;
+    1) EXTRA+=(--myarc-capture-updater-ui); SHOT_TITLE=("Software Update") ;;
+    *) EXTRA+=(--myarc-capture-updater-ui="$UPDATER"); SHOT_TITLE=("Software Update") ;;
+  esac
   # -g: launch without activating, so the user's frontmost app keeps focus.
   open -g -n ${OPEN_ENV[@]+"${OPEN_ENV[@]}"} -a "$APP" --args --user-data-dir="$PROFILE" --no-first-run --no-default-browser-check --use-mock-keychain \
     --enable-features=GlassFrame --disable-features=InitialWebUI \
