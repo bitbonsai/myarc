@@ -27,13 +27,11 @@ Sparkle's default update window was still an opaque gray box, so I replaced its 
 
 *The updater window once an update is verified and ready.*
 
-## One-click Arc import and a simpler welcome
+## A simpler welcome and one-click Arc import
 
-Settings and the welcome screen used to show a "Choose a file…" button next to "Import". That was left over from when myArc only read Arc's Markdown export.
+A welcome screen shouldn't make you read a manual. If Arc is on your Mac, you see **Import from Arc** and **Let's go**. If it isn't, you just get **Let's go**. No extra links, no file pickers up front.
 
-Clicking **Import from Arc** now checks `~/Library/Application Support/Arc/StorableSidebar.json` on its own and opens the preview right away, with your Arc profile names, Favorites, pinned tab names and page titles. If Arc isn't on that Mac, Settings shows a dialog that lets you pick an export or backup file from another machine.
-
-On the welcome screen, **Import from Arc** only appears when Arc is installed on the Mac. Otherwise you get one button, **Let's go**. I also dropped the "Found your Arc data" label, the "Choose a file…" link and the "Skip tour" link from the welcome screen. Esc still skips the tour, and every tour card has its own Skip button.
+Clicking **Import from Arc** finds your Arc data on its own and opens a preview right away, with your profile names, Favorites, pinned tab names and page titles. If you're moving from another Mac, Settings still lets you pick an export file.
 
 ![The myArc welcome screen with the 3D ribbon A logo above myArc, forever yours., and two centered pill buttons: Import from Arc in blue and Let's go in translucent ivory](welcome.png)
 
