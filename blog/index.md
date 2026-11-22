@@ -8,7 +8,7 @@ November 2026
 
 November 22, 2026
 
-myArc's dialogs, Settings, command bar and updater now sit on macOS frosted glass, Arc import is one click, and pinned extension icons live in the URL pill on hover.
+Settings, dialogs, the command bar and the updater now use macOS frosted glass, Arc import is one click, and pinned extension icons sit in the URL pill on hover.
 
 ## [A proper welcome](https://myarc.dev/blog/a-proper-welcome/)
 
