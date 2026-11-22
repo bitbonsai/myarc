@@ -1,8 +1,35 @@
 diff --git a/chrome/browser/ui/views/extensions/extensions_toolbar_desktop.cc b/chrome/browser/ui/views/extensions/extensions_toolbar_desktop.cc
-index dce94a0eb7efbdd2a569ddf636695fa090237a42..6eb7036313e3667665e65ef0b10f750a9ab829b1 100644
+index dce94a0eb7efbdd2a569ddf636695fa090237a42..9abdb437004ea012da2bebb2e40a699fcbba2bc3 100644
 --- a/chrome/browser/ui/views/extensions/extensions_toolbar_desktop.cc
 +++ b/chrome/browser/ui/views/extensions/extensions_toolbar_desktop.cc
-@@ -697,6 +697,11 @@ views::LabelButton* ExtensionsToolbarDesktop::GetOverflowReferenceView() const {
+@@ -453,6 +453,11 @@ void ExtensionsToolbarDesktop::ShowWidgetForExtension(
+     const std::string& extension_id) {
+   anchored_widgets_.push_back({widget, extension_id});
+   widget->AddObserver(this);
++  if (myarc_sidebar_mode_) {
++    // The URL pill hides the container until hovered; reveal it so the
++    // dialog anchors to the extension's icon.
++    UpdateContainerVisibility();
++  }
+   UpdateIconVisibility(extension_id);
+   GetAnimatingLayoutManager()->PostOrQueueAction(
+       base::BindOnce(&ExtensionsToolbarDesktop::AnchorAndShowWidgetImmediately,
+@@ -583,9 +588,12 @@ void ExtensionsToolbarDesktop::AnchorAndShowWidgetImmediately(
+   // Revisit how to handle that, likely the Widget should Close on removal which
+   // would remove the AnchoredWidget entry.
+   views::View* const anchor_view = GetViewForId(iter->extension_id);
++  // The URL pill hides the extensions button, so fall back to the container.
++  views::View* const fallback_view =
++      myarc_sidebar_mode_ ? static_cast<views::View*>(this)
++                          : GetExtensionsButton();
+   widget->widget_delegate()->AsBubbleDialogDelegate()->SetAnchorView(
+-      anchor_view && anchor_view->GetVisible() ? anchor_view
+-                                               : GetExtensionsButton());
++      anchor_view && anchor_view->GetVisible() ? anchor_view : fallback_view);
+   widget->Show();
+ }
+ 
+@@ -697,6 +705,11 @@ views::LabelButton* ExtensionsToolbarDesktop::GetOverflowReferenceView() const {
  
  gfx::Size ExtensionsToolbarDesktop::GetToolbarActionSize() {
    constexpr gfx::Size kDefaultSize(28, 28);
@@ -14,7 +41,7 @@ index dce94a0eb7efbdd2a569ddf636695fa090237a42..6eb7036313e3667665e65ef0b10f750a
    BrowserView* const browser_view =
        BrowserView::GetBrowserViewForBrowser(browser_);
    return browser_view
-@@ -877,6 +882,9 @@ void ExtensionsToolbarDesktop::OnPinnedActionsChanged() {
+@@ -877,6 +890,9 @@ void ExtensionsToolbarDesktop::OnPinnedActionsChanged() {
      UpdateIconVisibility(it.first);
    }
    ReorderAllChildViews();
@@ -24,7 +51,17 @@ index dce94a0eb7efbdd2a569ddf636695fa090237a42..6eb7036313e3667665e65ef0b10f750a
  
    drop_weak_ptr_factory_.InvalidateWeakPtrs();
  }
-@@ -1095,6 +1103,30 @@ void ExtensionsToolbarDesktop::SetExtensionIconVisibility(
+@@ -1055,6 +1071,9 @@ void ExtensionsToolbarDesktop::OnWidgetDestroying(views::Widget* widget) {
+   anchored_widgets_.erase(iter);
+   if (GetWidget() && !GetWidget()->IsClosed()) {
+     UpdateIconVisibility(extension_id);
++    if (myarc_sidebar_mode_) {
++      UpdateContainerVisibilityAfterAnimation();
++    }
+   }
+ }
+ 
+@@ -1095,6 +1114,31 @@ void ExtensionsToolbarDesktop::SetExtensionIconVisibility(
        visible ? GetExtensionIcon(extension_view) : ui::ImageModel());
  }
  
@@ -34,7 +71,8 @@ index dce94a0eb7efbdd2a569ddf636695fa090237a42..6eb7036313e3667665e65ef0b10f750a
 +  }
 +  myarc_sidebar_mode_ = enabled;
 +  myarc_revealed_ = false;
-+  // The pill shows pinned icons only, as Arc's does.
++  // The pill shows pinned icons only, as Arc's does, with no container ring.
++  SetHighlightBorderEnabled(!enabled);
 +  extensions_button_->SetVisible(!enabled);
 +  GetTargetLayoutManager()->SetCrossAxisAlignment(
 +      enabled ? views::LayoutAlignment::kCenter
@@ -55,7 +93,7 @@ index dce94a0eb7efbdd2a569ddf636695fa090237a42..6eb7036313e3667665e65ef0b10f750a
  void ExtensionsToolbarDesktop::UpdateContainerVisibility() {
    bool was_visible = GetVisible();
    SetVisible(ShouldContainerBeVisible());
-@@ -1103,6 +1135,10 @@ void ExtensionsToolbarDesktop::UpdateContainerVisibility() {
+@@ -1103,6 +1147,10 @@ void ExtensionsToolbarDesktop::UpdateContainerVisibility() {
    // resetting.
    if (was_visible != GetVisible()) {
      GetAnimatingLayoutManager()->ResetLayout();
@@ -66,14 +104,14 @@ index dce94a0eb7efbdd2a569ddf636695fa090237a42..6eb7036313e3667665e65ef0b10f750a
    }
  
    if (!was_visible && GetVisible() && GetOnVisibleCallbackForTesting()) {
-@@ -1117,6 +1153,14 @@ bool ExtensionsToolbarDesktop::ShouldContainerBeVisible() const {
+@@ -1117,6 +1165,14 @@ bool ExtensionsToolbarDesktop::ShouldContainerBeVisible() const {
      return false;
    }
  
 +  if (myarc_sidebar_mode_) {
 +    // In the URL pill, pinned icons show with its hover actions, and an open
-+    // popup keeps its icon.
-+    return popped_out_action_ || popup_owner_ ||
++    // popup or anchored dialog keeps its icon.
++    return popped_out_action_ || popup_owner_ || !anchored_widgets_.empty() ||
 +           (myarc_revealed_ &&
 +            !toolbar_view_model_->GetPinnedActionIds().empty());
 +  }
@@ -81,9 +119,22 @@ index dce94a0eb7efbdd2a569ddf636695fa090237a42..6eb7036313e3667665e65ef0b10f750a
    // All other display modes are constantly visible.
    if (display_mode_ != DisplayMode::kAutoHide) {
      return true;
-@@ -1269,7 +1313,8 @@ views::BubbleAnchor ExtensionsToolbarDesktop::GetExtensionsButtonAnchor() {
+@@ -1265,11 +1321,21 @@ views::BubbleAnchor ExtensionsToolbarDesktop::GetReferenceButtonForPopup(
  }
  
+ views::BubbleAnchor ExtensionsToolbarDesktop::GetExtensionsButtonAnchor() {
++  // The URL pill hides the extensions button; anchor to the container.
++  if (myarc_sidebar_mode_) {
++    return views::BubbleAnchor(this);
++  }
+   return views::BubbleAnchor(GetExtensionsButton());
+ }
+ 
++bool ExtensionsToolbarDesktop::CanRevealForExtension(
++    const extensions::ExtensionId& extension_id) const {
++  return myarc_sidebar_mode_ && icons_.contains(extension_id);
++}
++
  views::BubbleBorder::Arrow ExtensionsToolbarDesktop::GetPopupArrow() const {
 -  return views::BubbleBorder::TOP_RIGHT;
 +  return myarc_sidebar_mode_ ? views::BubbleBorder::TOP_LEFT

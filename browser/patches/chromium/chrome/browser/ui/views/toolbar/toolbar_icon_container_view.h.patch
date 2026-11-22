@@ -1,0 +1,25 @@
+diff --git a/chrome/browser/ui/views/toolbar/toolbar_icon_container_view.h b/chrome/browser/ui/views/toolbar/toolbar_icon_container_view.h
+index 4b4cf6cb8d7ee5b72d4c17dbfd5e2bed02f01ca6..937bb29057620402d5fdbdeb1296f5d12944c42f 100644
+--- a/chrome/browser/ui/views/toolbar/toolbar_icon_container_view.h
++++ b/chrome/browser/ui/views/toolbar/toolbar_icon_container_view.h
+@@ -54,6 +54,11 @@ class ToolbarIconContainerView : public views::View,
+ 
+   bool uses_highlight() const { return uses_highlight_; }
+ 
++  // Turns the highlight border off, for hosts that draw their own container
++  // (myArc's sidebar URL pill). The border layer is positioned in widget
++  // coordinates, which only line up while the container sits in the toolbar.
++  void SetHighlightBorderEnabled(bool enabled);
++
+   // Provides access to the animating layout manager for subclasses.
+   views::AnimatingLayoutManager* GetAnimatingLayoutManager();
+   const views::AnimatingLayoutManager* GetAnimatingLayoutManager() const;
+@@ -101,7 +106,7 @@ class ToolbarIconContainerView : public views::View,
+   void OnButtonHighlightedChanged(views::Button* button);
+ 
+   // Determine whether the container shows its highlight border.
+-  const bool uses_highlight_;
++  bool uses_highlight_;
+ 
+   // The main view is nominally always present and is last child in the view
+   // hierarchy.

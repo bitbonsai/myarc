@@ -1,0 +1,16 @@
+diff --git a/chrome/browser/ui/webui/webui_toolbar/webui_toolbar_extensions_container.cc b/chrome/browser/ui/webui/webui_toolbar/webui_toolbar_extensions_container.cc
+index d833d40ede5d9e7b42b0fc72242b5d0fc8a887b9..0b5d84b55bb680ebe6836d7b3ec9f01e9dfb1fb2 100644
+--- a/chrome/browser/ui/webui/webui_toolbar/webui_toolbar_extensions_container.cc
++++ b/chrome/browser/ui/webui/webui_toolbar/webui_toolbar_extensions_container.cc
+@@ -535,6 +535,11 @@ views::BubbleBorder::Arrow WebUIToolbarExtensionsContainer::GetPopupArrow()
+   return views::BubbleBorder::TOP_RIGHT;
+ }
+ 
++bool WebUIToolbarExtensionsContainer::CanRevealForExtension(
++    const extensions::ExtensionId& extension_id) const {
++  return false;
++}
++
+ void WebUIToolbarExtensionsContainer::CollapseConfirmation() {
+   NOTIMPLEMENTED();
+ }

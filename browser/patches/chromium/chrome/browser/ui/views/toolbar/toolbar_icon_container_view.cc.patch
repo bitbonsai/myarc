@@ -1,0 +1,19 @@
+diff --git a/chrome/browser/ui/views/toolbar/toolbar_icon_container_view.cc b/chrome/browser/ui/views/toolbar/toolbar_icon_container_view.cc
+index 226bad58b3a067803f489bb933d1a7da2d01715d..2e4ddd9b34ee308490ea8f75a83cd876621c8282 100644
+--- a/chrome/browser/ui/views/toolbar/toolbar_icon_container_view.cc
++++ b/chrome/browser/ui/views/toolbar/toolbar_icon_container_view.cc
+@@ -166,6 +166,14 @@ void ToolbarIconContainerView::ObserveButton(views::Button* button) {
+   button->AddObserver(this);
+ }
+ 
++void ToolbarIconContainerView::SetHighlightBorderEnabled(bool enabled) {
++  if (uses_highlight_ == enabled) {
++    return;
++  }
++  uses_highlight_ = enabled;
++  UpdateHighlight();
++}
++
+ bool ToolbarIconContainerView::GetHighlighted() const {
+   if (!uses_highlight_) {
+     return false;

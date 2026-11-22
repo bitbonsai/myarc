@@ -1,0 +1,15 @@
+diff --git a/chrome/browser/ui/extensions/extension_post_install_dialog.cc b/chrome/browser/ui/extensions/extension_post_install_dialog.cc
+index 2938bf6741437b3b273a4c1c8d446ad41829d179..f79eab231fc9f651271c9efa4c8b0c95c3ad1d4a 100644
+--- a/chrome/browser/ui/extensions/extension_post_install_dialog.cc
++++ b/chrome/browser/ui/extensions/extension_post_install_dialog.cc
+@@ -89,6 +89,10 @@ void ConfigurePostInstallDialogModel(
+       base::DoNothing(),
+       ui::DialogModel::Button::Params().SetLabel(
+           l10n_util::GetStringUTF16(IDS_EXTENSION_INSTALLED_OK_BUTTON)));
++#else
++  // Keep a close button even when the dialog falls back to a browser modal,
++  // which has no other way out.
++  dialog_model_builder.OverrideShowCloseButton(true);
+ #endif
+ }
+ 

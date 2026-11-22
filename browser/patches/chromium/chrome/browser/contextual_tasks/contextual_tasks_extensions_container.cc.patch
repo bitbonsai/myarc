@@ -1,0 +1,16 @@
+diff --git a/chrome/browser/contextual_tasks/contextual_tasks_extensions_container.cc b/chrome/browser/contextual_tasks/contextual_tasks_extensions_container.cc
+index a5da09732c5aca5f93a63b2128a440c528de3abe..3dea97f038a4b8fafef73b6c08bcd3c7e09a8a05 100644
+--- a/chrome/browser/contextual_tasks/contextual_tasks_extensions_container.cc
++++ b/chrome/browser/contextual_tasks/contextual_tasks_extensions_container.cc
+@@ -218,6 +218,11 @@ views::BubbleBorder::Arrow ContextualTasksExtensionsContainer::GetPopupArrow()
+   return views::BubbleBorder::TOP_LEFT;
+ }
+ 
++bool ContextualTasksExtensionsContainer::CanRevealForExtension(
++    const extensions::ExtensionId& extension_id) const {
++  return false;
++}
++
+ void ContextualTasksExtensionsContainer::OnToolbarModelInitialized() {
+   CreateActions();
+ }

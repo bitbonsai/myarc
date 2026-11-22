@@ -1,0 +1,13 @@
+diff --git a/chrome/browser/resources/extensions/toolbar.html.ts b/chrome/browser/resources/extensions/toolbar.html.ts
+index f2de5b086ddc9508c8cfac534482aa183e8a8359..bfda8d1f4467afe5d3d52ba908ab06c90d9f4280 100644
+--- a/chrome/browser/resources/extensions/toolbar.html.ts
++++ b/chrome/browser/resources/extensions/toolbar.html.ts
+@@ -13,7 +13,7 @@ export function getHtml(this: ToolbarElement) {
+ <cr-toolbar id="toolbar" page-name="$i18n{toolbarTitle}"
+     search-prompt="$i18n{search}" clear-label="$i18n{clearSearch}" autofocus
+     menu-label="$i18n{mainMenu}" ?narrow="${this.narrow}"
+-    @narrow-changed="${this.onNarrowChanged_}" narrow-threshold="1000"
++    @narrow-changed="${this.onNarrowChanged_}" narrow-threshold="720"
+     ?show-menu="${this.narrow}">
+   <div class="more-actions">
+     <span id="devModeLabel">$i18n{toolbarDevMode}</span>

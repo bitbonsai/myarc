@@ -1,0 +1,46 @@
+diff --git a/chrome/browser/ui/extensions/extension_dialog_utils_views.cc b/chrome/browser/ui/extensions/extension_dialog_utils_views.cc
+index e59ca9ea3884c7265ee3dab87aa7b77771ff5df5..9bd246b71cc992d0f89230e809deb383daddf270 100644
+--- a/chrome/browser/ui/extensions/extension_dialog_utils_views.cc
++++ b/chrome/browser/ui/extensions/extension_dialog_utils_views.cc
+@@ -31,6 +31,21 @@ views::BubbleAnchor GetDialogAnchor(
+   return container->GetExtensionsButtonAnchor();
+ }
+ 
++// Returns whether the dialog can anchor to `container`. A hidden container
++// still works when it reveals itself for a single extension (myArc's URL pill).
++bool CanAnchorDialog(
++    ExtensionsContainerViews* container,
++    const std::vector<extensions::ExtensionId>& extension_ids) {
++  if (!container) {
++    return false;
++  }
++  const bool can_show =
++      container->IsVisible() ||
++      (extension_ids.size() == 1 &&
++       container->CanRevealForExtension(extension_ids[0]));
++  return can_show && !GetDialogAnchor(container, extension_ids).IsNull();
++}
++
+ }  // namespace
+ 
+ void ShowDialog(gfx::NativeWindow parent,
+@@ -54,8 +69,7 @@ void ShowDialog(gfx::NativeWindow parent,
+                 std::unique_ptr<ui::DialogModel> dialog_model) {
+   ExtensionsContainerViews* const container =
+       parent ? GetExtensionsContainerViews(parent) : nullptr;
+-  if (container && container->IsVisible() &&
+-      !GetDialogAnchor(container, extension_ids).IsNull()) {
++  if (CanAnchorDialog(container, extension_ids)) {
+     ShowDialog(container, extension_ids, std::move(dialog_model));
+   } else {
+     // If the container is not available, show a modal dialog.
+@@ -68,8 +82,7 @@ void ShowDialog(content::WebContents* web_contents,
+                 std::unique_ptr<ui::DialogModel> dialog_model) {
+   ExtensionsContainerViews* const container =
+       GetExtensionsContainerViews(web_contents);
+-  if (container && container->IsVisible() &&
+-      !GetDialogAnchor(container, extension_ids).IsNull()) {
++  if (CanAnchorDialog(container, extension_ids)) {
+     ShowDialog(container, extension_ids, std::move(dialog_model));
+   } else {
+     ShowModalDialog(web_contents ? web_contents->GetTopLevelNativeWindow()

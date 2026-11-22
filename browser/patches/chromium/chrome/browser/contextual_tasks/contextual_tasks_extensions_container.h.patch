@@ -1,0 +1,13 @@
+diff --git a/chrome/browser/contextual_tasks/contextual_tasks_extensions_container.h b/chrome/browser/contextual_tasks/contextual_tasks_extensions_container.h
+index 4178dd8cec15d4f68cecfc954ce2b46e1bf76c49..b3dd6ece64604842b804b3ce7fe0ecd603539b3d 100644
+--- a/chrome/browser/contextual_tasks/contextual_tasks_extensions_container.h
++++ b/chrome/browser/contextual_tasks/contextual_tasks_extensions_container.h
+@@ -98,6 +98,8 @@ class ContextualTasksExtensionsContainer
+       const extensions::ExtensionId& action_id) override;
+   views::BubbleAnchor GetExtensionsButtonAnchor() override;
+   views::BubbleBorder::Arrow GetPopupArrow() const override;
++  bool CanRevealForExtension(
++      const extensions::ExtensionId& extension_id) const override;
+ 
+   // ToolbarActionsModel::Observer:
+   void OnToolbarModelInitialized() override;

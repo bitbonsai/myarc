@@ -1,0 +1,16 @@
+diff --git a/chrome/browser/ui/views/extensions/extensions_container_views.h b/chrome/browser/ui/views/extensions/extensions_container_views.h
+index 168ec13effc09ca7922c87b8446e236bc867e2c8..4a69fc0d8f2f8a3146b943b96baac3ffcafc89fe 100644
+--- a/chrome/browser/ui/views/extensions/extensions_container_views.h
++++ b/chrome/browser/ui/views/extensions/extensions_container_views.h
+@@ -100,6 +100,11 @@ class ExtensionsContainerViews {
+   // Returns the arrow to use for popups and menus anchored to this container.
+   virtual views::BubbleBorder::Arrow GetPopupArrow() const = 0;
+ 
++  // Returns whether a dialog for `extension_id` can anchor to this container
++  // while it is hidden, because ShowWidgetForExtension() reveals it.
++  virtual bool CanRevealForExtension(
++      const extensions::ExtensionId& extension_id) const = 0;
++
+   // Called when the side panel state has changed for an extensions side panel
+   // to pop out button reflecting the side panel being open.
+   virtual void UpdateSidePanelState(bool is_active) {}

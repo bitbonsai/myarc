@@ -1,0 +1,13 @@
+diff --git a/chrome/browser/ui/webui/webui_toolbar/webui_toolbar_extensions_container.h b/chrome/browser/ui/webui/webui_toolbar/webui_toolbar_extensions_container.h
+index c918653f129b50b7b5c2f8250089e8017187d4df..c70d7f0a8c7203ce95c664450630c9c4badd6573 100644
+--- a/chrome/browser/ui/webui/webui_toolbar/webui_toolbar_extensions_container.h
++++ b/chrome/browser/ui/webui/webui_toolbar/webui_toolbar_extensions_container.h
+@@ -91,6 +91,8 @@ class WebUIToolbarExtensionsContainer
+       const extensions::ExtensionId& action_id) override;
+   views::BubbleAnchor GetExtensionsButtonAnchor() override;
+   views::BubbleBorder::Arrow GetPopupArrow() const override;
++  bool CanRevealForExtension(
++      const extensions::ExtensionId& extension_id) const override;
+ 
+   void CollapseConfirmation() override;
+ 

@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-11-22: Lucide search icon in URL pill, extension post-install bubble, and `chrome://extensions` polish
+
+- Replaced Chromium's default-search-engine favicon in the sidebar URL pill with Lucide's monochrome `myarc::kSearchIcon` (`location_bar_view.cc`); fixed the trapped extension post-install dialog by letting `ShowDialog` reveal/anchor to `ExtensionsToolbarDesktop` in sidebar mode instead of falling back to an unclosable modal (`extension_dialog_utils_views.cc`, `extensions_container_views.h`, `extensions_toolbar_desktop.{h,cc}`) plus `OverrideShowCloseButton(true)` (`extension_post_install_dialog.cc`); lowered `chrome://extensions` `narrow-threshold` from 1000 to 720 (`toolbar.html.ts`) and capped `--cr-toolbar-center-basis` to 400px (`toolbar.css`); and disabled `ToolbarIconContainerView::RoundRectBorder` in sidebar mode (`toolbar_icon_container_view.{h,cc}`) to remove the misaligned hover circle below pinned extension icons.
+- Evidence: Chromium `myarc` commits `ad99646222`, `038a409cf8`, and `5c10d806af` build cleanly in `out/MyarcRelease`; captures verify the Lucide magnifier in an empty pill and the visible left rail, Chrome Web Store link, and 400px search bar on `chrome://extensions` at 1200x800.
+- Verification: `python3 tools/export_patches.py --check` (150 patches match `myarc`) and `python3 tools/check_docs.py` pass. Post-install bubble anchoring and extension-icon hover ring removal are verified by build and code inspection; live store install and real-pointer Bitwarden hover were not captured in a disposable profile.
+
 ## 2026-11-22: Nightly 2026.11.22.1 and progress post
 
 - Published the prerelease `nightly-2026.11.22.1` from `main` `e27d6f3` and Chromium `bd0522a9fe`, built in `out/MyarcRelease`: macOS frosted glass across Settings, dialogs, popovers, command bar, coach marks, and the custom Sparkle updater (`MyarcSparkleUserDriver`), plus pinned extension icons in the sidebar URL pill on hover (24 DIP, hidden while editing), automatic one-time uBOL unpin, and clearing the false Safety Check warning on bundled uBOL. Added the progress post `site/posts/glass-and-extensions/` and synced it to `mauriciowolff.com`.

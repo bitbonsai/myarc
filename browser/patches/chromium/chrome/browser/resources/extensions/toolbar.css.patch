@@ -1,0 +1,15 @@
+diff --git a/chrome/browser/resources/extensions/toolbar.css b/chrome/browser/resources/extensions/toolbar.css
+index 881317e1cfe24b05aedba9fc3f4d54d33a35276f..81e0df3c3c801202a5431c3f94465ffa34d5a233 100644
+--- a/chrome/browser/resources/extensions/toolbar.css
++++ b/chrome/browser/resources/extensions/toolbar.css
+@@ -74,7 +74,9 @@ cr-tooltip-icon {
+ }
+ 
+ cr-toolbar {
+-  --cr-toolbar-center-basis: 680px;
++  /* myArc keeps the search box narrower than Chromium's 680px so it reads as a
++     field next to the title rather than a bar across the page. */
++  --cr-toolbar-center-basis: 400px;
+   --cr-toolbar-field-max-width: var(--cr-toolbar-center-basis);
+   --cr-toolbar-field-width: 100%;
+   --cr-toolbar-header-white-space: nowrap;
