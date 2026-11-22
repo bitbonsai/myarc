@@ -2,13 +2,13 @@ HTML: https://myarc.dev/blog/glass-and-extensions/
 
 [All posts](https://myarc.dev/blog/)
 
-# Getting closer to alpha
+# Alpha is here!!! 🎉
 
 November 22, 2026
 
 [Mauricio Wolff](https://github.com/bitbonsai)3 min read
 
-myArc is getting close to alpha, and that shifts what I spend time on. Most of the big pieces work now, so this round went to TLC. Opening each screen with fresh eyes, walking through the day-one flows, and fixing the rough spots that make an app feel unfinished.
+myArc alpha is here. That shifts what I spend time on. Most of the big pieces work now, so this round went to TLC. Opening each screen with fresh eyes, walking through the day-one flows, and fixing the rough spots that make an app feel unfinished.
 
 ## Cleaning up Settings
 
@@ -60,4 +60,4 @@ Bitwarden pinned in the URL pill on hover, beside Copy URL and site info.
 
 ## Try it
 
-Everything here is in nightly `2026.11.22.1` on the [download page](https://myarc.dev/download/), or via myArc → Check for Updates… if you are already on a recent nightly. The code is [on GitHub](https://github.com/bitbonsai/myarc).
+Everything here is in alpha nightly `2026.11.22.2` on the [download page](https://myarc.dev/download/), or via myArc → Check for Updates… if you are already on a recent nightly. The code is [on GitHub](https://github.com/bitbonsai/myarc).

@@ -4,11 +4,11 @@ HTML: https://myarc.dev/blog/
 
 November 2026
 
-## [Getting closer to alpha](https://myarc.dev/blog/glass-and-extensions/)
+## [Alpha is here!!! 🎉](https://myarc.dev/blog/glass-and-extensions/)
 
 November 22, 2026
 
-As alpha gets close, myArc is getting real TLC. Settings is cleaner, the welcome screen only shows what your Mac can do, frosted glass covers every window, and pinned extension icons sit in the URL pill on hover.
+myArc alpha is here. Settings is cleaner, the welcome screen only shows what your Mac can do, frosted glass covers every window, and pinned extension icons sit in the URL pill on hover.
 
 ## [A proper welcome](https://myarc.dev/blog/a-proper-welcome/)
 
