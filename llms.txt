@@ -8,7 +8,7 @@ A complete myArc browser remains unimplemented, and the Arc importer brings over
 
 - [Overview](https://myarc.dev/index.md): Markdown equivalent of the homepage.
 - [Progress journal](https://myarc.dev/blog/index.md): Published development updates.
-- [Download](https://myarc.dev/download/index.md): Pre-alpha nightly status, requirements and known limitations.
+- [Download](https://myarc.dev/download/index.md): Alpha nightly status, requirements and known limitations.
 - [Repository](https://github.com/bitbonsai/myarc): Public source and plans.
 
 ## Docs
@@ -22,7 +22,7 @@ A complete myArc browser remains unimplemented, and the Arc importer brings over
 - [Your data](https://myarc.dev/docs/your-data/index.md): Where myArc keeps your workspace on disk, how to back it up, and what it sends over the network. There is no account.
 - [Ad blocking](https://myarc.dev/docs/ad-blocking/index.md): How myArc blocks ads and trackers, and how to turn blocking off or on for one site.
 - [CLI and MCP](https://myarc.dev/docs/cli-and-mcp/index.md): Drive myArc from a script or an AI agent with the bundled myarc command and its MCP server. It's off by default, and tab commands reach only the Agent Space.
-- [Known limitations](https://myarc.dev/docs/known-limitations/index.md): What the pre-alpha nightly can't do yet, and what to do after a crash or when something breaks.
+- [Known limitations](https://myarc.dev/docs/known-limitations/index.md): What the alpha nightly can't do yet, and what to do after a crash or when something breaks.
 
 ## Posts
 

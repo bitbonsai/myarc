@@ -4,7 +4,7 @@ HTML: https://myarc.dev/docs/install/
 
 What your Mac needs, what macOS asks on first launch, the welcome tour, and how myArc moves to a newer nightly.
 
-myArc ships as a pre-alpha nightly, a build made from the latest code and published without release testing. Each nightly is a disk image (DMG) on the [download page](https://myarc.dev/download/).
+myArc ships as an alpha nightly, a build made from the latest code and published without release testing. Each nightly is a disk image (DMG) on the [download page](https://myarc.dev/download/).
 
 ## What you need
 

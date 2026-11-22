@@ -41,7 +41,7 @@ How to move from Arc to myArc: install the nightly, import your Spaces, learn th
 
 - [Known limitations](https://myarc.dev/docs/known-limitations/)
 
-  What the pre-alpha nightly can't do yet, and what to do after a crash or when something breaks.
+  What the alpha nightly can't do yet, and what to do after a crash or when something breaks.
 
 ## Contributing
 
