@@ -23,9 +23,9 @@ The welcome screen now matches the Mac it opens on. If Arc is installed, you get
 
 No extra links or file pickers before your first tab is even open.
 
-![The myArc welcome screen with the 3D ribbon A logo above myArc, forever yours., and two buttons: Import from Arc and Let's go](welcome.png)
+![The myArc welcome, from a dimmed desktop through the tour to a split view with arc.net](welcome.mp4)
 
-*The welcome screen on a Mac with Arc installed.*
+*The welcome, tour, and split view on a Mac with Arc installed.*
 
 ## Frosted glass everywhere
 
