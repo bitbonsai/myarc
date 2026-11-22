@@ -83,7 +83,7 @@ class DownloadTests(unittest.TestCase):
         self.assertNotIn('<!--', off.split('<body>')[1])
         self.assertEqual(on.count('href="/download/"'), 4)
         self.assertIn(f"Download the {SAMPLE['version']} nightly", on)
-        self.assertIn('Download pre-alpha', on)
+        self.assertIn('Download alpha', on)
         self.assertIn('See what works', on)
 
     def test_page_uses_site_shell_and_marks_itself_current(self):
@@ -94,7 +94,7 @@ class DownloadTests(unittest.TestCase):
         self.assertIn('"@type": "WebPage"', page)
         self.assertIn('class="button download-link" aria-current="page"', page)
         self.assertNotIn('class="blog-link" aria-current', page)
-        self.assertIn('<h1>myArc pre-alpha nightly</h1>', page)
+        self.assertIn('<h1>myArc alpha nightly</h1>', page)
 
 
 if __name__ == '__main__':

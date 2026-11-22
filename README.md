@@ -5,7 +5,7 @@
 <h1 align="center">myArc, forever yours.</h1>
 
 <p align="center">
-  <a href="https://myarc.dev/download/"><b>Download pre-alpha</b></a> · <a href="https://myarc.dev">Website</a> · <a href="https://myarc.dev/blog/">Blog</a>
+  <a href="https://myarc.dev/download/"><b>Download alpha</b></a> · <a href="https://myarc.dev">Website</a> · <a href="https://myarc.dev/blog/">Blog</a>
 </p>
 
 Arc is being [sunsetted](https://arc.net/). myArc is an open-source browser that brings back the way Arc works: the sidebar, Spaces, pinned tabs and the command bar. It runs on Chromium, needs no account and keeps your workspace on your Mac.
@@ -14,7 +14,7 @@ Arc is being [sunsetted](https://arc.net/). myArc is an open-source browser that
 
 ## Try it
 
-The [pre-alpha nightly](https://myarc.dev/download/) runs on Apple silicon Macs with macOS 26 or later. It's for trying the shell, not for daily or sensitive browsing: it has no automatic or security updates, and recent tabs can be lost after a crash. The download page lists every known limitation.
+The [alpha nightly](https://myarc.dev/download/) runs on Apple silicon Macs with macOS 26 or later. It's for trying the shell, not yet for daily or sensitive browsing: recent tabs can be lost after a crash, and Chromium fixes arrive with the next nightly. Nightlies are signed and update themselves in place, and the download page lists every known limitation.
 
 What works today:
 

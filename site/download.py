@@ -1,4 +1,4 @@
-"""Build the pre-alpha downloads page and release notes from site/release.json."""
+"""Build the alpha downloads page and release notes from site/release.json."""
 from datetime import date, datetime, timezone
 from email.utils import format_datetime
 from html import escape
@@ -16,9 +16,9 @@ KEYS = {'published', 'version', 'date', 'dmg_url', 'size_bytes', 'sha256', 'rele
 # EdDSA signature from tools/package_nightly.sh.
 OPTIONAL = {'ed_signature'}
 DEFAULTS = {'release_url': REPO + '/releases', 'min_macos': '26', 'proprietary_codecs': False}
-TITLE = 'myArc pre-alpha nightly'
-STATUS = 'Pre-alpha nightly, for trying the Arc-like shell. Not for daily or sensitive browsing.'
-SUMMARY = 'Pre-alpha nightly of myArc for macOS on Apple silicon: requirements, first launch, what works, known limitations and how to report problems.'
+TITLE = 'myArc alpha nightly'
+STATUS = 'Alpha nightly, for trying the Arc-like shell. Not yet for daily or sensitive browsing.'
+SUMMARY = 'Alpha nightly of myArc for macOS on Apple silicon: requirements, first launch, what works, known limitations and how to report problems.'
 APP = '/Applications/myArc Nightly.app'
 
 WORKS = [
@@ -161,7 +161,7 @@ def first_launch(release):
 def release_notes(release):
     name = release['dmg_url'].rsplit('/', 1)[1]
     shown = facts(release)
-    out = [f'# myArc pre-alpha nightly {release["version"]}', '', STATUS, '', '## Download', '',
+    out = [f'# myArc alpha nightly {release["version"]}', '', STATUS, '', '## Download', '',
            f'- File: `{name}` ({shown["Size"]})',
            f'- Released: {shown["Date"]}',
            f'- SHA-256: `{release["sha256"]}`', '']
@@ -222,9 +222,9 @@ CSS = '''
 
 def apply_release(template, release):
     """Add the header link and homepage call to action only for a published release."""
-    link = '<a class="button download-link" href="/download/">Download pre-alpha</a>' if release else ''
+    link = '<a class="button download-link" href="/download/">Download alpha</a>' if release else ''
     template = template.replace('<!--download-nav-->', link)
-    big = f'<a class="button stacked" href="/download/">Download pre-alpha<small>Nightly v{escape(release["version"])}</small></a>' if release else ''
+    big = f'<a class="button stacked" href="/download/">Download alpha<small>Nightly v{escape(release["version"])}</small></a>' if release else ''
     works = big
     template = template.replace('<!--works-download-->', works)
     latest = f'<a href="/download/">Download the {release["version"]} nightly &rarr;</a> ' if release else ''
