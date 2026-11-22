@@ -108,7 +108,10 @@ export const checkProfileFiles = (profile, dirs, sides, count = sqliteCount) => 
   const results = []
   for (const [own, other] of [['a', 'b'], ['b', 'a']]) {
     const dir = `${profile}/${dirs[own]}`
-    const cookies = name => count(`${dir}/Network/Cookies`, `select count(*) from cookies where name = '${name}'`)
+    // Chromium keeps the cookie store in Network/ once the network service has
+    // run; before that it sits at the Profile root.
+    const cookieFile = [`${dir}/Network/Cookies`, `${dir}/Cookies`].find(fs.existsSync) ?? `${dir}/Network/Cookies`
+    const cookies = name => count(cookieFile, `select count(*) from cookies where name = '${name}'`)
     const visits = token => count(`${dir}/History`, `select count(*) from urls where url like '%${token}%'`)
     const row = {
       dir: dirs[own],

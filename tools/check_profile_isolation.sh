@@ -13,7 +13,8 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 APP="${APP:-$HOME/.cache/myarc-m0/chromium/src/out/MyarcM0/Chromium.app}"
 
 if [ "${1:-}" = "--inner" ]; then
-  [ -x "$APP/Contents/MacOS/Chromium" ] || { echo "native binary missing: $APP" >&2; exit 1; }
+  BIN="$APP/Contents/MacOS/$(/usr/libexec/PlistBuddy -c "Print :CFBundleExecutable" "$APP/Contents/Info.plist" 2>/dev/null || echo Chromium)"
+  [ -x "$BIN" ] || { echo "native binary missing: $BIN" >&2; exit 1; }
   # The title requests exist only in builds with the GN arg myarc_test_hooks.
   ARGS="$(dirname "$APP")/args.gn"
   if [ -f "$ARGS" ] && ! grep -Eq '^myarc_test_hooks *= *true' "$ARGS"; then
