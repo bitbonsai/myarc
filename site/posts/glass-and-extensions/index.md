@@ -1,56 +1,60 @@
 ---
-title: "Frosted glass, cleaner settings, and extensions in the sidebar"
-summary: "Settings, dialogs, the command bar and the updater now use macOS frosted glass, Arc import is one click, and pinned extension icons sit in the URL pill on hover."
+title: "Getting closer to alpha"
+summary: "As alpha gets close, myArc is getting real TLC. Settings is cleaner, the welcome screen only shows what your Mac can do, frosted glass covers every window, and pinned extension icons sit in the URL pill on hover."
 date: 2026-11-22
 draft: false
 ---
 
-Most of this round went into fixing things that got in the way when I used myArc day to day: flat dark boxes floating over a blurred sidebar, too many buttons on Settings and the welcome screen, and no place to click a password manager's icon after installing it.
+myArc is getting close to alpha, and that shifts what I spend time on. Most of the big pieces work now, so this round went to TLC. Opening each screen with fresh eyes, walking through the day-one flows, and fixing the rough spots that make an app feel unfinished.
 
-![myArc Settings Advanced window on macOS frosted glass, showing three grouped cards for Data (Import from Arc and Export Pins and Favorites), Browser control, and More (Chromium Settings and Welcome tour)](settings-advanced.png)
+## Cleaning up Settings
 
-*Settings > Advanced, grouped into three cards on frosted glass.*
+The Advanced tab had grown busy, with too many rows and a file picker sitting in the middle of the page. I pared it down to three cards so you can spot what you came for without scanning a wall of controls.
 
-## Frosted glass on the rest of the UI
+Import from Arc also got simpler. Instead of opening a file dialog right away, it looks for Arc on your Mac and jumps straight to the preview. The file picker only appears if Arc isn't installed.
 
-The sidebar already blurred the desktop behind it, so opaque panels sitting next to it looked out of place. Every myArc window and popup now uses the same macOS vibrancy helper: Settings, the command bar, the Create a Space panel, the theme and icon pickers, tour cards, import and export dialogs, and the copy-link toast.
+![myArc Settings on Advanced, showing three grouped cards for Data, Browser control, and More on frosted glass](settings-advanced.png)
 
-Each one uses behind-window blur with a thin border and a tint that keeps text readable over white and dark pages alike. If Reduce Transparency is on in macOS System Settings, they switch to solid panels instead.
+*Advanced in Settings, down to three cards.*
 
-![The frosted glass myArc command bar floating over a split light and dark test page, showing Search Settings highlighted in blue above search suggestions](palette.png)
+## A calmer welcome
 
-*The command bar over a half-white, half-blue page.*
+The welcome screen now matches the Mac it opens on. If Arc is installed, you get Import from Arc and Let's go. If it isn't, you only see Let's go.
 
-Sparkle's default update window was still an opaque gray box, so I replaced its standard UI with a custom `SPUUserDriver` window. Signature checks, automatic background checks and EdDSA validation work the same as before, just in a frosted window that matches myArc.
+No extra links or file pickers before your first tab is even open.
 
-![The frosted glass myArc updater window showing the 3D ribbon logo, Ready to Install, Nightly 2026.11.22.1 is verified and ready, and Later and Install and Relaunch buttons](updater-ready.png)
-
-*The updater window once an update is verified and ready.*
-
-## A simpler welcome and one-click Arc import
-
-A welcome screen shouldn't make you read a manual. If Arc is on your Mac, you see **Import from Arc** and **Let's go**. If it isn't, you just get **Let's go**. No extra links, no file pickers up front.
-
-Clicking **Import from Arc** finds your Arc data on its own and opens a preview right away, with your profile names, Favorites, pinned tab names and page titles. If you're moving from another Mac, Settings still lets you pick an export file.
-
-![The myArc welcome screen with the 3D ribbon A logo above myArc, forever yours., and two centered pill buttons: Import from Arc in blue and Let's go in translucent ivory](welcome.png)
+![The myArc welcome screen with the 3D ribbon A logo above myArc, forever yours., and two buttons: Import from Arc and Let's go](welcome.png)
 
 *The welcome screen on a Mac with Arc installed.*
 
-## Extension icons in the URL pill
+## Frosted glass everywhere
 
-Installing Bitwarden from the Chrome Web Store turned up a real gap: the extension installed and survived restarts, but there was nowhere to click its icon because myArc's sidebar header hid Chromium's extensions container.
+The sidebar has blurred your desktop for a while, so every time Settings or the command bar popped up as a flat dark box, it looked like it belonged to another app.
 
-Pinned extension icons now sit at the right end of the URL pill. At rest the pill shows only the address. Hovering reveals your pinned icons next to Copy URL, and clicking one opens its popup and keeps the icon visible until the popup closes. Pressing ⌘L to type an address hides the icons again so you get the full width.
+Settings, the command bar, Space panels, the theme and icon pickers, tour cards, dialogs, and the copy-link toast all share the same macOS vibrancy helper now. Behind-window blur, a thin border, and a tint that stays readable over both white and dark pages. Turn on Reduce Transparency in System Settings and they switch to solid panels.
 
-The bundled uBlock Origin Lite now stays unpinned by default (including a one-time unpin for existing profiles), since it already has its own switch in the site info popover. Chromium's Safety Check also no longer warns that it can't verify where uBlock Origin Lite came from.
+![The frosted glass myArc command bar floating over a split light and dark test page, with Search Settings highlighted above search suggestions](palette.png)
 
-## Smaller fixes
+*The command bar over a half-white, half-blue page.*
 
-- Hidden Profile windows now restore with only their active tab scheduled to load, dropping background renderers at launch from 30 to 17 in a three-Profile test.
-- When you type something in the command bar that names an action (like "Switch to"), web search suggestions no longer mix in below it.
-- Export Pins and Favorites now exports every regular Profile into one bookmarks HTML file.
+Sparkle's built-in updater window was the last opaque gray box left. I replaced its UI with a custom user driver so updates arrive in the same frosted glass as the rest of myArc. Automatic background checks and EdDSA signature verification are untouched; only the window changed.
+
+![The frosted glass myArc updater window over the myArc ribbon artwork, showing You're up to date and an OK button](updater-ready.png)
+
+*The frosted updater window over the myArc page.*
+
+## Extensions in the URL pill
+
+Testing Bitwarden from the Chrome Web Store caught a real gap. It installed cleanly and survived a restart, then I had nowhere to click it because the sidebar header hid Chromium's extensions container.
+
+Pinned extension icons now live at the right end of the URL pill. At rest you only see the address. Hover over the pill and your pinned icons show up next to Copy URL. Clicking one opens its popup and keeps it visible until you close it, and pressing ⌘L hides them again so you get the full width to type.
+
+The bundled uBlock Origin Lite starts unpinned now (including a one-time unpin for existing profiles), since the site info popover already has a switch for it. Chromium's Safety Check also stopped flagging it as an unverified extension.
+
+![Close-up of the myArc sidebar URL pill showing myarc.dev with the pinned Bitwarden shield icon revealed next to Copy URL and site info on hover](url-pill-extensions.png)
+
+*Bitwarden pinned in the URL pill on hover, beside Copy URL and site info.*
 
 ## Try it
 
-Everything above is in nightly `2026.11.22.1` on the [download page](https://myarc.dev/download/), or through **myArc → Check for Updates…** if you're already on a recent nightly. The code is [on GitHub](https://github.com/bitbonsai/myarc).
+Everything here is in nightly `2026.11.22.1` on the [download page](https://myarc.dev/download/), or via myArc → Check for Updates… if you are already on a recent nightly. The code is [on GitHub](https://github.com/bitbonsai/myarc).
