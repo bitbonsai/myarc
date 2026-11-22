@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-11-22: Alpha nightly `2026.11.22.2`, and myarc.dev moves to alpha
+
+- Shipped the prerelease `nightly-2026.11.22.2` from `main` `2ee2e26` and Chromium `c79fde785c`, and switched `myarc.dev` from the pre-alpha copy to alpha. Developer ID signed, Apple notarized and stapled; 184181609 bytes, SHA-256 `bc7331d3...9331`, Sparkle EdDSA signature verified.
+- The glass corner clip patch is in: the HUDWindow material now clips its layer to the window corner curve instead of masking with an image, and the opaque frame view is skipped under `--myarc-visual-parity` (`browser_native_widget_mac.mm`, exported as a patch for `c79fde785c`).
+- Verification: `mise run site-check` (site build, unit tests, gallery, HTML, SEO, 510 doc links), `python3 tools/check_docs.py`, the DMG URL returns HTTP 200, and the published `myarc.dev` download and appcast pages serve the alpha copy.
+
 ## 2026-11-22: Alpha readiness background checks, nightly `2026.11.22.2` held
 
 - Ran the seven applicable `tools/check_*.sh` suites against `out/MyarcNightly` (`myarc_test_hooks = true`): blocker (all four steps, including the switch and the second Profile), crash report (4 cases), durability (26 cases, 0 failed), extension store (Bitwarden 2026.11.0 installed, turned on, content script and worker before and after a restart, PASS), onboarding (10 relaunch cases, 0 failed), private windows (clean quit and SIGKILL), and profile isolation (3 phases) all pass. `tools/check_updates.sh` was skipped, since it needs two DMGs from `tools/package_nightly.sh`.
