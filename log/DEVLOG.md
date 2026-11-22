@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-11-22: Nightly 2026.11.22.1 and progress post
+
+- Published the prerelease `nightly-2026.11.22.1` from `main` `e27d6f3` and Chromium `bd0522a9fe`, built in `out/MyarcRelease`: macOS frosted glass across Settings, dialogs, popovers, command bar, coach marks, and the custom Sparkle updater (`MyarcSparkleUserDriver`), plus pinned extension icons in the sidebar URL pill on hover (24 DIP, hidden while editing), automatic one-time uBOL unpin, and clearing the false Safety Check warning on bundled uBOL. Added the progress post `site/posts/glass-and-extensions/` and synced it to `mauriciowolff.com`.
+- Evidence: Developer ID signed, Apple notarized and stapled (`notarize-app.zip` `b1678508...` and DMG `02a677bb...`), `spctl` accepted both app and DMG, Sparkle EdDSA signature verified. 184181641 bytes, SHA-256 `7ba46c46...6565`.
+- Verification: `site/build.py`, `mise run site-check`, `check_docs.py`, live `myarc.dev` appcast/download/blog checks, and `mauriciowolff.com` sync/check/test/ship.
+
 ## 2026-11-21: Polish URL pill extension icons and unpin uBOL on existing profiles
 
 - Follow-up to `6e6bc4f`: compacted sidebar URL pill extension buttons and Copy URL from 28 to 24 DIP (`extensions_toolbar_desktop.cc`, `location_bar_view.cc`) so more of the address stays visible on hover; hid both while editing a URL (`⌘L`) or on blank Spaces (`myarc_has_page && !IsEditingOrEmpty()`); and added a one-time Profile pref migration (`myarc.blocker.unpinned_v1` in `blocker.h`/`blocker.cc` + `ToolbarActionsModel::OnReady`) to unpin `uBlock Origin Lite` on profiles created before `6e6bc4f` while preserving any later manual pin.
