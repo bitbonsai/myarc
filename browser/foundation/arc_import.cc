@@ -285,7 +285,7 @@ views::Widget* Show(std::unique_ptr<ui::DialogModel> model,
       color_utils::IsDark(provider->GetColor(ui::kColorDialogBackground));
   ApplyBubbleGlass(
       *widget, GlassMaterial::kSheet, dark,
-      dark ? SkColorSetARGB(0xB8, 0x1E, 0x1E, 0x24)
+      dark ? SkColorSetARGB(0xA1, 0x1E, 0x1E, 0x24)
            : SkColorSetARGB(0xD4, 0xFA, 0xFA, 0xFD),
       provider ? provider->GetColor(ui::kColorDialogBackground)
                : (dark ? SkColorSetRGB(0x25, 0x25, 0x28) : SK_ColorWHITE));

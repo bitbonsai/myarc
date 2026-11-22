@@ -250,7 +250,7 @@ constexpr float kBrandRadius = 10;
 constexpr SkColor kWindowFill = SkColorSetRGB(0x22, 0x22, 0x23);
 // Frosted dark glass tint over behind-window NSVisualEffectView, calibrated
 // to stay high-contrast over both bright white and dark pages behind Settings.
-constexpr SkColor kWindowGlassTint = SkColorSetARGB(0x9E, 0x18, 0x18, 0x1D);
+constexpr SkColor kWindowGlassTint = SkColorSetARGB(0xA1, 0x18, 0x18, 0x1D);
 constexpr float kWindowCornerRadius = 16.f;
 constexpr SkColor kTitleText = SkColorSetRGB(0xB2, 0xB2, 0xB6);
 constexpr SkColor kTabText = SkColorSetRGB(0x9E, 0x9E, 0xA2);

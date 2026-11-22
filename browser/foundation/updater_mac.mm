@@ -294,7 +294,7 @@ NSString* FormatByteProgress(uint64_t received, uint64_t expected) {
     [[NSColor colorWithSRGBRed:0x18 / 255.0
                          green:0x18 / 255.0
                           blue:0x1D / 255.0
-                         alpha:0.62] setFill];
+                         alpha:0.63] setFill];
     NSRectFillUsingOperation(bounds, NSCompositingOperationSourceOver);
 
     // Subtle ribbon-tinted ambient glow behind the app mark.

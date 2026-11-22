@@ -78,7 +78,7 @@ constexpr int kFirstProfileCommand = 100;
 // transparency is enabled.
 constexpr int kPickerRadius = 14;
 constexpr SkColor kPickerDark = SkColorSetRGB(0x25, 0x24, 0x2E);
-constexpr SkColor kPickerDarkGlass = SkColorSetARGB(0xB4, 0x1E, 0x1D, 0x28);
+constexpr SkColor kPickerDarkGlass = SkColorSetARGB(0xA1, 0x1E, 0x1D, 0x28);
 constexpr SkColor kPickerLightGlass = SkColorSetARGB(0xCE, 0xFA, 0xFA, 0xFD);
 
 // Arc's primary blue, sampled from its Create Space button; disabled, the

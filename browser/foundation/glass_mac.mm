@@ -55,10 +55,9 @@ NSVisualEffectMaterial ToAppKitMaterial(GlassMaterial material) {
   switch (material) {
     case GlassMaterial::kWindow:
     case GlassMaterial::kHud:
-      return NSVisualEffectMaterialHUDWindow;
     case GlassMaterial::kPopover:
     case GlassMaterial::kSheet:
-      return NSVisualEffectMaterialPopover;
+      return NSVisualEffectMaterialHUDWindow;
   }
 }
 

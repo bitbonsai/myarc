@@ -33,9 +33,9 @@ The sidebar has blurred your desktop for a while, so every time Settings or the 
 
 Settings, the command bar, Space panels, the theme and icon pickers, tour cards, dialogs, and the copy-link toast all share the same macOS vibrancy helper now. Behind-window blur, a thin border, and a tint that stays readable over both white and dark pages. Turn on Reduce Transparency in System Settings and they switch to solid panels.
 
-![The frosted glass myArc command bar floating over a split light and dark test page, with Search Settings highlighted above search suggestions](palette.png)
+![The frosted glass myArc command bar floating over myarc.dev, with Archive Tab highlighted above Switch to Tab rows and the ribbon artwork glowing through the glass](palette.png)
 
-*The command bar over a half-white, half-blue page.*
+*The frosted command bar over myarc.dev.*
 
 Sparkle's built-in updater window was the last opaque gray box left. I replaced its UI with a custom user driver so updates arrive in the same frosted glass as the rest of myArc. Automatic background checks and EdDSA signature verification are untouched; only the window changed.
 
