@@ -1,11 +1,11 @@
 ---
-title: "Getting closer to alpha"
-summary: "As alpha gets close, myArc is getting real TLC. Settings is cleaner, the welcome screen only shows what your Mac can do, frosted glass covers every window, and pinned extension icons sit in the URL pill on hover."
+title: "Alpha is here!!! 🎉"
+summary: "myArc alpha is here. Settings is cleaner, the welcome screen only shows what your Mac can do, frosted glass covers every window, and pinned extension icons sit in the URL pill on hover."
 date: 2026-11-22
 draft: false
 ---
 
-myArc is getting close to alpha, and that shifts what I spend time on. Most of the big pieces work now, so this round went to TLC. Opening each screen with fresh eyes, walking through the day-one flows, and fixing the rough spots that make an app feel unfinished.
+myArc alpha is here. That shifts what I spend time on. Most of the big pieces work now, so this round went to TLC. Opening each screen with fresh eyes, walking through the day-one flows, and fixing the rough spots that make an app feel unfinished.
 
 ## Cleaning up Settings
 
@@ -57,4 +57,4 @@ The bundled uBlock Origin Lite starts unpinned now (including a one-time unpin f
 
 ## Try it
 
-Everything here is in nightly `2026.11.22.1` on the [download page](https://myarc.dev/download/), or via myArc → Check for Updates… if you are already on a recent nightly. The code is [on GitHub](https://github.com/bitbonsai/myarc).
+Everything here is in alpha nightly `2026.11.22.2` on the [download page](https://myarc.dev/download/), or via myArc → Check for Updates… if you are already on a recent nightly. The code is [on GitHub](https://github.com/bitbonsai/myarc).
