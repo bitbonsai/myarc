@@ -26,7 +26,7 @@ A complete myArc browser remains unimplemented, and the Arc importer brings over
 
 ## Posts
 
-- [Frosted glass, cleaner settings, and extensions in the sidebar](https://myarc.dev/blog/glass-and-extensions/index.md): Settings, dialogs, the command bar and the updater now use macOS frosted glass, Arc import is one click, and pinned extension icons sit in the URL pill on hover.
+- [Getting closer to alpha](https://myarc.dev/blog/glass-and-extensions/index.md): As alpha gets close, myArc is getting real TLC. Settings is cleaner, the welcome screen only shows what your Mac can do, frosted glass covers every window, and pinned extension icons sit in the URL pill on hover.
 - [A proper welcome](https://myarc.dev/blog/a-proper-welcome/index.md): myArc now says hello before your first tab. The screen dims, a soft blob of colour grows into a window, and a short tour has you try the basics on the real browser.
 - [Keeping Arc's ideas going](https://myarc.dev/blog/keeping-arcs-ideas-going/index.md): Arc shuts down on December 22. myArc now has Peek, Split View and Little Arc, blocks ads from the first page, and opens on a Mac like any other app.
 - [Letting agents use myArc](https://myarc.dev/blog/agents-use-myarc/index.md): The agents that build myArc can now use it, in a Space of their own and only after you say yes. Getting there turned up a bug in Chromium and a sidebar full of gray globes.

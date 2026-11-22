@@ -4,11 +4,11 @@ HTML: https://myarc.dev/blog/
 
 November 2026
 
-## [Frosted glass, cleaner settings, and extensions in the sidebar](https://myarc.dev/blog/glass-and-extensions/)
+## [Getting closer to alpha](https://myarc.dev/blog/glass-and-extensions/)
 
 November 22, 2026
 
-Settings, dialogs, the command bar and the updater now use macOS frosted glass, Arc import is one click, and pinned extension icons sit in the URL pill on hover.
+As alpha gets close, myArc is getting real TLC. Settings is cleaner, the welcome screen only shows what your Mac can do, frosted glass covers every window, and pinned extension icons sit in the URL pill on hover.
 
 ## [A proper welcome](https://myarc.dev/blog/a-proper-welcome/)
 
