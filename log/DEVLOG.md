@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-11-23: Core browsing smoke check (permissions, find, DevTools, history) on nightly `2026.11.22.2`
+
+- Added `tools/check_core_smoke.sh` to run a hands-free background check of CORE-01 essentials against `/Applications/myArc Nightly.app` on a disposable Profile and local synthetic HTTP fixture server.
+- Verified all four paths on `2026.11.22.2`: user-gesture `Notification.requestPermission()` opened the native permission bubble (`Block` / `Allow`) under the `Get notifications?` URL-pill chip, `Cmd+F` highlighted `1/2` matches in the glass find bar, `Cmd+Opt+I` opened docked DevTools (Elements), and `Cmd+Y` opened `chrome://history` with `Default/History` SQLite confirming the recorded URL after clean quit.
+- Evidence: captures in `/tmp/myarc-core-smoke-20261123/`, checked off **Permissions, history, find and DevTools** in `docs/ALPHA.md`, and updated `docs/GAPS.md`.
+
 ## 2026-11-23: MA-011 CLI, MCP stdio, and Claude Code control evidence on nightly `2026.11.22.2`
 
 - Added `tools/check_control.sh` to verify the control endpoint (`700/600/600`), Allow card, identical synthetic-site journeys across `Helpers/myarc` CLI, `Helpers/myarc mcp` stdio (`2025-06-18`), and Claude Code (`2.1.330`, `--strict-mcp-config`), adversarial/scope rejections (stale revision, forged `[ref=e99]`, bidi `\u{202e}` escape, cross-Profile/non-Agent tab denial, bad schemes, 70 KiB fill, `page.screenshot` unsupported), and Stop revocation.

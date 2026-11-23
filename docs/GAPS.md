@@ -6,7 +6,7 @@ Current priority: close the remaining core browsing verification gaps (Archive R
 
 | Rank | Gap | Why it leads | Completion evidence |
 | --- | --- | --- | --- |
-| 1 | Core browsing smoke and Restore still open | Archive restore to the original Space is unconfirmed; permissions, history, find in page and DevTools lack a native smoke | Restore check + native smoke recorded in ALPHA / SCORECARD |
+| 1 | Archive restore live confirmation still open | Permissions, history, find in page and DevTools passed in `tools/check_core_smoke.sh` on `2026.11.22.2`; restoring an archived tab from Library -> Archived Tabs to its original Space is still unconfirmed live | Restore check recorded in ALPHA |
 | 2 | Offline / no-account network audit missing | Account independence gate needs a fresh install with the network off and a request audit | Recorded journey separating updates/site traffic from optional services |
 | 3 | Accessibility and responsiveness budgets unmeasured | 1,000-tab frame/responsiveness trace and VoiceOver review are still open onboarding and scorecard gates | Native recordings and traces on a reference Mac |
 | 4 | Remaining MA-011 control surface (`page.screenshot`, `scroll`, `wait`, broader client matrix) | Core CLI + MCP + Claude Code journey, Allow/Stop, and isolation passed on `2026.11.22.2`; remaining registry commands still return `unsupported` | Implemented commands + multi-client matrix in [CONTROL-PROTOCOL.md](CONTROL-PROTOCOL.md) |
