@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-11-23: 1,000-tab responsiveness, startup and memory benchmark on nightly `2026.11.22.2`
+
+- Added `tools/check_responsiveness.sh` (and digits `1`/`2`/`3` to `tools/bgcapture.swift`) to benchmark `/Applications/myArc Nightly.app` on a 1,000-item synthetic workspace (10 Spaces × 100 dormant items) with 100 Space switches (`Ctrl+1`/`Ctrl+2`), 100 Command-bar open/close cycles (`Cmd+T`/`Esc`), startup timing, RSS, and a Chromium JSON trace.
+- Measured on `Mac17,9` (Apple M5 Pro, macOS `26.7.3`, `2026.11.22.2` / `158.0.8122.0`): first window in 797.5 ms, steady-state RSS 953.5 MB (11 processes), Space switch net browser latency p50 75.5 ms / p95 83.1 ms (workspace save p95 2.22 ms), and `CrBrowserMain` trace (1.38M events) key dispatch p95 6.88 ms / UI tasks ≥0.5 ms p95 45.80 ms (max 80.39 ms).
+- Evidence: `/tmp/myarc-responsiveness-20261123/` (`space-switch.json`, `command-bar.json`, `trace-summary.json`, `trace.json`, sidebar & command-bar PNGs); updated `docs/SCORECARD.md` and `docs/GAPS.md`.
+
 ## 2026-11-23: Offline / no-account startup and NetLog request audit on nightly `2026.11.22.2`
 
 - Added `tools/check_offline_audit.sh` to launch a brand-new disposable Profile with external DNS blocked (`MAP * ~NOTFOUND, EXCLUDE 127.0.0.1`) and Chromium `--log-net-log`, pin a local synthetic page with `Cmd+D`, and classify every `URL_REQUEST_START_JOB` host.
