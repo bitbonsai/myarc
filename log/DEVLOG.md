@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-11-23: `page.screenshot` control command and filled robot-head Agent Space icon
+
+- Implemented `page.screenshot` across `crates/control`, `browser/foundation/bridge.rs`, `browser/foundation/control_tabs.cc` (`ScreenshotTaker` via `RenderWidgetHostView::CopyFromSurface`, clamped to 1280px, ThreadPool PNG / JPEG fallback <= 600 KiB), and `crates/myarc-cli/src/mcp.rs` (native MCP `image` content block + metadata `text` block), with CLI + MCP assertions added to `tools/check_control.sh`.
+- Replaced the stroked Lucide `kBotIcon` path in `browser/foundation/icons.h` with the filled robot-head vector glyph (even-odd circular eye cutouts and side ears on a 243x243 canvas) used in the Agent Space footer and title.
+- Evidence: `cargo fmt --all -- --check`, `rustfmt --check --edition 2024 browser/foundation/bridge.rs`, `cargo clippy --workspace --all-targets --locked -- -D warnings`, `cargo test --workspace --locked`, and `autoninja -C out/MyarcNightly chrome` all pass; background capture `/tmp/myarc-new-bot-icon-crop.png` confirms the new icon in both the footer and Agent Space title.
+
 ## 2026-11-23: 1,000-tab responsiveness, startup and memory benchmark on nightly `2026.11.22.2`
 
 - Added `tools/check_responsiveness.sh` (and digits `1`/`2`/`3` to `tools/bgcapture.swift`) to benchmark `/Applications/myArc Nightly.app` on a 1,000-item synthetic workspace (10 Spaces × 100 dormant items) with 100 Space switches (`Ctrl+1`/`Ctrl+2`), 100 Command-bar open/close cycles (`Cmd+T`/`Esc`), startup timing, RSS, and a Chromium JSON trace.

@@ -337,6 +337,18 @@ assert big["status"] == "invalid", big
 unsup = run_json("page.scroll", {"tab": tab_handle, "revision": rev, "direction": "down"}, expect_rc=1)
 assert unsup["status"] == "unsupported", unsup
 
+shot = run_json("page.screenshot", {"tab": tab_handle})
+assert shot["status"] == "success", shot
+sdata = shot["data"]
+assert sdata["mime_type"] in ("image/png", "image/jpeg"), sdata
+assert sdata["width"] > 0 and sdata["height"] > 0, sdata
+import base64
+raw_img = base64.b64decode(sdata["data_base64"])
+assert raw_img[:4] in (b"\x89PNG", b"\xff\xd8\xff\xe0", b"\xff\xd8\xff\xe1") or raw_img[:2] == b"\xff\xd8", raw_img[:8]
+with open(os.path.join(outdir, "cli-screenshot.png"), "wb") as f:
+    f.write(raw_img)
+print(f"CLI page.screenshot ok: {sdata['width']}x{sdata['height']} {sdata['mime_type']} ({len(raw_img)} bytes)")
+
 run_cli("close")
 tabs_after = run_json("tabs.list")
 assert tabs_after["data"]["tabs"] == [], tabs_after
@@ -439,6 +451,17 @@ m_bad, e4 = call_tool("tab_open", {"url": "chrome://settings"})
 assert e4 and m_bad["status"] == "denied", m_bad
 m_big, e5 = call_tool("page_fill", {"tab": mcp_tab, "revision": rev, "ref": "e1", "text": "a" * 70000})
 assert e5 and m_big["status"] == "invalid", m_big
+
+m_shot_res = rpc("tools/call", {"name": "page_screenshot", "arguments": {"tab": mcp_tab}})
+assert not m_shot_res["result"].get("isError", False), m_shot_res
+m_blocks = m_shot_res["result"]["content"]
+assert len(m_blocks) == 2 and m_blocks[0]["type"] == "image" and m_blocks[1]["type"] == "text", m_blocks
+assert m_blocks[0]["mimeType"] in ("image/png", "image/jpeg"), m_blocks[0]
+m_img = base64.b64decode(m_blocks[0]["data"])
+assert len(m_img) > 100, len(m_img)
+with open(os.path.join(outdir, "mcp-screenshot.png"), "wb") as f:
+    f.write(m_img)
+print(f"MCP page_screenshot ok: {m_blocks[0]['mimeType']} ({len(m_img)} bytes)")
 
 closed, is_err = call_tool("tab_close", {"tab": mcp_tab})
 assert not is_err and closed["status"] == "success", closed
