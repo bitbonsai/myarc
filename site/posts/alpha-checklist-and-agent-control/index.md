@@ -13,9 +13,9 @@ Browser control ships inside `myArc Nightly.app/Contents/Helpers/myarc` as both 
 
 I ran the full verification suite against `Helpers/myarc`, raw MCP stdio, and Claude Code (`--strict-mcp-config`) on a synthetic form fixture with adversarial inputs: stale snapshot revisions, forged element refs, hidden bidi characters, cross-Profile tab IDs, user tab IDs, blocked URL schemes, and oversized fills. All 161 control and CLI tests passed alongside the live runs.
 
-![myArc running an active Agent Space with the Stop pill and a synthetic form fixture](agent-space-active.png)
+![myArc running the local synthetic form fixture used to verify CLI, MCP, and Claude Code control](agent-space-active.png)
 
-*An active Agent Space running against a local synthetic form fixture, with the Stop button ready to revoke access.*
+*The local synthetic form fixture used for CLI, MCP, and Claude Code verification, including the untrusted prompt-injection note.*
 
 This nightly adds three new commands to both the CLI and MCP:
 
