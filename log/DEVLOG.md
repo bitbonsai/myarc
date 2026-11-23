@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-11-23: Offline / no-account startup and NetLog request audit on nightly `2026.11.22.2`
+
+- Added `tools/check_offline_audit.sh` to launch a brand-new disposable Profile with external DNS blocked (`MAP * ~NOTFOUND, EXCLUDE 127.0.0.1`) and Chromium `--log-net-log`, pin a local synthetic page with `Cmd+D`, and classify every `URL_REQUEST_START_JOB` host.
+- Passed on `/Applications/myArc Nightly.app` (`2026.11.22.2`): reached a usable workspace without an account, persisted the pinned page (`placement: 1`) in `myarc-workspace-v1.json`, and logged 7 HTTP(S) requests (`127.0.0.1`: 2, `accounts.google.com`: 3 upstream Gaia, `update.googleapis.com`: 2 upstream updater) with zero `myarc.dev` or myArc service calls.
+- Evidence: `/tmp/myarc-offline-audit-20261123/netlog.json` and `audit-summary.txt`; checked off **No account needed** in `docs/ALPHA.md` and updated `docs/SCORECARD.md` and `docs/GAPS.md`.
+
 ## 2026-11-23: Core browsing smoke check (permissions, find, DevTools, history) on nightly `2026.11.22.2`
 
 - Added `tools/check_core_smoke.sh` to run a hands-free background check of CORE-01 essentials against `/Applications/myArc Nightly.app` on a disposable Profile and local synthetic HTTP fixture server.
