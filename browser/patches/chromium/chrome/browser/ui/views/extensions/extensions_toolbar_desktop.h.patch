@@ -1,8 +1,19 @@
 diff --git a/chrome/browser/ui/views/extensions/extensions_toolbar_desktop.h b/chrome/browser/ui/views/extensions/extensions_toolbar_desktop.h
-index b6de9f344dc9effa2115c7b89fcc2127d24f5997..1d8e15ae8c5c69add4cd891bc5a03ec41764c199 100644
+index b6de9f344dc9effa2115c7b89fcc2127d24f5997..8a5e22a208357fda54a921c68c12ada5d1a35557 100644
 --- a/chrome/browser/ui/views/extensions/extensions_toolbar_desktop.h
 +++ b/chrome/browser/ui/views/extensions/extensions_toolbar_desktop.h
-@@ -115,6 +115,13 @@ class ExtensionsToolbarDesktop : public ToolbarIconContainerView,
+@@ -35,6 +35,10 @@ class ExtensionsToolbarButton;
+ class ToolbarActionViewModel;
+ class ExtensionsMenuCoordinator;
+ 
++namespace myarc {
++class FooterTooltip;
++}  // namespace myarc
++
+ // Container for extensions shown in the toolbar. These include pinned
+ // extensions and extensions that are 'popped out' transitively to show dialogs
+ // or be called out to the user.
+@@ -115,6 +119,13 @@ class ExtensionsToolbarDesktop : public ToolbarIconContainerView,
    // Updates the container visibility and animation as needed.
    void UpdateContainerVisibility();
  
@@ -16,7 +27,7 @@ index b6de9f344dc9effa2115c7b89fcc2127d24f5997..1d8e15ae8c5c69add4cd891bc5a03ec4
    // Updates the controls visibility.
    void UpdateControlsVisibility();
  
-@@ -204,6 +211,8 @@ class ExtensionsToolbarDesktop : public ToolbarIconContainerView,
+@@ -204,6 +215,8 @@ class ExtensionsToolbarDesktop : public ToolbarIconContainerView,
        const extensions::ExtensionId& action_id) override;
    views::BubbleAnchor GetExtensionsButtonAnchor() override;
    views::BubbleBorder::Arrow GetPopupArrow() const override;
@@ -25,7 +36,27 @@ index b6de9f344dc9effa2115c7b89fcc2127d24f5997..1d8e15ae8c5c69add4cd891bc5a03ec4
  
    // ToolbarActionView::Delegate:
    content::WebContents* GetCurrentWebContents() override;
-@@ -348,6 +357,8 @@ class ExtensionsToolbarDesktop : public ToolbarIconContainerView,
+@@ -222,6 +235,7 @@ class ExtensionsToolbarDesktop : public ToolbarIconContainerView,
+                            const gfx::Point& press_pt,
+                            const gfx::Point& p) override;
+   bool IsFocusOnExtensionAction() const override;
++  bool ShouldShowNativeTooltip() const override;
+ 
+   // ExtensionsToolbarViewModel::Delegate:
+   std::unique_ptr<ExtensionActionViewModel> CreateActionViewModel(
+@@ -337,6 +351,11 @@ class ExtensionsToolbarDesktop : public ToolbarIconContainerView,
+   // Updates the `request_access_button_` given the current `web_contents`.
+   void UpdateRequestAccessButton(content::WebContents& web_contents);
+ 
++  // URL-pill icons: no ink-drop tile, glass FooterTooltip instead of the
++  // Chromium hover card.
++  void ConfigureMyarcSidebarAction(ToolbarActionView* icon);
++  void RestoreDefaultActionChrome(ToolbarActionView* icon);
++
+   // Maybe displays the In-Product-Help with a specific priority order.
+   void MaybeShowIPH();
+ 
+@@ -348,11 +367,18 @@ class ExtensionsToolbarDesktop : public ToolbarIconContainerView,
    const raw_ptr<ToolbarActionsModel> model_;
  
    DisplayMode display_mode_;
@@ -34,3 +65,13 @@ index b6de9f344dc9effa2115c7b89fcc2127d24f5997..1d8e15ae8c5c69add4cd891bc5a03ec4
  
    // Controller for showing the toolbar action hover card.
    std::unique_ptr<ToolbarActionHoverCardController>
+       action_hover_card_controller_;
+ 
++  // Glass pill tooltip for URL-pill extension icons (sidebar mode only).
++  std::unique_ptr<myarc::FooterTooltip> myarc_tooltip_;
++  raw_ptr<ToolbarActionView> myarc_hovered_action_ = nullptr;
++  std::u16string myarc_hovered_label_;
++
+   // The view model for this container.
+   std::unique_ptr<ExtensionsToolbarViewModel> toolbar_view_model_;
+ 

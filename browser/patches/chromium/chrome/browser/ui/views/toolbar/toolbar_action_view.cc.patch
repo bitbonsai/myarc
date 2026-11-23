@@ -1,0 +1,26 @@
+diff --git a/chrome/browser/ui/views/toolbar/toolbar_action_view.cc b/chrome/browser/ui/views/toolbar/toolbar_action_view.cc
+index a9b7a01645abcd3dac7eac5a58d192045d69c684..4ce05ecbc062c82902b2338bdb8e075f6d1a96b6 100644
+--- a/chrome/browser/ui/views/toolbar/toolbar_action_view.cc
++++ b/chrome/browser/ui/views/toolbar/toolbar_action_view.cc
+@@ -68,6 +68,10 @@ using views::LabelButtonBorder;
+ ////////////////////////////////////////////////////////////////////////////////
+ // ToolbarActionView
+ 
++bool ToolbarActionView::Delegate::ShouldShowNativeTooltip() const {
++  return true;
++}
++
+ ToolbarActionView::ToolbarActionView(ToolbarActionViewModel* view_model,
+                                      ToolbarActionView::Delegate* delegate)
+     : MenuButton(base::BindRepeating(&ToolbarActionView::ButtonPressed,
+@@ -209,7 +213,9 @@ void ToolbarActionView::UpdateState() {
+ 
+   if (!base::FeatureList::IsEnabled(
+           extensions_features::kExtensionsMenuAccessControl)) {
+-    SetTooltipText(view_model_->GetTooltip(web_contents));
++    SetTooltipText(delegate_->ShouldShowNativeTooltip()
++                       ? view_model_->GetTooltip(web_contents)
++                       : std::u16string());
+   }
+ 
+   SchedulePaint();

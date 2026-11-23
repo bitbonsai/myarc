@@ -1,5 +1,17 @@
 # Development log
 
+## 2026-11-23: Drop hover plate and use glass tooltips on URL-pill extension icons
+
+- Disabled `ToolbarActionView` ink-drop hover plates in `ExtensionsToolbarDesktop` sidebar mode (`InkDropMode::OFF`, `SetShowInkDropWhenHotTracked(false)`) and swapped Chromium's hover card and native OS tooltip for `myarc::FooterTooltip` showing the extension name beside the icon (`extensions_toolbar_desktop.{h,cc}`, `toolbar_action_view.{h,cc}`, `extensions/BUILD.gn`).
+- Fixed hover/lifecycle edge cases: tracked the hovered action/label to prevent per-pixel `OnMouseMoved` timer resets, routed `kEvent` clicks to `FooterTooltip::Press` to avoid warm-window flashes, reset `myarc_tooltip_` before child teardown and on action removal, and suppressed native `SetTooltipText` in `ToolbarActionView::UpdateState` via `Delegate::ShouldShowNativeTooltip`.
+- Evidence: Chromium `myarc` commit `810f26e1e7` builds cleanly in `out/MyarcNightly chrome`; `export_patches.py --check` (153 patches) and `check_docs.py` pass. Live visual check on the built `MyarcNightly` app is ready for the user.
+
+## 2026-11-23: Alpha live pass on nightly `2026.11.22.2` (AppleScript)
+
+- Ran [ALPHA-LIVE-CHECK.md](../docs/ALPHA-LIVE-CHECK.md) on `/Applications/myArc Nightly.app` with disposable profile `/tmp/myarc-live-pass-profile-rerun3`. Little Arc opened (760×600) and ⌘O promoted myarc.dev; one-click Arc import previewed/committed (1 Profile, 3 Favorites, 2 Spaces, 1 folder, 4 pins) with zero-dup re-import and unchanged Arc sidebar SHA; welcome replay, coach Back, ⌃1 Space switch, You're ready/Done, and Reduce Motion welcome all captured.
+- Bitwarden installed from the Chrome Web Store via Add to Chrome + confirm dialog (`nngceckbapebfimnlniiiahkandclblb` 2026.11.0, from_webstore, pinned, empty disable_reasons); popup opens before and after quit/relaunch. URL pill hover showed Copy URL; the Bitwarden page-action icon was not clearly visible beside it in AX/crops.
+- Evidence: `/tmp/myarc-live-pass-20261123/` (incl. `RESULTS.md`). Open from the plan: CLI Allow + MCP journey, URL-pill Bitwarden icon confirmation, perf/a11y budgets. ALPHA.md checkboxes not flipped yet for the icon gap and Raycast/⌥⌘N caveat.
+
 ## 2026-11-22: Alpha nightly `2026.11.22.2`, and myarc.dev moves to alpha
 
 - Shipped the prerelease `nightly-2026.11.22.2` from `main` `2ee2e26` and Chromium `c79fde785c`, and switched `myarc.dev` from the pre-alpha copy to alpha. Developer ID signed, Apple notarized and stapled; 184181609 bytes, SHA-256 `bc7331d3...9331`, Sparkle EdDSA signature verified.

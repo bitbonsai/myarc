@@ -1,27 +1,22 @@
 # Ranked work and blockers
 
-Updated: 2026-11-10. Browser release blockers remain open. Synthetic onboarding and the opt-in Rust/native browser experiment supply bounded evidence.
+Updated: 2026-11-23. Statuses follow [ALPHA.md](ALPHA.md), [SCORECARD.md](SCORECARD.md), and [DEVLOG.md](../log/DEVLOG.md) through nightly `2026.11.22.2` (`origin/main` `6059737`). Alpha daily-use shape is largely in the packaged nightly; the open work below is what still blocks calling alpha "closed" or a full release.
 
-Current implementation priority is [MA-007.a, native visual parity](../.plans/EXECUTION.md#ma-007a-native-visual-parity-first-state). Match the empty/new-tab window before expanding export investigation or the foundation test matrix. The ranking below retains release blockers; it does not override that current visible slice or permit unsafe browsing claims. The [alpha checklist](ALPHA.md) says which of this work alpha needs.
-
-[Native crash evidence](../browser/evidence/workspace-process-crash.json) now distinguishes successful clean-persisted session restoration from actual recent localStorage/navigation loss. [Navigation run details](../browser/experiments/native-session-navigation-crash.md) retain the failed strict duplicate-URL result. Acknowledgement and power-loss durability remain blockers despite stable-ID recovery controls. Renderer stays off by default; native browser/interactive suites remain unrun.
+Current priority: finish the [alpha live pass](ALPHA-LIVE-CHECK.md), then MA-011 CLI/MCP evidence on a packaged nightly. Visual parity polish continues in the Chromium lane when a slice is assigned; it no longer outranks those gates.
 
 | Rank | Gap | Why it leads | Completion evidence |
 | --- | --- | --- | --- |
-| 1 | Foundation acceptance and maintenance capacity unresolved | Build/native interoperation passed; extension lifecycle, runtime boundaries and ownership remain unverified | MA-002 extension/recovery evidence, complete notices and accepted upkeep/signing/budget plan |
-| 2 | Arc export semantic coverage incomplete | Built-in Markdown export action confirmed and its observed shape parses; version binding, Favorites scope and nested-folder behavior remain unverified | MA-003 field mapping, controlled cases and expanded synthetic corpus |
-| 3 | Native animated onboarding remains unverified | First-run quality is an explicit product requirement; [web study](../design/onboarding/README.md) now runs with synthetic fixtures | Review study; integrate shared state and gather native motion, accessibility, performance and user-task evidence |
-| 4 | Full workspace semantics and crash durability unaccepted | Import, sidebar, onboarding and recovery share this contract | MA-004/005 model, commands, round trip and interruption checks |
-| 5 | No safe import transaction or preservation utility | Users need a usable escape hatch before the complete browser | MA-006 dry run, omissions report, rollback/source-integrity proof |
-| 6 | No complete browsing slice | An attractive shell is insufficient | MA-007 integrated import → pin → Space → command → restart journey |
-| 7 | Security/update/profile/private-mode guarantees unproven | Blocks any public daily-use promise | MA-009 and [security plan](SECURITY-PLAN.md) evidence |
-| 8 | No extension/platform compatibility matrix | Chromium heritage is not compatibility evidence | MA-002/009 named test cases, versions and outcomes |
-| 9 | No usable CLI/MCP browser control | P0 user requirement; AI agents must observe and act on real pages | MA-011 both-interface and external-client journeys, grants, isolation and Stop control |
-| 10 | Peek/splits and initial Boosts unimplemented | Important workflow fidelity after the core is stable | MA-010 tests, user tasks and recordings |
-| 11 | Built-in AI/service economics and demand untested | Revenue must support maintenance, without delaying the browser or core control interfaces | Optional provider pilot, cost ledger and limit/billing evidence |
+| 1 | Alpha live pass unfinished | Five **Required for alpha** boxes still unchecked: Little Arc `⌥⌘N` from another app, one-click Arc import on real data, welcome tour Back/`⌃2`/Reduce Motion, Chrome Web Store Bitwarden install | Checked boxes in [ALPHA.md](ALPHA.md) from a run of [ALPHA-LIVE-CHECK.md](ALPHA-LIVE-CHECK.md) on `2026.11.22.2` or newer |
+| 2 | No usable CLI/MCP journey on a packaged nightly (MA-011) | P0 for full release; CLI and MCP ship in the nightly, but the log has no external MCP client page journey and no control-on packaged launch | Both interfaces complete the same real page journey; Allow/Stop; [CONTROL-PROTOCOL.md](CONTROL-PROTOCOL.md) |
+| 3 | Core browsing smoke and Restore still open | Archive restore to the original Space is unconfirmed; permissions, history, find in page and DevTools lack a native smoke | Restore check + native smoke recorded in ALPHA / SCORECARD |
+| 4 | Offline / no-account network audit missing | Account independence gate needs a fresh install with the network off and a request audit | Recorded journey separating updates/site traffic from optional services |
+| 5 | Accessibility and responsiveness budgets unmeasured | 1,000-tab frame/responsiveness trace and VoiceOver review are still open onboarding and scorecard gates | Native recordings and traces on a reference Mac |
+| 6 | Foundation acceptance residue (MA-002) | Build/native interoperation passed; default-context target-creation assertion and broader extension update/removal coverage remain | MA-002 extension/recovery evidence and accepted upkeep plan |
+| 7 | Extension/platform compatibility matrix incomplete | Bitwarden store path and bundled uBOL have background evidence; named suite across platforms is not done | Versioned matrix; failures and limits visible |
+| 8 | Security/update edge cases still thin | Signed updates and notarization ship; disk-full, power-loss and schema-upgrade durability are unmeasured | SCORECARD rows with dated evidence |
+| 9 | Boosts and remaining Arc fidelity | Important after the core is stable; Easels stay out of scope | MA-010 tests and recordings where claimed |
+| 10 | Built-in AI/service economics untested | Revenue must support maintenance without delaying the browser or control interfaces | Optional provider pilot only after P0 control and alpha close |
 
 Choose the highest-ranked task whose dependencies and resources are available. Keep MA-001 design progress moving while build/data investigations proceed; this is a sequencing instruction, not authorization to spawn autonomous agents or contact users.
-
-The standalone Rust model and preservation path may progress while the browser foundation is blocked; MA-004 no longer treats a completed Chromium build as a prerequisite. Use [behavior contracts](../.plans/BEHAVIOR-CONTRACTS.md) to settle cross-system rules and retain useful failed-attempt context in [the development log](../log/DEVLOG.md).
 
 Security, data loss, cross-Profile leakage, an invalid updater, or import corruption outrank feature work. A blocked task produces a concrete blocker record, not pretend completion.

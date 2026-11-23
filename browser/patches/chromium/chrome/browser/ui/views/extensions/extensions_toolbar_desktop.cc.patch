@@ -1,8 +1,43 @@
 diff --git a/chrome/browser/ui/views/extensions/extensions_toolbar_desktop.cc b/chrome/browser/ui/views/extensions/extensions_toolbar_desktop.cc
-index dce94a0eb7efbdd2a569ddf636695fa090237a42..9abdb437004ea012da2bebb2e40a699fcbba2bc3 100644
+index dce94a0eb7efbdd2a569ddf636695fa090237a42..1610fb33f88b21639af4bebf6b2674fe12be9b57 100644
 --- a/chrome/browser/ui/views/extensions/extensions_toolbar_desktop.cc
 +++ b/chrome/browser/ui/views/extensions/extensions_toolbar_desktop.cc
-@@ -453,6 +453,11 @@ void ExtensionsToolbarDesktop::ShowWidgetForExtension(
+@@ -42,6 +42,7 @@
+ #include "chrome/browser/ui/views/frame/browser_view.h"
+ #include "chrome/browser/ui/views/frame/toolbar_button_provider.h"
+ #include "chrome/browser/ui/views/toolbar/toolbar_action_hover_card_controller.h"
++#include "chrome/browser/ui/views/toolbar/toolbar_ink_drop_util.h"
+ #include "chrome/browser/ui/views/toolbar/toolbar_view.h"
+ #include "chrome/browser/user_education/user_education_service.h"
+ #include "chrome/browser/user_education/user_education_service_factory.h"
+@@ -55,12 +56,16 @@
+ #include "extensions/browser/extension_util.h"
+ #include "extensions/common/extension_features.h"
+ #include "extensions/common/extension_id.h"
++#include "myarc/footer_button.h"
+ #include "ui/base/dragdrop/drag_drop_types.h"
+ #include "ui/base/dragdrop/mojom/drag_drop_types.mojom.h"
+ #include "ui/base/l10n/l10n_util.h"
+ #include "ui/base/metadata/metadata_impl_macros.h"
+ #include "ui/base/models/image_model.h"
+ #include "ui/base/ui_base_features.h"
++#include "ui/display/screen.h"
++#include "ui/views/animation/ink_drop.h"
++#include "ui/views/animation/ink_drop_host.h"
+ #include "ui/views/layout/animating_layout_manager.h"
+ #include "ui/views/layout/flex_layout.h"
+ #include "ui/views/layout/flex_layout_types.h"
+@@ -270,6 +275,9 @@ ExtensionsToolbarDesktop::~ExtensionsToolbarDesktop() {
+   // Eliminate the hover card first to avoid order-of-operation issues (e.g.
+   // avoid events during teardown).
+   action_hover_card_controller_.reset();
++  myarc_hovered_action_ = nullptr;
++  myarc_hovered_label_.clear();
++  myarc_tooltip_.reset();
+ 
+   close_side_panel_button_ = nullptr;
+ 
+@@ -453,6 +461,11 @@ void ExtensionsToolbarDesktop::ShowWidgetForExtension(
      const std::string& extension_id) {
    anchored_widgets_.push_back({widget, extension_id});
    widget->AddObserver(this);
@@ -14,7 +49,7 @@ index dce94a0eb7efbdd2a569ddf636695fa090237a42..9abdb437004ea012da2bebb2e40a699f
    UpdateIconVisibility(extension_id);
    GetAnimatingLayoutManager()->PostOrQueueAction(
        base::BindOnce(&ExtensionsToolbarDesktop::AnchorAndShowWidgetImmediately,
-@@ -583,9 +588,12 @@ void ExtensionsToolbarDesktop::AnchorAndShowWidgetImmediately(
+@@ -583,9 +596,12 @@ void ExtensionsToolbarDesktop::AnchorAndShowWidgetImmediately(
    // Revisit how to handle that, likely the Widget should Close on removal which
    // would remove the AnchoredWidget entry.
    views::View* const anchor_view = GetViewForId(iter->extension_id);
@@ -29,7 +64,17 @@ index dce94a0eb7efbdd2a569ddf636695fa090237a42..9abdb437004ea012da2bebb2e40a699f
    widget->Show();
  }
  
-@@ -697,6 +705,11 @@ views::LabelButton* ExtensionsToolbarDesktop::GetOverflowReferenceView() const {
+@@ -682,6 +698,9 @@ void ExtensionsToolbarDesktop::CreateActionViewForId(
+   icon->SetVisible(ToolbarActionsModel::CanShowActionsInToolbar(*browser_) &&
+                    model_->IsActionPinned(action_id));
+   views::FocusRing::Get(icon.get())->SetOutsetFocusRingDisabled(true);
++  if (myarc_sidebar_mode_) {
++    ConfigureMyarcSidebarAction(icon.get());
++  }
+   ObserveButton(icon.get());
+   icons_.insert({action_id, AddChildView(std::move(icon))});
+ }
+@@ -697,6 +716,11 @@ views::LabelButton* ExtensionsToolbarDesktop::GetOverflowReferenceView() const {
  
  gfx::Size ExtensionsToolbarDesktop::GetToolbarActionSize() {
    constexpr gfx::Size kDefaultSize(28, 28);
@@ -41,7 +86,59 @@ index dce94a0eb7efbdd2a569ddf636695fa090237a42..9abdb437004ea012da2bebb2e40a699f
    BrowserView* const browser_view =
        BrowserView::GetBrowserViewForBrowser(browser_);
    return browser_view
-@@ -877,6 +890,9 @@ void ExtensionsToolbarDesktop::OnPinnedActionsChanged() {
+@@ -726,9 +750,37 @@ bool ExtensionsToolbarDesktop::IsFocusOnExtensionAction() const {
+   return false;
+ }
+ 
++bool ExtensionsToolbarDesktop::ShouldShowNativeTooltip() const {
++  return !myarc_sidebar_mode_;
++}
++
+ void ExtensionsToolbarDesktop::UpdateHoverCard(
+     ToolbarActionView* action_view,
+     ToolbarActionHoverCardUpdateType update_type) {
++  if (myarc_sidebar_mode_) {
++    if (!myarc_tooltip_) {
++      return;
++    }
++    if (!action_view) {
++      myarc_hovered_action_ = nullptr;
++      myarc_hovered_label_.clear();
++      if (update_type == ToolbarActionHoverCardUpdateType::kEvent) {
++        myarc_tooltip_->Press(display::Screen::Get()->GetCursorScreenPoint());
++      } else {
++        myarc_tooltip_->Hide();
++      }
++      return;
++    }
++    const std::u16string label = action_view->view_model()->GetActionName();
++    if (myarc_hovered_action_ == action_view && myarc_hovered_label_ == label) {
++      return;
++    }
++    myarc_hovered_action_ = action_view;
++    myarc_hovered_label_ = label;
++    // Extension name only; Arc's pill tooltips stay short.
++    myarc_tooltip_->Hover(*action_view, {.label = label, .beside = true});
++    return;
++  }
+   action_hover_card_controller_->UpdateHoverCard(action_view, update_type);
+ }
+ 
+@@ -843,6 +895,13 @@ void ExtensionsToolbarDesktop::OnActionRemoved(
+ 
+   ToolbarActionView* action_view = GetViewForId(action_id);
+   if (action_view) {
++    if (myarc_hovered_action_ == action_view) {
++      myarc_hovered_action_ = nullptr;
++      myarc_hovered_label_.clear();
++      if (myarc_tooltip_) {
++        myarc_tooltip_->Hide();
++      }
++    }
+     RemoveChildViewT(action_view);
+     icons_.erase(action_id);
+   }
+@@ -877,6 +936,9 @@ void ExtensionsToolbarDesktop::OnPinnedActionsChanged() {
      UpdateIconVisibility(it.first);
    }
    ReorderAllChildViews();
@@ -51,7 +148,7 @@ index dce94a0eb7efbdd2a569ddf636695fa090237a42..9abdb437004ea012da2bebb2e40a699f
  
    drop_weak_ptr_factory_.InvalidateWeakPtrs();
  }
-@@ -1055,6 +1071,9 @@ void ExtensionsToolbarDesktop::OnWidgetDestroying(views::Widget* widget) {
+@@ -1055,6 +1117,9 @@ void ExtensionsToolbarDesktop::OnWidgetDestroying(views::Widget* widget) {
    anchored_widgets_.erase(iter);
    if (GetWidget() && !GetWidget()->IsClosed()) {
      UpdateIconVisibility(extension_id);
@@ -61,10 +158,25 @@ index dce94a0eb7efbdd2a569ddf636695fa090237a42..9abdb437004ea012da2bebb2e40a699f
    }
  }
  
-@@ -1095,6 +1114,31 @@ void ExtensionsToolbarDesktop::SetExtensionIconVisibility(
+@@ -1095,6 +1160,65 @@ void ExtensionsToolbarDesktop::SetExtensionIconVisibility(
        visible ? GetExtensionIcon(extension_view) : ui::ImageModel());
  }
  
++void ExtensionsToolbarDesktop::ConfigureMyarcSidebarAction(
++    ToolbarActionView* icon) {
++  views::InkDrop::Get(icon)->SetMode(views::InkDropHost::InkDropMode::OFF);
++  icon->SetShowInkDropWhenHotTracked(false);
++  // FooterTooltip replaces the Chromium hover card and native tooltip.
++  icon->SetTooltipText(std::u16string());
++}
++
++void ExtensionsToolbarDesktop::RestoreDefaultActionChrome(
++    ToolbarActionView* icon) {
++  ConfigureInkDrop(icon);
++  icon->SetShowInkDropWhenHotTracked(true);
++  icon->UpdateState();
++}
++
 +void ExtensionsToolbarDesktop::SetMyarcSidebarMode(bool enabled) {
 +  if (myarc_sidebar_mode_ == enabled) {
 +    return;
@@ -77,7 +189,26 @@ index dce94a0eb7efbdd2a569ddf636695fa090237a42..9abdb437004ea012da2bebb2e40a699f
 +  GetTargetLayoutManager()->SetCrossAxisAlignment(
 +      enabled ? views::LayoutAlignment::kCenter
 +              : views::LayoutAlignment::kStretch);
++  if (enabled) {
++    myarc_tooltip_ = std::make_unique<myarc::FooterTooltip>();
++  } else {
++    myarc_hovered_action_ = nullptr;
++    myarc_hovered_label_.clear();
++    if (myarc_tooltip_) {
++      myarc_tooltip_->Hide();
++      myarc_tooltip_.reset();
++    }
++  }
 +  UpdateAllIcons();
++  // After UpdateState, which may set a native tooltip when the access-control
++  // hover card is off.
++  for (auto& [id, icon] : icons_) {
++    if (enabled) {
++      ConfigureMyarcSidebarAction(icon);
++    } else {
++      RestoreDefaultActionChrome(icon);
++    }
++  }
 +  UpdateContainerVisibility();
 +  GetAnimatingLayoutManager()->ResetLayout();
 +  PreferredSizeChanged();
@@ -93,7 +224,7 @@ index dce94a0eb7efbdd2a569ddf636695fa090237a42..9abdb437004ea012da2bebb2e40a699f
  void ExtensionsToolbarDesktop::UpdateContainerVisibility() {
    bool was_visible = GetVisible();
    SetVisible(ShouldContainerBeVisible());
-@@ -1103,6 +1147,10 @@ void ExtensionsToolbarDesktop::UpdateContainerVisibility() {
+@@ -1103,6 +1227,10 @@ void ExtensionsToolbarDesktop::UpdateContainerVisibility() {
    // resetting.
    if (was_visible != GetVisible()) {
      GetAnimatingLayoutManager()->ResetLayout();
@@ -104,7 +235,7 @@ index dce94a0eb7efbdd2a569ddf636695fa090237a42..9abdb437004ea012da2bebb2e40a699f
    }
  
    if (!was_visible && GetVisible() && GetOnVisibleCallbackForTesting()) {
-@@ -1117,6 +1165,14 @@ bool ExtensionsToolbarDesktop::ShouldContainerBeVisible() const {
+@@ -1117,6 +1245,14 @@ bool ExtensionsToolbarDesktop::ShouldContainerBeVisible() const {
      return false;
    }
  
@@ -119,7 +250,7 @@ index dce94a0eb7efbdd2a569ddf636695fa090237a42..9abdb437004ea012da2bebb2e40a699f
    // All other display modes are constantly visible.
    if (display_mode_ != DisplayMode::kAutoHide) {
      return true;
-@@ -1265,11 +1321,21 @@ views::BubbleAnchor ExtensionsToolbarDesktop::GetReferenceButtonForPopup(
+@@ -1265,11 +1401,21 @@ views::BubbleAnchor ExtensionsToolbarDesktop::GetReferenceButtonForPopup(
  }
  
  views::BubbleAnchor ExtensionsToolbarDesktop::GetExtensionsButtonAnchor() {

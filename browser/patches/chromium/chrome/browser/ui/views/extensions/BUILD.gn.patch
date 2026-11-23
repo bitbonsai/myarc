@@ -1,0 +1,13 @@
+diff --git a/chrome/browser/ui/views/extensions/BUILD.gn b/chrome/browser/ui/views/extensions/BUILD.gn
+index e526aa4072c86345e320266f5ed88393fc9174de..42d4465cabfe1d8cc79dd0eaee9a96077cb36f7a 100644
+--- a/chrome/browser/ui/views/extensions/BUILD.gn
++++ b/chrome/browser/ui/views/extensions/BUILD.gn
+@@ -937,6 +937,8 @@ source_set("extensions_toolbar_desktop") {
+     "//chrome/browser/ui/views/frame:toolbar_button_provider",
+     "//chrome/browser/ui/views/toolbar",
+     "//chrome/browser/user_education",
++    "//myarc:sidebar_view",
+     "//ui/base/dragdrop/mojom",
++    "//ui/display",
+   ]
+ }
