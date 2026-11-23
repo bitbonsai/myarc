@@ -16,9 +16,9 @@ Browser control ships inside `myArc Nightly.app/Contents/Helpers/myarc` as both 
 
 I ran the full verification suite against `Helpers/myarc`, raw MCP stdio, and Claude Code (`--strict-mcp-config`) on a synthetic form fixture with adversarial inputs: stale snapshot revisions, forged element refs, hidden bidi characters, cross-Profile tab IDs, user tab IDs, blocked URL schemes, and oversized fills. All 161 control and CLI tests passed alongside the live runs.
 
-[![myArc running an active Agent Space with the Stop pill and a synthetic form fixture](https://myarc.dev/blog/alpha-checklist-and-agent-control/agent-space-active.c5f6463436c1.webp)](https://myarc.dev/blog/alpha-checklist-and-agent-control/agent-space-active.c5f6463436c1.webp)
+[![myArc running the local synthetic form fixture used to verify CLI, MCP, and Claude Code control](https://myarc.dev/blog/alpha-checklist-and-agent-control/agent-space-active.c5a8193b5686.webp)](https://myarc.dev/blog/alpha-checklist-and-agent-control/agent-space-active.c5a8193b5686.webp)
 
-An active Agent Space running against a local synthetic form fixture, with the Stop button ready to revoke access.
+The local synthetic form fixture used for CLI, MCP, and Claude Code verification, including the untrusted prompt-injection note.
 
 This nightly adds three new commands to both the CLI and MCP:
 
@@ -30,7 +30,7 @@ This nightly adds three new commands to both the CLI and MCP:
 
 The Agent Space has a new filled robot-head icon in both the Space header and the sidebar footer, matching the weight of the other Space icons.
 
-[![myArc sidebar showing the new filled robot-head icon in the Agent Space header and bottom footer](https://myarc.dev/blog/alpha-checklist-and-agent-control/agent-space-icon.7689a2b8e6a4.webp)](https://myarc.dev/blog/alpha-checklist-and-agent-control/agent-space-icon.7689a2b8e6a4.webp)
+[![myArc sidebar showing the new filled robot-head icon in the Agent Space header and bottom footer](https://myarc.dev/blog/alpha-checklist-and-agent-control/agent-space-icon.ccfc09de7010.webp)](https://myarc.dev/blog/alpha-checklist-and-agent-control/agent-space-icon.ccfc09de7010.webp)
 
 The filled robot-head icon in the Agent Space header and footer.
 
@@ -47,15 +47,15 @@ To close the remaining alpha gates without hand-waving, I added three more scrip
 - **Offline and no-account audit:** launched with `--host-resolver-rules` blocking external hosts and captured a full NetLog. myArc opened with zero account prompts, loaded a local page, pinned it with `⌘D`, persisted it to disk, and made zero calls to any myArc service.
 - **1,000-tab responsiveness benchmark:** seeded 10 Spaces with 100 dormant items each on an Apple M5 Pro (macOS 26.7.3). First on-screen window appeared in **797.5 ms**, steady-state memory settled at **953.5 MB** across 11 processes, Space switches ran at **75.5 ms median / 83.1 ms p95**, and atomic workspace saves finished in **2.08 ms median**.
 
-[![myArc showing frosted find-in-page highlighting matches on a synthetic fixture](https://myarc.dev/blog/alpha-checklist-and-agent-control/core-smoke-find.fac47e7bd61e.webp)](https://myarc.dev/blog/alpha-checklist-and-agent-control/core-smoke-find.fac47e7bd61e.webp)
+[![myArc showing frosted find-in-page highlighting matches on a synthetic fixture](https://myarc.dev/blog/alpha-checklist-and-agent-control/core-smoke-find.fc9d74b8a3ba.webp)](https://myarc.dev/blog/alpha-checklist-and-agent-control/core-smoke-find.fc9d74b8a3ba.webp)
 
 Find-in-page highlighting matches inside the glass bar.
 
-[![myArc showing docked Chromium DevTools inspecting the synthetic fixture](https://myarc.dev/blog/alpha-checklist-and-agent-control/core-smoke-devtools.bf5836105f84.webp)](https://myarc.dev/blog/alpha-checklist-and-agent-control/core-smoke-devtools.bf5836105f84.webp)
+[![myArc showing docked Chromium DevTools inspecting the synthetic fixture](https://myarc.dev/blog/alpha-checklist-and-agent-control/core-smoke-devtools.aa0c0f10953f.webp)](https://myarc.dev/blog/alpha-checklist-and-agent-control/core-smoke-devtools.aa0c0f10953f.webp)
 
 Docked DevTools inspecting a local test page.
 
-[![myArc sidebar populated with 1,000 synthetic dormant items across 10 Spaces](https://myarc.dev/blog/alpha-checklist-and-agent-control/thousand-tabs.c2d24f0b773f.webp)](https://myarc.dev/blog/alpha-checklist-and-agent-control/thousand-tabs.c2d24f0b773f.webp)
+[![myArc sidebar populated with 1,000 synthetic dormant items across 10 Spaces](https://myarc.dev/blog/alpha-checklist-and-agent-control/thousand-tabs.79ee9153b8e8.webp)](https://myarc.dev/blog/alpha-checklist-and-agent-control/thousand-tabs.79ee9153b8e8.webp)
 
 The 1,000-item synthetic workspace used for startup, memory, and Space-switch measurements.
 
