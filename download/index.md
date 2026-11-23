@@ -4,12 +4,12 @@ HTML: https://myarc.dev/download/
 
 Alpha nightly, for trying the Arc-like shell. Not yet for daily or sensitive browsing.
 
-[Download for macOS (Apple silicon)](https://github.com/bitbonsai/myarc/releases/download/nightly-2026.11.22.2/myArc-Nightly-2026.11.22.2-arm64.dmg)
+[Download for macOS (Apple silicon)](https://github.com/bitbonsai/myarc/releases/download/nightly-2026.11.23.1/myArc-Nightly-2026.11.23.1-arm64.dmg)
 
-- **Version:** 2026.11.22.2
-- **Date:** November 22, 2026
+- **Version:** 2026.11.23.1
+- **Date:** November 23, 2026
 - **Size:** 184.2 MB
-- **SHA-256:** `bc7331d317dfcff8ebeb9cd46d0e45887f3b9eeda4cd38b7610b10cab8d49331`
+- **SHA-256:** `35495145451e8638272cbfcf2cfd327ad6552bed6a126730b82cebbbb6282666`
 
 ## System requirements
 
@@ -21,7 +21,7 @@ Alpha nightly, for trying the Arc-like shell. Not yet for daily or sensitive bro
 1. Check the download against the SHA-256 listed with it. The two values must match.
 
    ```
-   shasum -a 256 ~/Downloads/myArc-Nightly-2026.11.22.2-arm64.dmg
+   shasum -a 256 ~/Downloads/myArc-Nightly-2026.11.23.1-arm64.dmg
    ```
 2. Open the DMG and drag myArc Nightly to Applications.
 3. Open myArc Nightly. From 2026.11.18 on, Apple has notarized each nightly, so macOS only asks once whether to open an app downloaded from the internet. Choose Open.
@@ -59,7 +59,7 @@ Each item was seen working in a native run or experiment note. None of it has ha
 
 ## Other ways to get it
 
-- [GitHub releases](https://github.com/bitbonsai/myarc/releases/tag/nightly-2026.11.22.2) lists every nightly.
+- [GitHub releases](https://github.com/bitbonsai/myarc/releases/tag/nightly-2026.11.23.1) lists every nightly.
 - [Source on GitHub](https://github.com/bitbonsai/myarc), with instructions to [build it from source](https://github.com/bitbonsai/myarc/blob/main/browser/README.md).
 - [GitHub issues](https://github.com/bitbonsai/myarc/issues) take bug reports. Include the version, your macOS version and the steps that trigger the problem, and leave out private pages.
 

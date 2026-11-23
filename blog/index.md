@@ -4,6 +4,12 @@ HTML: https://myarc.dev/blog/
 
 November 2026
 
+## [Closing the alpha checklist and giving agents eyes](https://myarc.dev/blog/alpha-checklist-and-agent-control/)
+
+November 23, 2026
+
+Nightly 2026.11.23.1 closes every remaining alpha check, adds page.screenshot, page.scroll, and page.wait to CLI and MCP browser control, refreshes the Agent Space icon, and brings 1,000-tab responsiveness numbers.
+
 ## [Alpha is here!!! 🎉](https://myarc.dev/blog/glass-and-extensions/)
 
 November 22, 2026
