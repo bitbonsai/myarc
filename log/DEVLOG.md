@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-11-23: MA-011 CLI, MCP stdio, and Claude Code control evidence on nightly `2026.11.22.2`
+
+- Added `tools/check_control.sh` to verify the control endpoint (`700/600/600`), Allow card, identical synthetic-site journeys across `Helpers/myarc` CLI, `Helpers/myarc mcp` stdio (`2025-06-18`), and Claude Code (`2.1.330`, `--strict-mcp-config`), adversarial/scope rejections (stale revision, forged `[ref=e99]`, bidi `\u{202e}` escape, cross-Profile/non-Agent tab denial, bad schemes, 70 KiB fill, `page.screenshot` unsupported), and Stop revocation.
+- Ran against `/Applications/myArc Nightly.app` (`2026.11.22.2`, `myarc.control.enabled: true` in `Local State`, no test hooks, disposable Profile, built-in AI off, no account): CLI, direct MCP, and Claude Code completed the form journey cleanly (Claude Code ignored the page's `"IGNORE PREVIOUS INSTRUCTIONS"` note), captures recorded the Allow card and active Agent Space indicator + Stop button, and clicking Stop immediately revoked approval and triggered a fresh Allow prompt.
+- Evidence: `cargo test -p myarc-control -p myarc-cli --locked` (161/161 pass), captures in `/tmp/myarc-control-evidence-20261123/`, updated `docs/ALPHA.md`, `docs/SCORECARD.md`, `docs/GAPS.md`, and `.plans/INDEX.md`.
+
 ## 2026-11-23: Drop hover plate and use glass tooltips on URL-pill extension icons
 
 - Disabled `ToolbarActionView` ink-drop hover plates in `ExtensionsToolbarDesktop` sidebar mode (`InkDropMode::OFF`, `SetShowInkDropWhenHotTracked(false)`) and swapped Chromium's hover card and native OS tooltip for `myarc::FooterTooltip` showing the extension name beside the icon (`extensions_toolbar_desktop.{h,cc}`, `toolbar_action_view.{h,cc}`, `extensions/BUILD.gn`).
