@@ -334,7 +334,7 @@ for bad_url in ("chrome://settings", "file:///etc/passwd", "javascript:alert(1)"
 big = run_json("page.fill", {"tab": tab_handle, "revision": rev, "ref": "e1", "text": "a" * 70000}, expect_rc=1)
 assert big["status"] == "invalid", big
 
-unsup = run_json("page.scroll", {"tab": tab_handle, "revision": rev, "direction": "down"}, expect_rc=1)
+unsup = run_json("tab.pin", {"tab": tab_handle}, expect_rc=1)
 assert unsup["status"] == "unsupported", unsup
 
 shot = run_json("page.screenshot", {"tab": tab_handle})

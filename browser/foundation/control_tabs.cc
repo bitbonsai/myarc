@@ -46,6 +46,7 @@
 #include "third_party/blink/public/common/associated_interfaces/associated_interface_provider.h"
 #include "third_party/blink/public/common/input/web_input_event.h"
 #include "third_party/blink/public/mojom/content_extraction/ai_page_content.mojom.h"
+#include "third_party/blink/public/mojom/input/scroll_direction.mojom-shared.h"
 #include "third_party/skia/include/core/SkBitmap.h"
 #include "ui/accessibility/ax_enum_util.h"
 #include "ui/accessibility/ax_mode.h"
@@ -628,6 +629,22 @@ class ActionRun final : public content::WebContentsObserver {
           Acted();
         }
         return;
+      case Kind::Scroll: {
+        auto scroll = actor::mojom::ScrollAction::New();
+        const std::string_view dir(start_.text.data(), start_.text.size());
+        if (dir == "up") {
+          scroll->direction = blink::mojom::ScrollDirectionPhysical::kUp;
+        } else if (dir == "left") {
+          scroll->direction = blink::mojom::ScrollDirectionPhysical::kLeft;
+        } else if (dir == "right") {
+          scroll->direction = blink::mojom::ScrollDirectionPhysical::kRight;
+        } else {
+          scroll->direction = blink::mojom::ScrollDirectionPhysical::kDown;
+        }
+        scroll->amount = actor::mojom::ScrollAmount::NewDistance(480.0f);
+        Initialize(actor::mojom::ToolAction::NewScroll(std::move(scroll)));
+        return;
+      }
       default:
         Finish(foundation::ActionStatus::Refused, "Unknown page action");
         return;
@@ -1133,6 +1150,68 @@ class ScreenshotTaker final : public content::WebContentsObserver {
   base::WeakPtrFactory<ScreenshotTaker> weak_factory_{this};
 };
 
+class LoadWait final : public content::WebContentsObserver {
+ public:
+  LoadWait(content::WebContents& page,
+           uint64_t item,
+           rust::Box<foundation::ControlReply> reply)
+      : content::WebContentsObserver(&page),
+        item_(item),
+        reply_(std::move(reply)) {}
+
+  void Start(base::TimeDelta timeout) {
+    if (!web_contents()->IsLoading()) {
+      FinishLoaded();
+      return;
+    }
+    if (timeout.is_zero()) {
+      FinishError(TabStatus::TimedOut, "The tab is still loading");
+      return;
+    }
+    timer_.Start(FROM_HERE, timeout,
+                 base::BindOnce(&LoadWait::FinishError, base::Unretained(this),
+                                TabStatus::TimedOut,
+                                "Timed out waiting for the tab to finish loading"));
+  }
+
+  void DidStopLoading() override { FinishLoaded(); }
+
+  void WebContentsDestroyed() override {
+    FinishError(TabStatus::Stale, "The tab closed while waiting");
+  }
+
+ private:
+  void FinishLoaded() {
+    if (finished_) {
+      return;
+    }
+    finished_ = true;
+    timer_.Stop();
+    content::WebContents* page = web_contents();
+    Observe(nullptr);
+    AnswerWith(*reply_, item_, *page);
+    base::SingleThreadTaskRunner::GetCurrentDefault()->DeleteSoon(FROM_HERE,
+                                                                  this);
+  }
+
+  void FinishError(TabStatus status, std::string reason) {
+    if (finished_) {
+      return;
+    }
+    finished_ = true;
+    timer_.Stop();
+    Observe(nullptr);
+    Answer(*reply_, status, reason);
+    base::SingleThreadTaskRunner::GetCurrentDefault()->DeleteSoon(FROM_HERE,
+                                                                  this);
+  }
+
+  const uint64_t item_;
+  rust::Box<foundation::ControlReply> reply_;
+  base::OneShotTimer timer_;
+  bool finished_ = false;
+};
+
 }  // namespace
 
 void RunTabAction(BrowserWorkspaceAdapter& target,
@@ -1255,6 +1334,13 @@ void RunTabAction(BrowserWorkspaceAdapter& target,
           ->Start(
               base::Milliseconds(foundation::control_snapshot_timeout_ms()));
       return;
+    case TabActionKind::Wait: {
+      const uint64_t cap_ms =
+          std::min(plan.timeout_ms, foundation::control_navigation_wait_ms());
+      (new LoadWait(*page, plan.item, std::move(reply)))
+          ->Start(base::Milliseconds(cap_ms));
+      return;
+    }
     case TabActionKind::Act: {
       foundation::ActionStart start =
           foundation::begin_page_action(*reply, DocumentOf(*page));

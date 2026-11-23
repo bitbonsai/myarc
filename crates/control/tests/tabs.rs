@@ -510,3 +510,59 @@ fn screenshot_is_scoped_and_bounded() {
     );
     assert!(matches!(empty.outcome, Outcome::OutcomeUnknown { .. }));
 }
+
+#[test]
+fn scroll_and_wait_are_scoped_and_validated() {
+    use myarc_control::actions::{ActKind, PageAction, ScrollDirection};
+    let (mut workspace, agent_tab, user_tab) = seeded();
+    assert_eq!(
+        action(
+            &mut workspace,
+            "page.scroll",
+            json!({ "tab": tab_handle(agent_tab), "revision": "1.1", "direction": "down" })
+        ),
+        TabAction::Act(PageAction {
+            item: agent_tab,
+            revision: String::from("1.1"),
+            element: None,
+            kind: ActKind::Scroll {
+                direction: ScrollDirection::Down,
+            },
+        })
+    );
+    assert!(matches!(
+        refused(
+            &mut workspace,
+            "page.scroll",
+            json!({ "tab": tab_handle(agent_tab), "revision": "1.1", "direction": "sideways" })
+        ),
+        Outcome::Invalid { .. }
+    ));
+    assert_eq!(
+        action(
+            &mut workspace,
+            "page.wait",
+            json!({ "tab": tab_handle(agent_tab), "timeout_ms": 2500 })
+        ),
+        TabAction::Wait {
+            item: agent_tab,
+            timeout_ms: 2500
+        }
+    );
+    assert!(matches!(
+        refused(
+            &mut workspace,
+            "page.wait",
+            json!({ "tab": tab_handle(user_tab), "timeout_ms": 1000 })
+        ),
+        Outcome::Denied { .. }
+    ));
+    assert!(matches!(
+        refused(
+            &mut workspace,
+            "page.wait",
+            json!({ "tab": tab_handle(agent_tab), "timeout_ms": 99999 })
+        ),
+        Outcome::Invalid { .. }
+    ));
+}

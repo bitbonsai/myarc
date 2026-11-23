@@ -97,6 +97,8 @@ fn registry_schemas_are_objects_and_only_tab_page_and_space_commands_are_impleme
             "page.fill",
             "page.select",
             "page.press",
+            "page.scroll",
+            "page.wait",
             "space.list",
             "space.create",
             "space.select",

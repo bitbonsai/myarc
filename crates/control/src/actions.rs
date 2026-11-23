@@ -36,6 +36,39 @@ pub const MAX_CHANGES: usize = 20;
 /// Most options a `page.select` reads from the page.
 pub const MAX_SELECT_OPTIONS: usize = 1_000;
 
+/// Direction for `page.scroll`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ScrollDirection {
+    Up,
+    Down,
+    Left,
+    Right,
+}
+
+impl ScrollDirection {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Up => "up",
+            Self::Down => "down",
+            Self::Left => "left",
+            Self::Right => "right",
+        }
+    }
+}
+
+pub fn parse_direction(raw: &str) -> Result<ScrollDirection, String> {
+    match raw {
+        "up" => Ok(ScrollDirection::Up),
+        "down" => Ok(ScrollDirection::Down),
+        "left" => Ok(ScrollDirection::Left),
+        "right" => Ok(ScrollDirection::Right),
+        other => Err(format!(
+            "Direction {:?} is not supported; use up, down, left or right",
+            bounded(other)
+        )),
+    }
+}
+
 /// What to do to the element.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum ActKind {
@@ -43,6 +76,7 @@ pub enum ActKind {
     Fill { text: String },
     Select { value: String },
     Press { key: KeySpec },
+    Scroll { direction: ScrollDirection },
 }
 
 /// An interaction command that passed its parameter checks.
@@ -329,6 +363,7 @@ pub fn prepare(
                 })?;
                 focus_first = true;
             }
+            ActKind::Scroll { .. } => {}
         }
     }
     let taken = store.take(document, &action.revision)?;

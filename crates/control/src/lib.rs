@@ -234,6 +234,12 @@ pub enum TabAction {
     Screenshot {
         item: ItemId,
     },
+    /// Wait up to `timeout_ms` milliseconds for the tab to finish loading and
+    /// answer with [`tab_response`].
+    Wait {
+        item: ItemId,
+        timeout_ms: u64,
+    },
     /// Act on an element of the latest snapshot and answer with
     /// [`actions::action_response`].
     Act(actions::PageAction),
@@ -484,8 +490,16 @@ fn tab_action(
                 .map_err(|error| invalid(workspace_error(error)))?;
             Ok(TabAction::Open { space_id, url })
         }
-        "page.click" | "page.fill" | "page.select" | "page.press" => {
+        "page.click" | "page.fill" | "page.select" | "page.press" | "page.scroll" => {
             page_action(workspace, command, params).map(TabAction::Act)
+        }
+        "page.wait" => {
+            let params = Params::parse(params, &["tab", "timeout_ms"]).map_err(invalid)?;
+            let item = agent_tab(workspace, &params)?;
+            let timeout_ms = params
+                .non_negative_u64("timeout_ms", 30_000)
+                .map_err(invalid)?;
+            Ok(TabAction::Wait { item, timeout_ms })
         }
         "tab.navigate" => {
             let params = Params::parse(params, &["tab", "url"]).map_err(invalid)?;
@@ -523,13 +537,14 @@ fn page_action(
         "page.fill" => &["tab", "revision", "ref", "text"],
         "page.select" => &["tab", "revision", "ref", "value"],
         "page.press" => &["tab", "revision", "ref", "key"],
+        "page.scroll" => &["tab", "revision", "ref", "direction"],
         _ => &["tab", "revision", "ref"],
     };
     let params = Params::parse(params, extra).map_err(invalid)?;
     let item = agent_tab(workspace, &params)?;
     let revision = params.text("revision", MAX_QUOTED_BYTES).map_err(invalid)?;
     actions::check_revision(revision).map_err(invalid)?;
-    let element = if command == "page.press" && params.get("ref").is_err() {
+    let element = if matches!(command, "page.press" | "page.scroll") && params.get("ref").is_err() {
         None
     } else {
         let element = params.text("ref", MAX_QUOTED_BYTES).map_err(invalid)?;
@@ -552,6 +567,14 @@ fn page_action(
         "page.press" => ActKind::Press {
             key: actions::parse_key(params.text("key", MAX_QUOTED_BYTES).map_err(invalid)?)
                 .map_err(invalid)?,
+        },
+        "page.scroll" => ActKind::Scroll {
+            direction: actions::parse_direction(
+                params
+                    .text("direction", MAX_QUOTED_BYTES)
+                    .map_err(invalid)?,
+            )
+            .map_err(invalid)?,
         },
         _ => ActKind::Click,
     };
@@ -899,6 +922,17 @@ impl<'a> Params<'a> {
             .filter(|&id| id >= 1)
             .ok_or_else(|| format!("Parameter {key} must be a positive integer ID"))
     }
+
+    fn non_negative_u64(&self, key: &str, max: u64) -> Result<u64, String> {
+        let value = self
+            .get(key)?
+            .as_u64()
+            .ok_or_else(|| format!("Parameter {key} must be an integer between 0 and {max}"))?;
+        if value > max {
+            return Err(format!("Parameter {key} exceeds maximum {max}"));
+        }
+        Ok(value)
+    }
 }
 
 fn invalid(reason: String) -> Outcome {
@@ -1173,7 +1207,7 @@ fn build_registry() -> Vec<CommandSpec> {
                 }),
                 &["tab", "revision", "direction"],
             ),
-            false,
+            true,
         ),
         spec(
             "page.wait",
@@ -1191,7 +1225,7 @@ fn build_registry() -> Vec<CommandSpec> {
                 }),
                 &["tab", "timeout_ms"],
             ),
-            false,
+            true,
         ),
         spec(
             "space.list",

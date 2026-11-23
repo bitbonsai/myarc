@@ -517,19 +517,22 @@ mod ffi {
         Snapshot,
         // page.screenshot: answer with answer_screenshot_request.
         Screenshot,
-        // page.click, page.fill, page.select or page.press: begin with
-        // begin_page_action and answer with answer_action_request.
+        // page.wait: wait for loading to finish and answer with answer_tab_request.
+        Wait,
+        // page.click, page.fill, page.select, page.press or page.scroll: begin
+        // with begin_page_action and answer with answer_action_request.
         Act,
     }
 
     // Every item is a tab in the agent Space. `url` is set for Open and
-    // Navigate, `space` for Open and `items` for List.
+    // Navigate, `space` for Open, `timeout_ms` for Wait and `items` for List.
     struct ControlPlan {
         // The workspace changed, so the caller saves and notifies.
         changed: bool,
         action: TabActionKind,
         item: u64,
         space: u64,
+        timeout_ms: u64,
         url: String,
         items: Vec<u64>,
     }
@@ -594,6 +597,7 @@ mod ffi {
         Fill,
         Select,
         Press,
+        Scroll,
     }
 
     // A key press on a US layout. `key` and `code` are DOM key and code
@@ -3041,6 +3045,7 @@ pub fn answer_control_request(
         action: Kind::Answered,
         item: 0,
         space: 0,
+        timeout_ms: 0,
         url: String::new(),
         items: Vec::new(),
     };
@@ -3085,6 +3090,10 @@ pub fn answer_control_request(
         TabAction::Reload { item } => (Kind::Reload, item),
         TabAction::Snapshot { item } => (Kind::Snapshot, item),
         TabAction::Screenshot { item } => (Kind::Screenshot, item),
+        TabAction::Wait { item, timeout_ms } => {
+            plan.timeout_ms = timeout_ms;
+            (Kind::Wait, item)
+        }
         TabAction::Act(action) => {
             let item = action.item;
             reply.action = Some(action);
@@ -3299,6 +3308,10 @@ pub fn begin_page_action(reply: &mut ControlReply, document: u64) -> ffi::Action
                 ActKind::Press { key } => {
                     start.key = key_record(key.clone());
                     ffi::PageActKind::Press
+                }
+                ActKind::Scroll { direction } => {
+                    start.text = direction.as_str().to_owned();
+                    ffi::PageActKind::Scroll
                 }
             };
         }
