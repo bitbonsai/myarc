@@ -64,16 +64,28 @@ inline constexpr gfx::VectorIcon kArrowDownIcon(kArrowDownRep,
                                                 std::size(kArrowDownRep),
                                                 "myarc_arrow_down");
 
-// "bot" for the agent Space, where external agents open their tabs: its
-// footer glyph and title icon until the user picks another.
+// Filled robot-head glyph for the agent Space, where external agents open
+// their tabs: its footer glyph and title icon until the user picks another.
+// Default even-odd fill punches the two circular eyes out of the head.
 inline constexpr gfx::PathElement kBotPath[] = {
-    gfx::CANVAS_DIMENSIONS, 24, gfx::STROKE, 2,
-    gfx::MOVE_TO, 12, 8, gfx::V_LINE_TO, 4, gfx::H_LINE_TO, 8,
-    gfx::ROUND_RECT, 4, 8, 16, 12, 2,
-    gfx::MOVE_TO, 2, 14, gfx::H_LINE_TO, 4,
-    gfx::MOVE_TO, 20, 14, gfx::H_LINE_TO, 22,
-    gfx::MOVE_TO, 15, 13, gfx::V_LINE_TO, 15,
-    gfx::MOVE_TO, 9, 13, gfx::V_LINE_TO, 15};
+    gfx::CANVAS_DIMENSIONS, 243,
+    gfx::ROUND_RECT, 45, 51, 153, 141, 28,
+    gfx::CIRCLE, 91, 112, 17,
+    gfx::CIRCLE, 152, 112, 17,
+    gfx::MOVE_TO, 38, 95,
+    gfx::H_LINE_TO, 27,
+    gfx::ARC_TO, 11, 11, 0, 0, 0, 16, 106,
+    gfx::V_LINE_TO, 149,
+    gfx::ARC_TO, 11, 11, 0, 0, 0, 27, 160,
+    gfx::H_LINE_TO, 38,
+    gfx::CLOSE,
+    gfx::MOVE_TO, 205, 95,
+    gfx::H_LINE_TO, 216,
+    gfx::ARC_TO, 11, 11, 0, 0, 1, 227, 106,
+    gfx::V_LINE_TO, 149,
+    gfx::ARC_TO, 11, 11, 0, 0, 1, 216, 160,
+    gfx::H_LINE_TO, 205,
+    gfx::CLOSE};
 inline constexpr gfx::VectorIconRep kBotRep[] = {{kBotPath}};
 inline constexpr gfx::VectorIcon kBotIcon(kBotRep,
                                           std::size(kBotRep),
