@@ -4,11 +4,13 @@
 
 #include <algorithm>
 #include <cmath>
+#include <optional>
 
 #include "ui/gfx/native_ui_types.h"
 #include "ui/views/border.h"
 #include "ui/views/bubble/bubble_dialog_delegate_view.h"
 #include "ui/views/bubble/bubble_frame_view.h"
+#include "ui/views/controls/scroll_view.h"
 #include "ui/views/view_utils.h"
 #include "ui/views/widget/widget.h"
 #include "ui/views/widget/widget_delegate.h"
@@ -184,6 +186,12 @@ bool ApplyBubbleGlass(views::Widget& widget,
   if (widget.widget_delegate()) {
     if (auto* bubble = widget.widget_delegate()->AsBubbleDialogDelegate()) {
       bubble->SetBackgroundColor(fill);
+    }
+    // Modal BubbleDialogModelHost wraps its contents in a ScrollView whose
+    // default opaque kColorDialogBackground would cover the frosted backdrop.
+    if (auto* scroll = views::AsViewClass<views::ScrollView>(
+            widget.widget_delegate()->GetContentsView())) {
+      scroll->SetBackgroundColor(std::nullopt);
     }
   }
   if (frame) {
