@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-11-23: `page.scroll` / `page.wait`, nightly `2026.11.23.1`, and progress post
+
+- Implemented `page.scroll` (`actor::mojom::ScrollAction` with `up`/`down`/`left`/`right` on the viewport or a target ref) and `page.wait` (`LoadWait` `WebContentsObserver` observing `DidStopLoading` with bounded timeout) across `crates/control`, `browser/foundation/bridge.rs`, `browser/foundation/control_tabs.cc`, and `crates/myarc-cli`.
+- Packaged, Developer ID signed, Apple notarized, stapled, and EdDSA-signed `myArc-Nightly-2026.11.23.1-arm64.dmg` (184,154,097 bytes), published GitHub prerelease `nightly-2026.11.23.1`, updated `site/release.json`, and published `site/posts/alpha-checklist-and-agent-control/`.
+- Evidence: `cargo fmt`, `rustfmt`, `cargo clippy`, `cargo test`, `autoninja -C out/MyarcNightly chrome`, `tools/package_nightly.sh` (Gatekeeper accepted), `site/build.py`, `site/check.py`, `site/check_seo.py`, and `tools/check_docs.py` all pass.
+
 ## 2026-11-23: `page.screenshot` control command and filled robot-head Agent Space icon
 
 - Implemented `page.screenshot` across `crates/control`, `browser/foundation/bridge.rs`, `browser/foundation/control_tabs.cc` (`ScreenshotTaker` via `RenderWidgetHostView::CopyFromSurface`, clamped to 1280px, ThreadPool PNG / JPEG fallback <= 600 KiB), and `crates/myarc-cli/src/mcp.rs` (native MCP `image` content block + metadata `text` block), with CLI + MCP assertions added to `tools/check_control.sh`.
