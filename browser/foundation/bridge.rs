@@ -515,6 +515,8 @@ mod ffi {
         Reload,
         // page.snapshot: answer with answer_snapshot_request.
         Snapshot,
+        // page.screenshot: answer with answer_screenshot_request.
+        Screenshot,
         // page.click, page.fill, page.select or page.press: begin with
         // begin_page_action and answer with answer_action_request.
         Act,
@@ -550,6 +552,16 @@ mod ffi {
         loading: bool,
         can_go_back: bool,
         can_go_forward: bool,
+    }
+
+    struct ScreenshotRecord {
+        item: u64,
+        url: String,
+        title: String,
+        mime_type: String,
+        width: u32,
+        height: u32,
+        data_base64: String,
     }
 
     // One accessibility node for page.snapshot. `role` is Chromium's role
@@ -1015,6 +1027,13 @@ mod ffi {
             focus: i32,
             source_truncated: bool,
             nodes: Vec<AxNodeRecord>,
+        );
+        // Answers page.screenshot with an encoded PNG or JPEG payload.
+        fn answer_screenshot_request(
+            reply: &mut ControlReply,
+            status: TabStatus,
+            reason: &str,
+            shot: ScreenshotRecord,
         );
         // Milliseconds to wait for a snapshot before answering timeout.
         fn control_snapshot_timeout_ms() -> u64;
@@ -3065,6 +3084,7 @@ pub fn answer_control_request(
         TabAction::Forward { item } => (Kind::Forward, item),
         TabAction::Reload { item } => (Kind::Reload, item),
         TabAction::Snapshot { item } => (Kind::Snapshot, item),
+        TabAction::Screenshot { item } => (Kind::Screenshot, item),
         TabAction::Act(action) => {
             let item = action.item;
             reply.action = Some(action);
@@ -3166,6 +3186,35 @@ pub fn answer_snapshot_request(
         control::snapshot::snapshot_response(pending.request(), result, &mut store)
     });
     drop(store);
+    pending.reply(response);
+}
+
+pub fn answer_screenshot_request(
+    reply: &mut ControlReply,
+    status: ffi::TabStatus,
+    reason: &str,
+    shot: ffi::ScreenshotRecord,
+) {
+    use control::{ScreenshotData, ScreenshotResult};
+    let Some(pending) = reply.pending.take() else {
+        return;
+    };
+    let result = if status == ffi::TabStatus::Done {
+        ScreenshotResult::Done(ScreenshotData {
+            item: shot.item,
+            url: shot.url,
+            title: shot.title,
+            mime_type: shot.mime_type,
+            width: shot.width,
+            height: shot.height,
+            data_base64: shot.data_base64,
+        })
+    } else {
+        ScreenshotResult::Failed(failure(status, reason.to_owned()))
+    };
+    let response = control::in_profile(&reply.profile, || {
+        control::screenshot_response(pending.request(), result)
+    });
     pending.reply(response);
 }
 

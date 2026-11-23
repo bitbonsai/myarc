@@ -269,12 +269,36 @@ impl Server {
                 format!("Could not encode response: {error}"),
             )
         })?;
+        let content = mcp_content(spec.id, &structured);
         Ok(json!({
-            "content": [{ "type": "text", "text": structured.to_string() }],
+            "content": content,
             "structuredContent": structured,
             "isError": is_error,
         }))
     }
+}
+
+fn mcp_content(command: &str, structured: &Value) -> Vec<Value> {
+    if command == "page.screenshot"
+        && let Some(data) = structured.get("data").and_then(Value::as_object)
+        && let Some(image_b64) = data.get("data_base64").and_then(Value::as_str)
+        && let Some(mime) = data.get("mime_type").and_then(Value::as_str)
+    {
+        let meta = json!({
+            "tab": data.get("tab"),
+            "url": data.get("url"),
+            "title": data.get("title"),
+            "mime_type": mime,
+            "width": data.get("width"),
+            "height": data.get("height"),
+            "base64_bytes": image_b64.len(),
+        });
+        return vec![
+            json!({ "type": "image", "data": image_b64, "mimeType": mime }),
+            json!({ "type": "text", "text": meta.to_string() }),
+        ];
+    }
+    vec![json!({ "type": "text", "text": structured.to_string() })]
 }
 
 fn initialize(params: &Map<String, Value>) -> Result<Value, RpcError> {
@@ -337,4 +361,37 @@ fn error_reply(id: Value, code: i64, message: String) -> Value {
         "id": id,
         "error": { "code": code, "message": message },
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn screenshot_returns_mcp_image_and_metadata_blocks() {
+        let structured = json!({
+            "id": "mcp-1",
+            "command": "page.screenshot",
+            "status": "success",
+            "data": {
+                "tab": "t3",
+                "url": "https://example.test",
+                "title": "Example",
+                "mime_type": "image/png",
+                "width": 1280,
+                "height": 800,
+                "data_base64": "iVBORw0KGgo="
+            }
+        });
+        let blocks = mcp_content("page.screenshot", &structured);
+        assert_eq!(blocks.len(), 2);
+        assert_eq!(blocks[0]["type"], "image");
+        assert_eq!(blocks[0]["mimeType"], "image/png");
+        assert_eq!(blocks[0]["data"], "iVBORw0KGgo=");
+        assert_eq!(blocks[1]["type"], "text");
+        let meta: Value = serde_json::from_str(blocks[1]["text"].as_str().unwrap()).unwrap();
+        assert_eq!(meta["width"], 1280);
+        assert_eq!(meta["height"], 800);
+        assert!(meta.get("data_base64").is_none());
+    }
 }

@@ -92,6 +92,7 @@ fn registry_schemas_are_objects_and_only_tab_page_and_space_commands_are_impleme
             "tab.forward",
             "tab.reload",
             "page.snapshot",
+            "page.screenshot",
             "page.click",
             "page.fill",
             "page.select",

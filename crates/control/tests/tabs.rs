@@ -433,3 +433,80 @@ fn snapshot_is_scoped_to_the_agent_space() {
     let response = service.handle(request("page.snapshot", json!({ "tab": "t1" })));
     assert!(matches!(response.outcome, Outcome::Unsupported { .. }));
 }
+
+#[test]
+fn screenshot_is_scoped_and_bounded() {
+    use myarc_control::{
+        MAX_SCREENSHOT_BASE64_BYTES, ScreenshotData, ScreenshotResult, screenshot_response,
+    };
+    let (mut workspace, agent_tab, user_tab) = seeded();
+    assert_eq!(
+        action(
+            &mut workspace,
+            "page.screenshot",
+            json!({ "tab": tab_handle(agent_tab) })
+        ),
+        TabAction::Screenshot { item: agent_tab }
+    );
+    assert!(matches!(
+        refused(
+            &mut workspace,
+            "page.screenshot",
+            json!({ "tab": tab_handle(user_tab) })
+        ),
+        Outcome::Denied { .. }
+    ));
+    assert!(matches!(
+        refused(&mut workspace, "page.screenshot", json!({ "tab": "t999" })),
+        Outcome::Stale { .. }
+    ));
+    let req = request("page.screenshot", json!({ "tab": tab_handle(agent_tab) }));
+    let ok = screenshot_response(
+        &req,
+        ScreenshotResult::Done(ScreenshotData {
+            item: agent_tab,
+            url: String::from("https://example.test/page"),
+            title: String::from("Example"),
+            mime_type: String::from("image/png"),
+            width: 800,
+            height: 600,
+            data_base64: String::from("iVBORw0KGgo="),
+        }),
+    );
+    match ok.outcome {
+        Outcome::Success { data } => {
+            assert_eq!(data["tab"], tab_handle(agent_tab));
+            assert_eq!(data["mime_type"], "image/png");
+            assert_eq!(data["width"], 800);
+            assert_eq!(data["height"], 600);
+            assert_eq!(data["data_base64"], "iVBORw0KGgo=");
+        }
+        other => panic!("expected success: {other:?}"),
+    }
+    let too_big = screenshot_response(
+        &req,
+        ScreenshotResult::Done(ScreenshotData {
+            item: agent_tab,
+            url: String::from("https://example.test/page"),
+            title: String::from("Example"),
+            mime_type: String::from("image/png"),
+            width: 800,
+            height: 600,
+            data_base64: "A".repeat(MAX_SCREENSHOT_BASE64_BYTES + 1),
+        }),
+    );
+    assert!(matches!(too_big.outcome, Outcome::Invalid { .. }));
+    let empty = screenshot_response(
+        &req,
+        ScreenshotResult::Done(ScreenshotData {
+            item: agent_tab,
+            url: String::from("https://example.test/page"),
+            title: String::from("Example"),
+            mime_type: String::from("image/png"),
+            width: 0,
+            height: 0,
+            data_base64: String::new(),
+        }),
+    );
+    assert!(matches!(empty.outcome, Outcome::OutcomeUnknown { .. }));
+}

@@ -8,6 +8,7 @@
 #include <utility>
 #include <vector>
 
+#include "base/base64.h"
 #include "base/functional/bind.h"
 #include "base/functional/callback_helpers.h"
 #include "base/location.h"
@@ -19,6 +20,7 @@
 #include "base/strings/to_string.h"
 #include "base/strings/utf_string_conversions.h"
 #include "base/task/single_thread_task_runner.h"
+#include "base/task/thread_pool.h"
 #include "base/time/time.h"
 #include "base/timer/timer.h"
 #include "chrome/common/actor.mojom.h"
@@ -26,6 +28,7 @@
 #include "components/actor/core/task_id.h"
 #include "components/actor/public/mojom/actor_types.mojom.h"
 #include "components/input/native_web_keyboard_event.h"
+#include "components/viz/common/frame_sinks/copy_output_result.h"
 #include "content/public/browser/browser_thread.h"
 #include "content/public/browser/document_user_data.h"
 #include "content/public/browser/navigation_controller.h"
@@ -33,6 +36,7 @@
 #include "content/public/browser/reload_type.h"
 #include "content/public/browser/render_frame_host.h"
 #include "content/public/browser/render_widget_host.h"
+#include "content/public/browser/render_widget_host_view.h"
 #include "content/public/browser/web_contents.h"
 #include "content/public/browser/web_contents_observer.h"
 #include "mojo/public/cpp/bindings/associated_remote.h"
@@ -42,6 +46,7 @@
 #include "third_party/blink/public/common/associated_interfaces/associated_interface_provider.h"
 #include "third_party/blink/public/common/input/web_input_event.h"
 #include "third_party/blink/public/mojom/content_extraction/ai_page_content.mojom.h"
+#include "third_party/skia/include/core/SkBitmap.h"
 #include "ui/accessibility/ax_enum_util.h"
 #include "ui/accessibility/ax_mode.h"
 #include "ui/accessibility/ax_node_data.h"
@@ -51,6 +56,9 @@
 #include "ui/events/keycodes/dom/dom_code.h"
 #include "ui/events/keycodes/dom/dom_key.h"
 #include "ui/events/keycodes/dom/keycode_converter.h"
+#include "ui/gfx/codec/jpeg_codec.h"
+#include "ui/gfx/codec/png_codec.h"
+#include "ui/gfx/geometry/rect.h"
 #include "ui/gfx/geometry/size.h"
 #include "url/gurl.h"
 
@@ -976,6 +984,155 @@ class ActionRun final : public content::WebContentsObserver {
   base::WeakPtrFactory<ActionRun> weak_factory_{this};
 };
 
+struct EncodedScreenshot {
+  std::string mime_type;
+  std::string data_base64;
+  uint32_t width = 0;
+  uint32_t height = 0;
+};
+
+EncodedScreenshot EncodeScreenshotBitmap(SkBitmap bitmap) {
+  constexpr size_t kMaxEncodedBytes = 600 * 1024;
+  EncodedScreenshot out;
+  if (bitmap.drawsNothing()) {
+    return out;
+  }
+  out.width = static_cast<uint32_t>(bitmap.width());
+  out.height = static_cast<uint32_t>(bitmap.height());
+  if (auto png = gfx::PNGCodec::FastEncodeBGRASkBitmap(
+          bitmap, /*discard_transparency=*/true);
+      png && png->size() <= kMaxEncodedBytes) {
+    out.mime_type = "image/png";
+    out.data_base64 = base::Base64Encode(*png);
+    return out;
+  }
+  for (int quality : {82, 60}) {
+    if (auto jpg = gfx::JPEGCodec::Encode(bitmap, quality);
+        jpg && jpg->size() <= kMaxEncodedBytes) {
+      out.mime_type = "image/jpeg";
+      out.data_base64 = base::Base64Encode(*jpg);
+      return out;
+    }
+  }
+  return out;
+}
+
+class ScreenshotTaker final : public content::WebContentsObserver {
+ public:
+  ScreenshotTaker(content::WebContents& page,
+                  uint64_t item,
+                  rust::Box<foundation::ControlReply> reply)
+      : content::WebContentsObserver(&page),
+        item_(item),
+        reply_(std::move(reply)) {}
+
+  void Start(base::TimeDelta timeout) {
+    awake_ = web_contents()->IncrementCapturerCount(
+        gfx::Size(), /*stay_hidden=*/false, /*stay_awake=*/true,
+        /*is_activity=*/true);
+    content::RenderWidgetHostView* view =
+        web_contents()->GetRenderWidgetHostView();
+    if (!view) {
+      FinishError(TabStatus::Invalid,
+                  "The tab has no rendered view yet; retry once it loads");
+      return;
+    }
+    gfx::Size target = view->GetViewBounds().size();
+    constexpr int kMaxDim = 1280;
+    if (target.width() > kMaxDim || target.height() > kMaxDim) {
+      const double scale =
+          static_cast<double>(kMaxDim) /
+          static_cast<double>(std::max(target.width(), target.height()));
+      target.SetSize(std::max(1, static_cast<int>(target.width() * scale)),
+                     std::max(1, static_cast<int>(target.height() * scale)));
+    }
+    timer_.Start(FROM_HERE, timeout,
+                 base::BindOnce(&ScreenshotTaker::FinishError,
+                                base::Unretained(this), TabStatus::TimedOut,
+                                "Timed out waiting for the tab screenshot"));
+    view->CopyFromSurface(
+        gfx::Rect(), target, timeout,
+        base::BindOnce(&ScreenshotTaker::OnCaptured,
+                       weak_factory_.GetWeakPtr()));
+  }
+
+  void WebContentsDestroyed() override {
+    FinishError(TabStatus::Stale,
+                "The tab closed before the screenshot finished");
+  }
+
+ private:
+  void OnCaptured(const content::CopyFromSurfaceResult& result) {
+    if (finished_) {
+      return;
+    }
+    if (!result.has_value() || result->bitmap.drawsNothing()) {
+      FinishError(TabStatus::NotCommitted,
+                  "The tab did not produce a screenshot frame");
+      return;
+    }
+    url_ = web_contents()->GetLastCommittedURL().spec();
+    title_ = base::UTF16ToUTF8(web_contents()->GetTitle());
+    base::ThreadPool::PostTaskAndReplyWithResult(
+        FROM_HERE, {base::MayBlock(), base::TaskPriority::USER_VISIBLE},
+        base::BindOnce(&EncodeScreenshotBitmap, result->bitmap),
+        base::BindOnce(&ScreenshotTaker::OnEncoded,
+                       weak_factory_.GetWeakPtr()));
+  }
+
+  void OnEncoded(EncodedScreenshot encoded) {
+    if (finished_) {
+      return;
+    }
+    if (encoded.data_base64.empty()) {
+      FinishError(TabStatus::Invalid,
+                  "Could not encode screenshot within the size limit");
+      return;
+    }
+    finished_ = true;
+    timer_.Stop();
+    Observe(nullptr);
+    awake_.RunAndReset();
+    foundation::ScreenshotRecord record;
+    record.item = item_;
+    record.url = url_;
+    record.title = title_;
+    record.mime_type = std::move(encoded.mime_type);
+    record.width = encoded.width;
+    record.height = encoded.height;
+    record.data_base64 = std::move(encoded.data_base64);
+    foundation::answer_screenshot_request(*reply_, TabStatus::Done, "",
+                                          std::move(record));
+    base::SingleThreadTaskRunner::GetCurrentDefault()->DeleteSoon(FROM_HERE,
+                                                                  this);
+  }
+
+  void FinishError(TabStatus status, std::string reason) {
+    if (finished_) {
+      return;
+    }
+    finished_ = true;
+    timer_.Stop();
+    Observe(nullptr);
+    awake_.RunAndReset();
+    foundation::ScreenshotRecord empty;
+    empty.item = item_;
+    foundation::answer_screenshot_request(*reply_, status, reason,
+                                          std::move(empty));
+    base::SingleThreadTaskRunner::GetCurrentDefault()->DeleteSoon(FROM_HERE,
+                                                                  this);
+  }
+
+  const uint64_t item_;
+  rust::Box<foundation::ControlReply> reply_;
+  base::ScopedClosureRunner awake_;
+  base::OneShotTimer timer_;
+  std::string url_;
+  std::string title_;
+  bool finished_ = false;
+  base::WeakPtrFactory<ScreenshotTaker> weak_factory_{this};
+};
+
 }  // namespace
 
 void RunTabAction(BrowserWorkspaceAdapter& target,
@@ -1086,6 +1243,17 @@ void RunTabAction(BrowserWorkspaceAdapter& target,
           base::Milliseconds(foundation::control_snapshot_timeout_ms()),
           base::BindOnce(&AnswerSnapshot, page->GetWeakPtr(), plan.item,
                          std::move(reply)));
+      return;
+    case TabActionKind::Screenshot:
+      if (page->IsCrashed()) {
+        Answer(*reply, TabStatus::Invalid,
+               base::StrCat({"The page crashed (", CrashDetail(*page),
+                             "); reload it with tab.reload first"}));
+        return;
+      }
+      (new ScreenshotTaker(*page, plan.item, std::move(reply)))
+          ->Start(
+              base::Milliseconds(foundation::control_snapshot_timeout_ms()));
       return;
     case TabActionKind::Act: {
       foundation::ActionStart start =

@@ -499,6 +499,17 @@ fn request_id() -> String {
 fn readable(response: &Response) -> String {
     let command = &response.command;
     match &response.outcome {
+        Outcome::Success { data } if command == "page.screenshot" => {
+            let tab = data.get("tab").and_then(Value::as_str).unwrap_or("?");
+            let mime = data.get("mime_type").and_then(Value::as_str).unwrap_or("?");
+            let w = data.get("width").and_then(Value::as_u64).unwrap_or(0);
+            let h = data.get("height").and_then(Value::as_u64).unwrap_or(0);
+            let bytes = data
+                .get("data_base64")
+                .and_then(Value::as_str)
+                .map_or(0, str::len);
+            format!("{command}: ok {tab} {w}x{h} {mime} ({bytes} base64 bytes)")
+        }
         Outcome::Success { data } => format!("{command}: ok {data}"),
         Outcome::Denied { reason } => format!("{command}: denied: {reason}"),
         Outcome::Unsupported { reason, .. } => format!("{command}: unsupported: {reason}"),

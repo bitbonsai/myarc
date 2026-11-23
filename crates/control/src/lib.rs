@@ -229,6 +229,11 @@ pub enum TabAction {
     Snapshot {
         item: ItemId,
     },
+    /// Capture a bounded screenshot of the page and answer with
+    /// [`screenshot_response`].
+    Screenshot {
+        item: ItemId,
+    },
     /// Act on an element of the latest snapshot and answer with
     /// [`actions::action_response`].
     Act(actions::PageAction),
@@ -498,6 +503,7 @@ fn tab_action(
                 "tab.forward" => Ok(TabAction::Forward { item }),
                 "tab.reload" => Ok(TabAction::Reload { item }),
                 "page.snapshot" => Ok(TabAction::Snapshot { item }),
+                "page.screenshot" => Ok(TabAction::Screenshot { item }),
                 other => Err(invalid(format!(
                     "{other} is registered as implemented but has no handler"
                 ))),
@@ -642,6 +648,67 @@ pub fn tab_response(req: &Request, result: TabResult) -> Response {
             data: Some(data(tabs)),
         },
         TabResult::Failed(outcome) => outcome,
+    };
+    answer(req, outcome)
+}
+
+/// Longest base64 screenshot payload allowed in a single control reply,
+/// leaving headroom below the 1 MiB IPC frame limit for JSON metadata.
+pub const MAX_SCREENSHOT_BASE64_BYTES: usize = 850 * 1024;
+
+/// A captured tab screenshot reported by the browser.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ScreenshotData {
+    pub item: ItemId,
+    pub url: String,
+    pub title: String,
+    pub mime_type: String,
+    pub width: u32,
+    pub height: u32,
+    pub data_base64: String,
+}
+
+/// How the browser finished [`TabAction::Screenshot`].
+#[derive(Clone, Debug, PartialEq)]
+pub enum ScreenshotResult {
+    Done(ScreenshotData),
+    Failed(Outcome),
+}
+
+/// The answer to `page.screenshot`.
+pub fn screenshot_response(req: &Request, result: ScreenshotResult) -> Response {
+    let outcome = match result {
+        ScreenshotResult::Done(shot) => {
+            if shot.data_base64.is_empty() || shot.width == 0 || shot.height == 0 {
+                Outcome::OutcomeUnknown {
+                    reason: String::from("Screenshot capture returned an empty image"),
+                    data: None,
+                }
+            } else if shot.data_base64.len() > MAX_SCREENSHOT_BASE64_BYTES {
+                Outcome::Invalid {
+                    reason: format!(
+                        "Screenshot exceeds the {MAX_SCREENSHOT_BASE64_BYTES}-byte limit"
+                    ),
+                }
+            } else if !matches!(shot.mime_type.as_str(), "image/png" | "image/jpeg") {
+                Outcome::Invalid {
+                    reason: String::from("Screenshot MIME type must be image/png or image/jpeg"),
+                }
+            } else {
+                Outcome::Success {
+                    data: json!({
+                        "tab": tab_handle(shot.item),
+                        "url": truncate(&shot.url, MAX_URL_LENGTH),
+                        "title": truncate(&shot.title, MAX_TITLE_BYTES),
+                        "mime_type": shot.mime_type,
+                        "width": shot.width,
+                        "height": shot.height,
+                        "data_base64": shot.data_base64,
+                    }),
+                }
+            }
+        }
+        ScreenshotResult::Failed(outcome) => outcome,
     };
     answer(req, outcome)
 }
@@ -1034,9 +1101,9 @@ fn build_registry() -> Vec<CommandSpec> {
         spec(
             "page.screenshot",
             Observation,
-            "Screenshot of a granted tab",
+            "Capture a bounded PNG or JPEG screenshot of an agent Space tab, returning base64 image data, dimensions, URL and title",
             tab_only(),
-            false,
+            true,
         ),
         spec(
             "page.click",
