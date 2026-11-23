@@ -1,5 +1,10 @@
 # Development log
 
+## 2026-11-22: Page-card corners without glass mode
+- Moved visual-parity vertical-tab card radii outside the glass-mode gate; fullscreen explicitly resets them to square.
+- Preserved Chromium's glass-only fallback and the existing split-pane radius propagation.
+- Verification: patch applies to exact upstream `8d208f20744ac6d4ce00cc3f9de6a14a9b8b926d` without offsets; `python3 tools/check_docs.py` passes. Native visual checks not run.
+
 ## 2026-11-22: Alpha nightly `2026.11.22.2`, and myarc.dev moves to alpha
 
 - Shipped the prerelease `nightly-2026.11.22.2` from `main` `2ee2e26` and Chromium `c79fde785c`, and switched `myarc.dev` from the pre-alpha copy to alpha. Developer ID signed, Apple notarized and stapled; 184181609 bytes, SHA-256 `bc7331d3...9331`, Sparkle EdDSA signature verified.
