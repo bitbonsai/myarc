@@ -8,7 +8,7 @@ November 23, 2026
 
 [Mauricio Wolff](https://github.com/bitbonsai)4 min read
 
-Yesterday alpha went out. That felt great, and it also left a short list of things I wanted to prove against the real signed app instead of trusting memory or unit tests. Could an outside agent really drive a session from scratch? Would the browser stay calm with a thousand tabs sitting in the sidebar? Could you open it offline without an account prompt or a single call home? Nightly `2026.11.23.1` answers all three, and the numbers came back better than I expected.
+Yesterday alpha went out. That felt great, and it also left a short list of things I wanted to prove against the real signed app instead of trusting memory or unit tests. Could an outside agent really drive a session from scratch? Would the browser stay calm with a thousand tabs sitting in the sidebar? Could you open it offline without an account prompt or a single call home? Build `2026.11.23.1` answers all three, and the numbers came back better than I expected.
 
 ## Giving agents eyes
 
@@ -16,7 +16,7 @@ When I first wired up browser control, agents worked purely from text outlines o
 
 Still, once I hooked Claude Code up to the real packaged app and watched it fill forms and ignore prompt-injection text on a local test page, three gaps showed up right away. Sometimes an agent genuinely needs to look at what rendered. Sometimes the button it wants sits below the fold. Guessing with fixed sleeps while a page finishes loading is fragile too.
 
-So this nightly adds `page.screenshot`, `page.scroll`, and `page.wait` to both the `myarc` CLI and the MCP server. Screenshots come straight from Chromium's compositor, scaled down to fit cleanly, and arrive over MCP as native image blocks. Scrolling moves the viewport or a target element in any direction. Waiting listens for Chromium's real load event with a hard timeout instead of a timer. Everything stays inside the Agent Space, behind the same Allow card and Stop button, while your own Spaces and Profiles stay out of reach.
+So this build adds `page.screenshot`, `page.scroll`, and `page.wait` to both the `myarc` CLI and the MCP server. Screenshots come straight from Chromium's compositor, scaled down to fit cleanly, and arrive over MCP as native image blocks. Scrolling moves the viewport or a target element in any direction. Waiting listens for Chromium's real load event with a hard timeout instead of a timer. Everything stays inside the Agent Space, behind the same Allow card and Stop button, while your own Spaces and Profiles stay out of reach.
 
 [![Side-by-side comparison of the same local test form in Arc on the left with its purple top localhost banner and myArc on the right with a thin blue viewport border and compact port tag in the URL pill](https://myarc.dev/blog/thousand-tabs/localhost-comparison.6025eeb90a9b.webp)](https://myarc.dev/blog/thousand-tabs/localhost-comparison.6025eeb90a9b.webp)
 
@@ -58,6 +58,6 @@ Docked DevTools inspecting the same page.
 
 After this round, I am ready to make myArc my default browser. Having the latest Chromium underneath, with ungoogled-chromium and extra privacy patches on top, paired with Arc's way of organizing tabs, is the browser I wanted from the start.
 
-I also set up [myarc.slirc.app](https://myarc.slirc.app) to collect feedback and talk through what comes next. If you are trying the nightly, come join and share what works or what still feels rough.
+I also set up [myarc.slirc.app](https://myarc.slirc.app) to collect feedback and talk through what comes next. If you are trying the alpha, come join and share what works or what still feels rough.
 
-If you already have myArc Nightly installed, open **myArc \> Check for Updates…** to pull `2026.11.23.1`. Fresh installs are on the [download page](https://myarc.dev/download/).
+If you already have myArc installed, open **myArc \> Check for Updates…** to pull `2026.11.23.1`. Fresh installs are on the [download page](https://myarc.dev/download/).
