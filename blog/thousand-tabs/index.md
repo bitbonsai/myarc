@@ -18,7 +18,7 @@ Still, once I hooked Claude Code up to the real packaged app and watched it fill
 
 So this nightly adds `page.screenshot`, `page.scroll`, and `page.wait` to both the `myarc` CLI and the MCP server. Screenshots come straight from Chromium's compositor, scaled down to fit cleanly, and arrive over MCP as native image blocks. Scrolling moves the viewport or a target element in any direction. Waiting listens for Chromium's real load event with a hard timeout instead of a timer. Everything stays inside the Agent Space, behind the same Allow card and Stop button, while your own Spaces and Profiles stay out of reach.
 
-[![Side-by-side comparison of the same local test form in Arc on the left with its purple top localhost banner and myArc on the right with a thin blue viewport border and compact port tag in the URL pill](https://myarc.dev/blog/thousand-tabs/localhost-comparison.2c5e9873e59a.webp)](https://myarc.dev/blog/thousand-tabs/localhost-comparison.2c5e9873e59a.webp)
+[![Side-by-side comparison of the same local test form in Arc on the left with its purple top localhost banner and myArc on the right with a thin blue viewport border and compact port tag in the URL pill](https://myarc.dev/blog/thousand-tabs/localhost-comparison.6025eeb90a9b.webp)](https://myarc.dev/blog/thousand-tabs/localhost-comparison.6025eeb90a9b.webp)
 
 The same local test page in Arc (left) and myArc (right).
 
@@ -28,7 +28,7 @@ You can also spot a small localhost touch in that comparison. Arc puts a heavy p
 
 Spending an afternoon staring at captures has a funny side effect. Tiny visual rough edges jump off the screen.
 
-The Agent Space icon was a thin outline sitting next to heavier filled icons, so I swapped it for a filled robot head in both the Space header and the sidebar footer. While I was in there, I cleared a stray opaque backdrop that was dulling frosted modals, and removed the hover plates behind pinned extension icons in the URL pill so they use the same frosted tooltips as the footer.
+The Agent Space icon was a thin outline sitting next to heavier filled icons, so I swapped it for the filled robot head I created for [agentbar.fyi](https://agentbar.fyi) in both the Space header and the sidebar footer. While I was in there, I cleared a stray opaque backdrop that was dulling frosted modals, and removed the hover plates behind pinned extension icons in the URL pill so they use the same frosted tooltips as the footer.
 
 [![Side-by-side close-up of the myArc sidebar header and bottom footer showing the new filled robot-head icon for the Agent Space](https://myarc.dev/blog/thousand-tabs/agent-space-icon.418b87b88871.webp)](https://myarc.dev/blog/thousand-tabs/agent-space-icon.418b87b88871.webp)
 
