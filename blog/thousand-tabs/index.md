@@ -54,6 +54,10 @@ Find-in-page highlighting matches inside the glass bar.
 
 Docked DevTools inspecting the same page.
 
-## Grab the update
+## Moving in for real
+
+After this round, I am ready to make myArc my default browser. Having the latest Chromium underneath, with ungoogled-chromium and extra privacy patches on top, paired with Arc's way of organizing tabs, is the browser I wanted from the start.
+
+I also set up [myarc.slirc.app](https://myarc.slirc.app) to collect feedback and talk through what comes next. If you are trying the nightly, come join and share what works or what still feels rough.
 
 If you already have myArc Nightly installed, open **myArc \> Check for Updates…** to pull `2026.11.23.1`. Fresh installs are on the [download page](https://myarc.dev/download/).
