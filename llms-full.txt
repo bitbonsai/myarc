@@ -801,13 +801,9 @@ The same local test page in Arc (left) and myArc (right).
 
 Arc puts a thick purple bar across the top of local pages. myArc uses a thin blue border around the viewport and puts a `</> :port` tag in the URL pill instead, so you keep your vertical space.
 
-## A few small fixes
+## A new icon for the Agent Space
 
-Looking through screenshots all afternoon, a few small things started to bother me.
-
-The Agent Space icon was a thin outline next to filled icons, and once I noticed it I couldn't unsee it. I swapped it for the filled robot head I made for [agentbar.fyi](https://agentbar.fyi), in both the Space header and the sidebar footer.
-
-While I was in there, I cleared a stray opaque layer that was dulling the glass modals, and removed the hover boxes behind pinned extensions in the URL pill so they match the tooltips in the footer.
+Looking through screenshots all afternoon, the Agent Space icon started to bother me. It was a thin outline sitting next to filled icons, and once I noticed it I couldn't unsee it. I swapped it for the filled robot head I made for [agentbar.fyi](https://agentbar.fyi), in both the Space header and the sidebar footer.
 
 [![Side-by-side close-up of the myArc sidebar header and bottom footer showing the new filled robot-head icon for the Agent Space](https://myarc.dev/blog/thousand-tabs/agent-space-icon.418b87b88871.webp)](https://myarc.dev/blog/thousand-tabs/agent-space-icon.418b87b88871.webp)
 
@@ -817,7 +813,7 @@ The filled robot-head icon in the Agent Space header and bottom footer.
 
 Arc people tend to hoard tabs, so I wanted to see what happens when myArc has to carry that weight. I loaded a fresh profile with ten Spaces and a hundred dormant items each, a thousand in all, on an Apple M5 Pro.
 
-It held up better than I expected. The first window opened in 797.5 ms, and memory settled at 953.5 MB across 11 processes. Switching Spaces took 75.5 ms at the median (83.1 ms at p95), with workspace saves at 2.08 ms. The command bar stayed snappy the whole time.
+It held up better than I expected. The first window opened in `797.5ms`, and memory settled at `953.5MB` across 11 processes. Switching Spaces took `75.5ms` at the median (`83.1ms` at p95), with workspace saves at `2.08ms`. The command bar stayed snappy the whole time.
 
 [![Full myArc window with a thousand synthetic items across ten Spaces and the frosted command bar open in the center](https://myarc.dev/blog/thousand-tabs/thousand-tabs.0b0fae3e3284.webp)](https://myarc.dev/blog/thousand-tabs/thousand-tabs.0b0fae3e3284.webp)
 
