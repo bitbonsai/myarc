@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-11-24: Sidebar empty-space Space menu and `v2026.11.24` release
+
+- Attached `SidebarView` as its own context menu controller (`browser/foundation/sidebar_view.cc`) so right-clicking empty sidebar space opens the current Space menu (with `New Folder`) instead of falling through to Chromium's tab-strip menu.
+- Rebuilt `out/MyarcRelease/myArc.app`, packaged/signed/notarized/stapled `myArc-2026.11.24-arm64.dmg` (184,804,323 bytes), updated `site/release.json`, and published GitHub prerelease `v2026.11.24` and `myarc.dev`.
+- Evidence: `codesign --verify --deep --strict`, `spctl -a -vvv`, Sparkle EdDSA verification, `python3 tools/check_docs.py`, and `mise run site-check` all pass.
+
 ## 2026-11-24: Retire Nightly naming and move to myArc release
 
 - Renamed `myarc_nightly` / `MyarcNightly` / `myArc Nightly.app` to `myarc_release` / `MyarcRelease` / `myArc.app` (`dev.myarc.browser`), `browser/args-release.gn`, `browser/foundation/release/`, `tools/package_release.sh`, `tools/make_app_icons.sh`, check scripts, CLI/skill paths, and site docs.

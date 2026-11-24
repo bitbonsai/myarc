@@ -1084,6 +1084,7 @@ SidebarView::SidebarView(Delegate& delegate)
                                                       kSidebarInsets, 8));
   GetViewAccessibility().SetRole(ax::mojom::Role::kGroup);
   GetViewAccessibility().SetName(u"Workspace sidebar");
+  set_context_menu_controller(this);
   row_drag_handler_ = std::make_unique<RowDragHandler>(base::BindRepeating(
       &SidebarView::OnRowDragEvent, base::Unretained(this)));
   AddPreTargetHandler(row_drag_handler_.get());
@@ -1104,6 +1105,23 @@ void SidebarView::ShowContextMenuForViewImpl(
     ui::mojom::MenuSourceType source_type) {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
   if (!GetWidget() || (menu_runner_ && menu_runner_->IsRunning())) {
+    return;
+  }
+  if (source == this) {
+    // Right-clicking empty space in the sidebar opens the current Space's
+    // menu (including New Folder) instead of falling through to Chromium's
+    // tab-strip menu.
+    if (!current_space_id_ || library_) {
+      return;
+    }
+    menu_item_id_ = 0;
+    menu_folder_id_ = 0;
+    menu_space_id_ = current_space_id_;
+    menu_runner_.reset();
+    menu_model_ = std::make_unique<ui::SimpleMenuModel>(this);
+    folder_menu_model_.reset();
+    AddSpaceCommands(/*folder=*/true);
+    RunMenu(point, source_type);
     return;
   }
   const auto target =

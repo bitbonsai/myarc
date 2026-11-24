@@ -1,12 +1,12 @@
 {
   "published": true,
-  "version": "2026.11.23.1",
-  "date": "2026-11-23",
-  "dmg_url": "https://github.com/bitbonsai/myarc/releases/download/nightly-2026.11.23.1/myArc-Nightly-2026.11.23.1-arm64.dmg",
-  "size_bytes": 184154097,
-  "sha256": "35495145451e8638272cbfcf2cfd327ad6552bed6a126730b82cebbbb6282666",
-  "release_url": "https://github.com/bitbonsai/myarc/releases/tag/nightly-2026.11.23.1",
+  "version": "2026.11.24",
+  "date": "2026-11-24",
+  "dmg_url": "https://github.com/bitbonsai/myarc/releases/download/v2026.11.24/myArc-2026.11.24-arm64.dmg",
+  "size_bytes": 184804323,
+  "sha256": "ee77a30fed6b4ee7b3b56c98ba71d0c163c2c9a0830b585d2a8640d3fe03b805",
+  "release_url": "https://github.com/bitbonsai/myarc/releases/tag/v2026.11.24",
   "min_macos": "26",
   "proprietary_codecs": true,
-  "ed_signature": "IOL0pBxQC8GrANK0rnUHgmoZIHFl3SSPPynu3FE2fvhMdjvkCRrJ2ti6eMo7jOlEZIcSkojo9HBHSpmMHNRLAw=="
+  "ed_signature": "2Ha2MIipWDLXU1bUaeayznMFGZR9puWOhI9ULuf8Gidy24bm3YFUZUu3sR9EpPX57iWTTLK2hKYm/pMgRwtkCw=="
 }
