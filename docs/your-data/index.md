@@ -11,18 +11,18 @@ myArc has no account and nothing to sign in to. Everything it saves stays on you
 myArc keeps its data in this folder:
 
 ```
-~/Library/Application Support/myArc/
+~/Library/Application Support/myArc Nightly/
 ```
 
 Inside it, each Profile has its own folder. The first is called `Default`, later ones `Profile 1`, `Profile 2` and so on. A Profile folder holds Chromium's usual data, such as history, cookies and extensions, plus one myArc file, `myarc-workspace-v1.json`. That file is your workspace, meaning the Spaces of that Profile with their names, icons and colors, your pinned tabs and Favorites, your temporary tabs and Archived Tabs. It's plain JSON you can open in a text editor.
 
 When myArc saves the workspace, it writes a new file and swaps it in, so a save that gets interrupted leaves the previous version in place.
 
-Saved passwords and cookies stay in Chromium's own stores. Chromium encrypts them with a key it keeps in your macOS Keychain, under the name myArc Safe Storage.
+Saved passwords and cookies stay in Chromium's own stores. Chromium encrypts them with a key it keeps in your macOS Keychain, under the name myArc Nightly Safe Storage.
 
 ## Back it up
 
-To back up everything, quit myArc and copy the whole `myArc` folder somewhere safe. Quitting first means nothing is halfway through a save while you copy.
+To back up everything, quit myArc and copy the whole `myArc Nightly` folder somewhere safe. Quitting first means nothing is halfway through a save while you copy.
 
 To take your Favorites and pinned tabs to another browser, open Settings \> Advanced and click Export Pins and Favorites…, or type Export in the command bar. myArc saves a bookmarks file that any browser can import, with Favorites in a Favorites folder and one folder per Space that keeps your sidebar folders. With more than one Profile, each Profile gets its own folder, even when you export from a private window.
 
@@ -30,7 +30,7 @@ To take your Favorites and pinned tabs to another browser, open Settings \> Adva
 
 myArc adds no analytics and no usage tracking. It makes two kinds of request of its own.
 
-myArc asks myarc.dev once a day whether a newer build is out. When you install one, it downloads from GitHub.
+Nightlies after 2026.11.20.2 ask myarc.dev once a day whether a newer nightly is out. When you install one, it downloads from GitHub.
 
 When a pinned tab or Favorite has no icon yet, myArc asks that site for its icon. The request goes only to that site's domain, carries no cookies and never sends the path of the page you saved. No Google icon service or other third party is involved.
 

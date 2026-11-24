@@ -4,7 +4,7 @@ HTML: https://myarc.dev/docs/shortcuts/
 
 The shortcuts that work in myArc today, and the Arc shortcuts that are still missing.
 
-These shortcuts work in the current build. Standard Chromium shortcuts, such as Cmd\+W to close a tab and Cmd\+R to reload, work as they do in Chrome.
+These shortcuts work in the current nightly. Standard Chromium shortcuts, such as Cmd\+W to close a tab and Cmd\+R to reload, work as they do in Chrome.
 
 | Shortcut | What it does | Compared with Arc |
 | --- | --- | --- |

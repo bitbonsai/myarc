@@ -2,14 +2,14 @@ HTML: https://myarc.dev/docs/known-limitations/
 
 # Known limitations
 
-What myArc Alpha can't do yet, and what to do after a crash or when something breaks.
+What the alpha nightly can't do yet, and what to do after a crash or when something breaks.
 
 myArc is an alpha. Use it to try the Arc-style sidebar, and keep daily and sensitive browsing in another browser for now.
 
 ## Safety and updates
 
-- Each build is based on a Chromium 158 development revision, before Chromium ships it as a stable release.
-- There are no separate security updates between builds. myArc updates itself from myarc.dev; older `myArc Nightly` builds need `myArc.app` installed by hand once. [Install myArc](https://myarc.dev/docs/install/) covers both.
+- Each nightly is built from a Chromium 158 development revision, before Chromium ships it as a stable release.
+- There are no security updates between nightlies. Nightlies after 2026.11.20.2 update themselves; older ones need the new nightly installed by hand once. [Install myArc](https://myarc.dev/docs/install/) covers both.
 - The protections around Profile separation, cookies and saved passwords aren't verified yet.
 - Safe Browsing doesn't scan RAR downloads, because the UnRAR license conflicts with GPL-3.0, the license myArc uses.
 - myArc is an independent project with no ties to Arc or The Browser Company.
@@ -38,7 +38,7 @@ If a single page crashes, reload it with Cmd\+R. The rest of the browser keeps r
 
 A crash also brings up a card that asks "myArc quit unexpectedly. Report it?" Report… opens a new GitHub issue in a tab, filled in with the myArc and macOS versions and the top of the crash log macOS wrote, without the lines that identify your Mac. Nothing is sent until you read it and submit it, which needs a GitHub account. Not Now closes the card. It offers each crash log once.
 
-Crash report uploads are off. Chromium keeps crash reports on your Mac, in `~/Library/Application Support/myArc/Crashpad/`. They can hold pieces of the pages you had open, so don't attach them to a public issue.
+Crash report uploads are off. Chromium keeps crash reports on your Mac, in `~/Library/Application Support/myArc Nightly/Crashpad/`. They can hold pieces of the pages you had open, so don't attach them to a public issue.
 
 ## Troubleshooting
 

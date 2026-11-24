@@ -550,11 +550,11 @@
 <h2 id="turn-it-on">Turn it on</h2>
 <p>Browser control is off by default. Press Cmd+, to open Settings, go to Advanced and turn on Allow agents to control myArc. The switch covers every Profile. Turning it off disconnects every tool at once.</p>
 <h2 id="install-the-command">Install the command</h2>
-<p>myArc carries <code>myarc</code> inside the app. Link it into your <code>PATH</code>:</p>
+<p>The nightly carries <code>myarc</code> inside the app. Link it into your <code>PATH</code>:</p>
 <pre><code class="language-sh">sudo mkdir -p /usr/local/bin
-sudo ln -sf &quot;/Applications/myArc.app/Contents/Helpers/myarc&quot; /usr/local/bin/myarc
+sudo ln -sf &quot;/Applications/myArc Nightly.app/Contents/Helpers/myarc&quot; /usr/local/bin/myarc
 </code></pre>
-<p>The link points into the app, so it keeps working after you replace the app with a newer build.</p>
+<p>The link points into the app, so it keeps working after you replace the app with a newer nightly.</p>
 <h2 id="approve-each-tool">Approve each tool</h2>
 <p>The first time a tool connects, a card at the top right of your myArc window names the tool and asks whether it may control your Agent Space. Choose Allow or Don't allow. The command waits up to 60 seconds for your answer. Allow lasts until you quit myArc.</p>
 <p>While a tool is working, the bot icon at the bottom of the sidebar shows a small blue dot. To take back control, right-click the bot and stop the tool from its menu, or click Stop next to the Agent Space's name. Stop disconnects the tool, and its next command asks you again.</p>
@@ -632,7 +632,7 @@ myarc run space.rename '{&quot;space_id&quot;:1,&quot;name&quot;:&quot;Home&quot
 <p>The Space commands reach all your Spaces in that Profile, so <code>space.rename</code> can rename one of yours. The first command runs in the window you used last. Later commands stay in that window's Profile until you turn control off or quit myArc.</p>
 <h2 id="use-it-from-an-mcp-client">Use it from an MCP client</h2>
 <p><code>myarc mcp</code> starts the MCP server. It has one tool per command, named with an underscore in place of each dot, so <code>space.create</code> is called <code>space_create</code> there. To add it to Claude Code for every project, run:</p>
-<pre><code class="language-sh">claude mcp add --scope user myarc -- &quot;/Applications/myArc.app/Contents/Helpers/myarc&quot; mcp
+<pre><code class="language-sh">claude mcp add --scope user myarc -- &quot;/Applications/myArc Nightly.app/Contents/Helpers/myarc&quot; mcp
 </code></pre>
 <p>For other MCP clients, use this server entry once <code>myarc</code> is on your <code>PATH</code>:</p>
 <pre><code class="language-json">{&quot;command&quot;: &quot;myarc&quot;, &quot;args&quot;: [&quot;mcp&quot;]}
