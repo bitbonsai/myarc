@@ -16,11 +16,11 @@ Still, once I hooked Claude Code up to the real packaged app and watched it fill
 
 So this nightly adds `page.screenshot`, `page.scroll`, and `page.wait` to both the `myarc` CLI and the MCP server. Screenshots come straight from Chromium's compositor, scaled down to fit cleanly, and arrive over MCP as native image blocks. Scrolling moves the viewport or a target element in any direction. Waiting listens for Chromium's real load event with a hard timeout instead of a timer. Everything stays inside the Agent Space, behind the same Allow card and Stop button, while your own Spaces and Profiles stay out of reach.
 
-![myArc running the local synthetic form fixture used to verify CLI, MCP, and Claude Code control](agent-space-active.png)
+![Side-by-side comparison of the same local test form in Arc on the left with its purple top localhost banner and myArc on the right with a thin blue viewport border and compact port tag in the URL pill](localhost-comparison.png)
 
-*The local test form Claude Code drove over MCP, untrusted prompt-injection note included.*
+*The same local test page in Arc (left) and myArc (right).*
 
-You can also spot a small localhost touch in that screenshot. Arc puts a heavy developer banner across the top of local pages. myArc wraps the viewport in a thin blue border and puts a compact `</> :port` tag right into the URL pill, so you always know you are looking at a local server without losing vertical space.
+You can also spot a small localhost touch in that comparison. Arc puts a heavy purple developer banner across the top of local pages. myArc wraps the viewport in a thin blue border and puts a compact `</> :port` tag right into the URL pill, so you always know you are looking at a local server without losing vertical space.
 
 ## Small details that stood out
 
