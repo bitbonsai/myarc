@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-11-24: Publish `v2026.11.24.2` release
+
+- Packaged, Developer ID signed, Apple notarized, stapled, and Sparkle EdDSA-signed `myArc-2026.11.24.2-arm64.dmg` (184,765,819 bytes, SHA-256 `68f39ab6...867f`) from `main` `abca90c` and Chromium `11a53a9fa1` (myArc and Chromium versions in updater up-to-date sheet).
+- Published GitHub prerelease `v2026.11.24.2`, updated `site/release.json`, rebuilt `site/index.html`, and deployed `myarc.dev` (including `/appcast.xml`).
+- Evidence: `codesign --verify`, `spctl` Notarized Developer ID acceptance on both `myArc.app` and DMG, `mise run site-check`, `python3 tools/check_docs.py`, and live `https://myarc.dev/appcast.xml` verification.
+
 ## 2026-11-24: Show myArc and Chromium versions in updater up-to-date sheet
 
 - Updated `browser/foundation/updater_mac.mm` (`ChromiumVersionLabel()`, `UpToDateSubtitle()`) so the Sparkle "You’re up to date" sheet displays `myArc <MyarcVersion> is the newest version available.` with `Chromium <CFBundleShortVersionString>` on the line below, instead of Sparkle's `localizedRecoverySuggestion` (which only reported the Chromium version).
