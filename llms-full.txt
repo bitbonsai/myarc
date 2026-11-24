@@ -78,7 +78,7 @@ November 2026
 
 November 23, 2026
 
-I put the signed myArc alpha to a real test: an agent driving the app, a thousand tabs in the sidebar, and no internet. It held up well enough that I'm moving in.
+I tested the signed myArc alpha with an agent driving the app, a thousand tabs in the sidebar, and no internet. It held up well enough that I'm moving in.
 
 ## [Alpha is here!!! 🎉](https://myarc.dev/blog/glass-and-extensions/)
 
@@ -781,23 +781,23 @@ November 23, 2026
 
 [Mauricio Wolff](https://github.com/bitbonsai)4 min read
 
-Alpha went out yesterday, and I wanted to put it to a real test to see what would happen. Not a dev build or unit tests, the signed app you actually download. Throw an agent at it, stuff a thousand tabs into the sidebar, cut the internet, and see what breaks.
+Alpha went out yesterday, and I wanted to put the signed app through a real test to see what breaks. I had an agent drive it, stuffed a thousand tabs into the sidebar, and cut the internet.
 
 Build `2026.11.23.1` is what came out of that.
 
 ## Giving agents eyes
 
-When I first wired up browser control, agents only saw a text outline of the page. Most of the time that's plenty. It's fast, cheap, and doesn't burn tokens on images.
+When I first wired up browser control, agents only got a text outline of the page. Most of the time that's plenty, because it's fast and doesn't burn tokens on images.
 
-Then I pointed Claude Code at the packaged app on a local test page. It filled out the form and ignored the prompt-injection text I'd hidden there, which was nice to see. Where it got stuck was the ordinary stuff: checking how something actually looked, scrolling down to a button off-screen, or waiting for a load without guessing a sleep timer.
+Then I pointed Claude Code at the packaged app on a local test page. It filled out the form and ignored the prompt-injection text I'd hidden there, which was nice to see. It got stuck on simpler things: checking how the page looked, scrolling to a button off-screen, and waiting for a load without guessing a sleep timer.
 
-So I added `page.screenshot`, `page.scroll` and `page.wait` to the `myarc` CLI and MCP server. Screenshots come straight from Chromium's compositor as MCP image blocks, scrolling moves the viewport or a specific element, and waiting hooks into the real load event instead of sleeping. Everything stays locked inside the Agent Space behind the Allow card and Stop button. Your own Spaces and Profiles stay untouched.
+So I added `page.screenshot`, `page.scroll` and `page.wait` to the `myarc` CLI and MCP server. Screenshots come from the compositor as MCP image blocks, scrolling moves the viewport or a specific element, and waiting listens for the real load event with a timeout. Everything stays locked inside the Agent Space behind the Allow card and Stop button. Your own Spaces and Profiles stay untouched.
 
 [![Side-by-side comparison of the same local test form in Arc on the left with its purple top localhost banner and myArc on the right with a thin blue viewport border and compact port tag in the URL pill](https://myarc.dev/blog/thousand-tabs/localhost-comparison.6025eeb90a9b.webp)](https://myarc.dev/blog/thousand-tabs/localhost-comparison.6025eeb90a9b.webp)
 
 The same local test page in Arc (left) and myArc (right).
 
-One small thing in that comparison. Arc puts a thick purple bar across the top of local pages. myArc wraps the viewport in a thin blue border and slips a `</> :port` tag into the URL pill instead. You still know you're on localhost, and you keep your vertical space.
+Arc puts a thick purple bar across the top of local pages. myArc uses a thin blue border around the viewport and puts a `</> :port` tag in the URL pill instead, so you keep your vertical space.
 
 ## A few small fixes
 
@@ -813,7 +813,7 @@ The filled robot-head icon in the Agent Space header and bottom footer.
 
 ## A thousand tabs and no calls home
 
-Arc people tend to hoard tabs, so I wanted to see what happens when myArc actually has to carry that weight. I loaded a fresh profile with ten Spaces and a hundred dormant items each, a thousand in all, on an Apple M5 Pro.
+Arc people tend to hoard tabs, so I wanted to see what happens when myArc has to carry that weight. I loaded a fresh profile with ten Spaces and a hundred dormant items each, a thousand in all, on an Apple M5 Pro.
 
 It held up better than I expected. The first window opened in 797.5 ms, and memory settled at 953.5 MB across 11 processes. Switching Spaces took 75.5 ms at the median (83.1 ms at p95), with workspace saves at 2.08 ms. The command bar stayed snappy the whole time.
 
