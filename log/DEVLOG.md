@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-11-24: Suppress icon backgrounds and ink drops in sidebar URL pill
+
+- Added `IconLabelBubbleView::Delegate::ShouldSuppressIconLabelBubbleBackground()`, overridden in `LocationBarView` to return `IsMyarcUrlPill()`, so all `IconLabelBubbleView`s, `PageActionView`s, `PageActionContainerView`, and the sidebar Copy URL button paint with no pill/circle background or ink-drop plate.
+- Recaptured `site/posts/thousand-tabs/core-smoke-find.png` on the updated `MyarcNightly` build (clean background-free Find-in-page icon beside `:4321`) and synced to `mauriciowolff.com`.
+- Evidence: Chromium `myarc` commit `8599e06e2d` built cleanly in `out/MyarcNightly`, exported with `tools/export_patches.py --check`, and passed `site/build.py`, site tests, `check.py`, `check_seo.py`, and `check_docs.py`.
+
 ## 2026-11-24: Neutral sidebar tab port chips and refreshed Agent icon blog image
 
 - Changed `LocalPageChip::Style::kSidebarTab` in `browser/foundation/local_page_marker.cc` from blue to neutral translucent white/gray (`0x1A` bg / `0xA6` text in dark mode, `0x14` bg / `0x99` text in light mode) while keeping the location-bar pill blue; rebuilt `out/MyarcNightly/myArc.app`.

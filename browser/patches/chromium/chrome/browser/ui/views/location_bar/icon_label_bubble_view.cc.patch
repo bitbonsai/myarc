@@ -1,0 +1,41 @@
+diff --git a/chrome/browser/ui/views/location_bar/icon_label_bubble_view.cc b/chrome/browser/ui/views/location_bar/icon_label_bubble_view.cc
+index 8dc5172864131480017d466ce985bed5c0af68bc..b56bc266683b8d9dd34776cc3c324f825c671940 100644
+--- a/chrome/browser/ui/views/location_bar/icon_label_bubble_view.cc
++++ b/chrome/browser/ui/views/location_bar/icon_label_bubble_view.cc
+@@ -63,6 +63,11 @@ SkColor IconLabelBubbleView::Delegate::GetIconLabelBubbleInkDropColor() const {
+   return GetIconLabelBubbleSurroundingForegroundColor();
+ }
+ 
++bool IconLabelBubbleView::Delegate::ShouldSuppressIconLabelBubbleBackground()
++    const {
++  return false;
++}
++
+ IconLabelBubbleView::SeparatorView::SeparatorView(IconLabelBubbleView* owner) {
+   CHECK(owner, base::NotFatalUntil::M162);
+   owner_ = owner;
+@@ -387,6 +392,13 @@ void IconLabelBubbleView::UpdateBackground() {
+     return;
+   }
+ 
++  if (ShouldSuppressBackground()) {
++    SetBackground(nullptr);
++    views::InkDrop::Get(this)->SetMode(views::InkDropHost::InkDropMode::OFF);
++    UpdateLabelColors();
++    return;
++  }
++
+   // If the label is showing we must ensure the icon label is painted over a
+   // solid background.
+   const bool painted_on_solid_background = PaintedOnSolidBackground();
+@@ -670,7 +682,9 @@ int IconLabelBubbleView::GetEndPaddingWithSeparator() const {
+ }
+ 
+ void IconLabelBubbleView::SetUpForAnimation(base::TimeDelta duration) {
+-  views::InkDrop::Get(this)->SetMode(views::InkDropHost::InkDropMode::ON);
++  views::InkDrop::Get(this)->SetMode(
++      ShouldSuppressBackground() ? views::InkDropHost::InkDropMode::OFF
++                                 : views::InkDropHost::InkDropMode::ON);
+   SetFocusBehavior(views::PlatformStyle::kDefaultFocusBehavior);
+   label()->SetElideBehavior(gfx::NO_ELIDE);
+   label()->SetVisible(false);

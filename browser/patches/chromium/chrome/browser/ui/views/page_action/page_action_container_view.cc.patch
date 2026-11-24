@@ -1,0 +1,25 @@
+diff --git a/chrome/browser/ui/views/page_action/page_action_container_view.cc b/chrome/browser/ui/views/page_action/page_action_container_view.cc
+index b102a5c13758b59bc65bb534f5ee40b1a505a8e8..56ee0086e04002b5552d800632c55782b5154ea3 100644
+--- a/chrome/browser/ui/views/page_action/page_action_container_view.cc
++++ b/chrome/browser/ui/views/page_action/page_action_container_view.cc
+@@ -45,6 +45,7 @@ PageActionContainerView::PageActionContainerView(
+     const PageActionViewParams& params) {
+   SetProperty(views::kElementIdentifierKey, kPageActionContainerViewElementId);
+   between_icon_spacing_ = params.between_icon_spacing;
++  icon_label_bubble_delegate_ = params.icon_label_bubble_delegate;
+ 
+   layout_ = SetLayoutManager(std::make_unique<views::FlexLayout>());
+   layout_->SetMainAxisAlignment(views::LayoutAlignment::kEnd);
+@@ -173,6 +174,12 @@ int PageActionContainerView::GetCapsuleHeight() {
+ }
+ 
+ void PageActionContainerView::UpdateBackgroundAndMargins() {
++  if (icon_label_bubble_delegate_ &&
++      icon_label_bubble_delegate_->ShouldSuppressIconLabelBubbleBackground()) {
++    SetBackground(nullptr);
++    is_capsule_active_ = false;
++    return;
++  }
+   if (!features::IsPageActionsElevatedToolbarEnabled()) {
+     return;
+   }

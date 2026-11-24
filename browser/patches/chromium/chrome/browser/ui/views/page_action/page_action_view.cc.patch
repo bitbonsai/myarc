@@ -1,0 +1,31 @@
+diff --git a/chrome/browser/ui/views/page_action/page_action_view.cc b/chrome/browser/ui/views/page_action/page_action_view.cc
+index ad4c332e035428d636539e4abefb36c7aa6082d2..5590821d2c745e9e276408bd0447de5f570830b3 100644
+--- a/chrome/browser/ui/views/page_action/page_action_view.cc
++++ b/chrome/browser/ui/views/page_action/page_action_view.cc
+@@ -78,7 +78,9 @@ PageActionView::PageActionView(actions::ActionItem* action_item,
+   }
+ 
+   image_container_view()->SetFlipCanvasOnPaintForRTLUI(true);
+-  views::InkDrop::Get(this)->SetMode(views::InkDropHost::InkDropMode::ON);
++  views::InkDrop::Get(this)->SetMode(
++      ShouldSuppressBackground() ? views::InkDropHost::InkDropMode::OFF
++                                 : views::InkDropHost::InkDropMode::ON);
+ 
+   SetVisible(false);
+   label()->SetVisible(false);
+@@ -774,6 +776,15 @@ gfx::RoundedCornersF PageActionView::GetCornerRadii() const {
+ }
+ 
+ void PageActionView::UpdateBackground() {
++  if (ShouldSuppressBackground()) {
++    if (!GetWidget()) {
++      return;
++    }
++    SetBackground(nullptr);
++    views::InkDrop::Get(this)->SetMode(views::InkDropHost::InkDropMode::OFF);
++    UpdateLabelColors();
++    return;
++  }
+   if (features::IsPageActionsElevatedToolbarEnabled()) {
+     if (!GetWidget()) {
+       return;

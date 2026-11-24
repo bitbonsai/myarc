@@ -1,0 +1,26 @@
+diff --git a/chrome/browser/ui/views/location_bar/icon_label_bubble_view.h b/chrome/browser/ui/views/location_bar/icon_label_bubble_view.h
+index 962fd310670fd133b11fd63f2720287f0ed2a71e..ff0ef86f30c085ba212a0c43f0a0c7e9c0ee6600 100644
+--- a/chrome/browser/ui/views/location_bar/icon_label_bubble_view.h
++++ b/chrome/browser/ui/views/location_bar/icon_label_bubble_view.h
+@@ -112,6 +112,10 @@ class IconLabelBubbleView : public views::InkDropObserver,
+ 
+     // Returns the background color behind the IconLabelBubbleView.
+     virtual SkColor GetIconLabelBubbleBackgroundColor() const = 0;
++
++    // Returns true when trailing icons in this location bar should paint
++    // without a pill/circle background or ink-drop plate (myArc sidebar pill).
++    virtual bool ShouldSuppressIconLabelBubbleBackground() const;
+   };
+ 
+   // A view that draws the separator.
+@@ -335,6 +339,10 @@ class IconLabelBubbleView : public views::InkDropObserver,
+   void SetCustomBackgroundColorId(const ui::ColorId color_id);
+   void SetCustomForegroundColorId(const ui::ColorId color_id);
+ 
++  bool ShouldSuppressBackground() const {
++    return delegate_->ShouldSuppressIconLabelBubbleBackground();
++  }
++
+   // Slide animation for label.
+   gfx::SlideAnimation slide_animation_{this};
+ 

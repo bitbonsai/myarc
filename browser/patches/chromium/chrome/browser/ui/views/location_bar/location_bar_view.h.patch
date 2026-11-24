@@ -1,5 +1,5 @@
 diff --git a/chrome/browser/ui/views/location_bar/location_bar_view.h b/chrome/browser/ui/views/location_bar/location_bar_view.h
-index 856d9d7c66a7314d7046571bb3dfefda898970cc..954a22fe83e0ad4a52cca8e3d49fcb70d7d53e15 100644
+index 856d9d7c66a7314d7046571bb3dfefda898970cc..8046c0a621bdd17e7c9adedeb7ca99f458ab96ce 100644
 --- a/chrome/browser/ui/views/location_bar/location_bar_view.h
 +++ b/chrome/browser/ui/views/location_bar/location_bar_view.h
 @@ -13,6 +13,7 @@
@@ -34,7 +34,15 @@ index 856d9d7c66a7314d7046571bb3dfefda898970cc..954a22fe83e0ad4a52cca8e3d49fcb70
    bool in_popup_state_transition() const override;
  
    // Returns a background that paints an (optionally stroked) rounded rect with
-@@ -303,6 +314,7 @@ class LocationBarView
+@@ -245,6 +256,7 @@ class LocationBarView
+   SkColor GetIconLabelBubbleSurroundingForegroundColor() const override;
+   SkAlpha GetIconLabelBubbleSeparatorAlpha() const override;
+   SkColor GetIconLabelBubbleBackgroundColor() const override;
++  bool ShouldSuppressIconLabelBubbleBackground() const override;
+ 
+   // ContentSettingImageViewDelegate:
+   bool ShouldHideContentSettingImage() override;
+@@ -303,6 +315,7 @@ class LocationBarView
    // LocationIconView::Delegate:
    const LocationBarModel* GetLocationBarModel() const override;
    bool IsEditingOrEmpty() const override;
@@ -42,7 +50,7 @@ index 856d9d7c66a7314d7046571bb3dfefda898970cc..954a22fe83e0ad4a52cca8e3d49fcb70
    void OnLocationIconGestureEvent(ui::GestureEvent* event) override;
    void OnLocationIconPressed(const ui::MouseEvent& event) override;
    void OnLocationIconDragged(const ui::MouseEvent& event) override;
-@@ -449,6 +461,7 @@ class LocationBarView
+@@ -449,6 +462,7 @@ class LocationBarView
    bool OnMousePressed(const ui::MouseEvent& event) override;
    bool OnMouseDragged(const ui::MouseEvent& event) override;
    void OnMouseReleased(const ui::MouseEvent& event) override;
@@ -50,7 +58,7 @@ index 856d9d7c66a7314d7046571bb3dfefda898970cc..954a22fe83e0ad4a52cca8e3d49fcb70
    void OnMouseMoved(const ui::MouseEvent& event) override;
    void OnMouseExited(const ui::MouseEvent& event) override;
    void ShowContextMenu(const gfx::Point& p,
-@@ -463,6 +476,9 @@ class LocationBarView
+@@ -463,6 +477,9 @@ class LocationBarView
                             const gfx::Point& press_pt,
                             const gfx::Point& p) override;
  
@@ -60,7 +68,7 @@ index 856d9d7c66a7314d7046571bb3dfefda898970cc..954a22fe83e0ad4a52cca8e3d49fcb70
    bool ShouldUsePopupOpenAppearance() const;
  
    bool ShouldHidePageActionIcons() const;
-@@ -575,6 +591,11 @@ class LocationBarView
+@@ -575,6 +592,11 @@ class LocationBarView
    // An icon to the left of the edit field: the HTTPS lock, blank page icon,
    // search icon, EV HTTPS bubble, etc.
    raw_ptr<LocationIconView> location_icon_view_ = nullptr;
