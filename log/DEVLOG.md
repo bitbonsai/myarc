@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-11-24: Neutral sidebar tab port chips and refreshed Agent icon blog image
+
+- Changed `LocalPageChip::Style::kSidebarTab` in `browser/foundation/local_page_marker.cc` from blue to neutral translucent white/gray (`0x1A` bg / `0xA6` text in dark mode, `0x14` bg / `0x99` text in light mode) while keeping the location-bar pill blue; rebuilt `out/MyarcNightly/myArc.app`.
+- Recaptured `site/posts/thousand-tabs/agent-space-icon.png` from the current build with clean borderless sidebar header and footer crops flattened against the matching sidebar background so no black window-corner artifacts remain.
+- Evidence: `/tmp/myarc-port-chip-neutral.png` confirms neutral `:4321` / `:9` sidebar tab badges, and `mise run site-check`, `python3 tools/export_patches.py --check`, and `python3 tools/check_docs.py` pass.
+
 ## 2026-11-24: Show sidebar tab port chip from live URL
 
 - Added `current_url` to `SidebarView::ItemPresentation` (`browser/foundation/sidebar_view.{h,cc}`, `chrome/browser/ui/views/frame/browser_view.cc`) so non-split sidebar tab rows build `LocalPageChip` from the live tab's `metadata->current_url`, falling back to `item.canonical_url` for dormant rows.

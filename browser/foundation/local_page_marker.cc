@@ -40,8 +40,10 @@ namespace {
 constexpr int kBorderWidth = 2;
 // macOS system blue, dark variant.
 constexpr SkColor kLocalBlue = SkColorSetRGB(0x0A, 0x84, 0xFF);
-constexpr SkColor kTabTagTextDark = SkColorSetRGB(0x70, 0xBC, 0xFF);
-constexpr SkColor kTabTagTextLight = SkColorSetRGB(0x00, 0x62, 0xCC);
+constexpr SkColor kTabTagTextDark = SkColorSetA(SK_ColorWHITE, 0xA6);
+constexpr SkColor kTabTagTextLight = SkColorSetA(SK_ColorBLACK, 0x99);
+constexpr SkColor kTabTagBgDark = SkColorSetA(SK_ColorWHITE, 0x1A);
+constexpr SkColor kTabTagBgLight = SkColorSetA(SK_ColorBLACK, 0x14);
 
 // The border is a child view so it follows the card's layer and bounds; the
 // card's rounded mask clips nothing because the stroke stays inside it.
@@ -193,7 +195,7 @@ void LocalPageChip::ApplyStyleColors() {
       color_utils::IsDark(color_provider->GetColor(ui::kColorSysSurface));
   port_->SetEnabledColor(dark ? kTabTagTextDark : kTabTagTextLight);
   SetBackground(views::CreateRoundedRectBackground(
-      SkColorSetA(kLocalBlue, dark ? 0x38 : 0x24), kTabHeight / 2));
+      dark ? kTabTagBgDark : kTabTagBgLight, kTabHeight / 2));
 }
 
 BEGIN_METADATA(LocalPageChip)
