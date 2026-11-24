@@ -8,7 +8,7 @@ November 2026
 
 November 23, 2026
 
-I tested the signed myArc alpha with an agent driving the app, a thousand tabs in the sidebar, and no internet. It held up well enough that I'm moving in.
+I tested the signed myArc alpha with Claude Code driving the app and a thousand tabs loaded in the sidebar. It held up well enough that I'm moving in.
 
 ## [Alpha is here!!! 🎉](https://myarc.dev/blog/glass-and-extensions/)
 
