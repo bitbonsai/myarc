@@ -1,8 +1,8 @@
 # Ranked work and blockers
 
-Updated: 2026-11-23. Statuses follow [ALPHA.md](ALPHA.md), [SCORECARD.md](SCORECARD.md), and [DEVLOG.md](../log/DEVLOG.md) through nightly `2026.11.23.1`. All **Required for alpha** boxes in [ALPHA.md](ALPHA.md) are closed, and the MA-011 CLI + MCP + Claude Code page journey passed on packaged nightly `2026.11.22.2`.
+Updated: 2026-11-24. Statuses follow [ALPHA.md](ALPHA.md), [SCORECARD.md](SCORECARD.md), and [DEVLOG.md](../log/DEVLOG.md) through release `v2026.11.24.2`. All **Required for alpha** boxes in [ALPHA.md](ALPHA.md) are closed, and the MA-011 CLI + MCP + Claude Code page journey passed on packaged `2026.11.22.2`.
 
-Current priority: close the remaining core browsing verification gaps (Archive Restore + permissions/history/find/DevTools smoke) and the offline / no-account request audit, then responsiveness/accessibility budgets.
+Current priority: confirm Restore from Archived Tabs live, then close accessibility review, onboarding reveal frame trace, and upstream memory baseline budgets.
 
 | Rank | Gap | Why it leads | Completion evidence |
 | --- | --- | --- | --- |

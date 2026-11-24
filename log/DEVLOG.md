@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-11-24: Refresh docs for `v2026.11.24.2` and prune merged worktrees
+
+- Updated `README.md`, `site/docs-src/` (`cli-and-mcp`, `import-from-arc`, `spaces-and-profiles`), `skills/myarc-browser/SKILL.md`, `.plans/INDEX.md`, `docs/GAPS.md`, `docs/ALPHA.md`, `docs/SCORECARD.md`, and `docs/CONTROL-PROTOCOL.md` to match retired Nightly naming, one-click multi-Profile Arc import, the Arc-aligned tab context menu, and shipped `page.screenshot`/`scroll`/`wait` control commands.
+- Removed merged worktrees `next-steps-after-alpha` and `ribbon-3d-hero` via `wt`, deleted merged remote branch `origin/next-steps-after-alpha`, and confirmed `v2026.11.24.2` live on GitHub Releases and `myarc.dev`.
+- Evidence: `mise run site-check`, `python3 tools/check_docs.py`, `cargo fmt`, `rustfmt`, `cargo clippy`, `cargo test`, `tools/export_patches.py --check`, and `design/onboarding/state.test.mjs` all pass; `myarc.dev` republished with updated docs.
+
 ## 2026-11-24: Publish `v2026.11.24.2` release
 
 - Packaged, Developer ID signed, Apple notarized, stapled, and Sparkle EdDSA-signed `myArc-2026.11.24.2-arm64.dmg` (184,765,819 bytes, SHA-256 `68f39ab6...867f`) from `main` `abca90c` and Chromium `11a53a9fa1` (myArc and Chromium versions in updater up-to-date sheet).

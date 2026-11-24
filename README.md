@@ -14,31 +14,31 @@ Arc is being [sunsetted](https://arc.net/). myArc is an open-source browser that
 
 ## Try it
 
-The [alpha nightly](https://myarc.dev/download/) runs on Apple silicon Macs with macOS 26 or later. It's for trying the shell, not yet for daily or sensitive browsing: recent tabs can be lost after a crash, and Chromium fixes arrive with the next nightly. Nightlies are signed and update themselves in place, and the download page lists every known limitation.
+The [alpha build](https://myarc.dev/download/) runs on Apple silicon Macs with macOS 26 or later. It's for trying the shell, not yet for daily or sensitive browsing: recent tabs can be lost after a crash, and Chromium fixes arrive with the next release. Builds are signed, notarized and update themselves in place, and the download page lists every known limitation.
 
 What works today:
 
-- Browsing with Chromium extensions
-- A glass sidebar with Favorites, pinned tabs and temporary tabs next to a rounded page card
-- Creating, switching and renaming Spaces
-- The command bar (Cmd+L) and Arc's shortcuts, such as Cmd+S to hide the sidebar and Cmd+Shift+C to copy the address
-- A native Settings window (Cmd+,)
+- Browsing with Chromium extensions and bundled ad and tracker blocking (uBlock Origin Lite)
+- A glass sidebar with Favorites, pinned tabs, folders and temporary tabs next to a rounded page card
+- Creating, switching, theming and renaming Spaces across multiple Profiles
+- Peek, two-pane Split View and Little Arc
+- One-click import from Arc (`StorableSidebar.json`) and Markdown export import
+- The command bar (Cmd+L / Cmd+T) and Arc's shortcuts, such as Cmd+S to hide the sidebar and Cmd+Shift+C to copy the address
+- Opt-in CLI (`myarc`) and MCP (`myarc mcp`) browser control in a separate Agent Space
+- A native Settings window (Cmd+,) and animated welcome tour
 
 ## Where it's going
 
-- Arc's layouts, shortcuts and habits, with an animated onboarding that shows what's different.
-- Import from Arc, and export of your workspace at any time.
-- No account, subscription or analytics about how you browse.
-- Ads and trackers blocked by default, with per-site controls.
-- Peek, Split View and Boosts.
-- Control from the command line and MCP, so scripts and AI agents can use the same commands as the UI, with your permission.
+- Nested folders, multi-pane Split View, Boosts and remaining Arc parity.
+- Workspace export and full migration coverage across Profiles.
+- Durability, accessibility, responsiveness and extension matrix gates for daily-use beta.
 - Optional AI, off by default, using models on your machine or your own API key.
 
 The [roadmap](ROADMAP.md) and [ranked gaps](docs/GAPS.md) track what comes next.
 
 ## Build and contribute
 
-myArc is a small patch set over Chromium, with a Rust core for workspace state and commands. The [foundation recipe](browser/README.md) covers the Chromium checkout, the build and the nightly packaging. Work happens in small loops, one Arc screenshot and one task at a time; [the workflow](docs/WORKFLOW.md) explains it. Read [AGENTS.md](AGENTS.md) and [CONTRIBUTING.md](CONTRIBUTING.md) before sending changes.
+myArc is a small patch set over Chromium, with a Rust core for workspace state and commands. The [foundation recipe](browser/README.md) covers the Chromium checkout, the build and release packaging. Work happens in small loops, one Arc screenshot and one task at a time; [the workflow](docs/WORKFLOW.md) explains it. Read [AGENTS.md](AGENTS.md) and [CONTRIBUTING.md](CONTRIBUTING.md) before sending changes.
 
 Checks:
 

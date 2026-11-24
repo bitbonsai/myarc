@@ -42,10 +42,10 @@ myarc use t12               # switch the current tab
 
 - `--tab t12` and `--rev 1.2` replace the current tab and revision for one call. `--json` prints the raw response.
 - Put `--` before text that starts with a dash: `myarc fill @e1 -- "-5"`.
-- URLs must be http or https. Navigation answers once it commits, so the outline header may say `loading`. There is no wait command yet, so run `snapshot` again if the page is still loading.
+- URLs must be http or https. Navigation answers once it commits, so the outline header may say `loading`. To wait for loading to finish, run `myarc run page.wait '{"tab":"t12","timeout_ms":10000}'` or run `snapshot` again.
 - `snapshot -i` keeps each ref line with its parents, the heading above it and the text line just before it, so a "Details" link keeps the item it belongs to. Link targets show only where several links share a name.
-- There is no scroll command yet. `click` scrolls its target into view first.
-- For a command without a short form, use `myarc run <command> '<json>'`. `myarc commands` lists the ones that run.
+- For screenshots and scrolling, use `myarc run page.screenshot '{"tab":"t12"}'` and `myarc run page.scroll '{"tab":"t12","revision":"1.2","direction":"down"}'` (with optional `"ref":"e4"`). `click` also scrolls its target into view first.
+- For any command without a short form, use `myarc run <command> '<json>'`. `myarc commands` lists the ones that run.
 
 ## Reading the output
 
