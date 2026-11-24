@@ -2,78 +2,67 @@ HTML: https://myarc.dev/download/
 
 # myArc Alpha
 
-Arc's workflow on Chromium with ungoogled-chromium privacy patches and Chrome extensions intact.
+Alpha build, for trying the Arc-like shell. Not yet for daily or sensitive browsing.
 
-- No account or sign-in
-- Ad blocking on, AI off by default
-- Imports your Arc Spaces
-- GPL-3.0, data stays on your machine
+[Download for macOS (Apple silicon)](https://github.com/bitbonsai/myarc/releases/download/v2026.11.24.1/myArc-2026.11.24.1-arm64.dmg)
 
-v2026.11.23.1November 23, 2026
+- **Version:** 2026.11.24.1
+- **Date:** November 24, 2026
+- **Size:** 184.8 MB
+- **SHA-256:** `07fb5e2c8b8681b3a5da72a606978b714ef2d23ff1f052a103f71678bfec02c6`
 
-[Download for macOS](https://github.com/bitbonsai/myarc/releases/download/nightly-2026.11.23.1/myArc-Nightly-2026.11.23.1-arm64.dmg)
+## System requirements
 
-184.2 MB · Apple silicon · macOS 26\+ · Notarized
+- An Apple silicon Mac. Intel Macs are not supported.
+- macOS 26 or later. The glass frame requires macOS 26\. It has been tested only on macOS 26.7.
 
-LinuxSoonWindowsSoon
+## First launch
 
-Verify download (SHA-256)
+1. Check the download against the SHA-256 listed with it. The two values must match.
 
-SHA-256
+   ```
+   shasum -a 256 ~/Downloads/myArc-2026.11.24.1-arm64.dmg
+   ```
+2. Open the DMG and drag myArc to Applications.
+3. Open myArc. Apple has notarized each build, so macOS only asks once whether to open an app downloaded from the internet. Choose Open.
 
-`35495145451e8638272cbfcf2cfd327ad6552bed6a126730b82cebbbb6282666`
+## What works today
 
-```
-shasum -a 256 ~/Downloads/myArc-Nightly-2026.11.23.1-arm64.dmg
-```
+Each item was seen working in a native run or experiment note. None of it has had release testing.
 
-Copy
+- Chromium browsing, with Chromium extensions. A Manifest V3 smoke test passed; wider extension coverage is untested.
+- A glass sidebar with Favorite tiles, a Space heading, pinned tabs, a New Tab row and temporary tabs below the divider, next to a rounded page card. Only the dark appearance has been compared with Arc.
+- Creating, switching and renaming Spaces from the sidebar footer. Favorites are shared across the Spaces of one Profile.
+- Closing a pinned tab keeps the pin.
+- A command bar: Cmd\+L opens it on the current address, arrows, Enter and Escape work, and new windows open it centered.
+- Shortcuts: Cmd\+S hides the sidebar, Cmd\+Shift\+T reopens a closed tab, Cmd\+Shift\+C copies the address and shows a Copied Current URL toast, Cmd\+Shift\+N opens a private window and Ctrl\+Cmd\+N a blank one.
+- Cmd\+, opens a native Settings window. General shows the default-browser banner, Profiles sets when tabs are archived, and Advanced holds Import from Arc and a link to the full Chromium settings. Links and Shortcuts are not available yet.
+- Quitting with Cmd\+Q needs no confirmation by default, with a setting to turn the warning on.
+- Importing an Arc export from Settings \> Advanced \> Import from Arc. A preview shows what it will add, then each Space arrives with its folders and pinned tabs, in Arc's order. Importing the same file again adds nothing.
+- Folders for a Space's pinned tabs. Create, rename and delete them from the right-click menu, and open or close them. Drag tabs in and out, and rename a pinned tab from its menu.
+- Split View for two tabs side by side. Use Open in Split View in a tab's menu or Ctrl\+Shift\+\=, and Ctrl\+Shift\+- to separate them. The split shows as one sidebar row and comes back after a restart.
+- Peek: a link from a pinned tab or Favorite to another site opens in a card over the page. Cmd\+W or Esc closes it, Cmd\+O turns it into a tab, a button splits it beside the pinned page, and Cmd\+Shift\+T reopens the last one closed. Settings \> Links can turn it off.
+- Ad and tracker blocking, on by default, with uBlock Origin Lite built in. Turn it off for one site with the Block ads on this site switch in the site info popover, which opens from the "i" in the address field. Private windows block only after you allow the extension there.
+- Ctrl\+Tab switches to your last tab, and holding Ctrl goes further back through the five most recent.
+- Little Arc: links from other apps open in a small window, and Option-Cmd-N opens one. Open in \<Space\> or Cmd\+O moves the page into your current Space. Settings \> Links turns it off.
+- The command bar runs actions: type pin, archive, split or a Space's name, or / to list them. View has Clear Cookies and Refresh and Clear Cache and Refresh for the current site.
+- Pins, folders and Spaces survive a force quit. Each change is saved before the sidebar shows it, and a damaged workspace file falls back to the backup.
+- Agents can drive tabs in the Agent Space through the bundled myarc CLI and MCP server. It is off by default. Turn it on in Settings \> Advanced, and myArc asks before each new agent connects.
 
-## First launch on macOS
+## Known limitations
 
-[Install and update guide →](https://myarc.dev/docs/install/)
+- myArc checks for new alpha builds itself and asks before it installs one, but there are no scheduled security updates yet.
+- Recent tabs and navigation can be lost after a crash or force quit.
+- H.264 and AAC are included, so most other web video plays.
 
-1. ### Download the DMG
+[Known limitations](https://myarc.dev/docs/known-limitations/) lists the rest, with what does not work yet and what to do after a crash.
 
-   Apple silicon Mac on macOS 26 or later. Intel Macs will not run it.
-2. ### Drag to Applications
+## Other ways to get it
 
-   Open the disk image and drop myArc Nightly into Applications.
-3. ### Open and allow once
+- [GitHub releases](https://github.com/bitbonsai/myarc/releases/tag/v2026.11.24.1) lists every build.
+- [Source on GitHub](https://github.com/bitbonsai/myarc), with instructions to [build it from source](https://github.com/bitbonsai/myarc/blob/main/browser/README.md).
+- [GitHub issues](https://github.com/bitbonsai/myarc/issues) take bug reports. Include the version, your macOS version and the steps that trigger the problem, and leave out private pages.
 
-   Apple has notarized each build, so macOS asks once. Click Open, then Always Allow if it asks for your login keychain.
+## License and notices
 
-## Ready to try
-
-[Browse docs →](https://myarc.dev/docs/)
-
-- **Spaces and Profiles.** Glass sidebar, shared Favorites, pinned tabs and folders.
-- **Command bar.** Press `⌘L` or `⌘T` to open sites, run actions or switch Spaces.
-- **Peek and Split View.** Open a link in a card over the page, or put two tabs side by side.
-- **Little Arc.** Links from other apps open in a small window, or press `⌥⌘N` anywhere.
-- **Import from Arc.** Bring over Spaces, folders and pinned tabs in Arc's order.
-- **Ad blocking and agents.** uBlock Origin Lite built in, plus opt-in CLI and MCP control.
-
-## Keep in mind
-
-[All limitations →](https://myarc.dev/docs/known-limitations/)
-
-- **Chromium 158 dev.** Checks for new alpha builds daily, with no separate security patches.
-- **Media playback.** No Widevine, so Netflix, Spotify and Disney\+ will not play. H.264 and AAC are included, so most other web video plays.
-- **Crashes.** Pins, folders and Spaces survive a force quit. Recent tabs can still be lost.
-- **Early guarantees.** Profile separation, cookie isolation and saved-password checks are not verified yet.
-
-- [Feedback and chat](https://myarc.slirc.app)
-
-  Join myarc.slirc.app to share what works or feels rough.
-- [Report a problem](https://github.com/bitbonsai/myarc/issues)
-
-  Include your myArc and OS versions, and leave out private pages.
-- [GitHub releases](https://github.com/bitbonsai/myarc/releases/tag/nightly-2026.11.23.1)
-
-  Every published build.
-- [Build from source](https://github.com/bitbonsai/myarc/blob/main/browser/README.md)
-
-  Clone [bitbonsai/myarc](https://github.com/bitbonsai/myarc) and compile it yourself.
-
-GPL-3.0 ([LICENSE](https://github.com/bitbonsai/myarc/blob/main/LICENSE)). Bundled components keep their own licenses ([ATTRIBUTION.md](https://github.com/bitbonsai/myarc/blob/main/ATTRIBUTION.md), [dependency inventory](https://github.com/bitbonsai/myarc/blob/main/browser/evidence/dependency-licenses.json)). Independent project, separate from Arc and The Browser Company.
+myArc is licensed under GPL-3.0, see [LICENSE](https://github.com/bitbonsai/myarc/blob/main/LICENSE). Chromium and other bundled components keep their own licenses. [ATTRIBUTION.md](https://github.com/bitbonsai/myarc/blob/main/ATTRIBUTION.md) records what is known, and the [dependency license inventory](https://github.com/bitbonsai/myarc/blob/main/browser/evidence/dependency-licenses.json) is not yet complete.

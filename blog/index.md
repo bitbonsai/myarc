@@ -8,7 +8,7 @@ November 2026
 
 November 23, 2026
 
-Every alpha check is done against the real notarized app. Agents can now take screenshots, scroll, and wait for pages to load, and myArc handled a thousand tabs without flinching.
+I tested the signed myArc alpha with Claude Code driving the app and a thousand tabs loaded in the sidebar. It held up well enough that I'm moving in.
 
 ## [Alpha is here!!! 🎉](https://myarc.dev/blog/glass-and-extensions/)
 

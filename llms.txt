@@ -8,13 +8,13 @@ A complete myArc browser remains unimplemented, and the Arc importer brings over
 
 - [Overview](https://myarc.dev/index.md): Markdown equivalent of the homepage.
 - [Progress journal](https://myarc.dev/blog/index.md): Published development updates.
-- [Download](https://myarc.dev/download/index.md): Alpha nightly status, requirements and known limitations.
+- [Download](https://myarc.dev/download/index.md): Alpha build status, requirements and known limitations.
 - [Repository](https://github.com/bitbonsai/myarc): Public source and plans.
 
 ## Docs
 
 - [Docs index](https://myarc.dev/docs/index.md): User guides for people moving from Arc.
-- [Install myArc](https://myarc.dev/docs/install/index.md): What your Mac needs, what macOS asks on first launch, the welcome tour, and how myArc moves to a newer nightly.
+- [Install myArc](https://myarc.dev/docs/install/index.md): What your Mac needs, what macOS asks on first launch, the welcome tour, and how myArc updates.
 - [Import from Arc](https://myarc.dev/docs/import-from-arc/index.md): Import your Spaces, folders, pinned tabs and Favorites from Arc's sidebar file or its export, preview what myArc will add, and import again without duplicates.
 - [Spaces and Profiles](https://myarc.dev/docs/spaces-and-profiles/index.md): How Spaces, Profiles, pinned tabs, Favorites and temporary tabs fit together in the myArc sidebar.
 - [Peek](https://myarc.dev/docs/peek/index.md): How links from pinned tabs and Favorites open in a preview over the page, and how to keep, split, reopen or turn off that preview.
@@ -22,11 +22,11 @@ A complete myArc browser remains unimplemented, and the Arc importer brings over
 - [Your data](https://myarc.dev/docs/your-data/index.md): Where myArc keeps your workspace on disk, how to back it up, and what it sends over the network. There is no account.
 - [Ad blocking](https://myarc.dev/docs/ad-blocking/index.md): How myArc blocks ads and trackers, and how to turn blocking off or on for one site.
 - [CLI and MCP](https://myarc.dev/docs/cli-and-mcp/index.md): Drive myArc from a script or an AI agent with the bundled myarc command and its MCP server. It's off by default, and tab commands reach only the Agent Space.
-- [Known limitations](https://myarc.dev/docs/known-limitations/index.md): What the alpha nightly can't do yet, and what to do after a crash or when something breaks.
+- [Known limitations](https://myarc.dev/docs/known-limitations/index.md): What myArc Alpha can't do yet, and what to do after a crash or when something breaks.
 
 ## Posts
 
-- [A thousand tabs, and agents that can see](https://myarc.dev/blog/thousand-tabs/index.md): Every alpha check is done against the real notarized app. Agents can now take screenshots, scroll, and wait for pages to load, and myArc handled a thousand tabs without flinching.
+- [A thousand tabs, and agents that can see](https://myarc.dev/blog/thousand-tabs/index.md): I tested the signed myArc alpha with Claude Code driving the app and a thousand tabs loaded in the sidebar. It held up well enough that I'm moving in.
 - [Alpha is here!!! 🎉](https://myarc.dev/blog/glass-and-extensions/index.md): myArc alpha is here. Settings is cleaner, the welcome screen only shows what your Mac can do, frosted glass covers every window, and pinned extension icons sit in the URL pill on hover.
 - [A proper welcome](https://myarc.dev/blog/a-proper-welcome/index.md): myArc now says hello before your first tab. The screen dims, a soft blob of colour grows into a window, and a short tour has you try the basics on the real browser.
 - [Keeping Arc's ideas going](https://myarc.dev/blog/keeping-arcs-ideas-going/index.md): Arc shuts down on December 22. myArc now has Peek, Split View and Little Arc, blocks ads from the first page, and opens on a Mac like any other app.

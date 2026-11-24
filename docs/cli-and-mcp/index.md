@@ -14,14 +14,14 @@ Browser control is off by default. Press Cmd\+, to open Settings, go to Advanced
 
 ## Install the command
 
-The nightly carries `myarc` inside the app. Link it into your `PATH`:
+myArc carries `myarc` inside the app. Link it into your `PATH`:
 
 ```
 sudo mkdir -p /usr/local/bin
-sudo ln -sf "/Applications/myArc Nightly.app/Contents/Helpers/myarc" /usr/local/bin/myarc
+sudo ln -sf "/Applications/myArc.app/Contents/Helpers/myarc" /usr/local/bin/myarc
 ```
 
-The link points into the app, so it keeps working after you replace the app with a newer nightly.
+The link points into the app, so it keeps working after you replace the app with a newer build.
 
 ## Approve each tool
 
@@ -100,7 +100,7 @@ The Space commands reach all your Spaces in that Profile, so `space.rename` can 
 `myarc mcp` starts the MCP server. It has one tool per command, named with an underscore in place of each dot, so `space.create` is called `space_create` there. To add it to Claude Code for every project, run:
 
 ```
-claude mcp add --scope user myarc -- "/Applications/myArc Nightly.app/Contents/Helpers/myarc" mcp
+claude mcp add --scope user myarc -- "/Applications/myArc.app/Contents/Helpers/myarc" mcp
 ```
 
 For other MCP clients, use this server entry once `myarc` is on your `PATH`:

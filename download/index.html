@@ -7,13 +7,13 @@
   <meta name="theme-color" content="#f5f2ec" media="(prefers-color-scheme: light)">
   <meta name="theme-color" content="#0b1420" media="(prefers-color-scheme: dark)">
   <title>myArc Alpha | myArc</title>
-  <meta name="description" content="Download myArc Alpha: Arc-style browsing on Chromium with ungoogled-chromium privacy patches. macOS available now, Linux and Windows coming soon.">
+  <meta name="description" content="myArc Alpha for macOS on Apple silicon: requirements, first launch, what works, known limitations and how to report problems.">
   <link rel="canonical" href="https://myarc.dev/download/">
   <link rel="icon" type="image/png" href="../blog/_assets/favicon.5bca6dcdff1e.png">
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="myArc">
   <meta property="og:title" content="myArc Alpha">
-  <meta property="og:description" content="Download myArc Alpha: Arc-style browsing on Chromium with ungoogled-chromium privacy patches. macOS available now, Linux and Windows coming soon.">
+  <meta property="og:description" content="myArc Alpha for macOS on Apple silicon: requirements, first launch, what works, known limitations and how to report problems.">
   <meta property="og:url" content="https://myarc.dev/download/">
   <meta name="robots" content="index, follow, max-image-preview:large">
   <meta property="og:image" content="https://myarc.dev/og-image.webp">
@@ -24,10 +24,10 @@
   <meta property="og:image:alt" content="myArc, forever yours. Colorful ribbon logo on navy.">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="myArc Alpha">
-  <meta name="twitter:description" content="Download myArc Alpha: Arc-style browsing on Chromium with ungoogled-chromium privacy patches. macOS available now, Linux and Windows coming soon.">
+  <meta name="twitter:description" content="myArc Alpha for macOS on Apple silicon: requirements, first launch, what works, known limitations and how to report problems.">
   <meta name="twitter:image" content="https://myarc.dev/og-image.webp">
   <meta name="twitter:image:alt" content="myArc, forever yours. Colorful ribbon logo on navy.">
-  <script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "WebPage", "name": "myArc Alpha", "description": "Download myArc Alpha: Arc-style browsing on Chromium with ungoogled-chromium privacy patches. macOS available now, Linux and Windows coming soon.", "url": "https://myarc.dev/download/", "inLanguage": "en", "isPartOf": {"@type": "WebSite", "name": "myArc", "url": "https://myarc.dev/"}}, {"@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "myArc", "item": "https://myarc.dev/"}, {"@type": "ListItem", "position": 2, "name": "Download", "item": "https://myarc.dev/download/"}]}]}</script>
+  <script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "WebPage", "name": "myArc Alpha", "description": "myArc Alpha for macOS on Apple silicon: requirements, first launch, what works, known limitations and how to report problems.", "url": "https://myarc.dev/download/", "inLanguage": "en", "isPartOf": {"@type": "WebSite", "name": "myArc", "url": "https://myarc.dev/"}}, {"@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "myArc", "item": "https://myarc.dev/"}, {"@type": "ListItem", "position": 2, "name": "Download", "item": "https://myarc.dev/download/"}]}]}</script>
   <style>
     @font-face {
       font-family: Outfit;
@@ -492,110 +492,14 @@
     }
 
   
-    .journal.download-page { max-width: 64rem; padding: 3rem 0 5rem }
-    .download-page { --dl-surface: color-mix(in srgb, var(--page) 92%, rgb(var(--link-rgb))); --dl-border: color-mix(in srgb, currentColor 12%, transparent) }
-
-    /* Hero: editorial title left, tactile release card right over a subtle ribbon wash. */
-    .dl-hero { position: relative; display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); align-items: start; gap: 2.5rem 3.5rem }
-    .dl-hero::before { content: ''; position: absolute; z-index: -1; top: -4rem; right: -4rem; width: 36rem; height: 28rem; pointer-events: none; filter: blur(3.5rem); opacity: .45;
-      background: radial-gradient(42% 45% at 35% 40%, rgb(26 133 255 / .42), transparent 70%), radial-gradient(36% 42% at 68% 35%, rgb(124 108 255 / .36), transparent 70%), radial-gradient(40% 42% at 55% 72%, rgb(255 122 92 / .3), transparent 70%) }
-    .download-page h1 { font-size: 4rem; line-height: 1.02; letter-spacing: -.045em; max-width: 14ch }
-    .dl-lede { margin-top: 1.25rem; max-width: 42ch; color: var(--quiet); font-size: 1.25rem; line-height: 1.48 }
-    .dl-promises { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .625rem 1.25rem; margin-top: 1.5rem; padding: 0; list-style: none }
-    .dl-promises li { display: flex; align-items: baseline; gap: .5rem; font-size: 1rem; font-weight: 500; color: var(--text) }
-    .dl-check { width: .9375rem; height: .9375rem; flex: none; color: var(--link-solid); transform: translateY(.125rem) }
-
-    /* Release card */
-    .download-box { padding: 1.75rem; border-radius: 1.5rem; border: 1px solid var(--dl-border);
-      background: color-mix(in srgb, var(--page) 82%, transparent);
-      -webkit-backdrop-filter: blur(1.25rem); backdrop-filter: blur(1.25rem);
-      box-shadow: inset 0 1px 0 rgb(255 255 255 / .55), 0 1.25rem 2.75rem -1.5rem rgb(16 28 43 / .22) }
-    .dl-coming h2 { font-size: 1.5rem }
-    .dl-coming p { margin-top: .75rem; color: var(--quiet) }
-    .dl-card-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: .25rem 1rem }
-    .dl-version { font-size: 1.375rem; font-weight: 600; letter-spacing: -.02em; font-variant-numeric: tabular-nums }
-    .dl-date { color: var(--quiet); font-size: 1rem; white-space: nowrap }
-    .dl-cta { display: flex; justify-content: center; width: 100%; margin-top: 1.25rem; padding: 1rem 1.5rem; font-size: 1.125rem }
-    .dl-icon { width: 1.25rem; height: 1.25rem; flex: none }
-    .dl-submeta { margin-top: .75rem; text-align: center; color: var(--quiet); font-size: .9375rem }
-    .dl-upcoming { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .625rem; margin-top: 1rem }
-    .dl-os-btn { display: flex; align-items: center; justify-content: space-between; gap: .5rem; width: 100%; padding: .6875rem 1rem; border-radius: 6rem; border: 1px dashed color-mix(in srgb, currentColor 28%, transparent); background: color-mix(in srgb, currentColor 4%, transparent); color: var(--quiet); font: inherit; font-size: .9375rem; font-weight: 500; cursor: not-allowed }
-    .dl-soon { font-size: .875rem; font-weight: 500; opacity: .72 }
-
-    /* Progressive SHA-256 verification disclosure */
-    .dl-verify { margin-top: 1.25rem; padding-top: 1rem; border-top: 1px solid var(--dl-border) }
-    .dl-verify summary { display: flex; align-items: center; justify-content: space-between; gap: .75rem; list-style: none; cursor: pointer; color: var(--quiet); font-size: .9375rem; font-weight: 500; transition: color .15s ease }
-    .dl-verify summary::-webkit-details-marker { display: none }
-    .dl-verify summary:hover, .dl-verify summary:focus-visible { color: var(--text) }
-    .dl-chevron { width: 1rem; height: 1rem; flex: none; transition: transform .2s var(--ease) }
-    .dl-verify[open] .dl-chevron { transform: rotate(180deg) }
-    .dl-verify-body { margin-top: .875rem }
-    .dl-hash-label { color: var(--quiet); font-size: .875rem; font-weight: 600; letter-spacing: .04em; text-transform: uppercase }
-    .dl-hash { display: block; margin-top: .25rem; font-family: inherit; font-size: .9375rem; line-height: 1.45; word-break: break-all; color: var(--text) }
-    .dl-cmd { display: flex; align-items: center; gap: .625rem; margin-top: .75rem; padding: .5rem .5rem .5rem 1rem; border-radius: .875rem; background: var(--panel); color: var(--ivory) }
-    .dl-cmd pre { flex: 1; min-width: 0; margin: 0; padding: .375rem 0; overflow-x: auto; background: none; color: inherit; font-family: inherit; font-size: .9375rem; line-height: 1.45 }
-    .dl-cmd code { font-family: inherit; white-space: nowrap }
-    .dl-copy { flex: none; padding: .375rem .75rem; border: 1px solid rgb(255 255 255 / .22); border-radius: 999rem; background: rgb(255 255 255 / .1); color: var(--ivory); font: inherit; font-size: .875rem; font-weight: 500; cursor: pointer; transition: background-color .15s ease }
-    .dl-copy:hover, .dl-copy:focus-visible { background: rgb(255 255 255 / .2) }
-
-    /* Sections below hero */
-    .dl-section { margin-top: 4rem }
-    .dl-section-head, .dl-panel-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: .5rem 1rem }
-    .download-page h2 { font-size: 1.75rem; letter-spacing: -.03em; line-height: 1.2 }
-    .dl-more { font-size: 1rem; font-weight: 500; white-space: nowrap }
-
-    /* 3-step horizontal install strip (unboxed editorial columns, matching the homepage rhythm). */
-    .dl-steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1.75rem 2.5rem; margin: 1.75rem 0 0; padding: 1.75rem 0 0; list-style: none; border-top: 1px solid var(--dl-border) }
-    .dl-step-num { color: var(--quiet); font-weight: 500; font-variant-numeric: tabular-nums }
-    .dl-steps h3 { font-size: 1.25rem; letter-spacing: -.02em }
-    .dl-steps p { margin-top: .5rem; color: var(--quiet); font-size: 1rem; line-height: 1.5 }
-
-    /* Two-column Ready to try / Keep in mind */
-    .dl-split { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1.5rem }
-    .dl-panel { padding: 1.75rem; border-radius: 1.5rem; border: 1px solid var(--dl-border); background: color-mix(in srgb, var(--page) 78%, transparent) }
-    .dl-panel-quiet { background: color-mix(in srgb, var(--page) 92%, rgb(var(--link-rgb) / .2)) }
-    .dl-list { margin: 1.25rem 0 0; padding: 0; list-style: none }
-    .dl-list li { font-size: 1rem; line-height: 1.5; color: var(--quiet) }
-    .dl-list li + li { margin-top: .875rem; padding-top: .875rem; border-top: 1px solid color-mix(in srgb, currentColor 10%, transparent) }
-    .dl-list strong { color: var(--text); font-weight: 600 }
-    .download-page kbd { padding: .05em .35em; border: 1px solid color-mix(in srgb, currentColor 18%, transparent); border-bottom-width: 2px; border-radius: .375rem; background: color-mix(in srgb, currentColor 6%, transparent); font-family: inherit; font-size: .9375rem; font-weight: 500; color: var(--text); white-space: nowrap }
-
-    /* Bottom links + compact legal */
-    .dl-footer-bar { padding-top: 2.5rem; border-top: 1px solid var(--dl-border) }
-    .dl-links { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1.25rem 2rem; padding: 0; list-style: none }
-    .dl-links > li > a { font-weight: 600; font-size: 1.0625rem }
-    .dl-links p { margin-top: .25rem; color: var(--quiet); font-size: 1rem; line-height: 1.45 }
-    .dl-legal { margin-top: 2rem; color: var(--quiet); font-size: .9375rem; line-height: 1.55; max-width: 72ch }
-
-    @media (prefers-color-scheme: dark) {
-      .download-page { --dl-border: rgb(255 255 255 / .12) }
-      .download-box { background: color-mix(in srgb, var(--panel) 84%, transparent);
-        box-shadow: inset 0 1px 0 rgb(255 255 255 / .12), 0 1.5rem 3rem -1.5rem rgb(0 0 0 / .75) }
-      .dl-os-btn { background: rgb(255 255 255 / .03) }
-      .dl-panel { background: color-mix(in srgb, var(--panel) 55%, transparent) }
-      .dl-panel-quiet { background: color-mix(in srgb, var(--panel) 72%, rgb(var(--link-rgb) / .14)) }
-      .dl-cmd { background: #09111b; border: 1px solid rgb(255 255 255 / .08) }
-    }
-
-    @media (max-width: 56rem) {
-      .dl-hero { grid-template-columns: minmax(0, 1fr); gap: 2rem }
-      .dl-hero::before { right: -2rem; width: 26rem; height: 22rem }
-      .dl-steps, .dl-split { grid-template-columns: minmax(0, 1fr) }
-      .dl-links { grid-template-columns: repeat(2, minmax(0, 1fr)) }
-    }
-
-    @media (max-width: 48rem) {
-      .journal.download-page { padding: 2rem 0 4rem }
-      .download-page h1 { font-size: 2.75rem }
-      .dl-lede { font-size: 1.125rem }
-      .dl-promises, .dl-links { grid-template-columns: minmax(0, 1fr) }
-      .download-box, .dl-panel { padding: 1.375rem }
-      .dl-section { margin-top: 3rem }
-    }
-
-    @media (prefers-reduced-motion: reduce) {
-      .dl-chevron, .dl-verify summary, .dl-copy { transition: none }
-    }
+    .download-status { margin-top: 1rem; color: var(--quiet) }
+    .download .download-box { padding: 1.5rem; border-radius: 1rem; background: rgb(var(--link-rgb) / .08) }
+    .download .download-box h2 { margin-top: 0; font-size: 1.5rem }
+    .download .download-box p { margin-top: .75rem }
+    .download .download-facts { margin-top: 1.25rem; padding: 0; list-style: none; font-size: 1rem }
+    .download .download-facts code { overflow-wrap: anywhere }
+    .download ol { padding-left: 1.5rem }
+    .download li > pre { margin-top: .75rem }
   </style>
 <link rel="alternate" type="text/markdown" href="https://myarc.dev/download/index.md" title="Markdown">
 <link rel="alternate" type="text/plain" href="https://myarc.dev/llms.txt" title="Site context">
@@ -633,7 +537,7 @@
           })
         })()
       </script>
-    </header><main id="main" class="journal download-page"><section class="dl-hero"><div class="dl-hero-copy"><h1 class="rise">myArc Alpha</h1><p class="dl-lede rise">Arc&#x27;s workflow on Chromium with ungoogled-chromium privacy patches and Chrome extensions intact.</p><ul class="dl-promises rise"><li><svg class="dl-check" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M3.5 8.5l3 3 6-6.5"/></svg><span>No account or sign-in</span></li><li><svg class="dl-check" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M3.5 8.5l3 3 6-6.5"/></svg><span>Ad blocking on, AI off by default</span></li><li><svg class="dl-check" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M3.5 8.5l3 3 6-6.5"/></svg><span>Imports your Arc Spaces</span></li><li><svg class="dl-check" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M3.5 8.5l3 3 6-6.5"/></svg><span>GPL-3.0, data stays on your machine</span></li></ul></div><div class="download-box rise"><div class="dl-card-head"><span class="dl-version">v2026.11.23.1</span><span class="dl-date">November 23, 2026</span></div><a class="button dl-cta" href="https://github.com/bitbonsai/myarc/releases/download/nightly-2026.11.23.1/myArc-Nightly-2026.11.23.1-arm64.dmg"><svg class="dl-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M10 3.5v9.5m0 0l-3.75-3.75M10 13l3.75-3.75M4 16.5h12"/></svg>Download for macOS</a><p class="dl-submeta">184.2 MB · Apple silicon · macOS 26+ · Notarized</p><div class="dl-upcoming" aria-label="Upcoming platforms"><button type="button" class="dl-os-btn" disabled><span>Linux</span><span class="dl-soon">Soon</span></button><button type="button" class="dl-os-btn" disabled><span>Windows</span><span class="dl-soon">Soon</span></button></div><details class="dl-verify"><summary><span>Verify download (SHA-256)</span><svg class="dl-chevron" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M4.5 6.25L8 9.75l3.5-3.5"/></svg></summary><div class="dl-verify-body"><p class="dl-hash-label">SHA-256</p><code class="dl-hash">35495145451e8638272cbfcf2cfd327ad6552bed6a126730b82cebbbb6282666</code><div class="dl-cmd"><pre><code>shasum -a 256 ~/Downloads/myArc-Nightly-2026.11.23.1-arm64.dmg</code></pre><button type="button" class="dl-copy" data-copy="shasum -a 256 ~/Downloads/myArc-Nightly-2026.11.23.1-arm64.dmg">Copy</button></div></div></details></div></section><section class="dl-section"><div class="dl-section-head"><h2>First launch on macOS</h2><a class="dl-more" href="/docs/install/">Install and update guide &rarr;</a></div><ol class="dl-steps"><li><h3><span class="dl-step-num" aria-hidden="true">1.</span> Download the DMG</h3><p>Apple silicon Mac on macOS 26 or later. Intel Macs will not run it.</p></li><li><h3><span class="dl-step-num" aria-hidden="true">2.</span> Drag to Applications</h3><p>Open the disk image and drop myArc Nightly into Applications.</p></li><li><h3><span class="dl-step-num" aria-hidden="true">3.</span> Open and allow once</h3><p>Apple has notarized each build, so macOS asks once. Click Open, then Always Allow if it asks for your login keychain.</p></li></ol></section><section class="dl-section dl-split"><div class="dl-panel"><div class="dl-panel-head"><h2>Ready to try</h2><a class="dl-more" href="/docs/">Browse docs &rarr;</a></div><ul class="dl-list"><li><strong>Spaces and Profiles.</strong> Glass sidebar, shared Favorites, pinned tabs and folders.</li><li><strong>Command bar.</strong> Press <kbd>⌘L</kbd> or <kbd>⌘T</kbd> to open sites, run actions or switch Spaces.</li><li><strong>Peek and Split View.</strong> Open a link in a card over the page, or put two tabs side by side.</li><li><strong>Little Arc.</strong> Links from other apps open in a small window, or press <kbd>⌥⌘N</kbd> anywhere.</li><li><strong>Import from Arc.</strong> Bring over Spaces, folders and pinned tabs in Arc&#x27;s order.</li><li><strong>Ad blocking and agents.</strong> uBlock Origin Lite built in, plus opt-in CLI and MCP control.</li></ul></div><div class="dl-panel dl-panel-quiet"><div class="dl-panel-head"><h2>Keep in mind</h2><a class="dl-more" href="/docs/known-limitations/">All limitations &rarr;</a></div><ul class="dl-list"><li><strong>Chromium 158 dev.</strong> Checks for new alpha builds daily, with no separate security patches.</li><li><strong>Media playback.</strong> No Widevine, so Netflix, Spotify and Disney+ will not play. H.264 and AAC are included, so most other web video plays.</li><li><strong>Crashes.</strong> Pins, folders and Spaces survive a force quit. Recent tabs can still be lost.</li><li><strong>Early guarantees.</strong> Profile separation, cookie isolation and saved-password checks are not verified yet.</li></ul></div></section><section class="dl-section dl-footer-bar"><ul class="dl-links"><li><a href="https://myarc.slirc.app">Feedback and chat</a><p>Join myarc.slirc.app to share what works or feels rough.</p></li><li><a href="https://github.com/bitbonsai/myarc/issues">Report a problem</a><p>Include your myArc and OS versions, and leave out private pages.</p></li><li><a href="https://github.com/bitbonsai/myarc/releases/tag/nightly-2026.11.23.1">GitHub releases</a><p>Every published build.</p></li><li><a href="https://github.com/bitbonsai/myarc/blob/main/browser/README.md">Build from source</a><p>Clone <a href="https://github.com/bitbonsai/myarc">bitbonsai/myarc</a> and compile it yourself.</p></li></ul><p class="dl-legal">GPL-3.0 (<a href="https://github.com/bitbonsai/myarc/blob/main/LICENSE">LICENSE</a>). Bundled components keep their own licenses (<a href="https://github.com/bitbonsai/myarc/blob/main/ATTRIBUTION.md">ATTRIBUTION.md</a>, <a href="https://github.com/bitbonsai/myarc/blob/main/browser/evidence/dependency-licenses.json">dependency inventory</a>). Independent project, separate from Arc and The Browser Company.</p></section></main><footer class="end">
+    </header><main id="main" class="journal"><header class="post-header"><h1>myArc Alpha</h1><p class="download-status">Alpha build, for trying the Arc-like shell. Not yet for daily or sensitive browsing.</p></header><div class="post-body download"><div class="download-box"><a class="button" href="https://github.com/bitbonsai/myarc/releases/download/v2026.11.24.1/myArc-2026.11.24.1-arm64.dmg">Download for macOS (Apple silicon)</a><ul class="download-facts"><li><strong>Version:</strong> 2026.11.24.1</li><li><strong>Date:</strong> November 24, 2026</li><li><strong>Size:</strong> 184.8 MB</li><li><strong>SHA-256:</strong> <code>07fb5e2c8b8681b3a5da72a606978b714ef2d23ff1f052a103f71678bfec02c6</code></li></ul></div><h2>System requirements</h2><ul><li>An Apple silicon Mac. Intel Macs are not supported.</li><li>macOS 26 or later. The glass frame requires macOS 26. It has been tested only on macOS 26.7.</li></ul><h2>First launch</h2><ol><li>Check the download against the SHA-256 listed with it. The two values must match.<pre><code>shasum -a 256 ~/Downloads/myArc-2026.11.24.1-arm64.dmg</code></pre></li><li>Open the DMG and drag myArc to Applications.</li><li>Open myArc. Apple has notarized each build, so macOS only asks once whether to open an app downloaded from the internet. Choose Open.</li></ol><h2>What works today</h2><p>Each item was seen working in a native run or experiment note. None of it has had release testing.</p><ul><li>Chromium browsing, with Chromium extensions. A Manifest V3 smoke test passed; wider extension coverage is untested.</li><li>A glass sidebar with Favorite tiles, a Space heading, pinned tabs, a New Tab row and temporary tabs below the divider, next to a rounded page card. Only the dark appearance has been compared with Arc.</li><li>Creating, switching and renaming Spaces from the sidebar footer. Favorites are shared across the Spaces of one Profile.</li><li>Closing a pinned tab keeps the pin.</li><li>A command bar: Cmd+L opens it on the current address, arrows, Enter and Escape work, and new windows open it centered.</li><li>Shortcuts: Cmd+S hides the sidebar, Cmd+Shift+T reopens a closed tab, Cmd+Shift+C copies the address and shows a Copied Current URL toast, Cmd+Shift+N opens a private window and Ctrl+Cmd+N a blank one.</li><li>Cmd+, opens a native Settings window. General shows the default-browser banner, Profiles sets when tabs are archived, and Advanced holds Import from Arc and a link to the full Chromium settings. Links and Shortcuts are not available yet.</li><li>Quitting with Cmd+Q needs no confirmation by default, with a setting to turn the warning on.</li><li>Importing an Arc export from Settings &gt; Advanced &gt; Import from Arc. A preview shows what it will add, then each Space arrives with its folders and pinned tabs, in Arc&#x27;s order. Importing the same file again adds nothing.</li><li>Folders for a Space&#x27;s pinned tabs. Create, rename and delete them from the right-click menu, and open or close them. Drag tabs in and out, and rename a pinned tab from its menu.</li><li>Split View for two tabs side by side. Use Open in Split View in a tab&#x27;s menu or Ctrl+Shift+=, and Ctrl+Shift+- to separate them. The split shows as one sidebar row and comes back after a restart.</li><li>Peek: a link from a pinned tab or Favorite to another site opens in a card over the page. Cmd+W or Esc closes it, Cmd+O turns it into a tab, a button splits it beside the pinned page, and Cmd+Shift+T reopens the last one closed. Settings &gt; Links can turn it off.</li><li>Ad and tracker blocking, on by default, with uBlock Origin Lite built in. Turn it off for one site with the Block ads on this site switch in the site info popover, which opens from the &quot;i&quot; in the address field. Private windows block only after you allow the extension there.</li><li>Ctrl+Tab switches to your last tab, and holding Ctrl goes further back through the five most recent.</li><li>Little Arc: links from other apps open in a small window, and Option-Cmd-N opens one. Open in &lt;Space&gt; or Cmd+O moves the page into your current Space. Settings &gt; Links turns it off.</li><li>The command bar runs actions: type pin, archive, split or a Space&#x27;s name, or / to list them. View has Clear Cookies and Refresh and Clear Cache and Refresh for the current site.</li><li>Pins, folders and Spaces survive a force quit. Each change is saved before the sidebar shows it, and a damaged workspace file falls back to the backup.</li><li>Agents can drive tabs in the Agent Space through the bundled myarc CLI and MCP server. It is off by default. Turn it on in Settings &gt; Advanced, and myArc asks before each new agent connects.</li></ul><h2>Known limitations</h2><ul><li>myArc checks for new alpha builds itself and asks before it installs one, but there are no scheduled security updates yet.</li><li>Recent tabs and navigation can be lost after a crash or force quit.</li><li>H.264 and AAC are included, so most other web video plays.</li></ul><p><a href="/docs/known-limitations/">Known limitations</a> lists the rest, with what does not work yet and what to do after a crash.</p><h2>Other ways to get it</h2><ul><li><a href="https://github.com/bitbonsai/myarc/releases/tag/v2026.11.24.1">GitHub releases</a> lists every build.</li><li><a href="https://github.com/bitbonsai/myarc">Source on GitHub</a>, with instructions to <a href="https://github.com/bitbonsai/myarc/blob/main/browser/README.md">build it from source</a>.</li><li><a href="https://github.com/bitbonsai/myarc/issues">GitHub issues</a> take bug reports. Include the version, your macOS version and the steps that trigger the problem, and leave out private pages.</li></ul><h2>License and notices</h2><p>myArc is licensed under GPL-3.0, see <a href="https://github.com/bitbonsai/myarc/blob/main/LICENSE">LICENSE</a>. Chromium and other bundled components keep their own licenses. <a href="https://github.com/bitbonsai/myarc/blob/main/ATTRIBUTION.md">ATTRIBUTION.md</a> records what is known, and the <a href="https://github.com/bitbonsai/myarc/blob/main/browser/evidence/dependency-licenses.json">dependency license inventory</a> is not yet complete.</p></div></main><footer class="end">
       <a class="mark plain" href="#main" aria-label="Back to top"><img class="ribbon" src="../blog/_assets/logo-matte.adbb3c7ddc14.webp" alt="" width="1254" height="1254"><picture><source media="(prefers-color-scheme: dark)" srcset="../blog/_assets/wordmark-ivory.3a99cf025832.svg"><img class="wordmark" src="../blog/_assets/wordmark-ink.18b9e7ae3785.svg" alt="myArc" width="3056" height="1049"></picture></a>
       <div class="end-copy">
         <p>Made with <svg class="heart" role="img" aria-label="love" focusable="false"
@@ -651,19 +555,4 @@
 </svg>
  by <a href="https://github.com/bitbonsai">@bitbonsai</a> for Arc enthusiasts.</p>
       </div>
-    </footer></div><script>
-  (() => {
-    document.querySelectorAll('.dl-copy').forEach((button) => {
-      if (!navigator.clipboard) { button.hidden = true; return }
-      let timer = 0
-      button.addEventListener('click', async () => {
-        try {
-          await navigator.clipboard.writeText(button.dataset.copy)
-          button.textContent = 'Copied'
-          clearTimeout(timer)
-          timer = setTimeout(() => { button.textContent = 'Copy' }, 1800)
-        } catch {}
-      })
-    })
-  })()
-</script></body></html>
+    </footer></div></body></html>
