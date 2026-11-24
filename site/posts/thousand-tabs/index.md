@@ -26,7 +26,7 @@ You can also spot a small localhost touch in that comparison. Arc puts a heavy p
 
 Spending an afternoon staring at captures has a funny side effect. Tiny visual rough edges jump off the screen.
 
-The Agent Space icon was a thin outline sitting next to heavier filled icons, so I swapped it for a filled robot head in both the Space header and the sidebar footer. While I was in there, I cleared a stray opaque backdrop that was dulling frosted modals, and removed the hover plates behind pinned extension icons in the URL pill so they use the same frosted tooltips as the footer.
+The Agent Space icon was a thin outline sitting next to heavier filled icons, so I swapped it for the filled robot head I created for [agentbar.fyi](https://agentbar.fyi) in both the Space header and the sidebar footer. While I was in there, I cleared a stray opaque backdrop that was dulling frosted modals, and removed the hover plates behind pinned extension icons in the URL pill so they use the same frosted tooltips as the footer.
 
 ![Side-by-side close-up of the myArc sidebar header and bottom footer showing the new filled robot-head icon for the Agent Space](agent-space-icon.png)
 
