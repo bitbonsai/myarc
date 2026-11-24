@@ -6,31 +6,33 @@ HTML: https://myarc.dev/blog/thousand-tabs/
 
 November 23, 2026
 
-[Mauricio Wolff](https://github.com/bitbonsai)3 min read
+[Mauricio Wolff](https://github.com/bitbonsai)4 min read
 
-Alpha shipped yesterday, so I ran the checklist against the real signed app instead of trusting unit tests. Build `2026.11.23.1` is what came out of that pass.
+Alpha went out yesterday, and I wanted to put it to a real test to see what would happen. Not a dev build or unit tests, the signed app you actually download. Throw an agent at it, stuff a thousand tabs into the sidebar, cut the internet, and see what breaks.
+
+Build `2026.11.23.1` is what came out of that.
 
 ## Giving agents eyes
 
-When I first added browser control, agents only got a text outline of the page. That's still how most steps run because it's fast and cheap.
+When I first wired up browser control, agents only saw a text outline of the page. Most of the time that's plenty. It's fast, cheap, and doesn't burn tokens on images.
 
-Watching Claude Code drive the packaged app showed what was missing. It filled forms and ignored prompt-injection text on a local test page, then hit a wall whenever it needed to see what actually rendered, scroll to a button below the fold or wait for a page without guessing a sleep time.
+Then I pointed Claude Code at the packaged app on a local test page. It filled out the form and ignored the prompt-injection text I'd hidden there, which was nice to see. Where it got stuck was the ordinary stuff: checking how something actually looked, scrolling down to a button off-screen, or waiting for a load without guessing a sleep timer.
 
-This round adds `page.screenshot`, `page.scroll` and `page.wait` to the `myarc` CLI and MCP server. Screenshots come straight from Chromium's compositor and arrive over MCP as image blocks. Scrolling moves the viewport or a specific element. Waiting listens for the real load event with a timeout instead of sleeping. All of it stays inside the Agent Space, behind the same Allow card and Stop button, with your other Spaces and Profiles off limits.
+So I added `page.screenshot`, `page.scroll` and `page.wait` to the `myarc` CLI and MCP server. Screenshots come straight from Chromium's compositor as MCP image blocks, scrolling moves the viewport or a specific element, and waiting hooks into the real load event instead of sleeping. Everything stays locked inside the Agent Space behind the Allow card and Stop button. Your own Spaces and Profiles stay untouched.
 
 [![Side-by-side comparison of the same local test form in Arc on the left with its purple top localhost banner and myArc on the right with a thin blue viewport border and compact port tag in the URL pill](https://myarc.dev/blog/thousand-tabs/localhost-comparison.6025eeb90a9b.webp)](https://myarc.dev/blog/thousand-tabs/localhost-comparison.6025eeb90a9b.webp)
 
 The same local test page in Arc (left) and myArc (right).
 
-Arc marks local pages with a purple banner across the top. myArc uses a thin blue border around the viewport and a `</> :port` tag in the URL pill instead, so you still see you're on localhost without giving up vertical space.
+One small thing in that comparison. Arc puts a thick purple bar across the top of local pages. myArc wraps the viewport in a thin blue border and slips a `</> :port` tag into the URL pill instead. You still know you're on localhost, and you keep your vertical space.
 
 ## A few small fixes
 
-Looking through screenshots all afternoon made a few rough edges hard to ignore.
+Looking through screenshots all afternoon, a few small things started to bother me.
 
-The Agent Space icon was a thin outline next to filled ones, so I swapped it for the filled robot head I made for [agentbar.fyi](https://agentbar.fyi) in both the Space header and the sidebar footer.
+The Agent Space icon was a thin outline next to filled icons, and once I noticed it I couldn't unsee it. I swapped it for the filled robot head I made for [agentbar.fyi](https://agentbar.fyi), in both the Space header and the sidebar footer.
 
-While cleaning that up, I cleared a stray opaque backdrop behind the glass modals and dropped the hover boxes behind pinned extensions in the URL pill so they use the same tooltips as the footer.
+While I was in there, I cleared a stray opaque layer that was dulling the glass modals, and removed the hover boxes behind pinned extensions in the URL pill so they match the tooltips in the footer.
 
 [![Side-by-side close-up of the myArc sidebar header and bottom footer showing the new filled robot-head icon for the Agent Space](https://myarc.dev/blog/thousand-tabs/agent-space-icon.418b87b88871.webp)](https://myarc.dev/blog/thousand-tabs/agent-space-icon.418b87b88871.webp)
 
@@ -38,15 +40,15 @@ The filled robot-head icon in the Agent Space header and bottom footer.
 
 ## A thousand tabs and no calls home
 
-People who used Arc tend to hoard tabs, so I wanted to see how myArc holds up under real weight. I loaded a fresh profile with ten Spaces and a hundred dormant items each, a thousand in all, and ran it on an Apple M5 Pro.
+Arc people tend to hoard tabs, so I wanted to see what happens when myArc actually has to carry that weight. I loaded a fresh profile with ten Spaces and a hundred dormant items each, a thousand in all, on an Apple M5 Pro.
 
-The first window opened in 797.5 ms, and memory settled at 953.5 MB across 11 processes. Switching Spaces took 75.5 ms at the median (83.1 ms at p95), with workspace saves at 2.08 ms. The command bar stayed quick through all of it.
+It held up better than I expected. The first window opened in 797.5 ms, and memory settled at 953.5 MB across 11 processes. Switching Spaces took 75.5 ms at the median (83.1 ms at p95), with workspace saves at 2.08 ms. The command bar stayed snappy the whole time.
 
 [![Full myArc window with a thousand synthetic items across ten Spaces and the frosted command bar open in the center](https://myarc.dev/blog/thousand-tabs/thousand-tabs.0b0fae3e3284.webp)](https://myarc.dev/blog/thousand-tabs/thousand-tabs.0b0fae3e3284.webp)
 
 A thousand dormant items across ten Spaces, with the command bar open over the window.
 
-I also ran automated checks on the basics you only notice when they break: native notification prompts, frosted find-in-page, docked DevTools and SQLite history. Then I blocked external DNS and logged every network request from a clean profile. It opened straight into a workspace with no account prompt, pinned a local page to disk and made zero calls to any myArc server.
+After that I ran automated checks on the everyday stuff you only think about when it breaks: native notification prompts, frosted find-in-page, docked DevTools and SQLite history. Then I blocked external DNS and watched every network request from a clean profile. It opened straight into a workspace with no account prompt, pinned a local page to disk and made zero calls to any myArc server.
 
 [![myArc showing frosted find-in-page highlighting matches on a local test page](https://myarc.dev/blog/thousand-tabs/core-smoke-find.5cbc653dfcd8.webp)](https://myarc.dev/blog/thousand-tabs/core-smoke-find.5cbc653dfcd8.webp)
 
@@ -58,8 +60,8 @@ Docked DevTools inspecting the same page.
 
 ## Moving in
 
-After this pass, I'm switching to myArc as my default browser. Current Chromium underneath, ungoogled-chromium and extra privacy patches on top, and Arc's way of organizing tabs is what I wanted from the start.
+I started this round wanting to put myArc through a real test and see what broke. Nothing major did, and that was enough. **I'm making myArc my default browser**. Current Chromium underneath, ungoogled-chromium and extra privacy patches on top, and Arc's way of organizing tabs is what I've been trying to get back to from the start.
 
-I also set up [myarc.slirc.app](https://myarc.slirc.app) for feedback and ideas on what comes next. If you're trying the alpha, drop in and tell me what works or what still feels rough.
+I also spun up [myarc.slirc.app](https://myarc.slirc.app) so there's a place to share feedback and talk through what comes next. If you're trying the alpha, come say hi and tell me what works or what still feels rough.
 
-If you already have myArc installed, open myArc → Check for Updates… to get `2026.11.23.1`. Fresh installs are on the [download page](https://myarc.dev/download/).
+Already on myArc? Open myArc → Check for Updates… to get `2026.11.23.1`. Fresh installs are on the [download page](https://myarc.dev/download/).
