@@ -56,6 +56,8 @@ After that I ran automated checks on the everyday stuff you only think about whe
 
 *Docked DevTools inspecting the same page.*
 
+We also tested macOS's Reduce Motion setting. I forgot it was still on, noticed every animation in myArc had stopped, and got annoyed thinking we'd broken something in the code. Neon had to remind me I was the one who flipped the switch.
+
 ## Moving in
 
 I started this round wanting to put myArc through a real test and see what broke. Nothing major did, and that was enough. **I'm making myArc my default browser**. Current Chromium underneath, ungoogled-chromium and extra privacy patches on top, and Arc's way of organizing tabs is what I've been trying to get back to from the start.
