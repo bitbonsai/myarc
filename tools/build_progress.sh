@@ -4,7 +4,7 @@
 set -eu
 
 SRC="${CHROMIUM_SRC:-$HOME/.cache/myarc-m0/chromium/src}"
-OUT="${1:-$SRC/out/MyarcNightly}"
+OUT="${1:-$SRC/out/MyarcRelease}"
 SISO="$SRC/third_party/siso/cipd/siso"
 
 if [ -x "$SISO" ] && line=$("$SISO" ps -C "$OUT" 2>/dev/null | grep -m1 '\[[0-9]*/[0-9]*'); then
@@ -19,7 +19,7 @@ if [ -x "$SISO" ] && line=$("$SISO" ps -C "$OUT" 2>/dev/null | grep -m1 '\[[0-9]
   exit 0
 fi
 
-for proc in package_nightly notarytool codesign cargo; do
+for proc in package_release notarytool codesign cargo; do
   if pgrep -qf "$proc"; then
     echo "Running: $proc"
     exit 0

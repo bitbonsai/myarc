@@ -42,7 +42,7 @@ class DownloadTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             load({**SAMPLE, 'extra': 1})
 
-    def test_appcast_lists_only_a_signed_nightly(self):
+    def test_appcast_lists_only_a_signed_release(self):
         sparkle = '{http://www.andymatuschak.org/xml-namespaces/sparkle}'
         self.assertEqual(ET.fromstring(appcast(SAMPLE)).findall('channel/item'), [])
         self.assertEqual(ET.fromstring(appcast(None)).findall('channel/item'), [])

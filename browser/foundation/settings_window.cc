@@ -77,7 +77,7 @@ namespace myarc {
 // settings_window_mac.mm: a titled window whose content fills the title bar.
 views::NativeWidget* CreateSettingsNativeWidget(views::Widget* widget);
 bool IsSettingsAppActive();
-// "Nightly <label>" from the packaged bundle, else "Development build".
+// Version label from the packaged bundle, else "Development build".
 std::u16string MyarcVersionLabel();
 ui::ImageModel AppIconImage();
 #else

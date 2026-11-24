@@ -2,15 +2,15 @@
 # Checks Sparkle updates end to end without publishing anything. Serves a local
 # appcast on 127.0.0.1 and launches the older app in the background with a
 # disposable profile and --myarc-test-update-feed, three times:
-#   older: the appcast lists an older nightly, so no update is offered.
+#   older: the appcast lists an older release, so no update is offered.
 #   tampered: the newer DMG with another file's signature, so Sparkle refuses it.
 #   good: the newer DMG with its own signature. Sparkle downloads and extracts
 #     it, checks the signature without aborting, and installs it over the test
 #     copy when the app quits.
-# Both apps come from tools/package_nightly.sh on a build with
+# Both apps come from tools/package_release.sh on a build with
 # myarc_test_hooks = true, which compiles the feed switch. Needs the site venv
 # from `mise run site-check`. Takes the build lock.
-# Usage: tools/check_updates.sh <old myArc Nightly.app> <new DMG> <new DMG's ed_signature> <new VERSION>
+# Usage: tools/check_updates.sh <old myArc.app> <new DMG> <new DMG's ed_signature> <new VERSION>
 set -euo pipefail
 
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
@@ -20,12 +20,12 @@ fi
 shift
 OLD_APP=$1 NEW_DMG=$2 SIGNATURE=$3 NEW_VERSION=$4
 PORT=${PORT:-8797}
-DOMAIN=dev.myarc.nightly
+DOMAIN=dev.myarc.browser
 WORK=$(mktemp -d "${TMPDIR:-/tmp}/myarc-updates.XXXXXX")
 SPARKLE=$("$ROOT/tools/fetch_sparkle.sh")
 
 # Sparkle saves its check times in the app's defaults, which the installed
-# nightly shares. Remember which SU keys exist so cleanup removes only new ones.
+# app shares. Remember which SU keys exist so cleanup removes only new ones.
 BEFORE=$(defaults read "$DOMAIN" 2>/dev/null | sed -n 's/^ *\(SU[A-Za-z]*\) = .*/\1/p' || true)
 SERVER=""
 cleanup() {
@@ -61,7 +61,7 @@ feed good "$NEW_VERSION" "$SIGNATURE"
 
 # Runs one case and waits for one of the expected log lines.
 run() {
-  local name=$1 expect=$2 app="$WORK/$1/myArc Nightly.app" profile="$WORK/$1/profile" pid=""
+  local name=$1 expect=$2 app="$WORK/$1/myArc.app" profile="$WORK/$1/profile" pid=""
   mkdir -p "$profile"
   ditto "$OLD_APP" "$app"
   open -g -n -a "$app" --args --user-data-dir="$profile" --no-first-run --no-default-browser-check \
@@ -96,11 +96,11 @@ if grep -q 'myarc-update: aborted' "$WORK/good/profile/chrome.log"; then
 fi
 # Sparkle installs over the quit app's copy a moment after it exits.
 for _ in $(seq 1 120); do
-  WANT=$(/usr/libexec/PlistBuddy -c 'Print :MyarcVersion' "$WORK/good/myArc Nightly.app/Contents/Info.plist" 2>/dev/null || true)
+  WANT=$(/usr/libexec/PlistBuddy -c 'Print :MyarcVersion' "$WORK/good/myArc.app/Contents/Info.plist" 2>/dev/null || true)
   [ "$WANT" = "$NEW_VERSION" ] && break
   sleep 0.5
 done
 echo "good: installed copy reports $WANT"
 [ "$WANT" = "$NEW_VERSION" ] || FAIL=1
-codesign --verify --deep --strict "$WORK/good/myArc Nightly.app" && echo "good: installed copy passes codesign" || FAIL=1
+codesign --verify --deep --strict "$WORK/good/myArc.app" && echo "good: installed copy passes codesign" || FAIL=1
 [ "$FAIL" = 0 ] && echo "updates: all cases passed" || { echo "updates: a case failed" >&2; exit 1; }

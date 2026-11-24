@@ -13,11 +13,11 @@
 #include "base/logging.h"
 #include "base/strings/sys_string_conversions.h"
 #include "myarc/glass_mac.h"
-#include "myarc/nightly_buildflags.h"
+#include "myarc/release_buildflags.h"
 #include "myarc/test_buildflags.h"
 #include "myarc/welcome_mark.h"
 
-// Sparkle.framework is embedded by tools/package_nightly.sh, not by the build,
+// Sparkle.framework is embedded by tools/package_release.sh, not by the build,
 // so it is loaded at runtime and only these parts of its API are declared.
 // Enum values match Sparkle 2.10.1's SPUUserUpdateState.h.
 typedef NS_ENUM(NSInteger, MyarcSparkleUpdateChoice) {
@@ -108,24 +108,24 @@ NSString* CurrentVersionLabel() {
   NSString* version = base::apple::ObjCCast<NSString>(
       [base::apple::OuterBundle() objectForInfoDictionaryKey:@"MyarcVersion"]);
   if (version.length) {
-    return [NSString stringWithFormat:@"Nightly %@", version];
+    return version;
   }
   return @"Development build";
 }
 
 NSString* FormatUpdateVersion(id<MyarcSparkleAppcastItem> item) {
   if (!item) {
-    return @"the latest nightly";
+    return @"the latest version";
   }
   NSString* label = item.displayVersionString.length ? item.displayVersionString
                                                      : item.versionString;
   if (!label.length) {
-    return @"the latest nightly";
+    return @"the latest version";
   }
-  if ([label hasPrefix:@"Nightly "] || [label hasPrefix:@"myArc "]) {
+  if ([label hasPrefix:@"myArc "]) {
     return label;
   }
-  return [NSString stringWithFormat:@"Nightly %@", label];
+  return [NSString stringWithFormat:@"myArc %@", label];
 }
 
 NSImage* UpdaterAppIcon() {
@@ -1113,7 +1113,7 @@ typedef NS_ENUM(NSInteger, MyarcUpdaterButtonStyle) {
                             _pendingVersionLabel]
             : [NSString stringWithFormat:
                             @"You’re currently on %@. Install the latest "
-                            @"nightly to get recent fixes and improvements.",
+                            @"version to get recent fixes and improvements.",
                             myarc::CurrentVersionLabel()];
   NSString* primary =
       _infoOnlyUpdate ? @"Learn More"
@@ -1299,7 +1299,7 @@ typedef NS_ENUM(NSInteger, MyarcUpdaterButtonStyle) {
   [self clearCallbacks];
   _choiceReply = [reply copy];
   NSString* version = _pendingVersionLabel.length ? _pendingVersionLabel
-                                                  : @"The new myArc nightly";
+                                                  : @"The new version of myArc";
   [self configureTitle:@"Ready to Install"
               subtitle:[NSString stringWithFormat:
                                      @"%@ is verified and ready. Relaunch "
@@ -1359,7 +1359,7 @@ typedef NS_ENUM(NSInteger, MyarcUpdaterButtonStyle) {
 
 - (void)showPreviewState:(NSString*)state {
   [self clearCallbacks];
-  _pendingVersionLabel = @"Nightly 2026.11.22.1";
+  _pendingVersionLabel = @"myArc 2026.11.24";
   _releaseNotesURL = [NSURL URLWithString:@"https://myarc.dev/download/"];
   _infoOnlyUpdate = NO;
 
@@ -1425,7 +1425,7 @@ typedef NS_ENUM(NSInteger, MyarcUpdaterButtonStyle) {
                 showSkip:NO];
   } else if ([state isEqualToString:@"ready"]) {
     [self configureTitle:@"Ready to Install"
-                subtitle:@"Nightly 2026.11.22.1 is verified and ready. "
+                subtitle:@"myArc 2026.11.24 is verified and ready. "
                          @"Relaunch myArc to finish updating."
             showProgress:NO
            indeterminate:NO
@@ -1437,10 +1437,10 @@ typedef NS_ENUM(NSInteger, MyarcUpdaterButtonStyle) {
                 showSkip:NO];
   } else {
     // Default preview: "Update Available" with release notes card + link.
-    [self configureTitle:@"Nightly 2026.11.22.1 is available"
+    [self configureTitle:@"myArc 2026.11.24 is available"
                 subtitle:[NSString stringWithFormat:
                                        @"You’re currently on %@. Install the "
-                                       @"latest nightly to get recent fixes.",
+                                       @"latest version to get recent fixes.",
                                        myarc::CurrentVersionLabel()]
             showProgress:NO
            indeterminate:NO
@@ -1532,10 +1532,11 @@ NSString* SparklePath() {
       stringByAppendingPathComponent:@"Sparkle.framework"];
 }
 
-// True when StartUpdater() can run: a nightly or a test feed, and an embedded
-// Sparkle.framework. Only checks the file, so it is cheap at menu build time.
+// True when StartUpdater() can run: a release build or a test feed, and an
+// embedded Sparkle.framework. Only checks the file, so it is cheap at menu
+// build time.
 bool UpdaterAvailable() {
-#if !BUILDFLAG(MYARC_NIGHTLY)
+#if !BUILDFLAG(MYARC_RELEASE)
   if (!TestFeed()) {
     return false;
   }

@@ -35,7 +35,7 @@ KEYS = [
 LINKS = [
     ('Import from Arc', '/docs/import-from-arc/', 'Bring over your Spaces, folders and pinned tabs.'),
     ('Docs', '/docs/', 'How everything works, and what is still missing.'),
-    ('Release notes', '/download/', 'What works in this nightly, and the latest download.'),
+    ('Release notes', '/download/', 'What works in this build, and the latest download.'),
     ('GitHub', REPO, 'The code, the plans and the roadmap.'),
     ('Report an issue', REPO + '/issues', 'Found a bug? Tell me what happened.'),
 ]

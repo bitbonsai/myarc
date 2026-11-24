@@ -1,11 +1,11 @@
 #!/bin/bash
-# Regenerate the nightly app icon (app.icns + Assets.car) from the matte mark.
-# Usage: tools/make_nightly_icons.sh   Needs Python 3 with Pillow, iconutil, actool.
+# Regenerate the app icon (app.icns + Assets.car) from the matte mark.
+# Usage: tools/make_app_icons.sh   Needs Python 3 with Pillow, iconutil, actool.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 SRC="$ROOT/design/brand/assets/myarc-matte.png"
-OUT="$ROOT/browser/foundation/nightly"
+OUT="$ROOT/browser/foundation/release"
 WORK=$(mktemp -d "${TMPDIR:-/tmp}/myarc-icons.XXXXXX")
 trap 'rm -rf "$WORK"' EXIT
 

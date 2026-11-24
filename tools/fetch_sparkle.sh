@@ -1,7 +1,7 @@
 #!/bin/bash
 # Downloads the pinned Sparkle 2 release once, checks its SHA-256 and prints
 # the directory holding Sparkle.framework, bin/sign_update and bin/generate_keys.
-# tools/package_nightly.sh embeds the framework and signs the DMG with it.
+# tools/package_release.sh embeds the framework and signs the DMG with it.
 # Usage: tools/fetch_sparkle.sh   env: SPARKLE_DIR=<cache dir>
 set -euo pipefail
 

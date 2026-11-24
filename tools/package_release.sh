@@ -1,20 +1,20 @@
 #!/bin/bash
-# Package the nightly build as a signed, optionally notarized DMG outside the repository.
+# Package the release build as a signed, optionally notarized DMG outside the repository.
 # Signs with a Developer ID or Apple Development identity when the keychain has one, then
 # "myArc Local Signing", then ad-hoc. SIGN_ID overrides the choice.
 # Strips local symbols from the main and framework binaries before signing.
 # Builds the myarc CLI in release mode and bundles it as Contents/Helpers/myarc.
 # It reports VERSION through MYARC_VERSION, so the approval card shows the
-# nightly label.
+# release label.
 # Signs inside out with the hardened runtime, a secure timestamp and Chromium's
 # own entitlements from chrome/app (JIT for the renderer and GPU helpers).
 # With a Developer ID and the notarytool keychain profile NOTARY_PROFILE, it
 # notarizes and staples the app, then the DMG. NOTARIZE=0 skips that.
 # Embeds Sparkle 2 (tools/fetch_sparkle.sh) for in-app updates, sets
-# CFBundleVersion from VERSION so Sparkle can compare nightlies, and signs the
+# CFBundleVersion from VERSION so Sparkle can compare builds, and signs the
 # DMG with the EdDSA key that generate_keys keeps in the login keychain under
 # the account myarc-sparkle.
-# Usage: tools/package_nightly.sh
+# Usage: tools/package_release.sh
 #   env: APP_SRC=<built myArc.app> DATE=YYYY-MM-DD VERSION=<label> TAG=<release tag>
 #        OUT=<output dir, default ~/.cache/myarc-m0/release/DATE>
 #        NOTARIZE=0|1 NOTARY_PROFILE=<keychain profile, default myarc-notary>
@@ -25,12 +25,12 @@ set -euo pipefail
 
 REPO=https://github.com/bitbonsai/myarc
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
-APP_SRC=${APP_SRC:-$HOME/.cache/myarc-m0/chromium/src/out/MyarcNightly/myArc.app}
+APP_SRC=${APP_SRC:-$HOME/.cache/myarc-m0/chromium/src/out/MyarcRelease/myArc.app}
 DATE=${DATE:-$(date +%F)}
 VERSION=${VERSION:-${DATE//-/.}}
-TAG=${TAG:-nightly-$VERSION}
+TAG=${TAG:-v$VERSION}
 OUT=${OUT:-$HOME/.cache/myarc-m0/release/$DATE}
-NAME="myArc-Nightly-$VERSION-arm64.dmg"
+NAME="myArc-$VERSION-arm64.dmg"
 # Sparkle compares CFBundleVersion, which stays Chromium's build number, so
 # the label becomes YYYYMMDD.N: 2026.11.20.2 is 20261120.2, 2026.11.20 is
 # 20261120.0. site/download.py derives the appcast's sparkle:version the same way.
@@ -43,7 +43,7 @@ SPARKLE_ACCOUNT=myarc-sparkle
 ENTITLEMENTS=${ENTITLEMENTS:-$HOME/.cache/myarc-m0/chromium/src/chrome/app}
 NOTARY_PROFILE=${NOTARY_PROFILE:-myarc-notary}
 STAGE="$OUT/stage"
-APP="$STAGE/myArc Nightly.app"
+APP="$STAGE/myArc.app"
 
 [ -d "$APP_SRC" ] || { echo "built app missing: $APP_SRC" >&2; exit 1; }
 for plist in app helper-renderer helper-gpu; do
@@ -194,7 +194,7 @@ fi
 
 ln -s /Applications "$STAGE/Applications"
 rm -f "$OUT/$NAME"
-hdiutil create -quiet -volname "myArc Nightly" -srcfolder "$STAGE" -format ULFO "$OUT/$NAME"
+hdiutil create -quiet -volname "myArc" -srcfolder "$STAGE" -format ULFO "$OUT/$NAME"
 rm "$STAGE/Applications"
 if [ "$NOTARIZE" = 1 ]; then
   sign "$OUT/$NAME"

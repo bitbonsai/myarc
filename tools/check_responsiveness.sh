@@ -11,14 +11,14 @@
 # Usage:
 #   tools/check_responsiveness.sh
 # Env:
-#   APP=<myArc.app>   default: /Applications/myArc Nightly.app
+#   APP=<myArc.app>   default: /Applications/myArc.app
 #   SAMPLES=100       number of Space-switch and Command-bar samples
 #   OUTDIR=<dir>      default: /tmp/myarc-responsiveness-<timestamp>
 #   KEEP=1            keeps the disposable profile directory
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-APP="${APP:-/Applications/myArc Nightly.app}"
+APP="${APP:-/Applications/myArc.app}"
 BIN="$APP/Contents/MacOS/$(/usr/libexec/PlistBuddy -c "Print :CFBundleExecutable" "$APP/Contents/Info.plist" 2>/dev/null || echo myArc)"
 SAMPLES="${SAMPLES:-100}"
 

@@ -1,10 +1,10 @@
 declare_args() {
-  # Builds the myArc nightly: myArc branding with its own bundle id, profile
+  # Builds the myArc release app: myArc branding with its own bundle id, profile
   # directory and app icon, and myArc mode switched on by default. Pair it
-  # with branding_file_path = "//myarc/nightly/BRANDING".
-  myarc_nightly = false
+  # with branding_file_path = "//myarc/release/BRANDING".
+  myarc_release = false
 
-  # Uses the nightly's myArc app icon without its branding, so a dev build
+  # Uses the release's myArc app icon without its branding, so a dev build
   # stays Chromium.app with Chromium's bundle id and profile directory.
   myarc_app_icon = false
 
@@ -15,7 +15,7 @@ declare_args() {
 
   # Compiles test hooks that a local test client drives through pages, such
   # as the --myarc-capture-profile-swap=cdp title requests that
-  # tools/check_profile_isolation.sh uses. Dev builds set it in args.gn; the
-  # nightly never does.
+  # tools/check_profile_isolation.sh uses. Dev builds set it in args.gn;
+  # release builds never do.
   myarc_test_hooks = false
 }

@@ -1,12 +1,12 @@
 diff --git a/chrome/app/chrome_main_delegate.cc b/chrome/app/chrome_main_delegate.cc
-index 33a3b3844ad4839eb87c15c7aef0c956abd9f98e..0bad1da420492ec844b3c02abc843e73626864ae 100644
+index 33a3b3844ad4839eb87c15c7aef0c956abd9f98e..f18ffd2bb3f64d6433534c1d6ad8fead61d39c98 100644
 --- a/chrome/app/chrome_main_delegate.cc
 +++ b/chrome/app/chrome_main_delegate.cc
 @@ -125,6 +125,7 @@
  #include "chrome/browser/mac/code_sign_clone_manager.h"
  #include "chrome/browser/mac/relauncher.h"
  #include "components/crash/core/common/objc_zombie.h"
-+#include "myarc/nightly_switches.h"
++#include "myarc/release_switches.h"
  #include "ui/base/l10n/l10n_util_mac.h"
  #endif  // BUILDFLAG(IS_MAC)
  
@@ -17,7 +17,7 @@ index 33a3b3844ad4839eb87c15c7aef0c956abd9f98e..0bad1da420492ec844b3c02abc843e73
 +#if BUILDFLAG(IS_MAC)
 +  if (!base::CommandLine::ForCurrentProcess()->HasSwitch(
 +          switches::kProcessType)) {
-+    myarc::MaybeEnableNightlyMode(*base::CommandLine::ForCurrentProcess());
++    myarc::MaybeEnableReleaseMode(*base::CommandLine::ForCurrentProcess());
 +  }
 +#endif  // BUILDFLAG(IS_MAC)
 +

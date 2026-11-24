@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-11-24: Retire Nightly naming and move to myArc release
+
+- Renamed `myarc_nightly` / `MyarcNightly` / `myArc Nightly.app` to `myarc_release` / `MyarcRelease` / `myArc.app` (`dev.myarc.browser`), `browser/args-release.gn`, `browser/foundation/release/`, `tools/package_release.sh`, `tools/make_app_icons.sh`, check scripts, CLI/skill paths, and site docs.
+- Added first-launch profile migration from `~/Library/Application Support/myArc Nightly` to `myArc` (handling the `myarc/control/` APFS case-insensitive directory) and `os_crypt` Keychain fallback read/copy from `myArc Nightly Safe Storage` to `myArc Safe Storage`.
+- Evidence: Chromium `myarc` commit `4fd92e3445` built in `out/MyarcRelease`, packaged/notarized/stapled `myArc-2026.11.24-arm64.dmg` (`spctl` + `codesign` + EdDSA verified), and passed `export_patches.py --check`, `check_docs.py`, `download_test.py`, `cargo` checks, and `state.test.mjs`.
+
 ## 2026-11-24: Suppress icon backgrounds and ink drops in sidebar URL pill
 
 - Added `IconLabelBubbleView::Delegate::ShouldSuppressIconLabelBubbleBackground()`, overridden in `LocationBarView` to return `IsMyarcUrlPill()`, so all `IconLabelBubbleView`s, `PageActionView`s, `PageActionContainerView`, and the sidebar Copy URL button paint with no pill/circle background or ink-drop plate.

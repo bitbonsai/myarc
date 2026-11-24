@@ -14,7 +14,7 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-export APP="${APP:-$HOME/.cache/myarc-m0/chromium/src/out/MyarcNightly/myArc.app}"
+export APP="${APP:-$HOME/.cache/myarc-m0/chromium/src/out/MyarcRelease/myArc.app}"
 OUT="${OUTDIR:-$ROOT/research-private/captures/crash-report-$(date -u +%Y%m%dT%H%M%SZ)}"
 mkdir -p "$OUT"
 WORK=$(mktemp -d "${TMPDIR:-/tmp}/myarc-crash.XXXXXX")

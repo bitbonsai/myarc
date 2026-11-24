@@ -20,7 +20,7 @@ URL = 'https://myarc.dev/docs/'
 REPO = 'https://github.com/bitbonsai/myarc'
 AREAS = ('Getting started', 'Your workspace', 'Control', 'Help')
 TITLE = 'Docs'
-SUMMARY = 'How to move from Arc to myArc: install the nightly, import your Spaces, learn the shortcuts, find your data, script the browser and work around known limitations.'
+SUMMARY = 'How to move from Arc to myArc: install myArc, import your Spaces, learn the shortcuts, find your data, script the browser and work around known limitations.'
 MAX_PAGES = 50
 
 CSS = '''

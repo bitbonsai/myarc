@@ -12,14 +12,14 @@ from blog import page_shell
 URL = 'https://myarc.dev/download/'
 REPO = 'https://github.com/bitbonsai/myarc'
 KEYS = {'published', 'version', 'date', 'dmg_url', 'size_bytes', 'sha256', 'release_url', 'min_macos', 'proprietary_codecs'}
-# Present from the first nightly with Sparkle, whose appcast needs the DMG's
-# EdDSA signature from tools/package_nightly.sh.
+# Present from the first release with Sparkle, whose appcast needs the DMG's
+# EdDSA signature from tools/package_release.sh.
 OPTIONAL = {'ed_signature'}
 DEFAULTS = {'release_url': REPO + '/releases', 'min_macos': '26', 'proprietary_codecs': False}
 TITLE = 'myArc Alpha'
 STATUS = 'Alpha build, for trying the Arc-like shell. Not yet for daily or sensitive browsing.'
 SUMMARY = 'myArc Alpha for macOS on Apple silicon: requirements, first launch, what works, known limitations and how to report problems.'
-APP = '/Applications/myArc Nightly.app'
+APP = '/Applications/myArc.app'
 
 WORKS = [
     'Chromium browsing, with Chromium extensions. A Manifest V3 smoke test passed; wider extension coverage is untested.',
@@ -89,7 +89,7 @@ def validate(data):
 
 
 def bundle_version(version):
-    """Return the CFBundleVersion tools/package_nightly.sh writes for a nightly label."""
+    """Return the CFBundleVersion tools/package_release.sh writes for a release label."""
     match = re.fullmatch(r'(\d{4})\.(\d{2})\.(\d{2})(?:\.(\d+))?', version)
     if not match:
         raise ValueError('release.json: version must be YYYY.MM.DD or YYYY.MM.DD.N for an update')
@@ -97,13 +97,13 @@ def bundle_version(version):
 
 
 def appcast(release):
-    """Sparkle appcast with the published nightly, or an empty feed before one is signed."""
+    """Sparkle appcast with the published release, or an empty feed before one is signed."""
     item = ''
     if release and 'ed_signature' in release:
         day = date.fromisoformat(release['date'])
         published = format_datetime(datetime(day.year, day.month, day.day, tzinfo=timezone.utc))
         item = f"""    <item>
-      <title>myArc Nightly {escape(release['version'])}</title>
+      <title>myArc {escape(release['version'])}</title>
       <pubDate>{published}</pubDate>
       <link>{escape(release['release_url'])}</link>
       <sparkle:version>{bundle_version(release['version'])}</sparkle:version>
@@ -115,7 +115,7 @@ def appcast(release):
     return f"""<?xml version="1.0" encoding="utf-8"?>
 <rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle">
   <channel>
-    <title>myArc Nightly</title>
+    <title>myArc</title>
     <link>https://myarc.dev/appcast.xml</link>
 {item}  </channel>
 </rss>
@@ -142,7 +142,7 @@ def codecs(release):
 def limitations(release):
     return ['Built from a Chromium 158 development revision, not a stable release.',
             'myArc checks for a new alpha build once a day and asks before installing it, and Check for Updates… in the myArc menu checks right away. Alpha builds get no separate security updates.' if 'ed_signature' in (release or {}) else 'No automatic updates and no security updates. Install each new build by hand.',
-            'From 2026.11.03 on, nightlies are signed with an Apple Developer ID that later nightlies keep. macOS asks once more for your login password so it can read the saved-data key; choose Always Allow, and newer nightlies stop asking.',
+            'Builds are signed with an Apple Developer ID that later builds keep. macOS may ask once for your login password so it can read the saved-data key; choose Always Allow, and newer builds stop asking.',
             'Recent tabs and navigation can be lost after a crash or force quit.',
             'Profile, cookie and credential guarantees are not verified.',
             'RAR downloads are not scanned by Safe Browsing, because the UnRAR license conflicts with GPL-3.0.',
@@ -154,8 +154,8 @@ def limitations(release):
 def first_launch(release):
     name = release['dmg_url'].rsplit('/', 1)[1]
     return [('Check the download against the SHA-256 listed with it. The two values must match.', f'shasum -a 256 ~/Downloads/{name}'),
-            ('Open the DMG and drag myArc Nightly to Applications.', None),
-            ('Open myArc Nightly. From 2026.11.18 on, Apple has notarized each build, so macOS only asks once whether to open an app downloaded from the internet. Choose Open.', None)]
+            ('Open the DMG and drag myArc to Applications.', None),
+            ('Open myArc. Apple has notarized each build, so macOS only asks once whether to open an app downloaded from the internet. Choose Open.', None)]
 
 
 def release_notes(release):
@@ -228,7 +228,7 @@ def apply_release(template, release):
     works = big
     template = template.replace('<!--works-download-->', works)
     latest = f'<a href="/download/">Download myArc Alpha {release["version"]} &rarr;</a> ' if release else ''
-    template = template.replace('<!--latest-nightly-->', latest)
+    template = template.replace('<!--latest-release-->', latest)
     if release:
         template = re.sub(r'<!--cta-->.*?<!--/cta-->', lambda _: big, template, count=1, flags=re.S)
     return re.sub(r'<!--/?cta-->', '', template)

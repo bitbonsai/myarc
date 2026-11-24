@@ -8,7 +8,7 @@
 # Usage:
 #   tools/check_control.sh
 # Env:
-#   APP=<myArc.app>          default: /Applications/myArc Nightly.app
+#   APP=<myArc.app>          default: /Applications/myArc.app
 #   CLI=<myarc binary>       default: $APP/Contents/Helpers/myarc (fallback target/debug/myarc)
 #   INTERACTIVE=1|0          default: 1 (0 uses $MYARC_CONTROL_DIR/test-hook on hooks builds)
 #   RUN_CLAUDE=1|0           default: 1 (runs Claude Code external MCP client if installed)
@@ -17,7 +17,7 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-APP="${APP:-/Applications/myArc Nightly.app}"
+APP="${APP:-/Applications/myArc.app}"
 BIN="$APP/Contents/MacOS/$(/usr/libexec/PlistBuddy -c "Print :CFBundleExecutable" "$APP/Contents/Info.plist" 2>/dev/null || echo myArc)"
 DEFAULT_CLI="$APP/Contents/Helpers/myarc"
 [ -x "$DEFAULT_CLI" ] || DEFAULT_CLI="$ROOT/target/debug/myarc"
@@ -212,8 +212,8 @@ PY
   sleep 1.2
   shot "$OUTDIR/1-approval-card.png"
   if [ "$INTERACTIVE" = "1" ]; then
-    echo ">>> ACTION NEEDED: Click 'Allow' on the myArc Nightly approval card (top-right of the myArc window) <<<"
-    osascript -e 'display notification "Click Allow on the myArc Nightly approval card" with title "myArc MA-011 check"' 2>/dev/null || true
+    echo ">>> ACTION NEEDED: Click 'Allow' on the myArc approval card (top-right of the myArc window) <<<"
+    osascript -e 'display notification "Click Allow on the myArc approval card" with title "myArc MA-011 check"' 2>/dev/null || true
   else
     for _ in $(seq 1 40); do
       kill -0 "$APPROVE_PID" 2>/dev/null || break
@@ -506,7 +506,7 @@ PY
   # 6. Human takeover: Stop revokes approval and forces re-prompt.
   echo "=== Human takeover (Stop) ==="
   if [ "$INTERACTIVE" = "1" ]; then
-    echo ">>> ACTION NEEDED: Click 'Stop' next to the Agent Space title in myArc Nightly (do NOT click Allow on the re-prompt) <<<"
+    echo ">>> ACTION NEEDED: Click 'Stop' next to the Agent Space title in myArc (do NOT click Allow on the re-prompt) <<<"
     osascript -e 'display notification "Click Stop next to Agent Space (do not click Allow again)" with title "myArc MA-011 check"' 2>/dev/null || true
     echo "Waiting for Stop to revoke the session (testing every 1.5s up to 60s)..."
     REVOKED=0

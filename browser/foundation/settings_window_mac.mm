@@ -41,10 +41,10 @@ bool IsSettingsAppActive() {
 }
 
 std::u16string MyarcVersionLabel() {
-  // Written into Info.plist when the nightly is packaged; dev builds lack it.
+  // Written into Info.plist when the release is packaged; dev builds lack it.
   NSString* version = base::apple::ObjCCast<NSString>(
       [base::apple::OuterBundle() objectForInfoDictionaryKey:@"MyarcVersion"]);
-  return version.length ? u"Nightly " + base::SysNSStringToUTF16(version)
+  return version.length ? base::SysNSStringToUTF16(version)
                         : u"Development build";
 }
 

@@ -1,9 +1,9 @@
-# myArc pre-alpha nightly: static release build with myArc branding and
-# myArc mode on by default. Ad-hoc signed by tools/package_nightly.sh.
+# myArc release build: static release build with myArc branding and
+# myArc mode on by default. Packaged and signed by tools/package_release.sh.
 is_debug = false
 is_official_build = false
 # Non-official release builds turn DCHECKs on by default, which costs startup
-# and runtime work. The nightly ships without them.
+# and runtime work. Release builds ship without them.
 dcheck_always_on = false
 # Dangling raw_ptr checks follow DCHECKs by default. Keep them on, as
 # browser/README.md describes.
@@ -14,8 +14,8 @@ target_cpu = "arm64"
 use_remoteexec = false
 proprietary_codecs = true
 ffmpeg_branding = "Chrome"
-myarc_nightly = true
-branding_file_path = "//myarc/nightly/BRANDING"
+myarc_release = true
+branding_file_path = "//myarc/release/BRANDING"
 # UnRAR's license conflicts with GPL-3.0, so RAR downloads are not scanned.
 safe_browsing_use_unrar = false
 # Privacy defaults taken from ungoogled-chromium's flags.gn (BSD-3-Clause).

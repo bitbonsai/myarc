@@ -308,10 +308,10 @@ Report Gather(base::FilePath user_data) {
 }
 
 std::string MyarcVersion() {
-  // Written into Info.plist when the nightly is packaged; dev builds lack it.
+  // Written into Info.plist when the release is packaged; dev builds lack it.
   NSString* version = base::apple::ObjCCast<NSString>(
       [base::apple::OuterBundle() objectForInfoDictionaryKey:@"MyarcVersion"]);
-  return version.length ? "Nightly " + base::SysNSStringToUTF8(version)
+  return version.length ? base::SysNSStringToUTF8(version)
                         : "Development build";
 }
 

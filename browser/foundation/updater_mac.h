@@ -7,7 +7,7 @@
 
 namespace myarc {
 
-// Inserts "Check for Updates…" into `app_menu` at `index` on nightly builds
+// Inserts "Check for Updates…" into `app_menu` at `index` on release builds
 // and starts Sparkle a few seconds later, or on the first click if that comes
 // sooner. Does nothing when the app bundle has no Sparkle.framework, as in dev
 // builds. Builds with test hooks start it only under

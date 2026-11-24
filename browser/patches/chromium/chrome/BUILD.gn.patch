@@ -1,12 +1,12 @@
 diff --git a/chrome/BUILD.gn b/chrome/BUILD.gn
-index 06bfcf5a90d093b9ac8e255e93ef2ffd0a00421e..0e948c8cb0c5de311c7454f8a9c6051b46b39774 100644
+index 06bfcf5a90d093b9ac8e255e93ef2ffd0a00421e..6edf7bec765f1727d8f19819eff5790ea224006b 100644
 --- a/chrome/BUILD.gn
 +++ b/chrome/BUILD.gn
 @@ -54,6 +54,7 @@ if (is_android) {
    import("//chrome/version.gni")
    import("//content/public/app/mac_helpers.gni")
    import("//media/cdm/library_cdm/cdm_paths.gni")
-+  import("//myarc/nightly.gni")
++  import("//myarc/release.gni")
    import("//services/on_device_model/on_device_model.gni")
    import("//third_party/icu/config.gni")
  }
@@ -15,10 +15,10 @@ index 06bfcf5a90d093b9ac8e255e93ef2ffd0a00421e..0e948c8cb0c5de311c7454f8a9c6051b
  
    tweak_info_plist("chrome_app_plist") {
 -    info_plist = "app/app-Info.plist"
-+    if (myarc_nightly) {
++    if (myarc_release) {
 +      info_plists = [
 +        "app/app-Info.plist",
-+        "//myarc/nightly/app-Info.plist",
++        "//myarc/release/app-Info.plist",
 +      ]
 +    } else {
 +      info_plist = "app/app-Info.plist"
@@ -47,8 +47,8 @@ index 06bfcf5a90d093b9ac8e255e93ef2ffd0a00421e..0e948c8cb0c5de311c7454f8a9c6051b
  
    bundle_data("chrome_app_icon") {
 -    sources = [ "app/theme/$branding_path_component/mac/app.icns" ]
-+    if (myarc_nightly || myarc_app_icon) {
-+      sources = [ "//myarc/nightly/app.icns" ]
++    if (myarc_release || myarc_app_icon) {
++      sources = [ "//myarc/release/app.icns" ]
 +    } else {
 +      sources = [ "app/theme/$branding_path_component/mac/app.icns" ]
 +    }
@@ -57,8 +57,8 @@ index 06bfcf5a90d093b9ac8e255e93ef2ffd0a00421e..0e948c8cb0c5de311c7454f8a9c6051b
  
    bundle_data("chrome_asset_catalog") {
 -    sources = [ "app/theme/$branding_path_component/mac/Assets.car" ]
-+    if (myarc_nightly || myarc_app_icon) {
-+      sources = [ "//myarc/nightly/Assets.car" ]
++    if (myarc_release || myarc_app_icon) {
++      sources = [ "//myarc/release/Assets.car" ]
 +    } else {
 +      sources = [ "app/theme/$branding_path_component/mac/Assets.car" ]
 +    }
@@ -69,7 +69,7 @@ index 06bfcf5a90d093b9ac8e255e93ef2ffd0a00421e..0e948c8cb0c5de311c7454f8a9c6051b
        "//components/policy:generated",
        "//components/webapps/isolated_web_apps:scheme",
        "//content/public/app",
-+      "//myarc:nightly_switches",
++      "//myarc:release_switches",
        "//third_party/cld_3/src/src:cld_3",
      ]
  

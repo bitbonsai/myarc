@@ -54,18 +54,18 @@ Local stdio does not imply compatibility with every MCP host or ChatGPT on the w
 
 References: [MCP transports](https://modelcontextprotocol.io/specification/2026-07-28/basic/transports) and [MCP tools](https://modelcontextprotocol.io/specification/2026-07-28/server/tools). These inform design, not a claim that interfaces have shipped.
 
-## Install from the nightly
+## Install from the app bundle
 
-From 2026.11.13 on, the nightly carries `myarc` at `/Applications/myArc Nightly.app/Contents/Helpers/myarc`, signed with the app. Earlier nightlies called it `myarcctl`, and 2026.11.13 also shipped `Helpers/myarcctl` as a link to `myarc`. Later nightlies drop that link, so point any old `myarcctl` link or MCP config at `Helpers/myarc`. Link it into your `PATH`:
+myArc carries `myarc` at `/Applications/myArc.app/Contents/Helpers/myarc`, signed with the app. Link it into your `PATH`:
 
 ```sh
-sudo mkdir -p /usr/local/bin && sudo ln -sf "/Applications/myArc Nightly.app/Contents/Helpers/myarc" /usr/local/bin/myarc
+sudo mkdir -p /usr/local/bin && sudo ln -sf "/Applications/myArc.app/Contents/Helpers/myarc" /usr/local/bin/myarc
 ```
 
 To give Claude Code the MCP server in every project, run:
 
 ```sh
-claude mcp add --scope user myarc -- "/Applications/myArc Nightly.app/Contents/Helpers/myarc" mcp
+claude mcp add --scope user myarc -- "/Applications/myArc.app/Contents/Helpers/myarc" mcp
 ```
 
 For the [skill](../skills/myarc-browser/SKILL.md), copy the `skills/myarc-browser` folder from this repository into `~/.claude/skills/`. The skill runs `myarc` through the link above. The CLI, the MCP server and the skill need "Allow agents to control myArc" turned on under Settings > Advanced, and the first command asks you in the myArc window to allow it (see Approval and Stop below).
@@ -91,7 +91,7 @@ Agents use the short commands, which send the same registry commands through the
 
 `run` exits 0 on success, 1 when the command returns an error, 2 on a usage error, 3 when it can't reach myArc and 4 when myArc refused control, for example because the user declined. On exit 3 the message names the cause, such as a missing endpoint (myArc isn't running or browser control is off), a stale one left by a process that has exited, a permission or ownership problem, a rejected token or a protocol version mismatch. On exit 4 it gives the reason and what to tell the user. The short commands use the same codes. `--json` prints the full response.
 
-`myarc mcp` serves the same registry as MCP tools over stdio, with dots in command IDs replaced by underscores (`space.create` becomes `space_create`). Tool calls reach the endpoint over one connection, which opens on the first call and reopens after it drops or sits idle. With no endpoint, each call returns a tool error that says why. `myarc mcp --local` keeps one in-memory workspace until the client disconnects instead. To add it to an MCP client, link the binary into your `PATH` as in Install from the nightly, or put a built one there, and use this server entry:
+`myarc mcp` serves the same registry as MCP tools over stdio, with dots in command IDs replaced by underscores (`space.create` becomes `space_create`). Tool calls reach the endpoint over one connection, which opens on the first call and reopens after it drops or sits idle. With no endpoint, each call returns a tool error that says why. `myarc mcp --local` keeps one in-memory workspace until the client disconnects instead. To add it to an MCP client, link the binary into your `PATH` as in Install from the app bundle, or put a built one there, and use this server entry:
 
 ```json
 {"command": "myarc", "args": ["mcp"]}
@@ -107,7 +107,7 @@ Each Profile has its own workspace, and each numbers its tabs from 1. The host's
 
 ### Approval and Stop
 
-Each connection's hello waits for the user before the browser sends its welcome. The first time a client name connects in a browser session, the last active normal window of the host's Profile shows a card at its top right that reads "myarc 2026.11.13 wants to control your Agent Space", with Allow and Don't allow. Name and version come from the hello, at most 64 bytes each. A nightly's `myarc` sends the nightly label as its version, which `tools/package_nightly.sh` sets through `MYARC_VERSION` at build time, and other builds send the crate version with `-dev`, such as `0.1.0-dev`. The card shows them without control or invisible format characters and cut to 40 characters. Allow welcomes every waiting connection of that name, lets later connections of that name in without asking until the browser quits, and pins the host to that window's Profile. Don't allow refuses the connection with `denied: the user declined`. With no answer after 60 seconds the connection gets `denied: waiting for approval timed out`, and with no window to ask in it gets `denied` and the reason. A restart or turning the switch off forgets every approval.
+Each connection's hello waits for the user before the browser sends its welcome. The first time a client name connects in a browser session, the last active normal window of the host's Profile shows a card at its top right that reads "myarc 2026.11.13 wants to control your Agent Space", with Allow and Don't allow. Name and version come from the hello, at most 64 bytes each. A release build's `myarc` sends the release label as its version, which `tools/package_release.sh` sets through `MYARC_VERSION` at build time, and other builds send the crate version with `-dev`, such as `0.1.0-dev`. The card shows them without control or invisible format characters and cut to 40 characters. Allow welcomes every waiting connection of that name, lets later connections of that name in without asking until the browser quits, and pins the host to that window's Profile. Don't allow refuses the connection with `denied: the user declined`. With no answer after 60 seconds the connection gets `denied: waiting for approval timed out`, and with no window to ask in it gets `denied` and the reason. A restart or turning the switch off forgets every approval.
 
 The wait happens before the welcome, so the 10 second reply timeout never runs during it. That timeout starts only with each request after the welcome. Clients wait up to 70 seconds for the welcome and 60 for each answer after it. `myarc` reports a refused hello with exit code 4, and `myarc mcp` as a tool error with the same text.
 
@@ -115,7 +115,7 @@ Each client names itself in its hello, so any process of the same user that can 
 
 While an approved client is connected, or has sent a request in the last 30 seconds, the agent Space's bot in the footer carries a small blue dot and its tooltip reads "myarc is controlling the Agent Space". Clicking it still selects the agent Space. Right-clicking it offers "Stop myarc", and while the agent Space shows, a Stop button next to its title does the same. Stop closes that client's connections, answers a request still waiting with `cancelled` and forgets the approval, so the next connection asks again. `myarc mcp` reconnects once when its connection closed before a request went out, so its first call after a Stop asks the user again instead of answering `outcome_unknown`.
 
-Builds with the GN arg `myarc_test_hooks` read one word from `test-hook` in `$MYARC_CONTROL_DIR`: `allow` and `decline` press the card's buttons, `stop` stops the active client, and `control-on` and `control-off` flip the switch. `tools/capture_native.sh` with `CONTROL_SWITCH=0` sets the directory without the override. Nightly builds have no test hooks.
+Builds with the GN arg `myarc_test_hooks` read one word from `test-hook` in `$MYARC_CONTROL_DIR`: `allow` and `decline` press the card's buttons, `stop` stops the active client, and `control-on` and `control-off` flip the switch. `tools/capture_native.sh` with `CONTROL_SWITCH=0` sets the directory without the override. Release builds have no test hooks.
 
 ### Tabs in the agent Space
 

@@ -20,7 +20,7 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-APP="${APP:-/Applications/myArc Nightly.app}"
+APP="${APP:-/Applications/myArc.app}"
 EXT=nngceckbapebfimnlniiiahkandclblb
 UPDATE_URL=https://clients2.google.com/service/update2/crx
 

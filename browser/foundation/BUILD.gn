@@ -1,10 +1,10 @@
 import("//build/buildflag_header.gni")
 import("//build/config/chrome_build.gni")
 import("//build/rust/rust_static_library.gni")
-import("//myarc/nightly.gni")
+import("//myarc/release.gni")
 
-assert(!myarc_nightly || branding_file_path == "//myarc/nightly/BRANDING",
-       "myarc_nightly needs branding_file_path = \"//myarc/nightly/BRANDING\"")
+assert(!myarc_release || branding_file_path == "//myarc/release/BRANDING",
+       "myarc_release needs branding_file_path = \"//myarc/release/BRANDING\"")
 
 rust_static_library("workspace") {
   crate_root = "workspace/src/lib.rs"
@@ -708,20 +708,20 @@ executable("bridge_check") {
   ]
 }
 
-assert(!myarc_nightly || !myarc_test_hooks,
-       "The nightly ships without test hooks; drop myarc_test_hooks")
+assert(!myarc_release || !myarc_test_hooks,
+       "Release builds ship without test hooks; drop myarc_test_hooks")
 
 buildflag_header("test_buildflags") {
   header = "test_buildflags.h"
   flags = [ "MYARC_TEST_HOOKS=$myarc_test_hooks" ]
 }
 
-buildflag_header("nightly_buildflags") {
-  header = "nightly_buildflags.h"
-  flags = [ "MYARC_NIGHTLY=$myarc_nightly" ]
+buildflag_header("release_buildflags") {
+  header = "release_buildflags.h"
+  flags = [ "MYARC_RELEASE=$myarc_release" ]
 }
 
-# Sparkle 2 in-app updates for the nightly. tools/package_nightly.sh embeds
+# Sparkle 2 in-app updates for release builds. tools/package_release.sh embeds
 # Sparkle.framework, which this loads at runtime.
 source_set("updater") {
   sources = [
@@ -730,7 +730,7 @@ source_set("updater") {
   ]
   deps = [
     ":glass",
-    ":nightly_buildflags",
+    ":release_buildflags",
     ":test_buildflags",
     ":welcome_mark",
     "//base",
@@ -741,13 +741,13 @@ source_set("updater") {
   ]
 }
 
-source_set("nightly_switches") {
+source_set("release_switches") {
   sources = [
-    "nightly_switches.cc",
-    "nightly_switches.h",
+    "release_switches.cc",
+    "release_switches.h",
   ]
   deps = [
-    ":nightly_buildflags",
+    ":release_buildflags",
     "//base",
   ]
 }

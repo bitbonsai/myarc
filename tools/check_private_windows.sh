@@ -15,7 +15,7 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-export APP="${APP:-$HOME/.cache/myarc-m0/chromium/src/out/MyarcNightly/myArc.app}"
+export APP="${APP:-$HOME/.cache/myarc-m0/chromium/src/out/MyarcRelease/myArc.app}"
 WORK=$(mktemp -d "${TMPDIR:-/tmp}/myarc-private.XXXXXX")
 SERVER=""
 cleanup() {

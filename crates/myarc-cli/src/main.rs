@@ -24,7 +24,7 @@ use myarc_control::{ControlService, Outcome, PROTOCOL_VERSION, Request, Response
 use serde_json::{Value, json};
 
 /// The version this build reports in `--version`, the hello and MCP
-/// `serverInfo`. Nightly builds set `MYARC_VERSION` to the nightly's date
+/// `serverInfo`. Release builds set `MYARC_VERSION` to the release's date
 /// label, so the approval card reads "myarc 2026.11.13". Other builds report
 /// the crate version with a `-dev` suffix.
 pub const VERSION: &str = match option_env!("MYARC_VERSION") {

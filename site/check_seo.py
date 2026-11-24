@@ -102,7 +102,7 @@ def check():
         assert [button['href'] for button in page.select('.download-box a.button')] == [release['dmg_url']] and links == {release['dmg_url']}, 'Download button must be the one release asset'
         assert release['sha256'] in page.get_text() and page.select_one('a.download-link[href="/download/"]') and 'Download alpha' in (ROOT / 'index.html').read_text()
     else:
-        assert not links and not page.select('.download-box a.button') and 'First nightly coming soon' in page.get_text(), 'Unpublished release must not link a download'
+        assert not links and not page.select('.download-box a.button') and 'First alpha build coming soon' in page.get_text(), 'Unpublished release must not link a download'
         assert not (ROOT / 'index.html').read_text().count('href="/download/"'), 'Unpublished release must not be linked from the homepage'
     sitemap = ET.parse(ROOT / 'sitemap.xml')
     listed = {node.text for node in sitemap.findall('.//{http://www.sitemaps.org/schemas/sitemap/0.9}loc')}

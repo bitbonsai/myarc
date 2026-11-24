@@ -7,13 +7,13 @@
 # Usage:
 #   tools/check_core_smoke.sh
 # Env:
-#   APP=<myArc.app>   default: /Applications/myArc Nightly.app
+#   APP=<myArc.app>   default: /Applications/myArc.app
 #   OUTDIR=<dir>      default: /tmp/myarc-core-smoke-<timestamp>
 #   KEEP=1            keeps the disposable profile directory
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-APP="${APP:-/Applications/myArc Nightly.app}"
+APP="${APP:-/Applications/myArc.app}"
 BIN="$APP/Contents/MacOS/$(/usr/libexec/PlistBuddy -c "Print :CFBundleExecutable" "$APP/Contents/Info.plist" 2>/dev/null || echo myArc)"
 
 if [ "${1:-}" = "--inner" ]; then
