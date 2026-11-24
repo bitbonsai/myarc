@@ -40,7 +40,7 @@ Pinned tabs and Favorites both appear as favicon tiles at the top of the sidebar
 - A pinned tab belongs to one Space and shows only there.
 - A Favorite belongs to the Profile and shows in every Space of that Profile.
 
-Right-click a tab in the sidebar to pin it to the Space or add it to the Profile's Favorites. The same menu moves a tile between the two, and Unpin from Space or Remove Favorite takes it away.
+Right-click a tab in the sidebar to copy its link, mute or unmute audio, open it in Split View, duplicate it, archive it (or archive tabs below it), or open Move to to pin it, add it to Profile Favorites, file it into a folder or move it to another Space. On a Favorite, Move to Space Pins turns it into a Space pin, and Unpin from Space or Remove Favorite takes a tile away.
 
 You can also drag a temporary tab up onto the pinned tiles, the Space name or a folder to pin it, or onto a Favorite tile to make it a Favorite. Drag a pinned tab down into the temporary tabs to unpin it.
 
@@ -48,7 +48,7 @@ Closing a pinned tab or a Favorite keeps its tile. The page closes, and clicking
 
 ## Folders
 
-A folder groups pinned tabs inside a Space. To make one, choose New Folder from the \+ menu at the bottom of the sidebar, right-click the Space name at the top of the sidebar, or type "new folder" in the command bar. Right-click a folder to rename or delete it, and click it to open or close it. To file a tab, right-click it and choose Move to Folder. Remove from Folder takes it out again. Folders don't nest.
+A folder groups pinned tabs inside a Space. To make one, choose New Folder from the \+ menu at the bottom of the sidebar, right-click the Space name or empty space in the sidebar, or type "new folder" in the command bar. Right-click a folder to rename or delete it, and click it to open or close it. To file a tab, right-click it and choose Move to, then pick the folder. Remove from Folder takes it out again. Folders don't nest.
 
 ## Temporary tabs
 

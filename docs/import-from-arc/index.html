@@ -552,20 +552,20 @@
 </ul>
 <h2 id="import-into-myarc">Import into myArc</h2>
 <ol>
-<li>Press Cmd+, to open Settings and go to the Advanced tab.</li>
-<li>Click Import from Arc…. When Arc's sidebar file is on your Mac, the file picker opens on it. Otherwise, pick the exported file.</li>
+<li>Press Cmd+, to open Settings and go to the Advanced tab, or click Import from Arc… on the welcome screen.</li>
+<li>Click Import from Arc…. When Arc's sidebar file is on your Mac, myArc reads it automatically and opens the preview directly. Only when Arc isn't found does myArc show a file picker so you can choose an exported file or sidebar file manually.</li>
 <li>Read the preview, then click Import. Cancel closes the preview and writes nothing.</li>
 </ol>
-<p>The preview counts the Favorites, Spaces and pinned tabs the import adds and the pinned tabs already in myArc. It also lists links it leaves out and lines it couldn't read. Nothing loads while you import, and each pinned tab opens its page the first time you click it. When the import finishes, a report counts what was added and each kind of thing it left out or changed.</p>
+<p>The preview counts the Profiles, Favorites, Spaces and pinned tabs the import adds and the pinned tabs already in myArc, and shows how each Arc profile maps to a myArc Profile. It also lists links it leaves out and lines it couldn't read. Nothing loads while you import, and each pinned tab opens its page the first time you click it. When the import finishes, a report counts what was added and each kind of thing it left out or changed.</p>
 <h2 id="what-comes-over">What comes over</h2>
 <ul>
 <li>Each Space becomes a Space with the same name, in Arc's order. If a Space with that name already exists, its links go there.</li>
 <li>Each folder in a Space becomes a folder with the same name, and its links become pinned tabs inside it, in Arc's order. myArc folders don't nest, so in the sidebar file the links of a folder inside a folder go into the outer one.</li>
-<li>From the sidebar file, the Favorites of Arc's main profile become Favorites of the Profile you're using. Favorites of other Arc profiles are left out.</li>
-<li>From the export, Arc Favorites become pinned tabs at the top of their Space. The export doesn't say which links were Favorites, so myArc can't make them Profile Favorites.</li>
+<li>From the sidebar file, Arc's main profile goes into the Profile you're using, and each other Arc profile maps to a myArc Profile with its Arc name (read from Arc's <code>User Data/Local State</code>, or named <code>Arc Profile 1</code>, <code>Arc Profile 2</code> and so on if no name is found), creating that Profile if needed. Favorites of Arc's main profile become Favorites of the Profile you're using; other Arc profiles' Favorites are counted in the report. Each tab keeps its custom name and saved page title.</li>
+<li>From the export, Arc Favorites become pinned tabs at the top of their Space, and every imported Space joins the Profile you're using, because the Markdown export doesn't record Favorites, Profiles or tab titles.</li>
 <li>Only http and https links come over. Anything else shows up under the links left out.</li>
 </ul>
-<p>Tab titles, temporary tabs, archived tabs, themes, history, passwords, cookies, extensions and Boosts don't come over. Every imported Space joins the Profile you're using, whichever Arc profile it had. <a href="../spaces-and-profiles/">Spaces and Profiles</a> explains the difference.</p>
+<p>Temporary tabs, archived tabs, themes, history, passwords, cookies, extensions and Boosts don't come over. <a href="../spaces-and-profiles/">Spaces and Profiles</a> explains how Spaces and Profiles work in myArc.</p>
 <p>myArc refuses a sidebar file over 32 MB and an export over 8 MB.</p>
 <h2 id="import-again">Import again</h2>
 <p>Importing the same file a second time adds nothing. myArc reuses Spaces and folders by name and keeps the pinned tabs they already have. Pinned tabs from an import made before myArc had folders move into their folder. If you export from Arc again later, the next import adds only the new Spaces and links.</p>

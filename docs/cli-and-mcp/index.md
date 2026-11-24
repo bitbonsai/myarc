@@ -63,7 +63,7 @@ Options that work with every short command:
 - `--json` prints the raw response.
 - Put `--` before text that starts with a dash, as in `myarc fill @e1 -- "-5"`.
 
-Only http and https pages open. There is no scroll or wait command yet. `click` scrolls its target into view first, and if a page is still loading, run `snapshot` again.
+Only http and https pages open. For screenshots, scrolling and waiting for a page to finish loading, use `myarc run` with `page.screenshot`, `page.scroll` and `page.wait` (or their MCP tools `page_screenshot`, `page_scroll` and `page_wait`). `click` also scrolls its target into view first.
 
 ## Exit codes
 
@@ -91,7 +91,7 @@ These commands work today:
 
 - Spaces: `space.list`, `space.create`, `space.select`, `space.rename` and `space.ensure_agent`, which creates the Agent Space if it's missing.
 - Tabs in the Agent Space: `tabs.list`, `tab.open`, `tab.activate`, `tab.close`, `tab.navigate`, `tab.back`, `tab.forward` and `tab.reload`.
-- Pages: `page.snapshot`, `page.click`, `page.fill`, `page.select` and `page.press`.
+- Pages: `page.snapshot`, `page.screenshot`, `page.click`, `page.fill`, `page.select`, `page.press`, `page.scroll` and `page.wait`.
 
 The Space commands reach all your Spaces in that Profile, so `space.rename` can rename one of yours. The first command runs in the window you used last. Later commands stay in that window's Profile until you turn control off or quit myArc.
 

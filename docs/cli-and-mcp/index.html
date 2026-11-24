@@ -584,7 +584,7 @@ myarc use t12                # make another tab current
 <li><code>--json</code> prints the raw response.</li>
 <li>Put <code>--</code> before text that starts with a dash, as in <code>myarc fill @e1 -- &quot;-5&quot;</code>.</li>
 </ul>
-<p>Only http and https pages open. There is no scroll or wait command yet. <code>click</code> scrolls its target into view first, and if a page is still loading, run <code>snapshot</code> again.</p>
+<p>Only http and https pages open. For screenshots, scrolling and waiting for a page to finish loading, use <code>myarc run</code> with <code>page.screenshot</code>, <code>page.scroll</code> and <code>page.wait</code> (or their MCP tools <code>page_screenshot</code>, <code>page_scroll</code> and <code>page_wait</code>). <code>click</code> also scrolls its target into view first.</p>
 <h2 id="exit-codes">Exit codes</h2>
 <table>
 <thead>
@@ -627,7 +627,7 @@ myarc run space.rename '{&quot;space_id&quot;:1,&quot;name&quot;:&quot;Home&quot
 <ul>
 <li>Spaces: <code>space.list</code>, <code>space.create</code>, <code>space.select</code>, <code>space.rename</code> and <code>space.ensure_agent</code>, which creates the Agent Space if it's missing.</li>
 <li>Tabs in the Agent Space: <code>tabs.list</code>, <code>tab.open</code>, <code>tab.activate</code>, <code>tab.close</code>, <code>tab.navigate</code>, <code>tab.back</code>, <code>tab.forward</code> and <code>tab.reload</code>.</li>
-<li>Pages: <code>page.snapshot</code>, <code>page.click</code>, <code>page.fill</code>, <code>page.select</code> and <code>page.press</code>.</li>
+<li>Pages: <code>page.snapshot</code>, <code>page.screenshot</code>, <code>page.click</code>, <code>page.fill</code>, <code>page.select</code>, <code>page.press</code>, <code>page.scroll</code> and <code>page.wait</code>.</li>
 </ul>
 <p>The Space commands reach all your Spaces in that Profile, so <code>space.rename</code> can rename one of yours. The first command runs in the window you used last. Later commands stay in that window's Profile until you turn control off or quit myArc.</p>
 <h2 id="use-it-from-an-mcp-client">Use it from an MCP client</h2>
