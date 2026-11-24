@@ -3,20 +3,23 @@
 #include <algorithm>
 #include <memory>
 #include <string>
+#include <string_view>
 
 #include "base/memory/raw_ref.h"
 #include "base/scoped_observation.h"
+#include "base/strings/string_util.h"
 #include "base/strings/utf_string_conversions.h"
 #include "cc/paint/paint_flags.h"
 #include "myarc/bridge.rs.h"
-#include "myarc/icons.h"
 #include "third_party/skia/include/core/SkColor.h"
 #include "third_party/skia/include/core/SkRRect.h"
 #include "ui/accessibility/ax_enums.mojom.h"
 #include "ui/base/metadata/metadata_impl_macros.h"
-#include "ui/base/models/image_model.h"
+#include "ui/color/color_id.h"
+#include "ui/color/color_provider.h"
 #include "ui/compositor/layer.h"
 #include "ui/gfx/canvas.h"
+#include "ui/gfx/color_utils.h"
 #include "ui/gfx/font_list.h"
 #include "ui/gfx/geometry/insets.h"
 #include "ui/gfx/geometry/rect_f.h"
@@ -24,7 +27,6 @@
 #include "ui/gfx/geometry/rrect_f.h"
 #include "ui/views/accessibility/view_accessibility.h"
 #include "ui/views/background.h"
-#include "ui/views/controls/image_view.h"
 #include "ui/views/controls/label.h"
 #include "ui/views/layout/box_layout.h"
 #include "ui/views/view.h"
@@ -36,9 +38,10 @@ namespace myarc {
 namespace {
 
 constexpr int kBorderWidth = 2;
-constexpr int kChipIconSize = 12;
 // macOS system blue, dark variant.
 constexpr SkColor kLocalBlue = SkColorSetRGB(0x0A, 0x84, 0xFF);
+constexpr SkColor kTabTagTextDark = SkColorSetRGB(0x70, 0xBC, 0xFF);
+constexpr SkColor kTabTagTextLight = SkColorSetRGB(0x00, 0x62, 0xCC);
 
 // The border is a child view so it follows the card's layer and bounds; the
 // card's rounded mask clips nothing because the stroke stays inside it.
@@ -93,6 +96,35 @@ bool IsLocalPage(const GURL& url) {
          foundation::is_local_dev_host(std::string(url.host()));
 }
 
+SkColor LocalPagePillBackground(bool dark, bool hovered) {
+  if (dark) {
+    return SkColorSetA(kLocalBlue, hovered ? 0x4C : 0x36);
+  }
+  return SkColorSetA(kLocalBlue, hovered ? 0x36 : 0x24);
+}
+
+std::u16string FormatLocalPageDisplayURL(const GURL& url) {
+  std::string_view host = url.host();
+  if (!host.empty() && host.back() == '.') {
+    host.remove_suffix(1);
+  }
+  std::string display =
+      (base::EqualsCaseInsensitiveASCII(host, "localhost") ||
+       host == "127.0.0.1")
+          ? "localhost"
+          : std::string(host);
+
+  const bool has_non_root_path = url.has_path() && url.path() != "/";
+  if (has_non_root_path || url.has_query()) {
+    display += url.PathForRequest();
+  }
+  if (url.has_ref()) {
+    display += '#';
+    display += url.ref();
+  }
+  return base::UTF8ToUTF16(display);
+}
+
 void UpdateLocalPageBorder(views::View& card, const GURL& url) {
   LocalPageBorder* border = nullptr;
   for (views::View* child : card.children()) {
@@ -113,36 +145,55 @@ void UpdateLocalPageBorder(views::View& card, const GURL& url) {
   border->OnViewBoundsChanged(&card);
 }
 
-LocalPageChip::LocalPageChip() {
+LocalPageChip::LocalPageChip(Style style) : style_(style) {
   SetOrientation(views::BoxLayout::Orientation::kHorizontal);
   SetCrossAxisAlignment(views::BoxLayout::CrossAxisAlignment::kCenter);
-  SetInsideBorderInsets(gfx::Insets::VH(0, 6));
-  SetBetweenChildSpacing(3);
+  SetMainAxisAlignment(views::BoxLayout::MainAxisAlignment::kCenter);
+  const bool is_tab = style_ == Style::kSidebarTab;
+  SetInsideBorderInsets(gfx::Insets::VH(0, is_tab ? 5 : 6));
+  SetMinimumCrossAxisSize(is_tab ? kTabHeight : kHeight);
   SetCanProcessEventsWithinSubtree(false);
-  icon_ = AddChildView(std::make_unique<views::ImageView>());
   port_ = AddChildView(std::make_unique<views::Label>());
-  port_->SetFontList(gfx::FontList().DeriveWithSizeDelta(-2));
+  port_->SetFontList(gfx::FontList().DeriveWithSizeDelta(is_tab ? -3 : -2));
   port_->SetAutoColorReadabilityEnabled(false);
-  port_->SetEnabledColor(SK_ColorWHITE);
-  icon_->SetImage(ui::ImageModel::FromVectorIcon(kCodeXmlIcon, SK_ColorWHITE,
-                                                 kChipIconSize));
-  SetBackground(views::CreateRoundedRectBackground(kLocalBlue, kHeight / 2));
+  ApplyStyleColors();
   GetViewAccessibility().SetRole(ax::mojom::Role::kStaticText);
-  GetViewAccessibility().SetName(u"Local page");
+  GetViewAccessibility().SetName(u"Local port");
 }
 
 LocalPageChip::~LocalPageChip() = default;
 
 bool LocalPageChip::Update(const GURL& url) {
-  if (!IsLocalPage(url)) {
+  if (!IsLocalPage(url) || !url.has_port()) {
+    has_port_ = false;
+    port_->SetText(std::u16string());
     return false;
   }
-  const std::u16string port =
-      url.has_port() ? u":" + base::UTF8ToUTF16(url.port()) : u"";
+  has_port_ = true;
+  const std::u16string port = u":" + base::UTF8ToUTF16(url.port());
   port_->SetText(port);
-  port_->SetVisible(!port.empty());
-  GetViewAccessibility().SetName(u"Local page" + port);
+  GetViewAccessibility().SetName(u"Local port " + port);
   return true;
+}
+
+void LocalPageChip::OnThemeChanged() {
+  views::BoxLayoutView::OnThemeChanged();
+  ApplyStyleColors();
+}
+
+void LocalPageChip::ApplyStyleColors() {
+  if (style_ == Style::kLocationBar) {
+    port_->SetEnabledColor(SK_ColorWHITE);
+    SetBackground(views::CreateRoundedRectBackground(kLocalBlue, kHeight / 2));
+    return;
+  }
+  const auto* color_provider = GetColorProvider();
+  const bool dark =
+      !color_provider ||
+      color_utils::IsDark(color_provider->GetColor(ui::kColorSysSurface));
+  port_->SetEnabledColor(dark ? kTabTagTextDark : kTabTagTextLight);
+  SetBackground(views::CreateRoundedRectBackground(
+      SkColorSetA(kLocalBlue, dark ? 0x38 : 0x24), kTabHeight / 2));
 }
 
 BEGIN_METADATA(LocalPageChip)

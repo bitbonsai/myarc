@@ -557,6 +557,7 @@ source_set("sidebar_view") {
   deps = [
     ":bridge",
     ":glass",
+    ":local_page_marker",
     "//base:i18n",
     "//cc/paint",
     "//components/vector_icons",
@@ -571,6 +572,7 @@ source_set("sidebar_view") {
     "//ui/gfx/animation",
     "//ui/gfx/geometry",
     "//ui/snapshot",
+    "//url",
   ]
 }
 
@@ -582,20 +584,20 @@ source_set("icons") {
 
 source_set("local_page_marker") {
   sources = [
-    "icons.h",
     "local_page_marker.cc",
     "local_page_marker.h",
   ]
   public_deps = [
     "//base",
+    "//skia",
     "//ui/base",
     "//ui/views",
   ]
   deps = [
     ":bridge",
     "//cc/paint",
-    "//skia",
     "//ui/accessibility",
+    "//ui/color",
     "//ui/compositor",
     "//ui/gfx",
     "//url",

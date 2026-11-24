@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-11-24: Sidebar location bar tint and compact local port chips
+
+- Local development pages now tint the full sidebar location bar system blue, show `localhost` at rest for `localhost` / `127.0.0.1`, move the `:port` chip to the trailing edge without the `</>` icon, and show a compact blue `:port` tag on non-split sidebar tab rows.
+- Exported Chromium commit `4ae305091b` to `browser/patches/chromium/` (3 patch files) and verified it with a `MyarcNightly` build and native screenshot capture.
+- Evidence: `python3 tools/export_patches.py --check`, `python3 tools/check_docs.py`, `cargo fmt --all -- --check`, `rustfmt --check --edition 2024 browser/foundation/bridge.rs`, `cargo clippy --workspace --all-targets --locked -- -D warnings`, `cargo test --workspace --locked`, and `node --test design/onboarding/state.test.mjs` all pass.
+
 ## 2026-11-23: `page.scroll` / `page.wait`, nightly `2026.11.23.1`, and progress post
 
 - Implemented `page.scroll` (`actor::mojom::ScrollAction` with `up`/`down`/`left`/`right` on the viewport or a target ref) and `page.wait` (`LoadWait` `WebContentsObserver` observing `DidStopLoading` with bounded timeout) across `crates/control`, `browser/foundation/bridge.rs`, `browser/foundation/control_tabs.cc`, and `crates/myarc-cli`.

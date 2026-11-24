@@ -30,6 +30,7 @@
 #include "myarc/footer_button.h"
 #include "myarc/icons.h"
 #include "myarc/library_view.h"
+#include "myarc/local_page_marker.h"
 #include "myarc/sidebar_tint.h"
 #include "myarc/space_icon_catalog.h"
 #include "myarc/space_icon_picker.h"
@@ -58,6 +59,7 @@
 #include "ui/gfx/image/canvas_image_source.h"
 #include "ui/gfx/image/image_skia_operations.h"
 #include "ui/gfx/paint_vector_icon.h"
+#include "url/gurl.h"
 #include "ui/gfx/scoped_canvas.h"
 #include "ui/gfx/vector_icon_types.h"
 #include "ui/native_theme/native_theme.h"
@@ -593,7 +595,8 @@ class ItemRow final : public views::View, public views::FocusChangeListener {
   ItemRow(std::unique_ptr<views::MdTextButton> activate,
           std::unique_ptr<views::MdTextButton> close,
           bool selected,
-          ui::ImageModel back = ui::ImageModel())
+          ui::ImageModel back = ui::ImageModel(),
+          std::unique_ptr<myarc::LocalPageChip> port_chip = nullptr)
       : selected_(selected), back_(std::move(back)) {
     if (!back_.IsEmpty()) {
       icon_ = activate->GetImageModel(views::Button::STATE_NORMAL)
@@ -608,6 +611,11 @@ class ItemRow final : public views::View, public views::FocusChangeListener {
         views::BoxLayout::CrossAxisAlignment::kCenter);
     activate_ = AddChildView(std::move(activate));
     layout->SetFlexForView(activate_, 1);
+    if (port_chip) {
+      port_chip_ = AddChildView(std::move(port_chip));
+      port_chip_->SetProperty(views::kMarginsKey,
+                              gfx::Insets::TLBR(0, 4, 0, 8));
+    }
     // Dormant Pins have no live page to close.
     if (close) {
       close_ = AddChildView(std::move(close));
@@ -689,6 +697,9 @@ class ItemRow final : public views::View, public views::FocusChangeListener {
                       ? views::CreateRoundedRectBackground(
                             selected_ ? fills.new_tab : fills.tile, 10)
                       : nullptr);
+    if (port_chip_) {
+      port_chip_->SetVisible(!(reveal && close_));
+    }
     if (close_) {
       close_->SetVisible(reveal);
     }
@@ -699,6 +710,7 @@ class ItemRow final : public views::View, public views::FocusChangeListener {
   }
 
   raw_ptr<views::MdTextButton> activate_ = nullptr;
+  raw_ptr<myarc::LocalPageChip> port_chip_ = nullptr;
   raw_ptr<views::MdTextButton> close_ = nullptr;
   const bool selected_;
   ui::ImageModel icon_;
@@ -2199,10 +2211,19 @@ std::unique_ptr<views::View> SidebarView::MakeItem(
     }
     return row;
   };
+  std::unique_ptr<myarc::LocalPageChip> port_chip;
+  if (!in_split && item.has_url) {
+    auto chip = std::make_unique<myarc::LocalPageChip>(
+        myarc::LocalPageChip::Style::kSidebarTab);
+    if (chip->Update(GURL(std::string(item.canonical_url)))) {
+      port_chip = std::move(chip);
+    }
+  }
   if (item.placement != foundation::PlacementKind::Temporary &&
       !presentation.is_live) {
     return add_row(std::make_unique<ItemRow>(std::move(activate), nullptr,
-                                             selected, back_icon));
+                                             selected, back_icon,
+                                             std::move(port_chip)));
   }
   auto close = IconButton(
       base::BindRepeating(&Delegate::CloseLiveItem,
@@ -2217,7 +2238,7 @@ std::unique_ptr<views::View> SidebarView::MakeItem(
   TrackFocus(close.get(), FocusAction::kClose, item.id, menu_state);
   return add_row(std::make_unique<ItemRow>(std::move(activate),
                                            std::move(close), selected,
-                                           back_icon));
+                                           back_icon, std::move(port_chip)));
 }
 
 std::unique_ptr<views::View> SidebarView::MakeSplit(

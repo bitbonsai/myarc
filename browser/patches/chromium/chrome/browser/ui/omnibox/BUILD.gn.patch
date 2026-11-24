@@ -1,0 +1,12 @@
+diff --git a/chrome/browser/ui/omnibox/BUILD.gn b/chrome/browser/ui/omnibox/BUILD.gn
+index d53fe57fe1018499ff329c5bc73a984d46f8fa5c..3c6d482b785f8ccd75e738a325971938cdc64e49 100644
+--- a/chrome/browser/ui/omnibox/BUILD.gn
++++ b/chrome/browser/ui/omnibox/BUILD.gn
+@@ -204,6 +204,7 @@ source_set("impl") {
+       "//components/user_education/common",
+       "//content/public/browser",
+       "//extensions/buildflags",
++      "//myarc:local_page_marker",
+       "//net",
+       "//net/traffic_annotation",
+       "//services/metrics/public/cpp:gen_ukm_builders",
