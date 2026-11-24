@@ -3,6 +3,7 @@ title: "A thousand tabs, and agents that can see"
 summary: "Every alpha check is done against the real notarized app. Agents can now take screenshots, scroll, and wait for pages to load, and myArc handled a thousand tabs without flinching."
 date: 2026-11-23
 draft: false
+redirect_from: [alpha-checklist-and-agent-control]
 ---
 
 Yesterday alpha went out. That felt great, and it also left a short list of things I wanted to prove against the real signed app instead of trusting memory or unit tests. Could an outside agent really drive a session from scratch? Would the browser stay calm with a thousand tabs sitting in the sidebar? Could you open it offline without an account prompt or a single call home? Nightly `2026.11.23.1` answers all three, and the numbers came back better than I expected.
@@ -18,6 +19,8 @@ So this nightly adds `page.screenshot`, `page.scroll`, and `page.wait` to both t
 ![myArc running the local synthetic form fixture used to verify CLI, MCP, and Claude Code control](agent-space-active.png)
 
 *The local test form Claude Code drove over MCP, untrusted prompt-injection note included.*
+
+You can also spot a small localhost touch in that screenshot. Arc puts a heavy developer banner across the top of local pages. myArc wraps the viewport in a thin blue border and puts a compact `</> :port` tag right into the URL pill, so you always know you are looking at a local server without losing vertical space.
 
 ## Small details that stood out
 
