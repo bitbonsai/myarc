@@ -18,6 +18,8 @@ Then I pointed Claude Code at the packaged app on a local test page. It filled o
 
 So I added `page.screenshot`, `page.scroll` and `page.wait` to the `myarc` CLI and MCP server. Screenshots come from the compositor as MCP image blocks, scrolling moves the viewport or a specific element, and waiting listens for the real load event with a timeout. Everything stays locked inside the Agent Space behind the Allow card and Stop button. Your own Spaces and Profiles stay untouched.
 
+## Localhost without the purple bar
+
 ![Side-by-side comparison of the same local test form in Arc on the left with its purple top localhost banner and myArc on the right with a thin blue viewport border and compact port tag in the URL pill](localhost-comparison.png)
 
 *The same local test page in Arc (left) and myArc (right).*
