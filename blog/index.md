@@ -4,7 +4,7 @@ HTML: https://myarc.dev/blog/
 
 November 2026
 
-## [A thousand tabs, and agents that can see](https://myarc.dev/blog/alpha-checklist-and-agent-control/)
+## [A thousand tabs, and agents that can see](https://myarc.dev/blog/thousand-tabs/)
 
 November 23, 2026
 
