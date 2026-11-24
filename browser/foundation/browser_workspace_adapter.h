@@ -110,6 +110,8 @@ class BrowserWorkspaceAdapter final : public TabStripModelObserver {
     GURL current_url;  // Never written back to saved canonical_url.
     gfx::Image icon;
     bool loading = false;
+    bool audible = false;
+    bool muted = false;
     size_t projections = 0;  // Exact Profile, including detached live pages.
   };
   std::optional<LiveMetadata> Metadata(uint64_t item) const;
@@ -223,6 +225,13 @@ class BrowserWorkspaceAdapter final : public TabStripModelObserver {
   foundation::MutationResult ClearSiteDataAndReload(bool cookies);
   // A Pin's own name, shown instead of its page title; empty clears it.
   foundation::MutationResult RenameItem(uint64_t item, std::string_view name);
+  // Toggles audio mute on `item`'s live page, if any.
+  void ToggleMute(uint64_t item);
+  // Opens a copy of `item`'s current or saved URL as a new Today tab in the
+  // current Space.
+  foundation::MutationResult DuplicateItem(uint64_t item);
+  // Moves a Today tab or Pin into `space` of the same Profile.
+  foundation::MutationResult MoveItemToSpace(uint64_t item, uint64_t space);
   // A sidebar drag's drop in this window's Space; see WorkspaceService. A
   // live Today tab pins the page it shows now.
   foundation::MutationResult DropItem(uint64_t item,

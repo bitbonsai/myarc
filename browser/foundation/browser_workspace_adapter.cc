@@ -1196,6 +1196,8 @@ BrowserWorkspaceAdapter::Metadata(uint64_t item) const {
   metadata.title = page->GetTitle();
   metadata.current_url = page->GetLastCommittedURL();
   metadata.loading = page->IsLoading();
+  metadata.audible = page->IsCurrentlyAudible();
+  metadata.muted = page->IsAudioMuted();
   metadata.projections = Count(*profile_, item);
   if (auto* entry = page->GetController().GetVisibleEntry())
     metadata.icon = entry->GetFavicon().image;
@@ -2550,6 +2552,68 @@ foundation::MutationResult BrowserWorkspaceAdapter::MovePinToFolder(
       return pinned;
   }
   return Remember(service_->MovePinToFolder(item, folder, 0));
+}
+
+void BrowserWorkspaceAdapter::ToggleMute(uint64_t item) {
+  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
+  if (!item) {
+    return;
+  }
+  content::WebContents* page = tabs_ ? LocalPage(*tabs_, item) : nullptr;
+  if (!page) {
+    page = AnyPage(*profile_, item);
+  }
+  if (!page) {
+    return;
+  }
+  page->SetAudioMuted(!page->IsAudioMuted());
+  changed_.Notify();
+}
+
+foundation::MutationResult BrowserWorkspaceAdapter::DuplicateItem(
+    uint64_t item) {
+  if (!ready()) {
+    return Fail(error());
+  }
+  GURL url;
+  if (auto metadata = Metadata(item);
+      metadata && metadata->current_url.is_valid()) {
+    url = metadata->current_url;
+  } else {
+    auto state = service_->ExportSnapshot();
+    const auto* row = state ? FindItem(*state, item) : nullptr;
+    if (row && row->has_url) {
+      url = GURL(std::string(row->canonical_url));
+    }
+  }
+  if (!url.is_valid()) {
+    return Fail("This tab has no page to duplicate.");
+  }
+  return OpenInCurrentSpace(url);
+}
+
+foundation::MutationResult BrowserWorkspaceAdapter::MoveItemToSpace(
+    uint64_t item,
+    uint64_t space) {
+  if (!ready()) {
+    return Fail(error());
+  }
+  auto state = service_->ExportSnapshot();
+  const auto* row = state ? FindItem(*state, item) : nullptr;
+  if (!row) {
+    return Fail("Workspace item does not exist.");
+  }
+  if (row->placement == foundation::PlacementKind::Temporary) {
+    return Remember(service_->SetPlacement(
+        item, foundation::PlacementKind::Temporary, space, false, ""));
+  }
+  if (row->placement == foundation::PlacementKind::Pin) {
+    return Remember(service_->SetPlacement(
+        item, foundation::PlacementKind::Pin, space, row->has_url,
+        std::string_view(row->canonical_url.data(),
+                         row->canonical_url.size())));
+  }
+  return Remember(Fail("Favorites belong to the Profile, not one Space."));
 }
 bool BrowserWorkspaceAdapter::NavigatedAway(uint64_t item) const {
   const auto metadata = Metadata(item);

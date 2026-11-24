@@ -500,7 +500,11 @@ enum ItemCommand {
   kDeleteFolder,
   kRemoveFromFolder,
   kMoveToFolder,
+  kMoveTo,
   kRenameItem,
+  kToggleMute,
+  kDuplicate,
+  kArchiveBelow,
   kOpenInSplitView,
   kSeparateSplit,
   kRenameSpace,
@@ -514,7 +518,9 @@ enum ItemCommand {
   kCopyLinks,
   kCloseSelected,
   // Move to Folder's entries: this plus the folder's index in folders_.
-  kMoveToFolderFirst = 1000
+  kMoveToFolderFirst = 1000,
+  // Move to Space's entries: this plus the space's index in menu_space_ids_.
+  kMoveToSpaceFirst = 2000
 };
 
 // Arc indents a folder's tabs under its name.
@@ -1179,6 +1185,8 @@ void SidebarView::ShowContextMenuForViewImpl(
   folder_menu_model_.reset();
   edit_pin_menu_model_.reset();
   menu_folder_ids_.clear();
+  menu_space_ids_.clear();
+  menu_archive_below_ids_.clear();
   menu_targets_.clear();
   // A selected row's menu acts on the whole selection, as Arc's does.
   if (const rust::Vec<uint64_t> targets = foundation::row_selection_menu_targets(
@@ -1207,15 +1215,17 @@ void SidebarView::ShowContextMenuForViewImpl(
     RunMenu(point, source_type);
     return;
   }
-  // Arc's order: Copy Link first, the page's own actions next, and removal
-  // last behind its own separator.
+  // Arc's order: Copy Link first, page actions (Rename / Edit / Mute) next,
+  // Split / Duplicate / Move to in the middle, and Archive / Close last.
+  const bool is_today = !menu_state_.is_pin && !menu_state_.is_favorite;
   if (!menu_state_.url.empty()) {
     menu_model_->AddItem(kCopyLink, u"Copy Link");
     menu_model_->AddSeparator(ui::NORMAL_SEPARATOR);
   }
-  // Arc renames a pinned tab from its menu.
+  bool added_page_group = false;
   if (menu_state_.is_pin) {
     menu_model_->AddItem(kRenameItem, u"Rename\u2026");
+    added_page_group = true;
   }
   // Arc's Edit Pinned Page goes back to the saved URL or saves the page
   // shown now in its place (BC-003). Both wait for the page to leave it.
@@ -1229,50 +1239,92 @@ void SidebarView::ShowContextMenuForViewImpl(
     }
     menu_model_->AddSubMenu(kEditPinnedPage, u"Edit Pinned Page",
                             edit_pin_menu_model_.get());
+    added_page_group = true;
   }
-  if (!menu_state_.is_pin) {
-    menu_model_->AddItem(kPin, menu_state_.is_favorite ? u"Move to Space Pins"
-                                                       : u"Pin to Space");
+  if (is_today || menu_state_.is_live) {
+    menu_model_->AddItem(kToggleMute,
+                         menu_state_.muted ? u"Unmute" : u"Mute");
+    menu_model_->SetEnabledAt(
+        menu_model_->GetItemCount() - 1,
+        menu_state_.is_live && (menu_state_.audible || menu_state_.muted));
+    added_page_group = true;
   }
-  if (!menu_state_.is_favorite) {
-    menu_model_->AddItem(kFavorite, menu_state_.is_pin
-                                        ? u"Move to Profile Favorites"
-                                        : u"Add to Profile Favorites");
+  if (added_page_group) {
+    menu_model_->AddSeparator(ui::NORMAL_SEPARATOR);
   }
-  // Pins, and tabs pinned on the way, file into the Space's folders.
-  if (!menu_state_.is_favorite) {
-    folder_menu_model_ = std::make_unique<ui::SimpleMenuModel>(this);
-    for (const FolderEntry& folder : folders_) {
-      if (folder.id != menu_state_.folder) {
-        folder_menu_model_->AddItem(
-            kMoveToFolderFirst + static_cast<int>(menu_folder_ids_.size()),
-            folder.name);
-        menu_folder_ids_.push_back(folder.id);
-      }
-    }
-    if (!menu_folder_ids_.empty()) {
-      menu_model_->AddSubMenu(kMoveToFolder, u"Move to Folder",
-                              folder_menu_model_.get());
-    }
-    if (menu_state_.folder) {
-      menu_model_->AddItem(kRemoveFromFolder, u"Remove from Folder");
-    }
-  }
-  // Arc offers Open in Split View on a tab's menu.
+
+  // Split, Duplicate, and Move to submenu (Pin / Favorites / Folders / Spaces).
   if (menu_state_.can_split) {
     menu_model_->AddItem(kOpenInSplitView, u"Open in Split View");
   }
   if (menu_state_.in_split) {
     menu_model_->AddItem(kSeparateSplit, u"Separate All Tabs");
   }
-  if (menu_state_.is_live) {
-    menu_model_->AddItem(
-        kClose, menu_state_.is_pin        ? u"Close live page (keep Space Pin)"
-                : menu_state_.is_favorite ? u"Close live page (keep Favorite)"
-                                          : u"Close live page");
+  if (!menu_state_.url.empty()) {
+    menu_model_->AddItem(kDuplicate, u"Duplicate");
   }
-  if (menu_state_.is_pin || menu_state_.is_favorite) {
-    menu_model_->AddSeparator(ui::NORMAL_SEPARATOR);
+  if (menu_state_.is_favorite) {
+    menu_model_->AddItem(kPin, u"Move to Space Pins");
+  } else {
+    folder_menu_model_ = std::make_unique<ui::SimpleMenuModel>(this);
+    if (!menu_state_.is_pin) {
+      folder_menu_model_->AddItem(kPin, u"Pin to Space");
+    }
+    folder_menu_model_->AddItem(kFavorite, menu_state_.is_pin
+                                               ? u"Move to Profile Favorites"
+                                               : u"Add to Profile Favorites");
+    bool added_folder_sep = false;
+    for (const FolderEntry& folder : folders_) {
+      if (folder.id != menu_state_.folder) {
+        if (!added_folder_sep) {
+          folder_menu_model_->AddSeparator(ui::NORMAL_SEPARATOR);
+          added_folder_sep = true;
+        }
+        folder_menu_model_->AddItem(
+            kMoveToFolderFirst + static_cast<int>(menu_folder_ids_.size()),
+            folder.name);
+        menu_folder_ids_.push_back(folder.id);
+      }
+    }
+    if (menu_state_.folder) {
+      if (!added_folder_sep) {
+        folder_menu_model_->AddSeparator(ui::NORMAL_SEPARATOR);
+      }
+      folder_menu_model_->AddItem(kRemoveFromFolder, u"Remove from Folder");
+    }
+    if (!menu_state_.in_split) {
+      bool added_space_sep = false;
+      for (const SpaceEntry& space : spaces_) {
+        if (space.id == current_space_id_ || space.agent) {
+          continue;
+        }
+        if (!added_space_sep) {
+          folder_menu_model_->AddSeparator(ui::NORMAL_SEPARATOR);
+          added_space_sep = true;
+        }
+        folder_menu_model_->AddItem(
+            kMoveToSpaceFirst + static_cast<int>(menu_space_ids_.size()),
+            space.name);
+        menu_space_ids_.push_back(space.id);
+      }
+    }
+    menu_model_->AddSubMenu(kMoveTo, u"Move to", folder_menu_model_.get());
+  }
+
+  menu_model_->AddSeparator(ui::NORMAL_SEPARATOR);
+  if (is_today) {
+    menu_model_->AddItem(kClose, u"Archive Tab");
+    const auto it = std::ranges::find(today_item_ids_, menu_item_id_);
+    if (it != today_item_ids_.end() && std::next(it) != today_item_ids_.end()) {
+      menu_archive_below_ids_.assign(std::next(it), today_item_ids_.end());
+    }
+    menu_model_->AddItem(kArchiveBelow, u"Archive Tabs Below");
+    menu_model_->SetEnabledAt(menu_model_->GetItemCount() - 1,
+                              !menu_archive_below_ids_.empty());
+  } else {
+    if (menu_state_.is_live) {
+      menu_model_->AddItem(kClose, u"Close Live Page");
+    }
     menu_model_->AddItem(kUnsave, menu_state_.is_pin ? u"Unpin from Space"
                                                      : u"Remove Favorite");
   }
@@ -1380,6 +1432,7 @@ void SidebarView::DropRows() {
   space_rows_ = nullptr;
   tiles_.clear();
   selectable_rows_.clear();
+  today_item_ids_.clear();
   create_panel_ = nullptr;
   RemoveAllChildViews();
 }
@@ -1794,6 +1847,19 @@ void SidebarView::ExecuteCommand(int command_id, int event_flags) {
     case kRenameItem:
       delegate_->RenameItem(id);
       return;
+    case kToggleMute:
+      delegate_->ToggleMuteItem(id);
+      return;
+    case kDuplicate:
+      delegate_->DuplicateItem(id);
+      return;
+    case kArchiveBelow:
+      if (std::vector<uint64_t> below =
+              std::exchange(menu_archive_below_ids_, {});
+          !below.empty()) {
+        ApplyToRowsLater(std::move(below), /*move=*/false, 0);
+      }
+      return;
     case kResetToSaved:
       delegate_->ResetItem(id);
       return;
@@ -1806,6 +1872,14 @@ void SidebarView::ExecuteCommand(int command_id, int event_flags) {
     case kSeparateSplit:
       delegate_->SeparateSplit(id);
       return;
+  }
+  if (command_id >= kMoveToSpaceFirst) {
+    const size_t space_index =
+        static_cast<size_t>(command_id - kMoveToSpaceFirst);
+    if (space_index < menu_space_ids_.size()) {
+      delegate_->MoveItemToSpace(id, menu_space_ids_[space_index]);
+    }
+    return;
   }
   const size_t index = static_cast<size_t>(command_id - kMoveToFolderFirst);
   if (command_id >= kMoveToFolderFirst && index < menu_folder_ids_.size()) {
@@ -2198,17 +2272,23 @@ std::unique_ptr<views::View> SidebarView::MakeItem(
   if (selectable && tile) {
     selectable_rows_.emplace_back(item.id, activate.get());
   }
+  const std::u16string menu_url =
+      !presentation.current_url.is_empty()
+          ? base::UTF8ToUTF16(presentation.current_url.spec())
+          : (item.has_url ? base::UTF8ToUTF16(std::string(item.canonical_url))
+                          : std::u16string());
   const ItemMenuState menu_state = {
       item.placement == foundation::PlacementKind::Pin,
       item.placement == foundation::PlacementKind::Favorite,
       presentation.is_live,
-      item.has_url ? base::UTF8ToUTF16(std::string(item.canonical_url))
-                   : std::u16string(),
+      menu_url,
       folder,
       item.placement == foundation::PlacementKind::Temporary &&
           presentation.is_live && !in_split,
       in_split,
-      saved && presentation.navigated_away};
+      saved && presentation.navigated_away,
+      presentation.audible,
+      presentation.muted};
   TrackFocus(activate.get(), FocusAction::kActivate, item.id, menu_state);
   if (tile) {
     activate->SetHorizontalAlignment(gfx::ALIGN_CENTER);
@@ -2815,6 +2895,8 @@ void SidebarView::SetModel(const foundation::SidebarResult& model,
       const auto right = std::ranges::find(model.temporary, pair->second,
                                            &foundation::ItemRecord::id);
       if (right != model.temporary.end()) {
+        today_item_ids_.push_back(item.id);
+        today_item_ids_.push_back(right->id);
         const auto after = std::max(model.temporary.begin() + i, right) + 1;
         drop_zones_.push_back(
             {.view = rows->AddChildView(
@@ -2826,6 +2908,7 @@ void SidebarView::SetModel(const foundation::SidebarResult& model,
         continue;
       }
     }
+    today_item_ids_.push_back(item.id);
     drop_zones_.push_back({.view = rows->AddChildView(MakeItem(
                                item, false, item.id == model.selected_item_id)),
                            .kind = foundation::DropTargetKind::Today,

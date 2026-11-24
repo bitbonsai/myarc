@@ -1,5 +1,5 @@
 diff --git a/chrome/browser/ui/views/frame/browser_view.cc b/chrome/browser/ui/views/frame/browser_view.cc
-index 7b568f6de760af21d6e9d2aa44415a7cef617c51..42905c24ea332894d855bdfda8143122d7d185db 100644
+index 7b568f6de760af21d6e9d2aa44415a7cef617c51..650c93627b5b0b2fcc090f7d08869670ccffe3fa 100644
 --- a/chrome/browser/ui/views/frame/browser_view.cc
 +++ b/chrome/browser/ui/views/frame/browser_view.cc
 @@ -11,6 +11,7 @@
@@ -2793,7 +2793,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..42905c24ea332894d855bdfda8143122
  }
  
  void BrowserView::RemovedFromWidget() {
-@@ -5267,104 +7628,3156 @@ const views::View* BrowserView::GetViewByElementId(
+@@ -5267,104 +7628,3170 @@ const views::View* BrowserView::GetViewByElementId(
  ///////////////////////////////////////////////////////////////////////////////
  // BrowserView, ui::AcceleratorTarget overrides:
  
@@ -3623,6 +3623,8 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..42905c24ea332894d855bdfda8143122
 +  if (auto metadata = myarc_workspace_adapter_->Metadata(item.id)) {
 +    result.title = metadata->title;
 +    result.current_url = metadata->current_url;
++    result.audible = metadata->audible;
++    result.muted = metadata->muted;
 +    // An empty page, such as New Split's blank pane, reads like New Tab
 +    // rather than "about:blank".
 +    if (metadata->current_url.IsAboutBlank() &&
@@ -3814,6 +3816,18 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..42905c24ea332894d855bdfda8143122
 +
 +void BrowserView::ReplaceItemUrl(uint64_t item) {
 +  MyarcWorkspaceResult(myarc_workspace_adapter_->ReplaceSavedUrl(item));
++}
++
++void BrowserView::ToggleMuteItem(uint64_t item) {
++  myarc_workspace_adapter_->ToggleMute(item);
++}
++
++void BrowserView::DuplicateItem(uint64_t item) {
++  MyarcWorkspaceResult(myarc_workspace_adapter_->DuplicateItem(item));
++}
++
++void BrowserView::MoveItemToSpace(uint64_t item, uint64_t space) {
++  MyarcWorkspaceResult(myarc_workspace_adapter_->MoveItemToSpace(item, space));
 +}
 +
 +void BrowserView::OpenInSplitView(uint64_t item) {
@@ -6027,7 +6041,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..42905c24ea332894d855bdfda8143122
  
  bool BrowserView::MaybeShowBookmarkBar(WebContents* contents) {
    const bool show_bookmark_bar =
-@@ -5471,6 +10884,10 @@ bool BrowserView::MaybeUpdateDevtools(content::WebContents* contents) {
+@@ -5471,6 +10898,10 @@ bool BrowserView::MaybeUpdateDevtools(content::WebContents* contents) {
  
  void BrowserView::UpdateUIForContents(WebContents* contents,
                                        bool should_layout_immediately) {
@@ -6038,7 +6052,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..42905c24ea332894d855bdfda8143122
    TRACE_EVENT0("ui", "BrowserView::UpdateUIForContents");
    bool needs_layout = MaybeShowBookmarkBar(contents);
  
-@@ -5706,6 +11123,26 @@ void BrowserView::LoadAccelerators() {
+@@ -5706,6 +11137,26 @@ void BrowserView::LoadAccelerators() {
    }
  
  #if BUILDFLAG(IS_MAC)

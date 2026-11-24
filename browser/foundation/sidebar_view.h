@@ -80,6 +80,8 @@ class SidebarView final : public views::View,
     ui::ImageModel icon;  // Parent supplies a favicon, preferably 16 or 20 DIP.
     GURL current_url;     // Live page URL when loaded; empty for dormant rows.
     bool is_live = false;
+    bool audible = false;
+    bool muted = false;
     // A Pin's or Favorite's live page has left its saved URL (BC-003).
     bool navigated_away = false;
     bool operator==(const ItemPresentation&) const = default;
@@ -184,6 +186,12 @@ class SidebarView final : public views::View,
     // Rename… on a Pin: the parent asks for its name, and an empty one goes
     // back to the page title.
     virtual void RenameItem(uint64_t item_id) = 0;
+    // Mute / Unmute on a live tab.
+    virtual void ToggleMuteItem(uint64_t item_id) = 0;
+    // Duplicate: opens a copy of the tab's URL in the current Space.
+    virtual void DuplicateItem(uint64_t item_id) = 0;
+    // Move to Space: moves a Today tab or Pin to another Space of this Profile.
+    virtual void MoveItemToSpace(uint64_t item_id, uint64_t space_id) = 0;
     // BC-003. Arc's back control on a Pin or Favorite that left its saved
     // URL: its page goes back there. Replace Pinned URL with Current saves
     // the page it shows instead. The parent reports errors.
@@ -404,6 +412,8 @@ class SidebarView final : public views::View,
     bool in_split = false;
     // The live page left the saved URL, so Edit Pinned Page can act.
     bool navigated_away = false;
+    bool audible = false;
+    bool muted = false;
     bool operator==(const ItemMenuState&) const = default;
   };
   struct FocusTarget {
@@ -646,6 +656,9 @@ class SidebarView final : public views::View,
   std::unique_ptr<ui::SimpleMenuModel> folder_menu_model_;
   std::unique_ptr<ui::SimpleMenuModel> edit_pin_menu_model_;
   std::vector<uint64_t> menu_folder_ids_;
+  std::vector<uint64_t> menu_space_ids_;
+  std::vector<uint64_t> menu_archive_below_ids_;
+  std::vector<uint64_t> today_item_ids_;
   std::unique_ptr<ui::SimpleMenuModel> menu_model_;
   std::unique_ptr<views::MenuRunner> menu_runner_;
   bool create_menu_open_ = false;

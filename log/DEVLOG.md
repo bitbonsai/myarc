@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-11-24: Arc-aligned tab context menu with Mute, Duplicate, Move to, and Archive Tabs Below
+
+- Reorganized the sidebar tab context menu (`browser/foundation/sidebar_view.{h,cc}`, `browser_workspace_adapter.{h,cc}`, `chrome/browser/ui/views/frame/browser_view.{h,cc}`) to match Arc's grouping while keeping myArc's Pin / Favorites / Folder / Space actions in a unified `Move to` submenu: `Copy Link` (with live `current_url` fallback), `Mute`/`Unmute`, `Open in Split View`, `Duplicate`, `Move to`, `Archive Tab`, and `Archive Tabs Below`.
+- Omitted unimplemented Arc items (`Share`, `Change Icon…` on Today tabs) to keep zero dead controls, and renamed `Close live page` to `Archive Tab` on Today rows and `Close Live Page` on Pins/Favorites.
+- Evidence: Chromium `myarc` commit `11a53a9fa1` built cleanly in `out/MyarcRelease`; `tools/export_patches.py --check`, `tools/check_docs.py`, `cargo fmt`, `rustfmt`, `cargo clippy`, `cargo test`, and `design/onboarding/state.test.mjs` all pass.
+
 ## 2026-11-24: Sidebar empty-space Space menu and `v2026.11.24` release
 
 - Attached `SidebarView` as its own context menu controller (`browser/foundation/sidebar_view.cc`) so right-clicking empty sidebar space opens the current Space menu (with `New Folder`) instead of falling through to Chromium's tab-strip menu.
