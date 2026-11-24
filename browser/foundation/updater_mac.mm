@@ -113,6 +113,23 @@ NSString* CurrentVersionLabel() {
   return @"Development build";
 }
 
+NSString* ChromiumVersionLabel() {
+  return base::apple::ObjCCast<NSString>([base::apple::OuterBundle()
+      objectForInfoDictionaryKey:@"CFBundleShortVersionString"]);
+}
+
+NSString* UpToDateSubtitle() {
+  NSString* version = CurrentVersionLabel();
+  NSString* chromium = ChromiumVersionLabel();
+  if (chromium.length) {
+    return [NSString stringWithFormat:@"myArc %@ is the newest version "
+                                      @"available.\nChromium %@",
+                                      version, chromium];
+  }
+  return [NSString
+      stringWithFormat:@"myArc %@ is the newest version available.", version];
+}
+
 NSString* FormatUpdateVersion(id<MyarcSparkleAppcastItem> item) {
   if (!item) {
     return @"the latest version";
@@ -1172,15 +1189,8 @@ typedef NS_ENUM(NSInteger, MyarcUpdaterButtonStyle) {
   }
   [self clearCallbacks];
   _acknowledgement = [acknowledgement copy];
-  NSString* subtitle = error.localizedRecoverySuggestion.length
-                           ? error.localizedRecoverySuggestion
-                           : [NSString
-                                 stringWithFormat:
-                                     @"myArc %@ is the newest version "
-                                     @"available.",
-                                     myarc::CurrentVersionLabel()];
   [self configureTitle:@"You’re up to date"
-              subtitle:subtitle
+              subtitle:myarc::UpToDateSubtitle()
           showProgress:NO
          indeterminate:NO
               progress:0
@@ -1399,10 +1409,7 @@ typedef NS_ENUM(NSInteger, MyarcUpdaterButtonStyle) {
                 showSkip:NO];
   } else if ([state isEqualToString:@"up-to-date"]) {
     [self configureTitle:@"You’re up to date"
-                subtitle:[NSString
-                             stringWithFormat:@"myArc %@ is the newest "
-                                              @"version available.",
-                                              myarc::CurrentVersionLabel()]
+                subtitle:myarc::UpToDateSubtitle()
             showProgress:NO
            indeterminate:NO
                 progress:0

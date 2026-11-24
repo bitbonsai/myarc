@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-11-24: Show myArc and Chromium versions in updater up-to-date sheet
+
+- Updated `browser/foundation/updater_mac.mm` (`ChromiumVersionLabel()`, `UpToDateSubtitle()`) so the Sparkle "You’re up to date" sheet displays `myArc <MyarcVersion> is the newest version available.` with `Chromium <CFBundleShortVersionString>` on the line below, instead of Sparkle's `localizedRecoverySuggestion` (which only reported the Chromium version).
+- Updated the `up-to-date` preview hook in `updater_mac.mm` to use the same helper.
+- Evidence: `out/MyarcRelease` compiled cleanly; `tools/export_patches.py --check` and `tools/check_docs.py` pass.
+
 ## 2026-11-24: Publish `v2026.11.24.1` release
 
 - Packaged, Developer ID signed, Apple notarized, stapled, and Sparkle EdDSA-signed `myArc-2026.11.24.1-arm64.dmg` (184,766,961 bytes, SHA-256 `07fb5e2c...02c6`) from `main` `38e0085` and Chromium `11a53a9fa1` (Arc-aligned tab context menu with Mute, Duplicate, unified Move to, Archive Tab, and Archive Tabs Below).
