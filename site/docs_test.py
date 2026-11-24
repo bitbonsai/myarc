@@ -76,7 +76,7 @@ class DocsTests(unittest.TestCase):
         self.assertIsNone(page.select_one('.docs-pill[aria-current]'))
         self.assertEqual('Getting started / Second', page.select_one('.docs-eyebrow').get_text())
         self.assertEqual('S', page.select_one('.docs-lede').get_text())
-        self.assertIn('Alpha nightly', page.select_one('main .docs-banner').get_text())
+        self.assertIn('Alpha build', page.select_one('main .docs-banner').get_text())
         self.assertIsNone(page.select_one('.top nav'))
         index = BeautifulSoup((self.root / 'docs/index.html').read_text(), 'html.parser')
         self.assertEqual('page', index.select_one('.docs-pill')['aria-current'])
