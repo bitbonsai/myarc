@@ -6,7 +6,7 @@ HTML: https://myarc.dev/
 
 An open-source browser bringing back Arc, with no account required and optional AI.
 
-[Download alphav2026.11.23.1](https://myarc.dev/download/)
+[Download alphav2026.11.24](https://myarc.dev/download/)
 [See what works](https://github.com/bitbonsai/myarc#try-it)
 
 ## How you browse is part of how you work. It should outlast the company behind your browser.
@@ -42,7 +42,7 @@ An open-source browser bringing back Arc, with no account required and optional 
 
   Builds for Windows and Linux.
 
-[Download myArc Alpha 2026.11.23.1 →](https://myarc.dev/download/) [Full alpha checklist →](https://github.com/bitbonsai/myarc/blob/main/docs/ALPHA.md)
+[Download myArc Alpha 2026.11.24 →](https://myarc.dev/download/) [Full alpha checklist →](https://github.com/bitbonsai/myarc/blob/main/docs/ALPHA.md)
 
 ## Read along
 
@@ -145,12 +145,12 @@ HTML: https://myarc.dev/download/
 
 Alpha build, for trying the Arc-like shell. Not yet for daily or sensitive browsing.
 
-[Download for macOS (Apple silicon)](https://github.com/bitbonsai/myarc/releases/download/nightly-2026.11.23.1/myArc-Nightly-2026.11.23.1-arm64.dmg)
+[Download for macOS (Apple silicon)](https://github.com/bitbonsai/myarc/releases/download/v2026.11.24/myArc-2026.11.24-arm64.dmg)
 
-- **Version:** 2026.11.23.1
-- **Date:** November 23, 2026
-- **Size:** 184.2 MB
-- **SHA-256:** `35495145451e8638272cbfcf2cfd327ad6552bed6a126730b82cebbbb6282666`
+- **Version:** 2026.11.24
+- **Date:** November 24, 2026
+- **Size:** 184.8 MB
+- **SHA-256:** `ee77a30fed6b4ee7b3b56c98ba71d0c163c2c9a0830b585d2a8640d3fe03b805`
 
 ## System requirements
 
@@ -162,10 +162,10 @@ Alpha build, for trying the Arc-like shell. Not yet for daily or sensitive brows
 1. Check the download against the SHA-256 listed with it. The two values must match.
 
    ```
-   shasum -a 256 ~/Downloads/myArc-Nightly-2026.11.23.1-arm64.dmg
+   shasum -a 256 ~/Downloads/myArc-2026.11.24-arm64.dmg
    ```
-2. Open the DMG and drag myArc Nightly to Applications.
-3. Open myArc Nightly. From 2026.11.18 on, Apple has notarized each build, so macOS only asks once whether to open an app downloaded from the internet. Choose Open.
+2. Open the DMG and drag myArc to Applications.
+3. Open myArc. Apple has notarized each build, so macOS only asks once whether to open an app downloaded from the internet. Choose Open.
 
 ## What works today
 
@@ -200,7 +200,7 @@ Each item was seen working in a native run or experiment note. None of it has ha
 
 ## Other ways to get it
 
-- [GitHub releases](https://github.com/bitbonsai/myarc/releases/tag/nightly-2026.11.23.1) lists every build.
+- [GitHub releases](https://github.com/bitbonsai/myarc/releases/tag/v2026.11.24) lists every build.
 - [Source on GitHub](https://github.com/bitbonsai/myarc), with instructions to [build it from source](https://github.com/bitbonsai/myarc/blob/main/browser/README.md).
 - [GitHub issues](https://github.com/bitbonsai/myarc/issues) take bug reports. Include the version, your macOS version and the steps that trigger the problem, and leave out private pages.
 
@@ -215,13 +215,13 @@ HTML: https://myarc.dev/docs/
 
 # Docs
 
-How to move from Arc to myArc: install the nightly, import your Spaces, learn the shortcuts, find your data, script the browser and work around known limitations.
+How to move from Arc to myArc: install myArc, import your Spaces, learn the shortcuts, find your data, script the browser and work around known limitations.
 
 ## Getting started
 
 - [Install myArc](https://myarc.dev/docs/install/)
 
-  What your Mac needs, what macOS asks on first launch, the welcome tour, and how myArc moves to a newer nightly.
+  What your Mac needs, what macOS asks on first launch, the welcome tour, and how myArc updates.
 - [Import from Arc](https://myarc.dev/docs/import-from-arc/)
 
   Import your Spaces, folders, pinned tabs and Favorites from Arc's sidebar file or its export, preview what myArc will add, and import again without duplicates.
@@ -254,7 +254,7 @@ How to move from Arc to myArc: install the nightly, import your Spaces, learn th
 
 - [Known limitations](https://myarc.dev/docs/known-limitations/)
 
-  What the alpha nightly can't do yet, and what to do after a crash or when something breaks.
+  What myArc Alpha can't do yet, and what to do after a crash or when something breaks.
 
 ## Contributing
 
@@ -267,30 +267,34 @@ HTML: https://myarc.dev/docs/install/
 
 # Install myArc
 
-What your Mac needs, what macOS asks on first launch, the welcome tour, and how myArc moves to a newer nightly.
+What your Mac needs, what macOS asks on first launch, the welcome tour, and how myArc updates.
 
-myArc ships as an alpha nightly, a build made from the latest code and published without release testing. Each nightly is a disk image (DMG) on the [download page](https://myarc.dev/download/).
+myArc ships as an alpha build, made from the latest code and published without release testing. Each build is a disk image (DMG) on the [download page](https://myarc.dev/download/).
 
 ## What you need
 
 - A Mac with Apple silicon. Intel Macs aren't supported.
-- macOS 26 or later. The glass window frame needs macOS 26, and the nightly has only been tested on macOS 26.7.
+- macOS 26 or later. The glass window frame needs macOS 26, and myArc has only been tested on macOS 26.7.
 
 ## Install the app
 
 1. Download the DMG from the download page.
-2. Check the file against the SHA-256 checksum listed next to the download button. Run this in Terminal and compare the two values. They must match. If you kept older nightlies in Downloads, it prints one line per file.
+2. Check the file against the SHA-256 checksum listed next to the download button. Run this in Terminal and compare the two values. They must match. If you kept older builds in Downloads, it prints one line per file.
 
    ```
-   shasum -a 256 ~/Downloads/myArc-Nightly-*.dmg
+   shasum -a 256 ~/Downloads/myArc-*.dmg
    ```
-3. Open the DMG and drag myArc Nightly to Applications.
+3. Open the DMG and drag myArc to Applications.
 
 ## First launch
 
-Open myArc Nightly from Applications. From 2026.11.18 on, each nightly is signed with an Apple Developer ID and notarized, which means Apple has scanned the build. Gatekeeper, the part of macOS that checks downloaded apps, asks once whether to open an app from the internet. Choose Open.
+Open myArc from Applications. Each build is signed with an Apple Developer ID and notarized, which means Apple has scanned the build. Gatekeeper, the part of macOS that checks downloaded apps, asks once whether to open an app from the internet. Choose Open.
 
-macOS may then ask for your login password so myArc can read the key that protects its saved data. Choose Always Allow. Nightlies from 2026.11.03 on are signed with the same Developer ID, so later nightlies stop asking.
+macOS may then ask for your login password so myArc can read the key that protects its saved data. Choose Always Allow. Builds are signed with the same Developer ID, so later updates stop asking.
+
+## Moving from myArc Nightly
+
+Earlier builds shipped as `myArc Nightly.app` with a separate bundle ID, so they won't auto-update to `myArc.app`. Install `myArc.app` from the DMG once, then remove `myArc Nightly.app` from Applications. On first launch, myArc moves your profile from `~/Library/Application Support/myArc Nightly/` to `~/Library/Application Support/myArc/` and migrates your Keychain encryption key automatically.
 
 ## The welcome tour
 
@@ -298,21 +302,21 @@ The first time myArc opens, a welcome window plays with sound. Choose Import fro
 
 When the tour ends after Start fresh or Skip tour, myArc opens a quick start page, [myarc.dev/welcome](https://myarc.dev/welcome/), in a new tab. It does this only once, and not after an import. To take the tour again, open Settings, go to Advanced and click Replay welcome tour.
 
-## Update to a newer nightly
+## Update to a newer build
 
-Nightlies after 2026.11.20.2 update themselves. Once a day, myArc checks myarc.dev for a newer nightly and asks before it installs one. To check right away, choose myArc \> Check for Updates…. Each nightly is signed, and myArc refuses an update whose signature doesn't match.
+myArc checks myarc.dev once a day for a newer build and asks before it installs one. To check right away, choose myArc \> Check for Updates…. Each build is signed, and myArc refuses an update whose signature doesn't match.
 
-myArc gets no security updates between nightlies, so a Chromium fix reaches you with the next nightly.
+myArc gets no separate security updates between builds, so a Chromium fix reaches you with the next build.
 
-Nightly 2026.11.20.2 and older can't update themselves. To move from one of those, install the new nightly by hand once:
+To update by hand:
 
 1. Quit myArc with Cmd\+Q.
-2. Download the new DMG and drag myArc Nightly to Applications, replacing the old copy.
+2. Download the new DMG and drag myArc to Applications, replacing the old copy.
 3. Open it. The new download goes through the first-launch step again.
 
 Your Spaces, tabs and settings live in your user folder, outside the app, so replacing the app keeps them. [Your data](https://myarc.dev/docs/your-data/) shows where.
 
-The [GitHub releases page](https://github.com/bitbonsai/myarc/releases) lists every nightly.
+The [GitHub releases page](https://github.com/bitbonsai/myarc/releases) lists every build.
 
 [Next: Import from Arc →](https://myarc.dev/docs/import-from-arc/)
 
@@ -465,7 +469,7 @@ HTML: https://myarc.dev/docs/shortcuts/
 
 The shortcuts that work in myArc today, and the Arc shortcuts that are still missing.
 
-These shortcuts work in the current nightly. Standard Chromium shortcuts, such as Cmd\+W to close a tab and Cmd\+R to reload, work as they do in Chrome.
+These shortcuts work in the current build. Standard Chromium shortcuts, such as Cmd\+W to close a tab and Cmd\+R to reload, work as they do in Chrome.
 
 | Shortcut | What it does | Compared with Arc |
 | --- | --- | --- |
@@ -519,18 +523,18 @@ myArc has no account and nothing to sign in to. Everything it saves stays on you
 myArc keeps its data in this folder:
 
 ```
-~/Library/Application Support/myArc Nightly/
+~/Library/Application Support/myArc/
 ```
 
 Inside it, each Profile has its own folder. The first is called `Default`, later ones `Profile 1`, `Profile 2` and so on. A Profile folder holds Chromium's usual data, such as history, cookies and extensions, plus one myArc file, `myarc-workspace-v1.json`. That file is your workspace, meaning the Spaces of that Profile with their names, icons and colors, your pinned tabs and Favorites, your temporary tabs and Archived Tabs. It's plain JSON you can open in a text editor.
 
 When myArc saves the workspace, it writes a new file and swaps it in, so a save that gets interrupted leaves the previous version in place.
 
-Saved passwords and cookies stay in Chromium's own stores. Chromium encrypts them with a key it keeps in your macOS Keychain, under the name myArc Nightly Safe Storage.
+Saved passwords and cookies stay in Chromium's own stores. Chromium encrypts them with a key it keeps in your macOS Keychain, under the name myArc Safe Storage.
 
 ## Back it up
 
-To back up everything, quit myArc and copy the whole `myArc Nightly` folder somewhere safe. Quitting first means nothing is halfway through a save while you copy.
+To back up everything, quit myArc and copy the whole `myArc` folder somewhere safe. Quitting first means nothing is halfway through a save while you copy.
 
 To take your Favorites and pinned tabs to another browser, open Settings \> Advanced and click Export Pins and Favorites…, or type Export in the command bar. myArc saves a bookmarks file that any browser can import, with Favorites in a Favorites folder and one folder per Space that keeps your sidebar folders. With more than one Profile, each Profile gets its own folder, even when you export from a private window.
 
@@ -538,7 +542,7 @@ To take your Favorites and pinned tabs to another browser, open Settings \> Adva
 
 myArc adds no analytics and no usage tracking. It makes two kinds of request of its own.
 
-Nightlies after 2026.11.20.2 ask myarc.dev once a day whether a newer nightly is out. When you install one, it downloads from GitHub.
+myArc asks myarc.dev once a day whether a newer build is out. When you install one, it downloads from GitHub.
 
 When a pinned tab or Favorite has no icon yet, myArc asks that site for its icon. The request goes only to that site's domain, carries no cookies and never sends the path of the page you saved. No Google icon service or other third party is involved.
 
@@ -600,14 +604,14 @@ Browser control is off by default. Press Cmd\+, to open Settings, go to Advanced
 
 ## Install the command
 
-The nightly carries `myarc` inside the app. Link it into your `PATH`:
+myArc carries `myarc` inside the app. Link it into your `PATH`:
 
 ```
 sudo mkdir -p /usr/local/bin
-sudo ln -sf "/Applications/myArc Nightly.app/Contents/Helpers/myarc" /usr/local/bin/myarc
+sudo ln -sf "/Applications/myArc.app/Contents/Helpers/myarc" /usr/local/bin/myarc
 ```
 
-The link points into the app, so it keeps working after you replace the app with a newer nightly.
+The link points into the app, so it keeps working after you replace the app with a newer build.
 
 ## Approve each tool
 
@@ -686,7 +690,7 @@ The Space commands reach all your Spaces in that Profile, so `space.rename` can 
 `myarc mcp` starts the MCP server. It has one tool per command, named with an underscore in place of each dot, so `space.create` is called `space_create` there. To add it to Claude Code for every project, run:
 
 ```
-claude mcp add --scope user myarc -- "/Applications/myArc Nightly.app/Contents/Helpers/myarc" mcp
+claude mcp add --scope user myarc -- "/Applications/myArc.app/Contents/Helpers/myarc" mcp
 ```
 
 For other MCP clients, use this server entry once `myarc` is on your `PATH`:
@@ -712,14 +716,14 @@ HTML: https://myarc.dev/docs/known-limitations/
 
 # Known limitations
 
-What the alpha nightly can't do yet, and what to do after a crash or when something breaks.
+What myArc Alpha can't do yet, and what to do after a crash or when something breaks.
 
 myArc is an alpha. Use it to try the Arc-style sidebar, and keep daily and sensitive browsing in another browser for now.
 
 ## Safety and updates
 
-- Each nightly is built from a Chromium 158 development revision, before Chromium ships it as a stable release.
-- There are no security updates between nightlies. Nightlies after 2026.11.20.2 update themselves; older ones need the new nightly installed by hand once. [Install myArc](https://myarc.dev/docs/install/) covers both.
+- Each build is based on a Chromium 158 development revision, before Chromium ships it as a stable release.
+- There are no separate security updates between builds. myArc updates itself from myarc.dev; older `myArc Nightly` builds need `myArc.app` installed by hand once. [Install myArc](https://myarc.dev/docs/install/) covers both.
 - The protections around Profile separation, cookies and saved passwords aren't verified yet.
 - Safe Browsing doesn't scan RAR downloads, because the UnRAR license conflicts with GPL-3.0, the license myArc uses.
 - myArc is an independent project with no ties to Arc or The Browser Company.
@@ -748,7 +752,7 @@ If a single page crashes, reload it with Cmd\+R. The rest of the browser keeps r
 
 A crash also brings up a card that asks "myArc quit unexpectedly. Report it?" Report… opens a new GitHub issue in a tab, filled in with the myArc and macOS versions and the top of the crash log macOS wrote, without the lines that identify your Mac. Nothing is sent until you read it and submit it, which needs a GitHub account. Not Now closes the card. It offers each crash log once.
 
-Crash report uploads are off. Chromium keeps crash reports on your Mac, in `~/Library/Application Support/myArc Nightly/Crashpad/`. They can hold pieces of the pages you had open, so don't attach them to a public issue.
+Crash report uploads are off. Chromium keeps crash reports on your Mac, in `~/Library/Application Support/myArc/Crashpad/`. They can hold pieces of the pages you had open, so don't attach them to a public issue.
 
 ## Troubleshooting
 
@@ -795,7 +799,7 @@ So I added `page.screenshot`, `page.scroll` and `page.wait` to the `myarc` CLI a
 
 ## Localhost without the purple bar
 
-[![Side-by-side comparison of the same local test form on localhost:4321 in Arc on the left with its purple top banner and myArc on the right with a thin blue viewport border, a blue-tinted URL pill with a :4321 chip, and a :4321 badge on the sidebar tab](https://myarc.dev/blog/thousand-tabs/localhost-comparison-v2.b5a80d66bff5.webp)](https://myarc.dev/blog/thousand-tabs/localhost-comparison-v2.b5a80d66bff5.webp)
+[![Side-by-side comparison of the same local test form on localhost:4321 in Arc on the left with its purple top banner and myArc on the right with a thin blue viewport border, a blue-tinted URL pill with a :4321 chip, and a :4321 badge on the sidebar tab](https://myarc.dev/blog/thousand-tabs/localhost-comparison-v2.84db71331176.webp)](https://myarc.dev/blog/thousand-tabs/localhost-comparison-v2.84db71331176.webp)
 
 The same local test page in Arc (left) and myArc (right).
 
@@ -805,7 +809,7 @@ Arc puts a thick purple bar across the top of local pages. myArc draws a thin bl
 
 Looking through screenshots all afternoon, the Agent Space icon started to bother me. It was a thin outline next to filled ones, and once I noticed it I couldn't unsee it. I swapped it for the robot head I made for [agentbar.fyi](https://agentbar.fyi).
 
-[![Side-by-side close-up of the myArc sidebar header and bottom footer showing the new filled robot-head icon for the Agent Space](https://myarc.dev/blog/thousand-tabs/agent-space-icon.418b87b88871.webp)](https://myarc.dev/blog/thousand-tabs/agent-space-icon.418b87b88871.webp)
+[![Side-by-side close-up of the myArc sidebar header and bottom footer showing the new filled robot-head icon for the Agent Space](https://myarc.dev/blog/thousand-tabs/agent-space-icon.94f9834f5979.webp)](https://myarc.dev/blog/thousand-tabs/agent-space-icon.94f9834f5979.webp)
 
 The new icon in the Space header and sidebar footer.
 
@@ -821,11 +825,11 @@ A thousand dormant items across ten Spaces, with the command bar open over the w
 
 While testing, I also checked frosted find-in-page and docked DevTools on the same build.
 
-[![myArc showing frosted find-in-page highlighting matches on a local test page](https://myarc.dev/blog/thousand-tabs/core-smoke-find.5cbc653dfcd8.webp)](https://myarc.dev/blog/thousand-tabs/core-smoke-find.5cbc653dfcd8.webp)
+[![myArc showing frosted find-in-page highlighting matches on a local test page](https://myarc.dev/blog/thousand-tabs/core-smoke-find.c103b2c087c1.webp)](https://myarc.dev/blog/thousand-tabs/core-smoke-find.c103b2c087c1.webp)
 
 Find-in-page highlighting matches inside the glass bar.
 
-[![myArc showing docked Chromium DevTools inspecting the local test page](https://myarc.dev/blog/thousand-tabs/core-smoke-devtools.8491e57988cc.webp)](https://myarc.dev/blog/thousand-tabs/core-smoke-devtools.8491e57988cc.webp)
+[![myArc showing docked Chromium DevTools inspecting the local test page](https://myarc.dev/blog/thousand-tabs/core-smoke-devtools.1ded77d13111.webp)](https://myarc.dev/blog/thousand-tabs/core-smoke-devtools.1ded77d13111.webp)
 
 Docked DevTools inspecting the same page.
 

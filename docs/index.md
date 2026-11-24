@@ -2,13 +2,13 @@ HTML: https://myarc.dev/docs/
 
 # Docs
 
-How to move from Arc to myArc: install the nightly, import your Spaces, learn the shortcuts, find your data, script the browser and work around known limitations.
+How to move from Arc to myArc: install myArc, import your Spaces, learn the shortcuts, find your data, script the browser and work around known limitations.
 
 ## Getting started
 
 - [Install myArc](https://myarc.dev/docs/install/)
 
-  What your Mac needs, what macOS asks on first launch, the welcome tour, and how myArc moves to a newer nightly.
+  What your Mac needs, what macOS asks on first launch, the welcome tour, and how myArc updates.
 - [Import from Arc](https://myarc.dev/docs/import-from-arc/)
 
   Import your Spaces, folders, pinned tabs and Favorites from Arc's sidebar file or its export, preview what myArc will add, and import again without duplicates.
@@ -41,7 +41,7 @@ How to move from Arc to myArc: install the nightly, import your Spaces, learn th
 
 - [Known limitations](https://myarc.dev/docs/known-limitations/)
 
-  What the alpha nightly can't do yet, and what to do after a crash or when something breaks.
+  What myArc Alpha can't do yet, and what to do after a crash or when something breaks.
 
 ## Contributing
 

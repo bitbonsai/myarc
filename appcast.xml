@@ -1,16 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
 <rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle">
   <channel>
-    <title>myArc Nightly</title>
+    <title>myArc</title>
     <link>https://myarc.dev/appcast.xml</link>
     <item>
-      <title>myArc Nightly 2026.11.23.1</title>
-      <pubDate>Mon, 23 Nov 2026 00:00:00 +0000</pubDate>
-      <link>https://github.com/bitbonsai/myarc/releases/tag/nightly-2026.11.23.1</link>
-      <sparkle:version>20261123.1</sparkle:version>
-      <sparkle:shortVersionString>2026.11.23.1</sparkle:shortVersionString>
+      <title>myArc 2026.11.24</title>
+      <pubDate>Tue, 24 Nov 2026 00:00:00 +0000</pubDate>
+      <link>https://github.com/bitbonsai/myarc/releases/tag/v2026.11.24</link>
+      <sparkle:version>20261124.0</sparkle:version>
+      <sparkle:shortVersionString>2026.11.24</sparkle:shortVersionString>
       <sparkle:minimumSystemVersion>26</sparkle:minimumSystemVersion>
-      <enclosure url="https://github.com/bitbonsai/myarc/releases/download/nightly-2026.11.23.1/myArc-Nightly-2026.11.23.1-arm64.dmg" length="184154097" type="application/octet-stream" sparkle:edSignature="IOL0pBxQC8GrANK0rnUHgmoZIHFl3SSPPynu3FE2fvhMdjvkCRrJ2ti6eMo7jOlEZIcSkojo9HBHSpmMHNRLAw=="/>
+      <enclosure url="https://github.com/bitbonsai/myarc/releases/download/v2026.11.24/myArc-2026.11.24-arm64.dmg" length="184804323" type="application/octet-stream" sparkle:edSignature="2Ha2MIipWDLXU1bUaeayznMFGZR9puWOhI9ULuf8Gidy24bm3YFUZUu3sR9EpPX57iWTTLK2hKYm/pMgRwtkCw=="/>
     </item>
   </channel>
 </rss>

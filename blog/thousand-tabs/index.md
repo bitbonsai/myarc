@@ -22,7 +22,7 @@ So I added `page.screenshot`, `page.scroll` and `page.wait` to the `myarc` CLI a
 
 ## Localhost without the purple bar
 
-[![Side-by-side comparison of the same local test form on localhost:4321 in Arc on the left with its purple top banner and myArc on the right with a thin blue viewport border, a blue-tinted URL pill with a :4321 chip, and a :4321 badge on the sidebar tab](https://myarc.dev/blog/thousand-tabs/localhost-comparison-v2.b5a80d66bff5.webp)](https://myarc.dev/blog/thousand-tabs/localhost-comparison-v2.b5a80d66bff5.webp)
+[![Side-by-side comparison of the same local test form on localhost:4321 in Arc on the left with its purple top banner and myArc on the right with a thin blue viewport border, a blue-tinted URL pill with a :4321 chip, and a :4321 badge on the sidebar tab](https://myarc.dev/blog/thousand-tabs/localhost-comparison-v2.84db71331176.webp)](https://myarc.dev/blog/thousand-tabs/localhost-comparison-v2.84db71331176.webp)
 
 The same local test page in Arc (left) and myArc (right).
 
@@ -32,7 +32,7 @@ Arc puts a thick purple bar across the top of local pages. myArc draws a thin bl
 
 Looking through screenshots all afternoon, the Agent Space icon started to bother me. It was a thin outline next to filled ones, and once I noticed it I couldn't unsee it. I swapped it for the robot head I made for [agentbar.fyi](https://agentbar.fyi).
 
-[![Side-by-side close-up of the myArc sidebar header and bottom footer showing the new filled robot-head icon for the Agent Space](https://myarc.dev/blog/thousand-tabs/agent-space-icon.418b87b88871.webp)](https://myarc.dev/blog/thousand-tabs/agent-space-icon.418b87b88871.webp)
+[![Side-by-side close-up of the myArc sidebar header and bottom footer showing the new filled robot-head icon for the Agent Space](https://myarc.dev/blog/thousand-tabs/agent-space-icon.94f9834f5979.webp)](https://myarc.dev/blog/thousand-tabs/agent-space-icon.94f9834f5979.webp)
 
 The new icon in the Space header and sidebar footer.
 
@@ -48,11 +48,11 @@ A thousand dormant items across ten Spaces, with the command bar open over the w
 
 While testing, I also checked frosted find-in-page and docked DevTools on the same build.
 
-[![myArc showing frosted find-in-page highlighting matches on a local test page](https://myarc.dev/blog/thousand-tabs/core-smoke-find.5cbc653dfcd8.webp)](https://myarc.dev/blog/thousand-tabs/core-smoke-find.5cbc653dfcd8.webp)
+[![myArc showing frosted find-in-page highlighting matches on a local test page](https://myarc.dev/blog/thousand-tabs/core-smoke-find.c103b2c087c1.webp)](https://myarc.dev/blog/thousand-tabs/core-smoke-find.c103b2c087c1.webp)
 
 Find-in-page highlighting matches inside the glass bar.
 
-[![myArc showing docked Chromium DevTools inspecting the local test page](https://myarc.dev/blog/thousand-tabs/core-smoke-devtools.8491e57988cc.webp)](https://myarc.dev/blog/thousand-tabs/core-smoke-devtools.8491e57988cc.webp)
+[![myArc showing docked Chromium DevTools inspecting the local test page](https://myarc.dev/blog/thousand-tabs/core-smoke-devtools.1ded77d13111.webp)](https://myarc.dev/blog/thousand-tabs/core-smoke-devtools.1ded77d13111.webp)
 
 Docked DevTools inspecting the same page.
 

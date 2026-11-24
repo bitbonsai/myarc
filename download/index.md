@@ -4,12 +4,12 @@ HTML: https://myarc.dev/download/
 
 Alpha build, for trying the Arc-like shell. Not yet for daily or sensitive browsing.
 
-[Download for macOS (Apple silicon)](https://github.com/bitbonsai/myarc/releases/download/nightly-2026.11.23.1/myArc-Nightly-2026.11.23.1-arm64.dmg)
+[Download for macOS (Apple silicon)](https://github.com/bitbonsai/myarc/releases/download/v2026.11.24/myArc-2026.11.24-arm64.dmg)
 
-- **Version:** 2026.11.23.1
-- **Date:** November 23, 2026
-- **Size:** 184.2 MB
-- **SHA-256:** `35495145451e8638272cbfcf2cfd327ad6552bed6a126730b82cebbbb6282666`
+- **Version:** 2026.11.24
+- **Date:** November 24, 2026
+- **Size:** 184.8 MB
+- **SHA-256:** `ee77a30fed6b4ee7b3b56c98ba71d0c163c2c9a0830b585d2a8640d3fe03b805`
 
 ## System requirements
 
@@ -21,10 +21,10 @@ Alpha build, for trying the Arc-like shell. Not yet for daily or sensitive brows
 1. Check the download against the SHA-256 listed with it. The two values must match.
 
    ```
-   shasum -a 256 ~/Downloads/myArc-Nightly-2026.11.23.1-arm64.dmg
+   shasum -a 256 ~/Downloads/myArc-2026.11.24-arm64.dmg
    ```
-2. Open the DMG and drag myArc Nightly to Applications.
-3. Open myArc Nightly. From 2026.11.18 on, Apple has notarized each build, so macOS only asks once whether to open an app downloaded from the internet. Choose Open.
+2. Open the DMG and drag myArc to Applications.
+3. Open myArc. Apple has notarized each build, so macOS only asks once whether to open an app downloaded from the internet. Choose Open.
 
 ## What works today
 
@@ -59,7 +59,7 @@ Each item was seen working in a native run or experiment note. None of it has ha
 
 ## Other ways to get it
 
-- [GitHub releases](https://github.com/bitbonsai/myarc/releases/tag/nightly-2026.11.23.1) lists every build.
+- [GitHub releases](https://github.com/bitbonsai/myarc/releases/tag/v2026.11.24) lists every build.
 - [Source on GitHub](https://github.com/bitbonsai/myarc), with instructions to [build it from source](https://github.com/bitbonsai/myarc/blob/main/browser/README.md).
 - [GitHub issues](https://github.com/bitbonsai/myarc/issues) take bug reports. Include the version, your macOS version and the steps that trigger the problem, and leave out private pages.
 
