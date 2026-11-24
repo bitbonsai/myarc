@@ -30,6 +30,7 @@
 #include "ui/views/context_menu_controller.h"
 #include "ui/views/view.h"
 #include "ui/views/view_tracker.h"
+#include "url/gurl.h"
 
 namespace ui {
 class Event;
@@ -77,6 +78,7 @@ class SidebarView final : public views::View,
   struct ItemPresentation {
     std::u16string title;
     ui::ImageModel icon;  // Parent supplies a favicon, preferably 16 or 20 DIP.
+    GURL current_url;     // Live page URL when loaded; empty for dormant rows.
     bool is_live = false;
     // A Pin's or Favorite's live page has left its saved URL (BC-003).
     bool navigated_away = false;

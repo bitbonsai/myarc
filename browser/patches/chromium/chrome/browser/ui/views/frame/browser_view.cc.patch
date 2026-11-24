@@ -1,5 +1,5 @@
 diff --git a/chrome/browser/ui/views/frame/browser_view.cc b/chrome/browser/ui/views/frame/browser_view.cc
-index 7b568f6de760af21d6e9d2aa44415a7cef617c51..2e6aa5704742192598d86e4af55aa91d820f74c5 100644
+index 7b568f6de760af21d6e9d2aa44415a7cef617c51..42905c24ea332894d855bdfda8143122d7d185db 100644
 --- a/chrome/browser/ui/views/frame/browser_view.cc
 +++ b/chrome/browser/ui/views/frame/browser_view.cc
 @@ -11,6 +11,7 @@
@@ -2793,7 +2793,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..2e6aa5704742192598d86e4af55aa91d
  }
  
  void BrowserView::RemovedFromWidget() {
-@@ -5267,104 +7628,3155 @@ const views::View* BrowserView::GetViewByElementId(
+@@ -5267,104 +7628,3156 @@ const views::View* BrowserView::GetViewByElementId(
  ///////////////////////////////////////////////////////////////////////////////
  // BrowserView, ui::AcceleratorTarget overrides:
  
@@ -3622,6 +3622,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..2e6aa5704742192598d86e4af55aa91d
 +  myarc::SidebarView::ItemPresentation result;
 +  if (auto metadata = myarc_workspace_adapter_->Metadata(item.id)) {
 +    result.title = metadata->title;
++    result.current_url = metadata->current_url;
 +    // An empty page, such as New Split's blank pane, reads like New Tab
 +    // rather than "about:blank".
 +    if (metadata->current_url.IsAboutBlank() &&
@@ -6026,7 +6027,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..2e6aa5704742192598d86e4af55aa91d
  
  bool BrowserView::MaybeShowBookmarkBar(WebContents* contents) {
    const bool show_bookmark_bar =
-@@ -5471,6 +10883,10 @@ bool BrowserView::MaybeUpdateDevtools(content::WebContents* contents) {
+@@ -5471,6 +10884,10 @@ bool BrowserView::MaybeUpdateDevtools(content::WebContents* contents) {
  
  void BrowserView::UpdateUIForContents(WebContents* contents,
                                        bool should_layout_immediately) {
@@ -6037,7 +6038,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..2e6aa5704742192598d86e4af55aa91d
    TRACE_EVENT0("ui", "BrowserView::UpdateUIForContents");
    bool needs_layout = MaybeShowBookmarkBar(contents);
  
-@@ -5706,6 +11122,26 @@ void BrowserView::LoadAccelerators() {
+@@ -5706,6 +11123,26 @@ void BrowserView::LoadAccelerators() {
    }
  
  #if BUILDFLAG(IS_MAC)

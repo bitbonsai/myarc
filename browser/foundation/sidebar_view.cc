@@ -2212,11 +2212,17 @@ std::unique_ptr<views::View> SidebarView::MakeItem(
     return row;
   };
   std::unique_ptr<myarc::LocalPageChip> port_chip;
-  if (!in_split && item.has_url) {
-    auto chip = std::make_unique<myarc::LocalPageChip>(
-        myarc::LocalPageChip::Style::kSidebarTab);
-    if (chip->Update(GURL(std::string(item.canonical_url)))) {
-      port_chip = std::move(chip);
+  if (!in_split) {
+    const GURL row_url =
+        !presentation.current_url.is_empty()
+            ? presentation.current_url
+            : (item.has_url ? GURL(std::string(item.canonical_url)) : GURL());
+    if (!row_url.is_empty()) {
+      auto chip = std::make_unique<myarc::LocalPageChip>(
+          myarc::LocalPageChip::Style::kSidebarTab);
+      if (chip->Update(row_url)) {
+        port_chip = std::move(chip);
+      }
     }
   }
   if (item.placement != foundation::PlacementKind::Temporary &&

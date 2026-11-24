@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-11-24: Show sidebar tab port chip from live URL
+
+- Added `current_url` to `SidebarView::ItemPresentation` (`browser/foundation/sidebar_view.{h,cc}`, `chrome/browser/ui/views/frame/browser_view.cc`) so non-split sidebar tab rows build `LocalPageChip` from the live tab's `metadata->current_url`, falling back to `item.canonical_url` for dormant rows.
+- Fixes missing `:port` tags on live Today tabs that have not persisted `canonical_url` yet (including connection-refused local dev pages) and pinned tabs navigated to local ports.
+- Evidence: Chromium `myarc` commit `ae0269b095` built in `out/MyarcNightly`, exported with `tools/export_patches.py --check` (154 patches), and verified via background capture `/tmp/myarc-port-chip-fix.png` showing `:4321` on a live `ERR_CONNECTION_REFUSED` localhost tab and `:9` on a dormant local tab.
+
 ## 2026-11-24: Sidebar location bar tint and compact local port chips
 
 - Local development pages now tint the full sidebar location bar system blue, show `localhost` at rest for `localhost` / `127.0.0.1`, move the `:port` chip to the trailing edge without the `</>` icon, and show a compact blue `:port` tag on non-split sidebar tab rows.
