@@ -20,11 +20,11 @@ So I added `page.screenshot`, `page.scroll` and `page.wait` to the `myarc` CLI a
 
 ## Localhost without the purple bar
 
-![Side-by-side comparison of the same local test form in Arc on the left with its purple top localhost banner and myArc on the right with a thin blue viewport border and compact port tag in the URL pill](localhost-comparison.png)
+![Side-by-side comparison of the same local test form on localhost:4321 in Arc on the left with its purple top banner and myArc on the right with a thin blue viewport border, a blue-tinted URL pill with a :4321 chip, and a :4321 badge on the sidebar tab](localhost-comparison-v2.png)
 
 *The same local test page in Arc (left) and myArc (right).*
 
-Arc puts a thick purple bar across the top of local pages. myArc draws a thin blue border around the viewport and shows a `</> :port` tag in the URL pill instead, so you keep your vertical space.
+Arc puts a thick purple bar across the top of local pages. myArc draws a thin blue border around the viewport and marks the port with a `:4321` chip in both the tinted URL pill and the sidebar tab. You keep your vertical space and can tell which local server is running on each tab at a glance.
 
 ## A new icon for the Agent Space
 
