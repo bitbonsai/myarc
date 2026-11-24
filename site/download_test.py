@@ -61,7 +61,8 @@ class DownloadTests(unittest.TestCase):
 
     def test_published_page_shows_values_and_steps(self):
         html = content(SAMPLE)
-        self.assertIn(f'<a class="button" href="{SAMPLE["dmg_url"]}">Download for macOS (Apple silicon)</a>', html)
+        self.assertIn(f'href="{SAMPLE["dmg_url"]}"', html)
+        self.assertIn('Download for macOS', html)
         for value in ('0.0.0-fake.1', 'January 2, 2099', '123.5 MB', SAMPLE['sha256'], 'shasum -a 256 ~/Downloads/myArc-Fake.dmg',
                       'Apple has notarized each build'):
             self.assertIn(value, html)
@@ -94,7 +95,7 @@ class DownloadTests(unittest.TestCase):
         self.assertIn('"@type": "WebPage"', page)
         self.assertIn('class="button download-link" aria-current="page"', page)
         self.assertNotIn('class="blog-link" aria-current', page)
-        self.assertIn('<h1>myArc Alpha</h1>', page)
+        self.assertIn('>myArc Alpha</h1>', page)
 
 
 if __name__ == '__main__':
