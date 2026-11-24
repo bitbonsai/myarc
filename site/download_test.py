@@ -27,7 +27,7 @@ class DownloadTests(unittest.TestCase):
         self.assertIsNone(load(None))
         self.assertIsNone(load({**SAMPLE, 'published': False, 'sha256': '', 'size_bytes': 0}))
         html = content(None)
-        self.assertIn('First nightly coming soon', html)
+        self.assertIn('First alpha build coming soon', html)
         self.assertNotIn('.dmg', html)
         self.assertNotIn('class="button"', html)
         self.assertNotIn('First launch', html)
@@ -63,7 +63,7 @@ class DownloadTests(unittest.TestCase):
         html = content(SAMPLE)
         self.assertIn(f'<a class="button" href="{SAMPLE["dmg_url"]}">Download for macOS (Apple silicon)</a>', html)
         for value in ('0.0.0-fake.1', 'January 2, 2099', '123.5 MB', SAMPLE['sha256'], 'shasum -a 256 ~/Downloads/myArc-Fake.dmg',
-                      'Apple has notarized each nightly'):
+                      'Apple has notarized each build'):
             self.assertIn(value, html)
         self.assertIn('H.264 and AAC are included', html)
         self.assertIn('H.264 and AAC are not included', content({**SAMPLE, 'proprietary_codecs': False}))
@@ -71,7 +71,7 @@ class DownloadTests(unittest.TestCase):
     def test_release_notes_share_the_page_warnings(self):
         notes = release_notes(SAMPLE)
         self.assertIn(SAMPLE['sha256'], notes)
-        self.assertIn('Apple has notarized each nightly', notes)
+        self.assertIn('Apple has notarized each build', notes)
         self.assertNotIn('xattr', notes)
         for line in limitations(SAMPLE):
             self.assertIn(line, notes)
@@ -82,7 +82,7 @@ class DownloadTests(unittest.TestCase):
         self.assertIn('Follow development', off)
         self.assertNotIn('<!--', off.split('<body>')[1])
         self.assertEqual(on.count('href="/download/"'), 4)
-        self.assertIn(f"Download the {SAMPLE['version']} nightly", on)
+        self.assertIn(f"Download myArc Alpha {SAMPLE['version']}", on)
         self.assertIn('Download alpha', on)
         self.assertIn('See what works', on)
 
@@ -94,7 +94,7 @@ class DownloadTests(unittest.TestCase):
         self.assertIn('"@type": "WebPage"', page)
         self.assertIn('class="button download-link" aria-current="page"', page)
         self.assertNotIn('class="blog-link" aria-current', page)
-        self.assertIn('<h1>myArc alpha nightly</h1>', page)
+        self.assertIn('<h1>myArc Alpha</h1>', page)
 
 
 if __name__ == '__main__':

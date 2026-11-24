@@ -16,9 +16,9 @@ KEYS = {'published', 'version', 'date', 'dmg_url', 'size_bytes', 'sha256', 'rele
 # EdDSA signature from tools/package_nightly.sh.
 OPTIONAL = {'ed_signature'}
 DEFAULTS = {'release_url': REPO + '/releases', 'min_macos': '26', 'proprietary_codecs': False}
-TITLE = 'myArc alpha nightly'
-STATUS = 'Alpha nightly, for trying the Arc-like shell. Not yet for daily or sensitive browsing.'
-SUMMARY = 'Alpha nightly of myArc for macOS on Apple silicon: requirements, first launch, what works, known limitations and how to report problems.'
+TITLE = 'myArc Alpha'
+STATUS = 'Alpha build, for trying the Arc-like shell. Not yet for daily or sensitive browsing.'
+SUMMARY = 'myArc Alpha for macOS on Apple silicon: requirements, first launch, what works, known limitations and how to report problems.'
 APP = '/Applications/myArc Nightly.app'
 
 WORKS = [
@@ -141,7 +141,7 @@ def codecs(release):
 
 def limitations(release):
     return ['Built from a Chromium 158 development revision, not a stable release.',
-            'myArc checks for a new nightly once a day and asks before installing it, and Check for Updates… in the myArc menu checks right away. Nightlies get no separate security updates.' if 'ed_signature' in (release or {}) else 'No automatic updates and no security updates. Install each new nightly by hand.',
+            'myArc checks for a new alpha build once a day and asks before installing it, and Check for Updates… in the myArc menu checks right away. Alpha builds get no separate security updates.' if 'ed_signature' in (release or {}) else 'No automatic updates and no security updates. Install each new build by hand.',
             'From 2026.11.03 on, nightlies are signed with an Apple Developer ID that later nightlies keep. macOS asks once more for your login password so it can read the saved-data key; choose Always Allow, and newer nightlies stop asking.',
             'Recent tabs and navigation can be lost after a crash or force quit.',
             'Profile, cookie and credential guarantees are not verified.',
@@ -155,13 +155,13 @@ def first_launch(release):
     name = release['dmg_url'].rsplit('/', 1)[1]
     return [('Check the download against the SHA-256 listed with it. The two values must match.', f'shasum -a 256 ~/Downloads/{name}'),
             ('Open the DMG and drag myArc Nightly to Applications.', None),
-            ('Open myArc Nightly. From 2026.11.18 on, Apple has notarized each nightly, so macOS only asks once whether to open an app downloaded from the internet. Choose Open.', None)]
+            ('Open myArc Nightly. From 2026.11.18 on, Apple has notarized each build, so macOS only asks once whether to open an app downloaded from the internet. Choose Open.', None)]
 
 
 def release_notes(release):
     name = release['dmg_url'].rsplit('/', 1)[1]
     shown = facts(release)
-    out = [f'# myArc alpha nightly {release["version"]}', '', STATUS, '', '## Download', '',
+    out = [f'# myArc Alpha {release["version"]}', '', STATUS, '', '## Download', '',
            f'- File: `{name}` ({shown["Size"]})',
            f'- Released: {shown["Date"]}',
            f'- SHA-256: `{release["sha256"]}`', '']
@@ -185,7 +185,7 @@ def content(release):
         rows = ''.join(f'<li><strong>{label}:</strong> {"<code>" + escape(value) + "</code>" if label == "SHA-256" else escape(value)}</li>' for label, value in facts(release).items())
         box = f'<div class="download-box"><a class="button" href="{escape(release["dmg_url"], quote=True)}">Download for macOS (Apple silicon)</a><ul class="download-facts">{rows}</ul></div>'
     else:
-        box = f'<div class="download-box"><h2>First nightly coming soon</h2><p>There is no download yet. The <a href="{escape(DEFAULTS["release_url"], quote=True)}">releases page</a> will list each nightly when it exists.</p></div>'
+        box = f'<div class="download-box"><h2>First alpha build coming soon</h2><p>There is no download yet. The <a href="{escape(DEFAULTS["release_url"], quote=True)}">releases page</a> will list each build when it exists.</p></div>'
     html = box + '<h2>System requirements</h2>' + item_list(requirements(release))
     if release:
         steps = ''
@@ -194,13 +194,13 @@ def content(release):
         html += f'<h2>First launch</h2><ol>{steps}</ol>'
     html += '<h2>What works today</h2><p>Each item was seen working in a native run or experiment note. None of it has had release testing.</p>' + item_list(WORKS)
     html += ('<h2>Known limitations</h2>'
-             + item_list([('myArc checks for new nightlies itself and asks before it installs one, but there are no scheduled security updates yet.' if release and release.get('ed_signature') else 'No automatic updates and no security updates. Install each new nightly by hand.'),
+             + item_list([('myArc checks for new alpha builds itself and asks before it installs one, but there are no scheduled security updates yet.' if release and release.get('ed_signature') else 'No automatic updates and no security updates. Install each new build by hand.'),
                           'Recent tabs and navigation can be lost after a crash or force quit.',
                           codecs(release)])
              + '<p><a href="/docs/known-limitations/">Known limitations</a> lists the rest, with what does not work yet and what to do after a crash.</p>')
     shown = (release or DEFAULTS)['release_url']
     html += ('<h2>Other ways to get it</h2><ul>'
-             f'<li><a href="{escape(shown, quote=True)}">GitHub releases</a> lists every nightly.</li>'
+             f'<li><a href="{escape(shown, quote=True)}">GitHub releases</a> lists every build.</li>'
              f'<li><a href="{REPO}">Source on GitHub</a>, with instructions to <a href="{REPO}/blob/main/browser/README.md">build it from source</a>.</li>'
              f'<li><a href="{REPO}/issues">GitHub issues</a> take bug reports. Include the version, your macOS version and the steps that trigger the problem, and leave out private pages.</li></ul>')
     html += ('<h2>License and notices</h2>'
@@ -224,10 +224,10 @@ def apply_release(template, release):
     """Add the header link and homepage call to action only for a published release."""
     link = '<a class="button download-link" href="/download/">Download alpha</a>' if release else ''
     template = template.replace('<!--download-nav-->', link)
-    big = f'<a class="button stacked" href="/download/">Download alpha<small>Nightly v{escape(release["version"])}</small></a>' if release else ''
+    big = f'<a class="button stacked" href="/download/">Download alpha<small>v{escape(release["version"])}</small></a>' if release else ''
     works = big
     template = template.replace('<!--works-download-->', works)
-    latest = f'<a href="/download/">Download the {release["version"]} nightly &rarr;</a> ' if release else ''
+    latest = f'<a href="/download/">Download myArc Alpha {release["version"]} &rarr;</a> ' if release else ''
     template = template.replace('<!--latest-nightly-->', latest)
     if release:
         template = re.sub(r'<!--cta-->.*?<!--/cta-->', lambda _: big, template, count=1, flags=re.S)
