@@ -6,9 +6,9 @@ HTML: https://myarc.dev/blog/thousand-tabs/
 
 November 23, 2026
 
-[Mauricio Wolff](https://github.com/bitbonsai)4 min read
+[Mauricio Wolff](https://github.com/bitbonsai)3 min read
 
-Alpha went out yesterday, and I wanted to put the signed app through a real test to see what breaks. I let an agent drive it and stuffed a thousand tabs into the sidebar. Then I cut the internet to see if it ever called home.
+Alpha went out yesterday, and I wanted to put the signed app through a real test to see what breaks. I let an agent drive it and stuffed a thousand tabs into the sidebar.
 
 Build `2026.11.23.1` is what came out of that.
 
@@ -18,7 +18,7 @@ When I first wired up browser control, agents only got a text outline of the pag
 
 Then I pointed Claude Code at the packaged app on a local test page. It filled out the form and ignored the prompt-injection text I'd hidden there, which was nice to see. Still, a text outline only goes so far when an agent needs to see how something rendered or reach a button off-screen.
 
-So I added `page.screenshot`, `page.scroll` and `page.wait` to the `myarc` CLI and MCP server. Screenshots come straight from the compositor as MCP image blocks, and `page.wait` listens for the real load event with a timeout so the agent stops guessing with sleep timers. Everything stays locked inside the Agent Space behind the Allow card and Stop button. Your own Spaces and Profiles stay untouched.
+So I added `page.screenshot`, `page.scroll` and `page.wait` to the `myarc` CLI and MCP server. Screenshots come straight from Chromium as MCP image blocks, and `page.wait` listens for the real load event with a timeout so the agent stops guessing with sleep timers. Everything stays locked inside the Agent Space behind the Allow card and Stop button. Your own Spaces and Profiles stay untouched.
 
 ## Localhost without the purple bar
 
@@ -36,7 +36,7 @@ Looking through screenshots all afternoon, the Agent Space icon started to bothe
 
 The new icon in the Space header and sidebar footer.
 
-## A thousand tabs and no calls home
+## A thousand tabs
 
 Arc people tend to hoard tabs, so I wanted to see what happens when myArc has to carry that weight. I loaded a fresh profile with ten Spaces and a hundred dormant items each, a thousand in all, on an Apple M5 Pro.
 
@@ -46,7 +46,7 @@ It held up better than I expected. The first window opened in `797.5ms`, and mem
 
 A thousand dormant items across ten Spaces, with the command bar open over the window.
 
-After that I ran automated checks on the everyday stuff you only think about when it breaks: native notification prompts, frosted find-in-page, docked DevTools and SQLite history. Then I blocked external DNS and watched every network request from a clean profile. It opened straight into a workspace with no account prompt and pinned a local page to disk. Not a single request went to a myArc server.
+While testing, I also checked frosted find-in-page and docked DevTools on the same build.
 
 [![myArc showing frosted find-in-page highlighting matches on a local test page](https://myarc.dev/blog/thousand-tabs/core-smoke-find.5cbc653dfcd8.webp)](https://myarc.dev/blog/thousand-tabs/core-smoke-find.5cbc653dfcd8.webp)
 
