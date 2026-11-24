@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-11-24: Publish `v2026.11.24.1` release
+
+- Packaged, Developer ID signed, Apple notarized, stapled, and Sparkle EdDSA-signed `myArc-2026.11.24.1-arm64.dmg` (184,766,961 bytes, SHA-256 `07fb5e2c...02c6`) from `main` `38e0085` and Chromium `11a53a9fa1` (Arc-aligned tab context menu with Mute, Duplicate, unified Move to, Archive Tab, and Archive Tabs Below).
+- Published GitHub prerelease `v2026.11.24.1`, updated `site/release.json`, and rebuilt `site/index.html` and `appcast.xml`.
+- Evidence: `codesign --verify`, `spctl` Notarized Developer ID acceptance on both `myArc.app` and DMG, DMG HTTP 200 check, and `site/build.py`, site tests, `check.py`, `check_seo.py`, and `check_docs.py` all pass.
+
 ## 2026-11-24: Arc-aligned tab context menu with Mute, Duplicate, Move to, and Archive Tabs Below
 
 - Reorganized the sidebar tab context menu (`browser/foundation/sidebar_view.{h,cc}`, `browser_workspace_adapter.{h,cc}`, `chrome/browser/ui/views/frame/browser_view.{h,cc}`) to match Arc's grouping while keeping myArc's Pin / Favorites / Folder / Space actions in a unified `Move to` submenu: `Copy Link` (with live `current_url` fallback), `Mute`/`Unmute`, `Open in Split View`, `Duplicate`, `Move to`, `Archive Tab`, and `Archive Tabs Below`.
