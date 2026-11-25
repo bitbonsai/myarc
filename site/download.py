@@ -158,7 +158,7 @@ def limitations(release):
             'myArc checks for a new alpha build once a day and asks before installing it, and Check for Updates… in the myArc menu checks right away. Alpha builds get no separate security updates.' if 'ed_signature' in (release or {}) else 'No automatic updates and no security updates. Install each new build by hand.',
             'Builds are signed with an Apple Developer ID that later builds keep. macOS may ask once for your login password so it can read the saved-data key; choose Always Allow, and newer builds stop asking.',
             'Recent tabs and navigation can be lost after a crash or force quit.',
-            'Profile, cookie and credential guarantees are not verified.',
+            'Saved-password and credential guarantees are not verified yet.',
             'RAR downloads are not scanned by Safe Browsing, because the UnRAR license conflicts with GPL-3.0.',
             'No Widevine, so Netflix, Spotify and Disney+ will not play.',
             codecs(release),
@@ -204,7 +204,7 @@ def _caveats(release):
         ('Chromium 158 dev', updates),
         ('Media playback', f'No Widevine, so Netflix, Spotify and Disney+ will not play. {codecs(release)}'),
         ('Crashes', 'Pins, folders and Spaces survive a force quit. Recent tabs can still be lost.'),
-        ('Early guarantees', 'Profile separation, cookie isolation and saved-password checks are not verified yet.'),
+        ('Early guarantees', 'Saved-password and credential checks are not verified yet.'),
     ]
 
 
@@ -446,7 +446,7 @@ def apply_release(template, release):
     """Add the header link and homepage call to action only for a published release."""
     link = '<a class="button download-link" href="/download/">Download alpha</a>' if release else ''
     template = template.replace('<!--download-nav-->', link)
-    big = f'<a class="button stacked" href="/download/">Download alpha<small>v{escape(release["version"])}</small></a>' if release else ''
+    big = f'<a class="button stacked" href="/download/">Download alpha <small>v{escape(release["version"])}</small></a>' if release else ''
     works = big
     template = template.replace('<!--works-download-->', works)
     latest = f'<a href="/download/">Download myArc Alpha {release["version"]} &rarr;</a> ' if release else ''

@@ -15,7 +15,7 @@ SUMMARY = 'Quick start for myArc: Spaces, pinned tabs, the command bar, Peek, Sp
 # (title, text, a second line of detail, docs link or None, art).
 # Only features with their own docs page or section link out.
 CARDS = [
-    ('Spaces and Profiles', 'A Space holds the tabs for one part of your life, like Work or Travel. A Profile keeps your logins apart, and several Spaces can share one.', '⌃1 to ⌃8 jump to a Space, and ⌥⌘→ moves to the next one.', '/docs/spaces-and-profiles/', 'spaces'),
+    ('Spaces and Profiles', 'A Space holds the tabs for one part of your life, like Work or Travel. A Profile keeps your logins apart, and several Spaces can share one.', '⌃1 to ⌃9 jump to a Space, and ⌥⌘→ moves to the next one.', '/docs/spaces-and-profiles/', 'spaces'),
     ('Pinned tabs and Favorites', 'Press ⌘D to pin a tab to its Space. Favorites show in every Space of a Profile, and closing either one keeps its tile.', 'Press ⌘D again to unpin it. To remove a Favorite, use its right-click menu.', '/docs/spaces-and-profiles/#pinned-tabs-and-favorites', 'pinned'),
     ('Command bar', '⌘T opens it for a new tab and ⌘L on the current address. Type an action like pin or split to run it, or press Tab to list only actions.', 'Tab again leaves the actions list. The arrow keys move through suggestions, Enter opens one and Esc closes the bar.', None, 'command'),
     ('Peek', 'A link from a pinned tab or Favorite to another site opens in a card over the page. Press ⌘O to keep it as a tab.', 'Esc or a click outside closes it, and ⇧⌘T brings it back.', '/docs/peek/', 'peek'),
@@ -37,6 +37,7 @@ LINKS = [
     ('Docs', '/docs/', 'How everything works, and what is still missing.'),
     ('Release notes', '/download/', 'What works in this build, and the latest download.'),
     ('GitHub', REPO, 'The code, the plans and the roadmap.'),
+    ('Feedback and chat', 'https://myarc.slirc.app', 'Share what works or feels rough at myarc.slirc.app.'),
     ('Report an issue', REPO + '/issues', 'Found a bug? Tell me what happened.'),
 ]
 

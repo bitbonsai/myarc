@@ -47,8 +47,8 @@ def build_discovery(root, homepage, posts, docs=()):
         markdown = markdown_page(html, url)
         target.write_text(markdown)
         full.append(markdown)
-    index = '# myArc\n\n> A pre-release open-source browser project inspired by Arc, built on Chromium with a Rust-owned workspace core.\n\n'
-    index += 'A complete myArc browser remains unimplemented, and the Arc importer brings over only Spaces and pinned tabs. Native integration is experimental. Arc reference screenshots illustrate the target appearance. Local ownership and optional AI are product requirements, not evidence of a finished release.\n\n'
+    index = '# myArc\n\n> An open-source browser bringing back Arc, built on Chromium with a Rust-owned workspace core.\n\n'
+    index += 'Signed, notarized macOS Apple silicon alpha builds are available now (macOS 26+). One-click Arc import brings over Favorites, Spaces, folders, pinned tabs and multiple Profiles. Built-in ad blocking (uBlock Origin Lite), Chromium extensions, Split View, Peek, Little Arc, animated onboarding and opt-in CLI/MCP agent control ship in the alpha. Windows and Linux builds, Boosts, workspace export and optional AI are still ahead.\n\n'
     index += '## Project\n\n- [Overview](https://myarc.dev/index.md): Markdown equivalent of the homepage.\n- [Progress journal](https://myarc.dev/blog/index.md): Published development updates.\n- [Download](https://myarc.dev/download/index.md): Alpha build status, requirements and known limitations.\n- [Repository](https://github.com/bitbonsai/myarc): Public source and plans.\n\n'
     if docs:
         index += '## Docs\n\n- [Docs index](https://myarc.dev/docs/index.md): User guides for people moving from Arc.\n'

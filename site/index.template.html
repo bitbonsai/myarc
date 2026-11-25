@@ -6,7 +6,7 @@
   <meta name="color-scheme" content="light dark">
   <meta name="theme-color" content="#f5f2ec" media="(prefers-color-scheme: light)">
   <meta name="theme-color" content="#0b1420" media="(prefers-color-scheme: dark)">
-  <title>myArc, forever yours. | Open-source browser project</title>
+  <title>myArc, forever yours. | Open-source browser</title>
   <meta name="description" content="An open-source browser bringing back Arc, with no account required and optional AI.">
   <link rel="canonical" href="https://myarc.dev/">
   <link rel="icon" type="image/png" href="@@FAVICON@@">
@@ -480,7 +480,7 @@
           </li>
           <li>
             <h3>Keep what worked</h3>
-            <p>If you used Arc, you already know myArc. Where they differ, onboarding shows you.</p>
+            <p>If you used Arc, you already know myArc. One-click import brings over your Spaces, Favorites and pinned tabs.</p>
           </li>
           <li>
             <h3>AI by choice</h3>
@@ -488,7 +488,7 @@
           </li>
           <li>
             <h3>Built in the open</h3>
-            <p>The plans and decisions are public too, not just the code. If I stop, anyone can pick it up where I left off.</p>
+            <p>The code is GPL-3.0, and the plans and decisions are public too. If I stop, anyone can pick it up where I left off.</p>
           </li>
         </ul>
       </section>
@@ -496,21 +496,21 @@
       <section class="block" id="building" aria-labelledby="building-title">
         <h2 id="building-title">Where it stands</h2>
         <div class="stands-shot">
-          <div class="peek"><div class="peek-crop"><picture><source media="(prefers-color-scheme: dark)" srcset="@@PRODUCT_SHOT_DARK@@"><img class="shot" src="@@PRODUCT_SHOT_LIGHT@@" alt="A myArc window showing mauriciowolff.com. The sidebar holds the address field, three Favorites, the Everyday Space with its pinned tabs, a New Tab row and two open tabs, with the mauriciowolff.com pin selected." width="2368" height="1480" decoding="async"></picture></div></div>
+          <div class="peek"><div class="peek-crop"><picture><source media="(prefers-color-scheme: dark)" srcset="@@PRODUCT_SHOT_DARK@@"><img class="shot" src="@@PRODUCT_SHOT_LIGHT@@" alt="A myArc window showing mauriciowolff.com. The sidebar holds the address field, three Favorites, the Everyday Space with an open Projects folder holding pinned tabs, a closed Reading folder, a New Tab row, an open tab and a Split View row, with the mauriciowolff.com pin selected." width="2368" height="1480" decoding="async"></picture></div></div>
           <p class="peek-actions"><a class="button ghost peek-button peek-light" href="/product-window-light.webp">See it full size</a><a class="button ghost peek-button peek-dark" href="/product-window-dark.webp">See it full size</a></p>
         </div>
         <ul class="grid stands">
           <li>
             <h3>Works now</h3>
-            <p>Spaces, pinned tabs and Favorites, the Library, tabs that survive a restart, and AI agents that browse in a Space of their own.</p>
+            <p>Spaces across isolated Profiles, Favorites, pinned tabs and folders, Split View, Peek, Little Arc, one-click Arc import, built-in ad blocking, Chromium extensions, and opt-in CLI and MCP agent control.</p>
           </li>
           <li>
-            <h3>Next, for alpha</h3>
-            <p>Split view, Little Arc and onboarding.</p>
+            <h3>Next, for beta</h3>
+            <p>Nested folders, multi-pane Split View, workspace export, Boosts, and durability, accessibility and memory gates.</p>
           </li>
           <li>
-            <h3>After alpha</h3>
-            <p>Builds for Windows and Linux.</p>
+            <h3>Later</h3>
+            <p>Windows and Linux builds, plus optional AI with a local model, your own API key, or a hosted option.</p>
           </li>
         </ul>
         <p class="stands-links"><!--latest-release--><a class="alpha-link" href="https://github.com/bitbonsai/myarc/blob/main/docs/ALPHA.md">Full alpha checklist &rarr;</a></p>
@@ -520,6 +520,10 @@
         <h2 id="docs-title">Read along</h2>
         <ul class="grid docs">
           <li>
+            <a href="/docs/">User docs</a>
+            <p>Install, Spaces and Profiles, shortcuts, Arc import and known limitations.</p>
+          </li>
+          <li>
             <a href="https://github.com/bitbonsai/myarc/blob/main/ROADMAP.md">Roadmap</a>
             <p>Milestones, dependencies and the gates a release has to pass.</p>
           </li>
@@ -528,16 +532,12 @@
             <p>Why Chromium, and what Rust owns.</p>
           </li>
           <li>
-            <a href="https://github.com/bitbonsai/myarc/blob/main/docs/MIGRATION.md">Arc migration</a>
-            <p>What an Arc import brings over, what it leaves out, and how export will work.</p>
-          </li>
-          <li>
-            <a href="https://github.com/bitbonsai/myarc/blob/main/docs/AI.md">AI and services</a>
-            <p>Provider choices, privacy rules and how a hosted option would be paid for.</p>
-          </li>
-          <li>
-            <a href="https://github.com/bitbonsai/myarc/blob/main/docs/CONTROL-PROTOCOL.md">CLI and MCP control</a>
+            <a href="/docs/cli-and-mcp/">CLI and MCP control</a>
             <p>How the terminal and AI agents drive the browser, and what you let them do.</p>
+          </li>
+          <li>
+            <a href="https://myarc.slirc.app">Feedback and chat</a>
+            <p>Share what works or feels rough at myarc.slirc.app.</p>
           </li>
           <li>
             <a href="https://github.com/bitbonsai/myarc/blob/main/CONTRIBUTING.md">Contributing</a>
@@ -558,20 +558,18 @@
     <form method="dialog"><button class="works-close" aria-label="Close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button></form>
     <h2 id="works-title">What works today</h2>
     <ul>
-      <li>Browsing, with Chromium extensions</li>
-      <li>Spaces: create, switch, rename and reorder them</li>
-      <li>Pinned tabs and Favorites, kept across restarts</li>
-      <li>The Library: Downloads, Archived Tabs and your Spaces</li>
-      <li>Command bar <kbd>Cmd+L</kbd> and Arc's shortcuts</li>
-      <li>Hide the sidebar with <kbd>Cmd+S</kbd>, peek it from the window edge</li>
-      <li>AI agents browse in their own Agent Space, after you allow them</li>
-      <li>Import Spaces, folders and pinned tabs from an Arc export</li>
-      <li>Split View with two tabs side by side</li>
-      <li>Peek, for links that open over the page</li>
-      <li>Ad and tracker blocking, on by default</li>
-      <li>Little Arc, a small window for links from other apps</li>
+      <li>Browsing with Chromium extensions and bundled ad and tracker blocking (uBlock Origin Lite)</li>
+      <li>Spaces across multiple isolated Profiles, with custom themes and icons</li>
+      <li>Favorites, pinned tabs and folders, kept across restarts and force quits</li>
+      <li>Two-pane Split View and Peek overlays for links from pinned tabs</li>
+      <li>Little Arc (<kbd>Cmd+Opt+N</kbd>) for quick lookups and links from other apps</li>
+      <li>One-click import from Arc (Favorites, Spaces, folders, pins and Profiles)</li>
+      <li>Command bar <kbd>Cmd+L</kbd> and Arc's shortcuts, including <kbd>Cmd+S</kbd> to hide the sidebar</li>
+      <li>The Library (Downloads, Archived Tabs, Spaces) and Private windows</li>
+      <li>Opt-in CLI (<code>myarc</code>) and MCP (<code>myarc mcp</code>) agent control in an Agent Space</li>
+      <li>Animated welcome tour and signed, notarized in-app updates</li>
     </ul>
-    <p class="works-later">Not yet: Boosts, the Mini Player.</p>
+    <p class="works-later">Not yet: nested folders, multi-pane Split View, Boosts, workspace export, Mini Player, Windows and Linux.</p>
     <div class="works-actions"><!--works-download--><a href="https://github.com/bitbonsai/myarc#try-it">Full list on GitHub →</a></div>
   </dialog>
   <dialog id="alpha-checklist" class="works alpha" aria-labelledby="alpha-title">
@@ -588,44 +586,44 @@
       <section>
         <h3>Split view</h3>
         <ul>
-          <li><span class="state state-partial">Partial</span> <span>Create a split</span></li>
-          <li><span class="state state-partial">Partial</span> <span>One sidebar row, kept after a restart</span></li>
-          <li><span class="state state-partial">Partial</span> <span>Focus and the address bar in a split</span></li>
-          <li><span class="state state-partial">Partial</span> <span>Leave a split</span></li>
+          <li><span class="state state-done">Done</span> <span>Create a two-pane split</span></li>
+          <li><span class="state state-done">Done</span> <span>One sidebar row, restored after a restart</span></li>
+          <li><span class="state state-done">Done</span> <span>Focus and the address bar in a split</span></li>
+          <li><span class="state state-done">Done</span> <span>Leave a split</span></li>
         </ul>
       </section>
       <section>
         <h3>Little Arc</h3>
         <ul>
-          <li><span class="state state-partial">Partial</span> <span>Open with <kbd>Cmd+Opt+N</kbd></span></li>
+          <li><span class="state state-done">Done</span> <span>Open with <kbd>Cmd+Opt+N</kbd></span></li>
           <li><span class="state state-done">Done</span> <span>Links from other apps</span></li>
-          <li><span class="state state-partial">Partial</span> <span>Move it into a Space</span></li>
-          <li><span class="state state-done">Done</span> <span>Turn it off</span></li>
+          <li><span class="state state-done">Done</span> <span>Promote into a Space (<kbd>Cmd+O</kbd>)</span></li>
+          <li><span class="state state-done">Done</span> <span>Turn it off in Settings</span></li>
         </ul>
       </section>
       <section>
         <h3>Import and first run</h3>
         <ul>
-          <li><span class="state state-partial">Partial</span> <span>Arc import</span></li>
-          <li><span class="state state-missing">Missing</span> <span>Import report</span></li>
-          <li><span class="state state-partial">Partial</span> <span>Animated onboarding</span></li>
-          <li><span class="state state-missing">Missing</span> <span>Skip, Back and restart in onboarding</span></li>
+          <li><span class="state state-done">Done</span> <span>One-click Arc import and import report</span></li>
+          <li><span class="state state-done">Done</span> <span>Animated onboarding with Reduce Motion</span></li>
+          <li><span class="state state-done">Done</span> <span>Skip, Back and restart in onboarding</span></li>
+          <li><span class="state state-done">Done</span> <span>Quick start page after the tour</span></li>
         </ul>
       </section>
       <section>
         <h3>Browsing and privacy</h3>
         <ul>
           <li><span class="state state-done">Done</span> <span>Ad and tracker blocking, on by default</span></li>
-          <li><span class="state state-partial">Partial</span> <span>Profile isolation</span></li>
-          <li><span class="state state-done">Done</span> <span>Downloads</span></li>
+          <li><span class="state state-done">Done</span> <span>Isolated Profiles and Settings &gt; Profiles</span></li>
+          <li><span class="state state-done">Done</span> <span>Downloads, Extensions and Private windows</span></li>
         </ul>
       </section>
       <section>
         <h3>Durability and distribution</h3>
         <ul>
           <li><span class="state state-done">Done</span> <span>Tabs survive quitting</span></li>
-          <li><span class="state state-partial">Partial</span> <span>Changes survive a crash</span></li>
-          <li><span class="state state-missing">Missing</span> <span>Notarized build</span></li>
+          <li><span class="state state-done">Done</span> <span>Crash and kill durability</span></li>
+          <li><span class="state state-done">Done</span> <span>Notarized builds, signed updates and crash reports</span></li>
         </ul>
       </section>
     </div>
@@ -633,7 +631,7 @@
   </dialog>
   <dialog id="shot-view" class="works shot-view" aria-label="myArc window, full size">
     <form method="dialog"><button class="works-close" aria-label="Close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button></form>
-    <img alt="A myArc window showing mauriciowolff.com. The sidebar holds the address field, three Favorites, the Everyday Space with its pinned tabs, a New Tab row and two open tabs, with the mauriciowolff.com pin selected." width="2368" height="1480">
+    <img alt="A myArc window showing mauriciowolff.com. The sidebar holds the address field, three Favorites, the Everyday Space with an open Projects folder holding pinned tabs, a closed Reading folder, a New Tab row, an open tab and a Split View row, with the mauriciowolff.com pin selected." width="2368" height="1480">
   </dialog>
   <script>
     // One pattern for every glass dialog. Without script the triggers stay ordinary links.

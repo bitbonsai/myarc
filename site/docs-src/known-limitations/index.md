@@ -11,7 +11,7 @@ myArc is an alpha. Use it to try the Arc-style sidebar, and keep daily and sensi
 
 - Each build is based on a Chromium 158 development revision, before Chromium ships it as a stable release.
 - There are no separate security updates between builds. myArc updates itself from myarc.dev; older `myArc Nightly` builds need `myArc.app` installed by hand once. [Install myArc](../install/) covers both.
-- The protections around Profile separation, cookies and saved passwords aren't verified yet.
+- Saved-password and credential guarantees aren't verified yet.
 - Safe Browsing doesn't scan RAR downloads, because the UnRAR license conflicts with GPL-3.0, the license myArc uses.
 - myArc is an independent project with no ties to Arc or The Browser Company.
 
@@ -45,7 +45,7 @@ Crash report uploads are off. Chromium keeps crash reports on your Mac, in `~/Li
 
 ### macOS won't open myArc
 
-Each new download is blocked on its first launch. Follow the first-launch steps in [Install myArc](../install/).
+Each new download is notarized, so macOS only asks once whether to open an app downloaded from the internet. Follow the first-launch steps in [Install myArc](../install/).
 
 ### macOS keeps asking for your password
 
