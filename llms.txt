@@ -1,8 +1,8 @@
 # myArc
 
-> A pre-release open-source browser project inspired by Arc, built on Chromium with a Rust-owned workspace core.
+> An open-source browser bringing back Arc, built on Chromium with a Rust-owned workspace core.
 
-A complete myArc browser remains unimplemented, and the Arc importer brings over only Spaces and pinned tabs. Native integration is experimental. Arc reference screenshots illustrate the target appearance. Local ownership and optional AI are product requirements, not evidence of a finished release.
+Signed, notarized macOS Apple silicon alpha builds are available now (macOS 26+). One-click Arc import brings over Favorites, Spaces, folders, pinned tabs and multiple Profiles. Built-in ad blocking (uBlock Origin Lite), Chromium extensions, Split View, Peek, Little Arc, animated onboarding and opt-in CLI/MCP agent control ship in the alpha. Windows and Linux builds, Boosts, workspace export and optional AI are still ahead.
 
 ## Project
 
