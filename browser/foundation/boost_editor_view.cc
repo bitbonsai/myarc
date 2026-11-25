@@ -724,7 +724,6 @@ class BoostEditorView final : public views::View,
         origin_(std::move(origin)) {
     SetLayoutManager(std::make_unique<views::BoxLayout>(
         Orientation::kVertical, gfx::Insets(), 10));
-    SetPreferredSize(gfx::Size(kCardWidth, 0));
 
     service_observation_.Observe(service_.get());
 
@@ -738,7 +737,16 @@ class BoostEditorView final : public views::View,
     menu_runner_.reset();
     menu_model_.reset();
     bubble_delegate_ = nullptr;
+    browser_ = nullptr;
+    service_ = nullptr;
     ClearChildPointers();
+  }
+
+  gfx::Size CalculatePreferredSize(
+      const views::SizeBounds& available_size) const override {
+    const gfx::Size size = views::View::CalculatePreferredSize(
+        views::SizeBounds(kCardWidth, available_size.height()));
+    return gfx::Size(kCardWidth, size.height());
   }
 
   uint64_t boost_id() const { return boost_id_; }
@@ -746,13 +754,22 @@ class BoostEditorView final : public views::View,
   void OnWindowClosing() {
     CommitPendingCssIfValid();
     ClearPreview();
+    Observe(nullptr);
     service_observation_.Reset();
+    menu_runner_.reset();
+    menu_model_.reset();
     bubble_delegate_ = nullptr;
-    if (auto it = ActiveEditors().find(browser_);
-        it != ActiveEditors().end() && it->second && it->second->view == this) {
-      auto slot = std::move(it->second);
-      ActiveEditors().erase(it);
-      ReleaseEditorSlot(std::move(slot));
+    BrowserWindowInterface* browser = browser_;
+    browser_ = nullptr;
+    service_ = nullptr;
+    if (browser) {
+      if (auto it = ActiveEditors().find(browser);
+          it != ActiveEditors().end() && it->second &&
+          it->second->view == this) {
+        auto slot = std::move(it->second);
+        ActiveEditors().erase(it);
+        ReleaseEditorSlot(std::move(slot));
+      }
     }
   }
 
@@ -1591,9 +1608,9 @@ class BoostEditorView final : public views::View,
     }
   }
 
-  const raw_ptr<BrowserWindowInterface> browser_;
+  raw_ptr<BrowserWindowInterface> browser_;
   raw_ptr<views::BubbleDialogDelegate> bubble_delegate_ = nullptr;
-  const raw_ptr<BoostsService> service_;
+  raw_ptr<BoostsService> service_;
   const uint64_t boost_id_;
   const std::string origin_;
   base::ScopedObservation<BoostsService, BoostsService::Observer>
