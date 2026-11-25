@@ -1,5 +1,5 @@
 diff --git a/chrome/browser/ui/views/location_bar/location_bar_view.h b/chrome/browser/ui/views/location_bar/location_bar_view.h
-index 856d9d7c66a7314d7046571bb3dfefda898970cc..8046c0a621bdd17e7c9adedeb7ca99f458ab96ce 100644
+index 856d9d7c66a7314d7046571bb3dfefda898970cc..b76e4dd3c6777009a0c109b821ae6063aeea2e81 100644
 --- a/chrome/browser/ui/views/location_bar/location_bar_view.h
 +++ b/chrome/browser/ui/views/location_bar/location_bar_view.h
 @@ -13,6 +13,7 @@
@@ -58,21 +58,23 @@ index 856d9d7c66a7314d7046571bb3dfefda898970cc..8046c0a621bdd17e7c9adedeb7ca99f4
    void OnMouseMoved(const ui::MouseEvent& event) override;
    void OnMouseExited(const ui::MouseEvent& event) override;
    void ShowContextMenu(const gfx::Point& p,
-@@ -463,6 +477,9 @@ class LocationBarView
+@@ -463,6 +477,10 @@ class LocationBarView
                             const gfx::Point& press_pt,
                             const gfx::Point& p) override;
  
 +  bool IsMyarcUrlPill() const;
 +  void CopyMyarcCurrentUrl();
++  void OpenMyarcBoostEditor();
 +
    bool ShouldUsePopupOpenAppearance() const;
  
    bool ShouldHidePageActionIcons() const;
-@@ -575,6 +592,11 @@ class LocationBarView
+@@ -575,6 +593,12 @@ class LocationBarView
    // An icon to the left of the edit field: the HTTPS lock, blank page icon,
    // search icon, EV HTTPS bubble, etc.
    raw_ptr<LocationIconView> location_icon_view_ = nullptr;
 +  raw_ptr<views::ImageButton> myarc_copy_url_button_ = nullptr;
++  raw_ptr<views::ImageButton> myarc_boost_button_ = nullptr;
 +  raw_ptr<myarc::LocalPageChip> myarc_local_page_chip_ = nullptr;
 +  bool myarc_url_hovered_ = false;
 +  raw_ptr<views::View> myarc_extensions_view_ = nullptr;

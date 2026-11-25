@@ -32,6 +32,7 @@
 #include "ui/color/color_provider.h"
 #include "ui/compositor/layer.h"
 #include "ui/compositor/layer_animator.h"
+#include "ui/compositor/paint_recorder.h"
 #include "ui/compositor/scoped_layer_animation_settings.h"
 #include "ui/events/event.h"
 #include "ui/events/keycodes/keyboard_codes.h"
@@ -83,6 +84,9 @@ enum Command {
   kDeleteSpace,
   kEditTheme,
   kChangeIcon,
+  kEditBoost,
+  kToggleBoost,
+  kDeleteBoost,
 };
 
 // The other cards slide aside this fast while a card is dragged.
@@ -156,12 +160,12 @@ constexpr auto kSections = std::to_array<SectionInfo>({
      u"Archived Tabs", u"Search Archive..."},
 });
 
-// Media and Boosts aren't built. Their rail items stay in Arc's order but are
-// disabled, with the tooltip Settings gives its unbuilt sections.
+// Media isn't built yet. Its rail item stays in Arc's order but is disabled,
+// with the tooltip Settings gives its unbuilt sections.
 constexpr char16_t kNotYet[] = u"Not in myArc yet";
 
 bool IsBuilt(Section section) {
-  return section != Section::kMedia && section != Section::kBoosts;
+  return section != Section::kMedia;
 }
 
 const SectionInfo& Info(Section section) {
@@ -440,6 +444,160 @@ class ArchiveRow final : public TileButton {
 BEGIN_METADATA(ArchiveRow)
 END_METADATA
 
+// Rounded-square site favicon tile for Boost rows, dimmed with a diagonal slash
+// when disabled (matching Arc's Library -> Boosts list).
+class BoostIconTile final : public views::View {
+  METADATA_HEADER(BoostIconTile, views::View)
+
+ public:
+  BoostIconTile(const ui::ImageModel& icon, bool active)
+      : icon_(icon), active_(active) {
+    SetPreferredSize(gfx::Size(36, 36));
+    auto* layout = SetLayoutManager(std::make_unique<views::BoxLayout>(
+        Orientation::kHorizontal, gfx::Insets(), 0));
+    layout->set_main_axis_alignment(MainAxis::kCenter);
+    layout->set_cross_axis_alignment(CrossAxis::kCenter);
+    image_ = AddChildView(std::make_unique<views::ImageView>());
+    image_->SetImageSize(gfx::Size(20, 20));
+    image_->SetPreferredSize(gfx::Size(20, 20));
+    if (!active_) {
+      image_->SetPaintToLayer();
+      image_->layer()->SetFillsBoundsOpaquely(false);
+      image_->layer()->SetOpacity(0.45f);
+    }
+    UpdateIcon();
+  }
+
+  void OnThemeChanged() override {
+    views::View::OnThemeChanged();
+    UpdateIcon();
+  }
+
+  void OnPaint(gfx::Canvas* canvas) override {
+    const gfx::RectF rect(GetLocalBounds());
+    cc::PaintFlags bg;
+    bg.setAntiAlias(true);
+    bg.setColor(active_ ? SkColorSetRGB(0xF5, 0xF5, 0xF7)
+                        : SkColorSetA(SkColorSetRGB(0xB0, 0xB0, 0xBA), 0x80));
+    canvas->DrawRoundRect(rect, 8.f, bg);
+    views::View::OnPaint(canvas);
+  }
+
+  void PaintChildren(const views::PaintInfo& paint_info) override {
+    views::View::PaintChildren(paint_info);
+    if (active_) {
+      return;
+    }
+    // Paint diagonal slash over the disabled Boost tile.
+    ui::PaintRecorder recorder(paint_info.context(), size());
+    gfx::Canvas* canvas = recorder.canvas();
+    const gfx::PointF start(4.f, 4.f);
+    const gfx::PointF end(width() - 4.f, height() - 4.f);
+    cc::PaintFlags outline;
+    outline.setAntiAlias(true);
+    outline.setStyle(cc::PaintFlags::kStroke_Style);
+    outline.setStrokeWidth(4.5f);
+    outline.setStrokeCap(cc::PaintFlags::kRound_Cap);
+    outline.setColor(SkColorSetA(SK_ColorBLACK, 0x55));
+    canvas->DrawLine(start, end, outline);
+
+    cc::PaintFlags slash;
+    slash.setAntiAlias(true);
+    slash.setStyle(cc::PaintFlags::kStroke_Style);
+    slash.setStrokeWidth(2.2f);
+    slash.setStrokeCap(cc::PaintFlags::kRound_Cap);
+    slash.setColor(SkColorSetRGB(0x7A, 0x4A, 0x55));
+    canvas->DrawLine(start, end, slash);
+  }
+
+ private:
+  void UpdateIcon() {
+    if (!icon_.IsEmpty()) {
+      image_->SetImage(icon_);
+      return;
+    }
+    image_->SetImage(ui::ImageModel::FromVectorIcon(
+        kBoostsIcon,
+        active_ ? SkColorSetRGB(0x52, 0x52, 0x62)
+                : SkColorSetRGB(0x6E, 0x6E, 0x7A),
+        18));
+  }
+
+  const ui::ImageModel icon_;
+  const bool active_;
+  raw_ptr<views::ImageView> image_ = nullptr;
+};
+
+BEGIN_METADATA(BoostIconTile)
+END_METADATA
+
+// Arc's Boosts row: 36x36 rounded-square favicon tile (slashed when disabled),
+// Boost title over origin host subtitle.
+class BoostRow final : public TileButton {
+  METADATA_HEADER(BoostRow, TileButton)
+
+ public:
+  BoostRow(PressedCallback callback,
+           const SidebarView::BoostPresentation& boost,
+           bool global_enabled)
+      : TileButton(std::move(callback)),
+        boost_id_(boost.id),
+        boost_enabled_(boost.enabled),
+        active_(boost.enabled && global_enabled) {
+    auto* layout = SetLayoutManager(std::make_unique<views::BoxLayout>(
+        Orientation::kHorizontal, gfx::Insets::VH(7, 10), 12));
+    layout->set_cross_axis_alignment(CrossAxis::kCenter);
+    AddChildView(std::make_unique<BoostIconTile>(boost.icon, active_));
+    auto* text = AddChildView(Box(Orientation::kVertical, gfx::Insets(), 2));
+    layout->SetFlexForView(text, 1);
+    title_ = text->AddChildView(MakeLabel(
+        boost.name,
+        gfx::FontList().Derive(1, gfx::Font::NORMAL, gfx::Font::Weight::MEDIUM),
+        SK_ColorWHITE));
+    host_ = text->AddChildView(
+        MakeLabel(boost.host, gfx::FontList(), GetColors(nullptr).muted));
+    for (views::Label* label : {title_.get(), host_.get()}) {
+      label->SetHorizontalAlignment(gfx::ALIGN_LEFT);
+      label->SetElideBehavior(gfx::ELIDE_TAIL);
+    }
+    std::u16string detail = boost.host;
+    if (!boost.enabled) {
+      detail += u" (Disabled)";
+    } else if (!global_enabled) {
+      detail += u" (All Boosts disabled)";
+    }
+    SetTooltipText(boost.name + u"\n" + detail);
+    GetViewAccessibility().SetName(boost.name);
+    GetViewAccessibility().SetDescription(detail);
+  }
+
+  uint64_t boost_id() const { return boost_id_; }
+  bool boost_enabled() const { return boost_enabled_; }
+
+ private:
+  void Update() override {
+    TileButton::Update();
+    const Colors colors = GetColors(GetColorProvider());
+    const SkColor on_surface =
+        GetColorProvider()
+            ? GetColorProvider()->GetColor(ui::kColorSysOnSurface)
+            : SK_ColorWHITE;
+    title_->SetEnabledColor(active_ ? on_surface
+                                    : SkColorSetA(on_surface, 0x73));
+    host_->SetEnabledColor(active_ ? colors.muted
+                                   : SkColorSetA(colors.muted, 0x73));
+  }
+
+  const uint64_t boost_id_;
+  const bool boost_enabled_;
+  const bool active_;
+  raw_ptr<views::Label> title_ = nullptr;
+  raw_ptr<views::Label> host_ = nullptr;
+};
+
+BEGIN_METADATA(BoostRow)
+END_METADATA
+
 // A Pin on a Space's card: favicon and title, 36 DIP tall like the sidebar's
 // rows, with the same hover tile. Arc sets the title in 15pt semibold, 28 DIP
 // right of the card's icon column.
@@ -671,6 +829,20 @@ void LibraryView::RefreshArchive() {
     return;
   }
   archived_ = std::move(archived);
+  UpdateList(/*keep_scroll=*/true);
+}
+
+void LibraryView::RefreshBoosts() {
+  if (section_ != Section::kBoosts || !list_) {
+    return;
+  }
+  auto boosts = delegate_->GetBoosts();
+  const bool global_enabled = delegate_->AllBoostsEnabled();
+  if (boosts == boosts_ && global_enabled == boosts_global_enabled_) {
+    return;
+  }
+  boosts_ = std::move(boosts);
+  boosts_global_enabled_ = global_enabled;
   UpdateList(/*keep_scroll=*/true);
 }
 
@@ -1077,9 +1249,9 @@ void LibraryView::BuildList() {
   search->GetViewAccessibility().SetName(info.search);
   search->SetText(query_);
   search->set_controller(this);
-  // Only Downloads and Archived Tabs have anything to search yet.
   search->SetEnabled(section_ == Section::kDownloads ||
-                     section_ == Section::kArchive);
+                     section_ == Section::kArchive ||
+                     section_ == Section::kBoosts);
   search_ = field->AddChildView(std::move(search));
   static_cast<views::BoxLayout*>(field->GetLayoutManager())
       ->SetFlexForView(search_, 1);
@@ -1090,12 +1262,41 @@ void LibraryView::BuildList() {
   content_layout->SetFlexForView(list_, 1);
   downloads_.clear();
   archived_.clear();
+  boosts_.clear();
   if (section_ == Section::kDownloads) {
     downloads_ = delegate_->GetRecentDownloads();
   } else if (section_ == Section::kArchive) {
     archived_ = delegate_->GetArchivedTabs();
+  } else if (section_ == Section::kBoosts) {
+    boosts_ = delegate_->GetBoosts();
+    boosts_global_enabled_ = delegate_->AllBoostsEnabled();
   }
   UpdateList(/*keep_scroll=*/false);
+}
+
+void LibraryView::AddBoostRows(views::View& rows) {
+  for (const auto& boost : boosts_) {
+    if (!library::MatchesSearch(boost.name, query_) &&
+        !library::MatchesSearch(boost.host, query_)) {
+      continue;
+    }
+    auto row = std::make_unique<BoostRow>(
+        base::BindRepeating(
+            [](LibraryView* view, uint64_t id) {
+              view->PostAction(base::BindOnce(
+                  [](SidebarView::Delegate* delegate, uint64_t id,
+                     const base::RepeatingClosure& close) {
+                    close.Run();
+                    delegate->OpenBoost(id);
+                  },
+                  base::Unretained(&view->delegate_.get()), id, view->close_));
+            },
+            base::Unretained(this), boost.id),
+        boost, boosts_global_enabled_);
+    row->set_context_menu_controller(this);
+    keyed_views_.emplace_back(boost.id, row.get());
+    rows.AddChildView(std::move(row));
+  }
 }
 
 void LibraryView::AddArchiveRows(views::View& rows) {
@@ -1178,8 +1379,13 @@ void LibraryView::UpdateList(bool keep_scroll) {
         return library::MatchesSearch(tab.title, query_) ||
                library::MatchesSearch(tab.url, query_);
       });
+  const bool any_boosts =
+      std::ranges::any_of(boosts_, [this](const auto& boost) {
+        return library::MatchesSearch(boost.name, query_) ||
+               library::MatchesSearch(boost.host, query_);
+      });
 
-  if (downloads.empty() && !any_archived) {
+  if (downloads.empty() && !any_archived && !any_boosts) {
     const gfx::VectorIcon* icon = Info(section_).icon;
     std::u16string title = u"Nothing here yet!";
     std::u16string body =
@@ -1200,8 +1406,16 @@ void LibraryView::UpdateList(bool keep_scroll) {
           body = u"No archived tabs match your search.";
         }
         break;
-      case Section::kMedia:
       case Section::kBoosts:
+        body =
+            u"Customize any website\u2019s colors, fonts, or layout with a "
+            u"Boost.";
+        if (!query_.empty()) {
+          title = u"No matches";
+          body = u"No Boosts match your search.";
+        }
+        break;
+      case Section::kMedia:
       case Section::kSpaces:
         NOTREACHED();
     }
@@ -1251,8 +1465,11 @@ void LibraryView::UpdateList(bool keep_scroll) {
         scroll->SetContents(Box(Orientation::kVertical, gfx::Insets(), 2));
     rows->GetViewAccessibility().SetRole(ax::mojom::Role::kList);
     rows->GetViewAccessibility().SetName(
-        section_ == Section::kArchive ? u"Archived tabs" : u"Recent downloads");
+        section_ == Section::kArchive  ? u"Archived tabs"
+        : section_ == Section::kBoosts ? u"Boosts"
+                                       : u"Recent downloads");
     AddArchiveRows(*rows);
+    AddBoostRows(*rows);
     for (const auto& download : downloads) {
       auto row =
           TextButton(base::BindRepeating(
@@ -1290,6 +1507,33 @@ void LibraryView::UpdateList(bool keep_scroll) {
     all->SetEnabledTextColors(colors.muted);
     keyed_views_.emplace_back(0, all.get());
     list_->AddChildView(std::move(all));
+  } else if (section_ == Section::kBoosts) {
+    // Profile-wide Boosts kill switch.
+    const std::u16string label = boosts_global_enabled_
+                                     ? u"Disable All Boosts"
+                                     : u"Enable All Boosts";
+    auto kill_switch = TextButton(
+        base::BindRepeating(
+            [](LibraryView* view, bool enable) {
+              view->PostAction(base::BindOnce(
+                  [](LibraryView* view, bool enable) {
+                    view->delegate_->SetAllBoostsEnabled(enable);
+                    view->RefreshBoosts();
+                  },
+                  base::Unretained(view), enable));
+            },
+            base::Unretained(this), !boosts_global_enabled_),
+        label);
+    kill_switch->SetImageModel(
+        views::Button::STATE_NORMAL,
+        ui::ImageModel::FromVectorIcon(
+            kBoostsIcon,
+            boosts_global_enabled_ ? colors.muted : kAccent, 16));
+    kill_switch->SetEnabledTextColors(
+        boosts_global_enabled_ ? colors.muted : kAccent);
+    kill_switch->GetViewAccessibility().SetName(label);
+    keyed_views_.emplace_back(0, kill_switch.get());
+    list_->AddChildView(std::move(kill_switch));
   }
   // A refresh keeps focus on the same row, else on the search field.
   if (had_focus && !RestoreFocus(key)) {
@@ -1343,9 +1587,19 @@ void LibraryView::ShowContextMenuForViewImpl(
   }
   menu_runner_.reset();
   menu_model_ = std::make_unique<ui::SimpleMenuModel>(this);
-  menu_model_->AddItem(kClearArchive, u"Clear Archive");
-  // An empty archive has nothing to clear.
-  menu_model_->SetEnabledAt(0, !delegate_->GetArchivedTabs().empty());
+  if (auto* boost_row = views::AsViewClass<BoostRow>(source)) {
+    menu_boost_ = boost_row->boost_id();
+    menu_boost_enabled_ = boost_row->boost_enabled();
+    menu_model_->AddItem(kEditBoost, u"Edit Boost\u2026");
+    menu_model_->AddItem(kToggleBoost, menu_boost_enabled_ ? u"Disable Boost"
+                                                           : u"Enable Boost");
+    menu_model_->AddSeparator(ui::NORMAL_SEPARATOR);
+    menu_model_->AddItem(kDeleteBoost, u"Delete Boost");
+  } else {
+    menu_model_->AddItem(kClearArchive, u"Clear Archive");
+    // An empty archive has nothing to clear.
+    menu_model_->SetEnabledAt(0, !delegate_->GetArchivedTabs().empty());
+  }
   menu_runner_ = std::make_unique<views::MenuRunner>(
       menu_model_.get(), views::MenuRunner::CONTEXT_MENU);
   menu_runner_->RunMenuAt(GetWidget(), nullptr, gfx::Rect(point, gfx::Size()),
@@ -1408,6 +1662,31 @@ void LibraryView::ExecuteCommand(int command_id, int event_flags) {
                                  ids, source, left ? source - 1 : source + 1));
       break;
     }
+    case kEditBoost:
+      PostAction(base::BindOnce(
+          [](SidebarView::Delegate* delegate, uint64_t id,
+             const base::RepeatingClosure& close) {
+            close.Run();
+            delegate->OpenBoost(id);
+          },
+          base::Unretained(&delegate_.get()), menu_boost_, close_));
+      break;
+    case kToggleBoost:
+      PostAction(base::BindOnce(
+          [](LibraryView* view, uint64_t id, bool enable) {
+            view->delegate_->SetBoostEnabled(id, enable);
+            view->RefreshBoosts();
+          },
+          base::Unretained(this), menu_boost_, !menu_boost_enabled_));
+      break;
+    case kDeleteBoost:
+      PostAction(base::BindOnce(
+          [](LibraryView* view, uint64_t id) {
+            view->delegate_->DeleteBoost(id);
+            view->RefreshBoosts();
+          },
+          base::Unretained(this), menu_boost_));
+      break;
   }
 }
 

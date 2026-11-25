@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-11-25: Boosts Phase B1 Slices 4 & 5 (Library Boosts section, floating `BoostEditorView`, entry points)
+
+- Enabled `Section::kBoosts` in `LibraryView` with live `BoostsService` observation via `SidebarView::Delegate` (`BrowserView`), search filtering across Boost name and host, rounded-square site icon tiles with disabled diagonal-slash overlay, row context menu (Edit, Enable/Disable, Delete), and a Profile-wide Disable/Enable All Boosts kill switch.
+- Built floating `BoostEditorView` (`browser/foundation/boost_editor_view.{h,cc}`) anchored to the right edge of the active page card with close/title-menu/inline-rename/reset header, draggable 2D color/contrast pad (`Invert`/`Palette`/`None` modes) with live `BoostsTabHelper::SetPreviewOverride` preview, 4x4 `Aa` typography preset grid, `Size`/`Case` controls, expandable `Zap` hidden-selectors list, and `Code` custom CSS editor with inline sanitizer warning banner.
+- Wired `IDC_MYARC_EDIT_BOOST` and `IDC_MYARC_TOGGLE_BOOSTS` in `browser_command_controller.cc`, macOS `View` menu (`main_menu_builder.mm`), Page Info (`CreateBoostPageInfoRow`), and the sidebar URL bar (`LocationBarView`); verified with `out/MyarcRelease` `chrome` + `bridge_check`, `tools/export_patches.py --check` (163 patches), `tools/check_docs.py`, `cargo fmt`, `rustfmt`, `cargo clippy`, and `cargo test --workspace --locked`.
+
 ## 2026-11-25: Boosts Phase B1 Slices 2 & 3 (FFI, `BoostsService`, pure-CSS injection, `BoostsTabHelper`)
 
 - Wired `crates/boosts` into `browser/foundation/BUILD.gn` and `bridge.rs`, added Profile-scoped `BoostsService` (`myarc-boosts-v1.json` atomic writes, `.bak`/`.corrupt` fallback, off-thread `sync_all`, OTR isolation, and `Observer::OnBoostsChanged`), and added `CheckBoosts()` coverage in `bridge_check.cc`.

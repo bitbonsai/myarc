@@ -1630,6 +1630,13 @@ void SidebarView::RefreshLibraryDownloads() {
   }
 }
 
+void SidebarView::RefreshLibraryBoosts() {
+  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
+  if (library_) {
+    library_->RefreshBoosts();
+  }
+}
+
 void SidebarView::SetCreateMenuOpen(bool open) {
   create_menu_open_ = open;
   if (!create_button_) {

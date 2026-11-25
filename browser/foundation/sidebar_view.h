@@ -110,6 +110,16 @@ class SidebarView final : public views::View,
     bool operator==(const ArchivedTabPresentation&) const = default;
   };
 
+  struct BoostPresentation {
+    uint64_t id = 0;       // Rust Boost ID.
+    std::u16string name;   // e.g. "My Boost"
+    std::u16string host;   // Display host, e.g. "fly.io", "www.npmjs.com"
+    std::string origin;    // Primary canonical origin, e.g. "https://fly.io"
+    ui::ImageModel icon;   // Cached favicon, or empty.
+    bool enabled = true;
+    bool operator==(const BoostPresentation&) const = default;
+  };
+
   // A Space's card in the Library, with its Pins in sidebar order.
   struct LibraryPin {
     uint64_t id = 0;  // Rust item ID.
@@ -263,6 +273,15 @@ class SidebarView final : public views::View,
     // Clear Archive: the parent asks for confirmation, then drops every
     // archived tab and reports errors.
     virtual void ClearArchive() = 0;
+    // Boosts in the current Profile, newest/sorted order. Lookup only.
+    virtual std::vector<BoostPresentation> GetBoosts() const = 0;
+    // Profile-wide Boosts kill switch state and toggle.
+    virtual bool AllBoostsEnabled() const = 0;
+    virtual void SetAllBoostsEnabled(bool enabled) = 0;
+    // Opens/navigates to the Boost's origin and opens the floating Boost editor.
+    virtual void OpenBoost(uint64_t boost_id) = 0;
+    virtual void SetBoostEnabled(uint64_t boost_id, bool enabled) = 0;
+    virtual void DeleteBoost(uint64_t boost_id) = 0;
     // The parent resizes the sidebar region for the Library, and calls
     // RefreshLibraryDownloads while it is open. After closing it supplies a
     // fresh model with SetModel.
@@ -329,6 +348,8 @@ class SidebarView final : public views::View,
   void CloseLibrary();
   // Reloads an open Library's Downloads list if it changed.
   void RefreshLibraryDownloads();
+  // Reloads an open Library's Boosts list if it changed.
+  void RefreshLibraryBoosts();
   bool library_open() const { return !!library_; }
   // The URLs of the rows selected with Cmd-click or Shift-click, one per
   // line, or empty without a selection. Cmd+Shift+C copies them.

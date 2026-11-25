@@ -1,5 +1,5 @@
 diff --git a/chrome/browser/ui/views/frame/browser_view.h b/chrome/browser/ui/views/frame/browser_view.h
-index 750e46c97b64dccccf4268e912df5dbdb6516b3c..3406913d7d4f25619c9e2a3f64ce6cc6776c1abe 100644
+index 750e46c97b64dccccf4268e912df5dbdb6516b3c..ea7044dd75a1b0545635f42cfbdedd9592906010 100644
 --- a/chrome/browser/ui/views/frame/browser_view.h
 +++ b/chrome/browser/ui/views/frame/browser_view.h
 @@ -8,11 +8,13 @@
@@ -142,7 +142,7 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..3406913d7d4f25619c9e2a3f64ce6cc6
    base::WeakPtr<BrowserView> GetAsWeakPtr() {
      return weak_ptr_factory_.GetWeakPtr();
    }
-@@ -1253,12 +1329,266 @@ class BrowserView : public BrowserWindow,
+@@ -1253,12 +1329,274 @@ class BrowserView : public BrowserWindow,
  
    // Anchor point for help bubbles and other dialogs that want to reliably
    // anchor outside the content area of the window.
@@ -289,6 +289,12 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..3406913d7d4f25619c9e2a3f64ce6cc6
 +      const override;
 +  void RestoreArchivedTab(uint64_t archive_id) override;
 +  void ClearArchive() override;
++  std::vector<myarc::SidebarView::BoostPresentation> GetBoosts() const override;
++  bool AllBoostsEnabled() const override;
++  void SetAllBoostsEnabled(bool enabled) override;
++  void OpenBoost(uint64_t boost_id) override;
++  void SetBoostEnabled(uint64_t boost_id, bool enabled) override;
++  void DeleteBoost(uint64_t boost_id) override;
 +  void SetLibraryOpen(bool open) override;
 +  void MyarcWorkspaceResult(myarc::foundation::MutationResult result);
 +  void UpdateMyarcWorkspaceCanvas();
@@ -394,6 +400,8 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..3406913d7d4f25619c9e2a3f64ce6cc6
 +  // Refreshes the Library's Downloads list while the Library is open.
 +  class MyarcDownloadWatcher;
 +  std::unique_ptr<MyarcDownloadWatcher> myarc_download_watcher_;
++  class MyarcBoostsWatcher;
++  std::unique_ptr<MyarcBoostsWatcher> myarc_boosts_watcher_;
 +  // Refreshes the downloads stack while it shows.
 +  std::unique_ptr<MyarcDownloadWatcher> myarc_stack_download_watcher_;
 +  // Refreshes the stack and Library once history downloads finish loading.
@@ -409,7 +417,7 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..3406913d7d4f25619c9e2a3f64ce6cc6
  
    // A mapping between accelerators and command IDs.
    std::map<ui::Accelerator, int> accelerator_table_;
-@@ -1411,6 +1741,7 @@ class BrowserView : public BrowserWindow,
+@@ -1411,6 +1749,7 @@ class BrowserView : public BrowserWindow,
    base::EnumSet<TabStripAndWebAppViewsReparentedState>
        tab_strip_web_apps_reparented_state_;
  

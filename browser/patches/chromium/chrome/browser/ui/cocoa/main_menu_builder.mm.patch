@@ -1,5 +1,5 @@
 diff --git a/chrome/browser/ui/cocoa/main_menu_builder.mm b/chrome/browser/ui/cocoa/main_menu_builder.mm
-index 047674248727a122fb3aee712981eefd0a4c3049..9723b13429fe1d1282e171251c065244d5f9195b 100644
+index 047674248727a122fb3aee712981eefd0a4c3049..594b75b52affbd25c8661a1b3a77699a3f41df15 100644
 --- a/chrome/browser/ui/cocoa/main_menu_builder.mm
 +++ b/chrome/browser/ui/cocoa/main_menu_builder.mm
 @@ -6,6 +6,9 @@
@@ -70,7 +70,7 @@ index 047674248727a122fb3aee712981eefd0a4c3049..9723b13429fe1d1282e171251c065244
    return item;
  }
  
-@@ -361,6 +401,46 @@ NSMenuItem* BuildViewMenu(NSApplication* nsapp,
+@@ -361,6 +401,50 @@ NSMenuItem* BuildViewMenu(NSApplication* nsapp,
          })
          .Build();
    // clang-format on
@@ -113,11 +113,15 @@ index 047674248727a122fb3aee712981eefd0a4c3049..9723b13429fe1d1282e171251c065244
 +              IDC_MYARC_CLEAR_CACHE_RELOAD);
 +    add_after(IDC_MYARC_CLEAR_CACHE_RELOAD, @"Expand Current Split",
 +              IDC_MYARC_EXPAND_SPLIT);
++    add_after(IDC_MYARC_EXPAND_SPLIT, @"Edit Boost for This Site…",
++              IDC_MYARC_EDIT_BOOST);
++    add_after(IDC_MYARC_EDIT_BOOST, @"Toggle All Boosts",
++              IDC_MYARC_TOGGLE_BOOSTS);
 +  }
    return item;
  }
  
-@@ -500,6 +580,18 @@ NSMenuItem* BuildWindowMenu(NSApplication* nsapp,
+@@ -500,6 +584,18 @@ NSMenuItem* BuildWindowMenu(NSApplication* nsapp,
            })
            .Build();
    // clang-format on

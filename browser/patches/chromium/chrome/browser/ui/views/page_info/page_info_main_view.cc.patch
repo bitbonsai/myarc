@@ -1,16 +1,17 @@
 diff --git a/chrome/browser/ui/views/page_info/page_info_main_view.cc b/chrome/browser/ui/views/page_info/page_info_main_view.cc
-index b02babc4a946f5e1248b437c0436885c79aec322..d31231cc89782dae15de45ab67966b32ba0f7ee6 100644
+index b02babc4a946f5e1248b437c0436885c79aec322..1c716f09060e6ef4b8ee73bac038aa205d636aa3 100644
 --- a/chrome/browser/ui/views/page_info/page_info_main_view.cc
 +++ b/chrome/browser/ui/views/page_info/page_info_main_view.cc
-@@ -37,6 +37,7 @@
+@@ -37,6 +37,8 @@
  #include "components/permissions/permission_util.h"
  #include "components/strings/grit/components_branded_strings.h"
  #include "components/strings/grit/components_strings.h"
 +#include "myarc/blocker_switch.h"
++#include "myarc/boost_editor_view.h"
  #include "components/vector_icons/vector_icons.h"
  #include "content/public/browser/browser_task_traits.h"
  #include "content/public/browser/browser_thread.h"
-@@ -178,6 +179,13 @@ PageInfoMainView::PageInfoMainView(
+@@ -178,6 +180,19 @@ PageInfoMainView::PageInfoMainView(
  
    SetProperty(views::kElementIdentifierKey, kMainLayoutElementId);
  
@@ -19,6 +20,12 @@ index b02babc4a946f5e1248b437c0436885c79aec322..d31231cc89782dae15de45ab67966b32
 +          myarc::CreateBlockerSwitchRow(ui_delegate_->GetWebContents())) {
 +    AddChildView(CreateContainerView())
 +        ->AddChildView(std::move(blocker_switch));
++  }
++
++  // myArc: Boosts row for this site.
++  if (std::unique_ptr<views::View> boost_row =
++          myarc::CreateBoostPageInfoRow(ui_delegate_->GetWebContents())) {
++    AddChildView(CreateContainerView())->AddChildView(std::move(boost_row));
 +  }
 +
    site_settings_view_ = AddChildView(CreateContainerView());

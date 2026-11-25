@@ -72,6 +72,8 @@ class LibraryView final : public views::View,
   void RefreshDownloads();
   // Reloads the Archived Tabs list when it is showing and its entries changed.
   void RefreshArchive();
+  // Reloads the Boosts list when it is showing and its entries changed.
+  void RefreshBoosts();
   // Shows the Exit Library tooltip at once and keeps it up, for captures.
   void ShowExitTooltipNow();
 
@@ -88,10 +90,11 @@ class LibraryView final : public views::View,
   // cards, a Space's ID for its card's Pins.
   void BuildSpaces(const std::map<uint64_t, gfx::PointF>& offsets);
   void BuildList();
-  // Fills the Downloads or Archived Tabs list from the cached entries.
+  // Fills the Downloads, Boosts, or Archived Tabs list from cached entries.
   // `keep_scroll` keeps the list's scroll offset across the rebuild.
   void UpdateList(bool keep_scroll);
   void AddArchiveRows(views::View& rows);
+  void AddBoostRows(views::View& rows);
   // The keyed control that has focus, and putting focus back on it after a
   // rebuild. Returns false when no control has `key` any more.
   std::optional<uint64_t> FocusedKey() const;
@@ -155,6 +158,9 @@ class LibraryView final : public views::View,
   std::vector<SidebarView::DownloadPresentation> downloads_;
   // Archived Tabs, newest first and unfiltered, while that section shows.
   std::vector<SidebarView::ArchivedTabPresentation> archived_;
+  // Boosts in the current Profile, unfiltered, while the Boosts section shows.
+  std::vector<SidebarView::BoostPresentation> boosts_;
+  bool boosts_global_enabled_ = true;
   // Archived Tabs whose reopen is queued, so a second click does nothing.
   std::set<uint64_t> reopening_;
   std::u16string query_;
@@ -164,6 +170,9 @@ class LibraryView final : public views::View,
   std::unique_ptr<views::MenuRunner> menu_runner_;
   // The Space a card's "..." menu acts on.
   uint64_t menu_space_ = 0;
+  // The Boost a row's context menu acts on.
+  uint64_t menu_boost_ = 0;
+  bool menu_boost_enabled_ = true;
   // The Space cards in order, while the Spaces section shows.
   std::vector<raw_ptr<views::View>> cards_;
   // A card dragged by its move handle. `ids` is the order when it started,

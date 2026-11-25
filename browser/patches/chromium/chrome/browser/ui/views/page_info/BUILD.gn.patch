@@ -1,12 +1,13 @@
 diff --git a/chrome/browser/ui/views/page_info/BUILD.gn b/chrome/browser/ui/views/page_info/BUILD.gn
-index f5d590aaa9fef7a34872a71b40eaa9e6819c7072..2f347062b865625661a8580cda155f14807279c4 100644
+index f5d590aaa9fef7a34872a71b40eaa9e6819c7072..7ce11f4ad7a701a48f169e686cfdc4d146caba26 100644
 --- a/chrome/browser/ui/views/page_info/BUILD.gn
 +++ b/chrome/browser/ui/views/page_info/BUILD.gn
-@@ -113,6 +113,7 @@ source_set("impl") {
+@@ -113,6 +113,8 @@ source_set("impl") {
      "//components/strings:privacy_sandbox_strings_grit",
      "//content/public/browser",
      "//extensions/buildflags",
 +    "//myarc:blocker_popup",
++    "//myarc:boost_editor",
      "//ui/base",
      "//ui/gfx",
      "//ui/strings",
