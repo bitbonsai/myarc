@@ -335,6 +335,8 @@ class SidebarView final : public views::View,
   // tab is current, as the welcome tour's handoff does. False when it
   // doesn't show.
   bool FocusCurrentRow();
+  // Scrolls the active item's sidebar row into view without moving focus.
+  void RevealCurrentRow();
   // Runs the Space switch slide with `outgoing`, a picture of another
   // window's rows that showed at `origin` in widget coordinates, leaving as
   // the current rows come in. A Profile swap uses it. +1 slides them right.

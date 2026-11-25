@@ -1,8 +1,8 @@
 diff --git a/chrome/browser/ui/cocoa/main_menu_builder_unittest.mm b/chrome/browser/ui/cocoa/main_menu_builder_unittest.mm
-index 03f128044c43b1f09a430b15f984fbd674695b4e..c67217a60bdf5fedd69b9755d0bd9b7bdb62ecae 100644
+index 03f128044c43b1f09a430b15f984fbd674695b4e..4a645ed179f4c26c42b3c1a2130734e190c694a1 100644
 --- a/chrome/browser/ui/cocoa/main_menu_builder_unittest.mm
 +++ b/chrome/browser/ui/cocoa/main_menu_builder_unittest.mm
-@@ -4,7 +4,9 @@
+@@ -4,9 +4,12 @@
  
  #import "chrome/browser/ui/cocoa/main_menu_builder.h"
  
@@ -11,8 +11,11 @@ index 03f128044c43b1f09a430b15f984fbd674695b4e..c67217a60bdf5fedd69b9755d0bd9b7b
 +#include "base/test/scoped_command_line.h"
  #include "chrome/app/chrome_command_ids.h"
  #include "chrome/grit/generated_resources.h"
++#include "myarc/command_ids.h"
  #include "testing/gtest/include/gtest/gtest.h"
-@@ -134,4 +136,29 @@ TEST(MainMenuBuilderTest, CloseWindowKeyEquivalentApp) {
+ #include "testing/gtest_mac.h"
+ #include "ui/base/l10n/l10n_util.h"
+@@ -134,4 +137,101 @@ TEST(MainMenuBuilderTest, CloseWindowKeyEquivalentApp) {
    EXPECT_TRUE([@"w" isEqualToString:closeWindowMenuItem.keyEquivalent]);
  }
  
@@ -39,6 +42,78 @@ index 03f128044c43b1f09a430b15f984fbd674695b4e..c67217a60bdf5fedd69b9755d0bd9b7b
 +              [app_menu itemWithTag:IDC_HIDE_APP].title);
 +  EXPECT_NSEQ(l10n_util::GetNSStringF(IDS_EXIT_MAC, u"myArc"),
 +              [app_menu itemWithTag:IDC_EXIT].title);
++}
++
++TEST(MainMenuBuilderTest, MyarcMenuBarMatchesArcStructure) {
++  base::test::ScopedCommandLine scoped_command_line;
++  base::CommandLine* command_line = scoped_command_line.GetProcessCommandLine();
++  command_line->AppendSwitch("myarc-visual-parity");
++  command_line->AppendSwitch("myarc-workspace-sidebar");
++
++  NSMenu* main_menu = chrome::BuildMainMenu(nil, nil, u"Chromium",
++                                            /*is_pwa=*/false, /*is_rtl=*/false);
++  // Arc top-level order: App, File, Edit, View, Spaces, Tabs, Archive,
++  // Extensions, Window, Help.
++  ASSERT_EQ(10, main_menu.numberOfItems);
++  EXPECT_EQ(IDC_CHROME_MENU, [main_menu itemAtIndex:0].tag);
++  EXPECT_EQ(IDC_FILE_MENU, [main_menu itemAtIndex:1].tag);
++  EXPECT_EQ(IDC_EDIT_MENU, [main_menu itemAtIndex:2].tag);
++  EXPECT_EQ(IDC_VIEW_MENU, [main_menu itemAtIndex:3].tag);
++  EXPECT_EQ(IDC_MYARC_SPACES_MENU, [main_menu itemAtIndex:4].tag);
++  EXPECT_EQ(IDC_MYARC_TABS_MENU, [main_menu itemAtIndex:5].tag);
++  EXPECT_EQ(IDC_MYARC_ARCHIVE_MENU, [main_menu itemAtIndex:6].tag);
++  EXPECT_EQ(IDC_MYARC_EXTENSIONS_MENU, [main_menu itemAtIndex:7].tag);
++  EXPECT_EQ(IDC_WINDOW_MENU, [main_menu itemAtIndex:8].tag);
++
++  // Replaced Chromium top-level menus are removed.
++  EXPECT_EQ(nil, [main_menu itemWithTag:IDC_HISTORY_MENU]);
++  EXPECT_EQ(nil, [main_menu itemWithTag:IDC_BOOKMARKS_MENU]);
++  EXPECT_EQ(nil, [main_menu itemWithTag:IDC_PROFILE_MAIN_MENU]);
++  EXPECT_EQ(nil, [main_menu itemWithTag:IDC_TAB_MENU]);
++
++  // Key Arc items in Edit, View, Spaces, Tabs, Archive, Extensions, Window.
++  NSMenu* edit_menu = [main_menu itemWithTag:IDC_EDIT_MENU].submenu;
++  EXPECT_NE(nil, [edit_menu itemWithTag:IDC_COPY_URL]);
++  EXPECT_NE(nil, [edit_menu itemWithTag:IDC_MYARC_COPY_URL_MARKDOWN]);
++  EXPECT_NE(nil, [edit_menu itemWithTag:IDC_MYARC_COPY_URL_QUOTE]);
++
++  NSMenu* view_menu = [main_menu itemWithTag:IDC_VIEW_MENU].submenu;
++  EXPECT_EQ(nil, [view_menu itemWithTag:IDC_SHOW_BOOKMARK_BAR]);
++  EXPECT_NE(nil, [view_menu itemWithTag:IDC_NEW_SPLIT_TAB]);
++  EXPECT_NE(nil, [view_menu itemWithTag:IDC_MYARC_SEPARATE_SPLIT]);
++  EXPECT_NE(nil, [view_menu itemWithTag:IDC_MYARC_EXPAND_SPLIT]);
++
++  NSMenu* spaces_menu = [main_menu itemWithTag:IDC_MYARC_SPACES_MENU].submenu;
++  EXPECT_NE(nil, spaces_menu.delegate);
++  EXPECT_NE(nil, [spaces_menu itemWithTag:IDC_MYARC_NEW_SPACE]);
++  EXPECT_NE(nil, [spaces_menu itemWithTag:IDC_MYARC_MANAGE_SPACES]);
++
++  NSMenu* tabs_menu = [main_menu itemWithTag:IDC_MYARC_TABS_MENU].submenu;
++  EXPECT_NE(nil, [tabs_menu itemWithTag:IDC_MYARC_TOGGLE_PIN]);
++  EXPECT_NE(nil, [tabs_menu itemWithTag:IDC_MYARC_NEW_FOLDER]);
++  EXPECT_NE(nil, [tabs_menu itemWithTag:IDC_MYARC_REVEAL_TAB]);
++  EXPECT_NE(nil, [tabs_menu itemWithTag:IDC_MYARC_CLEAR_TODAY]);
++  EXPECT_NE(nil, [tabs_menu itemWithTag:IDC_MYARC_RESET_SPACE_TABS]);
++
++  NSMenu* archive_menu = [main_menu itemWithTag:IDC_MYARC_ARCHIVE_MENU].submenu;
++  EXPECT_NE(nil, [archive_menu itemWithTag:IDC_BACK]);
++  EXPECT_NE(nil, [archive_menu itemWithTag:IDC_FORWARD]);
++  EXPECT_NE(nil, [archive_menu itemWithTag:IDC_SHOW_HISTORY]);
++  EXPECT_NE(nil, [archive_menu itemWithTag:IDC_MYARC_VIEW_ARCHIVE]);
++  EXPECT_NE(nil, [archive_menu itemWithTag:IDC_MYARC_CLEAR_ARCHIVE]);
++
++  NSMenu* extensions_menu =
++      [main_menu itemWithTag:IDC_MYARC_EXTENSIONS_MENU].submenu;
++  EXPECT_NE(nil, [extensions_menu itemWithTag:IDC_MYARC_ADD_EXTENSION]);
++  EXPECT_NE(nil, [extensions_menu itemWithTag:IDC_MANAGE_EXTENSIONS]);
++  EXPECT_NE(nil, [extensions_menu itemWithTag:IDC_MYARC_BLOCKER_POPUP]);
++
++  NSMenu* window_menu = [main_menu itemWithTag:IDC_WINDOW_MENU].submenu;
++  EXPECT_NE(nil, [window_menu itemWithTag:IDC_MYARC_STAY_ON_TOP]);
++  EXPECT_NE(nil, [window_menu itemWithTag:IDC_MYARC_OPEN_LIBRARY]);
++  EXPECT_NE(nil, [window_menu itemWithTag:IDC_MYARC_VIEW_MEDIA]);
++  EXPECT_NE(nil, [window_menu itemWithTag:IDC_MYARC_VIEW_BOOSTS]);
++  EXPECT_EQ(nil, [window_menu itemWithTag:IDC_MANAGE_EXTENSIONS]);
 +}
 +
  }  // namespace

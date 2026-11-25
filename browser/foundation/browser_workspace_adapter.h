@@ -223,6 +223,13 @@ class BrowserWorkspaceAdapter final : public TabStripModelObserver {
   // page's site, its registrable domain or its host for an IP address, then
   // reloads the page once the data is gone. Only http(s) pages have a site.
   foundation::MutationResult ClearSiteDataAndReload(bool cookies);
+  // Arc's Tabs > Clear Today: closes all temporary tabs in the current Space.
+  foundation::MutationResult ClearTodayTabs();
+  // Arc's Tabs > Reset all tabs in this Space: returns every navigated-away
+  // Pin in the current Space to its saved URL.
+  foundation::MutationResult ResetSpaceTabs();
+  // Opens the active item's enclosing folder if it is collapsed.
+  foundation::MutationResult RevealActiveTabFolder();
   // A Pin's own name, shown instead of its page title; empty clears it.
   foundation::MutationResult RenameItem(uint64_t item, std::string_view name);
   // Toggles audio mute on `item`'s live page, if any.
