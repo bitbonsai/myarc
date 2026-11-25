@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-11-25: Fix Create Space landing in personal Profile when New Profile field is open
+
+- Fixed `CreateSpacePanel::RunCreate()` (`browser/foundation/create_space_panel.{h,cc}`) ignoring the open `Profile name…` field or an in-flight Profile creation and silently creating the Space in the previously selected Profile (`Default`).
+- Clicking **Create Space** (or pressing Return in the Space name field) while `new_profile_row_` is visible or `profile_pending_` is true now validates and creates the new Profile first (`create_after_profile_`), focuses the field on validation error, and proceeds with `RunCreate()` once `OnProfileDone()` selects the new Profile; Esc and Cancel clear the pending create.
+- Verified with `out/MyarcRelease` `chrome` build (merged with `arc-menu-bar` and Boosts `NewBoost`/`BoostItem` wiring), `tools/export_patches.py --check` (163 patches), `tools/check_docs.py`, `cargo fmt`, `rustfmt`, `cargo clippy`, `cargo test --workspace --locked`, and `node --test design/onboarding/state.test.mjs`.
+
 ## 2026-11-25: Arc macOS menu bar parity (`Spaces`, `Tabs`, `Archive`, `Extensions`, and missing menu commands)
 
 - Added `browser/foundation/main_menu_mac.{h,mm}` (`myarc::ApplyMainMenu`) to reshape Chromium's menu bar into Arc's top-level layout (`myArc | File | Edit | View | Spaces | Tabs | Archive | Extensions | Window | Help`), removing stock `History`/`Bookmarks`/`Profiles`/`Tab` menus (with nil-guards in `app_controller_mac.mm`) and attaching `MyarcSpacesMenuDelegate` for the live Space list with active checkmark and `⌃1`..`⌃9` shortcuts.
