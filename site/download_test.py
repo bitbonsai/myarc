@@ -81,11 +81,13 @@ class DownloadTests(unittest.TestCase):
         off, on = apply_release(TEMPLATE, None), apply_release(TEMPLATE, SAMPLE)
         self.assertNotIn('/download/', off)
         self.assertIn('Follow development', off)
+        self.assertIn('See what works', off)
         self.assertNotIn('<!--', off.split('<body>')[1])
         self.assertEqual(on.count('href="/download/"'), 4)
         self.assertIn(f"Download myArc Alpha {SAMPLE['version']}", on)
-        self.assertIn('Download alpha', on)
-        self.assertIn('See what works', on)
+        self.assertIn('>Download</a>', on)
+        self.assertIn(f">v{SAMPLE['version']}</a>", on)
+        self.assertNotIn('See what works', on)
 
     def test_page_uses_site_shell_and_marks_itself_current(self):
         with tempfile.TemporaryDirectory() as directory:

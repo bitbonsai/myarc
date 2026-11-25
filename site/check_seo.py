@@ -100,7 +100,7 @@ def check():
     links = {link['href'] for path in pages for link in BeautifulSoup(path.read_text(), 'html.parser').select('a[href$=".dmg"]')}
     if release:
         assert [button['href'] for button in page.select('.download-box a.button')] == [release['dmg_url']] and links == {release['dmg_url']}, 'Download button must be the one release asset'
-        assert release['sha256'] in page.get_text() and page.select_one('a.download-link[href="/download/"]') and 'Download alpha' in (ROOT / 'index.html').read_text()
+        assert release['sha256'] in page.get_text() and page.select_one('a.download-link[href="/download/"]') and '>Download</a>' in (ROOT / 'index.html').read_text() and f'v{release["version"]}' in (ROOT / 'index.html').read_text()
     else:
         assert not links and not page.select('.download-box a.button') and 'First alpha build coming soon' in page.get_text(), 'Unpublished release must not link a download'
         assert not (ROOT / 'index.html').read_text().count('href="/download/"'), 'Unpublished release must not be linked from the homepage'

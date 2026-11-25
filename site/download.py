@@ -444,16 +444,16 @@ CSS = '''
 
 def apply_release(template, release):
     """Add the header link and homepage call to action only for a published release."""
-    link = '<a class="button download-link" href="/download/">Download alpha</a>' if release else ''
+    link = '<a class="button download-link" href="/download/">Download</a>' if release else ''
     template = template.replace('<!--download-nav-->', link)
-    big = f'<a class="button stacked" href="/download/">Download alpha <small>v{escape(release["version"])}</small></a>' if release else ''
-    works = big
-    template = template.replace('<!--works-download-->', works)
+    big = '<a class="button" href="/download/">Download</a>' if release else ''
+    template = template.replace('<!--works-download-->', big)
     latest = f'<a href="/download/">Download myArc Alpha {release["version"]} &rarr;</a> ' if release else ''
     template = template.replace('<!--latest-release-->', latest)
     if release:
         template = re.sub(r'<!--cta-->.*?<!--/cta-->', lambda _: big, template, count=1, flags=re.S)
-    return re.sub(r'<!--/?cta-->', '', template)
+        template = re.sub(r'<!--works-label-->.*?<!--/works-label-->', lambda _: f'v{escape(release["version"])}', template, count=1, flags=re.S)
+    return re.sub(r'<!--/?(?:cta|works-label)-->', '', template)
 
 
 def build_download(root, template, embed, release):
