@@ -4,6 +4,12 @@ HTML: https://myarc.dev/blog/
 
 November 2026
 
+## [Boosts, minus the kitchen sink](https://myarc.dev/blog/boosts/)
+
+November 25, 2026
+
+myArc now ships Boosts: CSS-only, simpler than Arc's editor, and easier to start from anywhere. Easels are staying out, and Arc Boost import is next.
+
 ## [A thousand tabs, and agents that can see](https://myarc.dev/blog/thousand-tabs/)
 
 November 23, 2026

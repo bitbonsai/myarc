@@ -26,6 +26,7 @@ Signed, notarized macOS Apple silicon alpha builds are available now (macOS 26+)
 
 ## Posts
 
+- [Boosts, minus the kitchen sink](https://myarc.dev/blog/boosts/index.md): myArc now ships Boosts: CSS-only, simpler than Arc's editor, and easier to start from anywhere. Easels are staying out, and Arc Boost import is next.
 - [A thousand tabs, and agents that can see](https://myarc.dev/blog/thousand-tabs/index.md): I tested the signed myArc alpha with Claude Code driving the app and a thousand tabs loaded in the sidebar. It held up well enough that I'm moving in.
 - [Alpha is here!!! 🎉](https://myarc.dev/blog/glass-and-extensions/index.md): myArc alpha is here. Settings is cleaner, the welcome screen only shows what your Mac can do, frosted glass covers every window, and pinned extension icons sit in the URL pill on hover.
 - [A proper welcome](https://myarc.dev/blog/a-proper-welcome/index.md): myArc now says hello before your first tab. The screen dims, a soft blob of colour grows into a window, and a short tour has you try the basics on the real browser.
