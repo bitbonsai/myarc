@@ -632,9 +632,9 @@ source_set("sidebar_tint") {
   public_deps = [
     "//base",
     "//skia",
+    "//ui/base",
   ]
   deps = [
-    "//ui/base",
     "//ui/color",
     "//ui/gfx",
     "//ui/views",

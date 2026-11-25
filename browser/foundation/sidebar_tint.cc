@@ -3,12 +3,19 @@
 #include <algorithm>
 #include <memory>
 #include <utility>
+#include <vector>
 
+#include "base/functional/bind.h"
 #include "base/functional/callback.h"
+#include "third_party/skia/include/core/SkBitmap.h"
+#include "third_party/skia/include/private/chromium/SkPMColor.h"
 #include "ui/base/class_property.h"
 #include "ui/color/color_id.h"
 #include "ui/color/color_provider.h"
 #include "ui/gfx/color_utils.h"
+#include "ui/gfx/image/image.h"
+#include "ui/gfx/image/image_skia.h"
+#include "ui/gfx/image/image_skia_rep.h"
 #include "ui/views/view.h"
 #include "ui/views/widget/widget.h"
 
@@ -116,6 +123,106 @@ void SetSidebarThemeObserver(
   if (SidebarThemeState* state = EnsureState(widget)) {
     state->observer = std::move(observer);
   }
+}
+
+namespace {
+
+// A dark icon on a dark sidebar needs inversion only when almost none of its
+// visible pixels clear a 2.5:1 contrast ratio against the sidebar fill; badges
+// with light glyphs inside a dark square already have readable pixels.
+bool NeedsLightnessInvert(const SkBitmap& bitmap, SkColor background) {
+  if (bitmap.drawsNothing() || bitmap.width() <= 0 || bitmap.height() <= 0) {
+    return false;
+  }
+  double visible_alpha = 0.0;
+  double readable_alpha = 0.0;
+  for (int y = 0; y < bitmap.height(); ++y) {
+    for (int x = 0; x < bitmap.width(); ++x) {
+      const SkColor color = bitmap.getColor(x, y);
+      const SkAlpha alpha = SkColorGetA(color);
+      if (alpha < 32) {
+        continue;
+      }
+      const double weight = static_cast<double>(alpha) / 255.0;
+      visible_alpha += weight;
+      if (color_utils::GetContrastRatio(SkColorSetA(color, SK_AlphaOPAQUE),
+                                        background) >= 2.5f) {
+        readable_alpha += weight;
+      }
+    }
+  }
+  return visible_alpha >= 1.0 && (readable_alpha / visible_alpha) < 0.08;
+}
+
+SkBitmap InvertBitmapLightness(const SkBitmap& source) {
+  SkBitmap out;
+  out.allocN32Pixels(source.width(), source.height());
+  out.eraseColor(SK_ColorTRANSPARENT);
+  for (int y = 0; y < source.height(); ++y) {
+    for (int x = 0; x < source.width(); ++x) {
+      const SkColor color = source.getColor(x, y);
+      const SkAlpha alpha = SkColorGetA(color);
+      if (alpha == 0) {
+        continue;
+      }
+      color_utils::HSL hsl;
+      color_utils::SkColorToHSL(color, &hsl);
+      hsl.l = 1.0 - hsl.l;
+      *out.getAddr32(x, y) =
+          SkPreMultiplyColor(color_utils::HSLToSkColor(hsl, alpha));
+    }
+  }
+  out.setImmutable();
+  return out;
+}
+
+gfx::ImageSkia AdaptFaviconSkia(gfx::ImageSkia source,
+                                std::optional<SpaceTheme> theme,
+                                const ui::ColorProvider* provider) {
+  if (!provider) {
+    return source;
+  }
+  const SkColor background = GetSidebarPeekColor(*provider, theme);
+  if (!color_utils::IsDark(background)) {
+    return source;
+  }
+  source.EnsureRepsForSupportedScales();
+  const std::vector<gfx::ImageSkiaRep> reps = source.image_reps();
+  if (reps.empty()) {
+    return source;
+  }
+  const bool needs_invert = std::ranges::any_of(
+      reps, [background](const gfx::ImageSkiaRep& rep) {
+        return NeedsLightnessInvert(rep.GetBitmap(), background);
+      });
+  if (!needs_invert) {
+    return source;
+  }
+  gfx::ImageSkia lifted;
+  for (const gfx::ImageSkiaRep& rep : reps) {
+    const SkBitmap& bitmap = rep.GetBitmap();
+    if (bitmap.drawsNothing()) {
+      continue;
+    }
+    lifted.AddRepresentation(
+        gfx::ImageSkiaRep(InvertBitmapLightness(bitmap), rep.scale()));
+  }
+  return lifted.isNull() ? source : lifted;
+}
+
+}  // namespace
+
+ui::ImageModel EnsureFaviconContrast(const ui::ImageModel& icon,
+                                     const std::optional<SpaceTheme>& theme) {
+  if (icon.IsEmpty() || !icon.IsImage()) {
+    return icon;
+  }
+  const gfx::ImageSkia source = icon.GetImage().AsImageSkia();
+  if (source.isNull()) {
+    return icon;
+  }
+  return ui::ImageModel::FromImageGenerator(
+      base::BindRepeating(&AdaptFaviconSkia, source, theme), source.size());
 }
 
 }  // namespace myarc

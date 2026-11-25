@@ -5,6 +5,7 @@
 
 #include "base/functional/callback_forward.h"
 #include "third_party/skia/include/core/SkColor.h"
+#include "ui/base/models/image_model.h"
 
 namespace ui {
 class ColorProvider;
@@ -59,6 +60,12 @@ std::optional<SpaceTheme> GetSidebarTheme(const views::Widget* widget);
 // The frame that paints `widget`'s tint repaints from this; one per widget.
 void SetSidebarThemeObserver(views::Widget& widget,
                              base::RepeatingCallback<void(bool fade)> observer);
+
+// Lifts a dark favicon's HSL lightness when it has low contrast against a dark
+// sidebar background, preserving hue and alpha. Non-image models and readable
+// icons pass through untouched.
+ui::ImageModel EnsureFaviconContrast(const ui::ImageModel& icon,
+                                     const std::optional<SpaceTheme>& theme);
 
 }  // namespace myarc
 

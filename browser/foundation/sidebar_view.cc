@@ -2235,6 +2235,8 @@ std::unique_ptr<views::View> SidebarView::MakeItem(
   if (presentation.icon.IsEmpty()) {
     presentation.icon = ui::ImageModel::FromVectorIcon(
         vector_icons::kGlobeIcon, foreground, tile ? 20 : 16);
+  } else {
+    presentation.icon = EnsureFaviconContrast(presentation.icon, space_theme_);
   }
   activate->SetImageModel(views::Button::STATE_NORMAL, presentation.icon);
   const ui::ImageModel back_icon =

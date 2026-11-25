@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-11-25: Lift dark favicons on dark sidebars
+
+- Added `EnsureFaviconContrast` in `browser/foundation/sidebar_tint.{h,cc}` using `ui::ImageModel::FromImageGenerator`, inverting HSL lightness (`l = 1.0 - l`) while preserving hue, saturation, and alpha when a favicon's visible pixels fall below 2.5:1 contrast (< 8% readable alpha) against a dark sidebar fill.
+- Wired it into `SidebarView::MakeItem` (Favorites, Pins, folders, Today tabs, splits) and `LibraryView` (`ArchiveRow`, `PinRow`), keeping `RowsInputs` equality and light-glyph-on-dark-badge icons untouched.
+- Evidence: `out/MyarcRelease` `chrome` builds cleanly under `/tmp/myarc-build.lock`; `python3 tools/check_docs.py` and `python3 tools/export_patches.py --check` pass.
+
 ## 2026-11-25: Publish `v2026.11.25` release
 
 - Packaged, Developer ID signed, Apple notarized, stapled, and Sparkle EdDSA-signed `myArc-2026.11.25-arm64.dmg` (185,111,290 bytes, SHA-256 `4d63a4d7...bb71`) from `main` `fcfbe47` and Chromium `11a53a9fa1` ("+" menu rows take clicks again).

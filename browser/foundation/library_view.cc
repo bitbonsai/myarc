@@ -20,6 +20,7 @@
 #include "myarc/footer_button.h"
 #include "myarc/icons.h"
 #include "myarc/library_logic.h"
+#include "myarc/sidebar_tint.h"
 #include "third_party/skia/include/core/SkColor.h"
 #include "ui/base/accelerators/accelerator.h"
 #include "ui/base/cursor/cursor.h"
@@ -390,7 +391,8 @@ class ArchiveRow final : public TileButton {
         Orientation::kHorizontal, gfx::Insets::VH(9, 12), 12));
     layout->set_cross_axis_alignment(CrossAxis::kCenter);
     // Pages without a cached favicon get Arc's blank rounded square.
-    icon_ = AddChildView(std::make_unique<views::ImageView>(tab.icon));
+    icon_ = AddChildView(std::make_unique<views::ImageView>(
+        EnsureFaviconContrast(tab.icon, std::nullopt)));
     icon_->SetImageSize(gfx::Size(16, 16));
     icon_->SetPreferredSize(gfx::Size(20, 20));
     blank_icon_ = tab.icon.IsEmpty();
@@ -446,7 +448,8 @@ class PinRow final : public TileButton {
 
  public:
   PinRow(PressedCallback callback, const SidebarView::LibraryPin& pin)
-      : TileButton(std::move(callback)), icon_(pin.icon) {
+      : TileButton(std::move(callback)),
+        icon_(EnsureFaviconContrast(pin.icon, std::nullopt)) {
     auto* layout = SetLayoutManager(std::make_unique<views::BoxLayout>(
         Orientation::kHorizontal, gfx::Insets::VH(0, 8), 8));
     layout->set_cross_axis_alignment(CrossAxis::kCenter);
