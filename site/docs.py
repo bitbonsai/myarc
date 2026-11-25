@@ -11,7 +11,6 @@ from markdown_it import MarkdownIt
 import yaml
 
 from blog import SLUG, page_shell
-from download import STATUS
 
 # The blog's CommonMark settings, plus tables for the shortcut list.
 MD = MarkdownIt('commonmark', {'html': False, 'maxNesting': 20}).enable('table')
@@ -44,8 +43,6 @@ CSS = '''
     .docs-toc .toc-h3 a { padding-left: 1.5rem }
     .docs-toc a:hover, .docs-toc a:focus-visible { color: var(--link-solid) }
     .docs-toc a.is-active { background: rgb(var(--link-rgb) / .12); color: var(--link-solid) }
-    .docs-banner { padding: 1rem 1.25rem; border-radius: 1rem; background: color-mix(in srgb, currentColor 6%, transparent); font-size: 1rem }
-    .docs-main .post-header { margin-top: 2rem }
     .docs-eyebrow { color: var(--quiet); font-size: .875rem; font-weight: 600; letter-spacing: .08em; text-transform: uppercase }
     .docs-main h1 { margin-top: .5rem }
     .docs-lede { margin-top: 1rem; color: var(--quiet); font-size: 1.25rem; line-height: 1.5 }
@@ -69,7 +66,6 @@ CSS = '''
       .docs-nav-menu { display: block }
       .docs-nav-menu summary { min-height: 2.75rem; padding: .625rem 1rem; border-radius: .75rem; background: rgb(var(--link-rgb) / .08); font-weight: 600; cursor: pointer }
       .docs-nav-menu[open] summary { margin-bottom: .5rem }
-      .docs-main .post-header { margin-top: 1.5rem }
       .docs-lede { font-size: 1.125rem }
     }
 '''
@@ -204,14 +200,13 @@ def build_docs(root, template, embed, docs):
     if output.exists():
         shutil.rmtree(output)
     output.mkdir()
-    banner = f'<p class="docs-banner">{escape(STATUS)}</p>'
     listing = ''
     for area in AREAS:
         rows = ''.join(f'<li><a href="{doc.slug}/">{escape(doc.title)}</a><p>{escape(doc.summary)}</p></li>' for doc in docs if doc.area == area)
         if rows:
             listing += f'<h2>{area}</h2><ul>{rows}</ul>'
     listing += f'<h2>Contributing</h2><p>Plans, the alpha checklist and contributor docs live in the <a href="{REPO}">myArc repository</a> on GitHub.</p>'
-    content = f'{banner}<header class="post-header"><h1>{TITLE}</h1><p class="docs-lede">{escape(SUMMARY)}</p></header><div class="post-body docs-index">{listing}</div>'
+    content = f'<header class="post-header"><h1>{TITLE}</h1><p class="docs-lede">{escape(SUMMARY)}</p></header><div class="post-body docs-index">{listing}</div>'
     # Shared hashed assets live with the blog, which the build always creates first.
     (output / 'index.html').write_text(embed(shell(template, TITLE, SUMMARY, URL, content, [(TITLE, URL)], side_nav(docs, None, '')), '../blog/'))
     # The On this page highlight is a small hashed script; without it the list stays plain links.
@@ -224,7 +219,7 @@ def build_docs(root, template, embed, docs):
         folder.mkdir()
         following = docs[index + 1] if index + 1 < len(docs) else None
         after = f'<p class="docs-next"><a href="../{following.slug}/" rel="next">Next: {escape(following.title)} &rarr;</a></p>' if following else ''
-        content = f'{banner}<header class="post-header"><p class="docs-eyebrow">{escape(doc.area)} / {escape(doc.title)}</p><h1>{escape(doc.title)}</h1><p class="docs-lede">{escape(doc.summary)}</p></header><article class="post-body">{doc.html}</article>{after}'
+        content = f'<header class="post-header"><p class="docs-eyebrow">{escape(doc.area)} / {escape(doc.title)}</p><h1>{escape(doc.title)}</h1><p class="docs-lede">{escape(doc.summary)}</p></header><article class="post-body">{doc.html}</article>{after}'
         script_tag = f'<script defer src="../_assets/{script_name}"></script>' if doc.toc else ''
         page = shell(template, doc.title, doc.summary, doc.url, content, [(TITLE, URL), (doc.title, doc.url)], side_nav(docs, doc, '../'), contents(doc), script_tag)
         (folder / 'index.html').write_text(embed(page, '../../blog/'))

@@ -14,7 +14,7 @@ Arc is being [sunsetted](https://arc.net/). myArc is an open-source browser that
 
 ## Try it
 
-The [alpha build](https://myarc.dev/download/) runs on Apple silicon Macs with macOS 26 or later. It's for trying the shell, not yet for daily or sensitive browsing: recent tabs can be lost after a crash, and Chromium fixes arrive with the next release. Builds are signed, notarized and update themselves in place, and the download page lists every known limitation.
+The [alpha build](https://myarc.dev/download/) runs on Apple silicon Macs with macOS 26 or later. Builds are signed, notarized and update themselves in place. Recent tabs can still be lost after a crash, Chromium fixes arrive with the next release, and the download page lists every known limitation.
 
 What works today:
 
