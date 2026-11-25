@@ -974,6 +974,7 @@ class BoostEditorView final : public views::View,
                             base::Unretained(this)),
         u"My Boost \u2304");
     title->SetStyle(ui::ButtonStyle::kText);
+    title->SetBgColorOverrideDeprecated(SK_ColorTRANSPARENT);
     title->SetEnabledTextColors(kInkPrimary);
     title->SetHorizontalAlignment(gfx::ALIGN_CENTER);
     title->SetElideBehavior(gfx::ELIDE_TAIL);
@@ -994,6 +995,7 @@ class BoostEditorView final : public views::View,
                             base::Unretained(this)),
         u"\u21BA");
     reset->SetStyle(ui::ButtonStyle::kText);
+    reset->SetBgColorOverrideDeprecated(SK_ColorTRANSPARENT);
     reset->SetEnabledTextColors(kInkSecondary);
     reset->SetCustomPadding(gfx::Insets::VH(2, 6));
     reset->SetMinSize(gfx::Size(26, 26));
