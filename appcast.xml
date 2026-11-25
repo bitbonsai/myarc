@@ -4,13 +4,13 @@
     <title>myArc</title>
     <link>https://myarc.dev/appcast.xml</link>
     <item>
-      <title>myArc 2026.11.24.2</title>
-      <pubDate>Tue, 24 Nov 2026 00:00:00 +0000</pubDate>
-      <link>https://github.com/bitbonsai/myarc/releases/tag/v2026.11.24.2</link>
-      <sparkle:version>20261124.2</sparkle:version>
-      <sparkle:shortVersionString>2026.11.24.2</sparkle:shortVersionString>
+      <title>myArc 2026.11.25</title>
+      <pubDate>Wed, 25 Nov 2026 00:00:00 +0000</pubDate>
+      <link>https://github.com/bitbonsai/myarc/releases/tag/v2026.11.25</link>
+      <sparkle:version>20261125.0</sparkle:version>
+      <sparkle:shortVersionString>2026.11.25</sparkle:shortVersionString>
       <sparkle:minimumSystemVersion>26</sparkle:minimumSystemVersion>
-      <enclosure url="https://github.com/bitbonsai/myarc/releases/download/v2026.11.24.2/myArc-2026.11.24.2-arm64.dmg" length="184765819" type="application/octet-stream" sparkle:edSignature="TiJXdfxX47wuqEQxzhj2exr+y0PqthhNFEsT+oNRlUcUKcZWITR4E8GhLB6wTx70zvVKeN9QMG2u7HcvzfAtBQ=="/>
+      <enclosure url="https://github.com/bitbonsai/myarc/releases/download/v2026.11.25/myArc-2026.11.25-arm64.dmg" length="185111290" type="application/octet-stream" sparkle:edSignature="ZNsZ0i1wywqf8KFIvEIUva2XSgNdNVF0wpMGFA13+s3bjkxUhfFTzWwyUZK4PrL2CsgzClxH3Tzsu5D6I14kAg=="/>
     </item>
   </channel>
 </rss>
