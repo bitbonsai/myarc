@@ -396,6 +396,19 @@
     .state-partial { border-style: dashed; color: var(--text) }
     .state-missing { border-color: color-mix(in srgb, var(--quiet) 45%, transparent); color: var(--quiet) }
 
+    /* Recent updates. The list scrolls inside the panel, so the title and links stay put. */
+    .changelog { width: min(40rem, calc(100% - 2rem)) }
+    .changelog[open] { display: flex; flex-direction: column }
+    .changelog form { position: absolute; top: 1.25rem; right: 1.25rem; float: none; margin: 0 }
+    .changelog h2 { display: flex; align-items: center; flex-wrap: wrap; gap: .625rem; padding-right: 3rem }
+    .version-pill { padding: .125rem .625rem; border-radius: 1rem; background: rgb(var(--link-rgb) / .14); color: var(--link-solid); font-size: .875rem; font-weight: 600; letter-spacing: 0 }
+    .works .changelog-list { flex: 0 1 auto; min-height: 0; overflow-y: auto; margin-top: 1.25rem; padding: 0; list-style: none; overscroll-behavior: contain }
+    .works .changelog-list li { color: var(--quiet) }
+    .works .changelog-list li + li { margin-top: .875rem }
+    .changelog-list strong { color: var(--text); font-weight: 600 }
+    .changelog-list code { padding: .05em .35em; border-radius: .375rem; background: color-mix(in srgb, currentColor 10%, transparent); font-size: .875rem }
+    .changelog .works-actions { flex: none; margin-top: 1.5rem }
+
     /* Full-size screenshot. The script copies the peek's current source, so the theme matches and the page carries one copy. */
     .shot-view { width: fit-content; max-width: calc(100% - 2rem); padding: .625rem; border-radius: 1.5rem }
     .shot-view form { position: absolute; top: 1.25rem; right: 1.25rem; float: none; margin: 0 }

@@ -396,6 +396,19 @@
     .state-partial { border-style: dashed; color: var(--text) }
     .state-missing { border-color: color-mix(in srgb, var(--quiet) 45%, transparent); color: var(--quiet) }
 
+    /* Recent updates. The list scrolls inside the panel, so the title and links stay put. */
+    .changelog { width: min(40rem, calc(100% - 2rem)) }
+    .changelog[open] { display: flex; flex-direction: column }
+    .changelog form { position: absolute; top: 1.25rem; right: 1.25rem; float: none; margin: 0 }
+    .changelog h2 { display: flex; align-items: center; flex-wrap: wrap; gap: .625rem; padding-right: 3rem }
+    .version-pill { padding: .125rem .625rem; border-radius: 1rem; background: rgb(var(--link-rgb) / .14); color: var(--link-solid); font-size: .875rem; font-weight: 600; letter-spacing: 0 }
+    .works .changelog-list { flex: 0 1 auto; min-height: 0; overflow-y: auto; margin-top: 1.25rem; padding: 0; list-style: none; overscroll-behavior: contain }
+    .works .changelog-list li { color: var(--quiet) }
+    .works .changelog-list li + li { margin-top: .875rem }
+    .changelog-list strong { color: var(--text); font-weight: 600 }
+    .changelog-list code { padding: .05em .35em; border-radius: .375rem; background: color-mix(in srgb, currentColor 10%, transparent); font-size: .875rem }
+    .changelog .works-actions { flex: none; margin-top: 1.5rem }
+
     /* Full-size screenshot. The script copies the peek's current source, so the theme matches and the page carries one copy. */
     .shot-view { width: fit-content; max-width: calc(100% - 2rem); padding: .625rem; border-radius: 1.5rem }
     .shot-view form { position: absolute; top: 1.25rem; right: 1.25rem; float: none; margin: 0 }
@@ -461,7 +474,7 @@
           <p class="rise">An open-source browser bringing back Arc, with no account required and optional AI.</p>
           <div class="cta rise">
             <a class="button" href="/download/">Download</a>
-            <a class="works-link" href="https://github.com/bitbonsai/myarc#try-it">v2026.11.25</a>
+            <a class="changelog-link" href="https://github.com/bitbonsai/myarc/releases">v2026.11.25</a>
           </div>
         </div>
         <div class="hero-art">
@@ -935,6 +948,7 @@
       </div>
     </footer>
   </div>
+  <dialog id="changelog" class="works changelog" aria-labelledby="changelog-title"><form method="dialog"><button class="works-close" aria-label="Close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button></form><h2 id="changelog-title">Recent updates <span class="version-pill">v2026.11.25</span></h2><ul class="changelog-list"><li><strong>v2026.11.25 (November 25, 2026):</strong> Clicking New Space, New Folder, New Split or New Tab in the sidebar's &quot;+&quot; menu works again. Before, only Return chose a row.</li><li><strong>v2026.11.24.2 (November 24, 2026):</strong> Check for Updates shows both the myArc and the Chromium version when you're up to date.</li><li><strong>v2026.11.24.1 (November 24, 2026):</strong> The tab context menu follows Arc's, with Mute, Duplicate, Move to, Archive Tab and Archive Tabs Below.</li><li><strong>v2026.11.24 (November 24, 2026):</strong> Right-clicking empty sidebar space opens the Space menu, including New Folder. The app is now plain myArc, and it keeps the profile from myArc Nightly.</li></ul><div class="works-actions"><a class="works-link" href="https://github.com/bitbonsai/myarc#try-it">What works today</a><a href="https://github.com/bitbonsai/myarc/releases">All releases on GitHub →</a></div></dialog>
   <dialog id="what-works" class="works" aria-labelledby="works-title">
     <form method="dialog"><button class="works-close" aria-label="Close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button></form>
     <h2 id="works-title">What works today</h2>
@@ -1018,6 +1032,7 @@
     // One pattern for every glass dialog. Without script the triggers stay ordinary links.
     (() => {
       const reduced = () => matchMedia('(prefers-reduced-motion: reduce)').matches
+      const openers = new WeakMap()
       const wire = (dialog, triggers, prepare) => {
         if (!dialog || !triggers.length || typeof dialog.showModal !== 'function') return
         let frame = 0
@@ -1033,8 +1048,12 @@
         const show = event => {
           if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
           event.preventDefault()
+          // A link inside another dialog swaps the dialogs, and focus later returns to what opened the first one.
+          const host = event.currentTarget.closest('dialog')
+          if (host && host !== dialog && host.open) host.close()
           // The peek itself is not focusable, so focus returns to the visible button.
-          opener = event.currentTarget.matches('a, button') ? event.currentTarget : triggers.find(trigger => trigger.matches('a') && trigger.getClientRects().length)
+          opener = host ? openers.get(host) : event.currentTarget.matches('a, button') ? event.currentTarget : triggers.find(trigger => trigger.matches('a') && trigger.getClientRects().length)
+          openers.set(dialog, opener)
           clearTimeout(timer)
           if (prepare) prepare(dialog)
           if (!dialog.open) dialog.showModal()
@@ -1073,6 +1092,7 @@
         })
       }
       const $ = selector => [...document.querySelectorAll(selector)]
+      wire(document.querySelector('#changelog'), $('.changelog-link'))
       wire(document.querySelector('#what-works'), $('.works-link'))
       wire(document.querySelector('#alpha-checklist'), $('.alpha-link'))
       const shot = document.querySelector('.peek .shot')
