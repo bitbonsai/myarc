@@ -61,7 +61,7 @@ Copy
 - **Chromium 158 dev.** Checks for new alpha builds daily, with no separate security patches.
 - **Media playback.** No Widevine, so Netflix, Spotify and Disney\+ will not play. H.264 and AAC are included, so most other web video plays.
 - **Crashes.** Pins, folders and Spaces survive a force quit. Recent tabs can still be lost.
-- **Early guarantees.** Profile separation, cookie isolation and saved-password checks are not verified yet.
+- **Early guarantees.** Saved-password and credential checks are not verified yet.
 
 - [Feedback and chat](https://myarc.slirc.app)
 
