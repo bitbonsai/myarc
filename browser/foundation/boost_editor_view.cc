@@ -646,6 +646,21 @@ END_METADATA
 
 class BoostEditorView;
 
+class BoostEditorBubbleDelegate final : public views::BubbleDialogDelegate {
+ public:
+  explicit BoostEditorBubbleDelegate(views::View* anchor)
+      : views::BubbleDialogDelegate(anchor, views::BubbleBorder::TOP_RIGHT) {}
+
+  gfx::Rect GetAnchorRect() const override {
+    const gfx::Rect rect = views::BubbleDialogDelegate::GetAnchorRect();
+    if (rect.IsEmpty()) {
+      return rect;
+    }
+    // Hang the floating card inside the top-right corner of the page card.
+    return gfx::Rect(rect.right() - 16, rect.y() + 16, 1, 1);
+  }
+};
+
 struct ActiveEditorSlot {
   std::unique_ptr<views::BubbleDialogDelegate> delegate;
   std::unique_ptr<views::Widget> widget;
@@ -1806,8 +1821,7 @@ bool ShowBoostEditor(BrowserWindowInterface& browser, uint64_t boost_id) {
   }
 
   auto slot = std::make_unique<ActiveEditorSlot>();
-  slot->delegate = std::make_unique<views::BubbleDialogDelegate>(
-      anchor, views::BubbleBorder::NONE);
+  slot->delegate = std::make_unique<BoostEditorBubbleDelegate>(anchor);
   slot->delegate->SetButtons(static_cast<int>(ui::mojom::DialogButton::kNone));
   slot->delegate->SetShowCloseButton(false);
   slot->delegate->SetShowTitle(false);
@@ -1816,13 +1830,6 @@ bool ShowBoostEditor(BrowserWindowInterface& browser, uint64_t boost_id) {
   slot->delegate->set_corner_radius(kCardCornerRadius);
   slot->delegate->set_close_on_deactivate(false);
   slot->delegate->SetBackgroundColor(kCardBg);
-  if (anchor) {
-    const gfx::Rect anchor_screen = anchor->GetBoundsInScreen();
-    const gfx::Rect target(anchor_screen.right() - kCardWidth - 16,
-                           anchor_screen.y() + 64, kCardWidth, 1);
-    slot->delegate->SetAnchorRect(target);
-    slot->delegate->SetArrow(views::BubbleBorder::TOP_CENTER);
-  }
   slot->view = slot->delegate->SetContentsView(std::make_unique<BoostEditorView>(
       browser, slot->delegate.get(), contents, service, boost_id, origin_str));
   slot->delegate->RegisterWindowClosingCallback(base::BindOnce(
