@@ -2738,6 +2738,68 @@ foundation::MutationResult BrowserWorkspaceAdapter::ClearSiteDataAndReload(
   return Ok();
 }
 
+foundation::MutationResult BrowserWorkspaceAdapter::ClearTodayTabs() {
+  if (!ready()) {
+    return Fail(error());
+  }
+  const auto sidebar = Sidebar();
+  std::vector<uint64_t> ids;
+  ids.reserve(sidebar.temporary.size());
+  for (const auto& item : sidebar.temporary) {
+    ids.push_back(item.id);
+  }
+  if (ids.empty()) {
+    return Ok();
+  }
+  ShowRowAfterClosing(ids);
+  for (const uint64_t id : ids) {
+    CloseItem(id);
+  }
+  return Ok();
+}
+
+foundation::MutationResult BrowserWorkspaceAdapter::ResetSpaceTabs() {
+  if (!ready()) {
+    return Fail(error());
+  }
+  const auto sidebar = Sidebar();
+  for (const auto& row : sidebar.pins) {
+    if (!row.has_url) {
+      continue;
+    }
+    BrowserWorkspaceAdapter* owner = nullptr;
+    if (auto* page = FindPage(row.id, &owner);
+        page && owner == this && NavigatedAway(row.id)) {
+      content::NavigationController::LoadURLParams params(
+          GURL(std::string(row.canonical_url)));
+      params.transition_type = ui::PAGE_TRANSITION_AUTO_BOOKMARK;
+      page->GetController().LoadURLWithParams(params);
+    }
+  }
+  return Ok();
+}
+
+foundation::MutationResult BrowserWorkspaceAdapter::RevealActiveTabFolder() {
+  if (!ready()) {
+    return Fail(error());
+  }
+  const auto sidebar = Sidebar();
+  if (sidebar.selected_item_id == 0) {
+    return Ok();
+  }
+  for (const auto& folder : sidebar.folders) {
+    if (folder.open) {
+      continue;
+    }
+    for (const uint64_t item_id : folder.items) {
+      if (item_id == sidebar.selected_item_id) {
+        return SetFolderOpen(folder.id, true);
+      }
+    }
+  }
+  return Ok();
+}
+
 foundation::MutationResult BrowserWorkspaceAdapter::RenameItem(
     uint64_t item,
     std::string_view name) {

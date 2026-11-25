@@ -1,5 +1,5 @@
 diff --git a/chrome/browser/ui/cocoa/main_menu_builder.mm b/chrome/browser/ui/cocoa/main_menu_builder.mm
-index 047674248727a122fb3aee712981eefd0a4c3049..594b75b52affbd25c8661a1b3a77699a3f41df15 100644
+index 047674248727a122fb3aee712981eefd0a4c3049..06148cfc2f64d26b7f7ccbe8ca2dcab2b6c265e3 100644
 --- a/chrome/browser/ui/cocoa/main_menu_builder.mm
 +++ b/chrome/browser/ui/cocoa/main_menu_builder.mm
 @@ -6,6 +6,9 @@
@@ -12,16 +12,17 @@ index 047674248727a122fb3aee712981eefd0a4c3049..594b75b52affbd25c8661a1b3a77699a
  #include "base/feature_list.h"
  #include "base/i18n/rtl.h"
  #include "base/mac/mac_util.h"
-@@ -23,6 +26,8 @@
+@@ -23,6 +26,9 @@
  #include "chrome/grit/generated_resources.h"
  #include "components/dom_distiller/core/dom_distiller_features.h"
  #include "components/strings/grit/components_strings.h"
 +#include "myarc/command_ids.h"
++#import "myarc/main_menu_mac.h"
 +#include "myarc/updater_mac.h"
  #include "ui/base/accelerators/platform_accelerator_cocoa.h"
  #import "ui/base/cocoa/macos27_sdk.h"
  #include "ui/base/l10n/l10n_util.h"
-@@ -34,6 +39,37 @@ namespace {
+@@ -34,6 +40,37 @@ namespace {
  
  using Item = internal::MenuItemBuilder;
  
@@ -59,7 +60,7 @@ index 047674248727a122fb3aee712981eefd0a4c3049..594b75b52affbd25c8661a1b3a77699a
  // Capitalization Policy (go/chrome-capitalization):
  // Native macOS system menu bar items follow Apple Human Interface
  // Guidelines (HIG) and must use Title Case (via `_MAC` string variants or
-@@ -107,6 +143,10 @@ NSMenuItem* BuildAppMenu(NSApplication* nsapp,
+@@ -107,6 +144,10 @@ NSMenuItem* BuildAppMenu(NSApplication* nsapp,
  
    nsapp.servicesMenu = services_item.submenu;
  
@@ -70,7 +71,7 @@ index 047674248727a122fb3aee712981eefd0a4c3049..594b75b52affbd25c8661a1b3a77699a
    return item;
  }
  
-@@ -361,6 +401,50 @@ NSMenuItem* BuildViewMenu(NSApplication* nsapp,
+@@ -361,6 +402,50 @@ NSMenuItem* BuildViewMenu(NSApplication* nsapp,
          })
          .Build();
    // clang-format on
@@ -121,7 +122,7 @@ index 047674248727a122fb3aee712981eefd0a4c3049..594b75b52affbd25c8661a1b3a77699a
    return item;
  }
  
-@@ -500,6 +584,18 @@ NSMenuItem* BuildWindowMenu(NSApplication* nsapp,
+@@ -500,6 +585,18 @@ NSMenuItem* BuildWindowMenu(NSApplication* nsapp,
            })
            .Build();
    // clang-format on
@@ -140,3 +141,14 @@ index 047674248727a122fb3aee712981eefd0a4c3049..594b75b52affbd25c8661a1b3a77699a
    nsapp.windowsMenu = item.submenu;
    return item;
  }
+@@ -637,6 +734,10 @@ NSMenu* BuildMainMenu(NSApplication* nsapp,
+     }
+   }
+ 
++  if (UseMyarcAppMenu() && !is_pwa) {
++    myarc::ApplyMainMenu(main_menu, nsapp);
++  }
++
+   nsapp.mainMenu = main_menu;
+ 
+   return main_menu;

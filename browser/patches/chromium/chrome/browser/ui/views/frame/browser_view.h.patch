@@ -1,5 +1,5 @@
 diff --git a/chrome/browser/ui/views/frame/browser_view.h b/chrome/browser/ui/views/frame/browser_view.h
-index 750e46c97b64dccccf4268e912df5dbdb6516b3c..ea7044dd75a1b0545635f42cfbdedd9592906010 100644
+index 750e46c97b64dccccf4268e912df5dbdb6516b3c..d155328ef68a0ee60ce6d774ed30a0216671bd0e 100644
 --- a/chrome/browser/ui/views/frame/browser_view.h
 +++ b/chrome/browser/ui/views/frame/browser_view.h
 @@ -8,11 +8,13 @@
@@ -85,7 +85,7 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..ea7044dd75a1b0545635f42cfbdedd95
    std::optional<int> theme_background_y_offset() const {
      return theme_background_y_offset_;
    }
-@@ -311,6 +337,56 @@ class BrowserView : public BrowserWindow,
+@@ -311,6 +337,58 @@ class BrowserView : public BrowserWindow,
  
    ScrimView* window_scrim_view() { return window_scrim_view_; }
  
@@ -128,6 +128,8 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..ea7044dd75a1b0545635f42cfbdedd95
 +  std::u16string GetMyarcSelectedUrls() const override;
 +  bool CloseMyarcSelectedTabs() override;
 +  bool ShowMyarcSettings() override;
++  bool ExecuteMyarcWindowCommand(int command_id) override;
++  bool IsMyarcWindowCommandChecked(int command_id) const override;
 +  uint64_t GetMyarcAgentSpaceOf(content::WebContents& source) override;
 +  void AdoptMyarcAgentTab(content::WebContents& contents,
 +                          uint64_t space) override;
@@ -142,7 +144,7 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..ea7044dd75a1b0545635f42cfbdedd95
    base::WeakPtr<BrowserView> GetAsWeakPtr() {
      return weak_ptr_factory_.GetWeakPtr();
    }
-@@ -1253,12 +1329,274 @@ class BrowserView : public BrowserWindow,
+@@ -1253,12 +1331,275 @@ class BrowserView : public BrowserWindow,
  
    // Anchor point for help bubbles and other dialogs that want to reliably
    // anchor outside the content area of the window.
@@ -362,6 +364,7 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..ea7044dd75a1b0545635f42cfbdedd95
 +  bool myarc_capture_copy_url_scheduled_ = false;
 +  bool myarc_capture_close_tab_scheduled_ = false;
 +  std::unique_ptr<myarc::SettingsWindow> myarc_settings_window_;
++  bool myarc_stay_on_top_ = false;
 +  // --myarc-capture-open-settings opens Settings once per window.
 +  bool myarc_capture_settings_scheduled_ = false;
 +  // --myarc-capture-open-library opens the Library once per window.
@@ -417,7 +420,7 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..ea7044dd75a1b0545635f42cfbdedd95
  
    // A mapping between accelerators and command IDs.
    std::map<ui::Accelerator, int> accelerator_table_;
-@@ -1411,6 +1749,7 @@ class BrowserView : public BrowserWindow,
+@@ -1411,6 +1752,7 @@ class BrowserView : public BrowserWindow,
    base::EnumSet<TabStripAndWebAppViewsReparentedState>
        tab_strip_web_apps_reparented_state_;
  

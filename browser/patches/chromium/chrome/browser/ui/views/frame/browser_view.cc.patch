@@ -1,5 +1,5 @@
 diff --git a/chrome/browser/ui/views/frame/browser_view.cc b/chrome/browser/ui/views/frame/browser_view.cc
-index 7b568f6de760af21d6e9d2aa44415a7cef617c51..797916fa921f4f7c38a546074beb83745d4895ed 100644
+index 7b568f6de760af21d6e9d2aa44415a7cef617c51..c802508c510f6849d866bfb7c466c4c4d5b0f7ed 100644
 --- a/chrome/browser/ui/views/frame/browser_view.cc
 +++ b/chrome/browser/ui/views/frame/browser_view.cc
 @@ -11,6 +11,7 @@
@@ -2813,7 +2813,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..797916fa921f4f7c38a546074beb8374
  }
  
  void BrowserView::RemovedFromWidget() {
-@@ -5267,100 +7652,3274 @@ const views::View* BrowserView::GetViewByElementId(
+@@ -5267,97 +7652,3373 @@ const views::View* BrowserView::GetViewByElementId(
  ///////////////////////////////////////////////////////////////////////////////
  // BrowserView, ui::AcceleratorTarget overrides:
  
@@ -2986,7 +2986,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..797916fa921f4f7c38a546074beb8374
 +    if (!base::StringToInt(std::string_view(value).substr(5), &delay_ms)) {
 +      delay_ms = 2500;
 +    }
-+  }
+   }
 +  delay_ms = std::clamp(delay_ms, 0, 120000);
 +  base::SingleThreadTaskRunner::GetCurrentDefault()->PostDelayedTask(
 +      FROM_HERE,
@@ -3020,7 +3020,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..797916fa921f4f7c38a546074beb8374
 +          "myarc-visual-parity") ||
 +      !GetWidget()) {
 +    return false;
-   }
++  }
 +  // One Settings window per process: bring back the open one when it edits
 +  // this window's original Profile, whichever browser window owns it.
 +  // Settings of another Profile close, and this window opens its own.
@@ -3034,28 +3034,119 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..797916fa921f4f7c38a546074beb8374
 +  myarc_settings_window_->Show(myarc::SettingsWindow::Section::kGeneral,
 +                               /*inactive=*/false);
 +  return true;
- }
- 
--#if BUILDFLAG(IS_WIN)
--void BrowserView::CreateJumpList() {
--  // Ensure that this browser's Profile has a JumpList so that the JumpList is
--  // kept up to date.
--  JumpListFactory::GetForProfile(browser_->GetProfile());
++}
++
++bool BrowserView::ExecuteMyarcWindowCommand(int command_id) {
++  const auto open_settings = [this](myarc::SettingsWindow::Section section) {
++    if (!GetWidget()) {
++      return false;
++    }
++    if (!myarc_settings_window_) {
++      myarc_settings_window_ = CreateMyarcSettingsWindow();
++    }
++    myarc_settings_window_->Show(section, /*inactive=*/false);
++    return true;
++  };
++  const auto open_library = [this](myarc::SidebarView::LibrarySection section) {
++    if (!myarc_workspace_sidebar_) {
++      return false;
++    }
++    if (auto* controller =
++            tabs::VerticalTabStripStateController::From(browser());
++        controller && controller->IsCollapsed()) {
++      controller->RequestCollapse(false);
++    }
++    myarc_workspace_sidebar_->OpenLibrary(section);
++    return true;
++  };
++  const auto current_space_id = [this]() -> uint64_t {
++    if (!myarc_workspace_adapter_ || !myarc_workspace_adapter_->ready()) {
++      return 0;
++    }
++    return myarc_workspace_adapter_->Sidebar().current_space.id;
++  };
++
++  switch (command_id) {
++    case IDC_MYARC_NEW_SPACE:
++      if (!myarc_workspace_sidebar_) {
++        return false;
++      }
++      CreateSpace();
++      return true;
++    case IDC_MYARC_EDIT_SPACE_THEME:
++      if (const uint64_t space = current_space_id()) {
++        EditSpaceTheme(space);
++        return true;
++      }
++      return false;
++    case IDC_MYARC_RENAME_SPACE:
++      if (const uint64_t space = current_space_id()) {
++        RenameSpace(space);
++        return true;
++      }
++      return false;
++    case IDC_MYARC_CHANGE_PROFILE:
++      return open_settings(myarc::SettingsWindow::Section::kProfiles);
++    case IDC_MYARC_MANAGE_SPACES:
++      return open_library(myarc::SidebarView::LibrarySection::kSpaces);
++    case IDC_MYARC_NEW_FOLDER:
++      if (!myarc_workspace_sidebar_) {
++        return false;
++      }
++      CreateFolder();
++      return true;
++    case IDC_MYARC_REVEAL_TAB:
++      if (!myarc_workspace_sidebar_ || !myarc_workspace_adapter_) {
++        return false;
++      }
++      if (auto* controller =
++              tabs::VerticalTabStripStateController::From(browser());
++        controller && controller->IsCollapsed()) {
++      controller->RequestCollapse(false);
++    }
++      myarc_workspace_adapter_->RevealActiveTabFolder();
++      myarc_workspace_sidebar_->RevealCurrentRow();
++      return true;
++    case IDC_MYARC_VIEW_ARCHIVE:
++      return open_library(myarc::SidebarView::LibrarySection::kArchive);
++    case IDC_MYARC_OPEN_LIBRARY:
++      return open_library(myarc::SidebarView::LibrarySection::kSpaces);
++    case IDC_MYARC_VIEW_MEDIA:
++      return open_library(myarc::SidebarView::LibrarySection::kMedia);
++    case IDC_MYARC_VIEW_BOOSTS:
++      return open_library(myarc::SidebarView::LibrarySection::kBoosts);
++    case IDC_MYARC_STAY_ON_TOP:
++      if (!GetWidget()) {
++        return false;
++      }
++      myarc_stay_on_top_ = !myarc_stay_on_top_;
++      GetWidget()->SetZOrderLevel(myarc_stay_on_top_
++                                      ? ui::ZOrderLevel::kFloatingWindow
++                                      : ui::ZOrderLevel::kNormal);
++      return true;
++    case IDC_MYARC_HELP_RESTORE_DATA:
++      return open_settings(myarc::SettingsWindow::Section::kAdvanced);
++    default:
++      return false;
++  }
++}
++
++bool BrowserView::IsMyarcWindowCommandChecked(int command_id) const {
++  if (command_id == IDC_MYARC_STAY_ON_TOP) {
++    return myarc_stay_on_top_;
++  }
++  return false;
++}
++
 +void BrowserView::OpenChromiumSettings() {
 +  chrome::ShowSettings(browser());
- }
--#endif
- 
--BrowserFrameView* BrowserView::GetFrameView() {
--  return browser_widget_ ? browser_widget_->GetFrameView() : nullptr;
++}
++
 +void BrowserView::OpenMyarcSite() {
 +  chrome::AddSelectedTabWithURL(browser(), GURL("https://myarc.dev"),
 +                                ui::PAGE_TRANSITION_LINK);
- }
- 
--const BrowserFrameView* BrowserView::GetFrameView() const {
--  return browser_widget_ ? browser_widget_->GetFrameView() : nullptr;
--}
++}
++
 +namespace {
 +
 +// The entry's local name. Arc calls the first Profile "Default" until it is
@@ -6154,15 +6245,24 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..797916fa921f4f7c38a546074beb8374
 +
 +BrowserFrameView* BrowserView::GetFrameView() {
 +  return browser_widget_ ? browser_widget_->GetFrameView() : nullptr;
-+}
-+
-+const BrowserFrameView* BrowserView::GetFrameView() const {
-+  return browser_widget_ ? browser_widget_->GetFrameView() : nullptr;
-+}
+ }
  
- BrowserViewLayout* BrowserView::GetBrowserViewLayout() const {
-   return static_cast<BrowserViewLayout*>(GetLayoutManager());
-@@ -5471,6 +11030,10 @@ bool BrowserView::MaybeUpdateDevtools(content::WebContents* contents) {
+-#if BUILDFLAG(IS_WIN)
+-void BrowserView::CreateJumpList() {
+-  // Ensure that this browser's Profile has a JumpList so that the JumpList is
+-  // kept up to date.
+-  JumpListFactory::GetForProfile(browser_->GetProfile());
+-}
+-#endif
+-
+-BrowserFrameView* BrowserView::GetFrameView() {
+-  return browser_widget_ ? browser_widget_->GetFrameView() : nullptr;
+-}
+-
+ const BrowserFrameView* BrowserView::GetFrameView() const {
+   return browser_widget_ ? browser_widget_->GetFrameView() : nullptr;
+ }
+@@ -5471,6 +11132,10 @@ bool BrowserView::MaybeUpdateDevtools(content::WebContents* contents) {
  
  void BrowserView::UpdateUIForContents(WebContents* contents,
                                        bool should_layout_immediately) {
@@ -6173,7 +6273,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..797916fa921f4f7c38a546074beb8374
    TRACE_EVENT0("ui", "BrowserView::UpdateUIForContents");
    bool needs_layout = MaybeShowBookmarkBar(contents);
  
-@@ -5706,6 +11269,26 @@ void BrowserView::LoadAccelerators() {
+@@ -5706,6 +11371,26 @@ void BrowserView::LoadAccelerators() {
    }
  
  #if BUILDFLAG(IS_MAC)

@@ -911,3 +911,20 @@ bundle_data("blocker_bundle_data") {
   sources = [ "blocker/uBOLite_2026.1116.1650.chromium.zip" ]
   outputs = [ "{{bundle_resources_dir}}/ublock_origin_lite.zip" ]
 }
+
+if (is_mac) {
+  source_set("main_menu") {
+    sources = [
+      "main_menu_mac.h",
+      "main_menu_mac.mm",
+    ]
+    deps = [
+      ":browser_workspace_adapter",
+      ":command_ids",
+      "//base",
+      "//chrome/app:command_ids",
+      "//chrome/browser/ui/browser_window",
+    ]
+    frameworks = [ "Cocoa.framework" ]
+  }
+}

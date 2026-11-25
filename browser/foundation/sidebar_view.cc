@@ -3770,6 +3770,21 @@ bool SidebarView::FocusCurrentRow() {
   return current->view->HasFocus();
 }
 
+void SidebarView::RevealCurrentRow() {
+  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
+  if (library_ || create_panel_ || !active_item_id_) {
+    return;
+  }
+  const auto current =
+      std::ranges::find_if(focus_targets_, [this](const FocusTarget& target) {
+        return target.action == FocusAction::kActivate &&
+               target.id == active_item_id_;
+      });
+  if (current != focus_targets_.end() && current->view) {
+    current->view->ScrollViewToVisible();
+  }
+}
+
 void SidebarView::SlideInSpace(const gfx::ImageSkia& outgoing,
                                const gfx::Point& origin,
                                int shift) {

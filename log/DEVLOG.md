@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-11-25: Arc macOS menu bar parity (`Spaces`, `Tabs`, `Archive`, `Extensions`, and missing menu commands)
+
+- Added `browser/foundation/main_menu_mac.{h,mm}` (`myarc::ApplyMainMenu`) to reshape Chromium's menu bar into Arc's top-level layout (`myArc | File | Edit | View | Spaces | Tabs | Archive | Extensions | Window | Help`), removing stock `History`/`Bookmarks`/`Profiles`/`Tab` menus (with nil-guards in `app_controller_mac.mm`) and attaching `MyarcSpacesMenuDelegate` for the live Space list with active checkmark and `⌃1`..`⌃9` shortcuts.
+- Added `IDC_MYARC_*` commands and dispatch for `Set as Default Browser`, `Copy URL` / `Copy URL as Markdown` / `Copy URL as Quote`, `View` Split View actions, `Spaces` (`New Space…`, `Edit Theme…`, `Rename Space`, `Change Profile…`, `Manage Spaces…`), `Tabs` (`Pin/Unpin Tab`, `New Folder…`, `Reveal Tab in Sidebar`, `Clear Today`, `Reset all tabs in this Space`), `Archive` (`View Archive…`, `Clear Archive`), `Extensions` (`Add Extension…`, `Manage Extensions…`, `Ad Blocking for This Site…`), `Window` (`Stay On Top` with toggle checkmark, `Open Library…`, `View Downloads…`, `View Media…`, `View Boosts…`), and `Help` (`Getting Started`, `Essential Keyboard Shortcuts`, `Restore Data`, `Troubleshooting`).
+- Verified with `out/MyarcRelease` `chrome` + `main_menu_builder_unittest.o`, background smoke capture (`tools/capture_native.sh` against `out/MyarcRelease/myArc.app`), `tools/export_patches.py --check` (163 patches), and `tools/check_docs.py`.
+
 ## 2026-11-25: Boosts Phase B1 Slices 4 & 5 (Library Boosts section, floating `BoostEditorView`, entry points)
 
 - Enabled `Section::kBoosts` in `LibraryView` with live `BoostsService` observation via `SidebarView::Delegate` (`BrowserView`), search filtering across Boost name and host, rounded-square site icon tiles with disabled diagonal-slash overlay, row context menu (Edit, Enable/Disable, Delete), and a Profile-wide Disable/Enable All Boosts kill switch.
