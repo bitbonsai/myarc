@@ -1469,6 +1469,13 @@ void BrowserWorkspaceAdapter::ShowSelected() {
       dormant->id != dormant_opened_) {
     // Once per row, so a page that can't open doesn't retry every refresh.
     dormant_opened_ = dormant->id;
+    if (!dormant->has_url) {
+      // A dormant temporary row with no restorable URL (e.g. a file:// tab
+      // after restart) cannot be reopened; drop it cleanly instead of showing
+      // an error banner.
+      service_->LiveTabClosed(dormant->id);
+      return;
+    }
     if (Remember(OpenDormantPage(*dormant, &page)).ok)
       PersistBindings();
   }
@@ -2056,6 +2063,32 @@ foundation::MutationResult BrowserWorkspaceAdapter::ActivateItem(
     return Fail("Workspace item does not exist.");
   auto* page = LocalPage(*tabs_, item);
   if (!page) {
+    if (row->placement == foundation::PlacementKind::Temporary) {
+      // If this temporary tab is still open in another window of the same
+      // Profile, focus that window and tab instead of showing an error.
+      for (const auto& adapter : ForProfile(*profile_).adapters) {
+        if (adapter == this) {
+          continue;
+        }
+        if (auto* other_page = LocalPage(*adapter->tabs_, item)) {
+          adapter->tabs_->ActivateTabAt(
+              adapter->tabs_->GetIndexOfWebContents(other_page));
+          if (auto* window = adapter->browser_->GetWindow()) {
+            window->Activate();
+          }
+          other_page->Focus();
+          return Remember(Ok(item));
+        }
+      }
+      // A dormant temporary row with no restorable URL (e.g. a file:// tab
+      // whose page was closed) cannot be reopened; remove it cleanly from the
+      // sidebar instead of leaving a dead row and an error banner.
+      if (!row->has_url) {
+        service_->LiveTabClosed(item);
+        OnServiceChanged();
+        return Remember(Ok(0));
+      }
+    }
     auto opened = OpenDormantPage(*row, &page);
     if (!opened.ok)
       return opened;
