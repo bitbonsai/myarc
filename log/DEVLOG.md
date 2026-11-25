@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-11-25: Clicks on the "+" menu's rows reach the menu again
+
+- Clicking a row of the "+" creation menu did nothing; only Return chose it. Since `d3ce3b4` made empty sidebar space drag the window, `SidebarView::IsPositionInWindowCaption` kept presses only for buttons, text fields, scroll bars and views with a background, and the menu paints its own panel, so macOS turned each press on it into a window drag.
+- The open menu now keeps the press. A closed menu takes no events, so the space it covers still drags the window. The downloads stack's rows are buttons and were unaffected.
+- Evidence: `out/MyarcRelease` `chrome` builds under the lock; `export_patches.py --check` and `check_docs.py` pass. A live click wasn't driven, since background tooling only posts keys.
+
 ## 2026-11-24: Refresh docs for `v2026.11.24.2` and prune merged worktrees
 
 - Updated `README.md`, `site/docs-src/` (`cli-and-mcp`, `import-from-arc`, `spaces-and-profiles`), `skills/myarc-browser/SKILL.md`, `.plans/INDEX.md`, `docs/GAPS.md`, `docs/ALPHA.md`, `docs/SCORECARD.md`, and `docs/CONTROL-PROTOCOL.md` to match retired Nightly naming, one-click multi-Profile Arc import, the Arc-aligned tab context menu, and shipped `page.screenshot`/`scroll`/`wait` control commands.

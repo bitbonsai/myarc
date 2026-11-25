@@ -3720,9 +3720,13 @@ gfx::Rect SidebarView::GetTourAnchorInWidget(TourAnchor anchor,
 
 bool SidebarView::IsPositionInWindowCaption(const gfx::Point& point) {
   // Anything that takes a click, paints a fill of its own like a selected
-  // row, or holds the Favorites' tiles, gaps included, keeps the press.
+  // row, or holds the Favorites' tiles, gaps included, keeps the press. The
+  // creation menu paints its panel and takes its rows' clicks itself.
   for (const views::View* view = GetEventHandlerForPoint(point);
        view && view != this; view = view->parent()) {
+    if (view == create_menu_) {
+      return false;
+    }
     if (std::ranges::any_of(tiles_, [view](const auto& tile) {
           return tile.first && tile.first->parent() == view;
         })) {
