@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-11-25: Switch Space icons to filled Ionicons and publish `v2026.11.25.1`
+
+- Replaced Lucide outline Space icons and the custom `kSaturnPath` with filled Ionicons 8.1.1 (`dist/svg/*.svg`, MIT, `FILL_RULE_NONZERO` on a 512-unit canvas) in `tools/gen_space_icons.py`, `browser/foundation/space_icon_data.cc`, and `browser/foundation/icons.h`, keeping existing stored Space icon keys and custom `kBotIcon` intact.
+- Packaged, Developer ID signed, Apple notarized, stapled, and Sparkle EdDSA-signed `myArc-2026.11.25.1-arm64.dmg` (185,295,696 bytes, SHA-256 `1860f102...f0d5`), published GitHub prerelease `v2026.11.25.1`, updated `site/release.json` and `site/changelog.md`, and deployed `myarc.dev`.
+- Evidence: `out/MyarcRelease` `chrome` and `bridge_check` pass; `codesign --verify --deep --strict`, `spctl` Notarized Developer ID acceptance on app and DMG, `site/check.py`, `site/check_seo.py`, `tools/check_docs.py`, `cargo test --workspace --locked`, and `tools/export_patches.py --check` pass.
+
 ## 2026-11-25: Lift dark favicons on dark sidebars
 
 - Added `EnsureFaviconContrast` in `browser/foundation/sidebar_tint.{h,cc}` using `ui::ImageModel::FromImageGenerator`, inverting HSL lightness (`l = 1.0 - l`) while preserving hue, saturation, and alpha when a favicon's visible pixels fall below 2.5:1 contrast (< 8% readable alpha) against a dark sidebar fill.

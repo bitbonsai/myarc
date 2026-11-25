@@ -2,6 +2,10 @@
 
 One entry per alpha release, newest first, written for people using myArc. The homepage's Recent updates dialog shows them, and the build stops when the version in `release.json` has no entry here.
 
+## v2026.11.25.1 (2026-11-25)
+
+Space icons and the default Space planet now use filled Ionicons so every Space has the same visual weight in the sidebar. Dark favicons on dark sidebars also invert their lightness to stay readable.
+
 ## v2026.11.25 (2026-11-25)
 
 Clicking New Space, New Folder, New Split or New Tab in the sidebar's "+" menu works again. Before, only Return chose a row.
