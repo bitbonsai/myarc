@@ -1,5 +1,5 @@
 diff --git a/chrome/browser/ui/views/frame/browser_view.h b/chrome/browser/ui/views/frame/browser_view.h
-index 750e46c97b64dccccf4268e912df5dbdb6516b3c..d155328ef68a0ee60ce6d774ed30a0216671bd0e 100644
+index 750e46c97b64dccccf4268e912df5dbdb6516b3c..fc5cc2bf625716f018d0e12d3b4b015aebba01f6 100644
 --- a/chrome/browser/ui/views/frame/browser_view.h
 +++ b/chrome/browser/ui/views/frame/browser_view.h
 @@ -8,11 +8,13 @@
@@ -144,7 +144,7 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..d155328ef68a0ee60ce6d774ed30a021
    base::WeakPtr<BrowserView> GetAsWeakPtr() {
      return weak_ptr_factory_.GetWeakPtr();
    }
-@@ -1253,12 +1331,275 @@ class BrowserView : public BrowserWindow,
+@@ -1253,12 +1331,277 @@ class BrowserView : public BrowserWindow,
  
    // Anchor point for help bubbles and other dialogs that want to reliably
    // anchor outside the content area of the window.
@@ -295,6 +295,8 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..d155328ef68a0ee60ce6d774ed30a021
 +  bool AllBoostsEnabled() const override;
 +  void SetAllBoostsEnabled(bool enabled) override;
 +  void OpenBoost(uint64_t boost_id) override;
++  void NewBoost() override;
++  void BoostItem(uint64_t item_id) override;
 +  void SetBoostEnabled(uint64_t boost_id, bool enabled) override;
 +  void DeleteBoost(uint64_t boost_id) override;
 +  void SetLibraryOpen(bool open) override;
@@ -420,7 +422,7 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..d155328ef68a0ee60ce6d774ed30a021
  
    // A mapping between accelerators and command IDs.
    std::map<ui::Accelerator, int> accelerator_table_;
-@@ -1411,6 +1752,7 @@ class BrowserView : public BrowserWindow,
+@@ -1411,6 +1754,7 @@ class BrowserView : public BrowserWindow,
    base::EnumSet<TabStripAndWebAppViewsReparentedState>
        tab_strip_web_apps_reparented_state_;
  
