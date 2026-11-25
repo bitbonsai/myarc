@@ -442,8 +442,9 @@ CSS = '''
 '''
 
 
-def apply_release(template, release):
-    """Add the header link and homepage call to action only for a published release."""
+def apply_release(template, release, changelog=''):
+    """Add the header link, homepage call to action and Recent updates only for a published release."""
+    template = template.replace('<!--changelog-->', changelog if release else '')
     link = '<a class="button download-link" href="/download/">Download</a>' if release else ''
     template = template.replace('<!--download-nav-->', link)
     big = '<a class="button" href="/download/">Download</a>' if release else ''
@@ -452,7 +453,8 @@ def apply_release(template, release):
     template = template.replace('<!--latest-release-->', latest)
     if release:
         template = re.sub(r'<!--cta-->.*?<!--/cta-->', lambda _: big, template, count=1, flags=re.S)
-        template = re.sub(r'<!--works-label-->.*?<!--/works-label-->', lambda _: f'v{escape(release["version"])}', template, count=1, flags=re.S)
+        version = f'<a class="changelog-link" href="{REPO}/releases">v{escape(release["version"])}</a>'
+        template = re.sub(r'<!--works-label-->.*?<!--/works-label-->', lambda _: version, template, count=1, flags=re.S)
     return re.sub(r'<!--/?(?:cta|works-label)-->', '', template)
 
 

@@ -11,6 +11,7 @@ from fontTools.ttLib import TTFont
 
 from artwork import bake_shadow
 from blog import build_blog
+from changelog import check_release, dialog as changelog_dialog, load_changelog
 from discovery import build_discovery
 from docs import URL as DOCS_URL, build_docs, load_docs
 from download import appcast, apply_release, build_download, read_release
@@ -111,9 +112,11 @@ with Image.open(ROOT / 'og-image.png') as image:
 
 try:
     release = read_release(ROOT)
+    changelog = load_changelog(ROOT)
+    check_release(changelog, release)
 except ValueError as error:
     raise SystemExit(f'Release data invalid: {error}') from None
-template = apply_release((ROOT / 'index.template.html').read_text(), release)
+template = apply_release((ROOT / 'index.template.html').read_text(), release, changelog_dialog(changelog, release))
 try:
     docs = load_docs(ROOT)
     posts = build_blog(ROOT, template, embed, ['https://myarc.dev/download/', DOCS_URL] + [doc.url for doc in docs])
