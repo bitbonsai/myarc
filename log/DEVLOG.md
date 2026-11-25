@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-11-25: Publish `v2026.11.25` release
+
+- Packaged, Developer ID signed, Apple notarized, stapled, and Sparkle EdDSA-signed `myArc-2026.11.25-arm64.dmg` (185,111,290 bytes, SHA-256 `4d63a4d7...bb71`) from `main` `fcfbe47` and Chromium `11a53a9fa1` ("+" menu rows take clicks again).
+- Published GitHub prerelease `v2026.11.25`, updated `site/release.json`, rebuilt `site/index.html`, and deployed `myarc.dev` from a clean worktree so in-progress homepage edits stayed out.
+- Evidence: `codesign --verify`, `spctl` Notarized Developer ID acceptance on both `myArc.app` and DMG, `mise run site-check`, DMG HTTP 200, and live `https://myarc.dev/appcast.xml` showing `20261125.0` with the new signature.
+
 ## 2026-11-25: Clicks on the "+" menu's rows reach the menu again
 
 - Clicking a row of the "+" creation menu did nothing; only Return chose it. Since `d3ce3b4` made empty sidebar space drag the window, `SidebarView::IsPositionInWindowCaption` kept presses only for buttons, text fields, scroll bars and views with a background, and the menu paints its own panel, so macOS turned each press on it into a window drag.
