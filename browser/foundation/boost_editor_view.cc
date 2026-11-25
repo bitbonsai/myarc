@@ -367,6 +367,70 @@ class PillButton final : public views::Button {
 BEGIN_METADATA(PillButton)
 END_METADATA
 
+// Centered header title button with a Lucide chevron-down icon on the right.
+class TitleMenuButton final : public views::Button {
+  METADATA_HEADER(TitleMenuButton, views::Button)
+
+ public:
+  explicit TitleMenuButton(PressedCallback callback)
+      : views::Button(std::move(callback)) {
+    SetFocusBehavior(FocusBehavior::ALWAYS);
+    views::InkDrop::Get(this)->SetMode(views::InkDropHost::InkDropMode::OFF);
+    views::InstallRoundRectHighlightPathGenerator(this, gfx::Insets(), 6);
+    auto* layout = SetLayoutManager(std::make_unique<views::BoxLayout>(
+        Orientation::kHorizontal, gfx::Insets::VH(2, 6), 4));
+    layout->set_main_axis_alignment(MainAxis::kCenter);
+    layout->set_cross_axis_alignment(CrossAxis::kCenter);
+
+    label_ = AddChildView(MakeLabel(
+        u"My Boost",
+        gfx::FontList().Derive(0, gfx::Font::NORMAL,
+                               gfx::Font::Weight::SEMIBOLD),
+        kInkPrimary));
+    label_->SetElideBehavior(gfx::ELIDE_TAIL);
+    label_->SetCanProcessEventsWithinSubtree(false);
+
+    chevron_ = AddChildView(std::make_unique<views::ImageView>());
+    chevron_->SetCanProcessEventsWithinSubtree(false);
+    SetPreferredSize(gfx::Size(0, 26));
+    SetTooltipText(u"Boost options");
+    GetViewAccessibility().SetName(u"My Boost");
+    GetViewAccessibility().SetHasPopup(ax::mojom::HasPopup::kMenu);
+    UpdateVisuals();
+  }
+
+  void SetTitle(const std::u16string& text, bool enabled_boost) {
+    label_->SetText(text);
+    GetViewAccessibility().SetName(text);
+    enabled_boost_ = enabled_boost;
+    UpdateVisuals();
+  }
+
+  void StateChanged(ButtonState old_state) override {
+    views::Button::StateChanged(old_state);
+    UpdateVisuals();
+  }
+
+ private:
+  void UpdateVisuals() {
+    const bool hovered =
+        GetState() == STATE_HOVERED || GetState() == STATE_PRESSED;
+    SetBackground(hovered ? views::CreateRoundedRectBackground(kPillBg, 6)
+                          : nullptr);
+    const SkColor ink = enabled_boost_ ? kInkPrimary : kInkSecondary;
+    label_->SetEnabledColor(ink);
+    chevron_->SetImage(
+        ui::ImageModel::FromVectorIcon(kChevronDownIcon, kInkSecondary, 14));
+  }
+
+  bool enabled_boost_ = true;
+  raw_ptr<views::Label> label_ = nullptr;
+  raw_ptr<views::ImageView> chevron_ = nullptr;
+};
+
+BEGIN_METADATA(TitleMenuButton)
+END_METADATA
+
 // 2D color / contrast pad matching Arc's floating Boost card.
 class ColorPadView final : public views::View {
   METADATA_HEADER(ColorPadView, views::View)
@@ -985,18 +1049,9 @@ class BoostEditorView final : public views::View,
     views::InstallCircleHighlightPathGenerator(close.get());
     header->AddChildView(std::move(close));
 
-    auto title = std::make_unique<views::MdTextButton>(
+    title_button_ = header->AddChildView(std::make_unique<TitleMenuButton>(
         base::BindRepeating(&BoostEditorView::ShowTitleMenu,
-                            base::Unretained(this)),
-        u"My Boost \u2304");
-    title->SetStyle(ui::ButtonStyle::kText);
-    title->SetBgColorOverrideDeprecated(SK_ColorTRANSPARENT);
-    title->SetEnabledTextColors(kInkPrimary);
-    title->SetHorizontalAlignment(gfx::ALIGN_CENTER);
-    title->SetElideBehavior(gfx::ELIDE_TAIL);
-    title->SetMinSize(gfx::Size(0, 26));
-    title->SetTooltipText(u"Boost options");
-    title_button_ = header->AddChildView(std::move(title));
+                            base::Unretained(this))));
     header_layout->SetFlexForView(title_button_, 1);
 
     auto rename = std::make_unique<views::Textfield>();
@@ -1213,9 +1268,7 @@ class BoostEditorView final : public views::View,
     const std::u16string title_name =
         base::UTF8ToUTF16(std::string(record_->name.data(), record_->name.size()));
     if (title_button_) {
-      title_button_->SetText(title_name + u" \u2304");
-      title_button_->SetEnabledTextColors(record_->enabled ? kInkPrimary
-                                                           : kInkSecondary);
+      title_button_->SetTitle(title_name, record_->enabled);
     }
 
     if (color_pad_) {
@@ -1640,7 +1693,7 @@ class BoostEditorView final : public views::View,
   bool css_dirty_ = false;
   bool suppress_reload_ = false;
 
-  raw_ptr<views::MdTextButton> title_button_ = nullptr;
+  raw_ptr<TitleMenuButton> title_button_ = nullptr;
   raw_ptr<views::Textfield> rename_field_ = nullptr;
   raw_ptr<ColorPadView> color_pad_ = nullptr;
   raw_ptr<PillButton> mode_invert_ = nullptr;
