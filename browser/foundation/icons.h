@@ -238,6 +238,28 @@ inline constexpr gfx::VectorIcon kBrushIcon(kBrushRep,
                                             std::size(kBrushRep),
                                             "myarc_brush");
 
+// Painter's palette (Lucide `palette`), used for Boost's Color palette mode.
+inline constexpr gfx::PathElement kPalettePath[] = {
+    gfx::CANVAS_DIMENSIONS, 24, gfx::STROKE, 2,
+    gfx::MOVE_TO, 12, 22,
+    gfx::ARC_TO, 1, 1, 0, 0, 1, 12, 2,
+    gfx::ARC_TO, 10, 9, 0, 0, 1, 22, 11,
+    gfx::ARC_TO, 5, 5, 0, 0, 1, 17, 16,
+    gfx::H_LINE_TO, 14.75f,
+    gfx::ARC_TO, 1.75f, 1.75f, 0, 0, 0, 13.35f, 18.8f,
+    gfx::R_LINE_TO, 0.3f, 0.4f,
+    gfx::ARC_TO, 1.75f, 1.75f, 0, 0, 1, 12.25f, 22,
+    gfx::CLOSE,
+    gfx::NEW_PATH,
+    gfx::CIRCLE, 13.5f, 6.5f, 1.0f,
+    gfx::CIRCLE, 17.5f, 10.5f, 1.0f,
+    gfx::CIRCLE, 6.5f, 12.5f, 1.0f,
+    gfx::CIRCLE, 8.5f, 7.5f, 1.0f};
+inline constexpr gfx::VectorIconRep kPaletteRep[] = {{kPalettePath}};
+inline constexpr gfx::VectorIcon kPaletteIcon(kPaletteRep,
+                                              std::size(kPaletteRep),
+                                              "myarc_palette");
+
 // The creation menu's row icons, traced from Arc's. New Space is the Spaces
 // rail glyph's two cards with a plus on the front one, on its 28 DIP canvas.
 // New Split and New Tab use an 18 DIP canvas at stroke 1.6: a window split a

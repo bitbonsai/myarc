@@ -278,8 +278,9 @@ class PillButton final : public views::Button {
              const std::u16string& text,
              const std::u16string& trailing_glyph = {},
              bool centered = true,
-             int font_size_delta = 0)
-      : views::Button(std::move(callback)) {
+             int font_size_delta = 0,
+             const gfx::VectorIcon* icon = nullptr)
+      : views::Button(std::move(callback)), icon_(icon) {
     SetFocusBehavior(FocusBehavior::ALWAYS);
     views::InkDrop::Get(this)->SetMode(views::InkDropHost::InkDropMode::OFF);
     views::InstallRoundRectHighlightPathGenerator(this, gfx::Insets(), 10);
@@ -289,14 +290,19 @@ class PillButton final : public views::Button {
     layout->set_main_axis_alignment(centered ? MainAxis::kCenter
                                              : MainAxis::kStart);
 
-    label_ = AddChildView(MakeLabel(
-        text,
-        gfx::FontList().Derive(font_size_delta, gfx::Font::NORMAL,
-                               gfx::Font::Weight::SEMIBOLD),
-        kInkPrimary));
-    if (!centered) {
-      layout->SetFlexForView(label_, 1);
-      label_->SetHorizontalAlignment(gfx::ALIGN_LEFT);
+    if (icon_) {
+      icon_view_ = AddChildView(std::make_unique<views::ImageView>());
+      icon_view_->SetCanProcessEventsWithinSubtree(false);
+    } else {
+      label_ = AddChildView(MakeLabel(
+          text,
+          gfx::FontList().Derive(font_size_delta, gfx::Font::NORMAL,
+                                 gfx::Font::Weight::SEMIBOLD),
+          kInkPrimary));
+      if (!centered) {
+        layout->SetFlexForView(label_, 1);
+        label_->SetHorizontalAlignment(gfx::ALIGN_LEFT);
+      }
     }
     if (!trailing_glyph.empty()) {
       trailing_ = AddChildView(MakeLabel(
@@ -322,7 +328,9 @@ class PillButton final : public views::Button {
   }
 
   void SetText(const std::u16string& text) {
-    label_->SetText(text);
+    if (label_) {
+      label_->SetText(text);
+    }
     GetViewAccessibility().SetName(text);
   }
 
@@ -336,14 +344,22 @@ class PillButton final : public views::Button {
     const bool hovered =
         GetState() == STATE_HOVERED || GetState() == STATE_PRESSED;
     const SkColor bg = active_ ? kPillActiveBg : (hovered ? kPillHoverBg : kPillBg);
+    const SkColor fg = active_ ? SK_ColorWHITE : kInkPrimary;
     SetBackground(views::CreateRoundedRectBackground(bg, 10));
-    label_->SetEnabledColor(active_ ? SK_ColorWHITE : kInkPrimary);
+    if (icon_view_ && icon_) {
+      icon_view_->SetImage(ui::ImageModel::FromVectorIcon(*icon_, fg, 18));
+    }
+    if (label_) {
+      label_->SetEnabledColor(fg);
+    }
     if (trailing_) {
-      trailing_->SetEnabledColor(active_ ? SK_ColorWHITE : kInkPrimary);
+      trailing_->SetEnabledColor(fg);
     }
   }
 
   bool active_ = false;
+  raw_ptr<const gfx::VectorIcon> icon_ = nullptr;
+  raw_ptr<views::ImageView> icon_view_ = nullptr;
   raw_ptr<views::Label> label_ = nullptr;
   raw_ptr<views::Label> trailing_ = nullptr;
 };
@@ -1026,7 +1042,8 @@ class BoostEditorView final : public views::View,
         base::BindRepeating(&BoostEditorView::SetColorMode,
                             base::Unretained(this),
                             foundation::BoostColorMode::Palette),
-        u"\u2261", std::u16string(), /*centered=*/true, /*font_size_delta=*/3));
+        u"Color palette", std::u16string(), /*centered=*/true,
+        /*font_size_delta=*/0, &kPaletteIcon));
     mode_palette_->SetTooltipText(u"Color palette");
     mode_palette_->GetViewAccessibility().SetName(u"Color palette");
     modes_layout->SetFlexForView(mode_palette_, 1);
