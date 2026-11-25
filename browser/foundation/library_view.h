@@ -14,6 +14,7 @@
 #include "base/memory/raw_ptr.h"
 #include "base/memory/raw_ref.h"
 #include "base/memory/weak_ptr.h"
+#include "myarc/library_logic.h"
 #include "myarc/sidebar_view.h"
 #include "third_party/skia/include/core/SkColor.h"
 #include "ui/base/metadata/metadata_header_macros.h"
@@ -30,6 +31,7 @@ class MouseEvent;
 
 namespace views {
 class Button;
+class MdTextButton;
 class MenuRunner;
 class ScrollView;
 class Textfield;
@@ -39,6 +41,7 @@ namespace myarc {
 
 class FooterButton;
 class FooterTooltip;
+class MediaLightbox;
 
 // Arc's Library: a section rail and one section pane. Presentation only; the
 // Space and download actions go through the sidebar's Delegate. `close`
@@ -74,6 +77,8 @@ class LibraryView final : public views::View,
   void RefreshArchive();
   // Reloads the Boosts list when it is showing and its entries changed.
   void RefreshBoosts();
+  // Reloads the Media grid when it is showing and its entries changed.
+  void RefreshMedia();
   // Shows the Exit Library tooltip at once and keeps it up, for captures.
   void ShowExitTooltipNow();
 
@@ -95,6 +100,14 @@ class LibraryView final : public views::View,
   void UpdateList(bool keep_scroll);
   void AddArchiveRows(views::View& rows);
   void AddBoostRows(views::View& rows);
+  void BuildMediaOptIn();
+  void BuildMediaGrid(
+      const std::vector<SidebarView::MediaItemPresentation>& items,
+      std::optional<gfx::PointF> offset);
+  void ShowMediaPill(views::View* tile, const std::u16string& filename);
+  void HideMediaPill();
+  void OpenMediaLightbox(size_t index);
+  void CloseMediaLightbox();
   // The keyed control that has focus, and putting focus back on it after a
   // rebuild. Returns false when no control has `key` any more.
   std::optional<uint64_t> FocusedKey() const;
@@ -126,6 +139,9 @@ class LibraryView final : public views::View,
   void ShowSpaceMenu(uint64_t space,
                      views::View* anchor,
                      ui::mojom::MenuSourceType source_type);
+  void ShowArchiveFilterMenu(views::View* anchor,
+                             ui::mojom::MenuSourceType source_type);
+  void UpdateFilterButton();
 
   // views::ContextMenuController, for Arc's right-click on the Archived Tabs
   // rail item:
@@ -135,7 +151,17 @@ class LibraryView final : public views::View,
       ui::mojom::MenuSourceType source_type) override;
 
   // ui::SimpleMenuModel::Delegate:
+  bool IsCommandIdChecked(int command_id) const override;
+  bool IsCommandIdEnabled(int command_id) const override;
   void ExecuteCommand(int command_id, int event_flags) override;
+
+  struct ArchiveFilter {
+    std::optional<uint64_t> space_id;
+    library::ArchiveTimeRange range = library::ArchiveTimeRange::kAny;
+    bool IsActive() const {
+      return space_id.has_value() || range != library::ArchiveTimeRange::kAny;
+    }
+  };
 
   const raw_ref<SidebarView::Delegate> delegate_;
   const base::RepeatingClosure close_;
@@ -146,6 +172,7 @@ class LibraryView final : public views::View,
   raw_ptr<FooterButton> exit_ = nullptr;
   raw_ptr<views::View> pane_ = nullptr;
   raw_ptr<views::Textfield> search_ = nullptr;
+  raw_ptr<views::MdTextButton> filter_button_ = nullptr;
   raw_ptr<views::View> list_ = nullptr;
   // The Spaces section's scrolling views, keyed like BuildSpaces' `offsets`,
   // so a rebuild (a favicon, a rename) keeps every card where it was.
@@ -161,9 +188,26 @@ class LibraryView final : public views::View,
   // Boosts in the current Profile, unfiltered, while the Boosts section shows.
   std::vector<SidebarView::BoostPresentation> boosts_;
   bool boosts_global_enabled_ = true;
+  // Media items, unfiltered, while the Media section shows.
+  std::vector<SidebarView::MediaItemPresentation> media_;
+  bool media_enabled_ = false;
+  bool media_permission_denied_ = false;
+  bool media_card_dismissed_ = false;
+  bool media_shown_ = false;
+  // Filtered media list currently displayed in the grid (for lightbox stepping).
+  std::vector<SidebarView::MediaItemPresentation> visible_media_;
+  // Floating hover filename pill for Media tiles.
+  class MediaFilenamePill;
+  std::unique_ptr<MediaFilenamePill> media_pill_;
+  std::unique_ptr<MediaLightbox> lightbox_;
+  uint64_t lightbox_return_key_ = 0;
+  uint64_t menu_media_ = 0;
+  raw_ptr<views::Button> media_rail_item_ = nullptr;
   // Archived Tabs whose reopen is queued, so a second click does nothing.
   std::set<uint64_t> reopening_;
   std::u16string query_;
+  ArchiveFilter archive_filter_;
+  std::vector<uint64_t> filter_space_ids_;
   // Surface and text colors the pane was last built with.
   std::optional<std::pair<SkColor, SkColor>> theme_colors_;
   std::unique_ptr<ui::SimpleMenuModel> menu_model_;

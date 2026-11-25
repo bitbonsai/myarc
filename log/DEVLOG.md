@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-11-25: Library Media section, Media Lightbox, and Archived Tabs Filter
+
+- Added `Filter` menu (`Space` + `Time` range) to Library Archived Tabs (`browser/foundation/library_logic.{h,cc}`, `library_view.{h,cc}`, `browser_view.cc`) with DST-safe date predicates, active indigo pill state, and `Clear Filters` empty state.
+- Implemented per-Profile opt-in `MediaLibraryService` (`browser/foundation/media_prefs.{h,cc}`, `media_library_service.{h,cc}`, `media_library_mac.{h,mm}`) with shallow symlink-safe directory scanning (`kMaxMediaScanEntries = 2000`, `kMaxMediaItems = 120`), QuickLook/ImageIO thumbnails, debounced file watching while open, and native macOS drag-out/Preview/Finder/clipboard actions.
+- Enabled `Section::kMedia` in `LibraryView` with Arc's skeleton + floating opt-in card, 2-column thumbnail grid, floating indigo hover filename pill, `MediaLightbox` window-modal preview (`browser/foundation/media_lightbox.{h,cc}`), and `CheckArchiveFilter()` / `CheckMediaScan()` in `bridge_check`; verified with `out/MyarcRelease` `chrome` + `bridge_check`, `export_patches.py --check`, `check_docs.py`, `cargo fmt`/`clippy`/`test`, and `node --test`.
+
 ## 2026-11-25: Fix Create Space landing in personal Profile when New Profile field is open
 
 - Fixed `CreateSpacePanel::RunCreate()` (`browser/foundation/create_space_panel.{h,cc}`) ignoring the open `Profile name…` field or an in-flight Profile creation and silently creating the Space in the previously selected Profile (`Default`).

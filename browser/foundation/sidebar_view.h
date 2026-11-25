@@ -10,6 +10,7 @@
 #include <vector>
 
 #include "base/functional/callback.h"
+#include "base/files/file_path.h"
 #include "base/memory/raw_ptr.h"
 #include "base/memory/raw_ref.h"
 #include "base/memory/weak_ptr.h"
@@ -101,7 +102,8 @@ class SidebarView final : public views::View,
   };
 
   struct ArchivedTabPresentation {
-    uint64_t id = 0;  // Rust archive ID.
+    uint64_t id = 0;        // Rust archive ID.
+    uint64_t space_id = 0;  // Owning Space ID, or 0 once deleted.
     std::u16string title;
     std::u16string url;    // Display form, without the scheme.
     std::u16string space;  // Owning Space's name; empty once it is deleted.
@@ -118,6 +120,16 @@ class SidebarView final : public views::View,
     ui::ImageModel icon;   // Cached favicon, or empty.
     bool enabled = true;
     bool operator==(const BoostPresentation&) const = default;
+  };
+
+  struct MediaItemPresentation {
+    uint64_t id = 0;
+    std::u16string filename;
+    base::FilePath path;
+    base::Time modified;
+    bool is_video = false;
+    ui::ImageModel thumbnail;
+    bool operator==(const MediaItemPresentation&) const = default;
   };
 
   // A Space's card in the Library, with its Pins in sidebar order.
@@ -288,6 +300,20 @@ class SidebarView final : public views::View,
     virtual void BoostItem(uint64_t item_id) = 0;
     virtual void SetBoostEnabled(uint64_t boost_id, bool enabled) = 0;
     virtual void DeleteBoost(uint64_t boost_id) = 0;
+    // Library -> Media: explicit per-Profile opt-in local media discovery.
+    virtual bool IsMediaLibraryEnabled() const = 0;
+    virtual void SetMediaLibraryEnabled(bool enabled) = 0;
+    virtual bool IsMediaLibraryPermissionDenied() const = 0;
+    virtual std::vector<MediaItemPresentation> GetMediaItems() const = 0;
+    virtual void SetMediaLibraryShown(bool shown) = 0;
+    virtual void DragMediaItem(uint64_t id) = 0;
+    virtual void OpenMediaInPreview(uint64_t id) = 0;
+    virtual void RevealMediaInFinder(uint64_t id) = 0;
+    virtual void CopyMediaFile(uint64_t id) = 0;
+    virtual void OpenMediaPrivacySettings() = 0;
+    virtual void RequestMediaPreview(
+        uint64_t id,
+        base::OnceCallback<void(gfx::ImageSkia)> callback) = 0;
     // The parent resizes the sidebar region for the Library, and calls
     // RefreshLibraryDownloads while it is open. After closing it supplies a
     // fresh model with SetModel.
@@ -358,6 +384,7 @@ class SidebarView final : public views::View,
   void RefreshLibraryDownloads();
   // Reloads an open Library's Boosts list if it changed.
   void RefreshLibraryBoosts();
+  void RefreshLibraryMedia();
   bool library_open() const { return !!library_; }
   // The URLs of the rows selected with Cmd-click or Shift-click, one per
   // line, or empty without a selection. Cmd+Shift+C copies them.

@@ -260,6 +260,17 @@ inline constexpr gfx::VectorIcon kPaletteIcon(kPaletteRep,
                                               std::size(kPaletteRep),
                                               "myarc_palette");
 
+// Filter bars (Lucide `list-filter`), used for the Archived Tabs Filter button.
+inline constexpr gfx::PathElement kFilterPath[] = {
+    gfx::CANVAS_DIMENSIONS, 24, gfx::STROKE, 2,
+    gfx::MOVE_TO, 3, 6, gfx::H_LINE_TO, 21,
+    gfx::MOVE_TO, 7, 12, gfx::H_LINE_TO, 17,
+    gfx::MOVE_TO, 10, 18, gfx::H_LINE_TO, 14};
+inline constexpr gfx::VectorIconRep kFilterRep[] = {{kFilterPath}};
+inline constexpr gfx::VectorIcon kFilterIcon(kFilterRep,
+                                             std::size(kFilterRep),
+                                             "myarc_filter");
+
 // The creation menu's row icons, traced from Arc's. New Space is the Spaces
 // rail glyph's two cards with a plus on the front one, on its 28 DIP canvas.
 // New Split and New Tab use an 18 DIP canvas at stroke 1.6: a window split a

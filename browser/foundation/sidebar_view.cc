@@ -1640,6 +1640,13 @@ void SidebarView::RefreshLibraryBoosts() {
   }
 }
 
+void SidebarView::RefreshLibraryMedia() {
+  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
+  if (library_) {
+    library_->RefreshMedia();
+  }
+}
+
 void SidebarView::SetCreateMenuOpen(bool open) {
   create_menu_open_ = open;
   if (!create_button_) {

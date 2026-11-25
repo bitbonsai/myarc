@@ -1,5 +1,5 @@
 diff --git a/chrome/browser/ui/views/frame/browser_view.cc b/chrome/browser/ui/views/frame/browser_view.cc
-index 7b568f6de760af21d6e9d2aa44415a7cef617c51..049b3af88d4a68c94abc74e7fbea1d0b56a7a3a1 100644
+index 7b568f6de760af21d6e9d2aa44415a7cef617c51..138ea728c4491ea2c009b061b22c553a1fcb80d9 100644
 --- a/chrome/browser/ui/views/frame/browser_view.cc
 +++ b/chrome/browser/ui/views/frame/browser_view.cc
 @@ -11,6 +11,7 @@
@@ -158,7 +158,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..049b3af88d4a68c94abc74e7fbea1d0b
  #include "components/version_info/channel.h"
  #include "components/web_modal/web_contents_modal_dialog_manager.h"
  #include "content/public/browser/browser_accessibility_state.h"
-@@ -309,8 +358,34 @@
+@@ -309,8 +358,38 @@
  #include "content/public/common/content_features.h"
  #include "content/public/common/content_switches.h"
  #include "content/public/common/drop_data.h"
@@ -180,6 +180,10 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..049b3af88d4a68c94abc74e7fbea1d0b
 +#include "myarc/icons.h"
 +#include "myarc/library_logic.h"
 +#include "myarc/little_arc.h"
++#include "myarc/media_library_service.h"
++#if BUILDFLAG(IS_MAC)
++#include "myarc/media_library_mac.h"
++#endif
 +#include "myarc/onboarding_controller.h"
 +#include "myarc/peek.h"
 +#include "myarc/profile_swap_cover.h"
@@ -193,7 +197,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..049b3af88d4a68c94abc74e7fbea1d0b
  #include "third_party/blink/public/common/features.h"
  #include "third_party/blink/public/common/permissions/permission_utils.h"
  #include "ui/accessibility/ax_enums.mojom-shared.h"
-@@ -324,6 +399,7 @@
+@@ -324,6 +403,7 @@
  #include "ui/base/l10n/l10n_util.h"
  #include "ui/base/metadata/metadata_header_macros.h"
  #include "ui/base/metadata/metadata_impl_macros.h"
@@ -201,7 +205,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..049b3af88d4a68c94abc74e7fbea1d0b
  #include "ui/base/models/image_model.h"
  #include "ui/base/mojom/window_show_state.mojom.h"
  #include "ui/base/resource/resource_bundle.h"
-@@ -333,32 +409,54 @@
+@@ -333,32 +413,54 @@
  #include "ui/base/window_open_disposition.h"
  #include "ui/base/window_open_disposition_utils.h"
  #include "ui/color/color_id.h"
@@ -256,7 +260,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..049b3af88d4a68c94abc74e7fbea1d0b
  #include "ui/views/layout/fill_layout.h"
  #include "ui/views/view.h"
  #include "ui/views/view_class_properties.h"
-@@ -370,6 +468,8 @@
+@@ -370,6 +472,8 @@
  #include "ui/views/widget/widget.h"
  #include "ui/views/window/dialog_delegate.h"
  #include "ui/views/window/hit_test_utils.h"
@@ -265,7 +269,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..049b3af88d4a68c94abc74e7fbea1d0b
  
  #if BUILDFLAG(IS_CHROMEOS)
  #include "ash/constants/ash_switches.h"
-@@ -659,6 +759,1304 @@ bool ConvertedHitTest(views::View* src, views::View* dst, gfx::Point* point) {
+@@ -659,6 +763,1304 @@ bool ConvertedHitTest(views::View* src, views::View* dst, gfx::Point* point) {
    return dst->HitTestPoint(*point);
  }
  
@@ -1570,7 +1574,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..049b3af88d4a68c94abc74e7fbea1d0b
  }  // namespace
  
  // Implements the exclusive access context and bubble context.
-@@ -893,6 +2291,61 @@ class BrowserView::PipExclusionObserverImpl
+@@ -893,6 +2295,61 @@ class BrowserView::PipExclusionObserverImpl
  };
  #endif
  
@@ -1632,7 +1636,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..049b3af88d4a68c94abc74e7fbea1d0b
  ///////////////////////////////////////////////////////////////////////////////
  // BrowserView, public:
  
-@@ -962,6 +2415,34 @@ BrowserView::BrowserView(BrowserWindowInterface* browser)
+@@ -962,6 +2419,34 @@ BrowserView::BrowserView(BrowserWindowInterface* browser)
  
    auto multi_contents_view = std::make_unique<MultiContentsView>(
        this, std::make_unique<MultiContentsViewDelegateImpl>(*browser_));
@@ -1667,12 +1671,13 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..049b3af88d4a68c94abc74e7fbea1d0b
    multi_contents_view_ = AddChildView(std::move(multi_contents_view));
  
    set_contents_view(multi_contents_view_);
-@@ -1124,6 +2605,30 @@ BrowserView::~BrowserView() {
+@@ -1124,6 +2609,31 @@ BrowserView::~BrowserView() {
    // other cleanups that destroy views referenced in the layout manager.
    SetLayoutManager(nullptr);
  
 +  myarc_workspace_weak_factory_.InvalidateWeakPtrs();
 +  myarc_workspace_subscription_ = {};
++  myarc_media_subscription_ = {};
 +  CloseMyarcSpaceDialog();
 +  if (browser_) {
 +    myarc::CloseBoostEditor(*browser_);
@@ -1698,7 +1703,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..049b3af88d4a68c94abc74e7fbea1d0b
    tab_search_bubble_host_.reset();
  
    global_error_observation_.Reset();
-@@ -1168,6 +2673,7 @@ BrowserView::~BrowserView() {
+@@ -1168,6 +2678,7 @@ BrowserView::~BrowserView() {
    vertical_tab_strip_bottom_corner_ = nullptr;
    organizer_tray_ = nullptr;
    side_panel_ = nullptr;
@@ -1706,10 +1711,11 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..049b3af88d4a68c94abc74e7fbea1d0b
  
  #if BUILDFLAG(IS_MAC)
    tab_overlay_view_ = nullptr;
-@@ -1234,6 +2740,17 @@ void BrowserView::SetDisableRevealerDelayForTesting(bool disable) {
+@@ -1234,7 +2745,18 @@ void BrowserView::SetDisableRevealerDelayForTesting(bool disable) {
  }
  
  gfx::Rect BrowserView::GetFindBarBoundingBox() const {
+-  gfx::Rect contents_bounds = multi_contents_view_->ConvertRectToWidget(
 +  // myArc floats find over the focused page's top right corner, inset 12 DIP
 +  // as in Arc, so it never covers the sidebar.
 +  if (const views::View* pane =
@@ -1721,10 +1727,11 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..049b3af88d4a68c94abc74e7fbea1d0b
 +    return box;
 +  }
 +
-   gfx::Rect contents_bounds = multi_contents_view_->ConvertRectToWidget(
++  gfx::Rect contents_bounds = multi_contents_view_->ConvertRectToWidget(
        multi_contents_view_->GetLocalBounds());
  
-@@ -1624,6 +3141,7 @@ void BrowserView::OnVerticalTabStripModeChanged(
+   // If the location bar is visible use it to position the bounding box,
+@@ -1624,6 +3146,7 @@ void BrowserView::OnVerticalTabStripModeChanged(
      horizontal_tab_strip_region_view_->InitializeTabStrip();
    }
  
@@ -1732,19 +1739,17 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..049b3af88d4a68c94abc74e7fbea1d0b
    GetFrameView()->OnTabStripStateChanged();
  
    UpdateTabSearchBubbleHost();
-@@ -1638,7 +3156,10 @@ void BrowserView::Show() {
+@@ -1638,6 +3161,9 @@ void BrowserView::Show() {
    if (browser_widget_->IsClosed()) {
      return;
    }
--
 +  if (ShowMyarcGroupWindow(/*activate=*/true)) {
 +    return;
 +  }
-+
+ 
    if (auto* manager = InitialWebUIManager::From(browser())) {
      if (manager->RequestDeferShow(base::BindOnce(
-             &BrowserView::Show, weak_ptr_factory_.GetWeakPtr()))) {
-@@ -1674,12 +3195,383 @@ void BrowserView::Show() {
+@@ -1674,12 +3200,383 @@ void BrowserView::Show() {
  
    // Guard against destruction by platform event handlers called during Show().
    auto weak_ptr = weak_ptr_factory_.GetWeakPtr();
@@ -2129,7 +2134,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..049b3af88d4a68c94abc74e7fbea1d0b
  
    // The fullscreen transition clears out focus, but there are some cases (for
    // example, new window in Mac fullscreen with toolbar showing) where we need
-@@ -1699,6 +3591,9 @@ void BrowserView::Show() {
+@@ -1699,6 +3596,9 @@ void BrowserView::Show() {
  }
  
  void BrowserView::ShowInactive() {
@@ -2139,7 +2144,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..049b3af88d4a68c94abc74e7fbea1d0b
    if (!browser_widget_->IsVisible()) {
      browser_widget_->ShowInactive();
    }
-@@ -1743,6 +3638,9 @@ void BrowserView::Activate() {
+@@ -1743,6 +3643,9 @@ void BrowserView::Activate() {
      // to continue.
      return;
    }
@@ -2149,7 +2154,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..049b3af88d4a68c94abc74e7fbea1d0b
  
    if (auto* manager = InitialWebUIManager::From(browser())) {
      if (manager->RequestDeferShow(base::BindOnce(
-@@ -1992,6 +3890,15 @@ void BrowserView::OnActiveTabChanged(content::WebContents* old_contents,
+@@ -1992,6 +3895,15 @@ void BrowserView::OnActiveTabChanged(content::WebContents* old_contents,
                                       int index,
                                       int reason) {
    CHECK(new_contents, base::NotFatalUntil::M162);
@@ -2165,7 +2170,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..049b3af88d4a68c94abc74e7fbea1d0b
    TRACE_EVENT0("ui", "BrowserView::OnActiveTabChanged");
    views::WebView* active_contents_view = GetActiveContentsWebView();
    bool tab_change_in_split_view =
-@@ -2014,6 +3921,47 @@ void BrowserView::OnActiveTabChanged(content::WebContents* old_contents,
+@@ -2014,6 +3926,47 @@ void BrowserView::OnActiveTabChanged(content::WebContents* old_contents,
        active_contents_view->web_contents() != new_contents &&
        !tab_change_in_split_view;
  
@@ -2213,7 +2218,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..049b3af88d4a68c94abc74e7fbea1d0b
    bool will_restore_focus = !browser_->GetTabStripModel()->closing_all() &&
                              GetWidget()->IsVisible() &&
                              !tab_change_in_split_view;
-@@ -2139,6 +4087,23 @@ void BrowserView::OnActiveTabChanged(content::WebContents* old_contents,
+@@ -2139,6 +4092,23 @@ void BrowserView::OnActiveTabChanged(content::WebContents* old_contents,
    UpdateTitleBar();
  
    CHECK_DEREF(TranslateBubbleController::From(browser_.get())).CloseBubble();
@@ -2237,7 +2242,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..049b3af88d4a68c94abc74e7fbea1d0b
  }
  
  void BrowserView::OnTabDetached(content::WebContents* contents,
-@@ -2258,6 +4223,20 @@ bool BrowserView::IsFullscreen() const {
+@@ -2258,6 +4228,20 @@ bool BrowserView::IsFullscreen() const {
  }
  
  void BrowserView::RestoreFocus() {
@@ -2258,7 +2263,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..049b3af88d4a68c94abc74e7fbea1d0b
    WebContents* selected_web_contents = GetActiveWebContents();
    if (selected_web_contents) {
      selected_web_contents->RestoreFocus();
-@@ -2363,6 +4342,13 @@ PinnedToolbarActions* BrowserView::GetPinnedToolbarActions() {
+@@ -2363,6 +4347,13 @@ PinnedToolbarActions* BrowserView::GetPinnedToolbarActions() {
  }
  
  void BrowserView::SetFocusToLocationBar(bool is_user_initiated) {
@@ -2272,7 +2277,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..049b3af88d4a68c94abc74e7fbea1d0b
    // On Windows, changing focus to the location bar causes the browser window to
    // become active. This can steal focus if the user has another window open
    // already. On Chrome OS, changing focus makes a view believe it has a focus
-@@ -2383,16 +4369,26 @@ void BrowserView::SetFocusToLocationBar(bool is_user_initiated) {
+@@ -2383,16 +4374,26 @@ void BrowserView::SetFocusToLocationBar(bool is_user_initiated) {
  }
  
  void BrowserView::UpdateReloadStopState(bool is_loading, bool force) {
@@ -2299,7 +2304,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..049b3af88d4a68c94abc74e7fbea1d0b
    // We may end up here during destruction.
    if (toolbar_) {
      toolbar_->Update(contents);
-@@ -2404,6 +4400,9 @@ void BrowserView::UpdateToolbar(content::WebContents* contents) {
+@@ -2404,6 +4405,9 @@ void BrowserView::UpdateToolbar(content::WebContents* contents) {
  }
  
  bool BrowserView::UpdateToolbarSecurityState() {
@@ -2309,7 +2314,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..049b3af88d4a68c94abc74e7fbea1d0b
    // We may end up here during destruction.
    if (toolbar_) {
      return toolbar_->UpdateSecurityState();
-@@ -2900,6 +4899,10 @@ void BrowserView::TryNotifyWindowBoundsChanged(const gfx::Rect& widget_bounds) {
+@@ -2900,6 +4904,10 @@ void BrowserView::TryNotifyWindowBoundsChanged(const gfx::Rect& widget_bounds) {
  void BrowserView::OnWidgetVisibilityChanged(views::Widget* widget,
                                              bool visible) {
    UpdateLoadingAnimations(visible);
@@ -2320,7 +2325,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..049b3af88d4a68c94abc74e7fbea1d0b
  
    if (visible &&
        base::FeatureList::IsEnabled(
-@@ -3078,6 +5081,10 @@ void BrowserView::DisableTabStripEditingForTesting() {
+@@ -3078,6 +5086,10 @@ void BrowserView::DisableTabStripEditingForTesting() {
  }
  
  bool BrowserView::IsToolbarVisible() const {
@@ -2331,7 +2336,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..049b3af88d4a68c94abc74e7fbea1d0b
  #if BUILDFLAG(IS_MAC)
    // Immersive full screen makes it possible to display the toolbar when
    // kShowFullscreenToolbar is not set.
-@@ -3241,6 +5248,15 @@ content::KeyboardEventProcessingResult BrowserView::PreHandleKeyboardEvent(
+@@ -3241,6 +5253,15 @@ content::KeyboardEventProcessingResult BrowserView::PreHandleKeyboardEvent(
      return content::KeyboardEventProcessingResult::NOT_HANDLED;
    }
  
@@ -2347,7 +2352,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..049b3af88d4a68c94abc74e7fbea1d0b
    views::FocusManager* focus_manager = GetFocusManager();
    CHECK(focus_manager, base::NotFatalUntil::M162);
  
-@@ -3414,7 +5430,7 @@ void BrowserView::CutCopyPaste(int command_id) {
+@@ -3414,7 +5435,7 @@ void BrowserView::CutCopyPaste(int command_id) {
    // key events (and not accelerators) to the WebContents so it can give the web
    // page a chance to override them.
    WebContents* contents = browser_->GetTabStripModel()->GetActiveWebContents();
@@ -2356,7 +2361,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..049b3af88d4a68c94abc74e7fbea1d0b
      void (WebContents::*method)();
      if (command_id == IDC_CUT) {
        method = &content::WebContents::Cut;
-@@ -3483,6 +5499,10 @@ LocationBarView* BrowserView::GetLocationBarView() const {
+@@ -3483,6 +5504,10 @@ LocationBarView* BrowserView::GetLocationBarView() const {
  // BrowserView, TabStripModelObserver implementation:
  
  void BrowserView::OnSplitTabChanged(const SplitTabChange& change) {
@@ -2367,7 +2372,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..049b3af88d4a68c94abc74e7fbea1d0b
    switch (change.type) {
      case SplitTabChange::Type::kAdded: {
        const tabs::TabInterface* active_tab =
-@@ -3690,6 +5710,9 @@ bool BrowserView::CanActivate() const {
+@@ -3690,6 +5715,9 @@ bool BrowserView::CanActivate() const {
  }
  
  std::u16string BrowserView::GetWindowTitle() const {
@@ -2377,7 +2382,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..049b3af88d4a68c94abc74e7fbea1d0b
    std::u16string title =
        WindowMetadataController::From(browser_.get())
            ->GetWindowTitleForCurrentTab(true /* include_app_name */);
-@@ -3710,6 +5733,9 @@ std::u16string BrowserView::GetWindowTitle() const {
+@@ -3710,6 +5738,9 @@ std::u16string BrowserView::GetWindowTitle() const {
  }
  
  std::u16string BrowserView::GetAccessibleWindowTitle() const {
@@ -2387,7 +2392,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..049b3af88d4a68c94abc74e7fbea1d0b
    // If there is a focused and visible tab-modal dialog, report the dialog's
    // title instead of the page title.
    views::Widget* tab_modal =
-@@ -3947,7 +5973,10 @@ bool BrowserView::CanChangeWindowIcon() const {
+@@ -3947,7 +5978,10 @@ bool BrowserView::CanChangeWindowIcon() const {
  }
  
  views::View* BrowserView::GetInitiallyFocusedView() {
@@ -2399,7 +2404,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..049b3af88d4a68c94abc74e7fbea1d0b
  }
  
  bool BrowserView::ShouldShowWindowTitle() const {
-@@ -3971,6 +6000,9 @@ ui::ImageModel BrowserView::GetWindowAppIcon() {
+@@ -3971,6 +6005,9 @@ ui::ImageModel BrowserView::GetWindowAppIcon() {
  }
  
  ui::ImageModel BrowserView::GetWindowIcon() {
@@ -2409,7 +2414,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..049b3af88d4a68c94abc74e7fbea1d0b
    // Use the default icon for devtools.
    if (browser_->GetType() == BrowserWindowInterface::Type::TYPE_DEVTOOLS) {
      return ui::ImageModel();
-@@ -4199,6 +6231,8 @@ void BrowserView::OnWidgetDestroying(views::Widget* widget) {
+@@ -4199,6 +6236,8 @@ void BrowserView::OnWidgetDestroying(views::Widget* widget) {
  
  void BrowserView::OnWidgetActivationChanged(views::Widget* widget,
                                              bool active) {
@@ -2418,7 +2423,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..049b3af88d4a68c94abc74e7fbea1d0b
    if (browser_->GetWindow()) {
      if (active) {
        if (restore_focus_on_activation_.has_value() &&
-@@ -4336,6 +6370,10 @@ void BrowserView::UpdateTabSearchBubbleHost() {
+@@ -4336,6 +6375,10 @@ void BrowserView::UpdateTabSearchBubbleHost() {
  }
  
  void BrowserView::ShowSplitView(bool focus_active_view) {
@@ -2429,7 +2434,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..049b3af88d4a68c94abc74e7fbea1d0b
    const int active_index = browser_->GetTabStripModel()->active_index();
  
    std::optional<split_tabs::SplitTabId> split_tab_id =
-@@ -4610,8 +6648,10 @@ views::CloseRequestResult BrowserView::OnWindowCloseRequested() {
+@@ -4610,8 +6653,10 @@ views::CloseRequestResult BrowserView::OnWindowCloseRequested() {
    // Give beforeunload handlers, the user, or policy the chance to cancel the
    // close before we hide the window below.
    if (!UnloadController::From(browser_)->HandleBeforeClose()) {
@@ -2440,7 +2445,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..049b3af88d4a68c94abc74e7fbea1d0b
  
    views::CloseRequestResult result = views::CloseRequestResult::kCanClose;
    if (!browser_->GetTabStripModel()->empty()) {
-@@ -4632,6 +6672,15 @@ views::CloseRequestResult BrowserView::OnWindowCloseRequested() {
+@@ -4632,6 +6677,15 @@ views::CloseRequestResult BrowserView::OnWindowCloseRequested() {
  }
  
  int BrowserView::NonClientHitTest(const gfx::Point& point) {
@@ -2456,7 +2461,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..049b3af88d4a68c94abc74e7fbea1d0b
  #if BUILDFLAG(IS_MAC)
    // The top container while in immersive fullscreen on macOS lives in another
    // Widget (OverlayWidgetMac). This means that BrowserView does not need to
-@@ -4908,6 +6957,7 @@ void BrowserView::Layout(PassKey) {
+@@ -4908,6 +6962,7 @@ void BrowserView::Layout(PassKey) {
    }
  
    LayoutSuperclass<views::View>(this);
@@ -2464,7 +2469,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..049b3af88d4a68c94abc74e7fbea1d0b
  
    // TODO(jamescook): Why was this in the middle of layout code?
    toolbar_->location_bar()->UpdateFocusBehavior(IsToolbarVisible());
-@@ -4954,6 +7004,9 @@ void BrowserView::Layout(PassKey) {
+@@ -4954,6 +7009,9 @@ void BrowserView::Layout(PassKey) {
      if (fallback_popup_anchor_) {
        fallback_popup_anchor_->MaybeUpdateAnchor(rect);
      }
@@ -2474,7 +2479,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..049b3af88d4a68c94abc74e7fbea1d0b
  
      if (dialog_anchor_) {
        rect.Offset(0, -kAdditionalDialogToolbarOverlap);
-@@ -5197,6 +7250,338 @@ void BrowserView::AddedToWidget() {
+@@ -5197,6 +7255,338 @@ void BrowserView::AddedToWidget() {
        kFallbackPopupAnchorElementId, *this);
  
    initialized_ = true;
@@ -2813,7 +2818,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..049b3af88d4a68c94abc74e7fbea1d0b
  }
  
  void BrowserView::RemovedFromWidget() {
-@@ -5267,97 +7652,3389 @@ const views::View* BrowserView::GetViewByElementId(
+@@ -5267,95 +7657,3514 @@ const views::View* BrowserView::GetViewByElementId(
  ///////////////////////////////////////////////////////////////////////////////
  // BrowserView, ui::AcceleratorTarget overrides:
  
@@ -3034,8 +3039,18 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..049b3af88d4a68c94abc74e7fbea1d0b
 +  myarc_settings_window_->Show(myarc::SettingsWindow::Section::kGeneral,
 +                               /*inactive=*/false);
 +  return true;
-+}
-+
+ }
+ 
+-#if BUILDFLAG(IS_WIN)
+-void BrowserView::CreateJumpList() {
+-  // Ensure that this browser's Profile has a JumpList so that the JumpList is
+-  // kept up to date.
+-  JumpListFactory::GetForProfile(browser_->GetProfile());
+-}
+-#endif
+-
+-BrowserFrameView* BrowserView::GetFrameView() {
+-  return browser_widget_ ? browser_widget_->GetFrameView() : nullptr;
 +bool BrowserView::ExecuteMyarcWindowCommand(int command_id) {
 +  const auto open_settings = [this](myarc::SettingsWindow::Section section) {
 +    if (!GetWidget()) {
@@ -5308,6 +5323,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..049b3af88d4a68c94abc74e7fbea1d0b
 +        tab.title.empty() ? row.url : base::UTF8ToUTF16(std::string(tab.title));
 +    for (const auto& space : sidebar.spaces) {
 +      if (space.id == tab.space_id) {
++        row.space_id = space.id;
 +        row.space = base::UTF8ToUTF16(std::string(space.name));
 +      }
 +    }
@@ -5467,6 +5483,132 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..049b3af88d4a68c94abc74e7fbea1d0b
 +  }
 +  myarc::BoostsService::ForProfile(*browser_->GetProfile())
 +      .DeleteBoost(boost_id);
++}
++
++bool BrowserView::IsMediaLibraryEnabled() const {
++  if (!browser_ || !browser_->GetProfile()) {
++    return false;
++  }
++  return myarc::MediaLibraryService::ForProfile(*browser_->GetProfile())
++      .IsEnabled();
++}
++
++void BrowserView::SetMediaLibraryEnabled(bool enabled) {
++  if (!browser_ || !browser_->GetProfile()) {
++    return;
++  }
++  myarc::MediaLibraryService::ForProfile(*browser_->GetProfile())
++      .SetEnabled(enabled);
++}
++
++bool BrowserView::IsMediaLibraryPermissionDenied() const {
++  if (!browser_ || !browser_->GetProfile()) {
++    return false;
++  }
++  return myarc::MediaLibraryService::ForProfile(*browser_->GetProfile())
++      .PermissionDenied();
++}
++
++std::vector<myarc::SidebarView::MediaItemPresentation>
++BrowserView::GetMediaItems() const {
++  std::vector<myarc::SidebarView::MediaItemPresentation> out;
++  if (!browser_ || !browser_->GetProfile()) {
++    return out;
++  }
++  auto& service =
++      myarc::MediaLibraryService::ForProfile(*browser_->GetProfile());
++  const auto items = service.GetItems();
++  out.reserve(items.size());
++  for (const auto& item : items) {
++    myarc::SidebarView::MediaItemPresentation row;
++    row.id = item.id;
++    row.filename = item.filename;
++    row.path = item.path;
++    row.modified = item.modified;
++    row.is_video = item.is_video;
++    if (!item.thumbnail.isNull()) {
++      row.thumbnail = ui::ImageModel::FromImageSkia(item.thumbnail);
++    }
++    out.push_back(std::move(row));
++  }
++  return out;
++}
++
++void BrowserView::SetMediaLibraryShown(bool shown) {
++  if (!browser_ || !browser_->GetProfile()) {
++    return;
++  }
++  auto& service =
++      myarc::MediaLibraryService::ForProfile(*browser_->GetProfile());
++  if (shown) {
++    myarc_media_subscription_ = service.Subscribe(base::BindRepeating(
++        [](BrowserView* view) {
++          if (view->myarc_workspace_sidebar_) {
++            view->myarc_workspace_sidebar_->RefreshLibraryMedia();
++          }
++        },
++        base::Unretained(this)));
++  } else {
++    myarc_media_subscription_ = {};
++  }
++  service.SetShown(shown);
++}
++
++void BrowserView::DragMediaItem(uint64_t media_id) {
++#if BUILDFLAG(IS_MAC)
++  if (!browser_ || !browser_->GetProfile() || !GetWidget()) {
++    return;
++  }
++  auto& service =
++      myarc::MediaLibraryService::ForProfile(*browser_->GetProfile());
++  const auto item = service.FindItem(media_id);
++  if (!item) {
++    return;
++  }
++  myarc::DragMediaFileMac(item->path, item->thumbnail,
++                          GetWidget()->GetNativeView());
++#endif
++}
++
++void BrowserView::OpenMediaInPreview(uint64_t media_id) {
++  if (!browser_ || !browser_->GetProfile()) {
++    return;
++  }
++  myarc::MediaLibraryService::ForProfile(*browser_->GetProfile())
++      .OpenInPreview(media_id);
++}
++
++void BrowserView::RevealMediaInFinder(uint64_t media_id) {
++  if (!browser_ || !browser_->GetProfile()) {
++    return;
++  }
++  myarc::MediaLibraryService::ForProfile(*browser_->GetProfile())
++      .RevealInFinder(media_id);
++}
++
++void BrowserView::CopyMediaFile(uint64_t media_id) {
++  if (!browser_ || !browser_->GetProfile()) {
++    return;
++  }
++  myarc::MediaLibraryService::ForProfile(*browser_->GetProfile())
++      .CopyFile(media_id);
++}
++
++void BrowserView::OpenMediaPrivacySettings() {
++#if BUILDFLAG(IS_MAC)
++  myarc::OpenFilesAndFoldersSettingsMac();
++#endif
++}
++
++void BrowserView::RequestMediaPreview(
++    uint64_t media_id,
++    base::OnceCallback<void(gfx::ImageSkia)> callback) {
++  if (!browser_ || !browser_->GetProfile()) {
++    std::move(callback).Run(gfx::ImageSkia());
++    return;
++  }
++  myarc::MediaLibraryService::ForProfile(*browser_->GetProfile())
++      .RequestPreview(media_id, std::move(callback));
 +}
 +
 +void BrowserView::SetLibraryOpen(bool open) {
@@ -6263,22 +6405,8 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..049b3af88d4a68c94abc74e7fbea1d0b
 +  return browser_widget_ ? browser_widget_->GetFrameView() : nullptr;
  }
  
--#if BUILDFLAG(IS_WIN)
--void BrowserView::CreateJumpList() {
--  // Ensure that this browser's Profile has a JumpList so that the JumpList is
--  // kept up to date.
--  JumpListFactory::GetForProfile(browser_->GetProfile());
--}
--#endif
--
--BrowserFrameView* BrowserView::GetFrameView() {
--  return browser_widget_ ? browser_widget_->GetFrameView() : nullptr;
--}
--
  const BrowserFrameView* BrowserView::GetFrameView() const {
-   return browser_widget_ ? browser_widget_->GetFrameView() : nullptr;
- }
-@@ -5471,6 +11148,10 @@ bool BrowserView::MaybeUpdateDevtools(content::WebContents* contents) {
+@@ -5471,6 +11280,10 @@ bool BrowserView::MaybeUpdateDevtools(content::WebContents* contents) {
  
  void BrowserView::UpdateUIForContents(WebContents* contents,
                                        bool should_layout_immediately) {
@@ -6289,7 +6417,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..049b3af88d4a68c94abc74e7fbea1d0b
    TRACE_EVENT0("ui", "BrowserView::UpdateUIForContents");
    bool needs_layout = MaybeShowBookmarkBar(contents);
  
-@@ -5706,6 +11387,26 @@ void BrowserView::LoadAccelerators() {
+@@ -5706,6 +11519,26 @@ void BrowserView::LoadAccelerators() {
    }
  
  #if BUILDFLAG(IS_MAC)

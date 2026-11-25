@@ -1,5 +1,5 @@
 diff --git a/chrome/browser/ui/views/frame/browser_view.h b/chrome/browser/ui/views/frame/browser_view.h
-index 750e46c97b64dccccf4268e912df5dbdb6516b3c..fc5cc2bf625716f018d0e12d3b4b015aebba01f6 100644
+index 750e46c97b64dccccf4268e912df5dbdb6516b3c..1fc8cffb365fb3bb8ec77821fbbe2ae5ac1a37b7 100644
 --- a/chrome/browser/ui/views/frame/browser_view.h
 +++ b/chrome/browser/ui/views/frame/browser_view.h
 @@ -8,11 +8,13 @@
@@ -144,7 +144,7 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..fc5cc2bf625716f018d0e12d3b4b015a
    base::WeakPtr<BrowserView> GetAsWeakPtr() {
      return weak_ptr_factory_.GetWeakPtr();
    }
-@@ -1253,12 +1331,277 @@ class BrowserView : public BrowserWindow,
+@@ -1253,12 +1331,292 @@ class BrowserView : public BrowserWindow,
  
    // Anchor point for help bubbles and other dialogs that want to reliably
    // anchor outside the content area of the window.
@@ -299,6 +299,20 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..fc5cc2bf625716f018d0e12d3b4b015a
 +  void BoostItem(uint64_t item_id) override;
 +  void SetBoostEnabled(uint64_t boost_id, bool enabled) override;
 +  void DeleteBoost(uint64_t boost_id) override;
++  bool IsMediaLibraryEnabled() const override;
++  void SetMediaLibraryEnabled(bool enabled) override;
++  bool IsMediaLibraryPermissionDenied() const override;
++  std::vector<myarc::SidebarView::MediaItemPresentation> GetMediaItems()
++      const override;
++  void SetMediaLibraryShown(bool shown) override;
++  void DragMediaItem(uint64_t media_id) override;
++  void OpenMediaInPreview(uint64_t media_id) override;
++  void RevealMediaInFinder(uint64_t media_id) override;
++  void CopyMediaFile(uint64_t media_id) override;
++  void OpenMediaPrivacySettings() override;
++  void RequestMediaPreview(
++      uint64_t media_id,
++      base::OnceCallback<void(gfx::ImageSkia)> callback) override;
 +  void SetLibraryOpen(bool open) override;
 +  void MyarcWorkspaceResult(myarc::foundation::MutationResult result);
 +  void UpdateMyarcWorkspaceCanvas();
@@ -339,6 +353,7 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..fc5cc2bf625716f018d0e12d3b4b015a
 +  // --myarc-capture-peek clicks the active page's first link once.
 +  bool myarc_capture_peek_scheduled_ = false;
 +  base::CallbackListSubscription myarc_workspace_subscription_;
++  base::CallbackListSubscription myarc_media_subscription_;
 +  raw_ptr<myarc::SidebarView> myarc_workspace_sidebar_ = nullptr;
 +  // Refreshes the sidebar when any Profile's Spaces change.
 +  PrefChangeRegistrar myarc_spaces_index_registrar_;
@@ -422,7 +437,7 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..fc5cc2bf625716f018d0e12d3b4b015a
  
    // A mapping between accelerators and command IDs.
    std::map<ui::Accelerator, int> accelerator_table_;
-@@ -1411,6 +1754,7 @@ class BrowserView : public BrowserWindow,
+@@ -1411,6 +1769,7 @@ class BrowserView : public BrowserWindow,
    base::EnumSet<TabStripAndWebAppViewsReparentedState>
        tab_strip_web_apps_reparented_state_;
  

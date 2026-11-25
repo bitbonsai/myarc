@@ -18,6 +18,7 @@
 #include "myarc/boosts_service.h"
 #include "myarc/bridge.rs.h"
 #include "myarc/library_logic.h"
+#include "myarc/media_library_service.h"
 #include "myarc/spaces_index.h"
 #include "myarc/workspace_service.h"
 
@@ -1276,6 +1277,34 @@ bool CheckDownloadsStack() {
              std::vector<Download>{{7, true}};
 }
 
+bool CheckArchiveFilter() {
+  using myarc::library::ArchiveTimeRange;
+  using myarc::library::MatchesArchiveFilter;
+  const base::Time now = base::Time::UnixEpoch() + base::Days(400) +
+                         base::Hours(12);
+  // Space match.
+  if (!MatchesArchiveFilter(2, now, now, std::nullopt, ArchiveTimeRange::kAny) ||
+      !MatchesArchiveFilter(2, now, now, 2u, ArchiveTimeRange::kAny) ||
+      MatchesArchiveFilter(2, now, now, 3u, ArchiveTimeRange::kAny) ||
+      !MatchesArchiveFilter(0, now, now, 0u, ArchiveTimeRange::kAny) ||
+      MatchesArchiveFilter(2, now, now, 0u, ArchiveTimeRange::kAny)) {
+    return false;
+  }
+  // Calendar-day time ranges.
+  return MatchesArchiveFilter(1, now, now, std::nullopt,
+                              ArchiveTimeRange::kToday) &&
+         !MatchesArchiveFilter(1, now - base::Days(1), now, std::nullopt,
+                               ArchiveTimeRange::kToday) &&
+         MatchesArchiveFilter(1, now - base::Days(6), now, std::nullopt,
+                              ArchiveTimeRange::kLast7Days) &&
+         !MatchesArchiveFilter(1, now - base::Days(7), now, std::nullopt,
+                               ArchiveTimeRange::kLast7Days) &&
+         MatchesArchiveFilter(1, now - base::Days(29), now, std::nullopt,
+                              ArchiveTimeRange::kLast30Days) &&
+         !MatchesArchiveFilter(1, now - base::Days(30), now, std::nullopt,
+                               ArchiveTimeRange::kLast30Days);
+}
+
 // The Spaces index round-trips each Profile's Spaces in order, rewrites only
 // the named Profile, and reads a tampered Local State dictionary safely.
 bool CheckSpacesIndex() {
@@ -1725,6 +1754,71 @@ bool CheckBoosts() {
          base::PathExists(path) && base::PathExists(backup);
 }
 
+bool CheckMediaScan() {
+  bool is_video = false;
+  if (!myarc::IsAllowedMediaExtension(base::FilePath::FromASCII("a.png"),
+                                      &is_video) ||
+      is_video ||
+      !myarc::IsAllowedMediaExtension(base::FilePath::FromASCII("A.PNG")) ||
+      !myarc::IsAllowedMediaExtension(base::FilePath::FromASCII("b.heic")) ||
+      !myarc::IsAllowedMediaExtension(base::FilePath::FromASCII("c.mp4"),
+                                      &is_video) ||
+      !is_video ||
+      !myarc::IsAllowedMediaExtension(base::FilePath::FromASCII("d.mov"))) {
+    return false;
+  }
+  if (myarc::IsAllowedMediaExtension(base::FilePath::FromASCII("x.svg")) ||
+      myarc::IsAllowedMediaExtension(base::FilePath::FromASCII("x.html")) ||
+      myarc::IsAllowedMediaExtension(base::FilePath::FromASCII("x.dmg")) ||
+      myarc::IsAllowedMediaExtension(base::FilePath::FromASCII("x.pdf")) ||
+      myarc::IsAllowedMediaExtension(base::FilePath::FromASCII("x.txt"))) {
+    return false;
+  }
+
+  base::ScopedTempDir root;
+  base::ScopedTempDir outside;
+  if (!root.CreateUniqueTempDir() || !outside.CreateUniqueTempDir()) {
+    return false;
+  }
+  const base::FilePath dir = root.GetPath();
+  const base::FilePath img1 = dir.AppendASCII("a.png");
+  const base::FilePath vid1 = dir.AppendASCII("b.mov");
+  const base::FilePath dot = dir.AppendASCII(".hidden.png");
+  const base::FilePath svg = dir.AppendASCII("unsafe.svg");
+  const base::FilePath nested_dir = dir.AppendASCII("sub");
+  const base::FilePath nested = nested_dir.AppendASCII("deep.png");
+  const base::FilePath escaped_target =
+      outside.GetPath().AppendASCII("secret.png");
+  const base::FilePath escaped_link = dir.AppendASCII("escape.png");
+  if (!base::WriteFile(img1, "png") || !base::WriteFile(vid1, "mov") ||
+      !base::WriteFile(dot, "dot") || !base::WriteFile(svg, "<svg/>") ||
+      !base::CreateDirectory(nested_dir) || !base::WriteFile(nested, "deep") ||
+      !base::WriteFile(escaped_target, "secret")) {
+    return false;
+  }
+  base::CreateSymbolicLink(escaped_target, escaped_link);
+  const base::Time t1 = base::Time::Now() - base::Hours(2);
+  const base::Time t2 = base::Time::Now() - base::Minutes(5);
+  base::TouchFile(img1, t1, t1);
+  base::TouchFile(vid1, t2, t2);
+
+  bool permission_denied = true;
+  const std::vector<myarc::MediaRecord> items =
+      myarc::ScanMediaDirectories({dir}, &permission_denied);
+  if (permission_denied || items.size() != 2) {
+    return false;
+  }
+  // Sorted newest-first: b.mov then a.png; dotfiles, svg, nested, and
+  // symlink escapes are excluded.
+  if (items[0].filename != u"b.mov" || !items[0].is_video) {
+    return false;
+  }
+  if (items[1].filename != u"a.png" || items[1].is_video) {
+    return false;
+  }
+  return true;
+}
+
 }  // namespace
 
 int main() {
@@ -1809,6 +1903,10 @@ int main() {
     std::cerr << "Downloads stack checks failed\n";
     return 17;
   }
+  if (!CheckArchiveFilter()) {
+    std::cerr << "Archive filter checks failed\n";
+    return 17;
+  }
   if (!CheckDormantTemporary()) {
     std::cerr << "Dormant temporary item checks failed\n";
     return 18;
@@ -1856,6 +1954,10 @@ int main() {
   if (!CheckBoosts()) {
     std::cerr << "Boosts checks failed\n";
     return 29;
+  }
+  if (!CheckMediaScan()) {
+    std::cerr << "Media scan checks failed\n";
+    return 30;
   }
   std::cout << "7 legacy C++/Rust checks passed, including 1000 ownership "
                "round trips; workspace transitions, Space 1 deletion and "

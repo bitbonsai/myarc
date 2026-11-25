@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -31,6 +32,7 @@ inline constexpr uint64_t kPinKey = uint64_t{1} << 63;
 inline constexpr uint64_t kSpaceEditKey = uint64_t{1} << 62;
 inline constexpr uint64_t kSpaceMoreKey = uint64_t{1} << 61;
 inline constexpr uint64_t kNewBoostKey = uint64_t{1} << 60;
+inline constexpr uint64_t kArchiveFilterKey = uint64_t{1} << 59;
 
 // Width of the Spaces section, rail included, for `spaces` columns. The
 // browser layout still caps it to the window.
@@ -53,6 +55,18 @@ bool MatchesSearch(std::u16string_view text, std::u16string_view query);
 // Arc's day headers in Archived Tabs: "Today", "Yesterday" or "N days ago",
 // counted in local calendar days before `now`.
 std::u16string DayLabel(base::Time time, base::Time now);
+
+// Time-range buckets for the Archived Tabs Filter menu.
+enum class ArchiveTimeRange { kAny, kToday, kLast7Days, kLast30Days };
+
+// Whether an archived tab from `tab_space_id` archived at `archived` passes
+// the active Space (`filter_space_id`, nullopt = All Spaces) and calendar-day
+// time-range filter relative to `now`.
+bool MatchesArchiveFilter(uint64_t tab_space_id,
+                          base::Time archived,
+                          base::Time now,
+                          std::optional<uint64_t> filter_space_id,
+                          ArchiveTimeRange range);
 
 // Rows in the downloads stack above the Library button.
 inline constexpr size_t kStackRows = 4;

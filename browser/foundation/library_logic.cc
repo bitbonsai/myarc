@@ -63,6 +63,33 @@ std::u16string DayLabel(base::Time time, base::Time now) {
   return base::NumberToString16(days) + u" days ago";
 }
 
+bool MatchesArchiveFilter(uint64_t tab_space_id,
+                          base::Time archived,
+                          base::Time now,
+                          std::optional<uint64_t> filter_space_id,
+                          ArchiveTimeRange range) {
+  if (filter_space_id.has_value() && tab_space_id != *filter_space_id) {
+    return false;
+  }
+  if (range == ArchiveTimeRange::kAny) {
+    return true;
+  }
+  const int days =
+      ((now.LocalMidnight() - archived.LocalMidnight()) + base::Hours(12))
+          .InDays();
+  switch (range) {
+    case ArchiveTimeRange::kAny:
+      return true;
+    case ArchiveTimeRange::kToday:
+      return days <= 0;
+    case ArchiveTimeRange::kLast7Days:
+      return days < 7;
+    case ArchiveTimeRange::kLast30Days:
+      return days < 30;
+  }
+  return true;
+}
+
 std::u16string AgeLabel(base::Time time, base::Time now) {
   const base::TimeDelta age = now - time;
   const auto ago = [](int64_t count, std::u16string_view unit) {

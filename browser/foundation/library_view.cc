@@ -16,12 +16,18 @@
 #include "base/task/sequenced_task_runner.h"
 #include "base/time/time.h"
 #include "cc/paint/paint_flags.h"
+#include "cc/paint/paint_shader.h"
 #include "components/vector_icons/vector_icons.h"
 #include "myarc/footer_button.h"
 #include "myarc/icons.h"
 #include "myarc/library_logic.h"
+#include "myarc/media_lightbox.h"
 #include "myarc/sidebar_tint.h"
 #include "third_party/skia/include/core/SkColor.h"
+#include "third_party/skia/include/core/SkPath.h"
+#include "third_party/skia/include/core/SkPathBuilder.h"
+#include "third_party/skia/include/core/SkPoint.h"
+#include "third_party/skia/include/core/SkRRect.h"
 #include "ui/base/accelerators/accelerator.h"
 #include "ui/base/cursor/cursor.h"
 #include "ui/base/cursor/mojom/cursor_type.mojom-shared.h"
@@ -62,9 +68,11 @@
 #include "ui/views/controls/textfield/textfield.h"
 #include "ui/views/focus/focus_manager.h"
 #include "ui/views/layout/box_layout.h"
+#include "ui/views/layout/fill_layout.h"
 #include "ui/views/style/typography.h"
 #include "ui/views/view_class_properties.h"
 #include "ui/views/view_utils.h"
+#include "ui/views/widget/widget.h"
 
 namespace myarc {
 
@@ -87,6 +95,18 @@ enum Command {
   kEditBoost,
   kToggleBoost,
   kDeleteBoost,
+  kFilterAllSpaces,
+  kFilterDeletedSpaces,
+  kFilterTimeAny,
+  kFilterTimeToday,
+  kFilterTimeLast7Days,
+  kFilterTimeLast30Days,
+  kFilterReset,
+  kHideMedia,
+  kMediaOpenPreview,
+  kMediaCopy,
+  kMediaRevealFinder,
+  kFilterSpaceBase = 1000,
 };
 
 // The other cards slide aside this fast while a card is dragged.
@@ -160,12 +180,8 @@ constexpr auto kSections = std::to_array<SectionInfo>({
      u"Archived Tabs", u"Search Archive..."},
 });
 
-// Media isn't built yet. Its rail item stays in Arc's order but is disabled,
-// with the tooltip Settings gives its unbuilt sections.
-constexpr char16_t kNotYet[] = u"Not in myArc yet";
-
 bool IsBuilt(Section section) {
-  return section != Section::kMedia;
+  return true;
 }
 
 const SectionInfo& Info(Section section) {
@@ -706,7 +722,261 @@ void SlideCard(views::View& card, int x) {
   layer->SetTransform(gfx::Transform::MakeTranslation(x, 0));
 }
 
+// Arc's "Show Media" opt-in CTA: a rounded button with a pink-to-indigo
+// diagonal gradient (`#E8A6E8` -> `#5B73FF`) and centered semibold white text.
+class GradientCtaButton : public views::Button {
+  METADATA_HEADER(GradientCtaButton, views::Button)
+
+ public:
+  GradientCtaButton(PressedCallback callback, std::u16string text)
+      : views::Button(std::move(callback)), text_(std::move(text)) {
+    SetFocusBehavior(FocusBehavior::ALWAYS);
+    SetPreferredSize(gfx::Size(0, 36));
+    GetViewAccessibility().SetName(text_);
+    views::InstallRoundRectHighlightPathGenerator(this, gfx::Insets(), 8);
+  }
+
+  void PaintButtonContents(gfx::Canvas* canvas) override {
+    const gfx::RectF rect(GetLocalBounds());
+    constexpr float kRadius = 8.0f;
+    SkPoint pts[2] = {SkPoint::Make(0.0f, 0.0f),
+                      SkPoint::Make(rect.width(), rect.height())};
+    SkColor4f colors[2] = {SkColor4f::FromColor(SkColorSetRGB(0xE8, 0xA6, 0xE8)),
+                           SkColor4f::FromColor(SkColorSetRGB(0x5B, 0x73, 0xFF))};
+    cc::PaintFlags flags;
+    flags.setAntiAlias(true);
+    flags.setShader(cc::PaintShader::MakeLinearGradient(
+        pts, colors, nullptr, 2, SkTileMode::kClamp));
+    canvas->DrawRoundRect(rect, kRadius, flags);
+    if (GetState() == STATE_HOVERED || GetState() == STATE_PRESSED) {
+      cc::PaintFlags overlay;
+      overlay.setAntiAlias(true);
+      overlay.setColor(GetState() == STATE_PRESSED
+                           ? SkColorSetA(SK_ColorBLACK, 0x28)
+                           : SkColorSetA(SK_ColorWHITE, 0x18));
+      canvas->DrawRoundRect(rect, kRadius, overlay);
+    }
+    const gfx::FontList font = gfx::FontList().Derive(
+        0, gfx::Font::NORMAL, gfx::Font::Weight::SEMIBOLD);
+    canvas->DrawStringRectWithFlags(
+        text_, font, SK_ColorWHITE, GetLocalBounds(),
+        gfx::Canvas::TEXT_ALIGN_CENTER | gfx::Canvas::NO_SUBPIXEL_RENDERING);
+  }
+
+ private:
+  const std::u16string text_;
+};
+
+BEGIN_METADATA(GradientCtaButton)
+END_METADATA
+
+// A thumbnail tile in the 2-column Media grid: white-bordered aspect-fit
+// preview (or skeleton shimmer while loading), video play overlay, hover pill
+// trigger, and drag-out threshold detection for native NSFilePromise drag.
+class MediaTile : public views::Button {
+  METADATA_HEADER(MediaTile, views::Button)
+
+ public:
+  using HoverCallback =
+      base::RepeatingCallback<void(views::View*, const std::u16string&, bool)>;
+  using DragCallback = base::RepeatingCallback<void(uint64_t)>;
+
+  MediaTile(PressedCallback on_click,
+            HoverCallback on_hover,
+            DragCallback on_drag,
+            SidebarView::MediaItemPresentation item)
+      : views::Button(std::move(on_click)),
+        on_hover_(std::move(on_hover)),
+        on_drag_(std::move(on_drag)),
+        item_(std::move(item)) {
+    SetFocusBehavior(FocusBehavior::ALWAYS);
+    SetPreferredSize(gfx::Size(140, 108));
+    GetViewAccessibility().SetName(item_.filename);
+    views::InstallRoundRectHighlightPathGenerator(this, gfx::Insets(), 8);
+  }
+
+  uint64_t media_id() const { return item_.id; }
+  const std::u16string& filename() const { return item_.filename; }
+
+  void OnMouseEntered(const ui::MouseEvent& event) override {
+    views::Button::OnMouseEntered(event);
+    on_hover_.Run(this, item_.filename, true);
+  }
+
+  void OnMouseExited(const ui::MouseEvent& event) override {
+    views::Button::OnMouseExited(event);
+    on_hover_.Run(this, item_.filename, false);
+  }
+
+  bool OnMousePressed(const ui::MouseEvent& event) override {
+    if (event.IsOnlyLeftMouseButton()) {
+      drag_origin_ = event.location();
+      drag_started_ = false;
+    }
+    return views::Button::OnMousePressed(event);
+  }
+
+  bool OnMouseDragged(const ui::MouseEvent& event) override {
+    if (drag_origin_ && !drag_started_ &&
+        views::View::ExceededDragThreshold(event.location() - *drag_origin_)) {
+      drag_started_ = true;
+      on_hover_.Run(this, item_.filename, false);
+      on_drag_.Run(item_.id);
+      return true;
+    }
+    return views::Button::OnMouseDragged(event);
+  }
+
+  void OnMouseReleased(const ui::MouseEvent& event) override {
+    const bool was_drag = drag_started_;
+    drag_origin_.reset();
+    drag_started_ = false;
+    if (was_drag) {
+      SetState(STATE_NORMAL);
+      return;
+    }
+    views::Button::OnMouseReleased(event);
+  }
+
+  void PaintButtonContents(gfx::Canvas* canvas) override {
+    const gfx::Rect bounds = GetLocalBounds();
+    const gfx::RectF outer(bounds);
+    constexpr float kRadius = 8.0f;
+
+    if (item_.thumbnail.IsEmpty()) {
+      cc::PaintFlags bg;
+      bg.setAntiAlias(true);
+      bg.setColor(SkColorSetA(SK_ColorWHITE, 0x16));
+      canvas->DrawRoundRect(outer, kRadius, bg);
+      return;
+    }
+
+    const gfx::ImageSkia img = item_.thumbnail.Rasterize(GetColorProvider());
+    if (img.isNull()) {
+      return;
+    }
+
+    // White border + subtle frame around aspect-fit thumbnail, matching Arc.
+    const gfx::Size img_size = img.size();
+    const float avail_w = std::max(1.0f, outer.width() - 4.0f);
+    const float avail_h = std::max(1.0f, outer.height() - 4.0f);
+    const float scale = std::min(avail_w / std::max(1, img_size.width()),
+                                 avail_h / std::max(1, img_size.height()));
+    const int draw_w = std::max(1, static_cast<int>(img_size.width() * scale));
+    const int draw_h = std::max(1, static_cast<int>(img_size.height() * scale));
+    const gfx::Rect dst((bounds.width() - draw_w) / 2,
+                        (bounds.height() - draw_h) / 2, draw_w, draw_h);
+    const gfx::RectF frame(dst.x() - 2, dst.y() - 2, dst.width() + 4,
+                           dst.height() + 4);
+
+    cc::PaintFlags border_flags;
+    border_flags.setAntiAlias(true);
+    border_flags.setColor(SkColorSetA(SK_ColorWHITE, 0xE6));
+    canvas->DrawRoundRect(frame, 6.0f, border_flags);
+
+    canvas->Save();
+    SkPath clip =
+        SkPathBuilder()
+            .addRRect(SkRRect::MakeRectXY(
+                SkRect::MakeXYWH(dst.x(), dst.y(), dst.width(), dst.height()),
+                4.0f, 4.0f))
+            .detach();
+    canvas->ClipPath(clip, true);
+    canvas->DrawImageInt(img, 0, 0, img_size.width(), img_size.height(),
+                         dst.x(), dst.y(), dst.width(), dst.height(), true);
+    canvas->Restore();
+
+    if (item_.is_video) {
+      const gfx::Point center = dst.CenterPoint();
+      cc::PaintFlags badge;
+      badge.setAntiAlias(true);
+      badge.setColor(SkColorSetA(SK_ColorBLACK, 0x99));
+      canvas->DrawCircle(center, 15, badge);
+
+      SkPath tri = SkPathBuilder()
+                       .moveTo(center.x() - 4.0f, center.y() - 6.0f)
+                       .lineTo(center.x() + 7.0f, center.y())
+                       .lineTo(center.x() - 4.0f, center.y() + 6.0f)
+                       .close()
+                       .detach();
+      cc::PaintFlags play;
+      play.setAntiAlias(true);
+      play.setColor(SK_ColorWHITE);
+      canvas->DrawPath(tri, play);
+    }
+  }
+
+ private:
+  const HoverCallback on_hover_;
+  const DragCallback on_drag_;
+  const SidebarView::MediaItemPresentation item_;
+  std::optional<gfx::Point> drag_origin_;
+  bool drag_started_ = false;
+};
+
+BEGIN_METADATA(MediaTile)
+END_METADATA
+
 }  // namespace
+
+// Floating non-activating indigo filename pill anchored to the bottom-right of
+// the hovered Media tile, matching Arc's `#23297A` capsule badge.
+class LibraryView::MediaFilenamePill {
+ public:
+  MediaFilenamePill() = default;
+  ~MediaFilenamePill() { Hide(); }
+
+  void Show(views::Widget* parent,
+            const gfx::Rect& tile_screen_bounds,
+            const std::u16string& filename) {
+    if (!parent) {
+      return;
+    }
+    if (!widget_) {
+      widget_ = std::make_unique<views::Widget>();
+      views::Widget::InitParams params(
+          views::Widget::InitParams::CLIENT_OWNS_WIDGET,
+          views::Widget::InitParams::TYPE_POPUP);
+      params.parent = parent->GetNativeView();
+      params.activatable = views::Widget::InitParams::Activatable::kNo;
+      params.accept_events = false;
+      params.opacity = views::Widget::InitParams::WindowOpacity::kTranslucent;
+      params.shadow_type = views::Widget::InitParams::ShadowType::kDrop;
+      widget_->Init(std::move(params));
+
+      auto root = std::make_unique<views::View>();
+      root->SetLayoutManager(std::make_unique<views::BoxLayout>(
+          Orientation::kHorizontal, gfx::Insets::VH(4, 10), 0));
+      root->SetBackground(views::CreateRoundedRectBackground(
+          SkColorSetRGB(0x23, 0x29, 0x7A), 12));
+      auto label = std::make_unique<views::Label>();
+      label->SetFontList(gfx::FontList().Derive(
+          -1, gfx::Font::NORMAL, gfx::Font::Weight::SEMIBOLD));
+      label->SetEnabledColor(SK_ColorWHITE);
+      label->SetAutoColorReadabilityEnabled(false);
+      label->SetElideBehavior(gfx::ELIDE_MIDDLE);
+      label->SetMaximumWidthSingleLine(220);
+      label_ = root->AddChildView(std::move(label));
+      widget_->SetContentsView(std::move(root));
+    }
+    label_->SetText(filename);
+    const gfx::Size size = widget_->GetContentsView()->GetPreferredSize({});
+    const gfx::Point origin(tile_screen_bounds.right() - size.width() + 8,
+                            tile_screen_bounds.bottom() - size.height() + 4);
+    widget_->SetBounds(gfx::Rect(origin, size));
+    widget_->ShowInactive();
+  }
+
+  void Hide() {
+    if (widget_) {
+      widget_->Hide();
+    }
+  }
+
+ private:
+  std::unique_ptr<views::Widget> widget_;
+  raw_ptr<views::Label> label_ = nullptr;
+};
 
 LibraryView::LibraryView(SidebarView::Delegate& delegate,
                          base::RepeatingClosure close,
@@ -740,14 +1010,16 @@ LibraryView::LibraryView(SidebarView::Delegate& delegate,
         base::BindRepeating(&LibraryView::SelectSection, base::Unretained(this),
                             info.section),
         info)));
-    // Arc clears the archive from the Archived Tabs item's context menu.
+    // Arc clears the archive from the Archived Tabs item's context menu, and
+    // hides Media from the Media item's context menu.
     if (info.section == Section::kArchive) {
       rail_items_.back()->set_context_menu_controller(this);
+    } else if (info.section == Section::kMedia) {
+      rail_items_.back()->set_context_menu_controller(this);
+      media_rail_item_ = rail_items_.back();
     }
     if (!IsBuilt(info.section)) {
       rail_items_.back()->SetEnabled(false);
-      rail_items_.back()->SetTooltipText(kNotYet);
-      rail_items_.back()->GetViewAccessibility().SetDescription(kNotYet);
     }
   }
   auto* footer =
@@ -778,7 +1050,14 @@ LibraryView::LibraryView(SidebarView::Delegate& delegate,
   Rebuild();
 }
 
-LibraryView::~LibraryView() = default;
+LibraryView::~LibraryView() {
+  CloseMediaLightbox();
+  HideMediaPill();
+  if (media_shown_) {
+    media_shown_ = false;
+    delegate_->SetMediaLibraryShown(false);
+  }
+}
 
 void LibraryView::SetSpaces(Spaces spaces, uint64_t current) {
   if (spaces == spaces_ && current == current_space_) {
@@ -800,8 +1079,18 @@ void LibraryView::SelectSection(Section section) {
   if (section == section_ || !IsBuilt(section)) {
     return;
   }
+  if (section_ == Section::kMedia) {
+    CloseMediaLightbox();
+    HideMediaPill();
+    if (media_shown_) {
+      media_shown_ = false;
+      delegate_->SetMediaLibraryShown(false);
+    }
+  }
   section_ = section;
   query_.clear();
+  archive_filter_ = {};
+  media_card_dismissed_ = false;
   // Keys from the old section mean nothing in the new one.
   keyed_views_.clear();
   Rebuild();
@@ -846,6 +1135,27 @@ void LibraryView::RefreshBoosts() {
   UpdateList(/*keep_scroll=*/true);
 }
 
+void LibraryView::RefreshMedia() {
+  if (section_ != Section::kMedia || !list_) {
+    return;
+  }
+  const bool enabled = delegate_->IsMediaLibraryEnabled();
+  const bool denied = delegate_->IsMediaLibraryPermissionDenied();
+  auto items = enabled ? delegate_->GetMediaItems()
+                       : std::vector<SidebarView::MediaItemPresentation>();
+  if (enabled == media_enabled_ && denied == media_permission_denied_ &&
+      items == media_) {
+    return;
+  }
+  media_enabled_ = enabled;
+  media_permission_denied_ = denied;
+  media_ = std::move(items);
+  if (search_) {
+    search_->SetEnabled(media_enabled_);
+  }
+  UpdateList(/*keep_scroll=*/true);
+}
+
 void LibraryView::ShowExitTooltipNow() {
   exit_->ShowFooterTooltipNow();
 }
@@ -873,6 +1183,10 @@ gfx::Size LibraryView::CalculatePreferredSize(
 }
 
 bool LibraryView::AcceleratorPressed(const ui::Accelerator& accelerator) {
+  if (lightbox_) {
+    CloseMediaLightbox();
+    return true;
+  }
   // The window offers accelerators before the focused view sees the key, so
   // leave Esc to the omnibox and pages unless focus is in the sidebar.
   const views::FocusManager* manager = GetFocusManager();
@@ -975,6 +1289,7 @@ void LibraryView::Rebuild() {
   }
   scrolls_.clear();
   search_ = nullptr;
+  filter_button_ = nullptr;
   list_ = nullptr;
   keyed_views_.clear();
   cards_.clear();
@@ -1233,9 +1548,21 @@ void LibraryView::BuildList() {
       static_cast<views::BoxLayout*>(content->GetLayoutManager());
 
   // Arc's search field: 36 DIP tall on the tile fill, a 14pt placeholder 13
-  // DIP right of the magnifier.
-  auto* field = content->AddChildView(
+  // DIP right of the magnifier. In Archived Tabs, a Filter button sits beside
+  // it.
+  views::View* search_parent = content;
+  if (section_ == Section::kArchive) {
+    search_parent =
+        content->AddChildView(Box(Orientation::kHorizontal, gfx::Insets(), 8));
+    static_cast<views::BoxLayout*>(search_parent->GetLayoutManager())
+        ->set_cross_axis_alignment(CrossAxis::kCenter);
+  }
+  auto* field = search_parent->AddChildView(
       Box(Orientation::kHorizontal, gfx::Insets::VH(0, 14), 13));
+  if (section_ == Section::kArchive) {
+    static_cast<views::BoxLayout*>(search_parent->GetLayoutManager())
+        ->SetFlexForView(field, 1);
+  }
   field->SetBackground(views::CreateRoundedRectBackground(colors.tile, 10));
   field->SetPreferredSize(gfx::Size(0, 36));
   field->AddChildView(std::make_unique<views::ImageView>(
@@ -1253,18 +1580,42 @@ void LibraryView::BuildList() {
   search->set_controller(this);
   search->SetEnabled(section_ == Section::kDownloads ||
                      section_ == Section::kArchive ||
-                     section_ == Section::kBoosts);
+                     section_ == Section::kBoosts ||
+                     (section_ == Section::kMedia &&
+                      delegate_->IsMediaLibraryEnabled()));
   search_ = field->AddChildView(std::move(search));
   static_cast<views::BoxLayout*>(field->GetLayoutManager())
       ->SetFlexForView(search_, 1);
   static_cast<views::BoxLayout*>(field->GetLayoutManager())
       ->set_cross_axis_alignment(CrossAxis::kCenter);
 
+  if (section_ == Section::kArchive) {
+    auto filter = TextButton(
+        base::BindRepeating(
+            [](LibraryView* view, const ui::Event& event) {
+              view->ShowArchiveFilterMenu(
+                  view->filter_button_, ui::GetMenuSourceTypeForEvent(event));
+            },
+            base::Unretained(this)),
+        u"Filter");
+    filter->SetCornerRadius(10);
+    filter->SetCustomPadding(gfx::Insets::VH(0, 12));
+    filter->SetMinSize(gfx::Size(78, 36));
+    filter->SetHorizontalAlignment(gfx::ALIGN_CENTER);
+    filter->SetImageLabelSpacing(6);
+    filter->SetTooltipText(u"Filter archived tabs");
+    filter->GetViewAccessibility().SetName(u"Filter archived tabs");
+    filter->GetViewAccessibility().SetHasPopup(ax::mojom::HasPopup::kMenu);
+    filter_button_ = search_parent->AddChildView(std::move(filter));
+    UpdateFilterButton();
+  }
+
   list_ = content->AddChildView(Box(Orientation::kVertical, gfx::Insets(), 0));
   content_layout->SetFlexForView(list_, 1);
   downloads_.clear();
   archived_.clear();
   boosts_.clear();
+  media_.clear();
   if (section_ == Section::kDownloads) {
     downloads_ = delegate_->GetRecentDownloads();
   } else if (section_ == Section::kArchive) {
@@ -1272,6 +1623,16 @@ void LibraryView::BuildList() {
   } else if (section_ == Section::kBoosts) {
     boosts_ = delegate_->GetBoosts();
     boosts_global_enabled_ = delegate_->AllBoostsEnabled();
+  } else if (section_ == Section::kMedia) {
+    media_enabled_ = delegate_->IsMediaLibraryEnabled();
+    media_permission_denied_ = delegate_->IsMediaLibraryPermissionDenied();
+    if (!media_shown_) {
+      media_shown_ = true;
+      delegate_->SetMediaLibraryShown(true);
+    }
+    if (media_enabled_) {
+      media_ = delegate_->GetMediaItems();
+    }
   }
   UpdateList(/*keep_scroll=*/false);
 }
@@ -1306,8 +1667,11 @@ void LibraryView::AddArchiveRows(views::View& rows) {
   const base::Time now = base::Time::Now();
   std::u16string day;
   for (const auto& tab : archived_) {
-    if (!library::MatchesSearch(tab.title, query_) &&
-        !library::MatchesSearch(tab.url, query_)) {
+    if ((!library::MatchesSearch(tab.title, query_) &&
+         !library::MatchesSearch(tab.url, query_)) ||
+        !library::MatchesArchiveFilter(tab.space_id, tab.archived, now,
+                                       archive_filter_.space_id,
+                                       archive_filter_.range)) {
       continue;
     }
     // Entries come newest first, so each day's header appears once.
@@ -1366,9 +1730,78 @@ void LibraryView::UpdateList(bool keep_scroll) {
       list_->Contains(manager ? manager->GetFocusedView() : nullptr);
   const std::optional<uint64_t> key = FocusedKey();
   keyed_views_.clear();
+  HideMediaPill();
   list_->RemoveAllChildViews();
   const Colors colors = GetColors(GetColorProvider());
   auto* list_layout = static_cast<views::BoxLayout*>(list_->GetLayoutManager());
+
+  if (section_ == Section::kMedia) {
+    visible_media_.clear();
+    if (!media_enabled_) {
+      BuildMediaOptIn();
+      if (had_focus && !RestoreFocus(key)) {
+        FocusSection();
+      }
+      return;
+    }
+    if (media_permission_denied_) {
+      auto* empty = list_->AddChildView(
+          Box(Orientation::kVertical, gfx::Insets::VH(0, 16), 8));
+      list_layout->SetFlexForView(empty, 1);
+      auto* empty_layout =
+          static_cast<views::BoxLayout*>(empty->GetLayoutManager());
+      empty_layout->set_main_axis_alignment(MainAxis::kCenter);
+      empty_layout->set_cross_axis_alignment(CrossAxis::kCenter);
+      auto* image = empty->AddChildView(std::make_unique<views::ImageView>(
+          ui::ImageModel::FromVectorIcon(kMediaActiveIcon, colors.empty_icon,
+                                         44)));
+      image->SetProperty(views::kMarginsKey, gfx::Insets::TLBR(0, 0, 8, 0));
+      const SkColor on_surface =
+          GetColorProvider()
+              ? GetColorProvider()->GetColor(ui::kColorSysOnSurface)
+              : SK_ColorWHITE;
+      empty->AddChildView(
+          MakeLabel(u"Folder access needed",
+                    gfx::FontList().Derive(2, gfx::Font::NORMAL,
+                                           gfx::Font::Weight::SEMIBOLD),
+                    on_surface));
+      auto* body_label = empty->AddChildView(
+          MakeLabel(u"Allow myArc to read Desktop and Downloads in macOS "
+                    u"Privacy & Security settings.",
+                    gfx::FontList(), colors.empty_body));
+      body_label->SetMultiLine(true);
+      body_label->SetHorizontalAlignment(gfx::ALIGN_CENTER);
+      body_label->SizeToFit(248);
+      auto open_settings = TextButton(
+          base::BindRepeating(
+              [](LibraryView* view) {
+                view->PostAction(base::BindOnce(
+                    &SidebarView::Delegate::OpenMediaPrivacySettings,
+                    base::Unretained(&view->delegate_.get())));
+              },
+              base::Unretained(this)),
+          u"Open System Settings");
+      open_settings->SetBgColorOverrideDeprecated(colors.tile);
+      open_settings->SetHorizontalAlignment(gfx::ALIGN_CENTER);
+      open_settings->SetCustomPadding(gfx::Insets::VH(6, 14));
+      open_settings->SetProperty(views::kMarginsKey,
+                                 gfx::Insets::TLBR(10, 0, 0, 0));
+      empty->AddChildView(std::move(open_settings));
+      return;
+    }
+    for (const auto& item : media_) {
+      if (library::MatchesSearch(item.filename, query_)) {
+        visible_media_.push_back(item);
+      }
+    }
+    if (!visible_media_.empty()) {
+      BuildMediaGrid(visible_media_, std::move(offset));
+      if (had_focus && !RestoreFocus(key)) {
+        search_->RequestFocus();
+      }
+      return;
+    }
+  }
 
   std::vector<SidebarView::DownloadPresentation> downloads;
   for (const auto& download : downloads_) {
@@ -1376,10 +1809,14 @@ void LibraryView::UpdateList(bool keep_scroll) {
       downloads.push_back(download);
     }
   }
+  const base::Time now = base::Time::Now();
   const bool any_archived =
-      std::ranges::any_of(archived_, [this](const auto& tab) {
-        return library::MatchesSearch(tab.title, query_) ||
-               library::MatchesSearch(tab.url, query_);
+      std::ranges::any_of(archived_, [this, now](const auto& tab) {
+        return (library::MatchesSearch(tab.title, query_) ||
+                library::MatchesSearch(tab.url, query_)) &&
+               library::MatchesArchiveFilter(tab.space_id, tab.archived, now,
+                                             archive_filter_.space_id,
+                                             archive_filter_.range);
       });
   const bool any_boosts =
       std::ranges::any_of(boosts_, [this](const auto& boost) {
@@ -1403,9 +1840,11 @@ void LibraryView::UpdateList(bool keep_scroll) {
         body =
             u"Hover your mouse over a tab and press the \u00D7 to archive "
             u"it.";
-        if (!query_.empty()) {
+        if (!query_.empty() || archive_filter_.IsActive()) {
           title = u"No matches";
-          body = u"No archived tabs match your search.";
+          body = archive_filter_.IsActive()
+                     ? u"No archived tabs match your search or filter."
+                     : u"No archived tabs match your search.";
         }
         break;
       case Section::kBoosts:
@@ -1418,6 +1857,12 @@ void LibraryView::UpdateList(bool keep_scroll) {
         }
         break;
       case Section::kMedia:
+        title = query_.empty() ? u"No media found" : u"No matches";
+        body = query_.empty()
+                   ? u"Screenshots and recent downloads on this Mac will "
+                     u"appear here."
+                   : u"No media files match your search.";
+        break;
       case Section::kSpaces:
         NOTREACHED();
     }
@@ -1446,6 +1891,23 @@ void LibraryView::UpdateList(bool keep_scroll) {
     body_label->SetHorizontalAlignment(gfx::ALIGN_CENTER);
     // Arc wraps its empty-state text at about 248 DIP.
     body_label->SizeToFit(248);
+    if (section_ == Section::kArchive && archive_filter_.IsActive()) {
+      auto clear = TextButton(
+          base::BindRepeating(
+              [](LibraryView* view) {
+                view->archive_filter_ = {};
+                view->UpdateFilterButton();
+                view->UpdateList(/*keep_scroll=*/false);
+              },
+              base::Unretained(this)),
+          u"Clear Filters");
+      clear->SetBgColorOverrideDeprecated(colors.tile);
+      clear->SetHorizontalAlignment(gfx::ALIGN_CENTER);
+      clear->SetCustomPadding(gfx::Insets::VH(6, 14));
+      clear->SetProperty(views::kMarginsKey, gfx::Insets::TLBR(12, 0, 0, 0));
+      keyed_views_.emplace_back(library::kArchiveFilterKey, clear.get());
+      empty->AddChildView(std::move(clear));
+    }
     if (section_ == Section::kBoosts && query_.empty()) {
       auto create_boost = std::make_unique<views::MdTextButton>(
           base::BindRepeating(
@@ -1607,6 +2069,284 @@ void LibraryView::UpdateList(bool keep_scroll) {
   }
 }
 
+void LibraryView::BuildMediaOptIn() {
+  const Colors colors = GetColors(GetColorProvider());
+  auto* list_layout = static_cast<views::BoxLayout*>(list_->GetLayoutManager());
+  const SkColor on_surface =
+      GetColorProvider() ? GetColorProvider()->GetColor(ui::kColorSysOnSurface)
+                         : SK_ColorWHITE;
+
+  if (media_card_dismissed_) {
+    auto* minimal = list_->AddChildView(
+        Box(Orientation::kVertical, gfx::Insets::VH(0, 20), 10));
+    list_layout->SetFlexForView(minimal, 1);
+    auto* minimal_layout =
+        static_cast<views::BoxLayout*>(minimal->GetLayoutManager());
+    minimal_layout->set_main_axis_alignment(MainAxis::kCenter);
+    minimal_layout->set_cross_axis_alignment(CrossAxis::kCenter);
+    minimal->AddChildView(std::make_unique<views::ImageView>(
+        ui::ImageModel::FromVectorIcon(kMediaActiveIcon, colors.empty_icon,
+                                       36)));
+    auto cta = std::make_unique<GradientCtaButton>(
+        base::BindRepeating(
+            [](LibraryView* view) {
+              view->media_card_dismissed_ = false;
+              view->delegate_->SetMediaLibraryEnabled(true);
+              view->RefreshMedia();
+            },
+            base::Unretained(this)),
+        u"Show Media");
+    cta->SetPreferredSize(gfx::Size(160, 36));
+    minimal->AddChildView(std::move(cta));
+    return;
+  }
+
+  // Stacked FillLayout: subtle skeleton placeholder rows behind the centered
+  // floating dark opt-in card (matching Arc's Media empty-state screenshot).
+  auto* stack = list_->AddChildView(std::make_unique<views::View>());
+  stack->SetLayoutManager(std::make_unique<views::FillLayout>());
+  list_layout->SetFlexForView(stack, 1);
+
+  auto* skeleton = stack->AddChildView(
+      Box(Orientation::kVertical, gfx::Insets::TLBR(8, 2, 0, 2), 10));
+  const std::array<std::u16string, 3> buckets = {
+      u"Today", u"Yesterday", u"Earlier This Week"};
+  for (const auto& label_text : buckets) {
+    auto* heading = skeleton->AddChildView(MakeLabel(
+        label_text,
+        gfx::FontList().Derive(0, gfx::Font::NORMAL,
+                               gfx::Font::Weight::SEMIBOLD),
+        SkColorSetA(colors.muted, 0x66)));
+    heading->SetHorizontalAlignment(gfx::ALIGN_LEFT);
+    auto* pair = skeleton->AddChildView(
+        Box(Orientation::kHorizontal, gfx::Insets(), 8));
+    auto* pair_layout = static_cast<views::BoxLayout*>(pair->GetLayoutManager());
+    for (int col = 0; col < 2; ++col) {
+      auto* ph = pair->AddChildView(std::make_unique<views::View>());
+      ph->SetPreferredSize(gfx::Size(136, 92));
+      ph->SetBackground(views::CreateRoundedRectBackground(
+          SkColorSetA(SK_ColorWHITE, 0x0E), 8));
+      pair_layout->SetFlexForView(ph, 1);
+    }
+  }
+
+  auto* overlay = stack->AddChildView(
+      Box(Orientation::kVertical, gfx::Insets::VH(0, 12), 0));
+  auto* overlay_layout =
+      static_cast<views::BoxLayout*>(overlay->GetLayoutManager());
+  overlay_layout->set_main_axis_alignment(MainAxis::kCenter);
+  overlay_layout->set_cross_axis_alignment(CrossAxis::kCenter);
+
+  auto* card = overlay->AddChildView(
+      Box(Orientation::kVertical, gfx::Insets::TLBR(14, 18, 18, 18), 10));
+  auto* card_layout = static_cast<views::BoxLayout*>(card->GetLayoutManager());
+  card_layout->set_cross_axis_alignment(CrossAxis::kStretch);
+  card->SetPreferredSize(gfx::Size(248, 0));
+  card->SetBackground(views::CreateRoundedRectBackground(
+      SkColorSetRGB(0x28, 0x29, 0x36), 14));
+  card->SetBorder(views::CreateRoundedRectBorder(
+      1, 14, SkColorSetA(SK_ColorWHITE, 0x1A)));
+
+  auto* top_row =
+      card->AddChildView(Box(Orientation::kHorizontal, gfx::Insets(), 0));
+  auto* top_layout =
+      static_cast<views::BoxLayout*>(top_row->GetLayoutManager());
+  top_layout->SetFlexForView(
+      top_row->AddChildView(std::make_unique<views::View>()), 1);
+  auto dismiss = std::make_unique<views::ImageButton>(base::BindRepeating(
+      [](LibraryView* view) {
+        view->media_card_dismissed_ = true;
+        view->UpdateList(/*keep_scroll=*/false);
+      },
+      base::Unretained(this)));
+  dismiss->SetImageModel(
+      views::Button::STATE_NORMAL,
+      ui::ImageModel::FromVectorIcon(vector_icons::kCloseIcon, colors.muted,
+                                     14));
+  dismiss->SetPreferredSize(gfx::Size(22, 22));
+  dismiss->SetImageHorizontalAlignment(views::ImageButton::ALIGN_CENTER);
+  dismiss->SetImageVerticalAlignment(views::ImageButton::ALIGN_MIDDLE);
+  dismiss->SetTooltipText(u"Dismiss");
+  dismiss->GetViewAccessibility().SetName(u"Dismiss");
+  top_row->AddChildView(std::move(dismiss));
+
+  auto* icon_row =
+      card->AddChildView(Box(Orientation::kHorizontal, gfx::Insets(), 0));
+  static_cast<views::BoxLayout*>(icon_row->GetLayoutManager())
+      ->set_main_axis_alignment(MainAxis::kCenter);
+  icon_row->AddChildView(std::make_unique<views::ImageView>(
+      ui::ImageModel::FromVectorIcon(kMediaActiveIcon,
+                                     SkColorSetRGB(0xD8, 0x9C, 0xE8), 36)));
+
+  auto* title = card->AddChildView(MakeLabel(
+      u"Your Media in the Library",
+      gfx::FontList().Derive(2, gfx::Font::NORMAL, gfx::Font::Weight::SEMIBOLD),
+      on_surface));
+  title->SetHorizontalAlignment(gfx::ALIGN_CENTER);
+
+  auto* body = card->AddChildView(
+      MakeLabel(u"Quickly find, preview, and drag recent screenshots and "
+                u"downloads into any page.",
+                gfx::FontList(), colors.empty_body));
+  body->SetMultiLine(true);
+  body->SetHorizontalAlignment(gfx::ALIGN_CENTER);
+  body->SizeToFit(212);
+
+  auto cta = std::make_unique<GradientCtaButton>(
+      base::BindRepeating(
+          [](LibraryView* view) {
+            view->delegate_->SetMediaLibraryEnabled(true);
+            view->RefreshMedia();
+          },
+          base::Unretained(this)),
+      u"Show Media");
+  cta->SetProperty(views::kMarginsKey, gfx::Insets::TLBR(4, 0, 2, 0));
+  card->AddChildView(std::move(cta));
+
+  auto* privacy = card->AddChildView(
+      Box(Orientation::kHorizontal, gfx::Insets(), 5));
+  auto* privacy_layout =
+      static_cast<views::BoxLayout*>(privacy->GetLayoutManager());
+  privacy_layout->set_main_axis_alignment(MainAxis::kCenter);
+  privacy_layout->set_cross_axis_alignment(CrossAxis::kCenter);
+  privacy->AddChildView(std::make_unique<views::ImageView>(
+      ui::ImageModel::FromVectorIcon(vector_icons::kLockIcon, colors.muted,
+                                     11)));
+  privacy->AddChildView(MakeLabel(
+      u"Files never leave your computer.",
+      gfx::FontList().Derive(-2, gfx::Font::NORMAL, gfx::Font::Weight::NORMAL),
+      colors.muted));
+}
+
+void LibraryView::BuildMediaGrid(
+    const std::vector<SidebarView::MediaItemPresentation>& items,
+    std::optional<gfx::PointF> offset) {
+  const Colors colors = GetColors(GetColorProvider());
+  auto* list_layout = static_cast<views::BoxLayout*>(list_->GetLayoutManager());
+  auto* scroll = list_->AddChildView(std::make_unique<views::ScrollView>());
+  scroll->ClipHeightTo(0, std::numeric_limits<int>::max());
+  scroll->SetHorizontalScrollBarMode(
+      views::ScrollView::ScrollBarMode::kDisabled);
+  scroll->SetBackgroundColor(std::nullopt);
+  scroll->SetDrawOverflowIndicator(false);
+  list_layout->SetFlexForView(scroll, 1);
+
+  if (offset) {
+    scroll->RegisterPostLayoutCallback(base::BindRepeating(
+        [](std::optional<gfx::PointF>& saved, views::ScrollView* scroll) {
+          if (auto restore = std::exchange(saved, std::nullopt)) {
+            scroll->ScrollToOffset(*restore);
+          }
+        },
+        base::OwnedRef(std::move(offset))));
+  }
+
+  auto* container = scroll->SetContents(
+      Box(Orientation::kVertical, gfx::Insets::TLBR(2, 0, 10, 0), 8));
+  const base::Time now = base::Time::Now();
+  std::u16string current_group;
+  views::View* current_row = nullptr;
+  int col_in_row = 0;
+
+  for (size_t i = 0; i < items.size(); ++i) {
+    const auto& item = items[i];
+    const std::u16string group = library::DayLabel(item.modified, now);
+    if (group != current_group) {
+      current_group = group;
+      current_row = nullptr;
+      col_in_row = 0;
+      auto* header = container->AddChildView(MakeLabel(
+          group,
+          gfx::FontList().Derive(0, gfx::Font::NORMAL,
+                                 gfx::Font::Weight::SEMIBOLD),
+          colors.muted));
+      header->SetHorizontalAlignment(gfx::ALIGN_LEFT);
+      header->SetBorder(
+          views::CreateEmptyBorder(gfx::Insets::TLBR(8, 4, 2, 4)));
+      header->GetViewAccessibility().SetRole(ax::mojom::Role::kHeading);
+    }
+
+    if (!current_row || col_in_row == 2) {
+      current_row = container->AddChildView(
+          Box(Orientation::kHorizontal, gfx::Insets(), 8));
+      col_in_row = 0;
+    }
+
+    auto tile = std::make_unique<MediaTile>(
+        base::BindRepeating(&LibraryView::OpenMediaLightbox,
+                            base::Unretained(this), i),
+        base::BindRepeating(
+            [](LibraryView* view, views::View* tile,
+               const std::u16string& filename, bool hovered) {
+              if (hovered) {
+                view->ShowMediaPill(tile, filename);
+              } else {
+                view->HideMediaPill();
+              }
+            },
+            base::Unretained(this)),
+        base::BindRepeating(
+            [](LibraryView* view, uint64_t id) {
+              view->delegate_->DragMediaItem(id);
+            },
+            base::Unretained(this)),
+        item);
+    tile->set_context_menu_controller(this);
+    keyed_views_.emplace_back(item.id, tile.get());
+    auto* row_layout =
+        static_cast<views::BoxLayout*>(current_row->GetLayoutManager());
+    row_layout->SetFlexForView(current_row->AddChildView(std::move(tile)), 1);
+    ++col_in_row;
+  }
+
+  // Pad trailing single-item row so the tile keeps 50% width.
+  if (current_row && col_in_row == 1) {
+    auto* spacer = current_row->AddChildView(std::make_unique<views::View>());
+    static_cast<views::BoxLayout*>(current_row->GetLayoutManager())
+        ->SetFlexForView(spacer, 1);
+  }
+}
+
+void LibraryView::ShowMediaPill(views::View* tile,
+                                const std::u16string& filename) {
+  if (!tile || !GetWidget() || lightbox_) {
+    return;
+  }
+  if (!media_pill_) {
+    media_pill_ = std::make_unique<MediaFilenamePill>();
+  }
+  media_pill_->Show(GetWidget(), tile->GetBoundsInScreen(), filename);
+}
+
+void LibraryView::HideMediaPill() {
+  if (media_pill_) {
+    media_pill_->Hide();
+  }
+}
+
+void LibraryView::OpenMediaLightbox(size_t index) {
+  if (index >= visible_media_.size() || !GetWidget()) {
+    return;
+  }
+  HideMediaPill();
+  lightbox_return_key_ = visible_media_[index].id;
+  lightbox_ = std::make_unique<MediaLightbox>(
+      *GetWidget(), delegate_.get(), visible_media_, index,
+      base::BindOnce(&LibraryView::CloseMediaLightbox,
+                     weak_factory_.GetWeakPtr()));
+}
+
+void LibraryView::CloseMediaLightbox() {
+  if (!lightbox_) {
+    return;
+  }
+  lightbox_.reset();
+  if (lightbox_return_key_ != 0) {
+    RestoreFocus(lightbox_return_key_);
+    lightbox_return_key_ = 0;
+  }
+}
+
 void LibraryView::ShowSpaceMenu(uint64_t space,
                                 views::View* anchor,
                                 ui::mojom::MenuSourceType source_type) {
@@ -1661,6 +2401,15 @@ void LibraryView::ShowContextMenuForViewImpl(
                                                            : u"Enable Boost");
     menu_model_->AddSeparator(ui::NORMAL_SEPARATOR);
     menu_model_->AddItem(kDeleteBoost, u"Delete Boost");
+  } else if (auto* media_tile = views::AsViewClass<MediaTile>(source)) {
+    HideMediaPill();
+    menu_media_ = media_tile->media_id();
+    menu_model_->AddItem(kMediaOpenPreview, u"Open in Preview");
+    menu_model_->AddItem(kMediaCopy, u"Copy");
+    menu_model_->AddItem(kMediaRevealFinder, u"Reveal in Finder");
+  } else if (source == media_rail_item_) {
+    menu_model_->AddItem(kHideMedia, u"Hide Media in Library");
+    menu_model_->SetEnabledAt(0, delegate_->IsMediaLibraryEnabled());
   } else {
     menu_model_->AddItem(kClearArchive, u"Clear Archive");
     // An empty archive has nothing to clear.
@@ -1670,6 +2419,94 @@ void LibraryView::ShowContextMenuForViewImpl(
       menu_model_.get(), views::MenuRunner::CONTEXT_MENU);
   menu_runner_->RunMenuAt(GetWidget(), nullptr, gfx::Rect(point, gfx::Size()),
                           views::MenuAnchorPosition::kTopLeft, source_type);
+}
+
+void LibraryView::UpdateFilterButton() {
+  if (!filter_button_) {
+    return;
+  }
+  const Colors colors = GetColors(GetColorProvider());
+  const bool active = archive_filter_.IsActive();
+  const SkColor on_surface =
+      GetColorProvider() ? GetColorProvider()->GetColor(ui::kColorSysOnSurface)
+                         : SK_ColorWHITE;
+  filter_button_->SetBgColorOverrideDeprecated(
+      active ? SkColorSetA(kAccent, 0x38) : colors.tile);
+  filter_button_->SetEnabledTextColors(active ? on_surface : colors.muted);
+  filter_button_->SetImageModel(
+      views::Button::STATE_NORMAL,
+      ui::ImageModel::FromVectorIcon(kFilterIcon,
+                                     active ? on_surface : colors.muted, 15));
+}
+
+void LibraryView::ShowArchiveFilterMenu(views::View* anchor,
+                                        ui::mojom::MenuSourceType source_type) {
+  if (!GetWidget() || !anchor ||
+      (menu_runner_ && menu_runner_->IsRunning())) {
+    return;
+  }
+  menu_runner_.reset();
+  menu_model_ = std::make_unique<ui::SimpleMenuModel>(this);
+  filter_space_ids_.clear();
+
+  menu_model_->AddCheckItem(kFilterAllSpaces, u"All Spaces");
+  for (size_t i = 0; i < spaces_.size(); ++i) {
+    filter_space_ids_.push_back(spaces_[i].id);
+    menu_model_->AddCheckItem(kFilterSpaceBase + static_cast<int>(i),
+                              spaces_[i].name);
+  }
+  const bool has_deleted_space = std::ranges::any_of(
+      archived_, [](const auto& tab) { return tab.space_id == 0; });
+  if (has_deleted_space) {
+    menu_model_->AddCheckItem(kFilterDeletedSpaces, u"Other / Deleted Spaces");
+  }
+  menu_model_->AddSeparator(ui::NORMAL_SEPARATOR);
+  menu_model_->AddCheckItem(kFilterTimeAny, u"Any Time");
+  menu_model_->AddCheckItem(kFilterTimeToday, u"Today");
+  menu_model_->AddCheckItem(kFilterTimeLast7Days, u"Last 7 Days");
+  menu_model_->AddCheckItem(kFilterTimeLast30Days, u"Last 30 Days");
+  menu_model_->AddSeparator(ui::NORMAL_SEPARATOR);
+  menu_model_->AddItem(kFilterReset, u"Reset Filters");
+
+  menu_runner_ = std::make_unique<views::MenuRunner>(
+      menu_model_.get(), views::MenuRunner::CONTEXT_MENU);
+  const gfx::Rect bounds = anchor->GetBoundsInScreen();
+  menu_runner_->RunMenuAt(GetWidget(), nullptr,
+                          gfx::Rect(bounds.bottom_left(), gfx::Size()),
+                          views::MenuAnchorPosition::kTopLeft, source_type);
+}
+
+bool LibraryView::IsCommandIdChecked(int command_id) const {
+  if (command_id == kFilterAllSpaces) {
+    return !archive_filter_.space_id.has_value();
+  }
+  if (command_id == kFilterDeletedSpaces) {
+    return archive_filter_.space_id == 0u;
+  }
+  if (command_id >= kFilterSpaceBase) {
+    const size_t idx = static_cast<size_t>(command_id - kFilterSpaceBase);
+    return idx < filter_space_ids_.size() &&
+           archive_filter_.space_id == filter_space_ids_[idx];
+  }
+  switch (command_id) {
+    case kFilterTimeAny:
+      return archive_filter_.range == library::ArchiveTimeRange::kAny;
+    case kFilterTimeToday:
+      return archive_filter_.range == library::ArchiveTimeRange::kToday;
+    case kFilterTimeLast7Days:
+      return archive_filter_.range == library::ArchiveTimeRange::kLast7Days;
+    case kFilterTimeLast30Days:
+      return archive_filter_.range == library::ArchiveTimeRange::kLast30Days;
+    default:
+      return false;
+  }
+}
+
+bool LibraryView::IsCommandIdEnabled(int command_id) const {
+  if (command_id == kFilterReset) {
+    return archive_filter_.IsActive();
+  }
+  return ui::SimpleMenuModel::Delegate::IsCommandIdEnabled(command_id);
 }
 
 void LibraryView::ExecuteCommand(int command_id, int event_flags) {
@@ -1752,6 +2589,77 @@ void LibraryView::ExecuteCommand(int command_id, int event_flags) {
             view->RefreshBoosts();
           },
           base::Unretained(this), menu_boost_));
+      break;
+    case kFilterAllSpaces:
+      archive_filter_.space_id = std::nullopt;
+      UpdateFilterButton();
+      UpdateList(/*keep_scroll=*/false);
+      break;
+    case kFilterDeletedSpaces:
+      archive_filter_.space_id = 0u;
+      UpdateFilterButton();
+      UpdateList(/*keep_scroll=*/false);
+      break;
+    case kFilterTimeAny:
+      archive_filter_.range = library::ArchiveTimeRange::kAny;
+      UpdateFilterButton();
+      UpdateList(/*keep_scroll=*/false);
+      break;
+    case kFilterTimeToday:
+      archive_filter_.range = library::ArchiveTimeRange::kToday;
+      UpdateFilterButton();
+      UpdateList(/*keep_scroll=*/false);
+      break;
+    case kFilterTimeLast7Days:
+      archive_filter_.range = library::ArchiveTimeRange::kLast7Days;
+      UpdateFilterButton();
+      UpdateList(/*keep_scroll=*/false);
+      break;
+    case kFilterTimeLast30Days:
+      archive_filter_.range = library::ArchiveTimeRange::kLast30Days;
+      UpdateFilterButton();
+      UpdateList(/*keep_scroll=*/false);
+      break;
+    case kFilterReset:
+      archive_filter_ = {};
+      UpdateFilterButton();
+      UpdateList(/*keep_scroll=*/false);
+      break;
+    case kHideMedia:
+      PostAction(base::BindOnce(
+          [](LibraryView* view) {
+            view->CloseMediaLightbox();
+            view->HideMediaPill();
+            view->media_card_dismissed_ = false;
+            view->delegate_->SetMediaLibraryEnabled(false);
+            view->RefreshMedia();
+          },
+          base::Unretained(this)));
+      break;
+    case kMediaOpenPreview:
+      PostAction(base::BindOnce(&SidebarView::Delegate::OpenMediaInPreview,
+                                base::Unretained(&delegate_.get()),
+                                menu_media_));
+      break;
+    case kMediaCopy:
+      PostAction(base::BindOnce(&SidebarView::Delegate::CopyMediaFile,
+                                base::Unretained(&delegate_.get()),
+                                menu_media_));
+      break;
+    case kMediaRevealFinder:
+      PostAction(base::BindOnce(&SidebarView::Delegate::RevealMediaInFinder,
+                                base::Unretained(&delegate_.get()),
+                                menu_media_));
+      break;
+    default:
+      if (command_id >= kFilterSpaceBase) {
+        const size_t idx = static_cast<size_t>(command_id - kFilterSpaceBase);
+        if (idx < filter_space_ids_.size()) {
+          archive_filter_.space_id = filter_space_ids_[idx];
+          UpdateFilterButton();
+          UpdateList(/*keep_scroll=*/false);
+        }
+      }
       break;
   }
 }

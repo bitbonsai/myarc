@@ -395,6 +395,49 @@ source_set("control_prefs") {
   deps = [ "//components/prefs" ]
 }
 
+# Per-Profile opt-in pref for Library > Media.
+source_set("media_prefs") {
+  sources = [
+    "media_prefs.cc",
+    "media_prefs.h",
+  ]
+  deps = [
+    "//components/pref_registry",
+    "//components/prefs",
+  ]
+}
+
+# Library > Media discovery, QuickLook/ImageIO thumbnails, and macOS actions.
+source_set("media_library") {
+  sources = [
+    "media_library_service.cc",
+    "media_library_service.h",
+  ]
+  public_deps = [
+    "//base",
+    "//ui/gfx",
+  ]
+  deps = [
+    ":media_prefs",
+    "//chrome/browser/profiles:profile",
+    "//components/prefs",
+  ]
+  if (is_mac) {
+    sources += [
+      "media_library_mac.h",
+      "media_library_mac.mm",
+    ]
+    deps += [ "//ui/views" ]
+    frameworks = [
+      "AppKit.framework",
+      "AVFoundation.framework",
+      "CoreMedia.framework",
+      "ImageIO.framework",
+      "QuickLookThumbnailing.framework",
+    ]
+  }
+}
+
 # The welcome tour's Local State record and its first-run decision.
 source_set("onboarding_prefs") {
   sources = [
@@ -617,6 +660,8 @@ source_set("sidebar_view") {
     "icons.h",
     "library_view.cc",
     "library_view.h",
+    "media_lightbox.cc",
+    "media_lightbox.h",
     "profile_swap_cover.cc",
     "profile_swap_cover.h",
     "sidebar_view.cc",
@@ -787,6 +832,7 @@ executable("bridge_check") {
   deps = [
     ":boosts_service",
     ":library_logic",
+    ":media_library",
     ":spaces_index",
     ":workspace_service",
   ]
