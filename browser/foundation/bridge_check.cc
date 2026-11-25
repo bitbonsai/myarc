@@ -15,6 +15,7 @@
 #include "base/strings/string_number_conversions.h"
 #include "base/time/time.h"
 #include "base/timer/elapsed_timer.h"
+#include "myarc/boosts_service.h"
 #include "myarc/bridge.rs.h"
 #include "myarc/library_logic.h"
 #include "myarc/spaces_index.h"
@@ -1486,6 +1487,244 @@ bool CheckOnboarding() {
              "complete";
 }
 
+// Boosts CRUD, origin matching, CSS sanitizer rejection, revision undo/reset,
+// global kill switch, JSON round-trip, and corrupt-file `.bak` fallback.
+bool CheckBoosts() {
+  using namespace myarc::foundation;
+  using myarc::internal::ReadBoostsFile;
+
+  auto store = new_boost_store();
+  if (!boosts_global_enabled(*store) || !boosts_list(*store, "").empty()) {
+    return false;
+  }
+
+  // Create and reject invalid/non-HTTP(S) origins.
+  rust::Vec<rust::String> bad_origins;
+  bad_origins.push_back("chrome://settings");
+  if (boosts_create(*store, "Bad", std::move(bad_origins), 100).ok) {
+    return false;
+  }
+
+  rust::Vec<rust::String> origins;
+  origins.push_back("HTTPS://Example.COM:443");
+  const auto created = boosts_create(*store, "My Boost", std::move(origins), 100);
+  if (!created.ok || created.id != 1) {
+    return false;
+  }
+  const auto fetched = boosts_get(*store, created.id);
+  if (fetched.size() != 1 || std::string(fetched[0].name) != "My Boost" ||
+      std::string(fetched[0].display_host) != "example.com" ||
+      !fetched[0].enabled || fetched[0].origins.size() != 1 ||
+      std::string(fetched[0].origins[0]) != "https://example.com") {
+    return false;
+  }
+
+  // Rename and search.
+  if (!boosts_rename(*store, created.id, "Reader Mode", 101).ok ||
+      boosts_list(*store, "reader").size() != 1 ||
+      boosts_list(*store, "example.com").size() != 1 ||
+      !boosts_list(*store, "unrelated").empty()) {
+    return false;
+  }
+
+  // Appearance, hidden selectors, and custom CSS.
+  BoostAppearanceRecord appearance;
+  appearance.color_mode = BoostColorMode::Palette;
+  appearance.palette = {.set = true,
+                        .background = 0x112233,
+                        .text = 0xEEEEEE,
+                        .accent = 0x4488FF,
+                        .contrast = 60,
+                        .tint_strength = 75};
+  appearance.font = BoostFontPreset::SystemMono;
+  appearance.text_scale_pct = 115;
+  appearance.text_transform = BoostTextTransform::Uppercase;
+  if (!boosts_set_appearance(*store, created.id, appearance, 102).ok ||
+      !boosts_add_hidden_selector(*store, created.id, ".promo-banner", 103).ok ||
+      !boosts_set_custom_css(*store, created.id,
+                             "main { max-width: 720px; filter: url(#ok); }", 104)
+           .ok) {
+    return false;
+  }
+
+  // CSS sanitizer and selector breakout rejection.
+  for (const char* bad_css : {
+           "@import url(https://evil.test/a.css);",
+           "body { background: url(https://evil.test/a.png); }",
+           "body { background: \\75 rl(http://evil.test/b.png); }",
+           "body { background: image-set('a.png' 1x); }",
+           "body { background: src('https://evil.test/c.png'); }",
+       }) {
+    if (boosts_set_custom_css(*store, created.id, bad_css, 105).ok ||
+        boosts_inspect_css(bad_css).empty()) {
+      return false;
+    }
+  }
+  if (boosts_add_hidden_selector(*store, created.id, "} body { color: red", 105)
+          .ok) {
+    return false;
+  }
+
+  // Origin matching (exact, port/scheme mismatch, subdomain, look-alike, subframe).
+  const std::string exact_css =
+      std::string(boosts_compile_for_origin(*store, "https://example.com", false));
+  if (exact_css.find("#112233") == std::string::npos ||
+      exact_css.find(".promo-banner { display: none !important; }") ==
+          std::string::npos ||
+      exact_css.find("url(#ok)") == std::string::npos) {
+    return false;
+  }
+  if (!boosts_compile_for_origin(*store, "http://example.com", false).empty() ||
+      !boosts_compile_for_origin(*store, "https://example.com:8443", false)
+           .empty() ||
+      !boosts_compile_for_origin(*store, "https://sub.example.com", false)
+           .empty() ||
+      !boosts_compile_for_origin(*store, "https://example.com", true).empty() ||
+      !boosts_compile_for_origin(*store, "chrome://settings", false).empty()) {
+    return false;
+  }
+
+  // Enable subdomains and subframes; verify look-alike rejection.
+  rust::Vec<rust::String> scope_origins;
+  scope_origins.push_back("https://example.com");
+  if (!boosts_set_scope(*store, created.id, std::move(scope_origins), true, true,
+                        106)
+           .ok ||
+      boosts_compile_for_origin(*store, "https://sub.example.com", false)
+          .empty() ||
+      boosts_compile_for_origin(*store, "https://example.com", true).empty() ||
+      !boosts_compile_for_origin(*store, "https://notexample.com", false)
+           .empty() ||
+      !boosts_compile_for_origin(*store, "https://example.com.evil.test", false)
+           .empty()) {
+    return false;
+  }
+
+  // Global kill switch.
+  if (!boosts_set_global_enabled(*store, false) ||
+      boosts_global_enabled(*store) ||
+      !boosts_compile_for_origin(*store, "https://example.com", false).empty() ||
+      !boosts_set_global_enabled(*store, true) ||
+      boosts_compile_for_origin(*store, "https://example.com", false).empty()) {
+    return false;
+  }
+
+  // Revision undo & reset.
+  if (!boosts_reset(*store, created.id, 107).ok ||
+      !boosts_compile_for_origin(*store, "https://example.com", false).empty() ||
+      !boosts_undo(*store, created.id, 108).ok ||
+      boosts_compile_for_origin(*store, "https://example.com", false).empty()) {
+    return false;
+  }
+
+  // JSON round-trip.
+  const rust::String encoded = boosts_encode_json(*store);
+  auto restored = new_boost_store();
+  const auto load = boosts_restore_json(
+      *restored, rust::Slice<const uint8_t>(
+                     reinterpret_cast<const uint8_t*>(encoded.data()),
+                     encoded.size()));
+  if (!load.ok || load.damaged ||
+      std::string(boosts_compile_for_origin(*restored, "https://example.com",
+                                            false)) != exact_css) {
+    return false;
+  }
+
+  // Preview compilation does not require mutating the store.
+  rust::Vec<rust::String> preview_selectors;
+  preview_selectors.push_back("#cookie");
+  const std::string preview_css = std::string(boosts_compile_preview(
+      appearance, std::move(preview_selectors), "body { line-height: 1.6; }"));
+  if (preview_css.find("#cookie { display: none !important; }") ==
+          std::string::npos ||
+      preview_css.find("line-height: 1.6") == std::string::npos) {
+    return false;
+  }
+
+  // Delete.
+  if (!boosts_delete(*restored, created.id).ok ||
+      !boosts_list(*restored, "").empty()) {
+    return false;
+  }
+
+  // Corrupt-file `.bak` fallback, `.corrupt` set-aside, and newer-version
+  // read-only preservation.
+  base::ScopedTempDir dir;
+  if (!dir.CreateUniqueTempDir()) {
+    return false;
+  }
+  const auto path = dir.GetPath().AppendASCII("myarc-boosts-v1.json");
+  const auto backup = path.AddExtensionASCII("bak");
+  const auto aside = path.AddExtensionASCII("corrupt");
+  const auto write_store = [&](const BoostStore& s) {
+    const rust::String json = boosts_encode_json(s);
+    const std::string p = path.AsUTF8Unsafe();
+    return write_workspace_file(
+               rust::Str(p.data(), p.size()),
+               rust::Slice<const uint8_t>(
+                   reinterpret_cast<const uint8_t*>(json.data()), json.size()))
+        .empty();
+  };
+
+  // First run: missing file + missing backup returns empty with no error.
+  const auto first_run = ReadBoostsFile(path);
+  if (first_run.json || !first_run.error.empty()) {
+    return false;
+  }
+
+  // Write generation 1 ("Good") and generation 2 ("Newer").
+  if (!boosts_rename(*store, created.id, "Good", 110).ok ||
+      !write_store(*store) ||
+      !boosts_rename(*store, created.id, "Newer", 111).ok ||
+      !write_store(*store)) {
+    return false;
+  }
+  const auto good_newest = ReadBoostsFile(path);
+  if (!good_newest.json || good_newest.from_backup ||
+      good_newest.json->find("Newer") == std::string::npos) {
+    return false;
+  }
+
+  // Torn/corrupt main file -> restores `.bak` ("Good") and moves torn file to `.corrupt`.
+  if (!base::WriteFile(path, R"({"version":1,"boo)")) {
+    return false;
+  }
+  const auto torn = ReadBoostsFile(path);
+  std::string kept;
+  if (!torn.json || !torn.from_backup ||
+      torn.json->find("Good") == std::string::npos || base::PathExists(path) ||
+      !base::ReadFileToString(aside, &kept) || kept != R"({"version":1,"boo)") {
+    return false;
+  }
+
+  // Missing main file with good `.bak` -> restores `.bak`.
+  const auto missing = ReadBoostsFile(path);
+  if (!missing.json || !missing.from_backup ||
+      missing.json->find("Good") == std::string::npos) {
+    return false;
+  }
+
+  // Unsupported newer schema version -> read-only error, not damaged, file untouched.
+  if (!base::WriteFile(
+          path,
+          R"({"version":99,"global_enabled":true,"next_boost_id":1,"boosts":[]})")) {
+    return false;
+  }
+  const auto newer = ReadBoostsFile(path);
+  if (newer.json || newer.damaged || newer.error.empty() ||
+      !base::PathExists(path)) {
+    return false;
+  }
+
+  // Both main and backup damaged -> error, both preserved.
+  if (!base::WriteFile(path, "{broken") || !base::WriteFile(backup, "{")) {
+    return false;
+  }
+  const auto both = ReadBoostsFile(path);
+  return !both.json && both.damaged && !both.error.empty() &&
+         base::PathExists(path) && base::PathExists(backup);
+}
+
 }  // namespace
 
 int main() {
@@ -1614,12 +1853,16 @@ int main() {
     std::cerr << "Onboarding checks failed\n";
     return 28;
   }
+  if (!CheckBoosts()) {
+    std::cerr << "Boosts checks failed\n";
+    return 29;
+  }
   std::cout << "7 legacy C++/Rust checks passed, including 1000 ownership "
                "round trips; workspace transitions, Space 1 deletion and "
                "metadata codec, saved title, Archived Tabs, Auto Archive, "
                "archive timer, Clear Archive, downloads stack, dormant "
                "temporary item, Space reorder, Space icon, Space theme, first "
-               "Space, Spaces index, agent Space, folder, rename and drop, and "
-               "split and onboarding checks passed\n";
+               "Space, Spaces index, agent Space, folder, rename and drop, "
+               "split, onboarding, and Boosts checks passed\n";
   return 0;
 }

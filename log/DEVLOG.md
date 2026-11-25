@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-11-25: Boosts Phase B1 Slices 2 & 3 (FFI, `BoostsService`, pure-CSS injection, `BoostsTabHelper`)
+
+- Wired `crates/boosts` into `browser/foundation/BUILD.gn` and `bridge.rs`, added Profile-scoped `BoostsService` (`myarc-boosts-v1.json` atomic writes, `.bak`/`.corrupt` fallback, off-thread `sync_all`, OTR isolation, and `Observer::OnBoostsChanged`), and added `CheckBoosts()` coverage in `bridge_check.cc`.
+- Added one-way `ChromeRenderFrame::SetBoostStyleSheet` in `chrome_render_frame.mojom` and `ChromeRenderFrameObserver` (remove-before-insert author stylesheet with `BackForwardCacheAware::kAllow`), attached `BoostsTabHelper` in `TabFeatures::Init` / `WillDiscardContents` with SPA/BFCache/live-preview support, and wired `IDC_MYARC_TOGGLE_BOOSTS` / `IDC_MYARC_EDIT_BOOST`.
+- Evidence: `out/MyarcRelease` `chrome` and `myarc:bridge_check` build and pass (`CheckBoosts()` green); `tools/export_patches.py --check` (163 patches), `tools/check_docs.py`, `cargo fmt --check`, `rustfmt --check bridge.rs`, `cargo clippy -- -D warnings`, and `cargo test --workspace --locked` all pass.
+
 ## 2026-11-25: Switch Space icons to filled Ionicons and publish `v2026.11.25.1`
 
 - Replaced Lucide outline Space icons and the custom `kSaturnPath` with filled Ionicons 8.1.1 (`dist/svg/*.svg`, MIT, `FILL_RULE_NONZERO` on a 512-unit canvas) in `tools/gen_space_icons.py`, `browser/foundation/space_icon_data.cc`, and `browser/foundation/icons.h`, keeping existing stored Space icon keys and custom `kBotIcon` intact.

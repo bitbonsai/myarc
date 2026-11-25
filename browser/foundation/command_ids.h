@@ -29,5 +29,8 @@
 #define IDC_MYARC_REPLAY_INTRO 35421
 // Option-Cmd-O in a Little Arc: pick the Space its page moves to.
 #define IDC_MYARC_LITTLE_ARC_PICK_SPACE 35422
+// Boosts Phase B1: per-site Boost editor and Profile-wide kill switch.
+#define IDC_MYARC_EDIT_BOOST 35423
+#define IDC_MYARC_TOGGLE_BOOSTS 35424
 
 #endif  // MYARC_COMMAND_IDS_H_

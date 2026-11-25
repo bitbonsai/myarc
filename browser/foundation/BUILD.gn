@@ -71,12 +71,24 @@ rust_static_library("import") {
   ]
 }
 
+rust_static_library("boosts") {
+  crate_root = "boosts/src/lib.rs"
+  sources = [
+    "boosts/src/css.rs",
+    "boosts/src/json.rs",
+    "boosts/src/lib.rs",
+    "boosts/src/origin.rs",
+  ]
+  build_native_rust_unit_tests = true
+}
+
 rust_static_library("bridge") {
   crate_root = "bridge.rs"
   sources = [ crate_root ]
   cxx_bindings = [ crate_root ]
   allow_unsafe = true  # Cxx-generated interoperation only; core forbids unsafe.
   deps = [
+    ":boosts",
     ":control",
     ":import",
     ":workspace",
@@ -112,6 +124,41 @@ source_set("workspace_service") {
     "//chrome/browser/profiles:profile",
     "//components/prefs",
     "//content/public/browser",
+    "//url",
+  ]
+}
+
+source_set("boosts_service") {
+  sources = [
+    "boosts_service.cc",
+    "boosts_service.h",
+  ]
+  public_deps = [
+    ":bridge",
+    "//base",
+  ]
+  deps = [
+    "//chrome/browser/profiles:profile",
+    "//content/public/browser",
+    "//url",
+  ]
+}
+
+source_set("boosts_tab_helper") {
+  sources = [
+    "boosts_tab_helper.cc",
+    "boosts_tab_helper.h",
+  ]
+  public_deps = [
+    ":boosts_service",
+    "//base",
+    "//content/public/browser",
+  ]
+  deps = [
+    "//chrome/browser/profiles:profile",
+    "//chrome/common:mojo_bindings",
+    "//mojo/public/cpp/bindings",
+    "//third_party/blink/public/common",
     "//url",
   ]
 }
@@ -702,6 +749,7 @@ executable("bridge_check") {
   testonly = true
   sources = [ "bridge_check.cc" ]
   deps = [
+    ":boosts_service",
     ":library_logic",
     ":spaces_index",
     ":workspace_service",

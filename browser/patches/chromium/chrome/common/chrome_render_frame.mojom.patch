@@ -1,0 +1,13 @@
+diff --git a/chrome/common/chrome_render_frame.mojom b/chrome/common/chrome_render_frame.mojom
+index de6e6c8d8899b4da8658eafb4a159b54c98112f3..c5304d318db3f9eed26092c2fe4ce024a6f02c67 100644
+--- a/chrome/common/chrome_render_frame.mojom
++++ b/chrome/common/chrome_render_frame.mojom
+@@ -185,4 +185,8 @@ interface ChromeRenderFrame {
+   PdfPageCaptured(mojo_base.mojom.String16 contents,
+                   string pdf_lang,
+                   url.mojom.Url page_url);
++
++  // Inserts, updates, or removes (when `css` is empty) a myArc Boost author
++  // stylesheet keyed by `key` on the current document.
++  SetBoostStyleSheet(string key, string css);
+ };

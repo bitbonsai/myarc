@@ -1,0 +1,30 @@
+diff --git a/chrome/browser/ui/tabs/tab_features.cc b/chrome/browser/ui/tabs/tab_features.cc
+index 76c419bd2903e381e1d1d163f84224374a954609..4bbf8a0d98718dd773c8d4000a1f8561b9e1ce4d 100644
+--- a/chrome/browser/ui/tabs/tab_features.cc
++++ b/chrome/browser/ui/tabs/tab_features.cc
+@@ -291,6 +291,7 @@
+ #include "components/web_modal/web_contents_modal_dialog_manager.h"
+ #include "components/webapps/browser/installable/installable_manager.h"
+ #include "components/webapps/browser/installable/ml_installability_promoter.h"
++#include "myarc/boosts_tab_helper.h"
+ #include "net/base/features.h"
+ #include "ui/accessibility/accessibility_features.h"
+ #include "ui/base/unowned_user_data/user_data_factory.h"
+@@ -433,6 +434,8 @@ void TabFeatures::Init(TabInterface& tab, Profile* profile) {
+ 
+   zoom::ZoomController::CreateForWebContents(tab.GetContents());
+ 
++  myarc::BoostsTabHelper::CreateForWebContents(tab.GetContents());
++
+   infobars::ContentInfoBarManager::CreateForWebContents(tab.GetContents());
+ 
+   autofill::AutofillClientProvider& autofill_client_provider =
+@@ -1502,6 +1505,8 @@ void TabFeatures::WillDiscardContents(tabs::TabInterface* tab,
+ 
+   zoom::ZoomController::CreateForWebContents(new_contents);
+ 
++  myarc::BoostsTabHelper::CreateForWebContents(new_contents);
++
+   infobars::ContentInfoBarManager::CreateForWebContents(new_contents);
+ 
+   autofill::AutofillClientProvider& autofill_client_provider =

@@ -1,0 +1,31 @@
+diff --git a/chrome/renderer/chrome_render_frame_observer.h b/chrome/renderer/chrome_render_frame_observer.h
+index 6f06ca507e08db56876f31333f13fcb1bdce9d0a..ba7abd22917c82f3011b12c3fae08a84f37979b0 100644
+--- a/chrome/renderer/chrome_render_frame_observer.h
++++ b/chrome/renderer/chrome_render_frame_observer.h
+@@ -6,6 +6,7 @@
+ #define CHROME_RENDERER_CHROME_RENDER_FRAME_OBSERVER_H_
+ 
+ #include <memory>
++#include <set>
+ #include <string>
+ #include <vector>
+ 
+@@ -165,6 +166,8 @@ class ChromeRenderFrameObserver : public content::RenderFrameObserver,
+                        const std::string& pdf_lang,
+                        const GURL& page_url) override;
+ #endif
++  void SetBoostStyleSheet(const std::string& key,
++                          const std::string& css) override;
+ 
+   // Initialize a |phishing_classifier_delegate_|.
+   void SetClientSidePhishingDetection();
+@@ -228,6 +231,9 @@ class ChromeRenderFrameObserver : public content::RenderFrameObserver,
+   std::unique_ptr<page_content_annotations::PageStabilityMonitor>
+       page_stability_monitor_;
+ 
++  // Active myArc Boost stylesheet keys on the current document.
++  std::set<std::string> active_boost_keys_;
++
+   mojo::AssociatedReceiverSet<chrome::mojom::ChromeRenderFrame> receivers_;
+ 
+   service_manager::BinderRegistry registry_;

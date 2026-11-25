@@ -1,4 +1,5 @@
 chromium::import! {
+    "//myarc:boosts";
     "//myarc:control";
     "//myarc:import";
     "//myarc:workspace";
@@ -7,6 +8,7 @@ chromium::import! {
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 
 pub struct Workspace(workspace::Workspace);
+pub struct BoostStore(boosts::BoostStore);
 
 // A parsed Arc export, one part per Arc profile. The Markdown export and a
 // sidebar file with one profile have a single part, the main profile's.
@@ -713,6 +715,96 @@ mod ffi {
         note: String,
     }
 
+    enum BoostColorMode {
+        None,
+        Invert,
+        Palette,
+    }
+
+    enum BoostFontPreset {
+        Default,
+        SystemSans,
+        SystemSerif,
+        SystemMono,
+        Rounded,
+        Geometric,
+        Humanist,
+        Grotesk,
+        Didone,
+        SlabSerif,
+        ClassicSerif,
+        Typewriter,
+        Handwritten,
+        Condensed,
+        Wide,
+        Comic,
+    }
+
+    enum BoostTextTransform {
+        None,
+        Uppercase,
+        Lowercase,
+        Capitalize,
+    }
+
+    struct BoostPaletteRecord {
+        set: bool,
+        background: u32,
+        text: u32,
+        accent: u32,
+        contrast: u8,
+        tint_strength: u8,
+    }
+
+    struct BoostAppearanceRecord {
+        color_mode: BoostColorMode,
+        palette: BoostPaletteRecord,
+        font: BoostFontPreset,
+        text_scale_pct: u16,
+        text_transform: BoostTextTransform,
+    }
+
+    struct BoostRecord {
+        id: u64,
+        name: String,
+        origins: Vec<String>,
+        display_host: String,
+        include_subdomains: bool,
+        apply_to_subframes: bool,
+        enabled: bool,
+        version: u32,
+        updated_secs: u64,
+        appearance: BoostAppearanceRecord,
+        hidden_selectors: Vec<String>,
+        custom_css: String,
+        can_undo: bool,
+        has_inert_script: bool,
+    }
+
+    struct BoostCssFinding {
+        line: usize,
+        reason: String,
+    }
+
+    struct BoostLoadResult {
+        ok: bool,
+        damaged: bool,
+        error: String,
+    }
+
+    struct BoostLimits {
+        version: u32,
+        max_boosts: usize,
+        max_name_bytes: usize,
+        max_origins_per_boost: usize,
+        max_origin_bytes: usize,
+        max_hidden_selectors: usize,
+        max_selector_bytes: usize,
+        max_custom_css_bytes: usize,
+        max_revisions: usize,
+        max_file_bytes: usize,
+    }
+
     extern "Rust" {
         type Workspace;
         fn new_workspace() -> Box<Workspace>;
@@ -1274,6 +1366,93 @@ mod ffi {
         // Cmd+Shift+T over `item` in `space`: true reopens the Peek, false
         // restores a tab. Uses the closed Peek up either way.
         fn take_closed_peek(reopen: &mut PeekReopen, space: u64, item: u64) -> bool;
+
+        // Profile-scoped Boosts store (crates/boosts). Pure CSS, bounded,
+        // no panics across FFI.
+        type BoostStore;
+        fn boosts_limits() -> BoostLimits;
+        fn new_boost_store() -> Box<BoostStore>;
+        fn boosts_encode_json(store: &BoostStore) -> String;
+        fn boosts_restore_json(store: &mut BoostStore, bytes: &[u8]) -> BoostLoadResult;
+        fn boosts_global_enabled(store: &BoostStore) -> bool;
+        fn boosts_set_global_enabled(store: &mut BoostStore, enabled: bool) -> bool;
+        fn boosts_list(store: &BoostStore, query: &str) -> Vec<BoostRecord>;
+        fn boosts_get(store: &BoostStore, id: u64) -> Vec<BoostRecord>;
+        fn boosts_matching(
+            store: &BoostStore,
+            page_origin: &str,
+            is_subframe: bool,
+        ) -> Vec<BoostRecord>;
+        fn boosts_create(
+            store: &mut BoostStore,
+            name: &str,
+            origins: Vec<String>,
+            now_secs: u64,
+        ) -> MutationResult;
+        fn boosts_rename(
+            store: &mut BoostStore,
+            id: u64,
+            name: &str,
+            now_secs: u64,
+        ) -> MutationResult;
+        fn boosts_set_enabled(
+            store: &mut BoostStore,
+            id: u64,
+            enabled: bool,
+            now_secs: u64,
+        ) -> MutationResult;
+        fn boosts_set_scope(
+            store: &mut BoostStore,
+            id: u64,
+            origins: Vec<String>,
+            include_subdomains: bool,
+            apply_to_subframes: bool,
+            now_secs: u64,
+        ) -> MutationResult;
+        fn boosts_set_appearance(
+            store: &mut BoostStore,
+            id: u64,
+            appearance: BoostAppearanceRecord,
+            now_secs: u64,
+        ) -> MutationResult;
+        fn boosts_add_hidden_selector(
+            store: &mut BoostStore,
+            id: u64,
+            selector: &str,
+            now_secs: u64,
+        ) -> MutationResult;
+        fn boosts_remove_hidden_selector(
+            store: &mut BoostStore,
+            id: u64,
+            selector: &str,
+            now_secs: u64,
+        ) -> MutationResult;
+        fn boosts_clear_hidden_selectors(
+            store: &mut BoostStore,
+            id: u64,
+            now_secs: u64,
+        ) -> MutationResult;
+        fn boosts_set_custom_css(
+            store: &mut BoostStore,
+            id: u64,
+            custom_css: &str,
+            now_secs: u64,
+        ) -> MutationResult;
+        fn boosts_reset(store: &mut BoostStore, id: u64, now_secs: u64) -> MutationResult;
+        fn boosts_undo(store: &mut BoostStore, id: u64, now_secs: u64) -> MutationResult;
+        fn boosts_delete(store: &mut BoostStore, id: u64) -> MutationResult;
+        fn boosts_compile_for_origin(
+            store: &BoostStore,
+            page_origin: &str,
+            is_subframe: bool,
+        ) -> String;
+        fn boosts_compile_preview(
+            appearance: BoostAppearanceRecord,
+            hidden_selectors: Vec<String>,
+            custom_css: &str,
+        ) -> String;
+        fn boosts_inspect_css(css: &str) -> Vec<BoostCssFinding>;
+        fn boosts_normalize_origin(raw: &str) -> String;
     }
 }
 
@@ -3448,4 +3627,447 @@ pub fn stop_control_host() {
     if let Some(host) = host {
         host.stop();
     }
+}
+
+fn boost_color_mode_to_ffi(mode: boosts::ColorMode) -> ffi::BoostColorMode {
+    match mode {
+        boosts::ColorMode::None => ffi::BoostColorMode::None,
+        boosts::ColorMode::Invert => ffi::BoostColorMode::Invert,
+        boosts::ColorMode::Palette => ffi::BoostColorMode::Palette,
+    }
+}
+
+fn boost_color_mode_from_ffi(mode: ffi::BoostColorMode) -> boosts::ColorMode {
+    match mode {
+        ffi::BoostColorMode::Invert => boosts::ColorMode::Invert,
+        ffi::BoostColorMode::Palette => boosts::ColorMode::Palette,
+        _ => boosts::ColorMode::None,
+    }
+}
+
+fn boost_font_to_ffi(font: boosts::FontPreset) -> ffi::BoostFontPreset {
+    match font {
+        boosts::FontPreset::Default => ffi::BoostFontPreset::Default,
+        boosts::FontPreset::SystemSans => ffi::BoostFontPreset::SystemSans,
+        boosts::FontPreset::SystemSerif => ffi::BoostFontPreset::SystemSerif,
+        boosts::FontPreset::SystemMono => ffi::BoostFontPreset::SystemMono,
+        boosts::FontPreset::Rounded => ffi::BoostFontPreset::Rounded,
+        boosts::FontPreset::Geometric => ffi::BoostFontPreset::Geometric,
+        boosts::FontPreset::Humanist => ffi::BoostFontPreset::Humanist,
+        boosts::FontPreset::Grotesk => ffi::BoostFontPreset::Grotesk,
+        boosts::FontPreset::Didone => ffi::BoostFontPreset::Didone,
+        boosts::FontPreset::SlabSerif => ffi::BoostFontPreset::SlabSerif,
+        boosts::FontPreset::ClassicSerif => ffi::BoostFontPreset::ClassicSerif,
+        boosts::FontPreset::Typewriter => ffi::BoostFontPreset::Typewriter,
+        boosts::FontPreset::Handwritten => ffi::BoostFontPreset::Handwritten,
+        boosts::FontPreset::Condensed => ffi::BoostFontPreset::Condensed,
+        boosts::FontPreset::Wide => ffi::BoostFontPreset::Wide,
+        boosts::FontPreset::Comic => ffi::BoostFontPreset::Comic,
+    }
+}
+
+fn boost_font_from_ffi(font: ffi::BoostFontPreset) -> boosts::FontPreset {
+    match font {
+        ffi::BoostFontPreset::SystemSans => boosts::FontPreset::SystemSans,
+        ffi::BoostFontPreset::SystemSerif => boosts::FontPreset::SystemSerif,
+        ffi::BoostFontPreset::SystemMono => boosts::FontPreset::SystemMono,
+        ffi::BoostFontPreset::Rounded => boosts::FontPreset::Rounded,
+        ffi::BoostFontPreset::Geometric => boosts::FontPreset::Geometric,
+        ffi::BoostFontPreset::Humanist => boosts::FontPreset::Humanist,
+        ffi::BoostFontPreset::Grotesk => boosts::FontPreset::Grotesk,
+        ffi::BoostFontPreset::Didone => boosts::FontPreset::Didone,
+        ffi::BoostFontPreset::SlabSerif => boosts::FontPreset::SlabSerif,
+        ffi::BoostFontPreset::ClassicSerif => boosts::FontPreset::ClassicSerif,
+        ffi::BoostFontPreset::Typewriter => boosts::FontPreset::Typewriter,
+        ffi::BoostFontPreset::Handwritten => boosts::FontPreset::Handwritten,
+        ffi::BoostFontPreset::Condensed => boosts::FontPreset::Condensed,
+        ffi::BoostFontPreset::Wide => boosts::FontPreset::Wide,
+        ffi::BoostFontPreset::Comic => boosts::FontPreset::Comic,
+        _ => boosts::FontPreset::Default,
+    }
+}
+
+fn boost_text_transform_to_ffi(tt: boosts::TextTransform) -> ffi::BoostTextTransform {
+    match tt {
+        boosts::TextTransform::None => ffi::BoostTextTransform::None,
+        boosts::TextTransform::Uppercase => ffi::BoostTextTransform::Uppercase,
+        boosts::TextTransform::Lowercase => ffi::BoostTextTransform::Lowercase,
+        boosts::TextTransform::Capitalize => ffi::BoostTextTransform::Capitalize,
+    }
+}
+
+fn boost_text_transform_from_ffi(tt: ffi::BoostTextTransform) -> boosts::TextTransform {
+    match tt {
+        ffi::BoostTextTransform::Uppercase => boosts::TextTransform::Uppercase,
+        ffi::BoostTextTransform::Lowercase => boosts::TextTransform::Lowercase,
+        ffi::BoostTextTransform::Capitalize => boosts::TextTransform::Capitalize,
+        _ => boosts::TextTransform::None,
+    }
+}
+
+fn boost_appearance_to_ffi(appearance: &boosts::BoostAppearance) -> ffi::BoostAppearanceRecord {
+    let palette = match appearance.palette {
+        Some(p) => ffi::BoostPaletteRecord {
+            set: true,
+            background: p.background,
+            text: p.text,
+            accent: p.accent,
+            contrast: p.contrast,
+            tint_strength: p.tint_strength,
+        },
+        None => ffi::BoostPaletteRecord {
+            set: false,
+            background: 0,
+            text: 0,
+            accent: 0,
+            contrast: 50,
+            tint_strength: 50,
+        },
+    };
+    ffi::BoostAppearanceRecord {
+        color_mode: boost_color_mode_to_ffi(appearance.color_mode),
+        palette,
+        font: boost_font_to_ffi(appearance.font),
+        text_scale_pct: appearance.text_scale_pct,
+        text_transform: boost_text_transform_to_ffi(appearance.text_transform),
+    }
+}
+
+fn boost_appearance_from_ffi(record: ffi::BoostAppearanceRecord) -> boosts::BoostAppearance {
+    let palette = if record.palette.set {
+        Some(boosts::BoostPalette {
+            background: record.palette.background,
+            text: record.palette.text,
+            accent: record.palette.accent,
+            contrast: record.palette.contrast,
+            tint_strength: record.palette.tint_strength,
+        })
+    } else {
+        None
+    };
+    boosts::BoostAppearance {
+        color_mode: boost_color_mode_from_ffi(record.color_mode),
+        palette,
+        font: boost_font_from_ffi(record.font),
+        text_scale_pct: record.text_scale_pct,
+        text_transform: boost_text_transform_from_ffi(record.text_transform),
+    }
+}
+
+fn boost_record_to_ffi(boost: &boosts::Boost) -> ffi::BoostRecord {
+    let display_host = boost
+        .origins
+        .first()
+        .and_then(|origin| boosts::display_host(origin))
+        .unwrap_or_default();
+    let has_inert_script = boost
+        .script_payload
+        .as_deref()
+        .is_some_and(|s| !s.trim().is_empty());
+    ffi::BoostRecord {
+        id: boost.id,
+        name: boost.name.clone(),
+        origins: boost.origins.clone(),
+        display_host,
+        include_subdomains: boost.include_subdomains,
+        apply_to_subframes: boost.apply_to_subframes,
+        enabled: boost.enabled,
+        version: boost.version,
+        updated_secs: boost.updated_secs,
+        appearance: boost_appearance_to_ffi(&boost.appearance),
+        hidden_selectors: boost.hidden_selectors.clone(),
+        custom_css: boost.custom_css.clone(),
+        can_undo: !boost.revisions.is_empty(),
+        has_inert_script,
+    }
+}
+
+fn boost_bool_mutation(result: Result<bool, boosts::BoostsError>) -> ffi::MutationResult {
+    match result {
+        Ok(changed) => ffi::MutationResult {
+            ok: true,
+            id: u64::from(changed),
+            error: String::new(),
+        },
+        Err(error) => ffi::MutationResult {
+            ok: false,
+            id: 0,
+            error: error.to_string(),
+        },
+    }
+}
+
+pub fn boosts_limits() -> ffi::BoostLimits {
+    ffi::BoostLimits {
+        version: boosts::SNAPSHOT_VERSION,
+        max_boosts: boosts::MAX_BOOSTS,
+        max_name_bytes: boosts::MAX_NAME_BYTES,
+        max_origins_per_boost: boosts::MAX_ORIGINS_PER_BOOST,
+        max_origin_bytes: boosts::MAX_ORIGIN_BYTES,
+        max_hidden_selectors: boosts::MAX_HIDDEN_SELECTORS,
+        max_selector_bytes: boosts::MAX_SELECTOR_BYTES,
+        max_custom_css_bytes: boosts::MAX_CUSTOM_CSS_BYTES,
+        max_revisions: boosts::MAX_REVISIONS,
+        max_file_bytes: boosts::MAX_FILE_BYTES,
+    }
+}
+
+pub fn new_boost_store() -> Box<BoostStore> {
+    Box::new(BoostStore(boosts::BoostStore::new()))
+}
+
+pub fn boosts_encode_json(store: &BoostStore) -> String {
+    boosts::encode_snapshot(&store.0.snapshot())
+}
+
+pub fn boosts_restore_json(store: &mut BoostStore, bytes: &[u8]) -> ffi::BoostLoadResult {
+    let snapshot = match boosts::decode_snapshot(bytes) {
+        Ok(snapshot) => snapshot,
+        Err(boosts::BoostsError::UnsupportedSnapshotVersion(v)) => {
+            return ffi::BoostLoadResult {
+                ok: false,
+                damaged: false,
+                error: boosts::BoostsError::UnsupportedSnapshotVersion(v).to_string(),
+            };
+        }
+        Err(error) => {
+            return ffi::BoostLoadResult {
+                ok: false,
+                damaged: true,
+                error: error.to_string(),
+            };
+        }
+    };
+    match boosts::BoostStore::from_snapshot(snapshot) {
+        Ok(restored) => {
+            store.0 = restored;
+            ffi::BoostLoadResult {
+                ok: true,
+                damaged: false,
+                error: String::new(),
+            }
+        }
+        Err(boosts::BoostsError::UnsupportedSnapshotVersion(v)) => ffi::BoostLoadResult {
+            ok: false,
+            damaged: false,
+            error: boosts::BoostsError::UnsupportedSnapshotVersion(v).to_string(),
+        },
+        Err(error) => ffi::BoostLoadResult {
+            ok: false,
+            damaged: true,
+            error: error.to_string(),
+        },
+    }
+}
+
+pub fn boosts_global_enabled(store: &BoostStore) -> bool {
+    store.0.global_enabled()
+}
+
+pub fn boosts_set_global_enabled(store: &mut BoostStore, enabled: bool) -> bool {
+    store.0.set_global_enabled(enabled)
+}
+
+pub fn boosts_list(store: &BoostStore, query: &str) -> Vec<ffi::BoostRecord> {
+    store
+        .0
+        .search(query)
+        .into_iter()
+        .map(boost_record_to_ffi)
+        .collect()
+}
+
+pub fn boosts_get(store: &BoostStore, id: u64) -> Vec<ffi::BoostRecord> {
+    store
+        .0
+        .boost(id)
+        .map(boost_record_to_ffi)
+        .into_iter()
+        .collect()
+}
+
+pub fn boosts_matching(
+    store: &BoostStore,
+    page_origin: &str,
+    is_subframe: bool,
+) -> Vec<ffi::BoostRecord> {
+    store
+        .0
+        .matching_boosts(page_origin, is_subframe)
+        .into_iter()
+        .map(boost_record_to_ffi)
+        .collect()
+}
+
+pub fn boosts_create(
+    store: &mut BoostStore,
+    name: &str,
+    origins: Vec<String>,
+    now_secs: u64,
+) -> ffi::MutationResult {
+    let refs: Vec<&str> = origins.iter().map(String::as_str).collect();
+    match store.0.create_boost(name, &refs, now_secs) {
+        Ok(id) => ffi::MutationResult {
+            ok: true,
+            id,
+            error: String::new(),
+        },
+        Err(error) => ffi::MutationResult {
+            ok: false,
+            id: 0,
+            error: error.to_string(),
+        },
+    }
+}
+
+pub fn boosts_rename(
+    store: &mut BoostStore,
+    id: u64,
+    name: &str,
+    now_secs: u64,
+) -> ffi::MutationResult {
+    boost_bool_mutation(store.0.rename_boost(id, name, now_secs))
+}
+
+pub fn boosts_set_enabled(
+    store: &mut BoostStore,
+    id: u64,
+    enabled: bool,
+    now_secs: u64,
+) -> ffi::MutationResult {
+    boost_bool_mutation(store.0.set_enabled(id, enabled, now_secs))
+}
+
+pub fn boosts_set_scope(
+    store: &mut BoostStore,
+    id: u64,
+    origins: Vec<String>,
+    include_subdomains: bool,
+    apply_to_subframes: bool,
+    now_secs: u64,
+) -> ffi::MutationResult {
+    let refs: Vec<&str> = origins.iter().map(String::as_str).collect();
+    boost_bool_mutation(store.0.set_scope(
+        id,
+        &refs,
+        include_subdomains,
+        apply_to_subframes,
+        now_secs,
+    ))
+}
+
+pub fn boosts_set_appearance(
+    store: &mut BoostStore,
+    id: u64,
+    appearance: ffi::BoostAppearanceRecord,
+    now_secs: u64,
+) -> ffi::MutationResult {
+    boost_bool_mutation(
+        store
+            .0
+            .set_appearance(id, boost_appearance_from_ffi(appearance), now_secs),
+    )
+}
+
+pub fn boosts_add_hidden_selector(
+    store: &mut BoostStore,
+    id: u64,
+    selector: &str,
+    now_secs: u64,
+) -> ffi::MutationResult {
+    boost_bool_mutation(store.0.add_hidden_selector(id, selector, now_secs))
+}
+
+pub fn boosts_remove_hidden_selector(
+    store: &mut BoostStore,
+    id: u64,
+    selector: &str,
+    now_secs: u64,
+) -> ffi::MutationResult {
+    boost_bool_mutation(store.0.remove_hidden_selector(id, selector, now_secs))
+}
+
+pub fn boosts_clear_hidden_selectors(
+    store: &mut BoostStore,
+    id: u64,
+    now_secs: u64,
+) -> ffi::MutationResult {
+    boost_bool_mutation(store.0.clear_hidden_selectors(id, now_secs))
+}
+
+pub fn boosts_set_custom_css(
+    store: &mut BoostStore,
+    id: u64,
+    custom_css: &str,
+    now_secs: u64,
+) -> ffi::MutationResult {
+    boost_bool_mutation(store.0.set_custom_css(id, custom_css, now_secs))
+}
+
+pub fn boosts_reset(store: &mut BoostStore, id: u64, now_secs: u64) -> ffi::MutationResult {
+    boost_bool_mutation(store.0.reset_boost(id, now_secs))
+}
+
+pub fn boosts_undo(store: &mut BoostStore, id: u64, now_secs: u64) -> ffi::MutationResult {
+    boost_bool_mutation(store.0.undo(id, now_secs))
+}
+
+pub fn boosts_delete(store: &mut BoostStore, id: u64) -> ffi::MutationResult {
+    match store.0.delete_boost(id) {
+        Ok(()) => ffi::MutationResult {
+            ok: true,
+            id: 1,
+            error: String::new(),
+        },
+        Err(error) => ffi::MutationResult {
+            ok: false,
+            id: 0,
+            error: error.to_string(),
+        },
+    }
+}
+
+pub fn boosts_compile_for_origin(
+    store: &BoostStore,
+    page_origin: &str,
+    is_subframe: bool,
+) -> String {
+    store.0.compile_for_origin(page_origin, is_subframe)
+}
+
+pub fn boosts_compile_preview(
+    appearance: ffi::BoostAppearanceRecord,
+    hidden_selectors: Vec<String>,
+    custom_css: &str,
+) -> String {
+    let preview = boosts::Boost {
+        id: 0,
+        name: String::new(),
+        origins: Vec::new(),
+        include_subdomains: false,
+        apply_to_subframes: false,
+        enabled: true,
+        version: 1,
+        updated_secs: 0,
+        appearance: boost_appearance_from_ffi(appearance),
+        hidden_selectors,
+        custom_css: custom_css.to_owned(),
+        script_payload: None,
+        revisions: Vec::new(),
+    };
+    boosts::compile_boost_css(&preview)
+}
+
+pub fn boosts_inspect_css(css: &str) -> Vec<ffi::BoostCssFinding> {
+    boosts::inspect_css(css)
+        .into_iter()
+        .map(|f| ffi::BoostCssFinding {
+            line: f.line,
+            reason: f.reason.to_string(),
+        })
+        .collect()
+}
+
+pub fn boosts_normalize_origin(raw: &str) -> String {
+    boosts::normalize_origin(raw).unwrap_or_default()
 }

@@ -1,5 +1,5 @@
 diff --git a/chrome/browser/ui/browser_command_controller.cc b/chrome/browser/ui/browser_command_controller.cc
-index afc3f64a97c6a8676a656fca1a3ede18eb23b1fb..a18cd6675460b13e2448eaeb9fbef912cfe4c4ae 100644
+index afc3f64a97c6a8676a656fca1a3ede18eb23b1fb..b84d55d4363aeb723637431cb86a5a6b388b8d49 100644
 --- a/chrome/browser/ui/browser_command_controller.cc
 +++ b/chrome/browser/ui/browser_command_controller.cc
 @@ -60,6 +60,7 @@
@@ -10,11 +10,12 @@ index afc3f64a97c6a8676a656fca1a3ede18eb23b1fb..a18cd6675460b13e2448eaeb9fbef912
  #include "chrome/browser/ui/browser_actions.h"
  #include "chrome/browser/ui/browser_commands.h"
  #include "chrome/browser/ui/browser_element_identifiers.h"
-@@ -147,6 +148,11 @@
+@@ -147,6 +148,12 @@
  #include "extensions/browser/extension_registry.h"
  #include "extensions/buildflags/buildflags.h"
  #include "extensions/common/extension_urls.h"
 +#include "myarc/blocker_popup.h"
++#include "myarc/boosts_service.h"
 +#include "myarc/browser_workspace_adapter.h"
 +#include "myarc/command_ids.h"
 +#include "myarc/little_arc.h"
@@ -22,7 +23,7 @@ index afc3f64a97c6a8676a656fca1a3ede18eb23b1fb..a18cd6675460b13e2448eaeb9fbef912
  #include "printing/buildflags/buildflags.h"
  #include "third_party/omnibox_proto/chrome_aim_entry_point.pb.h"
  #include "ui/accessibility/accessibility_features.h"
-@@ -284,6 +290,157 @@ actions::ActionItem* FindAction(actions::ActionId action_id,
+@@ -284,6 +291,163 @@ actions::ActionItem* FindAction(actions::ActionId action_id,
    return actions::ActionManager::Get().FindAction(action_id, root_action_item);
  }
  
@@ -93,6 +94,12 @@ index afc3f64a97c6a8676a656fca1a3ede18eb23b1fb..a18cd6675460b13e2448eaeb9fbef912
 +  // Option-Cmd-O picks the Space first.
 +  if (id == IDC_MYARC_LITTLE_ARC_PICK_SPACE) {
 +    myarc::ShowLittleArcSpacePicker(*browser);
++    return true;
++  }
++  // Profile-wide Boosts kill switch.
++  if (id == IDC_MYARC_TOGGLE_BOOSTS) {
++    myarc::BoostsService::ForProfile(*browser->GetProfile())
++        .ToggleGlobalEnabled();
 +    return true;
 +  }
 +  auto* adapter = myarc::BrowserWorkspaceAdapter::ForBrowser(*browser);
@@ -180,7 +187,7 @@ index afc3f64a97c6a8676a656fca1a3ede18eb23b1fb..a18cd6675460b13e2448eaeb9fbef912
  #if BUILDFLAG(IS_CHROMEOS)
  bool IsLockedForOnTask(BrowserWindowInterface* browser) {
    if (features::IsUseUnifiedLockedStateControllerEnabled()) {
-@@ -651,7 +808,15 @@ bool BrowserCommandController::SupportsCommand(int id) const {
+@@ -651,7 +815,15 @@ bool BrowserCommandController::SupportsCommand(int id) const {
  }
  
  bool BrowserCommandController::IsCommandEnabled(int id) const {
@@ -197,7 +204,7 @@ index afc3f64a97c6a8676a656fca1a3ede18eb23b1fb..a18cd6675460b13e2448eaeb9fbef912
  }
  
  bool BrowserCommandController::ExecuteCommandWithDispositionAndContext(
-@@ -659,6 +824,12 @@ bool BrowserCommandController::ExecuteCommandWithDispositionAndContext(
+@@ -659,6 +831,12 @@ bool BrowserCommandController::ExecuteCommandWithDispositionAndContext(
      WindowOpenDisposition disposition,
      std::optional<actions::ActionInvocationContext> context,
      base::TimeTicks time_stamp) {
@@ -210,7 +217,7 @@ index afc3f64a97c6a8676a656fca1a3ede18eb23b1fb..a18cd6675460b13e2448eaeb9fbef912
    if (!SupportsCommand(id) || !IsCommandEnabled(id)) {
      return false;
    }
-@@ -684,6 +855,9 @@ void BrowserCommandController::HandleCommandWithDisposition(
+@@ -684,6 +862,9 @@ void BrowserCommandController::HandleCommandWithDisposition(
      int id,
      WindowOpenDisposition disposition,
      base::TimeTicks time_stamp) {
@@ -220,7 +227,7 @@ index afc3f64a97c6a8676a656fca1a3ede18eb23b1fb..a18cd6675460b13e2448eaeb9fbef912
    DCHECK(IsCommandEnabled(id)) << "Invalid/disabled command " << id;
  
    // LINT.IfChange
-@@ -783,7 +957,7 @@ void BrowserCommandController::HandleCommandWithDisposition(
+@@ -783,7 +964,7 @@ void BrowserCommandController::HandleCommandWithDisposition(
        CloseWindow(browser_);
        break;
      case IDC_NEW_TAB: {
@@ -229,7 +236,7 @@ index afc3f64a97c6a8676a656fca1a3ede18eb23b1fb..a18cd6675460b13e2448eaeb9fbef912
        break;
      }
      case IDC_NEW_TAB_TO_RIGHT: {
-@@ -1335,6 +1509,9 @@ void BrowserCommandController::HandleCommandWithDisposition(
+@@ -1335,6 +1516,9 @@ void BrowserCommandController::HandleCommandWithDisposition(
      case IDC_SAFETY_HUB_MANAGE_EXTENSIONS:
        ShowExtensions(webui::GetBrowserForOpeningWebUi(browser_));
        break;
@@ -239,7 +246,7 @@ index afc3f64a97c6a8676a656fca1a3ede18eb23b1fb..a18cd6675460b13e2448eaeb9fbef912
      case IDC_EXTENSIONS_SUBMENU_MANAGE_EXTENSIONS:
        ShowExtensions(webui::GetBrowserForOpeningWebUi(browser_));
        break;
-@@ -1347,6 +1524,10 @@ void BrowserCommandController::HandleCommandWithDisposition(
+@@ -1347,6 +1531,10 @@ void BrowserCommandController::HandleCommandWithDisposition(
                            chrome::kPerformanceSubPage);
        break;
      case IDC_OPTIONS:
@@ -250,7 +257,7 @@ index afc3f64a97c6a8676a656fca1a3ede18eb23b1fb..a18cd6675460b13e2448eaeb9fbef912
        ShowSettings(webui::GetBrowserForOpeningWebUi(browser_));
        break;
      case IDC_EDIT_SEARCH_ENGINES:
-@@ -2195,6 +2376,32 @@ void BrowserCommandController::UpdateCommandsForIncognitoAvailability() {
+@@ -2195,6 +2383,34 @@ void BrowserCommandController::UpdateCommandsForIncognitoAvailability() {
  
    UpdateSharedCommandsForIncognitoAvailability(command_updater_.get(),
                                                 profile());
@@ -280,10 +287,12 @@ index afc3f64a97c6a8676a656fca1a3ede18eb23b1fb..a18cd6675460b13e2448eaeb9fbef912
 +          "myarc-visual-parity") &&
 +          base::CommandLine::ForCurrentProcess()->HasSwitch(
 +              "myarc-workspace-sidebar"));
++  // myArc: Profile-wide Boosts kill switch.
++  command_updater_->UpdateCommandEnabled(IDC_MYARC_TOGGLE_BOOSTS, true);
    // Update the new incognito window ActionItem enabled state. Note, this cannot
    // be done in UpdateSharedCommandsForIncognitoAvailability as the method is
    // static to also handle states for NSApplication where no browser window are
-@@ -2234,6 +2441,51 @@ void BrowserCommandController::UpdateCommandsForExtensionsMenu() {
+@@ -2234,6 +2450,51 @@ void BrowserCommandController::UpdateCommandsForExtensionsMenu() {
                                           /*state=*/true);
  }
  
@@ -335,7 +344,7 @@ index afc3f64a97c6a8676a656fca1a3ede18eb23b1fb..a18cd6675460b13e2448eaeb9fbef912
  void BrowserCommandController::UpdateCommandsForTabState() {
    // Keep commands disabled when in locked fullscreen so users cannot exit this
    // mode. Only update navigation ones when the webapp is locked for OnTask
-@@ -2260,6 +2512,22 @@ void BrowserCommandController::UpdateCommandsForTabState() {
+@@ -2260,6 +2521,22 @@ void BrowserCommandController::UpdateCommandsForTabState() {
    command_updater_->UpdateCommandEnabled(IDC_RELOAD_BYPASSING_CACHE,
                                           can_reload);
    command_updater_->UpdateCommandEnabled(IDC_RELOAD_CLEARING_CACHE, can_reload);
@@ -358,7 +367,7 @@ index afc3f64a97c6a8676a656fca1a3ede18eb23b1fb..a18cd6675460b13e2448eaeb9fbef912
    if (IsInLockedFullscreenMode(/*allow_ontask=*/false)) {
      // Skip other command updates.
      // NOTE: If new commands are being added, please add them after this
-@@ -2974,8 +3242,10 @@ void BrowserCommandController::UpdateActionsForSharingHubPolicy() {
+@@ -2974,8 +3251,10 @@ void BrowserCommandController::UpdateActionsForSharingHubPolicy() {
  }
  
  void BrowserCommandController::UpdateQRCodeGeneratorActionEnabledState() {
@@ -371,7 +380,7 @@ index afc3f64a97c6a8676a656fca1a3ede18eb23b1fb..a18cd6675460b13e2448eaeb9fbef912
    if (auto* qr_code_action_item =
            FindAction(kActionQrCodeGenerator, browser_)) {
      qr_code_action_item->SetEnabled(qr_code_generator_enabled);
-@@ -2989,7 +3259,8 @@ void BrowserCommandController::UpdateCommandAndActionEnabled(
+@@ -2989,7 +3268,8 @@ void BrowserCommandController::UpdateCommandAndActionEnabled(
    command_updater_->UpdateCommandEnabled(command_id, enabled);
    if (!features::ShouldUseActionsForBrowserCommands()) {
      if (auto* const action = FindAction(action_id, browser_)) {
@@ -381,7 +390,7 @@ index afc3f64a97c6a8676a656fca1a3ede18eb23b1fb..a18cd6675460b13e2448eaeb9fbef912
      }
    }
  }
-@@ -3010,10 +3281,12 @@ bool BrowserCommandController::IsInLockedFullscreenMode(
+@@ -3010,10 +3290,12 @@ bool BrowserCommandController::IsInLockedFullscreenMode(
  std::unique_ptr<CommandUpdater>
  BrowserCommandController::CreateCommandUpdater() {
    if (features::ShouldUseActionsForBrowserCommands()) {

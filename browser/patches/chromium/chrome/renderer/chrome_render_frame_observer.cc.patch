@@ -1,0 +1,44 @@
+diff --git a/chrome/renderer/chrome_render_frame_observer.cc b/chrome/renderer/chrome_render_frame_observer.cc
+index 0cd3d2a1fba35de50087e570209f74c04d33e0cc..2ef574f435371f292c1e2b04767b5eec923ef918 100644
+--- a/chrome/renderer/chrome_render_frame_observer.cc
++++ b/chrome/renderer/chrome_render_frame_observer.cc
+@@ -337,6 +337,7 @@ void ChromeRenderFrameObserver::DidFinishLoad() {
+ }
+ 
+ void ChromeRenderFrameObserver::DidCreateNewDocument() {
++  active_boost_keys_.clear();
+ #if BUILDFLAG(ENABLE_OFFLINE_PAGES)
+   DCHECK(render_frame());
+   if (!render_frame()->IsMainFrame())
+@@ -783,6 +784,31 @@ void ChromeRenderFrameObserver::PdfPageCaptured(const std::u16string& contents,
+ }
+ #endif
+ 
++void ChromeRenderFrameObserver::SetBoostStyleSheet(const std::string& key,
++                                                   const std::string& css) {
++  if (key.empty() || !render_frame()) {
++    return;
++  }
++  blink::WebLocalFrame* frame = render_frame()->GetWebFrame();
++  if (!frame) {
++    return;
++  }
++  blink::WebDocument doc = frame->GetDocument();
++  if (doc.IsNull()) {
++    return;
++  }
++  const blink::WebStyleSheetKey web_key = blink::WebString::FromUtf8(key);
++  if (active_boost_keys_.erase(key) > 0) {
++    doc.RemoveInsertedStyleSheet(web_key, blink::WebCssOrigin::kAuthor);
++  }
++  if (!css.empty()) {
++    doc.InsertStyleSheet(blink::WebString::FromUtf8(css), &web_key,
++                         blink::WebCssOrigin::kAuthor,
++                         blink::BackForwardCacheAware::kAllow);
++    active_boost_keys_.insert(key);
++  }
++}
++
+ void ChromeRenderFrameObserver::OnRenderFrameObserverRequest(
+     mojo::PendingAssociatedReceiver<chrome::mojom::ChromeRenderFrame>
+         receiver) {
