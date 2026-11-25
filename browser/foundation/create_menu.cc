@@ -60,9 +60,9 @@ constexpr float kPanelRadius = 11;
 constexpr int kPad = 7;
 constexpr int kRowHeight = 40;
 constexpr int kSeparatorBand = 17;
-// Rows above the separator: New Space and New Folder.
-constexpr int kRowsAboveSeparator = 2;
-constexpr int kPanelHeight = 2 * kPad + 4 * kRowHeight + kSeparatorBand;
+// Rows above the separator: New Space, New Folder, and New Boost.
+constexpr int kRowsAboveSeparator = 3;
+constexpr int kPanelHeight = 2 * kPad + 5 * kRowHeight + kSeparatorBand;
 constexpr int kSeparatorInset = 17;
 constexpr int kPillInset = 7;
 constexpr float kPillRadius = 7.5f;
@@ -142,6 +142,8 @@ constexpr auto kRows = std::to_array<RowSpec>({
     // starts the same create and rename.
     {CreateMenu::Item::kNewFolder, u"New Folder", &kFolderClosedIcon, 18, {},
      nullptr, true, nullptr, kPad + kRowHeight},
+    {CreateMenu::Item::kNewBoost, u"New Boost", &kBoostsIcon, 18, {}, nullptr,
+     true, nullptr, kPad + 2 * kRowHeight},
     {CreateMenu::Item::kNewSplit,
      u"New Split",
      &kNewSplitIcon,

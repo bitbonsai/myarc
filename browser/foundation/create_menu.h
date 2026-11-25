@@ -44,7 +44,7 @@ class CreateMenu : public views::View,
   METADATA_HEADER(CreateMenu, views::View)
 
  public:
-  enum class Item { kNewSpace, kNewFolder, kNewSplit, kNewTab };
+  enum class Item { kNewSpace, kNewFolder, kNewBoost, kNewSplit, kNewTab };
 
   // `select` runs for the chosen row once closing has started. `open_changed`
   // runs with true on opening and with false as soon as closing starts.

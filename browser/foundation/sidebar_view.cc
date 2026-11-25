@@ -503,6 +503,7 @@ enum ItemCommand {
   kMoveTo,
   kRenameItem,
   kToggleMute,
+  kBoostItem,
   kDuplicate,
   kArchiveBelow,
   kOpenInSplitView,
@@ -1249,6 +1250,8 @@ void SidebarView::ShowContextMenuForViewImpl(
         menu_state_.is_live && (menu_state_.audible || menu_state_.muted));
     added_page_group = true;
   }
+  menu_model_->AddItem(kBoostItem, u"Boost (Customize)");
+  added_page_group = true;
   if (added_page_group) {
     menu_model_->AddSeparator(ui::NORMAL_SEPARATOR);
   }
@@ -1685,6 +1688,9 @@ void SidebarView::ChooseCreateItem(int item) {
                          case CreateMenu::Item::kNewFolder:
                            sidebar->delegate_->CreateFolder();
                            return;
+                         case CreateMenu::Item::kNewBoost:
+                           sidebar->delegate_->NewBoost();
+                           return;
                          case CreateMenu::Item::kNewTab:
                            sidebar->delegate_->NewTab();
                            return;
@@ -1856,6 +1862,9 @@ void SidebarView::ExecuteCommand(int command_id, int event_flags) {
       return;
     case kToggleMute:
       delegate_->ToggleMuteItem(id);
+      return;
+    case kBoostItem:
+      delegate_->BoostItem(id);
       return;
     case kDuplicate:
       delegate_->DuplicateItem(id);

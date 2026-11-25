@@ -30,6 +30,7 @@ inline constexpr int kCreateTrailing = 38;
 inline constexpr uint64_t kPinKey = uint64_t{1} << 63;
 inline constexpr uint64_t kSpaceEditKey = uint64_t{1} << 62;
 inline constexpr uint64_t kSpaceMoreKey = uint64_t{1} << 61;
+inline constexpr uint64_t kNewBoostKey = uint64_t{1} << 60;
 
 // Width of the Spaces section, rail included, for `spaces` columns. The
 // browser layout still caps it to the window.

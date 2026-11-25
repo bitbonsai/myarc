@@ -1242,7 +1242,9 @@ void LibraryView::BuildList() {
       ui::ImageModel::FromVectorIcon(kSearchIcon, colors.muted, 16)));
   auto search = std::make_unique<views::Textfield>();
   search->SetBackgroundEnabled(false);
+  search->SetBackground(nullptr);
   search->SetBorder(views::CreateEmptyBorder(gfx::Insets()));
+  search->RemoveHoverEffect();
   search->SetFontList(
       gfx::FontList().Derive(1, gfx::Font::NORMAL, gfx::Font::Weight::NORMAL));
   search->SetPlaceholderText(info.search);
@@ -1444,6 +1446,35 @@ void LibraryView::UpdateList(bool keep_scroll) {
     body_label->SetHorizontalAlignment(gfx::ALIGN_CENTER);
     // Arc wraps its empty-state text at about 248 DIP.
     body_label->SizeToFit(248);
+    if (section_ == Section::kBoosts && query_.empty()) {
+      auto create_boost = std::make_unique<views::MdTextButton>(
+          base::BindRepeating(
+              [](LibraryView* view) {
+                view->PostAction(base::BindOnce(
+                    [](SidebarView::Delegate* delegate,
+                       const base::RepeatingClosure& close) {
+                      close.Run();
+                      delegate->NewBoost();
+                    },
+                    base::Unretained(&view->delegate_.get()), view->close_));
+              },
+              base::Unretained(this)),
+          u"New Boost");
+      create_boost->SetStyle(ui::ButtonStyle::kProminent);
+      create_boost->SetBgColorOverrideDeprecated(kAccent);
+      create_boost->SetEnabledTextColors(SK_ColorWHITE);
+      create_boost->SetImageModel(
+          views::Button::STATE_NORMAL,
+          ui::ImageModel::FromVectorIcon(kPlusIcon, SK_ColorWHITE, 14));
+      create_boost->SetImageLabelSpacing(6);
+      create_boost->SetCornerRadius(8);
+      create_boost->SetCustomPadding(gfx::Insets::VH(8, 16));
+      create_boost->SetProperty(views::kMarginsKey,
+                                gfx::Insets::TLBR(14, 0, 0, 0));
+      create_boost->GetViewAccessibility().SetName(u"New Boost");
+      keyed_views_.emplace_back(library::kNewBoostKey, create_boost.get());
+      empty->AddChildView(std::move(create_boost));
+    }
   } else {
     auto* scroll = list_->AddChildView(std::make_unique<views::ScrollView>());
     scroll->ClipHeightTo(0, std::numeric_limits<int>::max());
@@ -1508,6 +1539,39 @@ void LibraryView::UpdateList(bool keep_scroll) {
     keyed_views_.emplace_back(0, all.get());
     list_->AddChildView(std::move(all));
   } else if (section_ == Section::kBoosts) {
+    auto* footer =
+        list_->AddChildView(Box(Orientation::kHorizontal, gfx::Insets(), 4));
+    auto* footer_layout =
+        static_cast<views::BoxLayout*>(footer->GetLayoutManager());
+    footer_layout->set_cross_axis_alignment(CrossAxis::kCenter);
+
+    // Quick-create Boost button, always reachable in the Boosts panel.
+    auto new_boost = TextButton(
+        base::BindRepeating(
+            [](LibraryView* view) {
+              view->PostAction(base::BindOnce(
+                  [](SidebarView::Delegate* delegate,
+                     const base::RepeatingClosure& close) {
+                    close.Run();
+                    delegate->NewBoost();
+                  },
+                  base::Unretained(&view->delegate_.get()), view->close_));
+            },
+            base::Unretained(this)),
+        u"New Boost");
+    new_boost->SetImageModel(
+        views::Button::STATE_NORMAL,
+        ui::ImageModel::FromVectorIcon(kPlusIcon, kAccent, 14));
+    new_boost->SetEnabledTextColors(kAccent);
+    new_boost->SetImageLabelSpacing(6);
+    new_boost->GetViewAccessibility().SetName(u"New Boost");
+    if (query_.empty() && boosts_.empty()) {
+      // Empty state already registers kNewBoostKey on its prominent CTA.
+    } else {
+      keyed_views_.emplace_back(library::kNewBoostKey, new_boost.get());
+    }
+    footer->AddChildView(std::move(new_boost));
+
     // Profile-wide Boosts kill switch.
     const std::u16string label = boosts_global_enabled_
                                      ? u"Disable All Boosts"
@@ -1531,9 +1595,11 @@ void LibraryView::UpdateList(bool keep_scroll) {
             boosts_global_enabled_ ? colors.muted : kAccent, 16));
     kill_switch->SetEnabledTextColors(
         boosts_global_enabled_ ? colors.muted : kAccent);
+    kill_switch->SetHorizontalAlignment(gfx::ALIGN_RIGHT);
     kill_switch->GetViewAccessibility().SetName(label);
     keyed_views_.emplace_back(0, kill_switch.get());
-    list_->AddChildView(std::move(kill_switch));
+    footer_layout->SetFlexForView(footer->AddChildView(std::move(kill_switch)),
+                                  1);
   }
   // A refresh keeps focus on the same row, else on the search field.
   if (had_focus && !RestoreFocus(key)) {

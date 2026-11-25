@@ -280,6 +280,12 @@ class SidebarView final : public views::View,
     virtual void SetAllBoostsEnabled(bool enabled) = 0;
     // Opens/navigates to the Boost's origin and opens the floating Boost editor.
     virtual void OpenBoost(uint64_t boost_id) = 0;
+    // Opens the floating Boost editor for the active HTTP(S) tab, or opens the
+    // command bar with a hint when no HTTP(S) tab is active.
+    virtual void NewBoost() = 0;
+    // Activates `item_id` if needed and opens the Boost editor for it (or the
+    // empty-tab fallback if it is not an HTTP(S) page).
+    virtual void BoostItem(uint64_t item_id) = 0;
     virtual void SetBoostEnabled(uint64_t boost_id, bool enabled) = 0;
     virtual void DeleteBoost(uint64_t boost_id) = 0;
     // The parent resizes the sidebar region for the Library, and calls

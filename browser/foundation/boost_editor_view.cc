@@ -277,20 +277,22 @@ class PillButton final : public views::Button {
   PillButton(PressedCallback callback,
              const std::u16string& text,
              const std::u16string& trailing_glyph = {},
-             bool centered = true)
+             bool centered = true,
+             int font_size_delta = 0)
       : views::Button(std::move(callback)) {
     SetFocusBehavior(FocusBehavior::ALWAYS);
     views::InkDrop::Get(this)->SetMode(views::InkDropHost::InkDropMode::OFF);
     views::InstallRoundRectHighlightPathGenerator(this, gfx::Insets(), 10);
     auto* layout = SetLayoutManager(std::make_unique<views::BoxLayout>(
-        Orientation::kHorizontal, gfx::Insets::VH(0, 12), 6));
+        Orientation::kHorizontal, gfx::Insets::VH(0, 14), 6));
     layout->set_cross_axis_alignment(CrossAxis::kCenter);
     layout->set_main_axis_alignment(centered ? MainAxis::kCenter
                                              : MainAxis::kStart);
 
     label_ = AddChildView(MakeLabel(
         text,
-        gfx::FontList().Derive(0, gfx::Font::NORMAL, gfx::Font::Weight::MEDIUM),
+        gfx::FontList().Derive(font_size_delta, gfx::Font::NORMAL,
+                               gfx::Font::Weight::SEMIBOLD),
         kInkPrimary));
     if (!centered) {
       layout->SetFlexForView(label_, 1);
@@ -299,11 +301,11 @@ class PillButton final : public views::Button {
     if (!trailing_glyph.empty()) {
       trailing_ = AddChildView(MakeLabel(
           trailing_glyph,
-          gfx::FontList().Derive(0, gfx::Font::NORMAL,
+          gfx::FontList().Derive(1, gfx::Font::NORMAL,
                                  gfx::Font::Weight::SEMIBOLD),
-          kInkSecondary));
+          kInkPrimary));
     }
-    SetPreferredSize(gfx::Size(0, 36));
+    SetPreferredSize(gfx::Size(0, 38));
     GetViewAccessibility().SetName(text);
     UpdateVisuals();
   }
@@ -337,8 +339,7 @@ class PillButton final : public views::Button {
     SetBackground(views::CreateRoundedRectBackground(bg, 10));
     label_->SetEnabledColor(active_ ? SK_ColorWHITE : kInkPrimary);
     if (trailing_) {
-      trailing_->SetEnabledColor(active_ ? SkColorSetA(SK_ColorWHITE, 0xCC)
-                                         : kInkSecondary);
+      trailing_->SetEnabledColor(active_ ? SK_ColorWHITE : kInkPrimary);
     }
   }
 
@@ -474,7 +475,7 @@ class ColorPadView final : public views::View {
 
     // 2. Inner white surface inset by border thickness.
     const float inset =
-        mode_ == foundation::BoostColorMode::None ? 2.f : 4.f;
+        mode_ == foundation::BoostColorMode::None ? 2.f : 5.f;
     gfx::RectF inner = bounds;
     inner.Inset(inset);
     cc::PaintFlags fill;
@@ -515,7 +516,7 @@ class ColorPadView final : public views::View {
     }
 
     // 5. Draggable circular handle.
-    const float handle_r = 12.f;
+    const float handle_r = 14.f;
     const float hx =
         inner.x() + handle_r + pos_.x() * (inner.width() - handle_r * 2.f);
     const float hy =
@@ -524,15 +525,15 @@ class ColorPadView final : public views::View {
 
     cc::PaintFlags shadow;
     shadow.setAntiAlias(true);
-    shadow.setColor(SkColorSetA(SK_ColorBLACK, 0x22));
-    canvas->DrawCircle(gfx::PointF(hx, hy + 1.5f), handle_r + 1.f, shadow);
+    shadow.setColor(SkColorSetA(SK_ColorBLACK, 0x26));
+    canvas->DrawCircle(gfx::PointF(hx, hy + 1.5f), handle_r + 1.5f, shadow);
 
     cc::PaintFlags knob;
     knob.setAntiAlias(true);
     if (mode_ == foundation::BoostColorMode::Palette && palette_.set) {
       knob.setColor(Rgb24ToSkColor(palette_.background));
     } else if (mode_ == foundation::BoostColorMode::Invert) {
-      knob.setColor(SkColorSetRGB(0x4A, 0x4A, 0x52));
+      knob.setColor(SkColorSetRGB(0x2B, 0x2B, 0x30));
     } else {
       knob.setColor(SK_ColorWHITE);
     }
@@ -541,9 +542,16 @@ class ColorPadView final : public views::View {
     cc::PaintFlags ring;
     ring.setAntiAlias(true);
     ring.setStyle(cc::PaintFlags::kStroke_Style);
-    ring.setStrokeWidth(2.f);
+    ring.setStrokeWidth(2.5f);
     ring.setColor(SK_ColorWHITE);
     canvas->DrawCircle(center, handle_r, ring);
+
+    cc::PaintFlags outline;
+    outline.setAntiAlias(true);
+    outline.setStyle(cc::PaintFlags::kStroke_Style);
+    outline.setStrokeWidth(1.f);
+    outline.setColor(SkColorSetA(SK_ColorBLACK, 0x1A));
+    canvas->DrawCircle(center, handle_r + 1.25f, outline);
   }
 
  private:
@@ -700,7 +708,7 @@ class BoostEditorView final : public views::View,
         boost_id_(boost_id),
         origin_(std::move(origin)) {
     SetLayoutManager(std::make_unique<views::BoxLayout>(
-        Orientation::kVertical, gfx::Insets(), 8));
+        Orientation::kVertical, gfx::Insets(), 10));
     SetPreferredSize(gfx::Size(kCardWidth, 0));
 
     service_observation_.Observe(service_.get());
@@ -906,7 +914,10 @@ class BoostEditorView final : public views::View,
   void BuildUi() {
     // 1. Header row: Close (x), Title dropdown / rename, Reset (↺).
     auto* header =
-        AddChildView(MakeBox(Orientation::kHorizontal, gfx::Insets(), 4));
+        AddChildView(MakeBox(Orientation::kHorizontal,
+                             gfx::Insets::TLBR(0, 0, 8, 0), 4));
+    header->SetBorder(
+        views::CreateSolidSidedBorder(gfx::Insets::TLBR(0, 0, 1, 0), kBorderSubtle));
     auto* header_layout =
         static_cast<views::BoxLayout*>(header->GetLayoutManager());
     header_layout->set_cross_axis_alignment(CrossAxis::kCenter);
@@ -915,10 +926,12 @@ class BoostEditorView final : public views::View,
         &BoostEditorView::CloseEditor, base::Unretained(this)));
     close->SetImageModel(
         views::Button::STATE_NORMAL,
-        ui::ImageModel::FromVectorIcon(kPeekCloseIcon, kInkSecondary, 14));
+        ui::ImageModel::FromVectorIcon(kPeekCloseIcon, SK_ColorWHITE, 11));
     close->SetImageHorizontalAlignment(views::ImageButton::ALIGN_CENTER);
     close->SetImageVerticalAlignment(views::ImageButton::ALIGN_MIDDLE);
-    close->SetPreferredSize(gfx::Size(26, 26));
+    close->SetPreferredSize(gfx::Size(22, 22));
+    close->SetBackground(
+        views::CreateRoundedRectBackground(SkColorSetRGB(0xAE, 0xAE, 0xB2), 11));
     close->SetTooltipText(u"Close Boost Editor");
     close->GetViewAccessibility().SetName(u"Close Boost Editor");
     views::InstallCircleHighlightPathGenerator(close.get());
@@ -970,7 +983,7 @@ class BoostEditorView final : public views::View,
         base::BindRepeating(&BoostEditorView::SetColorMode,
                             base::Unretained(this),
                             foundation::BoostColorMode::Invert),
-        u"\u25D0"));
+        u"\u25D0", std::u16string(), /*centered=*/true, /*font_size_delta=*/3));
     mode_invert_->SetTooltipText(u"Invert colors");
     mode_invert_->GetViewAccessibility().SetName(u"Invert colors");
     modes_layout->SetFlexForView(mode_invert_, 1);
@@ -979,7 +992,7 @@ class BoostEditorView final : public views::View,
         base::BindRepeating(&BoostEditorView::SetColorMode,
                             base::Unretained(this),
                             foundation::BoostColorMode::Palette),
-        u"\u2261"));
+        u"\u2261", std::u16string(), /*centered=*/true, /*font_size_delta=*/3));
     mode_palette_->SetTooltipText(u"Color palette");
     mode_palette_->GetViewAccessibility().SetName(u"Color palette");
     modes_layout->SetFlexForView(mode_palette_, 1);
@@ -988,14 +1001,14 @@ class BoostEditorView final : public views::View,
         base::BindRepeating(&BoostEditorView::SetColorMode,
                             base::Unretained(this),
                             foundation::BoostColorMode::None),
-        u"\u2298"));
+        u"\u2298", std::u16string(), /*centered=*/true, /*font_size_delta=*/3));
     mode_none_->SetTooltipText(u"No color override");
     mode_none_->GetViewAccessibility().SetName(u"No color override");
     modes_layout->SetFlexForView(mode_none_, 1);
 
     // 4. 4x4 "Aa" typography preset grid.
     auto* grid_card = AddChildView(
-        MakeBox(Orientation::kVertical, gfx::Insets(6), 2));
+        MakeBox(Orientation::kVertical, gfx::Insets(8), 2));
     grid_card->SetBackground(
         views::CreateRoundedRectBackground(kCardBg, 12));
     grid_card->SetBorder(
@@ -1799,7 +1812,7 @@ bool ShowBoostEditor(BrowserWindowInterface& browser, uint64_t boost_id) {
   slot->delegate->SetShowCloseButton(false);
   slot->delegate->SetShowTitle(false);
   slot->delegate->SetTitle(u"Boost Editor");
-  slot->delegate->set_margins(gfx::Insets(12));
+  slot->delegate->set_margins(gfx::Insets(14));
   slot->delegate->set_corner_radius(kCardCornerRadius);
   slot->delegate->set_close_on_deactivate(false);
   slot->delegate->SetBackgroundColor(kCardBg);
