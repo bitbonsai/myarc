@@ -4,7 +4,7 @@ HTML: https://myarc.dev/docs/known-limitations/
 
 What myArc Alpha can't do yet, and what to do after a crash or when something breaks.
 
-myArc is an alpha. Use it to try the Arc-style sidebar, and keep daily and sensitive browsing in another browser for now.
+myArc is an alpha build on Chromium 158 dev. Expect rough edges, and Chromium security fixes arrive with the next release.
 
 ## Safety and updates
 
