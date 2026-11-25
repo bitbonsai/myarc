@@ -149,7 +149,9 @@ class CreateSpacePanel final : public views::View,
   void UpdateProfilePill();
   // Back from the Profile name field to the Profile row.
   void CloseNewProfile();
-  void SubmitProfile();
+  // Validates the Profile name field and starts creating it. Returns false on
+  // a validation error.
+  bool SubmitProfile();
   void OnProfileDone(const std::u16string& error);
   void ShowProfileError(const std::u16string& error);
 
@@ -160,6 +162,8 @@ class CreateSpacePanel final : public views::View,
   std::vector<ProfileChoice> profiles_;
   size_t selected_profile_ = 0;
   bool profile_pending_ = false;
+  // Create was pressed while a new Profile was being entered or created.
+  bool create_after_profile_ = false;
   raw_ptr<views::ImageView> art_ = nullptr;
   raw_ptr<views::Label> title_ = nullptr;
   raw_ptr<views::Label> subtitle_ = nullptr;

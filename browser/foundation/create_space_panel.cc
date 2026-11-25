@@ -660,7 +660,9 @@ bool CreateSpacePanel::AcceleratorPressed(const ui::Accelerator& accelerator) {
   }
   // Esc leaves the Profile name field before it leaves the panel.
   if (new_profile_row_->GetVisible()) {
+    create_after_profile_ = false;
     CloseNewProfile();
+    UpdateCreateButton();
   } else {
     Cancel();
   }
@@ -695,7 +697,9 @@ bool CreateSpacePanel::HandleKeyEvent(views::Textfield* sender,
       return true;
     case ui::VKEY_ESCAPE:
       if (profile) {
+        create_after_profile_ = false;
         CloseNewProfile();
+        UpdateCreateButton();
       } else {
         Cancel();
       }
@@ -812,27 +816,33 @@ void CreateSpacePanel::CloseNewProfile() {
   }
 }
 
-void CreateSpacePanel::SubmitProfile() {
+bool CreateSpacePanel::SubmitProfile() {
   if (profile_pending_) {
-    return;
+    return true;
+  }
+  if (!create_profile_) {
+    return false;
   }
   std::u16string name;
   base::TrimWhitespace(new_profile_name_->GetText(), base::TRIM_ALL, &name);
   if (name.empty()) {
     ShowProfileError(u"Enter a Profile name.");
-    return;
+    new_profile_name_->RequestFocus();
+    return false;
   }
   // Counted in UTF-16 units, so emoji count double.
   if (name.size() > kMaxProfileName) {
     ShowProfileError(u"Profile names can be up to 64 characters.");
-    return;
+    new_profile_name_->RequestFocus();
+    return false;
   }
   const std::u16string folded = base::i18n::FoldCase(name);
   if (std::ranges::any_of(profiles_, [&folded](const ProfileChoice& profile) {
         return base::i18n::FoldCase(profile.name) == folded;
       })) {
     ShowProfileError(u"Name already in use.");
-    return;
+    new_profile_name_->RequestFocus();
+    return false;
   }
   profile_pending_ = true;
   new_profile_name_->SetReadOnly(true);
@@ -852,15 +862,21 @@ void CreateSpacePanel::SubmitProfile() {
                 name, base::BindOnce(&CreateSpacePanel::OnProfileDone, panel));
           },
           weak_factory_.GetWeakPtr(), std::move(name)));
+  return true;
 }
 
 void CreateSpacePanel::OnProfileDone(const std::u16string& error) {
   profile_pending_ = false;
+  const bool create_after = std::exchange(create_after_profile_, false);
   new_profile_name_->SetReadOnly(false);
   // Brings the caret back.
   new_profile_name_->ClearSelection();
+  UpdateCreateButton();
   if (error.empty()) {
     CloseNewProfile();
+    if (create_after) {
+      RunCreate();
+    }
     return;
   }
   ShowProfileError(error);
@@ -883,7 +899,7 @@ std::u16string CreateSpacePanel::TrimmedName() const {
 }
 
 void CreateSpacePanel::UpdateCreateButton() {
-  const bool enabled = !TrimmedName().empty();
+  const bool enabled = !TrimmedName().empty() && !create_after_profile_;
   create_button_->SetEnabled(enabled);
   create_button_->SetBackground(views::CreateRoundedRectBackground(
       enabled ? kPrimary : SkColorSetA(kPrimary, kPrimaryDisabledAlpha),
@@ -894,7 +910,7 @@ void CreateSpacePanel::UpdateCreateButton() {
 }
 
 void CreateSpacePanel::Create() {
-  if (TrimmedName().empty()) {
+  if (TrimmedName().empty() || create_after_profile_) {
     return;
   }
   base::SequencedTaskRunner::GetCurrentDefault()->PostTask(
@@ -903,6 +919,7 @@ void CreateSpacePanel::Create() {
 }
 
 void CreateSpacePanel::Cancel() {
+  create_after_profile_ = false;
   base::SequencedTaskRunner::GetCurrentDefault()->PostTask(
       FROM_HERE, base::BindOnce(
                      [](base::WeakPtr<CreateSpacePanel> panel) {
@@ -924,6 +941,17 @@ void CreateSpacePanel::CreateForCapture(const std::u16string& name) {
 void CreateSpacePanel::RunCreate() {
   const std::u16string name = TrimmedName();
   if (name.empty()) {
+    return;
+  }
+  // Create the Profile first when the user is still in New Profile…, or wait
+  // for one already in flight, rather than landing the Space in the current
+  // Profile.
+  if (profile_pending_ || new_profile_row_->GetVisible()) {
+    if (!SubmitProfile()) {
+      return;
+    }
+    create_after_profile_ = true;
+    UpdateCreateButton();
     return;
   }
   auto weak = weak_factory_.GetWeakPtr();
