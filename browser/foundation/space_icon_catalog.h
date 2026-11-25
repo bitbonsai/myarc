@@ -17,8 +17,9 @@ struct VectorIcon;
 namespace myarc {
 
 // The Space icon picker's bundled sets: emoji from Unicode with CLDR search
-// keywords, and Lucide icons. A Space may only carry an icon from these, so
-// text the core accepts but the picker never offers draws the default glyph.
+// keywords, and Ionicons filled icons. A Space may only carry an icon from
+// these, so text the core accepts but the picker never offers draws the
+// default glyph.
 
 // The Emoji tab's categories, in Arc's tab order.
 enum class EmojiCategory : uint8_t {
@@ -42,7 +43,7 @@ struct EmojiEntry {
 };
 
 struct NamedSpaceIcon {
-  // Lucide's name, which the Space stores.
+  // Stable icon key stored by a Space.
   const char* name;
   // A constexpr table of static icons.
   RAW_PTR_EXCLUSION const gfx::VectorIcon* icon;

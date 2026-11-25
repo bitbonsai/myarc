@@ -1,17 +1,19 @@
 #!/usr/bin/env python3
 """Generate browser/foundation/space_icon_data.cc for the Space icon picker.
 
-  gen_space_icons.py EMOJI_TEST ANNOTATIONS ANNOTATIONS_DERIVED LUCIDE_DIR
+  gen_space_icons.py EMOJI_TEST ANNOTATIONS ANNOTATIONS_DERIVED IONICONS_DIR
+  gen_space_icons.py --icons-only IONICONS_DIR
 
 EMOJI_TEST is Unicode's emoji-test.txt (15.1). ANNOTATIONS and
 ANNOTATIONS_DERIVED are CLDR's English annotations.json files from
-cldr-json's cldr-annotations-full and cldr-annotations-derived-full. LUCIDE_DIR
-holds lucide-static 1.61.0 icons/*.svg. All are read as data only.
+cldr-json's cldr-annotations-full and cldr-annotations-derived-full.
+IONICONS_DIR holds ionicons 8.1.1 dist/svg/*.svg. All are read as data only.
 
 The emoji list keeps fully-qualified emoji without skin-tone variants, in
 Unicode's order, sorted into Arc's eight picker tabs. Each entry carries its
-CLDR name and keywords for search. Lucide icons become Chromium vector-icon
-paths in absolute commands at their 24-unit canvas and stroke 2.
+CLDR name and keywords for search. Ionicons filled icons become Chromium
+vector-icon paths in absolute commands at their 512-unit canvas with
+FILL_RULE_NONZERO.
 """
 
 import json
@@ -38,19 +40,33 @@ CATEGORIES = {
 SKIN_TONES = set(range(0x1F3FB, 0x1F400))
 MAX_KEYWORDS = 8
 
-# Icons offered on the Icon tab, in grid order. Names are Lucide's and are
-# what a Space stores.
+# Icons offered on the Icon tab, in grid order: (stored Space key, Ionicons SVG).
+# Stored keys stay stable so existing Spaces keep their chosen icon.
 SPACE_ICONS = [
-    'star', 'heart', 'house', 'briefcase', 'book-open', 'graduation-cap',
-    'code', 'terminal', 'music', 'headphones', 'camera', 'film', 'gamepad-2',
-    'palette', 'pen-tool', 'coffee', 'utensils', 'shopping-cart', 'plane',
-    'car', 'globe', 'map-pin', 'rocket', 'lightbulb', 'flame', 'zap', 'leaf',
-    'sun', 'moon', 'cloud', 'umbrella', 'gift', 'trophy', 'dumbbell', 'wallet',
-    'chart-column', 'calendar', 'mail', 'users', 'flask-conical', 'wrench',
-    'shield', 'folder', 'sparkles', 'dog',
+    ('star', 'star'), ('heart', 'heart'), ('house', 'home'),
+    ('briefcase', 'briefcase'), ('book-open', 'book'),
+    ('graduation-cap', 'school'), ('code', 'code-slash'),
+    ('terminal', 'terminal'), ('music', 'musical-notes'),
+    ('headphones', 'headset'), ('camera', 'camera'), ('film', 'film'),
+    ('gamepad-2', 'game-controller'), ('palette', 'color-palette'),
+    ('pen-tool', 'brush'), ('coffee', 'cafe'), ('utensils', 'restaurant'),
+    ('shopping-cart', 'cart'), ('plane', 'airplane'), ('car', 'car'),
+    ('globe', 'globe'), ('map-pin', 'location'), ('rocket', 'rocket'),
+    ('lightbulb', 'bulb'), ('flame', 'flame'), ('zap', 'flash'),
+    ('leaf', 'leaf'), ('sun', 'sunny'), ('moon', 'moon'), ('cloud', 'cloud'),
+    ('umbrella', 'umbrella'), ('gift', 'gift'), ('trophy', 'trophy'),
+    ('dumbbell', 'barbell'), ('wallet', 'wallet'),
+    ('chart-column', 'bar-chart'), ('calendar', 'calendar'), ('mail', 'mail'),
+    ('users', 'people'), ('flask-conical', 'flask'), ('wrench', 'build'),
+    ('shield', 'shield'), ('folder', 'folder'), ('sparkles', 'sparkles'),
+    ('dog', 'paw'),
 ]
-# The Emoji tab's category buttons, in tab order.
-TAB_ICONS = ['smile', 'sun', 'coffee', 'award', 'truck', 'gift', 'heart', 'flag']
+# The Emoji tab's category buttons, in tab order: (key, Ionicons SVG).
+TAB_ICONS = [
+    ('smile', 'happy'), ('sun', 'sunny'), ('coffee', 'cafe'),
+    ('award', 'trophy'), ('truck', 'car'), ('gift', 'gift'),
+    ('heart', 'heart'), ('flag', 'flag'),
+]
 
 
 def c_string(text):
@@ -232,8 +248,10 @@ def convert_svg(path):
     commands = []
     for element in root:
         tag = element.tag.split('}')[-1]
+        if tag == 'title' or element.attrib.get('fill') == 'none':
+            continue
         a = {k: float(v) for k, v in element.attrib.items()
-             if k not in ('d', 'fill', 'points')}
+             if k not in ('d', 'fill', 'fill-rule', 'points', 'class', 'id')}
         if tag == 'path':
             commands += convert_path(element.attrib['d'])
         elif tag == 'circle':
@@ -261,33 +279,53 @@ def identifier(name):
     return 'k' + ''.join(part.capitalize() for part in name.split('-'))
 
 
-def icon_source(name, svg_dir):
-    commands = convert_svg(Path(svg_dir) / f'{name}.svg')
-    body = ['gfx::CANVAS_DIMENSIONS, 24', 'gfx::STROKE, 2']
+def icon_source(key, svg_name, svg_dir):
+    commands = convert_svg(Path(svg_dir) / f'{svg_name}.svg')
+    body = ['gfx::CANVAS_DIMENSIONS, 512', 'gfx::FILL_RULE_NONZERO']
     for command in commands:
         body.append(', '.join(['gfx::' + command[0]] + [fmt(v) for v in command[1:]]))
-    ident = identifier(name)
+    ident = identifier(key)
     lines = [f'constexpr gfx::PathElement {ident}Path[] = {{']
     lines += [f'    {item},' for item in body]
     lines.append('};')
     lines.append(f'constexpr gfx::VectorIconRep {ident}Rep[] = {{{{{ident}Path}}}};')
     lines.append(f'constexpr gfx::VectorIcon {ident}Icon({ident}Rep, '
-                 f'std::size({ident}Rep), "myarc_space_{name.replace("-", "_")}");')
+                 f'std::size({ident}Rep), "myarc_space_{key.replace("-", "_")}");')
     return '\n'.join(lines)
 
 
+def existing_emoji_block():
+    text = OUT.read_text()
+    start = text.index('constexpr EmojiEntry kEmoji[] = {')
+    end = text.index('};', start) + 2
+    return text[start:end]
+
+
 def main():
-    if len(sys.argv) != 5:
+    if len(sys.argv) == 3 and sys.argv[1] == '--icons-only':
+        svg_dir = sys.argv[2]
+        emoji_block = existing_emoji_block()
+        emoji_count = emoji_block.count('EmojiCategory::')
+    elif len(sys.argv) == 5:
+        test, annotations, derived, svg_dir = sys.argv[1:]
+        emoji = load_emoji(test, annotations, derived)
+        emoji_lines = ['constexpr EmojiEntry kEmoji[] = {']
+        for text, keywords, category in emoji:
+            emoji_lines.append(f'    {{{c_string(text)}, {c_string(keywords)}, '
+                               f'EmojiCategory::{category}}},')
+        emoji_lines.append('};')
+        emoji_block = '\n'.join(emoji_lines)
+        emoji_count = len(emoji)
+    else:
         raise SystemExit(__doc__)
-    test, annotations, derived, svg_dir = sys.argv[1:]
-    emoji = load_emoji(test, annotations, derived)
+
     icons = list(dict.fromkeys(SPACE_ICONS + TAB_ICONS))
     parts = [
         '// Generated by tools/gen_space_icons.py. Do not edit.',
         '//',
         '// Emoji, names and keywords: Unicode emoji-test.txt 15.1 and CLDR 49',
         '// English annotations, under the Unicode License v3. Icons:',
-        '// lucide-static 1.61.0, under ISC. See ATTRIBUTION.md.',
+        '// ionicons 8.1.1, under MIT. See ATTRIBUTION.md.',
         '',
         '#include <array>',
         '#include <iterator>',
@@ -300,21 +338,17 @@ def main():
         '',
         '// clang-format off',
     ]
-    parts += [icon_source(name, svg_dir) for name in icons]
+    parts += [icon_source(key, svg_name, svg_dir) for key, svg_name in icons]
     parts.append('')
-    parts.append('constexpr EmojiEntry kEmoji[] = {')
-    for text, keywords, category in emoji:
-        parts.append(f'    {{{c_string(text)}, {c_string(keywords)}, '
-                     f'EmojiCategory::{category}}},')
-    parts.append('};')
+    parts.append(emoji_block)
     parts.append('')
     parts.append('constexpr NamedSpaceIcon kNamedIcons[] = {')
-    for name in SPACE_ICONS:
-        parts.append(f'    {{"{name}", &{identifier(name)}Icon}},')
+    for key, _ in SPACE_ICONS:
+        parts.append(f'    {{"{key}", &{identifier(key)}Icon}},')
     parts.append('};')
     parts.append('')
     parts.append(f'constexpr std::array<const gfx::VectorIcon*, {len(TAB_ICONS)}> kTabIcons = {{')
-    parts += [f'    &{identifier(name)}Icon,' for name in TAB_ICONS]
+    parts += [f'    &{identifier(key)}Icon,' for key, _ in TAB_ICONS]
     parts.append('};')
     parts += [
         '// clang-format on',
@@ -337,7 +371,7 @@ def main():
         '',
     ]
     OUT.write_text('\n'.join(parts))
-    print(f'{OUT.relative_to(ROOT)}: {len(emoji)} emoji, {len(SPACE_ICONS)} icons')
+    print(f'{OUT.relative_to(ROOT)}: {emoji_count} emoji, {len(SPACE_ICONS)} icons')
 
 
 if __name__ == '__main__':
