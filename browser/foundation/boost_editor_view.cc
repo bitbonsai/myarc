@@ -110,6 +110,7 @@ using CrossAxis = views::BoxLayout::CrossAxisAlignment;
 
 // Floating white card palette matching Arc's Boost editor card.
 constexpr int kCardWidth = 244;
+constexpr int kCodeCardWidth = 380;
 constexpr int kPadWidth = 220;
 constexpr int kPadHeight = 152;
 constexpr int kCardCornerRadius = 16;
@@ -195,6 +196,76 @@ uint32_t SkColorToRgb24(SkColor color) {
 
 SkColor Rgb24ToSkColor(uint32_t rgb) {
   return SkColorSetRGB((rgb >> 16) & 0xFF, (rgb >> 8) & 0xFF, rgb & 0xFF);
+}
+
+std::string FormatRgb24Hex(uint32_t rgb) {
+  static constexpr char kHex[] = "0123456789abcdef";
+  std::string out(7, '#');
+  out[1] = kHex[(rgb >> 20) & 0xF];
+  out[2] = kHex[(rgb >> 16) & 0xF];
+  out[3] = kHex[(rgb >> 12) & 0xF];
+  out[4] = kHex[(rgb >> 8) & 0xF];
+  out[5] = kHex[(rgb >> 4) & 0xF];
+  out[6] = kHex[rgb & 0xF];
+  return out;
+}
+
+std::optional<uint32_t> ParseHexColor(std::string_view input) {
+  std::string_view s = base::TrimWhitespaceASCII(input, base::TRIM_ALL);
+  if (!s.empty() && s.front() == '#') {
+    s.remove_prefix(1);
+  }
+  if (s.size() == 3) {
+    uint32_t rgb = 0;
+    for (char c : s) {
+      int digit = 0;
+      if (c >= '0' && c <= '9') {
+        digit = c - '0';
+      } else if (c >= 'a' && c <= 'f') {
+        digit = 10 + (c - 'a');
+      } else if (c >= 'A' && c <= 'F') {
+        digit = 10 + (c - 'A');
+      } else {
+        return std::nullopt;
+      }
+      rgb = (rgb << 8) | static_cast<uint32_t>((digit << 4) | digit);
+    }
+    return rgb;
+  }
+  if (s.size() != 6) {
+    return std::nullopt;
+  }
+  uint32_t rgb = 0;
+  if (!base::HexStringToUInt(s, &rgb)) {
+    return std::nullopt;
+  }
+  return rgb & 0xFF'FFFF;
+}
+
+foundation::BoostPaletteRecord PaletteFromRgb24(
+    uint32_t rgb,
+    const foundation::BoostPaletteRecord& prev) {
+  const SkColor bg = Rgb24ToSkColor(rgb);
+  color_utils::HSL bg_hsl;
+  color_utils::SkColorToHSL(bg, &bg_hsl);
+  const bool dark_bg = color_utils::IsDark(bg);
+  const SkColor text = dark_bg ? SkColorSetRGB(0xF5, 0xF5, 0xF7)
+                               : SkColorSetRGB(0x18, 0x18, 0x1B);
+  const color_utils::HSL accent_hsl{bg_hsl.h, std::min(1.0, bg_hsl.s + 0.25),
+                                    dark_bg ? 0.72 : 0.38};
+  const SkColor accent = color_utils::HSLToSkColor(accent_hsl, SK_AlphaOPAQUE);
+
+  foundation::BoostPaletteRecord palette{};
+  palette.set = true;
+  palette.background = rgb & 0xFF'FFFF;
+  palette.text = SkColorToRgb24(text);
+  palette.accent = SkColorToRgb24(accent);
+  palette.contrast = prev.set ? prev.contrast : 50;
+  palette.brightness = prev.set ? prev.brightness : 50;
+  palette.saturation = prev.set ? prev.saturation : 50;
+  palette.tint_strength =
+      static_cast<uint8_t>(std::round(std::clamp(bg_hsl.s, 0.0, 1.0) * 100.0));
+  return palette;
 }
 
 // Converts (x, y) in [0, 1] x [0, 1] on the 2D pad to a BoostPaletteRecord.
@@ -823,7 +894,7 @@ constexpr char16_t kZapStartScript[] = uR"JS((() => {
   style.textContent = `
     .frame {
       position: fixed; inset: 0; pointer-events: none;
-      border: 2px solid #5B73FF; box-sizing: border-box;
+      border: 2px solid #F9671D; border-radius: 10px; box-sizing: border-box;
     }
     .box {
       position: fixed; pointer-events: none; display: none;
@@ -834,6 +905,7 @@ constexpr char16_t kZapStartScript[] = uR"JS((() => {
     .bar {
       position: fixed; left: 2px; right: 2px; bottom: 2px;
       height: 52px; padding: 0 14px;
+      border-bottom-left-radius: 8px; border-bottom-right-radius: 8px;
       display: flex; align-items: center; justify-content: center;
       background: rgba(18, 18, 22, 0.94); color: #F5F5F7;
       font: 500 13px -apple-system, BlinkMacSystemFont, sans-serif;
@@ -997,7 +1069,8 @@ constexpr char16_t kZapStartScript[] = uR"JS((() => {
     pill.style.display = 'block'
     const r = el.getBoundingClientRect()
     const pr = pill.getBoundingClientRect()
-    let left = Math.max(12, Math.min(r.left, window.innerWidth - pr.width - 12))
+    const safeRight = window.innerWidth > 680 ? 276 : 12
+    let left = Math.max(12, Math.min(r.left, window.innerWidth - pr.width - safeRight))
     let top = r.bottom + 8
     if (top + pr.height > window.innerHeight - 64) {
       top = Math.max(12, r.top - pr.height - 8)
@@ -1109,6 +1182,156 @@ constexpr char16_t kZapStopScript[] = uR"JS((() => {
   delete window.__myarcZap
 })())JS";
 
+// Isolated-world single-element selector picker for the Boost Code editor.
+constexpr char16_t kCssPickStartScript[] = uR"JS((() => {
+  if (window.__myarcZap && typeof window.__myarcZap.stop === 'function') {
+    window.__myarcZap.stop()
+  }
+  const queue = []
+  const host = document.createElement('div')
+  host.setAttribute('data-myarc-zap-host', '1')
+  host.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:2147483647;'
+  const shadow = host.attachShadow({ mode: 'closed' })
+
+  const style = document.createElement('style')
+  style.textContent = `
+    .frame {
+      position: fixed; inset: 0; pointer-events: none;
+      border: 2px solid #4F5BFF; border-radius: 10px; box-sizing: border-box;
+    }
+    .box {
+      position: fixed; pointer-events: none; display: none;
+      background: rgba(79, 91, 255, 0.14);
+      border: 1.5px solid #4F5BFF; border-radius: 3px;
+      box-sizing: border-box;
+    }
+    .tip {
+      position: fixed; pointer-events: none; display: none;
+      background: #1C1C1E; color: #F5F5F7; border-radius: 6px;
+      padding: 4px 8px; font: 500 11px Menlo, ui-monospace, monospace;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+      max-width: 320px; white-space: nowrap; overflow: hidden;
+      text-overflow: ellipsis;
+    }
+  `
+  shadow.appendChild(style)
+  const frame = document.createElement('div')
+  frame.className = 'frame'
+  const box = document.createElement('div')
+  box.className = 'box'
+  const tip = document.createElement('div')
+  tip.className = 'tip'
+  shadow.append(frame, box, tip)
+  ;(document.documentElement || document.body).appendChild(host)
+
+  const safeIdent = (s) => typeof s === 'string' && /^[A-Za-z_][A-Za-z0-9_-]*$/.test(s)
+  const buildSelector = (el) => {
+    const tag = el.tagName.toLowerCase()
+    if (el.id && safeIdent(el.id)) return '#' + el.id
+    const cls = el.classList
+      ? Array.from(el.classList).filter((c) => safeIdent(c) && c.length <= 48).slice(0, 2)
+      : []
+    if (cls.length) return tag + '.' + cls.join('.')
+    return tag
+  }
+
+  let hovered = null
+  const onMove = (e) => {
+    const el = document.elementFromPoint(e.clientX, e.clientY)
+    if (!el || el === host || el === document.documentElement || el === document.body) {
+      box.style.display = 'none'
+      tip.style.display = 'none'
+      return
+    }
+    if (el !== hovered) {
+      hovered = el
+      const r = el.getBoundingClientRect()
+      box.style.display = 'block'
+      box.style.left = r.left + 'px'
+      box.style.top = r.top + 'px'
+      box.style.width = r.width + 'px'
+      box.style.height = r.height + 'px'
+      tip.textContent = buildSelector(el)
+      tip.style.display = 'block'
+      const safeRight = window.innerWidth > 760 ? 412 : 12
+      tip.style.left = Math.max(10, Math.min(r.left, window.innerWidth - 200 - safeRight)) + 'px'
+      tip.style.top = Math.max(10, r.top - 28) + 'px'
+    }
+  }
+  const onClick = (e) => {
+    e.preventDefault()
+    e.stopImmediatePropagation()
+    const el = document.elementFromPoint(e.clientX, e.clientY)
+    if (el && el !== host && el !== document.documentElement && el !== document.body) {
+      queue.push({ type: 'pick', selector: buildSelector(el) })
+    }
+    stop()
+  }
+  const blockPointer = (e) => {
+    e.preventDefault()
+    e.stopImmediatePropagation()
+  }
+  const onKey = (e) => {
+    if (e.key === 'Escape') {
+      e.preventDefault()
+      e.stopImmediatePropagation()
+      queue.push({ type: 'pick_cancel' })
+      stop()
+    }
+  }
+  const stop = () => {
+    window.removeEventListener('mousemove', onMove, true)
+    window.removeEventListener('click', onClick, true)
+    window.removeEventListener('mousedown', blockPointer, true)
+    window.removeEventListener('mouseup', blockPointer, true)
+    window.removeEventListener('keydown', onKey, true)
+    host.remove()
+    if (window.__myarcZap) window.__myarcZap.active = false
+  }
+
+  window.addEventListener('mousemove', onMove, true)
+  window.addEventListener('click', onClick, true)
+  window.addEventListener('mousedown', blockPointer, true)
+  window.addEventListener('mouseup', blockPointer, true)
+  window.addEventListener('keydown', onKey, true)
+  window.__myarcZap = { active: true, queue, stop }
+})())JS";
+
+// Small circular swatch beside the editable hex color field.
+class ColorSwatchDot final : public views::View {
+  METADATA_HEADER(ColorSwatchDot, views::View)
+
+ public:
+  ColorSwatchDot() { SetPreferredSize(gfx::Size(16, 16)); }
+
+  void SetColor(std::optional<SkColor> color) {
+    color_ = color;
+    SchedulePaint();
+  }
+
+  void OnPaint(gfx::Canvas* canvas) override {
+    const gfx::PointF center(width() * 0.5f, height() * 0.5f);
+    const float r = 6.5f;
+    cc::PaintFlags fill;
+    fill.setAntiAlias(true);
+    fill.setColor(color_.value_or(SK_ColorWHITE));
+    canvas->DrawCircle(center, r, fill);
+
+    cc::PaintFlags stroke;
+    stroke.setAntiAlias(true);
+    stroke.setStyle(cc::PaintFlags::kStroke_Style);
+    stroke.setStrokeWidth(1.f);
+    stroke.setColor(SkColorSetA(SK_ColorBLACK, 0x24));
+    canvas->DrawCircle(center, r, stroke);
+  }
+
+ private:
+  std::optional<SkColor> color_;
+};
+
+BEGIN_METADATA(ColorSwatchDot)
+END_METADATA
+
 class BoostEditorView;
 
 class BoostEditorBubbleDelegate final : public views::BubbleDialogDelegate {
@@ -1214,9 +1437,26 @@ class BoostEditorView final : public views::View,
 
   gfx::Size CalculatePreferredSize(
       const views::SizeBounds& available_size) const override {
+    const int target_width = code_mode_ ? kCodeCardWidth : kCardWidth;
     const gfx::Size size = views::View::CalculatePreferredSize(
-        views::SizeBounds(kCardWidth, available_size.height()));
-    return gfx::Size(kCardWidth, size.height());
+        views::SizeBounds(target_width, available_size.height()));
+    return gfx::Size(target_width, size.height());
+  }
+
+  void OnThemeChanged() override {
+    views::View::OnThemeChanged();
+    if (hex_input_) {
+      hex_input_->SetColor(kInkPrimary);
+    }
+    if (zap_input_) {
+      zap_input_->SetColor(kInkPrimary);
+    }
+    if (rename_field_) {
+      rename_field_->SetColor(kInkPrimary);
+    }
+    if (css_editor_) {
+      css_editor_->SetColor(SkColorSetRGB(0xF5, 0xF5, 0xF7));
+    }
   }
 
   uint64_t boost_id() const { return boost_id_; }
@@ -1246,6 +1486,10 @@ class BoostEditorView final : public views::View,
 
   bool OnKeyPressed(const ui::KeyEvent& event) override {
     if (event.key_code() == ui::VKEY_ESCAPE) {
+      if (code_mode_) {
+        ExitCodeMode();
+        return true;
+      }
       CloseEditor();
       return true;
     }
@@ -1299,6 +1543,20 @@ class BoostEditorView final : public views::View,
       css_dirty_ = true;
       UpdateCssValidationUi();
       PushLivePreview();
+    } else if (sender == hex_input_) {
+      if (suppress_hex_change_) {
+        return;
+      }
+      const std::string raw = base::UTF16ToUTF8(new_contents);
+      std::string_view trimmed = base::TrimWhitespaceASCII(raw, base::TRIM_ALL);
+      if (!trimmed.empty() && trimmed.front() == '#') {
+        trimmed.remove_prefix(1);
+      }
+      if (trimmed.size() == 6) {
+        if (auto rgb = ParseHexColor(raw)) {
+          ApplyHexColor(*rgb, /*commit=*/false);
+        }
+      }
     } else if (sender == zap_input_) {
       if (zap_error_label_) {
         zap_error_label_->SetVisible(false);
@@ -1317,12 +1575,24 @@ class BoostEditorView final : public views::View,
         EndInlineRename(/*commit=*/false);
         return true;
       }
+      if (sender == hex_input_) {
+        SyncHexFieldFromDraft(/*force=*/true);
+        return true;
+      }
+      if (code_mode_) {
+        ExitCodeMode();
+        return true;
+      }
       CloseEditor();
       return true;
     }
     if (key_event.key_code() == ui::VKEY_RETURN) {
       if (sender == rename_field_) {
         EndInlineRename(/*commit=*/true);
+        return true;
+      }
+      if (sender == hex_input_) {
+        CommitHexInput();
         return true;
       }
       if (sender == zap_input_) {
@@ -1455,9 +1725,13 @@ class BoostEditorView final : public views::View,
 
  private:
   void ClearChildPointers() {
+    main_panel_ = nullptr;
+    code_panel_ = nullptr;
     title_button_ = nullptr;
     rename_field_ = nullptr;
     color_pad_ = nullptr;
+    hex_swatch_ = nullptr;
+    hex_input_ = nullptr;
     mode_invert_ = nullptr;
     mode_palette_ = nullptr;
     mode_adjust_ = nullptr;
@@ -1475,37 +1749,48 @@ class BoostEditorView final : public views::View,
     zap_error_label_ = nullptr;
     zap_list_ = nullptr;
     code_toggle_ = nullptr;
-    code_section_ = nullptr;
+    code_picker_button_ = nullptr;
     css_editor_ = nullptr;
     css_banner_ = nullptr;
     css_bytes_label_ = nullptr;
   }
 
   void BuildUi() {
+    auto style_light_textfield = [](views::Textfield* tf) {
+      tf->SetBackgroundColor(SK_ColorWHITE);
+      tf->SetColor(kInkPrimary);
+      tf->SetBorder(views::CreateRoundedRectBorder(1, 8, kBorderSubtle));
+    };
+
+    main_panel_ = AddChildView(
+        MakeBox(Orientation::kVertical, gfx::Insets(), 10));
+
     // 1. Header row: Close (x), Title dropdown / rename, Reset (↺).
-    auto* header =
-        AddChildView(MakeBox(Orientation::kHorizontal,
-                             gfx::Insets::TLBR(0, 0, 8, 0), 4));
+    auto* header = main_panel_->AddChildView(MakeBox(
+        Orientation::kHorizontal, gfx::Insets::TLBR(0, 0, 8, 0), 4));
     header->SetBorder(
         views::CreateSolidSidedBorder(gfx::Insets::TLBR(0, 0, 1, 0), kBorderSubtle));
     auto* header_layout =
         static_cast<views::BoxLayout*>(header->GetLayoutManager());
     header_layout->set_cross_axis_alignment(CrossAxis::kCenter);
 
-    auto close = std::make_unique<views::ImageButton>(base::BindRepeating(
-        &BoostEditorView::CloseEditor, base::Unretained(this)));
-    close->SetImageModel(
-        views::Button::STATE_NORMAL,
-        ui::ImageModel::FromVectorIcon(kPeekCloseIcon, SK_ColorWHITE, 11));
-    close->SetImageHorizontalAlignment(views::ImageButton::ALIGN_CENTER);
-    close->SetImageVerticalAlignment(views::ImageButton::ALIGN_MIDDLE);
-    close->SetPreferredSize(gfx::Size(22, 22));
-    close->SetBackground(
-        views::CreateRoundedRectBackground(SkColorSetRGB(0xAE, 0xAE, 0xB2), 11));
-    close->SetTooltipText(u"Close Boost Editor");
-    close->GetViewAccessibility().SetName(u"Close Boost Editor");
-    views::InstallCircleHighlightPathGenerator(close.get());
-    header->AddChildView(std::move(close));
+    auto make_close_button = [&]() {
+      auto close = std::make_unique<views::ImageButton>(base::BindRepeating(
+          &BoostEditorView::CloseEditor, base::Unretained(this)));
+      close->SetImageModel(
+          views::Button::STATE_NORMAL,
+          ui::ImageModel::FromVectorIcon(kPeekCloseIcon, SK_ColorWHITE, 11));
+      close->SetImageHorizontalAlignment(views::ImageButton::ALIGN_CENTER);
+      close->SetImageVerticalAlignment(views::ImageButton::ALIGN_MIDDLE);
+      close->SetPreferredSize(gfx::Size(22, 22));
+      close->SetBackground(views::CreateRoundedRectBackground(
+          SkColorSetRGB(0xAE, 0xAE, 0xB2), 11));
+      close->SetTooltipText(u"Close Boost Editor");
+      close->GetViewAccessibility().SetName(u"Close Boost Editor");
+      views::InstallCircleHighlightPathGenerator(close.get());
+      return close;
+    };
+    header->AddChildView(make_close_button());
 
     title_button_ = header->AddChildView(std::make_unique<TitleMenuButton>(
         base::BindRepeating(&BoostEditorView::ShowTitleMenu,
@@ -1516,6 +1801,7 @@ class BoostEditorView final : public views::View,
     rename->SetVisible(false);
     rename->set_controller(this);
     rename->SetPlaceholderText(u"Boost name");
+    style_light_textfield(rename.get());
     rename_field_ = header->AddChildView(std::move(rename));
     header_layout->SetFlexForView(rename_field_, 1);
 
@@ -1533,19 +1819,39 @@ class BoostEditorView final : public views::View,
     header->AddChildView(std::move(reset));
 
     // 2. 2D Color / Contrast Pad.
-    color_pad_ = AddChildView(std::make_unique<ColorPadView>(
+    color_pad_ = main_panel_->AddChildView(std::make_unique<ColorPadView>(
         base::BindRepeating(&BoostEditorView::OnPadChanged,
                             base::Unretained(this))));
 
+    // 2b. Compact hex color readout & editable input.
+    auto* hex_row = main_panel_->AddChildView(MakeBox(
+        Orientation::kHorizontal, gfx::Insets::VH(3, 10), 8));
+    hex_row->SetBackground(views::CreateRoundedRectBackground(kPillBg, 10));
+    auto* hex_layout =
+        static_cast<views::BoxLayout*>(hex_row->GetLayoutManager());
+    hex_layout->set_cross_axis_alignment(CrossAxis::kCenter);
+
+    hex_swatch_ = hex_row->AddChildView(std::make_unique<ColorSwatchDot>());
+
+    auto hex_tf = std::make_unique<views::Textfield>();
+    hex_tf->SetFontList(gfx::FontList(gfx::Font("Menlo", 12)));
+    hex_tf->SetPlaceholderText(u"#rrggbb");
+    hex_tf->GetViewAccessibility().SetName(u"Boost hex color");
+    hex_tf->SetBackgroundColor(SK_ColorTRANSPARENT);
+    hex_tf->SetColor(kInkPrimary);
+    hex_tf->SetBorder(views::CreateEmptyBorder(gfx::Insets::VH(2, 0)));
+    hex_tf->set_controller(this);
+    hex_input_ = hex_row->AddChildView(std::move(hex_tf));
+    hex_layout->SetFlexForView(hex_input_, 1);
+
     // 3. Four lighting / color mode buttons: Invert, Palette, Adjust, Reset.
-    auto* modes =
-        AddChildView(MakeBox(Orientation::kHorizontal, gfx::Insets(), 6));
+    auto* modes = main_panel_->AddChildView(
+        MakeBox(Orientation::kHorizontal, gfx::Insets(), 6));
     auto* modes_layout =
         static_cast<views::BoxLayout*>(modes->GetLayoutManager());
     mode_invert_ = modes->AddChildView(std::make_unique<PillButton>(
-        base::BindRepeating(&BoostEditorView::SetColorMode,
-                            base::Unretained(this),
-                            foundation::BoostColorMode::Invert),
+        base::BindRepeating(&BoostEditorView::OnInvertPressed,
+                            base::Unretained(this)),
         u"\u25D0", std::u16string(), /*centered=*/true, /*font_size_delta=*/3));
     mode_invert_->SetTooltipText(u"Invert colors");
     mode_invert_->GetViewAccessibility().SetName(u"Invert colors");
@@ -1581,7 +1887,7 @@ class BoostEditorView final : public views::View,
     modes_layout->SetFlexForView(mode_none_, 1);
 
     // 3b. Collapsible Contrast / Brightness / Original Saturation sliders.
-    adjust_section_ = AddChildView(
+    adjust_section_ = main_panel_->AddChildView(
         MakeBox(Orientation::kVertical, gfx::Insets::VH(10, 12), 8));
     adjust_section_->SetBackground(
         views::CreateRoundedRectBackground(kPillBg, 12));
@@ -1605,7 +1911,7 @@ class BoostEditorView final : public views::View,
     saturation_slider_ = add_slider_row(u"Original Saturation");
 
     // 4. 4x4 "Aa" typography preset grid.
-    auto* grid_card = AddChildView(
+    auto* grid_card = main_panel_->AddChildView(
         MakeBox(Orientation::kVertical, gfx::Insets(8), 2));
     grid_card->SetBackground(
         views::CreateRoundedRectBackground(kCardBg, 12));
@@ -1629,8 +1935,8 @@ class BoostEditorView final : public views::View,
     }
 
     // 5. Size and Case buttons.
-    auto* type_row =
-        AddChildView(MakeBox(Orientation::kHorizontal, gfx::Insets(), 8));
+    auto* type_row = main_panel_->AddChildView(
+        MakeBox(Orientation::kHorizontal, gfx::Insets(), 8));
     auto* type_layout =
         static_cast<views::BoxLayout*>(type_row->GetLayoutManager());
     size_button_ = type_row->AddChildView(std::make_unique<PillButton>(
@@ -1648,33 +1954,34 @@ class BoostEditorView final : public views::View,
     type_layout->SetFlexForView(case_button_, 1);
 
     // 6. Zap button + expandable hidden-selectors list.
-    zap_toggle_ = AddChildView(std::make_unique<PillButton>(
+    zap_toggle_ = main_panel_->AddChildView(std::make_unique<PillButton>(
         base::BindRepeating(&BoostEditorView::ToggleZapSection,
                             base::Unretained(this)),
         u"Zap", u"\u26A1", /*centered=*/false));
     zap_toggle_->SetTooltipText(u"Hide page elements by CSS selector");
 
-    zap_section_ = AddChildView(
+    zap_section_ = main_panel_->AddChildView(
         MakeBox(Orientation::kVertical, gfx::Insets::VH(4, 2), 6));
     zap_section_->SetVisible(false);
     {
       auto* input_row = zap_section_->AddChildView(
-          MakeBox(Orientation::kHorizontal, gfx::Insets(), 4));
+          MakeBox(Orientation::kHorizontal, gfx::Insets(), 6));
       auto* input_layout =
           static_cast<views::BoxLayout*>(input_row->GetLayoutManager());
+      input_layout->set_cross_axis_alignment(CrossAxis::kCenter);
       auto input = std::make_unique<views::Textfield>();
       input->SetPlaceholderText(u".banner, #ads");
       input->GetViewAccessibility().SetName(u"CSS selector to hide");
+      style_light_textfield(input.get());
       input->set_controller(this);
       zap_input_ = input_row->AddChildView(std::move(input));
       input_layout->SetFlexForView(zap_input_, 1);
 
-      auto add_btn = std::make_unique<views::MdTextButton>(
+      auto add_btn = std::make_unique<PillButton>(
           base::BindRepeating(&BoostEditorView::AddZapSelector,
                               base::Unretained(this)),
-          u"Hide");
-      add_btn->SetStyle(ui::ButtonStyle::kTonal);
-      add_btn->SetCustomPadding(gfx::Insets::VH(4, 10));
+          u"Hide", std::u16string(), /*centered=*/true, /*font_size_delta=*/-1);
+      add_btn->SetPreferredSize(gfx::Size(56, 30));
       input_row->AddChildView(std::move(add_btn));
 
       zap_error_label_ = zap_section_->AddChildView(MakeLabel(
@@ -1688,18 +1995,51 @@ class BoostEditorView final : public views::View,
           MakeBox(Orientation::kVertical, gfx::Insets(), 4));
     }
 
-    // 7. Code ({}) button + expandable custom CSS editor.
-    code_toggle_ = AddChildView(std::make_unique<PillButton>(
-        base::BindRepeating(&BoostEditorView::ToggleCodeSection,
+    // 7. Code ({}) button — morphs the card into the spacious Code Editor view.
+    code_toggle_ = main_panel_->AddChildView(std::make_unique<PillButton>(
+        base::BindRepeating(&BoostEditorView::EnterCodeMode,
                             base::Unretained(this)),
         u"Code", u"{}", /*centered=*/false));
     code_toggle_->SetTooltipText(u"Edit custom CSS");
 
-    code_section_ = AddChildView(
-        MakeBox(Orientation::kVertical, gfx::Insets::VH(4, 2), 6));
-    code_section_->SetVisible(false);
+    // 8. Morphed Code Editor panel (380px wide, Arc-style modal view).
+    code_panel_ = AddChildView(
+        MakeBox(Orientation::kVertical, gfx::Insets(), 10));
+    code_panel_->SetVisible(false);
     {
-      css_banner_ = code_section_->AddChildView(MakeLabel(
+      auto* code_header = code_panel_->AddChildView(MakeBox(
+          Orientation::kHorizontal, gfx::Insets::TLBR(0, 0, 8, 0), 8));
+      code_header->SetBorder(views::CreateSolidSidedBorder(
+          gfx::Insets::TLBR(0, 0, 1, 0), kBorderSubtle));
+      auto* ch_layout =
+          static_cast<views::BoxLayout*>(code_header->GetLayoutManager());
+      ch_layout->set_cross_axis_alignment(CrossAxis::kCenter);
+
+      auto back = std::make_unique<PillButton>(
+          base::BindRepeating(&BoostEditorView::ExitCodeMode,
+                              base::Unretained(this)),
+          u"\u2190 Back", std::u16string(), /*centered=*/true,
+          /*font_size_delta=*/-1);
+      back->SetPreferredSize(gfx::Size(76, 28));
+      code_header->AddChildView(std::move(back));
+
+      auto* spacer_l = code_header->AddChildView(std::make_unique<views::View>());
+      ch_layout->SetFlexForView(spacer_l, 1);
+
+      auto* badge = code_header->AddChildView(MakeLabel(
+          u"CSS",
+          gfx::FontList().Derive(-1, gfx::Font::NORMAL,
+                                 gfx::Font::Weight::SEMIBOLD),
+          kInkPrimary));
+      badge->SetBackground(views::CreateRoundedRectBackground(kPillBg, 6));
+      badge->SetBorder(views::CreateEmptyBorder(gfx::Insets::VH(4, 12)));
+
+      auto* spacer_r = code_header->AddChildView(std::make_unique<views::View>());
+      ch_layout->SetFlexForView(spacer_r, 1);
+
+      code_header->AddChildView(make_close_button());
+
+      css_banner_ = code_panel_->AddChildView(MakeLabel(
           u"",
           gfx::FontList().Derive(-1, gfx::Font::NORMAL,
                                  gfx::Font::Weight::MEDIUM),
@@ -1712,18 +2052,31 @@ class BoostEditorView final : public views::View,
       css_banner_->SetVisible(false);
 
       auto editor = std::make_unique<views::Textarea>();
-      editor->SetFontList(gfx::FontList(gfx::Font("Menlo", 11)));
+      editor->SetFontList(gfx::FontList(gfx::Font("Menlo", 12)));
       editor->SetPlaceholderText(u"/* Custom CSS */");
       editor->GetViewAccessibility().SetName(u"Custom CSS");
-      editor->SetPreferredSize(gfx::Size(kPadWidth, 108));
+      editor->SetBackgroundColor(SkColorSetRGB(0x1E, 0x1E, 0x22));
+      editor->SetColor(SkColorSetRGB(0xF5, 0xF5, 0xF7));
+      editor->SetBorder(views::CreateRoundedRectBorder(
+          1, 10, SkColorSetRGB(0x32, 0x32, 0x38)));
+      editor->SetPreferredSize(gfx::Size(kCodeCardWidth - 28, 260));
       editor->set_controller(this);
-      css_editor_ = code_section_->AddChildView(std::move(editor));
+      css_editor_ = code_panel_->AddChildView(std::move(editor));
 
-      auto* footer = code_section_->AddChildView(
-          MakeBox(Orientation::kHorizontal, gfx::Insets(), 6));
+      auto* footer = code_panel_->AddChildView(
+          MakeBox(Orientation::kHorizontal, gfx::Insets(), 8));
       auto* footer_layout =
           static_cast<views::BoxLayout*>(footer->GetLayoutManager());
       footer_layout->set_cross_axis_alignment(CrossAxis::kCenter);
+
+      code_picker_button_ = footer->AddChildView(std::make_unique<PillButton>(
+          base::BindRepeating(&BoostEditorView::ToggleCodeElementPicker,
+                              base::Unretained(this)),
+          u"Pick element on page", std::u16string(), /*centered=*/true,
+          /*font_size_delta=*/0, &kInspectElementIcon));
+      code_picker_button_->SetPreferredSize(gfx::Size(36, 32));
+      code_picker_button_->SetTooltipText(u"Pick an element on the page");
+
       css_bytes_label_ = footer->AddChildView(MakeLabel(
           u"0 / 64 KB",
           gfx::FontList().Derive(-2, gfx::Font::NORMAL,
@@ -1732,12 +2085,13 @@ class BoostEditorView final : public views::View,
       css_bytes_label_->SetHorizontalAlignment(gfx::ALIGN_LEFT);
       footer_layout->SetFlexForView(css_bytes_label_, 1);
 
-      auto apply = std::make_unique<views::MdTextButton>(
+      auto apply = std::make_unique<PillButton>(
           base::BindRepeating(&BoostEditorView::CommitCustomCss,
                               base::Unretained(this)),
-          u"Apply");
-      apply->SetStyle(ui::ButtonStyle::kProminent);
-      apply->SetCustomPadding(gfx::Insets::VH(4, 10));
+          u"Apply", std::u16string(), /*centered=*/true,
+          /*font_size_delta=*/-1);
+      apply->SetActive(true);
+      apply->SetPreferredSize(gfx::Size(72, 32));
       footer->AddChildView(std::move(apply));
     }
   }
@@ -1767,6 +2121,7 @@ class BoostEditorView final : public views::View,
       color_pad_->SetState(draft_appearance_.color_mode,
                            draft_appearance_.palette);
     }
+    SyncHexFieldFromDraft(/*force=*/false);
     if (mode_invert_) {
       mode_invert_->SetActive(draft_appearance_.color_mode ==
                               foundation::BoostColorMode::Invert);
@@ -1882,13 +2237,13 @@ class BoostEditorView final : public views::View,
       row->AddChildView(std::move(remove));
     }
     if (!record_->hidden_selectors.empty()) {
-      auto clear = std::make_unique<views::MdTextButton>(
+      auto clear = std::make_unique<PillButton>(
           base::BindRepeating(&BoostEditorView::ClearZapSelectors,
                               base::Unretained(this)),
-          u"Clear all");
-      clear->SetStyle(ui::ButtonStyle::kText);
-      clear->SetEnabledTextColors(kInkSecondary);
-      clear->SetCustomPadding(gfx::Insets::VH(2, 6));
+          u"Clear all", std::u16string(), /*centered=*/true,
+          /*font_size_delta=*/-1);
+      clear->SetPreferredSize(gfx::Size(0, 30));
+      clear->SetProperty(views::kMarginsKey, gfx::Insets::TLBR(4, 0, 0, 0));
       zap_list_->AddChildView(std::move(clear));
     }
   }
@@ -1972,6 +2327,7 @@ class BoostEditorView final : public views::View,
       color_pad_->SetState(draft_appearance_.color_mode,
                            draft_appearance_.palette);
     }
+    SyncHexFieldFromDraft(/*force=*/true);
     if (mode_invert_) {
       mode_invert_->SetActive(draft_appearance_.color_mode ==
                               foundation::BoostColorMode::Invert);
@@ -1986,6 +2342,94 @@ class BoostEditorView final : public views::View,
     PushLivePreview();
     if (commit) {
       CommitAppearance();
+    }
+  }
+
+  void SyncHexFieldFromDraft(bool force) {
+    const bool has_palette_color =
+        draft_appearance_.color_mode == foundation::BoostColorMode::Palette &&
+        draft_appearance_.palette.set;
+    if (hex_swatch_) {
+      if (has_palette_color) {
+        hex_swatch_->SetColor(
+            Rgb24ToSkColor(draft_appearance_.palette.background));
+      } else if (draft_appearance_.color_mode ==
+                 foundation::BoostColorMode::Invert) {
+        hex_swatch_->SetColor(SkColorSetRGB(0x2B, 0x2B, 0x30));
+      } else {
+        hex_swatch_->SetColor(std::nullopt);
+      }
+    }
+    if (!hex_input_) {
+      return;
+    }
+    if (!force && hex_input_->HasFocus()) {
+      return;
+    }
+    suppress_hex_change_ = true;
+    hex_input_->SetText(
+        has_palette_color
+            ? base::UTF8ToUTF16(
+                  FormatRgb24Hex(draft_appearance_.palette.background))
+            : std::u16string());
+    suppress_hex_change_ = false;
+  }
+
+  void ApplyHexColor(uint32_t rgb, bool commit) {
+    draft_appearance_.color_mode = foundation::BoostColorMode::Palette;
+    draft_appearance_.palette =
+        PaletteFromRgb24(rgb, draft_appearance_.palette);
+    if (color_pad_) {
+      color_pad_->SetState(draft_appearance_.color_mode,
+                           draft_appearance_.palette);
+    }
+    if (hex_swatch_) {
+      hex_swatch_->SetColor(Rgb24ToSkColor(rgb));
+    }
+    if (mode_invert_) {
+      mode_invert_->SetActive(false);
+    }
+    if (mode_palette_) {
+      mode_palette_->SetActive(true);
+    }
+    if (mode_none_) {
+      mode_none_->SetActive(false);
+    }
+    PushLivePreview();
+    if (commit) {
+      CommitAppearance();
+    }
+  }
+
+  void CommitHexInput() {
+    if (!hex_input_) {
+      return;
+    }
+    if (auto rgb = ParseHexColor(base::UTF16ToUTF8(hex_input_->GetText()))) {
+      ApplyHexColor(*rgb, /*commit=*/true);
+      SyncHexFieldFromDraft(/*force=*/true);
+    } else {
+      SyncHexFieldFromDraft(/*force=*/true);
+    }
+  }
+
+  void OnInvertPressed() {
+    if (draft_appearance_.color_mode == foundation::BoostColorMode::Palette &&
+        draft_appearance_.palette.set) {
+      color_utils::HSL hsl;
+      color_utils::SkColorToHSL(
+          Rgb24ToSkColor(draft_appearance_.palette.background), &hsl);
+      hsl.l = std::clamp(1.0 - hsl.l, 0.08, 0.96);
+      const SkColor inverted =
+          color_utils::HSLToSkColor(hsl, SK_AlphaOPAQUE);
+      ApplyHexColor(SkColorToRgb24(inverted), /*commit=*/true);
+      SyncHexFieldFromDraft(/*force=*/true);
+      return;
+    }
+    if (draft_appearance_.color_mode == foundation::BoostColorMode::Invert) {
+      SetColorMode(foundation::BoostColorMode::None);
+    } else {
+      SetColorMode(foundation::BoostColorMode::Invert);
     }
   }
 
@@ -2182,6 +2626,8 @@ class BoostEditorView final : public views::View,
     }
     bool changed = false;
     bool done = false;
+    std::string picked_selector;
+    bool pick_cancelled = false;
     for (const base::Value& item : result.GetList()) {
       if (!item.is_dict()) {
         continue;
@@ -2192,6 +2638,13 @@ class BoostEditorView final : public views::View,
       }
       if (*type == "done") {
         done = true;
+      } else if (*type == "pick_cancel") {
+        pick_cancelled = true;
+      } else if (*type == "pick") {
+        const std::string* sel = item.GetDict().FindString("selector");
+        if (sel && !sel->empty()) {
+          picked_selector = *sel;
+        }
       } else if (*type == "zap") {
         const std::string* sel = item.GetDict().FindString("selector");
         if (sel && !sel->empty()) {
@@ -2200,6 +2653,24 @@ class BoostEditorView final : public views::View,
             changed = true;
           }
         }
+      }
+    }
+    if (!picked_selector.empty() || pick_cancelled) {
+      StopZapPicker();
+      if (code_picker_button_) {
+        code_picker_button_->SetActive(false);
+      }
+      if (!picked_selector.empty() && css_editor_) {
+        std::string snippet = picked_selector + " {\n  \n}\n";
+        if (!draft_css_.empty() && draft_css_.back() != '\n') {
+          draft_css_.push_back('\n');
+        }
+        draft_css_ += snippet;
+        css_dirty_ = true;
+        css_editor_->SetText(base::UTF8ToUTF16(draft_css_));
+        css_editor_->RequestFocus();
+        UpdateCssValidationUi();
+        PushLivePreview();
       }
     }
     if (changed) {
@@ -2253,19 +2724,65 @@ class BoostEditorView final : public views::View,
     ReloadFromService();
   }
 
-  void ToggleCodeSection() {
-    if (!code_section_) {
+  void EnterCodeMode() {
+    if (code_mode_ || !main_panel_ || !code_panel_) {
       return;
     }
-    const bool show = !code_section_->GetVisible();
-    code_section_->SetVisible(show);
-    if (code_toggle_) {
-      code_toggle_->SetActive(show);
+    if (zap_picker_active_) {
+      StopZapPicker();
+      if (zap_section_) {
+        zap_section_->SetVisible(false);
+      }
+      if (zap_toggle_) {
+        zap_toggle_->SetActive(false);
+      }
     }
-    if (show && css_editor_) {
+    code_mode_ = true;
+    main_panel_->SetVisible(false);
+    code_panel_->SetVisible(true);
+    SizeToContents();
+    if (css_editor_) {
       css_editor_->RequestFocus();
     }
+  }
+
+  void ExitCodeMode() {
+    if (!code_mode_ || !main_panel_ || !code_panel_) {
+      return;
+    }
+    StopZapPicker();
+    if (code_picker_button_) {
+      code_picker_button_->SetActive(false);
+    }
+    CommitPendingCssIfValid();
+    code_mode_ = false;
+    code_panel_->SetVisible(false);
+    main_panel_->SetVisible(true);
     SizeToContents();
+  }
+
+  void ToggleCodeElementPicker() {
+    if (!code_picker_button_ || !web_contents()) {
+      return;
+    }
+    if (zap_picker_active_) {
+      StopZapPicker();
+      code_picker_button_->SetActive(false);
+      return;
+    }
+    content::RenderFrameHost* rfh = web_contents()->GetPrimaryMainFrame();
+    if (!rfh || !rfh->IsRenderFrameLive()) {
+      return;
+    }
+    zap_picker_active_ = true;
+    code_picker_button_->SetActive(true);
+    rfh->ExecuteJavaScriptInIsolatedWorld(
+        kCssPickStartScript, base::NullCallback(),
+        ISOLATED_WORLD_ID_CHROME_INTERNAL);
+    zap_poll_timer_.Start(
+        FROM_HERE, base::Milliseconds(100),
+        base::BindRepeating(&BoostEditorView::PollZapPicker,
+                            base::Unretained(this)));
   }
 
   void CommitCustomCss() {
@@ -2378,13 +2895,19 @@ class BoostEditorView final : public views::View,
   std::string draft_css_;
   bool css_dirty_ = false;
   bool suppress_reload_ = false;
+  bool suppress_hex_change_ = false;
   bool slider_dragging_ = false;
   bool zap_picker_active_ = false;
+  bool code_mode_ = false;
   base::RepeatingTimer zap_poll_timer_;
 
+  raw_ptr<views::View> main_panel_ = nullptr;
+  raw_ptr<views::View> code_panel_ = nullptr;
   raw_ptr<TitleMenuButton> title_button_ = nullptr;
   raw_ptr<views::Textfield> rename_field_ = nullptr;
   raw_ptr<ColorPadView> color_pad_ = nullptr;
+  raw_ptr<ColorSwatchDot> hex_swatch_ = nullptr;
+  raw_ptr<views::Textfield> hex_input_ = nullptr;
   raw_ptr<PillButton> mode_invert_ = nullptr;
   raw_ptr<PillButton> mode_palette_ = nullptr;
   raw_ptr<PillButton> mode_adjust_ = nullptr;
@@ -2402,7 +2925,7 @@ class BoostEditorView final : public views::View,
   raw_ptr<views::Label> zap_error_label_ = nullptr;
   raw_ptr<views::View> zap_list_ = nullptr;
   raw_ptr<PillButton> code_toggle_ = nullptr;
-  raw_ptr<views::View> code_section_ = nullptr;
+  raw_ptr<PillButton> code_picker_button_ = nullptr;
   raw_ptr<views::Textarea> css_editor_ = nullptr;
   raw_ptr<views::Label> css_banner_ = nullptr;
   raw_ptr<views::Label> css_bytes_label_ = nullptr;

@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-11-26: Boost Editor & location bar polish (9 parity fixes)
+
+- Updated `LocationBarView` (`location_bar_view.cc.patch`) so the Boost icon appears only when a site has an active Boost and stays anchored in the rightmost trailing slot on hover.
+- Updated `BoostEditorView` (`browser/foundation/boost_editor_view.cc`) with an editable `#rrggbb` hex color bar under the color pad, palette-aware Invert (flips selected palette lightness when in Palette mode, or toggles Invert on original page), light-mode monochrome `Hide` / `Clear all` / input styling, and orange rounded Zap frame (`#F9671D`, 10px radius) with right-side safe clamping so the Zap popover stays clear of the editor card.
+- Morphed `Code {}` into a 380px Arc-style dark CSS editor modal (`← Back`, `CSS`, close, live sanitizer banner, byte counter, `Apply`) with a Chrome DevTools-style element picker (`kInspectElementIcon` in `browser/foundation/icons.h`); verified with `out/MyarcRelease` `chrome` build, `export_patches.py --check` (163 patches), and `check_docs.py`.
+
 ## 2026-11-26: Boost Editor Arc parity (Case colors, Title menu, Sliders, interactive Zap picker)
 
 - Updated `BoostEditorView` (`browser/foundation/boost_editor_view.cc`) with Arc's Case button states (`AA` amber, `aa` orange-red, `Aa` red, `Case` neutral) and `My Boost ⌄` title menu order (`Rename this Boost…`, `Shuffle`, `Reset all Edits`, `Delete this Boost`, `All Boosts…`).

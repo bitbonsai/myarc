@@ -636,6 +636,26 @@ inline constexpr gfx::VectorIcon kSlidersHorizontalIcon(
     std::size(kSlidersHorizontalRep),
     "myarc_sliders_horizontal");
 
+// Lucide "square-mouse-pointer" (Chrome DevTools inspect-element icon) for the
+// Boost Code editor element picker.
+inline constexpr gfx::PathElement kInspectElementPath[] = {
+    gfx::CANVAS_DIMENSIONS, 24, gfx::STROKE, 2,
+    gfx::MOVE_TO, 21, 11, gfx::V_LINE_TO, 5,
+    gfx::R_ARC_TO, 2, 2, 0, 0, 0, -2, -2,
+    gfx::H_LINE_TO, 5,
+    gfx::R_ARC_TO, 2, 2, 0, 0, 0, -2, 2,
+    gfx::V_LINE_TO, 19,
+    gfx::R_ARC_TO, 2, 2, 0, 0, 0, 2, 2,
+    gfx::H_LINE_TO, 6,
+    gfx::MOVE_TO, 12, 12, gfx::LINE_TO, 15, 21,
+    gfx::LINE_TO, 17, 17, gfx::LINE_TO, 21, 15, gfx::CLOSE};
+inline constexpr gfx::VectorIconRep kInspectElementRep[] = {
+    {kInspectElementPath}};
+inline constexpr gfx::VectorIcon kInspectElementIcon(
+    kInspectElementRep,
+    std::size(kInspectElementRep),
+    "myarc_inspect_element");
+
 #undef MYARC_RAIL_FILL
 
 }  // namespace myarc
