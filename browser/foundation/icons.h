@@ -636,19 +636,32 @@ inline constexpr gfx::VectorIcon kSlidersHorizontalIcon(
     std::size(kSlidersHorizontalRep),
     "myarc_sliders_horizontal");
 
-// Lucide "square-mouse-pointer" (Chrome DevTools inspect-element icon) for the
-// Boost Code editor element picker.
+// Chrome DevTools-style inspect-element icon (dotted square + diagonal arrow
+// pointing into the box) for the Boost Code editor element picker.
 inline constexpr gfx::PathElement kInspectElementPath[] = {
-    gfx::CANVAS_DIMENSIONS, 24, gfx::STROKE, 2,
-    gfx::MOVE_TO, 21, 11, gfx::V_LINE_TO, 5,
-    gfx::R_ARC_TO, 2, 2, 0, 0, 0, -2, -2,
-    gfx::H_LINE_TO, 5,
-    gfx::R_ARC_TO, 2, 2, 0, 0, 0, -2, 2,
-    gfx::V_LINE_TO, 19,
-    gfx::R_ARC_TO, 2, 2, 0, 0, 0, 2, 2,
-    gfx::H_LINE_TO, 6,
-    gfx::MOVE_TO, 12, 12, gfx::LINE_TO, 15, 21,
-    gfx::LINE_TO, 17, 17, gfx::LINE_TO, 21, 15, gfx::CLOSE};
+    gfx::CANVAS_DIMENSIONS, 24,
+    gfx::FILL_RULE_NONZERO,
+    // Top row dots (x = 3, 7.5, 12, 16.5, y = 3)
+    gfx::ROUND_RECT, 3, 3, 2.2f, 2.2f, 0.4f,
+    gfx::ROUND_RECT, 7.4f, 3, 2.2f, 2.2f, 0.4f,
+    gfx::ROUND_RECT, 11.8f, 3, 2.2f, 2.2f, 0.4f,
+    gfx::ROUND_RECT, 16.2f, 3, 2.2f, 2.2f, 0.4f,
+    // Right top-corner dot
+    gfx::ROUND_RECT, 16.2f, 7.4f, 2.2f, 2.2f, 0.4f,
+    // Left column dots (y = 7.4, 11.8, 16.2)
+    gfx::ROUND_RECT, 3, 7.4f, 2.2f, 2.2f, 0.4f,
+    gfx::ROUND_RECT, 3, 11.8f, 2.2f, 2.2f, 0.4f,
+    gfx::ROUND_RECT, 3, 16.2f, 2.2f, 2.2f, 0.4f,
+    // Bottom-left dot
+    gfx::ROUND_RECT, 7.4f, 16.2f, 2.2f, 2.2f, 0.4f,
+    // Diagonal arrow pointing up-left from bottom-right (x=11, y=11 -> x=20, y=20)
+    gfx::NEW_PATH,
+    gfx::STROKE, 2.2f,
+    gfx::MOVE_TO, 19.5f, 12,
+    gfx::H_LINE_TO, 12,
+    gfx::V_LINE_TO, 19.5f,
+    gfx::MOVE_TO, 12.6f, 12.6f,
+    gfx::LINE_TO, 20.2f, 20.2f};
 inline constexpr gfx::VectorIconRep kInspectElementRep[] = {
     {kInspectElementPath}};
 inline constexpr gfx::VectorIcon kInspectElementIcon(

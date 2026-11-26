@@ -59,8 +59,12 @@
 #include "ui/base/models/image_model.h"
 #include "ui/base/mojom/dialog_button.mojom.h"
 #include "ui/base/mojom/menu_source_type.mojom.h"
+#include "ui/compositor/layer.h"
 #include "ui/events/event.h"
 #include "ui/events/keycodes/keyboard_codes.h"
+#include "ui/gfx/animation/animation_delegate.h"
+#include "ui/gfx/animation/slide_animation.h"
+#include "ui/gfx/animation/tween.h"
 #include "ui/gfx/canvas.h"
 #include "ui/gfx/color_utils.h"
 #include "ui/gfx/font.h"
@@ -371,7 +375,8 @@ class PillButton final : public views::Button {
     views::InkDrop::Get(this)->SetMode(views::InkDropHost::InkDropMode::OFF);
     views::InstallRoundRectHighlightPathGenerator(this, gfx::Insets(), 10);
     auto* layout = SetLayoutManager(std::make_unique<views::BoxLayout>(
-        Orientation::kHorizontal, gfx::Insets::VH(0, 14), 6));
+        Orientation::kHorizontal,
+        icon_ ? gfx::Insets::VH(0, 6) : gfx::Insets::VH(0, 14), 6));
     layout->set_cross_axis_alignment(CrossAxis::kCenter);
     layout->set_main_axis_alignment(centered ? MainAxis::kCenter
                                              : MainAxis::kStart);
@@ -1386,6 +1391,7 @@ class BoostEditorView final : public views::View,
                               public BoostsService::Observer,
                               public views::TextfieldController,
                               public views::SliderListener,
+                              public gfx::AnimationDelegate,
                               public ui::SimpleMenuModel::Delegate {
   METADATA_HEADER(BoostEditorView, views::View)
 
@@ -1417,6 +1423,13 @@ class BoostEditorView final : public views::View,
     SetLayoutManager(std::make_unique<views::BoxLayout>(
         Orientation::kVertical, gfx::Insets(), 10));
 
+    SetPaintToLayer();
+    layer()->SetFillsBoundsOpaquely(false);
+    bounds_anim_.SetTweenType(gfx::Tween::FAST_OUT_SLOW_IN);
+    bounds_anim_.SetSlideDuration(base::Milliseconds(180));
+    fade_anim_.SetTweenType(gfx::Tween::FAST_OUT_SLOW_IN);
+    fade_anim_.SetSlideDuration(base::Milliseconds(160));
+
     service_observation_.Observe(service_.get());
 
     BuildUi();
@@ -1424,6 +1437,8 @@ class BoostEditorView final : public views::View,
   }
 
   ~BoostEditorView() override {
+    bounds_anim_.Stop();
+    fade_anim_.Stop();
     StopZapPicker();
     ClearPreview();
     service_observation_.Reset();
@@ -1433,6 +1448,43 @@ class BoostEditorView final : public views::View,
     browser_ = nullptr;
     service_ = nullptr;
     ClearChildPointers();
+  }
+
+  void StartOpenAnimation() {
+    if (!layer()) {
+      return;
+    }
+    fade_anim_.Stop();
+    fade_anim_.Reset(0.0);
+    layer()->SetOpacity(0.0f);
+    fade_anim_.Show();
+  }
+
+  // gfx::AnimationDelegate:
+  void AnimationProgressed(const gfx::Animation* animation) override {
+    if (animation == &fade_anim_) {
+      if (layer()) {
+        const double v = fade_anim_.GetCurrentValue();
+        layer()->SetOpacity(static_cast<float>(
+            fade_from_opacity_ + (1.0 - fade_from_opacity_) * v));
+      }
+      return;
+    }
+    if (animation == &bounds_anim_) {
+      if (views::Widget* widget = GetWidget(); widget && !widget->IsClosed()) {
+        const gfx::Rect current = gfx::Tween::RectValueBetween(
+            bounds_anim_.GetCurrentValue(), anim_start_bounds_,
+            anim_target_bounds_);
+        widget->SetBounds(current);
+      }
+    }
+  }
+
+  void AnimationEnded(const gfx::Animation* animation) override {
+    AnimationProgressed(animation);
+    if (animation == &fade_anim_) {
+      fade_from_opacity_ = 0.0;
+    }
   }
 
   gfx::Size CalculatePreferredSize(
@@ -1462,6 +1514,8 @@ class BoostEditorView final : public views::View,
   uint64_t boost_id() const { return boost_id_; }
 
   void OnWindowClosing() {
+    bounds_anim_.Stop();
+    fade_anim_.Stop();
     StopZapPicker();
     CommitPendingCssIfValid();
     ClearPreview();
@@ -2051,17 +2105,23 @@ class BoostEditorView final : public views::View,
       css_banner_->SetBorder(views::CreateEmptyBorder(gfx::Insets::VH(6, 8)));
       css_banner_->SetVisible(false);
 
+      auto* editor_well = code_panel_->AddChildView(
+          MakeBox(Orientation::kVertical, gfx::Insets(10), 0));
+      editor_well->SetBackground(views::CreateRoundedRectBackground(
+          SkColorSetRGB(0x1C, 0x1C, 0x20), 10));
+      editor_well->SetBorder(views::CreateRoundedRectBorder(
+          1, 10, SkColorSetRGB(0x32, 0x32, 0x38)));
+
       auto editor = std::make_unique<views::Textarea>();
       editor->SetFontList(gfx::FontList(gfx::Font("Menlo", 12)));
       editor->SetPlaceholderText(u"/* Custom CSS */");
       editor->GetViewAccessibility().SetName(u"Custom CSS");
-      editor->SetBackgroundColor(SkColorSetRGB(0x1E, 0x1E, 0x22));
+      editor->SetBackgroundColor(SkColorSetRGB(0x1C, 0x1C, 0x20));
       editor->SetColor(SkColorSetRGB(0xF5, 0xF5, 0xF7));
-      editor->SetBorder(views::CreateRoundedRectBorder(
-          1, 10, SkColorSetRGB(0x32, 0x32, 0x38)));
-      editor->SetPreferredSize(gfx::Size(kCodeCardWidth - 28, 260));
+      editor->SetBorder(views::CreateEmptyBorder(gfx::Insets()));
+      editor->SetPreferredSize(gfx::Size(kCodeCardWidth - 48, 250));
       editor->set_controller(this);
-      css_editor_ = code_panel_->AddChildView(std::move(editor));
+      css_editor_ = editor_well->AddChildView(std::move(editor));
 
       auto* footer = code_panel_->AddChildView(
           MakeBox(Orientation::kHorizontal, gfx::Insets(), 8));
@@ -2416,13 +2476,9 @@ class BoostEditorView final : public views::View,
   void OnInvertPressed() {
     if (draft_appearance_.color_mode == foundation::BoostColorMode::Palette &&
         draft_appearance_.palette.set) {
-      color_utils::HSL hsl;
-      color_utils::SkColorToHSL(
-          Rgb24ToSkColor(draft_appearance_.palette.background), &hsl);
-      hsl.l = std::clamp(1.0 - hsl.l, 0.08, 0.96);
-      const SkColor inverted =
-          color_utils::HSLToSkColor(hsl, SK_AlphaOPAQUE);
-      ApplyHexColor(SkColorToRgb24(inverted), /*commit=*/true);
+      const uint32_t inverted_rgb =
+          (~draft_appearance_.palette.background) & 0xFF'FFFF;
+      ApplyHexColor(inverted_rgb, /*commit=*/true);
       SyncHexFieldFromDraft(/*force=*/true);
       return;
     }
@@ -2457,7 +2513,7 @@ class BoostEditorView final : public views::View,
            draft_appearance_.palette.saturation != 50);
       mode_adjust_->SetActive(show || sliders_non_default);
     }
-    SizeToContents();
+    AnimateSizeToContents(/*crossfade=*/false);
   }
 
   bool HasAnyEdits() const {
@@ -2565,7 +2621,7 @@ class BoostEditorView final : public views::View,
     } else {
       StopZapPicker();
     }
-    SizeToContents();
+    AnimateSizeToContents(/*crossfade=*/false);
   }
 
   void StartZapPicker() {
@@ -2740,7 +2796,7 @@ class BoostEditorView final : public views::View,
     code_mode_ = true;
     main_panel_->SetVisible(false);
     code_panel_->SetVisible(true);
-    SizeToContents();
+    AnimateSizeToContents(/*crossfade=*/true);
     if (css_editor_) {
       css_editor_->RequestFocus();
     }
@@ -2758,7 +2814,7 @@ class BoostEditorView final : public views::View,
     code_mode_ = false;
     code_panel_->SetVisible(false);
     main_panel_->SetVisible(true);
-    SizeToContents();
+    AnimateSizeToContents(/*crossfade=*/true);
   }
 
   void ToggleCodeElementPicker() {
@@ -2877,6 +2933,31 @@ class BoostEditorView final : public views::View,
     }
   }
 
+  void AnimateSizeToContents(bool crossfade) {
+    views::Widget* widget = GetWidget();
+    if (!bubble_delegate_ || !widget || widget->IsClosed() ||
+        !widget->IsVisible()) {
+      SizeToContents();
+      return;
+    }
+    anim_start_bounds_ = widget->GetWindowBoundsInScreen();
+    bubble_delegate_->SizeToContents();
+    anim_target_bounds_ = widget->GetWindowBoundsInScreen();
+    if (anim_start_bounds_ != anim_target_bounds_) {
+      widget->SetBounds(anim_start_bounds_);
+      bounds_anim_.Stop();
+      bounds_anim_.Reset(0.0);
+      bounds_anim_.Show();
+    }
+    if (crossfade && layer()) {
+      fade_from_opacity_ = 0.45;
+      fade_anim_.Stop();
+      fade_anim_.Reset(0.0);
+      layer()->SetOpacity(static_cast<float>(fade_from_opacity_));
+      fade_anim_.Show();
+    }
+  }
+
   void CloseEditor() {
     if (GetWidget() && !GetWidget()->IsClosed()) {
       GetWidget()->Close();
@@ -2900,6 +2981,11 @@ class BoostEditorView final : public views::View,
   bool zap_picker_active_ = false;
   bool code_mode_ = false;
   base::RepeatingTimer zap_poll_timer_;
+  gfx::SlideAnimation bounds_anim_{this};
+  gfx::SlideAnimation fade_anim_{this};
+  gfx::Rect anim_start_bounds_;
+  gfx::Rect anim_target_bounds_;
+  double fade_from_opacity_ = 0.0;
 
   raw_ptr<views::View> main_panel_ = nullptr;
   raw_ptr<views::View> code_panel_ = nullptr;
@@ -3144,8 +3230,10 @@ bool ShowBoostEditor(BrowserWindowInterface& browser, uint64_t boost_id) {
   slot->widget =
       views::BubbleDialogDelegate::CreateBubble(slot->delegate.get());
   views::Widget* raw_widget = slot->widget.get();
+  BoostEditorView* raw_view = slot->view;
   editors[&browser] = std::move(slot);
   raw_widget->Show();
+  raw_view->StartOpenAnimation();
   return true;
 }
 

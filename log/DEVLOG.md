@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-11-26: Boost Code view polish, DevTools inspect icon, animations, and RGB Invert
+
+- Replaced `kInspectElementIcon` (`browser/foundation/icons.h`) with the Chrome DevTools dotted-square + diagonal arrow icon and reduced icon `PillButton` horizontal padding (`6px`) so icon buttons never clip.
+- Wrapped the Boost Code editor `Textarea` (`browser/foundation/boost_editor_view.cc`) in a padded dark rounded well (`10px` insets) and added `gfx::SlideAnimation` bounds + opacity animations for opening the card, expanding Sliders/Zap, and morphing between the Boost card and Code Editor view.
+- Changed Palette-mode Invert (`OnInvertPressed`) from lightness-only flip to exact RGB inversion (`~rgb & 0xFFFFFF`) so mid-lightness colors like `#0026e4` invert cleanly to `#ffd91b` and round-trip losslessly; verified with `out/MyarcRelease` `chrome` build.
+
 ## 2026-11-26: Boost Editor & location bar polish (9 parity fixes)
 
 - Updated `LocationBarView` (`location_bar_view.cc.patch`) so the Boost icon appears only when a site has an active Boost and stays anchored in the rightmost trailing slot on hover.
