@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-11-26: Specific element selector in Boost Code picker
+
+- Updated `buildSelector` in `kCssPickStartScript` (`browser/foundation/boost_editor_view.cc`) to require uniqueness (`document.querySelectorAll(sel).length === 1`) instead of returning bare tags like `a` or un-scoped class names.
+- Prefers unique `#id`, then short unique semantic attributes (`href` on links, `data-testid`, `aria-label`, `name`), then unique `tag.class`, and otherwise walks ancestors (bounded to 16 levels) adding `:nth-of-type(n)` only where needed so the shortest unique selector is emitted.
+- Verified with `out/MyarcRelease` `chrome` build.
+
 ## 2026-11-26: Streamlined Boost Zap drawer, 3-mode color row, CSS auto-save & inline autocomplete
 
 - Removed the truncated `.banner, #ads` + `Hi...` manual selector row from the Boost Zap drawer (`browser/foundation/boost_editor_view.cc`), styled zapped selector rows with `1px` glass borders and centered `×` restore buttons, kept the Zap badge orange when active, and only expand the drawer when hidden selectors exist.

@@ -1323,14 +1323,88 @@ constexpr char16_t kCssPickStartScript[] = uR"JS((() => {
   ;(document.documentElement || document.body).appendChild(host)
 
   const safeIdent = (s) => typeof s === 'string' && /^[A-Za-z_][A-Za-z0-9_-]*$/.test(s)
+  const safeAttrVal = (s) =>
+    typeof s === 'string' && s.length > 0 && s.length <= 96 &&
+    !/["'\\\r\n]/.test(s) && !s.includes('/*') && !/url\s*\(/i.test(s)
+  const isUnique = (sel, target) => {
+    try {
+      const m = document.querySelectorAll(sel)
+      return m.length === 1 && m[0] === target
+    } catch {
+      return false
+    }
+  }
+  const validClasses = (el) => {
+    if (!el || !el.classList) return []
+    return Array.from(el.classList).filter((c) => safeIdent(c) && c.length <= 48).slice(0, 2)
+  }
+  const nthOfType = (el) => {
+    const tag = el.tagName
+    let idx = 1
+    let same = false
+    for (let s = el.previousElementSibling; s; s = s.previousElementSibling) {
+      if (s.tagName === tag) {
+        idx += 1
+        same = true
+      }
+    }
+    if (!same) {
+      for (let s = el.nextElementSibling; s; s = s.nextElementSibling) {
+        if (s.tagName === tag) {
+          same = true
+          break
+        }
+      }
+    }
+    return same ? idx : 0
+  }
   const buildSelector = (el) => {
     const tag = el.tagName.toLowerCase()
-    if (el.id && safeIdent(el.id)) return '#' + el.id
-    const cls = el.classList
-      ? Array.from(el.classList).filter((c) => safeIdent(c) && c.length <= 48).slice(0, 2)
-      : []
-    if (cls.length) return tag + '.' + cls.join('.')
-    return tag
+    if (el.id && safeIdent(el.id) && isUnique('#' + el.id, el)) {
+      return '#' + el.id
+    }
+    const attrNames = tag === 'a'
+      ? ['href', 'data-testid', 'aria-label']
+      : ['data-testid', 'aria-label', 'name']
+    for (const attr of attrNames) {
+      const v = el.getAttribute(attr)
+      if (!safeAttrVal(v)) continue
+      if (attr === 'href' && (v === '#' || v.startsWith('javascript:'))) continue
+      const cand = tag + '[' + attr + '="' + v + '"]'
+      if (isUnique(cand, el)) return cand
+    }
+    const cls = validClasses(el)
+    if (cls.length) {
+      const cand = tag + '.' + cls.join('.')
+      if (isUnique(cand, el)) return cand
+    }
+    if (isUnique(tag, el)) return tag
+
+    const parts = []
+    let cur = el
+    let depth = 0
+    while (cur && cur.nodeType === 1 && cur !== document.documentElement && depth < 16) {
+      const cTag = cur.tagName.toLowerCase()
+      if (cur.id && safeIdent(cur.id)) {
+        parts.unshift('#' + cur.id)
+        if (isUnique(parts.join(' > '), el)) return parts.join(' > ')
+        cur = cur.parentElement
+        depth += 1
+        continue
+      }
+      const cCls = validClasses(cur)
+      const base = cTag + (cCls.length ? '.' + cCls.join('.') : '')
+      parts.unshift(base)
+      if (isUnique(parts.join(' > '), el)) return parts.join(' > ')
+      const nth = nthOfType(cur)
+      if (nth > 0) {
+        parts[0] = base + ':nth-of-type(' + nth + ')'
+        if (isUnique(parts.join(' > '), el)) return parts.join(' > ')
+      }
+      cur = cur.parentElement
+      depth += 1
+    }
+    return parts.join(' > ') || tag
   }
 
   const pad = 4
