@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-11-26: Boost Zap and Code picker single-click activation and immediate crosshair
+
+- Activated the parent browser window and focused `web_contents()` in `StartZapPicker()` and `ToggleCodeElementPicker()` (`browser/foundation/boost_editor_view.cc`) so macOS updates the cursor to `crosshair` immediately on hover instead of waiting for a click to activate the browser window behind the Boost Editor bubble.
+- Switched Zap picker element selection (`kZapStartScript`) from `click` to primary-button `mousedown` (while passing overlay button events through), ensuring a single click always selects the target element even after interacting with the Boost Editor card.
+- Verified with `out/MyarcRelease` `chrome` build.
+
 ## 2026-11-26: Boost Zap and Code picker highlight padding and crosshair cursor
 
 - Outset the Boost Zap (`kZapStartScript`) and Code element picker (`kCssPickStartScript`) highlight box by `4px` on all sides (clamped inside the viewport frame) with `6px` border-radius (`browser/foundation/boost_editor_view.cc`) so text and elements have clean breathing room inside the outline, and shifted the floating Zap pill and selector tooltip to match.

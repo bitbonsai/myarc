@@ -1104,8 +1104,9 @@ constexpr char16_t kZapStartScript[] = uR"JS((() => {
       positionBox(el)
     }
   }
-  const onClick = (e) => {
+  const onMouseDown = (e) => {
     if (isOwnEvent(e)) return
+    if (e.button !== 0) return
     e.preventDefault()
     e.stopImmediatePropagation()
     const el = document.elementFromPoint(e.clientX, e.clientY)
@@ -1168,9 +1169,9 @@ constexpr char16_t kZapStartScript[] = uR"JS((() => {
 
   const stop = () => {
     window.removeEventListener('mousemove', onMove, true)
-    window.removeEventListener('click', onClick, true)
-    window.removeEventListener('mousedown', blockPointer, true)
+    window.removeEventListener('mousedown', onMouseDown, true)
     window.removeEventListener('mouseup', blockPointer, true)
+    window.removeEventListener('click', blockPointer, true)
     window.removeEventListener('keydown', onKey, true)
     cursorStyle.remove()
     host.remove()
@@ -1178,9 +1179,9 @@ constexpr char16_t kZapStartScript[] = uR"JS((() => {
   }
 
   window.addEventListener('mousemove', onMove, true)
-  window.addEventListener('click', onClick, true)
-  window.addEventListener('mousedown', blockPointer, true)
+  window.addEventListener('mousedown', onMouseDown, true)
   window.addEventListener('mouseup', blockPointer, true)
+  window.addEventListener('click', blockPointer, true)
   window.addEventListener('keydown', onKey, true)
 
   window.__myarcZap = { active: true, queue, stop }
@@ -2672,6 +2673,10 @@ class BoostEditorView final : public views::View,
     rfh->ExecuteJavaScriptInIsolatedWorld(
         kZapStartScript, base::NullCallback(),
         ISOLATED_WORLD_ID_CHROME_INTERNAL);
+    if (views::Widget* parent = GetWidget() ? GetWidget()->parent() : nullptr) {
+      parent->Activate();
+    }
+    web_contents()->Focus();
     zap_poll_timer_.Start(
         FROM_HERE, base::Milliseconds(100),
         base::BindRepeating(&BoostEditorView::PollZapPicker,
@@ -2877,6 +2882,10 @@ class BoostEditorView final : public views::View,
     rfh->ExecuteJavaScriptInIsolatedWorld(
         kCssPickStartScript, base::NullCallback(),
         ISOLATED_WORLD_ID_CHROME_INTERNAL);
+    if (views::Widget* parent = GetWidget() ? GetWidget()->parent() : nullptr) {
+      parent->Activate();
+    }
+    web_contents()->Focus();
     zap_poll_timer_.Start(
         FROM_HERE, base::Milliseconds(100),
         base::BindRepeating(&BoostEditorView::PollZapPicker,
