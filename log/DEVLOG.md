@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-11-26: Pure transparent high-blur Boost dialog backdrop
+
+- Changed `kCardGlassTint` (`browser/foundation/boost_editor_view.cc`) from `0xC2` opaque white wash to `SK_ColorTRANSPARENT` over macOS `NSVisualEffectMaterialHUDWindow` blur so the Boost dialog uses pure high-blur vibrancy without muddying dark pages.
+- Updated `kPillBg`, `kPillHoverBg`, the font grid container, and light textfields to frosted translucent white (`0x9A` / `0xCC`) so controls float consistently over the glass backdrop.
+- Verified with `out/MyarcRelease` `chrome` build.
+
 ## 2026-11-26: Frosted glass Boost panels, CSS syntax highlighting, and Tab auto-indent
 
 - Applied `ApplyBubbleGlass()` (`GlassMaterial::kPopover`, translucent frosted white tint with Reduce Transparency fallback) to the Boost Editor card and Code panel (`browser/foundation/boost_editor_view.cc`), with translucent pill backgrounds and a dark translucent glass code well (`0xD8` alpha) so the blurred page shows subtly behind both views.

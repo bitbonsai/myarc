@@ -120,9 +120,9 @@ constexpr int kPadWidth = 220;
 constexpr int kPadHeight = 152;
 constexpr int kCardCornerRadius = 16;
 constexpr SkColor kCardBg = SK_ColorWHITE;
-constexpr SkColor kCardGlassTint = SkColorSetARGB(0xC2, 0xFF, 0xFF, 0xFF);
-constexpr SkColor kPillBg = SkColorSetARGB(0xA6, 0xEC, 0xED, 0xF2);
-constexpr SkColor kPillHoverBg = SkColorSetARGB(0xCC, 0xE2, 0xE4, 0xEC);
+constexpr SkColor kCardGlassTint = SK_ColorTRANSPARENT;
+constexpr SkColor kPillBg = SkColorSetARGB(0x9A, 0xFF, 0xFF, 0xFF);
+constexpr SkColor kPillHoverBg = SkColorSetARGB(0xCC, 0xFF, 0xFF, 0xFF);
 constexpr SkColor kPillActiveBg = SkColorSetRGB(0x2B, 0x2B, 0x30);
 constexpr SkColor kInkPrimary = SkColorSetRGB(0x1C, 0x1C, 0x1E);
 constexpr SkColor kInkSecondary = SkColorSetRGB(0x6E, 0x6E, 0x73);
@@ -2299,7 +2299,7 @@ class BoostEditorView final : public views::View,
 
   void BuildUi() {
     auto style_light_textfield = [](views::Textfield* tf) {
-      tf->SetBackgroundColor(SK_ColorWHITE);
+      tf->SetBackgroundColor(kPillBg);
       tf->SetColor(kInkPrimary);
       tf->SetBorder(views::CreatePaddedBorder(
           views::CreateRoundedRectBorder(1, 8, kBorderSubtle),
@@ -2458,7 +2458,7 @@ class BoostEditorView final : public views::View,
     auto* grid_card = main_panel_->AddChildView(
         MakeBox(Orientation::kVertical, gfx::Insets(8), 2));
     grid_card->SetBackground(
-        views::CreateRoundedRectBackground(kCardBg, 12));
+        views::CreateRoundedRectBackground(kPillBg, 12));
     grid_card->SetBorder(
         views::CreateRoundedRectBorder(1, 12, kBorderSubtle));
     for (size_t row = 0; row < 4; ++row) {
