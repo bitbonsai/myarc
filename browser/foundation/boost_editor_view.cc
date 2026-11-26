@@ -2517,10 +2517,8 @@ class BoostEditorView final : public views::View,
         MakeBox(Orientation::kVertical, gfx::Insets(), 10));
 
     // 1. Header row: Close (x), Title dropdown / rename, Reset (↺).
-    auto* header = main_panel_->AddChildView(MakeBox(
-        Orientation::kHorizontal, gfx::Insets::TLBR(0, 0, 8, 0), 4));
-    header->SetBorder(
-        views::CreateSolidSidedBorder(gfx::Insets::TLBR(0, 0, 1, 0), kBorderSubtle));
+    auto* header = main_panel_->AddChildView(
+        MakeBox(Orientation::kHorizontal, gfx::Insets::TLBR(0, 0, 2, 0), 4));
     auto* header_layout =
         static_cast<views::BoxLayout*>(header->GetLayoutManager());
     header_layout->set_cross_axis_alignment(CrossAxis::kCenter);
