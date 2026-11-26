@@ -134,6 +134,15 @@ class LittleArcHeader final : public views::View,
   uint64_t picker_current_ = 0;
   std::unique_ptr<ui::SimpleMenuModel> picker_model_;
   std::unique_ptr<views::MenuRunner> picker_runner_;
+  // Last rendered state to avoid redundant relayouts on progress ticks.
+  bool has_rendered_ = false;
+  bool last_dark_ = false;
+  bool last_space_found_ = false;
+  std::u16string last_space_name_;
+  std::string last_space_icon_;
+  std::u16string last_host_;
+  bool last_blank_ = false;
+  raw_ptr<const gfx::VectorIcon> last_security_icon_ = nullptr;
   base::WeakPtrFactory<LittleArcHeader> weak_factory_{this};
 };
 

@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-11-26: Little Arc header stability (no HTTPS warning flash or load relayout churn)
+
+- Updated `LittleArcHeader::Update()` (`browser/foundation/little_arc.{h,cc}`) to treat `security_state::NONE` on cryptographic (`https://`) URLs as secure (`kPeekLockIcon`) while connecting, preventing the transient warning-triangle flash on open.
+- Added rendered-state caching (`has_rendered_`, host, blank state, dark mode, Space pill, and security icon) in `LittleArcHeader` so navigation progress ticks no longer trigger redundant `InvalidateLayout()` / `SchedulePaint()` churn while a page loads.
+- Verified with `out/MyarcRelease` `chrome` build.
+
 ## 2026-11-26: Boost Code view polish, DevTools inspect icon, animations, and RGB Invert
 
 - Replaced `kInspectElementIcon` (`browser/foundation/icons.h`) with the Chrome DevTools dotted-square + diagonal arrow icon and reduced icon `PillButton` horizontal padding (`6px`) so icon buttons never clip.

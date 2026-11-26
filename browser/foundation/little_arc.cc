@@ -582,7 +582,8 @@ SkColor LittleArcHeader::FrameColor() const {
 }
 
 void LittleArcHeader::Update() {
-  const Palette& palette = IsDark() ? kDark : kLight;
+  const bool dark = IsDark();
+  const Palette& palette = dark ? kDark : kLight;
   const TargetSpace space = FindTargetSpace(*browser_);
   content::WebContents* contents =
       browser_->GetTabStripModel()->GetActiveWebContents();
@@ -597,14 +598,34 @@ void LittleArcHeader::Update() {
   const gfx::VectorIcon* security_icon = nullptr;
   std::u16string security_name;
   if (!blank && contents) {
-    const bool secure = chrome_security_state::GetSecurityLevel(contents) ==
-                        security_state::SECURE;
+    const security_state::SecurityLevel level =
+        chrome_security_state::GetSecurityLevel(contents);
     const bool web = url.SchemeIsHTTPOrHTTPS();
+    // Avoid flashing a warning triangle on HTTPS URLs while TLS is connecting
+    // (security_state::NONE before the first response commits).
+    const bool secure =
+        level == security_state::SECURE ||
+        (level == security_state::NONE && url.SchemeIsCryptographic());
     security_icon =
         secure ? &kPeekLockIcon : (web ? &kPeekNotSecureIcon : &kInfoIcon);
     security_name = secure ? u"Connection is secure"
                            : (web ? u"Not secure" : u"Browser page");
   }
+  if (has_rendered_ && last_dark_ == dark &&
+      last_space_found_ == space.found && last_space_name_ == space.name &&
+      last_space_icon_ == space.icon.value && last_host_ == host &&
+      last_blank_ == blank && last_security_icon_ == security_icon) {
+    return;
+  }
+  has_rendered_ = true;
+  last_dark_ = dark;
+  last_space_found_ = space.found;
+  last_space_name_ = space.name;
+  last_space_icon_ = space.icon.value;
+  last_host_ = host;
+  last_blank_ = blank;
+  last_security_icon_ = security_icon;
+
   address_->Set(palette, space, host, blank, security_icon, security_name);
   open_in_->Set(palette, space);
   InvalidateLayout();
