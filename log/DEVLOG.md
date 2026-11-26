@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-11-26: Streamlined Boost Zap drawer, 3-mode color row, CSS auto-save & inline autocomplete
+
+- Removed the truncated `.banner, #ads` + `Hi...` manual selector row from the Boost Zap drawer (`browser/foundation/boost_editor_view.cc`), styled zapped selector rows with `1px` glass borders and centered `×` restore buttons, kept the Zap badge orange when active, and only expand the drawer when hidden selectors exist.
+- Removed the redundant second reset (`mode_none_`) button so the color-mode row holds 3 balanced pills (`Invert`, `Palette`, `Sliders`), toggling `Palette`/`Invert` back to `None` on second click.
+- Removed `Apply` in favor of 400ms debounced silent CSS auto-save (auto-formatting on exit/`Cmd+S`), fixed double-space after `:` in `FormatCssText()`, and added bounded inline CSS property/value/`!important` autocomplete chips in the Code footer (`Tab` accepts, `↑`/`↓` cycles, `Esc` dismisses); verified with `out/MyarcRelease` `chrome` build.
+
 ## 2026-11-26: Sleeker Boost Code header (circular Back icon) and automatic CSS formatting
 
 - Replaced the wide `← Back` pill in the Boost Code header (`browser/foundation/boost_editor_view.cc`) with a symmetric `24x24` circular glass `kArrowLeftIcon` button matching the right-side close circle so `Custom CSS` sits dead-center.
