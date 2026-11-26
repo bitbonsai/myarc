@@ -1617,6 +1617,167 @@ void ApplyCssSyntaxHighlighting(views::Textarea* editor) {
   }
 }
 
+// Bounded CSS pretty-printer for the Boost Code editor Format button.
+std::u16string FormatCssText(std::u16string_view input) {
+  constexpr size_t kMaxFormatChars = 65536;
+  const size_t n = std::min(input.size(), kMaxFormatChars);
+  auto is_space = [](char16_t c) {
+    return c == ' ' || c == '\t' || c == '\n' || c == '\r';
+  };
+  auto trim_trailing_spaces = [](std::u16string& s) {
+    while (!s.empty() && (s.back() == u' ' || s.back() == u'\t')) {
+      s.pop_back();
+    }
+  };
+
+  std::u16string out;
+  out.reserve(n + 64);
+  int indent = 0;
+  bool at_line_start = true;
+  bool pending_space = false;
+
+  auto emit_indent = [&]() {
+    out.append(static_cast<size_t>(indent) * 2, u' ');
+    at_line_start = false;
+  };
+  auto emit_newline = [&]() {
+    trim_trailing_spaces(out);
+    if (!out.empty() && out.back() != u'\n') {
+      out.push_back(u'\n');
+    }
+    at_line_start = true;
+    pending_space = false;
+  };
+
+  size_t i = 0;
+  while (i < n) {
+    const char16_t c = input[i];
+    if (is_space(c)) {
+      if (!at_line_start) {
+        pending_space = true;
+      }
+      ++i;
+      continue;
+    }
+    // Preserve block comments verbatim on their own line when at line start.
+    if (c == u'/' && i + 1 < n && input[i + 1] == u'*') {
+      const size_t start = i;
+      i += 2;
+      while (i + 1 < n && !(input[i] == u'*' && input[i + 1] == u'/')) {
+        ++i;
+      }
+      i = (i + 1 < n) ? i + 2 : n;
+      if (at_line_start) {
+        emit_indent();
+      } else if (pending_space) {
+        out.push_back(u' ');
+      }
+      pending_space = false;
+      out.append(input.substr(start, i - start));
+      emit_newline();
+      continue;
+    }
+    // Preserve quoted strings verbatim.
+    if (c == u'"' || c == u'\'') {
+      const char16_t quote = c;
+      const size_t start = i++;
+      while (i < n) {
+        if (input[i] == u'\\' && i + 1 < n) {
+          i += 2;
+          continue;
+        }
+        if (input[i] == quote) {
+          ++i;
+          break;
+        }
+        ++i;
+      }
+      if (at_line_start) {
+        emit_indent();
+      } else if (pending_space) {
+        out.push_back(u' ');
+      }
+      pending_space = false;
+      out.append(input.substr(start, i - start));
+      continue;
+    }
+    if (c == u'{') {
+      trim_trailing_spaces(out);
+      if (!at_line_start) {
+        out.push_back(u' ');
+      } else {
+        emit_indent();
+      }
+      out.push_back(u'{');
+      ++indent;
+      emit_newline();
+      ++i;
+      continue;
+    }
+    if (c == u'}') {
+      indent = std::max(0, indent - 1);
+      if (!at_line_start) {
+        emit_newline();
+      }
+      emit_indent();
+      out.push_back(u'}');
+      emit_newline();
+      if (indent == 0) {
+        out.push_back(u'\n');
+      }
+      ++i;
+      continue;
+    }
+    if (c == u';') {
+      trim_trailing_spaces(out);
+      if (at_line_start) {
+        emit_indent();
+      }
+      out.push_back(u';');
+      emit_newline();
+      ++i;
+      continue;
+    }
+    if (c == u':' && indent > 0) {
+      trim_trailing_spaces(out);
+      if (at_line_start) {
+        emit_indent();
+      }
+      out.append(u": ");
+      pending_space = false;
+      ++i;
+      continue;
+    }
+    if (c == u',' && indent == 0) {
+      trim_trailing_spaces(out);
+      if (at_line_start) {
+        emit_indent();
+      }
+      out.append(u", ");
+      pending_space = false;
+      ++i;
+      continue;
+    }
+    if (at_line_start) {
+      emit_indent();
+    } else if (pending_space && !out.empty() && out.back() != u'(' &&
+               c != u')') {
+      out.push_back(u' ');
+    }
+    pending_space = false;
+    out.push_back(c);
+    ++i;
+  }
+
+  while (!out.empty() && (out.back() == u'\n' || out.back() == u' ')) {
+    out.pop_back();
+  }
+  if (!out.empty()) {
+    out.push_back(u'\n');
+  }
+  return out;
+}
+
 // Small circular swatch beside the editable hex color field.
 class ColorSwatchDot final : public views::View {
   METADATA_HEADER(ColorSwatchDot, views::View)
@@ -2331,13 +2492,13 @@ class BoostEditorView final : public views::View,
           &BoostEditorView::CloseEditor, base::Unretained(this)));
       close->SetImageModel(
           views::Button::STATE_NORMAL,
-          ui::ImageModel::FromVectorIcon(kPeekCloseIcon, SK_ColorWHITE, 11));
+          ui::ImageModel::FromVectorIcon(kPeekCloseIcon, SK_ColorWHITE, 12));
       close->SetImageHorizontalAlignment(views::ImageButton::ALIGN_CENTER);
       close->SetImageVerticalAlignment(views::ImageButton::ALIGN_MIDDLE);
-      close->SetPreferredSize(gfx::Size(22, 22));
+      close->SetPreferredSize(gfx::Size(24, 24));
       close->SetBackground(views::CreateRoundedRectBackground(
-          SkColorSetARGB(0x2E, 0xFF, 0xFF, 0xFF), 11));
-      close->SetBorder(views::CreateRoundedRectBorder(1, 11, kBorderSubtle));
+          SkColorSetARGB(0x2E, 0xFF, 0xFF, 0xFF), 12));
+      close->SetBorder(views::CreateRoundedRectBorder(1, 12, kBorderSubtle));
       close->SetTooltipText(u"Close Boost Editor");
       close->GetViewAccessibility().SetName(u"Close Boost Editor");
       views::InstallCircleHighlightPathGenerator(close.get());
@@ -2583,15 +2744,12 @@ class BoostEditorView final : public views::View,
       auto* spacer_l = code_header->AddChildView(std::make_unique<views::View>());
       ch_layout->SetFlexForView(spacer_l, 1);
 
-      auto* badge = code_header->AddChildView(MakeLabel(
-          u"CSS",
-          gfx::FontList().Derive(-1, gfx::Font::NORMAL,
+      auto* heading = code_header->AddChildView(MakeLabel(
+          u"Custom CSS",
+          gfx::FontList().Derive(0, gfx::Font::NORMAL,
                                  gfx::Font::Weight::SEMIBOLD),
           kInkPrimary));
-      badge->SetBackground(views::CreateRoundedRectBackground(kPillBg, 6));
-      badge->SetBorder(views::CreatePaddedBorder(
-          views::CreateRoundedRectBorder(1, 6, kPillBorder),
-          gfx::Insets::VH(3, 11)));
+      heading->SetHorizontalAlignment(gfx::ALIGN_CENTER);
 
       auto* spacer_r = code_header->AddChildView(std::make_unique<views::View>());
       ch_layout->SetFlexForView(spacer_r, 1);
@@ -2641,6 +2799,15 @@ class BoostEditorView final : public views::View,
           /*font_size_delta=*/0, &kInspectElementIcon));
       code_picker_button_->SetPreferredSize(gfx::Size(36, 32));
       code_picker_button_->SetTooltipText(u"Pick an element on the page");
+
+      auto format_btn = std::make_unique<PillButton>(
+          base::BindRepeating(&BoostEditorView::FormatCustomCss,
+                              base::Unretained(this)),
+          u"Format CSS", std::u16string(), /*centered=*/true,
+          /*font_size_delta=*/0, &kSparklesIcon);
+      format_btn->SetPreferredSize(gfx::Size(36, 32));
+      format_btn->SetTooltipText(u"Format CSS");
+      footer->AddChildView(std::move(format_btn));
 
       css_bytes_label_ = footer->AddChildView(MakeLabel(
           u"0 / 64 KB",
@@ -3399,6 +3566,15 @@ class BoostEditorView final : public views::View,
         FROM_HERE, base::Milliseconds(100),
         base::BindRepeating(&BoostEditorView::PollZapPicker,
                             base::Unretained(this)));
+  }
+
+  void FormatCustomCss() {
+    if (!css_editor_) {
+      return;
+    }
+    const std::u16string formatted = FormatCssText(css_editor_->GetText());
+    ApplyCssProgrammaticEdit(formatted, gfx::Range(formatted.size()));
+    css_editor_->RequestFocus();
   }
 
   void CommitCustomCss() {

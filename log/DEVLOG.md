@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-11-26: Boost Code editor Format CSS button, plain heading, and centered close icon
+
+- Added Lucide `kSparklesIcon` (`browser/foundation/icons.h`) and a `Format CSS` footer button wired to a bounded CSS pretty-printer (`FormatCssText` in `browser/foundation/boost_editor_view.cc`) that normalizes 2-space block indentation, spacing around `{`, `:`, `;`, and blank lines between top-level rules while preserving comments and strings.
+- Replaced the button-styled `CSS` pill in the Code editor header with a plain centered `Custom CSS` heading.
+- Resized the circular close button from `22x22` with an `11px` icon (half-pixel offset) to `24x24` with a `12px` icon so the `×` is mathematically centered on all sides; verified with `out/MyarcRelease` `chrome` build.
+
 ## 2026-11-26: Smoked dark crystal glass Boost & Code panels with high-contrast legibility
 
 - Switched `ApplyBubbleGlass()` (`browser/foundation/boost_editor_view.cc`) to `dark = true` (`NSAppearanceNameVibrantDark` + `NSVisualEffectMaterialHUDWindow`) with a translucent dark crystal tint (`0x52` alpha) so the backdrop reads as crisp smoked glass instead of chalky frost.

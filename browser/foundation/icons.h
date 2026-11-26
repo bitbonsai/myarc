@@ -710,6 +710,35 @@ inline constexpr gfx::VectorIcon kBracesIcon(kBracesRep,
                                              std::size(kBracesRep),
                                              "myarc_braces");
 
+// Lucide "sparkles" for Boost Code editor Format CSS button.
+inline constexpr gfx::PathElement kSparklesPath[] = {
+    gfx::CANVAS_DIMENSIONS, 24, gfx::STROKE, 2,
+    gfx::MOVE_TO, 9.937f, 15.5f,
+    gfx::ARC_TO, 2, 2, 0, 0, 0, 8.5f, 14.063f,
+    gfx::LINE_TO, 2.365f, 12.481f,
+    gfx::ARC_TO, 0.5f, 0.5f, 0, 0, 1, 2.365f, 11.519f,
+    gfx::LINE_TO, 8.5f, 9.937f,
+    gfx::ARC_TO, 2, 2, 0, 0, 0, 9.937f, 8.5f,
+    gfx::LINE_TO, 11.519f, 2.365f,
+    gfx::ARC_TO, 0.5f, 0.5f, 0, 0, 1, 12.481f, 2.365f,
+    gfx::LINE_TO, 14.063f, 8.5f,
+    gfx::ARC_TO, 2, 2, 0, 0, 0, 15.5f, 9.937f,
+    gfx::LINE_TO, 21.635f, 11.519f,
+    gfx::ARC_TO, 0.5f, 0.5f, 0, 0, 1, 21.635f, 12.481f,
+    gfx::LINE_TO, 15.5f, 14.063f,
+    gfx::ARC_TO, 2, 2, 0, 0, 0, 14.063f, 15.5f,
+    gfx::LINE_TO, 12.481f, 21.635f,
+    gfx::ARC_TO, 0.5f, 0.5f, 0, 0, 1, 11.519f, 21.635f,
+    gfx::CLOSE,
+    gfx::MOVE_TO, 20, 3, gfx::V_LINE_TO, 7,
+    gfx::MOVE_TO, 22, 5, gfx::H_LINE_TO, 18,
+    gfx::MOVE_TO, 4, 17, gfx::V_LINE_TO, 19,
+    gfx::MOVE_TO, 5, 18, gfx::H_LINE_TO, 3};
+inline constexpr gfx::VectorIconRep kSparklesRep[] = {{kSparklesPath}};
+inline constexpr gfx::VectorIcon kSparklesIcon(kSparklesRep,
+                                               std::size(kSparklesRep),
+                                               "myarc_sparkles");
+
 #undef MYARC_RAIL_FILL
 
 }  // namespace myarc
