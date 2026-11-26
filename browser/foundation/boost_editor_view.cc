@@ -2764,10 +2764,8 @@ class BoostEditorView final : public views::View,
         MakeBox(Orientation::kVertical, gfx::Insets(), 10));
     code_panel_->SetVisible(false);
     {
-      auto* code_header = code_panel_->AddChildView(MakeBox(
-          Orientation::kHorizontal, gfx::Insets::TLBR(0, 0, 8, 0), 8));
-      code_header->SetBorder(views::CreateSolidSidedBorder(
-          gfx::Insets::TLBR(0, 0, 1, 0), kBorderSubtle));
+      auto* code_header = code_panel_->AddChildView(
+          MakeBox(Orientation::kHorizontal, gfx::Insets::TLBR(0, 0, 2, 0), 8));
       auto* ch_layout =
           static_cast<views::BoxLayout*>(code_header->GetLayoutManager());
       ch_layout->set_cross_axis_alignment(CrossAxis::kCenter);
