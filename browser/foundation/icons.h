@@ -739,6 +739,17 @@ inline constexpr gfx::VectorIcon kSparklesIcon(kSparklesRep,
                                                std::size(kSparklesRep),
                                                "myarc_sparkles");
 
+// Lucide "ban" for Boost Editor original-colors / reset mode button.
+inline constexpr gfx::PathElement kBanPath[] = {
+    gfx::CANVAS_DIMENSIONS, 24, gfx::STROKE, 2,
+    gfx::CIRCLE, 12, 12, 10,
+    gfx::MOVE_TO, 4.93f, 4.93f,
+    gfx::LINE_TO, 19.07f, 19.07f};
+inline constexpr gfx::VectorIconRep kBanRep[] = {{kBanPath}};
+inline constexpr gfx::VectorIcon kBanIcon(kBanRep,
+                                          std::size(kBanRep),
+                                          "myarc_ban");
+
 #undef MYARC_RAIL_FILL
 
 }  // namespace myarc

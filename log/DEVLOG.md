@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-11-26: Boost contrast polish (swatch ring/shadow, crisp font/badge contrast, Lucide Ban icon)
+
+- Added Lucide `kBanIcon` (`ban`, 24x24 stroke 2) in `browser/foundation/icons.h` and replaced the Unicode `⊘` text glyph on `mode_none_` (`browser/foundation/boost_editor_view.cc`) so all four color-mode buttons share identical 18px Lucide stroke weight and sizing.
+- Styled `ColorSwatchDot` with a `1.5px` white outer ring and subtle drop shadow matching the Color Pad knob so dark or mid-tone hex colors stand out cleanly over glass.
+- Switched selected `FontPresetCell` to solid white with dark ink (`kPillActiveInk`) and `Zap`/`Code` circular badges to high-contrast solid `#F9671D` / `#5865F2` with white numerals; verified with `out/MyarcRelease` `chrome` build.
+
 ## 2026-11-26: Boost Code editor Format CSS button, plain heading, and centered close icon
 
 - Added Lucide `kSparklesIcon` (`browser/foundation/icons.h`) and a `Format CSS` footer button wired to a bounded CSS pretty-printer (`FormatCssText` in `browser/foundation/boost_editor_view.cc`) that normalizes 2-space block indentation, spacing around `{`, `:`, `;`, and blank lines between top-level rules while preserving comments and strings.

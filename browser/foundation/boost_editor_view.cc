@@ -879,9 +879,8 @@ class FontPresetCell final : public views::Button {
     const bool hovered =
         GetState() == STATE_HOVERED || GetState() == STATE_PRESSED;
     if (selected_) {
-      SetBackground(views::CreateRoundedRectBackground(
-          SkColorSetARGB(0x42, 0x63, 0x70, 0xFF), 6));
-      label_->SetEnabledColor(SkColorSetRGB(0xC7, 0xD2, 0xFE));
+      SetBackground(views::CreateRoundedRectBackground(SK_ColorWHITE, 6));
+      label_->SetEnabledColor(kPillActiveInk);
     } else if (hovered) {
       SetBackground(views::CreateRoundedRectBackground(kPillBg, 6));
       label_->SetEnabledColor(kInkPrimary);
@@ -1783,7 +1782,7 @@ class ColorSwatchDot final : public views::View {
   METADATA_HEADER(ColorSwatchDot, views::View)
 
  public:
-  ColorSwatchDot() { SetPreferredSize(gfx::Size(16, 16)); }
+  ColorSwatchDot() { SetPreferredSize(gfx::Size(20, 20)); }
 
   void SetColor(std::optional<SkColor> color) {
     color_ = color;
@@ -1792,18 +1791,25 @@ class ColorSwatchDot final : public views::View {
 
   void OnPaint(gfx::Canvas* canvas) override {
     const gfx::PointF center(width() * 0.5f, height() * 0.5f);
-    const float r = 6.5f;
+    const float r = 7.f;
+
+    cc::PaintFlags shadow;
+    shadow.setAntiAlias(true);
+    shadow.setColor(SkColorSetA(SK_ColorBLACK, 0x45));
+    canvas->DrawCircle(gfx::PointF(center.x(), center.y() + 1.f), r + 1.25f,
+                       shadow);
+
     cc::PaintFlags fill;
     fill.setAntiAlias(true);
     fill.setColor(color_.value_or(SK_ColorWHITE));
     canvas->DrawCircle(center, r, fill);
 
-    cc::PaintFlags stroke;
-    stroke.setAntiAlias(true);
-    stroke.setStyle(cc::PaintFlags::kStroke_Style);
-    stroke.setStrokeWidth(1.f);
-    stroke.setColor(SkColorSetA(SK_ColorBLACK, 0x24));
-    canvas->DrawCircle(center, r, stroke);
+    cc::PaintFlags ring;
+    ring.setAntiAlias(true);
+    ring.setStyle(cc::PaintFlags::kStroke_Style);
+    ring.setStrokeWidth(1.5f);
+    ring.setColor(SK_ColorWHITE);
+    canvas->DrawCircle(center, r, ring);
   }
 
  private:
@@ -2596,7 +2602,8 @@ class BoostEditorView final : public views::View,
         base::BindRepeating(&BoostEditorView::SetColorMode,
                             base::Unretained(this),
                             foundation::BoostColorMode::None),
-        u"\u2298", std::u16string(), /*centered=*/true, /*font_size_delta=*/3));
+        u"Reset to original colors", std::u16string(), /*centered=*/true,
+        /*font_size_delta=*/0, &kBanIcon));
     mode_none_->SetTooltipText(u"Reset to original colors");
     mode_none_->GetViewAccessibility().SetName(u"Reset to original colors");
     modes_layout->SetFlexForView(mode_none_, 1);
@@ -2931,8 +2938,7 @@ class BoostEditorView final : public views::View,
       zap_toggle_->SetText(u"Zap");
       zap_toggle_->SetBadge(
           count == 0 ? std::u16string() : base::NumberToString16(count),
-          SkColorSetARGB(0x44, 0xF9, 0x67, 0x1D),
-          SkColorSetRGB(0xFF, 0xBA, 0x94));
+          SkColorSetRGB(0xF9, 0x67, 0x1D), SK_ColorWHITE);
       zap_toggle_->SetTooltipText(
           count == 0 ? u"Hide page elements by CSS selector"
                      : u"Hide page elements (" +
@@ -2953,8 +2959,7 @@ class BoostEditorView final : public views::View,
       code_toggle_->SetBadge(
           rule_count == 0 ? std::u16string()
                           : base::NumberToString16(rule_count),
-          SkColorSetARGB(0x44, 0x63, 0x70, 0xFF),
-          SkColorSetRGB(0xC7, 0xD2, 0xFE));
+          SkColorSetRGB(0x58, 0x65, 0xF2), SK_ColorWHITE);
       code_toggle_->SetTooltipText(
           rule_count == 0
               ? u"Edit custom CSS"
