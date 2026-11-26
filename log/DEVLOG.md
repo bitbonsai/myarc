@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-11-26: Hide and restore Boost panel across tab switches
+
+- Changed `BoostEditorView::OnVisibilityChanged()` (`browser/foundation/boost_editor_view.cc`) to `Hide()` the widget when switching away to another tab/Space and `ShowInactive()` when returning to the Boost's tab, preserving panel state while stopping active pickers and committing valid CSS on hide.
+- Updated `ShowBoostEditor()` so invoking Boost on another tab while a panel is hidden on a background tab replaces it and opens immediately for the active tab.
+- Verified with `out/MyarcRelease` `chrome` build.
+
 ## 2026-11-26: Boost auto-close on tab switch, always-on CSS syntax highlighting, and clear Format button
 
 - Added `WebContentsObserver::OnVisibilityChanged()` in `BoostEditorView` (`browser/foundation/boost_editor_view.cc`) so switching to another tab or Space closes the Boost Editor panel instead of leaving the previous site's Boost floating over the new tab.

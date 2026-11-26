@@ -1994,6 +1994,7 @@ class BoostEditorView final : public views::View,
   }
 
   uint64_t boost_id() const { return boost_id_; }
+  bool is_hidden_by_tab_switch() const { return hidden_by_tab_switch_; }
 
   void OnWindowClosing() {
     bounds_anim_.Stop();
@@ -2059,11 +2060,33 @@ class BoostEditorView final : public views::View,
   }
 
   void OnVisibilityChanged(content::Visibility visibility) override {
+    views::Widget* widget = GetWidget();
+    if (!widget || widget->IsClosed()) {
+      return;
+    }
     if (visibility == content::Visibility::HIDDEN) {
       TabStripModel* tab_strip = browser_->GetTabStripModel();
       if (!tab_strip || tab_strip->GetActiveWebContents() != web_contents()) {
-        CloseEditor();
+        if (zap_picker_active_) {
+          StopZapPicker();
+          if (zap_section_) {
+            zap_section_->SetVisible(false);
+          }
+          if (zap_toggle_) {
+            zap_toggle_->SetActive(false);
+          }
+          if (code_picker_button_) {
+            code_picker_button_->SetActive(false);
+          }
+        }
+        CommitPendingCssIfValid();
+        hidden_by_tab_switch_ = true;
+        widget->Hide();
       }
+    } else if (visibility == content::Visibility::VISIBLE &&
+               hidden_by_tab_switch_) {
+      hidden_by_tab_switch_ = false;
+      widget->ShowInactive();
     }
   }
 
@@ -3731,6 +3754,7 @@ class BoostEditorView final : public views::View,
   bool slider_dragging_ = false;
   bool zap_picker_active_ = false;
   bool code_mode_ = false;
+  bool hidden_by_tab_switch_ = false;
   base::RepeatingTimer zap_poll_timer_;
   gfx::SlideAnimation bounds_anim_{this};
   gfx::SlideAnimation fade_anim_{this};
@@ -3919,9 +3943,11 @@ bool ShowBoostEditor(BrowserWindowInterface& browser, uint64_t boost_id) {
   if (auto it = editors.find(&browser);
       it != editors.end() && it->second && it->second->view) {
     const uint64_t current_id = it->second->view->boost_id();
+    const bool was_hidden = it->second->view->is_hidden_by_tab_switch();
     CloseBoostEditor(browser);
-    // Toggling via command/button with no specific new target closes the card.
-    if (boost_id == 0 || boost_id == current_id) {
+    // Toggling via command/button with no specific new target closes the card,
+    // unless it was hidden on another tab (then open for the active tab).
+    if (!was_hidden && (boost_id == 0 || boost_id == current_id)) {
       return true;
     }
   }
