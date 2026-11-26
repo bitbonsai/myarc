@@ -1564,6 +1564,8 @@ bool CheckBoosts() {
                         .text = 0xEEEEEE,
                         .accent = 0x4488FF,
                         .contrast = 60,
+                        .brightness = 55,
+                        .saturation = 45,
                         .tint_strength = 75};
   appearance.font = BoostFontPreset::SystemMono;
   appearance.text_scale_pct = 115;

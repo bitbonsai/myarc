@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-11-26: Boost Editor Arc parity (Case colors, Title menu, Sliders, interactive Zap picker)
+
+- Updated `BoostEditorView` (`browser/foundation/boost_editor_view.cc`) with Arc's Case button states (`AA` amber, `aa` orange-red, `Aa` red, `Case` neutral) and `My Boost ⌄` title menu order (`Rename this Boost…`, `Shuffle`, `Reset all Edits`, `Delete this Boost`, `All Boosts…`).
+- Extended `BoostPalette` (`crates/boosts/src/{lib,css,json}.rs`, `browser/foundation/bridge.rs`, `bridge_check.cc`) with backward-compatible `brightness` and `saturation` (0..=100, neutral 50) emitting `contrast(...) brightness(...) saturate(...)` filters, wired to a collapsible `BoostAdjustSlider` panel toggled from the sliders button (`kSlidersHorizontalIcon` in `browser/foundation/icons.h`).
+- Implemented an isolated-world (`ISOLATED_WORLD_ID_CHROME_INTERNAL`) closed Shadow DOM interactive Zap picker in `BoostEditorView` with blue viewport frame, yellow hover highlight, floating `Zap this` / `Zap all related elements` / `Cancel` pill with selector + match count, and bottom `Done` bar; verified with `out/MyarcRelease` `chrome` + `bridge_check`, `export_patches.py --check`, `check_docs.py`, `cargo fmt`/`clippy`/`test`, and `node --test`.
+
 ## 2026-11-25: Library Media section, Media Lightbox, and Archived Tabs Filter
 
 - Added `Filter` menu (`Space` + `Time` range) to Library Archived Tabs (`browser/foundation/library_logic.{h,cc}`, `library_view.{h,cc}`, `browser_view.cc`) with DST-safe date predicates, active indigo pill state, and `Clear Filters` empty state.

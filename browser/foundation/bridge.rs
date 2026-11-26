@@ -753,6 +753,8 @@ mod ffi {
         text: u32,
         accent: u32,
         contrast: u8,
+        brightness: u8,
+        saturation: u8,
         tint_strength: u8,
     }
 
@@ -3713,6 +3715,8 @@ fn boost_appearance_to_ffi(appearance: &boosts::BoostAppearance) -> ffi::BoostAp
             text: p.text,
             accent: p.accent,
             contrast: p.contrast,
+            brightness: p.brightness,
+            saturation: p.saturation,
             tint_strength: p.tint_strength,
         },
         None => ffi::BoostPaletteRecord {
@@ -3721,6 +3725,8 @@ fn boost_appearance_to_ffi(appearance: &boosts::BoostAppearance) -> ffi::BoostAp
             text: 0,
             accent: 0,
             contrast: 50,
+            brightness: 50,
+            saturation: 50,
             tint_strength: 50,
         },
     };
@@ -3740,6 +3746,8 @@ fn boost_appearance_from_ffi(record: ffi::BoostAppearanceRecord) -> boosts::Boos
             text: record.palette.text,
             accent: record.palette.accent,
             contrast: record.palette.contrast,
+            brightness: record.palette.brightness,
+            saturation: record.palette.saturation,
             tint_strength: record.palette.tint_strength,
         })
     } else {

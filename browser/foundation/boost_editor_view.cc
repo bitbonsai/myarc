@@ -17,20 +17,26 @@
 #include "base/memory/raw_ptr.h"
 #include "base/memory/weak_ptr.h"
 #include "base/no_destructor.h"
+#include "base/rand_util.h"
 #include "base/scoped_observation.h"
 #include "base/strings/string_number_conversions.h"
 #include "base/strings/string_util.h"
 #include "base/strings/utf_string_conversions.h"
 #include "base/task/sequenced_task_runner.h"
+#include "base/time/time.h"
+#include "base/timer/timer.h"
+#include "base/values.h"
 #include "cc/paint/paint_flags.h"
 #include "cc/paint/paint_shader.h"
 #include "chrome/browser/profiles/profile.h"
+#include "chrome/browser/ui/browser_commands.h"
 #include "chrome/browser/ui/browser_element_identifiers.h"
 #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
 #include "chrome/browser/ui/views/controls/rich_controls_container_view.h"
 #include "chrome/browser/ui/views/interaction/browser_elements_views.h"
 #include "chrome/browser/ui/views/page_info/page_info_view_factory.h"
+#include "chrome/common/chrome_isolated_world_ids.h"
 #include "components/tabs/public/tab_interface.h"
 #include "content/public/browser/navigation_handle.h"
 #include "content/public/browser/render_frame_host.h"
@@ -39,6 +45,7 @@
 #include "myarc/boosts_service.h"
 #include "myarc/boosts_tab_helper.h"
 #include "myarc/bridge.rs.h"
+#include "myarc/command_ids.h"
 #include "myarc/icons.h"
 #include "third_party/skia/include/core/SkColor.h"
 #include "third_party/skia/include/core/SkPath.h"
@@ -80,6 +87,7 @@
 #include "ui/views/controls/label.h"
 #include "ui/views/controls/menu/menu_runner.h"
 #include "ui/views/controls/scroll_view.h"
+#include "ui/views/controls/slider.h"
 #include "ui/views/controls/styled_label.h"
 #include "ui/views/controls/textarea/textarea.h"
 #include "ui/views/controls/textfield/textfield.h"
@@ -113,6 +121,9 @@ constexpr SkColor kInkPrimary = SkColorSetRGB(0x1C, 0x1C, 0x1E);
 constexpr SkColor kInkSecondary = SkColorSetRGB(0x6E, 0x6E, 0x73);
 constexpr SkColor kBorderSubtle = SkColorSetRGB(0xE5, 0xE5, 0xEA);
 constexpr SkColor kAccentBlue = SkColorSetRGB(0x4F, 0x5B, 0xFF);
+constexpr SkColor kCaseUpperBg = SkColorSetRGB(0xE8, 0x9B, 0x1E);
+constexpr SkColor kCaseLowerBg = SkColorSetRGB(0xE8, 0x56, 0x1E);
+constexpr SkColor kCaseCapBg = SkColorSetRGB(0xDE, 0x1B, 0x1B);
 constexpr SkColor kWarnBg = SkColorSetRGB(0xFF, 0xF3, 0xCD);
 constexpr SkColor kWarnText = SkColorSetRGB(0x7A, 0x4F, 0x01);
 constexpr SkColor kErrorText = SkColorSetRGB(0xC6, 0x28, 0x28);
@@ -202,6 +213,8 @@ foundation::BoostPaletteRecord PadPositionToPalette(
     palette.text = 0xF5F5F7;
     palette.accent = 0x6E7BFF;
     palette.contrast = static_cast<uint8_t>(std::round(x * 100.f));
+    palette.brightness = 50;
+    palette.saturation = 50;
     palette.tint_strength = static_cast<uint8_t>(std::round((1.f - y) * 100.f));
     return palette;
   }
@@ -229,6 +242,8 @@ foundation::BoostPaletteRecord PadPositionToPalette(
   palette.text = SkColorToRgb24(text);
   palette.accent = SkColorToRgb24(accent);
   palette.contrast = 50;
+  palette.brightness = 50;
+  palette.saturation = 50;
   palette.tint_strength = static_cast<uint8_t>(std::round(dist * 100.f));
   return palette;
 }
@@ -327,6 +342,14 @@ class PillButton final : public views::Button {
     UpdateVisuals();
   }
 
+  void SetActiveColor(std::optional<SkColor> color) {
+    if (active_color_ == color) {
+      return;
+    }
+    active_color_ = color;
+    UpdateVisuals();
+  }
+
   void SetText(const std::u16string& text) {
     if (label_) {
       label_->SetText(text);
@@ -343,7 +366,8 @@ class PillButton final : public views::Button {
   void UpdateVisuals() {
     const bool hovered =
         GetState() == STATE_HOVERED || GetState() == STATE_PRESSED;
-    const SkColor bg = active_ ? kPillActiveBg : (hovered ? kPillHoverBg : kPillBg);
+    const SkColor bg = active_ ? active_color_.value_or(kPillActiveBg)
+                               : (hovered ? kPillHoverBg : kPillBg);
     const SkColor fg = active_ ? SK_ColorWHITE : kInkPrimary;
     SetBackground(views::CreateRoundedRectBackground(bg, 10));
     if (icon_view_ && icon_) {
@@ -358,6 +382,7 @@ class PillButton final : public views::Button {
   }
 
   bool active_ = false;
+  std::optional<SkColor> active_color_;
   raw_ptr<const gfx::VectorIcon> icon_ = nullptr;
   raw_ptr<views::ImageView> icon_view_ = nullptr;
   raw_ptr<views::Label> label_ = nullptr;
@@ -724,6 +749,366 @@ class FontPresetCell final : public views::Button {
 BEGIN_METADATA(FontPresetCell)
 END_METADATA
 
+// Arc-style light horizontal slider for Contrast, Brightness, and Saturation.
+class BoostAdjustSlider final : public views::Slider {
+  METADATA_HEADER(BoostAdjustSlider, views::Slider)
+
+ public:
+  explicit BoostAdjustSlider(views::SliderListener* listener)
+      : views::Slider(listener) {
+    SetValueIndicatorRadius(kThumbRadius);
+    SetPreferredSize(gfx::Size(0, kThumbRadius * 2 + 4));
+  }
+
+  void OnPaint(gfx::Canvas* canvas) override {
+    const gfx::Rect content = GetContentsBounds();
+    const float cy = static_cast<float>(content.CenterPoint().y());
+    const gfx::RectF track(content.x() + kThumbRadius, cy - kTrackHeight * 0.5f,
+                           std::max(1.f, content.width() - kThumbRadius * 2.f),
+                           kTrackHeight);
+    cc::PaintFlags track_flags;
+    track_flags.setAntiAlias(true);
+    track_flags.setColor(SkColorSetRGB(0xDD, 0xDD, 0xE2));
+    canvas->DrawRoundRect(track, kTrackHeight * 0.5f, track_flags);
+
+    // Subtle center tick at 50% (neutral).
+    const float mid_x = track.CenterPoint().x();
+    cc::PaintFlags tick_flags;
+    tick_flags.setAntiAlias(true);
+    tick_flags.setColor(SkColorSetRGB(0xB4, 0xB4, 0xBC));
+    canvas->DrawRoundRect(gfx::RectF(mid_x - 0.75f, cy - 4.f, 1.5f, 8.f),
+                          0.75f, tick_flags);
+
+    const float thumb_x = track.x() + GetValue() * track.width();
+    const gfx::PointF thumb(thumb_x, cy);
+
+    cc::PaintFlags shadow;
+    shadow.setAntiAlias(true);
+    shadow.setColor(SkColorSetA(SK_ColorBLACK, 0x24));
+    canvas->DrawCircle(gfx::PointF(thumb.x(), thumb.y() + 1.f),
+                       kThumbRadius + 0.5f, shadow);
+
+    cc::PaintFlags knob;
+    knob.setAntiAlias(true);
+    knob.setColor(SK_ColorWHITE);
+    canvas->DrawCircle(thumb, kThumbRadius, knob);
+
+    cc::PaintFlags border;
+    border.setAntiAlias(true);
+    border.setStyle(cc::PaintFlags::kStroke_Style);
+    border.setStrokeWidth(1.f);
+    border.setColor(SkColorSetA(SK_ColorBLACK, 0x1A));
+    canvas->DrawCircle(thumb, kThumbRadius, border);
+  }
+
+ private:
+  static constexpr float kTrackHeight = 4.f;
+  static constexpr float kThumbRadius = 7.f;
+};
+
+BEGIN_METADATA(BoostAdjustSlider)
+END_METADATA
+
+// Isolated-world interactive Zap picker overlay (closed Shadow DOM so page JS
+// cannot inspect, style, or forge Zap actions).
+constexpr char16_t kZapStartScript[] = uR"JS((() => {
+  if (window.__myarcZap && window.__myarcZap.active) return
+  const queue = []
+  const host = document.createElement('div')
+  host.setAttribute('data-myarc-zap-host', '1')
+  host.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:2147483647;'
+  const shadow = host.attachShadow({ mode: 'closed' })
+
+  const style = document.createElement('style')
+  style.textContent = `
+    .frame {
+      position: fixed; inset: 0; pointer-events: none;
+      border: 2px solid #5B73FF; box-sizing: border-box;
+    }
+    .box {
+      position: fixed; pointer-events: none; display: none;
+      background: rgba(255, 210, 60, 0.14);
+      border: 1.5px solid #EAB308; border-radius: 3px;
+      box-sizing: border-box;
+    }
+    .bar {
+      position: fixed; left: 2px; right: 2px; bottom: 2px;
+      height: 52px; padding: 0 14px;
+      display: flex; align-items: center; justify-content: center;
+      background: rgba(18, 18, 22, 0.94); color: #F5F5F7;
+      font: 500 13px -apple-system, BlinkMacSystemFont, sans-serif;
+      pointer-events: auto; box-sizing: border-box;
+    }
+    .bar strong { font-weight: 700; color: #FFFFFF; }
+    .done {
+      position: absolute; right: 14px;
+      background: #FFFFFF; color: #1C1C1E; border: none;
+      border-radius: 8px; padding: 7px 14px; cursor: pointer;
+      font: 600 13px -apple-system, BlinkMacSystemFont, sans-serif;
+    }
+    .done:hover { background: #EBEBF0; }
+    .pill {
+      position: fixed; display: none; pointer-events: auto;
+      background: #FFFFFF; color: #1C1C1E; border-radius: 14px;
+      padding: 8px 10px 7px; max-width: 380px;
+      box-shadow: 0 8px 28px rgba(0, 0, 0, 0.28), 0 0 0 1px rgba(0, 0, 0, 0.08);
+      font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+    }
+    .pill-row { display: flex; align-items: center; gap: 6px; }
+    .pill-btn {
+      border: none; border-radius: 9px; padding: 7px 12px; cursor: pointer;
+      font: 600 12px -apple-system, BlinkMacSystemFont, sans-serif;
+      color: #FFFFFF; white-space: nowrap;
+    }
+    .btn-this { background: #EF4444; }
+    .btn-this:hover { background: #DC2626; }
+    .btn-all { background: #F9671D; }
+    .btn-all:hover { background: #EA580C; }
+    .btn-cancel { background: #8E8E93; }
+    .btn-cancel:hover { background: #6E6E73; }
+    .pill-meta {
+      margin-top: 6px; font: 400 11px Menlo, ui-monospace, monospace;
+      color: #6E6E73; white-space: nowrap; overflow: hidden;
+      text-overflow: ellipsis; max-width: 360px;
+    }
+  `
+  shadow.appendChild(style)
+
+  const frame = document.createElement('div')
+  frame.className = 'frame'
+  const box = document.createElement('div')
+  box.className = 'box'
+  const bar = document.createElement('div')
+  bar.className = 'bar'
+  const msg = document.createElement('span')
+  msg.append('Click elements on the page to ')
+  const strong = document.createElement('strong')
+  strong.textContent = 'Zap'
+  msg.append(strong, ' them')
+  const doneBtn = document.createElement('button')
+  doneBtn.className = 'done'
+  doneBtn.textContent = 'Done'
+  bar.append(msg, doneBtn)
+
+  const pill = document.createElement('div')
+  pill.className = 'pill'
+  const row = document.createElement('div')
+  row.className = 'pill-row'
+  const btnThis = document.createElement('button')
+  btnThis.className = 'pill-btn btn-this'
+  btnThis.textContent = 'Zap this'
+  const btnAll = document.createElement('button')
+  btnAll.className = 'pill-btn btn-all'
+  btnAll.textContent = 'Zap all related elements'
+  const btnCancel = document.createElement('button')
+  btnCancel.className = 'pill-btn btn-cancel'
+  btnCancel.textContent = 'Cancel'
+  row.append(btnThis, btnAll, btnCancel)
+  const meta = document.createElement('div')
+  meta.className = 'pill-meta'
+  pill.append(row, meta)
+
+  shadow.append(frame, box, pill, bar)
+  ;(document.documentElement || document.body).appendChild(host)
+
+  const safeIdent = (s) => typeof s === 'string' && /^[A-Za-z_][A-Za-z0-9_-]*$/.test(s)
+  const validClasses = (el) => {
+    if (!el || !el.classList) return []
+    return Array.from(el.classList).filter((c) => safeIdent(c) && c.length <= 48).slice(0, 2)
+  }
+  const nthIndex = (el) => {
+    let i = 1
+    let sib = el
+    while ((sib = sib.previousElementSibling)) i += 1
+    return i
+  }
+  const specificSelector = (el) => {
+    const parts = []
+    let cur = el
+    let depth = 0
+    while (cur && cur.nodeType === 1 && cur !== document.documentElement && depth < 4) {
+      const tag = cur.tagName.toLowerCase()
+      if (cur.id && safeIdent(cur.id)) {
+        parts.unshift('#' + cur.id)
+        break
+      }
+      const cls = validClasses(cur)
+      let seg = tag + (cls.length ? '.' + cls.join('.') : '')
+      if (cur.parentElement && cur.parentElement.children.length > 1) {
+        seg += ':nth-child(' + nthIndex(cur) + ')'
+      }
+      parts.unshift(seg)
+      cur = cur.parentElement
+      depth += 1
+    }
+    return parts.join(' > ') || el.tagName.toLowerCase()
+  }
+  const relatedSelector = (el) => {
+    const tag = el.tagName.toLowerCase()
+    const cls = validClasses(el)
+    if (cls.length) return tag + '.' + cls.join('.')
+    if (el.parentElement && el.parentElement !== document.documentElement) {
+      const pCls = validClasses(el.parentElement)
+      const pTag = el.parentElement.tagName.toLowerCase()
+      return pTag + (pCls.length ? '.' + pCls[0] : '') + ' > ' + tag
+    }
+    return tag
+  }
+  const matchCount = (sel) => {
+    try { return document.querySelectorAll(sel).length } catch { return 1 }
+  }
+
+  let selected = null
+  let specSel = ''
+  let relSel = ''
+  let hovered = null
+
+  const positionBox = (el) => {
+    if (!el || el === host || el === document.documentElement || el === document.body) {
+      box.style.display = 'none'
+      return
+    }
+    const r = el.getBoundingClientRect()
+    if (r.width <= 0 || r.height <= 0) {
+      box.style.display = 'none'
+      return
+    }
+    box.style.display = 'block'
+    box.style.left = r.left + 'px'
+    box.style.top = r.top + 'px'
+    box.style.width = r.width + 'px'
+    box.style.height = r.height + 'px'
+  }
+
+  const clearSelection = () => {
+    selected = null
+    specSel = ''
+    relSel = ''
+    pill.style.display = 'none'
+  }
+
+  const showPillFor = (el) => {
+    selected = el
+    specSel = specificSelector(el)
+    relSel = relatedSelector(el)
+    positionBox(el)
+    const specCount = matchCount(specSel)
+    meta.textContent = specCount + '  ' + specSel
+    pill.style.display = 'block'
+    const r = el.getBoundingClientRect()
+    const pr = pill.getBoundingClientRect()
+    let left = Math.max(12, Math.min(r.left, window.innerWidth - pr.width - 12))
+    let top = r.bottom + 8
+    if (top + pr.height > window.innerHeight - 64) {
+      top = Math.max(12, r.top - pr.height - 8)
+    }
+    pill.style.left = left + 'px'
+    pill.style.top = top + 'px'
+  }
+
+  const isOwnEvent = (e) => e.composedPath && e.composedPath().includes(host)
+
+  const onMove = (e) => {
+    if (selected || isOwnEvent(e)) return
+    const el = document.elementFromPoint(e.clientX, e.clientY)
+    if (el && el !== hovered && el !== host) {
+      hovered = el
+      positionBox(el)
+    }
+  }
+  const onClick = (e) => {
+    if (isOwnEvent(e)) return
+    e.preventDefault()
+    e.stopImmediatePropagation()
+    const el = document.elementFromPoint(e.clientX, e.clientY)
+    if (!el || el === host || el === document.documentElement || el === document.body) return
+    showPillFor(el)
+  }
+  const blockPointer = (e) => {
+    if (isOwnEvent(e)) return
+    e.preventDefault()
+    e.stopImmediatePropagation()
+  }
+  const onKey = (e) => {
+    if (e.key === 'Escape') {
+      e.preventDefault()
+      e.stopImmediatePropagation()
+      if (selected) {
+        clearSelection()
+      } else {
+        queue.push({ type: 'done' })
+        stop()
+      }
+    }
+  }
+
+  btnThis.addEventListener('mouseenter', () => {
+    if (specSel) meta.textContent = matchCount(specSel) + '  ' + specSel
+  })
+  btnAll.addEventListener('mouseenter', () => {
+    if (relSel) meta.textContent = matchCount(relSel) + '  ' + relSel
+  })
+  btnThis.addEventListener('click', (e) => {
+    e.stopPropagation()
+    if (specSel) {
+      queue.push({ type: 'zap', selector: specSel })
+      if (selected) selected.style.setProperty('display', 'none', 'important')
+    }
+    clearSelection()
+    box.style.display = 'none'
+  })
+  btnAll.addEventListener('click', (e) => {
+    e.stopPropagation()
+    if (relSel) {
+      queue.push({ type: 'zap', selector: relSel })
+      try {
+        document.querySelectorAll(relSel).forEach((n) => n.style.setProperty('display', 'none', 'important'))
+      } catch {}
+    }
+    clearSelection()
+    box.style.display = 'none'
+  })
+  btnCancel.addEventListener('click', (e) => {
+    e.stopPropagation()
+    clearSelection()
+  })
+  doneBtn.addEventListener('click', (e) => {
+    e.stopPropagation()
+    queue.push({ type: 'done' })
+    stop()
+  })
+
+  const stop = () => {
+    window.removeEventListener('mousemove', onMove, true)
+    window.removeEventListener('click', onClick, true)
+    window.removeEventListener('mousedown', blockPointer, true)
+    window.removeEventListener('mouseup', blockPointer, true)
+    window.removeEventListener('keydown', onKey, true)
+    host.remove()
+    if (window.__myarcZap) window.__myarcZap.active = false
+  }
+
+  window.addEventListener('mousemove', onMove, true)
+  window.addEventListener('click', onClick, true)
+  window.addEventListener('mousedown', blockPointer, true)
+  window.addEventListener('mouseup', blockPointer, true)
+  window.addEventListener('keydown', onKey, true)
+
+  window.__myarcZap = { active: true, queue, stop }
+})())JS";
+
+constexpr char16_t kZapPollScript[] = uR"JS((() => {
+  const z = window.__myarcZap
+  if (!z || !z.queue || !z.queue.length) return []
+  return z.queue.splice(0, z.queue.length)
+})())JS";
+
+constexpr char16_t kZapStopScript[] = uR"JS((() => {
+  const z = window.__myarcZap
+  if (z && typeof z.stop === 'function') z.stop()
+  delete window.__myarcZap
+})())JS";
+
 class BoostEditorView;
 
 class BoostEditorBubbleDelegate final : public views::BubbleDialogDelegate {
@@ -777,17 +1162,21 @@ class BoostEditorView final : public views::View,
                               public content::WebContentsObserver,
                               public BoostsService::Observer,
                               public views::TextfieldController,
+                              public views::SliderListener,
                               public ui::SimpleMenuModel::Delegate {
   METADATA_HEADER(BoostEditorView, views::View)
 
  public:
   enum TitleCommand {
-    kCmdToggleEnabled = 1,
+    kCmdRename = 1,
+    kCmdShuffle,
+    kCmdReset,
+    kCmdDelete,
+    kCmdAllBoosts,
+    kCmdToggleEnabled,
     kCmdToggleSubdomains,
     kCmdToggleSubframes,
-    kCmdRename,
     kCmdUndo,
-    kCmdDelete,
   };
 
   BoostEditorView(BrowserWindowInterface& browser,
@@ -812,6 +1201,7 @@ class BoostEditorView final : public views::View,
   }
 
   ~BoostEditorView() override {
+    StopZapPicker();
     ClearPreview();
     service_observation_.Reset();
     menu_runner_.reset();
@@ -832,6 +1222,7 @@ class BoostEditorView final : public views::View,
   uint64_t boost_id() const { return boost_id_; }
 
   void OnWindowClosing() {
+    StopZapPicker();
     CommitPendingCssIfValid();
     ClearPreview();
     Observe(nullptr);
@@ -873,6 +1264,17 @@ class BoostEditorView final : public views::View,
     if (!IsEligibleHttpOrigin(next_origin) ||
         next_origin.Serialize() != origin_) {
       CloseEditor();
+      return;
+    }
+    if (zap_picker_active_) {
+      StopZapPicker();
+      if (zap_section_) {
+        zap_section_->SetVisible(false);
+      }
+      if (zap_toggle_) {
+        zap_toggle_->SetActive(false);
+      }
+      SizeToContents();
     }
   }
 
@@ -931,6 +1333,39 @@ class BoostEditorView final : public views::View,
     return false;
   }
 
+  // views::SliderListener:
+  void SliderValueChanged(views::Slider* sender,
+                          float value,
+                          float old_value,
+                          views::SliderChangeReason reason) override {
+    if (reason != views::SliderChangeReason::kByUser) {
+      return;
+    }
+    EnsurePaletteForSliders();
+    const uint8_t v =
+        static_cast<uint8_t>(std::round(std::clamp(value, 0.f, 1.f) * 100.f));
+    if (sender == contrast_slider_) {
+      draft_appearance_.palette.contrast = v;
+    } else if (sender == brightness_slider_) {
+      draft_appearance_.palette.brightness = v;
+    } else if (sender == saturation_slider_) {
+      draft_appearance_.palette.saturation = v;
+    }
+    PushLivePreview();
+    if (!slider_dragging_) {
+      CommitAppearance();
+    }
+  }
+
+  void SliderDragStarted(views::Slider* sender) override {
+    slider_dragging_ = true;
+  }
+
+  void SliderDragEnded(views::Slider* sender) override {
+    slider_dragging_ = false;
+    CommitAppearance();
+  }
+
   // ui::SimpleMenuModel::Delegate:
   bool IsCommandIdChecked(int command_id) const override {
     if (!record_) {
@@ -955,6 +1390,9 @@ class BoostEditorView final : public views::View,
     if (command_id == kCmdUndo) {
       return record_->can_undo;
     }
+    if (command_id == kCmdReset) {
+      return HasAnyEdits();
+    }
     return true;
   }
 
@@ -963,6 +1401,29 @@ class BoostEditorView final : public views::View,
       return;
     }
     switch (command_id) {
+      case kCmdRename:
+        BeginInlineRename();
+        break;
+      case kCmdShuffle:
+        ShuffleBoost();
+        break;
+      case kCmdReset:
+        OnResetPressed();
+        break;
+      case kCmdDelete:
+        StopZapPicker();
+        ClearPreview();
+        service_->DeleteBoost(boost_id_);
+        CloseEditor();
+        break;
+      case kCmdAllBoosts: {
+        BrowserWindowInterface* browser = browser_;
+        CloseEditor();
+        if (browser) {
+          chrome::ExecuteCommand(browser, IDC_MYARC_VIEW_BOOSTS);
+        }
+        break;
+      }
       case kCmdToggleEnabled:
         service_->SetBoostEnabled(boost_id_, !record_->enabled);
         break;
@@ -985,17 +1446,9 @@ class BoostEditorView final : public views::View,
                                 !record_->apply_to_subframes);
         break;
       }
-      case kCmdRename:
-        BeginInlineRename();
-        break;
       case kCmdUndo:
         ClearPreview();
         service_->UndoBoost(boost_id_);
-        break;
-      case kCmdDelete:
-        ClearPreview();
-        service_->DeleteBoost(boost_id_);
-        CloseEditor();
         break;
     }
   }
@@ -1007,7 +1460,12 @@ class BoostEditorView final : public views::View,
     color_pad_ = nullptr;
     mode_invert_ = nullptr;
     mode_palette_ = nullptr;
+    mode_adjust_ = nullptr;
     mode_none_ = nullptr;
+    adjust_section_ = nullptr;
+    contrast_slider_ = nullptr;
+    brightness_slider_ = nullptr;
+    saturation_slider_ = nullptr;
     font_cells_.fill(nullptr);
     size_button_ = nullptr;
     case_button_ = nullptr;
@@ -1079,9 +1537,9 @@ class BoostEditorView final : public views::View,
         base::BindRepeating(&BoostEditorView::OnPadChanged,
                             base::Unretained(this))));
 
-    // 3. Three lighting / color mode buttons: Invert, Palette, Clear.
+    // 3. Four lighting / color mode buttons: Invert, Palette, Adjust, Reset.
     auto* modes =
-        AddChildView(MakeBox(Orientation::kHorizontal, gfx::Insets(), 8));
+        AddChildView(MakeBox(Orientation::kHorizontal, gfx::Insets(), 6));
     auto* modes_layout =
         static_cast<views::BoxLayout*>(modes->GetLayoutManager());
     mode_invert_ = modes->AddChildView(std::make_unique<PillButton>(
@@ -1103,14 +1561,48 @@ class BoostEditorView final : public views::View,
     mode_palette_->GetViewAccessibility().SetName(u"Color palette");
     modes_layout->SetFlexForView(mode_palette_, 1);
 
+    mode_adjust_ = modes->AddChildView(std::make_unique<PillButton>(
+        base::BindRepeating(&BoostEditorView::ToggleAdjustSection,
+                            base::Unretained(this)),
+        u"Adjust contrast, brightness, and saturation", std::u16string(),
+        /*centered=*/true, /*font_size_delta=*/0, &kSlidersHorizontalIcon));
+    mode_adjust_->SetTooltipText(u"Contrast, Brightness & Saturation");
+    mode_adjust_->GetViewAccessibility().SetName(
+        u"Contrast, Brightness, and Saturation");
+    modes_layout->SetFlexForView(mode_adjust_, 1);
+
     mode_none_ = modes->AddChildView(std::make_unique<PillButton>(
         base::BindRepeating(&BoostEditorView::SetColorMode,
                             base::Unretained(this),
                             foundation::BoostColorMode::None),
         u"\u2298", std::u16string(), /*centered=*/true, /*font_size_delta=*/3));
-    mode_none_->SetTooltipText(u"No color override");
-    mode_none_->GetViewAccessibility().SetName(u"No color override");
+    mode_none_->SetTooltipText(u"Reset to original colors");
+    mode_none_->GetViewAccessibility().SetName(u"Reset to original colors");
     modes_layout->SetFlexForView(mode_none_, 1);
+
+    // 3b. Collapsible Contrast / Brightness / Original Saturation sliders.
+    adjust_section_ = AddChildView(
+        MakeBox(Orientation::kVertical, gfx::Insets::VH(10, 12), 8));
+    adjust_section_->SetBackground(
+        views::CreateRoundedRectBackground(kPillBg, 12));
+    adjust_section_->SetVisible(false);
+    auto add_slider_row = [&](const std::u16string& title) -> BoostAdjustSlider* {
+      auto* col = adjust_section_->AddChildView(
+          MakeBox(Orientation::kVertical, gfx::Insets(), 2));
+      auto* lbl = col->AddChildView(MakeLabel(
+          title,
+          gfx::FontList().Derive(-1, gfx::Font::NORMAL,
+                                 gfx::Font::Weight::MEDIUM),
+          kInkPrimary));
+      lbl->SetHorizontalAlignment(gfx::ALIGN_LEFT);
+      auto* slider = col->AddChildView(std::make_unique<BoostAdjustSlider>(this));
+      slider->GetViewAccessibility().SetName(title);
+      slider->SetValue(0.5f);
+      return slider;
+    };
+    contrast_slider_ = add_slider_row(u"Contrast");
+    brightness_slider_ = add_slider_row(u"Brightness");
+    saturation_slider_ = add_slider_row(u"Original Saturation");
 
     // 4. 4x4 "Aa" typography preset grid.
     auto* grid_card = AddChildView(
@@ -1287,6 +1779,28 @@ class BoostEditorView final : public views::View,
       mode_none_->SetActive(draft_appearance_.color_mode ==
                             foundation::BoostColorMode::None);
     }
+    const bool palette_set = draft_appearance_.palette.set;
+    if (contrast_slider_) {
+      contrast_slider_->SetValue(
+          palette_set ? draft_appearance_.palette.contrast / 100.f : 0.5f);
+    }
+    if (brightness_slider_) {
+      brightness_slider_->SetValue(
+          palette_set ? draft_appearance_.palette.brightness / 100.f : 0.5f);
+    }
+    if (saturation_slider_) {
+      saturation_slider_->SetValue(
+          palette_set ? draft_appearance_.palette.saturation / 100.f : 0.5f);
+    }
+    if (mode_adjust_) {
+      const bool sliders_non_default =
+          palette_set && (draft_appearance_.palette.contrast != 50 ||
+                          draft_appearance_.palette.brightness != 50 ||
+                          draft_appearance_.palette.saturation != 50);
+      mode_adjust_->SetActive(
+          (adjust_section_ && adjust_section_->GetVisible()) ||
+          sliders_non_default);
+    }
     for (auto& cell : font_cells_) {
       if (cell) {
         cell->SetSelected(cell->preset() == draft_appearance_.font);
@@ -1301,20 +1815,25 @@ class BoostEditorView final : public views::View,
     }
     if (case_button_) {
       std::u16string label = u"Case";
+      std::optional<SkColor> active_color;
       switch (draft_appearance_.text_transform) {
         case foundation::BoostTextTransform::None:
           break;
         case foundation::BoostTextTransform::Uppercase:
-          label = u"CASE";
+          label = u"AA";
+          active_color = kCaseUpperBg;
           break;
         case foundation::BoostTextTransform::Lowercase:
-          label = u"case";
+          label = u"aa";
+          active_color = kCaseLowerBg;
           break;
         case foundation::BoostTextTransform::Capitalize:
-          label = u"Case Aa";
+          label = u"Aa";
+          active_color = kCaseCapBg;
           break;
       }
       case_button_->SetText(label);
+      case_button_->SetActiveColor(active_color);
       case_button_->SetActive(draft_appearance_.text_transform !=
                               foundation::BoostTextTransform::None);
     }
@@ -1436,8 +1955,19 @@ class BoostEditorView final : public views::View,
     if (draft_appearance_.color_mode == foundation::BoostColorMode::None) {
       draft_appearance_.color_mode = foundation::BoostColorMode::Palette;
     }
+    const bool had_palette = draft_appearance_.palette.set;
+    const uint8_t prev_contrast = draft_appearance_.palette.contrast;
+    const uint8_t prev_brightness = draft_appearance_.palette.brightness;
+    const uint8_t prev_saturation = draft_appearance_.palette.saturation;
     draft_appearance_.palette =
         PadPositionToPalette(draft_appearance_.color_mode, x, y);
+    if (had_palette) {
+      if (draft_appearance_.color_mode == foundation::BoostColorMode::Palette) {
+        draft_appearance_.palette.contrast = prev_contrast;
+      }
+      draft_appearance_.palette.brightness = prev_brightness;
+      draft_appearance_.palette.saturation = prev_saturation;
+    }
     if (color_pad_) {
       color_pad_->SetState(draft_appearance_.color_mode,
                            draft_appearance_.palette);
@@ -1457,6 +1987,63 @@ class BoostEditorView final : public views::View,
     if (commit) {
       CommitAppearance();
     }
+  }
+
+  void EnsurePaletteForSliders() {
+    if (draft_appearance_.color_mode == foundation::BoostColorMode::None) {
+      draft_appearance_.color_mode = foundation::BoostColorMode::Palette;
+    }
+    if (!draft_appearance_.palette.set) {
+      draft_appearance_.palette =
+          PadPositionToPalette(draft_appearance_.color_mode, 0.55f, 0.25f);
+    }
+  }
+
+  void ToggleAdjustSection() {
+    if (!adjust_section_) {
+      return;
+    }
+    const bool show = !adjust_section_->GetVisible();
+    adjust_section_->SetVisible(show);
+    if (mode_adjust_) {
+      const bool sliders_non_default =
+          draft_appearance_.palette.set &&
+          (draft_appearance_.palette.contrast != 50 ||
+           draft_appearance_.palette.brightness != 50 ||
+           draft_appearance_.palette.saturation != 50);
+      mode_adjust_->SetActive(show || sliders_non_default);
+    }
+    SizeToContents();
+  }
+
+  bool HasAnyEdits() const {
+    if (!record_) {
+      return false;
+    }
+    const auto& a = record_->appearance;
+    if (a.color_mode != foundation::BoostColorMode::None ||
+        a.font != foundation::BoostFontPreset::Default ||
+        a.text_scale_pct != 100 ||
+        a.text_transform != foundation::BoostTextTransform::None) {
+      return true;
+    }
+    if (!record_->hidden_selectors.empty() || !record_->custom_css.empty()) {
+      return true;
+    }
+    return false;
+  }
+
+  void ShuffleBoost() {
+    const float x = static_cast<float>(base::RandDouble());
+    const float y = static_cast<float>(0.15 + base::RandDouble() * 0.75);
+    draft_appearance_.color_mode = foundation::BoostColorMode::Palette;
+    draft_appearance_.palette =
+        PadPositionToPalette(foundation::BoostColorMode::Palette, x, y);
+    const size_t font_idx =
+        static_cast<size_t>(base::RandGenerator(kFontPresets.size()));
+    draft_appearance_.font = kFontPresets[font_idx].preset;
+    PushLivePreview();
+    CommitAppearance();
   }
 
   void SetColorMode(foundation::BoostColorMode mode) {
@@ -1529,10 +2116,106 @@ class BoostEditorView final : public views::View,
     if (zap_toggle_) {
       zap_toggle_->SetActive(show);
     }
-    if (show && zap_input_) {
-      zap_input_->RequestFocus();
+    if (show) {
+      StartZapPicker();
+    } else {
+      StopZapPicker();
     }
     SizeToContents();
+  }
+
+  void StartZapPicker() {
+    if (zap_picker_active_ || !web_contents()) {
+      return;
+    }
+    content::RenderFrameHost* rfh = web_contents()->GetPrimaryMainFrame();
+    if (!rfh || !rfh->IsRenderFrameLive()) {
+      return;
+    }
+    zap_picker_active_ = true;
+    rfh->ExecuteJavaScriptInIsolatedWorld(
+        kZapStartScript, base::NullCallback(),
+        ISOLATED_WORLD_ID_CHROME_INTERNAL);
+    zap_poll_timer_.Start(
+        FROM_HERE, base::Milliseconds(100),
+        base::BindRepeating(&BoostEditorView::PollZapPicker,
+                            base::Unretained(this)));
+  }
+
+  void StopZapPicker() {
+    zap_poll_timer_.Stop();
+    if (!zap_picker_active_) {
+      return;
+    }
+    zap_picker_active_ = false;
+    if (!web_contents()) {
+      return;
+    }
+    content::RenderFrameHost* rfh = web_contents()->GetPrimaryMainFrame();
+    if (rfh && rfh->IsRenderFrameLive()) {
+      rfh->ExecuteJavaScriptInIsolatedWorld(
+          kZapStopScript, base::NullCallback(),
+          ISOLATED_WORLD_ID_CHROME_INTERNAL);
+    }
+  }
+
+  void PollZapPicker() {
+    if (!zap_picker_active_ || !web_contents()) {
+      StopZapPicker();
+      return;
+    }
+    content::RenderFrameHost* rfh = web_contents()->GetPrimaryMainFrame();
+    if (!rfh || !rfh->IsRenderFrameLive()) {
+      StopZapPicker();
+      return;
+    }
+    rfh->ExecuteJavaScriptInIsolatedWorld(
+        kZapPollScript,
+        base::BindOnce(&BoostEditorView::HandleZapEvents,
+                       weak_factory_.GetWeakPtr()),
+        ISOLATED_WORLD_ID_CHROME_INTERNAL);
+  }
+
+  void HandleZapEvents(base::Value result) {
+    if (!result.is_list() || !service_ || !record_) {
+      return;
+    }
+    bool changed = false;
+    bool done = false;
+    for (const base::Value& item : result.GetList()) {
+      if (!item.is_dict()) {
+        continue;
+      }
+      const std::string* type = item.GetDict().FindString("type");
+      if (!type) {
+        continue;
+      }
+      if (*type == "done") {
+        done = true;
+      } else if (*type == "zap") {
+        const std::string* sel = item.GetDict().FindString("selector");
+        if (sel && !sel->empty()) {
+          auto res = service_->AddHiddenSelector(boost_id_, *sel);
+          if (res.ok) {
+            changed = true;
+          }
+        }
+      }
+    }
+    if (changed) {
+      ClearPreview();
+      ReloadFromService();
+    }
+    if (done) {
+      StopZapPicker();
+      if (zap_section_) {
+        zap_section_->SetVisible(false);
+      }
+      if (zap_toggle_) {
+        zap_toggle_->SetActive(false);
+      }
+      SizeToContents();
+    }
   }
 
   void AddZapSelector() {
@@ -1627,14 +2310,17 @@ class BoostEditorView final : public views::View,
     }
     menu_runner_.reset();
     menu_model_ = std::make_unique<ui::SimpleMenuModel>(this);
+    menu_model_->AddItem(kCmdRename, u"Rename this Boost\u2026");
+    menu_model_->AddItem(kCmdShuffle, u"Shuffle");
+    menu_model_->AddItem(kCmdReset, u"Reset all Edits");
+    menu_model_->AddItem(kCmdDelete, u"Delete this Boost");
+    menu_model_->AddSeparator(ui::NORMAL_SEPARATOR);
+    menu_model_->AddItem(kCmdAllBoosts, u"All Boosts\u2026");
+    menu_model_->AddSeparator(ui::NORMAL_SEPARATOR);
     menu_model_->AddCheckItem(kCmdToggleEnabled, u"Enabled");
     menu_model_->AddCheckItem(kCmdToggleSubdomains, u"Include Subdomains");
     menu_model_->AddCheckItem(kCmdToggleSubframes, u"Apply to Subframes");
-    menu_model_->AddSeparator(ui::NORMAL_SEPARATOR);
-    menu_model_->AddItem(kCmdRename, u"Rename Boost\u2026");
     menu_model_->AddItem(kCmdUndo, u"Undo Last Change");
-    menu_model_->AddSeparator(ui::NORMAL_SEPARATOR);
-    menu_model_->AddItem(kCmdDelete, u"Delete Boost");
     menu_runner_ =
         std::make_unique<views::MenuRunner>(menu_model_.get(), /*run_types=*/0);
     menu_runner_->RunMenuAt(GetWidget(), nullptr,
@@ -1692,13 +2378,21 @@ class BoostEditorView final : public views::View,
   std::string draft_css_;
   bool css_dirty_ = false;
   bool suppress_reload_ = false;
+  bool slider_dragging_ = false;
+  bool zap_picker_active_ = false;
+  base::RepeatingTimer zap_poll_timer_;
 
   raw_ptr<TitleMenuButton> title_button_ = nullptr;
   raw_ptr<views::Textfield> rename_field_ = nullptr;
   raw_ptr<ColorPadView> color_pad_ = nullptr;
   raw_ptr<PillButton> mode_invert_ = nullptr;
   raw_ptr<PillButton> mode_palette_ = nullptr;
+  raw_ptr<PillButton> mode_adjust_ = nullptr;
   raw_ptr<PillButton> mode_none_ = nullptr;
+  raw_ptr<views::View> adjust_section_ = nullptr;
+  raw_ptr<BoostAdjustSlider> contrast_slider_ = nullptr;
+  raw_ptr<BoostAdjustSlider> brightness_slider_ = nullptr;
+  raw_ptr<BoostAdjustSlider> saturation_slider_ = nullptr;
   std::array<raw_ptr<FontPresetCell>, 16> font_cells_ = {};
   raw_ptr<PillButton> size_button_ = nullptr;
   raw_ptr<PillButton> case_button_ = nullptr;
@@ -1715,6 +2409,7 @@ class BoostEditorView final : public views::View,
 
   std::unique_ptr<ui::SimpleMenuModel> menu_model_;
   std::unique_ptr<views::MenuRunner> menu_runner_;
+  base::WeakPtrFactory<BoostEditorView> weak_factory_{this};
 };
 
 BEGIN_METADATA(BoostEditorView)

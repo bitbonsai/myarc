@@ -617,6 +617,25 @@ inline constexpr gfx::VectorIcon kCodeXmlIcon(kCodeXmlRep,
                                               std::size(kCodeXmlRep),
                                               "myarc_code_xml");
 
+// Lucide "sliders-horizontal" for Boost Editor Contrast/Brightness/Saturation.
+inline constexpr gfx::PathElement kSlidersHorizontalPath[] = {
+    gfx::CANVAS_DIMENSIONS, 24, gfx::STROKE, 2,
+    gfx::MOVE_TO, 21, 4, gfx::H_LINE_TO, 14,
+    gfx::MOVE_TO, 10, 4, gfx::H_LINE_TO, 3,
+    gfx::MOVE_TO, 21, 12, gfx::H_LINE_TO, 12,
+    gfx::MOVE_TO, 8, 12, gfx::H_LINE_TO, 3,
+    gfx::MOVE_TO, 21, 20, gfx::H_LINE_TO, 16,
+    gfx::MOVE_TO, 12, 20, gfx::H_LINE_TO, 3,
+    gfx::MOVE_TO, 14, 2, gfx::V_LINE_TO, 6,
+    gfx::MOVE_TO, 8, 10, gfx::V_LINE_TO, 14,
+    gfx::MOVE_TO, 16, 18, gfx::V_LINE_TO, 22};
+inline constexpr gfx::VectorIconRep kSlidersHorizontalRep[] = {
+    {kSlidersHorizontalPath}};
+inline constexpr gfx::VectorIcon kSlidersHorizontalIcon(
+    kSlidersHorizontalRep,
+    std::size(kSlidersHorizontalRep),
+    "myarc_sliders_horizontal");
+
 #undef MYARC_RAIL_FILL
 
 }  // namespace myarc

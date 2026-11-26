@@ -147,6 +147,10 @@ pub struct BoostPalette {
     pub accent: u32,
     /// 0..=100 (50 = neutral)
     pub contrast: u8,
+    /// 0..=100 (50 = neutral)
+    pub brightness: u8,
+    /// 0..=100 (50 = neutral, 0 = grayscale, 100 = 200%)
+    pub saturation: u8,
     /// 0..=100
     pub tint_strength: u8,
 }
@@ -829,6 +833,8 @@ fn validate_appearance(appearance: &BoostAppearance) -> Result<(), BoostsError> 
             || p.text > 0xFF_FFFF
             || p.accent > 0xFF_FFFF
             || p.contrast > 100
+            || p.brightness > 100
+            || p.saturation > 100
             || p.tint_strength > 100
         {
             return Err(BoostsError::InvalidAppearance);
@@ -1203,6 +1209,8 @@ mod tests {
                         text: 0xEEEEEE,
                         accent: 0xFF6600,
                         contrast: 70,
+                        brightness: 55,
+                        saturation: 45,
                         tint_strength: 80,
                     }),
                     font: FontPreset::SystemMono,
@@ -1454,6 +1462,8 @@ mod tests {
                         text: 0xF0F1F2,
                         accent: 0x7744FF,
                         contrast: 65,
+                        brightness: 50,
+                        saturation: 50,
                         tint_strength: 40,
                     }),
                     font: FontPreset::Geometric,

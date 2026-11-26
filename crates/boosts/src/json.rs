@@ -123,8 +123,14 @@ fn write_appearance(out: &mut String, appearance: &BoostAppearance) {
         Some(p) => {
             let _ = write!(
                 out,
-                "{{\"background\":{},\"text\":{},\"accent\":{},\"contrast\":{},\"tint_strength\":{}}}",
-                p.background, p.text, p.accent, p.contrast, p.tint_strength
+                "{{\"background\":{},\"text\":{},\"accent\":{},\"contrast\":{},\"brightness\":{},\"saturation\":{},\"tint_strength\":{}}}",
+                p.background,
+                p.text,
+                p.accent,
+                p.contrast,
+                p.brightness,
+                p.saturation,
+                p.tint_strength
             );
         }
         None => out.push_str("null"),
@@ -727,6 +733,8 @@ impl<'a> Parser<'a> {
         let mut text = 0u32;
         let mut accent = 0u32;
         let mut contrast = 50u8;
+        let mut brightness = 50u8;
+        let mut saturation = 50u8;
         let mut tint_strength = 50u8;
 
         self.parse_object(|p, key| match key {
@@ -746,6 +754,14 @@ impl<'a> Parser<'a> {
                 contrast = p.parse_u8()?;
                 Ok(())
             }
+            "brightness" => {
+                brightness = p.parse_u8()?;
+                Ok(())
+            }
+            "saturation" => {
+                saturation = p.parse_u8()?;
+                Ok(())
+            }
             "tint_strength" => {
                 tint_strength = p.parse_u8()?;
                 Ok(())
@@ -758,6 +774,8 @@ impl<'a> Parser<'a> {
             text,
             accent,
             contrast,
+            brightness,
+            saturation,
             tint_strength,
         })
     }

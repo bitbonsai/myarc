@@ -432,24 +432,31 @@ pub const fn font_stack(preset: FontPreset) -> Option<&'static str> {
     }
 }
 
+fn append_palette_filters(palette: Option<crate::BoostPalette>, out: &mut String) {
+    let Some(p) = palette else {
+        return;
+    };
+    if p.contrast != 50 {
+        let _ = write!(out, " contrast({}%)", 50 + u16::from(p.contrast));
+    }
+    if p.brightness != 50 {
+        let _ = write!(out, " brightness({}%)", 50 + u16::from(p.brightness));
+    }
+    if p.saturation != 50 {
+        let _ = write!(out, " saturate({}%)", u16::from(p.saturation) * 2);
+    }
+}
+
 fn emit_appearance_css(appearance: &BoostAppearance, css: &mut String) {
     match appearance.color_mode {
         ColorMode::None => {}
         ColorMode::Invert => {
-            let contrast_pct = appearance
-                .palette
-                .map_or(100u16, |p| 50 + u16::from(p.contrast));
-            if contrast_pct == 100 {
-                let _ = writeln!(
-                    css,
-                    "html {{ filter: invert(1) hue-rotate(180deg) !important; }}"
-                );
-            } else {
-                let _ = writeln!(
-                    css,
-                    "html {{ filter: invert(1) hue-rotate(180deg) contrast({contrast_pct}%) !important; }}"
-                );
-            }
+            let mut extra = String::new();
+            append_palette_filters(appearance.palette, &mut extra);
+            let _ = writeln!(
+                css,
+                "html {{ filter: invert(1) hue-rotate(180deg){extra} !important; }}"
+            );
             let _ = writeln!(
                 css,
                 "img, video, picture, canvas, svg {{ filter: invert(1) hue-rotate(180deg) !important; }}"
@@ -470,11 +477,13 @@ fn emit_appearance_css(appearance: &BoostAppearance, css: &mut String) {
                     "html, body {{ background-color: #{bg:06x} !important; color: #{text:06x} !important; }}"
                 );
                 let _ = writeln!(css, "a {{ color: #{accent:06x} !important; }}");
-                if p.contrast != 50 {
-                    let contrast_pct = 50 + u16::from(p.contrast);
+                let mut filters = String::new();
+                append_palette_filters(Some(p), &mut filters);
+                if !filters.is_empty() {
                     let _ = writeln!(
                         css,
-                        "html {{ filter: contrast({contrast_pct}%) !important; }}"
+                        "html {{ filter: {} !important; }}",
+                        filters.trim_start()
                     );
                 }
             }
