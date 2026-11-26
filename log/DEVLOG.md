@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-11-26: Circular Boost badges, Lucide Zap/Braces icons, and animated Zap collapse
+
+- Added Lucide `kZapIcon` (`zap`) and `kBracesIcon` (`braces`) vector icons (`browser/foundation/icons.h`) and wired them as subtle secondary-colored trailing icons (`16px`, `kInkSecondary`) on the Boost `Zap` and `Code` rows (`browser/foundation/boost_editor_view.cc`).
+- Updated `PillButton::SetBadge()` to render a circular `20x20` badge (radius `10`, stadium pill for multi-digit counts) with softer orange/indigo tints.
+- Animated collapsing the Zap drawer on `Done` (`AnimateSizeToContents(/*crossfade=*/false)`) to match click-to-expand/collapse; verified with `out/MyarcRelease` `chrome` build.
+
 ## 2026-11-26: Boost Code and Zap pill counter badges
 
 - Added `PillButton::SetBadge()` (`browser/foundation/boost_editor_view.cc`) rendering a compact rounded counter pill beside the trailing glyph (`⚡` / `{}`).

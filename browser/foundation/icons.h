@@ -669,6 +669,47 @@ inline constexpr gfx::VectorIcon kInspectElementIcon(
     std::size(kInspectElementRep),
     "myarc_inspect_element");
 
+// Lucide "zap" for Boost Editor Zap row.
+inline constexpr gfx::PathElement kZapPath[] = {
+    gfx::CANVAS_DIMENSIONS, 24, gfx::STROKE, 2,
+    gfx::MOVE_TO, 13, 2,
+    gfx::LINE_TO, 4, 14,
+    gfx::H_LINE_TO, 12,
+    gfx::LINE_TO, 11, 22,
+    gfx::LINE_TO, 20, 10,
+    gfx::H_LINE_TO, 12,
+    gfx::CLOSE};
+inline constexpr gfx::VectorIconRep kZapRep[] = {{kZapPath}};
+inline constexpr gfx::VectorIcon kZapIcon(kZapRep,
+                                          std::size(kZapRep),
+                                          "myarc_zap");
+
+// Lucide "braces" for Boost Editor Code row.
+inline constexpr gfx::PathElement kBracesPath[] = {
+    gfx::CANVAS_DIMENSIONS, 24, gfx::STROKE, 2,
+    gfx::MOVE_TO, 8, 3,
+    gfx::H_LINE_TO, 7,
+    gfx::ARC_TO, 2, 2, 0, 0, 0, 5, 5,
+    gfx::V_LINE_TO, 10,
+    gfx::ARC_TO, 2, 2, 0, 0, 1, 3, 12,
+    gfx::ARC_TO, 2, 2, 0, 0, 1, 5, 14,
+    gfx::V_LINE_TO, 19,
+    gfx::ARC_TO, 2, 2, 0, 0, 0, 7, 21,
+    gfx::H_LINE_TO, 8,
+    gfx::MOVE_TO, 16, 21,
+    gfx::H_LINE_TO, 17,
+    gfx::ARC_TO, 2, 2, 0, 0, 0, 19, 19,
+    gfx::V_LINE_TO, 14,
+    gfx::ARC_TO, 2, 2, 0, 0, 1, 21, 12,
+    gfx::ARC_TO, 2, 2, 0, 0, 1, 19, 10,
+    gfx::V_LINE_TO, 5,
+    gfx::ARC_TO, 2, 2, 0, 0, 0, 17, 3,
+    gfx::H_LINE_TO, 16};
+inline constexpr gfx::VectorIconRep kBracesRep[] = {{kBracesPath}};
+inline constexpr gfx::VectorIcon kBracesIcon(kBracesRep,
+                                             std::size(kBracesRep),
+                                             "myarc_braces");
+
 #undef MYARC_RAIL_FILL
 
 }  // namespace myarc

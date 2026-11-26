@@ -369,14 +369,17 @@ class PillButton final : public views::Button {
              const std::u16string& trailing_glyph = {},
              bool centered = true,
              int font_size_delta = 0,
-             const gfx::VectorIcon* icon = nullptr)
-      : views::Button(std::move(callback)), icon_(icon) {
+             const gfx::VectorIcon* icon = nullptr,
+             const gfx::VectorIcon* trailing_icon = nullptr)
+      : views::Button(std::move(callback)),
+        icon_(icon),
+        trailing_icon_(trailing_icon) {
     SetFocusBehavior(FocusBehavior::ALWAYS);
     views::InkDrop::Get(this)->SetMode(views::InkDropHost::InkDropMode::OFF);
     views::InstallRoundRectHighlightPathGenerator(this, gfx::Insets(), 10);
     auto* layout = SetLayoutManager(std::make_unique<views::BoxLayout>(
         Orientation::kHorizontal,
-        icon_ ? gfx::Insets::VH(0, 6) : gfx::Insets::VH(0, 14), 6));
+        icon_ ? gfx::Insets::VH(0, 6) : gfx::Insets::VH(0, 14), 8));
     layout->set_cross_axis_alignment(CrossAxis::kCenter);
     layout->set_main_axis_alignment(centered ? MainAxis::kCenter
                                              : MainAxis::kStart);
@@ -395,16 +398,21 @@ class PillButton final : public views::Button {
         label_->SetHorizontalAlignment(gfx::ALIGN_LEFT);
       }
     }
-    if (!trailing_glyph.empty()) {
+    if (!trailing_glyph.empty() || trailing_icon_) {
       badge_ = AddChildView(MakeLabel(
           std::u16string(),
           gfx::FontList().Derive(-2, gfx::Font::NORMAL,
                                  gfx::Font::Weight::BOLD),
           kInkPrimary));
       badge_->SetHorizontalAlignment(gfx::ALIGN_CENTER);
-      badge_->SetBorder(views::CreateEmptyBorder(gfx::Insets::VH(2, 6)));
+      badge_->SetLineHeight(20);
+      badge_->SetPreferredSize(gfx::Size(20, 20));
       badge_->SetVisible(false);
-
+    }
+    if (trailing_icon_) {
+      trailing_icon_view_ = AddChildView(std::make_unique<views::ImageView>());
+      trailing_icon_view_->SetCanProcessEventsWithinSubtree(false);
+    } else if (!trailing_glyph.empty()) {
       trailing_ = AddChildView(MakeLabel(
           trailing_glyph,
           gfx::FontList().Derive(1, gfx::Font::NORMAL,
@@ -423,7 +431,14 @@ class PillButton final : public views::Button {
     badge_bg_ = bg;
     badge_fg_ = fg;
     badge_->SetText(text);
-    badge_->SetVisible(!text.empty());
+    const bool show = !text.empty();
+    if (show) {
+      badge_->SetPreferredSize(std::nullopt);
+      const int text_w = badge_->GetPreferredSize({}).width();
+      const int w = text.size() <= 1 ? 20 : std::max(20, text_w + 10);
+      badge_->SetPreferredSize(gfx::Size(w, 20));
+    }
+    badge_->SetVisible(show);
     UpdateVisuals();
     InvalidateLayout();
   }
@@ -473,6 +488,11 @@ class PillButton final : public views::Button {
     if (label_) {
       label_->SetEnabledColor(fg);
     }
+    if (trailing_icon_view_ && trailing_icon_) {
+      const SkColor icon_fg = active_ ? SK_ColorWHITE : kInkSecondary;
+      trailing_icon_view_->SetImage(
+          ui::ImageModel::FromVectorIcon(*trailing_icon_, icon_fg, 16));
+    }
     if (trailing_) {
       trailing_->SetEnabledColor(fg);
     }
@@ -480,7 +500,7 @@ class PillButton final : public views::Button {
       const SkColor b_bg =
           active_ ? SkColorSetARGB(0x33, 0xFF, 0xFF, 0xFF) : badge_bg_;
       const SkColor b_fg = active_ ? SK_ColorWHITE : badge_fg_;
-      badge_->SetBackground(views::CreateRoundedRectBackground(b_bg, 9));
+      badge_->SetBackground(views::CreateRoundedRectBackground(b_bg, 10));
       badge_->SetEnabledColor(b_fg);
     }
   }
@@ -490,9 +510,11 @@ class PillButton final : public views::Button {
   SkColor badge_bg_ = kPillHoverBg;
   SkColor badge_fg_ = kInkPrimary;
   raw_ptr<const gfx::VectorIcon> icon_ = nullptr;
+  raw_ptr<const gfx::VectorIcon> trailing_icon_ = nullptr;
   raw_ptr<views::ImageView> icon_view_ = nullptr;
   raw_ptr<views::Label> label_ = nullptr;
   raw_ptr<views::Label> badge_ = nullptr;
+  raw_ptr<views::ImageView> trailing_icon_view_ = nullptr;
   raw_ptr<views::Label> trailing_ = nullptr;
 };
 
@@ -2085,7 +2107,8 @@ class BoostEditorView final : public views::View,
     zap_toggle_ = main_panel_->AddChildView(std::make_unique<PillButton>(
         base::BindRepeating(&BoostEditorView::ToggleZapSection,
                             base::Unretained(this)),
-        u"Zap", u"\u26A1", /*centered=*/false));
+        u"Zap", std::u16string(), /*centered=*/false, /*font_size_delta=*/0,
+        /*icon=*/nullptr, &kZapIcon));
     zap_toggle_->SetTooltipText(u"Hide page elements by CSS selector");
 
     zap_section_ = main_panel_->AddChildView(
@@ -2128,7 +2151,8 @@ class BoostEditorView final : public views::View,
     code_toggle_ = main_panel_->AddChildView(std::make_unique<PillButton>(
         base::BindRepeating(&BoostEditorView::EnterCodeMode,
                             base::Unretained(this)),
-        u"Code", u"{}", /*centered=*/false));
+        u"Code", std::u16string(), /*centered=*/false, /*font_size_delta=*/0,
+        /*icon=*/nullptr, &kBracesIcon));
     code_toggle_->SetTooltipText(u"Edit custom CSS");
 
     // 8. Morphed Code Editor panel (380px wide, Arc-style modal view).
@@ -2333,8 +2357,8 @@ class BoostEditorView final : public views::View,
       zap_toggle_->SetText(u"Zap");
       zap_toggle_->SetBadge(
           count == 0 ? std::u16string() : base::NumberToString16(count),
-          SkColorSetARGB(0x24, 0xF9, 0x67, 0x1D),
-          SkColorSetRGB(0xC8, 0x47, 0x0A));
+          SkColorSetARGB(0x1C, 0xF9, 0x67, 0x1D),
+          SkColorSetRGB(0xC8, 0x4E, 0x12));
       zap_toggle_->SetTooltipText(
           count == 0 ? u"Hide page elements by CSS selector"
                      : u"Hide page elements (" +
@@ -2355,8 +2379,8 @@ class BoostEditorView final : public views::View,
       code_toggle_->SetBadge(
           rule_count == 0 ? std::u16string()
                           : base::NumberToString16(rule_count),
-          SkColorSetARGB(0x22, 0x4F, 0x5B, 0xFF),
-          SkColorSetRGB(0x3A, 0x44, 0xD6));
+          SkColorSetARGB(0x18, 0x4F, 0x5B, 0xFF),
+          SkColorSetRGB(0x4A, 0x53, 0xD6));
       code_toggle_->SetTooltipText(
           rule_count == 0
               ? u"Edit custom CSS"
@@ -2865,7 +2889,7 @@ class BoostEditorView final : public views::View,
       if (zap_toggle_) {
         zap_toggle_->SetActive(false);
       }
-      SizeToContents();
+      AnimateSizeToContents(/*crossfade=*/false);
     }
   }
 
