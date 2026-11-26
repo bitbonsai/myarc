@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-11-26: Reversible Boost Zap preview (Clear all restores elements without reload)
+
+- Replaced inline `style="display: none !important"` mutations in `kZapStartScript` (`browser/foundation/boost_editor_view.cc`) with a scoped temporary `<style data-myarc-zap-preview="1">` stylesheet so zapped elements hide instantaneously without leaving sticky inline styles behind.
+- Cleared the temporary preview stylesheet in `HandleZapEvents()` right after `AddHiddenSelector()` injects the real Boost stylesheet (and removed it on `stop()`), so `Clear all`, single-selector `×`, Boost toggle-off, and `Reset all Edits` restore every element immediately without refreshing the page.
+- Verified with `out/MyarcRelease` `chrome` build.
+
 ## 2026-11-26: Boost Zap and Code picker single-click activation and immediate crosshair
 
 - Activated the parent browser window and focused `web_contents()` in `StartZapPicker()` and `ToggleCodeElementPicker()` (`browser/foundation/boost_editor_view.cc`) so macOS updates the cursor to `crosshair` immediately on hover instead of waiting for a click to activate the browser window behind the Boost Editor bubble.

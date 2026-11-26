@@ -900,6 +900,10 @@ constexpr char16_t kZapStartScript[] = uR"JS((() => {
   cursorStyle.textContent = '*, *::before, *::after { cursor: crosshair !important; user-select: none !important; -webkit-user-select: none !important; }'
   ;(document.head || document.documentElement).appendChild(cursorStyle)
 
+  const previewStyle = document.createElement('style')
+  previewStyle.setAttribute('data-myarc-zap-preview', '1')
+  ;(document.head || document.documentElement).appendChild(previewStyle)
+
   const style = document.createElement('style')
   style.textContent = `
     .frame {
@@ -1141,7 +1145,7 @@ constexpr char16_t kZapStartScript[] = uR"JS((() => {
     e.stopPropagation()
     if (specSel) {
       queue.push({ type: 'zap', selector: specSel })
-      if (selected) selected.style.setProperty('display', 'none', 'important')
+      previewStyle.textContent += specSel + ' { display: none !important; }\n'
     }
     clearSelection()
     box.style.display = 'none'
@@ -1150,9 +1154,7 @@ constexpr char16_t kZapStartScript[] = uR"JS((() => {
     e.stopPropagation()
     if (relSel) {
       queue.push({ type: 'zap', selector: relSel })
-      try {
-        document.querySelectorAll(relSel).forEach((n) => n.style.setProperty('display', 'none', 'important'))
-      } catch {}
+      previewStyle.textContent += relSel + ' { display: none !important; }\n'
     }
     clearSelection()
     box.style.display = 'none'
@@ -1167,6 +1169,10 @@ constexpr char16_t kZapStartScript[] = uR"JS((() => {
     stop()
   })
 
+  const clearPreview = () => {
+    previewStyle.textContent = ''
+  }
+
   const stop = () => {
     window.removeEventListener('mousemove', onMove, true)
     window.removeEventListener('mousedown', onMouseDown, true)
@@ -1174,6 +1180,7 @@ constexpr char16_t kZapStartScript[] = uR"JS((() => {
     window.removeEventListener('click', blockPointer, true)
     window.removeEventListener('keydown', onKey, true)
     cursorStyle.remove()
+    previewStyle.remove()
     host.remove()
     if (window.__myarcZap) window.__myarcZap.active = false
   }
@@ -1184,7 +1191,7 @@ constexpr char16_t kZapStartScript[] = uR"JS((() => {
   window.addEventListener('click', blockPointer, true)
   window.addEventListener('keydown', onKey, true)
 
-  window.__myarcZap = { active: true, queue, stop }
+  window.__myarcZap = { active: true, queue, stop, clearPreview }
 })())JS";
 
 constexpr char16_t kZapPollScript[] = uR"JS((() => {
@@ -2779,6 +2786,16 @@ class BoostEditorView final : public views::View,
     if (changed) {
       ClearPreview();
       ReloadFromService();
+      if (web_contents()) {
+        if (content::RenderFrameHost* rfh =
+                web_contents()->GetPrimaryMainFrame();
+            rfh && rfh->IsRenderFrameLive()) {
+          rfh->ExecuteJavaScriptInIsolatedWorld(
+              u"if(window.__myarcZap&&window.__myarcZap.clearPreview)"
+              u"window.__myarcZap.clearPreview()",
+              base::NullCallback(), ISOLATED_WORLD_ID_CHROME_INTERNAL);
+        }
+      }
     }
     if (done) {
       StopZapPicker();
