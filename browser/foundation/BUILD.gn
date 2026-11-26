@@ -163,6 +163,36 @@ source_set("boosts_tab_helper") {
   ]
 }
 
+config("tree_sitter_css_public_config") {
+  include_dirs = [ "third_party/tree_sitter/include" ]
+}
+
+static_library("tree_sitter_css") {
+  sources = [
+    "third_party/tree_sitter/src/lib.c",
+    "third_party/tree_sitter_css/src/parser.c",
+    "third_party/tree_sitter_css/src/scanner.c",
+  ]
+  include_dirs = [
+    "third_party/tree_sitter/include",
+    "third_party/tree_sitter/src",
+    "third_party/tree_sitter_css/src",
+  ]
+  public_configs = [ ":tree_sitter_css_public_config" ]
+  configs -= [
+    "//build/config/clang:unsafe_buffers",
+    "//build/config/compiler:chromium_code",
+  ]
+  configs += [ "//build/config/compiler:no_chromium_code" ]
+  cflags_c = [
+    "-std=c11",
+    "-Wno-unused-function",
+    "-Wno-unused-variable",
+    "-Wno-sign-compare",
+    "-Wno-missing-field-initializers",
+  ]
+}
+
 source_set("boost_editor") {
   sources = [
     "boost_editor_view.cc",
@@ -177,6 +207,7 @@ source_set("boost_editor") {
     ":boosts_tab_helper",
     ":bridge",
     ":icons",
+    ":tree_sitter_css",
     "//cc/paint",
     "//chrome/browser/profiles:profile",
     "//chrome/browser/ui:browser_element_identifiers",
@@ -298,6 +329,7 @@ source_set("browser_workspace_adapter") {
     ":control_prompt",
     ":settings_window",
     ":test_buildflags",
+    ":welcome_mark",
     ":workspace_lifecycle",
     "//chrome/browser:browser_process",
     "//chrome/browser/favicon",
@@ -337,6 +369,7 @@ source_set("browser_workspace_adapter") {
     "//ui/base",
     "//ui/events:dom_keycode_converter",
     "//ui/events:events_base",
+    "//ui/gfx/codec",
     "//ui/views",
   ]
 }

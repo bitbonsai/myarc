@@ -1238,13 +1238,22 @@ mod tests {
         assert!(css.contains(".cookie-banner { display: none !important; }"));
         assert!(css.contains("main { max-width: 720px; }"));
 
-        // Invert mode emits invert + media counter-invert.
+        // Invert mode relies on Blink's native Auto Dark (force_dark_mode_enabled),
+        // emitting only optional contrast/brightness/saturation filters when set.
         store
             .set_appearance(
                 id,
                 BoostAppearance {
                     color_mode: ColorMode::Invert,
-                    palette: None,
+                    palette: Some(BoostPalette {
+                        background: 0x000000,
+                        text: 0xFFFFFF,
+                        accent: 0x3B82F6,
+                        tint_strength: 0,
+                        contrast: 70,
+                        brightness: 50,
+                        saturation: 50,
+                    }),
                     font: FontPreset::Default,
                     text_scale_pct: 100,
                     text_transform: TextTransform::None,
@@ -1253,8 +1262,8 @@ mod tests {
             )
             .unwrap();
         let invert_css = store.compile_for_origin("https://fly.io", false);
-        assert!(invert_css.contains("invert(1) hue-rotate(180deg)"));
-        assert!(invert_css.contains("img, video, picture, canvas, svg"));
+        assert!(!invert_css.contains("invert(1)"));
+        assert!(invert_css.contains("contrast(120%)"));
     }
 
     #[test]

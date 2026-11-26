@@ -8,8 +8,11 @@
 #include <memory>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
+
+#include "tree_sitter/api.h"
 
 #include "base/functional/bind.h"
 #include "base/functional/callback.h"
@@ -1513,7 +1516,9 @@ class CssCodeTextarea final : public views::Textarea {
 BEGIN_METADATA(CssCodeTextarea)
 END_METADATA
 
-// Bounded single-pass CSS syntax highlighter for the dark Boost Code editor.
+extern "C" const TSLanguage* tree_sitter_css(void);
+
+// Bounded Tree-sitter CSS AST syntax highlighter for the dark Boost Code editor.
 void ApplyCssSyntaxHighlighting(views::Textarea* editor) {
   if (!editor) {
     return;
@@ -1526,175 +1531,114 @@ void ApplyCssSyntaxHighlighting(views::Textarea* editor) {
     return;
   }
 
-  auto is_ident_char = [](char16_t c) {
-    return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
-           (c >= '0' && c <= '9') || c == '-' || c == '_';
+  struct TsCssParserHolder {
+    TsCssParserHolder() : parser(ts_parser_new(), &ts_parser_delete) {
+      if (parser) {
+        ts_parser_set_language(parser.get(), tree_sitter_css());
+        ts_parser_set_timeout_micros(parser.get(), 50000);
+      }
+    }
+    std::unique_ptr<TSParser, decltype(&ts_parser_delete)> parser;
   };
-  auto is_hex_char = [](char16_t c) {
-    return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') ||
-           (c >= 'A' && c <= 'F');
-  };
-  auto is_space = [](char16_t c) {
-    return c == ' ' || c == '\t' || c == '\n' || c == '\r';
-  };
-
-  int brace_depth = 0;
-  bool in_value = false;
-  size_t i = 0;
-  while (i < n) {
-    const char16_t c = text[i];
-    if (is_space(c)) {
-      ++i;
-      continue;
-    }
-    // Block comment /* ... */
-    if (c == '/' && i + 1 < n && text[i + 1] == '*') {
-      const size_t start = i;
-      i += 2;
-      while (i + 1 < n && !(text[i] == '*' && text[i + 1] == '/')) {
-        ++i;
-      }
-      i = (i + 1 < n) ? i + 2 : n;
-      editor->ApplyColor(kCodeComment, gfx::Range(start, i));
-      continue;
-    }
-    // Quoted string '...' or "..."
-    if (c == '"' || c == '\'') {
-      const char16_t quote = c;
-      const size_t start = i++;
-      while (i < n) {
-        if (text[i] == '\\' && i + 1 < n) {
-          i += 2;
-          continue;
-        }
-        if (text[i] == quote) {
-          ++i;
-          break;
-        }
-        ++i;
-      }
-      editor->ApplyColor(kCodeString, gfx::Range(start, i));
-      continue;
-    }
-    // Structural punctuation
-    if (c == '{') {
-      editor->ApplyColor(kCodePunct, gfx::Range(i, i + 1));
-      ++brace_depth;
-      in_value = false;
-      ++i;
-      continue;
-    }
-    if (c == '}') {
-      editor->ApplyColor(kCodePunct, gfx::Range(i, i + 1));
-      brace_depth = std::max(0, brace_depth - 1);
-      in_value = false;
-      ++i;
-      continue;
-    }
-    if (c == ':' && brace_depth > 0 && !in_value) {
-      editor->ApplyColor(kCodePunct, gfx::Range(i, i + 1));
-      in_value = true;
-      ++i;
-      continue;
-    }
-    if (c == ';') {
-      editor->ApplyColor(kCodePunct, gfx::Range(i, i + 1));
-      in_value = false;
-      ++i;
-      continue;
-    }
-    if (c == '(' || c == ')' || c == ',') {
-      editor->ApplyColor(kCodePunct, gfx::Range(i, i + 1));
-      ++i;
-      continue;
-    }
-    // At-rule (@media, @keyframes, ...)
-    if (c == '@') {
-      const size_t start = i++;
-      while (i < n && is_ident_char(text[i])) {
-        ++i;
-      }
-      editor->ApplyColor(kCodeKeyword, gfx::Range(start, i));
-      continue;
-    }
-
-    if (brace_depth == 0) {
-      // Selector run up to '{', '}', ';', ',', comment, or string.
-      const size_t start = i;
-      while (i < n && text[i] != '{' && text[i] != '}' && text[i] != ';' &&
-             text[i] != ',' && text[i] != '"' && text[i] != '\'' &&
-             !(text[i] == '/' && i + 1 < n && text[i + 1] == '*')) {
-        ++i;
-      }
-      editor->ApplyColor(kCodeSelector, gfx::Range(start, i));
-      continue;
-    }
-
-    if (!in_value) {
-      // Property name up to ':', ';', '}', or whitespace.
-      const size_t start = i;
-      while (i < n && text[i] != ':' && text[i] != ';' && text[i] != '}' &&
-             text[i] != '{' && !is_space(text[i])) {
-        ++i;
-      }
-      editor->ApplyColor(kCodeProperty, gfx::Range(start, i));
-      continue;
-    }
-
-    // Inside property value:
-    // !important
-    if (c == '!') {
-      const size_t start = i++;
-      while (i < n && is_ident_char(text[i])) {
-        ++i;
-      }
-      editor->ApplyColor(kCodeKeyword, gfx::Range(start, i));
-      continue;
-    }
-    // Hex color (#fff, #0026e4, ...)
-    if (c == '#' && i + 1 < n && is_hex_char(text[i + 1])) {
-      const size_t start = i++;
-      while (i < n && is_hex_char(text[i])) {
-        ++i;
-      }
-      editor->ApplyColor(kCodeHex, gfx::Range(start, i));
-      continue;
-    }
-    // Number + optional unit (1rem, .5rem, -12px, 50%)
-    if ((c >= '0' && c <= '9') ||
-        (c == '.' && i + 1 < n && text[i + 1] >= '0' && text[i + 1] <= '9') ||
-        (c == '-' && i + 1 < n &&
-         ((text[i + 1] >= '0' && text[i + 1] <= '9') ||
-          (text[i + 1] == '.' && i + 2 < n && text[i + 2] >= '0' &&
-           text[i + 2] <= '9')))) {
-      const size_t start = i++;
-      while (i < n && ((text[i] >= '0' && text[i] <= '9') || text[i] == '.')) {
-        ++i;
-      }
-      if (i < n && text[i] == '%') {
-        ++i;
-      } else {
-        while (i < n && ((text[i] >= 'a' && text[i] <= 'z') ||
-                         (text[i] >= 'A' && text[i] <= 'Z'))) {
-          ++i;
-        }
-      }
-      editor->ApplyColor(kCodeNumber, gfx::Range(start, i));
-      continue;
-    }
-    // CSS function name (rgba(, calc(, var(, ...)
-    if (is_ident_char(c)) {
-      const size_t start = i;
-      while (i < n && is_ident_char(text[i])) {
-        ++i;
-      }
-      if (i < n && text[i] == '(') {
-        editor->ApplyColor(kCodeSelector, gfx::Range(start, i));
-      }
-      continue;
-    }
-    ++i;
+  static base::NoDestructor<TsCssParserHolder> holder;
+  if (!holder->parser) {
+    return;
   }
+
+  TSTree* tree = ts_parser_parse_string_encoding(
+      holder->parser.get(), nullptr, reinterpret_cast<const char*>(text.data()),
+      static_cast<uint32_t>(n * sizeof(char16_t)), TSInputEncodingUTF16LE);
+  if (!tree) {
+    return;
+  }
+
+  auto color_for_node = [](TSNode node,
+                           bool* descend) -> std::optional<SkColor> {
+    const std::string_view type(ts_node_type(node));
+    if (type == "comment") {
+      *descend = false;
+      return kCodeComment;
+    }
+    if (type == "string_value") {
+      *descend = false;
+      return kCodeString;
+    }
+    if (type == "color_value") {
+      *descend = false;
+      return kCodeHex;
+    }
+    if (type == "integer_value" || type == "float_value" || type == "unit") {
+      *descend = false;
+      return kCodeNumber;
+    }
+    if (type == "property_name" || type == "feature_name") {
+      *descend = false;
+      return kCodeProperty;
+    }
+    if (type == "important" || type == "at_keyword" || type == "to" ||
+        type == "from" || type == "and" || type == "or" || type == "not" ||
+        type == "only" || (!type.empty() && type[0] == '@')) {
+      *descend = false;
+      return kCodeKeyword;
+    }
+    if (type == "tag_name" || type == "class_name" || type == "id_name" ||
+        type == "attribute_name" || type == "universal_selector" ||
+        type == "namespace_name" || type == "nesting_selector" ||
+        type == "function_name") {
+      *descend = false;
+      return kCodeSelector;
+    }
+    if (!ts_node_is_named(node)) {
+      if (type == "." || type == "#") {
+        *descend = false;
+        return kCodeSelector;
+      }
+      if (type == "{" || type == "}" || type == ":" || type == "::" ||
+          type == ";" || type == "(" || type == ")" || type == "," ||
+          type == ">" || type == "+" || type == "~" || type == "[" ||
+          type == "]" || type == "=" || type == "~=" || type == "^=" ||
+          type == "$=" || type == "*=" || type == "|=") {
+        *descend = false;
+        return kCodePunct;
+      }
+    }
+    *descend = true;
+    return std::nullopt;
+  };
+
+  TSTreeCursor cursor = ts_tree_cursor_new(ts_tree_root_node(tree));
+  constexpr size_t kMaxVisitedNodes = 32768;
+  size_t visited = 0;
+  bool going_down = true;
+  while (visited < kMaxVisitedNodes) {
+    if (going_down) {
+      ++visited;
+      const TSNode node = ts_tree_cursor_current_node(&cursor);
+      bool descend = true;
+      if (std::optional<SkColor> color = color_for_node(node, &descend)) {
+        const size_t start =
+            std::min<size_t>(ts_node_start_byte(node) / sizeof(char16_t), n);
+        const size_t end =
+            std::min<size_t>(ts_node_end_byte(node) / sizeof(char16_t), n);
+        if (start < end) {
+          editor->ApplyColor(*color, gfx::Range(start, end));
+        }
+      }
+      if (descend && ts_tree_cursor_goto_first_child(&cursor)) {
+        continue;
+      }
+      going_down = false;
+    }
+    if (ts_tree_cursor_goto_next_sibling(&cursor)) {
+      going_down = true;
+      continue;
+    }
+    if (!ts_tree_cursor_goto_parent(&cursor)) {
+      break;
+    }
+  }
+  ts_tree_cursor_delete(&cursor);
+  ts_tree_delete(tree);
 }
 
 // Bounded CSS pretty-printer for the Boost Code editor Format button.
@@ -3368,8 +3312,10 @@ class BoostEditorView final : public views::View,
     }
     std::string css = BoostsService::CompilePreview(draft_appearance_,
                                                     selectors, draft_css_);
-    helper->SetPreviewOverride(origin_, std::move(css),
-                               record_->apply_to_subframes);
+    helper->SetPreviewOverride(
+        origin_, std::move(css), record_->apply_to_subframes,
+        /*auto_dark=*/draft_appearance_.color_mode ==
+            foundation::BoostColorMode::Invert);
   }
 
   void ClearPreview() {

@@ -1,0 +1,38 @@
+diff --git a/chrome/browser/chrome_content_browser_client.cc b/chrome/browser/chrome_content_browser_client.cc
+index 03111c8cb7cd0786314a448d01c358ae1b06a858..721d21a23521e02f07af1508dcef76699cc8f496 100644
+--- a/chrome/browser/chrome_content_browser_client.cc
++++ b/chrome/browser/chrome_content_browser_client.cc
+@@ -217,6 +217,7 @@
+ #include "chrome/browser/ui/ui_features.h"
+ #include "chrome/browser/ui/webid/identity_dialog_controller.h"
+ #include "chrome/browser/ui/webui/chrome_web_ui_controller_factory.h"
++#include "myarc/boosts_tab_helper.h"
+ #include "chrome/browser/ui/webui/internal_debug_pages_disabled/internal_debug_pages_disabled_ui.h"
+ #include "chrome/browser/ui/webui/log_web_ui_url.h"
+ #include "chrome/browser/universal_web_contents_observers.h"
+@@ -4818,6 +4819,10 @@ void ChromeContentBrowserClient::OverrideWebPreferences(
+ #endif
+   web_prefs->force_dark_mode_enabled =
+       prefs->GetBoolean(prefs::kWebKitForceDarkModeEnabled);
++  if (auto* boosts = myarc::BoostsTabHelper::FromWebContents(web_contents);
++      boosts && boosts->IsAutoDarkEnabled()) {
++    web_prefs->force_dark_mode_enabled = true;
++  }
+ 
+ #if BUILDFLAG(IS_CHROMEOS)
+   web_prefs->always_show_focus =
+@@ -5198,6 +5203,14 @@ bool ChromeContentBrowserClient::OverrideWebPreferencesAfterNavigation(
+   }
+ #endif
+ 
++  if (auto* boosts = myarc::BoostsTabHelper::FromWebContents(web_contents)) {
++    const bool want_dark =
++        profile->GetPrefs()->GetBoolean(prefs::kWebKitForceDarkModeEnabled) ||
++        boosts->IsAutoDarkEnabled();
++    prefs_changed |= (web_prefs->force_dark_mode_enabled != want_dark);
++    web_prefs->force_dark_mode_enabled = want_dark;
++  }
++
+   return prefs_changed;
+ }
+ 

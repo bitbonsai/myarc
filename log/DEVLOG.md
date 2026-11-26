@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-11-26: Blink Auto Dark for Boost Invert & Tree-sitter CSS syntax highlighting
+
+- Switched Boost `ColorMode::Invert` (`crates/boosts/src/css.rs`, `browser/foundation/boosts_tab_helper.{h,cc}`, `chrome/browser/chrome_content_browser_client.cc`, `chrome/browser/BUILD.gn`) from the naive CSS `invert(1) hue-rotate(180deg)` filter to Blink's native Auto Dark (`web_prefs->force_dark_mode_enabled`) with live preview support and optional contrast/brightness/saturation filters preserved.
+- Vendored MIT-licensed `tree-sitter` `v0.25.3` and `tree-sitter-css` `v0.23.2` C99 sources under `browser/foundation/third_party/` (recorded in `ATTRIBUTION.md`), compiled as `static_library("tree_sitter_css")`, and replaced the hand-rolled tokenizer in `ApplyCssSyntaxHighlighting()` (`browser/foundation/boost_editor_view.cc`) with a bounded Tree-sitter UTF-16LE AST highlighter (50ms timeout, 32k node cap).
+- Verified with `python3 tools/export_patches.py --check`, `python3 tools/check_docs.py`, `cargo fmt --all -- --check`, `cargo clippy --workspace --all-targets --locked -- -D warnings`, `cargo test --workspace --locked`, and `out/MyarcRelease` `chrome` build.
+
 ## 2026-11-26: Make Enter inherit previous line indentation in Boost Code editor
 
 - Overrode `PreHandleKeyPressed()` on `CssCodeTextarea` (`browser/foundation/boost_editor_view.cc`) to return `false` for plain `VKEY_RETURN`, preventing `views::Textarea::PreHandleKeyPressed()` from consuming Enter with a bare `\n` before `BoostEditorView::HandleKeyEvent()` runs `HandleCssReturnKey()`.
