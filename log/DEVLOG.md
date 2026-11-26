@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-11-26: Little Arc layout stability (eliminate 16px horizontal resize oscillation)
+
+- Fixed `BrowserView::Layout()` (`browser_view.cc.patch`) to run `LayoutMyarcLittleArc()` instead of `LayoutSuperclass<views::View>(this)` on Little Arc windows; previously `BrowserViewPopupLayoutImpl` resized `multi_contents_view_` to full window width (`760px`) and `LayoutMyarcLittleArc()` immediately resized it back to inset card width (`744px`), sending oscillating `760 -> 744px` resize IPCs to the renderer on every layout pass.
+- Updated `LayoutMyarcLittleArc()` to lay out `window_scrim_view_`, hide `top_container_`, and toggle `infobar_container_` visibility directly, and guarded `UpdateMyarcLittleArc()` so `SetBackground()` only runs when the frame color changes.
+- Verified with `out/MyarcRelease` `chrome` build and `export_patches.py --check` (163 patches).
+
 ## 2026-11-26: Little Arc header stability (no HTTPS warning flash or load relayout churn)
 
 - Updated `LittleArcHeader::Update()` (`browser/foundation/little_arc.{h,cc}`) to treat `security_state::NONE` on cryptographic (`https://`) URLs as secure (`kPeekLockIcon`) while connecting, preventing the transient warning-triangle flash on open.

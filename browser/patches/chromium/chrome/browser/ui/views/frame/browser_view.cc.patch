@@ -1,5 +1,5 @@
 diff --git a/chrome/browser/ui/views/frame/browser_view.cc b/chrome/browser/ui/views/frame/browser_view.cc
-index 7b568f6de760af21d6e9d2aa44415a7cef617c51..138ea728c4491ea2c009b061b22c553a1fcb80d9 100644
+index 7b568f6de760af21d6e9d2aa44415a7cef617c51..68f54aa19aceea247cc55a99f80f9ea2ef26bf92 100644
 --- a/chrome/browser/ui/views/frame/browser_view.cc
 +++ b/chrome/browser/ui/views/frame/browser_view.cc
 @@ -11,6 +11,7 @@
@@ -2461,15 +2461,20 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..138ea728c4491ea2c009b061b22c553a
  #if BUILDFLAG(IS_MAC)
    // The top container while in immersive fullscreen on macOS lives in another
    // Widget (OverlayWidgetMac). This means that BrowserView does not need to
-@@ -4908,6 +6962,7 @@ void BrowserView::Layout(PassKey) {
+@@ -4907,7 +6961,11 @@ void BrowserView::Layout(PassKey) {
+     did_first_layout_while_top_controls_are_sliding_ = false;
    }
  
-   LayoutSuperclass<views::View>(this);
-+  LayoutMyarcLittleArc();
+-  LayoutSuperclass<views::View>(this);
++  if (myarc_little_arc_header_) {
++    LayoutMyarcLittleArc();
++  } else {
++    LayoutSuperclass<views::View>(this);
++  }
  
    // TODO(jamescook): Why was this in the middle of layout code?
    toolbar_->location_bar()->UpdateFocusBehavior(IsToolbarVisible());
-@@ -4954,6 +7009,9 @@ void BrowserView::Layout(PassKey) {
+@@ -4954,6 +7012,9 @@ void BrowserView::Layout(PassKey) {
      if (fallback_popup_anchor_) {
        fallback_popup_anchor_->MaybeUpdateAnchor(rect);
      }
@@ -2479,7 +2484,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..138ea728c4491ea2c009b061b22c553a
  
      if (dialog_anchor_) {
        rect.Offset(0, -kAdditionalDialogToolbarOverlap);
-@@ -5197,6 +7255,338 @@ void BrowserView::AddedToWidget() {
+@@ -5197,6 +7258,338 @@ void BrowserView::AddedToWidget() {
        kFallbackPopupAnchorElementId, *this);
  
    initialized_ = true;
@@ -2818,7 +2823,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..138ea728c4491ea2c009b061b22c553a
  }
  
  void BrowserView::RemovedFromWidget() {
-@@ -5267,95 +7657,3514 @@ const views::View* BrowserView::GetViewByElementId(
+@@ -5267,90 +7660,3524 @@ const views::View* BrowserView::GetViewByElementId(
  ///////////////////////////////////////////////////////////////////////////////
  // BrowserView, ui::AcceleratorTarget overrides:
  
@@ -2832,24 +2837,15 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..138ea728c4491ea2c009b061b22c553a
 -    return true;
 -  }
 -#endif
--
++myarc::BrowserWorkspaceAdapter* BrowserView::GetMyarcWorkspaceAdapter() {
++  return myarc_workspace_adapter_.get();
++}
+ 
 -  int command_id;
 -  // Though AcceleratorManager should not send unknown |accelerator| to us, it's
 -  // still possible the command cannot be executed now.
 -  if (!FindCommandIdForAccelerator(accelerator, &command_id)) {
 -    return false;
--  }
--
--  UpdateAcceleratorMetrics(accelerator, command_id);
-+myarc::BrowserWorkspaceAdapter* BrowserView::GetMyarcWorkspaceAdapter() {
-+  return myarc_workspace_adapter_.get();
-+}
- 
--  if (command_id == IDC_CLEAR_BROWSING_DATA) {
--    views::ElementTrackerViews::GetInstance()->NotifyCustomEvent(
--        browsing_data_important_sites_util::
--            kOpenClearBrowsingDataDialogViaAcceleratorEventId,
--        this);
 -  }
 +std::u16string BrowserView::GetMyarcSelectedUrls() const {
 +  return HasMyarcWorkspaceSidebar()
@@ -2857,28 +2853,23 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..138ea728c4491ea2c009b061b22c553a
 +             : std::u16string();
 +}
  
--  actions::ActionInvocationContext context;
--  context.SetProperty(chrome::kActionInvocationSourceKey,
--                      chrome::ActionInvocationSource::kKeyboardShortcut);
+-  UpdateAcceleratorMetrics(accelerator, command_id);
 +bool BrowserView::CloseMyarcSelectedTabs() {
 +  return HasMyarcWorkspaceSidebar() &&
 +         myarc_workspace_sidebar_->CloseSelectedRows();
 +}
  
--  if (command_id == IDC_SHOW_READING_MODE) {
--    context.SetProperty(
--        kSidePanelOpenTriggerKey,
--        static_cast<std::underlying_type_t<SidePanelOpenTrigger>>(
--            SidePanelOpenTrigger::kReadAnythingKeyboardShortcut));
+-  if (command_id == IDC_CLEAR_BROWSING_DATA) {
+-    views::ElementTrackerViews::GetInstance()->NotifyCustomEvent(
+-        browsing_data_important_sites_util::
+-            kOpenClearBrowsingDataDialogViaAcceleratorEventId,
+-        this);
 +bool BrowserView::ShowMyarcCopiedUrlToast() {
 +  if (!base::CommandLine::ForCurrentProcess()->HasSwitch(
 +          "myarc-visual-parity") ||
 +      !GetWidget()) {
 +    return false;
    }
--
--  return chrome::ExecuteCommandWithContext(
--      browser_.get(), command_id, std::move(context), accelerator.time_stamp());
 +  if (!myarc_copied_url_toast_) {
 +    myarc_copied_url_toast_ =
 +        std::make_unique<myarc::CopiedUrlToast>(GetWidget());
@@ -2893,17 +2884,24 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..138ea728c4491ea2c009b061b22c553a
 +      base::CommandLine::ForCurrentProcess()->HasSwitch(kMyarcCaptureCopyUrl),
 +      links);
 +  return true;
- }
++}
  
--///////////////////////////////////////////////////////////////////////////////
--// BrowserView, infobars::InfoBarContainer::Delegate overrides:
+-  actions::ActionInvocationContext context;
+-  context.SetProperty(chrome::kActionInvocationSourceKey,
+-                      chrome::ActionInvocationSource::kKeyboardShortcut);
 -
--void BrowserView::InfoBarContainerStateChanged(bool is_animating) {
--  ToolbarSizeChanged(is_animating);
+-  if (command_id == IDC_SHOW_READING_MODE) {
+-    context.SetProperty(
+-        kSidePanelOpenTriggerKey,
+-        static_cast<std::underlying_type_t<SidePanelOpenTrigger>>(
+-            SidePanelOpenTrigger::kReadAnythingKeyboardShortcut));
 +void BrowserView::InitMyarcLittleArc() {
 +  if (myarc_little_arc_header_ || !myarc::IsLittleArc(*browser_)) {
 +    return;
-+  }
+   }
+-
+-  return chrome::ExecuteCommandWithContext(
+-      browser_.get(), command_id, std::move(context), accelerator.time_stamp());
 +  myarc_little_arc_header_ =
 +      AddChildView(std::make_unique<myarc::LittleArcHeader>(
 +          *browser_, base::BindRepeating(
@@ -2917,33 +2915,35 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..138ea728c4491ea2c009b061b22c553a
 +  InvalidateLayout();
  }
  
--void BrowserView::LoadingAnimationTimerCallback() {
--  LoadingAnimationCallback(base::TimeTicks::Now());
+-///////////////////////////////////////////////////////////////////////////////
+-// BrowserView, infobars::InfoBarContainer::Delegate overrides:
+-
+-void BrowserView::InfoBarContainerStateChanged(bool is_animating) {
+-  ToolbarSizeChanged(is_animating);
 +void BrowserView::UpdateMyarcLittleArc() {
 +  if (!myarc_little_arc_header_) {
 +    return;
 +  }
 +  myarc_little_arc_header_->Update();
-+  SetBackground(
-+      views::CreateSolidBackground(myarc_little_arc_header_->FrameColor()));
++  const ui::ColorVariant color(myarc_little_arc_header_->FrameColor());
++  if (!background() || background()->color() != color) {
++    SetBackground(views::CreateSolidBackground(color));
++  }
  }
  
--void BrowserView::LoadingAnimationCallback(base::TimeTicks timestamp) {
--  // Loading callbacks may trigger during Widget destruction after it has closed
--  // (in response to visibility change callbacks for e.g.). In such cases early
--  // return to avoid dereferencing partially torn-down state.
--  if (!GetWidget() || GetWidget()->IsClosed()) {
+-void BrowserView::LoadingAnimationTimerCallback() {
+-  LoadingAnimationCallback(base::TimeTicks::Now());
 +void BrowserView::LayoutMyarcLittleArc() {
 +  if (!myarc_little_arc_header_) {
-     return;
-   }
--
--  if (GetSupportsTabStrip()) {
--    // Loading animations are shown in the tab for tabbed windows. Update them
--    // even if the tabstrip isn't currently visible so they're in the right
--    // state when it returns.
--    tab_strip_view()->UpdateLoadingAnimations(timestamp -
--                                              loading_animation_start_);
++    return;
++  }
++  if (window_scrim_view_) {
++    window_scrim_view_->SetBoundsRect(GetLocalBounds());
++  }
++  if (top_container_ && top_container_->parent() == this) {
++    top_container_->SetVisible(false);
++    top_container_->SetBounds(0, 0, 0, 0);
++  }
 +  using Header = myarc::LittleArcHeader;
 +  const bool fullscreen = IsFullscreen();
 +  myarc_little_arc_header_->SetVisible(!fullscreen);
@@ -2953,35 +2953,45 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..138ea728c4491ea2c009b061b22c553a
 +  gfx::Rect card(inset, top, std::max(0, width() - 2 * inset),
 +                 std::max(1, height() - top - inset));
 +  // Infobars sit at the top of the card.
-+  if (infobar_container_ && infobar_container_->GetVisible()) {
-+    const int infobar_height = std::min(
-+        infobar_container_->GetPreferredSize().height(), card.height() - 1);
-+    infobar_container_->SetBounds(card.x(), card.y(), card.width(),
-+                                  infobar_height);
-+    card.Inset(gfx::Insets::TLBR(infobar_height, 0, 0, 0));
++  if (infobar_container_) {
++    const bool show_infobar = !infobar_container_->IsEmpty();
++    infobar_container_->SetVisible(show_infobar);
++    if (show_infobar) {
++      const int infobar_height = std::min(
++          infobar_container_->GetPreferredSize().height(), card.height() - 1);
++      infobar_container_->SetBounds(card.x(), card.y(), card.width(),
++                                    infobar_height);
++      card.Inset(gfx::Insets::TLBR(infobar_height, 0, 0, 0));
++    } else {
++      infobar_container_->SetBounds(0, 0, 0, 0);
++    }
 +  }
 +  multi_contents_view_->SetBoundsRect(card);
 +  multi_contents_view_->SetBackgroundRadii(
 +      fullscreen ? gfx::RoundedCornersF()
 +                 : gfx::RoundedCornersF(Header::kCardRadius));
-+}
-+
+ }
+ 
+-void BrowserView::LoadingAnimationCallback(base::TimeTicks timestamp) {
+-  // Loading callbacks may trigger during Widget destruction after it has closed
+-  // (in response to visibility change callbacks for e.g.). In such cases early
+-  // return to avoid dereferencing partially torn-down state.
+-  if (!GetWidget() || GetWidget()->IsClosed()) {
 +void BrowserView::MaybeScheduleMyarcCaptureLittleArc() {
 +  const base::CommandLine& command_line =
 +      *base::CommandLine::ForCurrentProcess();
 +  if (myarc_capture_little_arc_scheduled_ ||
 +      !command_line.HasSwitch("myarc-capture-little-arc") ||
 +      browser_->GetType() != BrowserWindowInterface::Type::TYPE_NORMAL) {
-+    return;
+     return;
    }
 -
--  if (ShouldShowWindowIcon()) {
--    WebContents* web_contents =
--        browser_->GetTabStripModel()->GetActiveWebContents();
--    // GetActiveWebContents can return null for example under Purify when
--    // the animations are running slowly and this function is called on a timer
--    // through LoadingAnimationCallback.
--    GetFrameView()->UpdateThrobber(web_contents && web_contents->IsLoading());
+-  if (GetSupportsTabStrip()) {
+-    // Loading animations are shown in the tab for tabbed windows. Update them
+-    // even if the tabstrip isn't currently visible so they're in the right
+-    // state when it returns.
+-    tab_strip_view()->UpdateLoadingAnimations(timestamp -
+-                                              loading_animation_start_);
 +  myarc_capture_little_arc_scheduled_ = true;
 +  const std::string value =
 +      command_line.GetSwitchValueASCII("myarc-capture-little-arc");
@@ -2992,6 +3002,14 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..138ea728c4491ea2c009b061b22c553a
 +      delay_ms = 2500;
 +    }
    }
+-
+-  if (ShouldShowWindowIcon()) {
+-    WebContents* web_contents =
+-        browser_->GetTabStripModel()->GetActiveWebContents();
+-    // GetActiveWebContents can return null for example under Purify when
+-    // the animations are running slowly and this function is called on a timer
+-    // through LoadingAnimationCallback.
+-    GetFrameView()->UpdateThrobber(web_contents && web_contents->IsLoading());
 +  delay_ms = std::clamp(delay_ms, 0, 120000);
 +  base::SingleThreadTaskRunner::GetCurrentDefault()->PostDelayedTask(
 +      FROM_HERE,
@@ -3035,7 +3053,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..138ea728c4491ea2c009b061b22c553a
 +  }
 +  if (!myarc_settings_window_) {
 +    myarc_settings_window_ = CreateMyarcSettingsWindow();
-+  }
+   }
 +  myarc_settings_window_->Show(myarc::SettingsWindow::Section::kGeneral,
 +                               /*inactive=*/false);
 +  return true;
@@ -3046,11 +3064,6 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..138ea728c4491ea2c009b061b22c553a
 -  // Ensure that this browser's Profile has a JumpList so that the JumpList is
 -  // kept up to date.
 -  JumpListFactory::GetForProfile(browser_->GetProfile());
--}
--#endif
--
--BrowserFrameView* BrowserView::GetFrameView() {
--  return browser_widget_ ? browser_widget_->GetFrameView() : nullptr;
 +bool BrowserView::ExecuteMyarcWindowCommand(int command_id) {
 +  const auto open_settings = [this](myarc::SettingsWindow::Section section) {
 +    if (!GetWidget()) {
@@ -6398,15 +6411,10 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..138ea728c4491ea2c009b061b22c553a
 +  // Ensure that this browser's Profile has a JumpList so that the JumpList is
 +  // kept up to date.
 +  JumpListFactory::GetForProfile(browser_->GetProfile());
-+}
-+#endif
-+
-+BrowserFrameView* BrowserView::GetFrameView() {
-+  return browser_widget_ ? browser_widget_->GetFrameView() : nullptr;
  }
+ #endif
  
- const BrowserFrameView* BrowserView::GetFrameView() const {
-@@ -5471,6 +11280,10 @@ bool BrowserView::MaybeUpdateDevtools(content::WebContents* contents) {
+@@ -5471,6 +11298,10 @@ bool BrowserView::MaybeUpdateDevtools(content::WebContents* contents) {
  
  void BrowserView::UpdateUIForContents(WebContents* contents,
                                        bool should_layout_immediately) {
@@ -6417,7 +6425,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..138ea728c4491ea2c009b061b22c553a
    TRACE_EVENT0("ui", "BrowserView::UpdateUIForContents");
    bool needs_layout = MaybeShowBookmarkBar(contents);
  
-@@ -5706,6 +11519,26 @@ void BrowserView::LoadAccelerators() {
+@@ -5706,6 +11537,26 @@ void BrowserView::LoadAccelerators() {
    }
  
  #if BUILDFLAG(IS_MAC)
