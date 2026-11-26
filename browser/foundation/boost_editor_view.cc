@@ -119,16 +119,19 @@ constexpr int kCodeCardWidth = 380;
 constexpr int kPadWidth = 220;
 constexpr int kPadHeight = 152;
 constexpr int kCardCornerRadius = 16;
-constexpr SkColor kCardBg = SK_ColorWHITE;
-constexpr SkColor kCardGlassTint = SK_ColorTRANSPARENT;
-constexpr SkColor kPillBg = SkColorSetARGB(0x9A, 0xFF, 0xFF, 0xFF);
-constexpr SkColor kPillHoverBg = SkColorSetARGB(0xCC, 0xFF, 0xFF, 0xFF);
-constexpr SkColor kPillActiveBg = SkColorSetRGB(0x2B, 0x2B, 0x30);
-constexpr SkColor kInkPrimary = SkColorSetRGB(0x1C, 0x1C, 0x1E);
-constexpr SkColor kInkSecondary = SkColorSetRGB(0x6E, 0x6E, 0x73);
-constexpr SkColor kBorderSubtle = SkColorSetARGB(0x22, 0x1C, 0x1C, 0x1E);
-constexpr SkColor kCodeWellBg = SkColorSetARGB(0xD8, 0x16, 0x17, 0x1E);
-constexpr SkColor kCodeWellBorder = SkColorSetARGB(0x28, 0xFF, 0xFF, 0xFF);
+constexpr SkColor kCardBg = SkColorSetRGB(0x1C, 0x1D, 0x24);
+constexpr SkColor kCardGlassTint = SkColorSetARGB(0x52, 0x12, 0x13, 0x1A);
+constexpr SkColor kPillBg = SkColorSetARGB(0x1E, 0xFF, 0xFF, 0xFF);
+constexpr SkColor kPillHoverBg = SkColorSetARGB(0x33, 0xFF, 0xFF, 0xFF);
+constexpr SkColor kPillBorder = SkColorSetARGB(0x28, 0xFF, 0xFF, 0xFF);
+constexpr SkColor kPillHoverBorder = SkColorSetARGB(0x44, 0xFF, 0xFF, 0xFF);
+constexpr SkColor kPillActiveBg = SK_ColorWHITE;
+constexpr SkColor kPillActiveInk = SkColorSetRGB(0x14, 0x14, 0x18);
+constexpr SkColor kInkPrimary = SkColorSetRGB(0xF5, 0xF5, 0xF7);
+constexpr SkColor kInkSecondary = SkColorSetARGB(0xC4, 0xEB, 0xEB, 0xF5);
+constexpr SkColor kBorderSubtle = SkColorSetARGB(0x26, 0xFF, 0xFF, 0xFF);
+constexpr SkColor kCodeWellBg = SkColorSetARGB(0x9C, 0x0C, 0x0D, 0x12);
+constexpr SkColor kCodeWellBorder = SkColorSetARGB(0x2C, 0xFF, 0xFF, 0xFF);
 constexpr SkColor kCodeInk = SkColorSetRGB(0xE5, 0xE7, 0xEB);
 constexpr SkColor kCodeComment = SkColorSetRGB(0x6B, 0x72, 0x80);
 constexpr SkColor kCodeSelector = SkColorSetRGB(0x7D, 0xD3, 0xFC);
@@ -138,7 +141,6 @@ constexpr SkColor kCodeHex = SkColorSetRGB(0xFD, 0xE0, 0x47);
 constexpr SkColor kCodeString = SkColorSetRGB(0x86, 0xEF, 0xAC);
 constexpr SkColor kCodeKeyword = SkColorSetRGB(0xF4, 0x72, 0xB6);
 constexpr SkColor kCodePunct = SkColorSetRGB(0x9C, 0xA3, 0xAF);
-constexpr SkColor kAccentBlue = SkColorSetRGB(0x4F, 0x5B, 0xFF);
 constexpr SkColor kCaseUpperBg = SkColorSetRGB(0xE8, 0x9B, 0x1E);
 constexpr SkColor kCaseLowerBg = SkColorSetRGB(0xE8, 0x56, 0x1E);
 constexpr SkColor kCaseCapBg = SkColorSetRGB(0xDE, 0x1B, 0x1B);
@@ -493,8 +495,14 @@ class PillButton final : public views::Button {
         GetState() == STATE_HOVERED || GetState() == STATE_PRESSED;
     const SkColor bg = active_ ? active_color_.value_or(kPillActiveBg)
                                : (hovered ? kPillHoverBg : kPillBg);
-    const SkColor fg = active_ ? SK_ColorWHITE : kInkPrimary;
+    const SkColor fg = active_
+                           ? (active_color_.has_value() ? SK_ColorWHITE
+                                                        : kPillActiveInk)
+                           : kInkPrimary;
     SetBackground(views::CreateRoundedRectBackground(bg, 10));
+    SetBorder(active_ ? nullptr
+                      : views::CreateRoundedRectBorder(
+                            1, 10, hovered ? kPillHoverBorder : kPillBorder));
     if (icon_view_ && icon_) {
       icon_view_->SetImage(ui::ImageModel::FromVectorIcon(*icon_, fg, 18));
     }
@@ -502,7 +510,7 @@ class PillButton final : public views::Button {
       label_->SetEnabledColor(fg);
     }
     if (trailing_icon_view_ && trailing_icon_) {
-      const SkColor icon_fg = active_ ? SK_ColorWHITE : kInkSecondary;
+      const SkColor icon_fg = active_ ? fg : kInkSecondary;
       trailing_icon_view_->SetImage(
           ui::ImageModel::FromVectorIcon(*trailing_icon_, icon_fg, 16));
     }
@@ -511,8 +519,8 @@ class PillButton final : public views::Button {
     }
     if (badge_ && badge_->GetVisible()) {
       const SkColor b_bg =
-          active_ ? SkColorSetARGB(0x33, 0xFF, 0xFF, 0xFF) : badge_bg_;
-      const SkColor b_fg = active_ ? SK_ColorWHITE : badge_fg_;
+          active_ ? SkColorSetARGB(0x28, 0x14, 0x14, 0x18) : badge_bg_;
+      const SkColor b_fg = active_ ? fg : badge_fg_;
       badge_->SetBackground(views::CreateRoundedRectBackground(b_bg, 10));
       badge_->SetEnabledColor(b_fg);
     }
@@ -755,7 +763,7 @@ class ColorPadView final : public views::View {
     // 4. Subtle dotted grid inside the pad.
     cc::PaintFlags dot_flags;
     dot_flags.setAntiAlias(true);
-    dot_flags.setColor(SkColorSetA(kInkPrimary, 0x14));
+    dot_flags.setColor(SkColorSetARGB(0x18, 0x1C, 0x1C, 0x1E));
     for (float y = inner.y() + 10.f; y < inner.bottom() - 6.f; y += 10.f) {
       for (float x = inner.x() + 10.f; x < inner.right() - 6.f; x += 10.f) {
         canvas->DrawCircle(gfx::PointF(x, y), 0.9f, dot_flags);
@@ -872,8 +880,8 @@ class FontPresetCell final : public views::Button {
         GetState() == STATE_HOVERED || GetState() == STATE_PRESSED;
     if (selected_) {
       SetBackground(views::CreateRoundedRectBackground(
-          SkColorSetA(kAccentBlue, 0x22), 6));
-      label_->SetEnabledColor(kAccentBlue);
+          SkColorSetARGB(0x42, 0x63, 0x70, 0xFF), 6));
+      label_->SetEnabledColor(SkColorSetRGB(0xC7, 0xD2, 0xFE));
     } else if (hovered) {
       SetBackground(views::CreateRoundedRectBackground(kPillBg, 6));
       label_->SetEnabledColor(kInkPrimary);
@@ -910,14 +918,14 @@ class BoostAdjustSlider final : public views::Slider {
                            kTrackHeight);
     cc::PaintFlags track_flags;
     track_flags.setAntiAlias(true);
-    track_flags.setColor(SkColorSetRGB(0xDD, 0xDD, 0xE2));
+    track_flags.setColor(SkColorSetARGB(0x38, 0xFF, 0xFF, 0xFF));
     canvas->DrawRoundRect(track, kTrackHeight * 0.5f, track_flags);
 
     // Subtle center tick at 50% (neutral).
     const float mid_x = track.CenterPoint().x();
     cc::PaintFlags tick_flags;
     tick_flags.setAntiAlias(true);
-    tick_flags.setColor(SkColorSetRGB(0xB4, 0xB4, 0xBC));
+    tick_flags.setColor(SkColorSetARGB(0x66, 0xFF, 0xFF, 0xFF));
     canvas->DrawRoundRect(gfx::RectF(mid_x - 0.75f, cy - 4.f, 1.5f, 8.f),
                           0.75f, tick_flags);
 
@@ -2328,7 +2336,8 @@ class BoostEditorView final : public views::View,
       close->SetImageVerticalAlignment(views::ImageButton::ALIGN_MIDDLE);
       close->SetPreferredSize(gfx::Size(22, 22));
       close->SetBackground(views::CreateRoundedRectBackground(
-          SkColorSetRGB(0xAE, 0xAE, 0xB2), 11));
+          SkColorSetARGB(0x2E, 0xFF, 0xFF, 0xFF), 11));
+      close->SetBorder(views::CreateRoundedRectBorder(1, 11, kBorderSubtle));
       close->SetTooltipText(u"Close Boost Editor");
       close->GetViewAccessibility().SetName(u"Close Boost Editor");
       views::InstallCircleHighlightPathGenerator(close.get());
@@ -2371,6 +2380,7 @@ class BoostEditorView final : public views::View,
     auto* hex_row = main_panel_->AddChildView(MakeBox(
         Orientation::kHorizontal, gfx::Insets::VH(3, 10), 8));
     hex_row->SetBackground(views::CreateRoundedRectBackground(kPillBg, 10));
+    hex_row->SetBorder(views::CreateRoundedRectBorder(1, 10, kPillBorder));
     auto* hex_layout =
         static_cast<views::BoxLayout*>(hex_row->GetLayoutManager());
     hex_layout->set_cross_axis_alignment(CrossAxis::kCenter);
@@ -2579,7 +2589,9 @@ class BoostEditorView final : public views::View,
                                  gfx::Font::Weight::SEMIBOLD),
           kInkPrimary));
       badge->SetBackground(views::CreateRoundedRectBackground(kPillBg, 6));
-      badge->SetBorder(views::CreateEmptyBorder(gfx::Insets::VH(4, 12)));
+      badge->SetBorder(views::CreatePaddedBorder(
+          views::CreateRoundedRectBorder(1, 6, kPillBorder),
+          gfx::Insets::VH(3, 11)));
 
       auto* spacer_r = code_header->AddChildView(std::make_unique<views::View>());
       ch_layout->SetFlexForView(spacer_r, 1);
@@ -2752,8 +2764,8 @@ class BoostEditorView final : public views::View,
       zap_toggle_->SetText(u"Zap");
       zap_toggle_->SetBadge(
           count == 0 ? std::u16string() : base::NumberToString16(count),
-          SkColorSetARGB(0x1C, 0xF9, 0x67, 0x1D),
-          SkColorSetRGB(0xC8, 0x4E, 0x12));
+          SkColorSetARGB(0x44, 0xF9, 0x67, 0x1D),
+          SkColorSetRGB(0xFF, 0xBA, 0x94));
       zap_toggle_->SetTooltipText(
           count == 0 ? u"Hide page elements by CSS selector"
                      : u"Hide page elements (" +
@@ -2774,8 +2786,8 @@ class BoostEditorView final : public views::View,
       code_toggle_->SetBadge(
           rule_count == 0 ? std::u16string()
                           : base::NumberToString16(rule_count),
-          SkColorSetARGB(0x18, 0x4F, 0x5B, 0xFF),
-          SkColorSetRGB(0x4A, 0x53, 0xD6));
+          SkColorSetARGB(0x44, 0x63, 0x70, 0xFF),
+          SkColorSetRGB(0xC7, 0xD2, 0xFE));
       code_toggle_->SetTooltipText(
           rule_count == 0
               ? u"Edit custom CSS"
@@ -3781,7 +3793,7 @@ bool ShowBoostEditor(BrowserWindowInterface& browser, uint64_t boost_id) {
   BoostEditorView* raw_view = slot->view;
   editors[&browser] = std::move(slot);
   raw_widget->Show();
-  ApplyBubbleGlass(*raw_widget, GlassMaterial::kPopover, /*dark=*/false,
+  ApplyBubbleGlass(*raw_widget, GlassMaterial::kPopover, /*dark=*/true,
                    kCardGlassTint, kCardBg);
   raw_view->StartOpenAnimation();
   return true;

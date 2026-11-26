@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-11-26: Smoked dark crystal glass Boost & Code panels with high-contrast legibility
+
+- Switched `ApplyBubbleGlass()` (`browser/foundation/boost_editor_view.cc`) to `dark = true` (`NSAppearanceNameVibrantDark` + `NSVisualEffectMaterialHUDWindow`) with a translucent dark crystal tint (`0x52` alpha) so the backdrop reads as crisp smoked glass instead of chalky frost.
+- Added `1px` specular white glass rims (`kPillBorder` / `kPillHoverBorder`) to `PillButton`, `hex_row`, `CSS` badge, close button, and the deep smoked code well (`0x9C` alpha), with crisp white primary ink (`#F5F5F7`), bright secondary ink (`0xC4` alpha) for `107 / 64 KB`, reset `↺`, close `×`, and Lucide icons, and inverted white active pills.
+- Updated `FontPresetCell`, `BoostAdjustSlider`, and Zap/Code circular badges for high contrast on dark glass; verified with `out/MyarcRelease` `chrome` build.
+
 ## 2026-11-26: Pure transparent high-blur Boost dialog backdrop
 
 - Changed `kCardGlassTint` (`browser/foundation/boost_editor_view.cc`) from `0xC2` opaque white wash to `SK_ColorTRANSPARENT` over macOS `NSVisualEffectMaterialHUDWindow` blur so the Boost dialog uses pure high-blur vibrancy without muddying dark pages.
