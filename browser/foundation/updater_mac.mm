@@ -1640,6 +1640,154 @@ void MaybeShowUpdaterPreview() {
 }  // namespace
 }  // namespace myarc
 
+@interface MyarcAboutPanelController : NSObject <NSWindowDelegate>
+- (void)showAbout;
+@end
+
+@implementation MyarcAboutPanelController {
+  NSWindow* __strong _window;
+}
+
+- (void)showAbout {
+  if (_window) {
+    [_window center];
+    [_window makeKeyAndOrderFront:nil];
+    [NSApp activateIgnoringOtherApps:YES];
+    return;
+  }
+
+  constexpr CGFloat kWidth = 340.0;
+  constexpr CGFloat kHeight = 296.0;
+  NSRect frame = NSMakeRect(0, 0, kWidth, kHeight);
+  NSWindow* window = [[NSWindow alloc]
+      initWithContentRect:frame
+                styleMask:NSWindowStyleMaskTitled | NSWindowStyleMaskClosable |
+                          NSWindowStyleMaskFullSizeContentView
+                  backing:NSBackingStoreBuffered
+                    defer:NO];
+  window.title = @"About myArc";
+  window.titleVisibility = NSWindowTitleHidden;
+  window.titlebarAppearsTransparent = YES;
+  window.movableByWindowBackground = YES;
+  window.releasedWhenClosed = NO;
+  window.delegate = self;
+
+  NSVisualEffectView* glass =
+      [[NSVisualEffectView alloc] initWithFrame:frame];
+  glass.material = NSVisualEffectMaterialPopover;
+  glass.blendingMode = NSVisualEffectBlendingModeBehindWindow;
+  glass.state = NSVisualEffectStateActive;
+  glass.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
+  window.contentView = glass;
+
+  NSImageView* icon = [[NSImageView alloc]
+      initWithFrame:NSMakeRect((kWidth - 72) / 2, kHeight - 104, 72, 72)];
+  icon.image = NSApp.applicationIconImage;
+  icon.imageScaling = NSImageScaleProportionallyUpOrDown;
+  [glass addSubview:icon];
+
+  NSTextField* title = [NSTextField labelWithString:@"myArc"];
+  title.font = [NSFont systemFontOfSize:20 weight:NSFontWeightBold];
+  title.alignment = NSTextAlignmentCenter;
+  title.frame = NSMakeRect(20, kHeight - 138, kWidth - 40, 26);
+  [glass addSubview:title];
+
+  NSBundle* bundle = base::apple::OuterBundle();
+  NSString* myarc_ver =
+      base::apple::ObjCCast<NSString>(
+          [bundle objectForInfoDictionaryKey:@"MyarcVersion"]);
+  NSString* version_line =
+      myarc_ver.length ? [NSString stringWithFormat:@"Version %@", myarc_ver]
+                       : @"Developer Build";
+  NSTextField* version = [NSTextField labelWithString:version_line];
+  version.font = [NSFont systemFontOfSize:13 weight:NSFontWeightMedium];
+  version.textColor = [NSColor secondaryLabelColor];
+  version.alignment = NSTextAlignmentCenter;
+  version.frame = NSMakeRect(20, kHeight - 160, kWidth - 40, 18);
+  [glass addSubview:version];
+
+  NSString* chromium_ver =
+      base::apple::ObjCCast<NSString>(
+          [bundle objectForInfoDictionaryKey:@"CFBundleShortVersionString"]);
+  NSString* engine_line =
+      chromium_ver.length
+          ? [NSString stringWithFormat:@"Chromium %@ · arm64", chromium_ver]
+          : @"Chromium · arm64";
+  NSTextField* engine = [NSTextField labelWithString:engine_line];
+  engine.font = [NSFont monospacedDigitSystemFontOfSize:11
+                                                 weight:NSFontWeightRegular];
+  engine.textColor = [NSColor tertiaryLabelColor];
+  engine.alignment = NSTextAlignmentCenter;
+  engine.frame = NSMakeRect(20, kHeight - 180, kWidth - 40, 16);
+  [glass addSubview:engine];
+
+  const BOOL has_updater = myarc::UpdaterAvailable();
+  if (has_updater) {
+    NSButton* check_btn = [NSButton buttonWithTitle:@"Check for Updates…"
+                                             target:self
+                                             action:@selector(checkUpdates:)];
+    check_btn.bezelStyle = NSBezelStyleRounded;
+    check_btn.keyEquivalent = @"\r";
+    check_btn.frame = NSMakeRect((kWidth - 168) / 2, 72, 168, 30);
+    [glass addSubview:check_btn];
+  }
+
+  const CGFloat link_y = has_updater ? 40 : 62;
+  NSButton* site_btn = [NSButton buttonWithTitle:@"myarc.dev"
+                                          target:self
+                                          action:@selector(openWebsite:)];
+  site_btn.bezelStyle = NSBezelStyleRecessed;
+  site_btn.bordered = NO;
+  site_btn.font = [NSFont systemFontOfSize:12 weight:NSFontWeightMedium];
+  site_btn.contentTintColor = [NSColor linkColor];
+  site_btn.frame = NSMakeRect(kWidth / 2 - 92, link_y, 84, 22);
+  [glass addSubview:site_btn];
+
+  NSButton* gh_btn = [NSButton buttonWithTitle:@"GitHub"
+                                        target:self
+                                        action:@selector(openGitHub:)];
+  gh_btn.bezelStyle = NSBezelStyleRecessed;
+  gh_btn.bordered = NO;
+  gh_btn.font = [NSFont systemFontOfSize:12 weight:NSFontWeightMedium];
+  gh_btn.contentTintColor = [NSColor linkColor];
+  gh_btn.frame = NSMakeRect(kWidth / 2 + 8, link_y, 84, 22);
+  [glass addSubview:gh_btn];
+
+  NSTextField* footer = [NSTextField
+      labelWithString:@"MIT License · Built on Chromium"];
+  footer.font = [NSFont systemFontOfSize:11 weight:NSFontWeightRegular];
+  footer.textColor = [NSColor tertiaryLabelColor];
+  footer.alignment = NSTextAlignmentCenter;
+  footer.frame = NSMakeRect(20, 16, kWidth - 40, 16);
+  [glass addSubview:footer];
+
+  _window = window;
+  [_window center];
+  [_window makeKeyAndOrderFront:nil];
+  [NSApp activateIgnoringOtherApps:YES];
+}
+
+- (void)checkUpdates:(id)sender {
+  [_window orderOut:nil];
+  [myarc::EnsureUpdater() checkForUpdates];
+}
+
+- (void)openWebsite:(id)sender {
+  [[NSWorkspace sharedWorkspace]
+      openURL:[NSURL URLWithString:@"https://myarc.dev/"]];
+}
+
+- (void)openGitHub:(id)sender {
+  [[NSWorkspace sharedWorkspace]
+      openURL:[NSURL URLWithString:@"https://github.com/bitbonsai/myarc"]];
+}
+
+- (void)windowWillClose:(NSNotification*)notification {
+  _window = nil;
+}
+
+@end
+
 // The menu item's target. Starts Sparkle on the first click if the delayed
 // start hasn't yet, then forwards to Sparkle's updater.
 @interface MyarcUpdaterMenuTarget : NSObject <NSMenuItemValidation>
@@ -1651,7 +1799,18 @@ void MaybeShowUpdaterPreview() {
   [myarc::EnsureUpdater() checkForUpdates];
 }
 
+- (void)showAbout:(id)sender {
+  static MyarcAboutPanelController* about_controller = nil;
+  if (!about_controller) {
+    about_controller = [[MyarcAboutPanelController alloc] init];
+  }
+  [about_controller showAbout];
+}
+
 - (BOOL)validateMenuItem:(NSMenuItem*)item {
+  if (item.action == @selector(showAbout:)) {
+    return YES;
+  }
   if (!myarc::g_started) {
     return YES;
   }
@@ -1687,6 +1846,18 @@ void AddUpdaterMenuItem(NSMenu* app_menu, NSInteger index) {
                           keyEquivalent:@""];
   item.target = target;
   [app_menu insertItem:item atIndex:index];
+}
+
+void BindAboutMenuItem(NSMenuItem* about_item) {
+  if (!about_item) {
+    return;
+  }
+  static MyarcUpdaterMenuTarget* about_target = nil;
+  if (!about_target) {
+    about_target = [[MyarcUpdaterMenuTarget alloc] init];
+  }
+  about_item.target = about_target;
+  about_item.action = @selector(showAbout:);
 }
 
 }  // namespace myarc

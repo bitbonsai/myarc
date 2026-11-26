@@ -4,6 +4,7 @@
 #import <Foundation/Foundation.h>
 
 @class NSMenu;
+@class NSMenuItem;
 
 namespace myarc {
 
@@ -13,6 +14,10 @@ namespace myarc {
 // builds. Builds with test hooks start it only under
 // --myarc-test-update-feed=<appcast URL>, right away.
 void AddUpdaterMenuItem(NSMenu* app_menu, NSInteger index);
+
+// Rebinds the macOS "About myArc" menu item to open myArc's native About
+// window instead of Chromium's chrome://settings/help page.
+void BindAboutMenuItem(NSMenuItem* about_item);
 
 }  // namespace myarc
 

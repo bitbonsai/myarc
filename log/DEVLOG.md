@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-11-26: Native frosted-glass About myArc dialog
+
+- Added `myarc::BindAboutMenuItem()` and `MyarcAboutPanelController` (`browser/foundation/updater_mac.{h,mm}`) to show a native frosted-glass About window with the myArc icon, `MyarcVersion`, Chromium version, a `Check for Updates…` button when Sparkle is embedded, `myarc.dev`/`GitHub` links, and MIT/Chromium attribution.
+- Bound `IDC_ABOUT` in `AddMyarcVersionItem()` (`chrome/browser/ui/cocoa/main_menu_builder.mm`) so **myArc -> About myArc** opens the native dialog instead of Chromium's `chrome://settings/help` page.
+- Verified with `python3 tools/export_patches.py --check`, `python3 tools/check_docs.py`, and `out/MyarcRelease` `chrome` build.
+
 ## 2026-11-26: Double-click sidebar resize edge to reset width to default
 
 - Added `SidebarResizeArea` (`views::ResizeArea` subclass with `METADATA_HEADER`) in `chrome/browser/ui/views/frame/vertical_tab_strip_region_view.cc` so double-clicking the sidebar's right edge resets its width to `kMyarcSidebarDefaultWidth` (`228` DIP) and persists the default width in `state_controller_`.
