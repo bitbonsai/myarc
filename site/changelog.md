@@ -2,6 +2,10 @@
 
 One entry per alpha release, newest first, written for people using myArc. The homepage's Recent updates dialog shows them, and the build stops when the version in `release.json` has no entry here.
 
+## v2026.11.26 (2026-11-26)
+
+Drag the sidebar edge to resize it across Arc's 160 to 500 DIP range, or double-click the edge to reset it. The Boost Editor now uses smoked dark glass, Tree-sitter CSS syntax highlighting, inline autocomplete with Tab and arrow-key cycling, auto-indent, auto-save, a specific element picker, and improved CSS Smart Invert. Little Arc stops oscillating on load, and the footer Profile capsule hover sits flush inside the pill.
+
 ## v2026.11.25.2 (2026-11-25)
 
 CSS-only Boosts are here, with a floating editor for colors, fonts, element zapping, and custom CSS, plus a Profile-wide kill switch in Library. The macOS menu bar now follows Arc's layout, Library adds Media with a lightbox preview, and Archived Tabs can be filtered by Space and date.

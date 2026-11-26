@@ -362,7 +362,7 @@ CSS = '''
     .dl-icon { width: 1.25rem; height: 1.25rem; flex: none }
     .dl-submeta { margin-top: .75rem; text-align: center; color: var(--quiet); font-size: .9375rem }
     .dl-upcoming { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .625rem; margin-top: 1rem }
-    .dl-os-btn { display: flex; align-items: center; justify-content: space-between; gap: .5rem; width: 100%; padding: .6875rem 1rem; border-radius: 6rem; border: 1px dashed color-mix(in srgb, currentColor 28%, transparent); background: color-mix(in srgb, currentColor 4%, transparent); color: var(--quiet); font: inherit; font-size: .9375rem; font-weight: 500; cursor: not-allowed }
+    .dl-os-btn { display: flex; align-items: center; justify-content: space-between; gap: .5rem; width: 100%; padding: .6875rem 1rem; border-radius: .75rem; border: 1px dashed color-mix(in srgb, currentColor 28%, transparent); background: color-mix(in srgb, currentColor 4%, transparent); color: var(--quiet); font: inherit; font-size: .9375rem; font-weight: 500; cursor: not-allowed }
     .dl-soon { font-size: .875rem; font-weight: 500; opacity: .72 }
 
     /* Progressive SHA-256 verification disclosure */
@@ -378,7 +378,7 @@ CSS = '''
     .dl-cmd { display: flex; align-items: center; gap: .625rem; margin-top: .75rem; padding: .5rem .5rem .5rem 1rem; border-radius: .875rem; background: var(--panel); color: var(--ivory) }
     .dl-cmd pre { flex: 1; min-width: 0; margin: 0; padding: .375rem 0; overflow-x: auto; background: none; color: inherit; font-family: inherit; font-size: .9375rem; line-height: 1.45 }
     .dl-cmd code { font-family: inherit; white-space: nowrap }
-    .dl-copy { flex: none; padding: .375rem .75rem; border: 1px solid rgb(255 255 255 / .22); border-radius: 999rem; background: rgb(255 255 255 / .1); color: var(--ivory); font: inherit; font-size: .875rem; font-weight: 500; cursor: pointer; transition: background-color .15s ease }
+    .dl-copy { flex: none; padding: .375rem .75rem; border: 1px solid rgb(255 255 255 / .22); border-radius: .5rem; background: rgb(255 255 255 / .1); color: var(--ivory); font: inherit; font-size: .875rem; font-weight: 500; cursor: pointer; transition: background-color .15s ease }
     .dl-copy:hover, .dl-copy:focus-visible { background: rgb(255 255 255 / .2) }
 
     /* Sections below hero */
