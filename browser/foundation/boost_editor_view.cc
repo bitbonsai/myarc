@@ -1263,16 +1263,23 @@ constexpr char16_t kCssPickStartScript[] = uR"JS((() => {
       tip.style.top = Math.max(10, r.top - 28) + 'px'
     }
   }
-  const onClick = (e) => {
+  let picked = false
+  const onMouseDown = (e) => {
+    if (e.button !== 0) return
     e.preventDefault()
     e.stopImmediatePropagation()
     const el = document.elementFromPoint(e.clientX, e.clientY)
     if (el && el !== host && el !== document.documentElement && el !== document.body) {
+      picked = true
       queue.push({ type: 'pick', selector: buildSelector(el) })
+      stop()
     }
-    stop()
   }
   const blockPointer = (e) => {
+    e.preventDefault()
+    e.stopImmediatePropagation()
+  }
+  const swallowOneClick = (e) => {
     e.preventDefault()
     e.stopImmediatePropagation()
   }
@@ -1286,18 +1293,22 @@ constexpr char16_t kCssPickStartScript[] = uR"JS((() => {
   }
   const stop = () => {
     window.removeEventListener('mousemove', onMove, true)
-    window.removeEventListener('click', onClick, true)
-    window.removeEventListener('mousedown', blockPointer, true)
+    window.removeEventListener('mousedown', onMouseDown, true)
     window.removeEventListener('mouseup', blockPointer, true)
+    window.removeEventListener('click', blockPointer, true)
     window.removeEventListener('keydown', onKey, true)
+    if (picked) {
+      window.addEventListener('click', swallowOneClick, { capture: true, once: true })
+      setTimeout(() => window.removeEventListener('click', swallowOneClick, true), 400)
+    }
     host.remove()
     if (window.__myarcZap) window.__myarcZap.active = false
   }
 
   window.addEventListener('mousemove', onMove, true)
-  window.addEventListener('click', onClick, true)
-  window.addEventListener('mousedown', blockPointer, true)
+  window.addEventListener('mousedown', onMouseDown, true)
   window.addEventListener('mouseup', blockPointer, true)
+  window.addEventListener('click', blockPointer, true)
   window.addEventListener('keydown', onKey, true)
   window.__myarcZap = { active: true, queue, stop }
 })())JS";
@@ -1813,7 +1824,9 @@ class BoostEditorView final : public views::View,
     auto style_light_textfield = [](views::Textfield* tf) {
       tf->SetBackgroundColor(SK_ColorWHITE);
       tf->SetColor(kInkPrimary);
-      tf->SetBorder(views::CreateRoundedRectBorder(1, 8, kBorderSubtle));
+      tf->SetBorder(views::CreatePaddedBorder(
+          views::CreateRoundedRectBorder(1, 8, kBorderSubtle),
+          gfx::Insets::VH(4, 8)));
     };
 
     main_panel_ = AddChildView(
@@ -2027,6 +2040,7 @@ class BoostEditorView final : public views::View,
       input->SetPlaceholderText(u".banner, #ads");
       input->GetViewAccessibility().SetName(u"CSS selector to hide");
       style_light_textfield(input.get());
+      input->SetPreferredSize(gfx::Size(0, 32));
       input->set_controller(this);
       zap_input_ = input_row->AddChildView(std::move(input));
       input_layout->SetFlexForView(zap_input_, 1);
@@ -2035,7 +2049,7 @@ class BoostEditorView final : public views::View,
           base::BindRepeating(&BoostEditorView::AddZapSelector,
                               base::Unretained(this)),
           u"Hide", std::u16string(), /*centered=*/true, /*font_size_delta=*/-1);
-      add_btn->SetPreferredSize(gfx::Size(56, 30));
+      add_btn->SetPreferredSize(gfx::Size(56, 32));
       input_row->AddChildView(std::move(add_btn));
 
       zap_error_label_ = zap_section_->AddChildView(MakeLabel(
@@ -2717,13 +2731,19 @@ class BoostEditorView final : public views::View,
         code_picker_button_->SetActive(false);
       }
       if (!picked_selector.empty() && css_editor_) {
-        std::string snippet = picked_selector + " {\n  \n}\n";
         if (!draft_css_.empty() && draft_css_.back() != '\n') {
           draft_css_.push_back('\n');
         }
-        draft_css_ += snippet;
+        const std::string prefix = picked_selector + " {\n  ";
+        draft_css_ += prefix;
+        const size_t caret_utf16 = base::UTF8ToUTF16(draft_css_).size();
+        draft_css_ += "\n}\n";
         css_dirty_ = true;
         css_editor_->SetText(base::UTF8ToUTF16(draft_css_));
+        css_editor_->SetSelectedRange(gfx::Range(caret_utf16));
+        if (GetWidget()) {
+          GetWidget()->Activate();
+        }
         css_editor_->RequestFocus();
         UpdateCssValidationUi();
         PushLivePreview();
