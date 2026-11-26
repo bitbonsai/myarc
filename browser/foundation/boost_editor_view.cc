@@ -1497,6 +1497,17 @@ class CssCodeTextarea final : public views::Textarea {
     }
     return views::Textarea::SkipDefaultKeyEventProcessing(event);
   }
+
+  // Let BoostEditorView::HandleKeyEvent handle Enter so new lines inherit the
+  // current line's indentation (Textarea::PreHandleKeyPressed would otherwise
+  // insert a bare '\n' before the controller sees the key).
+  bool PreHandleKeyPressed(const ui::KeyEvent& event) override {
+    if (event.key_code() == ui::VKEY_RETURN && !event.IsCommandDown() &&
+        !event.IsControlDown() && !event.IsAltDown()) {
+      return false;
+    }
+    return views::Textarea::PreHandleKeyPressed(event);
+  }
 };
 
 BEGIN_METADATA(CssCodeTextarea)
@@ -2495,6 +2506,7 @@ class BoostEditorView final : public views::View,
     draft_css_ = base::UTF16ToUTF8(next_text);
     css_dirty_ = true;
     ApplyCssSyntaxHighlighting(css_editor_);
+    UpdateCssSuggestions();
     UpdateCssValidationUi();
     PushLivePreview();
     ScheduleCssAutoSave();

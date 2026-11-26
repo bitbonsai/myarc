@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-11-26: Make Enter inherit previous line indentation in Boost Code editor
+
+- Overrode `PreHandleKeyPressed()` on `CssCodeTextarea` (`browser/foundation/boost_editor_view.cc`) to return `false` for plain `VKEY_RETURN`, preventing `views::Textarea::PreHandleKeyPressed()` from consuming Enter with a bare `\n` before `BoostEditorView::HandleKeyEvent()` runs `HandleCssReturnKey()`.
+- Updated `ApplyCssProgrammaticEdit()` to refresh CSS autocomplete suggestions so chips clear cleanly on newline/auto-indent edits.
+- Verified with `out/MyarcRelease` `chrome` build.
+
 ## 2026-11-26: Fix null-border crash when typing in Boost Code editor
 
 - Fixed a null dereference in `BoostEditorView::RebuildCssSuggestionChips()` (`browser/foundation/boost_editor_view.cc`) where selected autocomplete chips passed `nullptr` to `views::CreatePaddedBorder()`, whose `ExtraInsetsBorder` constructor unconditionally dereferences `border_->color()`.
