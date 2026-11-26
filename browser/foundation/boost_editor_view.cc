@@ -3925,9 +3925,11 @@ class BoostEditorView final : public views::View,
       chip->SetEnabledTextColors(selected ? kPillActiveInk : kInkPrimary);
       chip->SetBackground(views::CreateRoundedRectBackground(
           selected ? SK_ColorWHITE : kPillBg, 6));
-      chip->SetBorder(views::CreatePaddedBorder(
-          selected ? nullptr : views::CreateRoundedRectBorder(1, 6, kPillBorder),
-          gfx::Insets::VH(3, 7)));
+      chip->SetBorder(
+          selected ? views::CreateEmptyBorder(gfx::Insets::VH(4, 8))
+                   : views::CreatePaddedBorder(
+                         views::CreateRoundedRectBorder(1, 6, kPillBorder),
+                         gfx::Insets::VH(3, 7)));
       chip->SetFocusBehavior(views::View::FocusBehavior::NEVER);
       css_suggestions_row_->AddChildView(std::move(chip));
     }

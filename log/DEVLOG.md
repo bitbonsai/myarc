@@ -1,5 +1,17 @@
 # Development log
 
+## 2026-11-26: Fix null-border crash when typing in Boost Code editor
+
+- Fixed a null dereference in `BoostEditorView::RebuildCssSuggestionChips()` (`browser/foundation/boost_editor_view.cc`) where selected autocomplete chips passed `nullptr` to `views::CreatePaddedBorder()`, whose `ExtraInsetsBorder` constructor unconditionally dereferences `border_->color()`.
+- Used `views::CreateEmptyBorder(gfx::Insets::VH(4, 8))` for selected chips (matching the `1px` border + `VH(3, 7)` padding of unselected chips).
+- Verified with `out/MyarcRelease` `chrome` build.
+
+## 2026-11-26: First-run `myArc Basics` starter folder with bundled myArc icons
+
+- Added `Workspace::seed_quick_start_basics` (`crates/workspace/src/lib.rs`) and bridged it through `bridge.rs`, `WorkspaceService::SeedQuickStartBasics`, and `OnboardingController::Feed` so finishing or skipping the welcome tour on a fresh profile seeds an expanded `myArc Basics` folder (`Getting Started`, `Spaces & Profiles`, `Peek & Split View`, `Agents (CLI & MCP)`, `Import from Arc`) alongside opening `myarc.dev/welcome/` once, while skipping it on Arc import, replay, and relaunch.
+- Added a bundled 16 DIP retina-aware myArc mark fallback in `BrowserWorkspaceAdapter::CachedIcon` (`browser/foundation/browser_workspace_adapter.cc`, `BUILD.gn`) for dormant `myarc.dev` links so the starter folder shows crisp icons immediately with no network fetches.
+- Verified with `cargo test --workspace --locked`, `cargo clippy --workspace --all-targets --locked -- -D warnings`, `out/MyarcRelease` `chrome` + `myarc:bridge_check`, and a background native capture.
+
 ## 2026-11-26: Specific element selector in Boost Code picker
 
 - Updated `buildSelector` in `kCssPickStartScript` (`browser/foundation/boost_editor_view.cc`) to require uniqueness (`document.querySelectorAll(sel).length === 1`) instead of returning bare tags like `a` or un-scoped class names.
