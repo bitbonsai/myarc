@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-11-26: Frosted glass Boost panels, CSS syntax highlighting, and Tab auto-indent
+
+- Applied `ApplyBubbleGlass()` (`GlassMaterial::kPopover`, translucent frosted white tint with Reduce Transparency fallback) to the Boost Editor card and Code panel (`browser/foundation/boost_editor_view.cc`), with translucent pill backgrounds and a dark translucent glass code well (`0xD8` alpha) so the blurred page shows subtly behind both views.
+- Added bounded single-pass CSS syntax highlighting (`ApplyCssSyntaxHighlighting`) on `views::Textarea` via `ApplyColor` (comments, strings, at-rules, selectors, properties, hex colors, numbers/units, `!important`, function names, and punctuation).
+- Added `CssCodeTextarea` (`SkipDefaultKeyEventProcessing` for `Tab`) plus `Tab` / `Shift+Tab` single- and multi-line 2-space indent/unindent, `Enter` auto-indent (including `{|}` split), and `}` auto-outdent; verified with `out/MyarcRelease` `chrome` build.
+
 ## 2026-11-26: Circular Boost badges, Lucide Zap/Braces icons, and animated Zap collapse
 
 - Added Lucide `kZapIcon` (`zap`) and `kBracesIcon` (`braces`) vector icons (`browser/foundation/icons.h`) and wired them as subtle secondary-colored trailing icons (`16px`, `kInkSecondary`) on the Boost `Zap` and `Code` rows (`browser/foundation/boost_editor_view.cc`).

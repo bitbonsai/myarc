@@ -46,6 +46,7 @@
 #include "myarc/boosts_tab_helper.h"
 #include "myarc/bridge.rs.h"
 #include "myarc/command_ids.h"
+#include "myarc/glass_mac.h"
 #include "myarc/icons.h"
 #include "third_party/skia/include/core/SkColor.h"
 #include "third_party/skia/include/core/SkPath.h"
@@ -119,12 +120,24 @@ constexpr int kPadWidth = 220;
 constexpr int kPadHeight = 152;
 constexpr int kCardCornerRadius = 16;
 constexpr SkColor kCardBg = SK_ColorWHITE;
-constexpr SkColor kPillBg = SkColorSetRGB(0xF1, 0xF1, 0xF4);
-constexpr SkColor kPillHoverBg = SkColorSetRGB(0xE6, 0xE6, 0xEC);
+constexpr SkColor kCardGlassTint = SkColorSetARGB(0xC2, 0xFF, 0xFF, 0xFF);
+constexpr SkColor kPillBg = SkColorSetARGB(0xA6, 0xEC, 0xED, 0xF2);
+constexpr SkColor kPillHoverBg = SkColorSetARGB(0xCC, 0xE2, 0xE4, 0xEC);
 constexpr SkColor kPillActiveBg = SkColorSetRGB(0x2B, 0x2B, 0x30);
 constexpr SkColor kInkPrimary = SkColorSetRGB(0x1C, 0x1C, 0x1E);
 constexpr SkColor kInkSecondary = SkColorSetRGB(0x6E, 0x6E, 0x73);
-constexpr SkColor kBorderSubtle = SkColorSetRGB(0xE5, 0xE5, 0xEA);
+constexpr SkColor kBorderSubtle = SkColorSetARGB(0x22, 0x1C, 0x1C, 0x1E);
+constexpr SkColor kCodeWellBg = SkColorSetARGB(0xD8, 0x16, 0x17, 0x1E);
+constexpr SkColor kCodeWellBorder = SkColorSetARGB(0x28, 0xFF, 0xFF, 0xFF);
+constexpr SkColor kCodeInk = SkColorSetRGB(0xE5, 0xE7, 0xEB);
+constexpr SkColor kCodeComment = SkColorSetRGB(0x6B, 0x72, 0x80);
+constexpr SkColor kCodeSelector = SkColorSetRGB(0x7D, 0xD3, 0xFC);
+constexpr SkColor kCodeProperty = SkColorSetRGB(0xC4, 0xB5, 0xFD);
+constexpr SkColor kCodeNumber = SkColorSetRGB(0xFD, 0xBA, 0x74);
+constexpr SkColor kCodeHex = SkColorSetRGB(0xFD, 0xE0, 0x47);
+constexpr SkColor kCodeString = SkColorSetRGB(0x86, 0xEF, 0xAC);
+constexpr SkColor kCodeKeyword = SkColorSetRGB(0xF4, 0x72, 0xB6);
+constexpr SkColor kCodePunct = SkColorSetRGB(0x9C, 0xA3, 0xAF);
 constexpr SkColor kAccentBlue = SkColorSetRGB(0x4F, 0x5B, 0xFF);
 constexpr SkColor kCaseUpperBg = SkColorSetRGB(0xE8, 0x9B, 0x1E);
 constexpr SkColor kCaseLowerBg = SkColorSetRGB(0xE8, 0x56, 0x1E);
@@ -1396,6 +1409,206 @@ constexpr char16_t kCssPickStartScript[] = uR"JS((() => {
   window.__myarcZap = { active: true, queue, stop }
 })())JS";
 
+class CssCodeTextarea final : public views::Textarea {
+  METADATA_HEADER(CssCodeTextarea, views::Textarea)
+
+ public:
+  bool SkipDefaultKeyEventProcessing(const ui::KeyEvent& event) override {
+    if (event.key_code() == ui::VKEY_TAB && !event.IsCommandDown() &&
+        !event.IsControlDown()) {
+      return true;
+    }
+    return views::Textarea::SkipDefaultKeyEventProcessing(event);
+  }
+};
+
+BEGIN_METADATA(CssCodeTextarea)
+END_METADATA
+
+// Bounded single-pass CSS syntax highlighter for the dark Boost Code editor.
+void ApplyCssSyntaxHighlighting(views::Textarea* editor) {
+  if (!editor) {
+    return;
+  }
+  const std::u16string_view text = editor->GetText();
+  editor->SetColor(kCodeInk);
+  constexpr size_t kMaxHighlightChars = 65536;
+  const size_t n = std::min(text.size(), kMaxHighlightChars);
+  if (n == 0) {
+    return;
+  }
+
+  auto is_ident_char = [](char16_t c) {
+    return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
+           (c >= '0' && c <= '9') || c == '-' || c == '_';
+  };
+  auto is_hex_char = [](char16_t c) {
+    return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') ||
+           (c >= 'A' && c <= 'F');
+  };
+  auto is_space = [](char16_t c) {
+    return c == ' ' || c == '\t' || c == '\n' || c == '\r';
+  };
+
+  int brace_depth = 0;
+  bool in_value = false;
+  size_t i = 0;
+  while (i < n) {
+    const char16_t c = text[i];
+    if (is_space(c)) {
+      ++i;
+      continue;
+    }
+    // Block comment /* ... */
+    if (c == '/' && i + 1 < n && text[i + 1] == '*') {
+      const size_t start = i;
+      i += 2;
+      while (i + 1 < n && !(text[i] == '*' && text[i + 1] == '/')) {
+        ++i;
+      }
+      i = (i + 1 < n) ? i + 2 : n;
+      editor->ApplyColor(kCodeComment, gfx::Range(start, i));
+      continue;
+    }
+    // Quoted string '...' or "..."
+    if (c == '"' || c == '\'') {
+      const char16_t quote = c;
+      const size_t start = i++;
+      while (i < n) {
+        if (text[i] == '\\' && i + 1 < n) {
+          i += 2;
+          continue;
+        }
+        if (text[i] == quote) {
+          ++i;
+          break;
+        }
+        ++i;
+      }
+      editor->ApplyColor(kCodeString, gfx::Range(start, i));
+      continue;
+    }
+    // Structural punctuation
+    if (c == '{') {
+      editor->ApplyColor(kCodePunct, gfx::Range(i, i + 1));
+      ++brace_depth;
+      in_value = false;
+      ++i;
+      continue;
+    }
+    if (c == '}') {
+      editor->ApplyColor(kCodePunct, gfx::Range(i, i + 1));
+      brace_depth = std::max(0, brace_depth - 1);
+      in_value = false;
+      ++i;
+      continue;
+    }
+    if (c == ':' && brace_depth > 0 && !in_value) {
+      editor->ApplyColor(kCodePunct, gfx::Range(i, i + 1));
+      in_value = true;
+      ++i;
+      continue;
+    }
+    if (c == ';') {
+      editor->ApplyColor(kCodePunct, gfx::Range(i, i + 1));
+      in_value = false;
+      ++i;
+      continue;
+    }
+    if (c == '(' || c == ')' || c == ',') {
+      editor->ApplyColor(kCodePunct, gfx::Range(i, i + 1));
+      ++i;
+      continue;
+    }
+    // At-rule (@media, @keyframes, ...)
+    if (c == '@') {
+      const size_t start = i++;
+      while (i < n && is_ident_char(text[i])) {
+        ++i;
+      }
+      editor->ApplyColor(kCodeKeyword, gfx::Range(start, i));
+      continue;
+    }
+
+    if (brace_depth == 0) {
+      // Selector run up to '{', '}', ';', ',', comment, or string.
+      const size_t start = i;
+      while (i < n && text[i] != '{' && text[i] != '}' && text[i] != ';' &&
+             text[i] != ',' && text[i] != '"' && text[i] != '\'' &&
+             !(text[i] == '/' && i + 1 < n && text[i + 1] == '*')) {
+        ++i;
+      }
+      editor->ApplyColor(kCodeSelector, gfx::Range(start, i));
+      continue;
+    }
+
+    if (!in_value) {
+      // Property name up to ':', ';', '}', or whitespace.
+      const size_t start = i;
+      while (i < n && text[i] != ':' && text[i] != ';' && text[i] != '}' &&
+             text[i] != '{' && !is_space(text[i])) {
+        ++i;
+      }
+      editor->ApplyColor(kCodeProperty, gfx::Range(start, i));
+      continue;
+    }
+
+    // Inside property value:
+    // !important
+    if (c == '!') {
+      const size_t start = i++;
+      while (i < n && is_ident_char(text[i])) {
+        ++i;
+      }
+      editor->ApplyColor(kCodeKeyword, gfx::Range(start, i));
+      continue;
+    }
+    // Hex color (#fff, #0026e4, ...)
+    if (c == '#' && i + 1 < n && is_hex_char(text[i + 1])) {
+      const size_t start = i++;
+      while (i < n && is_hex_char(text[i])) {
+        ++i;
+      }
+      editor->ApplyColor(kCodeHex, gfx::Range(start, i));
+      continue;
+    }
+    // Number + optional unit (1rem, .5rem, -12px, 50%)
+    if ((c >= '0' && c <= '9') ||
+        (c == '.' && i + 1 < n && text[i + 1] >= '0' && text[i + 1] <= '9') ||
+        (c == '-' && i + 1 < n &&
+         ((text[i + 1] >= '0' && text[i + 1] <= '9') ||
+          (text[i + 1] == '.' && i + 2 < n && text[i + 2] >= '0' &&
+           text[i + 2] <= '9')))) {
+      const size_t start = i++;
+      while (i < n && ((text[i] >= '0' && text[i] <= '9') || text[i] == '.')) {
+        ++i;
+      }
+      if (i < n && text[i] == '%') {
+        ++i;
+      } else {
+        while (i < n && ((text[i] >= 'a' && text[i] <= 'z') ||
+                         (text[i] >= 'A' && text[i] <= 'Z'))) {
+          ++i;
+        }
+      }
+      editor->ApplyColor(kCodeNumber, gfx::Range(start, i));
+      continue;
+    }
+    // CSS function name (rgba(, calc(, var(, ...)
+    if (is_ident_char(c)) {
+      const size_t start = i;
+      while (i < n && is_ident_char(text[i])) {
+        ++i;
+      }
+      if (i < n && text[i] == '(') {
+        editor->ApplyColor(kCodeSelector, gfx::Range(start, i));
+      }
+      continue;
+    }
+    ++i;
+  }
+}
+
 // Small circular swatch beside the editable hex color field.
 class ColorSwatchDot final : public views::View {
   METADATA_HEADER(ColorSwatchDot, views::View)
@@ -1689,6 +1902,7 @@ class BoostEditorView final : public views::View,
     if (sender == css_editor_) {
       draft_css_ = base::UTF16ToUTF8(new_contents);
       css_dirty_ = true;
+      ApplyCssSyntaxHighlighting(css_editor_);
       UpdateCssValidationUi();
       PushLivePreview();
     } else if (sender == hex_input_) {
@@ -1747,8 +1961,188 @@ class BoostEditorView final : public views::View,
         AddZapSelector();
         return true;
       }
+      if (sender == css_editor_ && !key_event.IsCommandDown() &&
+          !key_event.IsControlDown() && !key_event.IsAltDown()) {
+        return HandleCssReturnKey();
+      }
+    }
+    if (sender == css_editor_ && key_event.key_code() == ui::VKEY_TAB &&
+        !key_event.IsCommandDown() && !key_event.IsControlDown()) {
+      return HandleCssTabKey(key_event.IsShiftDown());
+    }
+    if (sender == css_editor_ && key_event.GetCharacter() == u'}' &&
+        !key_event.IsCommandDown() && !key_event.IsControlDown()) {
+      return HandleCssCloseBraceKey();
     }
     return false;
+  }
+
+  void ApplyCssProgrammaticEdit(const std::u16string& next_text,
+                                const gfx::Range& next_selection) {
+    if (!css_editor_) {
+      return;
+    }
+    css_editor_->SetText(next_text);
+    css_editor_->SetSelectedRange(next_selection);
+    draft_css_ = base::UTF16ToUTF8(next_text);
+    css_dirty_ = true;
+    ApplyCssSyntaxHighlighting(css_editor_);
+    UpdateCssValidationUi();
+    PushLivePreview();
+  }
+
+  bool HandleCssTabKey(bool shift) {
+    if (!css_editor_) {
+      return false;
+    }
+    const std::u16string text = std::u16string(css_editor_->GetText());
+    const gfx::Range sel = css_editor_->GetSelectedRange();
+    const size_t min_pos = sel.GetMin();
+    const size_t max_pos = sel.GetMax();
+
+    if (!shift && min_pos == max_pos) {
+      css_editor_->InsertOrReplaceText(u"  ");
+      return true;
+    }
+
+    // Find start of first selected line.
+    size_t line_start = min_pos;
+    while (line_start > 0 && text[line_start - 1] != u'\n') {
+      --line_start;
+    }
+    // If selection ends at column 0 of a later line, don't touch that line.
+    size_t scan_end = max_pos;
+    if (scan_end > min_pos && scan_end > 0 && text[scan_end - 1] == u'\n') {
+      --scan_end;
+    }
+
+    std::u16string out;
+    out.reserve(text.size() + 32);
+    out.append(text, 0, line_start);
+
+    size_t new_start = min_pos;
+    size_t new_end = max_pos;
+    bool first_line = true;
+    size_t pos = line_start;
+    while (pos <= text.size()) {
+      size_t nl = text.find(u'\n', pos);
+      const size_t line_end = (nl == std::u16string::npos) ? text.size() : nl;
+      if (!shift) {
+        out.append(u"  ");
+        if (first_line) {
+          new_start += 2;
+        }
+        new_end += 2;
+        out.append(text, pos, line_end - pos);
+      } else {
+        size_t removed = 0;
+        if (pos < line_end && text[pos] == u'\t') {
+          removed = 1;
+        } else {
+          while (removed < 2 && pos + removed < line_end &&
+                 text[pos + removed] == u' ') {
+            ++removed;
+          }
+        }
+        if (first_line) {
+          const size_t offset_in_line = min_pos - pos;
+          new_start -= std::min(removed, offset_in_line);
+        }
+        new_end -= removed;
+        out.append(text, pos + removed, line_end - (pos + removed));
+      }
+      first_line = false;
+      if (nl == std::u16string::npos) {
+        break;
+      }
+      out.push_back(u'\n');
+      pos = nl + 1;
+      if (pos > scan_end) {
+        out.append(text, pos, text.size() - pos);
+        break;
+      }
+    }
+
+    if (sel.is_reversed()) {
+      ApplyCssProgrammaticEdit(out, gfx::Range(new_end, new_start));
+    } else {
+      ApplyCssProgrammaticEdit(out, gfx::Range(new_start, new_end));
+    }
+    return true;
+  }
+
+  bool HandleCssReturnKey() {
+    if (!css_editor_) {
+      return false;
+    }
+    const std::u16string text = std::u16string(css_editor_->GetText());
+    const gfx::Range sel = css_editor_->GetSelectedRange();
+    const size_t start = sel.GetMin();
+    const size_t end = sel.GetMax();
+
+    size_t line_start = start;
+    while (line_start > 0 && text[line_start - 1] != u'\n') {
+      --line_start;
+    }
+    size_t indent_len = 0;
+    while (line_start + indent_len < start &&
+           (text[line_start + indent_len] == u' ' ||
+            text[line_start + indent_len] == u'\t')) {
+      ++indent_len;
+    }
+    const std::u16string indent = text.substr(line_start, indent_len);
+
+    // Check last non-space char before caret on this line.
+    size_t prev = start;
+    while (prev > line_start &&
+           (text[prev - 1] == u' ' || text[prev - 1] == u'\t')) {
+      --prev;
+    }
+    const bool after_open_brace = prev > line_start && text[prev - 1] == u'{';
+    const bool before_close_brace = end < text.size() && text[end] == u'}';
+
+    std::u16string insert = u"\n" + indent;
+    if (after_open_brace) {
+      insert += u"  ";
+    }
+    size_t caret = start + insert.size();
+    if (after_open_brace && before_close_brace) {
+      insert += u"\n" + indent;
+    }
+
+    std::u16string next =
+        text.substr(0, start) + insert + text.substr(end);
+    ApplyCssProgrammaticEdit(next, gfx::Range(caret));
+    return true;
+  }
+
+  bool HandleCssCloseBraceKey() {
+    if (!css_editor_) {
+      return false;
+    }
+    const gfx::Range sel = css_editor_->GetSelectedRange();
+    if (!sel.is_empty()) {
+      return false;
+    }
+    const std::u16string text = std::u16string(css_editor_->GetText());
+    const size_t pos = sel.start();
+    size_t line_start = pos;
+    while (line_start > 0 && text[line_start - 1] != u'\n') {
+      --line_start;
+    }
+    // Only auto-outdent if the line before the caret is purely >= 2 spaces.
+    if (pos - line_start < 2) {
+      return false;
+    }
+    for (size_t i = line_start; i < pos; ++i) {
+      if (text[i] != u' ') {
+        return false;
+      }
+    }
+    std::u16string next =
+        text.substr(0, pos - 2) + u"}" + text.substr(pos);
+    ApplyCssProgrammaticEdit(next, gfx::Range(pos - 1));
+    return true;
   }
 
   // views::SliderListener:
@@ -2206,17 +2600,17 @@ class BoostEditorView final : public views::View,
 
       auto* editor_well = code_panel_->AddChildView(
           MakeBox(Orientation::kVertical, gfx::Insets(10), 0));
-      editor_well->SetBackground(views::CreateRoundedRectBackground(
-          SkColorSetRGB(0x1C, 0x1C, 0x20), 10));
-      editor_well->SetBorder(views::CreateRoundedRectBorder(
-          1, 10, SkColorSetRGB(0x32, 0x32, 0x38)));
+      editor_well->SetBackground(
+          views::CreateRoundedRectBackground(kCodeWellBg, 10));
+      editor_well->SetBorder(
+          views::CreateRoundedRectBorder(1, 10, kCodeWellBorder));
 
-      auto editor = std::make_unique<views::Textarea>();
+      auto editor = std::make_unique<CssCodeTextarea>();
       editor->SetFontList(gfx::FontList(gfx::Font("Menlo", 12)));
       editor->SetPlaceholderText(u"/* Custom CSS */");
       editor->GetViewAccessibility().SetName(u"Custom CSS");
-      editor->SetBackgroundColor(SkColorSetRGB(0x1C, 0x1C, 0x20));
-      editor->SetColor(SkColorSetRGB(0xF5, 0xF5, 0xF7));
+      editor->SetBackgroundColor(SK_ColorTRANSPARENT);
+      editor->SetColor(kCodeInk);
       editor->SetBorder(views::CreateEmptyBorder(gfx::Insets()));
       editor->SetPreferredSize(gfx::Size(kCodeCardWidth - 48, 250));
       editor->set_controller(this);
@@ -2267,6 +2661,7 @@ class BoostEditorView final : public views::View,
       draft_css_.assign(record_->custom_css.data(), record_->custom_css.size());
       if (css_editor_) {
         css_editor_->SetText(base::UTF8ToUTF16(draft_css_));
+        ApplyCssSyntaxHighlighting(css_editor_);
       }
     }
 
@@ -2859,6 +3254,7 @@ class BoostEditorView final : public views::View,
         css_dirty_ = true;
         css_editor_->SetText(base::UTF8ToUTF16(draft_css_));
         css_editor_->SetSelectedRange(gfx::Range(caret_utf16));
+        ApplyCssSyntaxHighlighting(css_editor_);
         if (GetWidget()) {
           GetWidget()->Activate();
         }
@@ -3385,6 +3781,8 @@ bool ShowBoostEditor(BrowserWindowInterface& browser, uint64_t boost_id) {
   BoostEditorView* raw_view = slot->view;
   editors[&browser] = std::move(slot);
   raw_widget->Show();
+  ApplyBubbleGlass(*raw_widget, GlassMaterial::kPopover, /*dark=*/false,
+                   kCardGlassTint, kCardBg);
   raw_view->StartOpenAnimation();
   return true;
 }
