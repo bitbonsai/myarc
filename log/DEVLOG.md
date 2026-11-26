@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-11-26: Double-click sidebar resize edge to reset width to default
+
+- Added `SidebarResizeArea` (`views::ResizeArea` subclass with `METADATA_HEADER`) in `chrome/browser/ui/views/frame/vertical_tab_strip_region_view.cc` so double-clicking the sidebar's right edge resets its width to `kMyarcSidebarDefaultWidth` (`228` DIP) and persists the default width in `state_controller_`.
+- Exported the updated `vertical_tab_strip_region_view.cc.patch` (`163` patches verified).
+- Verified with `python3 tools/export_patches.py --check`, `python3 tools/check_docs.py`, and `out/MyarcRelease` `chrome` build.
+
 ## 2026-11-26: Fix sidebar resize handle z-order and match Arc 160-500 DIP min/max widths
 
 - Reordered `resize_area_` above `myarc_workspace_sidebar_` in `VerticalTabStripRegionView::SetMyarcWorkspaceSidebar()` (`chrome/browser/ui/views/frame/vertical_tab_strip_region_view.cc`) and widened `kResizeAreaWidth` from `5` to `8` DIP so dragging the sidebar's right edge works along its full height instead of being swallowed by the workspace sidebar.
