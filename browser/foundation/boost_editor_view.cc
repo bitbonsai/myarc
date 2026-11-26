@@ -1989,7 +1989,7 @@ class BoostEditorView final : public views::View,
       rename_field_->SetColor(kInkPrimary);
     }
     if (css_editor_) {
-      css_editor_->SetColor(SkColorSetRGB(0xF5, 0xF5, 0xF7));
+      ApplyCssSyntaxHighlighting(css_editor_);
     }
   }
 
@@ -2055,6 +2055,15 @@ class BoostEditorView final : public views::View,
         zap_toggle_->SetActive(false);
       }
       SizeToContents();
+    }
+  }
+
+  void OnVisibilityChanged(content::Visibility visibility) override {
+    if (visibility == content::Visibility::HIDDEN) {
+      TabStripModel* tab_strip = browser_->GetTabStripModel();
+      if (!tab_strip || tab_strip->GetActiveWebContents() != web_contents()) {
+        CloseEditor();
+      }
     }
   }
 
@@ -2810,9 +2819,9 @@ class BoostEditorView final : public views::View,
       auto format_btn = std::make_unique<PillButton>(
           base::BindRepeating(&BoostEditorView::FormatCustomCss,
                               base::Unretained(this)),
-          u"Format CSS", std::u16string(), /*centered=*/true,
-          /*font_size_delta=*/0, &kSparklesIcon);
-      format_btn->SetPreferredSize(gfx::Size(36, 32));
+          u"Format", std::u16string(), /*centered=*/true,
+          /*font_size_delta=*/-1);
+      format_btn->SetPreferredSize(gfx::Size(64, 32));
       format_btn->SetTooltipText(u"Format CSS");
       footer->AddChildView(std::move(format_btn));
 
@@ -3526,6 +3535,7 @@ class BoostEditorView final : public views::View,
     code_panel_->SetVisible(true);
     AnimateSizeToContents(/*crossfade=*/true);
     if (css_editor_) {
+      ApplyCssSyntaxHighlighting(css_editor_);
       css_editor_->RequestFocus();
     }
   }

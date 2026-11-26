@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-11-26: Boost auto-close on tab switch, always-on CSS syntax highlighting, and clear Format button
+
+- Added `WebContentsObserver::OnVisibilityChanged()` in `BoostEditorView` (`browser/foundation/boost_editor_view.cc`) so switching to another tab or Space closes the Boost Editor panel instead of leaving the previous site's Boost floating over the new tab.
+- Fixed `OnThemeChanged()` overwriting CSS syntax colors with plain white on widget mount, and re-applied `ApplyCssSyntaxHighlighting()` in `EnterCodeMode()` so CSS syntax highlighting is always on by default as soon as the Code panel opens.
+- Replaced the ambiguous sparkles icon button with a clear `Format` pill button (`64x32`) beside the element picker; verified with `out/MyarcRelease` `chrome` build.
+
 ## 2026-11-26: Boost contrast polish (swatch ring/shadow, crisp font/badge contrast, Lucide Ban icon)
 
 - Added Lucide `kBanIcon` (`ban`, 24x24 stroke 2) in `browser/foundation/icons.h` and replaced the Unicode `⊘` text glyph on `mode_none_` (`browser/foundation/boost_editor_view.cc`) so all four color-mode buttons share identical 18px Lucide stroke weight and sizing.
