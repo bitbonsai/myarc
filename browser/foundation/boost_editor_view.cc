@@ -2844,7 +2844,7 @@ class BoostEditorView final : public views::View,
                               base::Unretained(this)),
           u"Format", std::u16string(), /*centered=*/true,
           /*font_size_delta=*/-1);
-      format_btn->SetPreferredSize(gfx::Size(64, 32));
+      format_btn->SetPreferredSize(gfx::Size(78, 32));
       format_btn->SetTooltipText(u"Format CSS");
       footer->AddChildView(std::move(format_btn));
 
