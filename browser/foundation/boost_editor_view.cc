@@ -2772,12 +2772,20 @@ class BoostEditorView final : public views::View,
           static_cast<views::BoxLayout*>(code_header->GetLayoutManager());
       ch_layout->set_cross_axis_alignment(CrossAxis::kCenter);
 
-      auto back = std::make_unique<PillButton>(
-          base::BindRepeating(&BoostEditorView::ExitCodeMode,
-                              base::Unretained(this)),
-          u"\u2190 Back", std::u16string(), /*centered=*/true,
-          /*font_size_delta=*/-1);
-      back->SetPreferredSize(gfx::Size(76, 28));
+      auto back = std::make_unique<views::ImageButton>(base::BindRepeating(
+          &BoostEditorView::ExitCodeMode, base::Unretained(this)));
+      back->SetImageModel(
+          views::Button::STATE_NORMAL,
+          ui::ImageModel::FromVectorIcon(kArrowLeftIcon, SK_ColorWHITE, 12));
+      back->SetImageHorizontalAlignment(views::ImageButton::ALIGN_CENTER);
+      back->SetImageVerticalAlignment(views::ImageButton::ALIGN_MIDDLE);
+      back->SetPreferredSize(gfx::Size(24, 24));
+      back->SetBackground(views::CreateRoundedRectBackground(
+          SkColorSetARGB(0x2E, 0xFF, 0xFF, 0xFF), 12));
+      back->SetBorder(views::CreateRoundedRectBorder(1, 12, kBorderSubtle));
+      back->SetTooltipText(u"Back to Boost");
+      back->GetViewAccessibility().SetName(u"Back to Boost");
+      views::InstallCircleHighlightPathGenerator(back.get());
       code_header->AddChildView(std::move(back));
 
       auto* spacer_l = code_header->AddChildView(std::make_unique<views::View>());
@@ -2839,17 +2847,8 @@ class BoostEditorView final : public views::View,
       code_picker_button_->SetPreferredSize(gfx::Size(36, 32));
       code_picker_button_->SetTooltipText(u"Pick an element on the page");
 
-      auto format_btn = std::make_unique<PillButton>(
-          base::BindRepeating(&BoostEditorView::FormatCustomCss,
-                              base::Unretained(this)),
-          u"Format", std::u16string(), /*centered=*/true,
-          /*font_size_delta=*/-1);
-      format_btn->SetPreferredSize(gfx::Size(78, 32));
-      format_btn->SetTooltipText(u"Format CSS");
-      footer->AddChildView(std::move(format_btn));
-
       css_bytes_label_ = footer->AddChildView(MakeLabel(
-          u"0 / 64 KB",
+          u"0 / 64 KB \u00B7 Auto-formatted",
           gfx::FontList().Derive(-2, gfx::Font::NORMAL,
                                  gfx::Font::Weight::NORMAL),
           kInkSecondary));
@@ -3051,8 +3050,8 @@ class BoostEditorView final : public views::View,
     if (!css_banner_ || !css_bytes_label_) {
       return;
     }
-    css_bytes_label_->SetText(
-        base::NumberToString16(draft_css_.size()) + u" / 64 KB");
+    css_bytes_label_->SetText(base::NumberToString16(draft_css_.size()) +
+                              u" / 64 KB \u00B7 Auto-formatted");
 
     auto findings = BoostsService::InspectCss(draft_css_);
     if (findings.empty()) {
@@ -3606,16 +3605,13 @@ class BoostEditorView final : public views::View,
                             base::Unretained(this)));
   }
 
-  void FormatCustomCss() {
-    if (!css_editor_) {
-      return;
-    }
-    const std::u16string formatted = FormatCssText(css_editor_->GetText());
-    ApplyCssProgrammaticEdit(formatted, gfx::Range(formatted.size()));
-    css_editor_->RequestFocus();
-  }
-
   void CommitCustomCss() {
+    if (css_editor_ && !draft_css_.empty()) {
+      const std::u16string formatted = FormatCssText(css_editor_->GetText());
+      draft_css_ = base::UTF16ToUTF8(formatted);
+      css_editor_->SetText(formatted);
+      ApplyCssSyntaxHighlighting(css_editor_);
+    }
     auto res = service_->SetCustomCss(boost_id_, draft_css_);
     if (!res.ok) {
       if (css_banner_) {
@@ -3636,6 +3632,12 @@ class BoostEditorView final : public views::View,
       return;
     }
     if (BoostsService::InspectCss(draft_css_).empty()) {
+      if (css_editor_ && !draft_css_.empty()) {
+        const std::u16string formatted = FormatCssText(css_editor_->GetText());
+        draft_css_ = base::UTF16ToUTF8(formatted);
+        css_editor_->SetText(formatted);
+        ApplyCssSyntaxHighlighting(css_editor_);
+      }
       suppress_reload_ = true;
       service_->SetCustomCss(boost_id_, draft_css_);
       suppress_reload_ = false;

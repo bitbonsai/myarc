@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-11-26: Sleeker Boost Code header (circular Back icon) and automatic CSS formatting
+
+- Replaced the wide `← Back` pill in the Boost Code header (`browser/foundation/boost_editor_view.cc`) with a symmetric `24x24` circular glass `kArrowLeftIcon` button matching the right-side close circle so `Custom CSS` sits dead-center.
+- Removed the redundant `Format` button from the footer, replaced it with a subtle `N / 64 KB · Auto-formatted` readout, and auto-formatted `draft_css_` automatically on `Apply` (`CommitCustomCss`) and when leaving Code mode (`CommitPendingCssIfValid`).
+- Verified with `out/MyarcRelease` `chrome` build.
+
 ## 2026-11-26: Hide and restore Boost panel across tab switches
 
 - Changed `BoostEditorView::OnVisibilityChanged()` (`browser/foundation/boost_editor_view.cc`) to `Hide()` the widget when switching away to another tab/Space and `ShowInactive()` when returning to the Boost's tab, preserving panel state while stopping active pickers and committing valid CSS on hide.
