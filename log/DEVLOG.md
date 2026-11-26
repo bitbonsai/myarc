@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-11-26: Boost Code and Zap pill counter badges
+
+- Added `PillButton::SetBadge()` (`browser/foundation/boost_editor_view.cc`) rendering a compact rounded counter pill beside the trailing glyph (`⚡` / `{}`).
+- Wired `code_toggle_` to show an indigo CSS rule-count badge when `custom_css` is non-empty (plus rule-count tooltip) and updated `zap_toggle_` to show a matching Zap-orange hidden-element count badge instead of inline `Zap (N)` text.
+- Verified with `out/MyarcRelease` `chrome` build.
+
 ## 2026-11-26: Reversible Boost Zap preview (Clear all restores elements without reload)
 
 - Replaced inline `style="display: none !important"` mutations in `kZapStartScript` (`browser/foundation/boost_editor_view.cc`) with a scoped temporary `<style data-myarc-zap-preview="1">` stylesheet so zapped elements hide instantaneously without leaving sticky inline styles behind.

@@ -396,6 +396,15 @@ class PillButton final : public views::Button {
       }
     }
     if (!trailing_glyph.empty()) {
+      badge_ = AddChildView(MakeLabel(
+          std::u16string(),
+          gfx::FontList().Derive(-2, gfx::Font::NORMAL,
+                                 gfx::Font::Weight::BOLD),
+          kInkPrimary));
+      badge_->SetHorizontalAlignment(gfx::ALIGN_CENTER);
+      badge_->SetBorder(views::CreateEmptyBorder(gfx::Insets::VH(2, 6)));
+      badge_->SetVisible(false);
+
       trailing_ = AddChildView(MakeLabel(
           trailing_glyph,
           gfx::FontList().Derive(1, gfx::Font::NORMAL,
@@ -405,6 +414,18 @@ class PillButton final : public views::Button {
     SetPreferredSize(gfx::Size(0, 38));
     GetViewAccessibility().SetName(text);
     UpdateVisuals();
+  }
+
+  void SetBadge(const std::u16string& text, SkColor bg, SkColor fg) {
+    if (!badge_) {
+      return;
+    }
+    badge_bg_ = bg;
+    badge_fg_ = fg;
+    badge_->SetText(text);
+    badge_->SetVisible(!text.empty());
+    UpdateVisuals();
+    InvalidateLayout();
   }
 
   void SetActive(bool active) {
@@ -455,13 +476,23 @@ class PillButton final : public views::Button {
     if (trailing_) {
       trailing_->SetEnabledColor(fg);
     }
+    if (badge_ && badge_->GetVisible()) {
+      const SkColor b_bg =
+          active_ ? SkColorSetARGB(0x33, 0xFF, 0xFF, 0xFF) : badge_bg_;
+      const SkColor b_fg = active_ ? SK_ColorWHITE : badge_fg_;
+      badge_->SetBackground(views::CreateRoundedRectBackground(b_bg, 9));
+      badge_->SetEnabledColor(b_fg);
+    }
   }
 
   bool active_ = false;
   std::optional<SkColor> active_color_;
+  SkColor badge_bg_ = kPillHoverBg;
+  SkColor badge_fg_ = kInkPrimary;
   raw_ptr<const gfx::VectorIcon> icon_ = nullptr;
   raw_ptr<views::ImageView> icon_view_ = nullptr;
   raw_ptr<views::Label> label_ = nullptr;
+  raw_ptr<views::Label> badge_ = nullptr;
   raw_ptr<views::Label> trailing_ = nullptr;
 };
 
@@ -2299,9 +2330,38 @@ class BoostEditorView final : public views::View,
 
     if (zap_toggle_) {
       const size_t count = record_->hidden_selectors.size();
-      zap_toggle_->SetText(
-          count == 0 ? u"Zap"
-                     : u"Zap (" + base::NumberToString16(count) + u")");
+      zap_toggle_->SetText(u"Zap");
+      zap_toggle_->SetBadge(
+          count == 0 ? std::u16string() : base::NumberToString16(count),
+          SkColorSetARGB(0x24, 0xF9, 0x67, 0x1D),
+          SkColorSetRGB(0xC8, 0x47, 0x0A));
+      zap_toggle_->SetTooltipText(
+          count == 0 ? u"Hide page elements by CSS selector"
+                     : u"Hide page elements (" +
+                           base::NumberToString16(count) + u" hidden)");
+    }
+    if (code_toggle_) {
+      const std::string css(record_->custom_css.data(),
+                            record_->custom_css.size());
+      const bool has_code =
+          css.find_first_not_of(" \t\r\n") != std::string::npos;
+      size_t rule_count = 0;
+      if (has_code) {
+        rule_count = static_cast<size_t>(std::count(css.begin(), css.end(), '{'));
+        if (rule_count == 0) {
+          rule_count = 1;
+        }
+      }
+      code_toggle_->SetBadge(
+          rule_count == 0 ? std::u16string()
+                          : base::NumberToString16(rule_count),
+          SkColorSetARGB(0x22, 0x4F, 0x5B, 0xFF),
+          SkColorSetRGB(0x3A, 0x44, 0xD6));
+      code_toggle_->SetTooltipText(
+          rule_count == 0
+              ? u"Edit custom CSS"
+              : u"Edit custom CSS (" + base::NumberToString16(rule_count) +
+                    (rule_count == 1 ? u" rule)" : u" rules)"));
     }
     RebuildZapList();
     UpdateCssValidationUi();
