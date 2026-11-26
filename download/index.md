@@ -9,11 +9,11 @@ Arc's workflow on Chromium with ungoogled-chromium privacy patches and Chrome ex
 - Imports your Arc Spaces
 - GPL-3.0, data stays on your machine
 
-v2026.11.25.2November 25, 2026
+v2026.11.26November 26, 2026
 
-[Download for macOS](https://github.com/bitbonsai/myarc/releases/download/v2026.11.25.2/myArc-2026.11.25.2-arm64.dmg)
+[Download for macOS](https://github.com/bitbonsai/myarc/releases/download/v2026.11.26/myArc-2026.11.26-arm64.dmg)
 
-184.9 MB · Apple silicon · macOS 26\+ · Notarized
+185.3 MB · Apple silicon · macOS 26\+ · Notarized
 
 LinuxSoonWindowsSoon
 
@@ -21,10 +21,10 @@ Verify download (SHA-256)
 
 SHA-256
 
-`9306431de82316c39023ba0ce13ea856cce41131e68ae0cfe5b344f7fb12ff63`
+`5ca00d27203d0d28b67763be47d7b371ed4a64e5005becbe969e0ffb8a37004a`
 
 ```
-shasum -a 256 ~/Downloads/myArc-2026.11.25.2-arm64.dmg
+shasum -a 256 ~/Downloads/myArc-2026.11.26-arm64.dmg
 ```
 
 Copy
@@ -69,7 +69,7 @@ Copy
 - [Report a problem](https://github.com/bitbonsai/myarc/issues)
 
   Include your myArc and OS versions, and leave out private pages.
-- [GitHub releases](https://github.com/bitbonsai/myarc/releases/tag/v2026.11.25.2)
+- [GitHub releases](https://github.com/bitbonsai/myarc/releases/tag/v2026.11.26)
 
   Every published build.
 - [Build from source](https://github.com/bitbonsai/myarc/blob/main/browser/README.md)

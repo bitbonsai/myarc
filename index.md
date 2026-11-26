@@ -5,7 +5,7 @@ HTML: https://myarc.dev/
 An open-source browser bringing back Arc, with no account required and optional AI.
 
 [Download](https://myarc.dev/download/)
-[v2026.11.25.2](https://github.com/bitbonsai/myarc/releases)
+[v2026.11.26](https://github.com/bitbonsai/myarc/releases)
 
 ## How you browse is part of how you work. It should outlast the company behind your browser.
 
@@ -40,7 +40,7 @@ An open-source browser bringing back Arc, with no account required and optional 
 
   Windows and Linux builds, plus optional AI with a local model, your own API key, or a hosted option.
 
-[Download myArc Alpha 2026.11.25.2 →](https://myarc.dev/download/) [Full alpha checklist →](https://github.com/bitbonsai/myarc/blob/main/docs/ALPHA.md)
+[Download myArc Alpha 2026.11.26 →](https://myarc.dev/download/) [Full alpha checklist →](https://github.com/bitbonsai/myarc/blob/main/docs/ALPHA.md)
 
 ## Read along
 
