@@ -895,6 +895,11 @@ constexpr char16_t kZapStartScript[] = uR"JS((() => {
   host.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:2147483647;'
   const shadow = host.attachShadow({ mode: 'closed' })
 
+  const cursorStyle = document.createElement('style')
+  cursorStyle.setAttribute('data-myarc-zap-cursor', '1')
+  cursorStyle.textContent = '*, *::before, *::after { cursor: crosshair !important; user-select: none !important; -webkit-user-select: none !important; }'
+  ;(document.head || document.documentElement).appendChild(cursorStyle)
+
   const style = document.createElement('style')
   style.textContent = `
     .frame {
@@ -904,7 +909,7 @@ constexpr char16_t kZapStartScript[] = uR"JS((() => {
     .box {
       position: fixed; pointer-events: none; display: none;
       background: rgba(255, 210, 60, 0.14);
-      border: 1.5px solid #EAB308; border-radius: 3px;
+      border: 1.5px solid #EAB308; border-radius: 6px;
       box-sizing: border-box;
     }
     .bar {
@@ -914,7 +919,7 @@ constexpr char16_t kZapStartScript[] = uR"JS((() => {
       display: flex; align-items: center; justify-content: center;
       background: rgba(18, 18, 22, 0.94); color: #F5F5F7;
       font: 500 13px -apple-system, BlinkMacSystemFont, sans-serif;
-      pointer-events: auto; box-sizing: border-box;
+      pointer-events: auto; box-sizing: border-box; cursor: default;
     }
     .bar strong { font-weight: 700; color: #FFFFFF; }
     .done {
@@ -925,7 +930,7 @@ constexpr char16_t kZapStartScript[] = uR"JS((() => {
     }
     .done:hover { background: #EBEBF0; }
     .pill {
-      position: fixed; display: none; pointer-events: auto;
+      position: fixed; display: none; pointer-events: auto; cursor: default;
       background: #FFFFFF; color: #1C1C1E; border-radius: 14px;
       padding: 8px 10px 7px; max-width: 380px;
       box-shadow: 0 8px 28px rgba(0, 0, 0, 0.28), 0 0 0 1px rgba(0, 0, 0, 0.08);
@@ -1040,6 +1045,7 @@ constexpr char16_t kZapStartScript[] = uR"JS((() => {
   let relSel = ''
   let hovered = null
 
+  const pad = 4
   const positionBox = (el) => {
     if (!el || el === host || el === document.documentElement || el === document.body) {
       box.style.display = 'none'
@@ -1050,11 +1056,15 @@ constexpr char16_t kZapStartScript[] = uR"JS((() => {
       box.style.display = 'none'
       return
     }
+    const left = Math.max(2, r.left - pad)
+    const top = Math.max(2, r.top - pad)
+    const right = Math.min(window.innerWidth - 2, r.right + pad)
+    const bottom = Math.min(window.innerHeight - 2, r.bottom + pad)
     box.style.display = 'block'
-    box.style.left = r.left + 'px'
-    box.style.top = r.top + 'px'
-    box.style.width = r.width + 'px'
-    box.style.height = r.height + 'px'
+    box.style.left = left + 'px'
+    box.style.top = top + 'px'
+    box.style.width = Math.max(0, right - left) + 'px'
+    box.style.height = Math.max(0, bottom - top) + 'px'
   }
 
   const clearSelection = () => {
@@ -1075,10 +1085,10 @@ constexpr char16_t kZapStartScript[] = uR"JS((() => {
     const r = el.getBoundingClientRect()
     const pr = pill.getBoundingClientRect()
     const safeRight = window.innerWidth > 680 ? 276 : 12
-    let left = Math.max(12, Math.min(r.left, window.innerWidth - pr.width - safeRight))
-    let top = r.bottom + 8
+    let left = Math.max(12, Math.min(r.left - pad, window.innerWidth - pr.width - safeRight))
+    let top = r.bottom + pad + 8
     if (top + pr.height > window.innerHeight - 64) {
-      top = Math.max(12, r.top - pr.height - 8)
+      top = Math.max(12, r.top - pr.height - pad - 8)
     }
     pill.style.left = left + 'px'
     pill.style.top = top + 'px'
@@ -1162,6 +1172,7 @@ constexpr char16_t kZapStartScript[] = uR"JS((() => {
     window.removeEventListener('mousedown', blockPointer, true)
     window.removeEventListener('mouseup', blockPointer, true)
     window.removeEventListener('keydown', onKey, true)
+    cursorStyle.remove()
     host.remove()
     if (window.__myarcZap) window.__myarcZap.active = false
   }
@@ -1198,6 +1209,11 @@ constexpr char16_t kCssPickStartScript[] = uR"JS((() => {
   host.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:2147483647;'
   const shadow = host.attachShadow({ mode: 'closed' })
 
+  const cursorStyle = document.createElement('style')
+  cursorStyle.setAttribute('data-myarc-zap-cursor', '1')
+  cursorStyle.textContent = '*, *::before, *::after { cursor: crosshair !important; user-select: none !important; -webkit-user-select: none !important; }'
+  ;(document.head || document.documentElement).appendChild(cursorStyle)
+
   const style = document.createElement('style')
   style.textContent = `
     .frame {
@@ -1207,7 +1223,7 @@ constexpr char16_t kCssPickStartScript[] = uR"JS((() => {
     .box {
       position: fixed; pointer-events: none; display: none;
       background: rgba(79, 91, 255, 0.14);
-      border: 1.5px solid #4F5BFF; border-radius: 3px;
+      border: 1.5px solid #4F5BFF; border-radius: 6px;
       box-sizing: border-box;
     }
     .tip {
@@ -1240,6 +1256,7 @@ constexpr char16_t kCssPickStartScript[] = uR"JS((() => {
     return tag
   }
 
+  const pad = 4
   let hovered = null
   const onMove = (e) => {
     const el = document.elementFromPoint(e.clientX, e.clientY)
@@ -1251,16 +1268,20 @@ constexpr char16_t kCssPickStartScript[] = uR"JS((() => {
     if (el !== hovered) {
       hovered = el
       const r = el.getBoundingClientRect()
+      const left = Math.max(2, r.left - pad)
+      const top = Math.max(2, r.top - pad)
+      const right = Math.min(window.innerWidth - 2, r.right + pad)
+      const bottom = Math.min(window.innerHeight - 2, r.bottom + pad)
       box.style.display = 'block'
-      box.style.left = r.left + 'px'
-      box.style.top = r.top + 'px'
-      box.style.width = r.width + 'px'
-      box.style.height = r.height + 'px'
+      box.style.left = left + 'px'
+      box.style.top = top + 'px'
+      box.style.width = Math.max(0, right - left) + 'px'
+      box.style.height = Math.max(0, bottom - top) + 'px'
       tip.textContent = buildSelector(el)
       tip.style.display = 'block'
       const safeRight = window.innerWidth > 760 ? 412 : 12
-      tip.style.left = Math.max(10, Math.min(r.left, window.innerWidth - 200 - safeRight)) + 'px'
-      tip.style.top = Math.max(10, r.top - 28) + 'px'
+      tip.style.left = Math.max(10, Math.min(left, window.innerWidth - 200 - safeRight)) + 'px'
+      tip.style.top = Math.max(10, top - 28) + 'px'
     }
   }
   let picked = false
@@ -1301,6 +1322,7 @@ constexpr char16_t kCssPickStartScript[] = uR"JS((() => {
       window.addEventListener('click', swallowOneClick, { capture: true, once: true })
       setTimeout(() => window.removeEventListener('click', swallowOneClick, true), 400)
     }
+    cursorStyle.remove()
     host.remove()
     if (window.__myarcZap) window.__myarcZap.active = false
   }

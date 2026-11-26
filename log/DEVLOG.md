@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-11-26: Boost Zap and Code picker highlight padding and crosshair cursor
+
+- Outset the Boost Zap (`kZapStartScript`) and Code element picker (`kCssPickStartScript`) highlight box by `4px` on all sides (clamped inside the viewport frame) with `6px` border-radius (`browser/foundation/boost_editor_view.cc`) so text and elements have clean breathing room inside the outline, and shifted the floating Zap pill and selector tooltip to match.
+- Added a scoped `cursor: crosshair !important; user-select: none !important;` style while Zap or Code picking is active (removed cleanly on `stop()`), keeping `pointer`/`default` cursors inside the overlay controls so hovering over text no longer shows an I-beam.
+- Verified with `out/MyarcRelease` `chrome` build.
+
 ## 2026-11-26: Little Arc layout stability (eliminate 16px horizontal resize oscillation)
 
 - Fixed `BrowserView::Layout()` (`browser_view.cc.patch`) to run `LayoutMyarcLittleArc()` instead of `LayoutSuperclass<views::View>(this)` on Little Arc windows; previously `BrowserViewPopupLayoutImpl` resized `multi_contents_view_` to full window width (`760px`) and `LayoutMyarcLittleArc()` immediately resized it back to inset card width (`744px`), sending oscillating `760 -> 744px` resize IPCs to the renderer on every layout pass.
