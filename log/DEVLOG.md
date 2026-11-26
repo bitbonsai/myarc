@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-11-26: Tab and Left/Right cycling for Boost CSS autocomplete chips
+
+- Updated `BoostEditorView::HandleKeyEvent()` (`browser/foundation/boost_editor_view.cc`) so `Tab` / `Right` / `Down` cycle forward through CSS suggestion chips, `Shift+Tab` / `Left` / `Up` cycle backward, `Enter` inserts the highlighted chip, and `Tab` with a single match inserts it directly.
+- Added `OnAfterUserAction()` to refresh or clear suggestions when clicking elsewhere in the editor, preserving the highlighted chip index when the candidate list is unchanged.
+- Verified with `out/MyarcRelease` `chrome` build.
+
 ## 2026-11-26: Fix footer ProfileGroup capsule hover highlight geometry
 
 - Added `FooterButton::SetTileStyle(float size, float radius)` (`browser/foundation/footer_button.{h,cc}`) and styled other-Profile Space buttons inside `ProfileGroup` (`browser/foundation/sidebar_view.cc`) with a `24x24` (`radius 12`) circular hover highlight instead of the `32x32` (`radius 8`) square tile that protruded above, below, and past the `24 DIP` capsule.

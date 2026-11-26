@@ -2329,6 +2329,12 @@ class BoostEditorView final : public views::View,
   }
 
   // views::TextfieldController:
+  void OnAfterUserAction(views::Textfield* sender) override {
+    if (sender == css_editor_) {
+      UpdateCssSuggestions();
+    }
+  }
+
   void ContentsChanged(views::Textfield* sender,
                        const std::u16string& new_contents) override {
     if (sender == css_editor_) {
@@ -2387,21 +2393,33 @@ class BoostEditorView final : public views::View,
       return true;
     }
     if (sender == css_editor_ && !css_completion_.items.empty() &&
-        !key_event.IsCommandDown() && !key_event.IsControlDown()) {
-      if (key_event.key_code() == ui::VKEY_TAB && !key_event.IsShiftDown()) {
+        !key_event.IsCommandDown() && !key_event.IsControlDown() &&
+        !key_event.IsAltDown()) {
+      const size_t count = css_completion_.items.size();
+      if (key_event.key_code() == ui::VKEY_RETURN) {
         AcceptCssSuggestion(css_completion_index_);
         return true;
       }
-      if (key_event.key_code() == ui::VKEY_DOWN) {
-        css_completion_index_ =
-            (css_completion_index_ + 1) % css_completion_.items.size();
+      if (key_event.key_code() == ui::VKEY_TAB) {
+        if (count == 1 && !key_event.IsShiftDown()) {
+          AcceptCssSuggestion(0);
+          return true;
+        }
+        css_completion_index_ = key_event.IsShiftDown()
+                                    ? (css_completion_index_ + count - 1) % count
+                                    : (css_completion_index_ + 1) % count;
         RebuildCssSuggestionChips();
         return true;
       }
-      if (key_event.key_code() == ui::VKEY_UP) {
-        css_completion_index_ =
-            (css_completion_index_ + css_completion_.items.size() - 1) %
-            css_completion_.items.size();
+      if (key_event.key_code() == ui::VKEY_RIGHT ||
+          key_event.key_code() == ui::VKEY_DOWN) {
+        css_completion_index_ = (css_completion_index_ + 1) % count;
+        RebuildCssSuggestionChips();
+        return true;
+      }
+      if (key_event.key_code() == ui::VKEY_LEFT ||
+          key_event.key_code() == ui::VKEY_UP) {
+        css_completion_index_ = (css_completion_index_ + count - 1) % count;
         RebuildCssSuggestionChips();
         return true;
       }
@@ -3842,9 +3860,14 @@ class BoostEditorView final : public views::View,
       ClearCssSuggestions();
       return;
     }
-    css_completion_ =
+    CssCompletionResult next =
         ComputeCssCompletions(css_editor_->GetText(), sel.start());
-    css_completion_index_ = 0;
+    const bool same = next.replace_start == css_completion_.replace_start &&
+                      next.items == css_completion_.items;
+    css_completion_ = std::move(next);
+    if (!same || css_completion_index_ >= css_completion_.items.size()) {
+      css_completion_index_ = 0;
+    }
     RebuildCssSuggestionChips();
   }
 
