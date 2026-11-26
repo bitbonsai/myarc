@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-11-26: Fix sidebar resize handle z-order and match Arc 160-500 DIP min/max widths
+
+- Reordered `resize_area_` above `myarc_workspace_sidebar_` in `VerticalTabStripRegionView::SetMyarcWorkspaceSidebar()` (`chrome/browser/ui/views/frame/vertical_tab_strip_region_view.cc`) and widened `kResizeAreaWidth` from `5` to `8` DIP so dragging the sidebar's right edge works along its full height instead of being swallowed by the workspace sidebar.
+- Updated `kMyarcSidebarMinWidth` (`198` -> `160` DIP) and added `kMyarcSidebarMaxWidth = 500` DIP (`chrome/browser/ui/tabs/vertical_tab_strip_state.h`, `vertical_tab_strip_state_controller_impl.cc`, `vertical_tab_strip_region_view.cc`) to match Arc's min/max sidebar range, hiding the sidebar toggle in `ToolbarView::Layout()` below `198` DIP so navigation buttons clear the traffic lights down to `160` DIP.
+- Verified with `python3 tools/export_patches.py --check`, `python3 tools/check_docs.py`, and `out/MyarcRelease` `chrome` build.
+
 ## 2026-11-26: Tab and Left/Right cycling for Boost CSS autocomplete chips
 
 - Updated `BoostEditorView::HandleKeyEvent()` (`browser/foundation/boost_editor_view.cc`) so `Tab` / `Right` / `Down` cycle forward through CSS suggestion chips, `Shift+Tab` / `Left` / `Up` cycle backward, `Enter` inserts the highlighted chip, and `Tab` with a single match inserts it directly.

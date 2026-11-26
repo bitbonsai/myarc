@@ -1,16 +1,17 @@
 diff --git a/chrome/browser/ui/tabs/vertical_tab_strip_state.h b/chrome/browser/ui/tabs/vertical_tab_strip_state.h
-index 1cc98a4df8a6f3c2c5b394cfac44d826eb85bc9c..25af5a2b6b29f6ffcde438d95c77599ed12fadb3 100644
+index 1cc98a4df8a6f3c2c5b394cfac44d826eb85bc9c..b4e7ff3063723b67c8638dd4ed55c57ba8874eec 100644
 --- a/chrome/browser/ui/tabs/vertical_tab_strip_state.h
 +++ b/chrome/browser/ui/tabs/vertical_tab_strip_state.h
-@@ -15,6 +15,11 @@ inline constexpr int kVerticalTabStripUncollapsedMinWidth = 126;
+@@ -15,6 +15,12 @@ inline constexpr int kVerticalTabStripUncollapsedMinWidth = 126;
  // view.
  inline constexpr int kVerticalTabStripUncollapsedMaxWidth = 400;
  inline constexpr int kVerticalTabStripCollapsedWidth = 56;
-+// myArc sidebar widths (--myarc-visual-parity). At the minimum the header
-+// toggle (after the traffic lights, x 77-105) just clears the right-aligned
-+// back/forward/reload cluster, which tightens to Arc's 30 DIP pitch.
++// myArc sidebar widths (--myarc-visual-parity), matching Arc's min/max range.
++// Below 198 DIP the header hides the sidebar toggle so back/forward/reload
++// clear the traffic lights cleanly down to 160 DIP.
 +inline constexpr int kMyarcSidebarDefaultWidth = 228;
-+inline constexpr int kMyarcSidebarMinWidth = 198;
++inline constexpr int kMyarcSidebarMinWidth = 160;
++inline constexpr int kMyarcSidebarMaxWidth = 500;
  // TODO(crbug.com/465833741): Determine snapping behavior.
  inline constexpr int kVerticalTabStripCollapseSnapWidth =
      (kVerticalTabStripUncollapsedMinWidth + kVerticalTabStripCollapsedWidth) /

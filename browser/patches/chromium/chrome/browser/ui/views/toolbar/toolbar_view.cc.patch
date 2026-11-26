@@ -1,5 +1,5 @@
 diff --git a/chrome/browser/ui/views/toolbar/toolbar_view.cc b/chrome/browser/ui/views/toolbar/toolbar_view.cc
-index 80b0e24263170de768a6684c8aabf106018710e7..1a320d829a4bfcc35dceeb2ad92752c5a9246b7d 100644
+index 80b0e24263170de768a6684c8aabf106018710e7..ec33b350a8c24abacbe6ebb40b07d41b84b953a6 100644
 --- a/chrome/browser/ui/views/toolbar/toolbar_view.cc
 +++ b/chrome/browser/ui/views/toolbar/toolbar_view.cc
 @@ -5,6 +5,7 @@
@@ -59,7 +59,7 @@ index 80b0e24263170de768a6684c8aabf106018710e7..1a320d829a4bfcc35dceeb2ad92752c5
    bool is_glic_left_of_profile =
        features::kGlicToolbarButtonLocationParam.Get() ==
            features::GlicToolbarButtonLocation::kLeftOfProfileChip ||
-@@ -1463,12 +1478,115 @@ gfx::Size ToolbarView::GetMinimumSize() const {
+@@ -1463,12 +1478,118 @@ gfx::Size ToolbarView::GetMinimumSize() const {
    return size;
  }
  
@@ -129,17 +129,20 @@ index 80b0e24263170de768a6684c8aabf106018710e7..1a320d829a4bfcc35dceeb2ad92752c5
 +    // Peek/collapse animations pass through narrower widths; lay out at the
 +    // minimum and let the sidebar clip, so nothing gets negative bounds.
 +    const int w = std::max(width(), tabs::kMyarcSidebarMinWidth);
++    const bool show_toggle = w >= 198;
 +    // Arc on macOS 26 spaces navigation 34 DIP apart at its 228 DIP default
-+    // width; older Arc headers use 30 DIP at 200 DIP. Tighten between the two
-+    // so the full header still fits at the minimum width.
++    // width; tighten down to 30 DIP at 198 DIP, and drop the toggle below
++    // 198 DIP (matching Arc's narrowest width) so nav buttons clear the
++    // traffic lights cleanly.
 +    const int squeeze = std::clamp(228 - w, 0, 28);
-+    const int pitch = 34 - squeeze / 7;
-+    const int reload_x = w - 36 + squeeze * 3 / 28;
++    const int pitch = show_toggle ? (34 - squeeze / 7) : 26;
++    const int reload_x =
++        show_toggle ? (w - 36 + squeeze * 3 / 28) : (w - 28);
 +    views::ProposedLayout layout;
 +    layout.host_size = size();
 +    for (views::View* child : children()) {
 +      const bool visible =
-+          child == myarc_sidebar_toggle_ ||
++          (child == myarc_sidebar_toggle_ && show_toggle) ||
 +          (child == location_bar_view_ && !myarc_url_pill_hidden_) ||
 +          child == back_ || child == forward_ || child == reload_;
 +      gfx::Rect bounds;
@@ -175,7 +178,7 @@ index 80b0e24263170de768a6684c8aabf106018710e7..1a320d829a4bfcc35dceeb2ad92752c5
    if (display_mode_ == DisplayMode::kCustomTab) {
      custom_tab_bar_->SetBounds(0, 0, width(),
                                 custom_tab_bar_->GetPreferredSize().height());
-@@ -1580,7 +1698,7 @@ void ToolbarView::InitLayout() {
+@@ -1580,7 +1701,7 @@ void ToolbarView::InitLayout() {
                                 views::MaximumFlexSizeRule::kUnbounded)
            .WithOrder(location_bar_flex_order);
  
