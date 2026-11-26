@@ -167,10 +167,8 @@ Pose Lerp(const Sparkle& sparkle, float t) {
           Lerp(sparkle.idle.scale, sparkle.glow.scale, t)};
 }
 
-// Arc's hover tile: 32 DIP, radius 8, white at 8% (black at 6% in light mode),
-// fading in over 120 ms and out over 150 ms.
-constexpr int kTileSize = 32;
-constexpr float kTileRadius = 8;
+// Arc's hover tile: default 32 DIP, radius 8, white at 8% (black at 6% in light
+// mode), fading in over 120 ms and out over 150 ms.
 constexpr base::TimeDelta kTileIn = base::Milliseconds(120);
 constexpr base::TimeDelta kTileOut = base::Milliseconds(150);
 
@@ -624,8 +622,14 @@ void FooterButton::OnPaintBackground(gfx::Canvas* canvas) {
   flags.setColor(color);
   flags.setAlphaf(flags.getAlphaf() * static_cast<float>(value));
   gfx::RectF tile(GetLocalBounds());
-  tile.ClampToCenteredSize(gfx::SizeF(kTileSize, kTileSize));
-  canvas->DrawRoundRect(tile, kTileRadius, flags);
+  tile.ClampToCenteredSize(gfx::SizeF(tile_size_, tile_size_));
+  canvas->DrawRoundRect(tile, tile_radius_, flags);
+}
+
+void FooterButton::SetTileStyle(float size, float radius) {
+  tile_size_ = size;
+  tile_radius_ = radius;
+  SchedulePaint();
 }
 
 void FooterButton::SetFooterTooltip(base::WeakPtr<FooterTooltip> tooltip,

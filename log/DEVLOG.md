@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-11-26: Fix footer ProfileGroup capsule hover highlight geometry
+
+- Added `FooterButton::SetTileStyle(float size, float radius)` (`browser/foundation/footer_button.{h,cc}`) and styled other-Profile Space buttons inside `ProfileGroup` (`browser/foundation/sidebar_view.cc`) with a `24x24` (`radius 12`) circular hover highlight instead of the `32x32` (`radius 8`) square tile that protruded above, below, and past the `24 DIP` capsule.
+- Updated `ProfileGroup::OnPaint()` to union a uniform `16x16` glyph slot centered on each button so dots (`8px`) and icons (`16px`) get symmetric capsule end-caps flush with the `24 DIP` hover circle.
+- Verified with `out/MyarcRelease` `chrome` build.
+
 ## 2026-11-26: Switch Boost Invert to improved CSS Smart Invert
 
 - Replaced Blink Auto Dark (`force_dark_mode_enabled`) with an improved CSS Smart Invert in `crates/boosts/src/css.rs`: fills default `html { background-color: #fff; }` before `invert(1) hue-rotate(180deg)`, counter-inverts `img, video, canvas, iframe, [style*="background-image"]`, prevents double counter-inversion on nested media via `:is(...) :is(...) { filter: none !important; }`, and leaves inline `<svg>` icons inverted with text.

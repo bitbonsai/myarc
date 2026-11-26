@@ -376,16 +376,18 @@ class ProfileGroup final : public views::View {
   }
 
   void OnPaint(gfx::Canvas* canvas) override {
-    // Each glyph sits centered in its button.
+    // Each glyph sits centered in its button; use a uniform 16x16 slot so
+    // dots and icons get symmetric capsule end-caps matching the 24 DIP hover
+    // circle.
     gfx::RectF glyphs;
     for (const views::View* child : children()) {
       const auto* button = views::AsViewClass<views::LabelButton>(child);
       if (!button) {
         continue;
       }
-      gfx::Rect image(button->GetImage(views::Button::STATE_NORMAL).size());
-      image.Offset(button->bounds().CenterPoint() - image.CenterPoint());
-      glyphs.Union(gfx::RectF(image));
+      gfx::Rect slot(gfx::Size(16, 16));
+      slot.Offset(button->bounds().CenterPoint() - slot.CenterPoint());
+      glyphs.Union(gfx::RectF(slot));
     }
     if (glyphs.IsEmpty()) {
       return;
@@ -3314,6 +3316,7 @@ void SidebarView::BuildFooter(const gfx::PointF& spaces_offset,
     choice->SetMinSize(gfx::Size(34, 32));
     choice->SetMaxSize(gfx::Size(34, 32));
     choice->SetPreferredSize(gfx::Size(34, 32));
+    choice->SetTileStyle(24.0f, 12.0f);
     choice->SetFooterTooltip(
         footer_tooltip_->GetWeakPtr(),
         {other.name + u" \u00B7 " + other.profile_name, {}});

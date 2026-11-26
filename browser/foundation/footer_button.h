@@ -147,6 +147,7 @@ class FooterButton : public views::MdTextButton {
                         FooterTooltip::Content content);
   const FooterTooltip::Content& footer_tooltip() const { return content_; }
   void ShowFooterTooltipNow();
+  void SetTileStyle(float size, float radius);
 
  protected:
   bool hovered() const { return hovered_; }
@@ -176,6 +177,8 @@ class FooterButton : public views::MdTextButton {
   void SetHovered(bool hovered);
 
   bool hovered_ = false;
+  float tile_size_ = 32.0f;
+  float tile_radius_ = 8.0f;
   base::WeakPtr<FooterTooltip> tooltip_;
   FooterTooltip::Content content_;
   TileDelegate tile_delegate_{this};
