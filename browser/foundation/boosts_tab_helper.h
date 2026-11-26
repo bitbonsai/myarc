@@ -37,14 +37,9 @@ class BoostsTabHelper final
   // of persisted Boosts without writing to disk.
   void SetPreviewOverride(std::string origin,
                           std::string css,
-                          bool apply_to_subframes = false,
-                          bool auto_dark = false);
+                          bool apply_to_subframes = false);
   void ClearPreviewOverride();
   bool HasPreviewOverride() const { return preview_.has_value(); }
-
-  // Returns true when an active Boost (or live preview) for the primary main
-  // frame's origin uses ColorMode::Invert, enabling Blink's native Auto Dark.
-  bool IsAutoDarkEnabled() const;
 
   // content::WebContentsObserver:
   void DidFinishNavigation(
@@ -62,14 +57,12 @@ class BoostsTabHelper final
     std::string origin;
     std::string css;
     bool apply_to_subframes = false;
-    bool auto_dark = false;
   };
 
   explicit BoostsTabHelper(content::WebContents* web_contents);
 
   void SyncAllFrames();
   void SyncFrame(content::RenderFrameHost* rfh);
-  void SyncAutoDark();
 
   base::ScopedObservation<BoostsService, BoostsService::Observer>
       service_observation_{this};
@@ -77,7 +70,6 @@ class BoostsTabHelper final
   // only send removal IPC when clearing a previously styled frame.
   std::set<content::GlobalRenderFrameHostId> styled_frames_;
   std::optional<PreviewOverride> preview_;
-  bool auto_dark_active_ = false;
 
   WEB_CONTENTS_USER_DATA_KEY_DECL();
 };

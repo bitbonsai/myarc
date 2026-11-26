@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-11-26: Switch Boost Invert to improved CSS Smart Invert
+
+- Replaced Blink Auto Dark (`force_dark_mode_enabled`) with an improved CSS Smart Invert in `crates/boosts/src/css.rs`: fills default `html { background-color: #fff; }` before `invert(1) hue-rotate(180deg)`, counter-inverts `img, video, canvas, iframe, [style*="background-image"]`, prevents double counter-inversion on nested media via `:is(...) :is(...) { filter: none !important; }`, and leaves inline `<svg>` icons inverted with text.
+- Removed the Blink Auto Dark hook from `browser/foundation/boosts_tab_helper.{h,cc}`, `browser/foundation/boost_editor_view.cc`, `chrome/browser/chrome_content_browser_client.cc`, and `chrome/browser/BUILD.gn`, and re-exported patches (`163` patches verified).
+- Verified with `cargo fmt --all -- --check`, `cargo clippy -p myarc-boosts --all-targets --locked -- -D warnings`, `cargo test -p myarc-boosts --locked`, `python3 tools/export_patches.py --check`, `python3 tools/check_docs.py`, and `out/MyarcRelease` `chrome` build.
+
 ## 2026-11-26: Blink Auto Dark for Boost Invert & Tree-sitter CSS syntax highlighting
 
 - Switched Boost `ColorMode::Invert` (`crates/boosts/src/css.rs`, `browser/foundation/boosts_tab_helper.{h,cc}`, `chrome/browser/chrome_content_browser_client.cc`, `chrome/browser/BUILD.gn`) from the naive CSS `invert(1) hue-rotate(180deg)` filter to Blink's native Auto Dark (`web_prefs->force_dark_mode_enabled`) with live preview support and optional contrast/brightness/saturation filters preserved.

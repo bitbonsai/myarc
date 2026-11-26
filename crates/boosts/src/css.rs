@@ -451,14 +451,20 @@ fn emit_appearance_css(appearance: &BoostAppearance, css: &mut String) {
     match appearance.color_mode {
         ColorMode::None => {}
         ColorMode::Invert => {
-            // Blink's native Auto Dark (web_prefs->force_dark_mode_enabled)
-            // handles smart color inversion while preserving photos and fixed
-            // layout. Only emit optional contrast/brightness/saturation tweaks.
             let mut extra = String::new();
             append_palette_filters(appearance.palette, &mut extra);
-            if !extra.is_empty() {
-                let _ = writeln!(css, "html {{ filter: {} !important; }}", extra.trim_start());
-            }
+            let _ = writeln!(
+                css,
+                "html {{ background-color: #fff; filter: invert(1) hue-rotate(180deg){extra} !important; }}"
+            );
+            let _ = writeln!(
+                css,
+                "img, video, canvas, iframe, [style*=\"background-image\"] {{ filter: invert(1) hue-rotate(180deg) !important; }}"
+            );
+            let _ = writeln!(
+                css,
+                ":is(img, video, canvas, iframe, [style*=\"background-image\"]) :is(img, video, canvas, iframe, [style*=\"background-image\"]) {{ filter: none !important; }}"
+            );
         }
         ColorMode::Palette => {
             if let Some(p) = appearance.palette {

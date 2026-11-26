@@ -3312,10 +3312,8 @@ class BoostEditorView final : public views::View,
     }
     std::string css = BoostsService::CompilePreview(draft_appearance_,
                                                     selectors, draft_css_);
-    helper->SetPreviewOverride(
-        origin_, std::move(css), record_->apply_to_subframes,
-        /*auto_dark=*/draft_appearance_.color_mode ==
-            foundation::BoostColorMode::Invert);
+    helper->SetPreviewOverride(origin_, std::move(css),
+                               record_->apply_to_subframes);
   }
 
   void ClearPreview() {

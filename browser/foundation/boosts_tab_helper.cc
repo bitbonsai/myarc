@@ -52,13 +52,11 @@ BoostsTabHelper::~BoostsTabHelper() {
 
 void BoostsTabHelper::SetPreviewOverride(std::string origin,
                                          std::string css,
-                                         bool apply_to_subframes,
-                                         bool auto_dark) {
+                                         bool apply_to_subframes) {
   preview_ = PreviewOverride{
       .origin = std::move(origin),
       .css = std::move(css),
       .apply_to_subframes = apply_to_subframes,
-      .auto_dark = auto_dark,
   };
   SyncAllFrames();
 }
@@ -69,34 +67,6 @@ void BoostsTabHelper::ClearPreviewOverride() {
   }
   preview_.reset();
   SyncAllFrames();
-}
-
-bool BoostsTabHelper::IsAutoDarkEnabled() const {
-  if (!web_contents()) {
-    return false;
-  }
-  content::RenderFrameHost* rfh = web_contents()->GetPrimaryMainFrame();
-  if (!rfh) {
-    return false;
-  }
-  const url::Origin origin = rfh->GetLastCommittedOrigin();
-  if (!IsEligibleHttpOrigin(origin)) {
-    return false;
-  }
-  if (preview_ && preview_->origin == origin.Serialize()) {
-    return preview_->auto_dark;
-  }
-  const BoostsService* service = service_observation_.GetSource();
-  if (!service || !service->GlobalEnabled()) {
-    return false;
-  }
-  for (const auto& boost : service->MatchingBoosts(origin)) {
-    if (boost.enabled &&
-        boost.appearance.color_mode == foundation::BoostColorMode::Invert) {
-      return true;
-    }
-  }
-  return false;
 }
 
 void BoostsTabHelper::DidFinishNavigation(
@@ -121,9 +91,6 @@ void BoostsTabHelper::DidFinishNavigation(
     styled_frames_.erase(rfh->GetGlobalId());
   }
   SyncFrame(rfh);
-  if (navigation_handle->IsInPrimaryMainFrame()) {
-    SyncAutoDark();
-  }
 }
 
 void BoostsTabHelper::RenderFrameDeleted(
@@ -137,7 +104,6 @@ void BoostsTabHelper::WebContentsDestroyed() {
   service_observation_.Reset();
   styled_frames_.clear();
   preview_.reset();
-  auto_dark_active_ = false;
 }
 
 void BoostsTabHelper::OnBoostsChanged() {
@@ -150,19 +116,6 @@ void BoostsTabHelper::SyncAllFrames() {
   }
   web_contents()->ForEachRenderFrameHost(
       [this](content::RenderFrameHost* rfh) { SyncFrame(rfh); });
-  SyncAutoDark();
-}
-
-void BoostsTabHelper::SyncAutoDark() {
-  if (!web_contents()) {
-    return;
-  }
-  const bool want = IsAutoDarkEnabled();
-  if (want == auto_dark_active_) {
-    return;
-  }
-  auto_dark_active_ = want;
-  web_contents()->NotifyPreferencesChanged();
 }
 
 void BoostsTabHelper::SyncFrame(content::RenderFrameHost* rfh) {
