@@ -494,6 +494,7 @@ enum ItemCommand {
   kPin = 1,
   kFavorite,
   kUnsave,
+  kUnsubscribeFeed,
   kClose,
   kStopControl,
   kCopyLink,
@@ -1391,8 +1392,12 @@ void SidebarView::ShowContextMenuForViewImpl(
     if (menu_state_.is_live) {
       menu_model_->AddItem(kClose, u"Close Live Page");
     }
-    menu_model_->AddItem(kUnsave, menu_state_.is_pin ? u"Unpin from Space"
-                                                     : u"Remove Favorite");
+    if (IsRssFolderId(menu_state_.folder)) {
+      menu_model_->AddItem(kUnsubscribeFeed, u"Unsubscribe");
+    } else {
+      menu_model_->AddItem(kUnsave, menu_state_.is_pin ? u"Unpin from Space"
+                                                       : u"Remove Favorite");
+    }
   }
   RunMenu(point, source_type);
 }
@@ -1980,6 +1985,9 @@ void SidebarView::ExecuteCommand(int command_id, int event_flags) {
     case kUnsave:
       delegate_->UnsaveItem(id);
       return;
+    case kUnsubscribeFeed:
+      delegate_->UnsubscribeFeedItem(id);
+      return;
     case kClose:
       delegate_->CloseLiveItem(id);
       return;
@@ -2035,6 +2043,19 @@ void SidebarView::ExecuteCommand(int command_id, int event_flags) {
 uint64_t SidebarView::FirstSpaceId() const {
   const auto first = std::ranges::find(spaces_, false, &SpaceEntry::agent);
   return first == spaces_.end() ? 0 : first->id;
+}
+
+bool SidebarView::IsRssFolderId(uint64_t folder_id) const {
+  if (!folder_id) {
+    return false;
+  }
+  for (const FolderEntry& entry : folders_) {
+    if (entry.id == folder_id) {
+      return base::EqualsCaseInsensitiveASCII(entry.name, u"RSS") ||
+             base::EqualsCaseInsensitiveASCII(entry.name, u"Feeds");
+    }
+  }
+  return false;
 }
 
 bool SidebarView::IsFolderDescendant(uint64_t ancestor,
@@ -2532,6 +2553,21 @@ std::unique_ptr<views::View> SidebarView::MakeItem(
         port_chip = std::move(chip);
       }
     }
+  }
+  if (IsRssFolderId(folder)) {
+    auto unsub = IconButton(
+        base::BindRepeating(&Delegate::UnsubscribeFeedItem,
+                            base::Unretained(&delegate_.get()), item.id),
+        &kTrashIcon, 14, SkColorSetRGB(0xFF, 0x5A, 0x5F));
+    views::InstallRoundRectHighlightPathGenerator(unsub.get(), gfx::Insets(4),
+                                                  6);
+    const std::u16string unsub_name = u"Unsubscribe: " + presentation.title;
+    unsub->SetTooltipText(unsub_name);
+    unsub->GetViewAccessibility().SetName(unsub_name);
+    TrackFocus(unsub.get(), FocusAction::kClose, item.id, menu_state);
+    return add_row(std::make_unique<ItemRow>(std::move(activate),
+                                             std::move(unsub), selected,
+                                             back_icon, std::move(port_chip)));
   }
   if (item.placement != foundation::PlacementKind::Temporary &&
       !presentation.is_live) {

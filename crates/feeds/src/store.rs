@@ -16,6 +16,12 @@ pub const MAX_HEADER_BYTES: usize = 256;
 
 pub type SubscriptionId = u64;
 
+fn normalize_feed_url(raw: &str) -> Option<String> {
+    let valid = safe_http_url(raw, None)?;
+    let without_ref = valid.split('#').next().unwrap_or(&valid);
+    Some(without_ref.to_string())
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Subscription {
     pub id: SubscriptionId,
@@ -84,10 +90,12 @@ impl FeedStore {
     }
 
     pub fn find_by_url(&self, feed_url: &str) -> Option<&Subscription> {
-        let normalized = safe_http_url(feed_url, None)?;
-        self.subscriptions
-            .iter()
-            .find(|s| s.feed_url.eq_ignore_ascii_case(&normalized))
+        let normalized = normalize_feed_url(feed_url)?;
+        self.subscriptions.iter().find(|s| {
+            normalize_feed_url(&s.feed_url)
+                .map(|u| u.eq_ignore_ascii_case(&normalized))
+                .unwrap_or_else(|| s.feed_url.eq_ignore_ascii_case(&normalized))
+        })
     }
 
     pub fn is_subscribed(&self, feed_url: &str) -> bool {
@@ -104,12 +112,12 @@ impl FeedStore {
         space_id: u64,
         now_secs: u64,
     ) -> Result<SubscriptionId, StoreError> {
-        let canonical = safe_http_url(feed_url, None).ok_or(StoreError::InvalidFeedUrl)?;
-        if let Some(existing) = self
-            .subscriptions
-            .iter()
-            .find(|s| s.feed_url.eq_ignore_ascii_case(&canonical))
-        {
+        let canonical = normalize_feed_url(feed_url).ok_or(StoreError::InvalidFeedUrl)?;
+        if let Some(existing) = self.subscriptions.iter().find(|s| {
+            normalize_feed_url(&s.feed_url)
+                .map(|u| u.eq_ignore_ascii_case(&canonical))
+                .unwrap_or_else(|| s.feed_url.eq_ignore_ascii_case(&canonical))
+        }) {
             return Ok(existing.id);
         }
         if self.subscriptions.len() >= MAX_SUBSCRIPTIONS {
@@ -148,12 +156,17 @@ impl FeedStore {
     }
 
     pub fn unsubscribe_by_url(&mut self, feed_url: &str) -> bool {
-        let Some(canonical) = safe_http_url(feed_url, None) else {
+        let Some(canonical) = normalize_feed_url(feed_url) else {
             return false;
         };
         let before = self.subscriptions.len();
-        self.subscriptions
-            .retain(|s| !s.feed_url.eq_ignore_ascii_case(&canonical));
+        self.subscriptions.retain(|s| {
+            let sub_url = normalize_feed_url(&s.feed_url);
+            !sub_url
+                .as_deref()
+                .unwrap_or(&s.feed_url)
+                .eq_ignore_ascii_case(&canonical)
+        });
         self.subscriptions.len() != before
     }
 

@@ -429,6 +429,8 @@ void ShowPrompt(GURL url, int attempt) {
                   u"before anything is sent.",
           .decline = u"Not Now",
           .accept = u"Report…",
+          .centered = true,
+          .show_close_dot = true,
       },
       base::BindOnce(&OpenIssue, url, attempt));
 }

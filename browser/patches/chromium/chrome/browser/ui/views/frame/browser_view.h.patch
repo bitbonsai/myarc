@@ -1,5 +1,5 @@
 diff --git a/chrome/browser/ui/views/frame/browser_view.h b/chrome/browser/ui/views/frame/browser_view.h
-index 750e46c97b64dccccf4268e912df5dbdb6516b3c..8db5d8ff34080b61195af1e97bd7263da99403b8 100644
+index 750e46c97b64dccccf4268e912df5dbdb6516b3c..78d51f4f4c3d66b893b85b64a22a3b0f5fb5c15a 100644
 --- a/chrome/browser/ui/views/frame/browser_view.h
 +++ b/chrome/browser/ui/views/frame/browser_view.h
 @@ -8,11 +8,13 @@
@@ -144,7 +144,7 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..8db5d8ff34080b61195af1e97bd7263d
    base::WeakPtr<BrowserView> GetAsWeakPtr() {
      return weak_ptr_factory_.GetWeakPtr();
    }
-@@ -1253,12 +1331,298 @@ class BrowserView : public BrowserWindow,
+@@ -1253,12 +1331,299 @@ class BrowserView : public BrowserWindow,
  
    // Anchor point for help bubbles and other dialogs that want to reliably
    // anchor outside the content area of the window.
@@ -157,6 +157,7 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..8db5d8ff34080b61195af1e97bd7263d
 +  void FavoriteItem(uint64_t item) override;
 +  bool DropFavorite(uint64_t item, uint64_t before) override;
 +  void UnsaveItem(uint64_t item) override;
++  void UnsubscribeFeedItem(uint64_t item) override;
 +  void CreateFolder(uint64_t parent_folder_id = 0) override;
 +  void RenameFolder(uint64_t folder) override;
 +  void DeleteFolder(uint64_t folder) override;
@@ -443,7 +444,7 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..8db5d8ff34080b61195af1e97bd7263d
  
    // A mapping between accelerators and command IDs.
    std::map<ui::Accelerator, int> accelerator_table_;
-@@ -1411,6 +1775,7 @@ class BrowserView : public BrowserWindow,
+@@ -1411,6 +1776,7 @@ class BrowserView : public BrowserWindow,
    base::EnumSet<TabStripAndWebAppViewsReparentedState>
        tab_strip_web_apps_reparented_state_;
  

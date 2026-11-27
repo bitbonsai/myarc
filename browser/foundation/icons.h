@@ -229,6 +229,32 @@ inline constexpr gfx::VectorIcon kRssIcon(kRssRep,
                                           std::size(kRssRep),
                                           "myarc_rss");
 
+inline constexpr gfx::PathElement kTrashPath[] = {
+    gfx::CANVAS_DIMENSIONS, 24,
+    gfx::STROKE, 2,
+    gfx::MOVE_TO, 3, 6,
+    gfx::LINE_TO, 21, 6,
+    gfx::MOVE_TO, 8, 6,
+    gfx::LINE_TO, 8, 4,
+    gfx::ARC_TO, 1, 1, 0, 0, 1, 9, 3,
+    gfx::LINE_TO, 15, 3,
+    gfx::ARC_TO, 1, 1, 0, 0, 1, 16, 4,
+    gfx::LINE_TO, 16, 6,
+    gfx::MOVE_TO, 19, 6,
+    gfx::LINE_TO, 18, 20,
+    gfx::ARC_TO, 2, 2, 0, 0, 1, 16, 21,
+    gfx::LINE_TO, 8, 21,
+    gfx::ARC_TO, 2, 2, 0, 0, 1, 6, 20,
+    gfx::LINE_TO, 5, 6,
+    gfx::MOVE_TO, 10, 11,
+    gfx::LINE_TO, 10, 17,
+    gfx::MOVE_TO, 14, 11,
+    gfx::LINE_TO, 14, 17};
+inline constexpr gfx::VectorIconRep kTrashRep[] = {{kTrashPath}};
+inline constexpr gfx::VectorIcon kTrashIcon(kTrashRep,
+                                            std::size(kTrashRep),
+                                            "myarc_trash");
+
 inline constexpr gfx::PathElement kChevronRightPath[] = {
     gfx::CANVAS_DIMENSIONS, 24, gfx::STROKE, 2, gfx::MOVE_TO, 9, 18,
     gfx::LINE_TO, 15, 12, gfx::LINE_TO, 9, 6};

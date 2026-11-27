@@ -109,6 +109,48 @@ views::LabelButton* AddButton(views::View* parent,
   return button;
 }
 
+class CloseDotButton : public views::Button {
+  METADATA_HEADER(CloseDotButton, views::Button)
+
+ public:
+  explicit CloseDotButton(PressedCallback callback)
+      : views::Button(std::move(callback)) {
+    const int d = static_cast<int>(dialog::kCloseDotSize);
+    SetSize(gfx::Size(d, d));
+    SetPreferredSize(gfx::Size(d, d));
+    GetViewAccessibility().SetName(u"Close");
+    SetTooltipText(u"Close");
+  }
+
+  void PaintButtonContents(gfx::Canvas* canvas) override {
+    const gfx::RectF bounds(GetLocalBounds());
+    const float r = bounds.width() * 0.5f;
+    cc::PaintFlags flags;
+    flags.setAntiAlias(true);
+    flags.setColor(GetState() == STATE_PRESSED
+                       ? SkColorSetRGB(0xE0, 0x44, 0x3E)
+                       : SkColorSetRGB(0xFF, 0x5F, 0x57));
+    canvas->DrawCircle(bounds.CenterPoint(), r, flags);
+    if (GetState() == STATE_HOVERED || GetState() == STATE_PRESSED) {
+      cc::PaintFlags x_flags;
+      x_flags.setAntiAlias(true);
+      x_flags.setStyle(cc::PaintFlags::kStroke_Style);
+      x_flags.setStrokeWidth(1.35f);
+      x_flags.setStrokeCap(cc::PaintFlags::kRound_Cap);
+      x_flags.setColor(SkColorSetARGB(0xB8, 0x4D, 0x00, 0x00));
+      const float m = 3.5f;
+      canvas->DrawLine(gfx::PointF(m, m),
+                       gfx::PointF(bounds.width() - m, bounds.height() - m),
+                       x_flags);
+      canvas->DrawLine(gfx::PointF(bounds.width() - m, m),
+                       gfx::PointF(m, bounds.height() - m), x_flags);
+    }
+  }
+};
+
+BEGIN_METADATA(CloseDotButton)
+END_METADATA
+
 class PromptView : public views::BoxLayoutView {
   METADATA_HEADER(PromptView, views::BoxLayoutView)
 
@@ -116,10 +158,16 @@ class PromptView : public views::BoxLayoutView {
   PromptView(const ControlPrompt::Copy& copy,
              base::RepeatingCallback<void(bool)> answer) {
     SetOrientation(views::BoxLayout::Orientation::kVertical);
-    SetInsideBorderInsets(gfx::Insets(kInset));
+    const int top_inset = copy.show_close_dot ? dialog::kTitleTopPadding : kInset;
+    SetInsideBorderInsets(gfx::Insets::TLBR(top_inset, kInset, kInset, kInset));
     SetBetweenChildSpacing(8);
     GetViewAccessibility().SetRole(ax::mojom::Role::kAlertDialog);
     GetViewAccessibility().SetName(copy.title);
+    if (copy.show_close_dot) {
+      close_dot_ = AddChildView(std::make_unique<CloseDotButton>(
+          base::BindRepeating(answer, false)));
+      close_dot_->SetProperty(views::kViewIgnoredByLayoutKey, true);
+    }
     AddText(this, copy.title, 15, gfx::Font::Weight::SEMIBOLD, kTitle);
     AddText(this, copy.body, 12, gfx::Font::Weight::NORMAL, kBody);
     auto* buttons = AddChildView(std::make_unique<views::BoxLayoutView>());
@@ -134,6 +182,15 @@ class PromptView : public views::BoxLayoutView {
                        kBlueButton, SK_ColorWHITE, gfx::Font::Weight::SEMIBOLD);
     SetPaintToLayer();
     layer()->SetFillsBoundsOpaquely(false);
+  }
+
+  void Layout(PassKey) override {
+    LayoutSuperclass<views::BoxLayoutView>(this);
+    if (close_dot_) {
+      const int inset = static_cast<int>(dialog::kCloseDotInset);
+      const int d = static_cast<int>(dialog::kCloseDotSize);
+      close_dot_->SetBounds(inset, inset, d, d);
+    }
   }
 
   void Press(bool allow) {
@@ -164,6 +221,7 @@ class PromptView : public views::BoxLayoutView {
   }
 
  private:
+  raw_ptr<CloseDotButton> close_dot_ = nullptr;
   raw_ptr<views::LabelButton> allow_ = nullptr;
   raw_ptr<views::LabelButton> decline_ = nullptr;
 };
@@ -205,8 +263,15 @@ views::View* FindAgentFooterButton(views::View* root) {
   return nullptr;
 }
 
-gfx::Rect ComputePromptBounds(views::Widget& parent, const gfx::Size& size) {
+gfx::Rect ComputePromptBounds(views::Widget& parent,
+                              const gfx::Size& size,
+                              bool centered) {
   const gfx::Rect window = parent.GetClientAreaBoundsInScreen();
+  if (centered) {
+    const int cx = window.x() + (window.width() - size.width()) / 2;
+    const int cy = window.y() + (window.height() - size.height()) / 2;
+    return gfx::Rect(cx, cy, size.width(), size.height());
+  }
   int x = window.x() + kWindowMargin;
   int y = window.bottom() - kWindowMargin - size.height();
   if (views::View* sidebar =
@@ -281,9 +346,12 @@ ControlPrompt::ControlPrompt(views::Widget& parent, const Copy& copy, Done done)
                 },
                 base::Unretained(this))));
   const gfx::Size size = contents->GetPreferredSize();
-  widget_->SetBounds(ComputePromptBounds(parent, size));
-  ApplyWidgetGlass(*widget_, GlassMaterial::kHud, kRadius, /*dark=*/true);
+  widget_->SetBounds(ComputePromptBounds(parent, size, copy.centered));
   widget_->ShowInactive();
+  ApplyWidgetGlass(*widget_,
+                   copy.centered ? GlassMaterial::kSheet
+                                 : GlassMaterial::kPopover,
+                   kRadius, /*dark=*/true);
   contents->GetViewAccessibility().AnnounceText(copy.title);
 }
 

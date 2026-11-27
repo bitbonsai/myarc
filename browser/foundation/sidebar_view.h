@@ -189,6 +189,8 @@ class SidebarView final : public views::View,
     // Returns false when the workspace rejected the change.
     virtual bool DropFavorite(uint64_t item_id, uint64_t before_id) = 0;
     virtual void UnsaveItem(uint64_t item_id) = 0;
+    // Confirms and unsubscribes a feed row inside the Space's RSS folder.
+    virtual void UnsubscribeFeedItem(uint64_t item_id) {}
     // Folders of the current Space's Pins. The parent names a new folder
     // and lets the user rename it, confirms a delete, and reports errors.
     // Nonzero `parent_folder_id` creates a subfolder inside that folder.
@@ -719,6 +721,7 @@ class SidebarView final : public views::View,
     std::u16string name;
   };
   bool IsFolderDescendant(uint64_t ancestor, uint64_t candidate) const;
+  bool IsRssFolderId(uint64_t folder_id) const;
   std::vector<FolderEntry> folders_;
   std::vector<SpaceEntry> spaces_;
   std::vector<OtherSpaceEntry> other_spaces_;

@@ -28,6 +28,8 @@ class ControlPrompt : public views::WidgetObserver {
     std::u16string body;
     std::u16string decline;
     std::u16string accept;
+    bool centered = false;
+    bool show_close_dot = false;
   };
 
   // `client` is already cleaned for display. `done` runs once, with kClosed
