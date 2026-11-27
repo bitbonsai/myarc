@@ -1,8 +1,8 @@
 diff --git a/chrome/browser/ui/views/chrome_layout_provider.cc b/chrome/browser/ui/views/chrome_layout_provider.cc
-index 6ee376f2de8ba1cec4e70965c0a76c8c7284c69d..ac8feeef210cb6f082cc9a4a5837afcd2948a25f 100644
+index 6ee376f2de8ba1cec4e70965c0a76c8c7284c69d..670e6e1b24956e1419cd077b37b598d1db397aef 100644
 --- a/chrome/browser/ui/views/chrome_layout_provider.cc
 +++ b/chrome/browser/ui/views/chrome_layout_provider.cc
-@@ -6,6 +6,7 @@
+@@ -6,9 +6,11 @@
  
  #include <algorithm>
  
@@ -10,14 +10,20 @@ index 6ee376f2de8ba1cec4e70965c0a76c8c7284c69d..ac8feeef210cb6f082cc9a4a5837afcd
  #include "base/containers/fixed_flat_map.h"
  #include "base/feature_list.h"
  #include "chrome/browser/ui/ui_features.h"
-@@ -49,8 +50,19 @@ gfx::Insets ChromeLayoutProvider::GetInsetsMetric(int metric) const {
++#include "myarc/glass_mac.h"
+ #include "chrome/browser/ui/views/chrome_typography.h"
+ #include "components/omnibox/common/omnibox_features.h"
+ #include "ui/base/pointer/touch_ui_controller.h"
+@@ -49,8 +51,22 @@ gfx::Insets ChromeLayoutProvider::GetInsetsMetric(int metric) const {
    CHECK_LT(metric, views::VIEWS_INSETS_MAX, base::NotFatalUntil::M162);
    const bool touch_ui = ui::TouchUiController::Get()->touch_ui();
    switch (metric) {
 +    case views::INSETS_DIALOG_TITLE: {
 +      if (base::CommandLine::ForCurrentProcess()->HasSwitch(
 +              "myarc-visual-parity")) {
-+        return gfx::Insets::TLBR(36, 24, 0, 24);
++        return gfx::Insets::TLBR(myarc::dialog::kTitleTopPadding,
++                                 myarc::dialog::kPadding, 0,
++                                 myarc::dialog::kPadding);
 +      }
 +      return LayoutProvider::GetInsetsMetric(metric);
 +    }
@@ -25,19 +31,20 @@ index 6ee376f2de8ba1cec4e70965c0a76c8c7284c69d..ac8feeef210cb6f082cc9a4a5837afcd
      case views::INSETS_DIALOG_SUBSECTION: {
 +      if (base::CommandLine::ForCurrentProcess()->HasSwitch(
 +              "myarc-visual-parity")) {
-+        return gfx::Insets::VH(24, 24);
++        return gfx::Insets::VH(myarc::dialog::kPadding,
++                               myarc::dialog::kPadding);
 +      }
        return gfx::Insets::VH(20, 20);
      }
      case views::INSETS_DIALOG_FOOTNOTE: {
-@@ -120,6 +132,12 @@ int ChromeLayoutProvider::GetDistanceMetric(int metric) const {
+@@ -120,6 +136,12 @@ int ChromeLayoutProvider::GetDistanceMetric(int metric) const {
    CHECK_GE(metric, views::VIEWS_DISTANCE_START, base::NotFatalUntil::M162);
    CHECK_LT(metric, views::VIEWS_DISTANCE_MAX, base::NotFatalUntil::M162);
  
 +  if (metric == views::DISTANCE_DIALOG_BUTTON_MINIMUM_WIDTH &&
 +      base::CommandLine::ForCurrentProcess()->HasSwitch(
 +          "myarc-visual-parity")) {
-+    return 84;
++    return myarc::dialog::kButtonMinWidth;
 +  }
 +
    if (metric < views::VIEWS_DISTANCE_END) {

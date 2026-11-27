@@ -87,7 +87,7 @@ constexpr char kCaptureUpdaterUi[] = "myarc-capture-updater-ui";
 // framework and its first check stay off the startup path.
 constexpr int64_t kStartDelaySeconds = 5;
 constexpr CGFloat kWindowWidth = 448;
-constexpr CGFloat kWindowCornerRadius = 16;
+constexpr CGFloat kWindowCornerRadius = dialog::kCornerRadius;
 // Bounds on untrusted release notes read from an appcast or remote URL.
 constexpr size_t kMaxReleaseNotesInputBytes = 16 * 1024;
 constexpr NSUInteger kMaxReleaseNotesChars = 360;
@@ -308,10 +308,10 @@ NSString* FormatByteProgress(uint64_t received, uint64_t expected) {
   [outer addClip];
 
   if (glass) {
-    [[NSColor colorWithSRGBRed:0x18 / 255.0
-                         green:0x18 / 255.0
-                          blue:0x1D / 255.0
-                         alpha:0.63] setFill];
+    [[NSColor colorWithSRGBRed:myarc::dialog::kDarkGlassRed
+                         green:myarc::dialog::kDarkGlassGreen
+                          blue:myarc::dialog::kDarkGlassBlue
+                         alpha:myarc::dialog::kDarkGlassAlpha] setFill];
     NSRectFillUsingOperation(bounds, NSCompositingOperationSourceOver);
 
     // Subtle ribbon-tinted ambient glow behind the app mark.
@@ -368,7 +368,7 @@ NSString* FormatByteProgress(uint64_t received, uint64_t expected) {
                                       yRadius:myarc::kWindowCornerRadius - 0.5];
   rim.lineWidth = 1.0;
   if (glass) {
-    [[NSColor colorWithWhite:1.0 alpha:0.20] setStroke];
+    [[NSColor colorWithWhite:1.0 alpha:myarc::dialog::kDarkRimAlpha] setStroke];
   } else {
     [[NSColor colorWithSRGBRed:0x3A / 255.0
                          green:0x3A / 255.0
@@ -592,7 +592,7 @@ typedef NS_ENUM(NSInteger, MyarcUpdaterButtonStyle) {
   const NSRect bounds = self.bounds;
 
   if (_pillStyle != MyarcUpdaterButtonStyleLink) {
-    const CGFloat radius = 7.0;
+    const CGFloat radius = myarc::dialog::kButtonCornerRadius;
     NSBezierPath* pill = [NSBezierPath bezierPathWithRoundedRect:bounds
                                                          xRadius:radius
                                                          yRadius:radius];

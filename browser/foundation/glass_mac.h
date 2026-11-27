@@ -15,6 +15,31 @@ class Widget;
 
 namespace myarc {
 
+// Canonical design tokens shared by all myArc frosted-glass dialogs,
+// modal panels, About myArc, and the Sparkle updater UI.
+namespace dialog {
+
+inline constexpr float kCornerRadius = 16.0f;
+inline constexpr float kButtonCornerRadius = 7.0f;
+inline constexpr int kPadding = 24;
+inline constexpr int kTitleTopPadding = 36;
+inline constexpr int kButtonHeight = 36;
+inline constexpr int kButtonMinWidth = 84;
+inline constexpr float kCloseDotSize = 12.0f;
+inline constexpr float kCloseDotInset = 12.0f;
+
+// Frosted dark/light surface fills and 1pt specular rim alphas.
+inline constexpr float kDarkGlassRed = 0x18 / 255.0f;
+inline constexpr float kDarkGlassGreen = 0x18 / 255.0f;
+inline constexpr float kDarkGlassBlue = 0x1D / 255.0f;
+inline constexpr float kDarkGlassAlpha = 0.63f;
+inline constexpr SkColor kDarkGlassTint = SkColorSetARGB(0xA1, 0x18, 0x18, 0x1D);
+inline constexpr SkColor kLightGlassTint = SkColorSetARGB(0xD4, 0xFA, 0xFA, 0xFD);
+inline constexpr float kDarkRimAlpha = 0.20f;
+inline constexpr float kLightRimAlpha = 0.14f;
+
+}  // namespace dialog
+
 // Frosted glass material presets for myArc-owned surfaces.
 enum class GlassMaterial {
   // Frosted window backdrop (e.g. Settings window).

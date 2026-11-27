@@ -103,9 +103,14 @@
   layer.cornerRadius = _myarcCornerRadius;
   layer.borderWidth = 1.0;
   layer.borderColor =
-      (_myarcDark
-           ? [NSColor colorWithSRGBRed:1.0 green:1.0 blue:1.0 alpha:0.20]
-           : [NSColor colorWithSRGBRed:0.0 green:0.0 blue:0.0 alpha:0.14])
+      (_myarcDark ? [NSColor colorWithSRGBRed:1.0
+                                        green:1.0
+                                         blue:1.0
+                                        alpha:myarc::dialog::kDarkRimAlpha]
+                  : [NSColor colorWithSRGBRed:0.0
+                                        green:0.0
+                                         blue:0.0
+                                        alpha:myarc::dialog::kLightRimAlpha])
           .CGColor;
 }
 @end
@@ -145,8 +150,8 @@
   if (!superview) {
     return;
   }
-  constexpr CGFloat kDot = 12.0;
-  constexpr CGFloat kInset = 12.0;
+  constexpr CGFloat kDot = myarc::dialog::kCloseDotSize;
+  constexpr CGFloat kInset = myarc::dialog::kCloseDotInset;
   const NSRect bounds = superview.bounds;
   const CGFloat x = _myarcInsets.left + kInset;
   const CGFloat y =
@@ -457,14 +462,10 @@ bool ApplyBubbleGlass(views::Widget& widget,
   }
 
   gfx::Insets insets;
-  float radius = 12.f;
+  const float radius = dialog::kCornerRadius;
   bool has_visible_arrow = false;
   if (frame) {
-    radius = frame->GetRoundedCorners().upper_left();
-    if (radius <= 0.f || radius > 12.f) {
-      frame->SetRoundedCorners(gfx::RoundedCornersF(12.f));
-      radius = 12.f;
-    }
+    frame->SetRoundedCorners(gfx::RoundedCornersF(radius));
     has_visible_arrow = frame->GetDisplayVisibleArrow();
     if (frame->GetBorder()) {
       insets = frame->GetBorder()->GetInsets();
