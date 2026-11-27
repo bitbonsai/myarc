@@ -30,6 +30,10 @@ The loop: the lead picks the next Arc screenshot from `research-private/arc/` (o
 
 Wrap builds and browser launches in `/usr/bin/lockf -k /tmp/myarc-build.lock`. `tools/capture_native.sh` takes that lock itself, so don't wrap it again, or it waits on itself forever. Launch the native build only in the background (`open -g`, as in `tools/capture_native.sh`) and capture with `tools/bgcapture.swift`; never run the binary directly or activate it, because windows pop over the user's work. The same goes for `browser_tests`, `interactive_ui_tests` and other test binaries that open browser windows: don't run them unless the user asks. Never `git fetch` in the Chromium checkout. Run builds and captures in the foreground and never end a turn while one is running or waiting on the lock; `lockf` blocks until it's free. Each task logs 3 lines in [log/DEVLOG.md](log/DEVLOG.md). Update `.plans/INDEX.md` at most daily.
 
+## Distribution
+
+Homebrew installs use `bitbonsai/homebrew-tap` (`Casks/myarc.rb`), auto-updated on GitHub Releases via `.github/workflows/homebrew.yml` (push `site/release.json` to `main` before publishing the release, or run `tools/update_homebrew_cask.sh` locally). Submit `Casks/myarc.rb` upstream to `Homebrew/homebrew-cask` for plain `brew install --cask myarc` once `bitbonsai/myarc` reaches 75+ stars or 30+ forks/watchers.
+
 ## Commands
 
 `python3 tools/check_docs.py`, `cargo fmt --all -- --check`, `rustfmt --check --edition 2024 browser/foundation/bridge.rs` (cargo fmt skips it), `cargo clippy --workspace --all-targets --locked -- -D warnings`, `cargo test --workspace --locked`, `python3 tools/export_patches.py --check`, `node --test design/onboarding/state.test.mjs`. Native runtime checks and evidence rules: [docs/VERIFY.md](docs/VERIFY.md).
