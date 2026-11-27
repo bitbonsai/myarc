@@ -228,6 +228,7 @@ def content(release):
         shown = facts(release)
         name = release['dmg_url'].rsplit('/', 1)[1]
         cmd = f'shasum -a 256 ~/Downloads/{name}'
+        brew_cmd = 'brew install --cask bitbonsai/tap/myarc'
         card = (
             '<div class="download-box rise">'
             '<div class="dl-card-head">'
@@ -236,6 +237,11 @@ def content(release):
             '</div>'
             f'<a class="button dl-cta" href="{escape(release["dmg_url"], quote=True)}">{DOWNLOAD_ICON}Download for macOS</a>'
             f'<p class="dl-submeta">{escape(shown["Size"])} · Apple silicon · macOS {escape(minimum)}+ · Notarized</p>'
+            '<div class="dl-brew">'
+            '<p class="dl-brew-label">Or install with Homebrew</p>'
+            f'<div class="dl-cmd"><pre><code>{escape(brew_cmd)}</code></pre>'
+            f'<button type="button" class="dl-copy" data-copy="{escape(brew_cmd, quote=True)}">Copy</button></div>'
+            '</div>'
             f'{upcoming}'
             '<details class="dl-verify">'
             f'<summary><span>Verify download (SHA-256)</span>{CHEVRON_ICON}</summary>'
@@ -364,6 +370,11 @@ CSS = '''
     .dl-upcoming { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .625rem; margin-top: 1rem }
     .dl-os-btn { display: flex; align-items: center; justify-content: space-between; gap: .5rem; width: 100%; padding: .6875rem 1rem; border-radius: .75rem; border: 1px dashed color-mix(in srgb, currentColor 28%, transparent); background: color-mix(in srgb, currentColor 4%, transparent); color: var(--quiet); font: inherit; font-size: .9375rem; font-weight: 500; cursor: not-allowed }
     .dl-soon { font-size: .875rem; font-weight: 500; opacity: .72 }
+
+    /* Homebrew install option */
+    .dl-brew { margin-top: 1.125rem; padding-top: 1rem; border-top: 1px solid var(--dl-border) }
+    .dl-brew-label { color: var(--quiet); font-size: .875rem; font-weight: 500 }
+    .dl-brew .dl-cmd { margin-top: .5rem }
 
     /* Progressive SHA-256 verification disclosure */
     .dl-verify { margin-top: 1.25rem; padding-top: 1rem; border-top: 1px solid var(--dl-border) }

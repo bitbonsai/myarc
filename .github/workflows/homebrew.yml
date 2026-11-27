@@ -1,0 +1,70 @@
+name: Update Homebrew cask
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  update-cask:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out myarc
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Extract release metadata
+        id: release
+        run: |
+          python3 - <<'PY'
+          import json, os, pathlib
+          data = json.loads(pathlib.Path('site/release.json').read_text())
+          if not data.get('published'):
+              raise SystemExit('site/release.json is not published')
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as out:
+              out.write(f"version={data['version']}\n")
+              out.write(f"sha256={data['sha256']}\n")
+          PY
+
+      - name: Check out homebrew-tap
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: bitbonsai/homebrew-tap
+          ssh-key: ${{ secrets.HOMEBREW_TAP_DEPLOY_KEY }}
+          path: homebrew-tap
+
+      - name: Update cask version and checksum
+        env:
+          VERSION: ${{ steps.release.outputs.version }}
+          SHA256: ${{ steps.release.outputs.sha256 }}
+        run: |
+          python3 - <<'PY'
+          import os, pathlib, re
+          path = pathlib.Path('homebrew-tap/Casks/myarc.rb')
+          text = path.read_text()
+          text, n_ver = re.subn(r'^(\s*version\s+)"[^"]+"', rf'\1"{os.environ["VERSION"]}"', text, count=1, flags=re.M)
+          text, n_sha = re.subn(r'^(\s*sha256\s+)"[^"]+"', rf'\1"{os.environ["SHA256"]}"', text, count=1, flags=re.M)
+          if n_ver != 1 or n_sha != 1:
+              raise SystemExit(f'unexpected cask format (version={n_ver}, sha256={n_sha})')
+          path.write_text(text)
+          PY
+
+      - name: Commit and push cask update
+        working-directory: homebrew-tap
+        env:
+          VERSION: ${{ steps.release.outputs.version }}
+        run: |
+          if git diff --quiet; then
+            echo "Cask already at v${VERSION}"
+            exit 0
+          fi
+          git config user.name "bitbonsai"
+          git config user.email "44185+bitbonsai@users.noreply.github.com"
+          git add Casks/myarc.rb
+          git commit -m "Update myarc cask to v${VERSION}"
+          git push origin main

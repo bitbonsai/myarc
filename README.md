@@ -16,6 +16,12 @@ Arc is being [sunsetted](https://arc.net/). myArc is an open-source browser that
 
 The [alpha build](https://myarc.dev/download/) runs on Apple silicon Macs with macOS 26 or later. Builds are signed, notarized and update themselves in place. Recent tabs can still be lost after a crash, Chromium fixes arrive with the next release, and the download page lists every known limitation.
 
+Or install with Homebrew (also links the `myarc` CLI onto your `PATH`):
+
+```sh
+brew install --cask bitbonsai/tap/myarc
+```
+
 What works today:
 
 - Browsing with Chromium extensions and bundled ad and tracker blocking (uBlock Origin Lite)

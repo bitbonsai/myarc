@@ -29,6 +29,7 @@ class DownloadTests(unittest.TestCase):
         html = content(None)
         self.assertIn('First alpha build coming soon', html)
         self.assertNotIn('.dmg', html)
+        self.assertNotIn('brew install --cask', html)
         self.assertNotIn('class="button"', html)
         self.assertNotIn('First launch', html)
 
@@ -64,7 +65,7 @@ class DownloadTests(unittest.TestCase):
         self.assertIn(f'href="{SAMPLE["dmg_url"]}"', html)
         self.assertIn('Download for macOS', html)
         for value in ('0.0.0-fake.1', 'January 2, 2099', '123.5 MB', SAMPLE['sha256'], 'shasum -a 256 ~/Downloads/myArc-Fake.dmg',
-                      'Apple has notarized each build'):
+                      'brew install --cask bitbonsai/tap/myarc', 'Apple has notarized each build'):
             self.assertIn(value, html)
         self.assertIn('H.264 and AAC are included', html)
         self.assertIn('H.264 and AAC are not included', content({**SAMPLE, 'proprietary_codecs': False}))

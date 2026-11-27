@@ -14,6 +14,16 @@ myArc ships as an alpha build, made from the latest code and published without r
 
 ## Install the app
 
+### With Homebrew
+
+```sh
+brew install --cask bitbonsai/tap/myarc
+```
+
+Homebrew puts `myArc.app` in Applications and links the `myarc` CLI onto your `PATH`. Updates continue through myArc's built-in updater.
+
+### From the DMG
+
 1. Download the DMG from the download page.
 2. Check the file against the SHA-256 checksum listed next to the download button. Run this in Terminal and compare the two values. They must match. If you kept older builds in Downloads, it prints one line per file.
 
