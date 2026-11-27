@@ -100,7 +100,6 @@
   }
   layer.backgroundColor = nil;
   layer.cornerRadius = _myarcCornerRadius;
-  layer.cornerCurve = kCACornerCurveContinuous;
   layer.borderWidth = 1.0;
   layer.borderColor =
       (_myarcDark
@@ -325,6 +324,10 @@ bool ApplyBubbleGlass(views::Widget& widget,
   bool has_visible_arrow = false;
   if (frame) {
     radius = frame->GetRoundedCorners().upper_left();
+    if (radius > 16.f) {
+      frame->SetRoundedCorners(gfx::RoundedCornersF(16.f));
+      radius = 16.f;
+    }
     has_visible_arrow = frame->GetDisplayVisibleArrow();
     if (frame->GetBorder()) {
       insets = frame->GetBorder()->GetInsets();
