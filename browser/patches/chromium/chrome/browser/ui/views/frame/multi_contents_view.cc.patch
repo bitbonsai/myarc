@@ -1,5 +1,5 @@
 diff --git a/chrome/browser/ui/views/frame/multi_contents_view.cc b/chrome/browser/ui/views/frame/multi_contents_view.cc
-index a756f076ffce50efa86bb84421b4ff8a77e8c581..a2605bb01b8745d4ecf9da28dd4821bff107f7b9 100644
+index a756f076ffce50efa86bb84421b4ff8a77e8c581..642e760aab5df8209ba3070271431867c4685617 100644
 --- a/chrome/browser/ui/views/frame/multi_contents_view.cc
 +++ b/chrome/browser/ui/views/frame/multi_contents_view.cc
 @@ -8,7 +8,9 @@
@@ -39,7 +39,7 @@ index a756f076ffce50efa86bb84421b4ff8a77e8c581..a2605bb01b8745d4ecf9da28dd4821bf
  
  void MultiContentsView::ContentsSeparators::Reset() {
    top_separator = nullptr;
-@@ -180,6 +192,10 @@ MultiContentsView::MultiContentsView(
+@@ -180,6 +192,14 @@ MultiContentsView::MultiContentsView(
        prefs::kSplitViewDragAndDropEnabled,
        base::BindRepeating(&MultiContentsView::OnDragAndDropPrefStateChange,
                            base::Unretained(this)));
@@ -47,10 +47,14 @@ index a756f076ffce50efa86bb84421b4ff8a77e8c581..a2605bb01b8745d4ecf9da28dd4821bf
 +  split_open_animation_.SetSlideDuration(base::Milliseconds(240));
 +  split_open_animation_.SetTweenType(gfx::Tween::FAST_OUT_SLOW_IN);
 +  split_open_animation_.Reset(1.0);
++
++  split_close_animation_.SetSlideDuration(base::Milliseconds(200));
++  split_close_animation_.SetTweenType(gfx::Tween::FAST_OUT_SLOW_IN);
++  split_close_animation_.Reset(0.0);
  }
  
  MultiContentsView::~MultiContentsView() {
-@@ -231,6 +247,11 @@ void MultiContentsView::SetBackgroundRadii(const gfx::RoundedCornersF& radii) {
+@@ -231,6 +251,11 @@ void MultiContentsView::SetBackgroundRadii(const gfx::RoundedCornersF& radii) {
      GetActiveContentsContainerView()->SetRoundedCorners(radii);
      GetInactiveContentsContainerView()->SetRoundedCorners(
          gfx::RoundedCornersF());
@@ -62,7 +66,7 @@ index a756f076ffce50efa86bb84421b4ff8a77e8c581..a2605bb01b8745d4ecf9da28dd4821bf
    }
  }
  
-@@ -267,6 +288,7 @@ void MultiContentsView::SetWebContentsAtIndex(
+@@ -267,6 +292,7 @@ void MultiContentsView::SetWebContentsAtIndex(
        web_contents);
  
    if (index == 1 && !contents_container_views_[1]->GetVisible()) {
@@ -70,7 +74,7 @@ index a756f076ffce50efa86bb84421b4ff8a77e8c581..a2605bb01b8745d4ecf9da28dd4821bf
      contents_container_views_[1]->SetVisible(true);
      resize_area_->SetVisible(true);
      UpdateContentsBorderAndOverlay();
-@@ -285,6 +307,7 @@ void MultiContentsView::ShowSplitView(
+@@ -285,6 +311,7 @@ void MultiContentsView::ShowSplitView(
      // If split view is not visible, set the `visual_data_` and update the view
      // visibility.
      visual_data_ = visual_data;
@@ -78,16 +82,34 @@ index a756f076ffce50efa86bb84421b4ff8a77e8c581..a2605bb01b8745d4ecf9da28dd4821bf
      contents_container_views_[1]->SetVisible(true);
      resize_area_->SetVisible(true);
      resize_area_->SetLayout(visual_data.split_layout());
-@@ -299,6 +322,8 @@ void MultiContentsView::CloseSplitView() {
+@@ -299,6 +326,12 @@ void MultiContentsView::CloseSplitView() {
    if (!IsInSplitView()) {
      return;
    }
++  const bool should_animate_close =
++      IsMyarcVisualParity() && gfx::Animation::ShouldRenderRichAnimation() &&
++      GetSplitLayout() == split_tabs::SplitTabLayout::kSideBySide;
++  closing_split_ratio_ = visual_data_.split_ratio();
 +  split_open_delay_timer_.Stop();
 +  split_open_animation_.Reset(1.0);
  
    if (active_index_ != 0) {
      SwapContentsInSplitView();
-@@ -405,6 +430,8 @@ std::vector<views::View*> MultiContentsView::GetAccessiblePanes() {
+@@ -308,6 +341,13 @@ void MultiContentsView::CloseSplitView() {
+   resize_area_->SetVisible(false);
+   UpdateContentsBorderAndOverlay();
+ 
++  if (should_animate_close) {
++    split_close_animation_.Reset(1.0);
++    split_close_animation_.Hide();
++  } else {
++    split_close_animation_.Reset(0.0);
++  }
++
+   SafeInvoke(GetActiveContentsView()->web_contents())
+       .Then(Overload<content::WebContents*>(
+           &tabs::TabInterface::MaybeGetFromContents))
+@@ -405,6 +445,8 @@ std::vector<views::View*> MultiContentsView::GetAccessiblePanes() {
  }
  
  void MultiContentsView::OnResize(int resize_amount, bool done_resizing) {
@@ -96,7 +118,7 @@ index a756f076ffce50efa86bb84421b4ff8a77e8c581..a2605bb01b8745d4ecf9da28dd4821bf
    if (!initial_start_size_on_resize_.has_value()) {
      initial_start_size_on_resize_ = std::make_optional(
          GetResizeAxisComponent(contents_container_views_[0]->size()));
-@@ -441,6 +468,27 @@ void MultiContentsView::OnThemeChanged() {
+@@ -441,6 +483,27 @@ void MultiContentsView::OnThemeChanged() {
    UpdateContentsBorderAndOverlay();
  }
  
@@ -124,7 +146,7 @@ index a756f076ffce50efa86bb84421b4ff8a77e8c581..a2605bb01b8745d4ecf9da28dd4821bf
  int MultiContentsView::GetInactiveIndex() const {
    return active_index_ == 0 ? 1 : 0;
  }
-@@ -508,7 +556,8 @@ views::ProposedLayout MultiContentsView::CalculateProposedLayout(
+@@ -508,7 +571,8 @@ views::ProposedLayout MultiContentsView::CalculateProposedLayout(
    gfx::Rect available_space = gfx::Rect(width, height);
  
    const bool show_background =
@@ -134,7 +156,7 @@ index a756f076ffce50efa86bb84421b4ff8a77e8c581..a2605bb01b8745d4ecf9da28dd4821bf
    layouts.child_layouts.emplace_back(background_view_.get(), show_background,
                                       available_space);
  
-@@ -559,7 +608,33 @@ views::ProposedLayout MultiContentsView::CalculateProposedLayout(
+@@ -559,7 +623,43 @@ views::ProposedLayout MultiContentsView::CalculateProposedLayout(
  }
  
  void MultiContentsView::BeforeApplyLayout(const views::ProposedLayout& layout) {
@@ -165,10 +187,20 @@ index a756f076ffce50efa86bb84421b4ff8a77e8c581..a2605bb01b8745d4ecf9da28dd4821bf
 +      }
 +      return;
 +    }
++    if (!IsInSplitView() && split_close_animation_.is_animating()) {
++      auto* const first = contents_container_views_[0].get();
++      if (const auto* first_cur = layout.GetLayoutFor(first)) {
++        first->SetTargetContentBounds(gfx::Outsets::TLBR(
++            0, 0, 0,
++            std::max(0, layout.host_size.width() - first_cur->bounds.width())));
++      }
++      contents_container_views_[1]->SetTargetContentBounds(std::nullopt);
++      return;
++    }
      for (auto& contents : contents_container_views_) {
        contents->SetTargetContentBounds(std::nullopt);
      }
-@@ -581,8 +656,11 @@ void MultiContentsView::BeforeApplyLayout(const views::ProposedLayout& layout) {
+@@ -581,8 +681,11 @@ void MultiContentsView::BeforeApplyLayout(const views::ProposedLayout& layout) {
    {
      // Need to temporarily override the split view insets.
      const auto split_view_insets =
@@ -182,7 +214,7 @@ index a756f076ffce50efa86bb84421b4ff8a77e8c581..a2605bb01b8745d4ecf9da28dd4821bf
      base::AutoReset inset_override(&split_view_insets_, split_view_insets);
      target_layout = CalculateProposedLayout(
          views::SizeBounds(target_content_bounds_->actual_size));
-@@ -744,9 +822,19 @@ MultiContentsView::ViewSizes MultiContentsView::GetViewSizes(
+@@ -744,22 +847,61 @@ MultiContentsView::ViewSizes MultiContentsView::GetViewSizes(
      sizes.resize = GetSplitLayout() == split_tabs::SplitTabLayout::kSideBySide
                         ? resize_area_->GetPreferredSize().width()
                         : resize_area_->GetPreferredSize().height();
@@ -204,12 +236,20 @@ index a756f076ffce50efa86bb84421b4ff8a77e8c581..a2605bb01b8745d4ecf9da28dd4821bf
 +    sizes.end = std::max(0, available_size - sizes.start - sizes.resize);
    } else {
      CHECK(!contents_container_views_[1]->GetVisible());
-     sizes.start = available_size;
-@@ -754,12 +842,34 @@ MultiContentsView::ViewSizes MultiContentsView::GetViewSizes(
+-    sizes.start = available_size;
++    if (split_close_animation_.is_animating()) {
++      const double effective_ratio = gfx::Tween::DoubleValueBetween(
++          split_close_animation_.GetCurrentValue(), 1.0, closing_split_ratio_);
++      sizes.start = std::round(effective_ratio * available_size);
++    } else {
++      sizes.start = available_size;
++    }
+   }
    return ClampToMinSize(available_space, sizes);
  }
  
 +void MultiContentsView::StartSplitOpenAnimation() {
++  split_close_animation_.Reset(0.0);
 +  split_open_delay_timer_.Stop();
 +  if (IsMyarcVisualParity() && gfx::Animation::ShouldRenderRichAnimation()) {
 +    split_open_animation_.Reset(0.0);
@@ -243,7 +283,7 @@ index a756f076ffce50efa86bb84421b4ff8a77e8c581..a2605bb01b8745d4ecf9da28dd4821bf
      return sizes;
    }
  
-@@ -799,13 +909,18 @@ void MultiContentsView::UpdateContentsBorderAndOverlay() {
+@@ -799,13 +941,18 @@ void MultiContentsView::UpdateContentsBorderAndOverlay() {
    for (auto& contents_container_view : contents_container_views_) {
      const bool is_active =
          contents_container_view->contents_view() == GetActiveContentsView();

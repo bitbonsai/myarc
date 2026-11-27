@@ -1,5 +1,5 @@
 diff --git a/chrome/browser/ui/views/frame/multi_contents_view.h b/chrome/browser/ui/views/frame/multi_contents_view.h
-index e39f000c2a9df3a6bc7b65f33a0d6f100840939a..3dde118d6ebd56a62b1bb1192c1da357ff654e6b 100644
+index e39f000c2a9df3a6bc7b65f33a0d6f100840939a..f3415b14498965fcbd6f37ed0a25e7c33d0c7f25 100644
 --- a/chrome/browser/ui/views/frame/multi_contents_view.h
 +++ b/chrome/browser/ui/views/frame/multi_contents_view.h
 @@ -9,6 +9,7 @@
@@ -58,12 +58,15 @@ index e39f000c2a9df3a6bc7b65f33a0d6f100840939a..3dde118d6ebd56a62b1bb1192c1da357
    // Adds the drop target layout to the given list and return the remaining
    // available space after the layout.
    gfx::Rect CalculateDropTargetLayout(
-@@ -336,6 +350,13 @@ class MultiContentsView
+@@ -336,6 +350,16 @@ class MultiContentsView
    // a resize action began. Nullopt if not currently resizing.
    std::optional<int> initial_start_size_on_resize_;
  
 +  // Animates the second split pane gliding in when entering split view.
 +  gfx::SlideAnimation split_open_animation_{this};
++  // Animates the remaining pane gliding back to full width when closing split.
++  gfx::SlideAnimation split_close_animation_{this};
++  double closing_split_ratio_ = 0.5;
 +  // Brief lead-in delay before starting `split_open_animation_` so the new
 +  // split pane can lay out at its final width before sliding in.
 +  base::OneShotTimer split_open_delay_timer_;
