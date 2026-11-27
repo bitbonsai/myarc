@@ -230,6 +230,53 @@ source_set("boost_editor") {
   ]
 }
 
+source_set("site_control_center") {
+  sources = [
+    "site_control_center_view.cc",
+    "site_control_center_view.h",
+  ]
+  public_deps = [
+    "//base",
+    "//ui/views",
+  ]
+  deps = [
+    ":boost_editor",
+    ":boosts_service",
+    ":bridge",
+    ":command_ids",
+    ":glass",
+    ":icons",
+    ":local_page_marker",
+    "//cc/paint",
+    "//chrome/app:command_ids",
+    "//chrome/browser/content_settings:content_settings_factory",
+    "//chrome/browser/devtools",
+    "//chrome/browser/profiles:profile",
+    "//chrome/browser/ssl",
+    "//chrome/browser/ui:browser_commands",
+    "//chrome/browser/ui:browser_element_identifiers",
+    "//chrome/browser/ui:chrome_pages",
+    "//chrome/browser/ui/browser_window",
+    "//chrome/browser/ui/tabs:tab_strip",
+    "//chrome/browser/ui/views/interaction",
+    "//chrome/browser/ui/views/page_info",
+    "//components/content_settings/core/browser",
+    "//components/content_settings/core/common",
+    "//components/security_state/core",
+    "//components/tabs:public",
+    "//content/public/browser",
+    "//skia",
+    "//ui/accessibility",
+    "//ui/base",
+    "//ui/color",
+    "//ui/events",
+    "//ui/gfx",
+    "//ui/gfx/geometry",
+    "//ui/menus",
+    "//url",
+  ]
+}
+
 source_set("glass") {
   sources = [ "glass_mac.h" ]
   public_deps = [

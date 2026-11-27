@@ -2,7 +2,7 @@ diff --git a/chrome/browser/ui/views/location_bar/BUILD.gn b/chrome/browser/ui/v
 index 7240098ddda452e5658e21811c2cb4775806ff84..9a4ba2e97be6dca527cfbce0108ace52b8377aed 100644
 --- a/chrome/browser/ui/views/location_bar/BUILD.gn
 +++ b/chrome/browser/ui/views/location_bar/BUILD.gn
-@@ -200,6 +200,11 @@ source_set("impl") {
+@@ -200,6 +200,12 @@ source_set("impl") {
        "//ui/native_theme",
        "//ui/strings:ui_strings_grit",
      ]
@@ -10,6 +10,7 @@ index 7240098ddda452e5658e21811c2cb4775806ff84..9a4ba2e97be6dca527cfbce0108ace52
 +      "//myarc:boost_editor",
 +      "//myarc:command_ids",
 +      "//myarc:local_page_marker",
++      "//myarc:site_control_center",
 +    ]
      if (is_mac) {
        deps += [ "//chrome/browser/ui:fullscreen_util_mac" ]

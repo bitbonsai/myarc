@@ -34,7 +34,7 @@ index 972bd7bc04d240f23d4c527bdb6faa81272421e5..28addc67959ff4b953b63fbe5af84d55
  #include "components/omnibox/browser/location_bar_model.h"
  #include "components/omnibox/browser/omnibox_client.h"
  #include "components/omnibox/browser/omnibox_field_trial.h"
-@@ -119,6 +123,10 @@
+@@ -119,6 +123,11 @@
  #include "content/public/browser/render_widget_host_view.h"
  #include "content/public/browser/web_contents.h"
  #include "content/public/browser/web_contents_observer.h"
@@ -42,6 +42,7 @@ index 972bd7bc04d240f23d4c527bdb6faa81272421e5..28addc67959ff4b953b63fbe5af84d55
 +#include "myarc/command_ids.h"
 +#include "myarc/icons.h"
 +#include "myarc/local_page_marker.h"
++#include "myarc/site_control_center_view.h"
  #include "services/device/public/cpp/device_features.h"
  #include "third_party/metrics_proto/omnibox_event.pb.h"
  #include "third_party/skia/include/core/SkColor.h"
@@ -423,7 +424,18 @@ index 972bd7bc04d240f23d4c527bdb6faa81272421e5..28addc67959ff4b953b63fbe5af84d55
  bool LocationBarView::ShowPageInfoDialog() {
    WebContents* contents = GetWebContents();
    if (!contents) {
-@@ -2399,10 +2625,27 @@ ui::ImageModel LocationBarView::GetLocationIcon(
+@@ -2362,6 +2589,10 @@ bool LocationBarView::ShowPageInfoDialog() {
+   }
+ 
+   DCHECK(GetWidget());
++
++  if (IsMyarcUrlPill()) {
++    return myarc::ToggleSiteControlCenter(*browser_, location_icon_view_);
++  }
+ 
+   std::unique_ptr<PageInfoBubbleSpecification> specification =
+       PageInfoBubbleSpecification::Builder(views::BubbleAnchor(this),
+@@ -2399,10 +2630,27 @@ ui::ImageModel LocationBarView::GetLocationIcon(
      return GetOmniboxController()->edit_model()->GetAddContextIcon(dip_size);
    }
  

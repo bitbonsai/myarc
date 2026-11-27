@@ -750,6 +750,152 @@ inline constexpr gfx::VectorIcon kBanIcon(kBanRep,
                                           std::size(kBanRep),
                                           "myarc_ban");
 
+// Lucide "share" for Site Control Center top-row Share / Copy URL button.
+inline constexpr gfx::PathElement kSharePath[] = {
+    gfx::CANVAS_DIMENSIONS, 24, gfx::STROKE, 2,
+    gfx::MOVE_TO, 4, 12,
+    gfx::V_LINE_TO, 20,
+    gfx::ARC_TO, 2, 2, 0, 0, 0, 6, 22,
+    gfx::H_LINE_TO, 18,
+    gfx::ARC_TO, 2, 2, 0, 0, 0, 20, 20,
+    gfx::V_LINE_TO, 12,
+    gfx::MOVE_TO, 16, 6,
+    gfx::LINE_TO, 12, 2,
+    gfx::LINE_TO, 8, 6,
+    gfx::MOVE_TO, 12, 2,
+    gfx::V_LINE_TO, 15};
+inline constexpr gfx::VectorIconRep kShareRep[] = {{kSharePath}};
+inline constexpr gfx::VectorIcon kShareIcon(kShareRep,
+                                            std::size(kShareRep),
+                                            "myarc_share");
+
+// Lucide "camera" for Site Control Center top-row Screenshot button.
+inline constexpr gfx::PathElement kCameraPath[] = {
+    gfx::CANVAS_DIMENSIONS, 24, gfx::STROKE, 2,
+    gfx::MOVE_TO, 14.5f, 4,
+    gfx::H_LINE_TO, 9.5f,
+    gfx::LINE_TO, 7.5f, 7,
+    gfx::H_LINE_TO, 4,
+    gfx::ARC_TO, 2, 2, 0, 0, 0, 2, 9,
+    gfx::V_LINE_TO, 18,
+    gfx::ARC_TO, 2, 2, 0, 0, 0, 4, 20,
+    gfx::H_LINE_TO, 20,
+    gfx::ARC_TO, 2, 2, 0, 0, 0, 22, 18,
+    gfx::V_LINE_TO, 9,
+    gfx::ARC_TO, 2, 2, 0, 0, 0, 20, 7,
+    gfx::H_LINE_TO, 16.5f,
+    gfx::CLOSE,
+    gfx::NEW_PATH, gfx::STROKE, 2,
+    gfx::CIRCLE, 12, 13, 3};
+inline constexpr gfx::VectorIconRep kCameraRep[] = {{kCameraPath}};
+inline constexpr gfx::VectorIcon kCameraIcon(kCameraRep,
+                                             std::size(kCameraRep),
+                                             "myarc_camera");
+
+// Lucide "scan-text" for Site Control Center top-row Reading Mode button.
+inline constexpr gfx::PathElement kReaderModePath[] = {
+    gfx::CANVAS_DIMENSIONS, 24, gfx::STROKE, 2,
+    gfx::MOVE_TO, 3, 7,
+    gfx::V_LINE_TO, 5,
+    gfx::ARC_TO, 2, 2, 0, 0, 1, 5, 3,
+    gfx::H_LINE_TO, 7,
+    gfx::MOVE_TO, 17, 3,
+    gfx::H_LINE_TO, 19,
+    gfx::ARC_TO, 2, 2, 0, 0, 1, 21, 5,
+    gfx::V_LINE_TO, 7,
+    gfx::MOVE_TO, 21, 17,
+    gfx::V_LINE_TO, 19,
+    gfx::ARC_TO, 2, 2, 0, 0, 1, 19, 21,
+    gfx::H_LINE_TO, 17,
+    gfx::MOVE_TO, 7, 21,
+    gfx::H_LINE_TO, 5,
+    gfx::ARC_TO, 2, 2, 0, 0, 1, 3, 19,
+    gfx::V_LINE_TO, 17,
+    gfx::MOVE_TO, 7, 8, gfx::H_LINE_TO, 15,
+    gfx::MOVE_TO, 7, 12, gfx::H_LINE_TO, 17,
+    gfx::MOVE_TO, 7, 16, gfx::H_LINE_TO, 13};
+inline constexpr gfx::VectorIconRep kReaderModeRep[] = {{kReaderModePath}};
+inline constexpr gfx::VectorIcon kReaderModeIcon(kReaderModeRep,
+                                                 std::size(kReaderModeRep),
+                                                 "myarc_reader_mode");
+
+// Lucide "hammer" for Site Control Center Developer Mode row.
+inline constexpr gfx::PathElement kHammerPath[] = {
+    gfx::CANVAS_DIMENSIONS, 24, gfx::STROKE, 2,
+    gfx::MOVE_TO, 15, 12,
+    gfx::LINE_TO, 6.627f, 20.373f,
+    gfx::ARC_TO, 1, 1, 0, 0, 1, 5.213f, 20.373f,
+    gfx::LINE_TO, 3.627f, 18.787f,
+    gfx::ARC_TO, 1, 1, 0, 0, 1, 3.627f, 17.373f,
+    gfx::LINE_TO, 12, 9,
+    gfx::MOVE_TO, 18, 15,
+    gfx::LINE_TO, 22, 11,
+    gfx::MOVE_TO, 21.5f, 11.5f,
+    gfx::LINE_TO, 19.586f, 9.586f,
+    gfx::ARC_TO, 2, 2, 0, 0, 1, 19, 8.172f,
+    gfx::V_LINE_TO, 7.172f,
+    gfx::ARC_TO, 2, 2, 0, 0, 0, 18.414f, 5.757f,
+    gfx::LINE_TO, 16.5f, 3.843f,
+    gfx::ARC_TO, 3, 3, 0, 0, 0, 14.379f, 3,
+    gfx::H_LINE_TO, 10,
+    gfx::LINE_TO, 12.5f, 5.5f,
+    gfx::ARC_TO, 2, 2, 0, 0, 1, 12.5f, 8.328f,
+    gfx::LINE_TO, 15.672f, 11.5f,
+    gfx::ARC_TO, 2, 2, 0, 0, 0, 18.5f, 11.5f,
+    gfx::CLOSE};
+inline constexpr gfx::VectorIconRep kHammerRep[] = {{kHammerPath}};
+inline constexpr gfx::VectorIcon kHammerIcon(kHammerRep,
+                                             std::size(kHammerRep),
+                                             "myarc_hammer");
+
+// Lucide "settings" (gear) for Site Control Center site permission rows.
+inline constexpr gfx::PathElement kSettingsGearPath[] = {
+    gfx::CANVAS_DIMENSIONS, 24, gfx::STROKE, 2,
+    gfx::MOVE_TO, 12.22f, 2,
+    gfx::H_LINE_TO, 11.78f,
+    gfx::ARC_TO, 2, 2, 0, 0, 0, 9.8f, 3.74f,
+    gfx::LINE_TO, 9.6f, 5.06f,
+    gfx::ARC_TO, 2, 2, 0, 0, 1, 8.27f, 6.66f,
+    gfx::LINE_TO, 7.0f, 6.17f,
+    gfx::ARC_TO, 2, 2, 0, 0, 0, 4.6f, 6.95f,
+    gfx::LINE_TO, 3.92f, 8.13f,
+    gfx::ARC_TO, 2, 2, 0, 0, 0, 4.38f, 10.7f,
+    gfx::LINE_TO, 5.44f, 11.52f,
+    gfx::ARC_TO, 2, 2, 0, 0, 1, 5.44f, 14.48f,
+    gfx::LINE_TO, 4.38f, 15.3f,
+    gfx::ARC_TO, 2, 2, 0, 0, 0, 3.92f, 17.87f,
+    gfx::LINE_TO, 4.6f, 19.05f,
+    gfx::ARC_TO, 2, 2, 0, 0, 0, 7.0f, 19.83f,
+    gfx::LINE_TO, 8.27f, 19.34f,
+    gfx::ARC_TO, 2, 2, 0, 0, 1, 9.6f, 20.94f,
+    gfx::LINE_TO, 9.8f, 22.26f,
+    gfx::ARC_TO, 2, 2, 0, 0, 0, 11.78f, 24,
+    gfx::H_LINE_TO, 12.22f,
+    gfx::ARC_TO, 2, 2, 0, 0, 0, 14.2f, 22.26f,
+    gfx::LINE_TO, 14.4f, 20.94f,
+    gfx::ARC_TO, 2, 2, 0, 0, 1, 15.73f, 19.34f,
+    gfx::LINE_TO, 17.0f, 19.83f,
+    gfx::ARC_TO, 2, 2, 0, 0, 0, 19.4f, 19.05f,
+    gfx::LINE_TO, 20.08f, 17.87f,
+    gfx::ARC_TO, 2, 2, 0, 0, 0, 19.62f, 15.3f,
+    gfx::LINE_TO, 18.56f, 14.48f,
+    gfx::ARC_TO, 2, 2, 0, 0, 1, 18.56f, 11.52f,
+    gfx::LINE_TO, 19.62f, 10.7f,
+    gfx::ARC_TO, 2, 2, 0, 0, 0, 20.08f, 8.13f,
+    gfx::LINE_TO, 19.4f, 6.95f,
+    gfx::ARC_TO, 2, 2, 0, 0, 0, 17.0f, 6.17f,
+    gfx::LINE_TO, 15.73f, 6.66f,
+    gfx::ARC_TO, 2, 2, 0, 0, 1, 14.4f, 5.06f,
+    gfx::LINE_TO, 14.2f, 3.74f,
+    gfx::ARC_TO, 2, 2, 0, 0, 0, 12.22f, 2,
+    gfx::CLOSE,
+    gfx::NEW_PATH, gfx::STROKE, 2,
+    gfx::CIRCLE, 12, 13, 3};
+inline constexpr gfx::VectorIconRep kSettingsGearRep[] = {{kSettingsGearPath}};
+inline constexpr gfx::VectorIcon kSettingsGearIcon(kSettingsGearRep,
+                                                   std::size(kSettingsGearRep),
+                                                   "myarc_settings_gear");
+
 #undef MYARC_RAIL_FILL
 
 }  // namespace myarc
