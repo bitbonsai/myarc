@@ -100,6 +100,7 @@
   }
   layer.backgroundColor = nil;
   layer.cornerRadius = _myarcCornerRadius;
+  layer.cornerCurve = kCACornerCurveContinuous;
   layer.borderWidth = 1.0;
   layer.borderColor =
       (_myarcDark
