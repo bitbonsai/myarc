@@ -2559,13 +2559,25 @@ foundation::MutationResult BrowserWorkspaceAdapter::ExportSpaceIntoFolder(
 }
 
 foundation::MutationResult BrowserWorkspaceAdapter::CreateFolder(
-    std::string_view name) {
+    std::string_view name,
+    uint64_t parent) {
   if (!ready())
     return Fail(error());
   const auto sidebar = Sidebar();
   if (!sidebar.ok)
     return Fail("Workspace window is not ready.");
-  return Remember(service_->CreateFolder(sidebar.current_space.id, name));
+  if (parent) {
+    const auto parent_it = std::ranges::find(sidebar.folders, parent,
+                                             &foundation::FolderRecord::id);
+    if (parent_it != sidebar.folders.end() && !parent_it->open) {
+      auto opened = SetFolderOpen(parent, true);
+      if (!opened.ok) {
+        return opened;
+      }
+    }
+  }
+  return Remember(
+      service_->CreateFolderIn(sidebar.current_space.id, parent, name));
 }
 foundation::MutationResult BrowserWorkspaceAdapter::RenameFolder(
     uint64_t folder,
@@ -2577,6 +2589,13 @@ foundation::MutationResult BrowserWorkspaceAdapter::SetFolderOpen(
     uint64_t folder,
     bool open) {
   return Remember(ready() ? service_->SetFolderOpen(folder, open)
+                          : Fail(error()));
+}
+foundation::MutationResult BrowserWorkspaceAdapter::MoveFolder(
+    uint64_t folder,
+    uint64_t parent,
+    uint64_t before) {
+  return Remember(ready() ? service_->MoveFolder(folder, parent, before)
                           : Fail(error()));
 }
 foundation::MutationResult BrowserWorkspaceAdapter::MovePinToFolder(
@@ -2829,14 +2848,40 @@ foundation::MutationResult BrowserWorkspaceAdapter::RevealActiveTabFolder() {
   if (sidebar.selected_item_id == 0) {
     return Ok();
   }
+  uint64_t holder = 0;
   for (const auto& folder : sidebar.folders) {
-    if (folder.open) {
-      continue;
-    }
     for (const uint64_t item_id : folder.items) {
       if (item_id == sidebar.selected_item_id) {
-        return SetFolderOpen(folder.id, true);
+        holder = folder.id;
+        break;
       }
+    }
+    if (holder) {
+      break;
+    }
+  }
+  if (!holder) {
+    return Ok();
+  }
+  // Open the holding folder and every closed ancestor up to top-level.
+  std::vector<uint64_t> to_open;
+  uint64_t cur = holder;
+  size_t guard = 0;
+  while (cur && guard++ <= sidebar.folders.size()) {
+    const auto it = std::ranges::find(sidebar.folders, cur,
+                                      &foundation::FolderRecord::id);
+    if (it == sidebar.folders.end()) {
+      break;
+    }
+    if (!it->open) {
+      to_open.push_back(it->id);
+    }
+    cur = it->parent_id;
+  }
+  for (auto it = to_open.rbegin(); it != to_open.rend(); ++it) {
+    auto res = SetFolderOpen(*it, true);
+    if (!res.ok) {
+      return res;
     }
   }
   return Ok();
@@ -2881,7 +2926,7 @@ foundation::MutationResult BrowserWorkspaceAdapter::DeleteFolder(
   if (!ready())
     return Fail(error());
   // Unpinning a live Pin keeps its page as a temporary tab, which also takes
-  // it out of the folder.
+  // it out of the folder. Walk the entire descendant subtree first.
   auto state = service_->ExportSnapshot();
   if (!state)
     return Fail(error());
@@ -2889,11 +2934,28 @@ foundation::MutationResult BrowserWorkspaceAdapter::DeleteFolder(
                                         &foundation::FolderRecord::id);
   if (record == state->folders.end())
     return Fail("Folder does not exist.");
-  for (const uint64_t item : record->items) {
-    if (Count(*profile_, item)) {
-      auto result = Unsave(item);
-      if (!result.ok)
-        return result;
+  std::vector<uint64_t> subtree = {folder};
+  for (size_t i = 0; i < subtree.size(); ++i) {
+    const uint64_t parent_id = subtree[i];
+    for (const auto& candidate : state->folders) {
+      if (candidate.parent_id == parent_id &&
+          std::ranges::find(subtree, candidate.id) == subtree.end()) {
+        subtree.push_back(candidate.id);
+      }
+    }
+  }
+  for (const uint64_t fid : subtree) {
+    const auto it = std::ranges::find(state->folders, fid,
+                                      &foundation::FolderRecord::id);
+    if (it == state->folders.end()) {
+      continue;
+    }
+    for (const uint64_t item : it->items) {
+      if (Count(*profile_, item)) {
+        auto result = Unsave(item);
+        if (!result.ok)
+          return result;
+      }
     }
   }
   const bool archive =

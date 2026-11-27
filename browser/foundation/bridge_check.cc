@@ -1035,9 +1035,51 @@ bool CheckFolders() {
   }
   // Deleting the folder deletes and archives its Pins.
   auto deleted = delete_folder(*restored, folder.id, true, 100);
-  return deleted.ok && deleted.id == 2 &&
-         sidebar_snapshot(*restored, 1).pins.empty() &&
-         archived_tabs(*restored, 100).size() == 2;
+  if (!deleted.ok || deleted.id != 2 ||
+      !sidebar_snapshot(*restored, 1).pins.empty() ||
+      archived_tabs(*restored, 100).size() != 2) {
+    return false;
+  }
+  // Nested folders: create_folder_in, move_folder, cycle rejection, JSON
+  // round-trip with parent_id, and recursive delete.
+  auto nested_model = new_workspace();
+  auto parent = create_folder(*nested_model, 1, "Parent");
+  auto child = create_folder_in(*nested_model, 1, parent.id, "Child");
+  auto sub_pin = add_temporary_item(*nested_model, 1);
+  if (!parent.ok || !child.ok || !sub_pin.ok ||
+      !set_placement(*nested_model, sub_pin.id, PlacementKind::Pin, 1, true,
+                     "https://sub.test/")
+           .ok ||
+      !move_pin_to_folder(*nested_model, sub_pin.id, child.id, 0).ok) {
+    return false;
+  }
+  if (move_folder(*nested_model, parent.id, child.id, 0).ok) {
+    return false;
+  }
+  const auto nested_json =
+      EncodeWorkspaceMetadata(export_snapshot(*nested_model));
+  auto nested_decoded = nested_json ? DecodeWorkspaceMetadata(*nested_json)
+                                    : myarc::internal::MetadataResult{};
+  auto nested_restored = new_workspace();
+  if (!nested_decoded.snapshot ||
+      !restore_snapshot(*nested_restored, std::move(*nested_decoded.snapshot))
+           .ok) {
+    return false;
+  }
+  auto nested_sidebar = sidebar_snapshot(*nested_restored, 1);
+  if (!nested_sidebar.ok || nested_sidebar.folders.size() != 2 ||
+      nested_sidebar.folders[0].id != parent.id ||
+      nested_sidebar.folders[0].parent_id != 0 ||
+      nested_sidebar.folders[0].depth != 0 ||
+      nested_sidebar.folders[1].id != child.id ||
+      nested_sidebar.folders[1].parent_id != parent.id ||
+      nested_sidebar.folders[1].depth != 1) {
+    return false;
+  }
+  auto nested_del = delete_folder(*nested_restored, parent.id, true, 200);
+  return nested_del.ok && nested_del.id == 1 &&
+         sidebar_snapshot(*nested_restored, 1).folders.empty() &&
+         sidebar_snapshot(*nested_restored, 1).pins.empty();
 }
 
 // A split survives the JSON codec and a restore. Files from before splits,

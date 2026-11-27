@@ -386,8 +386,9 @@ impl<'a> Reader<'a> {
         self.finish(main);
     }
 
-    /// The tabs under item `root`, in order. With `folders`, folders directly
-    /// under `root` become groups; otherwise their tabs join the list.
+    /// The tabs under item `root`, in order. With `folders`, folders under
+    /// `root` become nested groups up to `myarc_workspace::MAX_FOLDER_DEPTH`;
+    /// otherwise their tabs join the list.
     fn walk(&mut self, root: &str, folders: bool) -> Walk {
         let mut walk = Walk::default();
         let mut visited = BTreeSet::from([root.to_owned()]);
@@ -397,20 +398,48 @@ impl<'a> Reader<'a> {
                 continue;
             }
             if folders && matches!(kind(child), ItemKind::Folder) {
-                let mut entries = Vec::new();
-                self.collect(id, 1, &mut visited, &mut entries);
-                let label = clean(child.get("title").and_then(Value::as_str))
-                    .unwrap_or_else(|| "Untitled folder".to_owned());
-                walk.folders.push(Group {
-                    label,
-                    line: 0,
-                    entries,
-                });
+                let group = self.collect_folder(child, id, 0, &mut visited);
+                walk.folders.push(group);
             } else {
                 self.place(child, 0, &mut visited, &mut walk.tabs);
             }
         }
         walk
+    }
+
+    /// Builds a `Group` for folder `item` at nesting `depth` (0 = top-level),
+    /// preserving nested folders up to `myarc_workspace::MAX_FOLDER_DEPTH`.
+    fn collect_folder(
+        &mut self,
+        item: &'a Value,
+        id: &str,
+        depth: usize,
+        visited: &mut BTreeSet<String>,
+    ) -> Group {
+        let label = clean(item.get("title").and_then(Value::as_str))
+            .unwrap_or_else(|| "Untitled folder".to_owned());
+        let mut entries = Vec::new();
+        let mut children = Vec::new();
+        for child in self.children(id) {
+            let child_id = child.get("id").and_then(Value::as_str).unwrap_or_default();
+            if !visited.insert(child_id.to_owned()) {
+                continue;
+            }
+            match kind(child) {
+                ItemKind::Folder if depth + 1 < myarc_workspace::MAX_FOLDER_DEPTH => {
+                    children.push(self.collect_folder(child, child_id, depth + 1, visited));
+                }
+                _ => {
+                    self.place(child, depth + 1, visited, &mut entries);
+                }
+            }
+        }
+        Group {
+            label,
+            line: 0,
+            entries,
+            children,
+        }
     }
 
     /// Adds the tabs under item `id` to `out`.

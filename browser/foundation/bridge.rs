@@ -386,11 +386,14 @@ mod ffi {
     }
 
     // A folder of a Space's Pins. `items` are Pins of `space_id` in folder
-    // order; a closed folder shows only its row.
+    // order; `parent_id` is 0 for top-level folders, and `depth` is its
+    // nesting depth (0 = top-level).
     #[derive(PartialEq)]
     struct FolderRecord {
         id: u64,
         space_id: u64,
+        parent_id: u64,
+        depth: u32,
         name: String,
         open: bool,
         items: Vec<u64>,
@@ -1001,6 +1004,13 @@ mod ffi {
         fn reconcile_live_items(workspace: &mut Workspace, live: &[u64]) -> MutationResult;
         // A new open folder after the Space's others; `id` is the folder.
         fn create_folder(workspace: &mut Workspace, space_id: u64, name: &str) -> MutationResult;
+        // A new open folder inside `parent_id` (0 = top-level); `id` is the folder.
+        fn create_folder_in(
+            workspace: &mut Workspace,
+            space_id: u64,
+            parent_id: u64,
+            name: &str,
+        ) -> MutationResult;
         // Creates a new open folder named after `source_space_id` inside
         // `target_space_id` and copies all of the source Space's Pins (loose
         // and folder items) into it; `id` is the new folder.
@@ -1017,6 +1027,14 @@ mod ffi {
         fn move_folder_before(
             workspace: &mut Workspace,
             folder_id: u64,
+            before: u64,
+        ) -> MutationResult;
+        // Moves `folder_id` under `parent_id` (0 = top-level), before `before`
+        // (0 = end of siblings).
+        fn move_folder(
+            workspace: &mut Workspace,
+            folder_id: u64,
+            parent_id: u64,
             before: u64,
         ) -> MutationResult;
         // Zero folder takes the Pin out of its folder; zero before appends.
@@ -1815,12 +1833,7 @@ fn arc_import_result(
             preview.new_favorites = plan.new_favorite_count();
             preview.kept_pins = plan.kept_pin_count();
             preview.new_folders = plan.new_folder_count();
-            preview.kept_folders = plan
-                .spaces
-                .iter()
-                .flat_map(|space| &space.folders)
-                .filter(|folder| folder.existing.is_some())
-                .count();
+            preview.kept_folders = plan.kept_folder_count();
             preview.moved_pins = plan.moved_pin_count();
             preview.skipped_count = plan.skipped.len();
             preview.skipped = plan
@@ -2747,6 +2760,19 @@ pub fn create_folder(workspace: &mut Workspace, space_id: u64, name: &str) -> ff
     outcome(workspace.0.create_folder(space_id, name))
 }
 
+pub fn create_folder_in(
+    workspace: &mut Workspace,
+    space_id: u64,
+    parent_id: u64,
+    name: &str,
+) -> ffi::MutationResult {
+    outcome(
+        workspace
+            .0
+            .create_folder_in(space_id, (parent_id != 0).then_some(parent_id), name),
+    )
+}
+
 pub fn export_space_into_folder(
     workspace: &mut Workspace,
     source_space_id: u64,
@@ -2780,6 +2806,24 @@ pub fn move_folder_before(
         workspace
             .0
             .move_folder_before(folder_id, (before != 0).then_some(before))
+            .map(|()| 0),
+    )
+}
+
+pub fn move_folder(
+    workspace: &mut Workspace,
+    folder_id: u64,
+    parent_id: u64,
+    before: u64,
+) -> ffi::MutationResult {
+    outcome(
+        workspace
+            .0
+            .move_folder(
+                folder_id,
+                (parent_id != 0).then_some(parent_id),
+                (before != 0).then_some(before),
+            )
             .map(|()| 0),
     )
 }
@@ -2869,10 +2913,12 @@ fn split_record(split: workspace::Split) -> ffi::SplitRecord {
     }
 }
 
-fn folder_record(folder: workspace::Folder) -> ffi::FolderRecord {
+fn folder_record(folder: workspace::Folder, depth: usize) -> ffi::FolderRecord {
     ffi::FolderRecord {
         id: folder.id,
         space_id: folder.space_id,
+        parent_id: folder.parent_id.unwrap_or(0),
+        depth: depth as u32,
         name: folder.name,
         open: folder.open,
         items: folder.items,
@@ -2930,7 +2976,17 @@ pub fn sidebar_snapshot(workspace: &Workspace, window_id: u64) -> ffi::SidebarRe
             pins: sidebar.pins.into_iter().map(item_record).collect(),
             temporary: sidebar.temporary.into_iter().map(item_record).collect(),
             space_pins: sidebar.space_pins.into_iter().map(item_record).collect(),
-            folders: sidebar.folders.into_iter().map(folder_record).collect(),
+            folders: {
+                let all = sidebar.folders;
+                let depths: Vec<usize> = all
+                    .iter()
+                    .map(|f| workspace::folder::folder_depth_in(&all, f.id))
+                    .collect();
+                all.into_iter()
+                    .zip(depths)
+                    .map(|(f, d)| folder_record(f, d))
+                    .collect()
+            },
             splits: sidebar.splits.into_iter().map(split_record).collect(),
         },
         Err(error) => ffi::SidebarResult {
@@ -2983,7 +3039,17 @@ pub fn export_snapshot(workspace: &Workspace) -> ffi::StateSnapshot {
         archived: state.archived.into_iter().map(archived_record).collect(),
         open_secs: state.open_secs,
         archive_interval_secs: state.archive_interval.seconds(),
-        folders: state.folders.into_iter().map(folder_record).collect(),
+        folders: {
+            let all = state.folders;
+            let depths: Vec<usize> = all
+                .iter()
+                .map(|f| workspace::folder::folder_depth_in(&all, f.id))
+                .collect();
+            all.into_iter()
+                .zip(depths)
+                .map(|(f, d)| folder_record(f, d))
+                .collect()
+        },
         next_folder_id: state.next_folder_id,
         splits: state.splits.into_iter().map(split_record).collect(),
         quick_start_pending: state.quick_start_pending,
@@ -3103,6 +3169,7 @@ pub fn restore_snapshot(
                     .map(|folder| workspace::Folder {
                         id: folder.id,
                         space_id: folder.space_id,
+                        parent_id: (folder.parent_id != 0).then_some(folder.parent_id),
                         name: folder.name,
                         open: folder.open,
                         items: folder.items,

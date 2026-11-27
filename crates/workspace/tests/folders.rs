@@ -288,6 +288,7 @@ fn damaged_folders_load_without_losing_pins() {
     let folder = |id, space_id, name: &str, items: Vec<ItemId>| Folder {
         id,
         space_id,
+        parent_id: None,
         name: name.into(),
         open: false,
         items,
@@ -367,30 +368,44 @@ fn export_space_into_folder_copies_pins_and_folder_items_and_persists() {
     let exported_folder_id = workspace.export_space_into_folder(work, dest).unwrap();
     let exported = folder(&workspace, exported_folder_id);
     assert_eq!(exported.space_id, dest);
+    assert_eq!(exported.parent_id, None);
     assert_eq!(exported.name, "Work");
     assert!(exported.open);
-    assert_eq!(exported.items.len(), 4);
+    // Loose Pins go into the root exported folder; source folders become subfolders.
+    assert_eq!(exported.items.len(), 2);
 
-    // Copied items are placed in `dest` in sidebar order: loose Pins first,
-    // then source folder Pins in folder order, preserving URL, title and name.
-    let copied: Vec<(Option<&str>, &str, &str)> = exported
-        .items
+    let sub = workspace
+        .folders()
         .iter()
-        .map(|&id| {
-            let item = workspace.items().iter().find(|i| i.id == id).unwrap();
-            assert_eq!(item.placement, Placement::Pin { space_id: dest });
-            (
-                item.canonical_url.as_deref(),
-                item.title.as_str(),
-                item.name.as_str(),
-            )
-        })
-        .collect();
+        .find(|f| f.space_id == dest && f.parent_id == Some(exported_folder_id))
+        .unwrap()
+        .clone();
+    assert_eq!(sub.name, "Specs");
+    assert_eq!(sub.items.len(), 2);
+
+    let extract = |ids: &[ItemId]| -> Vec<(Option<&str>, &str, &str)> {
+        ids.iter()
+            .map(|&id| {
+                let item = workspace.items().iter().find(|i| i.id == id).unwrap();
+                assert_eq!(item.placement, Placement::Pin { space_id: dest });
+                (
+                    item.canonical_url.as_deref(),
+                    item.title.as_str(),
+                    item.name.as_str(),
+                )
+            })
+            .collect()
+    };
     assert_eq!(
-        copied,
+        extract(&exported.items),
         [
             (Some("https://a.test/"), "Alpha Page", "Alpha"),
             (Some("https://c.test/"), "Gamma", ""),
+        ]
+    );
+    assert_eq!(
+        extract(&sub.items),
+        [
             (Some("https://d.test/"), "Delta", ""),
             (Some("https://b.test/"), "Beta", ""),
         ]
@@ -453,4 +468,174 @@ fn export_space_into_folder_handles_empty_space_and_rejects_errors_atomically() 
         Err(WorkspaceError::LimitExceeded("items"))
     );
     assert_eq!(workspace.snapshot(), before_limit);
+}
+
+#[test]
+fn nested_folders_create_move_and_enforce_cycles_and_depth() {
+    let mut workspace = Workspace::default();
+    let root = workspace.create_folder(S1, "Root").unwrap();
+    let child = workspace.create_folder_in(S1, Some(root), "Child").unwrap();
+    let grand = workspace
+        .create_folder_in(S1, Some(child), "Grand")
+        .unwrap();
+    assert_eq!(workspace.folder_depth(root), 0);
+    assert_eq!(workspace.folder_depth(child), 1);
+    assert_eq!(workspace.folder_depth(grand), 2);
+    assert!(workspace.is_folder_ancestor(root, grand));
+    assert!(!workspace.is_folder_ancestor(grand, root));
+
+    // Rejects cycles (self and descendant).
+    assert_eq!(
+        workspace.move_folder(root, Some(root), None),
+        Err(WorkspaceError::FolderCycle(root))
+    );
+    assert_eq!(
+        workspace.move_folder(root, Some(grand), None),
+        Err(WorkspaceError::FolderCycle(root))
+    );
+
+    // Promote grandchild to top-level and move back under root before child.
+    workspace.move_folder(grand, None, None).unwrap();
+    assert_eq!(folder(&workspace, grand).parent_id, None);
+    assert_eq!(workspace.folder_depth(grand), 0);
+    workspace
+        .move_folder(grand, Some(root), Some(child))
+        .unwrap();
+    assert_eq!(folder(&workspace, grand).parent_id, Some(root));
+    let tree_names: Vec<String> = workspace
+        .sidebar_snapshot(W1)
+        .unwrap()
+        .folders
+        .into_iter()
+        .map(|f| f.name)
+        .collect();
+    assert_eq!(tree_names, ["Root", "Grand", "Child"]);
+
+    // Depth cap: chain of MAX_FOLDER_DEPTH folders succeeds; one more fails.
+    let mut cur = root;
+    for level in 1..MAX_FOLDER_DEPTH {
+        cur = workspace
+            .create_folder_in(S1, Some(cur), &format!("L{level}"))
+            .unwrap();
+    }
+    assert_eq!(workspace.folder_depth(cur), MAX_FOLDER_DEPTH - 1);
+    assert_eq!(
+        workspace.create_folder_in(S1, Some(cur), "TooDeep"),
+        Err(WorkspaceError::FolderDepthExceeded)
+    );
+    // Moving a subtree that would push a leaf past MAX_FOLDER_DEPTH fails.
+    let top = workspace.create_folder(S1, "Top").unwrap();
+    let _leaf = workspace.create_folder_in(S1, Some(top), "Leaf").unwrap();
+    let near_bottom = folder(&workspace, cur).parent_id.unwrap();
+    assert_eq!(
+        workspace.move_folder(top, Some(near_bottom), None),
+        Err(WorkspaceError::FolderDepthExceeded)
+    );
+}
+
+#[test]
+fn deleting_a_parent_folder_deletes_and_archives_entire_subtree() {
+    let mut workspace = Workspace::default();
+    let parent = workspace.create_folder(S1, "Parent").unwrap();
+    let child = workspace
+        .create_folder_in(S1, Some(parent), "Child")
+        .unwrap();
+    let p_pin = pin(&mut workspace, S1, "https://parent.test/");
+    let c_pin = pin(&mut workspace, S1, "https://child.test/");
+    workspace
+        .move_pin_to_folder(p_pin, Some(parent), None)
+        .unwrap();
+    workspace
+        .move_pin_to_folder(c_pin, Some(child), None)
+        .unwrap();
+
+    let deletion = workspace.delete_folder(parent, Some(2_000)).unwrap();
+    assert_eq!(deletion.removed_folders, [parent, child]);
+    assert_eq!(deletion.removed_items, [p_pin, c_pin]);
+    assert_eq!(deletion.archived, 2);
+    assert!(workspace.folders().is_empty());
+    assert!(workspace.items().is_empty());
+}
+
+#[test]
+fn closed_ancestor_hides_nested_pins_from_row_order_except_selected() {
+    let mut workspace = Workspace::default();
+    let parent = workspace.create_folder(S1, "Parent").unwrap();
+    let child = workspace
+        .create_folder_in(S1, Some(parent), "Child")
+        .unwrap();
+    let p_pin = pin(&mut workspace, S1, "https://parent.test/");
+    let c_pin = pin(&mut workspace, S1, "https://child.test/");
+    workspace
+        .move_pin_to_folder(p_pin, Some(parent), None)
+        .unwrap();
+    workspace
+        .move_pin_to_folder(c_pin, Some(child), None)
+        .unwrap();
+
+    assert_eq!(
+        workspace.sidebar_snapshot(W1).unwrap().row_order(),
+        [p_pin, c_pin]
+    );
+    workspace.set_folder_open(parent, false).unwrap();
+    assert!(
+        workspace
+            .sidebar_snapshot(W1)
+            .unwrap()
+            .row_order()
+            .is_empty()
+    );
+    workspace.select_item(W1, c_pin).unwrap();
+    assert_eq!(workspace.sidebar_snapshot(W1).unwrap().row_order(), [c_pin]);
+}
+
+#[test]
+fn sanitize_folders_breaks_cycles_and_promotes_invalid_or_deep_parents() {
+    let mut workspace = Workspace::default();
+    let work = workspace.create_space(P1, "Work").unwrap();
+    let mut snapshot = workspace.snapshot();
+    snapshot.folders = vec![
+        // Cycle: 1 <-> 2
+        Folder {
+            id: 1,
+            space_id: S1,
+            parent_id: Some(2),
+            name: "One".into(),
+            open: true,
+            items: vec![],
+        },
+        Folder {
+            id: 2,
+            space_id: S1,
+            parent_id: Some(1),
+            name: "Two".into(),
+            open: true,
+            items: vec![],
+        },
+        // Cross-space parent
+        Folder {
+            id: 3,
+            space_id: work,
+            parent_id: Some(1),
+            name: "Cross".into(),
+            open: true,
+            items: vec![],
+        },
+        // Missing parent
+        Folder {
+            id: 4,
+            space_id: S1,
+            parent_id: Some(99),
+            name: "Orphan".into(),
+            open: true,
+            items: vec![],
+        },
+    ];
+    let loaded = Workspace::from_snapshot(snapshot).unwrap();
+    assert_eq!(folder(&loaded, 3).parent_id, None);
+    assert_eq!(folder(&loaded, 4).parent_id, None);
+    // Cycle broken: at least one of 1, 2 is promoted to top-level.
+    assert!(folder(&loaded, 1).parent_id.is_none() || folder(&loaded, 2).parent_id.is_none());
+    assert!(!loaded.is_folder_ancestor(1, 1));
+    assert!(!loaded.is_folder_ancestor(2, 2));
 }

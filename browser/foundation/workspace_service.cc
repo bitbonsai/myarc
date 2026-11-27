@@ -266,6 +266,9 @@ std::optional<std::string> EncodeWorkspaceMetadata(
       base::DictValue record;
       record.Set("id", base::NumberToString(folder.id));
       record.Set("space_id", base::NumberToString(folder.space_id));
+      if (folder.parent_id) {
+        record.Set("parent_id", base::NumberToString(folder.parent_id));
+      }
       record.Set("name", std::string(folder.name));
       record.Set("open", folder.open);
       base::ListValue pins;
@@ -498,6 +501,10 @@ MetadataResult DecodeWorkspaceMetadata(std::string_view json) {
       }
       folder.name = *name;
       folder.open = record->FindBool("open").value_or(true);
+      uint64_t parent_id = 0;
+      if (ReadId(*record, "parent_id", parent_id)) {
+        folder.parent_id = parent_id;
+      }
       for (const auto& entry : *entries) {
         uint64_t item = 0;
         const auto* text = entry.GetIfString();
@@ -1270,12 +1277,19 @@ foundation::MutationResult WorkspaceService::MoveItemBefore(uint64_t item,
 foundation::MutationResult WorkspaceService::CreateFolder(
     uint64_t space,
     std::string_view name) {
+  return CreateFolderIn(space, 0, name);
+}
+
+foundation::MutationResult WorkspaceService::CreateFolderIn(
+    uint64_t space,
+    uint64_t parent,
+    std::string_view name) {
   if (!CanMutate())
     return Failure("Workspace is not loaded. Check storage state.");
   if (!BoundedText(name, foundation::bridge_limits().name_bytes))
     return Failure("Invalid UTF-8 or oversized folder name.");
-  return Changed(foundation::create_folder(
-      *workspace_, space, rust::Str(name.data(), name.size())));
+  return Changed(foundation::create_folder_in(
+      *workspace_, space, parent, rust::Str(name.data(), name.size())));
 }
 
 foundation::MutationResult WorkspaceService::ExportSpaceIntoFolder(
@@ -1312,6 +1326,14 @@ foundation::MutationResult WorkspaceService::MoveFolderBefore(uint64_t folder,
   if (!CanMutate())
     return Failure("Workspace is not loaded. Check storage state.");
   return Changed(foundation::move_folder_before(*workspace_, folder, before));
+}
+
+foundation::MutationResult WorkspaceService::MoveFolder(uint64_t folder,
+                                                        uint64_t parent,
+                                                        uint64_t before) {
+  if (!CanMutate())
+    return Failure("Workspace is not loaded. Check storage state.");
+  return Changed(foundation::move_folder(*workspace_, folder, parent, before));
 }
 
 foundation::MutationResult WorkspaceService::MovePinToFolder(uint64_t item,

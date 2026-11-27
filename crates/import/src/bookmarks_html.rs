@@ -107,40 +107,54 @@ pub fn write_space_json(snapshot: &WorkspaceSnapshot, space_id: SpaceId) -> Opti
     out.push_str("    \"folders\": [");
     if !section.folders.is_empty() {
         out.push('\n');
-        for (f_idx, (name, items)) in section.folders.iter().enumerate() {
-            out.push_str("      {\n");
-            let _ = writeln!(out, "        \"name\": {},", json_string(name));
-            out.push_str("        \"pins\": [");
-            if !items.is_empty() {
-                out.push('\n');
-                for (i_idx, item) in items.iter().enumerate() {
-                    if let Some(url) = url_of(item) {
-                        let title = item_title(item, url);
-                        let comma = if i_idx + 1 < items.len() { "," } else { "" };
-                        let _ = writeln!(
-                            out,
-                            "          {{ \"title\": {}, \"url\": {} }}{comma}",
-                            json_string(&title),
-                            json_string(url)
-                        );
-                    }
-                }
-                out.push_str("        ");
-            }
-            out.push_str("]\n");
-            let f_comma = if f_idx + 1 < section.folders.len() {
-                ","
-            } else {
-                ""
-            };
-            let _ = writeln!(out, "      }}{f_comma}");
-        }
+        write_json_folders(&mut out, &section.folders, 3);
         out.push_str("    ");
     }
     out.push_str("]\n");
     out.push_str("  }\n");
     out.push_str("}\n");
     Some(out)
+}
+
+fn write_json_folders(out: &mut String, folders: &[FolderNode<'_>], indent_level: usize) {
+    let pad = "  ".repeat(indent_level);
+    let inner = "  ".repeat(indent_level + 1);
+    let item_pad = "  ".repeat(indent_level + 2);
+    for (f_idx, folder) in folders.iter().enumerate() {
+        let _ = writeln!(out, "{pad}{{");
+        let _ = writeln!(out, "{inner}\"name\": {},", json_string(folder.name));
+        let _ = write!(out, "{inner}\"pins\": [");
+        if !folder.items.is_empty() {
+            out.push('\n');
+            for (i_idx, item) in folder.items.iter().enumerate() {
+                if let Some(url) = url_of(item) {
+                    let title = item_title(item, url);
+                    let comma = if i_idx + 1 < folder.items.len() {
+                        ","
+                    } else {
+                        ""
+                    };
+                    let _ = writeln!(
+                        out,
+                        "{item_pad}{{ \"title\": {}, \"url\": {} }}{comma}",
+                        json_string(&title),
+                        json_string(url)
+                    );
+                }
+            }
+            out.push_str(&inner);
+        }
+        if folder.children.is_empty() {
+            out.push_str("]\n");
+        } else {
+            out.push_str("],\n");
+            let _ = writeln!(out, "{inner}\"folders\": [");
+            write_json_folders(out, &folder.children, indent_level + 2);
+            let _ = writeln!(out, "{inner}]");
+        }
+        let f_comma = if f_idx + 1 < folders.len() { "," } else { "" };
+        let _ = writeln!(out, "{pad}}}{f_comma}");
+    }
 }
 
 /// The whole bookmarks file for several Profiles, each a `(name, snapshot)`
@@ -169,12 +183,19 @@ pub fn write_profiles(profiles: &[(&str, &WorkspaceSnapshot)]) -> String {
     out
 }
 
+/// A folder node in the export tree, with its own bookmarks and child folders.
+struct FolderNode<'a> {
+    name: &'a str,
+    items: Vec<&'a Item>,
+    children: Vec<FolderNode<'a>>,
+}
+
 /// A top-level folder of one Profile: Favorites or a Space, with its loose
 /// bookmarks and then its sidebar folders.
 struct Section<'a> {
     name: &'a str,
     items: Vec<&'a Item>,
-    folders: Vec<(&'a str, Vec<&'a Item>)>,
+    folders: Vec<FolderNode<'a>>,
 }
 
 /// The Profile's Favorites, then each Space, leaving out empty ones.
@@ -209,26 +230,19 @@ fn space_section<'a>(snapshot: &'a WorkspaceSnapshot, space: &'a Space) -> Secti
         .filter(|item| item.placement == Placement::Pin { space_id: space.id })
         .filter(|item| url_of(item).is_some())
         .collect();
-    let space_folders = || {
-        snapshot
-            .folders
-            .iter()
-            .filter(|folder| folder.space_id == space.id)
-    };
-    let folders: Vec<(&str, Vec<&Item>)> = space_folders()
-        .map(|folder| {
-            let items = folder
-                .items
-                .iter()
-                .filter_map(|id| pins.iter().find(|item| item.id == *id).copied())
-                .collect::<Vec<_>>();
-            (folder.name.as_str(), items)
-        })
-        .filter(|(_, items)| !items.is_empty())
+    let space_folders: Vec<&myarc_workspace::Folder> = snapshot
+        .folders
+        .iter()
+        .filter(|folder| folder.space_id == space.id)
         .collect();
+    let folders = build_folder_nodes(&space_folders, None, &pins, 0);
     let items: Vec<&Item> = pins
         .iter()
-        .filter(|item| !space_folders().any(|folder| folder.items.contains(&item.id)))
+        .filter(|item| {
+            !space_folders
+                .iter()
+                .any(|folder| folder.items.contains(&item.id))
+        })
         .copied()
         .collect();
     Section {
@@ -238,19 +252,55 @@ fn space_section<'a>(snapshot: &'a WorkspaceSnapshot, space: &'a Space) -> Secti
     }
 }
 
+fn build_folder_nodes<'a>(
+    space_folders: &[&'a myarc_workspace::Folder],
+    parent_id: Option<myarc_workspace::FolderId>,
+    pins: &[&'a Item],
+    depth: usize,
+) -> Vec<FolderNode<'a>> {
+    if depth >= myarc_workspace::MAX_FOLDER_DEPTH {
+        return Vec::new();
+    }
+    space_folders
+        .iter()
+        .filter(|folder| folder.parent_id == parent_id)
+        .filter_map(|folder| {
+            let items: Vec<&Item> = folder
+                .items
+                .iter()
+                .filter_map(|id| pins.iter().find(|item| item.id == *id).copied())
+                .collect();
+            let children = build_folder_nodes(space_folders, Some(folder.id), pins, depth + 1);
+            if items.is_empty() && children.is_empty() {
+                return None;
+            }
+            Some(FolderNode {
+                name: folder.name.as_str(),
+                items,
+                children,
+            })
+        })
+        .collect()
+}
+
 fn write_sections(out: &mut String, depth: usize, sections: &[Section<'_>]) {
     for section in sections {
         open_folder(out, depth, section.name);
         for item in &section.items {
             bookmark(out, depth + 1, item);
         }
-        for (name, items) in &section.folders {
-            open_folder(out, depth + 1, name);
-            for item in items {
-                bookmark(out, depth + 2, item);
-            }
-            close_folder(out, depth + 1);
+        write_folder_nodes(out, depth + 1, &section.folders);
+        close_folder(out, depth);
+    }
+}
+
+fn write_folder_nodes(out: &mut String, depth: usize, folders: &[FolderNode<'_>]) {
+    for folder in folders {
+        open_folder(out, depth, folder.name);
+        for item in &folder.items {
+            bookmark(out, depth + 1, item);
         }
+        write_folder_nodes(out, depth + 1, &folder.children);
         close_folder(out, depth);
     }
 }
@@ -378,6 +428,7 @@ mod tests {
         Folder {
             id,
             space_id,
+            parent_id: None,
             name: name.into(),
             open: true,
             items: items.to_vec(),
@@ -663,5 +714,49 @@ mod tests {
         assert_eq!(space_file_name("R&D / Ops:1", "html"), "R&D - Ops-1.html");
         assert_eq!(space_file_name("...   ", "json"), "Space.json");
         assert_eq!(space_file_name("", "html"), "Space.html");
+    }
+
+    #[test]
+    fn nested_folders_export_recursively_in_html_and_json() {
+        let mut snapshot = Workspace::default().snapshot();
+        snapshot.spaces = vec![space(1, "Work")];
+        snapshot.items = vec![
+            pin(1, 1, "https://a.example/", "A"),
+            pin(2, 1, "https://b.example/", "B"),
+        ];
+        let mut child = folder(2, 1, "Sub", &[2]);
+        child.parent_id = Some(1);
+        snapshot.folders = vec![folder(1, 1, "Parent", &[1]), child];
+
+        let html = write_space(&snapshot, 1).expect("Work");
+        assert_eq!(
+            body(&html),
+            "<DL><p>
+    <DT><H3>Work</H3>
+    <DL><p>
+        <DT><H3>Parent</H3>
+        <DL><p>
+            <DT><A HREF=\"https://a.example/\">A</A>
+            <DT><H3>Sub</H3>
+            <DL><p>
+                <DT><A HREF=\"https://b.example/\">B</A>
+            </DL><p>
+        </DL><p>
+    </DL><p>
+</DL><p>
+"
+        );
+
+        #[cfg(feature = "arc-sidebar")]
+        {
+            let json = write_space_json(&snapshot, 1).expect("Work json");
+            let value: serde_json::Value = serde_json::from_str(&json).expect("valid JSON");
+            assert_eq!(value["space"]["folders"][0]["name"], "Parent");
+            assert_eq!(value["space"]["folders"][0]["folders"][0]["name"], "Sub");
+            assert_eq!(
+                value["space"]["folders"][0]["folders"][0]["pins"][0]["url"],
+                "https://b.example/"
+            );
+        }
     }
 }

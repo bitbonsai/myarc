@@ -71,20 +71,45 @@ pub struct Space {
 pub enum Omission {
     /// Unpinned tabs. Arc archives them, so they are not saved sites.
     TodayTab,
-    /// Folders inside a folder. myarc's folders don't nest, so their tabs
-    /// join the outermost folder.
+    /// Folders nested deeper than `MAX_FOLDER_DEPTH`. Their tabs join the
+    /// deepest allowed parent folder.
     NestedFolder,
     /// Containers and sidebar items of a kind the reader doesn't know.
     UnknownContainer,
 }
 
-/// A second-level heading and its URLs in order. A group may be empty.
+/// A folder/group heading and its URLs and nested child groups in order.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Group {
     pub label: String,
     /// 1-based line of the heading.
     pub line: usize,
     pub entries: Vec<Entry>,
+    pub children: Vec<Group>,
+}
+
+impl Group {
+    /// Total number of groups in this subtree (self plus all descendants).
+    pub fn count_tree(&self) -> usize {
+        1 + self.children.iter().map(Self::count_tree).sum::<usize>()
+    }
+
+    /// Collects references to every group in this subtree in pre-order DFS.
+    pub fn collect_groups<'a>(&'a self, out: &mut Vec<&'a Group>) {
+        out.push(self);
+        for child in &self.children {
+            child.collect_groups(out);
+        }
+    }
+
+    /// Collects references to every entry in this subtree in pre-order DFS
+    /// (own entries first, then each child group recursively).
+    pub fn collect_entries<'a>(&'a self, out: &mut Vec<&'a Entry>) {
+        out.extend(self.entries.iter());
+        for child in &self.children {
+            child.collect_entries(out);
+        }
+    }
 }
 
 /// One list item. Repeated URLs stay as separate entries.
@@ -186,7 +211,11 @@ impl std::error::Error for ParseError {}
 
 impl Report {
     pub fn group_count(&self) -> usize {
-        self.spaces.iter().map(|space| space.groups.len()).sum()
+        self.spaces
+            .iter()
+            .flat_map(|space| &space.groups)
+            .map(Group::count_tree)
+            .sum()
     }
 
     pub fn entry_count(&self) -> usize {
@@ -202,16 +231,17 @@ impl Report {
     }
 
     /// Every entry in report order: Favorites, then each Space's pins and
-    /// groups.
+    /// groups (recursively in pre-order DFS).
     pub fn entries(&self) -> impl Iterator<Item = &Entry> {
-        self.favorites
-            .iter()
-            .chain(self.spaces.iter().flat_map(|space| {
-                space
-                    .pins
-                    .iter()
-                    .chain(space.groups.iter().flat_map(|group| &group.entries))
-            }))
+        let mut out = Vec::new();
+        out.extend(self.favorites.iter());
+        for space in &self.spaces {
+            out.extend(space.pins.iter());
+            for group in &space.groups {
+                group.collect_entries(&mut out);
+            }
+        }
+        out.into_iter()
     }
 }
 
@@ -261,6 +291,7 @@ fn place(report: &mut Report, content: &str, line: usize) -> Result<(), Reason> 
             label,
             line,
             entries: Vec::new(),
+            children: Vec::new(),
         });
         return Ok(());
     }

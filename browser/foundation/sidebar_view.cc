@@ -500,6 +500,7 @@ enum ItemCommand {
   kNewFolder,
   kRenameFolder,
   kDeleteFolder,
+  kMoveFolderToTop,
   kRemoveFromFolder,
   kMoveToFolder,
   kMoveTo,
@@ -528,11 +529,32 @@ enum ItemCommand {
   kMoveToSpaceFirst = 2000,
   // Export "<Space>" into Folder's entries: this plus the target space's index
   // in menu_export_space_ids_.
-  kExportSpaceIntoFolderFirst = 3000
+  kExportSpaceIntoFolderFirst = 3000,
+  // Move folder into another folder: this plus the index in menu_folder_ids_.
+  kMoveFolderToFirst = 4000
 };
 
 // Arc indents a folder's tabs under its name.
 constexpr int kFolderIndent = 14;
+// Maximum folder nesting depth (matches Rust MAX_FOLDER_DEPTH).
+constexpr uint32_t kMaxFolderDepth = 8;
+// Visual indentation caps at 5 levels so deeply nested rows keep readable width.
+constexpr uint32_t kMaxVisualFolderDepth = 5;
+
+std::u16string IndentedFolderLabel(uint32_t depth,
+                                   const std::u16string& name) {
+  if (depth == 0) {
+    return name;
+  }
+  std::u16string prefix;
+  prefix.reserve(depth * 2 + name.size());
+  for (uint32_t i = 0; i < depth; ++i) {
+    prefix.push_back(u'\u00A0');
+    prefix.push_back(u'\u00A0');
+  }
+  prefix.append(name);
+  return prefix;
+}
 // The disclosure arrow at a folder row's right end.
 constexpr int kChevronSize = 12;
 constexpr int kChevronInset = 10;
@@ -1171,8 +1193,42 @@ void SidebarView::ShowContextMenuForViewImpl(
     menu_model_ = std::make_unique<ui::SimpleMenuModel>(this);
     folder_menu_model_.reset();
     if (menu_folder_id_) {
+      menu_folder_ids_.clear();
+      const auto self_it =
+          std::ranges::find(folders_, menu_folder_id_, &FolderEntry::id);
+      const uint32_t self_depth =
+          self_it != folders_.end() ? self_it->depth : 0;
+      const uint64_t self_parent =
+          self_it != folders_.end() ? self_it->parent_id : 0;
       menu_model_->AddItem(kRenameFolder, u"Rename Folder\u2026");
       menu_model_->AddItem(kNewFolder, u"New Folder");
+      menu_model_->SetEnabledAt(menu_model_->GetItemCount() - 1,
+                                self_depth + 1 < kMaxFolderDepth);
+      folder_menu_model_ = std::make_unique<ui::SimpleMenuModel>(this);
+      if (self_parent != 0) {
+        folder_menu_model_->AddItem(kMoveFolderToTop, u"Top Level");
+      }
+      bool added_move_sep = false;
+      for (const FolderEntry& candidate : folders_) {
+        if (candidate.id == menu_folder_id_ || candidate.id == self_parent ||
+            IsFolderDescendant(menu_folder_id_, candidate.id)) {
+          continue;
+        }
+        if (self_parent != 0 && !added_move_sep) {
+          folder_menu_model_->AddSeparator(ui::NORMAL_SEPARATOR);
+          added_move_sep = true;
+        }
+        folder_menu_model_->AddItem(
+            kMoveFolderToFirst + static_cast<int>(menu_folder_ids_.size()),
+            IndentedFolderLabel(candidate.depth, candidate.name));
+        menu_folder_ids_.push_back(candidate.id);
+      }
+      if (folder_menu_model_->GetItemCount() > 0) {
+        menu_model_->AddSubMenu(kMoveToFolder, u"Move to Folder",
+                                folder_menu_model_.get());
+      } else {
+        folder_menu_model_.reset();
+      }
       menu_model_->AddSeparator(ui::NORMAL_SEPARATOR);
       menu_model_->AddItem(kDeleteFolder, u"Delete Folder\u2026");
     } else {
@@ -1209,7 +1265,7 @@ void SidebarView::ShowContextMenuForViewImpl(
     for (const FolderEntry& folder : folders_) {
       folder_menu_model_->AddItem(
           kMoveToFolderFirst + static_cast<int>(menu_folder_ids_.size()),
-          folder.name);
+          IndentedFolderLabel(folder.depth, folder.name));
       menu_folder_ids_.push_back(folder.id);
     }
     if (!menu_folder_ids_.empty()) {
@@ -1292,7 +1348,7 @@ void SidebarView::ShowContextMenuForViewImpl(
         }
         folder_menu_model_->AddItem(
             kMoveToFolderFirst + static_cast<int>(menu_folder_ids_.size()),
-            folder.name);
+            IndentedFolderLabel(folder.depth, folder.name));
         menu_folder_ids_.push_back(folder.id);
       }
     }
@@ -1816,6 +1872,15 @@ void SidebarView::ExecuteCommand(int command_id, int event_flags) {
     StopControl();
     return;
   }
+  if (command_id >= kMoveFolderToFirst) {
+    const uint64_t folder = std::exchange(menu_folder_id_, 0);
+    menu_item_id_ = 0;
+    const size_t idx = static_cast<size_t>(command_id - kMoveFolderToFirst);
+    if (folder && idx < menu_folder_ids_.size()) {
+      delegate_->MoveFolder(folder, menu_folder_ids_[idx], 0);
+    }
+    return;
+  }
   if (command_id >= kExportSpaceIntoFolderFirst) {
     const uint64_t source = std::exchange(menu_space_id_, 0);
     const size_t space_index =
@@ -1853,9 +1918,17 @@ void SidebarView::ExecuteCommand(int command_id, int event_flags) {
     return;
   }
   if (command_id == kNewFolder) {
+    const uint64_t parent = std::exchange(menu_folder_id_, 0);
     menu_item_id_ = 0;
-    menu_folder_id_ = 0;
-    delegate_->CreateFolder();
+    delegate_->CreateFolder(parent);
+    return;
+  }
+  if (command_id == kMoveFolderToTop) {
+    const uint64_t folder = std::exchange(menu_folder_id_, 0);
+    menu_item_id_ = 0;
+    if (folder) {
+      delegate_->MoveFolder(folder, 0, 0);
+    }
     return;
   }
   if (command_id == kRenameFolder || command_id == kDeleteFolder) {
@@ -1964,6 +2037,23 @@ uint64_t SidebarView::FirstSpaceId() const {
   return first == spaces_.end() ? 0 : first->id;
 }
 
+bool SidebarView::IsFolderDescendant(uint64_t ancestor,
+                                     uint64_t candidate) const {
+  uint64_t cur = candidate;
+  size_t guard = 0;
+  while (cur && guard++ <= folders_.size()) {
+    const auto it = std::ranges::find(folders_, cur, &FolderEntry::id);
+    if (it == folders_.end()) {
+      return false;
+    }
+    if (it->parent_id == ancestor) {
+      return true;
+    }
+    cur = it->parent_id;
+  }
+  return false;
+}
+
 void SidebarView::OnRowDragEvent(ui::Event& event) {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
   if (event.IsKeyEvent()) {
@@ -1996,12 +2086,14 @@ void SidebarView::OnRowDragEvent(ui::Event& event) {
       if (!mouse.IsOnlyLeftMouseButton()) {
         return;
       }
-      // Rows with an item drag: Pin tiles, folders' Pins and Today tabs.
+      // Rows with an item drag (Pin tiles, folders' Pins, Today tabs) or a
+      // folder row itself (reordering / nesting folders).
       for (const DropZone& zone : drop_zones_) {
-        if (zone.item && zone.view->Contains(target)) {
-          row_drag_ = RowDrag{.item = zone.item,
+        if ((zone.item || zone.is_folder_row) && zone.view->Contains(target)) {
+          row_drag_ = RowDrag{.item = zone.item ? zone.item : zone.folder,
                               .split = zone.split,
                               .favorite = zone.favorite,
+                              .is_folder = zone.is_folder_row && !zone.item,
                               .source = zone.view,
                               .press = point};
           break;
@@ -2061,6 +2153,47 @@ std::optional<SidebarView::Drop> SidebarView::DropAt(
         zone.view, this, zone.view->GetLocalBounds());
     if (!bounds.Contains(point)) {
       continue;
+    }
+    // Folder drags reorder among siblings, nest inside another folder, or
+    // promote to top-level when dropped on the Space title.
+    if (row_drag_ && row_drag_->is_folder) {
+      const uint64_t dragged = row_drag_->item;
+      if (zone.kind == foundation::DropTargetKind::Pins && !zone.item &&
+          !zone.tile) {
+        return Drop{.kind = foundation::DropTargetKind::Folder,
+                    .folder = 0,
+                    .before = 0,
+                    .mark = gfx::Rect(bounds.x(), bounds.bottom() - kDropLine / 2,
+                                      bounds.width(), kDropLine),
+                    .outline = false};
+      }
+      if (!zone.is_folder_row || zone.folder == dragged ||
+          IsFolderDescendant(dragged, zone.folder)) {
+        return std::nullopt;
+      }
+      const int rel_y = point.y() - bounds.y();
+      const int quarter = std::max(4, bounds.height() / 4);
+      if (rel_y < quarter) {
+        return Drop{.kind = foundation::DropTargetKind::Folder,
+                    .folder = zone.parent_folder,
+                    .before = zone.folder,
+                    .mark = gfx::Rect(bounds.x(), bounds.y() - kDropLine / 2,
+                                      bounds.width(), kDropLine),
+                    .outline = false};
+      }
+      if (rel_y >= bounds.height() - quarter) {
+        return Drop{.kind = foundation::DropTargetKind::Folder,
+                    .folder = zone.parent_folder,
+                    .before = zone.next_folder,
+                    .mark = gfx::Rect(bounds.x(), bounds.bottom() - kDropLine / 2,
+                                      bounds.width(), kDropLine),
+                    .outline = false};
+      }
+      return Drop{.kind = foundation::DropTargetKind::Folder,
+                  .folder = zone.folder,
+                  .before = 0,
+                  .mark = bounds,
+                  .outline = true};
     }
     // A split's row moves within Today only, until a split can be pinned.
     if (row_drag_ && row_drag_->split &&
@@ -2142,7 +2275,10 @@ void SidebarView::EndRowDrag(bool commit) {
     // rebuild or delete this view.
     auto weak = weak_factory_.GetWeakPtr();
     const bool dropped =
-        drag.drop->favorite
+        drag.is_folder
+            ? delegate_->MoveFolder(drag.item, drag.drop->folder,
+                                    drag.drop->before)
+        : drag.drop->favorite
             ? delegate_->DropFavorite(drag.item, drag.drop->before)
             : delegate_->DropItem(drag.item, drag.drop->kind,
                                   drag.drop->folder, drag.drop->before);
@@ -2745,8 +2881,8 @@ void SidebarView::SetModel(const foundation::SidebarResult& model,
   std::set<uint64_t> foldered;
   folders_.clear();
   for (const auto& folder : model.folders) {
-    folders_.push_back(
-        {folder.id, base::UTF8ToUTF16(std::string(folder.name))});
+    folders_.push_back({folder.id, folder.parent_id, folder.depth,
+                        base::UTF8ToUTF16(std::string(folder.name))});
     foldered.insert(folder.items.begin(), folder.items.end());
   }
   std::vector<const foundation::ItemRecord*> tile_items;
@@ -2883,31 +3019,97 @@ void SidebarView::SetModel(const foundation::SidebarResult& model,
     rows->AddChildView(std::move(heading));
   }
 
-  // The Space's folders follow its title, each with its Pins beneath it
-  // while open. A closed folder still shows its selected Pin, so the page
-  // on screen keeps its row.
-  for (const auto& folder : model.folders) {
-    if (model.pins_collapsed &&
-        std::ranges::find(folder.items, model.selected_item_id) ==
-            folder.items.end()) {
+  // The Space's folders follow its title in pre-order DFS, each with its Pins
+  // beneath it while open. A closed ancestor hides its nested folders and
+  // Pins, except along the path to `model.selected_item_id`.
+  const auto folder_ancestors_open = [&model](uint64_t folder_id) {
+    uint64_t cur = 0;
+    const auto self =
+        std::ranges::find(model.folders, folder_id,
+                          &foundation::FolderRecord::id);
+    if (self != model.folders.end()) {
+      cur = self->parent_id;
+    }
+    size_t guard = 0;
+    while (cur && guard++ <= model.folders.size()) {
+      const auto it = std::ranges::find(model.folders, cur,
+                                        &foundation::FolderRecord::id);
+      if (it == model.folders.end()) {
+        break;
+      }
+      if (!it->open) {
+        return false;
+      }
+      cur = it->parent_id;
+    }
+    return true;
+  };
+  // Folders on the ancestor path of `model.selected_item_id` stay visible even
+  // when a parent is closed or Pins are collapsed.
+  std::set<uint64_t> selected_folder_path;
+  if (model.selected_item_id != 0) {
+    for (const auto& folder : model.folders) {
+      if (std::ranges::find(folder.items, model.selected_item_id) !=
+          folder.items.end()) {
+        uint64_t cur = folder.id;
+        size_t guard = 0;
+        while (cur && guard++ <= model.folders.size()) {
+          selected_folder_path.insert(cur);
+          const auto it = std::ranges::find(model.folders, cur,
+                                            &foundation::FolderRecord::id);
+          cur = it != model.folders.end() ? it->parent_id : 0;
+        }
+        break;
+      }
+    }
+  }
+  for (size_t fi = 0; fi < model.folders.size(); ++fi) {
+    const auto& folder = model.folders[fi];
+    const bool has_selected = selected_folder_path.contains(folder.id);
+    if (model.pins_collapsed && !has_selected) {
       continue;
     }
+    const bool ancestors_open = folder_ancestors_open(folder.id);
+    if (!ancestors_open && !has_selected) {
+      continue;
+    }
+    // Next sibling folder with the same parent_id, for folder drag reordering.
+    uint64_t next_sibling = 0;
+    for (size_t nj = fi + 1; nj < model.folders.size(); ++nj) {
+      if (model.folders[nj].parent_id == folder.parent_id) {
+        next_sibling = model.folders[nj].id;
+        break;
+      }
+    }
+    const int visual_depth =
+        static_cast<int>(std::min<uint32_t>(folder.depth, kMaxVisualFolderDepth));
+    auto folder_view = MakeFolder(folder);
+    if (visual_depth > 0) {
+      folder_view->SetProperty(
+          views::kMarginsKey,
+          gfx::Insets::TLBR(0, visual_depth * kFolderIndent, 0, 0));
+    }
     // A row dropped on the folder's own row goes in at its end.
-    drop_zones_.push_back({.view = rows->AddChildView(MakeFolder(folder)),
+    drop_zones_.push_back({.view = rows->AddChildView(std::move(folder_view)),
                            .kind = foundation::DropTargetKind::Folder,
-                           .folder = folder.id});
+                           .folder = folder.id,
+                           .is_folder_row = true,
+                           .parent_folder = folder.parent_id,
+                           .next_folder = next_sibling});
+    const bool show_items = ancestors_open && folder.open;
     for (size_t i = 0; i < folder.items.size(); ++i) {
       const uint64_t id = folder.items[i];
       const auto item = std::ranges::find(model.pins, id,
                                           &foundation::ItemRecord::id);
       const bool selected = id == model.selected_item_id;
-      if (item == model.pins.end() || (!folder.open && !selected) ||
+      if (item == model.pins.end() || (!show_items && !selected) ||
           !pin_shown(id)) {
         continue;
       }
       auto row = MakeItem(*item, false, selected, folder.id);
-      row->SetProperty(views::kMarginsKey,
-                       gfx::Insets::TLBR(0, kFolderIndent, 0, 0));
+      row->SetProperty(
+          views::kMarginsKey,
+          gfx::Insets::TLBR(0, (visual_depth + 1) * kFolderIndent, 0, 0));
       drop_zones_.push_back(
           {.view = rows->AddChildView(std::move(row)),
            .kind = foundation::DropTargetKind::Folder,

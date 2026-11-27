@@ -144,7 +144,7 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..1fc8cffb365fb3bb8ec77821fbbe2ae5
    base::WeakPtr<BrowserView> GetAsWeakPtr() {
      return weak_ptr_factory_.GetWeakPtr();
    }
-@@ -1253,12 +1331,295 @@ class BrowserView : public BrowserWindow,
+@@ -1253,12 +1331,298 @@ class BrowserView : public BrowserWindow,
  
    // Anchor point for help bubbles and other dialogs that want to reliably
    // anchor outside the content area of the window.
@@ -157,10 +157,13 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..1fc8cffb365fb3bb8ec77821fbbe2ae5
 +  void FavoriteItem(uint64_t item) override;
 +  bool DropFavorite(uint64_t item, uint64_t before) override;
 +  void UnsaveItem(uint64_t item) override;
-+  void CreateFolder() override;
++  void CreateFolder(uint64_t parent_folder_id = 0) override;
 +  void RenameFolder(uint64_t folder) override;
 +  void DeleteFolder(uint64_t folder) override;
 +  void SetFolderOpen(uint64_t folder, bool open) override;
++  bool MoveFolder(uint64_t folder,
++                  uint64_t parent,
++                  uint64_t before) override;
 +  void MovePinToFolder(uint64_t item, uint64_t folder) override;
 +  bool DropItem(uint64_t item,
 +                myarc::foundation::DropTargetKind target,
@@ -440,7 +443,7 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..1fc8cffb365fb3bb8ec77821fbbe2ae5
  
    // A mapping between accelerators and command IDs.
    std::map<ui::Accelerator, int> accelerator_table_;
-@@ -1411,6 +1772,7 @@ class BrowserView : public BrowserWindow,
+@@ -1411,6 +1775,7 @@ class BrowserView : public BrowserWindow,
    base::EnumSet<TabStripAndWebAppViewsReparentedState>
        tab_strip_web_apps_reparented_state_;
  

@@ -201,10 +201,16 @@ class BrowserWorkspaceAdapter final : public TabStripModelObserver {
   foundation::MutationResult ExportSpaceIntoFolder(uint64_t source_space,
                                                    uint64_t target_space);
   // Folders of this window's current Space. `id` is the new folder.
-  foundation::MutationResult CreateFolder(std::string_view name);
+  // Nonzero `parent` nests the new folder inside `parent` and opens `parent`.
+  foundation::MutationResult CreateFolder(std::string_view name,
+                                          uint64_t parent = 0);
   foundation::MutationResult RenameFolder(uint64_t folder,
                                           std::string_view name);
   foundation::MutationResult SetFolderOpen(uint64_t folder, bool open);
+  // Moves `folder` under `parent` (0 = top-level) before `before` (0 = end).
+  foundation::MutationResult MoveFolder(uint64_t folder,
+                                        uint64_t parent,
+                                        uint64_t before = 0);
   // Pins a temporary item here first. Zero folder takes a Pin out of its
   // folder.
   foundation::MutationResult MovePinToFolder(uint64_t item, uint64_t folder);

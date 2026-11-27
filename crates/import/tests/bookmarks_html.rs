@@ -80,6 +80,16 @@ fn links(entries: &[Entry]) -> Vec<Node> {
         .collect()
 }
 
+fn expected_group(group: &myarc_import::arc_markdown::Group) -> Option<Node> {
+    let mut children = links(&group.entries);
+    for child in &group.children {
+        if let Some(node) = expected_group(child) {
+            children.push(node);
+        }
+    }
+    (!children.is_empty()).then(|| Node::Folder(group.label.clone(), children))
+}
+
 /// What the export should hold, built from Arc's report rather than from the
 /// workspace: Favorites, then each Space's Pins and its folders, in Arc's
 /// order, leaving out empty ones.
@@ -92,9 +102,8 @@ fn expected(report: &Report) -> Vec<Node> {
     for space in &report.spaces {
         let mut children = links(&space.pins);
         for group in &space.groups {
-            let entries = links(&group.entries);
-            if !entries.is_empty() {
-                children.push(Node::Folder(group.label.clone(), entries));
+            if let Some(node) = expected_group(group) {
+                children.push(node);
             }
         }
         if !children.is_empty() {

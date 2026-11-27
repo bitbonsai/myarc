@@ -1,21 +1,22 @@
 //! Folders of a Space's Pins, as in Arc's sidebar.
 //!
-//! A folder belongs to one Space and holds some of that Space's Pins in its own
-//! order. Every other Pin of the Space is ungrouped and keeps workspace order.
-//! A Pin sits in at most one folder. Folders don't nest: Arc can put a folder
-//! inside another, and this model doesn't yet.
+//! A folder belongs to one Space, may sit inside another folder of the same
+//! Space up to `MAX_FOLDER_DEPTH` levels deep, and holds some of that Space's
+//! Pins in its own order. Every other Pin of the Space is ungrouped and keeps
+//! workspace order. A Pin sits in at most one folder.
 //!
 //! A folder is open or closed, and that state persists with the snapshot. A new
-//! folder starts open. Deleting a folder deletes its Pins too, as Arc does, and
-//! archives each of them so the Library's Archived Tabs can bring it back.
+//! folder starts open. Deleting a folder deletes its subfolders and Pins too,
+//! as Arc does, and archives each Pin so the Library's Archived Tabs can bring
+//! it back.
 //!
 //! Folders follow their Pins. A Pin that moves to another Space, becomes a
 //! Favorite, is unpinned or removed leaves its folder; deleting a Space deletes
-//! its folders. A loaded snapshot keeps every folder it can and drops what it
-//! can't, so a damaged folder never fails the workspace and never loses a Pin:
-//! a Pin dropped from a folder shows ungrouped.
+//! its folders. A loaded snapshot keeps every folder it can and promotes or
+//! drops what it can't, so a damaged folder never fails the workspace and never
+//! loses a Pin: a Pin dropped from a folder shows ungrouped.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 use crate::{
     ArchivedTab, Item, ItemId, MAX_ARCHIVED_TABS, MAX_ITEMS, MAX_SPACE_NAME_BYTES, Placement,
@@ -26,6 +27,8 @@ pub type FolderId = u64;
 
 /// Folders across all Spaces.
 pub const MAX_FOLDERS: usize = 256;
+/// Maximum nesting depth for folders (0 = top-level, up to MAX_FOLDER_DEPTH - 1).
+pub const MAX_FOLDER_DEPTH: usize = 8;
 /// Same bound as a Space name.
 pub const MAX_FOLDER_NAME_BYTES: usize = MAX_SPACE_NAME_BYTES;
 
@@ -33,8 +36,11 @@ pub const MAX_FOLDER_NAME_BYTES: usize = MAX_SPACE_NAME_BYTES;
 pub struct Folder {
     pub id: FolderId,
     pub space_id: SpaceId,
+    /// Parent folder in the same Space, or `None` for a top-level folder.
+    pub parent_id: Option<FolderId>,
     pub name: String,
-    /// Shows its Pins beneath it. Closed folders show only their row.
+    /// Shows its Pins and child folders beneath it. Closed folders show only
+    /// their row (and any selected descendant Pin).
     pub open: bool,
     /// Pins of `space_id` in the folder's order.
     pub items: Vec<ItemId>,
@@ -43,14 +49,16 @@ pub struct Folder {
 /// What `Workspace::delete_folder` removed, so adapters can close live pages.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct FolderDeletion {
-    /// The folder's Pins in folder order. Their identities are gone.
+    /// The deleted folder and all descendant folders, in pre-order DFS.
+    pub removed_folders: Vec<FolderId>,
+    /// The removed Pins across the deleted subtree, in pre-order DFS.
     pub removed_items: Vec<ItemId>,
     /// How many of them went to Archived Tabs.
     pub archived: usize,
 }
 
 impl Workspace {
-    /// Every folder in workspace order; a Space's folders show in this order.
+    /// Every folder in workspace order; siblings show in this relative order.
     pub fn folders(&self) -> &[Folder] {
         &self.state.folders
     }
@@ -64,20 +72,149 @@ impl Workspace {
             .map(|folder| folder.id)
     }
 
-    /// A new, empty, open folder after the Space's other folders.
+    /// Nesting depth of `id` (0 for top-level folders).
+    pub fn folder_depth(&self, id: FolderId) -> usize {
+        folder_depth_in(&self.state.folders, id)
+    }
+
+    /// Whether `ancestor` is an ancestor of `descendant`.
+    pub fn is_folder_ancestor(&self, ancestor: FolderId, descendant: FolderId) -> bool {
+        let mut current = self.folder(descendant).ok().and_then(|f| f.parent_id);
+        let mut steps = 0;
+        while let Some(pid) = current {
+            if pid == ancestor {
+                return true;
+            }
+            steps += 1;
+            if steps > self.state.folders.len() {
+                break;
+            }
+            current = self.folder(pid).ok().and_then(|f| f.parent_id);
+        }
+        false
+    }
+
+    /// Maximum depth below `id` (0 for a folder with no children).
+    pub fn folder_subtree_height(&self, id: FolderId) -> usize {
+        self.subtree_height_bounded(id, 0)
+    }
+
+    fn subtree_height_bounded(&self, id: FolderId, guard: usize) -> usize {
+        if guard > MAX_FOLDERS {
+            return 0;
+        }
+        self.state
+            .folders
+            .iter()
+            .filter(|f| f.parent_id == Some(id))
+            .map(|child| 1 + self.subtree_height_bounded(child.id, guard + 1))
+            .max()
+            .unwrap_or(0)
+    }
+
+    /// `id` followed by all descendant folder IDs in pre-order DFS.
+    pub fn folder_subtree_ids(&self, id: FolderId) -> Vec<FolderId> {
+        let mut out = Vec::new();
+        let mut visited = BTreeSet::new();
+        self.collect_subtree_ids(id, &mut visited, &mut out);
+        out
+    }
+
+    fn collect_subtree_ids(
+        &self,
+        id: FolderId,
+        visited: &mut BTreeSet<FolderId>,
+        out: &mut Vec<FolderId>,
+    ) {
+        if !visited.insert(id) {
+            return;
+        }
+        out.push(id);
+        for folder in &self.state.folders {
+            if folder.parent_id == Some(id) {
+                self.collect_subtree_ids(folder.id, visited, out);
+            }
+        }
+    }
+
+    /// All folders of `space_id` in pre-order DFS tree order, preserving
+    /// sibling order from `self.state.folders`.
+    pub fn folders_in_tree_order(&self, space_id: SpaceId) -> Vec<Folder> {
+        let mut out = Vec::new();
+        let mut visited = BTreeSet::new();
+        for folder in &self.state.folders {
+            if folder.space_id == space_id && folder.parent_id.is_none() {
+                self.collect_tree_folders(space_id, folder.id, &mut visited, &mut out);
+            }
+        }
+        out
+    }
+
+    fn collect_tree_folders(
+        &self,
+        space_id: SpaceId,
+        id: FolderId,
+        visited: &mut BTreeSet<FolderId>,
+        out: &mut Vec<Folder>,
+    ) {
+        if !visited.insert(id) {
+            return;
+        }
+        let Some(folder) = self
+            .state
+            .folders
+            .iter()
+            .find(|f| f.id == id && f.space_id == space_id)
+        else {
+            return;
+        };
+        out.push(folder.clone());
+        let child_ids: Vec<FolderId> = self
+            .state
+            .folders
+            .iter()
+            .filter(|f| f.space_id == space_id && f.parent_id == Some(id))
+            .map(|f| f.id)
+            .collect();
+        for child_id in child_ids {
+            self.collect_tree_folders(space_id, child_id, visited, out);
+        }
+    }
+
+    /// A new, empty, open top-level folder after the Space's other folders.
     pub fn create_folder(
         &mut self,
         space_id: SpaceId,
         name: &str,
     ) -> Result<FolderId, WorkspaceError> {
+        self.create_folder_in(space_id, None, name)
+    }
+
+    /// A new, empty, open folder inside `parent_id` (or top-level when `None`).
+    pub fn create_folder_in(
+        &mut self,
+        space_id: SpaceId,
+        parent_id: Option<FolderId>,
+        name: &str,
+    ) -> Result<FolderId, WorkspaceError> {
         self.space(space_id)?;
         validate_name(name).map_err(WorkspaceError::InvalidFolderName)?;
+        if let Some(pid) = parent_id {
+            let parent = self.folder(pid)?;
+            if parent.space_id != space_id {
+                return Err(WorkspaceError::DifferentFolderSpace(pid));
+            }
+            if self.folder_depth(pid) + 1 >= MAX_FOLDER_DEPTH {
+                return Err(WorkspaceError::FolderDepthExceeded);
+            }
+        }
         check_limit(self.state.folders.len(), MAX_FOLDERS, "folders")?;
         let id = self.state.next_folder_id;
         let next = next_id(id, "folder")?;
         self.state.folders.push(Folder {
             id,
             space_id,
+            parent_id,
             name: name.to_owned(),
             open: true,
             items: Vec::new(),
@@ -88,10 +225,10 @@ impl Workspace {
 
     /// Creates a new open folder named after `source_space_id` inside
     /// `target_space_id` and copies all of the source Space's pinned tabs
-    /// (both ungrouped Pins and Pins inside the source Space's folders, in
-    /// sidebar order) into that new folder. The source Space and its items are
-    /// left untouched. Atomic: fails without mutating if limits or IDs would
-    /// be exceeded.
+    /// (ungrouped Pins into the new folder, and each source folder as a
+    /// subfolder preserving hierarchy and Pin order). The source Space and its
+    /// items are left untouched. Atomic: fails without mutating if limits,
+    /// depth, or IDs would be exceeded.
     pub fn export_space_into_folder(
         &mut self,
         source_space_id: SpaceId,
@@ -103,17 +240,25 @@ impl Workspace {
             return Err(WorkspaceError::SameSpace(source_space_id));
         }
         validate_name(&folder_name).map_err(WorkspaceError::InvalidFolderName)?;
-        check_limit(self.state.folders.len(), MAX_FOLDERS, "folders")?;
 
-        // Collect the source Space's Pins in sidebar order: ungrouped Pins
-        // first, then each source folder's Pins in folder order.
-        let mut grouped: BTreeSet<ItemId> = BTreeSet::new();
-        for folder in &self.state.folders {
-            if folder.space_id == source_space_id {
-                grouped.extend(folder.items.iter().copied());
+        let src_folders = self.folders_in_tree_order(source_space_id);
+        let needed_folders = 1 + src_folders.len();
+        if self.state.folders.len().saturating_add(needed_folders) > MAX_FOLDERS {
+            return Err(WorkspaceError::LimitExceeded("folders"));
+        }
+        for f in &src_folders {
+            if self.folder_depth(f.id) + 1 >= MAX_FOLDER_DEPTH {
+                return Err(WorkspaceError::FolderDepthExceeded);
             }
         }
-        let mut copies: Vec<(Option<String>, String, String)> = Vec::new();
+
+        // Collect loose Pins and per-folder Pins before mutating.
+        type PinCopy = (Option<String>, String, String);
+        let mut grouped: BTreeSet<ItemId> = BTreeSet::new();
+        for folder in &src_folders {
+            grouped.extend(folder.items.iter().copied());
+        }
+        let mut loose_copies: Vec<PinCopy> = Vec::new();
         for item in &self.state.items {
             if item.placement
                 == (Placement::Pin {
@@ -121,17 +266,17 @@ impl Workspace {
                 })
                 && !grouped.contains(&item.id)
             {
-                copies.push((
+                loose_copies.push((
                     item.canonical_url.clone(),
                     item.title.clone(),
                     item.name.clone(),
                 ));
             }
         }
-        for folder in &self.state.folders {
-            if folder.space_id != source_space_id {
-                continue;
-            }
+        let mut folder_copies: Vec<(&Folder, Vec<PinCopy>)> = Vec::with_capacity(src_folders.len());
+        let mut total_items = loose_copies.len();
+        for folder in &src_folders {
+            let mut copies = Vec::new();
             for &item_id in &folder.items {
                 if let Some(item) = self.state.items.iter().find(|item| {
                     item.id == item_id
@@ -147,22 +292,30 @@ impl Workspace {
                     ));
                 }
             }
+            total_items += copies.len();
+            folder_copies.push((folder, copies));
         }
 
-        if self.state.items.len().saturating_add(copies.len()) > MAX_ITEMS {
+        if self.state.items.len().saturating_add(total_items) > MAX_ITEMS {
             return Err(WorkspaceError::LimitExceeded("items"));
         }
-        let folder_id = self.state.next_folder_id;
-        let next_folder = next_id(folder_id, "folder")?;
+        let mut next_folder = self.state.next_folder_id;
+        for _ in 0..needed_folders {
+            next_folder = next_id(next_folder, "folder")?;
+        }
         let mut next_item = self.state.next_item_id;
-        for _ in 0..copies.len() {
+        for _ in 0..total_items {
             next_item = next_id(next_item, "item")?;
         }
 
-        let mut folder_items = Vec::with_capacity(copies.len());
-        for (item_id, (canonical_url, title, name)) in (self.state.next_item_id..).zip(copies) {
+        let root_folder_id = self.state.next_folder_id;
+        let mut cur_folder_id = root_folder_id + 1;
+        let mut cur_item_id = self.state.next_item_id;
+
+        let mut root_items = Vec::with_capacity(loose_copies.len());
+        for (canonical_url, title, name) in loose_copies {
             self.state.items.push(Item {
-                id: item_id,
+                id: cur_item_id,
                 placement: Placement::Pin {
                     space_id: target_space_id,
                 },
@@ -171,18 +324,54 @@ impl Workspace {
                 name,
                 last_viewed_secs: 0,
             });
-            folder_items.push(item_id);
+            root_items.push(cur_item_id);
+            cur_item_id += 1;
         }
-        self.state.next_item_id = next_item;
         self.state.folders.push(Folder {
-            id: folder_id,
+            id: root_folder_id,
             space_id: target_space_id,
+            parent_id: None,
             name: folder_name,
             open: true,
-            items: folder_items,
+            items: root_items,
         });
+
+        let mut id_map: BTreeMap<FolderId, FolderId> = BTreeMap::new();
+        for (src_folder, copies) in folder_copies {
+            let new_id = cur_folder_id;
+            cur_folder_id += 1;
+            id_map.insert(src_folder.id, new_id);
+            let new_parent = match src_folder.parent_id {
+                Some(pid) => id_map.get(&pid).copied().unwrap_or(root_folder_id),
+                None => root_folder_id,
+            };
+            let mut new_items = Vec::with_capacity(copies.len());
+            for (canonical_url, title, name) in copies {
+                self.state.items.push(Item {
+                    id: cur_item_id,
+                    placement: Placement::Pin {
+                        space_id: target_space_id,
+                    },
+                    canonical_url,
+                    title,
+                    name,
+                    last_viewed_secs: 0,
+                });
+                new_items.push(cur_item_id);
+                cur_item_id += 1;
+            }
+            self.state.folders.push(Folder {
+                id: new_id,
+                space_id: target_space_id,
+                parent_id: Some(new_parent),
+                name: src_folder.name.clone(),
+                open: src_folder.open,
+                items: new_items,
+            });
+        }
+        self.state.next_item_id = next_item;
         self.state.next_folder_id = next_folder;
-        Ok(folder_id)
+        Ok(root_folder_id)
     }
 
     pub fn rename_folder(&mut self, id: FolderId, name: &str) -> Result<(), WorkspaceError> {
@@ -202,21 +391,57 @@ impl Workspace {
         Ok(true)
     }
 
-    /// Reorder a Space's folders. `None` moves to the end of the Space's
-    /// folders; moving before oneself is a no-op. Folders of other Spaces keep
-    /// their places.
+    /// Reorder a folder among its current siblings. `None` moves to the end of
+    /// its sibling group; moving before oneself is a no-op.
     pub fn move_folder_before(
         &mut self,
         id: FolderId,
         before: Option<FolderId>,
     ) -> Result<(), WorkspaceError> {
-        let space_id = self.folder(id)?.space_id;
-        if let Some(before) = before {
-            if self.folder(before)?.space_id != space_id {
-                return Err(WorkspaceError::DifferentFolderSpace(before));
+        let parent_id = self.folder(id)?.parent_id;
+        self.move_folder(id, parent_id, before)
+    }
+
+    /// Moves folder `id` under `parent_id` (`None` = top-level of its Space),
+    /// before sibling `before` (`None` = end of `parent_id`'s children).
+    /// Rejects cross-Space targets, cycles, and moves exceeding
+    /// `MAX_FOLDER_DEPTH`.
+    pub fn move_folder(
+        &mut self,
+        id: FolderId,
+        parent_id: Option<FolderId>,
+        before: Option<FolderId>,
+    ) -> Result<(), WorkspaceError> {
+        let current = self.folder(id)?;
+        let space_id = current.space_id;
+        let current_parent = current.parent_id;
+        if let Some(pid) = parent_id {
+            let parent = self.folder(pid)?;
+            if parent.space_id != space_id {
+                return Err(WorkspaceError::DifferentFolderSpace(pid));
             }
-            if before == id {
-                return Ok(());
+            if pid == id || self.is_folder_ancestor(id, pid) {
+                return Err(WorkspaceError::FolderCycle(id));
+            }
+            let new_depth = self.folder_depth(pid) + 1;
+            let height = self.folder_subtree_height(id);
+            if new_depth + height >= MAX_FOLDER_DEPTH {
+                return Err(WorkspaceError::FolderDepthExceeded);
+            }
+        }
+        if let Some(before_id) = before {
+            let target = self.folder(before_id)?;
+            if target.space_id != space_id {
+                return Err(WorkspaceError::DifferentFolderSpace(before_id));
+            }
+            if before_id == id {
+                if current_parent == parent_id {
+                    return Ok(());
+                }
+                return Err(WorkspaceError::FolderCycle(id));
+            }
+            if target.parent_id != parent_id {
+                return Err(WorkspaceError::DifferentFolderSpace(before_id));
             }
         }
         let folders = &mut self.state.folders;
@@ -224,15 +449,16 @@ impl Workspace {
             .iter()
             .position(|folder| folder.id == id)
             .ok_or(WorkspaceError::UnknownFolder(id))?;
-        let folder = folders.remove(source);
+        let mut folder = folders.remove(source);
+        folder.parent_id = parent_id;
         let target = match before {
-            Some(before) => folders.iter().position(|folder| folder.id == before),
+            Some(before_id) => folders.iter().position(|f| f.id == before_id),
             None => folders
                 .iter()
-                .rposition(|folder| folder.space_id == space_id)
+                .rposition(|f| f.space_id == space_id && f.parent_id == parent_id)
+                .or_else(|| folders.iter().rposition(|f| f.space_id == space_id))
                 .map(|last| last + 1),
         };
-        // `before` was checked above; a Space with no other folder puts it back.
         let target = target.unwrap_or(source).min(folders.len());
         folders.insert(target, folder);
         Ok(())
@@ -285,20 +511,28 @@ impl Workspace {
         Ok(())
     }
 
-    /// Deletes a folder and its Pins, as Arc does. With `archive_at`, the
-    /// caller's wall-clock seconds, each Pin goes to Archived Tabs first; pass
-    /// `None` for Profiles that save no history. The caller confirms with the
-    /// user first and closes live pages for `removed_items`.
+    /// Deletes a folder, its descendant subfolders, and all of their Pins, as
+    /// Arc does. With `archive_at`, the caller's wall-clock seconds, each Pin
+    /// goes to Archived Tabs first; pass `None` for Profiles that save no
+    /// history. The caller confirms with the user first and closes live pages
+    /// for `removed_items`.
     pub fn delete_folder(
         &mut self,
         id: FolderId,
         archive_at: Option<u64>,
     ) -> Result<FolderDeletion, WorkspaceError> {
-        let folder = self.folder(id)?.clone();
+        let space_id = self.folder(id)?.space_id;
+        let subtree_ids = self.folder_subtree_ids(id);
+        let mut removed_items = Vec::new();
+        for &fid in &subtree_ids {
+            if let Ok(f) = self.folder(fid) {
+                removed_items.extend(f.items.iter().copied());
+            }
+        }
         let mut archived = 0;
         if let Some(now_secs) = archive_at {
             self.prune_archived_tabs(now_secs);
-            for &item_id in &folder.items {
+            for &item_id in &removed_items {
                 let Ok(item) = self.item(item_id) else {
                     continue;
                 };
@@ -314,7 +548,7 @@ impl Workspace {
                 }
                 self.state.archived.push(ArchivedTab {
                     id: item_id,
-                    space_id: folder.space_id,
+                    space_id,
                     url,
                     title,
                     archived_secs: now_secs,
@@ -322,12 +556,18 @@ impl Workspace {
                 archived += 1;
             }
         }
-        let removed: BTreeSet<ItemId> = folder.items.iter().copied().collect();
-        self.state.items.retain(|item| !removed.contains(&item.id));
-        self.state.folders.retain(|folder| folder.id != id);
+        let removed_item_set: BTreeSet<ItemId> = removed_items.iter().copied().collect();
+        let removed_folder_set: BTreeSet<FolderId> = subtree_ids.iter().copied().collect();
+        self.state
+            .items
+            .retain(|item| !removed_item_set.contains(&item.id));
+        self.state
+            .folders
+            .retain(|folder| !removed_folder_set.contains(&folder.id));
         self.clear_hidden_selections();
         Ok(FolderDeletion {
-            removed_items: folder.items,
+            removed_folders: subtree_ids,
+            removed_items,
             archived,
         })
     }
@@ -369,8 +609,10 @@ impl Workspace {
 
     /// A loaded snapshot's folders, cut down to what is valid: folders with a
     /// zero or repeated ID, a bad name or an unknown Space go, entries that are
-    /// not Pins of the folder's Space or already in a folder go, and only the
-    /// first `MAX_FOLDERS` stay. The next folder ID moves past every kept one.
+    /// not Pins of the folder's Space or already in a folder go, invalid or
+    /// cyclic `parent_id` links promote to top-level, folders deeper than
+    /// `MAX_FOLDER_DEPTH` promote to top-level, and only the first
+    /// `MAX_FOLDERS` stay. The next folder ID moves past every kept one.
     pub(crate) fn sanitize_folders(&mut self) {
         self.state.folders.truncate(MAX_FOLDERS);
         let mut ids = BTreeSet::new();
@@ -397,6 +639,61 @@ impl Workspace {
             });
             true
         });
+
+        // Clear parent_id pointing to self, missing folder, or another Space.
+        let kept_spaces: BTreeMap<FolderId, SpaceId> = self
+            .state
+            .folders
+            .iter()
+            .map(|f| (f.id, f.space_id))
+            .collect();
+        for folder in &mut self.state.folders {
+            if let Some(pid) = folder.parent_id {
+                if pid == folder.id || kept_spaces.get(&pid) != Some(&folder.space_id) {
+                    folder.parent_id = None;
+                }
+            }
+        }
+
+        // Break cycles by promoting the first folder encountered in a cycle.
+        let count = self.state.folders.len();
+        for i in 0..count {
+            let start_id = self.state.folders[i].id;
+            let mut seen = BTreeSet::from([start_id]);
+            let mut cur = self.state.folders[i].parent_id;
+            let mut cyclic = false;
+            while let Some(pid) = cur {
+                if !seen.insert(pid) {
+                    cyclic = true;
+                    break;
+                }
+                cur = self
+                    .state
+                    .folders
+                    .iter()
+                    .find(|f| f.id == pid)
+                    .and_then(|f| f.parent_id);
+            }
+            if cyclic {
+                self.state.folders[i].parent_id = None;
+            }
+        }
+
+        // Promote folders exceeding MAX_FOLDER_DEPTH to top-level.
+        for _ in 0..count {
+            let mut promoted = false;
+            for i in 0..count {
+                let id = self.state.folders[i].id;
+                if folder_depth_in(&self.state.folders, id) >= MAX_FOLDER_DEPTH {
+                    self.state.folders[i].parent_id = None;
+                    promoted = true;
+                }
+            }
+            if !promoted {
+                break;
+            }
+        }
+
         // Kept IDs are below `FolderId::MAX`, so the sum cannot overflow.
         let past_last = self
             .state
@@ -407,6 +704,46 @@ impl Workspace {
             .unwrap_or(1);
         self.state.next_folder_id = self.state.next_folder_id.max(past_last);
     }
+}
+
+/// Computes the nesting depth of `id` in `folders` (0 = top-level).
+pub fn folder_depth_in(folders: &[Folder], id: FolderId) -> usize {
+    let mut depth = 0;
+    let mut current = folders
+        .iter()
+        .find(|f| f.id == id)
+        .and_then(|f| f.parent_id);
+    while let Some(pid) = current {
+        depth += 1;
+        if depth > folders.len() {
+            break;
+        }
+        current = folders
+            .iter()
+            .find(|f| f.id == pid)
+            .and_then(|f| f.parent_id);
+    }
+    depth
+}
+
+/// Whether `id` and every ancestor folder in `folders` is open.
+pub fn folder_chain_open(folders: &[Folder], id: FolderId) -> bool {
+    let mut current = Some(id);
+    let mut steps = 0;
+    while let Some(fid) = current {
+        let Some(folder) = folders.iter().find(|f| f.id == fid) else {
+            return false;
+        };
+        if !folder.open {
+            return false;
+        }
+        steps += 1;
+        if steps > folders.len() {
+            return false;
+        }
+        current = folder.parent_id;
+    }
+    true
 }
 
 impl RenameError {

@@ -4,28 +4,29 @@
 //! Profile, after any it already has. Only Arc's sidebar file fills that list.
 //! Each Space becomes a Space with that name, and its [`Space::pins`] become
 //! Pins outside any folder. Each group becomes a folder of that Space's Pins
-//! with the group's name, and its URLs become Pins in that folder, in order.
+//! with the group's name, and its URLs become Pins in that folder, in order,
+//! with child groups nested as subfolders.
 //! A Markdown `Favorites` group is the exception: its URLs become ungrouped
 //! Pins, which the sidebar shows as tiles, because Arc's Favorites are tiles
 //! rather than a folder. They stay Space Pins rather than Profile Favorites
 //! because the Markdown export does not say which they are (see
-//! `tests/fixtures/arc-markdown/README.md`). Folders don't nest, and neither
-//! do report groups. A new Favorite or Pin takes its entry's name as its Rename
-//! name and its saved page title as its title; only Arc's sidebar file has
-//! them. [`apply_to_new_profile`] is for a Profile made for the import: its
-//! first new Space takes the place of the empty default Space
-//! (`Workspace::create_first_space`), so the Profile holds only Arc's Spaces.
+//! `tests/fixtures/arc-markdown/README.md`). A new Favorite or Pin takes its
+//! entry's name as its Rename name and its saved page title as its title; only
+//! Arc's sidebar file has them. [`apply_to_new_profile`] is for a Profile made
+//! for the import: its first new Space takes the place of the empty default
+//! Space (`Workspace::create_first_space`), so the Profile holds only Arc's
+//! Spaces.
 //!
 //! Importing is idempotent. A Favorite whose URL the Profile already has is
 //! kept. An export Space reuses an existing ordinary Space of the same name,
-//! and a group reuses the first folder of that Space with the same name. A URL
-//! the folder already holds is kept. A URL of a group that the Space pins
-//! outside any folder moves into the folder rather than being added again,
-//! which tidies up an import made before folders existed. An ungrouped URL the
-//! Space already pins outside any folder is kept. Each existing Favorite or
-//! Pin answers for one entry, so repeated URLs stay repeated. Every import is
-//! rehearsed on a copy first, so a failed import changes nothing. Nothing here
-//! opens tabs or fetches URLs.
+//! and a group reuses the first folder of that Space with the same parent and
+//! name. A URL the folder already holds is kept. A URL of a group that the
+//! Space pins outside any folder moves into the folder rather than being added
+//! again, which tidies up an import made before folders existed. An ungrouped
+//! URL the Space already pins outside any folder is kept. Each existing
+//! Favorite or Pin answers for one entry, so repeated URLs stay repeated.
+//! Every import is rehearsed on a copy first, so a failed import changes
+//! nothing. Nothing here opens tabs or fetches URLs.
 //!
 //! The browser canonicalizes URLs before they reach the workspace, so callers
 //! pass one canonical URL per entry, in [`entry_urls`] order, or `None` for an
@@ -71,7 +72,7 @@ pub struct SpacePreview {
     /// Entries the Space already pins in the right place, so the import leaves
     /// them alone. Covers folders too.
     pub kept_pins: usize,
-    /// One per distinct group name other than `Favorites`, in export order.
+    /// Top-level folders in export order.
     pub folders: Vec<FolderPreview>,
 }
 
@@ -82,6 +83,17 @@ pub struct FolderPreview {
     pub existing: Option<FolderId>,
     /// What the folder gains at its end, in export order.
     pub additions: Vec<FolderAddition>,
+    /// Nested subfolders in export order.
+    pub children: Vec<FolderPreview>,
+}
+
+impl FolderPreview {
+    fn collect_all<'a>(&'a self, out: &mut Vec<&'a FolderPreview>) {
+        out.push(self);
+        for child in &self.children {
+            child.collect_all(out);
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -154,7 +166,21 @@ impl Preview {
     }
 
     pub fn new_folder_count(&self) -> usize {
-        self.folders().filter(|f| f.existing.is_none()).count()
+        self.all_folders()
+            .into_iter()
+            .filter(|f| f.existing.is_none())
+            .count()
+    }
+
+    pub fn kept_folder_count(&self) -> usize {
+        self.all_folders()
+            .into_iter()
+            .filter(|f| f.existing.is_some())
+            .count()
+    }
+
+    pub fn total_folder_count(&self) -> usize {
+        self.all_folders().len()
     }
 
     pub fn new_favorite_count(&self) -> usize {
@@ -165,7 +191,8 @@ impl Preview {
     pub fn new_pin_count(&self) -> usize {
         let ungrouped: usize = self.spaces.iter().map(|s| s.new_pins.len()).sum();
         let foldered = self
-            .folders()
+            .all_folders()
+            .into_iter()
             .flat_map(|f| &f.additions)
             .filter(|a| matches!(a, FolderAddition::New(_)))
             .count();
@@ -174,14 +201,21 @@ impl Preview {
 
     /// Ungrouped Pins the import moves into a folder.
     pub fn moved_pin_count(&self) -> usize {
-        self.folders()
+        self.all_folders()
+            .into_iter()
             .flat_map(|f| &f.additions)
             .filter(|a| matches!(a, FolderAddition::Move(_)))
             .count()
     }
 
-    fn folders(&self) -> impl Iterator<Item = &FolderPreview> {
-        self.spaces.iter().flat_map(|s| &s.folders)
+    fn all_folders(&self) -> Vec<&FolderPreview> {
+        let mut out = Vec::new();
+        for space in &self.spaces {
+            for folder in &space.folders {
+                folder.collect_all(&mut out);
+            }
+        }
+        out
     }
 
     pub fn kept_pin_count(&self) -> usize {
@@ -275,27 +309,53 @@ enum Role<'a> {
     Favorite,
     /// An ungrouped Pin of the export Space with this index.
     Pin(usize),
-    /// An entry of a group of the export Space with this index.
-    Grouped(usize, &'a Group),
+    /// A Markdown `Favorites` group entry of the export Space with this index.
+    FavoritesGroup(usize),
+    /// An entry of a folder (possibly nested) in the export Space with this index.
+    /// The slice holds the folder label path from root to target.
+    Grouped(usize, Vec<&'a str>),
 }
 
 /// Every entry with its role, in [`Report::entries`] order.
-fn entries(report: &Report) -> impl Iterator<Item = (Role<'_>, &Entry)> {
-    let favorites = report.favorites.iter().map(|entry| (Role::Favorite, entry));
-    let spaces = report.spaces.iter().enumerate().flat_map(|(index, space)| {
-        let pins = space
-            .pins
-            .iter()
-            .map(move |entry| (Role::Pin(index), entry));
-        let groups = space.groups.iter().flat_map(move |group| {
-            group
-                .entries
-                .iter()
-                .map(move |entry| (Role::Grouped(index, group), entry))
-        });
-        pins.chain(groups)
-    });
-    favorites.chain(spaces)
+fn entries(report: &Report) -> Vec<(Role<'_>, &Entry)> {
+    let mut out = Vec::new();
+    for entry in &report.favorites {
+        out.push((Role::Favorite, entry));
+    }
+    for (index, space) in report.spaces.iter().enumerate() {
+        for entry in &space.pins {
+            out.push((Role::Pin(index), entry));
+        }
+        for group in &space.groups {
+            if is_favorites(group) {
+                let mut fav_entries = Vec::new();
+                group.collect_entries(&mut fav_entries);
+                for entry in fav_entries {
+                    out.push((Role::FavoritesGroup(index), entry));
+                }
+            } else {
+                let mut path = Vec::new();
+                collect_group_entries(index, group, &mut path, &mut out);
+            }
+        }
+    }
+    out
+}
+
+fn collect_group_entries<'a>(
+    space_index: usize,
+    group: &'a Group,
+    path: &mut Vec<&'a str>,
+    out: &mut Vec<(Role<'a>, &'a Entry)>,
+) {
+    path.push(group.label.as_str());
+    for entry in &group.entries {
+        out.push((Role::Grouped(space_index, path.clone()), entry));
+    }
+    for child in &group.children {
+        collect_group_entries(space_index, child, path, out);
+    }
+    path.pop();
 }
 
 fn is_favorites(group: &Group) -> bool {
@@ -349,9 +409,10 @@ fn plan(
             }
         };
         slots.push(slot);
-        // Every group names a folder, even an empty one.
+        // Every group (including nested ones) names a folder, even an empty one.
         for group in space.groups.iter().filter(|g| !is_favorites(g)) {
-            folder_slot(&mut preview.spaces[slot], &group.label, workspace);
+            let mut path = Vec::new();
+            register_group_tree(&mut preview.spaces[slot], group, &mut path, workspace);
         }
     }
     let mut present: Vec<Present> = preview
@@ -395,7 +456,7 @@ fn plan(
             }
         }
     }
-    for ((role, entry), url) in entries(report).zip(canonical) {
+    for ((role, entry), url) in entries(report).into_iter().zip(canonical) {
         let Some(url) = url else {
             preview.skipped.push(Skipped {
                 line: entry.line,
@@ -403,30 +464,23 @@ fn plan(
             });
             continue;
         };
-        let (index, group) = match role {
-            Role::Favorite => {
-                match favorites.get_mut(url.as_str()).filter(|count| **count > 0) {
-                    Some(count) => {
-                        *count -= 1;
-                        preview.kept_favorites += 1;
-                    }
-                    None => preview.new_favorites.push(NewItem::new(url, entry)),
+        match role {
+            Role::Favorite => match favorites.get_mut(url.as_str()).filter(|count| **count > 0) {
+                Some(count) => {
+                    *count -= 1;
+                    preview.kept_favorites += 1;
                 }
-                continue;
-            }
-            Role::Pin(index) => (index, None),
-            Role::Grouped(index, group) => (index, Some(group)),
-        };
-        let slot = slots[index];
-        let space = &mut preview.spaces[slot];
-        let present = &mut present[slot];
-        let ungrouped = present
-            .ungrouped
-            .get_mut(url.as_str())
-            .filter(|ids| !ids.is_empty());
-        let group = match group {
-            Some(group) if !is_favorites(group) => group,
-            _ => {
+                None => preview.new_favorites.push(NewItem::new(url, entry)),
+            },
+            Role::Pin(index) | Role::FavoritesGroup(index) => {
+                let from_favorites_group = matches!(role, Role::FavoritesGroup(_));
+                let slot = slots[index];
+                let space = &mut preview.spaces[slot];
+                let present = &mut present[slot];
+                let ungrouped = present
+                    .ungrouped
+                    .get_mut(url.as_str())
+                    .filter(|ids| !ids.is_empty());
                 match ungrouped {
                     Some(ids) => {
                         ids.remove(0);
@@ -434,54 +488,97 @@ fn plan(
                     }
                     None => {
                         space.new_pins.push(NewItem::new(url, entry));
-                        space.favorites_as_pins += usize::from(group.is_some());
+                        space.favorites_as_pins += usize::from(from_favorites_group);
                     }
                 }
-                continue;
             }
-        };
-        let folder = folder_slot(space, &group.label, workspace);
-        let held = space.folders[folder]
-            .existing
-            .and_then(|id| present.folders.get_mut(&id))
-            .and_then(|counts| counts.get_mut(url.as_str()))
-            .filter(|count| **count > 0);
-        if let Some(count) = held {
-            *count -= 1;
-            space.kept_pins += 1;
-        } else if let Some(ids) = ungrouped {
-            let id = ids.remove(0);
-            space.folders[folder]
-                .additions
-                .push(FolderAddition::Move(id));
-        } else {
-            space.folders[folder]
-                .additions
-                .push(FolderAddition::New(NewItem::new(url, entry)));
+            Role::Grouped(index, path) => {
+                let slot = slots[index];
+                let space = &mut preview.spaces[slot];
+                let present = &mut present[slot];
+                let ungrouped = present
+                    .ungrouped
+                    .get_mut(url.as_str())
+                    .filter(|ids| !ids.is_empty());
+                let folder = folder_at_path(space, &path, workspace);
+                let held = folder
+                    .existing
+                    .and_then(|id| present.folders.get_mut(&id))
+                    .and_then(|counts| counts.get_mut(url.as_str()))
+                    .filter(|count| **count > 0);
+                if let Some(count) = held {
+                    *count -= 1;
+                    space.kept_pins += 1;
+                } else if let Some(ids) = ungrouped {
+                    let id = ids.remove(0);
+                    folder.additions.push(FolderAddition::Move(id));
+                } else {
+                    folder
+                        .additions
+                        .push(FolderAddition::New(NewItem::new(url, entry)));
+                }
+            }
         }
     }
     Ok(preview)
 }
 
-/// The preview slot of the folder `label` names in `space`, added on first use.
-fn folder_slot(space: &mut SpacePreview, label: &str, workspace: &Workspace) -> usize {
-    let name = bounded_name(label, MAX_FOLDER_NAME_BYTES);
-    if let Some(slot) = space.folders.iter().position(|f| f.name == name) {
-        return slot;
+fn register_group_tree<'a>(
+    space: &mut SpacePreview,
+    group: &'a Group,
+    path: &mut Vec<&'a str>,
+    workspace: &Workspace,
+) {
+    path.push(group.label.as_str());
+    let _ = folder_at_path(space, path, workspace);
+    for child in &group.children {
+        register_group_tree(space, child, path, workspace);
     }
-    let existing = space.existing.and_then(|id| {
-        workspace
-            .folders()
-            .iter()
-            .find(|f| f.space_id == id && f.name == name)
-            .map(|f| f.id)
-    });
-    space.folders.push(FolderPreview {
-        name,
-        existing,
-        additions: Vec::new(),
-    });
-    space.folders.len() - 1
+    path.pop();
+}
+
+/// Ensures the folder chain described by `path` exists in `space` and returns
+/// a mutable reference to the leaf `FolderPreview`.
+fn folder_at_path<'a>(
+    space: &'a mut SpacePreview,
+    path: &[&str],
+    workspace: &Workspace,
+) -> &'a mut FolderPreview {
+    let space_id = space.existing;
+    let mut current_list = &mut space.folders;
+    let mut parent_existing: Option<FolderId> = None;
+    let last_idx = path.len() - 1;
+    for (i, &label) in path.iter().enumerate() {
+        let name = bounded_name(label, MAX_FOLDER_NAME_BYTES);
+        let slot = match current_list.iter().position(|f| f.name == name) {
+            Some(slot) => slot,
+            None => {
+                let existing = match (space_id, i == 0 || parent_existing.is_some()) {
+                    (Some(sid), true) => workspace
+                        .folders()
+                        .iter()
+                        .find(|f| {
+                            f.space_id == sid && f.parent_id == parent_existing && f.name == name
+                        })
+                        .map(|f| f.id),
+                    _ => None,
+                };
+                current_list.push(FolderPreview {
+                    name,
+                    existing,
+                    additions: Vec::new(),
+                    children: Vec::new(),
+                });
+                current_list.len() - 1
+            }
+        };
+        if i == last_idx {
+            return &mut current_list[slot];
+        }
+        parent_existing = current_list[slot].existing;
+        current_list = &mut current_list[slot].children;
+    }
+    unreachable!("folder path is non-empty")
 }
 
 /// Applies `plan`. Stops at the first refused step, leaving earlier steps
@@ -500,17 +597,7 @@ fn write(plan: &Preview, workspace: &mut Workspace, first: bool) -> Result<(), I
             add_pin(workspace, id, item)?;
         }
         for folder in &space.folders {
-            let folder_id = match folder.existing {
-                Some(folder_id) => folder_id,
-                None => workspace.create_folder(id, &folder.name)?,
-            };
-            for addition in &folder.additions {
-                let item = match addition {
-                    FolderAddition::New(item) => add_pin(workspace, id, item)?,
-                    FolderAddition::Move(item) => *item,
-                };
-                workspace.move_pin_to_folder(item, Some(folder_id), None)?;
-            }
+            write_folder_tree(workspace, id, None, folder)?;
         }
     }
     if !plan.new_favorites.is_empty() {
@@ -526,6 +613,29 @@ fn write(plan: &Preview, workspace: &mut Workspace, first: bool) -> Result<(), I
             let item = workspace.add_temporary_item(host)?;
             save(workspace, item, Placement::Favorite { profile_id }, new)?;
         }
+    }
+    Ok(())
+}
+
+fn write_folder_tree(
+    workspace: &mut Workspace,
+    space_id: SpaceId,
+    parent_id: Option<FolderId>,
+    folder: &FolderPreview,
+) -> Result<(), ImportError> {
+    let folder_id = match folder.existing {
+        Some(folder_id) => folder_id,
+        None => workspace.create_folder_in(space_id, parent_id, &folder.name)?,
+    };
+    for addition in &folder.additions {
+        let item = match addition {
+            FolderAddition::New(item) => add_pin(workspace, space_id, item)?,
+            FolderAddition::Move(item) => *item,
+        };
+        workspace.move_pin_to_folder(item, Some(folder_id), None)?;
+    }
+    for child in &folder.children {
+        write_folder_tree(workspace, space_id, Some(folder_id), child)?;
     }
     Ok(())
 }

@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-11-27: Nested folders across workspace core, FFI, sidebar UI, Arc import, and export
+
+- Added `parent_id: Option<FolderId>` and `MAX_FOLDER_DEPTH = 8` in `crates/workspace/src/folder.rs` (`create_folder_in`, `move_folder`, cycle/depth guards, recursive `delete_folder`, tree-preserving `export_space_into_folder`, `sanitize_folders` recovery, and ancestor-aware `SidebarSnapshot::row_order`), plus FFI (`parent_id`/`depth` on `FolderRecord`, `create_folder_in`, `move_folder`) and backwards-compatible `"parent_id"` JSON persistence in `browser/foundation/workspace_service.cc`.
+- Updated `browser/foundation/sidebar_view.{h,cc}`, `browser_workspace_adapter.{h,cc}`, and `browser_view.{h,cc}.patch` for pre-order DFS nested folder rendering with depth indentation, ancestor collapse/reveal, subfolder creation, folder `Move to Folder` menu, folder drag-and-drop reordering/nesting, and recursive delete confirmation, and updated `crates/import` (`arc_sidebar`, `arc_workspace`, `arc_report`, `bookmarks_html`) to preserve nested folders on Arc import and HTML/JSON export.
+- Verified in worktree `feat/nested-folders` with `cargo fmt`, `rustfmt`, `cargo clippy --workspace --all-targets --locked -- -D warnings`, `cargo test --workspace --locked`, `python3 tools/check_docs.py`, `node --test design/onboarding/state.test.mjs`, and `git apply --check` of the `browser_view.{h,cc}` patches against the `browser/upstream.json` base (Chromium native compile deferred so the shared checkout's in-progress `main` changes stay untouched).
+
 ## 2026-11-27: Frosted glass dialogs everywhere and sidebar-anchored prompts
 
 - Added `HasWidgetGlass()` and a `1px` specular rim overlay (`MyarcGlassRimView`) to `ApplyBubbleGlass()` (`browser/foundation/glass_mac.{h,mm}`), and hooked `views::AnyWidgetObserver` in `ChromeViewsDelegate` (`chrome_views_delegate_mac.cc`) under `--myarc-visual-parity` so all `BubbleFrameView`-backed bubbles and modal dialogs (permission prompts, Page Info, crash recovery, bookmarks, passwords, sheets) inherit dark/light frosted glass without double-applying over custom myArc popovers.

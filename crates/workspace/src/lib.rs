@@ -41,7 +41,9 @@ pub mod split;
 pub mod store;
 
 pub use drag::DropTarget;
-pub use folder::{Folder, FolderDeletion, FolderId, MAX_FOLDER_NAME_BYTES, MAX_FOLDERS};
+pub use folder::{
+    Folder, FolderDeletion, FolderId, MAX_FOLDER_DEPTH, MAX_FOLDER_NAME_BYTES, MAX_FOLDERS,
+};
 pub use split::{MAX_SPLITS, Split};
 
 pub const MAX_SPACE_NAME_BYTES: usize = 128;
@@ -130,6 +132,10 @@ pub enum WorkspaceError {
     DifferentSection(ItemId),
     /// The folder belongs to another Space than the Pin or folder it was paired with.
     DifferentFolderSpace(FolderId),
+    /// Moving a folder into itself or one of its descendants would form a cycle.
+    FolderCycle(FolderId),
+    /// Nesting a folder here would exceed `MAX_FOLDER_DEPTH`.
+    FolderDepthExceeded,
     /// A Space cannot be exported into itself.
     SameSpace(SpaceId),
     /// Only Pins go in folders.
@@ -180,6 +186,8 @@ impl fmt::Display for WorkspaceError {
             Self::ExplicitUnsaveRequired(id) => write!(formatter, "Item {id} is saved; use unsave_item with its live-page destination"),
             Self::DifferentSection(id) => write!(formatter, "Item {id} belongs to a different placement or owner section"),
             Self::DifferentFolderSpace(id) => write!(formatter, "Folder {id} belongs to a different Space"),
+            Self::FolderCycle(id) => write!(formatter, "Folder {id} cannot be moved into itself or a subfolder"),
+            Self::FolderDepthExceeded => write!(formatter, "Folders can be nested at most {MAX_FOLDER_DEPTH} levels deep"),
             Self::SameSpace(id) => write!(formatter, "Cannot export Space {id} into itself"),
             Self::NotPinned(id) => write!(formatter, "Item {id} is not a Space Pin; pin it before putting it in a folder"),
             Self::NotDraggable(id) => write!(formatter, "Item {id} is not a Pin or Today tab of this window's Space"),
@@ -1217,13 +1225,7 @@ impl Workspace {
             pins: Vec::new(),
             temporary: Vec::new(),
             space_pins: Vec::new(),
-            folders: self
-                .state
-                .folders
-                .iter()
-                .filter(|folder| folder.space_id == window.space_id)
-                .cloned()
-                .collect(),
+            folders: self.folders_in_tree_order(window.space_id),
             splits: Vec::new(),
             pins_collapsed: self.collapsed_pins.contains(&window_id),
         };

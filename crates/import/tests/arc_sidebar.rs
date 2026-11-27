@@ -107,7 +107,13 @@ fn reads_favorites_apart_from_space_pins() {
     assert_eq!(work.groups[0].label, "Projects");
     assert_eq!(
         urls(&work.groups[0].entries),
-        ["https://alpha.example.test/", "https://beta.example.test/"]
+        ["https://alpha.example.test/"]
+    );
+    assert_eq!(work.groups[0].children.len(), 1);
+    assert_eq!(work.groups[0].children[0].label, "Old");
+    assert_eq!(
+        urls(&work.groups[0].children[0].entries),
+        ["https://beta.example.test/"]
     );
     let home = &report.spaces[1];
     assert_eq!(home.label, "Home");
@@ -128,11 +134,7 @@ fn counts_what_it_leaves_out() {
     let omitted: Vec<_> = report.omitted.into_iter().collect();
     assert_eq!(
         omitted,
-        [
-            (Omission::TodayTab, 2),
-            (Omission::NestedFolder, 2),
-            (Omission::UnknownContainer, 3),
-        ]
+        [(Omission::TodayTab, 2), (Omission::UnknownContainer, 3),]
     );
 }
 
@@ -160,14 +162,29 @@ fn favorites_become_favorites_and_pins_stay_pins() {
     );
     assert_eq!(
         work.2,
-        [(
-            "Projects".to_owned(),
-            vec![
-                "https://alpha.example.test/".to_owned(),
-                "https://beta.example.test/".to_owned(),
-            ]
-        )]
+        [
+            (
+                "Projects".to_owned(),
+                vec!["https://alpha.example.test/".to_owned()]
+            ),
+            (
+                "Old".to_owned(),
+                vec!["https://beta.example.test/".to_owned()]
+            ),
+        ]
     );
+    let projects = workspace
+        .folders()
+        .iter()
+        .find(|f| f.name == "Projects")
+        .unwrap();
+    let old = workspace
+        .folders()
+        .iter()
+        .find(|f| f.name == "Old")
+        .unwrap();
+    assert_eq!(projects.parent_id, None);
+    assert_eq!(old.parent_id, Some(projects.id));
     let home = spaces.iter().find(|space| space.0 == "Home").unwrap();
     assert_eq!(home.1, ["https://news.example.test/"]);
     // No Favorite became a Pin anywhere.
@@ -237,7 +254,6 @@ fn report_names_omissions_and_no_favorites_as_pins() {
         [
             "Links left out, not web pages: 1",
             "Today tabs left out: 2",
-            "Folders inside folders, their tabs moved to the outer folder: 2",
             "Unknown sidebar parts left out: 3",
         ]
     );
@@ -320,10 +336,15 @@ fn reads_each_arc_profile_apart() {
     assert_eq!(urls(&side.pins), ["https://repo.example.test/"]);
     assert_eq!(side.groups.len(), 1);
     assert_eq!(side.groups[0].label, "Reading");
-    // "Later" sits inside "Reading"; its tab joins the outer folder.
     assert_eq!(
         urls(&side.groups[0].entries),
-        ["https://paper.example.test/", "https://essay.example.test/"]
+        ["https://paper.example.test/"]
+    );
+    assert_eq!(side.groups[0].children.len(), 1);
+    assert_eq!(side.groups[0].children[0].label, "Later");
+    assert_eq!(
+        urls(&side.groups[0].children[0].entries),
+        ["https://essay.example.test/"]
     );
     assert!(other.omitted.is_empty() && other.unrecognized.is_empty());
 }
@@ -396,15 +417,30 @@ fn another_profile_imports_into_its_own_new_profile_once() {
         [(
             "Side Project".to_owned(),
             vec!["https://repo.example.test/".to_owned()],
-            vec![(
-                "Reading".to_owned(),
-                vec![
-                    "https://paper.example.test/".to_owned(),
-                    "https://essay.example.test/".to_owned(),
-                ]
-            )]
+            vec![
+                (
+                    "Reading".to_owned(),
+                    vec!["https://paper.example.test/".to_owned()]
+                ),
+                (
+                    "Later".to_owned(),
+                    vec!["https://essay.example.test/".to_owned()]
+                ),
+            ]
         )]
     );
+    let reading = workspace
+        .folders()
+        .iter()
+        .find(|f| f.name == "Reading")
+        .unwrap();
+    let later = workspace
+        .folders()
+        .iter()
+        .find(|f| f.name == "Later")
+        .unwrap();
+    assert_eq!(reading.parent_id, None);
+    assert_eq!(later.parent_id, Some(reading.id));
     let repo = workspace.snapshot();
     let repo = repo
         .items

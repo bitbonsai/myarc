@@ -64,7 +64,7 @@ impl Line {
             Kind::FavoriteAsPin => "Favorites added as pinned tabs",
             Kind::Omitted(Omission::TodayTab) => "Today tabs left out",
             Kind::Omitted(Omission::NestedFolder) => {
-                "Folders inside folders, their tabs moved to the outer folder"
+                "Folders deeper than the nesting limit, their tabs moved up"
             }
             Kind::Omitted(Omission::UnknownContainer) => "Unknown sidebar parts left out",
             Kind::SpaceNameShortened => "Space names shortened to fit",
@@ -108,12 +108,14 @@ pub fn lines(report: &Report, canonical: &[Option<String>], plan: &Preview) -> V
     for (&omission, &count) in &report.omitted {
         add(Kind::Omitted(omission), count);
     }
-    let groups: Vec<_> = report
-        .spaces
-        .iter()
-        .flat_map(|space| &space.groups)
-        .filter(|group| group.label.trim() != FAVORITES_LABEL)
-        .collect();
+    let mut groups = Vec::new();
+    for space in &report.spaces {
+        for group in &space.groups {
+            if group.label.trim() != FAVORITES_LABEL {
+                group.collect_groups(&mut groups);
+            }
+        }
+    }
     add(
         Kind::SpaceNameShortened,
         report
@@ -133,7 +135,7 @@ pub fn lines(report: &Report, canonical: &[Option<String>], plan: &Preview) -> V
         Kind::RepeatedSpace,
         report.spaces.len().saturating_sub(plan.spaces.len()),
     );
-    let folders: usize = plan.spaces.iter().map(|space| space.folders.len()).sum();
+    let folders: usize = plan.total_folder_count();
     add(Kind::RepeatedFolder, groups.len().saturating_sub(folders));
     counts
         .into_iter()

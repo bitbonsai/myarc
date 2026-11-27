@@ -191,10 +191,16 @@ class SidebarView final : public views::View,
     virtual void UnsaveItem(uint64_t item_id) = 0;
     // Folders of the current Space's Pins. The parent names a new folder
     // and lets the user rename it, confirms a delete, and reports errors.
-    virtual void CreateFolder() = 0;
+    // Nonzero `parent_folder_id` creates a subfolder inside that folder.
+    virtual void CreateFolder(uint64_t parent_folder_id = 0) = 0;
     virtual void RenameFolder(uint64_t folder_id) = 0;
     virtual void DeleteFolder(uint64_t folder_id) = 0;
     virtual void SetFolderOpen(uint64_t folder_id, bool open) = 0;
+    // Moves `folder_id` under `parent_folder_id` (0 = top-level) before
+    // `before_folder_id` (0 = end). Returns false if rejected.
+    virtual bool MoveFolder(uint64_t folder_id,
+                            uint64_t parent_folder_id,
+                            uint64_t before_folder_id) = 0;
     // Pins `item_id` first if needed. Zero `folder_id` takes it out of its
     // folder.
     virtual void MovePinToFolder(uint64_t item_id, uint64_t folder_id) = 0;
@@ -502,6 +508,10 @@ class SidebarView final : public views::View,
     // A Favorite's tile. Favorites reorder among themselves, and a row
     // dropped there becomes a Favorite.
     bool favorite = false;
+    // A folder row itself, which can be dragged to reorder or nest.
+    bool is_folder_row = false;
+    uint64_t parent_folder = 0;
+    uint64_t next_folder = 0;
   };
   // Where a drag would land now, and the line or outline that shows it, in
   // this view's coordinates.
@@ -520,6 +530,8 @@ class SidebarView final : public views::View,
     uint64_t item = 0;
     bool split = false;
     bool favorite = false;
+    // True when dragging a folder row (`item` is the folder ID).
+    bool is_folder = false;
     raw_ptr<views::View> source;
     gfx::Point press;
     // The pointer's last place, which edge scrolling drops at.
@@ -699,11 +711,14 @@ class SidebarView final : public views::View,
   uint64_t active_item_id_ = 0;
   // The folder whose row menu is open, or 0.
   uint64_t menu_folder_id_ = 0;
-  // The current Space's folders, for the Move to Folder menu.
+  // The current Space's folders in tree order, for menus and drag checks.
   struct FolderEntry {
     uint64_t id = 0;
+    uint64_t parent_id = 0;
+    uint32_t depth = 0;
     std::u16string name;
   };
+  bool IsFolderDescendant(uint64_t ancestor, uint64_t candidate) const;
   std::vector<FolderEntry> folders_;
   std::vector<SpaceEntry> spaces_;
   std::vector<OtherSpaceEntry> other_spaces_;

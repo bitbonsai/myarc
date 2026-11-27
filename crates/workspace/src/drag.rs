@@ -211,8 +211,9 @@ impl SidebarSnapshot {
                 .filter(|&id| !foldered(id) && shown(id)),
         );
         for folder in &self.folders {
+            let chain_open = crate::folder::folder_chain_open(&self.folders, folder.id);
             order.extend(folder.items.iter().copied().filter(|&id| {
-                (folder.open || self.selected_item_id == Some(id))
+                (chain_open || self.selected_item_id == Some(id))
                     && shown(id)
                     && self.pins.iter().any(|item| item.id == id)
             }));

@@ -236,6 +236,10 @@ class WorkspaceService final : public base::SupportsUserData::Data {
       base::span<const uint64_t> live);
   // Folders of a Space's Pins. Create returns the folder's ID and opens it.
   foundation::MutationResult CreateFolder(uint64_t space, std::string_view name);
+  // Zero `parent` creates a top-level folder; nonzero nests inside `parent`.
+  foundation::MutationResult CreateFolderIn(uint64_t space,
+                                            uint64_t parent,
+                                            std::string_view name);
   // Creates a new open folder named after `source_space` inside `target_space`
   // and copies all of `source_space`'s Pins (loose and folder items) into it.
   foundation::MutationResult ExportSpaceIntoFolder(uint64_t source_space,
@@ -247,6 +251,10 @@ class WorkspaceService final : public base::SupportsUserData::Data {
   foundation::MutationResult SetFolderOpen(uint64_t folder, bool open);
   // Zero before moves the folder to the end of its Space's folders.
   foundation::MutationResult MoveFolderBefore(uint64_t folder, uint64_t before);
+  // Moves `folder` under `parent` (0 = top-level) before `before` (0 = end).
+  foundation::MutationResult MoveFolder(uint64_t folder,
+                                        uint64_t parent,
+                                        uint64_t before);
   // Zero folder takes the Pin out of its folder; zero before appends.
   foundation::MutationResult MovePinToFolder(uint64_t item,
                                              uint64_t folder,
