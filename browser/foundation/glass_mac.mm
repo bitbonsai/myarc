@@ -103,8 +103,8 @@
   layer.borderWidth = 1.0;
   layer.borderColor =
       (_myarcDark
-           ? [NSColor colorWithSRGBRed:1.0 green:1.0 blue:1.0 alpha:0.20]
-           : [NSColor colorWithSRGBRed:0.0 green:0.0 blue:0.0 alpha:0.14])
+           ? [NSColor colorWithSRGBRed:1.0 green:1.0 blue:1.0 alpha:0.12]
+           : [NSColor colorWithSRGBRed:0.0 green:0.0 blue:0.0 alpha:0.10])
           .CGColor;
 }
 @end
@@ -118,9 +118,10 @@ NSVisualEffectMaterial ToAppKitMaterial(GlassMaterial material) {
   switch (material) {
     case GlassMaterial::kWindow:
     case GlassMaterial::kHud:
+      return NSVisualEffectMaterialHUDWindow;
     case GlassMaterial::kPopover:
     case GlassMaterial::kSheet:
-      return NSVisualEffectMaterialHUDWindow;
+      return NSVisualEffectMaterialPopover;
   }
 }
 
@@ -163,6 +164,13 @@ MyarcGlassBackdropView* FindBackdrop(NSView* content) {
   return nil;
 }
 
+void MarkWindowGlassStyled(NSWindow* window) {
+  if (window) {
+    objc_setAssociatedObject(window, &kMyarcGlassStyledKey, @YES,
+                             OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+  }
+}
+
 MyarcGlassRimView* FindRim(NSView* content) {
   for (NSView* view in content.subviews) {
     if ([view isKindOfClass:[MyarcGlassRimView class]]) {
@@ -199,13 +207,6 @@ void ApplyBubbleRim(NSWindow* window,
   rim.myarcDark = dark;
   [rim updateFrameForSuperview];
   [rim setNeedsDisplay:YES];
-}
-
-void MarkWindowGlassStyled(NSWindow* window) {
-  if (window) {
-    objc_setAssociatedObject(window, &kMyarcGlassStyledKey, @YES,
-                             OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-  }
 }
 
 }  // namespace

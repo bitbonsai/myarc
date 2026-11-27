@@ -1,5 +1,5 @@
 diff --git a/ui/views/controls/button/md_text_button.cc b/ui/views/controls/button/md_text_button.cc
-index f4f6b86afe..97868758e5 100644
+index f4f6b86afebdc20b3ad6aeffd34f64655195df77..ab1ca6a7a69418e474aab233a571e518df473b48 100644
 --- a/ui/views/controls/button/md_text_button.cc
 +++ b/ui/views/controls/button/md_text_button.cc
 @@ -9,6 +9,7 @@
@@ -16,8 +16,30 @@ index f4f6b86afe..97868758e5 100644
    }
 +  if (base::CommandLine::ForCurrentProcess()->HasSwitch(
 +          "myarc-visual-parity")) {
-+    return gfx::RoundedCornersF(8.0f);
++    return gfx::RoundedCornersF(10.0f);
 +  }
    return gfx::RoundedCornersF(LayoutProvider::Get()->GetCornerRadiusMetric(
        ShapeContextTokens::kButtonRadius, size()));
  }
+@@ -263,6 +268,11 @@ void MdTextButton::UpdatePadding() {
+ gfx::Insets MdTextButton::CalculateDefaultPadding() const {
+   int target_height = LayoutProvider::GetControlHeightForFont(
+       label()->GetTextContext(), style::STYLE_PRIMARY, label()->font_list());
++  const bool myarc_parity =
++      base::CommandLine::ForCurrentProcess()->HasSwitch("myarc-visual-parity");
++  if (myarc_parity) {
++    target_height = std::max(target_height, 36);
++  }
+ 
+   int label_height = label()->GetPreferredSize({}).height();
+   DCHECK_GE(target_height, label_height);
+@@ -274,6 +284,9 @@ gfx::Insets MdTextButton::CalculateDefaultPadding() const {
+   // we apply the MD treatment to all buttons, even GTK buttons?
+   int right_padding = LayoutProvider::Get()->GetDistanceMetric(
+       DISTANCE_BUTTON_HORIZONTAL_PADDING);
++  if (myarc_parity) {
++    right_padding = std::max(right_padding, 16);
++  }
+   int left_padding = right_padding;
+   if (HasImage(GetVisualState())) {
+     constexpr int kLeftPadding = 12;

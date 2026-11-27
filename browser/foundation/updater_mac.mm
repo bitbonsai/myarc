@@ -1671,26 +1671,45 @@ void MaybeShowUpdaterPreview() {
   window.movableByWindowBackground = YES;
   window.releasedWhenClosed = NO;
   window.delegate = self;
+  [[window standardWindowButton:NSWindowMiniaturizeButton] setHidden:YES];
+  [[window standardWindowButton:NSWindowZoomButton] setHidden:YES];
 
-  NSVisualEffectView* glass =
-      [[NSVisualEffectView alloc] initWithFrame:frame];
-  glass.material = NSVisualEffectMaterialPopover;
-  glass.blendingMode = NSVisualEffectBlendingModeBehindWindow;
-  glass.state = NSVisualEffectStateActive;
-  glass.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
-  window.contentView = glass;
+  NSView* root = [[NSView alloc] initWithFrame:frame];
+  root.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
+  window.contentView = root;
+
+  myarc::ApplyNSWindowGlass(window, myarc::GlassMaterial::kHud,
+                            myarc::kWindowCornerRadius, /*dark=*/true);
+
+  MyarcUpdaterCanvasView* canvas =
+      [[MyarcUpdaterCanvasView alloc] initWithFrame:frame];
+  canvas.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
+  [root addSubview:canvas];
 
   NSImageView* icon = [[NSImageView alloc]
       initWithFrame:NSMakeRect((kWidth - 72) / 2, kHeight - 104, 72, 72)];
-  icon.image = NSApp.applicationIconImage;
+  icon.image = myarc::UpdaterAppIcon();
   icon.imageScaling = NSImageScaleProportionallyUpOrDown;
-  [glass addSubview:icon];
+  icon.wantsLayer = YES;
+  icon.layer.shadowColor = NSColor.blackColor.CGColor;
+  icon.layer.shadowOpacity = 0.35f;
+  icon.layer.shadowRadius = 10.0f;
+  icon.layer.shadowOffset = CGSizeMake(0, -3);
+  [canvas addSubview:icon];
+
+  NSColor* primary_ink = [NSColor colorWithSRGBRed:0xF5 / 255.0
+                                             green:0xF5 / 255.0
+                                              blue:0xF7 / 255.0
+                                             alpha:1.0];
+  NSColor* secondary_ink = [NSColor colorWithWhite:1.0 alpha:0.68];
+  NSColor* tertiary_ink = [NSColor colorWithWhite:1.0 alpha:0.44];
 
   NSTextField* title = [NSTextField labelWithString:@"myArc"];
   title.font = [NSFont systemFontOfSize:20 weight:NSFontWeightBold];
+  title.textColor = primary_ink;
   title.alignment = NSTextAlignmentCenter;
   title.frame = NSMakeRect(20, kHeight - 138, kWidth - 40, 26);
-  [glass addSubview:title];
+  [canvas addSubview:title];
 
   NSBundle* bundle = base::apple::OuterBundle();
   NSString* myarc_ver =
@@ -1701,10 +1720,10 @@ void MaybeShowUpdaterPreview() {
                        : @"Developer Build";
   NSTextField* version = [NSTextField labelWithString:version_line];
   version.font = [NSFont systemFontOfSize:13 weight:NSFontWeightMedium];
-  version.textColor = [NSColor secondaryLabelColor];
+  version.textColor = secondary_ink;
   version.alignment = NSTextAlignmentCenter;
   version.frame = NSMakeRect(20, kHeight - 160, kWidth - 40, 18);
-  [glass addSubview:version];
+  [canvas addSubview:version];
 
   NSString* chromium_ver =
       base::apple::ObjCCast<NSString>(
@@ -1716,50 +1735,47 @@ void MaybeShowUpdaterPreview() {
   NSTextField* engine = [NSTextField labelWithString:engine_line];
   engine.font = [NSFont monospacedDigitSystemFontOfSize:11
                                                  weight:NSFontWeightRegular];
-  engine.textColor = [NSColor tertiaryLabelColor];
+  engine.textColor = tertiary_ink;
   engine.alignment = NSTextAlignmentCenter;
   engine.frame = NSMakeRect(20, kHeight - 180, kWidth - 40, 16);
-  [glass addSubview:engine];
+  [canvas addSubview:engine];
 
   const BOOL has_updater = myarc::UpdaterAvailable();
   if (has_updater) {
-    NSButton* check_btn = [NSButton buttonWithTitle:@"Check for Updates…"
-                                             target:self
-                                             action:@selector(checkUpdates:)];
-    check_btn.bezelStyle = NSBezelStyleRounded;
+    MyarcUpdaterButton* check_btn = [[MyarcUpdaterButton alloc]
+        initWithStyle:MyarcUpdaterButtonStylePrimary];
+    check_btn.title = @"Check for Updates…";
+    check_btn.target = self;
+    check_btn.action = @selector(checkUpdates:);
     check_btn.keyEquivalent = @"\r";
-    check_btn.frame = NSMakeRect((kWidth - 168) / 2, 72, 168, 30);
-    [glass addSubview:check_btn];
+    check_btn.frame = NSMakeRect((kWidth - 172) / 2, 72, 172, 30);
+    [canvas addSubview:check_btn];
   }
 
-  const CGFloat link_y = has_updater ? 40 : 62;
-  NSButton* site_btn = [NSButton buttonWithTitle:@"myarc.dev"
-                                          target:self
-                                          action:@selector(openWebsite:)];
-  site_btn.bezelStyle = NSBezelStyleRecessed;
-  site_btn.bordered = NO;
-  site_btn.font = [NSFont systemFontOfSize:12 weight:NSFontWeightMedium];
-  site_btn.contentTintColor = [NSColor linkColor];
-  site_btn.frame = NSMakeRect(kWidth / 2 - 92, link_y, 84, 22);
-  [glass addSubview:site_btn];
+  const CGFloat link_y = has_updater ? 38 : 60;
+  MyarcUpdaterButton* site_btn = [[MyarcUpdaterButton alloc]
+      initWithStyle:MyarcUpdaterButtonStyleSecondary];
+  site_btn.title = @"myarc.dev";
+  site_btn.target = self;
+  site_btn.action = @selector(openWebsite:);
+  site_btn.frame = NSMakeRect(kWidth / 2 - 94, link_y, 88, 26);
+  [canvas addSubview:site_btn];
 
-  NSButton* gh_btn = [NSButton buttonWithTitle:@"GitHub"
-                                        target:self
-                                        action:@selector(openGitHub:)];
-  gh_btn.bezelStyle = NSBezelStyleRecessed;
-  gh_btn.bordered = NO;
-  gh_btn.font = [NSFont systemFontOfSize:12 weight:NSFontWeightMedium];
-  gh_btn.contentTintColor = [NSColor linkColor];
-  gh_btn.frame = NSMakeRect(kWidth / 2 + 8, link_y, 84, 22);
-  [glass addSubview:gh_btn];
+  MyarcUpdaterButton* gh_btn = [[MyarcUpdaterButton alloc]
+      initWithStyle:MyarcUpdaterButtonStyleSecondary];
+  gh_btn.title = @"GitHub";
+  gh_btn.target = self;
+  gh_btn.action = @selector(openGitHub:);
+  gh_btn.frame = NSMakeRect(kWidth / 2 + 6, link_y, 88, 26);
+  [canvas addSubview:gh_btn];
 
-  NSTextField* footer = [NSTextField
-      labelWithString:@"MIT License · Built on Chromium"];
+  NSTextField* footer =
+      [NSTextField labelWithString:@"GPL-3.0 · Built on Chromium"];
   footer.font = [NSFont systemFontOfSize:11 weight:NSFontWeightRegular];
-  footer.textColor = [NSColor tertiaryLabelColor];
+  footer.textColor = tertiary_ink;
   footer.alignment = NSTextAlignmentCenter;
-  footer.frame = NSMakeRect(20, 16, kWidth - 40, 16);
-  [glass addSubview:footer];
+  footer.frame = NSMakeRect(20, 14, kWidth - 40, 16);
+  [canvas addSubview:footer];
 
   _window = window;
   [_window center];

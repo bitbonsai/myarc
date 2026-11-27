@@ -1,5 +1,5 @@
 diff --git a/chrome/browser/ui/views/frame/browser_view.cc b/chrome/browser/ui/views/frame/browser_view.cc
-index 7b568f6de760af21d6e9d2aa44415a7cef617c51..e1baa33f45b131925092ffd782ff487ebbaeeb17 100644
+index 7b568f6de760af21d6e9d2aa44415a7cef617c51..bfb8dd537756312fbf5da00ea89e60e7a2cac284 100644
 --- a/chrome/browser/ui/views/frame/browser_view.cc
 +++ b/chrome/browser/ui/views/frame/browser_view.cc
 @@ -11,6 +11,7 @@
@@ -2823,7 +2823,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..e1baa33f45b131925092ffd782ff487e
  }
  
  void BrowserView::RemovedFromWidget() {
-@@ -5267,90 +7660,3550 @@ const views::View* BrowserView::GetViewByElementId(
+@@ -5267,90 +7660,3566 @@ const views::View* BrowserView::GetViewByElementId(
  ///////////////////////////////////////////////////////////////////////////////
  // BrowserView, ui::AcceleratorTarget overrides:
  
@@ -5778,8 +5778,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..e1baa33f45b131925092ffd782ff487e
 +        color_utils::IsDark(provider->GetColor(ui::kColorDialogBackground));
 +    myarc::ApplyBubbleGlass(
 +        *myarc_space_dialog_widget_, myarc::GlassMaterial::kSheet, dark,
-+        dark ? SkColorSetARGB(0xA1, 0x1E, 0x1E, 0x24)
-+             : SkColorSetARGB(0xD4, 0xFA, 0xFA, 0xFD),
++        SK_ColorTRANSPARENT,
 +        provider ? provider->GetColor(ui::kColorDialogBackground)
 +                 : (dark ? SkColorSetRGB(0x25, 0x25, 0x28) : SK_ColorWHITE));
 +  }
@@ -5918,6 +5917,10 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..e1baa33f45b131925092ffd782ff487e
 +       u"\u201D?"}));
 +  dialog->SetModalType(ui::mojom::ModalType::kWindow);
 +  dialog->SetButtonLabel(ui::mojom::DialogButton::kOk, u"Delete");
++  dialog->SetButtonStyle(ui::mojom::DialogButton::kOk,
++                         ui::ButtonStyle::kProminent);
++  dialog->SetButtonStyle(ui::mojom::DialogButton::kCancel,
++                         ui::ButtonStyle::kDefault);
 +  // As with a folder, the Space's tabs go with it and wait in the archive.
 +  const bool archive = !browser_->GetProfile()->GetPrefs()->GetBoolean(
 +      prefs::kSavingBrowserHistoryDisabled);
@@ -5929,7 +5932,8 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..e1baa33f45b131925092ffd782ff487e
 +           : u""}));
 +  body->SetMultiLine(true);
 +  body->SetHorizontalAlignment(gfx::ALIGN_LEFT);
-+  body->SetBorder(views::CreateEmptyBorder(gfx::Insets(16)));
++  body->SetBorder(
++      views::CreateEmptyBorder(gfx::Insets::TLBR(8, 24, 16, 24)));
 +  body->SizeToFit(360);
 +  dialog->SetContentsView(std::move(body));
 +  dialog->SetAcceptCallback(base::BindOnce(
@@ -5950,10 +5954,22 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..e1baa33f45b131925092ffd782ff487e
 +        color_utils::IsDark(provider->GetColor(ui::kColorDialogBackground));
 +    myarc::ApplyBubbleGlass(
 +        *myarc_space_dialog_widget_, myarc::GlassMaterial::kSheet, dark,
-+        dark ? SkColorSetARGB(0xA1, 0x1E, 0x1E, 0x24)
-+             : SkColorSetARGB(0xD4, 0xFA, 0xFA, 0xFD),
++        SK_ColorTRANSPARENT,
 +        provider ? provider->GetColor(ui::kColorDialogBackground)
 +                 : (dark ? SkColorSetRGB(0x25, 0x25, 0x28) : SK_ColorWHITE));
++    if (views::MdTextButton* ok = dialog->GetOkButton()) {
++      ok->SetBgColorIdOverride(std::nullopt);
++      ok->SetBgColorOverrideDeprecated(SkColorSetRGB(0xDC, 0x3E, 0x42));
++      ok->SetEnabledTextColors(SK_ColorWHITE);
++    }
++    if (views::MdTextButton* cancel = dialog->GetCancelButton()) {
++      cancel->SetBgColorIdOverride(std::nullopt);
++      cancel->SetBgColorOverrideDeprecated(
++          dark ? SkColorSetA(SK_ColorWHITE, 0x1A)
++               : SkColorSetA(SK_ColorBLACK, 0x10));
++      cancel->SetEnabledTextColors(
++          dark ? SK_ColorWHITE : SkColorSetRGB(0x1D, 0x1D, 0x1F));
++    }
 +  }
 +  myarc_space_dialog_widget_->MakeCloseSynchronous(
 +      base::IgnoreArgs<views::Widget::ClosedReason>(
@@ -6440,7 +6456,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..e1baa33f45b131925092ffd782ff487e
  }
  #endif
  
-@@ -5471,6 +11324,10 @@ bool BrowserView::MaybeUpdateDevtools(content::WebContents* contents) {
+@@ -5471,6 +11340,10 @@ bool BrowserView::MaybeUpdateDevtools(content::WebContents* contents) {
  
  void BrowserView::UpdateUIForContents(WebContents* contents,
                                        bool should_layout_immediately) {
@@ -6451,7 +6467,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..e1baa33f45b131925092ffd782ff487e
    TRACE_EVENT0("ui", "BrowserView::UpdateUIForContents");
    bool needs_layout = MaybeShowBookmarkBar(contents);
  
-@@ -5706,6 +11563,26 @@ void BrowserView::LoadAccelerators() {
+@@ -5706,6 +11579,26 @@ void BrowserView::LoadAccelerators() {
    }
  
  #if BUILDFLAG(IS_MAC)
