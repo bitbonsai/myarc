@@ -7,7 +7,7 @@ HTML: https://myarc.dev/
 An open-source browser bringing back Arc, with no account required and optional AI.
 
 [Download](https://myarc.dev/download/)
-[v2026.11.26](https://github.com/bitbonsai/myarc/releases)
+[v2026.11.27](https://github.com/bitbonsai/myarc/releases)
 
 ## How you browse is part of how you work. It should outlast the company behind your browser.
 
@@ -42,7 +42,7 @@ An open-source browser bringing back Arc, with no account required and optional 
 
   Windows and Linux builds, plus optional AI with a local model, your own API key, or a hosted option.
 
-[Download myArc Alpha 2026.11.26 →](https://myarc.dev/download/) [Full alpha checklist →](https://github.com/bitbonsai/myarc/blob/main/docs/ALPHA.md)
+[Download myArc Alpha 2026.11.27 →](https://myarc.dev/download/) [Full alpha checklist →](https://github.com/bitbonsai/myarc/blob/main/docs/ALPHA.md)
 
 ## Read along
 
@@ -156,9 +156,9 @@ Arc's workflow on Chromium with ungoogled-chromium privacy patches and Chrome ex
 - Imports your Arc Spaces
 - GPL-3.0, data stays on your machine
 
-v2026.11.26November 26, 2026
+v2026.11.27November 27, 2026
 
-[Download for macOS](https://github.com/bitbonsai/myarc/releases/download/v2026.11.26/myArc-2026.11.26-arm64.dmg)
+[Download for macOS](https://github.com/bitbonsai/myarc/releases/download/v2026.11.27/myArc-2026.11.27-arm64.dmg)
 
 185.3 MB · Apple silicon · macOS 26\+ · Notarized
 
@@ -168,10 +168,10 @@ Verify download (SHA-256)
 
 SHA-256
 
-`5ca00d27203d0d28b67763be47d7b371ed4a64e5005becbe969e0ffb8a37004a`
+`01e13c36f3f231a19a47d4395f02919d9d273e4e9cd47c27fccc02c544aa6c5b`
 
 ```
-shasum -a 256 ~/Downloads/myArc-2026.11.26-arm64.dmg
+shasum -a 256 ~/Downloads/myArc-2026.11.27-arm64.dmg
 ```
 
 Copy
@@ -216,7 +216,7 @@ Copy
 - [Report a problem](https://github.com/bitbonsai/myarc/issues)
 
   Include your myArc and OS versions, and leave out private pages.
-- [GitHub releases](https://github.com/bitbonsai/myarc/releases/tag/v2026.11.26)
+- [GitHub releases](https://github.com/bitbonsai/myarc/releases/tag/v2026.11.27)
 
   Every published build.
 - [Build from source](https://github.com/bitbonsai/myarc/blob/main/browser/README.md)
