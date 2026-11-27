@@ -12,6 +12,7 @@ from fontTools.ttLib import TTFont
 from artwork import bake_shadow
 from blog import build_blog
 from changelog import check_release, dialog as changelog_dialog, load_changelog
+from design_system import design_system_doc
 from discovery import build_discovery
 from docs import URL as DOCS_URL, build_docs, load_docs
 from download import appcast, apply_release, build_download, read_release
@@ -68,6 +69,8 @@ assets = {
     '@@WORDMARK_INK@@': uri('image/svg+xml', (ASSETS / 'wordmark-ink.svg').read_bytes()),
     '@@WORDMARK_IVORY@@': uri('image/svg+xml', (ASSETS / 'wordmark-ivory.svg').read_bytes()),
     '@@LOGO_MATTE@@': logo('myarc-matte.png'),
+    '@@LOGO_MATTE_LG@@': logo('myarc-matte.png', 256),
+    '@@LOGO_GLASS_LG@@': logo('myarc-glass.png', 256),
     '@@LOGO_HERO@@': logo('myarc-matte.png', 960, {
         'radius': 48, 'offset': (0, 40), 'color': (24, 36, 50, 46), 'padding': 240,
     }),
@@ -118,7 +121,7 @@ except ValueError as error:
     raise SystemExit(f'Release data invalid: {error}') from None
 template = apply_release((ROOT / 'index.template.html').read_text(), release, changelog_dialog(changelog, release))
 try:
-    docs = load_docs(ROOT)
+    docs = load_docs(ROOT) + [design_system_doc()]
     posts = build_blog(ROOT, template, embed, ['https://myarc.dev/download/', DOCS_URL] + [doc.url for doc in docs])
     build_docs(ROOT, template, embed, docs)
 except (ValueError, OSError, RecursionError) as error:

@@ -6,6 +6,7 @@ import unittest
 
 from bs4 import BeautifulSoup
 from blog import build_blog
+from design_system import design_system_doc
 from discovery import build_discovery
 from docs import URL, build_docs, load_docs
 
@@ -131,6 +132,37 @@ class DocsTests(unittest.TestCase):
     def test_raw_html_is_text(self):
         write(self.root, 'page', 'title: T\nsummary: S\narea: Help\norder: 1', '<script>alert(1)</script>')
         self.assertNotIn('<script>', load_docs(self.root)[0].html)
+
+    def test_design_system_page_builds_into_docs_and_exports_markdown(self):
+        write(self.root, 'install', 'title: Install\nsummary: S\narea: Getting started\norder: 1')
+        docs = load_docs(self.root) + [design_system_doc()]
+        posts = build_blog(self.root, TEMPLATE, lambda html, prefix: html, [URL] + [doc.url for doc in docs])
+        build_docs(self.root, TEMPLATE, lambda html, prefix: html, docs)
+        build_discovery(self.root, '<main><h1>myArc</h1></main>', posts, docs)
+        page = BeautifulSoup((self.root / 'docs/design-system/index.html').read_text(), 'html.parser')
+        self.assertEqual('Design system', page.h1.get_text())
+        self.assertEqual('Brand and design / Design system', page.select_one('.docs-eyebrow').get_text())
+        self.assertGreaterEqual(len(page.select('.ds-swatch')), 8)
+        self.assertEqual(2, len(page.select('.ds-mark-card')))
+        self.assertEqual(2, len(page.select('.ds-lockup-card')))
+        toc_hrefs = [a['href'] for a in page.select('.docs-toc a')]
+        self.assertIn('#product-decisions', toc_hrefs)
+        self.assertIn('#brand-identity', toc_hrefs)
+        self.assertIn('#color', toc_hrefs)
+        self.assertIn('#typography', toc_hrefs)
+        markdown = (self.root / 'docs/design-system/index.md').read_text()
+        self.assertTrue(markdown.startswith('HTML: https://myarc.dev/docs/design-system/'))
+        self.assertIn('## Brand identity', markdown)
+        search_script = page.select_one('script[src^="../_assets/docs-search."]')['src']
+        bundle = (self.root / 'docs/design-system' / search_script).resolve()
+        self.assertTrue(bundle.is_file())
+        bundle_text = bundle.read_text()
+        self.assertIn('window.__MYARC_DOCS_INDEX__', bundle_text)
+        self.assertIn('"slug": "design-system"', bundle_text)
+        self.assertEqual('../', page.select_one('#docs-search')['data-prefix'])
+        index_page = BeautifulSoup((self.root / 'docs/index.html').read_text(), 'html.parser')
+        self.assertEqual('', index_page.select_one('#docs-search')['data-prefix'])
+        self.assertIsNotNone(index_page.select_one('script[src^="_assets/docs-search."]'))
 
 
 if __name__ == '__main__':
