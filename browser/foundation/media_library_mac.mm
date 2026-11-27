@@ -15,6 +15,7 @@
 #include "base/functional/bind.h"
 #include "base/location.h"
 #include "base/path_service.h"
+#include "base/strings/string_util.h"
 #include "base/strings/sys_string_conversions.h"
 #include "base/task/sequenced_task_runner.h"
 #include "base/task/thread_pool.h"
@@ -91,6 +92,22 @@ gfx::ImageSkia DecodeVideoPoster(const base::FilePath& path, int max_px) {
   return CGImageToImageSkia(cg_image.get(), 1.0f);
 }
 
+bool IsVideoPath(const base::FilePath& path) {
+  const std::string ext = base::ToLowerASCII(path.Extension());
+  return ext == ".mov" || ext == ".mp4" || ext == ".m4v" || ext == ".webm";
+}
+
+gfx::ImageSkia DecodeThumbnailFallback(const base::FilePath& path,
+                                       int max_px,
+                                       float scale) {
+  @autoreleasepool {
+    if (IsVideoPath(path)) {
+      return DecodeVideoPoster(path, max_px);
+    }
+    return DecodeWithImageIO(path, max_px, scale, /*check_size_limit=*/false);
+  }
+}
+
 }  // namespace
 
 base::FilePath GetMacScreenshotsDirectory() {
@@ -159,15 +176,15 @@ void GenerateMediaThumbnailMac(
                                                   std::move(result)));
                                return;
                              }
-                             // Fall back to ImageIO off the UI thread.
+                             // Fall back to AVFoundation (video) or ImageIO
+                             // (raster) off the UI thread.
                              base::ThreadPool::PostTaskAndReplyWithResult(
                                  FROM_HERE,
                                  {base::MayBlock(),
                                   base::TaskPriority::USER_VISIBLE},
-                                 base::BindOnce(&DecodeWithImageIO, path,
+                                 base::BindOnce(&DecodeThumbnailFallback, path,
                                                 max_px,
-                                                static_cast<float>(scale),
-                                                /*check_size_limit=*/false),
+                                                static_cast<float>(scale)),
                                  base::BindOnce(
                                      [](scoped_refptr<base::SequencedTaskRunner>
                                             runner,

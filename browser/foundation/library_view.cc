@@ -790,9 +790,9 @@ class MediaTile : public views::Button {
         on_drag_(std::move(on_drag)),
         item_(std::move(item)) {
     SetFocusBehavior(FocusBehavior::ALWAYS);
-    SetPreferredSize(gfx::Size(140, 108));
+    SetPreferredSize(gfx::Size(140, 128));
     GetViewAccessibility().SetName(item_.filename);
-    views::InstallRoundRectHighlightPathGenerator(this, gfx::Insets(), 8);
+    views::InstallRoundRectHighlightPathGenerator(this, gfx::Insets(), 10);
   }
 
   uint64_t media_id() const { return item_.id; }
@@ -841,45 +841,103 @@ class MediaTile : public views::Button {
   void PaintButtonContents(gfx::Canvas* canvas) override {
     const gfx::Rect bounds = GetLocalBounds();
     const gfx::RectF outer(bounds);
-    constexpr float kRadius = 8.0f;
+    constexpr float kCardRadius = 10.0f;
+    constexpr float kCardPadding = 10.0f;
+    constexpr float kBorderWidth = 2.0f;
+    const ui::ColorProvider* provider = GetColorProvider();
+    const bool is_dark =
+        !provider ||
+        color_utils::IsDark(provider->GetColor(ui::kColorSysSurface));
+    const bool hovered = GetState() == STATE_HOVERED;
+
+    // Uniform subtle rounded card cell behind every tile, matching Arc's
+    // 2-column Media grid.
+    cc::PaintFlags card_bg;
+    card_bg.setAntiAlias(true);
+    card_bg.setColor(
+        is_dark
+            ? SkColorSetA(SK_ColorWHITE, hovered ? 0x18 : 0x0D)
+            : SkColorSetA(SK_ColorBLACK, hovered ? 0x12 : 0x08));
+    canvas->DrawRoundRect(outer, kCardRadius, card_bg);
+
+    const auto draw_play_badge = [canvas](const gfx::Rect& target) {
+      const gfx::PointF center(target.CenterPoint());
+      const float min_dim =
+          static_cast<float>(std::min(target.width(), target.height()));
+      const float radius = std::clamp(min_dim * 0.24f, 11.0f, 15.0f);
+      cc::PaintFlags badge;
+      badge.setAntiAlias(true);
+      badge.setColor(SkColorSetA(SK_ColorBLACK, 0x7A));
+      canvas->DrawCircle(center, radius, badge);
+
+      const float tri_h = radius * 0.52f;
+      const float tri_left = radius * 0.30f;
+      const float tri_right = radius * 0.48f;
+      SkPath tri = SkPathBuilder()
+                       .moveTo(center.x() - tri_left, center.y() - tri_h)
+                       .lineTo(center.x() + tri_right, center.y())
+                       .lineTo(center.x() - tri_left, center.y() + tri_h)
+                       .close()
+                       .detach();
+      cc::PaintFlags play;
+      play.setAntiAlias(true);
+      play.setColor(SK_ColorWHITE);
+      canvas->DrawPath(tri, play);
+    };
 
     if (item_.thumbnail.IsEmpty()) {
-      cc::PaintFlags bg;
-      bg.setAntiAlias(true);
-      bg.setColor(SkColorSetA(SK_ColorWHITE, 0x16));
-      canvas->DrawRoundRect(outer, kRadius, bg);
+      if (item_.is_video) {
+        draw_play_badge(bounds);
+      }
       return;
     }
 
-    const gfx::ImageSkia img = item_.thumbnail.Rasterize(GetColorProvider());
+    const gfx::ImageSkia img = item_.thumbnail.Rasterize(provider);
     if (img.isNull()) {
+      if (item_.is_video) {
+        draw_play_badge(bounds);
+      }
       return;
     }
 
-    // White border + subtle frame around aspect-fit thumbnail, matching Arc.
+    // Crisp 2 DIP white/light border frame around the aspect-fit thumbnail so
+    // dark screenshots stay clearly separated from the dark Library card.
     const gfx::Size img_size = img.size();
-    const float avail_w = std::max(1.0f, outer.width() - 4.0f);
-    const float avail_h = std::max(1.0f, outer.height() - 4.0f);
+    const float avail_w =
+        std::max(1.0f, outer.width() - (kCardPadding + kBorderWidth) * 2.0f);
+    const float avail_h =
+        std::max(1.0f, outer.height() - (kCardPadding + kBorderWidth) * 2.0f);
     const float scale = std::min(avail_w / std::max(1, img_size.width()),
                                  avail_h / std::max(1, img_size.height()));
     const int draw_w = std::max(1, static_cast<int>(img_size.width() * scale));
     const int draw_h = std::max(1, static_cast<int>(img_size.height() * scale));
     const gfx::Rect dst((bounds.width() - draw_w) / 2,
                         (bounds.height() - draw_h) / 2, draw_w, draw_h);
-    const gfx::RectF frame(dst.x() - 2, dst.y() - 2, dst.width() + 4,
-                           dst.height() + 4);
+    const gfx::RectF frame(dst.x() - kBorderWidth, dst.y() - kBorderWidth,
+                           dst.width() + kBorderWidth * 2.0f,
+                           dst.height() + kBorderWidth * 2.0f);
 
     cc::PaintFlags border_flags;
     border_flags.setAntiAlias(true);
-    border_flags.setColor(SkColorSetA(SK_ColorWHITE, 0xE6));
-    canvas->DrawRoundRect(frame, 6.0f, border_flags);
+    border_flags.setColor(is_dark ? SkColorSetA(SK_ColorWHITE, 0xF2)
+                                  : SK_ColorWHITE);
+    canvas->DrawRoundRect(frame, 4.5f, border_flags);
+
+    if (!is_dark) {
+      cc::PaintFlags light_outline;
+      light_outline.setAntiAlias(true);
+      light_outline.setStyle(cc::PaintFlags::kStroke_Style);
+      light_outline.setStrokeWidth(1.0f);
+      light_outline.setColor(SkColorSetA(SK_ColorBLACK, 0x1A));
+      canvas->DrawRoundRect(frame, 4.5f, light_outline);
+    }
 
     canvas->Save();
     SkPath clip =
         SkPathBuilder()
             .addRRect(SkRRect::MakeRectXY(
                 SkRect::MakeXYWH(dst.x(), dst.y(), dst.width(), dst.height()),
-                4.0f, 4.0f))
+                2.5f, 2.5f))
             .detach();
     canvas->ClipPath(clip, true);
     canvas->DrawImageInt(img, 0, 0, img_size.width(), img_size.height(),
@@ -887,22 +945,7 @@ class MediaTile : public views::Button {
     canvas->Restore();
 
     if (item_.is_video) {
-      const gfx::Point center = dst.CenterPoint();
-      cc::PaintFlags badge;
-      badge.setAntiAlias(true);
-      badge.setColor(SkColorSetA(SK_ColorBLACK, 0x99));
-      canvas->DrawCircle(center, 15, badge);
-
-      SkPath tri = SkPathBuilder()
-                       .moveTo(center.x() - 4.0f, center.y() - 6.0f)
-                       .lineTo(center.x() + 7.0f, center.y())
-                       .lineTo(center.x() - 4.0f, center.y() + 6.0f)
-                       .close()
-                       .detach();
-      cc::PaintFlags play;
-      play.setAntiAlias(true);
-      play.setColor(SK_ColorWHITE);
-      canvas->DrawPath(tri, play);
+      draw_play_badge(dst);
     }
   }
 

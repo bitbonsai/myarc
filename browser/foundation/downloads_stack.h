@@ -52,6 +52,8 @@ class DownloadsStack : public views::View,
   // Fills the rows from the delegate. Returns false when there are none.
   bool LoadRows();
   void SetRows(const std::vector<SidebarView::DownloadPresentation>& rows);
+  // Attaches cached Media Library thumbnails (when Media is enabled) to rows.
+  void ApplyMediaThumbnails();
   // Tells the delegate when the rows start or stop showing.
   void SetWatching(bool watching);
   void OpenRow(uint32_t id);
