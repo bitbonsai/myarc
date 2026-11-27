@@ -1,9 +1,11 @@
 #ifndef MYARC_GLASS_MAC_H_
 #define MYARC_GLASS_MAC_H_
 
+#include "base/functional/callback.h"
 #include "build/build_config.h"
 #include "third_party/skia/include/core/SkColor.h"
 #include "ui/gfx/geometry/insets.h"
+#include "ui/gfx/native_ui_types.h"
 
 #if BUILDFLAG(IS_MAC) && defined(__OBJC__)
 #import <Cocoa/Cocoa.h>
@@ -82,6 +84,13 @@ bool ApplyBubbleGlass(views::Widget& widget,
                       SkColor opaque_fill,
                       bool draw_rim = true);
 
+// Spins `native_view` 180 degrees around its vertical center with perspective
+// (0 -> +-90 deg, invokes `on_midpoint`, then -+90 -> 0 deg). Falls back to
+// invoking `on_midpoint` immediately when Reduce Motion is enabled.
+void FlipNativeView3D(gfx::NativeView native_view,
+                      bool reverse,
+                      base::OnceClosure on_midpoint);
+
 #if defined(__OBJC__)
 // Installs or updates a behind-window NSVisualEffectView in `window`'s
 // contentView, or removes it and returns nil when Reduce Transparency is on.
@@ -117,6 +126,14 @@ inline bool ApplyBubbleGlass(views::Widget& widget,
                              SkColor opaque_fill,
                              bool draw_rim = true) {
   return false;
+}
+
+inline void FlipNativeView3D(gfx::NativeView native_view,
+                             bool reverse,
+                             base::OnceClosure on_midpoint) {
+  if (on_midpoint) {
+    std::move(on_midpoint).Run();
+  }
 }
 
 #endif  // BUILDFLAG(IS_MAC)

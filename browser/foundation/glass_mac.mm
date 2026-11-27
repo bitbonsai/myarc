@@ -487,4 +487,114 @@ bool ApplyBubbleGlass(views::Widget& widget,
   return applied;
 }
 
+namespace {
+
+CATransform3D MakeCenteredFlipTransform(CGFloat width,
+                                        CGFloat height,
+                                        CGFloat angle_rad,
+                                        CGFloat scale) {
+  const CGFloat cx = width * 0.5;
+  const CGFloat cy = height * 0.5;
+  CATransform3D to_origin = CATransform3DMakeTranslation(-cx, -cy, 0.0);
+  CATransform3D rot = CATransform3DIdentity;
+  rot.m34 = -1.0 / 1400.0;
+  rot = CATransform3DRotate(rot, angle_rad, 0.0, 1.0, 0.0);
+  rot = CATransform3DScale(rot, scale, scale, 1.0);
+  CATransform3D back = CATransform3DMakeTranslation(cx, cy, 0.0);
+  return CATransform3DConcat(CATransform3DConcat(to_origin, rot), back);
+}
+
+CAKeyframeAnimation* MakeFlipKeyframe(CGFloat width,
+                                      CGFloat height,
+                                      CGFloat start_deg,
+                                      CGFloat end_deg,
+                                      CGFloat start_scale,
+                                      CGFloat end_scale,
+                                      CFTimeInterval duration,
+                                      CAMediaTimingFunctionName timing_name) {
+  constexpr int kSteps = 8;
+  NSMutableArray* values = [NSMutableArray arrayWithCapacity:kSteps + 1];
+  for (int i = 0; i <= kSteps; ++i) {
+    const CGFloat t = static_cast<CGFloat>(i) / static_cast<CGFloat>(kSteps);
+    const CGFloat deg = start_deg + (end_deg - start_deg) * t;
+    const CGFloat scale = start_scale + (end_scale - start_scale) * t;
+    const CGFloat rad = deg * (M_PI / 180.0);
+    [values addObject:[NSValue valueWithCATransform3D:MakeCenteredFlipTransform(
+                                                          width, height, rad,
+                                                          scale)]];
+  }
+  CAKeyframeAnimation* anim =
+      [CAKeyframeAnimation animationWithKeyPath:@"transform"];
+  anim.values = values;
+  anim.duration = duration;
+  anim.timingFunction = [CAMediaTimingFunction functionWithName:timing_name];
+  anim.fillMode = kCAFillModeForwards;
+  anim.removedOnCompletion = NO;
+  return anim;
+}
+
+}  // namespace
+
+void FlipNativeView3D(gfx::NativeView native_view,
+                      bool reverse,
+                      base::OnceClosure on_midpoint) {
+  NSView* view = native_view.GetNativeNSView();
+  if (!view ||
+      [[NSWorkspace sharedWorkspace] accessibilityDisplayShouldReduceMotion]) {
+    if (on_midpoint) {
+      std::move(on_midpoint).Run();
+    }
+    return;
+  }
+
+  view.wantsLayer = YES;
+  CALayer* layer = view.layer;
+  if (!layer) {
+    if (on_midpoint) {
+      std::move(on_midpoint).Run();
+    }
+    return;
+  }
+
+  const CGFloat width = NSWidth(view.bounds);
+  const CGFloat height = NSHeight(view.bounds);
+  if (width <= 1.0 || height <= 1.0) {
+    if (on_midpoint) {
+      std::move(on_midpoint).Run();
+    }
+    return;
+  }
+
+  const CGFloat dir = reverse ? -1.0 : 1.0;
+  __block base::OnceClosure midpoint_cb = std::move(on_midpoint);
+
+  [layer removeAnimationForKey:@"myarcFlip3D"];
+
+  [CATransaction begin];
+  [CATransaction setCompletionBlock:^{
+    if (midpoint_cb) {
+      std::move(midpoint_cb).Run();
+    }
+    if (!view.window || !view.layer) {
+      return;
+    }
+    [CATransaction begin];
+    [CATransaction setCompletionBlock:^{
+      [view.layer removeAnimationForKey:@"myarcFlip3D"];
+      view.layer.transform = CATransform3DIdentity;
+    }];
+    CAKeyframeAnimation* phase2 = MakeFlipKeyframe(
+        width, height, -90.0 * dir, 0.0, 0.93, 1.0, 0.25,
+        kCAMediaTimingFunctionEaseOut);
+    [view.layer addAnimation:phase2 forKey:@"myarcFlip3D"];
+    [CATransaction commit];
+  }];
+
+  CAKeyframeAnimation* phase1 =
+      MakeFlipKeyframe(width, height, 0.0, 90.0 * dir, 1.0, 0.93, 0.20,
+                       kCAMediaTimingFunctionEaseIn);
+  [layer addAnimation:phase1 forKey:@"myarcFlip3D"];
+  [CATransaction commit];
+}
+
 }  // namespace myarc

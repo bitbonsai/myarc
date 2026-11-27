@@ -1,5 +1,5 @@
 diff --git a/chrome/browser/ui/views/frame/multi_contents_view.cc b/chrome/browser/ui/views/frame/multi_contents_view.cc
-index a756f076ffce50efa86bb84421b4ff8a77e8c581..86cb552238260d697c36aff8f95b7f421a933d85 100644
+index a756f076ffce50efa86bb84421b4ff8a77e8c581..2ae0352c677810b4cf2f0ffa1f3d2f868969e23f 100644
 --- a/chrome/browser/ui/views/frame/multi_contents_view.cc
 +++ b/chrome/browser/ui/views/frame/multi_contents_view.cc
 @@ -8,7 +8,9 @@
@@ -44,7 +44,7 @@ index a756f076ffce50efa86bb84421b4ff8a77e8c581..86cb552238260d697c36aff8f95b7f42
        base::BindRepeating(&MultiContentsView::OnDragAndDropPrefStateChange,
                            base::Unretained(this)));
 +
-+  split_open_animation_.SetSlideDuration(base::Milliseconds(220));
++  split_open_animation_.SetSlideDuration(base::Milliseconds(260));
 +  split_open_animation_.SetTweenType(gfx::Tween::FAST_OUT_SLOW_IN);
 +  split_open_animation_.Reset(1.0);
  }
@@ -62,7 +62,20 @@ index a756f076ffce50efa86bb84421b4ff8a77e8c581..86cb552238260d697c36aff8f95b7f42
    }
  }
  
-@@ -285,6 +306,12 @@ void MultiContentsView::ShowSplitView(
+@@ -267,6 +288,12 @@ void MultiContentsView::SetWebContentsAtIndex(
+       web_contents);
+ 
+   if (index == 1 && !contents_container_views_[1]->GetVisible()) {
++    if (IsMyarcVisualParity() && gfx::Animation::ShouldRenderRichAnimation()) {
++      split_open_animation_.Reset(0.0);
++      split_open_animation_.Show();
++    } else {
++      split_open_animation_.Reset(1.0);
++    }
+     contents_container_views_[1]->SetVisible(true);
+     resize_area_->SetVisible(true);
+     UpdateContentsBorderAndOverlay();
+@@ -285,6 +312,12 @@ void MultiContentsView::ShowSplitView(
      // If split view is not visible, set the `visual_data_` and update the view
      // visibility.
      visual_data_ = visual_data;
@@ -75,7 +88,7 @@ index a756f076ffce50efa86bb84421b4ff8a77e8c581..86cb552238260d697c36aff8f95b7f42
      contents_container_views_[1]->SetVisible(true);
      resize_area_->SetVisible(true);
      resize_area_->SetLayout(visual_data.split_layout());
-@@ -299,6 +326,7 @@ void MultiContentsView::CloseSplitView() {
+@@ -299,6 +332,7 @@ void MultiContentsView::CloseSplitView() {
    if (!IsInSplitView()) {
      return;
    }
@@ -83,7 +96,7 @@ index a756f076ffce50efa86bb84421b4ff8a77e8c581..86cb552238260d697c36aff8f95b7f42
  
    if (active_index_ != 0) {
      SwapContentsInSplitView();
-@@ -405,6 +433,7 @@ std::vector<views::View*> MultiContentsView::GetAccessiblePanes() {
+@@ -405,6 +439,7 @@ std::vector<views::View*> MultiContentsView::GetAccessiblePanes() {
  }
  
  void MultiContentsView::OnResize(int resize_amount, bool done_resizing) {
@@ -91,7 +104,7 @@ index a756f076ffce50efa86bb84421b4ff8a77e8c581..86cb552238260d697c36aff8f95b7f42
    if (!initial_start_size_on_resize_.has_value()) {
      initial_start_size_on_resize_ = std::make_optional(
          GetResizeAxisComponent(contents_container_views_[0]->size()));
-@@ -441,6 +470,27 @@ void MultiContentsView::OnThemeChanged() {
+@@ -441,6 +476,27 @@ void MultiContentsView::OnThemeChanged() {
    UpdateContentsBorderAndOverlay();
  }
  
@@ -119,7 +132,7 @@ index a756f076ffce50efa86bb84421b4ff8a77e8c581..86cb552238260d697c36aff8f95b7f42
  int MultiContentsView::GetInactiveIndex() const {
    return active_index_ == 0 ? 1 : 0;
  }
-@@ -508,7 +558,8 @@ views::ProposedLayout MultiContentsView::CalculateProposedLayout(
+@@ -508,7 +564,8 @@ views::ProposedLayout MultiContentsView::CalculateProposedLayout(
    gfx::Rect available_space = gfx::Rect(width, height);
  
    const bool show_background =
@@ -129,7 +142,7 @@ index a756f076ffce50efa86bb84421b4ff8a77e8c581..86cb552238260d697c36aff8f95b7f42
    layouts.child_layouts.emplace_back(background_view_.get(), show_background,
                                       available_space);
  
-@@ -559,6 +610,10 @@ views::ProposedLayout MultiContentsView::CalculateProposedLayout(
+@@ -559,6 +616,10 @@ views::ProposedLayout MultiContentsView::CalculateProposedLayout(
  }
  
  void MultiContentsView::BeforeApplyLayout(const views::ProposedLayout& layout) {
@@ -140,7 +153,7 @@ index a756f076ffce50efa86bb84421b4ff8a77e8c581..86cb552238260d697c36aff8f95b7f42
    if (!target_content_bounds_) {
      for (auto& contents : contents_container_views_) {
        contents->SetTargetContentBounds(std::nullopt);
-@@ -581,8 +636,11 @@ void MultiContentsView::BeforeApplyLayout(const views::ProposedLayout& layout) {
+@@ -581,8 +642,11 @@ void MultiContentsView::BeforeApplyLayout(const views::ProposedLayout& layout) {
    {
      // Need to temporarily override the split view insets.
      const auto split_view_insets =
@@ -154,7 +167,7 @@ index a756f076ffce50efa86bb84421b4ff8a77e8c581..86cb552238260d697c36aff8f95b7f42
      base::AutoReset inset_override(&split_view_insets_, split_view_insets);
      target_layout = CalculateProposedLayout(
          views::SizeBounds(target_content_bounds_->actual_size));
-@@ -744,9 +802,17 @@ MultiContentsView::ViewSizes MultiContentsView::GetViewSizes(
+@@ -744,9 +808,17 @@ MultiContentsView::ViewSizes MultiContentsView::GetViewSizes(
      sizes.resize = GetSplitLayout() == split_tabs::SplitTabLayout::kSideBySide
                         ? resize_area_->GetPreferredSize().width()
                         : resize_area_->GetPreferredSize().height();
@@ -175,7 +188,7 @@ index a756f076ffce50efa86bb84421b4ff8a77e8c581..86cb552238260d697c36aff8f95b7f42
    } else {
      CHECK(!contents_container_views_[1]->GetVisible());
      sizes.start = available_size;
-@@ -754,12 +820,16 @@ MultiContentsView::ViewSizes MultiContentsView::GetViewSizes(
+@@ -754,12 +826,16 @@ MultiContentsView::ViewSizes MultiContentsView::GetViewSizes(
    return ClampToMinSize(available_space, sizes);
  }
  
@@ -195,7 +208,7 @@ index a756f076ffce50efa86bb84421b4ff8a77e8c581..86cb552238260d697c36aff8f95b7f42
      return sizes;
    }
  
-@@ -799,13 +869,18 @@ void MultiContentsView::UpdateContentsBorderAndOverlay() {
+@@ -799,13 +875,18 @@ void MultiContentsView::UpdateContentsBorderAndOverlay() {
    for (auto& contents_container_view : contents_container_views_) {
      const bool is_active =
          contents_container_view->contents_view() == GetActiveContentsView();
