@@ -15,6 +15,14 @@ v2026.11.27November 27, 2026
 
 185.3 MB · Apple silicon · macOS 26\+ · Notarized
 
+Or install with Homebrew
+
+```
+brew install --cask bitbonsai/tap/myarc
+```
+
+Copy
+
 LinuxSoonWindowsSoon
 
 Verify download (SHA-256)

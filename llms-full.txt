@@ -162,6 +162,14 @@ v2026.11.27November 27, 2026
 
 185.3 MB · Apple silicon · macOS 26\+ · Notarized
 
+Or install with Homebrew
+
+```
+brew install --cask bitbonsai/tap/myarc
+```
+
+Copy
+
 LinuxSoonWindowsSoon
 
 Verify download (SHA-256)
@@ -294,6 +302,16 @@ myArc ships as an alpha build, made from the latest code and published without r
 - macOS 26 or later. The glass window frame needs macOS 26, and myArc has only been tested on macOS 26.7.
 
 ## Install the app
+
+### With Homebrew
+
+```
+brew install --cask bitbonsai/tap/myarc
+```
+
+Homebrew puts `myArc.app` in Applications and links the `myarc` CLI onto your `PATH`. Updates continue through myArc's built-in updater.
+
+### From the DMG
 
 1. Download the DMG from the download page.
 2. Check the file against the SHA-256 checksum listed next to the download button. Run this in Terminal and compare the two values. They must match. If you kept older builds in Downloads, it prints one line per file.
@@ -621,7 +639,7 @@ Browser control is off by default. Press Cmd\+, to open Settings, go to Advanced
 
 ## Install the command
 
-myArc carries `myarc` inside the app. Link it into your `PATH`:
+If you installed myArc with Homebrew, `myarc` is already linked onto your `PATH`. Otherwise, link it from inside the app:
 
 ```
 sudo mkdir -p /usr/local/bin

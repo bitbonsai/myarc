@@ -14,7 +14,7 @@ Browser control is off by default. Press Cmd\+, to open Settings, go to Advanced
 
 ## Install the command
 
-myArc carries `myarc` inside the app. Link it into your `PATH`:
+If you installed myArc with Homebrew, `myarc` is already linked onto your `PATH`. Otherwise, link it from inside the app:
 
 ```
 sudo mkdir -p /usr/local/bin
