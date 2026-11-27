@@ -2,6 +2,10 @@
 
 One entry per alpha release, newest first, written for people using myArc. The homepage's Recent updates dialog shows them, and the build stops when the version in `release.json` has no entry here.
 
+## v2026.11.27 (2026-11-27)
+
+All dialogs, permission prompts, bubbles, and About myArc now share the dark frosted glass material, crisp rim border, 12 DIP corners, 24 DIP padding, and 7 DIP buttons. Clicking the site-controls icon in the URL pill opens the new Site Control Center popover with Copy URL, Boost, Screenshot, Reading Mode, live Boosts controls, and Extensions. You can also export any Space into a folder in another Space or to a local HTML/JSON file, and Library Media and the sidebar downloads stack show crisp framed thumbnails and video badges.
+
 ## v2026.11.26 (2026-11-26)
 
 Drag the sidebar edge to resize it across Arc's 160 to 500 DIP range, or double-click the edge to reset it. The Boost Editor now uses smoked dark glass, Tree-sitter CSS syntax highlighting, inline autocomplete with Tab and arrow-key cycling, auto-indent, auto-save, a specific element picker, and improved CSS Smart Invert. Little Arc stops oscillating on load, and the footer Profile capsule hover sits flush inside the pill.
