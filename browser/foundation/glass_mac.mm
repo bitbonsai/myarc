@@ -536,11 +536,7 @@ void AnimateCardShuffle(gfx::NativeView native_view,
   card.frame = host.bounds;
   card.contents = (__bridge id)cg_image;
   card.contentsGravity = kCAGravityResize;
-  card.cornerRadius = 10.0;
   card.masksToBounds = YES;
-  card.borderWidth = 1.0;
-  card.borderColor =
-      [NSColor colorWithWhite:1.0 alpha:0.14].CGColor;
   [host.layer addSublayer:card];
 
   [parent addChildWindow:overlay ordered:NSWindowAbove];
@@ -548,12 +544,7 @@ void AnimateCardShuffle(gfx::NativeView native_view,
   const CGFloat dir = reverse ? 1.0 : -1.0;
   const CGFloat w = NSWidth(on_screen);
 
-  CATransform3D end_t = CATransform3DIdentity;
-  end_t.m34 = -1.0 / 1600.0;
-  end_t = CATransform3DTranslate(end_t, dir * w * 0.58, -18.0, 0.0);
-  end_t = CATransform3DRotate(end_t, dir * 10.0 * (M_PI / 180.0), 0.0, 1.0, 0.0);
-  end_t = CATransform3DRotate(end_t, dir * 4.0 * (M_PI / 180.0), 0.0, 0.0, 1.0);
-  end_t = CATransform3DScale(end_t, 0.90, 0.90, 1.0);
+  CATransform3D end_t = CATransform3DMakeTranslation(dir * w * 0.45, 0.0, 0.0);
 
   CAMediaTimingFunction* curve =
       [CAMediaTimingFunction functionWithControlPoints:0.22f:1.0f:0.36f:1.0f];
@@ -562,7 +553,7 @@ void AnimateCardShuffle(gfx::NativeView native_view,
       [CABasicAnimation animationWithKeyPath:@"transform"];
   move_anim.fromValue = [NSValue valueWithCATransform3D:CATransform3DIdentity];
   move_anim.toValue = [NSValue valueWithCATransform3D:end_t];
-  move_anim.duration = 0.42;
+  move_anim.duration = 0.34;
   move_anim.timingFunction = curve;
   move_anim.fillMode = kCAFillModeForwards;
   move_anim.removedOnCompletion = NO;
@@ -571,8 +562,8 @@ void AnimateCardShuffle(gfx::NativeView native_view,
       [CABasicAnimation animationWithKeyPath:@"opacity"];
   fade_anim.fromValue = @1.0;
   fade_anim.toValue = @0.0;
-  fade_anim.duration = 0.36;
-  fade_anim.beginTime = CACurrentMediaTime() + 0.05;
+  fade_anim.duration = 0.28;
+  fade_anim.beginTime = CACurrentMediaTime() + 0.04;
   fade_anim.timingFunction = curve;
   fade_anim.fillMode = kCAFillModeForwards;
   fade_anim.removedOnCompletion = NO;
