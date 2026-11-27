@@ -519,6 +519,7 @@ typedef NS_ENUM(NSInteger, MyarcUpdaterButtonStyle) {
 // Pill push button matching Settings > Advanced's primary blue & glass buttons.
 @interface MyarcUpdaterButton : NSButton
 @property(nonatomic) MyarcUpdaterButtonStyle pillStyle;
+@property(nonatomic, strong) NSImage* leadingIcon;
 @end
 
 @implementation MyarcUpdaterButton {
@@ -527,6 +528,7 @@ typedef NS_ENUM(NSInteger, MyarcUpdaterButtonStyle) {
 }
 
 @synthesize pillStyle = _pillStyle;
+@synthesize leadingIcon = _leadingIcon;
 
 - (instancetype)initWithStyle:(MyarcUpdaterButtonStyle)style {
   self = [super initWithFrame:NSZeroRect];
@@ -569,14 +571,19 @@ typedef NS_ENUM(NSInteger, MyarcUpdaterButtonStyle) {
   if (_pillStyle == MyarcUpdaterButtonStyleLink) {
     return NSMakeSize(std::ceil(textSize.width) + 4, 24);
   }
-  return NSMakeSize(std::max<CGFloat>(74, std::ceil(textSize.width) + 28), 30);
+  const CGFloat iconExtra = _leadingIcon ? 22.0 : 0.0;
+  return NSMakeSize(
+      std::max<CGFloat>(74, std::ceil(textSize.width) + iconExtra + 28), 36);
 }
 
 - (NSFont*)labelFont {
   if (_pillStyle == MyarcUpdaterButtonStyleLink) {
     return [NSFont systemFontOfSize:12 weight:NSFontWeightMedium];
   }
-  return [NSFont systemFontOfSize:13 weight:NSFontWeightMedium];
+  if (_pillStyle == MyarcUpdaterButtonStylePrimary) {
+    return [NSFont systemFontOfSize:14 weight:NSFontWeightSemibold];
+  }
+  return [NSFont systemFontOfSize:14 weight:NSFontWeightMedium];
 }
 
 - (void)drawRect:(NSRect)dirtyRect {
@@ -643,7 +650,7 @@ typedef NS_ENUM(NSInteger, MyarcUpdaterButtonStyle) {
   }
 
   NSMutableParagraphStyle* para = [[NSMutableParagraphStyle alloc] init];
-  para.alignment = _pillStyle == MyarcUpdaterButtonStyleLink
+  para.alignment = (_pillStyle == MyarcUpdaterButtonStyleLink || _leadingIcon)
                        ? NSTextAlignmentLeft
                        : NSTextAlignmentCenter;
   NSDictionary* attrs = @{
@@ -652,10 +659,29 @@ typedef NS_ENUM(NSInteger, MyarcUpdaterButtonStyle) {
     NSParagraphStyleAttributeName : para,
   };
   NSSize textSize = [self.title sizeWithAttributes:attrs];
-  NSRect textRect =
-      NSMakeRect(0, std::floor((NSHeight(bounds) - textSize.height) / 2.0) - 0.5,
-                 NSWidth(bounds), textSize.height + 2);
-  [self.title drawInRect:textRect withAttributes:attrs];
+  if (_leadingIcon) {
+    constexpr CGFloat kIconSize = 15.0;
+    constexpr CGFloat kGap = 7.0;
+    const CGFloat totalW = kIconSize + kGap + std::ceil(textSize.width);
+    const CGFloat startX = std::floor((NSWidth(bounds) - totalW) / 2.0);
+    const CGFloat iconY = std::floor((NSHeight(bounds) - kIconSize) / 2.0);
+    [_leadingIcon drawInRect:NSMakeRect(startX, iconY, kIconSize, kIconSize)
+                    fromRect:NSZeroRect
+                   operation:NSCompositingOperationSourceOver
+                    fraction:self.enabled ? 0.90 : 0.45
+              respectFlipped:YES
+                       hints:nil];
+    NSRect textRect = NSMakeRect(
+        startX + kIconSize + kGap,
+        std::floor((NSHeight(bounds) - textSize.height) / 2.0) - 0.5,
+        std::ceil(textSize.width) + 2, textSize.height + 2);
+    [self.title drawInRect:textRect withAttributes:attrs];
+  } else {
+    NSRect textRect = NSMakeRect(
+        0, std::floor((NSHeight(bounds) - textSize.height) / 2.0) - 0.5,
+        NSWidth(bounds), textSize.height + 2);
+    [self.title drawInRect:textRect withAttributes:attrs];
+  }
 }
 
 @end
@@ -1640,12 +1666,218 @@ void MaybeShowUpdaterPreview() {
 }  // namespace
 }  // namespace myarc
 
+// Subtle clickable pill showing the myArc version + trailing copy icon.
+@interface MyarcVersionPillButton : NSButton
+@property(nonatomic, copy) NSString* displayTitle;
+@property(nonatomic, strong) NSImage* trailingIcon;
+@end
+
+@implementation MyarcVersionPillButton {
+  BOOL _hovered;
+  NSTrackingArea* _tracking;
+}
+
+@synthesize displayTitle = _displayTitle;
+@synthesize trailingIcon = _trailingIcon;
+
+- (instancetype)initWithFrame:(NSRect)frame {
+  self = [super initWithFrame:frame];
+  if (self) {
+    self.bordered = NO;
+    self.bezelStyle = NSBezelStyleInline;
+    self.focusRingType = NSFocusRingTypeExterior;
+  }
+  return self;
+}
+
+- (void)updateTrackingAreas {
+  [super updateTrackingAreas];
+  if (_tracking) {
+    [self removeTrackingArea:_tracking];
+  }
+  _tracking = [[NSTrackingArea alloc]
+      initWithRect:self.bounds
+           options:NSTrackingMouseEnteredAndExited | NSTrackingActiveAlways
+             owner:self
+          userInfo:nil];
+  [self addTrackingArea:_tracking];
+}
+
+- (void)mouseEntered:(NSEvent*)event {
+  _hovered = YES;
+  [self setNeedsDisplay:YES];
+}
+
+- (void)mouseExited:(NSEvent*)event {
+  _hovered = NO;
+  [self setNeedsDisplay:YES];
+}
+
+- (void)drawRect:(NSRect)dirtyRect {
+  const NSRect bounds = self.bounds;
+  const BOOL pressed = self.cell.isHighlighted;
+  NSBezierPath* pill =
+      [NSBezierPath bezierPathWithRoundedRect:bounds xRadius:6.0 yRadius:6.0];
+  [[NSColor colorWithWhite:1.0
+                     alpha:pressed ? 0.16 : (_hovered ? 0.11 : 0.06)] setFill];
+  [pill fill];
+
+  NSRect inset = NSInsetRect(bounds, 0.5, 0.5);
+  NSBezierPath* rim =
+      [NSBezierPath bezierPathWithRoundedRect:inset xRadius:5.5 yRadius:5.5];
+  rim.lineWidth = 1.0;
+  [[NSColor colorWithWhite:1.0 alpha:_hovered ? 0.18 : 0.10] setStroke];
+  [rim stroke];
+
+  NSDictionary* attrs = @{
+    NSFontAttributeName :
+        [NSFont systemFontOfSize:12 weight:NSFontWeightMedium],
+    NSForegroundColorAttributeName : [NSColor colorWithWhite:1.0 alpha:0.86],
+  };
+  NSString* label = _displayTitle ?: @"";
+  NSSize textSize = [label sizeWithAttributes:attrs];
+  constexpr CGFloat kIconSize = 12.0;
+  constexpr CGFloat kGap = 6.0;
+  const CGFloat totalW =
+      std::ceil(textSize.width) + (_trailingIcon ? (kGap + kIconSize) : 0.0);
+  const CGFloat startX = std::floor((NSWidth(bounds) - totalW) / 2.0);
+  const CGFloat textY =
+      std::floor((NSHeight(bounds) - textSize.height) / 2.0) - 0.5;
+  [label drawInRect:NSMakeRect(startX, textY, std::ceil(textSize.width) + 2,
+                               textSize.height + 2)
+      withAttributes:attrs];
+  if (_trailingIcon) {
+    const CGFloat iconX = startX + std::ceil(textSize.width) + kGap;
+    const CGFloat iconY = std::floor((NSHeight(bounds) - kIconSize) / 2.0);
+    [_trailingIcon drawInRect:NSMakeRect(iconX, iconY, kIconSize, kIconSize)
+                     fromRect:NSZeroRect
+                    operation:NSCompositingOperationSourceOver
+                     fraction:_hovered ? 0.85 : 0.55
+               respectFlipped:YES
+                        hints:nil];
+  }
+}
+
+@end
+
+namespace {
+
+NSImage* AboutSymbolIcon(NSString* symbol_name, CGFloat point_size) {
+  NSImage* img = [NSImage imageWithSystemSymbolName:symbol_name
+                           accessibilityDescription:nil];
+  if (!img) {
+    return nil;
+  }
+  NSImageSymbolConfiguration* size_cfg = [NSImageSymbolConfiguration
+      configurationWithPointSize:point_size
+                          weight:NSFontWeightRegular];
+  NSImageSymbolConfiguration* color_cfg = [NSImageSymbolConfiguration
+      configurationWithHierarchicalColor:[NSColor colorWithWhite:1.0
+                                                           alpha:0.92]];
+  return [img imageWithSymbolConfiguration:
+                  [size_cfg configurationByApplyingConfiguration:color_cfg]];
+}
+
+NSImage* AboutGitHubIcon() {
+  return [NSImage
+      imageWithSize:NSMakeSize(15, 15)
+            flipped:YES
+     drawingHandler:^BOOL(NSRect rect) {
+       // Standard 24x24 GitHub mark scaled to 15x15.
+       const CGFloat s = 15.0 / 24.0;
+       auto P = [s](CGFloat x, CGFloat y) { return NSMakePoint(x * s, y * s); };
+       NSBezierPath* path = [NSBezierPath bezierPath];
+       [path moveToPoint:P(12.0, 0.5)];
+       [path curveToPoint:P(0.5, 12.0)
+            controlPoint1:P(5.65, 0.5)
+            controlPoint2:P(0.5, 5.65)];
+       [path curveToPoint:P(8.36, 22.91)
+            controlPoint1:P(0.5, 17.08)
+            controlPoint2:P(3.79, 21.39)];
+       [path curveToPoint:P(9.15, 22.35)
+            controlPoint1:P(8.94, 23.02)
+            controlPoint2:P(9.15, 22.66)];
+       [path curveToPoint:P(9.13, 20.35)
+            controlPoint1:P(9.15, 22.07)
+            controlPoint2:P(9.14, 21.33)];
+       [path curveToPoint:P(5.25, 18.81)
+            controlPoint1:P(5.93, 21.05)
+            controlPoint2:P(5.25, 18.81)];
+       [path curveToPoint:P(3.97, 17.12)
+            controlPoint1:P(4.73, 17.48)
+            controlPoint2:P(3.97, 17.12)];
+       [path curveToPoint:P(4.05, 16.42)
+            controlPoint1:P(2.92, 16.40)
+            controlPoint2:P(4.05, 16.42)];
+       [path curveToPoint:P(5.82, 17.61)
+            controlPoint1:P(5.21, 16.50)
+            controlPoint2:P(5.82, 17.61)];
+       [path curveToPoint:P(9.18, 18.57)
+            controlPoint1:P(6.85, 19.38)
+            controlPoint2:P(8.52, 18.87)];
+       [path curveToPoint:P(9.91, 17.02)
+            controlPoint1:P(9.28, 17.82)
+            controlPoint2:P(9.58, 17.31)];
+       [path curveToPoint:P(4.67, 11.33)
+            controlPoint1:P(7.36, 16.73)
+            controlPoint2:P(4.67, 15.74)];
+       [path curveToPoint:P(5.86, 8.24)
+            controlPoint1:P(4.67, 10.07)
+            controlPoint2:P(5.12, 9.05)];
+       [path curveToPoint:P(5.97, 5.19)
+            controlPoint1:P(5.74, 7.95)
+            controlPoint2:P(5.34, 6.78)];
+       [path curveToPoint:P(9.15, 6.37)
+            controlPoint1:P(5.97, 5.19)
+            controlPoint2:P(6.94, 4.88)];
+       [path curveToPoint:P(14.94, 6.37)
+            controlPoint1:P(10.07, 6.11)
+            controlPoint2:P(14.02, 6.11)];
+       [path curveToPoint:P(18.12, 5.19)
+            controlPoint1:P(17.15, 4.88)
+            controlPoint2:P(18.12, 5.19)];
+       [path curveToPoint:P(18.23, 8.24)
+            controlPoint1:P(18.75, 6.78)
+            controlPoint2:P(18.35, 7.95)];
+       [path curveToPoint:P(19.42, 11.33)
+            controlPoint1:P(18.97, 9.05)
+            controlPoint2:P(19.42, 10.07)];
+       [path curveToPoint:P(14.16, 17.01)
+            controlPoint1:P(19.42, 15.75)
+            controlPoint2:P(16.73, 16.73)];
+       [path curveToPoint:P(14.94, 19.16)
+            controlPoint1:P(14.57, 17.37)
+            controlPoint2:P(14.94, 18.08)];
+       [path curveToPoint:P(14.93, 22.34)
+            controlPoint1:P(14.94, 20.71)
+            controlPoint2:P(14.93, 21.96)];
+       [path curveToPoint:P(15.73, 22.90)
+            controlPoint1:P(14.93, 22.65)
+            controlPoint2:P(15.14, 23.02)];
+       [path curveToPoint:P(23.5, 12.0)
+            controlPoint1:P(20.21, 21.39)
+            controlPoint2:P(23.5, 17.08)];
+       [path curveToPoint:P(12.0, 0.5)
+            controlPoint1:P(23.5, 5.65)
+            controlPoint2:P(18.35, 0.5)];
+       [path closePath];
+       [[NSColor colorWithWhite:1.0 alpha:0.92] setFill];
+       [path fill];
+       return YES;
+     }];
+}
+
+}  // namespace
+
 @interface MyarcAboutPanelController : NSObject <NSWindowDelegate>
 - (void)showAbout;
 @end
 
 @implementation MyarcAboutPanelController {
   NSWindow* __strong _window;
+  MyarcVersionPillButton* __strong _versionPill;
+  NSString* __strong _versionLabel;
+  NSString* __strong _copyPayload;
 }
 
 - (void)showAbout {
@@ -1656,8 +1888,12 @@ void MaybeShowUpdaterPreview() {
     return;
   }
 
-  constexpr CGFloat kWidth = 340.0;
-  constexpr CGFloat kHeight = 296.0;
+  const BOOL has_updater = myarc::UpdaterAvailable();
+  constexpr CGFloat kWidth = 332.0;
+  constexpr CGFloat kPadX = 28.0;
+  constexpr CGFloat kInnerW = kWidth - 2.0 * kPadX;
+  const CGFloat kHeight = has_updater ? 384.0 : 338.0;
+
   NSRect frame = NSMakeRect(0, 0, kWidth, kHeight);
   NSWindow* window = [[NSWindow alloc]
       initWithContentRect:frame
@@ -1681,49 +1917,49 @@ void MaybeShowUpdaterPreview() {
   myarc::ApplyNSWindowGlass(window, myarc::GlassMaterial::kHud,
                             myarc::kWindowCornerRadius, /*dark=*/true);
 
+  // MyarcUpdaterCanvasView is flipped (y = 0 at top).
   MyarcUpdaterCanvasView* canvas =
       [[MyarcUpdaterCanvasView alloc] initWithFrame:frame];
   canvas.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
   [root addSubview:canvas];
 
+  CGFloat y = 38.0;
+  constexpr CGFloat kIconSize = 76.0;
   NSImageView* icon = [[NSImageView alloc]
-      initWithFrame:NSMakeRect((kWidth - 72) / 2, kHeight - 104, 72, 72)];
+      initWithFrame:NSMakeRect((kWidth - kIconSize) / 2.0, y, kIconSize,
+                               kIconSize)];
   icon.image = myarc::UpdaterAppIcon();
   icon.imageScaling = NSImageScaleProportionallyUpOrDown;
   icon.wantsLayer = YES;
   icon.layer.shadowColor = NSColor.blackColor.CGColor;
   icon.layer.shadowOpacity = 0.35f;
   icon.layer.shadowRadius = 10.0f;
-  icon.layer.shadowOffset = CGSizeMake(0, -3);
+  icon.layer.shadowOffset = CGSizeMake(0, -4);
   [canvas addSubview:icon];
+  y += kIconSize + 14.0;
 
   NSColor* primary_ink = [NSColor colorWithSRGBRed:0xF5 / 255.0
                                              green:0xF5 / 255.0
                                               blue:0xF7 / 255.0
                                              alpha:1.0];
-  NSColor* secondary_ink = [NSColor colorWithWhite:1.0 alpha:0.68];
-  NSColor* tertiary_ink = [NSColor colorWithWhite:1.0 alpha:0.44];
+  NSColor* secondary_ink = [NSColor colorWithWhite:1.0 alpha:0.50];
+  NSColor* footer_ink = [NSColor colorWithWhite:1.0 alpha:0.42];
 
   NSTextField* title = [NSTextField labelWithString:@"myArc"];
-  title.font = [NSFont systemFontOfSize:20 weight:NSFontWeightBold];
+  title.font = [NSFont systemFontOfSize:22 weight:NSFontWeightBold];
   title.textColor = primary_ink;
   title.alignment = NSTextAlignmentCenter;
-  title.frame = NSMakeRect(20, kHeight - 138, kWidth - 40, 26);
+  title.frame = NSMakeRect(kPadX, y, kInnerW, 28.0);
   [canvas addSubview:title];
+  y += 28.0 + 10.0;
 
   NSBundle* bundle = base::apple::OuterBundle();
   NSString* myarc_ver =
       base::apple::ObjCCast<NSString>(
           [bundle objectForInfoDictionaryKey:@"MyarcVersion"]);
-  NSString* version_line =
+  _versionLabel =
       myarc_ver.length ? [NSString stringWithFormat:@"Version %@", myarc_ver]
                        : @"Developer Build";
-  NSTextField* version = [NSTextField labelWithString:version_line];
-  version.font = [NSFont systemFontOfSize:13 weight:NSFontWeightMedium];
-  version.textColor = secondary_ink;
-  version.alignment = NSTextAlignmentCenter;
-  version.frame = NSMakeRect(20, kHeight - 160, kWidth - 40, 18);
-  [canvas addSubview:version];
 
   NSString* chromium_ver =
       base::apple::ObjCCast<NSString>(
@@ -1732,15 +1968,40 @@ void MaybeShowUpdaterPreview() {
       chromium_ver.length
           ? [NSString stringWithFormat:@"Chromium %@ · arm64", chromium_ver]
           : @"Chromium · arm64";
-  NSTextField* engine = [NSTextField labelWithString:engine_line];
-  engine.font = [NSFont monospacedDigitSystemFontOfSize:11
-                                                 weight:NSFontWeightRegular];
-  engine.textColor = tertiary_ink;
-  engine.alignment = NSTextAlignmentCenter;
-  engine.frame = NSMakeRect(20, kHeight - 180, kWidth - 40, 16);
-  [canvas addSubview:engine];
+  _copyPayload = myarc_ver.length
+                     ? [NSString stringWithFormat:@"myArc %@ (%@)", myarc_ver,
+                                                  engine_line]
+                     : [NSString stringWithFormat:@"myArc (%@)", engine_line];
 
-  const BOOL has_updater = myarc::UpdaterAvailable();
+  NSDictionary* pill_attrs = @{
+    NSFontAttributeName :
+        [NSFont systemFontOfSize:12 weight:NSFontWeightMedium],
+  };
+  const CGFloat pill_text_w =
+      std::ceil([_versionLabel sizeWithAttributes:pill_attrs].width);
+  const CGFloat pill_w =
+      std::min(kInnerW, std::max<CGFloat>(148.0, pill_text_w + 42.0));
+  _versionPill = [[MyarcVersionPillButton alloc]
+      initWithFrame:NSMakeRect((kWidth - pill_w) / 2.0, y, pill_w, 26.0)];
+  _versionPill.displayTitle = _versionLabel;
+  _versionPill.trailingIcon = AboutSymbolIcon(@"doc.on.doc", 11.0);
+  _versionPill.toolTip = @"Copy version info";
+  _versionPill.target = self;
+  _versionPill.action = @selector(copyVersion:);
+  [canvas addSubview:_versionPill];
+  y += 26.0 + 8.0;
+
+  NSTextField* engine = [NSTextField labelWithString:engine_line];
+  engine.font = [NSFont monospacedDigitSystemFontOfSize:12
+                                                 weight:NSFontWeightRegular];
+  engine.textColor = secondary_ink;
+  engine.alignment = NSTextAlignmentCenter;
+  engine.frame = NSMakeRect(kPadX, y, kInnerW, 16.0);
+  [canvas addSubview:engine];
+  y += 16.0 + 26.0;
+
+  constexpr CGFloat kBtnHeight = 36.0;
+  constexpr CGFloat kBtnGap = 10.0;
   if (has_updater) {
     MyarcUpdaterButton* check_btn = [[MyarcUpdaterButton alloc]
         initWithStyle:MyarcUpdaterButtonStylePrimary];
@@ -1748,39 +2009,70 @@ void MaybeShowUpdaterPreview() {
     check_btn.target = self;
     check_btn.action = @selector(checkUpdates:);
     check_btn.keyEquivalent = @"\r";
-    check_btn.frame = NSMakeRect((kWidth - 172) / 2, 72, 172, 30);
+    check_btn.frame = NSMakeRect(kPadX, y, kInnerW, kBtnHeight);
     [canvas addSubview:check_btn];
+    y += kBtnHeight + kBtnGap;
   }
 
-  const CGFloat link_y = has_updater ? 38 : 60;
+  const CGFloat half_w = (kInnerW - kBtnGap) / 2.0;
   MyarcUpdaterButton* site_btn = [[MyarcUpdaterButton alloc]
       initWithStyle:MyarcUpdaterButtonStyleSecondary];
   site_btn.title = @"myarc.dev";
+  site_btn.leadingIcon = AboutSymbolIcon(@"globe", 14.0);
   site_btn.target = self;
   site_btn.action = @selector(openWebsite:);
-  site_btn.frame = NSMakeRect(kWidth / 2 - 94, link_y, 88, 26);
+  site_btn.frame = NSMakeRect(kPadX, y, half_w, kBtnHeight);
   [canvas addSubview:site_btn];
 
   MyarcUpdaterButton* gh_btn = [[MyarcUpdaterButton alloc]
       initWithStyle:MyarcUpdaterButtonStyleSecondary];
   gh_btn.title = @"GitHub";
+  gh_btn.leadingIcon = AboutGitHubIcon();
   gh_btn.target = self;
   gh_btn.action = @selector(openGitHub:);
-  gh_btn.frame = NSMakeRect(kWidth / 2 + 6, link_y, 88, 26);
+  gh_btn.frame = NSMakeRect(kPadX + half_w + kBtnGap, y, half_w, kBtnHeight);
   [canvas addSubview:gh_btn];
+  y += kBtnHeight + 22.0;
 
   NSTextField* footer =
-      [NSTextField labelWithString:@"GPL-3.0 · Built on Chromium"];
+      [NSTextField labelWithString:@"GPL-3.0 · ungoogled-chromium"];
   footer.font = [NSFont systemFontOfSize:11 weight:NSFontWeightRegular];
-  footer.textColor = tertiary_ink;
+  footer.textColor = footer_ink;
   footer.alignment = NSTextAlignmentCenter;
-  footer.frame = NSMakeRect(20, 14, kWidth - 40, 16);
+  footer.frame = NSMakeRect(kPadX, y, kInnerW, 16.0);
   [canvas addSubview:footer];
 
   _window = window;
   [_window center];
   [_window makeKeyAndOrderFront:nil];
   [NSApp activateIgnoringOtherApps:YES];
+}
+
+- (void)copyVersion:(id)sender {
+  if (!_copyPayload.length) {
+    return;
+  }
+  NSPasteboard* pb = [NSPasteboard generalPasteboard];
+  [pb clearContents];
+  [pb setString:_copyPayload forType:NSPasteboardTypeString];
+
+  _versionPill.displayTitle = @"Copied";
+  _versionPill.trailingIcon = AboutSymbolIcon(@"checkmark", 11.0);
+  [_versionPill setNeedsDisplay:YES];
+
+  __weak MyarcAboutPanelController* weakSelf = self;
+  dispatch_after(
+      dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.4 * NSEC_PER_SEC)),
+      dispatch_get_main_queue(), ^{
+        MyarcAboutPanelController* strongSelf = weakSelf;
+        if (!strongSelf || !strongSelf->_versionPill) {
+          return;
+        }
+        strongSelf->_versionPill.displayTitle = strongSelf->_versionLabel;
+        strongSelf->_versionPill.trailingIcon =
+            AboutSymbolIcon(@"doc.on.doc", 11.0);
+        [strongSelf->_versionPill setNeedsDisplay:YES];
+      });
 }
 
 - (void)checkUpdates:(id)sender {
@@ -1800,6 +2092,7 @@ void MaybeShowUpdaterPreview() {
 
 - (void)windowWillClose:(NSNotification*)notification {
   _window = nil;
+  _versionPill = nil;
 }
 
 @end
