@@ -1,24 +1,30 @@
 diff --git a/chrome/browser/extensions/api/messaging/launch_context_posix.cc b/chrome/browser/extensions/api/messaging/launch_context_posix.cc
-index 686da413362f5b3acd72bd1cf78601fc5ad67c18..9ee9d28cb70d6c8ff61e0d0843cfc973bbc55049 100644
+index 686da413362f5b3acd72bd1cf78601fc5ad67c18..da97188927ca9d6f8a92dd95d6db998f2aaba525 100644
 --- a/chrome/browser/extensions/api/messaging/launch_context_posix.cc
 +++ b/chrome/browser/extensions/api/messaging/launch_context_posix.cc
-@@ -48,6 +48,30 @@ base::FilePath LaunchContext::FindManifest(const std::string& host_name,
+@@ -48,6 +48,36 @@ base::FilePath LaunchContext::FindManifest(const std::string& host_name,
    if (result.empty()) {
      result = FindManifestInDir(chrome::DIR_NATIVE_MESSAGING, host_name);
    }
 +#if BUILDFLAG(IS_MAC)
-+  // Fall back to Chrome's NativeMessagingHosts directories so desktop password
-+  // managers (e.g. 1Password, Bitwarden) integrate without manual symlinks.
++  // Fall back to Chrome, Arc, and Chromium NativeMessagingHosts directories so
++  // desktop password managers (e.g. 1Password, Bitwarden) connect automatically
++  // without manual symlinks.
 +  if (result.empty() && allow_user_level_hosts) {
-+    base::FilePath chrome_user = base::GetHomeDir()
-+                                     .Append("Library")
-+                                     .Append("Application Support")
-+                                     .Append("Google")
-+                                     .Append("Chrome")
-+                                     .Append("NativeMessagingHosts")
-+                                     .Append(host_name + ".json");
-+    if (base::PathExists(chrome_user)) {
-+      result = chrome_user;
++    const base::FilePath app_support =
++        base::GetHomeDir().Append("Library").Append("Application Support");
++    constexpr const char* kFallbackDirs[] = {
++        "Google/Chrome/NativeMessagingHosts",
++        "Arc/User Data/NativeMessagingHosts",
++        "Chromium/NativeMessagingHosts",
++    };
++    for (const char* rel : kFallbackDirs) {
++      base::FilePath candidate =
++          app_support.Append(rel).Append(host_name + ".json");
++      if (base::PathExists(candidate)) {
++        result = candidate;
++        break;
++      }
 +    }
 +  }
 +  if (result.empty()) {
