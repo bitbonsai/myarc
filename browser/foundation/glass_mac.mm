@@ -12,6 +12,7 @@
 #include "ui/views/border.h"
 #include "ui/views/bubble/bubble_dialog_delegate_view.h"
 #include "ui/views/bubble/bubble_frame_view.h"
+#include "ui/views/controls/button/button.h"
 #include "ui/views/controls/scroll_view.h"
 #include "ui/views/view_utils.h"
 #include "ui/views/widget/widget.h"
@@ -109,6 +110,109 @@
 }
 @end
 
+// Native-style red traffic-light close dot in the top-left of frosted-glass
+// modal dialogs, matching About myArc and the Sparkle updater panels.
+@interface MyarcGlassCloseButton : NSButton
+@property(nonatomic) NSEdgeInsets myarcInsets;
+- (void)updateFrameForSuperview;
+@end
+
+@implementation MyarcGlassCloseButton {
+  BOOL _hovered;
+  NSTrackingArea* _tracking;
+}
+
+@synthesize myarcInsets = _myarcInsets;
+
+- (instancetype)initWithFrame:(NSRect)frame {
+  self = [super initWithFrame:frame];
+  if (self) {
+    self.bordered = NO;
+    self.title = @"";
+    self.focusRingType = NSFocusRingTypeNone;
+    self.target = self;
+    self.action = @selector(closeOwnerWindow:);
+  }
+  return self;
+}
+
+- (void)closeOwnerWindow:(id)sender {
+  [self.window performClose:nil];
+}
+
+- (void)updateFrameForSuperview {
+  NSView* superview = self.superview;
+  if (!superview) {
+    return;
+  }
+  constexpr CGFloat kDot = 12.0;
+  constexpr CGFloat kInset = 12.0;
+  const NSRect bounds = superview.bounds;
+  const CGFloat x = _myarcInsets.left + kInset;
+  const CGFloat y =
+      superview.isFlipped
+          ? (_myarcInsets.top + kInset)
+          : (NSHeight(bounds) - _myarcInsets.top - kInset - kDot);
+  self.frame = NSMakeRect(x, y, kDot, kDot);
+}
+
+- (void)resizeWithOldSuperviewSize:(NSSize)oldSize {
+  [self updateFrameForSuperview];
+}
+
+- (void)updateTrackingAreas {
+  [super updateTrackingAreas];
+  if (_tracking) {
+    [self removeTrackingArea:_tracking];
+  }
+  _tracking = [[NSTrackingArea alloc]
+      initWithRect:self.bounds
+           options:NSTrackingMouseEnteredAndExited | NSTrackingActiveAlways
+             owner:self
+          userInfo:nil];
+  [self addTrackingArea:_tracking];
+}
+
+- (void)mouseEntered:(NSEvent*)event {
+  _hovered = YES;
+  [self setNeedsDisplay:YES];
+}
+
+- (void)mouseExited:(NSEvent*)event {
+  _hovered = NO;
+  [self setNeedsDisplay:YES];
+}
+
+- (void)drawRect:(NSRect)dirtyRect {
+  const NSRect bounds = self.bounds;
+  const BOOL pressed = self.cell.isHighlighted;
+  NSBezierPath* dot = [NSBezierPath bezierPathWithOvalInRect:bounds];
+  [[NSColor colorWithSRGBRed:pressed ? 0.78 : 1.0
+                       green:pressed ? 0.25 : 0.373
+                        blue:pressed ? 0.22 : 0.341
+                       alpha:1.0] setFill];
+  [dot fill];
+
+  NSBezierPath* ring =
+      [NSBezierPath bezierPathWithOvalInRect:NSInsetRect(bounds, 0.25, 0.25)];
+  ring.lineWidth = 0.5;
+  [[NSColor colorWithWhite:0.0 alpha:0.20] setStroke];
+  [ring stroke];
+
+  if (_hovered || pressed) {
+    NSBezierPath* glyph = [NSBezierPath bezierPath];
+    [glyph moveToPoint:NSMakePoint(3.5, 3.5)];
+    [glyph lineToPoint:NSMakePoint(8.5, 8.5)];
+    [glyph moveToPoint:NSMakePoint(8.5, 3.5)];
+    [glyph lineToPoint:NSMakePoint(3.5, 8.5)];
+    glyph.lineWidth = 1.2;
+    glyph.lineCapStyle = NSLineCapStyleRound;
+    [[NSColor colorWithSRGBRed:0.30 green:0.0 blue:0.0 alpha:0.75] setStroke];
+    [glyph stroke];
+  }
+}
+@end
+
 namespace myarc {
 namespace {
 
@@ -177,6 +281,37 @@ MyarcGlassRimView* FindRim(NSView* content) {
     }
   }
   return nil;
+}
+
+MyarcGlassCloseButton* FindCloseDot(NSView* content) {
+  for (NSView* view in content.subviews) {
+    if ([view isKindOfClass:[MyarcGlassCloseButton class]]) {
+      return static_cast<MyarcGlassCloseButton*>(view);
+    }
+  }
+  return nil;
+}
+
+void ApplyModalCloseDot(NSWindow* window, NSEdgeInsets insets, bool show) {
+  if (!window || !window.contentView) {
+    return;
+  }
+  NSView* content = window.contentView;
+  if (!show) {
+    if (MyarcGlassCloseButton* existing = FindCloseDot(content)) {
+      [existing removeFromSuperview];
+    }
+    return;
+  }
+  MyarcGlassCloseButton* dot = FindCloseDot(content);
+  if (!dot) {
+    dot = [[MyarcGlassCloseButton alloc] initWithFrame:NSZeroRect];
+    dot.autoresizingMask = NSViewMaxXMargin | NSViewMinYMargin;
+    [content addSubview:dot positioned:NSWindowAbove relativeTo:nil];
+  }
+  dot.myarcInsets = insets;
+  [dot updateFrameForSuperview];
+  [dot setNeedsDisplay:YES];
 }
 
 void ApplyBubbleRim(NSWindow* window,
@@ -326,7 +461,7 @@ bool ApplyBubbleGlass(views::Widget& widget,
   bool has_visible_arrow = false;
   if (frame) {
     radius = frame->GetRoundedCorners().upper_left();
-    if (radius > 12.f) {
+    if (radius <= 0.f || radius > 12.f) {
       frame->SetRoundedCorners(gfx::RoundedCornersF(12.f));
       radius = 12.f;
     }
@@ -337,11 +472,17 @@ bool ApplyBubbleGlass(views::Widget& widget,
   }
   const bool applied =
       ApplyWidgetGlass(widget, material, radius, dark, insets);
-  ApplyBubbleRim(
-      window, radius, dark,
+  const NSEdgeInsets ns_insets =
       NSEdgeInsetsMake(insets.top(), insets.left(), insets.bottom(),
-                       insets.right()),
-      applied && draw_rim && !has_visible_arrow);
+                       insets.right());
+  ApplyBubbleRim(window, radius, dark, ns_insets,
+                 applied && draw_rim && !has_visible_arrow);
+  const bool show_close_dot =
+      applied && material == GlassMaterial::kSheet && !has_visible_arrow;
+  ApplyModalCloseDot(window, ns_insets, show_close_dot);
+  if (show_close_dot && frame && frame->close_button()) {
+    frame->close_button()->SetVisible(false);
+  }
   return applied;
 }
 
