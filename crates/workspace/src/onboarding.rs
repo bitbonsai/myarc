@@ -392,11 +392,13 @@ pub enum QuickStart {
 
 /// The quick start rule, for one tour transition from `before` to `after`.
 /// `pending` is the workspace's `quick_start_pending`, true only for a workspace
-/// created fresh. The page opens once, when the tour first reaches `Complete` by
-/// Start fresh or Skip tour; an import's receipt means the Arc setup is there,
-/// so the page is dropped instead.
+/// created fresh. The welcome folder and page open once, right as the user
+/// leaves Welcome by Start fresh or Skip tour (before the tour steps start);
+/// an import's receipt means the Arc setup is there, so it is dropped instead.
 pub fn quick_start(before: &TourRecord, after: &TourRecord, pending: bool) -> QuickStart {
-    if !pending || before.state == TourState::Complete || after.state != TourState::Complete {
+    let left_welcome = matches!(before.state, TourState::Welcome | TourState::Importing)
+        && !matches!(after.state, TourState::Welcome | TourState::Importing);
+    if !pending || !left_welcome {
         QuickStart::Keep
     } else if after.receipt.is_some() {
         QuickStart::Drop
@@ -1207,14 +1209,20 @@ mod tests {
     ];
 
     #[test]
-    fn start_fresh_opens_the_quick_start_page_at_the_end() {
+    fn start_fresh_opens_the_quick_start_page_when_tour_starts() {
         assert_eq!(
             quick_starts(&TourRecord::fresh(), START_FRESH, true),
             [QuickStart::Open]
         );
-        // Nothing before the end opens it.
-        let mut record = TourRecord::fresh();
-        for event in &START_FRESH[..5] {
+        // StartBrowsing opens the welcome folder and page right away, before the tour steps.
+        let after_start = apply(&TourRecord::fresh(), TourEvent::StartBrowsing).record;
+        assert_eq!(
+            quick_start(&TourRecord::fresh(), &after_start, true),
+            QuickStart::Open
+        );
+        // Subsequent steps do not reopen it.
+        let mut record = after_start;
+        for event in &START_FRESH[1..] {
             let next = apply(&record, event.clone()).record;
             assert_eq!(quick_start(&record, &next, true), QuickStart::Keep);
             record = next;
@@ -1313,5 +1321,58 @@ mod tests {
         fresh.clear_quick_start();
         let restored = crate::Workspace::from_snapshot(fresh.snapshot()).unwrap();
         assert!(!restored.quick_start_pending());
+    }
+
+    #[test]
+    fn seed_quick_start_basics_creates_open_folder_once_and_clears_pending() {
+        let mut fresh = crate::Workspace::default();
+        let space_id = fresh.snapshot().spaces[0].id;
+        assert_eq!(fresh.seed_quick_start_basics(space_id), Ok(true));
+        assert!(!fresh.quick_start_pending());
+        assert_eq!(fresh.folders().len(), 1);
+        let folder = &fresh.folders()[0];
+        assert_eq!(folder.name, crate::BASICS_FOLDER_NAME);
+        assert_eq!(folder.space_id, space_id);
+        assert!(folder.open);
+        assert_eq!(folder.items.len(), crate::BASICS_ITEMS.len());
+
+        let snapshot = fresh.snapshot();
+        for (&item_id, &(title, url)) in folder.items.iter().zip(crate::BASICS_ITEMS.iter()) {
+            let item = snapshot.items.iter().find(|it| it.id == item_id).unwrap();
+            assert_eq!(item.placement, crate::Placement::Pin { space_id });
+            assert_eq!(item.canonical_url.as_deref(), Some(url));
+            assert_eq!(item.title, title);
+            assert_eq!(item.name, title);
+        }
+
+        // Calling again (e.g. after replay or relaunch) is a no-op.
+        assert_eq!(fresh.seed_quick_start_basics(space_id), Ok(false));
+        assert_eq!(fresh.folders().len(), 1);
+
+        // Snapshot round-trip preserves the folder and cleared pending flag.
+        let mut restored = crate::Workspace::from_snapshot(fresh.snapshot()).unwrap();
+        assert!(!restored.quick_start_pending());
+        assert_eq!(restored.folders().len(), 1);
+        assert_eq!(restored.seed_quick_start_basics(space_id), Ok(false));
+
+        // The folder behaves like a normal user folder and can be deleted.
+        let folder_id = restored.folders()[0].id;
+        let deletion = restored.delete_folder(folder_id, None).unwrap();
+        assert_eq!(deletion.removed_items.len(), crate::BASICS_ITEMS.len());
+        assert!(restored.folders().is_empty());
+    }
+
+    #[test]
+    fn seed_quick_start_basics_falls_back_to_first_space_and_skips_after_clear() {
+        let mut fresh = crate::Workspace::default();
+        let first_space = fresh.snapshot().spaces[0].id;
+        assert_eq!(fresh.seed_quick_start_basics(0), Ok(true));
+        assert_eq!(fresh.folders()[0].space_id, first_space);
+
+        // An import path calls clear_quick_start; seeding afterwards is a no-op.
+        let mut imported = crate::Workspace::default();
+        imported.clear_quick_start();
+        assert_eq!(imported.seed_quick_start_basics(0), Ok(false));
+        assert!(imported.folders().is_empty());
     }
 }

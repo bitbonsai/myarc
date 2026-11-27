@@ -32,32 +32,34 @@
 #include "ui/views/layout/box_layout_view.h"
 #include "ui/views/view.h"
 #include "ui/views/view_class_properties.h"
+#include "ui/views/view_utils.h"
 
 namespace myarc {
 namespace {
 
-// The Settings window's dark card, with its row text and pill buttons.
-constexpr int kWidth = 320;
-constexpr int kInset = 14;
+// Unified frosted-glass card using myarc::dialog tokens.
+constexpr int kWidth = 360;
+constexpr int kInset = dialog::kPadding;
 constexpr int kTextWidth = kWidth - 2 * kInset;
-constexpr float kRadius = 12;
-constexpr int kButtonHeight = 24;
-constexpr int kButtonRadius = 5;
-constexpr int kButtonPad = 12;
-// Spacing below the sidebar's location bar and edge margins inside the window.
-constexpr int kAnchorGap = 8;
+constexpr float kRadius = dialog::kCornerRadius;
+constexpr int kButtonHeight = dialog::kButtonHeight;
+constexpr int kButtonRadius = static_cast<int>(dialog::kButtonCornerRadius);
+constexpr int kButtonMinWidth = dialog::kButtonMinWidth;
+constexpr int kButtonPad = 16;
+// Spacing beside the sidebar next to the Agent Space footer button.
+constexpr int kAnchorGap = 10;
 constexpr int kWindowMargin = 14;
 constexpr int kTopMargin = 19;
 constexpr SkColor kFill = SkColorSetRGB(0x25, 0x25, 0x26);
-constexpr SkColor kGlassFill = SkColorSetARGB(0xA1, 0x1A, 0x1A, 0x20);
+constexpr SkColor kGlassFill = dialog::kDarkGlassTint;
 constexpr SkColor kStroke = SkColorSetRGB(0x3A, 0x3A, 0x3B);
-constexpr SkColor kRimTop = SkColorSetA(SK_ColorWHITE, 0x38);
-constexpr SkColor kRimBottom = SkColorSetA(SK_ColorWHITE, 0x12);
+constexpr SkColor kRim =
+    SkColorSetA(SK_ColorWHITE, static_cast<U8CPU>(dialog::kDarkRimAlpha * 255));
 constexpr SkColor kTitle = SkColorSetRGB(0xF5, 0xF5, 0xF7);
 constexpr SkColor kBody = SkColorSetRGB(0xD0, 0xD0, 0xD4);
-constexpr SkColor kBlueButton = SkColorSetRGB(0x00, 0x7A, 0xFF);
+constexpr SkColor kBlueButton = SkColorSetRGB(0x0A, 0x84, 0xFF);
 constexpr SkColor kGrayButton = SkColorSetRGB(0x45, 0x45, 0x46);
-constexpr SkColor kGrayButtonGlass = SkColorSetA(SK_ColorWHITE, 0x1E);
+constexpr SkColor kGrayButtonGlass = SkColorSetA(SK_ColorWHITE, 0x1A);
 constexpr SkColor kButtonText = SkColorSetRGB(0xEC, 0xEC, 0xEF);
 
 gfx::FontList Font(int size, gfx::Font::Weight weight) {
@@ -85,17 +87,24 @@ views::LabelButton* AddButton(views::View* parent,
                               views::Button::PressedCallback callback,
                               const std::u16string& text,
                               SkColor fill,
-                              SkColor color) {
+                              SkColor color,
+                              gfx::Font::Weight weight = gfx::Font::Weight::MEDIUM) {
   auto* button = parent->AddChildView(
       std::make_unique<views::LabelButton>(std::move(callback), text));
   button->SetTextSubpixelRenderingEnabled(false);
+  for (views::View* child : button->children()) {
+    if (auto* label = views::AsViewClass<views::Label>(child)) {
+      label->SetFontList(Font(14, weight));
+      label->SetSubpixelRenderingEnabled(false);
+    }
+  }
   button->SetEnabledTextColors(color);
   button->SetTextColor(views::Button::STATE_DISABLED, color);
   button->SetHorizontalAlignment(gfx::ALIGN_CENTER);
   button->SetBackground(
       views::CreateRoundedRectBackground(fill, kButtonRadius));
   button->SetBorder(views::CreateEmptyBorder(gfx::Insets::VH(0, kButtonPad)));
-  button->SetMinSize(gfx::Size(0, kButtonHeight));
+  button->SetMinSize(gfx::Size(kButtonMinWidth, kButtonHeight));
   button->SetMaxSize(gfx::Size(0, kButtonHeight));
   return button;
 }
@@ -108,21 +117,21 @@ class PromptView : public views::BoxLayoutView {
              base::RepeatingCallback<void(bool)> answer) {
     SetOrientation(views::BoxLayout::Orientation::kVertical);
     SetInsideBorderInsets(gfx::Insets(kInset));
-    SetBetweenChildSpacing(6);
+    SetBetweenChildSpacing(8);
     GetViewAccessibility().SetRole(ax::mojom::Role::kAlertDialog);
     GetViewAccessibility().SetName(copy.title);
-    AddText(this, copy.title, 13, gfx::Font::Weight::SEMIBOLD, kTitle);
+    AddText(this, copy.title, 15, gfx::Font::Weight::SEMIBOLD, kTitle);
     AddText(this, copy.body, 12, gfx::Font::Weight::NORMAL, kBody);
     auto* buttons = AddChildView(std::make_unique<views::BoxLayoutView>());
     buttons->SetBetweenChildSpacing(8);
     buttons->SetMainAxisAlignment(views::BoxLayout::MainAxisAlignment::kEnd);
-    buttons->SetProperty(views::kMarginsKey, gfx::Insets::TLBR(6, 0, 0, 0));
+    buttons->SetProperty(views::kMarginsKey, gfx::Insets::TLBR(10, 0, 0, 0));
     decline_ = AddButton(
         buttons, base::BindRepeating(answer, false), copy.decline,
         ShouldReduceTransparency() ? kGrayButton : kGrayButtonGlass,
         kButtonText);
     allow_ = AddButton(buttons, base::BindRepeating(answer, true), copy.accept,
-                       kBlueButton, SK_ColorWHITE);
+                       kBlueButton, SK_ColorWHITE, gfx::Font::Weight::SEMIBOLD);
     SetPaintToLayer();
     layer()->SetFillsBoundsOpaquely(false);
   }
@@ -148,12 +157,7 @@ class PromptView : public views::BoxLayoutView {
     canvas->DrawRoundRect(bounds, kRadius, flags);
     flags.setStyle(cc::PaintFlags::kStroke_Style);
     flags.setStrokeWidth(1);
-    if (glass) {
-      flags.setShader(gfx::CreateGradientShader(
-          gfx::Point(), gfx::Point(0, height()), kRimTop, kRimBottom));
-    } else {
-      flags.setColor(kStroke);
-    }
+    flags.setColor(glass ? kRim : kStroke);
     gfx::RectF stroke = bounds;
     stroke.Inset(0.5f);
     canvas->DrawRoundRect(stroke, kRadius - 0.5f, flags);
@@ -167,16 +171,34 @@ class PromptView : public views::BoxLayoutView {
 BEGIN_METADATA(PromptView)
 END_METADATA
 
-views::View* FindLocationBarView(views::View* root) {
+views::View* FindViewByClassName(views::View* root, std::string_view name) {
   if (!root) {
     return nullptr;
   }
-  if (std::string_view(root->GetClassName()) == "LocationBarView" &&
-      root->IsDrawn()) {
+  if (std::string_view(root->GetClassName()) == name && root->IsDrawn()) {
     return root;
   }
   for (views::View* child : root->children()) {
-    if (views::View* found = FindLocationBarView(child)) {
+    if (views::View* found = FindViewByClassName(child, name)) {
+      return found;
+    }
+  }
+  return nullptr;
+}
+
+views::View* FindAgentFooterButton(views::View* root) {
+  if (!root) {
+    return nullptr;
+  }
+  if (std::string_view(root->GetClassName()) == "FooterButton" &&
+      root->IsDrawn()) {
+    const std::u16string tip = root->GetTooltipText();
+    if (tip.find(u"Agent Space") != std::u16string::npos) {
+      return root;
+    }
+  }
+  for (views::View* child : root->children()) {
+    if (views::View* found = FindAgentFooterButton(child)) {
       return found;
     }
   }
@@ -186,8 +208,22 @@ views::View* FindLocationBarView(views::View* root) {
 gfx::Rect ComputePromptBounds(views::Widget& parent, const gfx::Size& size) {
   const gfx::Rect window = parent.GetClientAreaBoundsInScreen();
   int x = window.x() + kWindowMargin;
-  int y = window.y() + kTopMargin;
-  if (views::View* bar = FindLocationBarView(parent.GetRootView())) {
+  int y = window.bottom() - kWindowMargin - size.height();
+  if (views::View* sidebar =
+          FindViewByClassName(parent.GetRootView(), "SidebarView")) {
+    const gfx::Rect sb = sidebar->GetBoundsInScreen();
+    if (!sb.IsEmpty()) {
+      x = sb.right() + kAnchorGap;
+      y = sb.bottom() - kWindowMargin - size.height();
+      if (views::View* agent = FindAgentFooterButton(sidebar)) {
+        const gfx::Rect ab = agent->GetBoundsInScreen();
+        if (!ab.IsEmpty()) {
+          y = ab.bottom() - size.height();
+        }
+      }
+    }
+  } else if (views::View* bar = FindViewByClassName(parent.GetRootView(),
+                                                    "LocationBarView")) {
     const gfx::Rect anchor = bar->GetBoundsInScreen();
     if (!anchor.IsEmpty()) {
       x = anchor.x();

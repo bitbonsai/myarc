@@ -57,13 +57,13 @@ constexpr char16_t kNext[] = u"Next";
 constexpr char16_t kSkip[] = u"Skip tour";
 
 // The card, pointer included.
-constexpr int kWidth = 300;
+constexpr int kWidth = 316;
 // How far the pointer reaches out of the card's left edge.
 constexpr int kPointer = 8;
 constexpr int kPointerHalf = 7;
-constexpr float kRadius = 12;
-constexpr int kButtonRadius = 6;
-constexpr SkColor kPrimary = SkColorSetRGB(0x3D, 0x4B, 0xF2);
+constexpr float kRadius = dialog::kCornerRadius;
+constexpr int kButtonRadius = static_cast<int>(dialog::kButtonCornerRadius);
+constexpr SkColor kPrimary = SkColorSetRGB(0x0A, 0x84, 0xFF);
 
 constexpr base::TimeDelta kGrow = base::Milliseconds(180);
 constexpr base::TimeDelta kReducedFade = base::Milliseconds(150);
@@ -93,7 +93,7 @@ std::unique_ptr<views::LabelButton> MakeButton(
   auto button = std::make_unique<views::LabelButton>(std::move(callback), text);
   button->SetFocusBehavior(views::View::FocusBehavior::ACCESSIBLE_ONLY);
   button->SetHorizontalAlignment(gfx::ALIGN_CENTER);
-  button->SetBorder(views::CreateEmptyBorder(gfx::Insets::VH(4, 10)));
+  button->SetBorder(views::CreateEmptyBorder(gfx::Insets::VH(7, 14)));
   views::InstallRoundRectHighlightPathGenerator(button.get(), gfx::Insets(),
                                                 kButtonRadius);
   for (views::View* child : button->children()) {
@@ -147,7 +147,7 @@ CoachMark::CoachMark(const Content& content, ActionCallback action)
   layer()->SetOpacity(0);
   auto* layout = SetLayoutManager(std::make_unique<views::BoxLayout>(
       views::BoxLayout::Orientation::kVertical,
-      gfx::Insets::TLBR(14, kPointer + 16, 12, 14), 0));
+      gfx::Insets::TLBR(20, kPointer + 20, 18, 20), 0));
   layout->set_cross_axis_alignment(
       views::BoxLayout::CrossAxisAlignment::kStart);
   GetViewAccessibility().SetRole(ax::mojom::Role::kGroup);
@@ -313,8 +313,7 @@ void CoachMark::OnPaint(gfx::Canvas* canvas) {
   cc::PaintFlags fill;
   fill.setAntiAlias(true);
   fill.setStyle(cc::PaintFlags::kFill_Style);
-  fill.setColor(glass ? (dark_ ? SkColorSetARGB(0xBC, 0x1C, 0x1D, 0x24)
-                               : SkColorSetARGB(0xD8, 0xFA, 0xFA, 0xFD))
+  fill.setColor(glass ? (dark_ ? dialog::kDarkGlassTint : dialog::kLightGlassTint)
                       : (dark_ ? SkColorSetRGB(0x27, 0x28, 0x2D)
                                : SK_ColorWHITE));
   canvas->DrawPath(path, fill);
@@ -323,12 +322,11 @@ void CoachMark::OnPaint(gfx::Canvas* canvas) {
   stroke.setStyle(cc::PaintFlags::kStroke_Style);
   stroke.setStrokeWidth(1);
   if (glass) {
-    stroke.setShader(gfx::CreateGradientShader(
-        gfx::Point(), gfx::Point(0, height()),
-        dark_ ? SkColorSetA(SK_ColorWHITE, 0x3A)
-              : SkColorSetA(SK_ColorWHITE, 0xE6),
-        dark_ ? SkColorSetA(SK_ColorWHITE, 0x14)
-              : SkColorSetA(SK_ColorBLACK, 0x24)));
+    stroke.setColor(
+        dark_ ? SkColorSetA(SK_ColorWHITE,
+                            static_cast<U8CPU>(dialog::kDarkRimAlpha * 255))
+              : SkColorSetA(SK_ColorBLACK,
+                            static_cast<U8CPU>(dialog::kLightRimAlpha * 255)));
   } else {
     stroke.setColor(dark_ ? SkColorSetRGB(0x42, 0x43, 0x4A)
                           : SkColorSetRGB(0xDD, 0xDD, 0xE3));

@@ -1,0 +1,35 @@
+diff --git a/chrome/browser/extensions/api/messaging/launch_context_posix.cc b/chrome/browser/extensions/api/messaging/launch_context_posix.cc
+index 686da413362f5b3acd72bd1cf78601fc5ad67c18..9ee9d28cb70d6c8ff61e0d0843cfc973bbc55049 100644
+--- a/chrome/browser/extensions/api/messaging/launch_context_posix.cc
++++ b/chrome/browser/extensions/api/messaging/launch_context_posix.cc
+@@ -48,6 +48,30 @@ base::FilePath LaunchContext::FindManifest(const std::string& host_name,
+   if (result.empty()) {
+     result = FindManifestInDir(chrome::DIR_NATIVE_MESSAGING, host_name);
+   }
++#if BUILDFLAG(IS_MAC)
++  // Fall back to Chrome's NativeMessagingHosts directories so desktop password
++  // managers (e.g. 1Password, Bitwarden) integrate without manual symlinks.
++  if (result.empty() && allow_user_level_hosts) {
++    base::FilePath chrome_user = base::GetHomeDir()
++                                     .Append("Library")
++                                     .Append("Application Support")
++                                     .Append("Google")
++                                     .Append("Chrome")
++                                     .Append("NativeMessagingHosts")
++                                     .Append(host_name + ".json");
++    if (base::PathExists(chrome_user)) {
++      result = chrome_user;
++    }
++  }
++  if (result.empty()) {
++    base::FilePath chrome_system =
++        base::FilePath("/Library/Google/Chrome/NativeMessagingHosts")
++            .Append(host_name + ".json");
++    if (base::PathExists(chrome_system)) {
++      result = chrome_system;
++    }
++  }
++#endif
+ 
+   if (result.empty()) {
+     error_message = "Can't find native messaging host " + host_name;
