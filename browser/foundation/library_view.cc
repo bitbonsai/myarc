@@ -2174,17 +2174,16 @@ void LibraryView::BuildMediaOptIn() {
   }
 
   auto* overlay = stack->AddChildView(
-      Box(Orientation::kVertical, gfx::Insets::VH(0, 12), 0));
+      Box(Orientation::kVertical, gfx::Insets::VH(0, 14), 0));
   auto* overlay_layout =
       static_cast<views::BoxLayout*>(overlay->GetLayoutManager());
   overlay_layout->set_main_axis_alignment(MainAxis::kCenter);
-  overlay_layout->set_cross_axis_alignment(CrossAxis::kCenter);
+  overlay_layout->set_cross_axis_alignment(CrossAxis::kStretch);
 
   auto* card = overlay->AddChildView(
       Box(Orientation::kVertical, gfx::Insets::TLBR(14, 18, 18, 18), 10));
   auto* card_layout = static_cast<views::BoxLayout*>(card->GetLayoutManager());
   card_layout->set_cross_axis_alignment(CrossAxis::kStretch);
-  card->SetPreferredSize(gfx::Size(248, 0));
   card->SetBackground(views::CreateRoundedRectBackground(
       SkColorSetRGB(0x28, 0x29, 0x36), 14));
   card->SetBorder(views::CreateRoundedRectBorder(

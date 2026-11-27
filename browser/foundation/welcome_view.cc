@@ -86,6 +86,7 @@ constexpr int kMarkGap = 28;
 constexpr int kRibbonSize = 180;
 constexpr int kButtonWidth = 240;
 constexpr int kButtonHeight = 42;
+constexpr int kButtonRadius = 12;
 constexpr int kHeadlineToChoiceGap = 36;
 constexpr int kButtonGap = 12;
 // The base in dark mode, myarc.dev's dark page.
@@ -359,18 +360,18 @@ WelcomeView::WelcomeView(ActionCallback action)
   };
   import_ = content_->AddChildView(std::make_unique<SheetButton>(
       base::BindRepeating(pressed, base::Unretained(this), Action::kImport),
-      kImport, kButtonHeight / 2));
+      kImport, kButtonRadius));
   import_->SetVisible(false);
   start_ = content_->AddChildView(std::make_unique<SheetButton>(
       base::BindRepeating(pressed, base::Unretained(this),
                           Action::kStartBrowsing),
-      kStart, kButtonHeight / 2));
+      kStart, kButtonRadius));
   // Let's go starts as the sole primary blue button; ShowImportFromArc()
   // promotes Import from Arc above it when Arc is detected on this Mac.
   import_->SetBackground(views::CreateRoundedRectBackground(
-      Rgb(welcome::kSiteBlue), kButtonHeight / 2));
+      Rgb(welcome::kSiteBlue), kButtonRadius));
   start_->SetBackground(views::CreateRoundedRectBackground(
-      Rgb(welcome::kSiteBlue), kButtonHeight / 2));
+      Rgb(welcome::kSiteBlue), kButtonRadius));
   for (views::LabelButton* button : {import_.get(), start_.get()}) {
     button->SetEnabledTextColors(kInk);
     button->SetTextColor(views::Button::STATE_DISABLED,
@@ -548,7 +549,7 @@ void WelcomeView::ShowImportFromArc() {
   const bool move_focus = start_->HasFocus();
   import_->SetVisible(true);
   start_->SetBackground(views::CreateRoundedRectBackground(
-      SkColorSetA(kInk, 0x26), kButtonHeight / 2));
+      SkColorSetA(kInk, 0x26), kButtonRadius));
   InvalidateLayout();
   if (move_focus) {
     import_->RequestFocus();
