@@ -2,7 +2,7 @@ HTML: https://myarc.dev/docs/
 
 # Docs
 
-How to move from Arc to myArc: install myArc, import your Spaces, learn the shortcuts, find your data, script the browser and work around known limitations.
+How to move from Arc to myArc: install myArc, import your Spaces, learn the shortcuts, find your data, script the browser, explore the design system and work around known limitations.
 
 ## Getting started
 
@@ -42,6 +42,12 @@ How to move from Arc to myArc: install myArc, import your Spaces, learn the shor
 - [Known limitations](https://myarc.dev/docs/known-limitations/)
 
   What myArc Alpha can't do yet, and what to do after a crash or when something breaks.
+
+## Brand and design
+
+- [Design system](https://myarc.dev/docs/design-system/)
+
+  Brand identity, color tokens, typography, layout, components, native glass surfaces and the product decisions behind them.
 
 ## Contributing
 

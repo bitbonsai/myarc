@@ -57,3 +57,5 @@ The `myarc` command exits with code 3 when myArc isn't running or browser contro
 ## Report a problem
 
 Open an issue on [GitHub](https://github.com/bitbonsai/myarc/issues). Include the myArc version, shown at the top of the app menu next to the Apple menu, your macOS version and the steps that cause the problem. Leave out private pages.
+
+[Next: Design system →](https://myarc.dev/docs/design-system/)

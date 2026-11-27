@@ -45,7 +45,15 @@ Earlier builds shipped as `myArc Nightly.app` with a separate bundle ID, so they
 
 The first time myArc opens, a welcome window plays with sound. Choose Import from Arc… to bring your Spaces over, as [Import from Arc](https://myarc.dev/docs/import-from-arc/) describes, Start fresh to begin without an import, or Skip tour. Three short practice steps follow: open a site from the command bar, pin a tab with Cmd\+D, and switch to another Space or make one.
 
-When the tour ends after Start fresh or Skip tour, myArc opens a quick start page, [myarc.dev/welcome](https://myarc.dev/welcome/), in a new tab. It does this only once, and not after an import. To take the tour again, open Settings, go to Advanced and click Replay welcome tour.
+When you choose Start fresh or Skip tour, myArc seeds a `myArc Basics` folder and opens the quick start page, [myarc.dev/welcome](https://myarc.dev/welcome/), before the practice steps begin. It does this once, and skips it after an Arc import. To take the tour again, open Settings, go to Advanced and click Replay welcome tour.
+
+## 1Password with Touch ID
+
+myArc automatically reads Chrome, Arc and Chromium native messaging manifests on macOS, so the 1Password extension can talk to the 1Password desktop app with no terminal setup. To unlock with Touch ID instead of typing your account password, tell 1Password to trust `myArc.app` once:
+
+1. Open and unlock 1Password on your Mac.
+2. Go to Settings \> Browser and click Add Browser.
+3. Select `myArc.app` in Applications, then restart myArc.
 
 ## Update to a newer build
 

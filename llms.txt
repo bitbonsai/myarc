@@ -23,6 +23,7 @@ Signed, notarized macOS Apple silicon alpha builds are available now (macOS 26+)
 - [Ad blocking](https://myarc.dev/docs/ad-blocking/index.md): How myArc blocks ads and trackers, and how to turn blocking off or on for one site.
 - [CLI and MCP](https://myarc.dev/docs/cli-and-mcp/index.md): Drive myArc from a script or an AI agent with the bundled myarc command and its MCP server. It's off by default, and tab commands reach only the Agent Space.
 - [Known limitations](https://myarc.dev/docs/known-limitations/index.md): What myArc Alpha can't do yet, and what to do after a crash or when something breaks.
+- [Design system](https://myarc.dev/docs/design-system/index.md): Brand identity, color tokens, typography, layout, components, native glass surfaces and the product decisions behind them.
 
 ## Posts
 
