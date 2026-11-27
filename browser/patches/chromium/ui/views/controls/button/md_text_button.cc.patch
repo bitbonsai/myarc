@@ -1,5 +1,5 @@
 diff --git a/ui/views/controls/button/md_text_button.cc b/ui/views/controls/button/md_text_button.cc
-index f4f6b86afebdc20b3ad6aeffd34f64655195df77..1c3cb618b89b791f0b7470976a141e588eaf184c 100644
+index f4f6b86afebdc20b3ad6aeffd34f64655195df77..4d48047eaca470bb8a114eed95e911300dc4ebdf 100644
 --- a/ui/views/controls/button/md_text_button.cc
 +++ b/ui/views/controls/button/md_text_button.cc
 @@ -9,6 +9,7 @@
@@ -43,3 +43,83 @@ index f4f6b86afebdc20b3ad6aeffd34f64655195df77..1c3cb618b89b791f0b7470976a141e58
    int left_padding = right_padding;
    if (HasImage(GetVisualState())) {
      constexpr int kLeftPadding = 12;
+@@ -288,6 +301,29 @@ void MdTextButton::UpdateTextColor() {
+     return;
+   }
+ 
++  const bool myarc_parity =
++      base::CommandLine::ForCurrentProcess()->HasSwitch("myarc-visual-parity");
++  if (myarc_parity && style_ != ui::ButtonStyle::kText) {
++    const ui::ColorProvider* color_provider = GetColorProvider();
++    const bool dark = color_utils::IsDark(
++        color_provider->GetColor(ui::kColorDialogBackground));
++    const auto colors = explicitly_set_colors();
++    if (style_ == ui::ButtonStyle::kProminent) {
++      LabelButton::SetEnabledTextColors(SK_ColorWHITE);
++      LabelButton::SetTextColor(
++          STATE_DISABLED, SkColorSetARGB(0x8C, 0xFF, 0xFF, 0xFF));
++    } else {
++      LabelButton::SetEnabledTextColors(
++          dark ? SkColorSetARGB(0xEB, 0xFF, 0xFF, 0xFF)
++               : SkColorSetARGB(0xE0, 0x00, 0x00, 0x00));
++      LabelButton::SetTextColor(
++          STATE_DISABLED, dark ? SkColorSetARGB(0x66, 0xFF, 0xFF, 0xFF)
++                               : SkColorSetARGB(0x66, 0x00, 0x00, 0x00));
++    }
++    set_explicitly_set_colors(colors);
++    return;
++  }
++
+   style::TextStyle text_style = style::STYLE_PRIMARY;
+   if (style_ == ui::ButtonStyle::kProminent) {
+     text_style = style::STYLE_DIALOG_BUTTON_DEFAULT;
+@@ -314,12 +350,29 @@ void MdTextButton::UpdateTextColor() {
+ void MdTextButton::UpdateBackgroundColor() {
+   bool is_disabled = GetVisualState() == STATE_DISABLED;
+   const ui::ColorProvider* color_provider = GetColorProvider();
++  const bool myarc_parity =
++      base::CommandLine::ForCurrentProcess()->HasSwitch("myarc-visual-parity");
++  const bool dark = color_utils::IsDark(
++      color_provider->GetColor(ui::kColorDialogBackground));
++
+   SkColor bg_color = color_provider->GetColor(ui::kColorButtonBackground);
++  SkColor stroke_color = color_provider->GetColor(
++      is_disabled ? ui::kColorButtonBorderDisabled : ui::kColorButtonBorder);
+ 
+   if (bg_color_id_override_) {
+     bg_color = color_provider->GetColor(bg_color_id_override_.value());
+   } else if (bg_color_override_) {
+     bg_color = *bg_color_override_;
++  } else if (myarc_parity && style_ != ui::ButtonStyle::kText) {
++    if (style_ == ui::ButtonStyle::kProminent) {
++      const SkColor accent =
++          dark ? SkColorSetRGB(0x0A, 0x84, 0xFF)
++               : SkColorSetRGB(0x00, 0x7A, 0xFF);
++      bg_color = is_disabled ? SkColorSetA(accent, 0x73) : accent;
++    } else {
++      bg_color = dark ? SkColorSetARGB(is_disabled ? 0x0A : 0x17, 0xFF, 0xFF, 0xFF)
++                      : SkColorSetARGB(is_disabled ? 0x08 : 0x0D, 0x00, 0x00, 0x00);
++    }
+   } else if (style_ == ui::ButtonStyle::kProminent) {
+     bg_color = color_provider->GetColor(
+         HasFocus() ? ui::kColorButtonBackgroundProminentFocused
+@@ -342,12 +395,17 @@ void MdTextButton::UpdateBackgroundColor() {
+     bg_color = GetNativeTheme()->GetSystemButtonPressedColor(bg_color);
+   }
+ 
+-  SkColor stroke_color = color_provider->GetColor(
+-      is_disabled ? ui::kColorButtonBorderDisabled : ui::kColorButtonBorder);
+   if (stroke_color_id_override_.has_value()) {
+     stroke_color = color_provider->GetColor(stroke_color_id_override_.value());
+   } else if (stroke_color_override_) {
+     stroke_color = *stroke_color_override_;
++  } else if (myarc_parity && style_ != ui::ButtonStyle::kText) {
++    if (style_ == ui::ButtonStyle::kProminent) {
++      stroke_color = SkColorSetARGB(0x38, 0xFF, 0xFF, 0xFF);
++    } else {
++      stroke_color = dark ? SkColorSetARGB(0x29, 0xFF, 0xFF, 0xFF)
++                          : SkColorSetARGB(0x24, 0x00, 0x00, 0x00);
++    }
+   } else if (style_ == ui::ButtonStyle::kProminent ||
+              style_ == ui::ButtonStyle::kText ||
+              style_ == ui::ButtonStyle::kTonal) {
