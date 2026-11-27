@@ -21,7 +21,7 @@ An open-source browser bringing back Arc, with no account required and optional 
   If you used Arc, you already know myArc. One-click import brings over your Profiles, Spaces, Favorites, folders and pinned tabs.
 - ### AI by choice
 
-  AI is off until you turn it on. Then you pick: a local model, your own API key, or a hosted option, and you decide what it can see.
+  AI stays off until you turn it on, with a local model or your own API key. Agents connect over CLI or MCP only when you approve, and stop on your click.
 - ### Built in the open
 
   The code is GPL-3.0, and the plans and decisions are public too. If I stop, anyone can pick it up where I left off.
