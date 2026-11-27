@@ -268,6 +268,8 @@ NSVisualEffectView* ApplyNSWindowGlass(NSWindow* window,
   glass.material = ToAppKitMaterial(material);
   glass.appearance = appearance;
   glass.maskImage = RoundedMask(corner_radius);
+  window.hasShadow = YES;
+  [window invalidateShadow];
   return glass;
 }
 

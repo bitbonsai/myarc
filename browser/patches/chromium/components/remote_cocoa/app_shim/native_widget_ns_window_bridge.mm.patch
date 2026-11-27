@@ -1,0 +1,18 @@
+diff --git a/components/remote_cocoa/app_shim/native_widget_ns_window_bridge.mm b/components/remote_cocoa/app_shim/native_widget_ns_window_bridge.mm
+index d753945e9b9da51d4dcfa1061839d82c0ac8bc53..0b1eac326eac531575dfd7c28d99bc25364c7ed7 100644
+--- a/components/remote_cocoa/app_shim/native_widget_ns_window_bridge.mm
++++ b/components/remote_cocoa/app_shim/native_widget_ns_window_bridge.mm
+@@ -2350,6 +2350,13 @@ void NativeWidgetNSWindowBridge::UpdateWindowDisplay() {
+ }
+ 
+ bool NativeWidgetNSWindowBridge::IsWindowModalSheet() const {
++  // Under --myarc-visual-parity, present window-modal dialogs as centered
++  // translucent floating windows so behind-window HUD glass and the 12pt
++  // specular rim are not overridden by macOS's opaque sheet chrome.
++  if (base::CommandLine::ForCurrentProcess()->HasSwitch(
++          "myarc-visual-parity")) {
++    return false;
++  }
+   return parent_ && modal_type_ == ui::mojom::ModalType::kWindow;
+ }
+ 
