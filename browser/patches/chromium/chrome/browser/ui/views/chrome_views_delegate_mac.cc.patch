@@ -1,8 +1,8 @@
 diff --git a/chrome/browser/ui/views/chrome_views_delegate_mac.cc b/chrome/browser/ui/views/chrome_views_delegate_mac.cc
-index 6c127de97aa355b76da1fdc1f08ec77d0404bb5e..7444b3a762b2bfed33e39de02935a4fd2e355327 100644
+index 6c127de97aa355b76da1fdc1f08ec77d0404bb5e..917cb83aa47a030e1007271a53857979a5b3ce6c 100644
 --- a/chrome/browser/ui/views/chrome_views_delegate_mac.cc
 +++ b/chrome/browser/ui/views/chrome_views_delegate_mac.cc
-@@ -4,8 +4,62 @@
+@@ -4,8 +4,63 @@
  
  #include "chrome/browser/ui/views/chrome_views_delegate.h"
  
@@ -47,7 +47,8 @@ index 6c127de97aa355b76da1fdc1f08ec77d0404bb5e..7444b3a762b2bfed33e39de02935a4fd
 +  const SkColor opaque_fill =
 +      provider ? provider->GetColor(bg_id) : SkColorSetRGB(0x25, 0x25, 0x28);
 +  const bool dark = !provider || color_utils::IsDark(opaque_fill);
-+  const SkColor glass_tint = SK_ColorTRANSPARENT;
++  const SkColor glass_tint = dark ? SkColorSetARGB(0xA1, 0x16, 0x17, 0x1C)
++                                  : SkColorSetARGB(0xD4, 0xFA, 0xFA, 0xFD);
 +  myarc::ApplyBubbleGlass(*widget,
 +                          is_modal ? myarc::GlassMaterial::kSheet
 +                                   : myarc::GlassMaterial::kPopover,

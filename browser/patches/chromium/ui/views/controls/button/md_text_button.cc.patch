@@ -1,5 +1,5 @@
 diff --git a/ui/views/controls/button/md_text_button.cc b/ui/views/controls/button/md_text_button.cc
-index f4f6b86afebdc20b3ad6aeffd34f64655195df77..ab1ca6a7a69418e474aab233a571e518df473b48 100644
+index f4f6b86afebdc20b3ad6aeffd34f64655195df77..1c3cb618b89b791f0b7470976a141e588eaf184c 100644
 --- a/ui/views/controls/button/md_text_button.cc
 +++ b/ui/views/controls/button/md_text_button.cc
 @@ -9,6 +9,7 @@
@@ -16,7 +16,7 @@ index f4f6b86afebdc20b3ad6aeffd34f64655195df77..ab1ca6a7a69418e474aab233a571e518
    }
 +  if (base::CommandLine::ForCurrentProcess()->HasSwitch(
 +          "myarc-visual-parity")) {
-+    return gfx::RoundedCornersF(10.0f);
++    return gfx::RoundedCornersF(7.0f);
 +  }
    return gfx::RoundedCornersF(LayoutProvider::Get()->GetCornerRadiusMetric(
        ShapeContextTokens::kButtonRadius, size()));

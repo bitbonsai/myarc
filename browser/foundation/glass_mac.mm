@@ -103,8 +103,8 @@
   layer.borderWidth = 1.0;
   layer.borderColor =
       (_myarcDark
-           ? [NSColor colorWithSRGBRed:1.0 green:1.0 blue:1.0 alpha:0.12]
-           : [NSColor colorWithSRGBRed:0.0 green:0.0 blue:0.0 alpha:0.10])
+           ? [NSColor colorWithSRGBRed:1.0 green:1.0 blue:1.0 alpha:0.20]
+           : [NSColor colorWithSRGBRed:0.0 green:0.0 blue:0.0 alpha:0.14])
           .CGColor;
 }
 @end
@@ -118,10 +118,9 @@ NSVisualEffectMaterial ToAppKitMaterial(GlassMaterial material) {
   switch (material) {
     case GlassMaterial::kWindow:
     case GlassMaterial::kHud:
-      return NSVisualEffectMaterialHUDWindow;
     case GlassMaterial::kPopover:
     case GlassMaterial::kSheet:
-      return NSVisualEffectMaterialPopover;
+      return NSVisualEffectMaterialHUDWindow;
   }
 }
 
@@ -325,9 +324,9 @@ bool ApplyBubbleGlass(views::Widget& widget,
   bool has_visible_arrow = false;
   if (frame) {
     radius = frame->GetRoundedCorners().upper_left();
-    if (radius > 16.f) {
-      frame->SetRoundedCorners(gfx::RoundedCornersF(16.f));
-      radius = 16.f;
+    if (radius > 12.f) {
+      frame->SetRoundedCorners(gfx::RoundedCornersF(12.f));
+      radius = 12.f;
     }
     has_visible_arrow = frame->GetDisplayVisibleArrow();
     if (frame->GetBorder()) {
