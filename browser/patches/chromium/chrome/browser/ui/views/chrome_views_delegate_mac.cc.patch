@@ -1,0 +1,70 @@
+diff --git a/chrome/browser/ui/views/chrome_views_delegate_mac.cc b/chrome/browser/ui/views/chrome_views_delegate_mac.cc
+index 6c127de97aa355b76da1fdc1f08ec77d0404bb5e..c652ed8d447104551ec72ec2d19f050619b6ecf3 100644
+--- a/chrome/browser/ui/views/chrome_views_delegate_mac.cc
++++ b/chrome/browser/ui/views/chrome_views_delegate_mac.cc
+@@ -4,8 +4,65 @@
+ 
+ #include "chrome/browser/ui/views/chrome_views_delegate.h"
+ 
++#include <memory>
++
++#include "base/command_line.h"
+ #include "base/feature_list.h"
++#include "base/functional/bind.h"
+ #include "content/public/browser/context_factory.h"
++#include "myarc/glass_mac.h"
++#include "third_party/skia/include/core/SkColor.h"
++#include "ui/base/mojom/ui_base_types.mojom.h"
++#include "ui/color/color_id.h"
++#include "ui/color/color_provider.h"
++#include "ui/gfx/color_utils.h"
++#include "ui/views/bubble/bubble_frame_view.h"
++#include "ui/views/view_utils.h"
++#include "ui/views/widget/any_widget_observer.h"
++#include "ui/views/widget/widget.h"
++#include "ui/views/widget/widget_delegate.h"
++#include "ui/views/window/non_client_view.h"
++
++namespace {
++
++void ApplyMyarcGlassToBubbleWidget(views::Widget* widget) {
++  if (!widget || widget->IsClosed() || myarc::HasWidgetGlass(*widget)) {
++    return;
++  }
++  views::NonClientView* non_client = widget->non_client_view();
++  if (!non_client ||
++      !views::AsViewClass<views::BubbleFrameView>(non_client->frame_view())) {
++    return;
++  }
++  const views::WidgetDelegate* delegate = widget->widget_delegate();
++  const bool is_modal =
++      delegate && delegate->GetModalType() != ui::mojom::ModalType::kNone;
++  const ui::ColorProvider* provider = widget->GetColorProvider();
++  const ui::ColorId bg_id =
++      is_modal ? ui::kColorDialogBackground : ui::kColorBubbleBackground;
++  const SkColor opaque_fill =
++      provider ? provider->GetColor(bg_id) : SkColorSetRGB(0x25, 0x25, 0x28);
++  const bool dark = !provider || color_utils::IsDark(opaque_fill);
++  const SkColor glass_tint = dark ? SkColorSetARGB(0xA1, 0x1A, 0x1A, 0x20)
++                                  : SkColorSetARGB(0xD4, 0xFA, 0xFA, 0xFD);
++  myarc::ApplyBubbleGlass(*widget,
++                          is_modal ? myarc::GlassMaterial::kSheet
++                                   : myarc::GlassMaterial::kPopover,
++                          dark, glass_tint, opaque_fill);
++}
++
++}  // namespace
++
++void ChromeViewsDelegate::InitMyarcBubbleGlass() {
++  if (!base::CommandLine::ForCurrentProcess()->HasSwitch(
++          "myarc-visual-parity")) {
++    return;
++  }
++  myarc_bubble_glass_observer_ =
++      std::make_unique<views::AnyWidgetObserver>(views::AnyWidgetPasskey{});
++  myarc_bubble_glass_observer_->set_shown_callback(
++      base::BindRepeating(&ApplyMyarcGlassToBubbleWidget));
++}
+ 
+ ui::ContextFactory* ChromeViewsDelegate::GetContextFactory() {
+   return content::GetContextFactory();

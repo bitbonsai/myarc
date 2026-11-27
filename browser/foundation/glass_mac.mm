@@ -1,6 +1,8 @@
 #include "myarc/glass_mac.h"
 
 #import <Cocoa/Cocoa.h>
+#import <QuartzCore/QuartzCore.h>
+#import <objc/runtime.h>
 
 #include <algorithm>
 #include <cmath>
@@ -50,8 +52,67 @@
 }
 @end
 
+// Crisp 1px specular rim hairline layered above a frosted glass bubble's
+// compositor view. Ignores pointer events and tracks superview resizes with
+// exact edge insets matching MyarcGlassBackdropView.
+@interface MyarcGlassRimView : NSView
+@property(nonatomic) NSEdgeInsets myarcInsets;
+@property(nonatomic) CGFloat myarcCornerRadius;
+@property(nonatomic) BOOL myarcDark;
+- (void)updateFrameForSuperview;
+@end
+
+@implementation MyarcGlassRimView
+@synthesize myarcInsets = _myarcInsets;
+@synthesize myarcCornerRadius = _myarcCornerRadius;
+@synthesize myarcDark = _myarcDark;
+
+- (NSView*)hitTest:(NSPoint)point {
+  return nil;
+}
+
+- (void)updateFrameForSuperview {
+  NSView* superview = self.superview;
+  if (!superview) {
+    return;
+  }
+  const NSRect bounds = superview.bounds;
+  self.frame = NSMakeRect(
+      _myarcInsets.left, _myarcInsets.bottom,
+      std::max<CGFloat>(0,
+                        NSWidth(bounds) - _myarcInsets.left - _myarcInsets.right),
+      std::max<CGFloat>(
+          0, NSHeight(bounds) - _myarcInsets.top - _myarcInsets.bottom));
+}
+
+- (void)resizeWithOldSuperviewSize:(NSSize)oldSize {
+  [self updateFrameForSuperview];
+}
+
+- (BOOL)wantsUpdateLayer {
+  return YES;
+}
+
+- (void)updateLayer {
+  CALayer* layer = self.layer;
+  if (!layer) {
+    return;
+  }
+  layer.backgroundColor = nil;
+  layer.cornerRadius = _myarcCornerRadius;
+  layer.borderWidth = 1.0;
+  layer.borderColor =
+      (_myarcDark
+           ? [NSColor colorWithSRGBRed:1.0 green:1.0 blue:1.0 alpha:0.20]
+           : [NSColor colorWithSRGBRed:0.0 green:0.0 blue:0.0 alpha:0.14])
+          .CGColor;
+}
+@end
+
 namespace myarc {
 namespace {
+
+const char kMyarcGlassStyledKey = 0;
 
 NSVisualEffectMaterial ToAppKitMaterial(GlassMaterial material) {
   switch (material) {
@@ -102,11 +163,62 @@ MyarcGlassBackdropView* FindBackdrop(NSView* content) {
   return nil;
 }
 
+MyarcGlassRimView* FindRim(NSView* content) {
+  for (NSView* view in content.subviews) {
+    if ([view isKindOfClass:[MyarcGlassRimView class]]) {
+      return static_cast<MyarcGlassRimView*>(view);
+    }
+  }
+  return nil;
+}
+
+void ApplyBubbleRim(NSWindow* window,
+                    CGFloat corner_radius,
+                    bool dark,
+                    NSEdgeInsets insets,
+                    bool show) {
+  if (!window || !window.contentView) {
+    return;
+  }
+  NSView* content = window.contentView;
+  if (!show) {
+    if (MyarcGlassRimView* existing = FindRim(content)) {
+      [existing removeFromSuperview];
+    }
+    return;
+  }
+  MyarcGlassRimView* rim = FindRim(content);
+  if (!rim) {
+    rim = [[MyarcGlassRimView alloc] initWithFrame:content.bounds];
+    rim.wantsLayer = YES;
+    rim.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
+    [content addSubview:rim positioned:NSWindowAbove relativeTo:nil];
+  }
+  rim.myarcInsets = insets;
+  rim.myarcCornerRadius = corner_radius;
+  rim.myarcDark = dark;
+  [rim updateFrameForSuperview];
+  [rim setNeedsDisplay:YES];
+}
+
+void MarkWindowGlassStyled(NSWindow* window) {
+  if (window) {
+    objc_setAssociatedObject(window, &kMyarcGlassStyledKey, @YES,
+                             OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+  }
+}
+
 }  // namespace
 
 bool ShouldReduceTransparency() {
   return NSWorkspace.sharedWorkspace
       .accessibilityDisplayShouldReduceTransparency;
+}
+
+bool HasWidgetGlass(const views::Widget& widget) {
+  NSWindow* window = widget.GetNativeWindow().GetNativeNSWindow();
+  return window &&
+         objc_getAssociatedObject(window, &kMyarcGlassStyledKey) != nil;
 }
 
 NSVisualEffectView* ApplyNSWindowGlass(NSWindow* window,
@@ -124,6 +236,7 @@ NSVisualEffectView* ApplyNSWindowGlass(NSWindow* window,
   NSAppearance* appearance = [NSAppearance
       appearanceNamed:dark ? NSAppearanceNameDarkAqua : NSAppearanceNameAqua];
   window.appearance = appearance;
+  MarkWindowGlassStyled(window);
 
   if (ShouldReduceTransparency()) {
     if (MyarcGlassBackdropView* existing = FindBackdrop(content)) {
@@ -174,7 +287,8 @@ bool ApplyBubbleGlass(views::Widget& widget,
                       GlassMaterial material,
                       bool dark,
                       SkColor glass_tint,
-                      SkColor opaque_fill) {
+                      SkColor opaque_fill,
+                      bool draw_rim) {
   const bool reduced = ShouldReduceTransparency();
   const SkColor fill = reduced ? opaque_fill : glass_tint;
 
@@ -198,20 +312,31 @@ bool ApplyBubbleGlass(views::Widget& widget,
     frame->SetBackgroundColor(fill);
   }
 
+  NSWindow* window = widget.GetNativeWindow().GetNativeNSWindow();
   if (reduced) {
+    ApplyBubbleRim(window, 0, dark, NSEdgeInsetsZero, /*show=*/false);
     ApplyWidgetGlass(widget, material, 0, dark);
     return false;
   }
 
   gfx::Insets insets;
   float radius = 12.f;
+  bool has_visible_arrow = false;
   if (frame) {
     radius = frame->GetRoundedCorners().upper_left();
+    has_visible_arrow = frame->GetDisplayVisibleArrow();
     if (frame->GetBorder()) {
       insets = frame->GetBorder()->GetInsets();
     }
   }
-  return ApplyWidgetGlass(widget, material, radius, dark, insets);
+  const bool applied =
+      ApplyWidgetGlass(widget, material, radius, dark, insets);
+  ApplyBubbleRim(
+      window, radius, dark,
+      NSEdgeInsetsMake(insets.top(), insets.left(), insets.bottom(),
+                       insets.right()),
+      applied && draw_rim && !has_visible_arrow);
+  return applied;
 }
 
 }  // namespace myarc

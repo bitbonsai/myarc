@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-11-27: Frosted glass dialogs everywhere and sidebar-anchored prompts
+
+- Added `HasWidgetGlass()` and a `1px` specular rim overlay (`MyarcGlassRimView`) to `ApplyBubbleGlass()` (`browser/foundation/glass_mac.{h,mm}`), and hooked `views::AnyWidgetObserver` in `ChromeViewsDelegate` (`chrome_views_delegate_mac.cc`) under `--myarc-visual-parity` so all `BubbleFrameView`-backed bubbles and modal dialogs (permission prompts, Page Info, crash recovery, bookmarks, passwords, sheets) inherit dark/light frosted glass without double-applying over custom myArc popovers.
+- Re-anchored `ControlPrompt` (`browser/foundation/control_prompt.{h,cc}`, used for Agent Space control approvals and crash report prompts) and `SessionCrashedBubbleView` (`chrome/browser/ui/views/session_crashed_bubble_view.cc`) to the sidebar's `LocationBarView` (`TOP_LEFT` / below the URL pill, with top-left or AppMenu fallback when collapsed) instead of the far top-right corner.
+- Verified with `out/MyarcRelease` `chrome` build, `python3 tools/export_patches.py --check` (`167` patches), and `python3 tools/check_docs.py`.
+
 ## 2026-11-26: Native frosted-glass About myArc dialog
 
 - Added `myarc::BindAboutMenuItem()` and `MyarcAboutPanelController` (`browser/foundation/updater_mac.{h,mm}`) to show a native frosted-glass About window with the myArc icon, `MyarcVersion`, Chromium version, a `Check for Updates…` button when Sparkle is embedded, `myarc.dev`/`GitHub` links, and MIT/Chromium attribution.

@@ -1,6 +1,8 @@
 #include "myarc/control_prompt.h"
 
+#include <algorithm>
 #include <memory>
+#include <string_view>
 #include <utility>
 
 #include "base/functional/bind.h"
@@ -38,13 +40,14 @@ namespace {
 constexpr int kWidth = 320;
 constexpr int kInset = 14;
 constexpr int kTextWidth = kWidth - 2 * kInset;
-constexpr float kRadius = 10;
+constexpr float kRadius = 12;
 constexpr int kButtonHeight = 24;
 constexpr int kButtonRadius = 5;
 constexpr int kButtonPad = 12;
-// Offset from the window's top-right corner, as the copied URL toast sits.
+// Spacing below the sidebar's location bar and edge margins inside the window.
+constexpr int kAnchorGap = 8;
+constexpr int kWindowMargin = 14;
 constexpr int kTopMargin = 19;
-constexpr int kRightMargin = 17;
 constexpr SkColor kFill = SkColorSetRGB(0x25, 0x25, 0x26);
 constexpr SkColor kGlassFill = SkColorSetARGB(0xA1, 0x1A, 0x1A, 0x20);
 constexpr SkColor kStroke = SkColorSetRGB(0x3A, 0x3A, 0x3B);
@@ -164,6 +167,42 @@ class PromptView : public views::BoxLayoutView {
 BEGIN_METADATA(PromptView)
 END_METADATA
 
+views::View* FindLocationBarView(views::View* root) {
+  if (!root) {
+    return nullptr;
+  }
+  if (std::string_view(root->GetClassName()) == "LocationBarView" &&
+      root->IsDrawn()) {
+    return root;
+  }
+  for (views::View* child : root->children()) {
+    if (views::View* found = FindLocationBarView(child)) {
+      return found;
+    }
+  }
+  return nullptr;
+}
+
+gfx::Rect ComputePromptBounds(views::Widget& parent, const gfx::Size& size) {
+  const gfx::Rect window = parent.GetClientAreaBoundsInScreen();
+  int x = window.x() + kWindowMargin;
+  int y = window.y() + kTopMargin;
+  if (views::View* bar = FindLocationBarView(parent.GetRootView())) {
+    const gfx::Rect anchor = bar->GetBoundsInScreen();
+    if (!anchor.IsEmpty()) {
+      x = anchor.x();
+      y = anchor.bottom() + kAnchorGap;
+    }
+  }
+  const int max_x = std::max(window.x() + kWindowMargin,
+                             window.right() - kWindowMargin - size.width());
+  const int max_y = std::max(window.y() + kTopMargin,
+                             window.bottom() - kWindowMargin - size.height());
+  x = std::clamp(x, window.x() + kWindowMargin, max_x);
+  y = std::clamp(y, window.y() + kTopMargin, max_y);
+  return gfx::Rect(x, y, size.width(), size.height());
+}
+
 }  // namespace
 
 ControlPrompt::ControlPrompt(views::Widget& parent,
@@ -205,11 +244,8 @@ ControlPrompt::ControlPrompt(views::Widget& parent, const Copy& copy, Done done)
                           allow ? Answer::kAllow : Answer::kDecline));
                 },
                 base::Unretained(this))));
-  const gfx::Rect window = parent.GetClientAreaBoundsInScreen();
   const gfx::Size size = contents->GetPreferredSize();
-  widget_->SetBounds(gfx::Rect(window.right() - kRightMargin - size.width(),
-                               window.y() + kTopMargin, size.width(),
-                               size.height()));
+  widget_->SetBounds(ComputePromptBounds(parent, size));
   ApplyWidgetGlass(*widget_, GlassMaterial::kHud, kRadius, /*dark=*/true);
   widget_->ShowInactive();
   contents->GetViewAccessibility().AnnounceText(copy.title);

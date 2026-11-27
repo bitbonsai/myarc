@@ -1,5 +1,5 @@
 diff --git a/chrome/browser/ui/views/frame/browser_view.cc b/chrome/browser/ui/views/frame/browser_view.cc
-index 7b568f6de760af21d6e9d2aa44415a7cef617c51..68f54aa19aceea247cc55a99f80f9ea2ef26bf92 100644
+index 7b568f6de760af21d6e9d2aa44415a7cef617c51..e1baa33f45b131925092ffd782ff487ebbaeeb17 100644
 --- a/chrome/browser/ui/views/frame/browser_view.cc
 +++ b/chrome/browser/ui/views/frame/browser_view.cc
 @@ -11,6 +11,7 @@
@@ -766,7 +766,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..68f54aa19aceea247cc55a99f80f9ea2
 +    if (GetWidget()) {
 +      glass = myarc::ApplyBubbleGlass(*GetWidget(),
 +                                      myarc::GlassMaterial::kPopover, dark_,
-+                                      glass_bg, opaque_bg);
++                                      glass_bg, opaque_bg, /*draw_rim=*/false);
 +    }
 +    SetBorder(views::CreateRoundedRectBorder(
 +        1, 12,

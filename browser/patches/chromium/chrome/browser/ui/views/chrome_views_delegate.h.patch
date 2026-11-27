@@ -1,0 +1,29 @@
+diff --git a/chrome/browser/ui/views/chrome_views_delegate.h b/chrome/browser/ui/views/chrome_views_delegate.h
+index c695c48d0c2672499bae2bcf1dbdc54d02822dbe..f52cba2bb6cfa01afec6986b97cd138eaec2aeda 100644
+--- a/chrome/browser/ui/views/chrome_views_delegate.h
++++ b/chrome/browser/ui/views/chrome_views_delegate.h
+@@ -18,6 +18,12 @@ class Profile;
+ class ScopedKeepAlive;
+ class ScopedProfileKeepAlive;
+ 
++#if BUILDFLAG(IS_MAC)
++namespace views {
++class AnyWidgetObserver;
++}
++#endif
++
+ class ChromeViewsDelegate : public views::ViewsDelegate {
+  public:
+   ChromeViewsDelegate();
+@@ -90,6 +96,11 @@ class ChromeViewsDelegate : public views::ViewsDelegate {
+       views::Widget::InitParams* params,
+       views::internal::NativeWidgetDelegate* delegate);
+ 
++#if BUILDFLAG(IS_MAC)
++  void InitMyarcBubbleGlass();
++  std::unique_ptr<views::AnyWidgetObserver> myarc_bubble_glass_observer_;
++#endif
++
+   // |ChromeViewsDelegate| exposes a |RefCounted|-like interface, but //chrome
+   // uses |ScopedKeepAlive|s to manage lifetime. We manage an internal counter
+   // to do that translation.

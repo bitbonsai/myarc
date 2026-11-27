@@ -4353,9 +4353,9 @@ bool ShowBoostEditor(BrowserWindowInterface& browser, uint64_t boost_id) {
   views::Widget* raw_widget = slot->widget.get();
   BoostEditorView* raw_view = slot->view;
   editors[&browser] = std::move(slot);
-  raw_widget->Show();
   ApplyBubbleGlass(*raw_widget, GlassMaterial::kPopover, /*dark=*/true,
                    kCardGlassTint, kCardBg);
+  raw_widget->Show();
   raw_view->StartOpenAnimation();
   return true;
 }

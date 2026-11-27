@@ -42,15 +42,20 @@ bool ApplyWidgetGlass(views::Widget& widget,
                       bool dark,
                       const gfx::Insets& insets = gfx::Insets());
 
+// True if ApplyWidgetGlass or ApplyBubbleGlass has already styled `widget`.
+bool HasWidgetGlass(const views::Widget& widget);
+
 // Styles a BubbleFrameView-backed widget (BubbleDialogDelegate,
-// BubbleDialogModelHost, or DialogDelegate) with a frosted glass backdrop and
-// translucent `glass_tint`, or `opaque_fill` when Reduce Transparency is on.
-// Returns true when frosted glass is active.
+// BubbleDialogModelHost, or DialogDelegate) with a frosted glass backdrop,
+// translucent `glass_tint`, and an optional 1px specular rim hairline (or
+// `opaque_fill` when Reduce Transparency is on). Returns true when frosted
+// glass is active.
 bool ApplyBubbleGlass(views::Widget& widget,
                       GlassMaterial material,
                       bool dark,
                       SkColor glass_tint,
-                      SkColor opaque_fill);
+                      SkColor opaque_fill,
+                      bool draw_rim = true);
 
 #if defined(__OBJC__)
 // Installs or updates a behind-window NSVisualEffectView in `window`'s
@@ -76,11 +81,16 @@ inline bool ApplyWidgetGlass(views::Widget& widget,
   return false;
 }
 
+inline bool HasWidgetGlass(const views::Widget& widget) {
+  return false;
+}
+
 inline bool ApplyBubbleGlass(views::Widget& widget,
                              GlassMaterial material,
                              bool dark,
                              SkColor glass_tint,
-                             SkColor opaque_fill) {
+                             SkColor opaque_fill,
+                             bool draw_rim = true) {
   return false;
 }
 

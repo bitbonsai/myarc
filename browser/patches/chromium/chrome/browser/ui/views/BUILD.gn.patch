@@ -1,8 +1,22 @@
 diff --git a/chrome/browser/ui/views/BUILD.gn b/chrome/browser/ui/views/BUILD.gn
-index d0dce2a8753cdb05b5e825c4473ff6105914f40b..af177c5acb764add09d56bef669aaf60f07b732e 100644
+index d0dce2a8753cdb05b5e825c4473ff6105914f40b..d5a312f995845c015c051bd6976504d45bd2362b 100644
 --- a/chrome/browser/ui/views/BUILD.gn
 +++ b/chrome/browser/ui/views/BUILD.gn
-@@ -1534,6 +1534,7 @@ source_set("find_bar_views") {
+@@ -1254,7 +1254,12 @@ source_set("chrome_views_delegate") {
+   }
+   if (is_mac) {
+     sources += [ "chrome_views_delegate_mac.cc" ]
+-    deps += [ "//content/public/browser" ]
++    deps += [
++      "//content/public/browser",
++      "//myarc:glass",
++      "//ui/color",
++      "//ui/gfx",
++    ]
+   }
+   if (is_win) {
+     sources += [ "chrome_views_delegate_win.cc" ]
+@@ -1534,6 +1539,7 @@ source_set("find_bar_views") {
      "//components/strings:components_strings",
      "//components/vector_icons",
      "//content/public/browser",
@@ -10,7 +24,7 @@ index d0dce2a8753cdb05b5e825c4473ff6105914f40b..af177c5acb764add09d56bef669aaf60
      "//skia",
      "//ui/accessibility:ax_base",
      "//ui/base",
-@@ -1609,6 +1610,8 @@ source_set("session_crashed_bubble_view") {
+@@ -1609,6 +1615,8 @@ source_set("session_crashed_bubble_view") {
      "//chrome/installer/util:with_no_strings",
      "//components/strings:components_strings",
      "//content/public/browser",
@@ -19,7 +33,7 @@ index d0dce2a8753cdb05b5e825c4473ff6105914f40b..af177c5acb764add09d56bef669aaf60
      "//ui/base",
      "//ui/views",
    ]
-@@ -1990,11 +1993,14 @@ if (!is_chromeos_device) {
+@@ -1990,11 +1998,14 @@ if (!is_chromeos_device) {
        ":ssl_client_certificate_selector",
        ":tab_modal_confirm_dialog_views",
        "//chrome/browser/prefs:util",
@@ -34,7 +48,7 @@ index d0dce2a8753cdb05b5e825c4473ff6105914f40b..af177c5acb764add09d56bef669aaf60
        "//chrome/browser/ui/views/test:view_event_test_base",
        "//chrome/browser/ui/views/toolbar:interactive_ui_tests",
        "//chrome/browser/ui/webui:chrome_web_contents_handler",
-@@ -2002,7 +2008,10 @@ if (!is_chromeos_device) {
+@@ -2002,7 +2013,10 @@ if (!is_chromeos_device) {
        "//chrome/test:test_support_ui",
        "//components/enterprise/data_controls/content/browser",
        "//components/enterprise/data_controls/core/browser:test_support",

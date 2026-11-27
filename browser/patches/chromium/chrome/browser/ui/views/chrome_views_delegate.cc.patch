@@ -1,0 +1,25 @@
+diff --git a/chrome/browser/ui/views/chrome_views_delegate.cc b/chrome/browser/ui/views/chrome_views_delegate.cc
+index d3456eba031456cc624f256d414dd5f748a687ca..b9038f4db8ef1d1b364e19c284b6c6d3a6e2c659 100644
+--- a/chrome/browser/ui/views/chrome_views_delegate.cc
++++ b/chrome/browser/ui/views/chrome_views_delegate.cc
+@@ -26,6 +26,10 @@
+ #include "ui/gfx/geometry/rect.h"
+ #include "ui/views/widget/widget.h"
+ 
++#if BUILDFLAG(IS_MAC)
++#include "ui/views/widget/any_widget_observer.h"
++#endif
++
+ #if BUILDFLAG(IS_CHROMEOS)
+ #include "chromeos/ash/experiences/arc/touch_selection_menu/touch_selection_menu_runner_chromeos.h"
+ #include "chromeos/ui/base/app_types.h"
+@@ -76,6 +80,9 @@ ChromeViewsDelegate::ChromeViewsDelegate() {
+   SetTouchSelectionMenuRunner(
+       std::make_unique<TouchSelectionMenuRunnerChromeOS>());
+ #endif
++#if BUILDFLAG(IS_MAC)
++  InitMyarcBubbleGlass();
++#endif
+ }
+ 
+ ChromeViewsDelegate::~ChromeViewsDelegate() {

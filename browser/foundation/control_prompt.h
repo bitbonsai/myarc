@@ -13,11 +13,11 @@
 
 namespace myarc {
 
-// The card at a browser window's top-right that asks a yes or no question,
-// such as whether a control client may use the Agent Space: "<client> wants
-// to control your Agent Space", with Allow and Don't allow. It shows without
-// activating the window. UI sequence only; `parent` must outlive it or close
-// first.
+// A frosted-glass card anchored below the sidebar's location bar (or top-left
+// when the sidebar is collapsed) that asks a yes or no question, such as
+// whether a control client may use the Agent Space: "<client> wants to control
+// your Agent Space", with Allow and Don't allow. It shows without activating
+// the window. UI sequence only; `parent` must outlive it or close first.
 class ControlPrompt : public views::WidgetObserver {
  public:
   enum class Answer { kAllow, kDecline, kClosed };
