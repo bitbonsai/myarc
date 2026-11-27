@@ -8,6 +8,7 @@
 #include <cmath>
 #include <optional>
 
+#include "skia/ext/skia_utils_mac.h"
 #include "ui/gfx/native_ui_types.h"
 #include "ui/views/border.h"
 #include "ui/views/bubble/bubble_dialog_delegate_view.h"
@@ -408,8 +409,12 @@ NSVisualEffectView* ApplyNSWindowGlass(NSWindow* window,
   glass.material = ToAppKitMaterial(material);
   glass.appearance = appearance;
   glass.maskImage = RoundedMask(corner_radius);
-  window.hasShadow = YES;
-  [window invalidateShadow];
+  const bool has_shadow_insets = insets.top > 0 || insets.left > 0 ||
+                                 insets.bottom > 0 || insets.right > 0;
+  if (!has_shadow_insets) {
+    window.hasShadow = YES;
+    [window invalidateShadow];
+  }
   return glass;
 }
 
@@ -487,113 +492,98 @@ bool ApplyBubbleGlass(views::Widget& widget,
   return applied;
 }
 
-namespace {
-
-CATransform3D MakeCenteredFlipTransform(CGFloat width,
-                                        CGFloat height,
-                                        CGFloat angle_rad,
-                                        CGFloat scale) {
-  const CGFloat cx = width * 0.5;
-  const CGFloat cy = height * 0.5;
-  CATransform3D to_origin = CATransform3DMakeTranslation(-cx, -cy, 0.0);
-  CATransform3D rot = CATransform3DIdentity;
-  rot.m34 = -1.0 / 1400.0;
-  rot = CATransform3DRotate(rot, angle_rad, 0.0, 1.0, 0.0);
-  rot = CATransform3DScale(rot, scale, scale, 1.0);
-  CATransform3D back = CATransform3DMakeTranslation(cx, cy, 0.0);
-  return CATransform3DConcat(CATransform3DConcat(to_origin, rot), back);
-}
-
-CAKeyframeAnimation* MakeFlipKeyframe(CGFloat width,
-                                      CGFloat height,
-                                      CGFloat start_deg,
-                                      CGFloat end_deg,
-                                      CGFloat start_scale,
-                                      CGFloat end_scale,
-                                      CFTimeInterval duration,
-                                      CAMediaTimingFunctionName timing_name) {
-  constexpr int kSteps = 8;
-  NSMutableArray* values = [NSMutableArray arrayWithCapacity:kSteps + 1];
-  for (int i = 0; i <= kSteps; ++i) {
-    const CGFloat t = static_cast<CGFloat>(i) / static_cast<CGFloat>(kSteps);
-    const CGFloat deg = start_deg + (end_deg - start_deg) * t;
-    const CGFloat scale = start_scale + (end_scale - start_scale) * t;
-    const CGFloat rad = deg * (M_PI / 180.0);
-    [values addObject:[NSValue valueWithCATransform3D:MakeCenteredFlipTransform(
-                                                          width, height, rad,
-                                                          scale)]];
-  }
-  CAKeyframeAnimation* anim =
-      [CAKeyframeAnimation animationWithKeyPath:@"transform"];
-  anim.values = values;
-  anim.duration = duration;
-  anim.timingFunction = [CAMediaTimingFunction functionWithName:timing_name];
-  anim.fillMode = kCAFillModeForwards;
-  anim.removedOnCompletion = NO;
-  return anim;
-}
-
-}  // namespace
-
-void FlipNativeView3D(gfx::NativeView native_view,
-                      bool reverse,
-                      base::OnceClosure on_midpoint) {
+void AnimateCardShuffle(gfx::NativeView native_view,
+                        const SkBitmap& snapshot,
+                        bool reverse) {
   NSView* view = native_view.GetNativeNSView();
-  if (!view ||
+  if (!view || !view.window || snapshot.drawsNothing() ||
       [[NSWorkspace sharedWorkspace] accessibilityDisplayShouldReduceMotion]) {
-    if (on_midpoint) {
-      std::move(on_midpoint).Run();
-    }
     return;
   }
 
-  view.wantsLayer = YES;
-  CALayer* layer = view.layer;
-  if (!layer) {
-    if (on_midpoint) {
-      std::move(on_midpoint).Run();
-    }
+  NSWindow* parent = view.window;
+  const NSRect in_window = [view convertRect:view.bounds toView:nil];
+  const NSRect on_screen = [parent convertRectToScreen:in_window];
+  if (NSWidth(on_screen) <= 1.0 || NSHeight(on_screen) <= 1.0) {
     return;
   }
 
-  const CGFloat width = NSWidth(view.bounds);
-  const CGFloat height = NSHeight(view.bounds);
-  if (width <= 1.0 || height <= 1.0) {
-    if (on_midpoint) {
-      std::move(on_midpoint).Run();
-    }
+  NSBitmapImageRep* rep = skia::SkBitmapToNSBitmapImageRep(snapshot);
+  CGImageRef cg_image = rep ? rep.CGImage : nullptr;
+  if (!cg_image) {
     return;
   }
 
-  const CGFloat dir = reverse ? -1.0 : 1.0;
-  __block base::OnceClosure midpoint_cb = std::move(on_midpoint);
+  // Create a transparent overlay child window aligned to the web content rect.
+  NSWindow* overlay =
+      [[NSWindow alloc] initWithContentRect:on_screen
+                                  styleMask:NSWindowStyleMaskBorderless
+                                    backing:NSBackingStoreBuffered
+                                      defer:NO];
+  overlay.opaque = NO;
+  overlay.backgroundColor = [NSColor clearColor];
+  overlay.hasShadow = NO;
+  overlay.ignoresMouseEvents = YES;
+  overlay.releasedWhenClosed = NO;
 
-  [layer removeAnimationForKey:@"myarcFlip3D"];
+  NSView* host = [[NSView alloc]
+      initWithFrame:NSMakeRect(0, 0, NSWidth(on_screen), NSHeight(on_screen))];
+  host.wantsLayer = YES;
+  host.layer.masksToBounds = YES;
+  overlay.contentView = host;
+
+  CALayer* card = [CALayer layer];
+  card.frame = host.bounds;
+  card.contents = (__bridge id)cg_image;
+  card.contentsGravity = kCAGravityResize;
+  card.cornerRadius = 10.0;
+  card.masksToBounds = YES;
+  card.borderWidth = 1.0;
+  card.borderColor =
+      [NSColor colorWithWhite:1.0 alpha:0.14].CGColor;
+  [host.layer addSublayer:card];
+
+  [parent addChildWindow:overlay ordered:NSWindowAbove];
+
+  const CGFloat dir = reverse ? 1.0 : -1.0;
+  const CGFloat w = NSWidth(on_screen);
+
+  CATransform3D end_t = CATransform3DIdentity;
+  end_t.m34 = -1.0 / 1600.0;
+  end_t = CATransform3DTranslate(end_t, dir * w * 0.58, -18.0, 0.0);
+  end_t = CATransform3DRotate(end_t, dir * 10.0 * (M_PI / 180.0), 0.0, 1.0, 0.0);
+  end_t = CATransform3DRotate(end_t, dir * 4.0 * (M_PI / 180.0), 0.0, 0.0, 1.0);
+  end_t = CATransform3DScale(end_t, 0.90, 0.90, 1.0);
+
+  CAMediaTimingFunction* curve =
+      [CAMediaTimingFunction functionWithControlPoints:0.22f:1.0f:0.36f:1.0f];
+
+  CABasicAnimation* move_anim =
+      [CABasicAnimation animationWithKeyPath:@"transform"];
+  move_anim.fromValue = [NSValue valueWithCATransform3D:CATransform3DIdentity];
+  move_anim.toValue = [NSValue valueWithCATransform3D:end_t];
+  move_anim.duration = 0.42;
+  move_anim.timingFunction = curve;
+  move_anim.fillMode = kCAFillModeForwards;
+  move_anim.removedOnCompletion = NO;
+
+  CABasicAnimation* fade_anim =
+      [CABasicAnimation animationWithKeyPath:@"opacity"];
+  fade_anim.fromValue = @1.0;
+  fade_anim.toValue = @0.0;
+  fade_anim.duration = 0.36;
+  fade_anim.beginTime = CACurrentMediaTime() + 0.05;
+  fade_anim.timingFunction = curve;
+  fade_anim.fillMode = kCAFillModeForwards;
+  fade_anim.removedOnCompletion = NO;
 
   [CATransaction begin];
   [CATransaction setCompletionBlock:^{
-    if (midpoint_cb) {
-      std::move(midpoint_cb).Run();
-    }
-    if (!view.window || !view.layer) {
-      return;
-    }
-    [CATransaction begin];
-    [CATransaction setCompletionBlock:^{
-      [view.layer removeAnimationForKey:@"myarcFlip3D"];
-      view.layer.transform = CATransform3DIdentity;
-    }];
-    CAKeyframeAnimation* phase2 = MakeFlipKeyframe(
-        width, height, -90.0 * dir, 0.0, 0.93, 1.0, 0.25,
-        kCAMediaTimingFunctionEaseOut);
-    [view.layer addAnimation:phase2 forKey:@"myarcFlip3D"];
-    [CATransaction commit];
+    [parent removeChildWindow:overlay];
+    [overlay orderOut:nil];
   }];
-
-  CAKeyframeAnimation* phase1 =
-      MakeFlipKeyframe(width, height, 0.0, 90.0 * dir, 1.0, 0.93, 0.20,
-                       kCAMediaTimingFunctionEaseIn);
-  [layer addAnimation:phase1 forKey:@"myarcFlip3D"];
+  [card addAnimation:move_anim forKey:@"myarcCardShuffleMove"];
+  [card addAnimation:fade_anim forKey:@"myarcCardShuffleFade"];
   [CATransaction commit];
 }
 

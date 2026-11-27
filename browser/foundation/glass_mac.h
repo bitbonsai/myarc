@@ -1,8 +1,8 @@
 #ifndef MYARC_GLASS_MAC_H_
 #define MYARC_GLASS_MAC_H_
 
-#include "base/functional/callback.h"
 #include "build/build_config.h"
+#include "third_party/skia/include/core/SkBitmap.h"
 #include "third_party/skia/include/core/SkColor.h"
 #include "ui/gfx/geometry/insets.h"
 #include "ui/gfx/native_ui_types.h"
@@ -84,12 +84,12 @@ bool ApplyBubbleGlass(views::Widget& widget,
                       SkColor opaque_fill,
                       bool draw_rim = true);
 
-// Spins `native_view` 180 degrees around its vertical center with perspective
-// (0 -> +-90 deg, invokes `on_midpoint`, then -+90 -> 0 deg). Falls back to
-// invoking `on_midpoint` immediately when Reduce Motion is enabled.
-void FlipNativeView3D(gfx::NativeView native_view,
-                      bool reverse,
-                      base::OnceClosure on_midpoint);
+// Animates a card-shuffle transition using a snapshot of `native_view`,
+// sliding and tilting the captured card off-screen to reveal the new page
+// underneath. No-op when Reduce Motion is enabled or `snapshot` is empty.
+void AnimateCardShuffle(gfx::NativeView native_view,
+                        const SkBitmap& snapshot,
+                        bool reverse);
 
 #if defined(__OBJC__)
 // Installs or updates a behind-window NSVisualEffectView in `window`'s
@@ -128,13 +128,9 @@ inline bool ApplyBubbleGlass(views::Widget& widget,
   return false;
 }
 
-inline void FlipNativeView3D(gfx::NativeView native_view,
-                             bool reverse,
-                             base::OnceClosure on_midpoint) {
-  if (on_midpoint) {
-    std::move(on_midpoint).Run();
-  }
-}
+inline void AnimateCardShuffle(gfx::NativeView native_view,
+                               const SkBitmap& snapshot,
+                               bool reverse) {}
 
 #endif  // BUILDFLAG(IS_MAC)
 
