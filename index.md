@@ -15,10 +15,10 @@ An open-source browser bringing back Arc, with no account required and optional 
 
 - ### Yours to keep
 
-  Your workspace stays on your computer, in files you own. Export is on the way.
+  Your workspace stays on your computer, in local JSON files you own. Export your pins and Favorites as standard Netscape HTML any time.
 - ### Keep what worked
 
-  If you used Arc, you already know myArc. One-click import brings over your Spaces, Favorites and pinned tabs.
+  If you used Arc, you already know myArc. One-click import brings over your Profiles, Spaces, Favorites, folders and pinned tabs.
 - ### AI by choice
 
   AI is off until you turn it on. Then you pick: a local model, your own API key, or a hosted option, and you decide what it can see.
