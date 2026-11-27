@@ -18,8 +18,8 @@
 use std::collections::BTreeSet;
 
 use crate::{
-    ArchivedTab, ItemId, MAX_ARCHIVED_TABS, MAX_SPACE_NAME_BYTES, Placement, RenameError, SpaceId,
-    Workspace, WorkspaceError, check_limit, next_id, validate_name,
+    ArchivedTab, Item, ItemId, MAX_ARCHIVED_TABS, MAX_ITEMS, MAX_SPACE_NAME_BYTES, Placement,
+    RenameError, SpaceId, Workspace, WorkspaceError, check_limit, next_id, validate_name,
 };
 
 pub type FolderId = u64;
@@ -84,6 +84,105 @@ impl Workspace {
         });
         self.state.next_folder_id = next;
         Ok(id)
+    }
+
+    /// Creates a new open folder named after `source_space_id` inside
+    /// `target_space_id` and copies all of the source Space's pinned tabs
+    /// (both ungrouped Pins and Pins inside the source Space's folders, in
+    /// sidebar order) into that new folder. The source Space and its items are
+    /// left untouched. Atomic: fails without mutating if limits or IDs would
+    /// be exceeded.
+    pub fn export_space_into_folder(
+        &mut self,
+        source_space_id: SpaceId,
+        target_space_id: SpaceId,
+    ) -> Result<FolderId, WorkspaceError> {
+        let folder_name = self.space(source_space_id)?.name.clone();
+        self.space(target_space_id)?;
+        if source_space_id == target_space_id {
+            return Err(WorkspaceError::SameSpace(source_space_id));
+        }
+        validate_name(&folder_name).map_err(WorkspaceError::InvalidFolderName)?;
+        check_limit(self.state.folders.len(), MAX_FOLDERS, "folders")?;
+
+        // Collect the source Space's Pins in sidebar order: ungrouped Pins
+        // first, then each source folder's Pins in folder order.
+        let mut grouped: BTreeSet<ItemId> = BTreeSet::new();
+        for folder in &self.state.folders {
+            if folder.space_id == source_space_id {
+                grouped.extend(folder.items.iter().copied());
+            }
+        }
+        let mut copies: Vec<(Option<String>, String, String)> = Vec::new();
+        for item in &self.state.items {
+            if item.placement
+                == (Placement::Pin {
+                    space_id: source_space_id,
+                })
+                && !grouped.contains(&item.id)
+            {
+                copies.push((
+                    item.canonical_url.clone(),
+                    item.title.clone(),
+                    item.name.clone(),
+                ));
+            }
+        }
+        for folder in &self.state.folders {
+            if folder.space_id != source_space_id {
+                continue;
+            }
+            for &item_id in &folder.items {
+                if let Some(item) = self.state.items.iter().find(|item| {
+                    item.id == item_id
+                        && item.placement
+                            == Placement::Pin {
+                                space_id: source_space_id,
+                            }
+                }) {
+                    copies.push((
+                        item.canonical_url.clone(),
+                        item.title.clone(),
+                        item.name.clone(),
+                    ));
+                }
+            }
+        }
+
+        if self.state.items.len().saturating_add(copies.len()) > MAX_ITEMS {
+            return Err(WorkspaceError::LimitExceeded("items"));
+        }
+        let folder_id = self.state.next_folder_id;
+        let next_folder = next_id(folder_id, "folder")?;
+        let mut next_item = self.state.next_item_id;
+        for _ in 0..copies.len() {
+            next_item = next_id(next_item, "item")?;
+        }
+
+        let mut folder_items = Vec::with_capacity(copies.len());
+        for (item_id, (canonical_url, title, name)) in (self.state.next_item_id..).zip(copies) {
+            self.state.items.push(Item {
+                id: item_id,
+                placement: Placement::Pin {
+                    space_id: target_space_id,
+                },
+                canonical_url,
+                title,
+                name,
+                last_viewed_secs: 0,
+            });
+            folder_items.push(item_id);
+        }
+        self.state.next_item_id = next_item;
+        self.state.folders.push(Folder {
+            id: folder_id,
+            space_id: target_space_id,
+            name: folder_name,
+            open: true,
+            items: folder_items,
+        });
+        self.state.next_folder_id = next_folder;
+        Ok(folder_id)
     }
 
     pub fn rename_folder(&mut self, id: FolderId, name: &str) -> Result<(), WorkspaceError> {

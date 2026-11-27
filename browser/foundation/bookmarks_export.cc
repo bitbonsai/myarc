@@ -11,6 +11,7 @@
 #include "base/functional/bind.h"
 #include "base/functional/callback_helpers.h"
 #include "base/memory/scoped_refptr.h"
+#include "base/memory/weak_ptr.h"
 #include "base/strings/strcat.h"
 #include "base/strings/utf_string_conversions.h"
 #include "base/task/thread_pool.h"
@@ -33,6 +34,7 @@ namespace myarc {
 namespace {
 
 constexpr char16_t kTitle[] = u"Export Pins and Favorites";
+constexpr char16_t kSpaceTitle[] = u"Export Space";
 constexpr char kWorkspaceFile[] = "myarc-workspace-v1.json";
 // The workspace file's own bound (workspace_service.cc).
 constexpr size_t kMaxWorkspaceBytes = 20 * 1024 * 1024;
@@ -82,11 +84,13 @@ Result Write(std::vector<Source> sources, const base::FilePath& path) {
   return result;
 }
 
-void ShowMessage(std::u16string message, gfx::NativeWindow parent) {
+void ShowMessage(std::u16string title,
+                 std::u16string message,
+                 gfx::NativeWindow parent) {
   views::Widget* widget = constrained_window::CreateBrowserModalDialogViews(
       views::BubbleDialogModelHost::CreateModal(
           ui::DialogModel::Builder()
-              .SetTitle(kTitle)
+              .SetTitle(std::move(title))
               .AddParagraph(ui::DialogModelLabel(std::move(message)))
               .AddOkButton(base::DoNothing(),
                            ui::DialogModel::Button::Params().SetLabel(u"OK"))
@@ -109,6 +113,7 @@ void ShowMessage(std::u16string message, gfx::NativeWindow parent) {
 void Written(gfx::NativeWindow parent, Result result) {
   if (!result.written) {
     ShowMessage(
+        kTitle,
         u"myArc couldn’t save the file there. Pick another folder and "
         u"try again.",
         parent);
@@ -119,11 +124,35 @@ void Written(gfx::NativeWindow parent, Result result) {
     for (const std::u16string& name : result.skipped) {
       names = names.empty() ? name : base::StrCat({names, u", ", name});
     }
-    ShowMessage(base::StrCat({u"The file is saved, but myArc couldn’t "
+    ShowMessage(kTitle,
+                base::StrCat({u"The file is saved, but myArc couldn’t "
                               u"read the Spaces of these Profiles, so they "
                               u"are left out: ",
                               names, u"."}),
                 parent);
+  }
+}
+
+bool WriteSpace(foundation::StateSnapshot snapshot,
+                uint64_t space_id,
+                bool as_json,
+                const base::FilePath& path) {
+  const rust::String payload = foundation::export_space_bookmarks(
+      std::move(snapshot), space_id, as_json);
+  if (payload.empty()) {
+    return false;
+  }
+  return base::WriteFile(path,
+                         std::string_view(payload.data(), payload.size()));
+}
+
+void SpaceWritten(gfx::NativeWindow parent, bool written) {
+  if (!written) {
+    ShowMessage(
+        kSpaceTitle,
+        u"myArc couldn’t save the file there. Pick another folder and "
+        u"try again.",
+        parent);
   }
 }
 
@@ -178,11 +207,85 @@ class Picker : public ui::SelectFileDialog::Listener {
   scoped_refptr<ui::SelectFileDialog> dialog_;
 };
 
+// Owns itself while the single-Space save panel is up.
+class SpacePicker : public ui::SelectFileDialog::Listener {
+ public:
+  SpacePicker(base::WeakPtr<Profile> profile,
+              uint64_t space_id,
+              std::u16string space_name,
+              gfx::NativeWindow parent)
+      : profile_(std::move(profile)),
+        space_id_(space_id),
+        space_name_(std::move(space_name)),
+        parent_(parent) {}
+  SpacePicker(const SpacePicker&) = delete;
+  SpacePicker& operator=(const SpacePicker&) = delete;
+  ~SpacePicker() override { dialog_->ListenerDestroyed(); }
+
+  void Open() {
+    dialog_ = ui::SelectFileDialog::Create(
+        this, std::make_unique<ChromeSelectFilePolicy>(nullptr));
+    ui::SelectFileDialog::FileTypeInfo types;
+    types.extensions = {{FILE_PATH_LITERAL("html"), FILE_PATH_LITERAL("htm")},
+                        {FILE_PATH_LITERAL("json")}};
+    types.extension_description_overrides = {u"Netscape Bookmarks HTML",
+                                             u"JSON"};
+    const std::string utf8_name = base::UTF16ToUTF8(space_name_);
+    const std::string file_name(foundation::space_export_file_name(
+        rust::Str(utf8_name.data(), utf8_name.size())));
+    dialog_->SelectFile(ui::SelectFileDialog::SELECT_SAVEAS_FILE, kSpaceTitle,
+                        base::GetHomeDir().Append("Downloads").Append(file_name),
+                        &types, 1, FILE_PATH_LITERAL("html"), parent_);
+  }
+
+  // ui::SelectFileDialog::Listener:
+  void FileSelected(const ui::SelectedFileInfo& file, int index) override {
+    if (!profile_) {
+      delete this;
+      return;
+    }
+    std::optional<foundation::StateSnapshot> snapshot =
+        WorkspaceService::ForProfile(*profile_).ExportSnapshot();
+    if (!snapshot) {
+      SpaceWritten(parent_, false);
+      delete this;
+      return;
+    }
+    const bool as_json =
+        file.path().MatchesExtension(FILE_PATH_LITERAL(".json")) || index == 2;
+    base::ThreadPool::PostTaskAndReplyWithResult(
+        FROM_HERE,
+        {base::MayBlock(), base::TaskPriority::USER_VISIBLE,
+         base::TaskShutdownBehavior::BLOCK_SHUTDOWN},
+        base::BindOnce(&WriteSpace, std::move(*snapshot), space_id_, as_json,
+                       file.path()),
+        base::BindOnce(&SpaceWritten, parent_));
+    delete this;
+  }
+  void FileSelectionCanceled() override { delete this; }
+
+ private:
+  const base::WeakPtr<Profile> profile_;
+  const uint64_t space_id_;
+  const std::u16string space_name_;
+  const gfx::NativeWindow parent_;
+  scoped_refptr<ui::SelectFileDialog> dialog_;
+};
+
 }  // namespace
 
 void ExportPinsAndFavorites(BookmarksProfiles profiles,
                             gfx::NativeWindow parent) {
   (new Picker(std::move(profiles), parent))->Open();
+}
+
+void ExportSpaceBookmarks(Profile& profile,
+                          uint64_t space_id,
+                          std::u16string space_name,
+                          gfx::NativeWindow parent) {
+  (new SpacePicker(profile.GetWeakPtr(), space_id, std::move(space_name),
+                   parent))
+      ->Open();
 }
 
 }  // namespace myarc

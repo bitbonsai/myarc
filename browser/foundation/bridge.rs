@@ -1001,6 +1001,14 @@ mod ffi {
         fn reconcile_live_items(workspace: &mut Workspace, live: &[u64]) -> MutationResult;
         // A new open folder after the Space's others; `id` is the folder.
         fn create_folder(workspace: &mut Workspace, space_id: u64, name: &str) -> MutationResult;
+        // Creates a new open folder named after `source_space_id` inside
+        // `target_space_id` and copies all of the source Space's Pins (loose
+        // and folder items) into it; `id` is the new folder.
+        fn export_space_into_folder(
+            workspace: &mut Workspace,
+            source_space_id: u64,
+            target_space_id: u64,
+        ) -> MutationResult;
         fn rename_folder(workspace: &mut Workspace, folder_id: u64, name: &str) -> MutationResult;
         // `id` is 1 when the state changed, else 0.
         fn set_folder_open(workspace: &mut Workspace, folder_id: u64, open: bool)
@@ -1316,6 +1324,12 @@ mod ffi {
         fn bookmarks_export_html(bookmarks: &BookmarksExport) -> String;
         // The save panel's default file name.
         fn bookmarks_html_file_name() -> String;
+        // Export Space…: writes a single Space's Pins and folders as Netscape
+        // bookmarks HTML, or portable JSON when `as_json` is true. Empty string
+        // if `snapshot` fails to restore or `space_id` does not exist.
+        fn export_space_bookmarks(snapshot: StateSnapshot, space_id: u64, as_json: bool) -> String;
+        // Safe default file name for exporting one Space as HTML.
+        fn space_export_file_name(space_name: &str) -> String;
 
         // Arc's Ctrl+Tab over one window's most recently shown items (BC-008).
         type RecentTabs;
@@ -1575,6 +1589,27 @@ pub fn bookmarks_export_html(bookmarks: &BookmarksExport) -> String {
 
 pub fn bookmarks_html_file_name() -> String {
     import::bookmarks_html::DEFAULT_FILE_NAME.to_owned()
+}
+
+pub fn export_space_bookmarks(
+    snapshot: ffi::StateSnapshot,
+    space_id: u64,
+    as_json: bool,
+) -> String {
+    let mut restored = Workspace(workspace::Workspace::default());
+    if !restore_snapshot(&mut restored, snapshot).ok {
+        return String::new();
+    }
+    let snap = restored.0.snapshot();
+    if as_json {
+        import::bookmarks_html::write_space_json(&snap, space_id).unwrap_or_default()
+    } else {
+        import::bookmarks_html::write_space(&snap, space_id).unwrap_or_default()
+    }
+}
+
+pub fn space_export_file_name(space_name: &str) -> String {
+    import::bookmarks_html::space_file_name(space_name, "html")
 }
 
 pub fn preview_arc_import(
@@ -2710,6 +2745,18 @@ pub fn reconcile_live_items(workspace: &mut Workspace, live: &[u64]) -> ffi::Mut
 
 pub fn create_folder(workspace: &mut Workspace, space_id: u64, name: &str) -> ffi::MutationResult {
     outcome(workspace.0.create_folder(space_id, name))
+}
+
+pub fn export_space_into_folder(
+    workspace: &mut Workspace,
+    source_space_id: u64,
+    target_space_id: u64,
+) -> ffi::MutationResult {
+    outcome(
+        workspace
+            .0
+            .export_space_into_folder(source_space_id, target_space_id),
+    )
 }
 
 pub fn rename_folder(workspace: &mut Workspace, folder_id: u64, name: &str) -> ffi::MutationResult {

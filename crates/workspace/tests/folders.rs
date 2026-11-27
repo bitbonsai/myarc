@@ -329,3 +329,128 @@ fn folder_count_is_bounded() {
         Err(WorkspaceError::LimitExceeded("folders"))
     );
 }
+
+#[test]
+fn export_space_into_folder_copies_pins_and_folder_items_and_persists() {
+    let mut workspace = Workspace::default();
+    let work = workspace.create_space(P1, "Work").unwrap();
+    let dest = workspace.create_space(P1, "Archive").unwrap();
+
+    // Source Space has loose Pins, a folder with Pins in a specific order, and
+    // a Today tab (which should not be exported).
+    let loose_a = pin(&mut workspace, work, "https://a.test/");
+    workspace.set_title(loose_a, "Alpha Page").unwrap();
+    workspace.rename_item(loose_a, "Alpha").unwrap();
+
+    let in_folder_1 = pin(&mut workspace, work, "https://b.test/");
+    workspace.set_title(in_folder_1, "Beta").unwrap();
+
+    let loose_c = pin(&mut workspace, work, "https://c.test/");
+    workspace.set_title(loose_c, "Gamma").unwrap();
+
+    let in_folder_2 = pin(&mut workspace, work, "https://d.test/");
+    workspace.set_title(in_folder_2, "Delta").unwrap();
+
+    let src_folder = workspace.create_folder(work, "Specs").unwrap();
+    workspace
+        .move_pin_to_folder(in_folder_2, Some(src_folder), None)
+        .unwrap();
+    workspace
+        .move_pin_to_folder(in_folder_1, Some(src_folder), None)
+        .unwrap();
+
+    // A Today tab in the source Space must not be copied into the folder.
+    let today = workspace.add_temporary_item(work).unwrap();
+    // An existing Pin in the target Space must stay untouched.
+    let existing_dest = pin(&mut workspace, dest, "https://dest.test/");
+
+    let exported_folder_id = workspace.export_space_into_folder(work, dest).unwrap();
+    let exported = folder(&workspace, exported_folder_id);
+    assert_eq!(exported.space_id, dest);
+    assert_eq!(exported.name, "Work");
+    assert!(exported.open);
+    assert_eq!(exported.items.len(), 4);
+
+    // Copied items are placed in `dest` in sidebar order: loose Pins first,
+    // then source folder Pins in folder order, preserving URL, title and name.
+    let copied: Vec<(Option<&str>, &str, &str)> = exported
+        .items
+        .iter()
+        .map(|&id| {
+            let item = workspace.items().iter().find(|i| i.id == id).unwrap();
+            assert_eq!(item.placement, Placement::Pin { space_id: dest });
+            (
+                item.canonical_url.as_deref(),
+                item.title.as_str(),
+                item.name.as_str(),
+            )
+        })
+        .collect();
+    assert_eq!(
+        copied,
+        [
+            (Some("https://a.test/"), "Alpha Page", "Alpha"),
+            (Some("https://c.test/"), "Gamma", ""),
+            (Some("https://d.test/"), "Delta", ""),
+            (Some("https://b.test/"), "Beta", ""),
+        ]
+    );
+
+    // Source Space and its items/folders/Today tab remain intact, and the
+    // target Space's existing Pin stays ungrouped.
+    assert_eq!(
+        folder(&workspace, src_folder).items,
+        [in_folder_2, in_folder_1]
+    );
+    assert!(workspace.items().iter().any(|i| i.id == today));
+    assert!(workspace.folder_of(existing_dest).is_none());
+
+    // Round-trip through snapshot persistence.
+    let restored = Workspace::from_snapshot(workspace.snapshot()).unwrap();
+    assert_eq!(restored, workspace);
+    assert_eq!(folder(&restored, exported_folder_id), exported);
+}
+
+#[test]
+fn export_space_into_folder_handles_empty_space_and_rejects_errors_atomically() {
+    let mut workspace = Workspace::default();
+    let empty_space = workspace.create_space(P1, "Empty").unwrap();
+
+    // Exporting an empty Space creates an empty open folder in the target.
+    let folder_id = workspace.export_space_into_folder(empty_space, S1).unwrap();
+    let made = folder(&workspace, folder_id);
+    assert_eq!(made.space_id, S1);
+    assert_eq!(made.name, "Empty");
+    assert!(made.open);
+    assert!(made.items.is_empty());
+
+    // Rejects exporting into self and unknown Spaces without mutating.
+    let before = workspace.snapshot();
+    assert_eq!(
+        workspace.export_space_into_folder(S1, S1),
+        Err(WorkspaceError::SameSpace(S1))
+    );
+    assert_eq!(
+        workspace.export_space_into_folder(99, S1),
+        Err(WorkspaceError::UnknownSpace(99))
+    );
+    assert_eq!(
+        workspace.export_space_into_folder(S1, 99),
+        Err(WorkspaceError::UnknownSpace(99))
+    );
+    assert_eq!(workspace.snapshot(), before);
+
+    // Rejects atomically if item limit would be exceeded.
+    let src = workspace.create_space(P1, "Big").unwrap();
+    pin(&mut workspace, src, "https://one.test/");
+    pin(&mut workspace, src, "https://two.test/");
+    while workspace.items().len() < MAX_ITEMS - 1 {
+        pin(&mut workspace, S1, "https://fill.test/");
+    }
+    let before_limit = workspace.snapshot();
+    assert_eq!(
+        workspace.export_space_into_folder(src, S1),
+        Err(WorkspaceError::LimitExceeded("items"))
+    );
+    assert_eq!(workspace.snapshot(), before_limit);
+}

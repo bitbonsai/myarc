@@ -236,6 +236,10 @@ class WorkspaceService final : public base::SupportsUserData::Data {
       base::span<const uint64_t> live);
   // Folders of a Space's Pins. Create returns the folder's ID and opens it.
   foundation::MutationResult CreateFolder(uint64_t space, std::string_view name);
+  // Creates a new open folder named after `source_space` inside `target_space`
+  // and copies all of `source_space`'s Pins (loose and folder items) into it.
+  foundation::MutationResult ExportSpaceIntoFolder(uint64_t source_space,
+                                                   uint64_t target_space);
   foundation::MutationResult RenameFolder(uint64_t folder,
                                           std::string_view name);
   // `id` is 1 when the state changed, else 0. Saved like any change, so the

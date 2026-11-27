@@ -1,6 +1,7 @@
 #ifndef MYARC_BOOKMARKS_EXPORT_H_
 #define MYARC_BOOKMARKS_EXPORT_H_
 
+#include <cstdint>
 #include <string>
 #include <vector>
 
@@ -35,6 +36,16 @@ using BookmarksProfiles =
 // shows why over `parent`. UI sequence only.
 void ExportPinsAndFavorites(BookmarksProfiles profiles,
                             gfx::NativeWindow parent);
+
+// Space context menu's "Export Space…". Opens a save panel over `parent` named
+// "<space_name>.html" (accepting Netscape HTML or JSON), and once the user
+// picks a file writes that Space's Pins and folders there (JSON when the
+// chosen file ends in ".json", otherwise Netscape bookmarks HTML). Cancel
+// writes nothing. A failed write shows why over `parent`. UI sequence only.
+void ExportSpaceBookmarks(Profile& profile,
+                          uint64_t space_id,
+                          std::u16string space_name,
+                          gfx::NativeWindow parent);
 
 }  // namespace myarc
 

@@ -130,6 +130,8 @@ pub enum WorkspaceError {
     DifferentSection(ItemId),
     /// The folder belongs to another Space than the Pin or folder it was paired with.
     DifferentFolderSpace(FolderId),
+    /// A Space cannot be exported into itself.
+    SameSpace(SpaceId),
     /// Only Pins go in folders.
     NotPinned(ItemId),
     /// Only the window's Pins and Today tabs can be dragged.
@@ -178,6 +180,7 @@ impl fmt::Display for WorkspaceError {
             Self::ExplicitUnsaveRequired(id) => write!(formatter, "Item {id} is saved; use unsave_item with its live-page destination"),
             Self::DifferentSection(id) => write!(formatter, "Item {id} belongs to a different placement or owner section"),
             Self::DifferentFolderSpace(id) => write!(formatter, "Folder {id} belongs to a different Space"),
+            Self::SameSpace(id) => write!(formatter, "Cannot export Space {id} into itself"),
             Self::NotPinned(id) => write!(formatter, "Item {id} is not a Space Pin; pin it before putting it in a folder"),
             Self::NotDraggable(id) => write!(formatter, "Item {id} is not a Pin or Today tab of this window's Space"),
             Self::DuplicateLiveItem(id) => write!(formatter, "Live item {id} is listed more than once"),

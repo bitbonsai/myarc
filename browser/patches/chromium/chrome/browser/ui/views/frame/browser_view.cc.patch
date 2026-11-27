@@ -2823,7 +2823,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..e1baa33f45b131925092ffd782ff487e
  }
  
  void BrowserView::RemovedFromWidget() {
-@@ -5267,90 +7660,3524 @@ const views::View* BrowserView::GetViewByElementId(
+@@ -5267,90 +7660,3550 @@ const views::View* BrowserView::GetViewByElementId(
  ///////////////////////////////////////////////////////////////////////////////
  // BrowserView, ui::AcceleratorTarget overrides:
  
@@ -5108,6 +5108,32 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..e1baa33f45b131925092ffd782ff487e
 +  ShowMyarcDeleteSpaceDialog(space);
 +}
 +
++void BrowserView::ExportSpaceIntoFolder(uint64_t source_space,
++                                        uint64_t target_space) {
++  if (myarc_workspace_adapter_) {
++    MyarcWorkspaceResult(myarc_workspace_adapter_->ExportSpaceIntoFolder(
++        source_space, target_space));
++  }
++}
++
++void BrowserView::ExportSpace(uint64_t space) {
++  if (!myarc_workspace_adapter_ || !myarc_workspace_adapter_->ready()) {
++    return;
++  }
++  const myarc::foundation::SidebarResult sidebar =
++      myarc_workspace_adapter_->Sidebar();
++  std::u16string name;
++  for (const myarc::foundation::SpaceRecord& entry : sidebar.spaces) {
++    if (entry.id == space) {
++      name = base::UTF8ToUTF16(
++          std::string_view(entry.name.data(), entry.name.size()));
++      break;
++    }
++  }
++  myarc::ExportSpaceBookmarks(*GetProfile(), space, std::move(name),
++                              GetNativeWindow());
++}
++
 +void BrowserView::EditSpaceTheme(uint64_t space) {
 +  OpenMyarcSpacePicker(space, myarc::SidebarView::SpacePicker::kTheme);
 +}
@@ -6414,7 +6440,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..e1baa33f45b131925092ffd782ff487e
  }
  #endif
  
-@@ -5471,6 +11298,10 @@ bool BrowserView::MaybeUpdateDevtools(content::WebContents* contents) {
+@@ -5471,6 +11324,10 @@ bool BrowserView::MaybeUpdateDevtools(content::WebContents* contents) {
  
  void BrowserView::UpdateUIForContents(WebContents* contents,
                                        bool should_layout_immediately) {
@@ -6425,7 +6451,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..e1baa33f45b131925092ffd782ff487e
    TRACE_EVENT0("ui", "BrowserView::UpdateUIForContents");
    bool needs_layout = MaybeShowBookmarkBar(contents);
  
-@@ -5706,6 +11537,26 @@ void BrowserView::LoadAccelerators() {
+@@ -5706,6 +11563,26 @@ void BrowserView::LoadAccelerators() {
    }
  
  #if BUILDFLAG(IS_MAC)

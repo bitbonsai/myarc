@@ -2549,6 +2549,15 @@ foundation::MutationResult BrowserWorkspaceAdapter::MoveSpaceBefore(
                           : Fail(error()));
 }
 
+foundation::MutationResult BrowserWorkspaceAdapter::ExportSpaceIntoFolder(
+    uint64_t source_space,
+    uint64_t target_space) {
+  return Remember(ready()
+                      ? service_->ExportSpaceIntoFolder(source_space,
+                                                        target_space)
+                      : Fail(error()));
+}
+
 foundation::MutationResult BrowserWorkspaceAdapter::CreateFolder(
     std::string_view name) {
   if (!ready())

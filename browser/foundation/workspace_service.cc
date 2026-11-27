@@ -1278,6 +1278,16 @@ foundation::MutationResult WorkspaceService::CreateFolder(
       *workspace_, space, rust::Str(name.data(), name.size())));
 }
 
+foundation::MutationResult WorkspaceService::ExportSpaceIntoFolder(
+    uint64_t source_space,
+    uint64_t target_space) {
+  if (!CanMutate()) {
+    return Failure("Workspace is not loaded. Check storage state.");
+  }
+  return Changed(foundation::export_space_into_folder(*workspace_, source_space,
+                                                      target_space));
+}
+
 foundation::MutationResult WorkspaceService::RenameFolder(
     uint64_t folder,
     std::string_view name) {

@@ -19,7 +19,7 @@
 use std::fmt::Write as _;
 
 use myarc_workspace::url_label::url_label;
-use myarc_workspace::{Item, Placement, WorkspaceSnapshot};
+use myarc_workspace::{Item, Placement, Space, SpaceId, WorkspaceSnapshot};
 
 const HEADER: &str = "<!DOCTYPE NETSCAPE-Bookmark-file-1>\n\
 <!-- This is an automatically generated file.\n     \
@@ -35,9 +35,112 @@ pub const FAVORITES_FOLDER: &str = "Favorites";
 /// Default file name for the save panel.
 pub const DEFAULT_FILE_NAME: &str = "myArc Bookmarks.html";
 
+/// Safe default file name for exporting a single Space, e.g. `"Work.html"`.
+pub fn space_file_name(space_name: &str, extension: &str) -> String {
+    let mut base = String::with_capacity(space_name.len());
+    for c in space_name.chars() {
+        if c == '/' || c == '\\' || c == ':' || c.is_control() {
+            base.push('-');
+        } else {
+            base.push(c);
+        }
+    }
+    let trimmed = base.trim().trim_start_matches('.');
+    let stem = if trimmed.is_empty() { "Space" } else { trimmed };
+    let ext = extension.trim_start_matches('.');
+    if ext.is_empty() {
+        stem.to_owned()
+    } else {
+        format!("{stem}.{ext}")
+    }
+}
+
 /// The whole bookmarks file for one Profile's `snapshot`.
 pub fn write(snapshot: &WorkspaceSnapshot) -> String {
     write_profiles(&[("", snapshot)])
+}
+
+/// Netscape bookmarks HTML file for a single Space's Pins and folders.
+/// Returns `None` if `space_id` does not exist in `snapshot`.
+pub fn write_space(snapshot: &WorkspaceSnapshot, space_id: SpaceId) -> Option<String> {
+    let space = snapshot.spaces.iter().find(|space| space.id == space_id)?;
+    let section = space_section(snapshot, space);
+    let mut out = String::from(HEADER);
+    out.push_str("<DL><p>\n");
+    write_sections(&mut out, 1, &[section]);
+    out.push_str("</DL><p>\n");
+    Some(out)
+}
+
+/// Portable JSON export for a single Space's Pins and folders.
+/// Returns `None` if `space_id` does not exist in `snapshot`.
+pub fn write_space_json(snapshot: &WorkspaceSnapshot, space_id: SpaceId) -> Option<String> {
+    let space = snapshot.spaces.iter().find(|space| space.id == space_id)?;
+    let section = space_section(snapshot, space);
+    let mut out = String::new();
+    out.push_str("{\n");
+    out.push_str("  \"version\": 1,\n");
+    out.push_str("  \"space\": {\n");
+    let _ = writeln!(out, "    \"name\": {},", json_string(section.name));
+    out.push_str("    \"pins\": [");
+    if !section.items.is_empty() {
+        out.push('\n');
+        for (idx, item) in section.items.iter().enumerate() {
+            if let Some(url) = url_of(item) {
+                let title = item_title(item, url);
+                let comma = if idx + 1 < section.items.len() {
+                    ","
+                } else {
+                    ""
+                };
+                let _ = writeln!(
+                    out,
+                    "      {{ \"title\": {}, \"url\": {} }}{comma}",
+                    json_string(&title),
+                    json_string(url)
+                );
+            }
+        }
+        out.push_str("    ");
+    }
+    out.push_str("],\n");
+    out.push_str("    \"folders\": [");
+    if !section.folders.is_empty() {
+        out.push('\n');
+        for (f_idx, (name, items)) in section.folders.iter().enumerate() {
+            out.push_str("      {\n");
+            let _ = writeln!(out, "        \"name\": {},", json_string(name));
+            out.push_str("        \"pins\": [");
+            if !items.is_empty() {
+                out.push('\n');
+                for (i_idx, item) in items.iter().enumerate() {
+                    if let Some(url) = url_of(item) {
+                        let title = item_title(item, url);
+                        let comma = if i_idx + 1 < items.len() { "," } else { "" };
+                        let _ = writeln!(
+                            out,
+                            "          {{ \"title\": {}, \"url\": {} }}{comma}",
+                            json_string(&title),
+                            json_string(url)
+                        );
+                    }
+                }
+                out.push_str("        ");
+            }
+            out.push_str("]\n");
+            let f_comma = if f_idx + 1 < section.folders.len() {
+                ","
+            } else {
+                ""
+            };
+            let _ = writeln!(out, "      }}{f_comma}");
+        }
+        out.push_str("    ");
+    }
+    out.push_str("]\n");
+    out.push_str("  }\n");
+    out.push_str("}\n");
+    Some(out)
 }
 
 /// The whole bookmarks file for several Profiles, each a `(name, snapshot)`
@@ -91,43 +194,48 @@ fn sections(snapshot: &WorkspaceSnapshot) -> Vec<Section<'_>> {
         });
     }
     for space in &snapshot.spaces {
-        let pins: Vec<&Item> = snapshot
-            .items
-            .iter()
-            .filter(|item| item.placement == Placement::Pin { space_id: space.id })
-            .filter(|item| url_of(item).is_some())
-            .collect();
-        let space_folders = || {
-            snapshot
-                .folders
-                .iter()
-                .filter(|folder| folder.space_id == space.id)
-        };
-        let folders: Vec<(&str, Vec<&Item>)> = space_folders()
-            .map(|folder| {
-                let items = folder
-                    .items
-                    .iter()
-                    .filter_map(|id| pins.iter().find(|item| item.id == *id).copied())
-                    .collect::<Vec<_>>();
-                (folder.name.as_str(), items)
-            })
-            .filter(|(_, items)| !items.is_empty())
-            .collect();
-        let items: Vec<&Item> = pins
-            .iter()
-            .filter(|item| !space_folders().any(|folder| folder.items.contains(&item.id)))
-            .copied()
-            .collect();
-        if !items.is_empty() || !folders.is_empty() {
-            sections.push(Section {
-                name: &space.name,
-                items,
-                folders,
-            });
+        let section = space_section(snapshot, space);
+        if !section.items.is_empty() || !section.folders.is_empty() {
+            sections.push(section);
         }
     }
     sections
+}
+
+fn space_section<'a>(snapshot: &'a WorkspaceSnapshot, space: &'a Space) -> Section<'a> {
+    let pins: Vec<&Item> = snapshot
+        .items
+        .iter()
+        .filter(|item| item.placement == Placement::Pin { space_id: space.id })
+        .filter(|item| url_of(item).is_some())
+        .collect();
+    let space_folders = || {
+        snapshot
+            .folders
+            .iter()
+            .filter(|folder| folder.space_id == space.id)
+    };
+    let folders: Vec<(&str, Vec<&Item>)> = space_folders()
+        .map(|folder| {
+            let items = folder
+                .items
+                .iter()
+                .filter_map(|id| pins.iter().find(|item| item.id == *id).copied())
+                .collect::<Vec<_>>();
+            (folder.name.as_str(), items)
+        })
+        .filter(|(_, items)| !items.is_empty())
+        .collect();
+    let items: Vec<&Item> = pins
+        .iter()
+        .filter(|item| !space_folders().any(|folder| folder.items.contains(&item.id)))
+        .copied()
+        .collect();
+    Section {
+        name: &space.name,
+        items,
+        folders,
+    }
 }
 
 fn write_sections(out: &mut String, depth: usize, sections: &[Section<'_>]) {
@@ -169,14 +277,18 @@ fn close_folder(out: &mut String, depth: usize) {
     out.push_str("</DL><p>\n");
 }
 
+fn item_title(item: &Item, url: &str) -> String {
+    [item.name.as_str(), item.title.as_str()]
+        .into_iter()
+        .find(|text| !text.trim().is_empty())
+        .map_or_else(|| url_label(url), str::to_owned)
+}
+
 fn bookmark(out: &mut String, depth: usize, item: &Item) {
     let Some(url) = url_of(item) else {
         return;
     };
-    let title = [item.name.as_str(), item.title.as_str()]
-        .into_iter()
-        .find(|text| !text.trim().is_empty())
-        .map_or_else(|| url_label(url), str::to_owned);
+    let title = item_title(item, url);
     indent(out, depth);
     let _ = writeln!(
         out,
@@ -184,6 +296,29 @@ fn bookmark(out: &mut String, depth: usize, item: &Item) {
         escape(url),
         escape(&title)
     );
+}
+
+/// JSON-escapes and quotes `text` per RFC 8259.
+fn json_string(text: &str) -> String {
+    let mut out = String::with_capacity(text.len() + 2);
+    out.push('"');
+    for c in text.chars() {
+        match c {
+            '"' => out.push_str("\\\""),
+            '\\' => out.push_str("\\\\"),
+            '\u{08}' => out.push_str("\\b"),
+            '\u{0C}' => out.push_str("\\f"),
+            '\n' => out.push_str("\\n"),
+            '\r' => out.push_str("\\r"),
+            '\t' => out.push_str("\\t"),
+            c if (c as u32) < 0x20 => {
+                let _ = write!(out, "\\u{:04x}", c as u32);
+            }
+            c => out.push(c),
+        }
+    }
+    out.push('"');
+    out
 }
 
 /// HTML-escapes `text` for an attribute or element body.
@@ -447,5 +582,86 @@ mod tests {
         </DL><p>
 "
         ));
+    }
+
+    #[test]
+    fn write_space_exports_only_the_requested_space_as_html() {
+        let mut snapshot = Workspace::default().snapshot();
+        snapshot.spaces = vec![space(1, "Work"), space(2, "Home")];
+        snapshot.items = vec![
+            favorite(1, "https://fav.example/", "Fav"),
+            pin(2, 1, "https://a.example/", "A"),
+            pin(3, 1, "https://b.example/", "B"),
+            pin(4, 2, "https://home.example/", "Home"),
+            item(
+                5,
+                Placement::Temporary { space_id: 1 },
+                "https://today.example/",
+                "Today",
+            ),
+        ];
+        snapshot.folders = vec![folder(1, 1, "Docs", &[3])];
+
+        let html = write_space(&snapshot, 1).expect("Work space");
+        assert_eq!(
+            body(&html),
+            "<DL><p>
+    <DT><H3>Work</H3>
+    <DL><p>
+        <DT><A HREF=\"https://a.example/\">A</A>
+        <DT><H3>Docs</H3>
+        <DL><p>
+            <DT><A HREF=\"https://b.example/\">B</A>
+        </DL><p>
+    </DL><p>
+</DL><p>
+"
+        );
+        assert!(write_space(&snapshot, 99).is_none());
+    }
+
+    #[test]
+    fn write_space_json_exports_valid_json_with_pins_and_folders() {
+        let mut snapshot = Workspace::default().snapshot();
+        snapshot.spaces = vec![space(1, "R&D \"Lab\""), space(2, "Other")];
+        let mut renamed = pin(1, 1, "https://a.example/?x=1", "Original");
+        renamed.name = "Custom\nName".into();
+        snapshot.items = vec![
+            renamed,
+            pin(2, 1, "https://b.example/", "Beta\\Path"),
+            pin(3, 2, "https://other.example/", "Other"),
+        ];
+        snapshot.folders = vec![folder(1, 1, "Specs", &[2])];
+
+        let json = write_space_json(&snapshot, 1).expect("R&D space");
+        assert!(write_space_json(&snapshot, 99).is_none());
+
+        #[cfg(feature = "arc-sidebar")]
+        {
+            let value: serde_json::Value = serde_json::from_str(&json).expect("valid JSON");
+            assert_eq!(value["version"], 1);
+            assert_eq!(value["space"]["name"], "R&D \"Lab\"");
+            assert_eq!(value["space"]["pins"].as_array().unwrap().len(), 1);
+            assert_eq!(value["space"]["pins"][0]["title"], "Custom\nName");
+            assert_eq!(value["space"]["pins"][0]["url"], "https://a.example/?x=1");
+            assert_eq!(value["space"]["folders"].as_array().unwrap().len(), 1);
+            assert_eq!(value["space"]["folders"][0]["name"], "Specs");
+            assert_eq!(
+                value["space"]["folders"][0]["pins"][0]["title"],
+                "Beta\\Path"
+            );
+            assert_eq!(
+                value["space"]["folders"][0]["pins"][0]["url"],
+                "https://b.example/"
+            );
+        }
+    }
+
+    #[test]
+    fn space_file_name_sanitizes_unsafe_characters() {
+        assert_eq!(space_file_name("Work", "html"), "Work.html");
+        assert_eq!(space_file_name("R&D / Ops:1", "html"), "R&D - Ops-1.html");
+        assert_eq!(space_file_name("...   ", "json"), "Space.json");
+        assert_eq!(space_file_name("", "html"), "Space.html");
     }
 }

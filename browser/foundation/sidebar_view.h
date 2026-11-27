@@ -250,6 +250,13 @@ class SidebarView final : public views::View,
     // of this Profile, closes its pages and reports errors. The last Space
     // stays.
     virtual void DeleteSpace(uint64_t space_id) = 0;
+    // Export "<Space>" into Folder: copies `source_space_id`'s Pins and folder
+    // items into a new folder named after it in `target_space_id`.
+    virtual void ExportSpaceIntoFolder(uint64_t source_space_id,
+                                       uint64_t target_space_id) = 0;
+    // Export Space…: opens a save panel to export `space_id`'s Pins and
+    // folders as Netscape HTML bookmarks or JSON.
+    virtual void ExportSpace(uint64_t space_id) = 0;
     // Edit Theme… and Change Icon…: the parent shows the Space, closing the
     // Library, then calls OpenSpacePicker.
     virtual void EditSpaceTheme(uint64_t space_id) = 0;
@@ -711,8 +718,10 @@ class SidebarView final : public views::View,
   // folder each of its entries names.
   std::unique_ptr<ui::SimpleMenuModel> folder_menu_model_;
   std::unique_ptr<ui::SimpleMenuModel> edit_pin_menu_model_;
+  std::unique_ptr<ui::SimpleMenuModel> export_space_menu_model_;
   std::vector<uint64_t> menu_folder_ids_;
   std::vector<uint64_t> menu_space_ids_;
+  std::vector<uint64_t> menu_export_space_ids_;
   std::vector<uint64_t> menu_archive_below_ids_;
   std::vector<uint64_t> today_item_ids_;
   std::unique_ptr<ui::SimpleMenuModel> menu_model_;

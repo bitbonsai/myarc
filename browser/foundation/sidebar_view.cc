@@ -514,6 +514,8 @@ enum ItemCommand {
   kDeleteSpace,
   kEditTheme,
   kChangeIcon,
+  kExportSpace,
+  kExportSpaceIntoFolder,
   kEditPinnedPage,
   kResetToSaved,
   kReplaceSavedUrl,
@@ -523,7 +525,10 @@ enum ItemCommand {
   // Move to Folder's entries: this plus the folder's index in folders_.
   kMoveToFolderFirst = 1000,
   // Move to Space's entries: this plus the space's index in menu_space_ids_.
-  kMoveToSpaceFirst = 2000
+  kMoveToSpaceFirst = 2000,
+  // Export "<Space>" into Folder's entries: this plus the target space's index
+  // in menu_export_space_ids_.
+  kExportSpaceIntoFolderFirst = 3000
 };
 
 // Arc indents a folder's tabs under its name.
@@ -1337,15 +1342,43 @@ void SidebarView::ShowContextMenuForViewImpl(
 }
 
 void SidebarView::AddSpaceCommands(bool folder) {
-  // Arc's Space menu: its look and name first, removal last behind a
-  // separator. The last Space of the Profile can't go, so its Delete is
-  // disabled.
+  // Arc's Space menu: its look and name first, export actions in the middle,
+  // removal last behind a separator. The last Space of the Profile can't go,
+  // so its Delete is disabled.
+  export_space_menu_model_.reset();
+  menu_export_space_ids_.clear();
   menu_model_->AddItem(kEditTheme, u"Edit Theme\u2026");
   menu_model_->AddItem(kChangeIcon, u"Change Icon\u2026");
   menu_model_->AddItem(kRenameSpace, u"Rename Space\u2026");
   if (folder) {
     menu_model_->AddSeparator(ui::NORMAL_SEPARATOR);
     menu_model_->AddItem(kNewFolder, u"New Folder");
+  }
+  menu_model_->AddSeparator(ui::NORMAL_SEPARATOR);
+  menu_model_->AddItem(kExportSpace, u"Export Space\u2026");
+  std::u16string source_name;
+  for (const SpaceEntry& space : spaces_) {
+    if (space.id == menu_space_id_) {
+      source_name = space.name;
+      break;
+    }
+  }
+  export_space_menu_model_ = std::make_unique<ui::SimpleMenuModel>(this);
+  for (const SpaceEntry& space : spaces_) {
+    if (space.id == menu_space_id_) {
+      continue;
+    }
+    export_space_menu_model_->AddItem(
+        kExportSpaceIntoFolderFirst +
+            static_cast<int>(menu_export_space_ids_.size()),
+        space.name);
+    menu_export_space_ids_.push_back(space.id);
+  }
+  if (!menu_export_space_ids_.empty()) {
+    menu_model_->AddSubMenu(
+        kExportSpaceIntoFolder,
+        u"Export \u201C" + source_name + u"\u201D into Folder",
+        export_space_menu_model_.get());
   }
   menu_model_->AddSeparator(ui::NORMAL_SEPARATOR);
   menu_model_->AddItem(kDeleteSpace, u"Delete Space\u2026");
@@ -1783,8 +1816,19 @@ void SidebarView::ExecuteCommand(int command_id, int event_flags) {
     StopControl();
     return;
   }
+  if (command_id >= kExportSpaceIntoFolderFirst) {
+    const uint64_t source = std::exchange(menu_space_id_, 0);
+    const size_t space_index =
+        static_cast<size_t>(command_id - kExportSpaceIntoFolderFirst);
+    if (source && space_index < menu_export_space_ids_.size()) {
+      delegate_->ExportSpaceIntoFolder(source,
+                                       menu_export_space_ids_[space_index]);
+    }
+    return;
+  }
   if (command_id == kRenameSpace || command_id == kDeleteSpace ||
-      command_id == kEditTheme || command_id == kChangeIcon) {
+      command_id == kEditTheme || command_id == kChangeIcon ||
+      command_id == kExportSpace) {
     const uint64_t space = std::exchange(menu_space_id_, 0);
     if (!space) {
       return;
@@ -1801,6 +1845,9 @@ void SidebarView::ExecuteCommand(int command_id, int event_flags) {
         return;
       case kChangeIcon:
         delegate_->ChangeSpaceIcon(space);
+        return;
+      case kExportSpace:
+        delegate_->ExportSpace(space);
         return;
     }
     return;

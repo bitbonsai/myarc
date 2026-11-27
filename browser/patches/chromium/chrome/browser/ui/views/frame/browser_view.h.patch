@@ -144,7 +144,7 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..1fc8cffb365fb3bb8ec77821fbbe2ae5
    base::WeakPtr<BrowserView> GetAsWeakPtr() {
      return weak_ptr_factory_.GetWeakPtr();
    }
-@@ -1253,12 +1331,292 @@ class BrowserView : public BrowserWindow,
+@@ -1253,12 +1331,295 @@ class BrowserView : public BrowserWindow,
  
    // Anchor point for help bubbles and other dialogs that want to reliably
    // anchor outside the content area of the window.
@@ -263,6 +263,9 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..1fc8cffb365fb3bb8ec77821fbbe2ae5
 +  void MyarcPaletteTestQuery(int request, const std::u16string& text);
 +  void RenameSpace(uint64_t space) override;
 +  void DeleteSpace(uint64_t space) override;
++  void ExportSpaceIntoFolder(uint64_t source_space,
++                             uint64_t target_space) override;
++  void ExportSpace(uint64_t space) override;
 +  void EditSpaceTheme(uint64_t space) override;
 +  void ChangeSpaceIcon(uint64_t space) override;
 +  void SetSpaceTheme(uint64_t space,
@@ -437,7 +440,7 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..1fc8cffb365fb3bb8ec77821fbbe2ae5
  
    // A mapping between accelerators and command IDs.
    std::map<ui::Accelerator, int> accelerator_table_;
-@@ -1411,6 +1769,7 @@ class BrowserView : public BrowserWindow,
+@@ -1411,6 +1772,7 @@ class BrowserView : public BrowserWindow,
    base::EnumSet<TabStripAndWebAppViewsReparentedState>
        tab_strip_web_apps_reparented_state_;
  
