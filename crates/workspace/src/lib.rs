@@ -433,6 +433,22 @@ impl Default for Workspace {
     }
 }
 
+/// Starter folder name seeded once at the end of a fresh welcome tour.
+pub const BASICS_FOLDER_NAME: &str = "myArc Basics";
+
+/// Dormant pins seeded inside `BASICS_FOLDER_NAME` on a fresh start or skipped
+/// tour (never after an Arc import).
+pub const BASICS_ITEMS: &[(&str, &str)] = &[
+    ("Getting Started", "https://myarc.dev/welcome/"),
+    (
+        "Spaces & Profiles",
+        "https://myarc.dev/docs/spaces-and-profiles/",
+    ),
+    ("Peek & Split View", "https://myarc.dev/docs/peek/"),
+    ("Agents (CLI & MCP)", "https://myarc.dev/docs/cli-and-mcp/"),
+    ("Import from Arc", "https://myarc.dev/docs/import-from-arc/"),
+];
+
 impl Workspace {
     /// Legacy bridge view of the first Space in order, independent of any window
     /// selection. That is Space 1 until it is deleted; restore guarantees one Space.
@@ -1260,6 +1276,41 @@ impl Workspace {
     /// The tour ended, so the quick start page never opens for this Profile.
     pub fn clear_quick_start(&mut self) {
         self.state.quick_start_pending = false;
+    }
+
+    /// Seeds the `myArc Basics` starter folder with dormant pins in `space_id`
+    /// (falling back to the first Space when `space_id` is 0 or unknown) and
+    /// clears `quick_start_pending`. Idempotent: once `quick_start_pending` is
+    /// false, leaves the workspace unchanged and returns `Ok(false)`.
+    pub fn seed_quick_start_basics(&mut self, space_id: SpaceId) -> Result<bool, WorkspaceError> {
+        if !self.state.quick_start_pending {
+            return Ok(false);
+        }
+        let target_space = if self.space(space_id).is_ok() {
+            space_id
+        } else {
+            self.state
+                .spaces
+                .first()
+                .map(|space| space.id)
+                .ok_or(WorkspaceError::UnknownSpace(space_id))?
+        };
+        let folder_id = self.create_folder(target_space, BASICS_FOLDER_NAME)?;
+        for &(title, url) in BASICS_ITEMS {
+            let item_id = self.add_temporary_item(target_space)?;
+            self.set_placement(
+                item_id,
+                Placement::Pin {
+                    space_id: target_space,
+                },
+                Some(url),
+            )?;
+            self.set_title(item_id, title)?;
+            self.rename_item(item_id, title)?;
+            self.move_pin_to_folder(item_id, Some(folder_id), None)?;
+        }
+        self.state.quick_start_pending = false;
+        Ok(true)
     }
 
     pub fn snapshot(&self) -> WorkspaceSnapshot {

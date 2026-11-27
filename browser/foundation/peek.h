@@ -61,6 +61,16 @@ class PeekController final : public TabStripModelObserver,
   bool is_open() const { return !!contents_; }
   // Whether Cmd+Shift+T would bring back the Peek closed last.
   bool CanReopen() const;
+  // Opens an article clicked in the built-in Feed Viewer in Split View beside
+  // `feed_contents` (reusing the other pane if already split).
+  static void OpenFeedArticleInSplit(content::WebContents* feed_contents,
+                                     const GURL& article_url);
+  // Persists a feed subscription and files it in the current Space's "Feeds"
+  // folder (or unsubscribes and unpins it from "Feeds").
+  static void HandleFeedSubscribe(content::WebContents* feed_contents,
+                                  const GURL& feed_url,
+                                  const std::string& title,
+                                  bool subscribe);
   base::WeakPtr<PeekController> GetWeakPtr() {
     return weak_factory_.GetWeakPtr();
   }

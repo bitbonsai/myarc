@@ -1,5 +1,5 @@
 diff --git a/chrome/browser/ui/views/frame/browser_view.cc b/chrome/browser/ui/views/frame/browser_view.cc
-index 7b568f6de760af21d6e9d2aa44415a7cef617c51..a8389c4ca6f447d55e7847e6802a1d57c7fa7b8f 100644
+index 7b568f6de760af21d6e9d2aa44415a7cef617c51..6385b4ad922f0a088e778a8a59e68e9ce25d565f 100644
 --- a/chrome/browser/ui/views/frame/browser_view.cc
 +++ b/chrome/browser/ui/views/frame/browser_view.cc
 @@ -11,6 +11,7 @@
@@ -2823,7 +2823,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..a8389c4ca6f447d55e7847e6802a1d57
  }
  
  void BrowserView::RemovedFromWidget() {
-@@ -5267,90 +7660,3564 @@ const views::View* BrowserView::GetViewByElementId(
+@@ -5267,90 +7660,3611 @@ const views::View* BrowserView::GetViewByElementId(
  ///////////////////////////////////////////////////////////////////////////////
  // BrowserView, ui::AcceleratorTarget overrides:
  
@@ -3894,9 +3894,10 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..a8389c4ca6f447d55e7847e6802a1d57
 +  MyarcWorkspaceResult(myarc_workspace_adapter_->Unsave(item));
 +}
 +
-+void BrowserView::CreateFolder() {
++void BrowserView::CreateFolder(uint64_t parent_folder_id) {
 +  // Like Arc, a new folder starts with a placeholder name to type over.
-+  auto result = myarc_workspace_adapter_->CreateFolder("New Folder");
++  auto result =
++      myarc_workspace_adapter_->CreateFolder("New Folder", parent_folder_id);
 +  const uint64_t folder = result.ok ? result.id : 0;
 +  MyarcWorkspaceResult(std::move(result));
 +  if (folder) {
@@ -3917,6 +3918,15 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..a8389c4ca6f447d55e7847e6802a1d57
 +
 +void BrowserView::SetFolderOpen(uint64_t folder, bool open) {
 +  MyarcWorkspaceResult(myarc_workspace_adapter_->SetFolderOpen(folder, open));
++}
++
++bool BrowserView::MoveFolder(uint64_t folder,
++                             uint64_t parent,
++                             uint64_t before) {
++  auto result = myarc_workspace_adapter_->MoveFolder(folder, parent, before);
++  const bool ok = result.ok;
++  MyarcWorkspaceResult(std::move(result));
++  return ok;
 +}
 +
 +void BrowserView::MovePinToFolder(uint64_t item, uint64_t folder) {
@@ -5857,21 +5867,58 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..a8389c4ca6f447d55e7847e6802a1d57
 +  dialog->SetModalType(ui::mojom::ModalType::kWindow);
 +  dialog->SetShowCloseButton(false);
 +  dialog->SetButtonLabel(ui::mojom::DialogButton::kOk, u"Delete");
-+  // Arc deletes a folder's tabs with it and keeps them in the archive.
-+  const size_t count = record->items.size();
++  // Arc deletes a folder's subfolders and tabs with it and keeps them in the
++  // archive.
++  std::vector<uint64_t> subtree = {folder};
++  for (size_t i = 0; i < subtree.size(); ++i) {
++    for (const auto& candidate : model.folders) {
++      if (candidate.parent_id == subtree[i] &&
++          std::ranges::find(subtree, candidate.id) == subtree.end()) {
++        subtree.push_back(candidate.id);
++      }
++    }
++  }
++  const size_t subfolders = subtree.size() - 1;
++  size_t count = 0;
++  for (const uint64_t fid : subtree) {
++    const auto it = std::ranges::find(model.folders, fid,
++                                      &myarc::foundation::FolderRecord::id);
++    if (it != model.folders.end()) {
++      count += it->items.size();
++    }
++  }
 +  const bool archive = !browser_->GetProfile()->GetPrefs()->GetBoolean(
 +      prefs::kSavingBrowserHistoryDisabled);
-+  std::u16string text =
-+      count == 0 ? u"The folder is empty."
-+      : base::StrCat(
-+            {u"This also deletes its ",
-+             count == 1 ? u"pinned tab"
-+                        : base::StrCat({base::NumberToString16(count),
-+                                        u" pinned tabs"}),
-+             u".", archive ? u" Archived Tabs in the Library keeps "
-+                             u"them for 30 days."
-+                           : u"",
-+             u" Open pages stay open in Today."});
++  std::u16string text;
++  if (count == 0 && subfolders == 0) {
++    text = u"The folder is empty.";
++  } else if (count == 0) {
++    text = base::StrCat(
++        {u"This also deletes its ",
++         subfolders == 1
++             ? u"subfolder"
++             : base::StrCat(
++                   {base::NumberToString16(subfolders), u" subfolders"}),
++         u"."});
++  } else {
++    std::u16string parts =
++        subfolders == 0
++            ? u""
++            : base::StrCat(
++                  {subfolders == 1
++                       ? u"subfolder and "
++                       : base::StrCat({base::NumberToString16(subfolders),
++                                       u" subfolders and "})});
++    text = base::StrCat(
++        {u"This also deletes its ", parts,
++         count == 1
++             ? u"pinned tab"
++             : base::StrCat({base::NumberToString16(count), u" pinned tabs"}),
++         u".",
++         archive ? u" Archived Tabs in the Library keeps them for 30 days."
++                 : u"",
++         u" Open pages stay open in Today."});
++  }
 +  auto body = std::make_unique<views::Label>(std::move(text));
 +  body->SetMultiLine(true);
 +  body->SetHorizontalAlignment(gfx::ALIGN_LEFT);
@@ -6454,7 +6501,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..a8389c4ca6f447d55e7847e6802a1d57
  }
  #endif
  
-@@ -5471,6 +11338,10 @@ bool BrowserView::MaybeUpdateDevtools(content::WebContents* contents) {
+@@ -5471,6 +11385,10 @@ bool BrowserView::MaybeUpdateDevtools(content::WebContents* contents) {
  
  void BrowserView::UpdateUIForContents(WebContents* contents,
                                        bool should_layout_immediately) {
@@ -6465,7 +6512,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..a8389c4ca6f447d55e7847e6802a1d57
    TRACE_EVENT0("ui", "BrowserView::UpdateUIForContents");
    bool needs_layout = MaybeShowBookmarkBar(contents);
  
-@@ -5706,6 +11577,26 @@ void BrowserView::LoadAccelerators() {
+@@ -5706,6 +11624,26 @@ void BrowserView::LoadAccelerators() {
    }
  
  #if BUILDFLAG(IS_MAC)

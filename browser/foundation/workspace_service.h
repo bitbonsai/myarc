@@ -170,6 +170,9 @@ class WorkspaceService final : public base::SupportsUserData::Data {
   bool QuickStartPending() const;
   // The tour ended: the quick start page never opens for this Profile.
   foundation::MutationResult ClearQuickStart();
+  // Seeds the `myArc Basics` starter folder in `space_id` (falling back to the
+  // first Space when 0 or unknown) and clears `quick_start_pending`.
+  foundation::MutationResult SeedQuickStartBasics(uint64_t space_id);
   // History deletion: drops Archived Tabs whose URL is in `urls`, and with
   // `range` those closed between its begin and end, inclusive. A null end
   // means no end. Writes only when an entry went.

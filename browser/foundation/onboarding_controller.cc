@@ -746,20 +746,34 @@ foundation::OnboardingTransition OnboardingController::Feed(
   if (quick_start == foundation::OnboardingQuickStart::Keep) {
     return transition;
   }
-  // Cleared first, so a kill right after never opens the page twice.
-  const auto cleared = service.ClearQuickStart();
-  LOG_IF(ERROR, !cleared.ok)
-      << "Quick start flag not cleared: " << std::string(cleared.error);
-  if (quick_start == foundation::OnboardingQuickStart::Open && cleared.ok) {
-    // The tour's window is the most recently used one of this Profile.
-    BrowserWorkspaceAdapter* adapter = nullptr;
-    ForEachCurrentBrowserWindowInterfaceOrderedByActivation(
-        [&](BrowserWindowInterface* browser) {
-          if (browser->GetProfile() == profile_) {
-            adapter = BrowserWorkspaceAdapter::ForBrowser(*browser);
-          }
-          return !adapter;
-        });
+  if (quick_start == foundation::OnboardingQuickStart::Drop) {
+    const auto cleared = service.ClearQuickStart();
+    LOG_IF(ERROR, !cleared.ok)
+        << "Quick start flag not cleared: " << std::string(cleared.error);
+    return transition;
+  }
+  // The tour's window is the most recently used one of this Profile.
+  BrowserWorkspaceAdapter* adapter = nullptr;
+  ForEachCurrentBrowserWindowInterfaceOrderedByActivation(
+      [&](BrowserWindowInterface* browser) {
+        if (browser->GetProfile() == profile_) {
+          adapter = BrowserWorkspaceAdapter::ForBrowser(*browser);
+        }
+        return !adapter;
+      });
+  uint64_t space_id = 0;
+  if (adapter) {
+    const auto sidebar = adapter->Sidebar();
+    if (sidebar.ok) {
+      space_id = sidebar.current_space.id;
+    }
+  }
+  // Seeds myArc Basics and clears quick_start_pending together, so a kill
+  // right after never seeds the folder or opens the page twice.
+  const auto seeded = service.SeedQuickStartBasics(space_id);
+  LOG_IF(ERROR, !seeded.ok)
+      << "Quick start basics not seeded: " << std::string(seeded.error);
+  if (seeded.ok) {
     const auto opened =
         adapter ? adapter->OpenInCurrentSpace(GURL(kQuickStartUrl))
                 : foundation::MutationResult{false, 0, "No workspace window."};

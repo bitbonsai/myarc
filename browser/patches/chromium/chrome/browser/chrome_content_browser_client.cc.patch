@@ -1,0 +1,28 @@
+diff --git a/chrome/browser/chrome_content_browser_client.cc b/chrome/browser/chrome_content_browser_client.cc
+index 03111c8cb7cd0786314a448d01c358ae1b06a858..14cddf06b2a61b9b3b094acd3cd0f972f92b0493 100644
+--- a/chrome/browser/chrome_content_browser_client.cc
++++ b/chrome/browser/chrome_content_browser_client.cc
+@@ -710,6 +710,7 @@
+ #include "chrome/browser/ui/web_applications/app_browser_controller.h"
+ #include "chrome/browser/web_applications/web_app_utils.h"
+ #include "extensions/browser/mime_handler/mime_handler_fallback_url_loader_request_interceptor.h"
++#include "myarc/feed_viewer.h"
+ #endif  // !BUILDFLAG(IS_ANDROID)
+ #endif  // BUILDFLAG(ENABLE_EXTENSIONS_CORE)
+ 
+@@ -6247,6 +6248,15 @@ ChromeContentBrowserClient::CreateURLLoaderThrottles(
+   }
+ #endif
+ 
++#if !BUILDFLAG(IS_ANDROID)
++  if (navigation_id.has_value()) {
++    if (auto feed_throttle =
++            myarc::MaybeCreateFeedViewerThrottle(request, wc_getter)) {
++      result.push_back(std::move(feed_throttle));
++    }
++  }
++#endif
++
+ #if BUILDFLAG(ENABLE_CAPTIVE_PORTAL_DETECTION)
+   result.push_back(
+       std::make_unique<captive_portal::CaptivePortalURLLoaderThrottle>(

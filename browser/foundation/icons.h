@@ -216,6 +216,19 @@ inline constexpr gfx::VectorIcon kFolderOpenIcon(kFolderOpenRep,
                                                  std::size(kFolderOpenRep),
                                                  "myarc_folder_open");
 
+inline constexpr gfx::PathElement kRssPath[] = {
+    gfx::CANVAS_DIMENSIONS, 24,
+    gfx::STROKE, 2,
+    gfx::MOVE_TO, 4, 11,
+    gfx::ARC_TO, 9, 9, 0, 0, 1, 13, 20,
+    gfx::MOVE_TO, 4, 4,
+    gfx::ARC_TO, 16, 16, 0, 0, 1, 20, 20,
+    gfx::CIRCLE, 5, 19, 1.5f};
+inline constexpr gfx::VectorIconRep kRssRep[] = {{kRssPath}};
+inline constexpr gfx::VectorIcon kRssIcon(kRssRep,
+                                          std::size(kRssRep),
+                                          "myarc_rss");
+
 inline constexpr gfx::PathElement kChevronRightPath[] = {
     gfx::CANVAS_DIMENSIONS, 24, gfx::STROKE, 2, gfx::MOVE_TO, 9, 18,
     gfx::LINE_TO, 15, 12, gfx::LINE_TO, 9, 6};

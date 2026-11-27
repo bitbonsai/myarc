@@ -82,6 +82,24 @@ rust_static_library("boosts") {
   build_native_rust_unit_tests = true
 }
 
+rust_static_library("feeds") {
+  crate_root = "feeds/src/lib.rs"
+  sources = [
+    "feeds/src/date.rs",
+    "feeds/src/discover.rs",
+    "feeds/src/json_feed.rs",
+    "feeds/src/lib.rs",
+    "feeds/src/opml.rs",
+    "feeds/src/render.rs",
+    "feeds/src/rss_atom.rs",
+    "feeds/src/sanitize.rs",
+    "feeds/src/store.rs",
+    "feeds/src/url.rs",
+    "feeds/src/xml.rs",
+  ]
+  build_native_rust_unit_tests = true
+}
+
 rust_static_library("bridge") {
   crate_root = "bridge.rs"
   sources = [ crate_root ]
@@ -90,8 +108,69 @@ rust_static_library("bridge") {
   deps = [
     ":boosts",
     ":control",
+    ":feeds",
     ":import",
     ":workspace",
+  ]
+}
+
+source_set("feeds_service") {
+  sources = [
+    "feeds_service.cc",
+    "feeds_service.h",
+  ]
+  public_deps = [
+    ":bridge",
+    "//base",
+  ]
+  deps = [
+    "//chrome/browser/profiles:profile",
+  ]
+}
+
+source_set("feed_viewer") {
+  sources = [
+    "feed_viewer.cc",
+    "feed_viewer.h",
+  ]
+  public_deps = [
+    "//base",
+    "//content/public/browser",
+    "//url",
+  ]
+  deps = [
+    ":bridge",
+    ":feeds_service",
+    ":local_page_marker",
+    "//chrome/browser/profiles:profile",
+    "//chrome/common",
+    "//mojo/public/cpp/bindings",
+    "//mojo/public/cpp/system",
+    "//net",
+    "//services/network/public/cpp",
+    "//services/network/public/mojom",
+    "//third_party/blink/public/common",
+  ]
+}
+
+source_set("feed_popover") {
+  sources = [
+    "feed_popover.cc",
+    "feed_popover.h",
+  ]
+  public_deps = [
+    "//base",
+  ]
+  deps = [
+    ":feed_viewer",
+    ":feeds_service",
+    ":icons",
+    "//chrome/browser/profiles:profile",
+    "//content/public/browser",
+    "//ui/base",
+    "//ui/color",
+    "//ui/gfx",
+    "//ui/views",
   ]
 }
 
@@ -374,6 +453,7 @@ source_set("browser_workspace_adapter") {
   deps = [
     ":arc_import",
     ":control_prompt",
+    ":feeds_service",
     ":settings_window",
     ":test_buildflags",
     ":welcome_mark",
@@ -443,6 +523,8 @@ source_set("peek") {
     "//url",
   ]
   deps = [
+    ":feed_viewer",
+    ":feeds_service",
     ":little_arc_prefs",
     ":peek_hook",
     "//base",
@@ -453,6 +535,7 @@ source_set("peek") {
     "//chrome/browser/ui/browser_window",
     "//chrome/browser/ui/tabs:tab_strip",
     "//components/input",
+    "//components/tabs:public",
     "//net",
     "//skia",
     "//third_party/blink/public/common",
@@ -650,10 +733,16 @@ source_set("little_arc") {
     ":browser_workspace_adapter",
     ":little_arc_prefs",
     ":sidebar_view",
+    ":spaces_index",
     ":test_buildflags",
+    ":workspace_lifecycle",
+    ":workspace_service",
     "//cc/paint",
     "//chrome/browser:browser_process",
     "//chrome/browser/profiles:profile",
+    "//chrome/browser/profiles:profile_manager",
+    "//chrome/browser/profiles:profile_util",
+    "//chrome/browser/profiles/keep_alive",
     "//chrome/browser/ssl",
     "//chrome/browser/ui:browser_init_state",
     "//chrome/browser/ui/browser_window",

@@ -1,13 +1,14 @@
 diff --git a/chrome/browser/chrome_content_browser_client_navigation_throttles.cc b/chrome/browser/chrome_content_browser_client_navigation_throttles.cc
-index 1dc3fdf54fb9acdbba0450b349e3de3eb0ed3225..3f03a54db44b73874ae5c9df879a716fd4e26027 100644
+index 1dc3fdf54fb9acdbba0450b349e3de3eb0ed3225..1edb0bb55a52e112b8f7bbc2cdba4f45cc77fc98 100644
 --- a/chrome/browser/chrome_content_browser_client_navigation_throttles.cc
 +++ b/chrome/browser/chrome_content_browser_client_navigation_throttles.cc
-@@ -130,6 +130,12 @@
+@@ -130,6 +130,13 @@
  #include "chrome/browser/ui/web_applications/app_browser_controller.h"
  #endif  // !BUILDFLAG(IS_ANDROID)
  
 +#if !BUILDFLAG(IS_ANDROID)
 +#include "myarc/blocker.h"
++#include "myarc/feed_viewer.h"
 +#include "myarc/peek_hook.h"
 +#include "myarc/startup_timing.h"
 +#endif  // !BUILDFLAG(IS_ANDROID)
@@ -15,7 +16,7 @@ index 1dc3fdf54fb9acdbba0450b349e3de3eb0ed3225..3f03a54db44b73874ae5c9df879a716f
  #if BUILDFLAG(ENABLE_DEVTOOLS_FRONTEND)
  #include "chrome/browser/devtools/devtools_window.h"
  #endif  // BUILDFLAG(ENABLE_DEVTOOLS_FRONTEND)
-@@ -308,6 +314,14 @@ void CreateAndAddChromeThrottlesForNavigation(
+@@ -308,6 +315,16 @@ void CreateAndAddChromeThrottlesForNavigation(
  
  #if BUILDFLAG(IS_ANDROID)
      CrossDeviceSigninFlowNavigationThrottle::MaybeCreateAndAdd(registry);
@@ -23,6 +24,8 @@ index 1dc3fdf54fb9acdbba0450b349e3de3eb0ed3225..3f03a54db44b73874ae5c9df879a716f
 +    // myArc's Peek: a link from a pinned tab or Favorite to another site
 +    // opens in a card over the page instead of replacing it.
 +    myarc::MaybeAddPeekThrottle(registry);
++    // myArc's Feed Viewer: clicking an article opens it in Split View.
++    myarc::MaybeAddFeedSplitThrottle(registry);
 +    // myArc: a new Profile's first pages wait for the bundled blocker.
 +    myarc::MaybeAddBlockerRulesThrottle(registry);
 +    // myArc's --myarc-startup-timing: time to the first painted page.

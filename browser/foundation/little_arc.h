@@ -3,6 +3,7 @@
 
 #include <cstdint>
 #include <memory>
+#include <string>
 #include <vector>
 
 #include "base/functional/callback.h"
@@ -11,6 +12,7 @@
 #include "base/memory/weak_ptr.h"
 #include "third_party/skia/include/core/SkColor.h"
 #include "ui/base/metadata/metadata_header_macros.h"
+#include "ui/base/mojom/menu_source_type.mojom-forward.h"
 #include "ui/menus/simple_menu_model.h"
 #include "ui/views/view.h"
 #include "url/gurl.h"
@@ -72,10 +74,18 @@ bool MoveLittleArcToSpace(BrowserWindowInterface& little_arc);
 // The same, into Space `space` of the target window's Profile, which the
 // target window switches to first.
 bool MoveLittleArcToSpace(BrowserWindowInterface& little_arc, uint64_t space);
+// Opens the Little Arc page in Space `space` of `profile_dir`. For the same
+// Profile with an open main window, moves the live tab with its history; for
+// another Profile (or when no main window is open), loads the Profile if
+// needed, opens the URL as a Today tab in that Space and closes Little Arc.
+bool MoveLittleArcToSpaceInProfile(BrowserWindowInterface& little_arc,
+                                   const std::string& profile_dir,
+                                   uint64_t space);
 
-// Option-Cmd-O: a menu of the target window's Spaces under the "Open in"
-// button. Picking one moves the page there as Cmd+O does. Does nothing
-// outside a Little Arc or without a target window.
+// Option-Cmd-O (or the chevron beside "Open in"): a menu of Spaces grouped by
+// Profile under the "Open in" button. Picking one moves or opens the page
+// there and closes Little Arc. Does nothing outside a Little Arc or when no
+// target Space exists.
 // Test-hook builds take --myarc-test-little-arc-pick=<index>: two seconds
 // after a Little Arc opens, it opens this menu, and two seconds later picks
 // the Space at that index.
@@ -92,7 +102,7 @@ class LittleArcHeader final : public views::View,
   static constexpr int kHeight = 40;
   // The page card's inset from the window edges and its corner radius.
   static constexpr int kCardInset = 6;
-  static constexpr int kCardRadius = 8;
+  static constexpr int kCardRadius = 10;
   // Room the traffic lights take at the header's left.
   static constexpr int kLightsWidth = 78;
 
@@ -105,7 +115,7 @@ class LittleArcHeader final : public views::View,
 
   // Rereads the page and the Space "Open in" would move it to.
   void Update();
-  // Opens the Space picker under "Open in".
+  // Opens the Space/Profile picker under "Open in".
   void ShowSpacePicker();
   // Picks the Space at `index`, as a click on it does, and closes the menu.
   void PickSpaceForTesting(size_t index);
@@ -123,14 +133,21 @@ class LittleArcHeader final : public views::View,
   bool IsCommandIdChecked(int command_id) const override;
 
  private:
+  struct PickerTarget {
+    std::string profile_dir;
+    uint64_t space_id = 0;
+    bool same_profile = false;
+  };
+
   bool IsDark() const;
   void Move();
+  void ShowSpacePickerWithSource(ui::mojom::MenuSourceType source_type);
 
   const raw_ref<BrowserWindowInterface> browser_;
   raw_ptr<LittleArcAddressPill> address_ = nullptr;
   raw_ptr<LittleArcOpenInButton> open_in_ = nullptr;
   // The picker's Spaces, by menu command ID, and the one shown now.
-  std::vector<uint64_t> picker_spaces_;
+  std::vector<PickerTarget> picker_targets_;
   uint64_t picker_current_ = 0;
   std::unique_ptr<ui::SimpleMenuModel> picker_model_;
   std::unique_ptr<views::MenuRunner> picker_runner_;
@@ -138,6 +155,7 @@ class LittleArcHeader final : public views::View,
   bool has_rendered_ = false;
   bool last_dark_ = false;
   bool last_space_found_ = false;
+  bool last_picker_available_ = false;
   std::u16string last_space_name_;
   std::string last_space_icon_;
   std::u16string last_host_;

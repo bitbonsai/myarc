@@ -1,6 +1,7 @@
 chromium::import! {
     "//myarc:boosts";
     "//myarc:control";
+    "//myarc:feeds";
     "//myarc:import";
     "//myarc:workspace";
 }
@@ -9,6 +10,7 @@ use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 
 pub struct Workspace(workspace::Workspace);
 pub struct BoostStore(boosts::BoostStore);
+pub struct FeedStore(feeds::FeedStore);
 
 // A parsed Arc export, one part per Arc profile. The Markdown export and a
 // sidebar file with one profile have a single part, the main profile's.
@@ -80,6 +82,12 @@ mod ffi {
         ok: bool,
         id: u64,
         error: String,
+    }
+
+    struct FeedRenderResult {
+        ok: bool,
+        title: String,
+        html: String,
     }
 
     // Sidebar rows selected together, top to bottom, and the row a
@@ -906,6 +914,10 @@ mod ffi {
         // True for a fresh workspace until its welcome tour ends.
         fn quick_start_pending(workspace: &Workspace) -> bool;
         fn clear_quick_start(workspace: &mut Workspace);
+        // Seeds the `myArc Basics` starter folder in `space_id` (falling back
+        // to the first Space when 0 or unknown) and clears `quick_start_pending`.
+        // `id` is 1 when seeded, 0 when already cleared.
+        fn seed_quick_start_basics(workspace: &mut Workspace, space_id: u64) -> MutationResult;
         // Rejects any other value.
         fn set_archive_interval(workspace: &mut Workspace, secs: u64) -> MutationResult;
         // Clear Archive: drops every entry; `id` is how many went.
@@ -1487,6 +1499,29 @@ mod ffi {
         ) -> String;
         fn boosts_inspect_css(css: &str) -> Vec<BoostCssFinding>;
         fn boosts_normalize_origin(raw: &str) -> String;
+
+        type FeedStore;
+        fn feed_max_bytes() -> usize;
+        fn render_feed_viewer(
+            content_type: &str,
+            url: &str,
+            body: &[u8],
+            show_subscribe: bool,
+            is_subscribed: bool,
+        ) -> FeedRenderResult;
+        fn feed_store_new() -> Box<FeedStore>;
+        fn feed_store_load_json(bytes: &[u8]) -> Box<FeedStore>;
+        fn feed_store_save_json(store: &FeedStore) -> String;
+        fn feed_store_is_subscribed(store: &FeedStore, feed_url: &str) -> bool;
+        fn feed_store_subscribe(
+            store: &mut FeedStore,
+            feed_url: &str,
+            title: &str,
+            site_url: &str,
+            space_id: u64,
+            now_secs: u64,
+        ) -> MutationResult;
+        fn feed_store_unsubscribe_url(store: &mut FeedStore, feed_url: &str) -> bool;
     }
 }
 
@@ -2544,6 +2579,17 @@ pub fn quick_start_pending(workspace: &Workspace) -> bool {
 
 pub fn clear_quick_start(workspace: &mut Workspace) {
     workspace.0.clear_quick_start();
+}
+
+pub fn seed_quick_start_basics(workspace: &mut Workspace, space_id: u64) -> ffi::MutationResult {
+    match workspace.0.seed_quick_start_basics(space_id) {
+        Ok(seeded) => ffi::MutationResult {
+            ok: true,
+            id: u64::from(seeded),
+            error: String::new(),
+        },
+        Err(err) => reject(&err.to_string()),
+    }
 }
 
 pub fn set_archive_interval(workspace: &mut Workspace, secs: u64) -> ffi::MutationResult {
@@ -4192,4 +4238,96 @@ pub fn boosts_inspect_css(css: &str) -> Vec<ffi::BoostCssFinding> {
 
 pub fn boosts_normalize_origin(raw: &str) -> String {
     boosts::normalize_origin(raw).unwrap_or_default()
+}
+
+pub fn feed_max_bytes() -> usize {
+    feeds::MAX_FEED_BYTES
+}
+
+pub fn render_feed_viewer(
+    content_type: &str,
+    url: &str,
+    body: &[u8],
+    show_subscribe: bool,
+    is_subscribed: bool,
+) -> ffi::FeedRenderResult {
+    let prefix_len = body.len().min(4096);
+    if feeds::looks_like_feed(content_type, &body[..prefix_len]).is_none() {
+        return ffi::FeedRenderResult {
+            ok: false,
+            title: String::new(),
+            html: String::new(),
+        };
+    }
+    let request_url = if url.is_empty() { None } else { Some(url) };
+    let Ok(feed) = feeds::parse_feed(body, request_url) else {
+        return ffi::FeedRenderResult {
+            ok: false,
+            title: String::new(),
+            html: String::new(),
+        };
+    };
+    let raw_source = String::from_utf8_lossy(body);
+    let html = feeds::render_viewer_html(
+        &feed,
+        &raw_source,
+        &feeds::RenderOptions {
+            show_subscribe_slot: show_subscribe,
+            is_subscribed,
+        },
+    );
+    ffi::FeedRenderResult {
+        ok: true,
+        title: feed.title,
+        html,
+    }
+}
+
+pub fn feed_store_new() -> Box<FeedStore> {
+    Box::new(FeedStore(feeds::FeedStore::new()))
+}
+
+pub fn feed_store_load_json(bytes: &[u8]) -> Box<FeedStore> {
+    let store =
+        feeds::FeedStore::decode_snapshot(bytes).unwrap_or_else(|_| feeds::FeedStore::new());
+    Box::new(FeedStore(store))
+}
+
+pub fn feed_store_save_json(store: &FeedStore) -> String {
+    store.0.encode_snapshot()
+}
+
+pub fn feed_store_is_subscribed(store: &FeedStore, feed_url: &str) -> bool {
+    store.0.is_subscribed(feed_url)
+}
+
+pub fn feed_store_subscribe(
+    store: &mut FeedStore,
+    feed_url: &str,
+    title: &str,
+    site_url: &str,
+    space_id: u64,
+    now_secs: u64,
+) -> ffi::MutationResult {
+    let site = if site_url.is_empty() {
+        None
+    } else {
+        Some(site_url)
+    };
+    match store.0.subscribe(feed_url, title, site, space_id, now_secs) {
+        Ok(id) => ffi::MutationResult {
+            ok: true,
+            id,
+            error: String::new(),
+        },
+        Err(error) => ffi::MutationResult {
+            ok: false,
+            id: 0,
+            error: error.to_string(),
+        },
+    }
+}
+
+pub fn feed_store_unsubscribe_url(store: &mut FeedStore, feed_url: &str) -> bool {
+    store.0.unsubscribe_by_url(feed_url)
 }

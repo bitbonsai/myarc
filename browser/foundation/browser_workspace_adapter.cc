@@ -1,4 +1,5 @@
 #include "myarc/browser_workspace_adapter.h"
+#include "myarc/feeds_service.h"
 
 #include <signal.h>
 #include <unistd.h>
@@ -13,6 +14,7 @@
 
 #include "base/auto_reset.h"
 #include "base/command_line.h"
+#include "base/containers/span.h"
 #include "base/functional/bind.h"
 #include "base/functional/callback_helpers.h"
 #include "base/location.h"
@@ -66,9 +68,15 @@
 #include "myarc/control_tabs.h"
 #include "myarc/site_icon_fetcher.h"
 #include "myarc/test_buildflags.h"
+#include "myarc/welcome_mark.h"
 #include "myarc/workspace_lifecycle.h"
 #include "net/base/registry_controlled_domains/registry_controlled_domain.h"
+#include "third_party/skia/include/core/SkBitmap.h"
 #include "ui/base/base_window.h"
+#include "ui/gfx/codec/png_codec.h"
+#include "ui/gfx/geometry/size.h"
+#include "ui/gfx/image/image_skia.h"
+#include "ui/gfx/image/image_skia_operations.h"
 #include "url/origin.h"
 
 namespace myarc {
@@ -1884,10 +1892,39 @@ favicon::FaviconService* BrowserWorkspaceAdapter::Favicons() const {
       profile_, ServiceAccessType::IMPLICIT_ACCESS);
 }
 
+namespace {
+
+bool IsMyArcSite(std::string_view url) {
+  const GURL parsed(url);
+  return parsed.is_valid() && parsed.SchemeIsHTTPOrHTTPS() &&
+         parsed.host() == "myarc.dev";
+}
+
+// Bundled myArc mark at 16 DIP (retina-aware from the 512 px PNG), used for
+// dormant myarc.dev links before they are visited so myArc Basics shows crisp
+// icons immediately without network fetches.
+const gfx::Image& BundledMyArcIcon() {
+  static const gfx::Image* const icon = [] {
+    constexpr int kIconSize = 16;
+    const SkBitmap bitmap = gfx::PNGCodec::Decode(base::span(kWelcomeMarkPng));
+    if (bitmap.isNull()) {
+      return new gfx::Image();
+    }
+    gfx::ImageSkia resized = gfx::ImageSkiaOperations::CreateResizedImage(
+        gfx::ImageSkia::CreateFromBitmap(
+            bitmap, static_cast<float>(bitmap.width()) / kIconSize),
+        skia::ImageOperations::RESIZE_BEST, gfx::Size(kIconSize, kIconSize));
+    return new gfx::Image(resized);
+  }();
+  return *icon;
+}
+
+}  // namespace
+
 void BrowserWorkspaceAdapter::RequestIcon(favicon::FaviconService& favicons,
                                           std::string_view url,
                                           bool fetch) {
-  if (saved_icons_.contains(url))
+  if (IsMyArcSite(url) || saved_icons_.contains(url))
     return;
   saved_icons_.emplace(url, gfx::Image());
   ++pending_icons_;
@@ -1980,7 +2017,11 @@ gfx::Image BrowserWorkspaceAdapter::SavedIcon(
 gfx::Image BrowserWorkspaceAdapter::CachedIcon(std::string_view url) const {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
   auto cached = saved_icons_.find(url);
-  return cached == saved_icons_.end() ? gfx::Image() : cached->second;
+  if (cached != saved_icons_.end() && !cached->second.IsEmpty())
+    return cached->second;
+  if (IsMyArcSite(url))
+    return BundledMyArcIcon();
+  return gfx::Image();
 }
 
 foundation::MutationResult BrowserWorkspaceAdapter::RestoreArchivedTab(
@@ -2503,8 +2544,26 @@ foundation::MutationResult BrowserWorkspaceAdapter::Favorite(uint64_t item) {
 foundation::MutationResult BrowserWorkspaceAdapter::Unsave(uint64_t item) {
   if (!ready())
     return Fail(error());
-  if (!Count(*profile_, item))
-    return Remember(service_->UnsaveItem(item, 0));
+  auto initial_state = service_->ExportSnapshot();
+  const auto* initial_row =
+      initial_state ? FindItem(*initial_state, item) : nullptr;
+  const std::string unsave_url =
+      initial_row && initial_row->has_url
+          ? std::string(initial_row->canonical_url)
+          : std::string();
+  auto maybe_unsubscribe = [&](const foundation::MutationResult& res) {
+    if (res.ok && !unsave_url.empty()) {
+      FeedsService& feeds = FeedsService::ForProfile(*profile_);
+      if (!feeds.IsEphemeral() && feeds.IsSubscribed(unsave_url)) {
+        feeds.UnsubscribeByUrl(unsave_url);
+      }
+    }
+  };
+  if (!Count(*profile_, item)) {
+    auto res = Remember(service_->UnsaveItem(item, 0));
+    maybe_unsubscribe(res);
+    return res;
+  }
   // Prefer this window's projection. A detached page has no owning window
   // Space yet, so wait for insertion rather than invent a destination.
   BrowserWorkspaceAdapter* owner = nullptr;
@@ -2534,7 +2593,9 @@ foundation::MutationResult BrowserWorkspaceAdapter::Unsave(uint64_t item) {
   const uint64_t space = row->placement == foundation::PlacementKind::Favorite
                              ? sidebar.current_space.id
                              : row->owner_id;
-  return Remember(service_->UnsaveItem(item, space));
+  auto res = Remember(service_->UnsaveItem(item, space));
+  maybe_unsubscribe(res);
+  return res;
 }
 foundation::MutationResult BrowserWorkspaceAdapter::MoveItemBefore(
     uint64_t item,
@@ -2613,6 +2674,39 @@ foundation::MutationResult BrowserWorkspaceAdapter::MovePinToFolder(
       return pinned;
   }
   return Remember(service_->MovePinToFolder(item, folder, 0));
+}
+
+foundation::MutationResult BrowserWorkspaceAdapter::PinUrlToFolder(
+    const GURL& url,
+    std::string_view title,
+    uint64_t folder) {
+  if (!ready())
+    return Fail(error());
+  if (!url.is_valid())
+    return Fail("Enter a valid URL.");
+  const auto sidebar = Sidebar();
+  if (!sidebar.ok)
+    return Fail("Workspace window is not ready.");
+  const uint64_t space_id = sidebar.current_space.id;
+  auto added = service_->AddTemporaryItem(space_id);
+  if (!added.ok)
+    return Remember(std::move(added));
+  const uint64_t item = added.id;
+  auto pinned = service_->SetPlacement(
+      item, foundation::PlacementKind::Pin, space_id, true, url.spec());
+  if (!pinned.ok) {
+    service_->LiveTabClosed(item);
+    return Remember(std::move(pinned));
+  }
+  if (!title.empty()) {
+    service_->SetTitle(item, title);
+  }
+  if (folder) {
+    auto moved = service_->MovePinToFolder(item, folder, 0);
+    if (!moved.ok)
+      return Remember(std::move(moved));
+  }
+  return Remember(Ok(item));
 }
 
 void BrowserWorkspaceAdapter::ToggleMute(uint64_t item) {
@@ -2944,6 +3038,7 @@ foundation::MutationResult BrowserWorkspaceAdapter::DeleteFolder(
       }
     }
   }
+  std::vector<std::string> removed_urls;
   for (const uint64_t fid : subtree) {
     const auto it = std::ranges::find(state->folders, fid,
                                       &foundation::FolderRecord::id);
@@ -2951,6 +3046,9 @@ foundation::MutationResult BrowserWorkspaceAdapter::DeleteFolder(
       continue;
     }
     for (const uint64_t item : it->items) {
+      if (const auto* row = FindItem(*state, item); row && row->has_url) {
+        removed_urls.emplace_back(row->canonical_url);
+      }
       if (Count(*profile_, item)) {
         auto result = Unsave(item);
         if (!result.ok)
@@ -2960,7 +3058,18 @@ foundation::MutationResult BrowserWorkspaceAdapter::DeleteFolder(
   }
   const bool archive =
       !profile_->GetPrefs()->GetBoolean(prefs::kSavingBrowserHistoryDisabled);
-  return Remember(service_->DeleteFolder(folder, archive));
+  auto res = Remember(service_->DeleteFolder(folder, archive));
+  if (res.ok && !removed_urls.empty()) {
+    FeedsService& feeds = FeedsService::ForProfile(*profile_);
+    if (!feeds.IsEphemeral()) {
+      for (const std::string& url : removed_urls) {
+        if (feeds.IsSubscribed(url)) {
+          feeds.UnsubscribeByUrl(url);
+        }
+      }
+    }
+  }
+  return res;
 }
 
 foundation::MutationResult BrowserWorkspaceAdapter::OpenInSplitView(

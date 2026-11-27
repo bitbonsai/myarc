@@ -2572,10 +2572,14 @@ std::unique_ptr<views::View> SidebarView::MakeFolder(
                                            base::Unretained(&delegate_.get()),
                                            folder.id, !folder.open),
                        name);
+  const bool is_feeds_folder =
+      base::EqualsCaseInsensitiveASCII(std::string(folder.name), "RSS") ||
+      base::EqualsCaseInsensitiveASCII(std::string(folder.name), "Feeds");
   toggle->SetImageModel(
       views::Button::STATE_NORMAL,
       ui::ImageModel::FromVectorIcon(
-          folder.open ? kFolderOpenIcon : kFolderClosedIcon,
+          is_feeds_folder ? kRssIcon
+                          : (folder.open ? kFolderOpenIcon : kFolderClosedIcon),
           ui::kColorSysOnSurface, 16));
   toggle->SetMinSize(gfx::Size(0, kRowHeight));
   AlignRowContents(*toggle, 16);

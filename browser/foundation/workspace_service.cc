@@ -1071,6 +1071,18 @@ foundation::MutationResult WorkspaceService::ClearQuickStart() {
   return Changed({true, 0, {}});
 }
 
+foundation::MutationResult WorkspaceService::SeedQuickStartBasics(
+    uint64_t space_id) {
+  if (!CanMutate()) {
+    return Failure("Workspace is not loaded. Check storage state.");
+  }
+  auto result = foundation::seed_quick_start_basics(*workspace_, space_id);
+  if (result.ok && result.id == 0) {
+    return result;
+  }
+  return Changed(std::move(result));
+}
+
 foundation::MutationResult WorkspaceService::ClearArchivedTabs() {
   if (!CanMutate())
     return Failure("Workspace is not loaded. Check storage state.");

@@ -1,14 +1,16 @@
 diff --git a/chrome/browser/ui/views/location_bar/BUILD.gn b/chrome/browser/ui/views/location_bar/BUILD.gn
-index 7240098ddda452e5658e21811c2cb4775806ff84..9a4ba2e97be6dca527cfbce0108ace52b8377aed 100644
+index 7240098ddda452e5658e21811c2cb4775806ff84..b63f9a28a98acf8a5b2f8270fef51d9999031a53 100644
 --- a/chrome/browser/ui/views/location_bar/BUILD.gn
 +++ b/chrome/browser/ui/views/location_bar/BUILD.gn
-@@ -200,6 +200,12 @@ source_set("impl") {
+@@ -200,6 +200,14 @@ source_set("impl") {
        "//ui/native_theme",
        "//ui/strings:ui_strings_grit",
      ]
 +    deps += [
 +      "//myarc:boost_editor",
 +      "//myarc:command_ids",
++      "//myarc:feed_popover",
++      "//myarc:feed_viewer",
 +      "//myarc:local_page_marker",
 +      "//myarc:site_control_center",
 +    ]

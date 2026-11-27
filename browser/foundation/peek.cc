@@ -16,12 +16,16 @@
 #include "chrome/browser/ui/browser_window/public/browser_window_interface.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
 #include "components/input/native_web_keyboard_event.h"
+#include "components/tabs/public/split_tab_data.h"
+#include "components/tabs/public/tab_interface.h"
 #include "content/public/browser/navigation_controller.h"
 #include "content/public/browser/navigation_handle.h"
 #include "content/public/browser/navigation_throttle.h"
 #include "content/public/browser/navigation_throttle_registry.h"
 #include "content/public/browser/page_navigator.h"
 #include "myarc/browser_workspace_adapter.h"
+#include "myarc/feed_viewer.h"
+#include "myarc/feeds_service.h"
 #include "myarc/icons.h"
 #include "myarc/little_arc_prefs.h"
 #include "myarc/peek_hook.h"
@@ -398,6 +402,8 @@ PeekController::PeekController(BrowserWindowInterface& browser,
     : browser_(&browser), host_(&host), area_(&area), adapter_(&adapter) {
   Controllers().push_back(this);
   SetPeekThrottleFactory(&PeekController::MaybeAddThrottle);
+  SetFeedOpenInSplitHandler(&PeekController::OpenFeedArticleInSplit);
+  SetFeedSubscribeHandler(&PeekController::HandleFeedSubscribe);
   browser.GetTabStripModel()->AddObserver(this);
   area_observation_.Observe(&area);
   workspace_subscription_ = adapter.Subscribe(base::BindRepeating(
@@ -420,6 +426,198 @@ PeekController* PeekController::ForBrowser(BrowserWindowInterface& browser) {
     }
   }
   return nullptr;
+}
+
+// static
+void PeekController::OpenFeedArticleInSplit(content::WebContents* feed_contents,
+                                            const GURL& article_url) {
+  if (!feed_contents || !article_url.SchemeIsHTTPOrHTTPS()) {
+    return;
+  }
+  for (PeekController* ctrl : Controllers()) {
+    TabStripModel* tabs = ctrl->browser_->GetTabStripModel();
+    const int idx = tabs->GetIndexOfWebContents(feed_contents);
+    if (idx == TabStripModel::kNoTab) {
+      continue;
+    }
+    // If the feed tab is already in a Split View, toggle it closed when
+    // clicking the article that is already shown in the other pane; otherwise
+    // load the new article in the other pane.
+    if (const auto split = tabs->GetSplitForTab(idx)) {
+      if (const auto* data = tabs->GetSplitData(*split)) {
+        auto trim_slash = [](std::string_view p) {
+          while (p.size() > 1 && p.ends_with('/')) {
+            p.remove_suffix(1);
+          }
+          return p;
+        };
+        for (tabs::TabInterface* pane : data->ListTabs()) {
+          if (pane && pane->GetContents() &&
+              pane->GetContents() != feed_contents) {
+            const GURL current_url = pane->GetContents()->GetVisibleURL();
+            const bool same_article =
+                current_url == article_url ||
+                (current_url.GetHost() == article_url.GetHost() &&
+                 trim_slash(current_url.path()) ==
+                     trim_slash(article_url.path()));
+            const int other_idx =
+                tabs->GetIndexOfWebContents(pane->GetContents());
+            if (same_article) {
+              tabs->ActivateTabAt(idx);
+              if (other_idx != TabStripModel::kNoTab) {
+                tabs->CloseWebContentsAt(other_idx,
+                                         TabCloseTypes::CLOSE_USER_GESTURE);
+              }
+              return;
+            }
+            content::NavigationController::LoadURLParams load(article_url);
+            load.transition_type = ui::PAGE_TRANSITION_LINK;
+            pane->GetContents()->GetController().LoadURLWithParams(load);
+            if (other_idx != TabStripModel::kNoTab) {
+              tabs->ActivateTabAt(other_idx);
+            }
+            return;
+          }
+        }
+      }
+    }
+
+    content::WebContents::CreateParams create_params(
+        feed_contents->GetBrowserContext());
+    std::unique_ptr<content::WebContents> article =
+        content::WebContents::Create(create_params);
+    content::WebContents* article_raw = article.get();
+    content::NavigationController::LoadURLParams load(article_url);
+    load.transition_type = ui::PAGE_TRANSITION_LINK;
+    article->GetController().LoadURLWithParams(load);
+
+    const foundation::MutationResult adopted =
+        ctrl->adapter_->AdoptAsTodayTab(article);
+    if (!adopted.ok) {
+      return;
+    }
+    const int feed_idx = tabs->GetIndexOfWebContents(feed_contents);
+    if (feed_idx != TabStripModel::kNoTab) {
+      tabs->ActivateTabAt(feed_idx);
+    }
+    const foundation::MutationResult split =
+        ctrl->adapter_->OpenInSplitView(adopted.id);
+    const int art_idx = tabs->GetIndexOfWebContents(article_raw);
+    if (art_idx != TabStripModel::kNoTab) {
+      tabs->ActivateTabAt(art_idx);
+    }
+    if (!split.ok) {
+      LOG(WARNING) << "Feed article opened as Today tab (could not split): "
+                   << std::string(split.error);
+    }
+    return;
+  }
+}
+
+// static
+void PeekController::HandleFeedSubscribe(content::WebContents* feed_contents,
+                                         const GURL& feed_url,
+                                         const std::string& title,
+                                         bool subscribe) {
+  if (!feed_contents || !feed_url.SchemeIsHTTPOrHTTPS()) {
+    return;
+  }
+  Profile* profile =
+      Profile::FromBrowserContext(feed_contents->GetBrowserContext());
+  if (!profile) {
+    return;
+  }
+  FeedsService& feeds_service = FeedsService::ForProfile(*profile);
+  if (feeds_service.IsEphemeral()) {
+    return;
+  }
+
+  for (PeekController* ctrl : Controllers()) {
+    TabStripModel* tabs = ctrl->browser_->GetTabStripModel();
+    if (tabs->GetIndexOfWebContents(feed_contents) == TabStripModel::kNoTab) {
+      continue;
+    }
+    const bool viewing_this_feed =
+        feed_contents->GetLastCommittedURL() == feed_url;
+    const uint64_t active_item_id =
+        viewing_this_feed
+            ? BrowserWorkspaceAdapter::ItemIdForContents(*feed_contents)
+            : 0;
+    const foundation::SidebarResult sidebar = ctrl->adapter_->Sidebar();
+    const uint64_t space_id = sidebar.ok ? sidebar.current_space.id : 0;
+
+    auto find_feed_item_in_sidebar = [&](uint64_t rss_folder_id) -> uint64_t {
+      if (!sidebar.ok) {
+        return 0;
+      }
+      for (const auto& folder : sidebar.folders) {
+        if (rss_folder_id && folder.id != rss_folder_id) {
+          continue;
+        }
+        if (!rss_folder_id && std::string(folder.name) != "RSS") {
+          continue;
+        }
+        for (uint64_t id : folder.items) {
+          for (const auto& item : sidebar.pins) {
+            if (item.id == id &&
+                std::string(item.canonical_url) == feed_url.spec()) {
+              return id;
+            }
+          }
+        }
+      }
+      return 0;
+    };
+
+    if (subscribe) {
+      feeds_service.Subscribe(feed_url.spec(), title, "", space_id);
+      if (sidebar.ok) {
+        uint64_t rss_folder_id = 0;
+        for (const auto& folder : sidebar.folders) {
+          if (std::string(folder.name) == "RSS") {
+            rss_folder_id = folder.id;
+            break;
+          }
+        }
+        if (!rss_folder_id) {
+          const auto created = ctrl->adapter_->CreateFolder("RSS");
+          if (created.ok) {
+            rss_folder_id = created.id;
+          }
+        }
+        if (rss_folder_id) {
+          ctrl->adapter_->SetFolderOpen(rss_folder_id, true);
+          if (active_item_id) {
+            ctrl->adapter_->MovePinToFolder(active_item_id, rss_folder_id);
+          } else if (!find_feed_item_in_sidebar(rss_folder_id)) {
+            ctrl->adapter_->PinUrlToFolder(feed_url, title, rss_folder_id);
+          }
+        }
+      }
+    } else {
+      feeds_service.UnsubscribeByUrl(feed_url.spec());
+      if (sidebar.ok) {
+        uint64_t target_id = active_item_id;
+        if (!target_id) {
+          target_id = find_feed_item_in_sidebar(0);
+        }
+        if (target_id) {
+          for (const auto& folder : sidebar.folders) {
+            if (std::string(folder.name) == "RSS") {
+              for (uint64_t id : folder.items) {
+                if (id == target_id) {
+                  ctrl->adapter_->Unsave(target_id);
+                  break;
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+    feed_contents->NotifyNavigationStateChanged(content::INVALIDATE_TYPE_URL);
+    return;
+  }
 }
 
 // static
