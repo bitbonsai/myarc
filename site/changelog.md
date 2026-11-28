@@ -2,6 +2,10 @@
 
 One entry per alpha release, newest first, written for people using myArc. The homepage's Recent updates dialog shows them, and the build stops when the version in `release.json` has no entry here.
 
+## v2026.11.27.1 (2026-11-27)
+
+Folders now nest in the sidebar, with subfolder creation, drag-to-nest, and full Arc import/export preservation. Built-in RSS adds feed discovery in the address bar, a native feed reader, Space RSS folder subscriptions with one-click unsubscribe, and a split-view toggle. Split View now animates open and closed, modal dialogs float as frosted-glass windows with a red close dot and aligned button colors, About myArc adds a copyable version pill, and macOS native messaging extensions (including 1Password) fall back to Chrome, Arc, and Chromium host manifests.
+
 ## v2026.11.27 (2026-11-27)
 
 All dialogs, permission prompts, bubbles, and About myArc now share the dark frosted glass material, crisp rim border, 12 DIP corners, 24 DIP padding, and 7 DIP buttons. Clicking the site-controls icon in the URL pill opens the new Site Control Center popover with Copy URL, Boost, Screenshot, Reading Mode, live Boosts controls, and Extensions. You can also export any Space into a folder in another Space or to a local HTML/JSON file, and Library Media and the sidebar downloads stack show crisp framed thumbnails and video badges.

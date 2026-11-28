@@ -1,12 +1,12 @@
 {
   "published": true,
-  "version": "2026.11.27",
+  "version": "2026.11.27.1",
   "date": "2026-11-27",
-  "dmg_url": "https://github.com/bitbonsai/myarc/releases/download/v2026.11.27/myArc-2026.11.27-arm64.dmg",
-  "size_bytes": 185336391,
-  "sha256": "01e13c36f3f231a19a47d4395f02919d9d273e4e9cd47c27fccc02c544aa6c5b",
-  "release_url": "https://github.com/bitbonsai/myarc/releases/tag/v2026.11.27",
+  "dmg_url": "https://github.com/bitbonsai/myarc/releases/download/v2026.11.27.1/myArc-2026.11.27.1-arm64.dmg",
+  "size_bytes": 185383286,
+  "sha256": "2d46ede364a1e82099bfbddde2cdf2dcf5253a2ddb7b9dac9885190876b58daa",
+  "release_url": "https://github.com/bitbonsai/myarc/releases/tag/v2026.11.27.1",
   "min_macos": "26",
   "proprietary_codecs": true,
-  "ed_signature": "eG5oJa+6RAQzcJRr7aSJTmdf7f+LR0EM+LB4jOLOMt9AB8kYTEI6xmNPt0xaZVnEkvm95qyJTJjrV7GaI+MrBg=="
+  "ed_signature": "bSuhsJF/UY/f0JF1R9eGDttrYpGa0SE3IZaQb8M4A0Prw7iHOAlemIwl7u811tDTrmd0BC4nvsS1IZs6ytOYAg=="
 }
