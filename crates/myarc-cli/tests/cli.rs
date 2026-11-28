@@ -217,6 +217,19 @@ fn help_mentions_local_and_the_dev_stub() {
     assert!(text.contains("fresh in-memory"), "{text}");
     assert!(text.contains("serve-local"), "{text}");
     assert!(text.contains("Development stub"), "{text}");
+    assert!(text.contains("myarc skill"), "{text}");
+}
+
+#[test]
+fn skill_prints_the_embedded_agent_guide() {
+    let output = myarc(&["skill"]);
+    assert_eq!(output.status.code(), Some(0));
+    let text = stdout(&output);
+    assert!(text.contains("Driving myArc with the myarc CLI"), "{text}");
+    assert!(text.contains("myarc screenshot"), "{text}");
+
+    let bad = myarc(&["skill", "extra"]);
+    assert_eq!(bad.status.code(), Some(2));
 }
 
 #[test]

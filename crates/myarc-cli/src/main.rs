@@ -39,6 +39,8 @@ const EXIT_NOT_CONNECTED: u8 = 3;
 /// Exit code when myArc refused this client, such as when the user declined.
 const EXIT_DENIED: u8 = 4;
 
+const SKILL_GUIDE: &str = include_str!("../../../skills/myarc-browser/SKILL.md");
+
 const HELP: &str = "\
 myarc: drive myArc's agent Space and run browser control commands
 
@@ -79,6 +81,9 @@ Usage:
       Prints one line, or the full response as JSON with --json.
   myarc mcp [--local]
       Serve the commands as MCP tools over stdio.
+  myarc skill
+      Print the agent usage guide (workflow, outline format, error handling
+      and safety rules) matching this build of myarc.
   myarc --version
   myarc --help
 
@@ -105,6 +110,7 @@ the user declined.
 enum Cli {
     Help,
     Version,
+    Skill,
     Commands {
         json: bool,
         all: bool,
@@ -141,6 +147,7 @@ fn main() -> ExitCode {
         Ok(Cli::Version) => print(&format!(
             "myarc {VERSION} (control protocol {PROTOCOL_VERSION})"
         )),
+        Ok(Cli::Skill) => print(SKILL_GUIDE.trim_end()),
         Ok(Cli::Commands { json, all }) => print(&commands(json, all)),
         Ok(Cli::Run {
             command,
@@ -278,6 +285,8 @@ fn parse(args: &[String]) -> Result<Cli, String> {
         )),
         ["mcp"] if !json => Ok(Cli::Mcp { local }),
         ["mcp", ..] => Err(String::from("mcp takes no arguments besides --local")),
+        ["skill"] if !json => Ok(Cli::Skill),
+        ["skill", ..] => Err(String::from("skill takes no arguments")),
         ["serve-local"] if !json => Ok(Cli::ServeLocal { dir }),
         ["serve-local", ..] => Err(String::from("serve-local takes no arguments besides --dir")),
         [other, ..] => Err(format!("unknown subcommand {:?}", mcp::bounded(other))),

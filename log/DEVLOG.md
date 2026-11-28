@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-11-28: Embed agent skill guide directly in `myarc skill`
+
+- Embedded `skills/myarc-browser/SKILL.md` into `myarc` via `include_str!` and added the `myarc skill` subcommand (documented in `myarc --help`) in `crates/myarc-cli/src/main.rs` so any agent inspecting `myarc --help` can pull the version-matched usage guide without installing a separate skill package.
+- Added integration test coverage in `crates/myarc-cli/tests/cli.rs` and updated the draft blog post in `site/posts/rss-nested-folders-and-faster-agents/index.md`.
+- Verified with `cargo fmt --all -- --check`, `cargo clippy --workspace --all-targets --locked -- -D warnings`, `cargo test -p myarc-cli --locked`, and `python3 tools/check_docs.py`.
+
 ## 2026-11-28: Agent-browser parity for `myarc` CLI (`screenshot`, `scroll`, `wait`, `-i`, auto-wait `open`)
 
 - Added `myarc screenshot [path]` (zero-dependency RFC 4648 base64 decode directly to disk or temp file), `myarc scroll <dir> [<ref>]`, `myarc wait [<ms>]`, global `-i`/`--interactive` filtering across all outline-returning short commands (`open`, `click`, `fill`, `select`, `press`, `scroll`, `back`, `forward`, `reload`, `snapshot`), and automatic `page.wait` on `open`/`back`/`forward`/`reload` when a tab is still loading (`--no-wait` to opt out) in `crates/myarc-cli/src/{main.rs,short.rs}`, plus optional default `timeout_ms` (`10000`) for `page.wait` in `crates/control/src/lib.rs`.

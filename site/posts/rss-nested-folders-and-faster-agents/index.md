@@ -24,7 +24,7 @@ In `2026.11.28`, `myarc` gets the short commands you actually reach for:
 
 Re-running that exact same 5-step journey (`open -i` -> `click -i` -> `click -i` -> `screenshot` -> `close`) took **1.12 seconds** total. The `/blog` outline shrank from 12.7 KB to 5.9 KB (54% smaller), and the post outline dropped from ~4.5 KB to 927 bytes (79% smaller).
 
-If you want your coding agents to use myArc by default, the `myarc-browser` skill in the repo now covers general browsing and screenshot triggers too. Install it if you want `myarc` to take over, skip it if you prefer keeping `agent-browser`.
+If you want your coding agents to use myArc, you don't even need to install a separate skill file. Running `myarc skill` prints the full agent usage guide (workflow, outline format, error handling, and safety rules) straight from the binary itself, and `myarc --help` points agents right to it. If you still want a standalone skill file in `~/.agents/skills/`, `myarc skill > SKILL.md` stays matched to the exact build you have installed.
 
 ## Built-in RSS, right in the sidebar
 
