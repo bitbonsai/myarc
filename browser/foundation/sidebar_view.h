@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <memory>
 #include <optional>
+#include <set>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -85,6 +86,8 @@ class SidebarView final : public views::View,
     bool muted = false;
     // A Pin's or Favorite's live page has left its saved URL (BC-003).
     bool navigated_away = false;
+    // Unread items of the feed a row in the RSS folder subscribes to.
+    uint32_t unread_count = 0;
     bool operator==(const ItemPresentation&) const = default;
   };
 
@@ -191,6 +194,10 @@ class SidebarView final : public views::View,
     virtual void UnsaveItem(uint64_t item_id) = 0;
     // Confirms and unsubscribes a feed row inside the Space's RSS folder.
     virtual void UnsubscribeFeedItem(uint64_t item_id) {}
+    // Marks a feed row's subscription read, or every subscription in the RSS
+    // folder `folder_id`.
+    virtual void MarkFeedItemRead(uint64_t item_id) {}
+    virtual void MarkFeedFolderRead(uint64_t folder_id) {}
     // Folders of the current Space's Pins. The parent names a new folder
     // and lets the user rename it, confirms a delete, and reports errors.
     // Nonzero `parent_folder_id` creates a subfolder inside that folder.
@@ -640,8 +647,11 @@ class SidebarView final : public views::View,
   std::unique_ptr<views::View> MakeSplit(const foundation::ItemRecord& left,
                                          const foundation::ItemRecord& right,
                                          uint64_t selected);
-  // A folder's row, which opens or closes it.
-  std::unique_ptr<views::View> MakeFolder(const foundation::FolderRecord& folder);
+  // A folder's row, which opens or closes it. `unread` dots an RSS folder
+  // whose subscriptions have unread items.
+  std::unique_ptr<views::View> MakeFolder(
+      const foundation::FolderRecord& folder,
+      bool unread = false);
   // The Space menu of menu_space_id_, with New Folder on the Space title.
   void AddSpaceCommands(bool folder);
   void PickSpaceTheme(SpaceTheme theme);
@@ -722,6 +732,9 @@ class SidebarView final : public views::View,
   };
   bool IsFolderDescendant(uint64_t ancestor, uint64_t candidate) const;
   bool IsRssFolderId(uint64_t folder_id) const;
+  // Feed rows and RSS folders on screen with unread items, for Mark as Read.
+  std::set<uint64_t> unread_feed_items_;
+  std::set<uint64_t> unread_feed_folders_;
   std::vector<FolderEntry> folders_;
   std::vector<SpaceEntry> spaces_;
   std::vector<OtherSpaceEntry> other_spaces_;

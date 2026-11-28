@@ -4,6 +4,7 @@
 #include <memory>
 #include <optional>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "base/functional/callback_forward.h"
@@ -60,6 +61,12 @@ class FeedTabHelper final : public content::WebContentsObserver,
     return discovered_feeds_;
   }
 
+  // The link and ID of each item of the feed about to commit, recorded when
+  // it is a subscription, so opening an item marks it read.
+  void SetPendingFeedItems(std::vector<std::pair<GURL, std::string>> items);
+  // Marks the item linking to `article_url` in the active feed read.
+  void MarkArticleRead(const GURL& article_url);
+
   static bool IsShowingFeed(content::WebContents* web_contents);
 
   // content::WebContentsObserver:
@@ -77,6 +84,8 @@ class FeedTabHelper final : public content::WebContentsObserver,
   std::string pending_feed_title_;
   std::optional<GURL> active_feed_url_;
   std::string active_feed_title_;
+  std::vector<std::pair<GURL, std::string>> pending_feed_items_;
+  std::vector<std::pair<GURL, std::string>> active_feed_items_;
   std::vector<DiscoveredFeed> discovered_feeds_;
   base::WeakPtrFactory<FeedTabHelper> weak_factory_{this};
 

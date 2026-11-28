@@ -90,12 +90,47 @@ impl FeedStore {
     }
 
     pub fn find_by_url(&self, feed_url: &str) -> Option<&Subscription> {
+        self.position_by_url(feed_url)
+            .map(|index| &self.subscriptions[index])
+    }
+
+    fn position_by_url(&self, feed_url: &str) -> Option<usize> {
         let normalized = normalize_feed_url(feed_url)?;
-        self.subscriptions.iter().find(|s| {
+        self.subscriptions.iter().position(|s| {
             normalize_feed_url(&s.feed_url)
                 .map(|u| u.eq_ignore_ascii_case(&normalized))
                 .unwrap_or_else(|| s.feed_url.eq_ignore_ascii_case(&normalized))
         })
+    }
+
+    /// Unread items of the subscription at `feed_url`, or 0 when there is none.
+    pub fn unread_count_by_url(&self, feed_url: &str) -> u32 {
+        self.find_by_url(feed_url).map_or(0, |s| s.unread_count)
+    }
+
+    /// `record_fetch` for the subscription at `feed_url`, or None when there
+    /// is none.
+    pub fn record_fetch_by_url(
+        &mut self,
+        feed_url: &str,
+        feed: &Feed,
+        now_secs: u64,
+    ) -> Option<u32> {
+        let id = self.find_by_url(feed_url)?.id;
+        self.record_fetch(id, feed, None, None, now_secs).ok()
+    }
+
+    /// Marks the subscription at `feed_url` read. Returns whether its unread
+    /// count changed.
+    pub fn mark_all_read_by_url(&mut self, feed_url: &str) -> bool {
+        let Some(sub) = self.find_by_url(feed_url) else {
+            return false;
+        };
+        if sub.unread_count == 0 {
+            return false;
+        }
+        let id = sub.id;
+        self.mark_all_read(id).is_ok()
     }
 
     pub fn is_subscribed(&self, feed_url: &str) -> bool {
@@ -213,16 +248,10 @@ impl FeedStore {
 
     /// Marks one item (by ID or URL) as read and decrements `unread_count`.
     pub fn mark_item_read(&mut self, feed_url: &str, item_id: &str) -> bool {
-        let Some(canonical) = safe_http_url(feed_url, None) else {
+        let Some(index) = self.position_by_url(feed_url) else {
             return false;
         };
-        let Some(sub) = self
-            .subscriptions
-            .iter_mut()
-            .find(|s| s.feed_url.eq_ignore_ascii_case(&canonical))
-        else {
-            return false;
-        };
+        let sub = &mut self.subscriptions[index];
         let id = truncate_utf8(item_id.trim(), MAX_ID_BYTES);
         if id.is_empty() || sub.read_ids.iter().any(|r| r == id) {
             return false;
@@ -694,5 +723,30 @@ mod tests {
 
         assert!(store.unsubscribe_by_url("https://example.test/rss.xml"));
         assert!(!store.is_subscribed("https://example.test/rss.xml"));
+    }
+
+    #[test]
+    fn unread_by_url_ignores_fragment_and_marks_read() {
+        let mut store = FeedStore::new();
+        store
+            .subscribe("https://example.test/rss.xml", "Blog", None, 1, 1000)
+            .unwrap();
+        let rss = br#"<rss version="2.0"><channel><title>Blog</title><item><guid>p1</guid><title>One</title></item><item><guid>p2</guid><title>Two</title></item></channel></rss>"#;
+        let parsed = parse_feed(rss, Some("https://example.test/rss.xml")).unwrap();
+        assert_eq!(
+            store.record_fetch_by_url("https://example.test/rss.xml#top", &parsed, 2000),
+            Some(2)
+        );
+        assert_eq!(store.unread_count_by_url("https://example.test/rss.xml"), 2);
+        assert_eq!(store.unread_count_by_url("https://other.test/rss.xml"), 0);
+        assert!(store.mark_item_read("https://example.test/rss.xml#top", "p2"));
+        assert_eq!(store.unread_count_by_url("https://example.test/rss.xml"), 1);
+        assert!(store.mark_all_read_by_url("https://example.test/rss.xml"));
+        assert!(!store.mark_all_read_by_url("https://example.test/rss.xml"));
+        assert_eq!(store.unread_count_by_url("https://example.test/rss.xml"), 0);
+        assert_eq!(
+            store.record_fetch_by_url("https://other.test/rss.xml", &parsed, 3000),
+            None
+        );
     }
 }

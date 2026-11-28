@@ -1,5 +1,5 @@
 diff --git a/chrome/browser/ui/views/frame/browser_view.cc b/chrome/browser/ui/views/frame/browser_view.cc
-index 7b568f6de760af21d6e9d2aa44415a7cef617c51..b932a9cb070a5746ba1dc44a04306aed634ebbc9 100644
+index 7b568f6de760af21d6e9d2aa44415a7cef617c51..eddd6ff2df99c8f06e0fa430baa3f7874acf94f8 100644
 --- a/chrome/browser/ui/views/frame/browser_view.cc
 +++ b/chrome/browser/ui/views/frame/browser_view.cc
 @@ -11,6 +11,7 @@
@@ -2485,7 +2485,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..b932a9cb070a5746ba1dc44a04306aed
  
      if (dialog_anchor_) {
        rect.Offset(0, -kAdditionalDialogToolbarOverlap);
-@@ -5197,6 +7259,338 @@ void BrowserView::AddedToWidget() {
+@@ -5197,6 +7259,343 @@ void BrowserView::AddedToWidget() {
        kFallbackPopupAnchorElementId, *this);
  
    initialized_ = true;
@@ -2635,6 +2635,11 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..b932a9cb070a5746ba1dc44a04306aed
 +    myarc_workspace_subscription_ = myarc_workspace_adapter_->Subscribe(
 +        base::BindRepeating(&BrowserView::RefreshMyarcWorkspaceSidebar,
 +                            myarc_workspace_weak_factory_.GetWeakPtr()));
++    myarc_feeds_subscription_ =
++        myarc::FeedsService::ForProfile(*browser_->GetProfile())
++            .AddUnreadObserver(base::BindRepeating(
++                &BrowserView::RefreshMyarcWorkspaceSidebar,
++                myarc_workspace_weak_factory_.GetWeakPtr()));
 +    // Metadata readiness is NOT the native async session-restore barrier.
 +    // Parent calls FinishSessionRestore only after all restore hooks complete.
 +    // New windows may follow startup; counted restore holds still apply.
@@ -2824,7 +2829,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..b932a9cb070a5746ba1dc44a04306aed
  }
  
  void BrowserView::RemovedFromWidget() {
-@@ -5267,90 +7661,3744 @@ const views::View* BrowserView::GetViewByElementId(
+@@ -5267,90 +7666,3794 @@ const views::View* BrowserView::GetViewByElementId(
  ///////////////////////////////////////////////////////////////////////////////
  // BrowserView, ui::AcceleratorTarget overrides:
  
@@ -3794,6 +3799,11 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..b932a9cb070a5746ba1dc44a04306aed
 +  result.navigated_away =
 +      item.placement != myarc::foundation::PlacementKind::Temporary &&
 +      myarc_workspace_adapter_->NavigatedAway(item.id);
++  if (item.has_url) {
++    result.unread_count =
++        myarc::FeedsService::ForProfile(*browser_->GetProfile())
++            .UnreadCount(std::string(item.canonical_url));
++  }
 +  return result;
 +}
 +
@@ -3917,6 +3927,51 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..b932a9cb070a5746ba1dc44a04306aed
 +      }
 +    }
 +  }
++}
++
++void BrowserView::MarkFeedItemRead(uint64_t item) {
++  if (!item || !myarc_workspace_adapter_ ||
++      !myarc_workspace_adapter_->ready()) {
++    return;
++  }
++  const auto model = myarc_workspace_adapter_->Sidebar();
++  if (!model.ok) {
++    return;
++  }
++  const auto record =
++      std::ranges::find(model.pins, item, &myarc::foundation::ItemRecord::id);
++  if (record == model.pins.end() || !record->has_url) {
++    return;
++  }
++  // The observer refreshes the sidebar.
++  myarc::FeedsService::ForProfile(*browser_->GetProfile())
++      .MarkAllRead({std::string(record->canonical_url)});
++}
++
++void BrowserView::MarkFeedFolderRead(uint64_t folder) {
++  if (!folder || !myarc_workspace_adapter_ ||
++      !myarc_workspace_adapter_->ready()) {
++    return;
++  }
++  const auto model = myarc_workspace_adapter_->Sidebar();
++  if (!model.ok) {
++    return;
++  }
++  const auto record = std::ranges::find(
++      model.folders, folder, &myarc::foundation::FolderRecord::id);
++  if (record == model.folders.end()) {
++    return;
++  }
++  std::vector<std::string> feed_urls;
++  for (const uint64_t id : record->items) {
++    const auto pin =
++        std::ranges::find(model.pins, id, &myarc::foundation::ItemRecord::id);
++    if (pin != model.pins.end() && pin->has_url) {
++      feed_urls.emplace_back(pin->canonical_url);
++    }
++  }
++  myarc::FeedsService::ForProfile(*browser_->GetProfile())
++      .MarkAllRead(feed_urls);
 +}
 +
 +void BrowserView::UnsubscribeFeedItem(uint64_t item) {
@@ -6635,7 +6690,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..b932a9cb070a5746ba1dc44a04306aed
  }
  #endif
  
-@@ -5471,6 +11519,10 @@ bool BrowserView::MaybeUpdateDevtools(content::WebContents* contents) {
+@@ -5471,6 +11574,10 @@ bool BrowserView::MaybeUpdateDevtools(content::WebContents* contents) {
  
  void BrowserView::UpdateUIForContents(WebContents* contents,
                                        bool should_layout_immediately) {
@@ -6646,7 +6701,7 @@ index 7b568f6de760af21d6e9d2aa44415a7cef617c51..b932a9cb070a5746ba1dc44a04306aed
    TRACE_EVENT0("ui", "BrowserView::UpdateUIForContents");
    bool needs_layout = MaybeShowBookmarkBar(contents);
  
-@@ -5706,6 +11758,26 @@ void BrowserView::LoadAccelerators() {
+@@ -5706,6 +11813,26 @@ void BrowserView::LoadAccelerators() {
    }
  
  #if BUILDFLAG(IS_MAC)

@@ -90,6 +90,15 @@ mod ffi {
         html: String,
     }
 
+    // A subscribed feed's fetch: its unread count, and each item's ID with
+    // its link (empty when it has none), so a click can mark the item read.
+    struct FeedFetchRecord {
+        ok: bool,
+        unread: u32,
+        item_ids: Vec<String>,
+        item_links: Vec<String>,
+    }
+
     // Sidebar rows selected together, top to bottom, and the row a
     // Shift-click range starts from (0 for none).
     struct RowSelection {
@@ -1522,6 +1531,15 @@ mod ffi {
             now_secs: u64,
         ) -> MutationResult;
         fn feed_store_unsubscribe_url(store: &mut FeedStore, feed_url: &str) -> bool;
+        fn feed_store_unread_count(store: &FeedStore, feed_url: &str) -> u32;
+        fn feed_store_record_fetch(
+            store: &mut FeedStore,
+            feed_url: &str,
+            body: &[u8],
+            now_secs: u64,
+        ) -> FeedFetchRecord;
+        fn feed_store_mark_item_read(store: &mut FeedStore, feed_url: &str, item_id: &str) -> bool;
+        fn feed_store_mark_all_read_url(store: &mut FeedStore, feed_url: &str) -> bool;
     }
 }
 
@@ -4330,4 +4348,45 @@ pub fn feed_store_subscribe(
 
 pub fn feed_store_unsubscribe_url(store: &mut FeedStore, feed_url: &str) -> bool {
     store.0.unsubscribe_by_url(feed_url)
+}
+
+pub fn feed_store_unread_count(store: &FeedStore, feed_url: &str) -> u32 {
+    store.0.unread_count_by_url(feed_url)
+}
+
+pub fn feed_store_record_fetch(
+    store: &mut FeedStore,
+    feed_url: &str,
+    body: &[u8],
+    now_secs: u64,
+) -> ffi::FeedFetchRecord {
+    let mut record = ffi::FeedFetchRecord {
+        ok: false,
+        unread: 0,
+        item_ids: Vec::new(),
+        item_links: Vec::new(),
+    };
+    let Ok(feed) = feeds::parse_feed(body, Some(feed_url)) else {
+        return record;
+    };
+    let Some(unread) = store.0.record_fetch_by_url(feed_url, &feed, now_secs) else {
+        return record;
+    };
+    record.ok = true;
+    record.unread = unread;
+    for item in feed.items.iter().take(feeds::store::MAX_SEEN_IDS_PER_FEED) {
+        record.item_ids.push(item.id.clone());
+        record
+            .item_links
+            .push(item.link.clone().unwrap_or_default());
+    }
+    record
+}
+
+pub fn feed_store_mark_item_read(store: &mut FeedStore, feed_url: &str, item_id: &str) -> bool {
+    store.0.mark_item_read(feed_url, item_id)
+}
+
+pub fn feed_store_mark_all_read_url(store: &mut FeedStore, feed_url: &str) -> bool {
+    store.0.mark_all_read_by_url(feed_url)
 }

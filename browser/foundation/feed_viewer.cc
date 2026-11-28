@@ -266,6 +266,20 @@ class FeedViewerURLLoaderThrottle final : public blink::URLLoaderThrottle,
               show_subscribe = true;
               is_subscribed = feeds_service.IsSubscribed(response_url_.spec());
             }
+            if (is_subscribed) {
+              // Updates the sidebar's unread counts for this subscription.
+              const foundation::FeedFetchRecord record =
+                  feeds_service.RecordFetch(response_url_.spec(), buffer_);
+              for (size_t i = 0; record.ok && i < record.item_ids.size() &&
+                                 i < record.item_links.size();
+                   ++i) {
+                const GURL link(std::string(record.item_links[i]));
+                if (link.SchemeIsHTTPOrHTTPS()) {
+                  feed_items_.emplace_back(link,
+                                           std::string(record.item_ids[i]));
+                }
+              }
+            }
           }
         }
       }
@@ -345,6 +359,7 @@ class FeedViewerURLLoaderThrottle final : public blink::URLLoaderThrottle,
     if (rendered_feed && wc_getter_) {
       if (content::WebContents* wc = wc_getter_.Run()) {
         if (auto* helper = FeedTabHelper::FromWebContents(wc)) {
+          helper->SetPendingFeedItems(std::move(feed_items_));
           helper->PreparePendingFeedTransition(
               response_url_, std::move(rendered_title),
               base::BindOnce(&FeedViewerURLLoaderThrottle::ResumeAfterTransition,
@@ -371,6 +386,7 @@ class FeedViewerURLLoaderThrottle final : public blink::URLLoaderThrottle,
   bool drainer_done_ = false;
   bool upstream_complete_ = false;
   std::vector<uint8_t> buffer_;
+  std::vector<std::pair<GURL, std::string>> feed_items_;
   network::URLLoaderCompletionStatus upstream_status_{net::OK};
 
   mojo::PendingRemote<network::mojom::URLLoader> original_loader_;
@@ -408,6 +424,7 @@ class FeedSplitNavigationThrottle final : public content::NavigationThrottle {
     if (url == *helper->active_feed_url()) {
       return PROCEED;
     }
+    helper->MarkArticleRead(url);
     g_open_in_split_handler(wc, url);
     return CANCEL_AND_IGNORE;
   }
@@ -459,6 +476,27 @@ void FeedTabHelper::PreparePendingFeedTransition(const GURL& url,
             }
           },
           weak_contents, std::move(on_ready)));
+}
+
+void FeedTabHelper::SetPendingFeedItems(
+    std::vector<std::pair<GURL, std::string>> items) {
+  pending_feed_items_ = std::move(items);
+}
+
+void FeedTabHelper::MarkArticleRead(const GURL& article_url) {
+  if (!active_feed_url_.has_value()) {
+    return;
+  }
+  const auto item = std::ranges::find(active_feed_items_, article_url,
+                                      &std::pair<GURL, std::string>::first);
+  if (item == active_feed_items_.end()) {
+    return;
+  }
+  if (Profile* profile =
+          Profile::FromBrowserContext(web_contents()->GetBrowserContext())) {
+    FeedsService::ForProfile(*profile).MarkItemRead(active_feed_url_->spec(),
+                                                    item->second);
+  }
 }
 
 // static
@@ -537,13 +575,17 @@ void FeedTabHelper::DidFinishNavigation(
       navigation_handle->GetURL() == *pending_feed_url_) {
     active_feed_url_ = pending_feed_url_;
     active_feed_title_ = std::move(pending_feed_title_);
+    active_feed_items_ = std::move(pending_feed_items_);
     pending_feed_url_.reset();
     pending_feed_title_.clear();
+    pending_feed_items_.clear();
   } else {
     pending_feed_url_.reset();
     pending_feed_title_.clear();
+    pending_feed_items_.clear();
     active_feed_url_.reset();
     active_feed_title_.clear();
+    active_feed_items_.clear();
   }
   if (!discovered_feeds_.empty()) {
     discovered_feeds_.clear();

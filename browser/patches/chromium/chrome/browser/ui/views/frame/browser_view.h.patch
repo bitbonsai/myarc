@@ -1,5 +1,5 @@
 diff --git a/chrome/browser/ui/views/frame/browser_view.h b/chrome/browser/ui/views/frame/browser_view.h
-index 750e46c97b64dccccf4268e912df5dbdb6516b3c..78d51f4f4c3d66b893b85b64a22a3b0f5fb5c15a 100644
+index 750e46c97b64dccccf4268e912df5dbdb6516b3c..010ff1404464da43439ad38d1d46aa25e00d00ac 100644
 --- a/chrome/browser/ui/views/frame/browser_view.h
 +++ b/chrome/browser/ui/views/frame/browser_view.h
 @@ -8,11 +8,13 @@
@@ -144,7 +144,7 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..78d51f4f4c3d66b893b85b64a22a3b0f
    base::WeakPtr<BrowserView> GetAsWeakPtr() {
      return weak_ptr_factory_.GetWeakPtr();
    }
-@@ -1253,12 +1331,299 @@ class BrowserView : public BrowserWindow,
+@@ -1253,12 +1331,303 @@ class BrowserView : public BrowserWindow,
  
    // Anchor point for help bubbles and other dialogs that want to reliably
    // anchor outside the content area of the window.
@@ -158,6 +158,8 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..78d51f4f4c3d66b893b85b64a22a3b0f
 +  bool DropFavorite(uint64_t item, uint64_t before) override;
 +  void UnsaveItem(uint64_t item) override;
 +  void UnsubscribeFeedItem(uint64_t item) override;
++  void MarkFeedItemRead(uint64_t item) override;
++  void MarkFeedFolderRead(uint64_t folder) override;
 +  void CreateFolder(uint64_t parent_folder_id = 0) override;
 +  void RenameFolder(uint64_t folder) override;
 +  void DeleteFolder(uint64_t folder) override;
@@ -361,6 +363,8 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..78d51f4f4c3d66b893b85b64a22a3b0f
 +  bool myarc_capture_peek_scheduled_ = false;
 +  base::CallbackListSubscription myarc_workspace_subscription_;
 +  base::CallbackListSubscription myarc_media_subscription_;
++  // Refreshes the sidebar's feed unread counts.
++  base::CallbackListSubscription myarc_feeds_subscription_;
 +  raw_ptr<myarc::SidebarView> myarc_workspace_sidebar_ = nullptr;
 +  // Refreshes the sidebar when any Profile's Spaces change.
 +  PrefChangeRegistrar myarc_spaces_index_registrar_;
@@ -444,7 +448,7 @@ index 750e46c97b64dccccf4268e912df5dbdb6516b3c..78d51f4f4c3d66b893b85b64a22a3b0f
  
    // A mapping between accelerators and command IDs.
    std::map<ui::Accelerator, int> accelerator_table_;
-@@ -1411,6 +1776,7 @@ class BrowserView : public BrowserWindow,
+@@ -1411,6 +1780,7 @@ class BrowserView : public BrowserWindow,
    base::EnumSet<TabStripAndWebAppViewsReparentedState>
        tab_strip_web_apps_reparented_state_;
  

@@ -495,6 +495,8 @@ enum ItemCommand {
   kFavorite,
   kUnsave,
   kUnsubscribeFeed,
+  kMarkFeedRead,
+  kMarkFolderRead,
   kClose,
   kStopControl,
   kCopyLink,
@@ -633,7 +635,8 @@ class ItemRow final : public views::View, public views::FocusChangeListener {
           std::unique_ptr<views::MdTextButton> close,
           bool selected,
           ui::ImageModel back = ui::ImageModel(),
-          std::unique_ptr<myarc::LocalPageChip> port_chip = nullptr)
+          std::unique_ptr<myarc::LocalPageChip> port_chip = nullptr,
+          std::unique_ptr<views::View> badge = nullptr)
       : selected_(selected), back_(std::move(back)) {
     if (!back_.IsEmpty()) {
       icon_ = activate->GetImageModel(views::Button::STATE_NORMAL)
@@ -652,6 +655,10 @@ class ItemRow final : public views::View, public views::FocusChangeListener {
       port_chip_ = AddChildView(std::move(port_chip));
       port_chip_->SetProperty(views::kMarginsKey,
                               gfx::Insets::TLBR(0, 4, 0, 8));
+    }
+    if (badge) {
+      badge_ = AddChildView(std::move(badge));
+      badge_->SetProperty(views::kMarginsKey, gfx::Insets::TLBR(0, 4, 0, 8));
     }
     // Dormant Pins have no live page to close.
     if (close) {
@@ -737,6 +744,9 @@ class ItemRow final : public views::View, public views::FocusChangeListener {
     if (port_chip_) {
       port_chip_->SetVisible(!(reveal && close_));
     }
+    if (badge_) {
+      badge_->SetVisible(!(reveal && close_));
+    }
     if (close_) {
       close_->SetVisible(reveal);
     }
@@ -748,6 +758,7 @@ class ItemRow final : public views::View, public views::FocusChangeListener {
 
   raw_ptr<views::MdTextButton> activate_ = nullptr;
   raw_ptr<myarc::LocalPageChip> port_chip_ = nullptr;
+  raw_ptr<views::View> badge_ = nullptr;
   raw_ptr<views::MdTextButton> close_ = nullptr;
   const bool selected_;
   ui::ImageModel icon_;
@@ -759,6 +770,33 @@ class ItemRow final : public views::View, public views::FocusChangeListener {
 };
 
 BEGIN_METADATA(ItemRow)
+END_METADATA
+
+// A feed row's unread count, a small pill at the row's right end. The row's
+// accessible name carries the count.
+class UnreadBadge final : public views::Label {
+  METADATA_HEADER(UnreadBadge, views::Label)
+
+ public:
+  explicit UnreadBadge(uint32_t count)
+      : views::Label(count > 99 ? u"99+" : base::NumberToString16(count)) {
+    SetFontList(font_list().DeriveWithSizeDelta(-2).DeriveWithWeight(
+        gfx::Font::Weight::SEMIBOLD));
+    SetAutoColorReadabilityEnabled(false);
+    SetBorder(views::CreateEmptyBorder(gfx::Insets::VH(1, 6)));
+    SetCanProcessEventsWithinSubtree(false);
+    GetViewAccessibility().SetIsIgnored(true);
+  }
+
+  void OnThemeChanged() override {
+    views::Label::OnThemeChanged();
+    const Fills fills = GetFills(GetColorProvider());
+    SetEnabledColor(fills.tile_ink);
+    SetBackground(views::CreateRoundedRectBackground(fills.new_tab, 8));
+  }
+};
+
+BEGIN_METADATA(UnreadBadge)
 END_METADATA
 
 // The thin line between a split's panes: 1 DIP wide and 16 DIP tall,
@@ -820,8 +858,10 @@ class FolderRow final : public views::View {
   METADATA_HEADER(FolderRow, views::View)
 
  public:
-  FolderRow(std::unique_ptr<views::MdTextButton> toggle, bool open)
-      : open_(open) {
+  FolderRow(std::unique_ptr<views::MdTextButton> toggle,
+            bool open,
+            bool unread = false)
+      : open_(open), unread_(unread) {
     views::InkDrop::Get(toggle.get())
         ->SetMode(views::InkDropHost::InkDropMode::OFF);
     SetLayoutManager(std::make_unique<views::BoxLayout>(
@@ -852,9 +892,22 @@ class FolderRow final : public views::View {
     const gfx::ImageSkia chevron = gfx::CreateVectorIcon(
         open_ ? kChevronDownIcon : kChevronRightIcon, kChevronSize,
         GetFills(GetColorProvider()).title);
-    canvas->DrawImageInt(chevron, width() - kChevronInset - kChevronSize,
-                         (height() - kChevronSize) / 2);
+    const int chevron_x = width() - kChevronInset - kChevronSize;
+    canvas->DrawImageInt(chevron, chevron_x, (height() - kChevronSize) / 2);
+    if (unread_) {
+      // A subtle dot left of the arrow while a subscription has unread items.
+      cc::PaintFlags flags;
+      flags.setAntiAlias(true);
+      flags.setColor(GetFills(GetColorProvider()).title);
+      canvas->DrawCircle(
+          gfx::PointF(chevron_x - kUnreadDotGap - kUnreadDotRadius,
+                      height() / 2.0f),
+          kUnreadDotRadius, flags);
+    }
   }
+
+  static constexpr float kUnreadDotRadius = 3;
+  static constexpr float kUnreadDotGap = 4;
 
  private:
   void UpdateFill() {
@@ -864,6 +917,7 @@ class FolderRow final : public views::View {
   }
 
   const bool open_;
+  const bool unread_;
   bool hovered_ = false;
 };
 
@@ -1201,6 +1255,13 @@ void SidebarView::ShowContextMenuForViewImpl(
           self_it != folders_.end() ? self_it->depth : 0;
       const uint64_t self_parent =
           self_it != folders_.end() ? self_it->parent_id : 0;
+      if (IsRssFolderId(menu_folder_id_)) {
+        menu_model_->AddItem(kMarkFolderRead, u"Mark All as Read");
+        menu_model_->SetEnabledAt(
+            menu_model_->GetItemCount() - 1,
+            unread_feed_folders_.contains(menu_folder_id_));
+        menu_model_->AddSeparator(ui::NORMAL_SEPARATOR);
+      }
       menu_model_->AddItem(kRenameFolder, u"Rename Folder\u2026");
       menu_model_->AddItem(kNewFolder, u"New Folder");
       menu_model_->SetEnabledAt(menu_model_->GetItemCount() - 1,
@@ -1393,6 +1454,9 @@ void SidebarView::ShowContextMenuForViewImpl(
       menu_model_->AddItem(kClose, u"Close Live Page");
     }
     if (IsRssFolderId(menu_state_.folder)) {
+      menu_model_->AddItem(kMarkFeedRead, u"Mark as Read");
+      menu_model_->SetEnabledAt(menu_model_->GetItemCount() - 1,
+                                unread_feed_items_.contains(menu_item_id_));
       menu_model_->AddItem(kUnsubscribeFeed, u"Unsubscribe");
     } else {
       menu_model_->AddItem(kUnsave, menu_state_.is_pin ? u"Unpin from Space"
@@ -1520,6 +1584,8 @@ void SidebarView::DropRows() {
   drop_indicator_ = nullptr;
   drop_zones_.clear();
   focus_targets_.clear();
+  unread_feed_items_.clear();
+  unread_feed_folders_.clear();
   footer_targets_.clear();
   footer_ = nullptr;
   downloads_stack_ = nullptr;
@@ -1936,6 +2002,14 @@ void SidebarView::ExecuteCommand(int command_id, int event_flags) {
     }
     return;
   }
+  if (command_id == kMarkFolderRead) {
+    const uint64_t folder = std::exchange(menu_folder_id_, 0);
+    menu_item_id_ = 0;
+    if (folder) {
+      delegate_->MarkFeedFolderRead(folder);
+    }
+    return;
+  }
   if (command_id == kRenameFolder || command_id == kDeleteFolder) {
     const uint64_t folder = std::exchange(menu_folder_id_, 0);
     if (!folder) {
@@ -1987,6 +2061,9 @@ void SidebarView::ExecuteCommand(int command_id, int event_flags) {
       return;
     case kUnsubscribeFeed:
       delegate_->UnsubscribeFeedItem(id);
+      return;
+    case kMarkFeedRead:
+      delegate_->MarkFeedItemRead(id);
       return;
     case kClose:
       delegate_->CloseLiveItem(id);
@@ -2555,6 +2632,14 @@ std::unique_ptr<views::View> SidebarView::MakeItem(
     }
   }
   if (IsRssFolderId(folder)) {
+    std::unique_ptr<views::View> badge;
+    if (presentation.unread_count > 0) {
+      unread_feed_items_.insert(item.id);
+      badge = std::make_unique<UnreadBadge>(presentation.unread_count);
+      activate->GetViewAccessibility().SetName(
+          presentation.title + u", " +
+          base::NumberToString16(presentation.unread_count) + u" unread");
+    }
     auto unsub = IconButton(
         base::BindRepeating(&Delegate::UnsubscribeFeedItem,
                             base::Unretained(&delegate_.get()), item.id),
@@ -2565,9 +2650,9 @@ std::unique_ptr<views::View> SidebarView::MakeItem(
     unsub->SetTooltipText(unsub_name);
     unsub->GetViewAccessibility().SetName(unsub_name);
     TrackFocus(unsub.get(), FocusAction::kClose, item.id, menu_state);
-    return add_row(std::make_unique<ItemRow>(std::move(activate),
-                                             std::move(unsub), selected,
-                                             back_icon, std::move(port_chip)));
+    return add_row(std::make_unique<ItemRow>(
+        std::move(activate), std::move(unsub), selected, back_icon,
+        std::move(port_chip), std::move(badge)));
   }
   if (item.placement != foundation::PlacementKind::Temporary &&
       !presentation.is_live) {
@@ -2602,7 +2687,8 @@ std::unique_ptr<views::View> SidebarView::MakeSplit(
 }
 
 std::unique_ptr<views::View> SidebarView::MakeFolder(
-    const foundation::FolderRecord& folder) {
+    const foundation::FolderRecord& folder,
+    bool unread) {
   const std::u16string name = base::UTF8ToUTF16(std::string(folder.name));
   auto toggle = Button(base::BindRepeating(&Delegate::SetFolderOpen,
                                            base::Unretained(&delegate_.get()),
@@ -2619,11 +2705,17 @@ std::unique_ptr<views::View> SidebarView::MakeFolder(
           ui::kColorSysOnSurface, 16));
   toggle->SetMinSize(gfx::Size(0, kRowHeight));
   AlignRowContents(*toggle, 16);
-  // The title stops short of the disclosure arrow.
-  toggle->SetCustomPadding(gfx::Insets::TLBR(
-      6, kRowIconCenter - 8, 6, kChevronInset + kChevronSize + 6));
+  // The title stops short of the disclosure arrow, and of the unread dot
+  // before it.
+  toggle->SetCustomPadding(
+      gfx::Insets::TLBR(6, kRowIconCenter - 8, 6,
+                        kChevronInset + kChevronSize + 6 + (unread ? 10 : 0)));
   toggle->SetTooltipText(name);
-  toggle->GetViewAccessibility().SetName(u"Folder: " + name);
+  toggle->GetViewAccessibility().SetName(u"Folder: " + name +
+                                         (unread ? u", unread items" : u""));
+  if (unread) {
+    unread_feed_folders_.insert(folder.id);
+  }
   if (folder.open) {
     toggle->GetViewAccessibility().SetIsExpanded();
   } else {
@@ -2632,7 +2724,7 @@ std::unique_ptr<views::View> SidebarView::MakeFolder(
   TrackFocus(toggle.get(), FocusAction::kFolder, folder.id);
   toggle->set_context_menu_controller(this);
   toggle->GetViewAccessibility().SetHasPopup(ax::mojom::HasPopup::kMenu);
-  return std::make_unique<FolderRow>(std::move(toggle), folder.open);
+  return std::make_unique<FolderRow>(std::move(toggle), folder.open, unread);
 }
 
 std::unique_ptr<views::View> SidebarView::MakeTodayDivider(
@@ -2864,6 +2956,8 @@ void SidebarView::SetModel(const foundation::SidebarResult& model,
   space_rows_ = nullptr;
   current_space_id_ = model.current_space.id;
   focus_targets_.clear();
+  unread_feed_items_.clear();
+  unread_feed_folders_.clear();
   drop_zones_.clear();
   selectable_rows_.clear();
   // A selection belongs to one Space's rows.
@@ -3123,7 +3217,14 @@ void SidebarView::SetModel(const foundation::SidebarResult& model,
     }
     const int visual_depth =
         static_cast<int>(std::min<uint32_t>(folder.depth, kMaxVisualFolderDepth));
-    auto folder_view = MakeFolder(folder);
+    const bool unread =
+        IsRssFolderId(folder.id) &&
+        std::ranges::any_of(folder.items, [&](uint64_t id) {
+          const auto pin =
+              std::ranges::find(model.pins, id, &foundation::ItemRecord::id);
+          return pin != model.pins.end() && Present(*pin).unread_count > 0;
+        });
+    auto folder_view = MakeFolder(folder, unread);
     if (visual_depth > 0) {
       folder_view->SetProperty(
           views::kMarginsKey,

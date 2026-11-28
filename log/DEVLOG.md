@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-11-28: RSS unread indicators and Mark as Read
+
+- Added unread lookup, fetch recording and mark-read by feed URL to `crates/feeds/src/store.rs` and `bridge.rs`, with an unread observer in `feeds_service.{h,cc}`. `feed_viewer.cc` now records each fetch of a subscribed feed and marks an item read when its article opens, so sidebar counts refresh as you read.
+- `sidebar_view.{h,cc}` and `browser_view.{h,cc}` draw a dot on the RSS folder row while any of its subscriptions has unread items and a count badge on each unread subscription row. Right-click adds Mark as Read on a subscription and Mark All as Read on the RSS folder.
+- Verified with `cargo fmt`, `rustfmt`, `cargo clippy`, `cargo test --workspace`, `tools/check_docs.py` and an `out/MyarcRelease` `chrome` build under the build lock. `tools/export_patches.py --check` passes for the `browser_view` patches but still flags 12 unrelated `.mm` patches whose hunk headers drift locally.
+
 ## 2026-11-28: Embed agent skill guide directly in `myarc skill`
 
 - Embedded `skills/myarc-browser/SKILL.md` into `myarc` via `include_str!` and added the `myarc skill` subcommand (documented in `myarc --help`) in `crates/myarc-cli/src/main.rs` so any agent inspecting `myarc --help` can pull the version-matched usage guide without installing a separate skill package.

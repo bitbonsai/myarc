@@ -4,7 +4,10 @@
 #include <cstdint>
 #include <string>
 #include <string_view>
+#include <vector>
 
+#include "base/callback_list.h"
+#include "base/containers/span.h"
 #include "base/files/file_path.h"
 #include "base/memory/scoped_refptr.h"
 #include "base/sequence_checker.h"
@@ -36,15 +39,31 @@ class FeedsService final : public base::SupportsUserData::Data {
                                        uint64_t space_id);
   bool UnsubscribeByUrl(std::string_view feed_url);
 
+  // Unread items of the subscription at `feed_url`, or 0 when there is none.
+  uint32_t UnreadCount(std::string_view feed_url) const;
+  // Records the fetched `body` of a subscribed feed. Not ok when the feed
+  // isn't subscribed or doesn't parse.
+  foundation::FeedFetchRecord RecordFetch(std::string_view feed_url,
+                                          base::span<const uint8_t> body);
+  bool MarkItemRead(std::string_view feed_url, std::string_view item_id);
+  // Marks every subscription in `feed_urls` read. Returns whether any
+  // unread count changed.
+  bool MarkAllRead(const std::vector<std::string>& feed_urls);
+  // Runs `callback` after any unread count changes.
+  base::CallbackListSubscription AddUnreadObserver(
+      base::RepeatingClosure callback);
+
  private:
   explicit FeedsService(Profile& profile);
 
   void SaveNow();
+  void NotifyUnreadChanged();
 
   bool ephemeral_ = false;
   base::FilePath path_;
   scoped_refptr<base::SequencedTaskRunner> io_runner_;
   rust::Box<foundation::FeedStore> store_;
+  base::RepeatingClosureList unread_observers_;
 
   SEQUENCE_CHECKER(sequence_checker_);
 };
