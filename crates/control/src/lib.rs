@@ -496,9 +496,13 @@ fn tab_action(
         "page.wait" => {
             let params = Params::parse(params, &["tab", "timeout_ms"]).map_err(invalid)?;
             let item = agent_tab(workspace, &params)?;
-            let timeout_ms = params
-                .non_negative_u64("timeout_ms", 30_000)
-                .map_err(invalid)?;
+            let timeout_ms = if params.get("timeout_ms").is_ok() {
+                params
+                    .non_negative_u64("timeout_ms", 30_000)
+                    .map_err(invalid)?
+            } else {
+                10_000
+            };
             Ok(TabAction::Wait { item, timeout_ms })
         }
         "tab.navigate" => {

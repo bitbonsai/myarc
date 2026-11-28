@@ -43,7 +43,7 @@ const HELP: &str = "\
 myarc: drive myArc's agent Space and run browser control commands
 
 Short commands act on the current tab with the last outline's refs:
-  myarc open <url>            Open a tab, make it current, print its outline
+  myarc open <url>            Open a tab, wait for load, print its outline
   myarc snapshot [-i]         Print the outline; -i keeps ref lines, the
                               lines they sit under and the heading and
                               text just before them
@@ -51,14 +51,19 @@ Short commands act on the current tab with the last outline's refs:
   myarc fill <ref> <text>     Replace a text field's value
   myarc select <ref> <value>  Pick an option by value or visible text
   myarc press <key> [<ref>]   Send Enter, Tab, Escape or another key
+  myarc scroll <dir> [<ref>]  Scroll up, down, left, right, top or bottom
+  myarc wait [<ms>]           Wait for the current tab to finish loading
+  myarc screenshot [<path>]   Save a PNG/JPEG screenshot to a file
   myarc back | forward | reload
-                              Navigate, then print the new outline
+                              Navigate, wait for load, print the new outline
   myarc close                 Close the current tab
   myarc tabs                  List agent Space tabs; * marks the current one
   myarc use <tab>             Make a tab such as t12 current
 
   Actions print a status line, then the changed refs and the new outline.
   Refs keep their numbers while the page stays loaded.
+  -i keeps only interactive refs and their context on any outline command.
+  --no-wait skips waiting for load after open, back, forward or reload.
   --tab <tab> and --rev <revision> replace the current tab and the last
   revision for one call. --json prints each raw response as one line. The
   current tab and revision live in cli-state.json inside the control
@@ -197,6 +202,8 @@ fn parse(args: &[String]) -> Result<Cli, String> {
                 }
                 None => return Err(String::from("--rev needs a revision such as 1.2")),
             },
+            "-i" | "--interactive" => overrides.interactive = true,
+            "--no-wait" => overrides.no_wait = true,
             "--" => {
                 positional.extend(args.by_ref().map(String::as_str));
                 break;
@@ -244,7 +251,7 @@ fn parse(args: &[String]) -> Result<Cli, String> {
     }
     if overrides != short::Overrides::default() {
         return Err(String::from(
-            "--tab and --rev only apply to the short commands",
+            "--tab, --rev, -i and --no-wait only apply to the short commands",
         ));
     }
     match positional.as_slice() {

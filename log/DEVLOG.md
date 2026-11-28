@@ -1,5 +1,11 @@
 # Development log
 
+## 2026-11-28: Agent-browser parity for `myarc` CLI (`screenshot`, `scroll`, `wait`, `-i`, auto-wait `open`)
+
+- Added `myarc screenshot [path]` (zero-dependency RFC 4648 base64 decode directly to disk or temp file), `myarc scroll <dir> [<ref>]`, `myarc wait [<ms>]`, global `-i`/`--interactive` filtering across all outline-returning short commands (`open`, `click`, `fill`, `select`, `press`, `scroll`, `back`, `forward`, `reload`, `snapshot`), and automatic `page.wait` on `open`/`back`/`forward`/`reload` when a tab is still loading (`--no-wait` to opt out) in `crates/myarc-cli/src/{main.rs,short.rs}`, plus optional default `timeout_ms` (`10000`) for `page.wait` in `crates/control/src/lib.rs`.
+- Updated `skills/myarc-browser/SKILL.md` with the new short commands, `-i` loop, and broader general browser-automation triggers so users who install the skill can opt in to replacing `agent-browser` with `myarc`.
+- Verified with `cargo fmt --all -- --check`, `cargo clippy --workspace --all-targets --locked -- -D warnings`, `cargo test -p myarc-control -p myarc-cli --locked` (all passing), `python3 tools/check_docs.py`, and a live `target/release/myarc` run (`open -i` -> `click -i e1` -> `click -i e4` -> `screenshot` -> `close` completed in `1.12s` total, shrinking `/blog` and post outlines by 54% and 79%).
+
 ## 2026-11-27: Nested folders across workspace core, FFI, sidebar UI, Arc import, and export
 
 - Added `parent_id: Option<FolderId>` and `MAX_FOLDER_DEPTH = 8` in `crates/workspace/src/folder.rs` (`create_folder_in`, `move_folder`, cycle/depth guards, recursive `delete_folder`, tree-preserving `export_space_into_folder`, `sanitize_folders` recovery, and ancestor-aware `SidebarSnapshot::row_order`), plus FFI (`parent_id`/`depth` on `FolderRecord`, `create_folder_in`, `move_folder`) and backwards-compatible `"parent_id"` JSON persistence in `browser/foundation/workspace_service.cc`.

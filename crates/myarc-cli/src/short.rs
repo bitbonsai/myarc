@@ -47,6 +47,16 @@ pub enum Short {
         key: String,
         element: Option<String>,
     },
+    Scroll {
+        direction: String,
+        element: Option<String>,
+    },
+    Wait {
+        timeout_ms: Option<u64>,
+    },
+    Screenshot {
+        path: Option<PathBuf>,
+    },
     Back,
     Forward,
     Reload,
@@ -57,12 +67,13 @@ pub enum Short {
     },
 }
 
-/// `--tab` and `--rev`, which replace the current tab and the last revision
-/// for one call.
+/// `--tab`, `--rev`, `-i`, and `--no-wait` for short commands.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Overrides {
     pub tab: Option<String>,
     pub revision: Option<String>,
+    pub interactive: bool,
+    pub no_wait: bool,
 }
 
 /// Parses a short command, or `None` when `positional` names another
@@ -99,6 +110,34 @@ pub fn parse(positional: &[&str]) -> Option<Result<Short, String>> {
             element: Some(element),
         }),
         ("press", _) => Err(String::from("press takes a key and an optional ref")),
+        ("scroll", [direction]) => parse_direction(direction).map(|direction| Short::Scroll {
+            direction,
+            element: None,
+        }),
+        ("scroll", [direction, element]) => parse_direction(direction).and_then(|direction| {
+            parse_ref(element).map(|element| Short::Scroll {
+                direction,
+                element: Some(element),
+            })
+        }),
+        ("scroll", _) => Err(String::from(
+            "scroll takes up|down|left|right|top|bottom and an optional ref",
+        )),
+        ("wait", []) => Ok(Short::Wait { timeout_ms: None }),
+        ("wait", [ms]) => ms
+            .parse::<u64>()
+            .map(|ms| Short::Wait {
+                timeout_ms: Some(ms),
+            })
+            .map_err(|_| String::from("wait takes milliseconds (0..30000)")),
+        ("wait", _) => Err(String::from(
+            "wait takes an optional timeout in milliseconds",
+        )),
+        ("screenshot", []) => Ok(Short::Screenshot { path: None }),
+        ("screenshot", [path]) => Ok(Short::Screenshot {
+            path: Some(PathBuf::from(path)),
+        }),
+        ("screenshot", _) => Err(String::from("screenshot takes an optional file path")),
         ("back", []) => Ok(Short::Back),
         ("forward", []) => Ok(Short::Forward),
         ("reload", []) => Ok(Short::Reload),
@@ -132,6 +171,17 @@ pub fn parse_tab(text: &str) -> Result<String, String> {
         Some(_) => Ok(text.to_owned()),
         None => Err(format!(
             "{:?} is not a tab handle, such as t12; myarc tabs lists them",
+            crate::mcp::bounded(text)
+        )),
+    }
+}
+
+fn parse_direction(text: &str) -> Result<String, String> {
+    let lower = text.to_ascii_lowercase();
+    match lower.as_str() {
+        "up" | "down" | "left" | "right" | "top" | "bottom" => Ok(lower),
+        _ => Err(format!(
+            "{:?} is not a scroll direction (up, down, left, right, top, bottom)",
             crate::mcp::bounded(text)
         )),
     }
@@ -504,7 +554,12 @@ pub fn render_snapshot(data: &Value, interactive_only: bool) -> String {
 
 /// An action's answer: `ok click e4 · rev 1.5 · navigated`, the changes, then
 /// the new outline.
+#[cfg(test)]
 pub fn render_action(label: &str, data: &Value) -> String {
+    render_action_with(label, data, false)
+}
+
+pub fn render_action_with(label: &str, data: &Value, interactive_only: bool) -> String {
     let snapshot = &data["snapshot"];
     let mut status = vec![
         format!("ok {label}"),
@@ -522,7 +577,12 @@ pub fn render_action(label: &str, data: &Value) -> String {
     }
     let mut lines = vec![status.join(" · ")];
     lines.extend(change_lines(&data["changes"]));
-    lines.push(snapshot["text"].as_str().unwrap_or_default().to_owned());
+    let outline = snapshot["text"].as_str().unwrap_or_default();
+    lines.push(if interactive_only {
+        interactive(outline)
+    } else {
+        outline.to_owned()
+    });
     join_nonempty(&lines)
 }
 
@@ -633,6 +693,17 @@ pub fn request(
             p["key"] = json!(key);
             (c, p)
         }),
+        Short::Scroll { direction, element } => {
+            act("page.scroll", element.as_deref()).map(|(c, mut p)| {
+                p["direction"] = json!(direction);
+                (c, p)
+            })
+        }
+        Short::Wait { timeout_ms } => Ok((
+            String::from("page.wait"),
+            json!({ "tab": tab()?, "timeout_ms": timeout_ms.unwrap_or(10_000) }),
+        )),
+        Short::Screenshot { .. } => on_tab("page.screenshot"),
         Short::Back => on_tab("tab.back"),
         Short::Forward => on_tab("tab.forward"),
         Short::Reload => on_tab("tab.reload"),
@@ -653,6 +724,13 @@ fn label(short: &Short) -> String {
             element: Some(element),
         } => format!("press {key} {element}"),
         Short::Press { key, .. } => format!("press {key}"),
+        Short::Scroll {
+            direction,
+            element: Some(element),
+        } => format!("scroll {direction} {element}"),
+        Short::Scroll { direction, .. } => format!("scroll {direction}"),
+        Short::Wait { .. } => String::from("wait"),
+        Short::Screenshot { .. } => String::from("screenshot"),
         Short::Open { .. } => String::from("open"),
         Short::Back => String::from("back"),
         Short::Forward => String::from("forward"),
@@ -708,6 +786,15 @@ pub fn run(short: Short, overrides: Overrides, json_output: bool) -> ExitCode {
                 .as_str()
                 .unwrap_or_default()
                 .to_owned();
+            if !overrides.no_wait && data["tab"]["loading"] == true {
+                let waited = send(
+                    &mut client,
+                    String::from("page.wait"),
+                    json!({ "tab": handle, "timeout_ms": 10_000 }),
+                );
+                state.apply(&waited);
+                out.response(&waited);
+            }
             let snapshot = send(
                 &mut client,
                 String::from("page.snapshot"),
@@ -720,7 +807,7 @@ pub fn run(short: Short, overrides: Overrides, json_output: bool) -> ExitCode {
                     out.text(&format!(
                         "ok {} {}",
                         label(&short),
-                        render_snapshot(data, false)
+                        render_snapshot(data, overrides.interactive)
                     ));
                     true
                 }
@@ -732,19 +819,60 @@ pub fn run(short: Short, overrides: Overrides, json_output: bool) -> ExitCode {
                 }
             }
         }
-        Outcome::Success { data } => {
-            let text = match &short {
-                Short::Snapshot { interactive } => render_snapshot(data, *interactive),
-                Short::Tabs => render_tabs(data, state.tab.as_deref()),
-                Short::Close => format!(
+        Outcome::Success { data } => match &short {
+            Short::Screenshot { path } => {
+                if json_output {
+                    true
+                } else {
+                    match save_screenshot(data, path.as_deref()) {
+                        Ok(summary) => {
+                            out.text(&summary);
+                            true
+                        }
+                        Err(error) => {
+                            write_line(&mut io::stderr(), &format!("myarc: screenshot: {error}"));
+                            false
+                        }
+                    }
+                }
+            }
+            Short::Wait { .. } => {
+                let tab = &data["tab"];
+                out.text(&format!(
+                    "ok wait {} · {} · {}",
+                    tab["handle"].as_str().unwrap_or("?"),
+                    quoted(&tab["title"]),
+                    tab["url"].as_str().unwrap_or_default()
+                ));
+                true
+            }
+            Short::Snapshot { interactive } => {
+                out.text(&render_snapshot(
+                    data,
+                    *interactive || overrides.interactive,
+                ));
+                true
+            }
+            Short::Tabs => {
+                out.text(&render_tabs(data, state.tab.as_deref()));
+                true
+            }
+            Short::Close => {
+                out.text(&format!(
                     "ok close {}",
                     data["tab"]["handle"].as_str().unwrap_or_default()
-                ),
-                _ => render_action(&label(&short), data),
-            };
-            out.text(&text);
-            true
-        }
+                ));
+                true
+            }
+            _ => {
+                out.text(&render_action_with(
+                    &label(&short),
+                    data,
+                    overrides.interactive,
+                ));
+                true
+            }
+        },
         _ => {
             out.failure(&first);
             false
@@ -818,6 +946,75 @@ impl Output {
             write_line(&mut io::stderr(), &render_failure(response));
         }
     }
+}
+
+/// Decodes a `page.screenshot` payload and writes the image file to `path`,
+/// or a unique file in the system temp directory when `path` is `None`.
+fn save_screenshot(data: &Value, path: Option<&Path>) -> Result<String, String> {
+    let encoded = data["data_base64"]
+        .as_str()
+        .ok_or_else(|| String::from("response has no data_base64"))?;
+    let bytes = decode_base64(encoded)?;
+    let mime = data["mime_type"].as_str().unwrap_or("image/png");
+    let ext = if mime.contains("jpeg") { "jpg" } else { "png" };
+    let target = match path {
+        Some(path) => path.to_path_buf(),
+        None => {
+            let suffix = random_suffix().map_err(|error| error.to_string())?;
+            std::env::temp_dir().join(format!("myarc-screenshot-{suffix}.{ext}"))
+        }
+    };
+    fs::write(&target, &bytes)
+        .map_err(|error| format!("can't write {}: {error}", target.display()))?;
+    let w = data["width"].as_u64().unwrap_or(0);
+    let h = data["height"].as_u64().unwrap_or(0);
+    Ok(format!(
+        "ok screenshot {} ({} bytes, {w}x{h} {mime})",
+        target.display(),
+        bytes.len()
+    ))
+}
+
+/// Strict standard base64 decoder (RFC 4648) with no external dependency.
+fn decode_base64(input: &str) -> Result<Vec<u8>, String> {
+    let bytes: Vec<u8> = input
+        .bytes()
+        .filter(|byte| !byte.is_ascii_whitespace())
+        .collect();
+    if bytes.len() % 4 != 0 {
+        return Err(String::from("invalid base64 length"));
+    }
+    let mut out = Vec::with_capacity(bytes.len() / 4 * 3);
+    for chunk in bytes.chunks_exact(4) {
+        let mut vals = [0u8; 4];
+        let mut pad = 0usize;
+        for (i, &b) in chunk.iter().enumerate() {
+            if b == b'=' {
+                if i < 2 || (i == 2 && chunk[3] != b'=') {
+                    return Err(String::from("invalid base64 padding"));
+                }
+                pad += 1;
+                vals[i] = 0;
+            } else {
+                vals[i] = match b {
+                    b'A'..=b'Z' => b - b'A',
+                    b'a'..=b'z' => b - b'a' + 26,
+                    b'0'..=b'9' => b - b'0' + 52,
+                    b'+' => 62,
+                    b'/' => 63,
+                    _ => return Err(String::from("invalid base64 character")),
+                };
+            }
+        }
+        out.push((vals[0] << 2) | (vals[1] >> 4));
+        if pad < 2 {
+            out.push((vals[1] << 4) | (vals[2] >> 2));
+        }
+        if pad == 0 {
+            out.push((vals[2] << 6) | vals[3]);
+        }
+    }
+    Ok(out)
 }
 
 #[cfg(test)]
@@ -1296,13 +1493,13 @@ form
         );
         // --rev replaces the revision; --tab alone has no revision to use.
         let rev = Overrides {
-            tab: None,
             revision: Some(String::from("1.4")),
+            ..Overrides::default()
         };
         assert_eq!(request(&click, &state, &rev).unwrap().1["revision"], "1.4");
         let tab = Overrides {
             tab: Some(String::from("t3")),
-            revision: None,
+            ..Overrides::default()
         };
         assert!(
             request(&click, &state, &tab)
@@ -1326,5 +1523,117 @@ form
             request(&press, &state, &none).unwrap().1,
             json!({ "tab": "t12", "revision": "1.5", "key": "Enter" })
         );
+    }
+
+    #[test]
+    fn parse_and_build_screenshot_scroll_and_wait() {
+        assert_eq!(
+            parse(&["screenshot"]),
+            Some(Ok(Short::Screenshot { path: None }))
+        );
+        assert_eq!(
+            parse(&["screenshot", "/tmp/a.png"]),
+            Some(Ok(Short::Screenshot {
+                path: Some(PathBuf::from("/tmp/a.png"))
+            }))
+        );
+        assert_eq!(
+            parse(&["scroll", "down"]),
+            Some(Ok(Short::Scroll {
+                direction: String::from("down"),
+                element: None
+            }))
+        );
+        assert_eq!(
+            parse(&["scroll", "UP", "@e4"]),
+            Some(Ok(Short::Scroll {
+                direction: String::from("up"),
+                element: Some(String::from("e4"))
+            }))
+        );
+        assert!(parse(&["scroll", "sideways"]).unwrap().is_err());
+        assert_eq!(parse(&["wait"]), Some(Ok(Short::Wait { timeout_ms: None })));
+        assert_eq!(
+            parse(&["wait", "2500"]),
+            Some(Ok(Short::Wait {
+                timeout_ms: Some(2500)
+            }))
+        );
+        assert!(parse(&["wait", "nope"]).unwrap().is_err());
+
+        let state = State {
+            tab: Some(String::from("t12")),
+            revision: Some(String::from("1.5")),
+        };
+        let none = Overrides::default();
+        assert_eq!(
+            request(
+                &Short::Scroll {
+                    direction: String::from("down"),
+                    element: Some(String::from("e4"))
+                },
+                &state,
+                &none
+            ),
+            Ok((
+                String::from("page.scroll"),
+                json!({ "tab": "t12", "revision": "1.5", "ref": "e4", "direction": "down" })
+            ))
+        );
+        assert_eq!(
+            request(&Short::Wait { timeout_ms: None }, &state, &none),
+            Ok((
+                String::from("page.wait"),
+                json!({ "tab": "t12", "timeout_ms": 10_000 })
+            ))
+        );
+        assert_eq!(
+            request(&Short::Screenshot { path: None }, &state, &none),
+            Ok((String::from("page.screenshot"), json!({ "tab": "t12" })))
+        );
+    }
+
+    #[test]
+    fn decode_base64_and_save_screenshot() {
+        assert_eq!(decode_base64("SGVsbG8=").unwrap(), b"Hello");
+        assert_eq!(decode_base64("Zm9v").unwrap(), b"foo");
+        assert_eq!(decode_base64("Zm8=").unwrap(), b"fo");
+        assert_eq!(decode_base64("Zg==").unwrap(), b"f");
+        assert!(decode_base64("abc").is_err());
+        assert!(decode_base64("!!!!").is_err());
+
+        let out = std::env::temp_dir().join(format!("myarc-unit-shot-{}.png", std::process::id()));
+        let _ = fs::remove_file(&out);
+        let data = json!({
+            "tab": "t12",
+            "mime_type": "image/png",
+            "width": 10,
+            "height": 20,
+            "data_base64": "SGVsbG8="
+        });
+        let summary = save_screenshot(&data, Some(&out)).unwrap();
+        assert!(summary.contains("ok screenshot"));
+        assert!(summary.contains("5 bytes"));
+        assert!(summary.contains("10x20"));
+        assert_eq!(fs::read(&out).unwrap(), b"Hello");
+        let _ = fs::remove_file(&out);
+    }
+
+    #[test]
+    fn render_action_interactive_filters_prose() {
+        let data = json!({
+            "tab": "t12",
+            "url": "https://example.test/",
+            "revision": "1.5",
+            "navigated": false,
+            "settled": true,
+            "changes": {},
+            "snapshot": { "text": OUTLINE, "truncated": false }
+        });
+        let full = render_action_with("click e4", &data, false);
+        let compact = render_action_with("click e4", &data, true);
+        assert!(full.contains("footer"));
+        assert!(!compact.contains("footer"));
+        assert!(compact.contains("button \"Send\" [ref=e4]"));
     }
 }

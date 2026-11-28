@@ -549,6 +549,17 @@ fn scroll_and_wait_are_scoped_and_validated() {
             timeout_ms: 2500
         }
     );
+    assert_eq!(
+        action(
+            &mut workspace,
+            "page.wait",
+            json!({ "tab": tab_handle(agent_tab) })
+        ),
+        TabAction::Wait {
+            item: agent_tab,
+            timeout_ms: 10_000
+        }
+    );
     assert!(matches!(
         refused(
             &mut workspace,

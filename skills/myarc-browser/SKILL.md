@@ -1,6 +1,6 @@
 ---
 name: myarc-browser
-description: Drive the myArc browser through the myarc CLI. Use when the user asks to open a page in myArc, check a site in their browser, fill a form, click through a page, read what a page says, or control the browser.
+description: Drive the myArc browser through the myarc CLI. Use when the user asks to open a website, browse or inspect a page, fill out a form, click through a web app, take a screenshot, scrape or read a page, test a site in their browser, or control myArc.
 ---
 
 # Driving myArc with the myarc CLI
@@ -18,33 +18,36 @@ description: Drive the myArc browser through the myarc CLI. Use when the user as
 
 ## The loop
 
-1. `myarc open <url>` opens a tab, makes it the current tab and prints its outline.
+1. `myarc open -i <url>` opens a tab, waits for it to finish loading, makes it the current tab and prints its compact interactive outline.
 2. Read the outline and pick the `[ref=eN]` you need.
-3. Act on it, for example `myarc click @e4`. The CLI fills in the current tab and the revision it last showed you.
+3. Act on it, for example `myarc click -i @e4`. The CLI fills in the current tab and the revision it last showed you.
 4. Read the outline the action prints and pick the next ref from it. Repeat until the task is done.
 
-Actions and navigation print a fresh outline, so don't run `snapshot` after each step.
+Actions and navigation print a fresh outline, so don't run `snapshot` after each step. Use `-i` whenever you only need interactive refs and their surrounding context; omit `-i` when you need to read full article prose.
 
 ## Commands
 
 ```sh
-myarc open <url>            # open a tab and print its outline
-myarc snapshot [-i]         # print the outline; -i keeps only ref lines and their context
-myarc click @e4
-myarc fill @e1 "text"       # replaces the field's value
-myarc select @e3 "Pro"      # by value or visible text
-myarc press Enter [@e1]     # Enter, Tab, Escape, arrows, one character
-myarc back | forward | reload
-myarc close                 # close the current tab
-myarc tabs                  # list tabs; * marks the current one
-myarc use t12               # switch the current tab
+myarc open [-i] [--no-wait] <url>   # open a tab, wait for load, print outline
+myarc snapshot [-i]                 # print the outline; -i keeps refs + context
+myarc click [-i] @e4
+myarc fill [-i] @e1 "text"          # replaces the field's value
+myarc select [-i] @e3 "Pro"         # by value or visible text
+myarc press [-i] Enter [@e1]        # Enter, Tab, Escape, arrows, one character
+myarc scroll [-i] down [@e4]        # up, down, left, right, top, bottom
+myarc wait [<ms>]                   # wait for loading to finish (default 10000 ms)
+myarc screenshot [<path>]           # save a PNG/JPEG screenshot to disk
+myarc back | forward | reload [-i]
+myarc close                         # close the current tab
+myarc tabs                          # list tabs; * marks the current one
+myarc use t12                       # switch the current tab
 ```
 
 - `--tab t12` and `--rev 1.2` replace the current tab and revision for one call. `--json` prints the raw response.
 - Put `--` before text that starts with a dash: `myarc fill @e1 -- "-5"`.
-- URLs must be http or https. Navigation answers once it commits, so the outline header may say `loading`. To wait for loading to finish, run `myarc run page.wait '{"tab":"t12","timeout_ms":10000}'` or run `snapshot` again.
-- `snapshot -i` keeps each ref line with its parents, the heading above it and the text line just before it, so a "Details" link keeps the item it belongs to. Link targets show only where several links share a name.
-- For screenshots and scrolling, use `myarc run page.screenshot '{"tab":"t12"}'` and `myarc run page.scroll '{"tab":"t12","revision":"1.2","direction":"down"}'` (with optional `"ref":"e4"`). `click` also scrolls its target into view first.
+- URLs must be http or https. `open`, `back`, `forward` and `reload` automatically wait up to 10s for loading to finish before taking the outline (`--no-wait` skips the wait).
+- `-i` keeps each ref line with its parents, the heading above it and the text line just before it, so a "Details" link keeps the item it belongs to. Link targets show only where several links share a name.
+- `myarc screenshot <path>` decodes and writes the PNG/JPEG directly to `<path>` (or a temp file when `<path>` is omitted) and prints the saved path and dimensions.
 - For any command without a short form, use `myarc run <command> '<json>'`. `myarc commands` lists the ones that run.
 
 ## Reading the output
