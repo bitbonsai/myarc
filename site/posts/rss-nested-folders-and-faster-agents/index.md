@@ -1,5 +1,5 @@
 ---
-title: "Your browser for agents, and RSS without another app"
+title: "Agents in the browser, and RSS"
 summary: "Why driving your real browser beats headless automation, putting the agent skill inside the CLI, and built-in RSS with nothing else to install."
 date: 2026-11-28
 draft: true
