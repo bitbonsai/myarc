@@ -86,6 +86,7 @@ BLOG_CSS = '''
     .post-body pre { font-family: inherit; padding: 1.25rem; overflow-x: auto; background: var(--panel); color: var(--ivory); border-radius: 1rem }
     .post-body code { font-family: inherit; font-size: 1rem; overflow-wrap: anywhere }
     .post-body :not(pre) > code { padding: .05em .4em; border: 1px solid color-mix(in srgb, currentColor 18%, transparent); border-bottom-width: 2px; border-radius: .375rem; background: color-mix(in srgb, currentColor 6%, transparent); font-size: 1rem; font-weight: 500; white-space: nowrap }
+    .post-body :is(h1, h2, h3, h4) > code { padding: .04em .28em; border-color: color-mix(in srgb, currentColor 14%, transparent); border-bottom-width: 1px; border-radius: .35em; background: color-mix(in srgb, currentColor 7%, transparent); font-size: .88em; font-weight: inherit; letter-spacing: -.01em }
     .post-body a, .post-body p { overflow-wrap: anywhere }
     @media (prefers-color-scheme: dark) {
       .post-month { color: #8794a3 }
