@@ -2,6 +2,10 @@
 
 One entry per alpha release, newest first, written for people using myArc. The homepage's Recent updates dialog shows them, and the build stops when the version in `release.json` has no entry here.
 
+## v2026.11.28 (2026-11-28)
+
+The `myarc` CLI now adds `screenshot [<path>]`, `scroll`, and `wait` short commands, supports `-i` compact interactive outlines on every outline command, and waits for pages to finish loading on `open`, `back`, `forward`, and `reload` (`--no-wait` to opt out). The `myarc-browser` skill also adds general browser-automation triggers so you can opt in to using `myarc` as an `agent-browser` replacement.
+
 ## v2026.11.27.1 (2026-11-27)
 
 Folders now nest in the sidebar, with subfolder creation, drag-to-nest, and full Arc import/export preservation. Built-in RSS adds feed discovery in the address bar, a native feed reader, Space RSS folder subscriptions with one-click unsubscribe, and a split-view toggle. Split View now animates open and closed, modal dialogs float as frosted-glass windows with a red close dot and aligned button colors, About myArc adds a copyable version pill, and macOS native messaging extensions (including 1Password) fall back to Chrome, Arc, and Chromium host manifests.
