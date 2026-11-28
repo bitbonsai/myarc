@@ -84,6 +84,7 @@ Usage:
   myarc skill
       Print the agent usage guide (workflow, outline format, error handling
       and safety rules) matching this build of myarc.
+      Docs: https://myarc.dev/docs/cli-and-mcp/
   myarc --version
   myarc --help
 
